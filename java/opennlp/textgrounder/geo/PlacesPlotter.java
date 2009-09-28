@@ -4,7 +4,7 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 
-public class PlacesPlotter {
+public class PlacesPlotter { // main class
 	
 	public static final int BAR_SCALE = 5000;
 
