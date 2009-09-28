@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# sets TEXTGROUNDER environment variables
+TEXTGROUNDER_LIB=$TEXTGROUNDER_DIR/lib
+DIRLIBS=$TEXTGROUNDER_LIB/trove.jar
+CP=${TEXTGROUNDER_DIR}/output/classes:${DIRLIBS}
+JAVA=$JAVA_HOME/bin/java
+
+if [ -z $JAVA_MEM_FLAG ] 
+then
+    JAVA_MEM_FLAG=-Xmx2g
+fi
+
+# Now prepares the Java command with the right settings
+JAVA_CMD="$JAVA $JAVA_MEM_FLAG -classpath $CP -Dtextgrounder.home=$TEXTGROUNDER_DIR 

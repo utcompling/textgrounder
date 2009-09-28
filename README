@@ -1,0 +1,124 @@
+Introduction
+============
+
+See CHANGES for a description of the project status. 
+
+This file contains the configuration and build instructions. 
+
+
+Requirements
+============
+
+* Version 1.6 of the Java 2 SDK (http://java.sun.com)
+
+
+Configuring your environment variables
+======================================
+
+The easiest thing to do is to set the environment variables JAVA_HOME
+and TEXTGROUNDER_DIR to the relevant locations on your system. Set JAVA_HOME
+to match the top level directory containing the Java installation you
+want to use.
+
+For example, on Windows:
+
+C:\> set JAVA_HOME=C:\Program Files\jdk1.5.0_04
+
+or on Unix:
+
+% setenv JAVA_HOME /usr/local/java
+  (csh)
+> export JAVA_HOME=/usr/java
+  (ksh, bash)
+
+On Windows, to get these settings to persist, it's actually easiest to
+set your environment variables through the System Properties from the
+Control Panel. For example, under WinXP, go to Control Panel, click on
+System Properties, choose the Advanced tab, click on Environment
+Variables, and add your settings in the User variables area.
+
+Next, likewise set TEXTGROUNDER_DIR to be the top level directory where you
+unzipped the download. In Unix, type 'pwd' in the directory where
+this file is and use the path given to you by the shell as
+TEXTGROUNDER_DIR.  You can set this in the same manner as for JAVA_HOME
+above.
+
+Next, add the directory TEXTGROUNDER_DIR/bin to your path. For example, you
+can set the path in your .bashrc file as follows:
+
+export PATH="$PATH:$TEXTGROUNDER_DIR/bin"
+
+On Windows, you should also add the python main directory to your path.
+
+Once you have taken care of these three things, you should be able to
+build and use the TextGrounder Library.
+
+Note: Spaces are allowed in JAVA_HOME but not in TEXTGROUNDER_DIR.  To set
+an environment variable with spaces in it, you need to put quotes around
+the value when on Unix, but you must *NOT* do this when under Windows.
+
+
+Building the system from source
+===============================
+
+The TextGrounder build system is based on Apache Ant.  Ant is a little but very
+handy tool that uses a build file written in XML (build.xml) as building
+instructions.  Building the Java portion of TextGrounder is accomplished using the
+script `ant'; this works under Windows and Unix, but requires that
+you run it from the top-level directory (where the build.xml file is
+located).  If everything is right and all the required packages are
+visible, this action will generate a file called textgrounder.jar in the
+./output directory.
+
+
+Build targets
+=============
+
+These are the meaningful targets for the main build file:
+
+  package  --> generates the textgrounder.jar file 
+  compile  --> compiles the source code (default)
+  javadoc  --> generates the API documentation
+  clean    --> cleans up the compilation directory
+
+There are also build files in each sample grammar directory.
+
+To learn the details of what each target does, read the build.xml file.
+It is quite understandable.
+
+If you create the javadocs (with "ant javadoc"), you can point your
+browser to ./docs/api/index.html to look at the TextGrounder API.
+
+
+Trying it out
+=============
+
+If you've managed to configure and build the system, you should be
+able to change to the /data/conll200 directory and run the tagger with
+atag.sh.
+
+$ cd data/conll2000
+$ atag.sh -t train.txt -e test.txt -o my_tagged_sentences.txt
+$ ascore_tags.sh test.txt my_tagged_sentences.txt
+
+These sh scripts are just simple frontends to Java or Python programs
+that ensure some environment variables are set up, including taking
+care of otherwise annoying classpath setup. (These all start with an
+"a" to make them unique from other utilities for tagging and parsing,
+etc.)
+
+
+Bug Reports
+===========
+
+Please report bugs by sending mail to jbaldrid at mail.utexas.edu.
+
+
+Special Note
+============
+
+Parts of this README and some of the directory structure and the build
+system for this project were borrowed from the JDOM project (kudos!).
+See www.jdom.org for more details.
+
+
