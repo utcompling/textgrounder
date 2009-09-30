@@ -1,6 +1,8 @@
 package opennlp.textgrounder.geo;
 
 public class Coordinate {
+    private final static double twoPI = 2*Math.PI;
+
     public double longitude;
     public double latitude;
     
@@ -9,27 +11,22 @@ public class Coordinate {
 	latitude = lat;
     }
 
-    public Coordinate[] getContainingSquare(double extent) {
-	Coordinate[] square =  {
-	    new Coordinate(longitude - extent, latitude + extent),
-	    new Coordinate(longitude + extent, latitude + extent),
-	    new Coordinate(longitude + extent, latitude - extent),
-	    new Coordinate(longitude - extent, latitude - extent)
-	};
-	return square;
+    public String toKMLPolygon(int sides, double radius, double height) {
+	final double radianUnit = twoPI/sides;
+	final double startRadian = radianUnit/2;
+	double currentRadian = startRadian;
+
+	StringBuilder sb = new StringBuilder("<coordinates>\n\t\t\t\t\t\t\t\t");
+	
+	while (currentRadian <= twoPI+startRadian) {
+	    sb.append(latitude+radius*Math.cos(currentRadian)).append(",").append(longitude+radius*Math.sin(currentRadian)).append(",").append(height).append("\n\t\t\t\t\t\t\t\t");
+	    currentRadian += radianUnit;
+	}
+	sb.append("</coordinates>");
+
+	return sb.toString();
     }
 
-    public String toKMLSquare(double extent, double height) {
-	Coordinate[] square = getContainingSquare(extent);
-	return "<coordinates>\n\t\t\t\t\t\t\t\t" 
-	    + square[0] + "," + height + "\n\t\t\t\t\t\t\t\t" 
-	    + square[1] + "," + height + "\n\t\t\t\t\t\t\t\t" 
-	    + square[2] + "," + height + "\n\t\t\t\t\t\t\t\t" 
-	    + square[2] + "," + height + "\n\t\t\t\t\t\t\t\t" 
-	    + square[3] + "," + height + "\n\t\t\t\t\t\t\t\t" 
-	    + square[0] + "," + height + "\n\t\t\t\t\t\t\t</coordinates>";
-    }
-    
     public String toString() {
 	return latitude + "," + longitude;
     }
