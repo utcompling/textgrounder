@@ -18,6 +18,17 @@ public class Coordinate {
 	};
 	return square;
     }
+
+    public String toKMLSquare(double extent, double height) {
+	Coordinate[] square = getContainingSquare(extent);
+	return "<coordinates>\n\t\t\t\t\t\t\t\t" 
+	    + square[0] + "," + height + "\n\t\t\t\t\t\t\t\t" 
+	    + square[1] + "," + height + "\n\t\t\t\t\t\t\t\t" 
+	    + square[2] + "," + height + "\n\t\t\t\t\t\t\t\t" 
+	    + square[2] + "," + height + "\n\t\t\t\t\t\t\t\t" 
+	    + square[3] + "," + height + "\n\t\t\t\t\t\t\t\t" 
+	    + square[0] + "," + height + "\n\t\t\t\t\t\t\t</coordinates>";
+    }
     
     public String toString() {
 	return latitude + "," + longitude;
