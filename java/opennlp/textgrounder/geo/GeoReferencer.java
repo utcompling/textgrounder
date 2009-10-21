@@ -46,22 +46,25 @@ public class GeoReferencer {
 
 
     public static void main(String[] args) throws FileNotFoundException, IOException {
-	if(args.length < 3) {
-	    System.out.println("usage: java opennlp.textgrounder.geo.GeoReferencer <input-text-filename> <gazetteer-filename> <gazetteer-type{g,c}> [output-filename]");
+	if(args.length < 2) {
+	    System.out.println("usage: java opennlp.textgrounder.geo.GeoReferencer <input-text-filename> <gazetteer-type{g,c}> [output-filename]");
 	    System.exit(0);
 	}
 
-	int gazType;
-	if(args[2].startsWith("c"))
-	    gazType = Gazetteer.US_CENSUS_TYPE;
-	else
-	    gazType = Gazetteer.DEFAULT_TYPE;
+	//System.out.println(System.getenv("PATH"));
 
-	GeoReferencer grefUS = new GeoReferencer(new Gazetteer(args[1], gazType), 50000);
+	int gazType;
+	Gazetteer myGaz;
+	if(args[1].startsWith("c"))
+	    myGaz = new CensusGazetteer();
+	else
+	    myGaz = new USGSGazetteer();
+
+	GeoReferencer grefUS = new GeoReferencer(myGaz, 50000);
 		
 	String outputFilename;
-	if(args.length >= 4)
-	    outputFilename = args[3];
+	if(args.length >= 3)
+	    outputFilename = args[2];
 	else
 	    outputFilename = "output.kml";
 

@@ -1,5 +1,7 @@
 package opennlp.textgrounder.geo;
 
+import opennlp.textgrounder.util.*;
+
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
@@ -7,16 +9,13 @@ import java.util.zip.*;
 
 import gnu.trove.*;
 
-public class Gazetteer extends THashMap<String, Coordinate> {
-
-    protected static Pattern allDigits = Pattern.compile("^[0-9]+$");
-
+public class CensusGazetteer extends Gazetteer {
 
     public CensusGazetteer () throws FileNotFoundException, IOException {
-	this(Constants.TEXTGROUNDER_DATA+"/gazetteer/places2k.txt.gz")
+	this(Constants.TEXTGROUNDER_DATA+"/gazetteer/places2k.txt.gz");
     }
 
-    public CensusGazetteer (String location, int gazType) throws FileNotFoundException, IOException {
+    public CensusGazetteer (String location) throws FileNotFoundException, IOException {
 
 	//BufferedReader gazIn = new BufferedReader(new FileReader(location));
 	
@@ -89,9 +88,6 @@ public class Gazetteer extends THashMap<String, Coordinate> {
 
 		//System.out.println("-------");
 	}
-	
-	break;
-
 	
 	gazIn.close();
 

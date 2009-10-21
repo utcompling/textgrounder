@@ -1,5 +1,7 @@
 package opennlp.textgrounder.geo;
 
+import opennlp.textgrounder.util.*;
+
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
@@ -10,7 +12,7 @@ import gnu.trove.*;
 public class USGSGazetteer extends Gazetteer {
 
     public USGSGazetteer () throws FileNotFoundException, IOException {
-	this(Constants.TEXTGROUNDER_DATA+"/gazetteer/pop_places_plaintext.txt.gz")
+	this(Constants.TEXTGROUNDER_DATA+"/gazetteer/pop_places_plaintext.txt.gz");
     }
 
     public USGSGazetteer (String location) throws FileNotFoundException, IOException {
@@ -44,7 +46,6 @@ public class USGSGazetteer extends Gazetteer {
 	    putIfAbsent(tokens[5].toLowerCase(), curCoord);
 	    putIfAbsent(tokens[16].toLowerCase(), curCoord);
 	}
-	break;
 	
 	gazIn.close();
 

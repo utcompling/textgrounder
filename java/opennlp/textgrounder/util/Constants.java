@@ -29,7 +29,8 @@ import java.text.DecimalFormat;
 public class Constants {
 
     // the location of TextGrounder
-    public final static String TEXTGROUNDER_HOME = System.getProperty("textgrounder.home");
+    public final static String TEXTGROUNDER_HOME = System.getenv("TEXTGROUNDER_HOME");
+    public final static String TEXTGROUNDER_DATA = System.getenv("TEXTGROUNDER_DATA");
 
     // the location of the user's home directory
     public final static String USER_HOME = System.getProperty("user.home");

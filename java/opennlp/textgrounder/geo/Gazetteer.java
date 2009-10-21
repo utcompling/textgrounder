@@ -7,16 +7,16 @@ import java.util.zip.*;
 
 import gnu.trove.*;
 
-public class Gazetteer extends THashMap<String, Coordinate> {
+public abstract class Gazetteer extends THashMap<String, Coordinate> {
 
-    public final static int USGS_TYPE = 0;
+    /*public final static int USGS_TYPE = 0;
     public final static int US_CENSUS_TYPE = 1;
     
-    public final static int DEFAULT_TYPE = USGS_TYPE;
+    public final static int DEFAULT_TYPE = USGS_TYPE;*/
 
-    private static Pattern allDigits = Pattern.compile("^[0-9]+$");
+    protected static Pattern allDigits = Pattern.compile("^[0-9]+$");
 
-    public Gazetteer (String location, int gazType) throws FileNotFoundException, IOException {
+    /*public Gazetteer (String location, int gazType) throws FileNotFoundException, IOException {
 
 	BufferedReader gazIn = new BufferedReader(new FileReader(location));
 	
@@ -102,9 +102,9 @@ public class Gazetteer extends THashMap<String, Coordinate> {
 		if(curLine == null) break;
 		//System.out.println(curLine);
 		tokens = curLine.split("\\|");
-		/*for(String token : tokens) {
+		for(String token : tokens) {
 		  System.out.println(token);
-		  }*/
+		  }
 		if(tokens.length < 17) {
 		    System.out.println("\nNot enough columns found; this file format should have at least " + 17 + " but only " + tokens.length + " were found. Quitting.");
 		    System.exit(0);
@@ -123,9 +123,9 @@ public class Gazetteer extends THashMap<String, Coordinate> {
 
 	System.out.println("done. Total number of actual place names = " + size());
 	       		
-	/*System.out.println(placenamesToCoords.get("salt springs"));
-	  System.out.println(placenamesToCoords.get("galveston"));*/
+	System.out.println(placenamesToCoords.get("salt springs"));
+        System.out.println(placenamesToCoords.get("galveston"));
 
-    }
+    }*/
 
 }
