@@ -9,30 +9,27 @@ import gnu.trove.*;
 
 public class Gazetteer extends THashMap<String, Coordinate> {
 
-    public final static int USGS_TYPE = 0;
-    public final static int US_CENSUS_TYPE = 1;
-    
-    public final static int DEFAULT_TYPE = USGS_TYPE;
+    protected static Pattern allDigits = Pattern.compile("^[0-9]+$");
 
-    private static Pattern allDigits = Pattern.compile("^[0-9]+$");
 
-    public Gazetteer (String location, int gazType) throws FileNotFoundException, IOException {
+    public CensusGazetteer () throws FileNotFoundException, IOException {
+	this(Constants.TEXTGROUNDER_DATA+"/gazetteer/places2k.txt.gz")
+    }
 
-	BufferedReader gazIn = new BufferedReader(new FileReader(location));
+    public CensusGazetteer (String location, int gazType) throws FileNotFoundException, IOException {
+
+	//BufferedReader gazIn = new BufferedReader(new FileReader(location));
 	
-	//BufferedReader gazIn = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(location))));
+	BufferedReader gazIn = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(location))));
 	
 	System.out.print("Populating gazetteer...");
 
 	String curLine;
 	String[] tokens;
 
-	switch(gazType) {
-	case US_CENSUS_TYPE:
-
-	    TObjectIntHashMap<String> populations = new TObjectIntHashMap<String>();
-
-	    while(true) {
+	TObjectIntHashMap<String> populations = new TObjectIntHashMap<String>();
+	    
+	while(true) {
 		curLine = gazIn.readLine();
 		if(curLine == null) break;
 		tokens = curLine.split("\\s+");
@@ -91,33 +88,10 @@ public class Gazetteer extends THashMap<String, Coordinate> {
 		}
 
 		//System.out.println("-------");
-	    }
-	    
-	    break;
-	case USGS_TYPE:
-	default:
-	    curLine = gazIn.readLine(); // first line of gazetteer is legend
-	    while(true) {
-		curLine = gazIn.readLine();
-		if(curLine == null) break;
-		//System.out.println(curLine);
-		tokens = curLine.split("\\|");
-		/*for(String token : tokens) {
-		  System.out.println(token);
-		  }*/
-		if(tokens.length < 17) {
-		    System.out.println("\nNot enough columns found; this file format should have at least " + 17 + " but only " + tokens.length + " were found. Quitting.");
-		    System.exit(0);
-		}
-		Coordinate curCoord = 
-		    new Coordinate(Double.parseDouble(tokens[9]), Double.parseDouble(tokens[10]));
-
-		putIfAbsent(tokens[1].toLowerCase(), curCoord);
-		putIfAbsent(tokens[5].toLowerCase(), curCoord);
-		putIfAbsent(tokens[16].toLowerCase(), curCoord);
-	    }
-	    break;
 	}
+	
+	break;
+
 	
 	gazIn.close();
 
