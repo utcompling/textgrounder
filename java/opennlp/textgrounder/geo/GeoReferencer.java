@@ -5,7 +5,7 @@ import java.util.*;
 
 import gnu.trove.*;
 
-public class GeoReferencer { // main class
+public class GeoReferencer {
 
     private int barScale = 50000;
     private Gazetteer gazetteer;
@@ -46,16 +46,22 @@ public class GeoReferencer { // main class
 
 
     public static void main(String[] args) throws FileNotFoundException, IOException {
-	if(args.length < 2) {
-	    System.out.println("usage: java opennlp.textgrounder.geo.GeoReferencer <input-text-filename> <gazetteer-filename> [output-filename]");
+	if(args.length < 3) {
+	    System.out.println("usage: java opennlp.textgrounder.geo.GeoReferencer <input-text-filename> <gazetteer-filename> <gazetteer-type{g,c}> [output-filename]");
 	    System.exit(0);
 	}
 
-	GeoReferencer grefUS = new GeoReferencer(new Gazetteer(args[1]), 50000);
+	int gazType;
+	if(args[2].startsWith("c"))
+	    gazType = Gazetteer.US_CENSUS_TYPE;
+	else
+	    gazType = Gazetteer.DEFAULT_TYPE;
+
+	GeoReferencer grefUS = new GeoReferencer(new Gazetteer(args[1], gazType), 50000);
 		
 	String outputFilename;
-	if(args.length >= 3)
-	    outputFilename = args[2];
+	if(args.length >= 4)
+	    outputFilename = args[3];
 	else
 	    outputFilename = "output.kml";
 
