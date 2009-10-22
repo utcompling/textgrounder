@@ -12,4 +12,4 @@ then
 fi
 
 # Now prepares the Java command with the right settings
-JAVA_CMD="$JAVA $JAVA_MEM_FLAG -classpath $CP -Dtextgrounder.home=$TEXTGROUNDER_DIR"
+JAVA_CMD="$JAVA $JAVA_MEM_FLAG -classpath $CP -Dtextgrounder.home=$TEXTGROUNDER_DIR" -Dtextgrounder.data=$TEXTGROUNDER_DATA"
