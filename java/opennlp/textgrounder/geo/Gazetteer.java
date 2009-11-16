@@ -15,6 +15,7 @@ public abstract class Gazetteer extends THashMap<String, Coordinate> {
     public final static int DEFAULT_TYPE = USGS_TYPE;*/
 
     protected static Pattern allDigits = Pattern.compile("^[0-9]+$");
+    protected static Pattern rawCoord = Pattern.compile("^\\-?[0-9]+$");
 
     /*public Gazetteer (String location, int gazType) throws FileNotFoundException, IOException {
 

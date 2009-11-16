@@ -57,8 +57,18 @@ public class GeoReferencer {
 	Gazetteer myGaz;
 	if(args[1].startsWith("c"))
 	    myGaz = new CensusGazetteer();
-	else
+	else if(args[1].startsWith("n"))
+	    myGaz = new NGAGazetteer();
+	else if(args[1].startsWith("g"))
 	    myGaz = new USGSGazetteer();
+	else if(args[1].startsWith("w"))
+	    myGaz = new WGGazetteer();
+	else {
+	    System.err.println("Error: unrecognized gazetteer type: " + args[1]);
+	    System.err.println("Please enter c, n, or g.");
+	    System.exit(0);
+	    myGaz = new CensusGazetteer();
+	}
 
 	GeoReferencer grefUS = new GeoReferencer(myGaz, 50000);
 		
