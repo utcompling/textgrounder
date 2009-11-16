@@ -25,7 +25,7 @@ public class WGGazetteer extends Gazetteer {
 	String[] tokens;
 
 	TObjectIntHashMap<String> populations = new TObjectIntHashMap<String>();
-	TObjectIntHashMap<String> countryPopulations = new TObjectIntHashMap<String>();
+	TObjectIntHashMap<String> nonPointPopulations = new TObjectIntHashMap<String>();
 
 	curLine = gazIn.readLine(); // first line of gazetteer is legend
 	int lines = 1;
@@ -42,11 +42,17 @@ public class WGGazetteer extends Gazetteer {
 		//System.out.println("\nNot enough columns found; this file format should have at least " + 8 + " but only " + tokens.length + " were found. Quitting.");
 		//System.exit(0);
 
-		if(tokens.length >= 6 && tokens[4].equals("country")) {
-		    countryPopulations.put(tokens[1].toLowerCase(), Integer.parseInt(tokens[5]));
+		if(tokens.length >= 6 && /*!tokens[4].equals("locality")*/allDigits.matcher(tokens[5]).matches()) {
+		    nonPointPopulations.put(tokens[1].toLowerCase(), Integer.parseInt(tokens[5]));
 		    //System.out.println("Found country " + tokens[1].toLowerCase() + ": " + tokens[5]);
 		}
+
 		continue;
+	    }
+
+	    if(!tokens[4].equals("locality") && allDigits.matcher(tokens[5]).matches()) {
+		nonPointPopulations.put(tokens[1].toLowerCase(), Integer.parseInt(tokens[5]));
+		//System.out.println("Found country " + tokens[1].toLowerCase() + ": " + tokens[5]);
 	    }
 
 	    String placeName = tokens[1].toLowerCase();
@@ -98,11 +104,11 @@ public class WGGazetteer extends Gazetteer {
 
 	System.out.println("done. Total number of actual place names = " + size());
 
-	System.out.print("Removing place names with smaller populations than countries of the same name...");
-	Object[] countrySet = countryPopulations.keys();
+	System.out.print("Removing place names with smaller populations than non-point places of the same name...");
+	Object[] countrySet = nonPointPopulations.keys();
 	for(int i = 0; i < countrySet.length; i++) {
 	    String curCountry = (String)countrySet[i];
-	    if(populations.containsKey(curCountry) && populations.get(curCountry) < countryPopulations.get(curCountry)) {
+	    if(populations.containsKey(curCountry) && populations.get(curCountry) < nonPointPopulations.get(curCountry)) {
 		remove(curCountry);
 		//System.out.println("removed " + curCountry);
 	    }
