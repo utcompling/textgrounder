@@ -19,7 +19,7 @@ public class WGGazetteer extends Gazetteer {
 	
 	BufferedReader gazIn = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(location))));
 	
-	System.out.print("Populating gazetteer...");
+	System.out.print("Populating World Gazetteer gazetteer from " + location + " ...");
 
 	String curLine;
 	String[] tokens;

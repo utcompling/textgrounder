@@ -21,7 +21,7 @@ public class CensusGazetteer extends Gazetteer {
 	
 	BufferedReader gazIn = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(location))));
 	
-	System.out.print("Populating gazetteer...");
+	System.out.print("Populating US Census gazetteer from " + location + " ...");
 
 	String curLine;
 	String[] tokens;

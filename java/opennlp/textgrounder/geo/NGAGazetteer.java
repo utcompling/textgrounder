@@ -21,7 +21,7 @@ public class NGAGazetteer extends Gazetteer {
 	
 	BufferedReader gazIn = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(location))));
 	
-	System.out.println("Populating gazetteer...");
+	System.out.println("Populating NGA gazetteer from " + location + " ...");
 
 	String curLine;
 	String[] tokens;
