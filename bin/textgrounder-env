@@ -2,8 +2,8 @@
 
 # sets TEXTGROUNDER environment variables
 TEXTGROUNDER_LIB=$TEXTGROUNDER_DIR/lib
-DIRLIBS=$TEXTGROUNDER_LIB/trove.jar
-CP=${TEXTGROUNDER_DIR}/output/classes:${DIRLIBS}
+DIRLIBS=$TEXTGROUNDER_LIB/trove.jar:$TEXTGROUNDER_LIB/stanford-ner.jar
+CP=${TEXTGROUNDER_DIR}/output/classes:${STANFORD_NER_DIR}/stanford-ner.jar:${DIRLIBS}
 JAVA=$JAVA_HOME/bin/java
 
 if [ -z $JAVA_MEM_FLAG ] 
