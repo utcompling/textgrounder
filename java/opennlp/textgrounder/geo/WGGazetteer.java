@@ -12,7 +12,7 @@ import gnu.trove.*;
 public class WGGazetteer extends Gazetteer {
 
     public WGGazetteer () throws FileNotFoundException, IOException {
-	this(Constants.TEXTGROUNDER_DATA+"/gazetteer/dataen.txt.gz");
+	this(Constants.TEXTGROUNDER_DATA+"/gazetteer/dataen-fixed.txt.gz");
     }
 
     public WGGazetteer (String location) throws FileNotFoundException, IOException {
