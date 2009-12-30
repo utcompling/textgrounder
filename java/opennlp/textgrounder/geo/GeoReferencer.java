@@ -103,24 +103,9 @@ public class GeoReferencer {
 	    outputFilename = "output.kml";
 
 	System.out.println("Writing KML file " + outputFilename + " ...");
-
-	//BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));
-
 	SNERPlaceCounter placeCounts = new SNERPlaceCounter(myGaz, myClassifier);
-
-	//grefUS.initializeXMLFile(args[0], out);
-
 	grefUS.processPath(argFile, placeCounts);
-
-	//if(argFile.isDirectory())
-	//else
-	//    grefUS.processFile(args[0], placeCounts);
-
 	grefUS.writeXMLFile(placeCounts, outputFilename, args[0]);
-
-	//grefUS.finalizeXMLFile(out);
-
-	//out.close();
 		
 	System.out.println("Done.");
     }
