@@ -25,22 +25,6 @@ public class GeoReferencer {
 	classifier = classif;
     }
     
-    public void initializeXMLFile(String inputFilename, BufferedWriter out) throws Exception {
-	if(initializedXMLFile) return;
-
-	out.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<kml xmlns=\"http://www.opengis.net/kml/2.2\" xmlns:gx=\"http://www.google.com/kml/ext/2.2\" xmlns:kml=\"http://www.opengis.net/kml/2.2\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n\t<Document>\n\t\t<Style id=\"transBluePoly\">\n\t\t\t<PolyStyle>\n\t\t\t\t<outline>0</outline>\n\t\t\t</PolyStyle>\n\t\t\t<IconStyle>\n\t\t\t\t<Icon></Icon>\n\t\t\t</IconStyle>\n\t\t</Style>\n\t\t<Folder>\n\t\t\t<name>" + inputFilename + "</name>\n\t\t\t<open>1</open>\n\t\t\t<description>Distribution of place names found in " + inputFilename + "</description>\n\t\t\t<LookAt>\n\t\t\t\t<latitude>42</latitude>\n\t\t\t\t<longitude>-102</longitude>\n\t\t\t\t<altitude>0</altitude>\n\t\t\t\t<range>5000000</range>\n\t\t\t\t<tilt>53.454348562403</tilt>\n\t\t\t\t<heading>0</heading>\n\t\t\t</LookAt>\n");
-
-	initializedXMLFile = true;
-    }
-
-    public void finalizeXMLFile(BufferedWriter out) throws Exception {
-	if(!initializedXMLFile || finalizedXMLFile) return;
-
-	out.write("\t\t</Folder>\n\t</Document>\n</kml>");
-
-	finalizedXMLFile = true;
-    }
-
     public void writeXMLFile(SNERPlaceCounter placeCounts, String outputFile, String inputFilename) throws Exception {
 
 	BufferedWriter out = new BufferedWriter(new FileWriter(outputFile));
@@ -66,49 +50,12 @@ public class GeoReferencer {
 	out.close();
     }
 
-    public void processFile(String inputFile, /*BufferedWriter out, */SNERPlaceCounter placeCounts) 
-	throws Exception {
-
-	//RegexPlaceCounter placeCounts = new RegexPlaceCounter(inputFile, gazetteer);
-	//ListPlaceCounter placeCounts = new ListPlaceCounter(inputFile, gazetteer);
-	//SNERPlaceCounter placeCounts = new SNERPlaceCounter(inputFile, gazetteer, classifier);
-	placeCounts.extractPlacesFromFile(inputFile);
-
-	//BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));
-		
-	//System.out.print("Writing KML file " + outputFilename + "...");
-		
-	//out.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<kml xmlns=\"http://www.opengis.net/kml/2.2\" xmlns:gx=\"http://www.google.com/kml/ext/2.2\" xmlns:kml=\"http://www.opengis.net/kml/2.2\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n\t<Document>\n\t\t<Style id=\"transBluePoly\">\n\t\t\t<PolyStyle>\n\t\t\t\t<outline>0</outline>\n\t\t\t</PolyStyle>\n\t\t\t<IconStyle>\n\t\t\t\t<Icon></Icon>\n\t\t\t</IconStyle>\n\t\t</Style>\n\t\t<Folder>\n\t\t\t<name>" + inputFile + "</name>\n\t\t\t<open>1</open>\n\t\t\t<description>Distribution of place names found in " + inputFile + "</description>\n\t\t\t<LookAt>\n\t\t\t\t<latitude>42</latitude>\n\t\t\t\t<longitude>-102</longitude>\n\t\t\t\t<altitude>0</altitude>\n\t\t\t\t<range>5000000</range>\n\t\t\t\t<tilt>53.454348562403</tilt>\n\t\t\t\t<heading>0</heading>\n\t\t\t</LookAt>\n");
-		
-	/*TObjectIntIterator<String> placeIterator = placeCounts.iterator();
-	for (int i = placeCounts.size(); i-- > 0;) {
-	    placeIterator.advance();
-	    String placename = placeIterator.key();
-	    double height = Math.log(placeIterator.value()) * barScale;
-
-	    Coordinate coord = gazetteer.get(placename);
-
-	    //String kmlPolygon = coord.toKMLPolygon(4,.15,height);  // a square
-	    String kmlPolygon = coord.toKMLPolygon(10,.15,height);
-
-	    out.write("\t\t\t<Placemark>\n\t\t\t\t<name>" + placename + "</name>\n\t\t\t\t<styleUrl>#transBluePoly</styleUrl>\n\t\t\t\t<Point>\n\t\t\t\t\t<coordinates>\n\t\t\t\t\t\t" + coord + "\n\t\t\t\t\t</coordinates>\n\t\t\t\t</Point>\n\t\t\t</Placemark>\n\t\t\t<Placemark>\n\t\t\t\t<name>" + placename + " POLYGON</name>\n\t\t\t\t<styleUrl>#transBluePoly</styleUrl>\n\t\t\t\t<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>\n\t\t\t\t<Polygon>\n\t\t\t\t\t<extrude>1</extrude><tessellate>1</tessellate>\n\t\t\t\t\t<altitudeMode>relativeToGround</altitudeMode>\n\t\t\t\t\t<outerBoundaryIs>\n\t\t\t\t\t\t<LinearRing>\n\t\t\t\t\t\t\t"+kmlPolygon+"\n\t\t\t\t\t\t</LinearRing>\n\t\t\t\t\t</outerBoundaryIs>\n\t\t\t\t</Polygon>\n\t\t\t</Placemark>\n");
-	}
-		
-	//out.write("\t\t</Folder>\n\t</Document>\n</kml>");
-	//out.close();
-	out.flush();*/
-    }
-
-    public void processDir(File myDir, /*BufferedWriter out, */SNERPlaceCounter placeCounts) throws Exception {
-	String[] children = myDir.list();
-
-	for(String filename : children) {
-	    File aFile = new File(filename);
-	    if(aFile.isDirectory())
-		processDir(aFile, placeCounts);
-	    else
-		processFile(myDir.getPath() + "/" + filename, placeCounts);
-	}
+    public void processPath(File myPath, SNERPlaceCounter placeCounts) throws Exception {
+	if(myPath.isDirectory())
+	    for(String pathname : myPath.list())
+		processPath(new File(pathname), placeCounts);
+	else
+	    placeCounts.extractPlacesFromFile(myPath.getPath());
     }
 
 
@@ -163,10 +110,11 @@ public class GeoReferencer {
 
 	//grefUS.initializeXMLFile(args[0], out);
 
-	if(argFile.isDirectory())
-	    grefUS.processDir(argFile, placeCounts);
-	else
-	    grefUS.processFile(args[0], placeCounts);
+	grefUS.processPath(argFile, placeCounts);
+
+	//if(argFile.isDirectory())
+	//else
+	//    grefUS.processFile(args[0], placeCounts);
 
 	grefUS.writeXMLFile(placeCounts, outputFilename, args[0]);
 
