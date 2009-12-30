@@ -1,2 +1,2 @@
 #!/bin/sh
-./tg-georef.sh ~/textgrounder/data/travel/txt/pcl_corpus w pcl_corpus.kml
+tg-georef.sh $TEXTGROUNDER_DATA/pcl_corpus/txt w pcl_corpus.kml
