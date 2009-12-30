@@ -27,7 +27,20 @@ public class IOUtil {
 	}
 	return;
     }
-    
+
+    /**
+     * Reads a file as a single String all in one. From code snippet
+     * found on web (http://snippets.dzone.com/posts/show/1335).
+     *
+     * @param  filePath  The File object identifying the location of the file
+     */
+    public static String readFileAsString(String filePath) throws java.io.IOException {
+	byte[] buffer = new byte[(int) new File(filePath).length()];
+	FileInputStream f = new FileInputStream(filePath);
+	f.read(buffer);
+	return new String(buffer);
+    }
+
     /**
      * Calls runCommand/2 assuming that wait=true.
      *

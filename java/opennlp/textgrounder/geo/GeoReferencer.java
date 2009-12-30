@@ -71,6 +71,13 @@ public class GeoReferencer {
 	    System.exit(0);
 	}
 
+	String outputFilename;
+	if(args.length >= 3)
+	    outputFilename = args[2];
+	else
+	    outputFilename = "output.kml";
+
+
 	//System.out.println(System.getenv("PATH"));
 
 	int gazType;
@@ -96,12 +103,6 @@ public class GeoReferencer {
 
 	GeoReferencer grefUS = new GeoReferencer(myGaz, 50000, myClassifier);
 		
-	String outputFilename;
-	if(args.length >= 3)
-	    outputFilename = args[2];
-	else
-	    outputFilename = "output.kml";
-
 	System.out.println("Writing KML file " + outputFilename + " ...");
 	SNERPlaceCounter placeCounts = new SNERPlaceCounter(myGaz, myClassifier);
 	grefUS.processPath(argFile, placeCounts);
