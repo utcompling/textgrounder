@@ -3,7 +3,7 @@
 # sets TEXTGROUNDER environment variables
 TEXTGROUNDER_LIB=$TEXTGROUNDER_DIR/lib
 DIRLIBS=$TEXTGROUNDER_LIB/trove.jar:$TEXTGROUNDER_LIB/stanford-ner.jar
-CP=${TEXTGROUNDER_DIR}/output/classes:${STANFORD_NER_DIR}/stanford-ner.jar:${DIRLIBS}
+CP=${TEXTGROUNDER_DIR}/output/classes:${STANFORD_NER_DIR}/stanford-ner.jar:${TEXTGROUNDER_LIB}/sqlitejdbc-v056.jar:${DIRLIBS}
 JAVA=$JAVA_HOME/bin/java
 
 if [ -z $JAVA_MEM_FLAG ] 

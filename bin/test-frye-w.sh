@@ -1,2 +1,2 @@
 #!/bin/sh
-./tg-georef.sh ~/textgrounder/data/travel/txt/fryeplaces.txt w
+./tg-georef.sh ~/textgrounder/data/travel/txt/frye.txt w

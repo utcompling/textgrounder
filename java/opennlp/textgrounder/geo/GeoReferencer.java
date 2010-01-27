@@ -37,7 +37,14 @@ public class GeoReferencer {
 	    String placename = placeIterator.key();
 	    double height = Math.log(placeIterator.value()) * barScale;
 
-	    Coordinate coord = gazetteer.get(placename);
+	    Coordinate coord;
+	    if(gazetteer instanceof WGGazetteer)
+		coord = ((WGGazetteer)gazetteer).baselineGet(placename);
+	    else
+		coord = gazetteer.get(placename);
+
+	    if(coord.longitude == 9999.99) // sentinel
+		continue;
 
 	    //String kmlPolygon = coord.toKMLPolygon(4,.15,height);  // a square
 	    String kmlPolygon = coord.toKMLPolygon(10,.15,height);
@@ -78,8 +85,6 @@ public class GeoReferencer {
 	    outputFilename = "output.kml";
 
 
-	//System.out.println(System.getenv("PATH"));
-
 	int gazType;
 	Gazetteer myGaz;
 	if(args[1].startsWith("c"))
@@ -92,7 +97,7 @@ public class GeoReferencer {
 	    myGaz = new WGGazetteer();
 	else {
 	    System.err.println("Error: unrecognized gazetteer type: " + args[1]);
-	    System.err.println("Please enter c, n, or g.");
+	    System.err.println("Please enter w, c, or g.");
 	    System.exit(0);
 	    myGaz = new CensusGazetteer();
 	}
@@ -106,6 +111,7 @@ public class GeoReferencer {
 	System.out.println("Writing KML file " + outputFilename + " ...");
 	SNERPlaceCounter placeCounts = new SNERPlaceCounter(myGaz, myClassifier);
 	grefUS.processPath(argFile, placeCounts);
+	System.out.println("Disambiguating place names found...");
 	grefUS.writeXMLFile(placeCounts, outputFilename, args[0]);
 		
 	System.out.println("Done.");

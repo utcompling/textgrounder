@@ -35,6 +35,9 @@ public class Constants {
     // the location of the Stanford NER system
     public final static String STANFORD_NER_HOME = System.getenv("STANFORD_NER_HOME");
 
+    // the location of the World Gazetteer database file
+    public final static String WGDB_PATH = System.getenv("WGDB_PATH");
+
     // the location of the user's home directory
     public final static String USER_HOME = System.getProperty("user.home");
 

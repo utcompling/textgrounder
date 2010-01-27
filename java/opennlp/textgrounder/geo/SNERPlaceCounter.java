@@ -40,6 +40,7 @@ public class SNERPlaceCounter extends TObjectIntHashMap<String> {
 	    String potentialPlacename = m.group();
 	    potentialPlacename = potentialPlacename.replaceAll("/LOCATION", "").toLowerCase();
 	    if(gazetteer.containsKey(potentialPlacename))
+		//|| (gazetteer instanceof WGGazetteer && ((WGGazetteer)gazetteer).hasPlace(potentialPlacename)))
 		if (!increment(potentialPlacename))
 		    put(potentialPlacename,1);
 	}    
