@@ -10,9 +10,9 @@
 			</IconStyle>
 		</Style>
 		<Folder>
-			<name>/home/msperiosu/textgrounder/data/travel/txt/frye.txt</name>
+			<name>-i</name>
 			<open>1</open>
-			<description>Distribution of place names found in /home/msperiosu/textgrounder/data/travel/txt/frye.txt</description>
+			<description>Distribution of place names found in -i</description>
 			<LookAt>
 				<latitude>42</latitude>
 				<longitude>-102</longitude>
@@ -407,6 +407,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>trinity</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-95.38,30.95
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>trinity POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-95.23734152255572,30.996352549156242,34657.35902799726
+								-95.29183221215612,31.07135254915624,34657.35902799726
+								-95.38,31.099999999999998,34657.35902799726
+								-95.46816778784387,31.07135254915624,34657.35902799726
+								-95.52265847744427,30.996352549156242,34657.35902799726
+								-95.52265847744427,30.903647450843756,34657.35902799726
+								-95.46816778784387,30.828647450843757,34657.35902799726
+								-95.38,30.8,34657.35902799726
+								-95.29183221215612,30.828647450843757,34657.35902799726
+								-95.23734152255572,30.903647450843756,34657.35902799726
+								-95.23734152255572,30.996352549156242,34657.35902799726
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>paul</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -436,6 +471,41 @@
 								-113.69183221215613,42.48864745084376,54930.61443340548
 								-113.63734152255573,42.56364745084376,54930.61443340548
 								-113.63734152255573,42.65635254915624,54930.61443340548
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>macon</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-92.47,39.74
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>macon POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-92.32734152255573,39.78635254915624,69314.71805599453
+								-92.38183221215613,39.861352549156244,69314.71805599453
+								-92.47,39.89,69314.71805599453
+								-92.55816778784387,39.861352549156244,69314.71805599453
+								-92.61265847744427,39.78635254915624,69314.71805599453
+								-92.61265847744427,39.69364745084376,69314.71805599453
+								-92.55816778784387,39.61864745084376,69314.71805599453
+								-92.47,39.59,69314.71805599453
+								-92.38183221215613,39.61864745084376,69314.71805599453
+								-92.32734152255573,39.69364745084376,69314.71805599453
+								-92.32734152255573,39.78635254915624,69314.71805599453
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -1002,6 +1072,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>hamilton</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-98.12,31.7
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>hamilton POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-97.97734152255573,31.746352549156242,0.0
+								-98.03183221215613,31.82135254915624,0.0
+								-98.12,31.849999999999998,0.0
+								-98.20816778784388,31.82135254915624,0.0
+								-98.26265847744428,31.746352549156242,0.0
+								-98.26265847744428,31.653647450843756,0.0
+								-98.20816778784388,31.578647450843757,0.0
+								-98.12,31.55,0.0
+								-98.03183221215613,31.578647450843757,0.0
+								-97.97734152255573,31.653647450843756,0.0
+								-97.97734152255573,31.746352549156242,0.0
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>joliet</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -1101,6 +1206,41 @@
 								-113.18183221215612,54.59864745084376,0.0
 								-113.12734152255572,54.67364745084376,0.0
 								-113.12734152255572,54.76635254915624,0.0
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>humboldt</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-94.22,42.72
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>humboldt POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-94.07734152255573,42.76635254915624,89587.97346140275
+								-94.13183221215613,42.84135254915624,89587.97346140275
+								-94.22,42.87,89587.97346140275
+								-94.30816778784387,42.84135254915624,89587.97346140275
+								-94.36265847744427,42.76635254915624,89587.97346140275
+								-94.36265847744427,42.67364745084376,89587.97346140275
+								-94.30816778784387,42.59864745084376,89587.97346140275
+								-94.22,42.57,89587.97346140275
+								-94.13183221215613,42.59864745084376,89587.97346140275
+								-94.07734152255573,42.67364745084376,89587.97346140275
+								-94.07734152255573,42.76635254915624,89587.97346140275
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -2011,6 +2151,41 @@
 								-97.09183221215613,31.448647450843758,97295.50745276567
 								-97.03734152255574,31.523647450843757,97295.50745276567
 								-97.03734152255574,31.616352549156243,97295.50745276567
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>santa cruz</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-122.04,36.97
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>santa cruz POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-121.89734152255573,37.01635254915624,0.0
+								-121.95183221215613,37.09135254915624,0.0
+								-122.04,37.12,0.0
+								-122.12816778784388,37.09135254915624,0.0
+								-122.18265847744428,37.01635254915624,0.0
+								-122.18265847744428,36.92364745084376,0.0
+								-122.12816778784388,36.84864745084376,0.0
+								-122.04,36.82,0.0
+								-121.95183221215613,36.84864745084376,0.0
+								-121.89734152255573,36.92364745084376,0.0
+								-121.89734152255573,37.01635254915624,0.0
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -3627,6 +3802,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>geneva</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-85.86,31.03
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>geneva POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-85.71734152255573,31.076352549156244,109861.22886681098
+								-85.77183221215613,31.151352549156243,109861.22886681098
+								-85.86,31.18,109861.22886681098
+								-85.94816778784387,31.151352549156243,109861.22886681098
+								-86.00265847744427,31.076352549156244,109861.22886681098
+								-86.00265847744427,30.98364745084376,109861.22886681098
+								-85.94816778784387,30.90864745084376,109861.22886681098
+								-85.86,30.880000000000003,109861.22886681098
+								-85.77183221215613,30.90864745084376,109861.22886681098
+								-85.71734152255573,30.98364745084376,109861.22886681098
+								-85.71734152255573,31.076352549156244,109861.22886681098
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>bradford</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -3767,6 +3977,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>houston</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-91.57,43.76
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>houston POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-91.42734152255572,43.80635254915624,97295.50745276567
+								-91.48183221215612,43.88135254915624,97295.50745276567
+								-91.57,43.91,97295.50745276567
+								-91.65816778784387,43.88135254915624,97295.50745276567
+								-91.71265847744426,43.80635254915624,97295.50745276567
+								-91.71265847744426,43.71364745084376,97295.50745276567
+								-91.65816778784387,43.638647450843756,97295.50745276567
+								-91.57,43.61,97295.50745276567
+								-91.48183221215612,43.638647450843756,97295.50745276567
+								-91.42734152255572,43.71364745084376,97295.50745276567
+								-91.42734152255572,43.80635254915624,97295.50745276567
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>dover</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -3837,6 +4082,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>cascade</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-111.7,47.27
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>cascade POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-111.55734152255573,47.31635254915624,0.0
+								-111.61183221215613,47.391352549156245,0.0
+								-111.7,47.42,0.0
+								-111.78816778784388,47.391352549156245,0.0
+								-111.84265847744427,47.31635254915624,0.0
+								-111.84265847744427,47.223647450843764,0.0
+								-111.78816778784388,47.14864745084376,0.0
+								-111.7,47.120000000000005,0.0
+								-111.61183221215613,47.14864745084376,0.0
+								-111.55734152255573,47.223647450843764,0.0
+								-111.55734152255573,47.31635254915624,0.0
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>dallas</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -3901,6 +4181,41 @@
 								-118.04183221215612,33.958647450843756,34657.35902799726
 								-117.98734152255572,34.03364745084376,34657.35902799726
 								-117.98734152255572,34.12635254915624,34657.35902799726
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>mitchell</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-92.87,43.32
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>mitchell POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-92.72734152255573,43.36635254915624,0.0
+								-92.78183221215613,43.44135254915624,0.0
+								-92.87,43.47,0.0
+								-92.95816778784388,43.44135254915624,0.0
+								-93.01265847744428,43.36635254915624,0.0
+								-93.01265847744428,43.27364745084376,0.0
+								-92.95816778784388,43.19864745084376,0.0
+								-92.87,43.17,0.0
+								-92.78183221215613,43.19864745084376,0.0
+								-92.72734152255573,43.27364745084376,0.0
+								-92.72734152255573,43.36635254915624,0.0
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -5196,6 +5511,41 @@
 								7.768167787843871,44.958647450843756,34657.35902799726
 								7.822658477444273,45.03364745084376,34657.35902799726
 								7.822658477444273,45.12635254915624,34657.35902799726
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>beaufort</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-80.69,32.43
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>beaufort POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-80.54734152255573,32.47635254915624,0.0
+								-80.60183221215613,32.55135254915624,0.0
+								-80.69,32.58,0.0
+								-80.77816778784387,32.55135254915624,0.0
+								-80.83265847744427,32.47635254915624,0.0
+								-80.83265847744427,32.38364745084376,0.0
+								-80.77816778784387,32.30864745084376,0.0
+								-80.69,32.28,0.0
+								-80.60183221215613,32.30864745084376,0.0
+								-80.54734152255573,32.38364745084376,0.0
+								-80.54734152255573,32.47635254915624,0.0
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -6736,6 +7086,41 @@
 								-70.35183221215613,43.34864745084376,34657.35902799726
 								-70.29734152255573,43.42364745084376,34657.35902799726
 								-70.29734152255573,43.51635254915624,34657.35902799726
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>peoria</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-89.61,40.74
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>peoria POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-89.46734152255573,40.78635254915624,69314.71805599453
+								-89.52183221215613,40.861352549156244,69314.71805599453
+								-89.61,40.89,69314.71805599453
+								-89.69816778784387,40.861352549156244,69314.71805599453
+								-89.75265847744427,40.78635254915624,69314.71805599453
+								-89.75265847744427,40.69364745084376,69314.71805599453
+								-89.69816778784387,40.61864745084376,69314.71805599453
+								-89.61,40.59,69314.71805599453
+								-89.52183221215613,40.61864745084376,69314.71805599453
+								-89.46734152255573,40.69364745084376,69314.71805599453
+								-89.46734152255573,40.78635254915624,69314.71805599453
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -8842,6 +9227,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>oswego</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-76.5,43.46
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>oswego POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-76.35734152255573,43.50635254915624,34657.35902799726
+								-76.41183221215613,43.58135254915624,34657.35902799726
+								-76.5,43.61,34657.35902799726
+								-76.58816778784387,43.58135254915624,34657.35902799726
+								-76.64265847744427,43.50635254915624,34657.35902799726
+								-76.64265847744427,43.41364745084376,34657.35902799726
+								-76.58816778784387,43.33864745084376,34657.35902799726
+								-76.5,43.31,34657.35902799726
+								-76.41183221215613,43.33864745084376,34657.35902799726
+								-76.35734152255573,43.41364745084376,34657.35902799726
+								-76.35734152255573,43.50635254915624,34657.35902799726
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>guayama</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -9437,6 +9857,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>guadalajara</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-3.17,40.64
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>guadalajara POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-3.027341522555727,40.68635254915624,34657.35902799726
+								-3.081832212156129,40.76135254915624,34657.35902799726
+								-3.17,40.79,34657.35902799726
+								-3.258167787843871,40.76135254915624,34657.35902799726
+								-3.312658477444273,40.68635254915624,34657.35902799726
+								-3.312658477444273,40.59364745084376,34657.35902799726
+								-3.258167787843871,40.51864745084376,34657.35902799726
+								-3.17,40.49,34657.35902799726
+								-3.081832212156129,40.51864745084376,34657.35902799726
+								-3.027341522555727,40.59364745084376,34657.35902799726
+								-3.027341522555727,40.68635254915624,34657.35902799726
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>malden</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -9577,6 +10032,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>wyoming</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-78.09,42.83
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>wyoming POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-77.94734152255573,42.87635254915624,115129.2546497023
+								-78.00183221215613,42.95135254915624,115129.2546497023
+								-78.09,42.98,115129.2546497023
+								-78.17816778784388,42.95135254915624,115129.2546497023
+								-78.23265847744428,42.87635254915624,115129.2546497023
+								-78.23265847744428,42.78364745084376,115129.2546497023
+								-78.17816778784388,42.708647450843756,115129.2546497023
+								-78.09,42.68,115129.2546497023
+								-78.00183221215613,42.708647450843756,115129.2546497023
+								-77.94734152255573,42.78364745084376,115129.2546497023
+								-77.94734152255573,42.87635254915624,115129.2546497023
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>great river</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -9682,6 +10172,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>ashland</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-82.32,40.87
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>ashland POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-82.17734152255572,40.91635254915624,0.0
+								-82.23183221215612,40.99135254915624,0.0
+								-82.32,41.019999999999996,0.0
+								-82.40816778784387,40.99135254915624,0.0
+								-82.46265847744426,40.91635254915624,0.0
+								-82.46265847744426,40.82364745084376,0.0
+								-82.40816778784387,40.748647450843755,0.0
+								-82.32,40.72,0.0
+								-82.23183221215612,40.748647450843755,0.0
+								-82.17734152255572,40.82364745084376,0.0
+								-82.17734152255572,40.91635254915624,0.0
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>sour lake</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -9752,6 +10277,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>greenville</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-82.37,34.84
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>greenville POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-82.22734152255573,34.88635254915624,69314.71805599453
+								-82.28183221215613,34.961352549156246,69314.71805599453
+								-82.37,34.99,69314.71805599453
+								-82.45816778784388,34.961352549156246,69314.71805599453
+								-82.51265847744428,34.88635254915624,69314.71805599453
+								-82.51265847744428,34.793647450843764,69314.71805599453
+								-82.45816778784388,34.71864745084376,69314.71805599453
+								-82.37,34.690000000000005,69314.71805599453
+								-82.28183221215613,34.71864745084376,69314.71805599453
+								-82.22734152255573,34.793647450843764,69314.71805599453
+								-82.22734152255573,34.88635254915624,69314.71805599453
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>pekin</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -9816,6 +10376,76 @@
 								-97.01183221215612,18.708647450843756,0.0
 								-96.95734152255572,18.783647450843755,0.0
 								-96.95734152255572,18.87635254915624,0.0
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>valencia</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-106.7,34.8
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>valencia POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-106.55734152255573,34.84635254915624,97295.50745276567
+								-106.61183221215613,34.92135254915624,97295.50745276567
+								-106.7,34.949999999999996,97295.50745276567
+								-106.78816778784388,34.92135254915624,97295.50745276567
+								-106.84265847744427,34.84635254915624,97295.50745276567
+								-106.84265847744427,34.75364745084376,97295.50745276567
+								-106.78816778784388,34.678647450843755,97295.50745276567
+								-106.7,34.65,97295.50745276567
+								-106.61183221215613,34.678647450843755,97295.50745276567
+								-106.55734152255573,34.75364745084376,97295.50745276567
+								-106.55734152255573,34.84635254915624,97295.50745276567
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>washington</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-113.5,37.12
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>washington POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-113.35734152255573,37.16635254915624,186883.4809141684
+								-113.41183221215613,37.24135254915624,186883.4809141684
+								-113.5,37.269999999999996,186883.4809141684
+								-113.58816778784387,37.24135254915624,186883.4809141684
+								-113.64265847744427,37.16635254915624,186883.4809141684
+								-113.64265847744427,37.07364745084376,186883.4809141684
+								-113.58816778784387,36.998647450843755,186883.4809141684
+								-113.5,36.97,186883.4809141684
+								-113.41183221215613,36.998647450843755,186883.4809141684
+								-113.35734152255573,37.07364745084376,186883.4809141684
+								-113.35734152255573,37.16635254915624,186883.4809141684
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -10096,6 +10726,41 @@
 								-74.33183221215613,40.498647450843755,0.0
 								-74.27734152255573,40.57364745084376,0.0
 								-74.27734152255573,40.66635254915624,0.0
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>northampton</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-75.49,40.68
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>northampton POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-75.34734152255572,40.72635254915624,0.0
+								-75.40183221215612,40.80135254915624,0.0
+								-75.49,40.83,0.0
+								-75.57816778784387,40.80135254915624,0.0
+								-75.63265847744427,40.72635254915624,0.0
+								-75.63265847744427,40.63364745084376,0.0
+								-75.57816778784387,40.55864745084376,0.0
+								-75.49,40.53,0.0
+								-75.40183221215612,40.55864745084376,0.0
+								-75.34734152255572,40.63364745084376,0.0
+								-75.34734152255572,40.72635254915624,0.0
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -10411,6 +11076,41 @@
 								170.56816778784386,-46.001352549156245,69314.71805599453
 								170.62265847744428,-45.92635254915624,69314.71805599453
 								170.62265847744428,-45.83364745084376,69314.71805599453
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>alexandria</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-77.09,38.82
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>alexandria POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-76.94734152255573,38.86635254915624,89587.97346140275
+								-77.00183221215613,38.94135254915624,89587.97346140275
+								-77.09,38.97,89587.97346140275
+								-77.17816778784388,38.94135254915624,89587.97346140275
+								-77.23265847744428,38.86635254915624,89587.97346140275
+								-77.23265847744428,38.77364745084376,89587.97346140275
+								-77.17816778784388,38.69864745084376,89587.97346140275
+								-77.09,38.67,89587.97346140275
+								-77.00183221215613,38.69864745084376,89587.97346140275
+								-76.94734152255573,38.77364745084376,89587.97346140275
+								-76.94734152255573,38.86635254915624,89587.97346140275
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -11327,6 +12027,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>lebanon</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-76.42,40.34
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>lebanon POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-76.27734152255573,40.38635254915624,54930.61443340548
+								-76.33183221215613,40.461352549156246,54930.61443340548
+								-76.42,40.49,54930.61443340548
+								-76.50816778784387,40.461352549156246,54930.61443340548
+								-76.56265847744427,40.38635254915624,54930.61443340548
+								-76.56265847744427,40.293647450843764,54930.61443340548
+								-76.50816778784387,40.21864745084376,54930.61443340548
+								-76.42,40.190000000000005,54930.61443340548
+								-76.33183221215613,40.21864745084376,54930.61443340548
+								-76.27734152255573,40.293647450843764,54930.61443340548
+								-76.27734152255573,40.38635254915624,54930.61443340548
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>killarney</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -11677,6 +12412,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>cumberland</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-70.55,43.94
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>cumberland POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-70.40734152255573,43.98635254915624,97295.50745276567
+								-70.46183221215612,44.06135254915624,97295.50745276567
+								-70.55,44.089999999999996,97295.50745276567
+								-70.63816778784387,44.06135254915624,97295.50745276567
+								-70.69265847744427,43.98635254915624,97295.50745276567
+								-70.69265847744427,43.89364745084376,97295.50745276567
+								-70.63816778784387,43.818647450843756,97295.50745276567
+								-70.55,43.79,97295.50745276567
+								-70.46183221215612,43.818647450843756,97295.50745276567
+								-70.40734152255573,43.89364745084376,97295.50745276567
+								-70.40734152255573,43.98635254915624,97295.50745276567
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>guayaquil</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -11776,6 +12546,41 @@
 								-112.89183221215613,36.86864745084376,0.0
 								-112.83734152255573,36.94364745084376,0.0
 								-112.83734152255573,37.03635254915624,0.0
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>santa clara</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-121.97,37.37
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>santa clara POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-121.82734152255573,37.41635254915624,0.0
+								-121.88183221215613,37.49135254915624,0.0
+								-121.97,37.519999999999996,0.0
+								-122.05816778784387,37.49135254915624,0.0
+								-122.11265847744427,37.41635254915624,0.0
+								-122.11265847744427,37.32364745084376,0.0
+								-122.05816778784387,37.248647450843755,0.0
+								-121.97,37.22,0.0
+								-121.88183221215613,37.248647450843755,0.0
+								-121.82734152255573,37.32364745084376,0.0
+								-121.82734152255573,37.41635254915624,0.0
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -12231,6 +13036,41 @@
 								-93.84183221215613,29.778647450843756,0.0
 								-93.78734152255574,29.853647450843756,0.0
 								-93.78734152255574,29.94635254915624,0.0
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>san antonio</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-71.61,-33.6
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>san antonio POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-71.46734152255573,-33.55364745084376,119894.76363991853
+								-71.52183221215613,-33.47864745084376,119894.76363991853
+								-71.61,-33.45,119894.76363991853
+								-71.69816778784387,-33.47864745084376,119894.76363991853
+								-71.75265847744427,-33.55364745084376,119894.76363991853
+								-71.75265847744427,-33.64635254915624,119894.76363991853
+								-71.69816778784387,-33.721352549156244,119894.76363991853
+								-71.61,-33.75,119894.76363991853
+								-71.52183221215613,-33.721352549156244,119894.76363991853
+								-71.46734152255573,-33.64635254915624,119894.76363991853
+								-71.46734152255573,-33.55364745084376,119894.76363991853
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -12861,6 +13701,41 @@
 								-76.22183221215613,36.55864745084376,138629.43611198905
 								-76.16734152255573,36.63364745084376,138629.43611198905
 								-76.16734152255573,36.72635254915624,138629.43611198905
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>burlington</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-74.86,40.07
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>burlington POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-74.71734152255573,40.11635254915624,80471.89562170501
+								-74.77183221215613,40.19135254915624,80471.89562170501
+								-74.86,40.22,80471.89562170501
+								-74.94816778784387,40.19135254915624,80471.89562170501
+								-75.00265847744427,40.11635254915624,80471.89562170501
+								-75.00265847744427,40.02364745084376,80471.89562170501
+								-74.94816778784387,39.94864745084376,80471.89562170501
+								-74.86,39.92,80471.89562170501
+								-74.77183221215613,39.94864745084376,80471.89562170501
+								-74.71734152255573,40.02364745084376,80471.89562170501
+								-74.71734152255573,40.11635254915624,80471.89562170501
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -13567,6 +14442,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>halifax</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-78.93,36.77
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>halifax POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-78.78734152255574,36.81635254915624,69314.71805599453
+								-78.84183221215613,36.891352549156245,69314.71805599453
+								-78.93,36.92,69314.71805599453
+								-79.01816778784388,36.891352549156245,69314.71805599453
+								-79.07265847744428,36.81635254915624,69314.71805599453
+								-79.07265847744428,36.723647450843764,69314.71805599453
+								-79.01816778784388,36.64864745084376,69314.71805599453
+								-78.93,36.620000000000005,69314.71805599453
+								-78.84183221215613,36.64864745084376,69314.71805599453
+								-78.78734152255574,36.723647450843764,69314.71805599453
+								-78.78734152255574,36.81635254915624,69314.71805599453
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>adelaide</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -13666,6 +14576,41 @@
 								35.73816778784387,-9.241352549156241,80471.89562170501
 								35.79265847744427,-9.166352549156242,80471.89562170501
 								35.79265847744427,-9.073647450843756,80471.89562170501
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>newton</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-89.16,32.32
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>newton POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-89.01734152255572,32.36635254915624,0.0
+								-89.07183221215612,32.44135254915624,0.0
+								-89.16,32.47,0.0
+								-89.24816778784387,32.44135254915624,0.0
+								-89.30265847744427,32.36635254915624,0.0
+								-89.30265847744427,32.27364745084376,0.0
+								-89.24816778784387,32.19864745084376,0.0
+								-89.16,32.17,0.0
+								-89.07183221215612,32.19864745084376,0.0
+								-89.01734152255572,32.27364745084376,0.0
+								-89.01734152255572,32.36635254915624,0.0
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -14121,6 +15066,41 @@
 								0.08816778784387093,-0.12135254915624213,168364.7914993237
 								0.142658477444273,-0.046352549156242144,168364.7914993237
 								0.14265847744427304,0.046352549156242075,168364.7914993237
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>florida</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-66.58,18.39
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>florida POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-66.43734152255573,18.436352549156243,164791.84330021645
+								-66.49183221215613,18.511352549156243,164791.84330021645
+								-66.58,18.54,164791.84330021645
+								-66.66816778784387,18.511352549156243,164791.84330021645
+								-66.72265847744427,18.436352549156243,164791.84330021645
+								-66.72265847744427,18.343647450843758,164791.84330021645
+								-66.66816778784387,18.26864745084376,164791.84330021645
+								-66.58,18.240000000000002,164791.84330021645
+								-66.49183221215613,18.26864745084376,164791.84330021645
+								-66.43734152255573,18.343647450843758,164791.84330021645
+								-66.43734152255573,18.436352549156243,164791.84330021645
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -14926,6 +15906,41 @@
 								23.818167787843873,37.858647450843755,97295.50745276567
 								23.872658477444272,37.93364745084376,97295.50745276567
 								23.872658477444272,38.026352549156236,97295.50745276567
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>san juan</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-66.13,18.44
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>san juan POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-65.98734152255572,18.486352549156244,80471.89562170501
+								-66.04183221215612,18.561352549156243,80471.89562170501
+								-66.13,18.59,80471.89562170501
+								-66.21816778784387,18.561352549156243,80471.89562170501
+								-66.27265847744427,18.486352549156244,80471.89562170501
+								-66.27265847744427,18.39364745084376,80471.89562170501
+								-66.21816778784387,18.31864745084376,80471.89562170501
+								-66.13,18.290000000000003,80471.89562170501
+								-66.04183221215612,18.31864745084376,80471.89562170501
+								-65.98734152255572,18.39364745084376,80471.89562170501
+								-65.98734152255572,18.486352549156244,80471.89562170501
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -16746,6 +17761,41 @@
 								-75.38183221215613,44.58864745084376,0.0
 								-75.32734152255573,44.66364745084376,0.0
 								-75.32734152255573,44.75635254915624,0.0
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>jackson</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-84.4,42.24
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>jackson POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-84.25734152255573,42.28635254915624,0.0
+								-84.31183221215613,42.361352549156244,0.0
+								-84.4,42.39,0.0
+								-84.48816778784388,42.361352549156244,0.0
+								-84.54265847744428,42.28635254915624,0.0
+								-84.54265847744428,42.19364745084376,0.0
+								-84.48816778784388,42.11864745084376,0.0
+								-84.4,42.09,0.0
+								-84.31183221215613,42.11864745084376,0.0
+								-84.25734152255573,42.19364745084376,0.0
+								-84.25734152255573,42.28635254915624,0.0
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>
@@ -18677,6 +19727,41 @@
 				</Polygon>
 			</Placemark>
 			<Placemark>
+				<name>toledo</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-4.03,39.86
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>toledo POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-3.8873415225557273,39.90635254915624,54930.61443340548
+								-3.9418322121561293,39.98135254915624,54930.61443340548
+								-4.03,40.01,54930.61443340548
+								-4.118167787843872,39.98135254915624,54930.61443340548
+								-4.172658477444274,39.90635254915624,54930.61443340548
+								-4.172658477444274,39.81364745084376,54930.61443340548
+								-4.118167787843872,39.73864745084376,54930.61443340548
+								-4.03,39.71,54930.61443340548
+								-3.9418322121561293,39.73864745084376,54930.61443340548
+								-3.8873415225557273,39.81364745084376,54930.61443340548
+								-3.8873415225557273,39.90635254915624,54930.61443340548
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
 				<name>yakima</name>
 				<styleUrl>#transBluePoly</styleUrl>
 				<Point>
@@ -19406,6 +20491,41 @@
 								-76.41183221215613,38.84864745084376,34657.35902799726
 								-76.35734152255573,38.92364745084376,34657.35902799726
 								-76.35734152255573,39.01635254915624,34657.35902799726
+								</coordinates>
+						</LinearRing>
+					</outerBoundaryIs>
+				</Polygon>
+			</Placemark>
+			<Placemark>
+				<name>victoria</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Point>
+					<coordinates>
+						-96.98,28.82
+					</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
+				<name>victoria POLYGON</name>
+				<styleUrl>#transBluePoly</styleUrl>
+				<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>
+				<Polygon>
+					<extrude>1</extrude><tessellate>1</tessellate>
+					<altitudeMode>relativeToGround</altitudeMode>
+					<outerBoundaryIs>
+						<LinearRing>
+							<coordinates>
+								-96.83734152255573,28.866352549156243,119894.76363991853
+								-96.89183221215613,28.941352549156242,119894.76363991853
+								-96.98,28.97,119894.76363991853
+								-97.06816778784388,28.941352549156242,119894.76363991853
+								-97.12265847744428,28.866352549156243,119894.76363991853
+								-97.12265847744428,28.773647450843757,119894.76363991853
+								-97.06816778784388,28.698647450843758,119894.76363991853
+								-96.98,28.67,119894.76363991853
+								-96.89183221215613,28.698647450843758,119894.76363991853
+								-96.83734152255573,28.773647450843757,119894.76363991853
+								-96.83734152255573,28.866352549156243,119894.76363991853
 								</coordinates>
 						</LinearRing>
 					</outerBoundaryIs>

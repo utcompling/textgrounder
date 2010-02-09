@@ -17,6 +17,8 @@ public abstract class Gazetteer extends THashMap<String, Coordinate> {
     protected static Pattern allDigits = Pattern.compile("^[0-9]+$");
     protected static Pattern rawCoord = Pattern.compile("^\\-?[0-9]+$");
 
+    public abstract List<Location> get(String Placename) throws Exception;
+
     /*public Gazetteer (String location, int gazType) throws FileNotFoundException, IOException {
 
 	BufferedReader gazIn = new BufferedReader(new FileReader(location));

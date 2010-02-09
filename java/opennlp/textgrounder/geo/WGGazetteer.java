@@ -269,4 +269,22 @@ public class WGGazetteer extends Gazetteer {
 	    super.finalize();
 	}
     }
+
+    public List<Location> get(String placename) throws Exception {
+	ArrayList<Location> locationsToReturn = new ArrayList<Location>();
+
+	ResultSet rs = stat.executeQuery("select * from places where name = \"" + placename + "\";");
+	while(rs.next()) {
+	    Location locationToAdd = new Location(rs.getInt("id"),
+						  rs.getString("name"),
+						  rs.getString("type"),
+						  new Coordinate(rs.getDouble("lon"), rs.getDouble("lat")),
+						  rs.getInt("pop"),
+						  rs.getString("container"),
+						  0);
+	    locationsToReturn.add(locationToAdd);
+	}
+	rs.close();
+	return locationsToReturn;
+    }
 }

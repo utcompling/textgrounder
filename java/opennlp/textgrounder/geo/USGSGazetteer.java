@@ -55,4 +55,8 @@ public class USGSGazetteer extends Gazetteer {
 	  System.out.println(placenamesToCoords.get("galveston"));*/
 
     }
+
+    public List<Location> get(String placename) {
+	return new ArrayList<Location>();
+    }
 }

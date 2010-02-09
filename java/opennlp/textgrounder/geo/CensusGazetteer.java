@@ -98,4 +98,7 @@ public class CensusGazetteer extends Gazetteer {
 
     }
 
+    public List<Location> get(String placename) {
+	return new ArrayList<Location>();
+    }
 }
