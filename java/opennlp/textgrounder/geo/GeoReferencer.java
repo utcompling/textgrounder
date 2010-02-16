@@ -18,6 +18,8 @@ public class GeoReferencer {
     
     private CRFClassifier classifier;
 
+    private DocumentSet docSet = new DocumentSet();
+
     private boolean initializedXMLFile = false;
     private boolean finalizedXMLFile = false;
 
@@ -27,21 +29,80 @@ public class GeoReferencer {
 	classifier = classif;
     }
 
-    private List<Location> disambiguatePlacenames(SNERPlaceCounter placeCounts) throws Exception {
-	ArrayList<Location> locs = new ArrayList<Location>();
+    private String stripPunc(String aString) {
+	while(aString.length() > 0 && !Character.isLetterOrDigit(aString.charAt(0)))
+	    aString = aString.substring(1);
+	while(aString.length() > 0 && !Character.isLetterOrDigit(aString.charAt(aString.length()-1)))
+	    aString = aString.substring(0, aString.length()-1);
+	return aString;
+    }
 
-	TObjectIntIterator<String> placeIterator = placeCounts.iterator();
+    private String getPlacenameString(ToponymSpan curTopSpan, int docIndex) {
+	String toReturn = "";
+	ArrayList<Integer> curDoc = docSet.get(docIndex);
+
+	for(int i = curTopSpan.begin; i < curTopSpan.end; i++)
+	    toReturn += docSet.getWordForInt(curDoc.get(i)) + " ";
+
+	return stripPunc(toReturn.trim());
+    }
+
+    private List<Location> disambiguateAndCountPlacenames(SNERPairListSet pairListSet) throws Exception {
+	ArrayList<Location> locs = new ArrayList<Location>();
+	//TIntHashSet locationsFound = new TIntHashSet();
+
+	TIntIntHashMap idsToCounts = new TIntIntHashMap();
+
+	/*	TObjectIntIterator<String> placeIterator = placeCounts.iterator();
 	for (int i = placeCounts.size(); i-- > 0;) {
-	    placeIterator.advance();
-	    String placename = placeIterator.key();
-	    int count = placeIterator.value();
+	placeIterator.advance();*/
+	assert(pairListSet.size() == docSet.size());
+	for(int docIndex = 0; docIndex < docSet.size(); docIndex++) {
+	    ArrayList<ToponymSpan> curDocSpans = pairListSet.get(docIndex);
+	    ArrayList<Integer> curDoc = docSet.get(docIndex);
+	    
+	    for(int topSpanIndex = 0; topSpanIndex < curDocSpans.size(); topSpanIndex++) {
+		System.out.println("topSpanIndex: " + topSpanIndex);
+		ToponymSpan curTopSpan = curDocSpans.get(topSpanIndex);
+
+		String placename = getPlacenameString(curTopSpan, docIndex).toLowerCase();
+		System.out.println(placename);
+
+		if(!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
+		    continue;
+
+		List<Location> possibleLocations = gazetteer.get(placename);
+		Location curLocation = popBaselineDisambiguate(possibleLocations);
+		if(curLocation == null) continue;
+
+		/*if(!locationsFound.contains(curLocation.id)) {
+		    locs.add(curLocation);
+		    locationsFound.add(curLocation.id);
+		    }*/
+
+		int curCount = idsToCounts.get(curLocation.id);
+		if(curCount == 0) {// sentinel for not found in hashmap
+		    locs.add(curLocation);
+		    idsToCounts.put(curLocation.id, 1);
+		    System.out.println("Found first " + curLocation.name + "; id = " + curLocation.id);
+		}
+		else {
+		    idsToCounts.increment(curLocation.id);
+		    System.out.println("Found " + curLocation.name + " #" + idsToCounts.get(curLocation.id));
+		}
+	    }
+
+
+
+	    //String placename = getPlacenameStrin(;
+	    //int count = placeIterator.value();
 	    //double height = Math.log(placeIterator.value()) * barScale;
 
-	    List<Location> possibleLocations = gazetteer.get(placename);
+	    /*List<Location> possibleLocations = gazetteer.get(placename);
 	    Location curLocation = popBaselineDisambiguate(possibleLocations);
 	    if(curLocation == null) continue;
 	    curLocation.count = count;
-	    locs.add(curLocation);
+	    locs.add(curLocation);*/
 	    
 
 	    /*Coordinate coord;
@@ -53,6 +114,9 @@ public class GeoReferencer {
 	    if(coord.longitude == 9999.99) // sentinel
 	    continue;*/
 	}
+
+	for(int i = 0; i < locs.size(); i++) // set all the counts properly
+	    locs.get(i).count = idsToCounts.get(locs.get(i).id);
 
 	return locs;
     }
@@ -124,12 +188,14 @@ public class GeoReferencer {
 	out.close();
     }
 
-    public void processPath(File myPath, SNERPlaceCounter placeCounts) throws Exception {
+    public void processPath(File myPath, SNERPairListSet pairListSet) throws Exception {
 	if(myPath.isDirectory())
 	    for(String pathname : myPath.list())
-		processPath(new File(pathname), placeCounts);
-	else
-	    placeCounts.extractPlacesFromFile(myPath.getPath());
+		processPath(new File(pathname), pairListSet);
+	else {
+   	    docSet.addDocumentFromFile(myPath.getPath());
+	    pairListSet.addToponymSpansFromFile(myPath.getPath());
+	}
     }
 
 
@@ -223,10 +289,11 @@ public class GeoReferencer {
 	GeoReferencer grefUS = new GeoReferencer(myGaz, 50000, myClassifier);
 		
 	System.out.println("Writing KML file " + outputFilename + " ...");
-	SNERPlaceCounter placeCounts = new SNERPlaceCounter(myGaz, myClassifier);
-	grefUS.processPath(argFile, placeCounts);
+	//SNERPlaceCounter placeCounts = new SNERPlaceCounter(myGaz, myClassifier);
+	SNERPairListSet pairListSet = new SNERPairListSet(myClassifier);
+	grefUS.processPath(argFile, pairListSet);
 	System.out.println("Disambiguating place names found...");
-	grefUS.writeXMLFile(grefUS.disambiguatePlacenames(placeCounts), outputFilename, args[0]);
+	grefUS.writeXMLFile(grefUS.disambiguateAndCountPlacenames(pairListSet), outputFilename, args[0]);
 		
 	System.out.println("Done.");
     }

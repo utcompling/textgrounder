@@ -153,7 +153,10 @@ public class WGGazetteer extends Gazetteer {
 
 
 	    // old disambiguation method; as of now still used just to keep a hashtable of places for quick lookup of whether the database has at least 1 mention of the place:
-	    int storedPop = populations.get(placeName);
+	    if(placeType.equals("locality"))
+		put(placeName, new Coordinate(0.0, 0.0));
+
+	    /*int storedPop = populations.get(placeName);
 	    if(storedPop == 0) { // 0 is not-found sentinal for TObjectIntHashMap
 		populations.put(placeName, population);
 		put(placeName, curCoord);
@@ -163,12 +166,12 @@ public class WGGazetteer extends Gazetteer {
 	    else if(population > storedPop) {
 		populations.put(placeName, population);
 		put(placeName, curCoord);
-		/*if(placeName.contains("venice")) {
-		    System.out.println("putting bigger " + placeName + ": " + population);
-		    System.out.println("  coordinates: " + curCoord);
-		    }*/
+		//if(placeName.contains("venice")) {
+		//    System.out.println("putting bigger " + placeName + ": " + population);
+		//    System.out.println("  coordinates: " + curCoord);
+		//    }
 		//System.out.println("Found a bigger " + placeName + " with population " + population + "; was " + storedPop);
-	    }
+	    }*/
 
 	}
 
