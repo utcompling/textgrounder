@@ -43,7 +43,7 @@ public class DocumentSet extends ArrayList<ArrayList<Integer> > {
 	String curLine;
 	while(true) {
 	    curLine = textIn.readLine();
-	    if(curLine.equals(""))
+	    if(curLine == null || curLine.equals(""))
 		break;
 	    
 	    for(String token : curLine.split(" ")) {

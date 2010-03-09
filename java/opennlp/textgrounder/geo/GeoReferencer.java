@@ -15,6 +15,11 @@ public class GeoReferencer {
 
     private int barScale = 50000;
     private Gazetteer gazetteer;
+    private Hashtable<String, List<Location> > gazCache = new Hashtable<String, List<Location> >();
+
+    private double degreesPerRegion = 3.0;
+    private Region[][] regionArray;
+    private int regionArrayWidth, regionArrayHeight, activeRegions;
     
     private CRFClassifier classifier;
 
@@ -47,7 +52,57 @@ public class GeoReferencer {
 	return stripPunc(toReturn.trim());
     }
 
+    private void initializeRegionArray() {
+	activeRegions = 0;
+
+	regionArrayWidth = 360 / (int)degreesPerRegion;
+	regionArrayHeight = 180 / (int)degreesPerRegion;
+
+	regionArray = new Region[regionArrayWidth][regionArrayHeight];
+	for(int w = 0; w < regionArrayWidth; w++) {
+	    for(int h = 0; h < regionArrayHeight; h++) {
+		regionArray[w][h] = null;
+	    }
+	}
+    }
+
+    private void addLocationsToRegionArray(List<Location> locs) {
+	for(Location loc : locs) {
+	    int curX = (int)(loc.coord.latitude + 180) / (int)degreesPerRegion;
+	    int curY = (int)(loc.coord.longitude + 90) / (int)degreesPerRegion;
+	    if(regionArray[curX][curY] == null) {
+		double minLon = loc.coord.longitude - loc.coord.longitude % degreesPerRegion;
+		double maxLon = minLon + degreesPerRegion;
+		double minLat = loc.coord.latitude - loc.coord.latitude % degreesPerRegion;
+		double maxLat = minLat + degreesPerRegion;
+		regionArray[curX][curY] = new Region(minLon, maxLon, minLat, maxLat);
+		activeRegions++;
+	    }
+	}
+    }
+
+    private void printRegionArray() {
+	System.out.println();
+
+	for(int h = 0; h < regionArrayHeight; h++) {
+	    for(int w = 0; w < regionArrayWidth; w++) {
+		if(regionArray[w][h] == null)
+		    System.out.print("0");
+		else
+		    System.out.print("1");
+	    }
+	    System.out.println();
+	}
+
+	System.out.println(activeRegions + " active regions for this document out of a possible "
+			   + (regionArrayHeight * regionArrayWidth) + " (region size = "
+			   + degreesPerRegion + " x " + degreesPerRegion + " degrees).");
+    }
+
     private List<Location> disambiguateAndCountPlacenames(SNERPairListSet pairListSet) throws Exception {
+
+	System.out.println("Disambiguating place names found...");
+
 	ArrayList<Location> locs = new ArrayList<Location>();
 	//TIntHashSet locationsFound = new TIntHashSet();
 
@@ -71,9 +126,18 @@ public class GeoReferencer {
 		if(!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
 		    continue;
 
-		List<Location> possibleLocations = gazetteer.get(placename);
+		// try the cache first. if not in there, do a full DB lookup and add that pair to the cache:
+		List<Location> possibleLocations = gazCache.get(placename);
+		if(possibleLocations == null) {
+		    possibleLocations = gazetteer.get(placename);
+		    gazCache.put(placename, possibleLocations);
+		    addLocationsToRegionArray(possibleLocations);
+		}
+
 		Location curLocation = popBaselineDisambiguate(possibleLocations);
 		if(curLocation == null) continue;
+
+		// instantiate the region containing curLocation
 
 		/*if(!locationsFound.contains(curLocation.id)) {
 		    locs.add(curLocation);
@@ -117,6 +181,8 @@ public class GeoReferencer {
 
 	for(int i = 0; i < locs.size(); i++) // set all the counts properly
 	    locs.get(i).count = idsToCounts.get(locs.get(i).id);
+
+	System.out.println("Done.");
 
 	return locs;
     }
@@ -191,10 +257,10 @@ public class GeoReferencer {
     public void processPath(File myPath, SNERPairListSet pairListSet) throws Exception {
 	if(myPath.isDirectory())
 	    for(String pathname : myPath.list())
-		processPath(new File(pathname), pairListSet);
+		processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), pairListSet);
 	else {
-   	    docSet.addDocumentFromFile(myPath.getPath());
-	    pairListSet.addToponymSpansFromFile(myPath.getPath());
+   	    docSet.addDocumentFromFile(myPath.getCanonicalPath());
+	    pairListSet.addToponymSpansFromFile(myPath.getCanonicalPath());
 	}
     }
 
@@ -210,6 +276,8 @@ public class GeoReferencer {
 	File argFile = null;
 	String outputFilename = null;
 
+	double dpr = 3.0; // degrees per region
+
 	CommandLineParser optparse = new PosixParser();
 
 	Options options = new Options();
@@ -217,6 +285,7 @@ public class GeoReferencer {
 	options.addOption("m", "model", true, "model [default = PopBaseline]"); // nothing is done with this yet
 	options.addOption("i", "input", true, "input file or directory name");
 	options.addOption("o", "output", true, "output filename [default = 'output.kml']");
+	options.addOption("d", "degrees-per-region", true, "size of Region squares in degrees [default = 3.0]");
 	options.addOption("h", "help", false, "print help");
 
 	try {
@@ -261,6 +330,9 @@ public class GeoReferencer {
 	    else {
 		outputFilename = "output.kml";
 	    }
+
+	    if(cline.hasOption("d"))
+		dpr = Double.parseDouble(cline.getOptionValue("d"));
 	    
 	} catch(ParseException exp) {
 	    System.out.println("Unexpected exception parsing command line options: " + exp.getMessage());
@@ -287,15 +359,17 @@ public class GeoReferencer {
 	myClassifier.loadClassifier(Constants.STANFORD_NER_HOME+"/classifiers/ner-eng-ie.crf-3-all2008-distsim.ser.gz");
 
 	GeoReferencer grefUS = new GeoReferencer(myGaz, 50000, myClassifier);
+	grefUS.degreesPerRegion = dpr;
 		
 	System.out.println("Writing KML file " + outputFilename + " ...");
 	//SNERPlaceCounter placeCounts = new SNERPlaceCounter(myGaz, myClassifier);
 	SNERPairListSet pairListSet = new SNERPairListSet(myClassifier);
+	System.out.println(argFile.getCanonicalPath());
 	grefUS.processPath(argFile, pairListSet);
-	System.out.println("Disambiguating place names found...");
-	grefUS.writeXMLFile(grefUS.disambiguateAndCountPlacenames(pairListSet), outputFilename, args[0]);
-		
-	System.out.println("Done.");
+	grefUS.initializeRegionArray();
+	List<Location> locs = grefUS.disambiguateAndCountPlacenames(pairListSet);
+	grefUS.printRegionArray();
+	grefUS.writeXMLFile(locs, outputFilename, args[0]);
     }
 
 }
