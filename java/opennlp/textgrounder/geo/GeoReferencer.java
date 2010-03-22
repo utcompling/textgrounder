@@ -29,13 +29,7 @@ public class GeoReferencer {
         barScale = bscale;
         gazetteer = gaz;
         classifier = classif;
-
-        if (paragraphsAsDocs == -1) {
-            docSet = new DocumentSet();
-        } else {
-            docSet = new ParagraphSet(paragraphsAsDocs);
-        }
-
+        docSet = new DocumentSet(paragraphsAsDocs);
     }
 
     private String stripPunc(String aString) {
@@ -304,10 +298,10 @@ public class GeoReferencer {
         options.addOption("i", "input", true, "input file or directory name");
         options.addOption("o", "output", true, "output filename [default = 'output.kml']");
         options.addOption("d", "degrees-per-region", true, "size of Region squares in degrees [default = 3.0]");
-        options.addOption("p", "paragraphs-as-docs", true, "number of paragraphs to treat as a document");
+        options.addOption("p", "paragraphs-as-docs", true, "number of paragraphs to treat as a document. Set the argument to 0 if documents should be treated whole");
         options.addOption("h", "help", false, "print help");
 
-        int paragraphsAsDocs = -1;
+        int paragraphsAsDocs = 0;
         try {
             CommandLine cline = optparse.parse(options, args);
 
