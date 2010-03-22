@@ -17,7 +17,7 @@ public class DocumentSet extends ArrayList<ArrayList<Integer> > {
     public TObjectIntHashMap<String> wordsToInts = new TObjectIntHashMap<String>();
     public TIntObjectHashMap<String> intsToWords = new TIntObjectHashMap<String>();
 
-    private int nextInt = 0;
+    protected int nextInt = 0;
 
     public DocumentSet() {
 	
