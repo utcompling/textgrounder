@@ -28,6 +28,11 @@ import java.text.DecimalFormat;
  */
 public class Constants {
 
+    /**
+     * Machine epsilon for comparing equality in floating point numbers.
+     */
+    public static final double EPSILON = 1e-6;
+
     // the location of TextGrounder
     public final static String TEXTGROUNDER_HOME = System.getenv("TEXTGROUNDER_HOME");
     public final static String TEXTGROUNDER_DATA = System.getenv("TEXTGROUNDER_DATA");

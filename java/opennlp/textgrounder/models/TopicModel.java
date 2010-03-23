@@ -17,9 +17,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
-import opennlp.textgrounder.annealers.Annealer;
+import java.util.ArrayList;
+
+import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.ec.util.MersenneTwisterFast;
-import opennlp.textgrounder.geo.DocumentSet;
+import opennlp.textgrounder.geo.*;
+import opennlp.textgrounder.util.Constants;
 
 /**
  * Basic topic model implementation.
@@ -49,8 +52,8 @@ public class TopicModel {
      */
     protected int[] topicCounts;
     /**
-     * Counts of words per topic. However, since access more often occurs in
-     * terms of the words, it will be a topic by word matrix.
+     * Counts of tcount per topic. However, since access more often occurs in
+     * terms of the tcount, it will be a topic by word matrix.
      */
     protected int[] wordByTopicCounts;
     /**
@@ -96,7 +99,7 @@ public class TopicModel {
 
     /**
      * This is not the default constructor. It should only be called by
-     * constructors of derived classes.
+     * constructors of derived classes if necessary.
      */
     protected TopicModel() {
     }
@@ -108,10 +111,9 @@ public class TopicModel {
      *              arrays of word indices
      * @param T Number of topics
      */
-    public TopicModel(DocumentSet docSet, int T) {
-        this.T = T;
+    public TopicModel(DocumentSet docSet, CommandLineOptions options) {
         this.docSet = docSet;
-        rand = new MersenneTwisterFast(0);
+        initializeFromOptions(options);
         allocateFields(docSet, T);
     }
 
@@ -148,6 +150,48 @@ public class TopicModel {
         for (int i = 0; i < W * T; ++i) {
             wordByTopicCounts[i] = 0;
         }
+
+        int tcount = 0, docs = 0;
+        for (ArrayList<Integer> doc : docSet) {
+            int offset = 0;
+            for (int idx : doc) {
+                wordVector[tcount + offset] = idx;
+                documentVector[tcount + offset] = docs;
+                offset += 1;
+            }
+            tcount += doc.size();
+            docs += 1;
+        }
+    }
+
+    /**
+     * 
+     * @param options
+     */
+    protected void initializeFromOptions(CommandLineOptions options) {
+        T = options.getTopics();
+        alpha = options.getAlpha();
+        beta = options.getBeta();
+
+        int randSeed = options.getRandomSeed();
+        if (randSeed == 0) {
+            /**
+             * Case for complete random seeding
+             */
+            rand = new MersenneTwisterFast();
+        } else {
+            /**
+             * Case for non-random seeding. For debugging. Also, the default
+             */
+            rand = new MersenneTwisterFast(randSeed);
+        }
+        double targetTemp = options.getTargetTemperature();
+        double initialTemp = options.getInitialTemperature();
+        if (Math.abs(initialTemp - targetTemp) < Constants.EPSILON) {
+            annealer = new EmptyAnnealer(options);
+        } else {
+            annealer = new SimulatedAnnealer(options);
+        }
     }
 
     /**
@@ -167,13 +211,18 @@ public class TopicModel {
         }
     }
 
+    /**
+     * Train topic model
+     *
+     * @param annealer Annealing scheme to use
+     */
     public void train(Annealer annealer) {
         int wordid, docid, topicid;
         int wordoff, docoff;
         double[] probs = new double[T];
         double totalprob, max, r;
 
-        while (!annealer.nextIter()) {
+        while (annealer.nextIter()) {
             for (int i = 0; i < N; ++i) {
                 wordid = wordVector[i];
                 docid = documentVector[i];

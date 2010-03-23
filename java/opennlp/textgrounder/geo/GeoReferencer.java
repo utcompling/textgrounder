@@ -42,7 +42,7 @@ public class GeoReferencer {
         return aString;
     }
 
-    private String getPlacenameString(ToponymSpan curTopSpan, int docIndex) {
+    public String getPlacenameString(ToponymSpan curTopSpan, int docIndex) {
         String toReturn = "";
         ArrayList<Integer> curDoc = docSet.get(docIndex);
 

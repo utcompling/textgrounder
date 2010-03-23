@@ -17,12 +17,19 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.annealers;
 
+import opennlp.textgrounder.geo.CommandLineOptions;
+
 /**
- *
+ * A full simulated annealer
+ * 
  * @author tsmoon
  */
 public class SimulatedAnnealer extends Annealer {
-    
+
+    public SimulatedAnnealer(CommandLineOptions options) {
+        super(options);
+    }
+
     @Override
     public double annealProbs(int starti, double[] classes) {
         double sum = 0, sumw = 0;
@@ -54,10 +61,5 @@ public class SimulatedAnnealer extends Annealer {
          * For now, we set everything so that it sums to one.
          */
         return 1;
-    }
-
-    @Override
-    public boolean nextIter() {
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 }
