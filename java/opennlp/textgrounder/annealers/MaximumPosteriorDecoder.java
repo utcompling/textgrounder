@@ -45,4 +45,9 @@ public class MaximumPosteriorDecoder extends Annealer {
         classes[maxid] = 1;
         return 1;
     }
+
+    @Override
+    public boolean nextIter() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 }

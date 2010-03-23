@@ -55,4 +55,9 @@ public class SimulatedAnnealer extends Annealer {
          */
         return 1;
     }
+
+    @Override
+    public boolean nextIter() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 }

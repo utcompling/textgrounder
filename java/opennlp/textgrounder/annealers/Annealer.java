@@ -56,6 +56,8 @@ public abstract class Annealer {
 
     public abstract double annealProbs(int starti, double[] classes);
 
+    public abstract boolean nextIter();
+    
     /**
      * Anneal an array of probabilities. For use when every array is
      * meaningfully populated. Discards with bounds checking.
