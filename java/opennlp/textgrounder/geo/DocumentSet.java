@@ -96,6 +96,13 @@ public class DocumentSet extends ArrayList<ArrayList<Integer>> {
             }
         }
 
+        /**
+         * Remove last item if the previous loop did not populate it.
+         */
+        if (this.get(this.size() - 1).size() == 0) {
+            this.remove(this.size() - 1);
+        }
+
         System.out.println("done.");
 
         textIn.close();
