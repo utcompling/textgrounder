@@ -43,6 +43,9 @@ public class Constants {
     // the location of the World Gazetteer database file
     public final static String WGDB_PATH = System.getenv("WGDB_PATH");
 
+    // the location of the TR-CoNLL database file
+    public static final String TRDB_PATH = System.getenv("TRDB_PATH");
+
     // the location of the user's home directory
     public final static String USER_HOME = System.getProperty("user.home");
 

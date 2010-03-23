@@ -327,6 +327,8 @@ public class GeoReferencer {
                     myGaz = new USGSGazetteer();
                 } else if (gazTypeArg.startsWith("w")) {
                     myGaz = new WGGazetteer();
+		} else if (gazTypeArg.startsWith("t")) {
+		    myGaz = new TRGazetteer();
                 } else {
                     System.err.println("Error: unrecognized gazetteer type: " + gazTypeArg);
                     System.err.println("Please enter w, c, u, or g.");

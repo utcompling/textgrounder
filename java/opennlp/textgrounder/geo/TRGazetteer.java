@@ -13,18 +13,35 @@ import org.sqlite.*;
 
 import gnu.trove.*;
 
-public class WGGazetteer extends Gazetteer {
+public class TRGazetteer extends Gazetteer {
 
     private Connection conn;
     private Statement stat;
 
-    public WGGazetteer () throws FileNotFoundException, IOException, Exception {
-	this(Constants.TEXTGROUNDER_DATA+"/gazetteer/dataen-fixed.txt.gz");
+    public TRGazetteer () throws FileNotFoundException, IOException, Exception {
+	this("/tmp/toponym.db"/*Constants.TRDB_PATH*/);
     }
 
-    public WGGazetteer (String location) throws FileNotFoundException, IOException, Exception {
+    public TRGazetteer (String location) throws FileNotFoundException, IOException, Exception {
+
+	Class.forName("org.sqlite.JDBC");
+
+	conn = DriverManager.getConnection("jdbc:sqlite:"+location);
+
+	stat = conn.createStatement();
+
+	//ResultSet rs = stat.executeQuery("show tables;");
+	ResultSet rs = stat.executeQuery("select * from sqlite_master where type='table';");
 	
-	BufferedReader gazIn = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(location))));
+	while(rs.next()) {
+	    System.out.println(rs.toString()/*rs.getString("id") + ": " + rs.getString("name") + ": " + rs.getString("type") + ": " + rs.getString("lat") + ": " + rs.getString("lon") + ": " + rs.getString("pop")*/);
+	    }
+
+	rs.close();
+
+	conn.close();
+	
+	/*BufferedReader gazIn = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(location))));
 	
 	System.out.println("Populating World Gazetteer gazetteer from " + location + " ...");
 
@@ -32,7 +49,6 @@ public class WGGazetteer extends Gazetteer {
 	//System.out.println("after class");
 	//System.out.println(DriverManager.getLoginTimeout());
 	//System.out.println(DriverManager.getDrivers());
-	System.out.println("jdbc:sqlite:"+Constants.WGDB_PATH);
 	conn = DriverManager.getConnection("jdbc:sqlite:"+Constants.WGDB_PATH);
 	//System.out.println("after conn");
 
@@ -59,7 +75,7 @@ public class WGGazetteer extends Gazetteer {
 	    //System.out.println(curLine);
 	    tokens = curLine.split("\t");
 
-	    /*if(tokens.length < 8) {
+	    if(tokens.length < 8) {
 		//System.out.println("\nNot enough columns found; this file format should have at least " + 8 + " but only " + tokens.length + " were found. Quitting.");
 		//System.exit(0);
 
@@ -69,7 +85,7 @@ public class WGGazetteer extends Gazetteer {
 		}
 
 		continue;
-	    }*/
+	    }
 
 	    if(tokens.length < 6) {
 		if(tokens.length >= 2) {
@@ -80,10 +96,10 @@ public class WGGazetteer extends Gazetteer {
 	    }
 
 
-	    /*if(!tokens[4].equals("locality") && allDigits.matcher(tokens[5]).matches()) {
+	    if(!tokens[4].equals("locality") && allDigits.matcher(tokens[5]).matches()) {
 		nonPointPopulations.put(tokens[1].toLowerCase(), Integer.parseInt(tokens[5]));
 		//System.out.println("Found country " + tokens[1].toLowerCase() + ": " + tokens[5]);
-		}*/
+		}
 
 	    String placeName = tokens[1].toLowerCase();
 
@@ -157,7 +173,7 @@ public class WGGazetteer extends Gazetteer {
 	    if(placeType.equals("locality"))
 		put(placeName, new Coordinate(0.0, 0.0));
 
-	    /*int storedPop = populations.get(placeName);
+	    int storedPop = populations.get(placeName);
 	    if(storedPop == 0) { // 0 is not-found sentinal for TObjectIntHashMap
 		populations.put(placeName, population);
 		put(placeName, curCoord);
@@ -172,7 +188,7 @@ public class WGGazetteer extends Gazetteer {
 		//    System.out.println("  coordinates: " + curCoord);
 		//    }
 		//System.out.println("Found a bigger " + placeName + " with population " + population + "; was " + storedPop);
-	    }*/
+	    }
 
 	}
 
@@ -200,9 +216,9 @@ public class WGGazetteer extends Gazetteer {
 
 	//conn.close();
 	
-	gazIn.close();
+	/*gazIn.close();
 
-	System.out.println("Done. Number of entries in database = " + (placeId - 1));
+	  System.out.println("Done. Number of entries in database = " + (placeId - 1));*/
 
 	//System.exit(0);
 
