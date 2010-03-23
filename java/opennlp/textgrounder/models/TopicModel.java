@@ -17,6 +17,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
+import opennlp.textgrounder.annealers.Annealer;
 import opennlp.textgrounder.ec.util.MersenneTwisterFast;
 import opennlp.textgrounder.geo.DocumentSet;
 
@@ -85,9 +86,13 @@ public class TopicModel {
      */
     protected int N;
     /**
-     * 
+     * Collection of training data
      */
     protected DocumentSet docSet;
+    /**
+     * Handles simulated annealing, burn-in, and full sampling cycle
+     */
+    protected Annealer annealer;
 
     /**
      * This is not the default constructor. It should only be called by
@@ -162,18 +167,47 @@ public class TopicModel {
         }
     }
 
-    public void train() {
+    public void train(Annealer annealer) {
         int wordid, docid, topicid;
         int wordoff, docoff;
-        for (int i = 0; i < N; ++i) {
-            wordid = wordVector[i];
-            docid = documentVector[i];
-            topicid = topicVector[i];
+        double[] probs = new double[T];
+        double totalprob, max, r;
 
+        while (!annealer.nextIter()) {
+            for (int i = 0; i < N; ++i) {
+                wordid = wordVector[i];
+                docid = documentVector[i];
+                topicid = topicVector[i];
+                docoff = docid * T;
+                wordoff = wordid * T;
 
-            topicCounts[topicid]--;
-            topicByDocumentCounts[docid * T + topicid]--;
-            wordByTopicCounts[wordid * T + topicid]--;
+                topicCounts[topicid]--;
+                topicByDocumentCounts[docoff + topicid]--;
+                wordByTopicCounts[wordoff + topicid]--;
+
+                try {
+                    for (int j = 0;; ++j) {
+                        probs[j] = (wordByTopicCounts[wordoff + j] + beta)
+                              / (topicCounts[j] + betaW)
+                              * (topicByDocumentCounts[docoff + j] + alpha);
+                    }
+                } catch (ArrayIndexOutOfBoundsException e) {
+                }
+                totalprob = annealer.annealProbs(probs);
+                r = rand.nextDouble() * totalprob;
+
+                max = probs[0];
+                topicid = 0;
+                while (r > max) {
+                    topicid++;
+                    max += probs[topicid];
+                }
+                topicVector[i] = topicid;
+
+                topicCounts[topicid]++;
+                topicByDocumentCounts[docoff + topicid]++;
+                wordByTopicCounts[wordoff + topicid]++;
+            }
         }
     }
 }
