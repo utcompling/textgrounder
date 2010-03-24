@@ -17,6 +17,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
+import opennlp.textgrounder.io.DocumentSet;
 import java.util.ArrayList;
 
 import opennlp.textgrounder.annealers.*;
@@ -29,7 +30,7 @@ import opennlp.textgrounder.util.Constants;
  *
  * @author tsmoon
  */
-public class TopicModel {
+public class TopicModel extends Model {
 
     /**
      * Random number generator. Implements the fast Mersenne Twister.

@@ -17,6 +17,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
+import opennlp.textgrounder.io.DocumentSet;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -154,7 +155,7 @@ public class RegionModel extends TopicModel {
             for (int topSpanIndex = 0; topSpanIndex < curDocSpans.size();
                   topSpanIndex++) {
                 ToponymSpan curTopSpan = curDocSpans.get(topSpanIndex);
-                String placename = georef.getPlacenameString(curTopSpan, docIndex).toLowerCase();
+                String placename = null;//georef.getPlacenameString(curTopSpan, docIndex).toLowerCase();
 
                 for (int i = curTopSpan.begin; i < curTopSpan.end; ++i) {
                     toponymVector[docoff + i] = 1;

@@ -18,7 +18,6 @@
 package opennlp.textgrounder.geo;
 
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -48,7 +47,7 @@ public class CommandLineOptions {
     /**
      * Number of training iterations
      */
-    protected int numIterations = 100;
+    protected int iterations = 100;
     /**
      * Number to seed random number generator. If 0 is passed from the commandline,
      * it means that a true random seed will be used (i.e. one based on the current time).
@@ -89,6 +88,37 @@ public class CommandLineOptions {
      * Number of iterations between samples
      */
     protected int lag = 10;
+    /**
+     * Type of gazette. The gazette shorthands from the commandline are:
+     * <pre>
+     * "c": CensusGazetteer
+     * "n": NGAGazetteer
+     * "u": USGSGazetteer
+     * "w": WGGazetteer (default)
+     * "t": TRGazetteer
+     * </pre>
+     */
+    protected String gazetteType = "w";
+    /**
+     * Path to training data. Can be directory or a single file.
+     */
+    protected String input = null;
+    /**
+     * Path to output kml file.
+     */
+    protected String output = "output.kml";
+    /**
+     * Number of paragraphs to treat as a single document.
+     */
+    protected int paragraphsAsDocs;
+    /**
+     * Dimensions of region in degrees
+     */
+    protected double degreesPerRegion = 3.0;
+    /**
+     * Size of bars in kml output
+     */
+    protected int barScale = 50000;
 
     /**
      *
@@ -108,11 +138,20 @@ public class CommandLineOptions {
                 case 'b':
                     beta = Double.parseDouble(value);
                     break;
+                case 'c':
+                    barScale = Integer.parseInt(value);
+                    break;
+                case 'd':
+                    degreesPerRegion = Double.parseDouble(value);
+                    break;
+                case 'e':
+                    iterations = Integer.parseInt(value);
+                    break;
+                case 'g':
+                    gazetteType = value;
+                    break;
                 case 'i':
-                    opt = option.getOpt();
-                    if (opt.equals("itr")) {
-                        numIterations = Integer.parseInt(value);
-                    }
+                    input = value;
                     break;
                 case 'k':
                     opt = option.getOpt();
@@ -122,23 +161,28 @@ public class CommandLineOptions {
                         lag = Integer.parseInt(value);
                     }
                     break;
+                case 'm':
+                    opt = option.getOpt();
+                    if (opt.equals("mi")) {
+                        initialTemperature = Double.parseDouble(value);
+                    } else if (opt.equals("md")) {
+                        temperatureDecrement = Double.parseDouble(value);
+                    } else if (opt.equals("mt")) {
+                        targetTemperature = Double.parseDouble(value);
+                    }
+                    break;
                 case 'o':
                     opt = option.getOpt();
                     if (opt.equals("ot")) {
                         tabularOutputFilename = value;
                         tabulatedOutput = new BufferedWriter(new OutputStreamWriter(
                               new FileOutputStream(tabularOutputFilename)));
+                    } else if (opt.equals("o")) {
+                        output = value;
                     }
                     break;
                 case 'p':
-                    opt = option.getOpt();
-                    if (opt.equals("pi")) {
-                        initialTemperature = Double.parseDouble(value);
-                    } else if (opt.equals("pd")) {
-                        temperatureDecrement = Double.parseDouble(value);
-                    } else if (opt.equals("pt")) {
-                        targetTemperature = Double.parseDouble(value);
-                    }
+                    paragraphsAsDocs = Integer.parseInt(value);
                     break;
                 case 'r':
                     randomSeed = Integer.valueOf(value);
@@ -161,8 +205,8 @@ public class CommandLineOptions {
         return beta;
     }
 
-    public int getNumIterations() {
-        return numIterations;
+    public int getIterations() {
+        return iterations;
     }
 
     public String getTabularOutputFilename() {
@@ -197,17 +241,35 @@ public class CommandLineOptions {
         return topics;
     }
 
-    /**
-     * @return the number of samples take
-     */
     public int getSamples() {
         return samples;
     }
 
-    /**
-     * @return the number of iterations per sample
-     */
     public int getLag() {
         return lag;
+    }
+
+    public String getGazetteType() {
+        return gazetteType;
+    }
+
+    public String getInput() {
+        return input;
+    }
+
+    public String getOutput() {
+        return output;
+    }
+
+    public int getParagraphsAsDocs() {
+        return paragraphsAsDocs;
+    }
+
+    public double getDegreesPerRegion() {
+        return degreesPerRegion;
+    }
+
+    public int getBarScale() {
+        return barScale;
     }
 }

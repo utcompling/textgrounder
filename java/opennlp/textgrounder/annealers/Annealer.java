@@ -82,7 +82,7 @@ public abstract class Annealer {
         temperatureReciprocal = 1 / temperature;
         temperatureDecrement = options.getTemperatureDecrement();
         targetTemperature = options.getTargetTemperature();
-        innerIterationsMax = options.getNumIterations();
+        innerIterationsMax = options.getIterations();
         outerIterationsMax =
               (int) Math.round((initialTemperature - targetTemperature)
               / temperatureDecrement) + 1;
