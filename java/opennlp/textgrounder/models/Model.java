@@ -1,20 +1,3 @@
-///////////////////////////////////////////////////////////////////////////////
-//  Copyright (C) 2010 Taesun Moon, The University of Texas at Austin
-//
-//  This library is free software; you can redistribute it and/or
-//  modify it under the terms of the GNU Lesser General Public
-//  License as published by the Free Software Foundation; either
-//  version 3 of the License, or (at your option) any later version.
-//
-//  This library is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU Lesser General Public License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public
-//  License along with this program; if not, write to the Free Software
-//  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
 import opennlp.textgrounder.io.DocumentSet;
@@ -32,23 +15,47 @@ import opennlp.textgrounder.topostructs.*;
 
 /**
  * Base abstract class for all training models. Defines some methods for
- * interfacing with gazetteers. Declares some fields
+ * interfacing with gazetteers. Declares some fields that deal with regions
+ * and placenames.
  * 
- * @author tsmoon
+ * @author 
  */
 public abstract class Model {
 
+    /**
+     *
+     */
     protected Gazetteer gazetteer;
+    /**
+     *
+     */
     protected SNERPairListSet pairListSet;
+    /**
+     *
+     */
     protected Hashtable<String, List<Location>> gazCache;
+    /**
+     *
+     */
     protected double degreesPerRegion;
+    /**
+     *
+     */
     protected Region[][] regionArray;
+    /**
+     * 
+     */
     protected int activeRegions;
     /**
      * Collection of training data
      */
     protected DocumentSet docSet;
 
+    /**
+     *
+     * @param aString
+     * @return
+     */
     protected String stripPunc(String aString) {
         while (aString.length() > 0 && !Character.isLetterOrDigit(aString.charAt(0))) {
             aString = aString.substring(1);
@@ -59,6 +66,12 @@ public abstract class Model {
         return aString;
     }
 
+    /**
+     * 
+     * @param curTopSpan
+     * @param docIndex
+     * @return
+     */
     protected String getPlacenameString(ToponymSpan curTopSpan, int docIndex) {
         String toReturn = "";
         ArrayList<Integer> curDoc = docSet.get(docIndex);
@@ -70,6 +83,10 @@ public abstract class Model {
         return stripPunc(toReturn.trim());
     }
 
+    /**
+     * 
+     * @param locs
+     */
     protected void addLocationsToRegionArray(List<Location> locs) {
         for (Location loc : locs) {
             int curX = (int) (loc.coord.latitude + 180) / (int) degreesPerRegion;

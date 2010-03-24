@@ -39,7 +39,7 @@ public class GeoReferencerLDA extends BaseApp {
 
         if (cline.hasOption('h')) {
             HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp("java GeoReferencer", options);
+            formatter.printHelp("java GeoReferencerLDA", options);
             System.exit(0);
         }
 
