@@ -24,22 +24,16 @@ import opennlp.textgrounder.util.Constants;
  *
  * @author 
  */
-public class BaselineModel {
+public class BaselineModel extends Model {
 
-    private int barScale = 50000;
-    private Gazetteer gazetteer;
-    private Hashtable<String, List<Location>> gazCache = new Hashtable<String, List<Location>>();
-    private double degreesPerRegion = 3.0;
-    private Region[][] regionArray;
-    private int regionArrayWidth, regionArrayHeight, activeRegions;
-    private CRFClassifier classifier;
-    private DocumentSet docSet;
-    protected SNERPairListSet pairListSet;
+    protected int barScale = 50000;
+    protected int regionArrayWidth, regionArrayHeight;
+    protected CRFClassifier classifier;
     protected List<Location> locations;
     protected String outputFilename;
     protected File inputFile;
-    private boolean initializedXMLFile = false;
-    private boolean finalizedXMLFile = false;
+    protected boolean initializedXMLFile = false;
+    protected boolean finalizedXMLFile = false;
 
     public BaselineModel(Gazetteer gaz, int bscale, CRFClassifier classif,
           int paragraphsAsDocs) {
@@ -88,27 +82,6 @@ public class BaselineModel {
         docSet = new DocumentSet(options.getParagraphsAsDocs());
     }
 
-    private String stripPunc(String aString) {
-        while (aString.length() > 0 && !Character.isLetterOrDigit(aString.charAt(0))) {
-            aString = aString.substring(1);
-        }
-        while (aString.length() > 0 && !Character.isLetterOrDigit(aString.charAt(aString.length() - 1))) {
-            aString = aString.substring(0, aString.length() - 1);
-        }
-        return aString;
-    }
-
-    public String getPlacenameString(ToponymSpan curTopSpan, int docIndex) {
-        String toReturn = "";
-        ArrayList<Integer> curDoc = docSet.get(docIndex);
-
-        for (int i = curTopSpan.begin; i < curTopSpan.end; i++) {
-            toReturn += docSet.getWordForInt(curDoc.get(i)) + " ";
-        }
-
-        return stripPunc(toReturn.trim());
-    }
-
     public void initializeRegionArray() {
         activeRegions = 0;
 
@@ -119,21 +92,6 @@ public class BaselineModel {
         for (int w = 0; w < regionArrayWidth; w++) {
             for (int h = 0; h < regionArrayHeight; h++) {
                 regionArray[w][h] = null;
-            }
-        }
-    }
-
-    private void addLocationsToRegionArray(List<Location> locs) {
-        for (Location loc : locs) {
-            int curX = (int) (loc.coord.latitude + 180) / (int) degreesPerRegion;
-            int curY = (int) (loc.coord.longitude + 90) / (int) degreesPerRegion;
-            if (regionArray[curX][curY] == null) {
-                double minLon = loc.coord.longitude - loc.coord.longitude % degreesPerRegion;
-                double maxLon = minLon + degreesPerRegion;
-                double minLat = loc.coord.latitude - loc.coord.latitude % degreesPerRegion;
-                double maxLat = minLat + degreesPerRegion;
-                regionArray[curX][curY] = new Region(minLon, maxLon, minLat, maxLat);
-                activeRegions++;
             }
         }
     }
@@ -251,7 +209,7 @@ public class BaselineModel {
         return locations;
     }
 
-    private Location popBaselineDisambiguate(List<Location> possibleLocations)
+    protected Location popBaselineDisambiguate(List<Location> possibleLocations)
           throws Exception {
         int maxPointPop = -1;
         Location pointToReturn = null;

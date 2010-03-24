@@ -33,9 +33,18 @@ public class BaseApp {
         options.addOption("e", "training-iterations", true, "number of training iterations (default=100)");
         options.addOption("g", "gazetteer", true, "gazetteer to use [world, census, NGA, USGS; default = world]");
         options.addOption("i", "input", true, "input file or directory name");
+        options.addOption("ks", "samples", true, "number of samples to take (default=100)");
+        options.addOption("kl", "lag", true, "number of iterations between samples (default=100)");
         options.addOption("m", "model", true, "model [default = PopBaseline]"); // nothing is done with this yet
         options.addOption("o", "output", true, "output filename [default = 'output.kml']");
+        options.addOption("ot", "output-tabulated-probabilities", true, "path of tabulated probability output");
         options.addOption("p", "paragraphs-as-docs", true, "number of paragraphs to treat as a document. Set the argument to 0 if documents should be treated whole");
+        options.addOption("pi", "initial-temperature", true, "initial temperature for annealing regime (default=0.1)");
+        options.addOption("pd", "temperature-decrement", true, "temperature decrement steps (default=0.1)");
+        options.addOption("pt", "target-temperature", true, "temperature at which to stop annealing (default=1)");
+        options.addOption("r", "random-seed", true, "seed for random number generator. set argument to 0 to seed with the current time (default=1)");
+        options.addOption("t", "topics", true, "number of topics for baseline topic model (default=50)");
+
         options.addOption("h", "help", false, "print help");
     }
 }

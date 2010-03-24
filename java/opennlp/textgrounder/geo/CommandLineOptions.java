@@ -119,6 +119,10 @@ public class CommandLineOptions {
      * Size of bars in kml output
      */
     protected int barScale = 50000;
+    /**
+     * Model type
+     */
+    protected String model = null;
 
     /**
      *
@@ -162,14 +166,7 @@ public class CommandLineOptions {
                     }
                     break;
                 case 'm':
-                    opt = option.getOpt();
-                    if (opt.equals("mi")) {
-                        initialTemperature = Double.parseDouble(value);
-                    } else if (opt.equals("md")) {
-                        temperatureDecrement = Double.parseDouble(value);
-                    } else if (opt.equals("mt")) {
-                        targetTemperature = Double.parseDouble(value);
-                    }
+                    model = value;
                     break;
                 case 'o':
                     opt = option.getOpt();
@@ -182,7 +179,16 @@ public class CommandLineOptions {
                     }
                     break;
                 case 'p':
-                    paragraphsAsDocs = Integer.parseInt(value);
+                    opt = option.getOpt();
+                    if (opt.equals("p")) {
+                        paragraphsAsDocs = Integer.parseInt(value);
+                    } else if (opt.equals("pi")) {
+                        initialTemperature = Double.parseDouble(value);
+                    } else if (opt.equals("pd")) {
+                        temperatureDecrement = Double.parseDouble(value);
+                    } else if (opt.equals("pt")) {
+                        targetTemperature = Double.parseDouble(value);
+                    }
                     break;
                 case 'r':
                     randomSeed = Integer.valueOf(value);
@@ -271,5 +277,9 @@ public class CommandLineOptions {
 
     public int getBarScale() {
         return barScale;
+    }
+
+    public String getModel() {
+        return model;
     }
 }

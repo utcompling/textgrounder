@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.geo.*;
@@ -35,48 +37,10 @@ import opennlp.textgrounder.ners.*;
  * 
  * @author tsmoon
  */
-public class RegionModel extends TopicModel {
+public class MultiwordRegionModel extends RegionModel {
 
-    /**
-     * Table from index to region
-     */
-    protected Hashtable<Integer, Region> regionMap;
-    /**
-     * Table from region to index. Reverse storage table for regionMap.
-     */
-    protected Hashtable<Region, Integer> reverseRegionMap;
-    /**
-     * Table from placename to set of region indexes. The indexes and their
-     * referents are stored in regionMap.
-     */
-    protected Hashtable<String, HashSet<Integer>> nameToRegionIndex;
-    /**
-     * Vector of toponyms. If 0, the word is not a toponym. If 1, it is.
-     */
-    protected int[] toponymVector;
-    /**
-     * An index of toponyms and possible regions. The goal is fast lookup and not
-     * frugality with memory. The dimensions are equivalent to the wordByTopicCounts
-     * array. Instead of counts, this array is populated with ones and zeros.
-     * If a toponym occurs in a certain region, the cell value is one, zero if not.
-     */
-    protected int[] regionByToponym;
-
-    public RegionModel(CommandLineOptions options) {
-        BaselineModel bm = null;
-        try {
-            bm = new BaselineModel(options);
-            bm.processPath();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            System.exit(1);
-        }
-        
-        this.gazetteer = bm.gazetteer;
-        this.gazCache = bm.gazCache;
-        this.degreesPerRegion = bm.degreesPerRegion;
-        this.pairListSet = bm.pairListSet;
-
+    public MultiwordRegionModel(CommandLineOptions options) {
+        super(options);
         regionMap = new Hashtable<Integer, Region>();
         reverseRegionMap = new Hashtable<Region, Integer>();
         nameToRegionIndex = new Hashtable<String, HashSet<Integer>>();
@@ -180,6 +144,7 @@ public class RegionModel extends TopicModel {
                     try {
                         possibleLocations = gazetteer.get(placename);
                     } catch (Exception ex) {
+                        Logger.getLogger(MultiwordRegionModel.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 }
                 HashSet<Integer> regions = getRegions(possibleLocations);
@@ -223,119 +188,5 @@ public class RegionModel extends TopicModel {
                 }
             }
         }
-    }
-
-    /**
-     * Randomly initialize fields for training. If word is a toponym, choose
-     * random region only from regions aligned to name.
-     */
-    @Override
-    public void randomInitialize() {
-        int wordid, docid, topicid;
-        int istop;
-        int wordoff;
-        double[] probs = new double[T];
-        double totalprob, max, r;
-
-        for (int i = 0; i < N; ++i) {
-            wordid = wordVector[i];
-            docid = documentVector[i];
-            istop = toponymVector[i];
-
-            if (istop == 1) {
-                wordoff = wordid * T;
-                totalprob = 0;
-                try {
-                    for (int j = 0;; ++j) {
-                        totalprob += probs[j] = regionByToponym[wordoff + j];
-                    }
-                } catch (ArrayIndexOutOfBoundsException e) {
-                }
-                r = rand.nextDouble() * totalprob;
-
-                max = probs[0];
-                topicid = 0;
-                while (r > max) {
-                    topicid++;
-                    max += probs[topicid];
-                }
-
-            } else {
-                topicid = rand.nextInt(T);
-            }
-
-            topicVector[i] = topicid;
-            topicCounts[topicid]++;
-            topicByDocumentCounts[docid * T + topicid]++;
-            wordByTopicCounts[wordid * T + topicid]++;
-        }
-    }
-
-    /**
-     * Train topics
-     *
-     * @param annealer Annealing scheme to use
-     */
-    @Override
-    public void train(Annealer annealer) {
-        int wordid, docid, topicid;
-        int wordoff, docoff;
-        int istop;
-        double[] probs = new double[T];
-        double totalprob, max, r;
-
-        while (annealer.nextIter()) {
-            for (int i = 0; i < N; ++i) {
-                wordid = wordVector[i];
-                docid = documentVector[i];
-                topicid = topicVector[i];
-                istop = toponymVector[i];
-                docoff = docid * T;
-                wordoff = wordid * T;
-
-                topicCounts[topicid]--;
-                topicByDocumentCounts[docoff + topicid]--;
-                wordByTopicCounts[wordoff + topicid]--;
-
-                try {
-                    if (istop == 1) {
-                        for (int j = 0;; ++j) {
-                            probs[j] = (wordByTopicCounts[wordoff + j] + beta)
-                                  / (topicCounts[j] + betaW)
-                                  * (topicByDocumentCounts[docoff + j] + alpha)
-                                  * regionByToponym[wordoff + j];
-                        }
-                    } else {
-                        for (int j = 0;; ++j) {
-                            probs[j] = (wordByTopicCounts[wordoff + j] + beta)
-                                  / (topicCounts[j] + betaW)
-                                  * (topicByDocumentCounts[docoff + j] + alpha);
-                        }
-                    }
-                } catch (ArrayIndexOutOfBoundsException e) {
-                }
-                totalprob = annealer.annealProbs(probs);
-                r = rand.nextDouble() * totalprob;
-
-                max = probs[0];
-                topicid = 0;
-                while (r > max) {
-                    topicid++;
-                    max += probs[topicid];
-                }
-                topicVector[i] = topicid;
-
-                topicCounts[topicid]++;
-                topicByDocumentCounts[docoff + topicid]++;
-                wordByTopicCounts[wordoff + topicid]++;
-            }
-        }
-    }
-
-    /**
-     * Training routine to call from external class
-     */
-    public void train() {
-        train(annealer);
     }
 }

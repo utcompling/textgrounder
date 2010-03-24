@@ -17,12 +17,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
-import opennlp.textgrounder.io.DocumentSet;
 import java.util.ArrayList;
 
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.ec.util.MersenneTwisterFast;
 import opennlp.textgrounder.geo.*;
+import opennlp.textgrounder.io.DocumentSet;
 import opennlp.textgrounder.util.Constants;
 
 /**
@@ -89,10 +89,6 @@ public class TopicModel extends Model {
      * Number of tokens
      */
     protected int N;
-    /**
-     * Collection of training data
-     */
-    protected DocumentSet docSet;
     /**
      * Handles simulated annealing, burn-in, and full sampling cycle
      */
@@ -166,8 +162,9 @@ public class TopicModel extends Model {
     }
 
     /**
+     * Takes commandline options and initializes/assigns model parameters
      * 
-     * @param options
+     * @param options Default options and options from the command line
      */
     protected void initializeFromOptions(CommandLineOptions options) {
         T = options.getTopics();
