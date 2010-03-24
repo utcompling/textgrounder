@@ -1,5 +1,11 @@
 package opennlp.textgrounder.geo;
 
+import opennlp.textgrounder.gazetteers.NGAGazetteer;
+import opennlp.textgrounder.gazetteers.CensusGazetteer;
+import opennlp.textgrounder.gazetteers.WGGazetteer;
+import opennlp.textgrounder.gazetteers.TRGazetteer;
+import opennlp.textgrounder.gazetteers.USGSGazetteer;
+import opennlp.textgrounder.gazetteers.Gazetteer;
 import java.io.*;
 import java.util.*;
 

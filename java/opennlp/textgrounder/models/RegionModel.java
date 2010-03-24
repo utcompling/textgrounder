@@ -27,7 +27,7 @@ import opennlp.textgrounder.annealers.Annealer;
 
 import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.geo.DocumentSet;
-import opennlp.textgrounder.geo.Gazetteer;
+import opennlp.textgrounder.gazetteers.Gazetteer;
 import opennlp.textgrounder.geo.GeoReferencer;
 import opennlp.textgrounder.geo.Location;
 import opennlp.textgrounder.geo.Region;

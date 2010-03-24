@@ -1,4 +1,4 @@
-package opennlp.textgrounder.geo;
+package opennlp.textgrounder.gazetteers;
 
 import opennlp.textgrounder.util.*;
 
@@ -12,6 +12,8 @@ import org.sqlite.JDBC;
 import org.sqlite.*;
 
 import gnu.trove.*;
+import opennlp.textgrounder.geo.Coordinate;
+import opennlp.textgrounder.geo.Location;
 
 public class TRGazetteer extends Gazetteer {
 

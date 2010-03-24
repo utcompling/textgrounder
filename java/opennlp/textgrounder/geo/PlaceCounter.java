@@ -1,5 +1,6 @@
 package opennlp.textgrounder.geo;
 
+import opennlp.textgrounder.gazetteers.Gazetteer;
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;

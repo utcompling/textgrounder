@@ -1,4 +1,4 @@
-package opennlp.textgrounder.geo;
+package opennlp.textgrounder.gazetteers;
 
 import opennlp.textgrounder.util.*;
 
@@ -8,6 +8,8 @@ import java.util.regex.*;
 import java.util.zip.*;
 
 import gnu.trove.*;
+import opennlp.textgrounder.geo.Coordinate;
+import opennlp.textgrounder.geo.Location;
 
 public class USGSGazetteer extends Gazetteer {
 

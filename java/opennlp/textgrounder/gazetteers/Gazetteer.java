@@ -1,4 +1,4 @@
-package opennlp.textgrounder.geo;
+package opennlp.textgrounder.gazetteers;
 
 import java.io.*;
 import java.util.*;
@@ -6,6 +6,8 @@ import java.util.regex.*;
 import java.util.zip.*;
 
 import gnu.trove.*;
+import opennlp.textgrounder.geo.Coordinate;
+import opennlp.textgrounder.geo.Location;
 
 public abstract class Gazetteer extends THashMap<String, Coordinate> {
 
