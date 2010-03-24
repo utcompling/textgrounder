@@ -1,19 +1,18 @@
 package opennlp.textgrounder.geo;
 
-import opennlp.textgrounder.topostructs.Location;
-import opennlp.textgrounder.topostructs.Region;
-import opennlp.textgrounder.topostructs.Coordinate;
 import java.io.*;
 import java.util.*;
-
-import opennlp.textgrounder.gazetteers.*;
-import opennlp.textgrounder.util.*;
 
 import gnu.trove.*;
 
 import edu.stanford.nlp.ie.crf.*;
 
 import org.apache.commons.cli.*;
+
+import opennlp.textgrounder.gazetteers.*;
+import opennlp.textgrounder.topostructs.*;
+import opennlp.textgrounder.util.*;
+import opennlp.textgrounder.ners.*;
 
 public class GeoReferencer {
 

@@ -1,11 +1,12 @@
-package opennlp.textgrounder.geo;
+package opennlp.textgrounder.ners;
 
-import opennlp.textgrounder.gazetteers.Gazetteer;
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 
 import gnu.trove.*;
+
+import opennlp.textgrounder.gazetteers.Gazetteer;
 
 public class ListPlaceCounter extends TObjectIntHashMap<String> {
 

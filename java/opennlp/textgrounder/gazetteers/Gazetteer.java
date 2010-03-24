@@ -6,8 +6,8 @@ import java.util.regex.*;
 import java.util.zip.*;
 
 import gnu.trove.*;
-import opennlp.textgrounder.topostructs.Coordinate;
-import opennlp.textgrounder.topostructs.Location;
+
+import opennlp.textgrounder.topostructs.*;
 
 public abstract class Gazetteer extends THashMap<String, Coordinate> {
 

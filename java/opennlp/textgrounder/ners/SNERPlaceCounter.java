@@ -1,7 +1,4 @@
-package opennlp.textgrounder.geo;
-
-import opennlp.textgrounder.gazetteers.Gazetteer;
-import opennlp.textgrounder.util.*;
+package opennlp.textgrounder.ners;
 
 import java.io.*;
 import java.util.*;
@@ -12,6 +9,9 @@ import gnu.trove.*;
 import edu.stanford.nlp.ie.crf.*;
 import edu.stanford.nlp.ling.*;
 import edu.stanford.nlp.ling.CoreAnnotations.*;
+
+import opennlp.textgrounder.gazetteers.Gazetteer;
+import opennlp.textgrounder.util.*;
 
 public class SNERPlaceCounter extends TObjectIntHashMap<String> {
 

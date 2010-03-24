@@ -23,16 +23,12 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import opennlp.textgrounder.annealers.Annealer;
 
-import opennlp.textgrounder.geo.CommandLineOptions;
-import opennlp.textgrounder.geo.DocumentSet;
-import opennlp.textgrounder.gazetteers.Gazetteer;
-import opennlp.textgrounder.geo.GeoReferencer;
-import opennlp.textgrounder.topostructs.Location;
-import opennlp.textgrounder.topostructs.Region;
-import opennlp.textgrounder.geo.SNERPairListSet;
-import opennlp.textgrounder.geo.ToponymSpan;
+import opennlp.textgrounder.annealers.*;
+import opennlp.textgrounder.geo.*;
+import opennlp.textgrounder.gazetteers.*;
+import opennlp.textgrounder.topostructs.*;
+import opennlp.textgrounder.ners.*;
 
 /**
  * Topic model with region awareness.

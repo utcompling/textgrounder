@@ -1,4 +1,4 @@
-package opennlp.textgrounder.geo;
+package opennlp.textgrounder.ners;
 
 /**
  * Class for handling toponyms in a natural language text. Pair object that

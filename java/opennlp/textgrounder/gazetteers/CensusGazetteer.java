@@ -1,15 +1,14 @@
 package opennlp.textgrounder.gazetteers;
 
-import opennlp.textgrounder.util.*;
-
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 import java.util.zip.*;
 
 import gnu.trove.*;
-import opennlp.textgrounder.topostructs.Coordinate;
-import opennlp.textgrounder.topostructs.Location;
+
+import opennlp.textgrounder.topostructs.*;
+import opennlp.textgrounder.util.*;
 
 public class CensusGazetteer extends Gazetteer {
 

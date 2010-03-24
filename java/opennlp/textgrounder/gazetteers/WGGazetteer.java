@@ -1,7 +1,5 @@
 package opennlp.textgrounder.gazetteers;
 
-import opennlp.textgrounder.util.*;
-
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
@@ -12,8 +10,9 @@ import org.sqlite.JDBC;
 import org.sqlite.*;
 
 import gnu.trove.*;
-import opennlp.textgrounder.topostructs.Coordinate;
-import opennlp.textgrounder.topostructs.Location;
+
+import opennlp.textgrounder.topostructs.*;
+import opennlp.textgrounder.util.*;
 
 public class WGGazetteer extends Gazetteer {
 
