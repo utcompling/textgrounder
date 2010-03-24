@@ -1,14 +1,12 @@
 package opennlp.textgrounder.geo;
 
-import opennlp.textgrounder.gazetteers.NGAGazetteer;
-import opennlp.textgrounder.gazetteers.CensusGazetteer;
-import opennlp.textgrounder.gazetteers.WGGazetteer;
-import opennlp.textgrounder.gazetteers.TRGazetteer;
-import opennlp.textgrounder.gazetteers.USGSGazetteer;
-import opennlp.textgrounder.gazetteers.Gazetteer;
+import opennlp.textgrounder.topostructs.Location;
+import opennlp.textgrounder.topostructs.Region;
+import opennlp.textgrounder.topostructs.Coordinate;
 import java.io.*;
 import java.util.*;
 
+import opennlp.textgrounder.gazetteers.*;
 import opennlp.textgrounder.util.*;
 
 import gnu.trove.*;

@@ -1,4 +1,4 @@
-package opennlp.textgrounder.geo;
+package opennlp.textgrounder.topostructs;
 
 public class Coordinate {
     private final static double twoPI = 2*Math.PI;

@@ -8,8 +8,8 @@ import java.util.regex.*;
 import java.util.zip.*;
 
 import gnu.trove.*;
-import opennlp.textgrounder.geo.Coordinate;
-import opennlp.textgrounder.geo.Location;
+import opennlp.textgrounder.topostructs.Coordinate;
+import opennlp.textgrounder.topostructs.Location;
 
 public class NGAGazetteer extends Gazetteer {
 

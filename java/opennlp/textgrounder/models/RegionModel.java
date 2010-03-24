@@ -29,8 +29,8 @@ import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.geo.DocumentSet;
 import opennlp.textgrounder.gazetteers.Gazetteer;
 import opennlp.textgrounder.geo.GeoReferencer;
-import opennlp.textgrounder.geo.Location;
-import opennlp.textgrounder.geo.Region;
+import opennlp.textgrounder.topostructs.Location;
+import opennlp.textgrounder.topostructs.Region;
 import opennlp.textgrounder.geo.SNERPairListSet;
 import opennlp.textgrounder.geo.ToponymSpan;
 

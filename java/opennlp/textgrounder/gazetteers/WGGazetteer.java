@@ -12,8 +12,8 @@ import org.sqlite.JDBC;
 import org.sqlite.*;
 
 import gnu.trove.*;
-import opennlp.textgrounder.geo.Coordinate;
-import opennlp.textgrounder.geo.Location;
+import opennlp.textgrounder.topostructs.Coordinate;
+import opennlp.textgrounder.topostructs.Location;
 
 public class WGGazetteer extends Gazetteer {
 
