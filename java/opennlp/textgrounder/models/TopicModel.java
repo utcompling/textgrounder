@@ -257,4 +257,12 @@ public class TopicModel extends Model {
             }
         }
     }
+
+    /**
+     * 
+     */
+    @Override
+    public void train() {
+        train(annealer);
+    }
 }

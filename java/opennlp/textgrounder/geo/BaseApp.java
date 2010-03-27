@@ -20,11 +20,18 @@ package opennlp.textgrounder.geo;
 import org.apache.commons.cli.Options;
 
 /**
+ * Base class for setting command line options for all georeferencing classes that have a
+ * "main" method.
  *
  * @author tsmoon
  */
 public class BaseApp {
 
+    /**
+     * Takes an Options instance and adds/sets command line options.
+     *
+     * @param options Command line options
+     */
     protected static void setOptions(Options options) {
         options.addOption("a", "alpha", true, "alpha value (default=50/topics)");
         options.addOption("b", "beta", true, "beta value (default=0.1)");

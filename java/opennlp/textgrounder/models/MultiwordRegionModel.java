@@ -25,9 +25,7 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.geo.*;
-import opennlp.textgrounder.gazetteers.*;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.ners.*;
 

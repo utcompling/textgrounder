@@ -24,13 +24,11 @@ public class GeoReferencer extends BaseApp {
         CommandLineOptions modelOptions = new CommandLineOptions(cline);
         BaselineModel grefUS = new BaselineModel(modelOptions);
 
-        System.out.println("Writing KML file " + grefUS.getOutputFilename() + " ...");
-
         System.out.println(grefUS.getInputFile().getCanonicalPath());
-        grefUS.processPath();
-        grefUS.initializeRegionArray();
-        grefUS.disambiguateAndCountPlacenames();
+        grefUS.train();
         grefUS.printRegionArray();
-        grefUS.writeXMLFile(args[0]);
+
+        System.out.println("Writing KML file " + grefUS.getOutputFilename() + " ...");
+        grefUS.writeXMLFile();
     }
 }
