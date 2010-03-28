@@ -107,4 +107,36 @@ public class DocumentSet extends ArrayList<ArrayList<Integer>> {
 
         textIn.close();
     }
+
+    /**
+     * Add word to hash tables. To be used in
+     * external classes in post-initialization addition of placenames.
+     * 
+     * @param word word to add
+     */
+    public void addWord(String word) {
+        wordsToInts.put(word, nextInt);
+        intsToWords.put(nextInt, word);
+        nextInt++;
+    }
+
+    /**
+     * Checks whether word is in keys of wordsToInts or not. To be used in
+     * external classes in post-initialization addition of placenames.
+     *
+     * @param word word to check for existence
+     * @return truth value of whether word exists or not
+     */
+    public boolean hasWord(String word) {
+        return wordsToInts.containsKey(word);
+    }
+
+    /**
+     * Size of current dictionary
+     * 
+     * @return size of dictionary
+     */
+    public int getDictionarySize() {
+        return nextInt;
+    }
 }

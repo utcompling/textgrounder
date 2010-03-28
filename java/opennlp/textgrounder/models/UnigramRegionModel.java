@@ -25,7 +25,7 @@ import java.util.List;
 
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.geo.*;
-import opennlp.textgrounder.gazetteers.*;
+import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.ners.*;
 
@@ -35,8 +35,12 @@ import opennlp.textgrounder.ners.*;
  * 
  * @author tsmoon
  */
-public class RegionModel extends TopicModel {
+public class UnigramRegionModel extends TopicModel {
 
+    /**
+     * Callback class for handling mappings between regions, locations and placenames
+     */
+    protected RegionMapperCallback regionMapperCallback;
     /**
      * Table from index to region
      */
@@ -62,7 +66,18 @@ public class RegionModel extends TopicModel {
      */
     protected int[] regionByToponym;
 
-    public RegionModel(CommandLineOptions options) {
+    public UnigramRegionModel(CommandLineOptions options) {
+        regionMapperCallback = new UnigramRegionMapperCallback();
+        initialize(options, regionMapperCallback);
+    }
+
+    public UnigramRegionModel(CommandLineOptions options,
+          RegionMapperCallback regionMapperCallback) {
+        initialize(options, regionMapperCallback);
+    }
+
+    protected void initialize(CommandLineOptions options,
+          RegionMapperCallback regionMapperCallback) {
         BaselineModel bm = null;
         try {
             bm = new BaselineModel(options);
@@ -71,7 +86,7 @@ public class RegionModel extends TopicModel {
             ex.printStackTrace();
             System.exit(1);
         }
-        
+
         this.gazetteer = bm.gazetteer;
         this.gazCache = bm.gazCache;
         this.degreesPerRegion = bm.degreesPerRegion;
@@ -80,6 +95,9 @@ public class RegionModel extends TopicModel {
         regionMap = new Hashtable<Integer, Region>();
         reverseRegionMap = new Hashtable<Region, Integer>();
         nameToRegionIndex = new Hashtable<String, HashSet<Integer>>();
+
+        regionMapperCallback.setMaps(regionMap, reverseRegionMap, nameToRegionIndex);
+        this.regionMapperCallback = regionMapperCallback;
 
         T = 0;
         setAllocateRegions();
@@ -126,36 +144,9 @@ public class RegionModel extends TopicModel {
 
     /**
      *
-     * @param locs
-     * @return
-     */
-    protected HashSet<Integer> getRegions(List<Location> locs) {
-        HashSet<Integer> rs = new HashSet<Integer>();
-        for (Location loc : locs) {
-            int curX = (int) (loc.coord.latitude + 180) / (int) degreesPerRegion;
-            int curY = (int) (loc.coord.longitude + 90) / (int) degreesPerRegion;
-            if (regionArray[curX][curY] == null) {
-                double minLon = loc.coord.longitude - loc.coord.longitude % degreesPerRegion;
-                double maxLon = minLon + degreesPerRegion;
-                double minLat = loc.coord.latitude - loc.coord.latitude % degreesPerRegion;
-                double maxLat = minLat + degreesPerRegion;
-                Region current = new Region(minLon, maxLon, minLat, maxLat);
-                regionMap.put(T, current);
-                reverseRegionMap.put(current, T);
-                regionArray[curX][curY] = current;
-                activeRegions++;
-            }
-            rs.add(reverseRegionMap.get(regionArray[curX][curY]));
-        }
-        return rs;
-    }
-
-    /**
-     *
      * @param pairListSet
      */
     protected void setAllocateRegions() {
-
         int docoff = 0;
         for (int docIndex = 0; docIndex < docSet.size(); docIndex++) {
             ArrayList<ToponymSpan> curDocSpans = pairListSet.get(docIndex);
@@ -182,15 +173,21 @@ public class RegionModel extends TopicModel {
                     } catch (Exception ex) {
                     }
                 }
-                HashSet<Integer> regions = getRegions(possibleLocations);
-                if (nameToRegionIndex.contains(placename)) {
-                    nameToRegionIndex.get(placename).addAll(regions);
-                } else {
-                    nameToRegionIndex.put(placename, regions);
-                }
+                regionMapperCallback.setCurrentRegion(placename);
+                addLocationsToRegionArray(possibleLocations, regionMapperCallback);
             }
             docoff += docSet.get(docIndex).size();
         }
+
+        /**
+         * Confirm and fill in dictionary if placenames do not exist
+         */
+        for (String placename : nameToRegionIndex.keySet()) {
+            regionMapperCallback.confirmPlacenameTokens(placename, docSet);
+        }
+
+        W = docSet.getDictionarySize();
+        T = activeRegions;
 
         topicCounts = new int[T];
         for (int i = 0; i < T; ++i) {
@@ -204,7 +201,6 @@ public class RegionModel extends TopicModel {
         for (int i = 0; i < W * T; ++i) {
             wordByTopicCounts[i] = 0;
         }
-
         regionByToponym = new int[W * T];
         for (int i = 0; i < W * T; ++i) {
             regionByToponym[i] = 0;
@@ -217,10 +213,14 @@ public class RegionModel extends TopicModel {
         for (String placename : nameToRegionIndex.keySet()) {
             String[] names = placename.split(" ");
             for (String name : names) {
+                if (!docSet.hasWord(name)) {
+                    docSet.addWord(name);
+                }
                 int wordoff = docSet.getIntForWord(name) * T;
                 for (int j : nameToRegionIndex.get(placename)) {
                     regionByToponym[wordoff + j] = 1;
                 }
+
             }
         }
     }
@@ -330,12 +330,5 @@ public class RegionModel extends TopicModel {
                 wordByTopicCounts[wordoff + topicid]++;
             }
         }
-    }
-
-    /**
-     * Training routine to call from external class
-     */
-    public void train() {
-        train(annealer);
     }
 }

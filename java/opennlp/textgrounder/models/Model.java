@@ -1,5 +1,7 @@
 package opennlp.textgrounder.models;
 
+import opennlp.textgrounder.models.callbacks.RegionMapperCallback;
+import opennlp.textgrounder.models.callbacks.NullRegionMapperCallback;
 import opennlp.textgrounder.io.DocumentSet;
 import edu.stanford.nlp.ie.crf.CRFClassifier;
 import java.io.BufferedWriter;
@@ -120,15 +122,27 @@ public abstract class Model {
      * @param locs
      */
     protected void addLocationsToRegionArray(List<Location> locs) {
+        addLocationsToRegionArray(locs, new NullRegionMapperCallback());
+    }
+
+    /**
+     *
+     *
+     * @param locs
+     */
+    protected void addLocationsToRegionArray(List<Location> locs, RegionMapperCallback regionMapper) {
         for (Location loc : locs) {
             int curX = (int) (loc.coord.latitude + 180) / (int) degreesPerRegion;
             int curY = (int) (loc.coord.longitude + 90) / (int) degreesPerRegion;
+            Region current = null;
             if (regionArray[curX][curY] == null) {
                 double minLon = loc.coord.longitude - loc.coord.longitude % degreesPerRegion;
                 double maxLon = minLon + degreesPerRegion;
                 double minLat = loc.coord.latitude - loc.coord.latitude % degreesPerRegion;
                 double maxLat = minLat + degreesPerRegion;
-                regionArray[curX][curY] = new Region(minLon, maxLon, minLat, maxLat);
+                current = new Region(minLon, maxLon, minLat, maxLat);
+                regionMapper.addRegion(activeRegions, current);
+                regionArray[curX][curY] = current;
                 activeRegions++;
             }
         }

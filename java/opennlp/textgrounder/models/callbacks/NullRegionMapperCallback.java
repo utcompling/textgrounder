@@ -15,37 +15,31 @@
 //  License along with this program; if not, write to the Free Software
 //  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.geo;
+package opennlp.textgrounder.models.callbacks;
 
-import org.apache.commons.cli.*;
-
-import opennlp.textgrounder.models.*;
+import opennlp.textgrounder.io.DocumentSet;
+import opennlp.textgrounder.topostructs.Region;
 
 /**
- * App to be called from command line. Runs LDA based georeferencing models
+ * A callback class to 
  *
  * @author tsmoon
  */
-public class GeoReferencerLDA extends BaseApp {
+public class NullRegionMapperCallback extends RegionMapperCallback {
 
-    public static void main(String[] args) throws Exception {
+    @Override
+    public void addRegion(int idx, Region region) {
+    }
 
-        CommandLineParser optparse = new PosixParser();
+    @Override
+    public void addToPlace(Region region) {
+    }
 
-        Options options = new Options();
-        setOptions(options);
+    @Override
+    public void setCurrentRegion(String placename) {        
+    }
 
-        CommandLine cline = optparse.parse(options, args);
-
-        if (cline.hasOption('h')) {
-            HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp("java GeoReferencerLDA", options);
-            System.exit(0);
-        }
-
-        CommandLineOptions modelOptions = new CommandLineOptions(cline);
-        UnigramRegionModel rm = new UnigramRegionModel(modelOptions);
-        rm.randomInitialize();
-        rm.train();
+    @Override
+    public void confirmPlacenameTokens(String placename, DocumentSet docSet) {
     }
 }
