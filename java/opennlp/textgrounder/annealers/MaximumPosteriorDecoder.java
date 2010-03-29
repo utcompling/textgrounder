@@ -26,6 +26,11 @@ import opennlp.textgrounder.geo.CommandLineOptions;
  */
 public class MaximumPosteriorDecoder extends Annealer {
 
+    private int count = 1;
+    
+    public MaximumPosteriorDecoder() {
+    }
+
     public MaximumPosteriorDecoder(CommandLineOptions options) {
         super(options);
     }
@@ -51,5 +56,15 @@ public class MaximumPosteriorDecoder extends Annealer {
         }
         classes[maxid] = 1;
         return 1;
+    }
+
+    @Override
+    public boolean nextIter() {
+        if(count != 0) {
+            count = 0;
+            return true;
+        } else {
+            return false;
+        }
     }
 }

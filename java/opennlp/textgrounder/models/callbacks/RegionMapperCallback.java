@@ -17,6 +17,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models.callbacks;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Hashtable;
 import opennlp.textgrounder.io.DocumentSet;
@@ -47,11 +48,19 @@ public abstract class RegionMapperCallback {
      * 
      */
     protected HashSet<Integer> currentRegionHashSet;
+    /**
+     * 
+     */
+    protected int numRegions;
 
     /**
      *
      */
     public RegionMapperCallback() {
+        numRegions = 0;
+        regionMap = new Hashtable<Integer, Region>();
+        reverseRegionMap = new Hashtable<Region, Integer>();
+        nameToRegionIndex = new Hashtable<String, HashSet<Integer>>();
     }
 
     public RegionMapperCallback(Hashtable<Integer, Region> regionMap,
@@ -73,10 +82,9 @@ public abstract class RegionMapperCallback {
 
     /**
      *
-     * @param idx
      * @param region
      */
-    public abstract void addRegion(int idx, Region region);
+    public abstract void addRegion(Region region);
 
     /**
      *
@@ -90,10 +98,42 @@ public abstract class RegionMapperCallback {
      */
     public abstract void setCurrentRegion(String placename);
 
+    public abstract void addPlacenameTokens(String placename, DocumentSet docSet,
+          ArrayList<Integer> wordVector, ArrayList<Integer> toponymVector);
+
     /**
      * 
      * @param placename
      * @param docSet
      */
-    public abstract void confirmPlacenameTokens(String placename, DocumentSet docSet);
+    public abstract void confirmPlacenameTokens(String placename,
+          DocumentSet docSet);
+
+    /**
+     * @return the regionMap
+     */
+    public Hashtable<Integer, Region> getRegionMap() {
+        return regionMap;
+    }
+
+    /**
+     * @return the reverseRegionMap
+     */
+    public Hashtable<Region, Integer> getReverseRegionMap() {
+        return reverseRegionMap;
+    }
+
+    /**
+     * @return the nameToRegionIndex
+     */
+    public Hashtable<String, HashSet<Integer>> getNameToRegionIndex() {
+        return nameToRegionIndex;
+    }
+
+    /**
+     * @return the numRegions
+     */
+    public int getNumRegions() {
+        return numRegions;
+    }
 }

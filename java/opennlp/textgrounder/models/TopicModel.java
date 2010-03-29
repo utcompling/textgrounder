@@ -17,6 +17,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 
 import opennlp.textgrounder.annealers.*;
@@ -264,5 +266,61 @@ public class TopicModel extends Model {
     @Override
     public void train() {
         train(annealer);
+    }
+
+    /**
+     * Print the normalized sample counts to out. Print only the top {@link
+     * #outputPerTopic} per given state and topic.
+     *
+     * @param out Output buffer to write to.
+     * @throws IOException
+     */
+    public void printTabulatedProbabilities(BufferedWriter out) throws
+          IOException {
+        printTopics(out);
+    }
+
+    /**
+     * Print the normalized sample counts for each state to out. Print only the top {@link
+     * #outputPerTopic} per given state.
+     *
+     * @param out
+     * @throws IOException
+     */
+    protected void printTopics(BufferedWriter out) throws IOException {
+        int startt = 0, M = 4, endt = Math.min(M + startt, stateProbs.length);
+        out.write("***** Word Probabilities by State *****\n\n");
+        while (startt < T) {
+            for (int i = startt; i < endt; ++i) {
+                String header = "S_" + i;
+                header = String.format("%25s\t%6.5f\t",
+                      String.format("%s:%s:%s", header, i
+
+                stateProbs[i])
+                ;
+
+            out.write(
+            header);
+                }
+
+            out.newLine();
+            out.newLine();
+
+            for (int i = 0;
+                  i < outputPerClass; ++i) {
+                for (int c = startt; c < endt; ++c) {
+                    String line = String.format("%25s\t%6.5f\t",
+                          topWordsPerState[c][i].stringValue,
+                          topWordsPerState[c][i].doubleValue);
+                    out.write(line);
+                }
+                out.newLine();
+            }
+            out.newLine();
+            out.newLine();
+
+            startt = endt;
+            endt = java.lang.Math.min(stateS, startt + M);
+        }
     }
 }

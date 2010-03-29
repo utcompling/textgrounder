@@ -17,7 +17,10 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
-import opennlp.textgrounder.io.DocumentSet;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -42,19 +45,6 @@ public class UnigramRegionModel extends TopicModel {
      */
     protected RegionMapperCallback regionMapperCallback;
     /**
-     * Table from index to region
-     */
-    protected Hashtable<Integer, Region> regionMap;
-    /**
-     * Table from region to index. Reverse storage table for regionMap.
-     */
-    protected Hashtable<Region, Integer> reverseRegionMap;
-    /**
-     * Table from placename to set of region indexes. The indexes and their
-     * referents are stored in regionMap.
-     */
-    protected Hashtable<String, HashSet<Integer>> nameToRegionIndex;
-    /**
      * Vector of toponyms. If 0, the word is not a toponym. If 1, it is.
      */
     protected int[] toponymVector;
@@ -66,18 +56,18 @@ public class UnigramRegionModel extends TopicModel {
      */
     protected int[] regionByToponym;
 
+    protected UnigramRegionModel() {
+    }
+
     public UnigramRegionModel(CommandLineOptions options) {
         regionMapperCallback = new UnigramRegionMapperCallback();
-        initialize(options, regionMapperCallback);
+        initialize(options);
     }
 
-    public UnigramRegionModel(CommandLineOptions options,
-          RegionMapperCallback regionMapperCallback) {
-        initialize(options, regionMapperCallback);
-    }
+    protected void initialize(CommandLineOptions options) {
 
-    protected void initialize(CommandLineOptions options,
-          RegionMapperCallback regionMapperCallback) {
+        initializeFromOptions(options);
+
         BaselineModel bm = null;
         try {
             bm = new BaselineModel(options);
@@ -86,108 +76,77 @@ public class UnigramRegionModel extends TopicModel {
             ex.printStackTrace();
             System.exit(1);
         }
+        try {
+            bm.processPath();
+        } catch (Exception ex) {
+            Logger.getLogger(UnigramRegionModel.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        bm.initializeRegionArray();
 
         this.gazetteer = bm.gazetteer;
         this.gazCache = bm.gazCache;
-        this.degreesPerRegion = bm.degreesPerRegion;
         this.pairListSet = bm.pairListSet;
 
-        regionMap = new Hashtable<Integer, Region>();
-        reverseRegionMap = new Hashtable<Region, Integer>();
-        nameToRegionIndex = new Hashtable<String, HashSet<Integer>>();
-
-        regionMapperCallback.setMaps(regionMap, reverseRegionMap, nameToRegionIndex);
-        this.regionMapperCallback = regionMapperCallback;
-
-        T = 0;
         setAllocateRegions();
     }
 
     /**
-     * Allocate memory for fields
      *
-     * @param docSet Container holding training data.
-     * @param T Number of regions
-     */
-    @Override
-    protected void allocateFields(DocumentSet docSet, int T) {
-        N = 0;
-        W = docSet.wordsToInts.size();
-        D = docSet.size();
-        betaW = beta * W;
-        for (int i = 0; i < docSet.size(); i++) {
-            N += docSet.get(i).size();
-        }
-
-        documentVector = new int[N];
-        wordVector = new int[N];
-        topicVector = new int[N];
-        toponymVector = new int[N];
-
-        for (int i = 0; i < N; ++i) {
-            toponymVector[i] = documentVector[i] = wordVector[i] = topicVector[i] = 0;
-        }
-
-        int tcount = 0, docs = 0;
-        for (ArrayList<Integer> doc : docSet) {
-            int offset = 0;
-            for (int idx : doc) {
-                wordVector[tcount + offset] = idx;
-                documentVector[tcount + offset] = docs;
-                offset += 1;
-            }
-            tcount += doc.size();
-            docs += 1;
-        }
-
-    }
-
-    /**
-     *
-     * @param pairListSet
      */
     protected void setAllocateRegions() {
-        int docoff = 0;
+        ArrayList<Integer> wordVectorT = new ArrayList<Integer>(),
+              docVectorT = new ArrayList<Integer>(),
+              toponymVectorT = new ArrayList<Integer>();
+
         for (int docIndex = 0; docIndex < docSet.size(); docIndex++) {
+            ArrayList<Integer> curDoc = docSet.get(docIndex);
             ArrayList<ToponymSpan> curDocSpans = pairListSet.get(docIndex);
+            int topSpanIndex = 0;
+            ToponymSpan curTopSpan = curDocSpans.get(topSpanIndex);
+            for (int wordIndex = 0; wordIndex < curDoc.size(); wordIndex++) {
 
-            for (int topSpanIndex = 0; topSpanIndex < curDocSpans.size();
-                  topSpanIndex++) {
-                ToponymSpan curTopSpan = curDocSpans.get(topSpanIndex);
-                String placename = getPlacenameString(curTopSpan, docIndex).toLowerCase();
+                if (wordIndex != curTopSpan.begin) {
+                    wordVectorT.add(curDoc.get(wordIndex));
+                    toponymVectorT.add(0);
+                } else {
+                    String placename = getPlacenameString(curTopSpan, docIndex).toLowerCase();
 
-                for (int i = curTopSpan.begin; i < curTopSpan.end; ++i) {
-                    toponymVector[docoff + i] = 1;
-                }
-
-                if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
-                {
-                    continue;
-                }
-
-                // try the cache first. if not in there, do a full DB lookup and add that pair to the cache:
-                List<Location> possibleLocations = gazCache.get(placename);
-                if (possibleLocations == null) {
-                    try {
-                        possibleLocations = gazetteer.get(placename);
-                    } catch (Exception ex) {
+                    if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
+                    {
+                        continue;
                     }
+
+                    // try the cache first. if not in there, do a full DB lookup and add that pair to the cache:
+                    List<Location> possibleLocations = gazCache.get(placename);
+                    if (possibleLocations == null) {
+                        try {
+                            possibleLocations = gazetteer.get(placename);
+                        } catch (Exception ex) {
+                        }
+                    }
+                    regionMapperCallback.setCurrentRegion(placename);
+                    addLocationsToRegionArray(possibleLocations, regionMapperCallback);
+                    regionMapperCallback.addPlacenameTokens(placename, docSet, wordVectorT, toponymVectorT);
+
+                    wordIndex = curTopSpan.end;
+                    topSpanIndex += 1;
                 }
-                regionMapperCallback.setCurrentRegion(placename);
-                addLocationsToRegionArray(possibleLocations, regionMapperCallback);
+                docVectorT.add(docIndex);
             }
-            docoff += docSet.get(docIndex).size();
         }
 
-        /**
-         * Confirm and fill in dictionary if placenames do not exist
-         */
-        for (String placename : nameToRegionIndex.keySet()) {
-            regionMapperCallback.confirmPlacenameTokens(placename, docSet);
-        }
-
+        N = regionMapperCallback.getNumRegions();
         W = docSet.getDictionarySize();
         T = activeRegions;
+        D = docSet.size();
+        betaW = beta * W;
+
+        wordVector = new int[N];
+        copyToArray(wordVector, wordVectorT);
+        documentVector = new int[N];
+        copyToArray(documentVector, docVectorT);
+        toponymVector = new int[N];
+        copyToArray(toponymVector, toponymVectorT);
 
         topicCounts = new int[T];
         for (int i = 0; i < T; ++i) {
@@ -206,21 +165,11 @@ public class UnigramRegionModel extends TopicModel {
             regionByToponym[i] = 0;
         }
 
-        /**
-         * Could potentially blow up here if a token in a placename does not
-         * exist in the dictionary
-         */
+        Hashtable<String, HashSet<Integer>> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
         for (String placename : nameToRegionIndex.keySet()) {
-            String[] names = placename.split(" ");
-            for (String name : names) {
-                if (!docSet.hasWord(name)) {
-                    docSet.addWord(name);
-                }
-                int wordoff = docSet.getIntForWord(name) * T;
-                for (int j : nameToRegionIndex.get(placename)) {
-                    regionByToponym[wordoff + j] = 1;
-                }
-
+            int wordoff = docSet.getIntForWord(placename) * T;
+            for (int j : nameToRegionIndex.get(placename)) {
+                regionByToponym[wordoff + j] = 1;
             }
         }
     }
@@ -329,6 +278,24 @@ public class UnigramRegionModel extends TopicModel {
                 topicByDocumentCounts[docoff + topicid]++;
                 wordByTopicCounts[wordoff + topicid]++;
             }
+        }
+    }
+
+    public void decode() {
+        Annealer ann = new MaximumPosteriorDecoder();
+        train(ann);
+    }
+
+    /**
+     * Copy a sequence of numbers from ta to array ia.
+     *
+     * @param <T>   Any number type
+     * @param ia    Target array of integers to be copied to
+     * @param ta    Source List<T> of numbers to be copied from
+     */
+    protected static <T extends Number> void copyToArray(int[] ia, List<T> ta) {
+        for (int i = 0; i < ta.size(); ++i) {
+            ia[i] = ta.get(i).intValue();
         }
     }
 }

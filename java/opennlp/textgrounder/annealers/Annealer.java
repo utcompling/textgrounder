@@ -76,6 +76,9 @@ public abstract class Annealer {
      */
     protected double temperature;
 
+    protected Annealer() {
+    }
+
     public Annealer(CommandLineOptions options) {
         initialTemperature = options.getInitialTemperature();
         temperature = initialTemperature;

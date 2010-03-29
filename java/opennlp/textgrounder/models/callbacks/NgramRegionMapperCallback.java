@@ -17,6 +17,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models.callbacks;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Hashtable;
 import opennlp.textgrounder.io.DocumentSet;
@@ -28,12 +29,13 @@ import opennlp.textgrounder.topostructs.Region;
  *
  * @author tsmoon
  */
-public class NgramRegionMapperCallback extends RegionMapperCallback {
+public class NgramRegionMapperCallback extends UnigramRegionMapperCallback {
 
     /**
      *
      */
     public NgramRegionMapperCallback() {
+        super();
     }
 
     /**
@@ -50,31 +52,23 @@ public class NgramRegionMapperCallback extends RegionMapperCallback {
 
     /**
      *
-     * @param idx
      * @param region
      */
-    public void addRegion(int idx, Region region) {
-        regionMap.put(idx, region);
-        reverseRegionMap.put(region, idx);
-    }
-
-    /**
-     *
-     * @param region
-     */
+    @Override
     public void addToPlace(Region region) {
-        currentRegionHashSet.add(reverseRegionMap.get(region));
+        currentRegionHashSet.add(getReverseRegionMap().get(region));
     }
 
     /**
      * 
      * @param placename
      */
+    @Override
     public void setCurrentRegion(String placename) {
         if (!nameToRegionIndex.contains(placename)) {
-            nameToRegionIndex.put(placename, new HashSet<Integer>());
+            getNameToRegionIndex().put(placename, new HashSet<Integer>());
         }
-        currentRegionHashSet = nameToRegionIndex.get(placename);
+        currentRegionHashSet = getNameToRegionIndex().get(placename);
     }
 
     /**
@@ -87,5 +81,13 @@ public class NgramRegionMapperCallback extends RegionMapperCallback {
         if (!docSet.hasWord(placename)) {
             docSet.addWord(placename);
         }
+    }
+
+    @Override
+    public void addPlacenameTokens(String placename, DocumentSet docSet,
+          ArrayList<Integer> wordVector, ArrayList<Integer> toponymVector) {
+        confirmPlacenameTokens(placename, docSet);
+        wordVector.add(docSet.getIntForWord(placename));
+        toponymVector.add(1);
     }
 }

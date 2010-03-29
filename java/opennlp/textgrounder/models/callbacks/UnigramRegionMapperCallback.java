@@ -17,6 +17,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models.callbacks;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Hashtable;
 import opennlp.textgrounder.io.DocumentSet;
@@ -28,12 +29,12 @@ import opennlp.textgrounder.topostructs.Region;
  *
  * @author tsmoon
  */
-public class UnigramRegionMapperCallback extends NgramRegionMapperCallback {
+public class UnigramRegionMapperCallback extends RegionMapperCallback {
 
     /**
      * 
      */
-    HashSet<HashSet<Integer>> associatedSets;
+    private HashSet<HashSet<Integer>> associatedSets;
 
     /**
      *
@@ -59,7 +60,7 @@ public class UnigramRegionMapperCallback extends NgramRegionMapperCallback {
      */
     @Override
     public void addToPlace(Region region) {
-        int regionid = reverseRegionMap.get(region);
+        int regionid = getReverseRegionMap().get(region);
         for (HashSet<Integer> as : associatedSets) {
             as.add(regionid);
         }
@@ -75,9 +76,9 @@ public class UnigramRegionMapperCallback extends NgramRegionMapperCallback {
         associatedSets = new HashSet<HashSet<Integer>>();
         for (String name : names) {
             if (!nameToRegionIndex.contains(name)) {
-                nameToRegionIndex.put(name, new HashSet<Integer>());
+                getNameToRegionIndex().put(name, new HashSet<Integer>());
             }
-            associatedSets.add(nameToRegionIndex.get(name));
+            associatedSets.add(getNameToRegionIndex().get(name));
         }
     }
 
@@ -93,6 +94,29 @@ public class UnigramRegionMapperCallback extends NgramRegionMapperCallback {
             if (!docSet.hasWord(name)) {
                 docSet.addWord(name);
             }
+        }
+    }
+
+    /**
+     *
+     * @param region
+     */
+    public void addRegion(Region region) {
+        if (!reverseRegionMap.contains(region)) {
+            getRegionMap().put(getNumRegions(),region);
+            getReverseRegionMap().put(region, getNumRegions());
+            numRegions += 1;
+        }
+    }
+
+    @Override
+    public void addPlacenameTokens(String placename, DocumentSet docSet,
+          ArrayList<Integer> wordVector, ArrayList<Integer> toponymVector) {
+        confirmPlacenameTokens(placename, docSet);
+        String[] names = placename.split(" ");
+        for(String name: names) {
+            wordVector.add(docSet.getIntForWord(name));
+            toponymVector.add(1);
         }
     }
 }

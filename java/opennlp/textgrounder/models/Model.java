@@ -1,20 +1,18 @@
 package opennlp.textgrounder.models;
 
-import opennlp.textgrounder.models.callbacks.RegionMapperCallback;
-import opennlp.textgrounder.models.callbacks.NullRegionMapperCallback;
-import opennlp.textgrounder.io.DocumentSet;
 import edu.stanford.nlp.ie.crf.CRFClassifier;
+
 import java.io.BufferedWriter;
 import java.io.FileWriter;
-import java.util.ArrayList;
 
+import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
 
 import opennlp.textgrounder.gazetteers.*;
-import opennlp.textgrounder.geo.*;
-import opennlp.textgrounder.ners.SNERPairListSet;
-import opennlp.textgrounder.ners.ToponymSpan;
+import opennlp.textgrounder.io.*;
+import opennlp.textgrounder.models.callbacks.*;
+import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
 
 /**
@@ -141,7 +139,7 @@ public abstract class Model {
                 double minLat = loc.coord.latitude - loc.coord.latitude % degreesPerRegion;
                 double maxLat = minLat + degreesPerRegion;
                 current = new Region(minLon, maxLon, minLat, maxLat);
-                regionMapper.addRegion(activeRegions, current);
+                regionMapper.addRegion(current);
                 regionArray[curX][curY] = current;
                 activeRegions++;
             }
