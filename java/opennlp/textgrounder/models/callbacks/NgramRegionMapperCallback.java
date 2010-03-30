@@ -31,7 +31,6 @@ import opennlp.textgrounder.topostructs.*;
  */
 public class NgramRegionMapperCallback extends UnigramRegionMapperCallback {
 
-//    protected String currentPlacename;
     /**
      *
      */
@@ -51,26 +50,15 @@ public class NgramRegionMapperCallback extends UnigramRegionMapperCallback {
         super(regionMap, reverseRegionMap, nameToRegionIndex);
     }
 
-//    /**
-//     *
-//     * @param region
-//     */
-//    @Override
-//    public void addToPlace(Location loc, Region region) {
-//        currentRegionHashSet.add(reverseRegionMap.get(region));
-//    }
-//
     /**
      * 
      * @param placename
      */
     @Override
     public void setCurrentRegion(String placename) {
-//        currentPlacename = placename;
         if (!nameToRegionIndex.containsKey(placename)) {
             nameToRegionIndex.put(placename, new HashSet<Integer>());
         }
-//        currentRegionHashSet = nameToRegionIndex.get(placename);
     }
 
     /**
@@ -85,6 +73,16 @@ public class NgramRegionMapperCallback extends UnigramRegionMapperCallback {
         }
     }
 
+    /**
+     * 
+     * @param placename
+     * @param docSet
+     * @param wordVector
+     * @param toponymVector
+     * @param documentVector
+     * @param docIndex
+     * @param locs
+     */
     @Override
     public void addAll(String placename, DocumentSet docSet,
           List<Integer> wordVector, List<Integer> toponymVector,

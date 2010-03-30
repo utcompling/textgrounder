@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import opennlp.textgrounder.io.DocumentSet;
 import opennlp.textgrounder.topostructs.*;
@@ -49,22 +48,6 @@ public abstract class RegionMapperCallback {
     /**
      * 
      */
-    protected Set<Integer> currentRegionHashSet;
-    /**
-     * 
-     */
-    protected Map<Region, HashSet<Location>> regionToLocations;
-    /**
-     *
-     */
-    protected Map<String, HashSet<Location>> placenameToLocations;
-    /**
-     *
-     */
-    protected Map<Location, Region> locationToRegion;
-    /**
-     * 
-     */
     protected int numRegions;
     /**
      * 
@@ -79,9 +62,6 @@ public abstract class RegionMapperCallback {
         regionMap = new HashMap<Integer, Region>();
         reverseRegionMap = new HashMap<Region, Integer>();
         nameToRegionIndex = new HashMap<String, HashSet<Integer>>();
-        regionToLocations = new HashMap<Region, HashSet<Location>>();
-        locationToRegion = new HashMap<Location, Region>();
-        placenameToLocations = new HashMap<String, HashSet<Location>>();
         toponymRegionToLocations = new HashMap<ToponymRegionPair, HashSet<Location>>();
     }
 
@@ -162,27 +142,6 @@ public abstract class RegionMapperCallback {
      */
     public int getNumRegions() {
         return numRegions;
-    }
-
-    /**
-     * @return the regionToLocations
-     */
-    public Map<Region, HashSet<Location>> getRegionToLocations() {
-        return regionToLocations;
-    }
-
-    /**
-     * @return the locationToRegion
-     */
-    public Map<Location, Region> getLocationToRegion() {
-        return locationToRegion;
-    }
-
-    /**
-     * @return the placenameToLocations
-     */
-    public Map<String, HashSet<Location>> getPlacenameToLocations() {
-        return placenameToLocations;
     }
 
     /**

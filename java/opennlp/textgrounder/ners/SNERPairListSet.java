@@ -37,13 +37,24 @@ public class SNERPairListSet extends ArrayList<ArrayList<ToponymSpan>> {
 
         System.out.print("Extracting toponym indices from " + locationOfFile + " ...");
 
-        ArrayList<ToponymSpan> curSpanList = new ArrayList<ToponymSpan>();
+        String contents = IOUtil.readFileAsString(locationOfFile);
+        ArrayList<ToponymSpan> curSpanList = addToponymSpansFromString(contents);
         this.add(curSpanList);
 
-        String contents = IOUtil.readFileAsString(locationOfFile);
-        String nerOutput = classifier.classifyToString(contents);
-        //textOut.write(nerOutput);
-        //textOut.close();
+        textIn.close();
+
+        System.out.println("done. Found " + curSpanList.size()
+              + " toponym spans in document " + (this.size() - 1) + ".");
+    }
+
+    /**
+     * 
+     * @param text
+     */
+    protected ArrayList<ToponymSpan> addToponymSpansFromString(String text) {
+        ArrayList<ToponymSpan> curSpanList = new ArrayList<ToponymSpan>();
+
+        String nerOutput = classifier.classifyToString(text);
 
         String[] tokens = nerOutput.split(" ");
 
@@ -52,10 +63,9 @@ public class SNERPairListSet extends ArrayList<ArrayList<ToponymSpan>> {
 
         for (int i = 0; i < tokens.length; i++) {
             String token = tokens[i];
-            //Matcher m = locationTokenPattern.matcher(token);
             boolean isLocationToken = token.contains("/LOCATION");
             if (isLocationToken) {
-                if (toponymStartIndex == -1) {// && isLocationToken/*m.matches()*/)
+                if (toponymStartIndex == -1) {
                     toponymStartIndex = i;
                 }
                 if (token.endsWith("/O")) {
@@ -64,7 +74,7 @@ public class SNERPairListSet extends ArrayList<ArrayList<ToponymSpan>> {
                     toponymStartIndex = -1;
                     toponymEndIndex = -1;
                 }
-            } else if (toponymStartIndex != -1) {// && !isLocationToken/*m.matches()*/) {
+            } else if (toponymStartIndex != -1) {
                 toponymEndIndex = i;
                 curSpanList.add(new ToponymSpan(toponymStartIndex, toponymEndIndex));
                 toponymStartIndex = -1;
@@ -74,62 +84,22 @@ public class SNERPairListSet extends ArrayList<ArrayList<ToponymSpan>> {
         //case where toponym ended at very end of document:
         if (toponymStartIndex != -1) {
             curSpanList.add(new ToponymSpan(toponymStartIndex, tokens.length));
-
-
         }
-        textIn.close();
-
-        System.out.println("done. Found " + curSpanList.size()
-              + " toponym spans in document " + (this.size() - 1) + ".");
+        return curSpanList;
     }
 
+    /**
+     *
+     * @param docSet
+     */
     public void addToponymSpansFromDocumentSet(DocumentSet docSet) {
-
-        System.out.print("Extracting toponym indices from document as multiple documents");
-
-        ArrayList<ToponymSpan> curSpanList = new ArrayList<ToponymSpan>();
-        this.add(curSpanList);
-
+        System.out.println("Extracting toponym indices from set of documents");
         for (int docid = 0; docid < docSet.size(); docid++) {
             String doctext = docSet.getDocumentAsString(docid);
-            String nerOutput = classifier.classifyToString(doctext);
-            //textOut.write(nerOutput);
-            //textOut.close();
-
-            int toponymStartIndex = -1;
-            int toponymEndIndex = -1;
-
-            String[] tokens = nerOutput.split(" ");
-
-            for (int i = 0; i < tokens.length; i++) {
-                String token = tokens[i];
-                //Matcher m = locationTokenPattern.matcher(token);
-                boolean isLocationToken = token.contains("/LOCATION");
-                if (isLocationToken) {
-                    if (toponymStartIndex == -1) {// && isLocationToken/*m.matches()*/)
-                        toponymStartIndex = i;
-                    }
-                    if (token.endsWith("/O")) {
-                        toponymEndIndex = i + 1;
-                        curSpanList.add(new ToponymSpan(toponymStartIndex, toponymEndIndex));
-                        toponymStartIndex = -1;
-                        toponymEndIndex = -1;
-                    }
-                } else if (toponymStartIndex != -1) {// && !isLocationToken/*m.matches()*/) {
-                    toponymEndIndex = i;
-                    curSpanList.add(new ToponymSpan(toponymStartIndex, toponymEndIndex));
-                    toponymStartIndex = -1;
-                    toponymEndIndex = -1;
-                }
-            }
-            //case where toponym ended at very end of document:
-            if (toponymStartIndex != -1) {
-                curSpanList.add(new ToponymSpan(toponymStartIndex, tokens.length));
-            }
+            ArrayList<ToponymSpan> curSpanList = addToponymSpansFromString(doctext);
             this.add(curSpanList);
-            curSpanList = new ArrayList<ToponymSpan>();
+            System.out.println("done. Found " + curSpanList.size()
+                  + " toponym spans in document " + (this.size() - 1) + ".");
         }
-        System.out.println("done. Found " + curSpanList.size()
-              + " toponym spans in document " + (this.size() - 1) + ".");
     }
 }

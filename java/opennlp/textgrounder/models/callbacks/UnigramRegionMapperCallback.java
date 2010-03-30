@@ -41,10 +41,6 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
     protected HashSet<LocationRegionPair> currentLocationRegions;
 
     /**
-     * 
-     */
-//    private HashSet<HashSet<Integer>> associatedRegionsSets;
-    /**
      *
      */
     public UnigramRegionMapperCallback() {
@@ -72,9 +68,6 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
     @Override
     public void addToPlace(Location loc, Region region) {
         int regionid = reverseRegionMap.get(region);
-//        for (HashSet<Integer> as : associatedRegionsSets) {
-//            as.add(regionid);
-//        }
         currentLocationRegions.add(new LocationRegionPair(loc, regionid));
     }
 
@@ -85,32 +78,13 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
     @Override
     public void setCurrentRegion(String placename) {
         currentPlacenames = placename.split(" ");
-//        associatedRegionsSets = new HashSet<HashSet<Integer>>();
         for (String name : currentPlacenames) {
             if (!nameToRegionIndex.containsKey(name)) {
                 nameToRegionIndex.put(name, new HashSet<Integer>());
             }
-//            associatedRegionsSets.add(nameToRegionIndex.get(name));
         }
     }
 
-//    /**
-//     *
-//     * @param placename
-//     * @param docSet
-//     */
-//    @Override
-//    public void confirmPlacenameTokens(String placename, DocumentSet docSet) {
-//        String[] names = placename.split(" ");
-//        for (String name : names) {
-//            if (!docSet.hasWord(name)) {
-//                docSet.addWord(name);
-//            }
-////            if (!placenameToLocations.containsKey(name)) {
-////                placenameToLocations.put(name, new HashSet<Location>());
-////            }
-//        }
-//    }
     /**
      *
      * @param region
@@ -123,6 +97,16 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
         }
     }
 
+    /**
+     * 
+     * @param placename
+     * @param docSet
+     * @param wordVector
+     * @param toponymVector
+     * @param documentVector
+     * @param docIndex
+     * @param locs
+     */
     @Override
     public void addAll(String placename, DocumentSet docSet,
           List<Integer> wordVector, List<Integer> toponymVector,
@@ -134,9 +118,6 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
             wordVector.add(wordid);
             toponymVector.add(1);
             documentVector.add(docIndex);
-
-//            HashSet<Location> plocs = placenameToLocations.get(name);
-//            plocs.addAll(locs);
 
             for (LocationRegionPair lrp : currentLocationRegions) {
                 ToponymRegionPair trp = new ToponymRegionPair(wordid, lrp.regionIndex);

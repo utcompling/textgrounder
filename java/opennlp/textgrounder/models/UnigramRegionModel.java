@@ -17,10 +17,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,7 +28,6 @@ import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.ners.*;
-import opennlp.textgrounder.util.*;
 
 /**
  * Topic model with region awareness. Toponyms are all unigrams. Multiword
@@ -65,18 +61,28 @@ public class UnigramRegionModel extends TopicModel {
      */
     protected HashSet<Location> locationSet;
 
+    /**
+     *
+     */
     protected UnigramRegionModel() {
     }
 
+    /**
+     *
+     * @param options
+     */
     public UnigramRegionModel(CommandLineOptions options) {
         regionMapperCallback = new UnigramRegionMapperCallback();
         initialize(options);
     }
 
+    /**
+     *
+     * @param options
+     */
     protected void initialize(CommandLineOptions options) {
 
         initializeFromOptions(options);
-        kmlOutputFilename = options.getKMLOutputFilename();
 
         try {
             baselineModel = new BaselineModel(options);
@@ -96,6 +102,16 @@ public class UnigramRegionModel extends TopicModel {
         locationSet = new HashSet<Location>();
 
         setAllocateRegions();
+    }
+
+    /**
+     * 
+     * @param options
+     */
+    @Override
+    protected void initializeFromOptions(CommandLineOptions options) {
+        super.initializeFromOptions(options);
+        kmlOutputFilename = options.getKMLOutputFilename();
     }
 
     /**
@@ -133,10 +149,11 @@ public class UnigramRegionModel extends TopicModel {
                         if (possibleLocations == null) {
                             try {
                                 possibleLocations = gazetteer.get(placename);
+                                gazCache.put(placename, possibleLocations);
                             } catch (Exception ex) {
                             }
                         }
-//                        regionMapperCallback.setCurrentRegion(placename);
+
                         baselineModel.addLocationsToRegionArray(possibleLocations, regionMapperCallback);
                         regionMapperCallback.addAll(placename, docSet, wordVectorT, toponymVectorT, docVectorT, docIndex, possibleLocations);
                         locationSet.addAll(possibleLocations);
@@ -308,16 +325,22 @@ public class UnigramRegionModel extends TopicModel {
         }
     }
 
+    /**
+     * 
+     */
     public void decode() {
         Annealer ann = new MaximumPosteriorDecoder();
         train(ann);
     }
 
+    /**
+     *
+     */
     protected void normalizeLocations() {
-        HashMap<Integer, Location> himl = new HashMap<Integer, Location>();
+        Map<Integer, Location> locationIdToLocation = new HashMap<Integer, Location>();
         for (Location loc : locationSet) {
             loc.count += beta;
-            himl.put(loc.id, loc);
+            locationIdToLocation.put(loc.id, loc);
         }
 
         Map<String, HashSet<Integer>> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
@@ -328,15 +351,19 @@ public class UnigramRegionModel extends TopicModel {
                 ToponymRegionPair trp = new ToponymRegionPair(wordid, regid);
                 HashSet<Location> locs = toponymRegionToLocations.get(trp);
                 for (Location loc : locs) {
-                    Location tl = himl.get(loc.id);
+                    Location tl = locationIdToLocation.get(loc.id);
                     tl.count += wordByTopicCounts[wordid * T + regid];
                 }
             }
         }
 
-        locations = new ArrayList<Location>(himl.values());
+        locations = new ArrayList<Location>(locationIdToLocation.values());
     }
 
+    /**
+     * 
+     * @throws Exception
+     */
     @Override
     public void writeXMLFile() throws Exception {
         System.err.println();
