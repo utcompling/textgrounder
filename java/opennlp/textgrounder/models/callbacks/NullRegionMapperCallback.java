@@ -17,8 +17,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models.callbacks;
 
-import java.util.ArrayList;
+import java.util.List;
 import opennlp.textgrounder.io.DocumentSet;
+import opennlp.textgrounder.topostructs.Location;
 import opennlp.textgrounder.topostructs.Region;
 
 /**
@@ -29,11 +30,15 @@ import opennlp.textgrounder.topostructs.Region;
 public class NullRegionMapperCallback extends RegionMapperCallback {
 
     @Override
+    public void addRegion(Region region) {
+    }
+
+    @Override
     public void addToPlace(Region region) {
     }
 
     @Override
-    public void setCurrentRegion(String placename) {        
+    public void setCurrentRegion(String placename) {
     }
 
     @Override
@@ -41,12 +46,8 @@ public class NullRegionMapperCallback extends RegionMapperCallback {
     }
 
     @Override
-    public void addRegion(Region region) {
-    }
-
-    @Override
     public void addPlacenameTokens(String placename, DocumentSet docSet,
-          ArrayList<Integer> wordVector,
-          ArrayList<Integer> toponymVector) {
+          List<Integer> wordVector, List<Integer> toponymVector,
+          List<Location> locs) {
     }
 }

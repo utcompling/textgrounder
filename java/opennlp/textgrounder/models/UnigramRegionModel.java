@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Map;
 
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.geo.*;
@@ -85,6 +86,8 @@ public class UnigramRegionModel extends TopicModel {
         this.gazCache = bm.gazCache;
         this.pairListSet = bm.pairListSet;
 
+        locations = new ArrayList<Location>();
+
         setAllocateRegions();
     }
 
@@ -109,25 +112,26 @@ public class UnigramRegionModel extends TopicModel {
                 } else {
                     String placename = getPlacenameString(curTopSpan, docIndex).toLowerCase();
 
-                    if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
-                    {
-                        continue;
-                    }
-
-                    // try the cache first. if not in there, do a full DB lookup and add that pair to the cache:
-                    List<Location> possibleLocations = gazCache.get(placename);
-                    if (possibleLocations == null) {
-                        try {
-                            possibleLocations = gazetteer.get(placename);
-                        } catch (Exception ex) {
+                    if (gazetteer.contains(placename)) { // quick lookup to see if it has even 1 place by that name
+                        // try the cache first. if not in there, do a full DB lookup and add that pair to the cache:
+                        List<Location> possibleLocations = gazCache.get(placename);
+                        if (possibleLocations == null) {
+                            try {
+                                possibleLocations = gazetteer.get(placename);
+                            } catch (Exception ex) {
+                            }
                         }
-                    }
-                    regionMapperCallback.setCurrentRegion(placename);
-                    addLocationsToRegionArray(possibleLocations, regionMapperCallback);
-                    regionMapperCallback.addPlacenameTokens(placename, docSet, wordVectorT, toponymVectorT);
+                        regionMapperCallback.setCurrentRegion(placename);
+                        addLocationsToRegionArray(possibleLocations, regionMapperCallback);
+                        regionMapperCallback.addPlacenameTokens(placename, docSet, wordVectorT, toponymVectorT, possibleLocations);
 
-                    wordIndex = curTopSpan.end;
-                    topSpanIndex += 1;
+                        wordIndex = curTopSpan.end;
+                        topSpanIndex += 1;
+                    } else {
+                        wordVectorT.add(curDoc.get(wordIndex));
+                        toponymVectorT.add(0);
+                        topSpanIndex += 1;
+                    }
                 }
                 docVectorT.add(docIndex);
             }
@@ -163,7 +167,7 @@ public class UnigramRegionModel extends TopicModel {
             regionByToponym[i] = 0;
         }
 
-        Hashtable<String, HashSet<Integer>> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
+        Map<String, HashSet<Integer>> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
         for (String placename : nameToRegionIndex.keySet()) {
             int wordoff = docSet.getIntForWord(placename) * T;
             for (int j : nameToRegionIndex.get(placename)) {

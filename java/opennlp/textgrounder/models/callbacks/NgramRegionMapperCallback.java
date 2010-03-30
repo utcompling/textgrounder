@@ -17,10 +17,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models.callbacks;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Hashtable;
+import java.util.List;
+import java.util.Map;
 import opennlp.textgrounder.io.DocumentSet;
+import opennlp.textgrounder.topostructs.Location;
 
 import opennlp.textgrounder.topostructs.Region;
 
@@ -30,6 +31,8 @@ import opennlp.textgrounder.topostructs.Region;
  * @author tsmoon
  */
 public class NgramRegionMapperCallback extends UnigramRegionMapperCallback {
+
+    protected String currentPlacename;
 
     /**
      *
@@ -44,9 +47,9 @@ public class NgramRegionMapperCallback extends UnigramRegionMapperCallback {
      * @param reverseRegionMap
      * @param nameToRegionIndex
      */
-    public NgramRegionMapperCallback(Hashtable<Integer, Region> regionMap,
-          Hashtable<Region, Integer> reverseRegionMap,
-          Hashtable<String, HashSet<Integer>> nameToRegionIndex) {
+    public NgramRegionMapperCallback(Map<Integer, Region> regionMap,
+          Map<Region, Integer> reverseRegionMap,
+          Map<String, HashSet<Integer>> nameToRegionIndex) {
         super(regionMap, reverseRegionMap, nameToRegionIndex);
     }
 
@@ -65,8 +68,8 @@ public class NgramRegionMapperCallback extends UnigramRegionMapperCallback {
      */
     @Override
     public void setCurrentRegion(String placename) {
-        if (!nameToRegionIndex.contains(placename)) {
-            getNameToRegionIndex().put(placename, new HashSet<Integer>());
+        if (!nameToRegionIndex.containsKey(placename)) {
+            nameToRegionIndex.put(placename, new HashSet<Integer>());
         }
         currentRegionHashSet = getNameToRegionIndex().get(placename);
     }
@@ -85,7 +88,8 @@ public class NgramRegionMapperCallback extends UnigramRegionMapperCallback {
 
     @Override
     public void addPlacenameTokens(String placename, DocumentSet docSet,
-          ArrayList<Integer> wordVector, ArrayList<Integer> toponymVector) {
+          List<Integer> wordVector, List<Integer> toponymVector,
+          List<Location> locs) {
         confirmPlacenameTokens(placename, docSet);
         wordVector.add(docSet.getIntForWord(placename));
         toponymVector.add(1);

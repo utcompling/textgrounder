@@ -17,12 +17,14 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models.callbacks;
 
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
-import opennlp.textgrounder.io.DocumentSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import opennlp.textgrounder.topostructs.Region;
+import opennlp.textgrounder.io.DocumentSet;
+import opennlp.textgrounder.topostructs.*;
 
 /**
  * A callback class to 
@@ -34,20 +36,32 @@ public abstract class RegionMapperCallback {
     /**
      * Table from index to region
      */
-    protected Hashtable<Integer, Region> regionMap;
+    protected Map<Integer, Region> regionMap;
     /**
      * Table from region to index. Reverse storage table for regionMap.
      */
-    protected Hashtable<Region, Integer> reverseRegionMap;
+    protected Map<Region, Integer> reverseRegionMap;
     /**
      * Table from placename to set of region indexes. The indexes and their
      * referents are stored in regionMap.
      */
-    protected Hashtable<String, HashSet<Integer>> nameToRegionIndex;
+    protected Map<String, HashSet<Integer>> nameToRegionIndex;
     /**
      * 
      */
-    protected HashSet<Integer> currentRegionHashSet;
+    protected Set<Integer> currentRegionHashSet;
+    /**
+     * 
+     */
+    protected Map<Region, HashSet<Location>> regionToLocations;
+    /**
+     *
+     */
+    protected Map<String, HashSet<Location>> placenameToLocations;
+    /**
+     *
+     */
+    protected Map<Location, Region> locationToRegion;
     /**
      * 
      */
@@ -56,25 +70,28 @@ public abstract class RegionMapperCallback {
     /**
      *
      */
-    public RegionMapperCallback() {
+    protected RegionMapperCallback() {
         numRegions = 0;
-        regionMap = new Hashtable<Integer, Region>();
-        reverseRegionMap = new Hashtable<Region, Integer>();
-        nameToRegionIndex = new Hashtable<String, HashSet<Integer>>();
+        regionMap = new HashMap<Integer, Region>();
+        reverseRegionMap = new HashMap<Region, Integer>();
+        nameToRegionIndex = new HashMap<String, HashSet<Integer>>();
+        regionToLocations = new HashMap<Region, HashSet<Location>>();
+        locationToRegion = new HashMap<Location, Region>();
+        placenameToLocations = new HashMap<String, HashSet<Location>>();
     }
 
-    public RegionMapperCallback(Hashtable<Integer, Region> regionMap,
-          Hashtable<Region, Integer> reverseRegionMap,
-          Hashtable<String, HashSet<Integer>> nameToRegionIndex) {
+    public RegionMapperCallback(Map<Integer, Region> regionMap,
+          Map<Region, Integer> reverseRegionMap,
+          Map<String, HashSet<Integer>> nameToRegionIndex) {
         setMaps(regionMap, reverseRegionMap, nameToRegionIndex);
     }
 
     /**
      * 
      */
-    public void setMaps(Hashtable<Integer, Region> regionMap,
-          Hashtable<Region, Integer> reverseRegionMap,
-          Hashtable<String, HashSet<Integer>> nameToRegionIndex) {
+    public void setMaps(Map<Integer, Region> regionMap,
+          Map<Region, Integer> reverseRegionMap,
+          Map<String, HashSet<Integer>> nameToRegionIndex) {
         this.regionMap = regionMap;
         this.reverseRegionMap = reverseRegionMap;
         this.nameToRegionIndex = nameToRegionIndex;
@@ -99,7 +116,8 @@ public abstract class RegionMapperCallback {
     public abstract void setCurrentRegion(String placename);
 
     public abstract void addPlacenameTokens(String placename, DocumentSet docSet,
-          ArrayList<Integer> wordVector, ArrayList<Integer> toponymVector);
+          List<Integer> wordVector, List<Integer> toponymVector,
+          List<Location> locs);
 
     /**
      * 
@@ -112,21 +130,21 @@ public abstract class RegionMapperCallback {
     /**
      * @return the regionMap
      */
-    public Hashtable<Integer, Region> getRegionMap() {
+    public Map<Integer, Region> getRegionMap() {
         return regionMap;
     }
 
     /**
      * @return the reverseRegionMap
      */
-    public Hashtable<Region, Integer> getReverseRegionMap() {
+    public Map<Region, Integer> getReverseRegionMap() {
         return reverseRegionMap;
     }
 
     /**
      * @return the nameToRegionIndex
      */
-    public Hashtable<String, HashSet<Integer>> getNameToRegionIndex() {
+    public Map<String, HashSet<Integer>> getNameToRegionIndex() {
         return nameToRegionIndex;
     }
 
@@ -135,5 +153,26 @@ public abstract class RegionMapperCallback {
      */
     public int getNumRegions() {
         return numRegions;
+    }
+
+    /**
+     * @return the regionToLocations
+     */
+    public Map<Region, HashSet<Location>> getRegionToLocations() {
+        return regionToLocations;
+    }
+
+    /**
+     * @return the locationToRegion
+     */
+    public Map<Location, Region> getLocationToRegion() {
+        return locationToRegion;
+    }
+
+    /**
+     * @return the placenameToLocations
+     */
+    public Map<String, HashSet<Location>> getPlacenameToLocations() {
+        return placenameToLocations;
     }
 }

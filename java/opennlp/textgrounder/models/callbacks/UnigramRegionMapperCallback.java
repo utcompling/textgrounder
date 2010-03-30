@@ -17,10 +17,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models.callbacks;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.List;
+import java.util.Map;
 import opennlp.textgrounder.io.DocumentSet;
+import opennlp.textgrounder.topostructs.Location;
 
 import opennlp.textgrounder.topostructs.Region;
 
@@ -31,6 +33,7 @@ import opennlp.textgrounder.topostructs.Region;
  */
 public class UnigramRegionMapperCallback extends RegionMapperCallback {
 
+    private String[] currentPlacenames;
     /**
      * 
      */
@@ -40,6 +43,7 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
      *
      */
     public UnigramRegionMapperCallback() {
+        super();
     }
 
     /**
@@ -48,9 +52,9 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
      * @param reverseRegionMap
      * @param nameToRegionIndex
      */
-    public UnigramRegionMapperCallback(Hashtable<Integer, Region> regionMap,
-          Hashtable<Region, Integer> reverseRegionMap,
-          Hashtable<String, HashSet<Integer>> nameToRegionIndex) {
+    public UnigramRegionMapperCallback(Map<Integer, Region> regionMap,
+          Map<Region, Integer> reverseRegionMap,
+          Map<String, HashSet<Integer>> nameToRegionIndex) {
         super(regionMap, reverseRegionMap, nameToRegionIndex);
     }
 
@@ -72,11 +76,11 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
      */
     @Override
     public void setCurrentRegion(String placename) {
-        String[] names = placename.split(" ");
+        currentPlacenames = placename.split(" ");
         associatedSets = new HashSet<HashSet<Integer>>();
-        for (String name : names) {
-            if (!nameToRegionIndex.contains(name)) {
-                getNameToRegionIndex().put(name, new HashSet<Integer>());
+        for (String name : currentPlacenames) {
+            if (!nameToRegionIndex.containsKey(name)) {
+                nameToRegionIndex.put(name, new HashSet<Integer>());
             }
             associatedSets.add(getNameToRegionIndex().get(name));
         }
@@ -94,6 +98,9 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
             if (!docSet.hasWord(name)) {
                 docSet.addWord(name);
             }
+            if(!placenameToLocations.containsKey(name)) {
+                placenameToLocations.put(name, new HashSet<Location>());
+            }
         }
     }
 
@@ -102,8 +109,8 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
      * @param region
      */
     public void addRegion(Region region) {
-        if (!reverseRegionMap.contains(region)) {
-            getRegionMap().put(getNumRegions(),region);
+        if (!reverseRegionMap.containsKey(region)) {
+            getRegionMap().put(getNumRegions(), region);
             getReverseRegionMap().put(region, getNumRegions());
             numRegions += 1;
         }
@@ -111,12 +118,20 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
 
     @Override
     public void addPlacenameTokens(String placename, DocumentSet docSet,
-          ArrayList<Integer> wordVector, ArrayList<Integer> toponymVector) {
+          List<Integer> wordVector, List<Integer> toponymVector,
+          List<Location> locs) {
         confirmPlacenameTokens(placename, docSet);
         String[] names = placename.split(" ");
-        for(String name: names) {
+        for (String name : names) {
             wordVector.add(docSet.getIntForWord(name));
             toponymVector.add(1);
+
+            HashSet<Location> tlocs = placenameToLocations.get(name);
+            tlocs.addAll(locs);
+
+            for(Location loc: locs) {
+                
+            }
         }
     }
 }

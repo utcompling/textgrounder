@@ -114,7 +114,7 @@ public class CommandLineOptions {
     /**
      * Number of paragraphs to treat as a single document.
      */
-    protected int paragraphsAsDocs;
+    protected int paragraphsAsDocs = 10;
     /**
      * Dimensions of region in degrees
      */
