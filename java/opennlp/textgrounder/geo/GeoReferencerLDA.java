@@ -48,9 +48,11 @@ public class GeoReferencerLDA extends BaseApp {
         rm.train();
         if (modelOptions.getTabularOutputFilename() != null) {
             rm.normalize();
-            rm.printTabulatedProbabilities(modelOptions.getTabulatedOutput());
+            rm.printTabulatedProbabilities();
         }
 
-        rm.writeXMLFile();
+        if (modelOptions.getKMLOutputFilename() != null) {
+            rm.writeXMLFile();
+        }
     }
 }

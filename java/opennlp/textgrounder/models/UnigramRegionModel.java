@@ -20,8 +20,9 @@ package opennlp.textgrounder.models;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +31,7 @@ import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.ners.*;
+import opennlp.textgrounder.util.*;
 
 /**
  * Topic model with region awareness. Toponyms are all unigrams. Multiword
@@ -54,6 +56,10 @@ public class UnigramRegionModel extends TopicModel {
      * If a toponym occurs in a certain region, the cell value is one, zero if not.
      */
     protected int[] regionByToponym;
+    /**
+     * 
+     */
+    protected HashSet<Location> locationSet;
 
     protected UnigramRegionModel() {
     }
@@ -86,7 +92,7 @@ public class UnigramRegionModel extends TopicModel {
         this.gazCache = bm.gazCache;
         this.pairListSet = bm.pairListSet;
 
-        locations = new ArrayList<Location>();
+        locationSet = new HashSet<Location>();
 
         setAllocateRegions();
     }
@@ -109,6 +115,7 @@ public class UnigramRegionModel extends TopicModel {
                 if (wordIndex != curTopSpan.begin) {
                     wordVectorT.add(curDoc.get(wordIndex));
                     toponymVectorT.add(0);
+                    docVectorT.add(docIndex);
                 } else {
                     String placename = getPlacenameString(curTopSpan, docIndex).toLowerCase();
 
@@ -121,9 +128,10 @@ public class UnigramRegionModel extends TopicModel {
                             } catch (Exception ex) {
                             }
                         }
-                        regionMapperCallback.setCurrentRegion(placename);
+//                        regionMapperCallback.setCurrentRegion(placename);
                         addLocationsToRegionArray(possibleLocations, regionMapperCallback);
-                        regionMapperCallback.addPlacenameTokens(placename, docSet, wordVectorT, toponymVectorT, possibleLocations);
+                        regionMapperCallback.addAll(placename, docSet, wordVectorT, toponymVectorT, docVectorT, docIndex, possibleLocations);
+                        locationSet.addAll(possibleLocations);
 
                         wordIndex = curTopSpan.end;
                         topSpanIndex += 1;
@@ -133,7 +141,6 @@ public class UnigramRegionModel extends TopicModel {
                         topSpanIndex += 1;
                     }
                 }
-                docVectorT.add(docIndex);
             }
         }
 
@@ -286,6 +293,36 @@ public class UnigramRegionModel extends TopicModel {
     public void decode() {
         Annealer ann = new MaximumPosteriorDecoder();
         train(ann);
+    }
+
+    protected void normalizeLocations() {
+        HashMap<Integer, Location> himl = new HashMap<Integer, Location>();
+        for (Location loc : locationSet) {
+            loc.count += beta;
+            himl.put(loc.id, loc);
+        }
+
+        Map<String, HashSet<Integer>> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
+        Map<ToponymRegionPair, HashSet<Location>> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
+        for (String name : nameToRegionIndex.keySet()) {
+            int wordid = docSet.getIntForWord(name);
+            for (int regid : nameToRegionIndex.get(name)) {
+                ToponymRegionPair trp = new ToponymRegionPair(wordid, regid);
+                HashSet<Location> locs = toponymRegionToLocations.get(trp);
+                for (Location loc : locs) {
+                    Location tl = himl.get(loc.id);
+                    tl.count += wordByTopicCounts[wordid * T + regid];
+                }
+            }
+        }
+
+        locations = new ArrayList<Location>(himl.values());
+    }
+
+    @Override
+    public void writeXMLFile() throws Exception {
+        normalizeLocations();
+        writeXMLFile(inputPath, kmlOutputFilename, locations);
     }
 
     /**

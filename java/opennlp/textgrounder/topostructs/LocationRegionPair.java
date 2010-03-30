@@ -15,39 +15,46 @@
 //  License along with this program; if not, write to the Free Software
 //  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.models.callbacks;
 
-import java.util.List;
-import opennlp.textgrounder.io.DocumentSet;
-import opennlp.textgrounder.topostructs.Location;
-import opennlp.textgrounder.topostructs.Region;
+package opennlp.textgrounder.topostructs;
 
 /**
- * A callback class to 
  *
  * @author tsmoon
  */
-public class NullRegionMapperCallback extends RegionMapperCallback {
+public class LocationRegionPair {
 
-    @Override
-    public void addRegion(Region region) {
+    public final Location location;
+    public final int regionIndex;
+
+    public LocationRegionPair(Location loc, int ridx) {
+        location = loc;
+        regionIndex = ridx;
     }
 
     @Override
-    public void setCurrentRegion(String placename) {
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final LocationRegionPair other = (LocationRegionPair) obj;
+        if (!this.location.equals(other.location)) {
+            return false;
+        }
+        if (this.regionIndex != other.regionIndex) {
+            return false;
+        }
+        return true;
     }
 
     @Override
-    public void confirmPlacenameTokens(String placename, DocumentSet docSet) {
-    }
-
-    @Override
-    public void addAll(String placename, DocumentSet docSet,
-          List<Integer> wordVector, List<Integer> toponymVector,
-          List<Integer> documentVector, int docIndex, List<Location> locs) {
-    }
-
-    @Override
-    public void addToPlace(Location loc, Region region) {
+    public int hashCode() {
+        int hash = 3;
+        hash = 59 * hash + this.location.id;
+        hash = 59 * hash + this.regionIndex;
+        return hash;
     }
 }

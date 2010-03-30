@@ -8,7 +8,11 @@ public class Location {
     public Coordinate coord;
     public int pop;
     public String container;
-    public int count;
+    /**
+     * Counts of location in given text. Is double type to accomodate
+     * hyperparameters and fractional counts;
+     */
+    public double count;
 
     public Location(int id, String name, String type, Coordinate coord, int pop,
           String container, int count) {

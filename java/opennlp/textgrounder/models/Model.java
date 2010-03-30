@@ -144,6 +144,8 @@ public abstract class Model {
                 regionArray[curX][curY] = current;
                 activeRegions++;
             }
+            current = regionArray[curX][curY];
+            regionMapper.addToPlace(loc, current);
         }
     }
 

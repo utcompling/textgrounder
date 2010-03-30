@@ -66,6 +66,10 @@ public abstract class RegionMapperCallback {
      * 
      */
     protected int numRegions;
+    /**
+     * 
+     */
+    protected Map<ToponymRegionPair, HashSet<Location>> toponymRegionToLocations;
 
     /**
      *
@@ -78,6 +82,7 @@ public abstract class RegionMapperCallback {
         regionToLocations = new HashMap<Region, HashSet<Location>>();
         locationToRegion = new HashMap<Location, Region>();
         placenameToLocations = new HashMap<String, HashSet<Location>>();
+        toponymRegionToLocations = new HashMap<ToponymRegionPair, HashSet<Location>>();
     }
 
     public RegionMapperCallback(Map<Integer, Region> regionMap,
@@ -107,7 +112,7 @@ public abstract class RegionMapperCallback {
      *
      * @param region
      */
-    public abstract void addToPlace(Region region);
+    public abstract void addToPlace(Location loc, Region region);
 
     /**
      * 
@@ -115,17 +120,21 @@ public abstract class RegionMapperCallback {
      */
     public abstract void setCurrentRegion(String placename);
 
-    public abstract void addPlacenameTokens(String placename, DocumentSet docSet,
+    public abstract void addAll(String placename, DocumentSet docSet,
           List<Integer> wordVector, List<Integer> toponymVector,
-          List<Location> locs);
+          List<Integer> documentVector, int docIndex, List<Location> locs);
 
     /**
      * 
      * @param placename
      * @param docSet
      */
-    public abstract void confirmPlacenameTokens(String placename,
-          DocumentSet docSet);
+    public void confirmPlacenameTokens(String placename,
+          DocumentSet docSet) {
+        if (!docSet.hasWord(placename)) {
+            docSet.addWord(placename);
+        }
+    }
 
     /**
      * @return the regionMap
@@ -174,5 +183,12 @@ public abstract class RegionMapperCallback {
      */
     public Map<String, HashSet<Location>> getPlacenameToLocations() {
         return placenameToLocations;
+    }
+
+    /**
+     * @return the toponymRegionToLocations
+     */
+    public Map<ToponymRegionPair, HashSet<Location>> getToponymRegionToLocations() {
+        return toponymRegionToLocations;
     }
 }

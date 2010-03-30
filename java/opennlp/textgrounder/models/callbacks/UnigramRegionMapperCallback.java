@@ -18,13 +18,11 @@
 package opennlp.textgrounder.models.callbacks;
 
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
-import opennlp.textgrounder.io.DocumentSet;
-import opennlp.textgrounder.topostructs.Location;
 
-import opennlp.textgrounder.topostructs.Region;
+import opennlp.textgrounder.io.DocumentSet;
+import opennlp.textgrounder.topostructs.*;
 
 /**
  * A callback class to 
@@ -33,12 +31,19 @@ import opennlp.textgrounder.topostructs.Region;
  */
 public class UnigramRegionMapperCallback extends RegionMapperCallback {
 
+    /**
+     *
+     */
     private String[] currentPlacenames;
     /**
      * 
      */
-    private HashSet<HashSet<Integer>> associatedSets;
+    protected HashSet<LocationRegionPair> currentLocationRegions;
 
+    /**
+     * 
+     */
+//    private HashSet<HashSet<Integer>> associatedRegionsSets;
     /**
      *
      */
@@ -56,6 +61,7 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
           Map<Region, Integer> reverseRegionMap,
           Map<String, HashSet<Integer>> nameToRegionIndex) {
         super(regionMap, reverseRegionMap, nameToRegionIndex);
+        currentLocationRegions = new HashSet<LocationRegionPair>();
     }
 
     /**
@@ -63,11 +69,12 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
      * @param region
      */
     @Override
-    public void addToPlace(Region region) {
-        int regionid = getReverseRegionMap().get(region);
-        for (HashSet<Integer> as : associatedSets) {
-            as.add(regionid);
-        }
+    public void addToPlace(Location loc, Region region) {
+        int regionid = reverseRegionMap.get(region);
+//        for (HashSet<Integer> as : associatedRegionsSets) {
+//            as.add(regionid);
+//        }
+        currentLocationRegions.add(new LocationRegionPair(loc, regionid));
     }
 
     /**
@@ -77,61 +84,68 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
     @Override
     public void setCurrentRegion(String placename) {
         currentPlacenames = placename.split(" ");
-        associatedSets = new HashSet<HashSet<Integer>>();
+//        associatedRegionsSets = new HashSet<HashSet<Integer>>();
         for (String name : currentPlacenames) {
             if (!nameToRegionIndex.containsKey(name)) {
                 nameToRegionIndex.put(name, new HashSet<Integer>());
             }
-            associatedSets.add(getNameToRegionIndex().get(name));
+//            associatedRegionsSets.add(nameToRegionIndex.get(name));
         }
     }
 
-    /**
-     *
-     * @param placename
-     * @param docSet
-     */
-    @Override
-    public void confirmPlacenameTokens(String placename, DocumentSet docSet) {
-        String[] names = placename.split(" ");
-        for (String name : names) {
-            if (!docSet.hasWord(name)) {
-                docSet.addWord(name);
-            }
-            if(!placenameToLocations.containsKey(name)) {
-                placenameToLocations.put(name, new HashSet<Location>());
-            }
-        }
-    }
-
+//    /**
+//     *
+//     * @param placename
+//     * @param docSet
+//     */
+//    @Override
+//    public void confirmPlacenameTokens(String placename, DocumentSet docSet) {
+//        String[] names = placename.split(" ");
+//        for (String name : names) {
+//            if (!docSet.hasWord(name)) {
+//                docSet.addWord(name);
+//            }
+////            if (!placenameToLocations.containsKey(name)) {
+////                placenameToLocations.put(name, new HashSet<Location>());
+////            }
+//        }
+//    }
     /**
      *
      * @param region
      */
     public void addRegion(Region region) {
         if (!reverseRegionMap.containsKey(region)) {
-            getRegionMap().put(getNumRegions(), region);
-            getReverseRegionMap().put(region, getNumRegions());
+            regionMap.put(numRegions, region);
+            reverseRegionMap.put(region, numRegions);
             numRegions += 1;
         }
     }
 
     @Override
-    public void addPlacenameTokens(String placename, DocumentSet docSet,
+    public void addAll(String placename, DocumentSet docSet,
           List<Integer> wordVector, List<Integer> toponymVector,
-          List<Location> locs) {
-        confirmPlacenameTokens(placename, docSet);
+          List<Integer> documentVector, int docIndex, List<Location> locs) {
         String[] names = placename.split(" ");
         for (String name : names) {
-            wordVector.add(docSet.getIntForWord(name));
+            confirmPlacenameTokens(name, docSet);
+            int wordid = docSet.getIntForWord(name);
+            wordVector.add(wordid);
             toponymVector.add(1);
+            documentVector.add(docIndex);
 
-            HashSet<Location> tlocs = placenameToLocations.get(name);
-            tlocs.addAll(locs);
+//            HashSet<Location> plocs = placenameToLocations.get(name);
+//            plocs.addAll(locs);
 
-            for(Location loc: locs) {
-                
+            for (LocationRegionPair lrp : currentLocationRegions) {
+                ToponymRegionPair trp = new ToponymRegionPair(wordid, lrp.regionIndex);
+                if (!toponymRegionToLocations.containsKey(trp)) {
+                    getToponymRegionToLocations().put(trp, new HashSet<Location>());
+                }
+                getToponymRegionToLocations().get(trp).add(lrp.location);
             }
         }
+
+        currentLocationRegions = new HashSet<LocationRegionPair>();
     }
 }
