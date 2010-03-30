@@ -57,7 +57,7 @@ public class CommandLineOptions {
      */
     protected int randomSeed = 1;
     /**
-     * Name of file to generate tabulated output to
+     * Name of file to generate tabulated kmlOutputFilename to
      */
     protected String tabularOutputFilename = null;
     /**
@@ -102,11 +102,15 @@ public class CommandLineOptions {
     /**
      * Path to training data. Can be directory or a single file.
      */
-    protected String input = null;
+    protected String trainInputPath = null;
     /**
-     * Path to output kml file.
+     * Path to test data. Can be directory or a single file.
      */
-    protected String output = "output.kml";
+    protected String testInputPath = null;
+    /**
+     * Path to kmlOutputFilename kml file.
+     */
+    protected String kmlOutputFilename = "output.kml";
     /**
      * Number of paragraphs to treat as a single document.
      */
@@ -116,7 +120,7 @@ public class CommandLineOptions {
      */
     protected double degreesPerRegion = 3.0;
     /**
-     * Size of bars in kml output
+     * Size of bars in kml kmlOutputFilename
      */
     protected int barScale = 50000;
     /**
@@ -155,7 +159,12 @@ public class CommandLineOptions {
                     gazetteType = value;
                     break;
                 case 'i':
-                    input = value;
+                    opt = option.getOpt();
+                    if (opt.equals("i")) {
+                        trainInputPath = value;
+                    } else if (opt.equals("ie")) {
+                        testInputPath = value;
+                    }
                     break;
                 case 'k':
                     opt = option.getOpt();
@@ -175,7 +184,7 @@ public class CommandLineOptions {
                         tabulatedOutput = new BufferedWriter(new OutputStreamWriter(
                               new FileOutputStream(tabularOutputFilename)));
                     } else if (opt.equals("o")) {
-                        output = value;
+                        kmlOutputFilename = value;
                     }
                     break;
                 case 'p':
@@ -259,12 +268,12 @@ public class CommandLineOptions {
         return gazetteType;
     }
 
-    public String getInput() {
-        return input;
+    public String getTrainInputPath() {
+        return trainInputPath;
     }
 
-    public String getOutput() {
-        return output;
+    public String getKMLOutputFilename() {
+        return kmlOutputFilename;
     }
 
     public int getParagraphsAsDocs() {
@@ -281,5 +290,9 @@ public class CommandLineOptions {
 
     public String getModel() {
         return model;
+    }
+
+    public String getTestInputPath() {
+        return testInputPath;
     }
 }

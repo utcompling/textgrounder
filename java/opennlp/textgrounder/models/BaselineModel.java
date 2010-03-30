@@ -41,12 +41,12 @@ public class BaselineModel extends Model {
     }
 
     public BaselineModel(CommandLineOptions options) throws Exception {
-        inputFilename = options.getInput();
-        if (inputFilename == null) {
+        inputPath = options.getTrainInputPath();
+        if (inputPath == null) {
             System.out.println("Error: You must specify an input filename with the -i flag.");
             System.exit(0);
         }
-        inputFile = new File(inputFilename);
+        inputFile = new File(inputPath);
 
         String gazTypeArg = options.getGazetteType().toLowerCase();
         if (gazTypeArg.startsWith("c")) {
@@ -66,7 +66,7 @@ public class BaselineModel extends Model {
             //myGaz = new WGGazetteer();
         }
 
-        outputFilename = options.getOutput();
+        kmlOutputFilename = options.getKMLOutputFilename();
         degreesPerRegion = options.getDegreesPerRegion();
 
         Properties myClassifierProperties = new Properties();
@@ -238,7 +238,7 @@ public class BaselineModel extends Model {
     }
 
     public void writeXMLFile(String inputFilename) throws Exception {
-        writeXMLFile(inputFilename, outputFilename, locations);
+        writeXMLFile(inputFilename, kmlOutputFilename, locations);
     }
 
     public void processPath() throws Exception {
@@ -258,10 +258,10 @@ public class BaselineModel extends Model {
     }
 
     /**
-     * @return the outputFilename
+     * @return the kmlOutputFilename
      */
     public String getOutputFilename() {
-        return outputFilename;
+        return kmlOutputFilename;
     }
 
     /**

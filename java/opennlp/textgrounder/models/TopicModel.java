@@ -20,12 +20,13 @@ package opennlp.textgrounder.models;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.ec.util.MersenneTwisterFast;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.io.DocumentSet;
-import opennlp.textgrounder.util.Constants;
+import opennlp.textgrounder.util.*;
 
 /**
  * Basic topic model implementation.
@@ -95,6 +96,19 @@ public class TopicModel extends Model {
      * Handles simulated annealing, burn-in, and full sampling cycle
      */
     protected Annealer annealer;
+    /**
+     * Number of types (either word or morpheme) to print per state or topic
+     */
+    protected int outputPerClass;
+    /**
+     * Posterior probabilities for topics.
+     */
+    protected double[] topicProbs;
+    /**
+     * Table of top {@link #outputPerTopic} words per topic. Used in
+     * normalization and printing.
+     */
+    protected StringDoublePair[][] topWordsPerTopic;
 
     /**
      * This is not the default constructor. It should only be called by
@@ -192,6 +206,9 @@ public class TopicModel extends Model {
         } else {
             annealer = new SimulatedAnnealer(options);
         }
+
+        outputPerClass = options.getOutputPerClass();
+        inputPath = options.getTrainInputPath();
     }
 
     /**
@@ -265,12 +282,47 @@ public class TopicModel extends Model {
      */
     @Override
     public void train() {
+        randomInitialize();
         train(annealer);
     }
 
     /**
+     * Create two normalized probability tables, {@link #TopWordsPerTopic} and
+     * {@link #topicProbs}. {@link #topicProbs} overwrites previous values.
+     * {@link #TopWordsPerTopic} only retains first {@link #outputPerTopic}
+     * words and values.
+     */
+    public void normalize() {
+        topWordsPerTopic = new StringDoublePair[T][];
+        for (int i = 0; i < T; ++i) {
+            topWordsPerTopic[i] = new StringDoublePair[outputPerClass];
+        }
+
+        Double sum = 0.;
+        for (int i = 0; i < T; ++i) {
+            sum += topicProbs[i] = topicCounts[i] + betaW;
+            ArrayList<DoubleStringPair> topWords = new ArrayList<DoubleStringPair>();
+            for (int j = 0; j < W; ++j) {
+                topWords.add(
+                      new DoubleStringPair(wordByTopicCounts[j * T + i] + beta,
+                      docSet.getWordForInt(j)));
+            }
+            Collections.sort(topWords);
+            for (int j = 0; j < outputPerClass; ++j) {
+                topWordsPerTopic[i][j] = new StringDoublePair(
+                      topWords.get(j).stringValue, topWords.get(j).doubleValue
+                      / topicProbs[i]);
+            }
+        }
+
+        for (int i = 0; i < T; ++i) {
+            topicProbs[i] /= sum;
+        }
+    }
+
+    /**
      * Print the normalized sample counts to out. Print only the top {@link
-     * #outputPerTopic} per given state and topic.
+     * #outputPerClass} per given topic.
      *
      * @param out Output buffer to write to.
      * @throws IOException
@@ -281,27 +333,21 @@ public class TopicModel extends Model {
     }
 
     /**
-     * Print the normalized sample counts for each state to out. Print only the top {@link
-     * #outputPerTopic} per given state.
+     * Print the normalized sample counts for each topic to out. Print only the top {@link
+     * #outputPerTopic} per given topic.
      *
      * @param out
      * @throws IOException
      */
     protected void printTopics(BufferedWriter out) throws IOException {
-        int startt = 0, M = 4, endt = Math.min(M + startt, stateProbs.length);
-        out.write("***** Word Probabilities by State *****\n\n");
+        int startt = 0, M = 4, endt = Math.min(M + startt, topicProbs.length);
+        out.write("***** Word Probabilities by Topic *****\n\n");
         while (startt < T) {
             for (int i = startt; i < endt; ++i) {
-                String header = "S_" + i;
-                header = String.format("%25s\t%6.5f\t",
-                      String.format("%s:%s:%s", header, i
-
-                stateProbs[i])
-                ;
-
-            out.write(
-            header);
-                }
+                String header = "T_" + i;
+                header = String.format("%25s\t%6.5f\t", header, topicProbs[i]);
+                out.write(header);
+            }
 
             out.newLine();
             out.newLine();
@@ -310,8 +356,8 @@ public class TopicModel extends Model {
                   i < outputPerClass; ++i) {
                 for (int c = startt; c < endt; ++c) {
                     String line = String.format("%25s\t%6.5f\t",
-                          topWordsPerState[c][i].stringValue,
-                          topWordsPerState[c][i].doubleValue);
+                          topWordsPerTopic[c][i].stringValue,
+                          topWordsPerTopic[c][i].doubleValue);
                     out.write(line);
                 }
                 out.newLine();
@@ -320,7 +366,7 @@ public class TopicModel extends Model {
             out.newLine();
 
             startt = endt;
-            endt = java.lang.Math.min(stateS, startt + M);
+            endt = java.lang.Math.min(T, startt + M);
         }
     }
 }

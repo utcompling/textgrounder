@@ -39,11 +39,11 @@ public abstract class Model {
     /**
      * Training data
      */
-    protected String inputFilename;
+    protected String inputPath;
     /**
      * Name of kml file (i.e. Google Earth format xml) to generate output to
      */
-    protected String outputFilename;
+    protected String kmlOutputFilename;
     /**
      * Height of bars for Google Earth KML output
      */
@@ -128,7 +128,8 @@ public abstract class Model {
      *
      * @param locs
      */
-    protected void addLocationsToRegionArray(List<Location> locs, RegionMapperCallback regionMapper) {
+    protected void addLocationsToRegionArray(List<Location> locs,
+          RegionMapperCallback regionMapper) {
         for (Location loc : locs) {
             int curX = (int) (loc.coord.latitude + 180) / (int) degreesPerRegion;
             int curY = (int) (loc.coord.longitude + 90) / (int) degreesPerRegion;
@@ -152,14 +153,14 @@ public abstract class Model {
      * @throws Exception
      */
     public void writeXMLFile() throws Exception {
-        writeXMLFile(inputFilename, outputFilename, locations);
+        writeXMLFile(inputPath, kmlOutputFilename, locations);
     }
 
     /**
      * Output tagged and disambiguated placenames to Google Earth kml file.
      *
-     * @param inputFilename
-     * @param outputFilename
+     * @param inputPath
+     * @param kmlOutputFilename
      * @param locations
      * @throws Exception
      */
