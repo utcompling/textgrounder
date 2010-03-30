@@ -134,12 +134,14 @@ public abstract class Annealer {
             return false;
         } else {
             if (innerIter == innerIterationsMax) {
+                System.err.print("\nOuter iter:" + outerIter);
                 innerIter = 0;
                 outerIter++;
                 temperature -= temperatureDecrement;
                 temperatureReciprocal = 1 / temperature;
                 stabilizeTemperature();
             } else {
+                System.err.print(innerIter + ",");
                 innerIter++;
             }
             return true;

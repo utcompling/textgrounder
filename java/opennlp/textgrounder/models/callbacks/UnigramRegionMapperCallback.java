@@ -49,6 +49,7 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
      */
     public UnigramRegionMapperCallback() {
         super();
+        currentLocationRegions = new HashSet<LocationRegionPair>();
     }
 
     /**

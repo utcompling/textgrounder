@@ -257,6 +257,23 @@ public class BaselineModel extends Model {
         }
     }
 
+    public void processPathFromTM() throws Exception {
+        processPathFromTM(getInputFile(), pairListSet);
+    }
+
+    public void processPathFromTM(File myPath, SNERPairListSet pairListSet)
+          throws
+          Exception {
+        if (myPath.isDirectory()) {
+            for (String pathname : myPath.list()) {
+                processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), pairListSet);
+            }
+        } else {
+            docSet.addDocumentFromFile(myPath.getCanonicalPath());
+            pairListSet.addToponymSpansFromDocumentSet(docSet);
+        }
+    }
+
     /**
      * @return the kmlOutputFilename
      */

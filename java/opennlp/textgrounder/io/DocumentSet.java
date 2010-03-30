@@ -108,6 +108,15 @@ public class DocumentSet extends ArrayList<ArrayList<Integer>> {
         textIn.close();
     }
 
+    public String getDocumentAsString(int idx) {
+        String text = "";
+        ArrayList<Integer> doc = get(idx);
+        for(int tok : doc) {
+            text += getWordForInt(tok) + " ";
+        }
+        return text;
+    }
+
     /**
      * Add word to hash tables. To be used in
      * external classes in post-initialization addition of placenames.

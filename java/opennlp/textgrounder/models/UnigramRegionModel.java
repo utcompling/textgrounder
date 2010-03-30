@@ -42,6 +42,10 @@ import opennlp.textgrounder.util.*;
 public class UnigramRegionModel extends TopicModel {
 
     /**
+     *
+     */
+    protected BaselineModel baselineModel = null;
+    /**
      * Callback class for handling mappings between regions, locations and placenames
      */
     protected RegionMapperCallback regionMapperCallback;
@@ -72,25 +76,22 @@ public class UnigramRegionModel extends TopicModel {
     protected void initialize(CommandLineOptions options) {
 
         initializeFromOptions(options);
+        kmlOutputFilename = options.getKMLOutputFilename();
 
-        BaselineModel bm = null;
         try {
-            bm = new BaselineModel(options);
-            bm.processPath();
+            baselineModel = new BaselineModel(options);
+            baselineModel.processPathFromTM();
         } catch (Exception ex) {
             ex.printStackTrace();
             System.exit(1);
         }
-        try {
-            bm.processPath();
-        } catch (Exception ex) {
-            Logger.getLogger(UnigramRegionModel.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        bm.initializeRegionArray();
 
-        this.gazetteer = bm.gazetteer;
-        this.gazCache = bm.gazCache;
-        this.pairListSet = bm.pairListSet;
+        baselineModel.initializeRegionArray();
+
+        this.gazetteer = baselineModel.gazetteer;
+        this.gazCache = baselineModel.gazCache;
+        this.pairListSet = baselineModel.pairListSet;
+        this.docSet = baselineModel.docSet;
 
         locationSet = new HashSet<Location>();
 
@@ -105,13 +106,20 @@ public class UnigramRegionModel extends TopicModel {
               docVectorT = new ArrayList<Integer>(),
               toponymVectorT = new ArrayList<Integer>();
 
+        System.err.print("Extracting words and placenames from document: ");
         for (int docIndex = 0; docIndex < docSet.size(); docIndex++) {
+            System.err.print(docIndex + ",");
             ArrayList<Integer> curDoc = docSet.get(docIndex);
             ArrayList<ToponymSpan> curDocSpans = pairListSet.get(docIndex);
             int topSpanIndex = 0;
-            ToponymSpan curTopSpan = curDocSpans.get(topSpanIndex);
-            for (int wordIndex = 0; wordIndex < curDoc.size(); wordIndex++) {
+            ToponymSpan curTopSpan = null;
+            try {
+                curTopSpan = curDocSpans.get(topSpanIndex);
+            } catch (IndexOutOfBoundsException e) {
+                curTopSpan = new ToponymSpan(-1, -1);
+            }
 
+            for (int wordIndex = 0; wordIndex < curDoc.size(); wordIndex++) {
                 if (wordIndex != curTopSpan.begin) {
                     wordVectorT.add(curDoc.get(wordIndex));
                     toponymVectorT.add(0);
@@ -129,24 +137,31 @@ public class UnigramRegionModel extends TopicModel {
                             }
                         }
 //                        regionMapperCallback.setCurrentRegion(placename);
-                        addLocationsToRegionArray(possibleLocations, regionMapperCallback);
+                        baselineModel.addLocationsToRegionArray(possibleLocations, regionMapperCallback);
                         regionMapperCallback.addAll(placename, docSet, wordVectorT, toponymVectorT, docVectorT, docIndex, possibleLocations);
                         locationSet.addAll(possibleLocations);
 
-                        wordIndex = curTopSpan.end;
-                        topSpanIndex += 1;
+                        wordIndex = curTopSpan.end - 1;
                     } else {
                         wordVectorT.add(curDoc.get(wordIndex));
                         toponymVectorT.add(0);
-                        topSpanIndex += 1;
+                        docVectorT.add(docIndex);
+                    }
+
+                    topSpanIndex += 1;
+                    try {
+                        curTopSpan = curDocSpans.get(topSpanIndex);
+                    } catch (IndexOutOfBoundsException e) {
+                        curTopSpan = new ToponymSpan(-1, -1);
                     }
                 }
             }
         }
+        System.err.println();
 
-        N = regionMapperCallback.getNumRegions();
+        N = wordVectorT.size();
         W = docSet.getDictionarySize();
-        T = activeRegions;
+        T = regionMapperCallback.getNumRegions();
         D = docSet.size();
         betaW = beta * W;
 
@@ -157,6 +172,7 @@ public class UnigramRegionModel extends TopicModel {
         toponymVector = new int[N];
         copyToArray(toponymVector, toponymVectorT);
 
+        topicVector = new int[N];
         topicCounts = new int[T];
         for (int i = 0; i < T; ++i) {
             topicCounts[i] = 0;
@@ -236,6 +252,8 @@ public class UnigramRegionModel extends TopicModel {
      */
     @Override
     public void train(Annealer annealer) {
+        System.err.println(String.format("Beginning training with %d tokens, %d words, %d regions, %d documents", N, W, T, D));
+
         int wordid, docid, topicid;
         int wordoff, docoff;
         int istop;
@@ -321,7 +339,10 @@ public class UnigramRegionModel extends TopicModel {
 
     @Override
     public void writeXMLFile() throws Exception {
+        System.err.println();
+        System.err.println("Counting locations and smoothing");
         normalizeLocations();
+        System.err.println("Writing output");
         writeXMLFile(inputPath, kmlOutputFilename, locations);
     }
 

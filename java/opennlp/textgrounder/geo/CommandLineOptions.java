@@ -63,7 +63,7 @@ public class CommandLineOptions {
     /**
      * Output buffer to write normalized, tabulated data to.
      */
-    protected BufferedWriter tabulatedOutput;
+    protected BufferedWriter tabulatedOutput = null;
     /**
      * Temperature at which to start annealing process
      */

@@ -44,7 +44,7 @@ public class GeoReferencerLDA extends BaseApp {
         }
 
         CommandLineOptions modelOptions = new CommandLineOptions(cline);
-        UnigramRegionModel rm = new UnigramRegionModel(modelOptions);
+        NgramRegionModel rm = new NgramRegionModel(modelOptions);
         rm.train();
         if (modelOptions.getTabularOutputFilename() != null) {
             rm.normalize();
