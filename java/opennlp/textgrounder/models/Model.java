@@ -24,6 +24,9 @@ import opennlp.textgrounder.topostructs.*;
  */
 public abstract class Model {
 
+    // Minimum number of pixels the (small) square region (NOT our Region) represented by each city must occupy on the screen for its label to appear:
+    private final static int MIN_LOD_PIXELS = 8;
+
     /**
      * Dimensions of regionArray.
      */
@@ -213,13 +216,25 @@ public abstract class Model {
 
             double height = Math.log(loc.count) * barScale;
 
-            //String kmlPolygon = coord.toKMLPolygon(4,.15,height);  // a square
-            String kmlPolygon = loc.coord.toKMLPolygon(10, .15, height);
+	    double radius = .15;
+	    //String kmlPolygon = coord.toKMLPolygon(4,radius,height);  // a square
+            String kmlPolygon = loc.coord.toKMLPolygon(10, radius, height);
 
             String placename = loc.name;
             Coordinate coord = loc.coord;
             out.write("\t\t\t<Placemark>\n"
                   + "\t\t\t\t<name>" + placename + "</name>\n"
+		  + "\t\t\t\t<Region>"
+		  + "\t\t\t\t\t<LatLonAltBox>"
+                  + "\t\t\t\t\t\t<north>" + (coord.longitude + radius) + "</north>"
+	          + "\t\t\t\t\t\t<south>" + (coord.longitude - radius)  + "</south>"
+	          + "\t\t\t\t\t\t<east>" + (coord.latitude + radius) + "</east>"
+	          + "\t\t\t\t\t\t<west>" + (coord.latitude - radius) + "</west>"
+		  + "\t\t\t\t\t</LatLonAltBox>"
+		  + "\t\t\t\t\t<Lod>"
+		  + "\t\t\t\t\t\t<minLodPixels>" + MIN_LOD_PIXELS + "</minLodPixels>"
+		  + "\t\t\t\t\t</Lod>"
+		  + "\t\t\t\t</Region>"
                   + "\t\t\t\t<styleUrl>#transBluePoly</styleUrl>\n"
                   + "\t\t\t\t<Point>\n"
                   + "\t\t\t\t\t<coordinates>\n"
