@@ -23,6 +23,7 @@ import java.util.Map;
 
 import opennlp.textgrounder.io.DocumentSet;
 import opennlp.textgrounder.topostructs.*;
+import opennlp.textgrounder.util.Constants;
 
 /**
  * A callback class to 
@@ -67,7 +68,7 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
      */
     @Override
     public void addToPlace(Location loc, Region region) {
-        if (loc.coord.latitude != 0 && loc.coord.longitude != 0) {
+        if (loc.coord.latitude > Constants.EPSILON && loc.coord.longitude > Constants.EPSILON) {
             if (!reverseRegionMap.containsKey(region)) {
                 reverseRegionMap.put(region, numRegions);
                 regionMap.put(numRegions, region);

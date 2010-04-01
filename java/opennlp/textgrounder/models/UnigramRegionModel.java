@@ -28,6 +28,7 @@ import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.ners.*;
+import opennlp.textgrounder.util.Constants;
 
 /**
  * Topic model with region awareness. Toponyms are all unigrams. Multiword
@@ -153,6 +154,14 @@ public class UnigramRegionModel extends TopicModel {
                             } catch (Exception ex) {
                             }
                         }
+
+                        List<Location> tp = new ArrayList<Location>();
+                        for (Location loc : possibleLocations) {
+                            if (loc.coord.latitude > Constants.EPSILON && loc.coord.longitude > Constants.EPSILON) {
+                                tp.add(loc);
+                            }
+                        }
+                        possibleLocations = tp;
 
                         baselineModel.addLocationsToRegionArray(possibleLocations, regionMapperCallback);
                         regionMapperCallback.addAll(placename, docSet, wordVectorT, toponymVectorT, docVectorT, docIndex, possibleLocations);
