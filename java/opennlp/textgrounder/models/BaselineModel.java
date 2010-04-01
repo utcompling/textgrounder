@@ -77,7 +77,8 @@ public class BaselineModel extends Model {
 
         gazCache = new Hashtable<String, List<Location>>();
         barScale = options.getBarScale();
-        docSet = new DocumentSet(options.getParagraphsAsDocs());
+        paragraphsAsDocs = options.getParagraphsAsDocs();
+        docSet = new DocumentSet(paragraphsAsDocs);
     }
 
     public void initializeRegionArray() {
@@ -253,24 +254,11 @@ public class BaselineModel extends Model {
             }
         } else {
             docSet.addDocumentFromFile(myPath.getCanonicalPath());
-            pairListSet.addToponymSpansFromFile(myPath.getCanonicalPath());
-        }
-    }
-
-    public void processPathFromTM() throws Exception {
-        processPathFromTM(getInputFile(), pairListSet);
-    }
-
-    public void processPathFromTM(File myPath, SNERPairListSet pairListSet)
-          throws
-          Exception {
-        if (myPath.isDirectory()) {
-            for (String pathname : myPath.list()) {
-                processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), pairListSet);
+            if (paragraphsAsDocs == 0) {
+                pairListSet.addToponymSpansFromFile(myPath.getCanonicalPath());
+            } else {
+                pairListSet.addToponymSpansFromDocumentSet(docSet);
             }
-        } else {
-            docSet.addDocumentFromFile(myPath.getCanonicalPath());
-            pairListSet.addToponymSpansFromDocumentSet(docSet);
         }
     }
 

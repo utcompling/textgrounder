@@ -67,8 +67,15 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
      */
     @Override
     public void addToPlace(Location loc, Region region) {
-        int regionid = reverseRegionMap.get(region);
-        currentLocationRegions.add(new LocationRegionPair(loc, regionid));
+        if (loc.coord.latitude != 0 && loc.coord.longitude != 0) {
+            if (!reverseRegionMap.containsKey(region)) {
+                reverseRegionMap.put(region, numRegions);
+                regionMap.put(numRegions, region);
+                numRegions += 1;
+            }
+            int regionid = reverseRegionMap.get(region);
+            currentLocationRegions.add(new LocationRegionPair(loc, regionid));
+        }
     }
 
     /**

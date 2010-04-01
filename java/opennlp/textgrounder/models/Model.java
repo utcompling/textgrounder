@@ -26,7 +26,10 @@ public abstract class Model {
 
     // Minimum number of pixels the (small) square region (NOT our Region) represented by each city must occupy on the screen for its label to appear:
     private final static int MIN_LOD_PIXELS = 8;
-
+    /**
+     * 
+     */
+    protected int paragraphsAsDocs;
     /**
      * Dimensions of regionArray.
      */
@@ -143,7 +146,6 @@ public abstract class Model {
                 double minLat = loc.coord.latitude - loc.coord.latitude % degreesPerRegion;
                 double maxLat = minLat + degreesPerRegion;
                 current = new Region(minLon, maxLon, minLat, maxLat);
-                regionMapper.addRegion(current);
                 regionArray[curX][curY] = current;
                 activeRegions++;
             }
@@ -216,25 +218,25 @@ public abstract class Model {
 
             double height = Math.log(loc.count) * barScale;
 
-	    double radius = .15;
-	    //String kmlPolygon = coord.toKMLPolygon(4,radius,height);  // a square
+            double radius = .15;
+            //String kmlPolygon = coord.toKMLPolygon(4,radius,height);  // a square
             String kmlPolygon = loc.coord.toKMLPolygon(10, radius, height);
 
             String placename = loc.name;
             Coordinate coord = loc.coord;
             out.write("\t\t\t<Placemark>\n"
                   + "\t\t\t\t<name>" + placename + "</name>\n"
-		  + "\t\t\t\t<Region>"
-		  + "\t\t\t\t\t<LatLonAltBox>"
+                  + "\t\t\t\t<Region>"
+                  + "\t\t\t\t\t<LatLonAltBox>"
                   + "\t\t\t\t\t\t<north>" + (coord.longitude + radius) + "</north>"
-	          + "\t\t\t\t\t\t<south>" + (coord.longitude - radius)  + "</south>"
-	          + "\t\t\t\t\t\t<east>" + (coord.latitude + radius) + "</east>"
-	          + "\t\t\t\t\t\t<west>" + (coord.latitude - radius) + "</west>"
-		  + "\t\t\t\t\t</LatLonAltBox>"
-		  + "\t\t\t\t\t<Lod>"
-		  + "\t\t\t\t\t\t<minLodPixels>" + MIN_LOD_PIXELS + "</minLodPixels>"
-		  + "\t\t\t\t\t</Lod>"
-		  + "\t\t\t\t</Region>"
+                  + "\t\t\t\t\t\t<south>" + (coord.longitude - radius) + "</south>"
+                  + "\t\t\t\t\t\t<east>" + (coord.latitude + radius) + "</east>"
+                  + "\t\t\t\t\t\t<west>" + (coord.latitude - radius) + "</west>"
+                  + "\t\t\t\t\t</LatLonAltBox>"
+                  + "\t\t\t\t\t<Lod>"
+                  + "\t\t\t\t\t\t<minLodPixels>" + MIN_LOD_PIXELS + "</minLodPixels>"
+                  + "\t\t\t\t\t</Lod>"
+                  + "\t\t\t\t</Region>"
                   + "\t\t\t\t<styleUrl>#transBluePoly</styleUrl>\n"
                   + "\t\t\t\t<Point>\n"
                   + "\t\t\t\t\t<coordinates>\n"

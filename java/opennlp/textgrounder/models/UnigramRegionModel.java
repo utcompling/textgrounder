@@ -86,7 +86,7 @@ public class UnigramRegionModel extends TopicModel {
 
         try {
             baselineModel = new BaselineModel(options);
-            baselineModel.processPathFromTM();
+            baselineModel.processPath();
         } catch (Exception ex) {
             ex.printStackTrace();
             System.exit(1);
