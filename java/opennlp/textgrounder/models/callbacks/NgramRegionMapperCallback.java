@@ -87,20 +87,27 @@ public class NgramRegionMapperCallback extends UnigramRegionMapperCallback {
     public void addAll(String placename, DocumentSet docSet,
           List<Integer> wordVector, List<Integer> toponymVector,
           List<Integer> documentVector, int docIndex, List<Location> locs) {
-        confirmPlacenameTokens(placename, docSet);
-        int wordid = docSet.getIntForWord(placename);
-        wordVector.add(wordid);
-        toponymVector.add(1);
-        documentVector.add(docIndex);
+//        confirmPlacenameTokens(placename, docSet);
+//        int wordid = docSet.getIntForWord(placename);
+//        wordVector.add(wordid);
+//        toponymVector.add(1);
+//        documentVector.add(docIndex);
+//
+//        if(!nameToRegionIndex.containsKey(placename)) {
+//            nameToRegionIndex.put(placename, new HashSet<Integer>());
+//        }
+//        HashSet<Integer> currentRegions = nameToRegionIndex.get(placename);
+//
+//        for (LocationRegionPair lrp : currentLocationRegions) {
+//            ToponymRegionPair trp = new ToponymRegionPair(wordid, lrp.regionIndex);
+//            if (!toponymRegionToLocations.containsKey(trp)) {
+//                toponymRegionToLocations.put(trp, new HashSet<Location>());
+//            }
+//            toponymRegionToLocations.get(trp).add(lrp.location);
+//            currentRegions.add(lrp.regionIndex);
+//        }
 
-        for (LocationRegionPair lrp : currentLocationRegions) {
-            ToponymRegionPair trp = new ToponymRegionPair(wordid, lrp.regionIndex);
-            if (!toponymRegionToLocations.containsKey(trp)) {
-                getToponymRegionToLocations().put(trp, new HashSet<Location>());
-            }
-            getToponymRegionToLocations().get(trp).add(lrp.location);
-        }
-
+        addAll(placename, docSet, wordVector, toponymVector, documentVector, docIndex);
         currentLocationRegions = new HashSet<LocationRegionPair>();
     }
 }

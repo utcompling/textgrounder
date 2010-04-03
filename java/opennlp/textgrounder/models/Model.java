@@ -139,18 +139,15 @@ public abstract class Model {
         for (Location loc : locs) {
             int curX = (int) (loc.coord.latitude + 180) / (int) degreesPerRegion;
             int curY = (int) (loc.coord.longitude + 90) / (int) degreesPerRegion;
-            Region current = null;
             if (regionArray[curX][curY] == null) {
                 double minLon = loc.coord.longitude - loc.coord.longitude % degreesPerRegion;
                 double maxLon = minLon + degreesPerRegion;
                 double minLat = loc.coord.latitude - loc.coord.latitude % degreesPerRegion;
                 double maxLat = minLat + degreesPerRegion;
-                current = new Region(minLon, maxLon, minLat, maxLat);
-                regionArray[curX][curY] = current;
+                regionArray[curX][curY] = new Region(minLon, maxLon, minLat, maxLat);
                 activeRegions++;
             }
-            current = regionArray[curX][curY];
-            regionMapper.addToPlace(loc, current);
+            regionMapper.addToPlace(loc, regionArray[curX][curY]);
         }
     }
 

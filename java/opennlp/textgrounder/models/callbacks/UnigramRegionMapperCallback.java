@@ -68,15 +68,15 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
      */
     @Override
     public void addToPlace(Location loc, Region region) {
-        if (loc.coord.latitude > Constants.EPSILON && loc.coord.longitude > Constants.EPSILON) {
-            if (!reverseRegionMap.containsKey(region)) {
-                reverseRegionMap.put(region, numRegions);
-                regionMap.put(numRegions, region);
-                numRegions += 1;
-            }
-            int regionid = reverseRegionMap.get(region);
-            currentLocationRegions.add(new LocationRegionPair(loc, regionid));
+//        if (loc.coord.latitude > Constants.EPSILON && loc.coord.longitude > Constants.EPSILON) {
+        if (!reverseRegionMap.containsKey(region)) {
+            reverseRegionMap.put(region, numRegions);
+            regionMap.put(numRegions, region);
+            numRegions += 1;
         }
+        int regionid = reverseRegionMap.get(region);
+        currentLocationRegions.add(new LocationRegionPair(loc, regionid));
+//        }
     }
 
     /**
@@ -121,21 +121,60 @@ public class UnigramRegionMapperCallback extends RegionMapperCallback {
           List<Integer> documentVector, int docIndex, List<Location> locs) {
         String[] names = placename.split(" ");
         for (String name : names) {
-            confirmPlacenameTokens(name, docSet);
-            int wordid = docSet.getIntForWord(name);
-            wordVector.add(wordid);
-            toponymVector.add(1);
-            documentVector.add(docIndex);
-
-            for (LocationRegionPair lrp : currentLocationRegions) {
-                ToponymRegionPair trp = new ToponymRegionPair(wordid, lrp.regionIndex);
-                if (!toponymRegionToLocations.containsKey(trp)) {
-                    getToponymRegionToLocations().put(trp, new HashSet<Location>());
-                }
-                getToponymRegionToLocations().get(trp).add(lrp.location);
-            }
+            addAll(name, docSet, wordVector, toponymVector, documentVector, docIndex);
+//            confirmPlacenameTokens(name, docSet);
+//            int wordid = docSet.getIntForWord(name);
+//            wordVector.add(wordid);
+//            toponymVector.add(1);
+//            documentVector.add(docIndex);
+//            if (!nameToRegionIndex.containsKey(name)) {
+//                nameToRegionIndex.put(name, new HashSet<Integer>());
+//            }
+//            HashSet<Integer> currentRegions = nameToRegionIndex.get(name);
+//
+//
+//            for (LocationRegionPair lrp : currentLocationRegions) {
+//                ToponymRegionPair trp = new ToponymRegionPair(wordid, lrp.regionIndex);
+//                if (!toponymRegionToLocations.containsKey(trp)) {
+//                    toponymRegionToLocations.put(trp, new HashSet<Location>());
+//                }
+//                toponymRegionToLocations.get(trp).add(lrp.location);
+//                currentRegions.add(lrp.regionIndex);
+//            }
         }
 
         currentLocationRegions = new HashSet<LocationRegionPair>();
+    }
+
+    /**
+     *
+     * @param placename
+     * @param docSet
+     * @param wordVector
+     * @param toponymVector
+     * @param documentVector
+     * @param docIndex
+     */
+    public void addAll(String name, DocumentSet docSet,
+          List<Integer> wordVector, List<Integer> toponymVector,
+          List<Integer> documentVector, int docIndex) {
+        confirmPlacenameTokens(name, docSet);
+        int wordid = docSet.getIntForWord(name);
+        wordVector.add(wordid);
+        toponymVector.add(1);
+        documentVector.add(docIndex);
+        if (!nameToRegionIndex.containsKey(name)) {
+            nameToRegionIndex.put(name, new HashSet<Integer>());
+        }
+        HashSet<Integer> currentRegions = nameToRegionIndex.get(name);
+
+        for (LocationRegionPair lrp : currentLocationRegions) {
+            ToponymRegionPair trp = new ToponymRegionPair(wordid, lrp.regionIndex);
+            if (!toponymRegionToLocations.containsKey(trp)) {
+                toponymRegionToLocations.put(trp, new HashSet<Location>());
+            }
+            toponymRegionToLocations.get(trp).add(lrp.location);
+            currentRegions.add(lrp.regionIndex);
+        }
     }
 }

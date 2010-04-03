@@ -157,7 +157,7 @@ public class UnigramRegionModel extends TopicModel {
 
                         List<Location> tp = new ArrayList<Location>();
                         for (Location loc : possibleLocations) {
-                            if (loc.coord.latitude > Constants.EPSILON && loc.coord.longitude > Constants.EPSILON) {
+                            if (Math.abs(loc.coord.latitude) > Constants.EPSILON && Math.abs(loc.coord.longitude) > Constants.EPSILON) {
                                 tp.add(loc);
                             }
                         }
@@ -278,8 +278,6 @@ public class UnigramRegionModel extends TopicModel {
      */
     @Override
     public void train(Annealer annealer) {
-        System.err.println(String.format("Beginning training with %d tokens, %d words, %d regions, %d documents", N, W, T, D));
-
         int wordid, docid, topicid;
         int wordoff, docoff;
         int istop;
@@ -338,6 +336,7 @@ public class UnigramRegionModel extends TopicModel {
      * 
      */
     public void decode() {
+        System.err.println(String.format("Decoding maximum posterior topics"));
         Annealer ann = new MaximumPosteriorDecoder();
         train(ann);
     }

@@ -131,21 +131,29 @@ public abstract class Annealer {
      */
     public boolean nextIter() {
         if (outerIter == outerIterationsMax) {
+            System.err.print("\n");
             return false;
         } else {
             if (innerIter == innerIterationsMax) {
-                innerIter = 0;
                 outerIter++;
+                if (outerIter == outerIterationsMax) {
+                    System.err.print("\n");
+                    return false;
+                }
+                innerIter = 0;
                 temperature -= temperatureDecrement;
                 temperatureReciprocal = 1 / temperature;
                 stabilizeTemperature();
+                System.err.println(String.format("Outer iteration: %d (temperature: %.2f)", outerIter, temperature));
+                System.err.print("Inner iteration: ");
+                innerIter += 1;
             } else {
                 if (innerIter == 0) {
                     System.err.println(String.format("Outer iteration: %d (temperature: %.2f)", outerIter, temperature));
                     System.err.print("Inner iteration: ");
                 }
                 System.err.print(innerIter + ",");
-                innerIter++;
+                innerIter += 1;
             }
             return true;
         }

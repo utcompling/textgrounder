@@ -288,6 +288,7 @@ public class TopicModel extends Model {
     @Override
     public void train() {
         randomInitialize();
+        System.err.println(String.format("Beginning training with %d tokens, %d words, %d regions, %d documents", N, W, T, D));
         train(annealer);
     }
 
