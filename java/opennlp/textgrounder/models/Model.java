@@ -86,6 +86,11 @@ public abstract class Model {
     protected DocumentSet docSet;
 
     /**
+     * Flag that tells system to ignore the input file(s) and instead run on every locality in the gazetteer
+     */
+    protected boolean runWholeGazetteer = false;
+
+    /**
      * Remove punctuation from first and last characters of a string
      *
      * @param aString String to strip
@@ -157,7 +162,10 @@ public abstract class Model {
      * @throws Exception
      */
     public void writeXMLFile() throws Exception {
-        writeXMLFile(inputPath, kmlOutputFilename, locations);
+	if(!runWholeGazetteer)
+	    writeXMLFile(inputPath, kmlOutputFilename, locations);
+	else
+	    writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, locations);
     }
 
     /**

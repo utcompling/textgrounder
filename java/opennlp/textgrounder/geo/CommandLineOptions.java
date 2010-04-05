@@ -129,6 +129,11 @@ public class CommandLineOptions {
     protected String model = null;
 
     /**
+     * A flag that runs the system on every locality in the gazetteer, ignoring the input text file(s), if set to true
+     */
+    protected boolean runWholeGazetteer = false;
+
+    /**
      *
      * @param cline
      * @throws IOException
@@ -206,7 +211,12 @@ public class CommandLineOptions {
                     topics = Integer.parseInt(value);
                     break;
                 case 'w':
-                    outputPerClass = Integer.parseInt(value);
+		    if(option.getOpt().equals("wg")) {
+			runWholeGazetteer = true;
+		    }
+                    else {
+			outputPerClass = Integer.parseInt(value);
+		    }
                     break;
             }
         }
@@ -294,5 +304,9 @@ public class CommandLineOptions {
 
     public String getTestInputPath() {
         return testInputPath;
+    }
+
+    public boolean getRunWholeGazetteer() {
+	return runWholeGazetteer;
     }
 }

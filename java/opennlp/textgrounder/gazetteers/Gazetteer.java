@@ -20,6 +20,10 @@ public abstract class Gazetteer extends THashMap<String, Coordinate> {
     protected static Pattern rawCoord = Pattern.compile("^\\-?[0-9]+$");
 
     public abstract List<Location> get(String Placename) throws Exception;
+    
+    public List<Location> getAllLocalities() throws Exception { // overridden by WGGazetteer only right now
+	return new ArrayList<Location>();
+    }
 
     /*public Gazetteer (String location, int gazType) throws FileNotFoundException, IOException {
 

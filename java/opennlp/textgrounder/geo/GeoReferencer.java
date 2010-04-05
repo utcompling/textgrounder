@@ -24,7 +24,7 @@ public class GeoReferencer extends BaseApp {
         CommandLineOptions modelOptions = new CommandLineOptions(cline);
         BaselineModel grefUS = new BaselineModel(modelOptions);
 
-        System.out.println(grefUS.getInputFile().getCanonicalPath());
+        //System.out.println(grefUS.getInputFile().getCanonicalPath());
         grefUS.train();
         grefUS.printRegionArray();
 

@@ -41,12 +41,21 @@ public class BaselineModel extends Model {
     }
 
     public BaselineModel(CommandLineOptions options) throws Exception {
-        inputPath = options.getTrainInputPath();
-        if (inputPath == null) {
-            System.out.println("Error: You must specify an input filename with the -i flag.");
-            System.exit(0);
-        }
-        inputFile = new File(inputPath);
+
+	runWholeGazetteer = options.getRunWholeGazetteer();
+
+	if(!runWholeGazetteer) {
+	    inputPath = options.getTrainInputPath();
+	    if (inputPath == null) {
+		System.out.println("Error: You must specify an input filename with the -i flag.");
+		System.exit(0);
+	    }
+	    inputFile = new File(inputPath);
+	}
+	else {
+	    inputPath = null;
+	    inputFile = null;
+	}
 
         String gazTypeArg = options.getGazetteType().toLowerCase();
         if (gazTypeArg.startsWith("c")) {
@@ -61,7 +70,7 @@ public class BaselineModel extends Model {
             gazetteer = new TRGazetteer();
         } else {
             System.err.println("Error: unrecognized gazetteer type: " + gazTypeArg);
-            System.err.println("Please enter w, c, u, or g.");
+            System.err.println("Please enter w, c, u, g, or t.");
             System.exit(0);
             //myGaz = new WGGazetteer();
         }
@@ -69,16 +78,20 @@ public class BaselineModel extends Model {
         kmlOutputFilename = options.getKMLOutputFilename();
         degreesPerRegion = options.getDegreesPerRegion();
 
-        Properties myClassifierProperties = new Properties();
-        classifier = new CRFClassifier(myClassifierProperties);
-        classifier.loadClassifier(Constants.STANFORD_NER_HOME + "/classifiers/ner-eng-ie.crf-3-all2008-distsim.ser.gz");
+	if(!runWholeGazetteer) {
+	    Properties myClassifierProperties = new Properties();
+	    classifier = new CRFClassifier(myClassifierProperties);
+	    classifier.loadClassifier(Constants.STANFORD_NER_HOME + "/classifiers/ner-eng-ie.crf-3-all2008-distsim.ser.gz");
 
-        pairListSet = new SNERPairListSet(classifier);
+	    pairListSet = new SNERPairListSet(classifier);
 
-        gazCache = new Hashtable<String, List<Location>>();
-        barScale = options.getBarScale();
-        paragraphsAsDocs = options.getParagraphsAsDocs();
-        docSet = new DocumentSet(paragraphsAsDocs);
+	    //<<<<<<< .mine
+	    gazCache = new Hashtable<String, List<Location>>();
+	    paragraphsAsDocs = options.getParagraphsAsDocs();
+	    docSet = new DocumentSet(options.getParagraphsAsDocs());
+	}
+
+	barScale = options.getBarScale();
     }
 
     public void initializeRegionArray() {
@@ -112,6 +125,16 @@ public class BaselineModel extends Model {
         System.out.println(activeRegions + " active regions for this document out of a possible "
               + (regionArrayHeight * regionArrayWidth) + " (region size = "
               + degreesPerRegion + " x " + degreesPerRegion + " degrees).");
+    }
+
+    public void activateRegionsForWholeGaz() throws Exception {
+	System.out.println("Running whole gazetteer through system...");
+	
+	//locations = new ArrayList<Location>();
+	locations = gazetteer.getAllLocalities();
+	addLocationsToRegionArray(locations);
+	//locations = null; //////////////// uncomment this to get a null pointer but much faster termination
+	//                                   if you only want to know the number of active regions :)
     }
 
     public List<Location> disambiguateAndCountPlacenames() throws Exception {
@@ -278,16 +301,25 @@ public class BaselineModel extends Model {
 
     @Override
     public void train() {
-        try {
-            processPath();
-        } catch (Exception ex) {
-            Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
-        }
         initializeRegionArray();
-        try {
-            disambiguateAndCountPlacenames();
-        } catch (Exception ex) {
-            Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
-        }
+	if(!runWholeGazetteer) {
+	    try {
+		processPath();
+	    } catch (Exception ex) {
+		Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
+	    }
+	    try {
+		disambiguateAndCountPlacenames();
+	    } catch (Exception ex) {
+		Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
+	    }
+	}
+	else {
+	    try {
+		activateRegionsForWholeGaz();
+	    } catch (Exception ex) {
+		Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
+	    }
+	}
     }
 }
