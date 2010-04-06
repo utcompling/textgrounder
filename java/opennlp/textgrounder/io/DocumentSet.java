@@ -6,6 +6,7 @@ import java.util.*;
 import gnu.trove.*;
 
 import edu.stanford.nlp.ling.CoreAnnotations.*;
+import java.util.ArrayList;
 
 /**
  * Class of documents as array of array of integers (i.e. indexes of word types).
@@ -108,13 +109,19 @@ public class DocumentSet extends ArrayList<ArrayList<Integer>> {
         textIn.close();
     }
 
+    /**
+     * 
+     * @param idx
+     * @return
+     */
     public String getDocumentAsString(int idx) {
-        String text = "";
         ArrayList<Integer> doc = get(idx);
+        StringBuffer buff = new StringBuffer();
         for(int tok : doc) {
-            text += getWordForInt(tok) + " ";
+            buff.append(getWordForInt(tok));
+            buff.append(" ");
         }
-        return text;
+        return buff.toString();
     }
 
     /**
