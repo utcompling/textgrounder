@@ -39,8 +39,70 @@ public class TRGazetteer extends Gazetteer {
 
 	int placeId = 1;
 	
-	// get places from NGA portion:
-	ResultSet rs = stat.executeQuery("select * from T_NGA");
+	// get places from CIA centroids section:
+	System.out.println(" Reading CIA centroids section...");
+	ResultSet rs = stat.executeQuery("select * from T_CIA_CENTROIDS");
+	while(rs.next()) {
+	    prep.setInt(1, placeId);
+	    String nameToInsert = rs.getString("COUNTRY");
+	    if(nameToInsert != null)
+		prep.setString(2, nameToInsert);
+	    prep.setString(3, "cia_centroid");
+	    double latToInsert = DMDtoDD(rs.getInt("LAT_DEG"), rs.getInt("LAT_MIN"), rs.getString("LAT_DIR"));
+	    prep.setDouble(4, latToInsert);
+	    double longToInsert = DMDtoDD(rs.getInt("LONG_DEG"), rs.getInt("LONG_MIN"), rs.getString("LONG_DIR"));
+	    prep.setDouble(5, longToInsert);
+
+	    prep.addBatch();
+
+	    if(placeId % 100 == 0) {
+	    	System.out.println("  Added " + placeId + " places...");// gazetteer has " + populations.size() + " entries so far.");
+		System.out.println("    Last added: " + nameToInsert + ", cia_centroid, (" + latToInsert + ", " + longToInsert + ")");
+	    }
+
+	    placeId++;
+	}
+
+	// get places from USGS section:
+	System.out.println(" Reading USGS section...");
+	rs = stat.executeQuery("select * from T_USGS_PP");
+	while(rs.next()) {
+	    String rawType = rs.getString("FeatureType");
+	    String typeToInsert = "";
+	    if(rawType != null) {
+		if(rawType.equals("ppl"))
+		    typeToInsert = "locality";
+		else {
+		    continue; // skipping non-localities for now
+		    //typeToInsert = "NON-locality";
+		}
+		prep.setString(3, typeToInsert);
+	    }
+	    prep.setInt(1, placeId);
+	    String nameToInsert = rs.getString("FeatureName");
+	    if(nameToInsert != null)
+		prep.setString(2, nameToInsert);
+	    double latToInsert = rs.getDouble("PrimaryLatitudeDD");
+	    prep.setDouble(4, latToInsert);
+	    double longToInsert = rs.getDouble("PrimaryLongitudeDD");
+	    prep.setDouble(5, longToInsert);
+	    int popToInsert = rs.getInt("EstimatedPopulation");
+	    if(popToInsert != 0)
+		prep.setDouble(6, popToInsert);
+	    
+	    prep.addBatch();
+
+	    if(placeId % 50000 == 0) {
+		System.out.println("  Added " + placeId + " places...");// gazetteer has " + populations.size() + " entries so far.");
+		System.out.println("    Last added: " + nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + ")");
+	    }
+
+	    placeId++;
+	}
+
+	// get places from NGA section:
+	System.out.println(" Reading NGA section...");
+	rs = stat.executeQuery("select * from T_NGA");
 	while(rs.next()) {
 	    String rawType = rs.getString("FC");
 	    String typeToInsert = "";
@@ -68,22 +130,25 @@ public class TRGazetteer extends Gazetteer {
 	    if(popToInsert == 0 && rawType != null && rawType.equals("P"))
 		prep.setInt(6, popToInsert);
 	    // could use ADM2 for container, but those are counties, not countries, so probably a bad idea. leaving container field blank for now
-
 	    prep.addBatch();
 
 	    if(placeId % 100000 == 0) {
 	    	System.out.println("  Added " + placeId + " places...");// gazetteer has " + populations.size() + " entries so far.");
 		System.out.println("    Last added: " + nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + ")");
 	    }
+	    //if(placeId == 1000)//////////////////
+	    //  System.exit(0);//////////////////
 	    
 	    placeId++;
 	}
 
+	System.out.print("Executing batch insertion into database...");
 	conn.setAutoCommit(false);
 	prep.executeBatch();
 	conn.setAutoCommit(true);
+	System.out.println("done.");
 
-	System.out.println("Done. Number of entries in database = " + (placeId - 1));
+	System.out.println("Number of entries in database = " + (placeId - 1));
 
 	//ResultSet rs = stat.executeQuery("show tables;");
 	//ResultSet rs = stat.executeQuery("select * from sqlite_master where type='table';");
@@ -336,6 +401,16 @@ public class TRGazetteer extends Gazetteer {
 	    return false;
 	}
 	}*/
+    /**
+     * Converts (half) a coordinate from degrees-minutes-direction to decimal degrees
+     */
+    private double DMDtoDD(int degrees, int minutes, String direction) {
+	double dd = degrees;
+	dd += ((double)minutes)/60.0;
+	if(direction.equals("S") || direction.equals("W"))
+	    dd *= -1;
+	return dd;
+    }
 
     protected void finalize() throws Throwable {
 	try {
