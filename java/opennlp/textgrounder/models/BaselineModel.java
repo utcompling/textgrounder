@@ -85,7 +85,6 @@ public class BaselineModel extends Model {
 
 	    pairListSet = new SNERPairListSet(classifier);
 
-	    //<<<<<<< .mine
 	    gazCache = new Hashtable<String, List<Location>>();
 	    paragraphsAsDocs = options.getParagraphsAsDocs();
 	    docSet = new DocumentSet(options.getParagraphsAsDocs());

@@ -25,22 +25,76 @@ public class TRGazetteer extends Gazetteer {
 
     public TRGazetteer (String location) throws FileNotFoundException, IOException, Exception {
 
+	System.out.println("Populating TR-Gazetteer from " + location + " ...");
+
 	Class.forName("org.sqlite.JDBC");
 
 	conn = DriverManager.getConnection("jdbc:sqlite:"+location);
 
 	stat = conn.createStatement();
 
-	//ResultSet rs = stat.executeQuery("show tables;");
-	ResultSet rs = stat.executeQuery("select * from sqlite_master where type='table';");
+	stat.executeUpdate("drop table if exists places;");
+	stat.executeUpdate("create table places (id integer primary key, name, type, lat float, lon float, pop int, container);");
+	PreparedStatement prep = conn.prepareStatement("insert into places values (?, ?, ?, ?, ?, ?, ?);");
+
+	int placeId = 1;
 	
+	// get places from NGA portion:
+	ResultSet rs = stat.executeQuery("select * from T_NGA");
 	while(rs.next()) {
-	    System.out.println(rs.toString()/*rs.getString("id") + ": " + rs.getString("name") + ": " + rs.getString("type") + ": " + rs.getString("lat") + ": " + rs.getString("lon") + ": " + rs.getString("pop")*/);
+	    String rawType = rs.getString("FC");
+	    String typeToInsert = "";
+	    if(rawType != null) {
+		if(rawType.equals("P"))
+		    typeToInsert = "locality";
+		else {
+		    continue; // skipping non-localities for now
+		    //typeToInsert = "NON-locality";
+		}
+		prep.setString(3, typeToInsert);
 	    }
+	    prep.setInt(1, placeId);
+	    String nameToInsert = rs.getString("FULL_NAME_ND");
+	    if(nameToInsert != null)
+		prep.setString(2, nameToInsert);
+	    
+	    double latToInsert = rs.getDouble("DD_LAT");
+	    //if(latToInsert != null)
+	    prep.setDouble(4, latToInsert);
+	    double longToInsert = rs.getDouble("DD_LONG");
+	    //if(longToInsert != null)
+	    prep.setDouble(5, longToInsert);
+	    int popToInsert = rs.getInt("DIM"); // note: DIM holds population for type P and elevation for all others
+	    if(popToInsert == 0 && rawType != null && rawType.equals("P"))
+		prep.setInt(6, popToInsert);
+	    // could use ADM2 for container, but those are counties, not countries, so probably a bad idea. leaving container field blank for now
 
-	rs.close();
+	    prep.addBatch();
 
-	conn.close();
+	    if(placeId % 100000 == 0) {
+	    	System.out.println("  Added " + placeId + " places...");// gazetteer has " + populations.size() + " entries so far.");
+		System.out.println("    Last added: " + nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + ")");
+	    }
+	    
+	    placeId++;
+	}
+
+	conn.setAutoCommit(false);
+	prep.executeBatch();
+	conn.setAutoCommit(true);
+
+	System.out.println("Done. Number of entries in database = " + (placeId - 1));
+
+	//ResultSet rs = stat.executeQuery("show tables;");
+	//ResultSet rs = stat.executeQuery("select * from sqlite_master where type='table';");
+	
+	//while(rs.next()) {
+	//    System.out.println(rs.toString()/*rs.getString("id") + ": " + rs.getString("name") + ": " + rs.getString("type") + ": " + rs.getString("lat") + ": " + rs.getString("lon") + ": " + rs.getString("pop")*/);
+	//    }
+
+	//rs.close();
+
+	//conn.close();
 	
 	/*BufferedReader gazIn = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(location))));
 	
@@ -236,7 +290,7 @@ public class TRGazetteer extends Gazetteer {
 
     }
 
-    private static double convertRawToDec(String raw) {
+    /*    private static double convertRawToDec(String raw) {
 	//System.out.println(raw);
 	if(raw.length() <= 1) {
 	    return Double.parseDouble(raw);
@@ -247,9 +301,9 @@ public class TRGazetteer extends Gazetteer {
 	}
 	int willBeDecimalIndex = raw.length() - 2;
 	return Double.parseDouble(raw.substring(0, willBeDecimalIndex) + "." + raw.substring(willBeDecimalIndex));
-    }
+	}*/
 
-    public Coordinate baselineGet(String placename) throws Exception {
+    /*public Coordinate baselineGet(String placename) throws Exception {
 	ResultSet rs = stat.executeQuery("select pop from places where type != \"locality\" and name = \""
 					 + placename + "\" order by pop desc;");
 	int nonLocalityPop = 0;
@@ -259,7 +313,7 @@ public class TRGazetteer extends Gazetteer {
 
 	rs = stat.executeQuery("select * from places where type = \"locality\" and name = \""
 					 + placename + "\" order by pop desc;");
-	/*while*/if(rs.next()) {
+	whileif(rs.next()) {
 	    //System.out.println(rs.getString("id") + ": " + rs.getString("name") + ": " + rs.getString("type") + ": " + rs.getString("lat") + ": " + rs.getString("lon") + ": " + rs.getString("pop"));
 	    if(rs.getInt("pop") > nonLocalityPop || rs.getString("container").equals(rs.getString("name"))) {
 		Coordinate returnCoord = new Coordinate(rs.getDouble("lon"), rs.getDouble("lat"));
@@ -269,9 +323,9 @@ public class TRGazetteer extends Gazetteer {
 	}
 	rs.close();
 	return new Coordinate(9999.99, 9999.99);
-    }
+    }*/
 
-    public boolean hasPlace(String placename) throws Exception {
+    /*public boolean hasPlace(String placename) throws Exception {
 	ResultSet rs = stat.executeQuery("select * from places where type = \"locality\" and name = \"" + placename + "\";");
 	if(rs.next()) {
 	    rs.close();
@@ -281,7 +335,7 @@ public class TRGazetteer extends Gazetteer {
 	    rs.close();
 	    return false;
 	}
-    }
+	}*/
 
     protected void finalize() throws Throwable {
 	try {
@@ -294,7 +348,7 @@ public class TRGazetteer extends Gazetteer {
     public List<Location> get(String placename) throws Exception {
 	ArrayList<Location> locationsToReturn = new ArrayList<Location>();
 
-	ResultSet rs = stat.executeQuery("select * from places where name = \"" + placename + "\";");
+	ResultSet rs = stat.executeQuery("select * from T_USGS_PP where FeatureName like \"" + placename + "\";");
 	while(rs.next()) {
 	    Location locationToAdd = new Location(rs.getInt("id"),
 						  rs.getString("name"),
