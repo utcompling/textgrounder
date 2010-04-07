@@ -63,6 +63,10 @@ public class SNERPairListSet extends ArrayList<ArrayList<ToponymSpan>> {
 
         for (int i = 0; i < tokens.length; i++) {
             String token = tokens[i];
+	    /*if(i==89111) {
+		System.out.println(token);
+		System.exit(0);
+		}*/
             boolean isLocationToken = token.contains("/LOCATION");
             if (isLocationToken) {
                 if (toponymStartIndex == -1) {
