@@ -1,35 +1,21 @@
 package opennlp.textgrounder.ners;
 
-import java.io.*;
-import java.util.*;
-import java.util.regex.*;
-
-import gnu.trove.*;
-
 import edu.stanford.nlp.ie.crf.*;
-import edu.stanford.nlp.ling.*;
 import edu.stanford.nlp.ling.CoreAnnotations.*;
+
+import java.io.*;
 import java.util.ArrayList;
 
 import opennlp.textgrounder.io.DocumentSet;
-import opennlp.textgrounder.util.StringUtil;
+import opennlp.textgrounder.models.callbacks.TokenArrayBuffer;
 import opennlp.textgrounder.util.*;
 
-public class SNERPairListSet extends ArrayList<ArrayList<ToponymSpan>> {
+public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
 
-    //public static final Pattern locationPattern = Pattern.compile("(\\w+/LOCATION(\\s*\\w+/LOCATION)*)");
-    public static final Pattern locationTokenPattern = Pattern.compile("(\\w+/LOCATION)");
-    //public Gazetteer gazetteer;
     public CRFClassifier classifier;
-    //public DocumentSet docSet;
-    //private int docCounter = 0;
 
-    public SNERPairListSet(CRFClassifier classif/*, DocumentSet ds*/) {
-        //	throws FileNotFoundException, IOException {
-
-        //gazetteer = gaz;
+    public SNERDocumentToponymArray(CRFClassifier classif) {
         classifier = classif;
-        //docSet = ds;
     }
 
     /**
@@ -37,17 +23,22 @@ public class SNERPairListSet extends ArrayList<ArrayList<ToponymSpan>> {
      * 
      * @param locationOfFile
      * @param docSet
+     * @param tokenArrayBuffer
+     * @throws FileNotFoundException
+     * @throws IOException
      */
-    public void addToponymSpansFromFile(String locationOfFile,
-          DocumentSet docSet) throws FileNotFoundException, IOException {
+    public void addToponymsFromFile(String locationOfFile,
+          DocumentSet docSet, TokenArrayBuffer tokenArrayBuffer) throws
+          FileNotFoundException, IOException {
 
         BufferedReader textIn = new BufferedReader(new FileReader(locationOfFile));
         System.out.print("Extracting toponym indices from " + locationOfFile + " ...");
 
         int parAsDocSize = docSet.getParAsDocSize();
         docSet.newDoc();
-        
-        ArrayList<ToponymSpan> curSpanList = new ArrayList<ToponymSpan>();
+        int currentDoc = docSet.size() - 1;
+
+        ArrayList<Integer> curSpanList = new ArrayList<Integer>();
         String curLine = null;
         StringBuffer buf = new StringBuffer();
         int counter = 1;
@@ -62,12 +53,13 @@ public class SNERPairListSet extends ArrayList<ArrayList<ToponymSpan>> {
             if (counter < parAsDocSize) {
                 counter++;
             } else {
-                addToponymSpans(buf, curSpanList, docSet);
+                addToponymSpans(buf, curSpanList, docSet, tokenArrayBuffer, currentDoc);
                 add(curSpanList);
-                
-                curSpanList = new ArrayList<ToponymSpan>();
+
+                curSpanList = new ArrayList<Integer>();
                 buf = new StringBuffer();
                 docSet.newDoc();
+                currentDoc += 1;
                 counter = 1;
             }
         }
@@ -76,7 +68,7 @@ public class SNERPairListSet extends ArrayList<ArrayList<ToponymSpan>> {
          * Add last lines if they have not been processed and added
          */
         if (counter > 1) {
-            addToponymSpans(buf, curSpanList, docSet);
+            addToponymSpans(buf, curSpanList, docSet, tokenArrayBuffer, currentDoc);
             add(curSpanList);
         }
     }
@@ -86,9 +78,12 @@ public class SNERPairListSet extends ArrayList<ArrayList<ToponymSpan>> {
      * @param buf
      * @param curSpanList
      * @param docSet
+     * @param tokenArrayBuffer
+     * @param currentDoc
      */
     public void addToponymSpans(StringBuffer buf,
-          ArrayList<ToponymSpan> curSpanList, DocumentSet docSet) {
+          ArrayList<Integer> curSpanList, DocumentSet docSet,
+          TokenArrayBuffer tokenArrayBuffer, int currentDoc) {
 
         String nerOutput = classifier.classifyToString(buf.toString());
 
@@ -98,6 +93,7 @@ public class SNERPairListSet extends ArrayList<ArrayList<ToponymSpan>> {
 
         for (int i = 0; i < tokens.length; i++) {
             String token = tokens[i];
+            int wordidx = 0;
             boolean isLocationToken = token.contains("/LOCATION");
             if (isLocationToken) {
                 if (toponymStartIndex == -1) {
@@ -105,31 +101,54 @@ public class SNERPairListSet extends ArrayList<ArrayList<ToponymSpan>> {
                 }
                 if (token.endsWith("/O")) {
                     toponymEndIndex = i + 1;
-                    curSpanList.add(new ToponymSpan(toponymStartIndex, toponymEndIndex));
-                    docSet.addWordToSeq(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
+                    wordidx = docSet.addWordToSeq(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
+                    curSpanList.add(wordidx);
+                    tokenArrayBuffer.addWord(wordidx);
+                    tokenArrayBuffer.addDoc(currentDoc);
+                    tokenArrayBuffer.addToponym(1);
 
                     toponymStartIndex = -1;
                     toponymEndIndex = -1;
                 }
             } else if (toponymStartIndex != -1) {
                 toponymEndIndex = i;
-                curSpanList.add(new ToponymSpan(toponymStartIndex, toponymEndIndex));
-                docSet.addWordToSeq(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
-                
+                /**
+                 * Add the toponym that spans from toponymStartIndex to
+                 * toponymEndIndex. This does not include the current token
+                 */
+                wordidx = docSet.addWordToSeq(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
+                curSpanList.add(wordidx);
+                tokenArrayBuffer.addWord(wordidx);
+                tokenArrayBuffer.addDoc(currentDoc);
+                tokenArrayBuffer.addToponym(1);
+
+                /**
+                 * Add the current token
+                 */
                 String curToken = token.split("/")[0];
-                docSet.addWordToSeq(curToken);
+                wordidx = docSet.addWordToSeq(curToken);
+                tokenArrayBuffer.addWord(wordidx);
+                tokenArrayBuffer.addDoc(currentDoc);
+                tokenArrayBuffer.addToponym(0);
 
                 toponymStartIndex = -1;
                 toponymEndIndex = -1;
             } else {
                 String curToken = token.split("/")[0];
                 docSet.addWordToSeq(curToken);
+                tokenArrayBuffer.addWord(wordidx);
+                tokenArrayBuffer.addDoc(currentDoc);
+                tokenArrayBuffer.addToponym(0);
             }
         }
 
         //case where toponym ended at very end of document:
         if (toponymStartIndex != -1) {
-            curSpanList.add(new ToponymSpan(toponymStartIndex, tokens.length));
+            int wordidx = docSet.addWordToSeq(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
+            curSpanList.add(wordidx);
+            tokenArrayBuffer.addWord(wordidx);
+            tokenArrayBuffer.addDoc(currentDoc);
+            tokenArrayBuffer.addToponym(1);
         }
     }
 }

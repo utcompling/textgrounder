@@ -15,21 +15,35 @@
 //  License along with this program; if not, write to the Free Software
 //  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.models;
+package opennlp.textgrounder.models.callbacks;
 
-import opennlp.textgrounder.geo.*;
-import opennlp.textgrounder.models.callbacks.NgramRegionMapperCallback;
+import java.util.ArrayList;
 
 /**
- * Topic model with region awareness. Toponyms are all unigrams. Multiword
- * toponyms are split into space delimited tokens.
- * 
+ *
  * @author tsmoon
  */
-public class NgramRegionModel extends UnigramRegionModel {
+public class TokenArrayBuffer {
 
-    public NgramRegionModel(CommandLineOptions options) {
-        regionMapperCallback = new NgramRegionMapperCallback();
-        initialize(options);
+    public ArrayList<Integer> wordVector;
+    public ArrayList<Integer> docVector;
+    public ArrayList<Integer> toponymVector;
+
+    public TokenArrayBuffer() {
+        wordVector = new ArrayList<Integer>();
+        docVector = new ArrayList<Integer>();
+        toponymVector = new ArrayList<Integer>();
+    }
+
+    public void addWord(int wordIdx) {
+        wordVector.add(wordIdx);
+    }
+
+    public void addDoc(int docIdx) {
+        docVector.add(docIdx);
+    }
+
+    public void addToponym(int topIdx) {
+        toponymVector.add(topIdx);
     }
 }

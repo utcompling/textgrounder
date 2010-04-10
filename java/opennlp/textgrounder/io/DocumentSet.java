@@ -97,8 +97,9 @@ public class DocumentSet extends ArrayList<ArrayList<Integer>> {
      * exist in the dictionary, add it to the dictionary as well.
      *
      * @param word
+     * @return index of the word that has been added
      */
-    public void addWordToSeq(String word) {
+    public int addWordToSeq(String word) {
         int idx = 0;
         if (!wordsToInts.containsKey(word)) {
             wordsToInts.put(word, nextInt);
@@ -109,6 +110,7 @@ public class DocumentSet extends ArrayList<ArrayList<Integer>> {
             idx = wordsToInts.get(word);
         }
         currentDoc.add(idx);
+        return idx;
     }
 
     /**

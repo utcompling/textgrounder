@@ -17,26 +17,21 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models.callbacks;
 
-import java.util.List;
-import opennlp.textgrounder.io.DocumentSet;
-import opennlp.textgrounder.topostructs.Location;
-import opennlp.textgrounder.topostructs.Region;
-
 /**
- * A callback class to 
  *
  * @author tsmoon
  */
-public class NullRegionMapperCallback extends RegionMapperCallback {
+public class NullTokenArrayBuffer extends TokenArrayBuffer {
 
-    public NullRegionMapperCallback() {
+    public NullTokenArrayBuffer() {
     }
 
-    @Override
-    public void addAll(String placename, DocumentSet docSet) {
+    public void addWord(int wordIdx) {
     }
 
-    @Override
-    public void addToPlace(Location loc, Region region) {
+    public void addDoc(int docIdx) {
+    }
+
+    public void addToponym(int topIdx) {
     }
 }

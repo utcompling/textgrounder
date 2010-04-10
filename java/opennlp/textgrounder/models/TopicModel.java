@@ -126,7 +126,7 @@ public class TopicModel extends Model {
      *
      * @param docSet Container holding training data. In the form of arrays of
      *              arrays of word indices
-     * @param T Number of topics
+     * @param options options from the commandline
      */
     public TopicModel(DocumentSet docSet, CommandLineOptions options) {
         this.docSet = docSet;
@@ -234,7 +234,7 @@ public class TopicModel extends Model {
     }
 
     /**
-     * Train topic model
+     * Train topic model with specified annealing scheme (Annealer).
      *
      * @param annealer Annealing scheme to use
      */
@@ -283,7 +283,8 @@ public class TopicModel extends Model {
     }
 
     /**
-     * 
+     * Train topic model. Use this when calling from outside the class, e.g.
+     * a main routine.
      */
     @Override
     public void train() {

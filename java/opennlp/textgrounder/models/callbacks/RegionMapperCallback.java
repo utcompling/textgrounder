@@ -30,7 +30,7 @@ import opennlp.textgrounder.topostructs.*;
  *
  * @author tsmoon
  */
-public abstract class RegionMapperCallback {
+public class RegionMapperCallback {
 
     /**
      * Table from index to region
@@ -46,74 +46,65 @@ public abstract class RegionMapperCallback {
      */
     protected Map<String, HashSet<Integer>> nameToRegionIndex;
     /**
-     * 
+     *
      */
-    protected int numRegions;
+    protected HashSet<LocationRegionPair> currentLocationRegions;
     /**
      * 
      */
     protected Map<ToponymRegionPair, HashSet<Location>> toponymRegionToLocations;
+    /**
+     *
+     */
+    protected int numRegions;
 
     /**
      *
      */
-    protected RegionMapperCallback() {
+    public RegionMapperCallback() {
         numRegions = 0;
         regionMap = new HashMap<Integer, Region>();
         reverseRegionMap = new HashMap<Region, Integer>();
         nameToRegionIndex = new HashMap<String, HashSet<Integer>>();
         toponymRegionToLocations = new HashMap<ToponymRegionPair, HashSet<Location>>();
-    }
-
-    public RegionMapperCallback(Map<Integer, Region> regionMap,
-          Map<Region, Integer> reverseRegionMap,
-          Map<String, HashSet<Integer>> nameToRegionIndex) {
-        setMaps(regionMap, reverseRegionMap, nameToRegionIndex);
-    }
-
-    /**
-     * 
-     */
-    public void setMaps(Map<Integer, Region> regionMap,
-          Map<Region, Integer> reverseRegionMap,
-          Map<String, HashSet<Integer>> nameToRegionIndex) {
-        this.regionMap = regionMap;
-        this.reverseRegionMap = reverseRegionMap;
-        this.nameToRegionIndex = nameToRegionIndex;
+        currentLocationRegions = new HashSet<LocationRegionPair>();
     }
 
     /**
      *
+     * @param loc 
      * @param region
      */
-    public abstract void addRegion(Region region);
+    public void addToPlace(Location loc, Region region) {
+        if (!reverseRegionMap.containsKey(region)) {
+            reverseRegionMap.put(region, numRegions);
+            regionMap.put(numRegions, region);
+            numRegions += 1;
+        }
+        int regionid = reverseRegionMap.get(region);
+        currentLocationRegions.add(new LocationRegionPair(loc, regionid));
+    }
 
     /**
      *
-     * @param region
-     */
-    public abstract void addToPlace(Location loc, Region region);
-
-    /**
-     * 
-     * @param placename
-     */
-    public abstract void setCurrentRegion(String placename);
-
-    public abstract void addAll(String placename, DocumentSet docSet,
-          List<Integer> wordVector, List<Integer> toponymVector,
-          List<Integer> documentVector, int docIndex, List<Location> locs);
-
-    /**
-     * 
      * @param placename
      * @param docSet
      */
-    public void confirmPlacenameTokens(String placename,
-          DocumentSet docSet) {
-        if (!docSet.hasWord(placename)) {
-            docSet.addWord(placename);
+    public void addAll(String placename, DocumentSet docSet) {
+        int wordid = docSet.getIntForWord(placename);
+
+        HashSet<Integer> currentRegions = nameToRegionIndex.get(placename);
+
+        for (LocationRegionPair lrp : currentLocationRegions) {
+            ToponymRegionPair trp = new ToponymRegionPair(wordid, lrp.regionIndex);
+            if (!toponymRegionToLocations.containsKey(trp)) {
+                toponymRegionToLocations.put(trp, new HashSet<Location>());
+            }
+            toponymRegionToLocations.get(trp).add(lrp.location);
+            currentRegions.add(lrp.regionIndex);
         }
+        
+        currentLocationRegions = new HashSet<LocationRegionPair>();
     }
 
     /**

@@ -44,7 +44,7 @@ public class GeoReferencerLDA extends BaseApp {
         }
 
         CommandLineOptions modelOptions = new CommandLineOptions(cline);
-        NgramRegionModel rm = new NgramRegionModel(modelOptions);
+        RegionModel rm = new RegionModel(modelOptions);
         rm.train();
         rm.decode();
         if (modelOptions.getTabularOutputFilename() != null) {

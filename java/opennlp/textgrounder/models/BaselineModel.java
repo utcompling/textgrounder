@@ -18,6 +18,8 @@ import java.util.logging.Logger;
 import opennlp.textgrounder.gazetteers.*;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.io.*;
+import opennlp.textgrounder.models.callbacks.NullTokenArrayBuffer;
+import opennlp.textgrounder.models.callbacks.TokenArrayBuffer;
 import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.Constants;
@@ -82,7 +84,7 @@ public class BaselineModel extends Model {
             classifier = new CRFClassifier(myClassifierProperties);
             classifier.loadClassifier(Constants.STANFORD_NER_HOME + "/classifiers/ner-eng-ie.crf-3-all2008-distsim.ser.gz");
 
-            pairListSet = new SNERPairListSet(classifier);
+            documentToponymArray = new SNERDocumentToponymArray(classifier);
 
             gazCache = new Hashtable<String, List<Location>>();
             paragraphsAsDocs = options.getParagraphsAsDocs();
@@ -147,17 +149,14 @@ public class BaselineModel extends Model {
         /*	TObjectIntIterator<String> placeIterator = placeCounts.iterator();
         for (int i = placeCounts.size(); i-- > 0;) {
         placeIterator.advance();*/
-        assert (pairListSet.size() == docSet.size());
+        assert (documentToponymArray.size() == docSet.size());
         for (int docIndex = 0; docIndex < docSet.size(); docIndex++) {
-            ArrayList<ToponymSpan> curDocSpans = pairListSet.get(docIndex);
-            ArrayList<Integer> curDoc = docSet.get(docIndex);
+            ArrayList<Integer> curDocSpans = documentToponymArray.get(docIndex);
 
-            for (int topSpanIndex = 0; topSpanIndex < curDocSpans.size();
-                  topSpanIndex++) {
-                System.out.println("topSpanIndex: " + topSpanIndex);
-                ToponymSpan curTopSpan = curDocSpans.get(topSpanIndex);
+            for (int topidx : curDocSpans) {
+                System.out.println("topSpanIndex: " + topidx);
 
-                String placename = getPlacenameString(curTopSpan, docIndex).toLowerCase();
+                String placename = docSet.getWordForInt(topidx).toLowerCase();
                 System.out.println(placename);
 
                 if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
@@ -264,17 +263,18 @@ public class BaselineModel extends Model {
     }
 
     public void processPath() throws Exception {
-        processPath(getInputFile(), pairListSet);
+        processPath(getInputFile(), documentToponymArray, new NullTokenArrayBuffer());
     }
 
-    public void processPath(File myPath, SNERPairListSet pairListSet) throws
-          Exception {
+    public void processPath(File myPath,
+          SNERDocumentToponymArray documentToponymArray,
+          TokenArrayBuffer tokenArrayBuffer) throws Exception {
         if (myPath.isDirectory()) {
             for (String pathname : myPath.list()) {
-                processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), pairListSet);
+                processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), documentToponymArray, tokenArrayBuffer);
             }
         } else {
-            pairListSet.addToponymSpansFromFile(myPath.getCanonicalPath(), docSet);
+            documentToponymArray.addToponymsFromFile(myPath.getCanonicalPath(), docSet, tokenArrayBuffer);
         }
     }
 
@@ -290,6 +290,13 @@ public class BaselineModel extends Model {
      */
     public File getInputFile() {
         return inputFile;
+    }
+
+    /**
+     * @return the documentToponymArray
+     */
+    public SNERDocumentToponymArray getDocumentToponymArray() {
+        return documentToponymArray;
     }
 
     @Override

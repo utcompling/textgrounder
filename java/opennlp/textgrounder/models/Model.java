@@ -27,7 +27,7 @@ public abstract class Model {
     // Minimum number of pixels the (small) square region (NOT our Region) represented by each city must occupy on the screen for its label to appear:
     private final static int MIN_LOD_PIXELS = 8;
     /**
-     * 
+     * Number of paragraphs to consider as one document.
      */
     protected int paragraphsAsDocs;
     /**
@@ -59,10 +59,10 @@ public abstract class Model {
      */
     protected Gazetteer gazetteer;
     /**
-     * Array of array of ToponymSpan objects that indicate locations of toponyms
-     * in input
+     * Array of array of toponym indices by document. This includes only the
+     * toponyms and none of the non-toponyms.
      */
-    protected SNERPairListSet pairListSet;
+    protected SNERDocumentToponymArray documentToponymArray;
     /**
      * Quick lookup table for gazetteer info based on toponym
      */
@@ -84,7 +84,6 @@ public abstract class Model {
      * Collection of training data
      */
     protected DocumentSet docSet;
-
     /**
      * Flag that tells system to ignore the input file(s) and instead run on every locality in the gazetteer
      */
@@ -126,18 +125,22 @@ public abstract class Model {
     }
 
     /**
-     * 
+     * Add locations to the 2D regionArray. To be used by classes that
+     * do not use a RegionMapperCallback.
      *
-     * @param locs
+     * @param locs list of locations.
      */
     protected void addLocationsToRegionArray(List<Location> locs) {
         addLocationsToRegionArray(locs, new NullRegionMapperCallback());
     }
 
     /**
+     * Add locations to 2D regionArray. To be used by classes and methods that
+     * use a RegionMapperCallback
      *
-     *
-     * @param locs
+     * @param locs list of locations
+     * @param regionMapper callback class for handling mappings of locations
+     * and regions
      */
     protected void addLocationsToRegionArray(List<Location> locs,
           RegionMapperCallback regionMapper) {
