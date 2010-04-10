@@ -160,6 +160,9 @@ public class BaselineModel extends Model {
 
                 String placename = docSet.getWordForInt(topidx).toLowerCase();
                 System.out.println(placename);
+		//assert(docSet.getWordForInt(docSet.getIntForWord(placename)).equalsIgnoreCase(placename));
+		/*if(placename.contains(" "))
+		  System.out.println("CONTAINS SPACE");*/
 
                 if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
                 {
@@ -189,12 +192,16 @@ public class BaselineModel extends Model {
                 int curCount = idsToCounts.get(curLocation.id);
                 if (curCount == 0) {// sentinel for not found in hashmap
                     locations.add(curLocation);
+		    curLocation.backPointers = new ArrayList<DocIdAndIndex>();
                     idsToCounts.put(curLocation.id, 1);
                     System.out.println("Found first " + curLocation.name + "; id = " + curLocation.id);
                 } else {
                     idsToCounts.increment(curLocation.id);
                     System.out.println("Found " + curLocation.name + " #" + idsToCounts.get(curLocation.id));
                 }
+		DocIdAndIndex curDocIdAndIndex = new DocIdAndIndex(docIndex, topidx);
+		curLocation.backPointers.add(curDocIdAndIndex);
+		//System.out.println(docSet.getContext(curDocIdAndIndex, 10));
             }
 
 
@@ -265,7 +272,8 @@ public class BaselineModel extends Model {
     }
 
     public void processPath() throws Exception {
-        processPath(getInputFile(), documentToponymArray, new NullTokenArrayBuffer(), new NullStopwordList());
+	TokenArrayBuffer tab = new TokenArrayBuffer();
+        processPath(getInputFile(), documentToponymArray, tab, new NullStopwordList());
     }
 
     public void processPath(File myPath,

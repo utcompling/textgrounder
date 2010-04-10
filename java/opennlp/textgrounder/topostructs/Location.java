@@ -1,5 +1,7 @@
 package opennlp.textgrounder.topostructs;
 
+import java.util.*;
+
 public class Location {
 
     public int id;
@@ -8,6 +10,12 @@ public class Location {
     public Coordinate coord;
     public int pop;
     public String container;
+
+    /**
+     * List of pack pointers into the DocumentSet so that context (snippets) can be extracted
+     */
+    public ArrayList<DocIdAndIndex> backPointers;
+
     /**
      * Counts of location in given text. Is double type to accomodate
      * hyperparameters and fractional counts;
@@ -15,7 +23,7 @@ public class Location {
     public double count;
 
     public Location(int id, String name, String type, Coordinate coord, int pop,
-          String container, int count) {
+		    String container, int count) {
         this.id = id;
         this.name = name;
         this.type = type;

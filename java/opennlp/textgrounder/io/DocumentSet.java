@@ -6,6 +6,8 @@ import gnu.trove.*;
 
 import edu.stanford.nlp.ling.CoreAnnotations.*;
 
+import opennlp.textgrounder.topostructs.*;
+
 /**
  * Class of documents as array of array of integers (i.e. indexes of word types).
  * It can also handle a single large document as a collection of smaller documents
@@ -81,6 +83,25 @@ public class DocumentSet extends ArrayList<ArrayList<Integer>> {
         }
         currentDoc.add(idx);
         return idx;
+    }
+
+    /**
+     * Return the context (snippet) of up to window size n for the given doc id and index
+     */
+    public String getContext(DocIdAndIndex dii, int windowSize) {
+	String context = "";
+
+	ArrayList<Integer> curDoc = this.get(dii.docId);
+
+	int i = dii.docIndex - windowSize;
+	if(i < 0) i = 0; // re-initialize the start of the window to be the start of the document if window too big
+	for(; i < dii.docIndex + windowSize; i++) {
+	    if(i >= curDoc.size()) break;
+
+	    context += " " + getWordForInt(curDoc.get(i));
+	}
+
+	return context.trim();
     }
 
     /**
