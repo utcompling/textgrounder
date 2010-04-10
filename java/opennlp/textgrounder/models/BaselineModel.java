@@ -18,7 +18,9 @@ import java.util.logging.Logger;
 import opennlp.textgrounder.gazetteers.*;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.io.*;
+import opennlp.textgrounder.models.callbacks.NullStopwordList;
 import opennlp.textgrounder.models.callbacks.NullTokenArrayBuffer;
+import opennlp.textgrounder.models.callbacks.StopwordList;
 import opennlp.textgrounder.models.callbacks.TokenArrayBuffer;
 import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
@@ -263,18 +265,19 @@ public class BaselineModel extends Model {
     }
 
     public void processPath() throws Exception {
-        processPath(getInputFile(), documentToponymArray, new NullTokenArrayBuffer());
+        processPath(getInputFile(), documentToponymArray, new NullTokenArrayBuffer(), new NullStopwordList());
     }
 
     public void processPath(File myPath,
           SNERDocumentToponymArray documentToponymArray,
-          TokenArrayBuffer tokenArrayBuffer) throws Exception {
+          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws
+          Exception {
         if (myPath.isDirectory()) {
             for (String pathname : myPath.list()) {
-                processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), documentToponymArray, tokenArrayBuffer);
+                processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), documentToponymArray, tokenArrayBuffer, stopwordList);
             }
         } else {
-            documentToponymArray.addToponymsFromFile(myPath.getCanonicalPath(), docSet, tokenArrayBuffer);
+            documentToponymArray.addToponymsFromFile(myPath.getCanonicalPath(), docSet, tokenArrayBuffer, stopwordList);
         }
     }
 

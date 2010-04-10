@@ -84,7 +84,9 @@ public class RegionModel extends TopicModel {
 
         try {
             baselineModel = new BaselineModel(options);
-            baselineModel.processPath(baselineModel.getInputFile(), baselineModel.getDocumentToponymArray(), tokenArrayBuffer);
+            baselineModel.processPath(baselineModel.getInputFile(),
+                  baselineModel.getDocumentToponymArray(), tokenArrayBuffer,
+                  new StopwordList());
         } catch (Exception ex) {
             ex.printStackTrace();
             System.exit(1);
@@ -115,7 +117,8 @@ public class RegionModel extends TopicModel {
     /**
      *
      */
-    protected void setAllocateRegions(TokenArrayBuffer tokenArrayBuffer, BaselineModel baselineModel) {
+    protected void setAllocateRegions(TokenArrayBuffer tokenArrayBuffer,
+          BaselineModel baselineModel) {
         N = tokenArrayBuffer.wordVector.size();
         W = docSet.getDictionarySize();
         T = regionMapperCallback.getNumRegions();
