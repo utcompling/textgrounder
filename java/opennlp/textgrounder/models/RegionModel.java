@@ -121,7 +121,6 @@ public class RegionModel extends TopicModel {
           BaselineModel baselineModel) {
         N = tokenArrayBuffer.wordVector.size();
         W = docSet.getDictionarySize();
-        T = regionMapperCallback.getNumRegions();
         D = docSet.size();
         betaW = beta * W;
 
@@ -131,6 +130,11 @@ public class RegionModel extends TopicModel {
         copyToArray(documentVector, tokenArrayBuffer.docVector);
         toponymVector = new int[N];
         copyToArray(toponymVector, tokenArrayBuffer.toponymVector);
+        /**
+         * There is no need to initialize the topicVector. It will be randomly
+         * initialized
+         */
+        topicVector = new int[N];
 
         System.err.print("Extracting words and placenames from document: ");
         for (int i = 0; i < N; i++) {
@@ -163,8 +167,7 @@ public class RegionModel extends TopicModel {
         }
         System.err.println();
 
-
-        topicVector = new int[N];
+        T = regionMapperCallback.getNumRegions();
         topicCounts = new int[T];
         for (int i = 0; i < T; ++i) {
             topicCounts[i] = 0;

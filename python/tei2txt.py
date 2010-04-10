@@ -1,8 +1,13 @@
+#! /usr/bin/python
+
 import sys
 import os
 import re
 import gzip
 import fnmatch
+
+from codecs import latin_1_decode
+from unicodedata import normalize
 
 commaRE = re.compile(",")
 nonAlpha = re.compile("[^A-Za-z]")
@@ -16,11 +21,14 @@ def cleanWord(word):
 
 
 def strip_text (text):
+    text = latin_1_decode(text)[0]
+    text = normalize('NFD',text).encode('ascii','ignore')
+
     text = re.sub('&mdash+;', ' ', text)   # convert mdash to " "
     text = re.sub('&[A-Za-z]+;', '', text)   # convert ampersand stuff to ""
     text = re.sub('<[^>]*>', ' ', text)   # strip HTML markup
-    #text = re.sub('[^A-Za-z]', ' ', text)   # convert non-letter chars to spaces
     text = re.sub('\s+', ' ', text)      # strip whitespace
+
     return text
 
 
@@ -41,9 +49,11 @@ for file in files:
         file_reader = open(directory_name+"/"+file)
         text = ""
         for line in file_reader.readlines():
-            text = text + " " + line.strip()
+            text = line.strip()
+            text = strip_text(text).strip()
+            if text != "":
+                raw_writer.write(text)
+                raw_writer.write("\n")
 
-        raw_writer.write(strip_text(text))
-        raw_writer.write("\n\n")
         raw_writer.close()
                 
