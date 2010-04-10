@@ -93,6 +93,9 @@ public class RegionMapperCallback {
     public void addAll(String placename, DocumentSet docSet) {
         int wordid = docSet.getIntForWord(placename);
 
+        if(!nameToRegionIndex.containsKey(placename)) {
+            nameToRegionIndex.put(placename, new HashSet<Integer>());
+        }
         HashSet<Integer> currentRegions = nameToRegionIndex.get(placename);
 
         for (LocationRegionPair lrp : currentLocationRegions) {
