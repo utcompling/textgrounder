@@ -1,7 +1,5 @@
 package opennlp.textgrounder.models;
 
-import edu.stanford.nlp.ie.crf.CRFClassifier;
-
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 
@@ -34,10 +32,6 @@ public abstract class Model {
      * Dimensions of regionArray.
      */
     protected int regionArrayWidth, regionArrayHeight;
-    /**
-     * Base class for Stanford NER system.
-     */
-    protected CRFClassifier classifier;
     /**
      * Array of locations that have been identified in training data
      */

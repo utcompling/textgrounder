@@ -10,15 +10,22 @@ import opennlp.textgrounder.topostructs.*;
 
 /**
  * Class of documents as array of array of integers (i.e. indexes of word types).
- * It can also handle a single large document as a collection of smaller documents
- * where the documents are actually a collection of N (parAsDocSize) paragraphs.
  *
  * @author
  */
 public class DocumentSet extends ArrayList<ArrayList<Integer>> {
 
+    /**
+     *
+     */
     public TObjectIntHashMap<String> wordsToInts = new TObjectIntHashMap<String>();
+    /**
+     *
+     */
     public TIntObjectHashMap<String> intsToWords = new TIntObjectHashMap<String>();
+    /**
+     * 
+     */
     protected int nextInt = 0;
     /**
      * The number of paragraphs to treat as a single document.

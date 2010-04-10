@@ -1,17 +1,12 @@
 package opennlp.textgrounder.models;
 
-import edu.stanford.nlp.ie.crf.CRFClassifier;
-
 import gnu.trove.TIntIntHashMap;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
 
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
-import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -24,7 +19,6 @@ import opennlp.textgrounder.models.callbacks.StopwordList;
 import opennlp.textgrounder.models.callbacks.TokenArrayBuffer;
 import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
-import opennlp.textgrounder.util.Constants;
 
 /**
  *
@@ -36,11 +30,9 @@ public class BaselineModel extends Model {
     protected boolean initializedXMLFile = false;
     protected boolean finalizedXMLFile = false;
 
-    public BaselineModel(Gazetteer gaz, int bscale, CRFClassifier classif,
-          int paragraphsAsDocs) {
+    public BaselineModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
         barScale = bscale;
         gazetteer = gaz;
-        classifier = classif;
         docSet = new DocumentSet(paragraphsAsDocs);
     }
 
@@ -82,11 +74,7 @@ public class BaselineModel extends Model {
         degreesPerRegion = options.getDegreesPerRegion();
 
         if (!runWholeGazetteer) {
-            Properties myClassifierProperties = new Properties();
-            classifier = new CRFClassifier(myClassifierProperties);
-            classifier.loadClassifier(Constants.STANFORD_NER_HOME + "/classifiers/ner-eng-ie.crf-3-all2008-distsim.ser.gz");
-
-            documentToponymArray = new SNERDocumentToponymArray(classifier);
+            documentToponymArray = new SNERDocumentToponymArray();
 
             gazCache = new Hashtable<String, List<Location>>();
             paragraphsAsDocs = options.getParagraphsAsDocs();
