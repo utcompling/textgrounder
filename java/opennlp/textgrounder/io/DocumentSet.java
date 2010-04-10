@@ -1,12 +1,10 @@
 package opennlp.textgrounder.io;
 
-import java.io.*;
 import java.util.*;
 
 import gnu.trove.*;
 
 import edu.stanford.nlp.ling.CoreAnnotations.*;
-import java.util.ArrayList;
 
 /**
  * Class of documents as array of array of integers (i.e. indexes of word types).
@@ -65,34 +63,6 @@ public class DocumentSet extends ArrayList<ArrayList<Integer>> {
     }
 
     /**
-     * Get a single document as a single string.
-     * 
-     * @param idx Index of document to obtain
-     * @return text of document as string.
-     */
-    public String getDocumentAsString(int idx) {
-        ArrayList<Integer> doc = get(idx);
-        StringBuffer buff = new StringBuffer();
-        for (int tok : doc) {
-            buff.append(getWordForInt(tok));
-            buff.append(" ");
-        }
-        return buff.toString();
-    }
-
-    /**
-     * Add word to hash tables. To be used in
-     * external classes in post-initialization addition of placenames.
-     * 
-     * @param word word to add
-     */
-    public void addWord(String word) {
-        wordsToInts.put(word, nextInt);
-        intsToWords.put(nextInt, word);
-        nextInt++;
-    }
-
-    /**
      * Add word to sequence of indices in DocumentSet. If the word does not
      * exist in the dictionary, add it to the dictionary as well.
      *
@@ -119,17 +89,6 @@ public class DocumentSet extends ArrayList<ArrayList<Integer>> {
     public void newDoc() {
         currentDoc = new ArrayList<Integer>();
         add(currentDoc);
-    }
-
-    /**
-     * Checks whether word is in keys of wordsToInts or not. To be used in
-     * external classes in post-initialization addition of placenames.
-     *
-     * @param word word to check for existence
-     * @return truth value of whether word exists or not
-     */
-    public boolean hasWord(String word) {
-        return wordsToInts.containsKey(word);
     }
 
     /**
