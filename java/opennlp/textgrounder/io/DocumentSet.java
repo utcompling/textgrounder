@@ -24,6 +24,10 @@ public class DocumentSet extends ArrayList<ArrayList<Integer>> {
      * The number of paragraphs to treat as a single document.
      */
     protected int parAsDocSize;
+    /**
+     * 
+     */
+    protected ArrayList<Integer> currentDoc;
 
     /**
      * Default constructor. In this case, parAsDocSize is set to the maximum
@@ -60,64 +64,16 @@ public class DocumentSet extends ArrayList<ArrayList<Integer>> {
         return wordsToInts.get(someWord);
     }
 
-    public void addDocumentFromFile(String locationOfFile) throws Exception {
-
-        BufferedReader textIn = new BufferedReader(new FileReader(locationOfFile));
-
-        System.out.print("Processing document at " + locationOfFile + " ...");
-
-        ArrayList<Integer> curDoc = new ArrayList<Integer>();
-        this.add(curDoc);
-
-        int counter = 1;
-        String curLine;
-        while (true) {
-            curLine = textIn.readLine();
-            if (curLine == null || curLine.equals("")) {
-                break;
-            }
-
-            for (String token : curLine.split(" ")) {
-                if (wordsToInts.containsKey(token)) {
-                    curDoc.add(wordsToInts.get(token));
-                } else {
-                    wordsToInts.put(token, nextInt);
-                    intsToWords.put(nextInt, token);
-                    curDoc.add(nextInt);
-                    nextInt++;
-                }
-            }
-
-            if (counter < parAsDocSize) {
-                counter++;
-            } else {
-                counter = 1;
-                curDoc = new ArrayList<Integer>();
-                this.add(curDoc);
-            }
-        }
-
-        /**
-         * Remove last item if the previous loop did not populate it.
-         */
-        if (this.get(this.size() - 1).size() == 0) {
-            this.remove(this.size() - 1);
-        }
-
-        System.out.println("done.");
-
-        textIn.close();
-    }
-
     /**
+     * Get a single document as a single string.
      * 
-     * @param idx
-     * @return
+     * @param idx Index of document to obtain
+     * @return text of document as string.
      */
     public String getDocumentAsString(int idx) {
         ArrayList<Integer> doc = get(idx);
         StringBuffer buff = new StringBuffer();
-        for(int tok : doc) {
+        for (int tok : doc) {
             buff.append(getWordForInt(tok));
             buff.append(" ");
         }
@@ -134,6 +90,33 @@ public class DocumentSet extends ArrayList<ArrayList<Integer>> {
         wordsToInts.put(word, nextInt);
         intsToWords.put(nextInt, word);
         nextInt++;
+    }
+
+    /**
+     * Add word to sequence of indices in DocumentSet. If the word does not
+     * exist in the dictionary, add it to the dictionary as well.
+     *
+     * @param word
+     */
+    public void addWordToSeq(String word) {
+        int idx = 0;
+        if (!wordsToInts.containsKey(word)) {
+            wordsToInts.put(word, nextInt);
+            intsToWords.put(nextInt, word);
+            idx = nextInt;
+            nextInt += 1;
+        } else {
+            idx = wordsToInts.get(word);
+        }
+        currentDoc.add(idx);
+    }
+
+    /**
+     * Add a new document to DocumentSet
+     */
+    public void newDoc() {
+        currentDoc = new ArrayList<Integer>();
+        add(currentDoc);
     }
 
     /**
@@ -154,5 +137,12 @@ public class DocumentSet extends ArrayList<ArrayList<Integer>> {
      */
     public int getDictionarySize() {
         return nextInt;
+    }
+
+    /**
+     * @return the parAsDocSize
+     */
+    public int getParAsDocSize() {
+        return parAsDocSize;
     }
 }
