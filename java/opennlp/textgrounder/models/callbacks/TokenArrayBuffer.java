@@ -64,7 +64,7 @@ public class TokenArrayBuffer {
     /**
      * The lexicon of token indexes to tokens.
      */
-    public DocumentSet docSet;
+    protected DocumentSet docSet;
 
     /**
      * Default constructor. Allocates memory for arrays and assigns docSet.
@@ -137,5 +137,12 @@ public class TokenArrayBuffer {
      */
     public int size() {
         return size;
+    }
+
+    /**
+     * @param docSet the docSet to set
+     */
+    public void setDocSet(DocumentSet docSet) {
+        this.docSet = docSet;
     }
 }

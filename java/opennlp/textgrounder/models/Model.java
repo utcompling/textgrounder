@@ -85,7 +85,7 @@ public abstract class Model {
 
     protected int windowSize;
 
-    protected TokenArrayBuffer tab;
+    protected TokenArrayBuffer tokenArrayBuffer;
     //protected int indexInTAB = 0;
 
     /**
@@ -293,12 +293,12 @@ public abstract class Model {
                   + "\t\t\t</Placemark>\n");
 
 	    //System.out.println("Contexts for " + placename);
-	    /*while(indexInTAB < tab.toponymVector.size() && tab.toponymVector.get(indexInTAB) == 0) {
+	    /*while(indexInTAB < tokenArrayBuffer.toponymVector.size() && tokenArrayBuffer.toponymVector.get(indexInTAB) == 0) {
 		indexInTAB++;
 		}*/
 	    for(int j = 0; j < loc.backPointers.size(); j++) {
 		int index = loc.backPointers.get(j);
-		String context = tab.getContextAround(index, windowSize, true);
+		String context = tokenArrayBuffer.getContextAround(index, windowSize, true);
 		Coordinate spiralPoint = coord.getNthSpiralPoint(j, 0.1);
 
 		contextOut.write("\t\t\t<Placemark>\n"

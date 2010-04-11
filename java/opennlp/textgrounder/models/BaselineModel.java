@@ -140,14 +140,14 @@ public class BaselineModel extends Model {
         placeIterator.advance();*/
         assert (documentToponymArray.size() == docSet.size());
 	//int wvCounter = 0;
-	for(int i = 0; i < tab.documentVector.size(); i++) {
+	for(int i = 0; i < tokenArrayBuffer.documentVector.size(); i++) {
 	    /*for (int docIndex = 0; docIndex < docSet.size(); docIndex++) {
             ArrayList<Integer> curDocSpans = documentToponymArray.get(docIndex);
 
             for (int i = 0; i < curDocSpans.size(); i++) {//int topidx : curDocSpans) {*/
-	        if(tab.toponymVector.get(i) == 0)
+	        if(tokenArrayBuffer.toponymVector.get(i) == 0)
 		    continue;
-		int topidx = tab.wordVector.get(i);
+		int topidx = tokenArrayBuffer.wordVector.get(i);
                 System.out.println("toponym (in int form): " + topidx);
 
                 String placename = docSet.getWordForInt(topidx).toLowerCase();
@@ -194,7 +194,7 @@ public class BaselineModel extends Model {
 		//DocIdAndIndex curDocIdAndIndex = new DocIdAndIndex(docIndex, i);
 		curLocation.backPointers.add(i);
 		//System.out.println(docSet.getContext(curDocIdAndIndex, 10));
-		//System.out.println(tab.wordVector
+		//System.out.println(tokenArrayBuffer.wordVector
 		//}
 
 
@@ -265,8 +265,8 @@ public class BaselineModel extends Model {
     }
 
     public void processPath() throws Exception {
-	tab = new TokenArrayBuffer(docSet);
-        processPath(getInputFile(), documentToponymArray, tab, new NullStopwordList());
+	tokenArrayBuffer = new TokenArrayBuffer(docSet);
+        processPath(getInputFile(), documentToponymArray, tokenArrayBuffer, new NullStopwordList());
     }
 
     public void processPath(File myPath,

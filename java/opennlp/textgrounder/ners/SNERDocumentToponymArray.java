@@ -84,7 +84,7 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
         String curLine = null;
         StringBuffer buf = new StringBuffer();
         int counter = 1;
-        System.err.print("Processing document 1,");
+        System.err.print("Processing document 0,");
         while (true) {
             curLine = textIn.readLine();
             if (curLine == null || curLine.equals("")) {
@@ -104,7 +104,7 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
                 docSet.newDoc();
                 currentDoc += 1;
                 counter = 1;
-                System.err.print(currentDoc + 1 + ",");
+                System.err.print(currentDoc + ",");
             }
         }
 

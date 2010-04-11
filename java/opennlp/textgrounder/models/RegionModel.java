@@ -17,6 +17,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -88,7 +89,7 @@ public class RegionModel extends TopicModel {
     protected void initialize(CommandLineOptions options) {
 
         initializeFromOptions(options);
-        TokenArrayBuffer tokenArrayBuffer = new TokenArrayBuffer(docSet);
+        tokenArrayBuffer = new TokenArrayBuffer(null);
         BaselineModel baselineModel = null;
 
         try {
@@ -109,6 +110,7 @@ public class RegionModel extends TopicModel {
         this.gazCache = baselineModel.gazCache;
         this.documentToponymArray = baselineModel.documentToponymArray;
         this.docSet = baselineModel.docSet;
+        tokenArrayBuffer.setDocSet(this.docSet);
 
         locationSet = new HashSet<Location>();
 
@@ -122,6 +124,7 @@ public class RegionModel extends TopicModel {
     @Override
     protected void initializeFromOptions(CommandLineOptions options) {
         super.initializeFromOptions(options);
+        windowSize = options.getWindowSize();
         kmlOutputFilename = options.getKMLOutputFilename();
     }
 
@@ -227,20 +230,20 @@ public class RegionModel extends TopicModel {
      */
     @Override
     public void randomInitialize() {
-        int wordid, docid, topicid, stopid;
-        int istop;
+        int wordid, docid, topicid;
+        int istoponym, isstopword;
         int wordoff;
         double[] probs = new double[T];
         double totalprob, max, r;
 
         for (int i = 0; i < N; ++i) {
-            stopid = stopwordVector[i];
-            if (stopid != 0) {
+            isstopword = stopwordVector[i];
+            if (isstopword == 0) {
                 wordid = wordVector[i];
                 docid = documentVector[i];
-                istop = toponymVector[i];
+                istoponym = toponymVector[i];
 
-                if (istop == 1) {
+                if (istoponym == 1) {
                     wordoff = wordid * T;
                     totalprob = 0;
                     try {
@@ -277,16 +280,16 @@ public class RegionModel extends TopicModel {
      */
     @Override
     public void train(Annealer annealer) {
-        int wordid, docid, topicid, stopid;
+        int wordid, docid, topicid;
         int wordoff, docoff;
-        int istoponym;
+        int istoponym, isstopword;
         double[] probs = new double[T];
         double totalprob, max, r;
 
         while (annealer.nextIter()) {
             for (int i = 0; i < N; ++i) {
-                stopid = stopwordVector[i];
-                if (stopid != 0) {
+                isstopword = stopwordVector[i];
+                if (isstopword == 0) {
                     wordid = wordVector[i];
                     docid = documentVector[i];
                     topicid = topicVector[i];
@@ -350,6 +353,7 @@ public class RegionModel extends TopicModel {
         Map<Integer, Location> locationIdToLocation = new HashMap<Integer, Location>();
         for (Location loc : locationSet) {
             loc.count += beta;
+            loc.backPointers = new ArrayList<Integer>();
             locationIdToLocation.put(loc.id, loc);
         }
 
@@ -361,13 +365,42 @@ public class RegionModel extends TopicModel {
                 ToponymRegionPair trp = new ToponymRegionPair(wordid, regid);
                 HashSet<Location> locs = toponymRegionToLocations.get(trp);
                 for (Location loc : locs) {
-                    Location tl = locationIdToLocation.get(loc.id);
-                    tl.count += wordByTopicCounts[wordid * T + regid];
+                    Location tloc = locationIdToLocation.get(loc.id);
+                    tloc.count += wordByTopicCounts[wordid * T + regid];
                 }
             }
         }
 
-        locations = new ArrayList<Location>(locationIdToLocation.values());
+        int wordid, topicid;
+        int istoponym, isstopword;
+
+        for (int i = 0; i < N; ++i) {
+            isstopword = stopwordVector[i];
+            if (isstopword == 0) {
+                istoponym = toponymVector[i];
+                if (istoponym == 1) {
+                    wordid = wordVector[i];
+                    topicid = topicVector[i];
+                    ToponymRegionPair trp = new ToponymRegionPair(wordid, topicid);
+                    HashSet<Location> locs = toponymRegionToLocations.get(trp);
+                    try {
+                        for (Location loc : locs) {
+                            Location tloc = locationIdToLocation.get(loc.id);
+                            tloc.backPointers.add(i);
+                        }
+                    } catch (NullPointerException e) {
+                    }
+                }
+            }
+        }
+
+        locations = new ArrayList<Location>();
+        for (Location loc : locationIdToLocation.values()) {
+            if (loc.backPointers.size() != 0) {
+                locations.add(loc);
+            }
+//            locations = new ArrayList<Location>(locationIdToLocation.values());
+        }
     }
 
     /**
