@@ -193,10 +193,11 @@ public class TokenArrayBuffer {
     }
 
     /**
-     * @return the number of documents in the training data
+     * @return the number of documents in the training data. Need to add one
+     * to the output since document counting starts at 0.
      */
     public int getNumDocs() {
-        return numDocs;
+        return numDocs + 1;
     }
 
     /**

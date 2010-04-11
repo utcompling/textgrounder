@@ -237,7 +237,7 @@ public class TextProcessor {
                  */
                 cur = token.split("/")[0].toLowerCase();
                 int isstop = 0;
-                if (!stopwordList.isStopWord(cur)) {
+                if (stopwordList.isStopWord(cur)) {
                     isstop = 1;
                 }
                 wordidx = lexicon.addWord(cur);
@@ -248,7 +248,7 @@ public class TextProcessor {
             } else {
                 String cur = token.split("/")[0].toLowerCase();
                 int isstop = 0;
-                if (!stopwordList.isStopWord(cur)) {
+                if (stopwordList.isStopWord(cur)) {
                     isstop = 1;
                 }
                 wordidx = lexicon.addWord(cur);
