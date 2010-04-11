@@ -22,7 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import opennlp.textgrounder.io.DocumentSet;
+import opennlp.textgrounder.textstructs.Lexicon;
 import opennlp.textgrounder.topostructs.*;
 
 /**
@@ -90,7 +90,7 @@ public class RegionMapperCallback {
      * @param placename
      * @param docSet
      */
-    public void addAll(String placename, DocumentSet docSet) {
+    public void addAll(String placename, Lexicon docSet) {
         int wordid = docSet.getIntForWord(placename);
 
         if(!nameToRegionIndex.containsKey(placename)) {

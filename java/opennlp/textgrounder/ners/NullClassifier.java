@@ -15,28 +15,40 @@
 //  License along with this program; if not, write to the Free Software
 //  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.models.callbacks;
+package opennlp.textgrounder.ners;
 
-import java.util.List;
-import opennlp.textgrounder.textstructs.Lexicon;
-import opennlp.textgrounder.topostructs.Location;
-import opennlp.textgrounder.topostructs.Region;
+import edu.stanford.nlp.ie.crf.*;
 
 /**
- * A callback class to 
- *
+ * An override of the CRFClassifier for use in the base TopicModel which
+ * does not need placename identification.
+ * 
  * @author tsmoon
  */
-public class NullRegionMapperCallback extends RegionMapperCallback {
+public class NullClassifier extends CRFClassifier {
 
-    public NullRegionMapperCallback() {
+    /**
+     * Default constructor. Does nothing.
+     */
+    public NullClassifier() {
     }
 
+    /**
+     * Override of sole CRFClassifier method used in TextProcessor. Merely
+     * lowercases words and strips tokens of non-alphanumeric characters
+     *
+     * @param text string to process
+     * @return input string lowercased and removed of all non-alphanumeric
+     * characters
+     */
     @Override
-    public void addAll(String placename, Lexicon docSet) {
-    }
-
-    @Override
-    public void addToPlace(Location loc, Region region) {
+    public String classifyToString(String text) {
+        StringBuffer buf = new StringBuffer();
+        String[] tokens = text.split(" ");
+        for (String token : tokens) {
+            buf.append(token.toLowerCase().replaceAll("[^a-z0-9]", ""));
+            buf.append(" ");
+        }
+        return buf.toString();
     }
 }

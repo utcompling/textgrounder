@@ -15,28 +15,47 @@
 //  License along with this program; if not, write to the Free Software
 //  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.models.callbacks;
+package opennlp.textgrounder.textstructs;
 
-import java.util.List;
-import opennlp.textgrounder.textstructs.Lexicon;
-import opennlp.textgrounder.topostructs.Location;
-import opennlp.textgrounder.topostructs.Region;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 
 /**
- * A callback class to 
- *
+ * Empty StopwordList class for models that do not require stopword removal.
+ * 
  * @author tsmoon
  */
-public class NullRegionMapperCallback extends RegionMapperCallback {
+public class NullStopwordList extends StopwordList {
 
-    public NullRegionMapperCallback() {
+    /**
+     * Default constructor.
+     * 
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
+    public NullStopwordList() throws FileNotFoundException, IOException {
+        stopwords = null;
     }
 
+    /**
+     * Empty override of isStopWord of base class. It returns false always.
+     * No word is a stopword.
+     *
+     * @param word word to (not) examine
+     * @return false always. no word is a stopword.
+     */
     @Override
-    public void addAll(String placename, Lexicon docSet) {
+    public boolean isStopWord(String word) {
+        return false;
     }
 
+    /**
+     * Size of the list of stopwords. Returns 0, meaning there are no stopwords.
+     *
+     * @return 0
+     */
     @Override
-    public void addToPlace(Location loc, Region region) {
+    public int size() {
+        return 0;
     }
 }

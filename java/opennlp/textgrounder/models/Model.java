@@ -1,6 +1,10 @@
 package opennlp.textgrounder.models;
 
+import java.io.IOException;
+import opennlp.textgrounder.textstructs.TokenArrayBuffer;
+import opennlp.textgrounder.textstructs.TextProcessor;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 
 import java.util.ArrayList;
@@ -8,7 +12,7 @@ import java.util.Hashtable;
 import java.util.List;
 
 import opennlp.textgrounder.gazetteers.*;
-import opennlp.textgrounder.io.*;
+import opennlp.textgrounder.textstructs.*;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
@@ -56,7 +60,7 @@ public abstract class Model {
      * Array of array of toponym indices by document. This includes only the
      * toponyms and none of the non-toponyms.
      */
-    protected SNERDocumentToponymArray documentToponymArray;
+    protected TextProcessor textProcessor;
     /**
      * Quick lookup table for gazetteer info based on toponym
      */
@@ -77,14 +81,12 @@ public abstract class Model {
     /**
      * Collection of training data
      */
-    protected DocumentSet docSet;
+    protected Lexicon lexicon;
     /**
      * Flag that tells system to ignore the input file(s) and instead run on every locality in the gazetteer
      */
     protected boolean runWholeGazetteer = false;
-
     protected int windowSize;
-
     protected TokenArrayBuffer tokenArrayBuffer;
     //protected int indexInTAB = 0;
 
@@ -102,25 +104,6 @@ public abstract class Model {
             aString = aString.substring(0, aString.length() - 1);
         }
         return aString;
-    }
-
-    /**
-     * String of placename given the offsets of the tokens in some document.
-     * The placename may have two or more words.
-     *
-     * @param curTopSpan
-     * @param docIndex
-     * @return
-     */
-    protected String getPlacenameString(ToponymSpan curTopSpan, int docIndex) {
-        String toReturn = "";
-        ArrayList<Integer> curDoc = docSet.get(docIndex);
-
-        for (int i = curTopSpan.begin; i < curTopSpan.end; i++) {
-            toReturn += docSet.getWordForInt(curDoc.get(i)) + " ";
-        }
-
-        return stripPunc(toReturn.trim());
     }
 
     /**
@@ -158,16 +141,28 @@ public abstract class Model {
         }
     }
 
+    public void processPath(File myPath, TextProcessor textProcessor,
+          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws IOException {
+        if (myPath.isDirectory()) {
+            for (String pathname : myPath.list()) {
+                processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer, stopwordList);
+            }
+        } else {
+            textProcessor.addToponymsFromFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
+        }
+    }
+
     /**
      * Output tagged and disambiguated placenames to Google Earth kml file.
      * 
      * @throws Exception
      */
     public void writeXMLFile() throws Exception {
-	if(!runWholeGazetteer)
-	    writeXMLFile(inputPath, kmlOutputFilename, locations);
-	else
-	    writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, locations);
+        if (!runWholeGazetteer) {
+            writeXMLFile(inputPath, kmlOutputFilename, locations);
+        } else {
+            writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, locations);
+        }
     }
 
     /**
@@ -182,9 +177,9 @@ public abstract class Model {
           List<Location> locations) throws Exception {
 
         BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));
-	int dotKmlIndex = outputFilename.lastIndexOf(".kml");
-	String contextFilename = outputFilename.substring(0, dotKmlIndex) + "-context.kml";
-	BufferedWriter contextOut = new BufferedWriter(new FileWriter(contextFilename));
+        int dotKmlIndex = outputFilename.lastIndexOf(".kml");
+        String contextFilename = outputFilename.substring(0, dotKmlIndex) + "-context.kml";
+        BufferedWriter contextOut = new BufferedWriter(new FileWriter(contextFilename));
 
         out.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
               + "<kml xmlns=\"http://www.opengis.net/kml/2.2\" xmlns:gx=\"http://www.google.com/kml/ext/2.2\" xmlns:kml=\"http://www.opengis.net/kml/2.2\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n"
@@ -196,7 +191,7 @@ public abstract class Model {
               + "\t\t\t<IconStyle>\n"
               + "\t\t\t\t<Icon></Icon>\n"
               + "\t\t\t</IconStyle>\n"
-	      + "\t\t</Style>\n"
+              + "\t\t</Style>\n"
               + "\t\t<Folder>\n"
               + "\t\t\t<name>" + inputFilename + "</name>\n"
               + "\t\t\t<open>1</open>\n"
@@ -210,19 +205,19 @@ public abstract class Model {
               + "\t\t\t\t<heading>0</heading>\n"
               + "\t\t\t</LookAt>\n");
 
-	contextOut.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        contextOut.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
               + "<kml xmlns=\"http://www.opengis.net/kml/2.2\" xmlns:gx=\"http://www.google.com/kml/ext/2.2\" xmlns:kml=\"http://www.opengis.net/kml/2.2\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n"
-	      + "\t<Document>\n"
-	      + "\t\t<Style id=\"context\">\n"
-	      + "\t\t\t<LabelStyle>\n"
-	      + "\t\t\t\t<scale>0</scale>\n"
-	      + "\t\t\t</LabelStyle>\n"
-	      + "\t\t</Style>\n"
+              + "\t<Document>\n"
+              + "\t\t<Style id=\"context\">\n"
+              + "\t\t\t<LabelStyle>\n"
+              + "\t\t\t\t<scale>0</scale>\n"
+              + "\t\t\t</LabelStyle>\n"
+              + "\t\t</Style>\n"
               + "\t\t<Folder>\n"
               + "\t\t\t<name>" + inputFilename + " CONTEXTS</name>\n"
               + "\t\t\t<open>1</open>\n"
               + "\t\t\t<description>Contexts of place names found in " + inputFilename + "</description>\n"
-	      + "\t\t\t<LookAt>\n"
+              + "\t\t\t<LookAt>\n"
               + "\t\t\t\t<latitude>42</latitude>\n"
               + "\t\t\t\t<longitude>-102</longitude>\n"
               + "\t\t\t\t<altitude>0</altitude>\n"
@@ -247,7 +242,7 @@ public abstract class Model {
         continue;*/
 
         for (int i = 0; i < locations.size(); i++) {//Location loc : locations) {
-	    Location loc = locations.get(i);
+            Location loc = locations.get(i);
 
             double height = Math.log(loc.count) * barScale;
 
@@ -292,46 +287,46 @@ public abstract class Model {
                   + "\t\t\t\t</Polygon>"
                   + "\t\t\t</Placemark>\n");
 
-	    //System.out.println("Contexts for " + placename);
+            //System.out.println("Contexts for " + placename);
 	    /*while(indexInTAB < tokenArrayBuffer.toponymVector.size() && tokenArrayBuffer.toponymVector.get(indexInTAB) == 0) {
-		indexInTAB++;
-		}*/
-	    for(int j = 0; j < loc.backPointers.size(); j++) {
-		int index = loc.backPointers.get(j);
-		String context = tokenArrayBuffer.getContextAround(index, windowSize, true);
-		Coordinate spiralPoint = coord.getNthSpiralPoint(j, 0.1);
+            indexInTAB++;
+            }*/
+            for (int j = 0; j < loc.backPointers.size(); j++) {
+                int index = loc.backPointers.get(j);
+                String context = tokenArrayBuffer.getContextAround(index, windowSize, true);
+                Coordinate spiralPoint = coord.getNthSpiralPoint(j, 0.1);
 
-		contextOut.write("\t\t\t<Placemark>\n"
-				 + "\t\t\t\t<name>" + placename + " #" + (j + 1) + "</name>\n"
-				 + "\t\t\t\t<description>" + context + "</description>\n"
-				 + "\t\t\t\t<Region>"
-				 + "\t\t\t\t\t<LatLonAltBox>"
-				 + "\t\t\t\t\t\t<north>" + (spiralPoint.longitude + radius) + "</north>"
-				 + "\t\t\t\t\t\t<south>" + (spiralPoint.longitude - radius) + "</south>"
-				 + "\t\t\t\t\t\t<east>" + (spiralPoint.latitude + radius) + "</east>"
-				 + "\t\t\t\t\t\t<west>" + (spiralPoint.latitude - radius) + "</west>"
-				 + "\t\t\t\t\t</LatLonAltBox>"
-				 + "\t\t\t\t\t<Lod>"
-				 + "\t\t\t\t\t\t<minLodPixels>" + MIN_LOD_PIXELS + "</minLodPixels>"
-				 + "\t\t\t\t\t</Lod>"
-				 + "\t\t\t\t</Region>"
-				 + "\t\t\t\t<styleUrl>#context</styleUrl>\n"
-				 + "\t\t\t\t<Point>\n"
-				 + "\t\t\t\t\t<coordinates>" + spiralPoint + "</coordinates>\n"
-				 + "\t\t\t\t</Point>\n"
-				 + "\t\t\t</Placemark>\n");
-	    }
-	    //indexInTAB++;
+                contextOut.write("\t\t\t<Placemark>\n"
+                      + "\t\t\t\t<name>" + placename + " #" + (j + 1) + "</name>\n"
+                      + "\t\t\t\t<description>" + context + "</description>\n"
+                      + "\t\t\t\t<Region>"
+                      + "\t\t\t\t\t<LatLonAltBox>"
+                      + "\t\t\t\t\t\t<north>" + (spiralPoint.longitude + radius) + "</north>"
+                      + "\t\t\t\t\t\t<south>" + (spiralPoint.longitude - radius) + "</south>"
+                      + "\t\t\t\t\t\t<east>" + (spiralPoint.latitude + radius) + "</east>"
+                      + "\t\t\t\t\t\t<west>" + (spiralPoint.latitude - radius) + "</west>"
+                      + "\t\t\t\t\t</LatLonAltBox>"
+                      + "\t\t\t\t\t<Lod>"
+                      + "\t\t\t\t\t\t<minLodPixels>" + MIN_LOD_PIXELS + "</minLodPixels>"
+                      + "\t\t\t\t\t</Lod>"
+                      + "\t\t\t\t</Region>"
+                      + "\t\t\t\t<styleUrl>#context</styleUrl>\n"
+                      + "\t\t\t\t<Point>\n"
+                      + "\t\t\t\t\t<coordinates>" + spiralPoint + "</coordinates>\n"
+                      + "\t\t\t\t</Point>\n"
+                      + "\t\t\t</Placemark>\n");
+            }
+            //indexInTAB++;
 
-	    //if(i >= 10) System.exit(0);
-	    
+            //if(i >= 10) System.exit(0);
+
         }
 
         out.write("\t\t</Folder>\n\t</Document>\n</kml>");
-	contextOut.write("\t\t</Folder>\n\t</Document>\n</kml>");
+        contextOut.write("\t\t</Folder>\n\t</Document>\n</kml>");
 
         out.close();
-	contextOut.close();
+        contextOut.close();
     }
 
     /**

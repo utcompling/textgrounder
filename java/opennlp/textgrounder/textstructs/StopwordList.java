@@ -15,47 +15,66 @@
 //  License along with this program; if not, write to the Free Software
 //  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.models.callbacks;
+package opennlp.textgrounder.textstructs;
 
+import java.io.BufferedReader;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
+
+import opennlp.textgrounder.util.Constants;
 
 /**
- * Empty StopwordList class for models that do not require stopword removal.
- * 
+ * A list of stopwords populated from a fixed table
+ *
  * @author tsmoon
  */
-public class NullStopwordList extends StopwordList {
+public class StopwordList {
 
     /**
-     * Default constructor.
-     * 
+     * The list of stopwords
+     */
+    protected Set<String> stopwords;
+
+    /**
+     * Default constructor
+     *
      * @throws FileNotFoundException
      * @throws IOException
      */
-    public NullStopwordList() throws FileNotFoundException, IOException {
-        stopwords = null;
+    public StopwordList() throws FileNotFoundException, IOException {
+        stopwords = new HashSet<String>();
+
+        String stopwordPath = Constants.TEXTGROUNDER_HOME + "/data/lists/stopwords.english";
+        BufferedReader textIn = new BufferedReader(new FileReader(stopwordPath));
+        String curLine = null;
+        while ((curLine = textIn.readLine()) != null) {
+            curLine = curLine.trim();
+            stopwords.add(curLine);
+        }
     }
 
     /**
-     * Empty override of isStopWord of base class. It returns false always.
-     * No word is a stopword.
+     * Check if a word is a stopword or not. Returns true if it is a stopword,
+     * false if not.
      *
-     * @param word word to (not) examine
-     * @return false always. no word is a stopword.
+     * @param word the word to examine
+     * @return Returns true if it is a stopword, false if not.
      */
-    @Override
     public boolean isStopWord(String word) {
-        return false;
+        if (stopwords.contains(word)) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /**
-     * Size of the list of stopwords. Returns 0, meaning there are no stopwords.
-     *
-     * @return 0
+     * @return size of the stopword list
      */
-    @Override
     public int size() {
-        return 0;
+        return stopwords.size();
     }
 }

@@ -18,6 +18,7 @@
 package opennlp.textgrounder.models;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,7 +26,8 @@ import java.util.Collections;
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.ec.util.MersenneTwisterFast;
 import opennlp.textgrounder.geo.*;
-import opennlp.textgrounder.io.DocumentSet;
+import opennlp.textgrounder.ners.NullClassifier;
+import opennlp.textgrounder.textstructs.*;
 import opennlp.textgrounder.util.*;
 
 /**
@@ -85,6 +87,14 @@ public class TopicModel extends Model {
      */
     protected int W;
     /**
+     * Size of the vocabulary including stopwords.
+     */
+    protected int fW;
+    /**
+     * Size of stopword list
+     */
+    protected int sW;
+    /**
      * Number of documents
      */
     protected int D;
@@ -124,30 +134,32 @@ public class TopicModel extends Model {
     /**
      * Default constructor. Allocates memory for all the fields.
      *
-     * @param docSet Container holding training data. In the form of arrays of
+     * @param lexicon Container holding training data. In the form of arrays of
      *              arrays of word indices
      * @param options options from the commandline
      */
-    public TopicModel(DocumentSet docSet, CommandLineOptions options) {
-        this.docSet = docSet;
+    public TopicModel(CommandLineOptions options) throws ClassCastException,
+          IOException, ClassNotFoundException {
         initializeFromOptions(options);
-        allocateFields(docSet, T);
+        lexicon = new Lexicon();
+        textProcessor = new TextProcessor(new NullClassifier(), lexicon, paragraphsAsDocs);
+        tokenArrayBuffer = new TokenArrayBuffer(lexicon);
+        StopwordList stopwordList = new StopwordList();
+        sW = stopwordList.size();
+        processPath(new File(inputPath), textProcessor, tokenArrayBuffer, stopwordList);
+        allocateFields();
     }
 
     /**
      * Allocate memory for fields
      *
-     * @param docSet Container holding training data.
-     * @param T Number of topics
      */
-    protected void allocateFields(DocumentSet docSet, int T) {
-        N = 0;
-        W = docSet.wordsToInts.size();
-        D = docSet.size();
+    protected void allocateFields() {
+        fW = lexicon.wordsToInts.size();
+        W = fW - sW;
         betaW = beta * W;
-        for (int i = 0; i < docSet.size(); i++) {
-            N += docSet.get(i).size();
-        }
+        N = tokenArrayBuffer.size();
+        D = tokenArrayBuffer.getNumDocs();
 
         documentVector = new int[N];
         wordVector = new int[N];
@@ -163,22 +175,13 @@ public class TopicModel extends Model {
         for (int i = 0; i < D * T; ++i) {
             topicByDocumentCounts[i] = 0;
         }
-        wordByTopicCounts = new int[W * T];
-        for (int i = 0; i < W * T; ++i) {
+        wordByTopicCounts = new int[fW * T];
+        for (int i = 0; i < fW * T; ++i) {
             wordByTopicCounts[i] = 0;
         }
 
-        int tcount = 0, docs = 0;
-        for (ArrayList<Integer> doc : docSet) {
-            int offset = 0;
-            for (int idx : doc) {
-                wordVector[tcount + offset] = idx;
-                documentVector[tcount + offset] = docs;
-                offset += 1;
-            }
-            tcount += doc.size();
-            docs += 1;
-        }
+        wordVector = tokenArrayBuffer.wordVector;
+        documentVector = tokenArrayBuffer.documentVector;
     }
 
     /**
@@ -211,6 +214,7 @@ public class TopicModel extends Model {
             annealer = new SimulatedAnnealer(options);
         }
 
+        paragraphsAsDocs = options.getParagraphsAsDocs();
         outputPerClass = options.getOutputPerClass();
         inputPath = options.getTrainInputPath();
         tabulatedOutput = options.getTabulatedOutput();
@@ -312,7 +316,7 @@ public class TopicModel extends Model {
             for (int j = 0; j < W; ++j) {
                 topWords.add(
                       new DoubleStringPair(wordByTopicCounts[j * T + i] + beta,
-                      docSet.getWordForInt(j)));
+                      lexicon.getWordForInt(j)));
             }
             Collections.sort(topWords);
             for (int j = 0; j < outputPerClass; ++j) {

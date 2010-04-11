@@ -17,6 +17,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
+import opennlp.textgrounder.textstructs.StopwordList;
+import opennlp.textgrounder.textstructs.TokenArrayBuffer;
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -61,14 +63,6 @@ public class RegionModel extends TopicModel {
      * The set of locations that have been observed with the model.
      */
     protected HashSet<Location> locationSet;
-    /**
-     * Size of the vocabulary including stopwords.
-     */
-    protected int fW;
-    /**
-     * Size of stopword list
-     */
-    protected int sW;
 
     /**
      * Default constructor. Take input from commandline and default options
@@ -97,7 +91,7 @@ public class RegionModel extends TopicModel {
             StopwordList stopwordList = new StopwordList();
             sW = stopwordList.size();
             baselineModel.processPath(baselineModel.getInputFile(),
-                  baselineModel.getDocumentToponymArray(), tokenArrayBuffer,
+                  baselineModel.getTextProcessor(), tokenArrayBuffer,
                   stopwordList);
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -108,9 +102,9 @@ public class RegionModel extends TopicModel {
 
         this.gazetteer = baselineModel.gazetteer;
         this.gazCache = baselineModel.gazCache;
-        this.documentToponymArray = baselineModel.documentToponymArray;
-        this.docSet = baselineModel.docSet;
-        tokenArrayBuffer.setDocSet(this.docSet);
+        this.textProcessor = baselineModel.textProcessor;
+        this.lexicon = baselineModel.lexicon;
+        tokenArrayBuffer.setDocSet(this.lexicon);
 
         locationSet = new HashSet<Location>();
 
@@ -139,19 +133,15 @@ public class RegionModel extends TopicModel {
          * dictionary size without stopwords (W). Normalization is conducted with
          * the dictionary size without stopwords.
          */
-        fW = docSet.getDictionarySize();
+        fW = lexicon.getDictionarySize();
         W = fW - sW;
-        D = docSet.size();
+        D = tokenArrayBuffer.getNumDocs();
         betaW = beta * W;
 
-        wordVector = new int[N];
-        copyToArray(wordVector, tokenArrayBuffer.wordVector);
-        documentVector = new int[N];
-        copyToArray(documentVector, tokenArrayBuffer.documentVector);
-        toponymVector = new int[N];
-        copyToArray(toponymVector, tokenArrayBuffer.toponymVector);
-        stopwordVector = new int[N];
-        copyToArray(stopwordVector, tokenArrayBuffer.stopwordVector);
+        wordVector = tokenArrayBuffer.wordVector;
+        documentVector = tokenArrayBuffer.documentVector;
+        toponymVector = tokenArrayBuffer.toponymVector;
+        stopwordVector = tokenArrayBuffer.stopwordVector;
 
         /**
          * There is no need to initialize the topicVector. It will be randomly
@@ -169,7 +159,7 @@ public class RegionModel extends TopicModel {
             }
             prevDoc = curDoc;
             if (toponymVector[i] == 1) {
-                String placename = docSet.getWordForInt(wordVector[i]);
+                String placename = lexicon.getWordForInt(wordVector[i]);
                 if (gazetteer.contains(placename)) { // quick lookup to see if it has even 1 place by that name
                     // try the cache first. if not in there, do a full DB lookup and add that pair to the cache:
                     List<Location> possibleLocations = gazCache.get(placename);
@@ -190,7 +180,7 @@ public class RegionModel extends TopicModel {
                     possibleLocations = tempLocs;
 
                     baselineModel.addLocationsToRegionArray(possibleLocations, regionMapperCallback);
-                    regionMapperCallback.addAll(placename, docSet);
+                    regionMapperCallback.addAll(placename, lexicon);
                     locationSet.addAll(possibleLocations);
                 }
             }
@@ -217,7 +207,7 @@ public class RegionModel extends TopicModel {
 
         Map<String, HashSet<Integer>> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
         for (String placename : nameToRegionIndex.keySet()) {
-            int wordoff = docSet.getIntForWord(placename) * T;
+            int wordoff = lexicon.getIntForWord(placename) * T;
             for (int j : nameToRegionIndex.get(placename)) {
                 regionByToponym[wordoff + j] = 1;
             }
@@ -360,7 +350,7 @@ public class RegionModel extends TopicModel {
         Map<String, HashSet<Integer>> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
         Map<ToponymRegionPair, HashSet<Location>> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
         for (String name : nameToRegionIndex.keySet()) {
-            int wordid = docSet.getIntForWord(name);
+            int wordid = lexicon.getIntForWord(name);
             for (int regid : nameToRegionIndex.get(name)) {
                 ToponymRegionPair trp = new ToponymRegionPair(wordid, regid);
                 HashSet<Location> locs = toponymRegionToLocations.get(trp);
@@ -415,18 +405,5 @@ public class RegionModel extends TopicModel {
         normalizeLocations();
         System.err.println("Writing output");
         writeXMLFile(inputPath, kmlOutputFilename, locations);
-    }
-
-    /**
-     * Copy a sequence of numbers from ta to array ia.
-     *
-     * @param <T>   Any number type
-     * @param ia    Target array of integers to be copied to
-     * @param ta    Source List<T> of numbers to be copied from
-     */
-    protected static <T extends Number> void copyToArray(int[] ia, List<T> ta) {
-        for (int i = 0; i < ta.size(); ++i) {
-            ia[i] = ta.get(i).intValue();
-        }
     }
 }

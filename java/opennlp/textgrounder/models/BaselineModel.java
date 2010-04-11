@@ -1,5 +1,9 @@
 package opennlp.textgrounder.models;
 
+import opennlp.textgrounder.textstructs.StopwordList;
+import opennlp.textgrounder.textstructs.NullStopwordList;
+import opennlp.textgrounder.textstructs.TokenArrayBuffer;
+import opennlp.textgrounder.textstructs.TextProcessor;
 import gnu.trove.TIntIntHashMap;
 
 import java.io.File;
@@ -12,7 +16,7 @@ import java.util.logging.Logger;
 
 import opennlp.textgrounder.gazetteers.*;
 import opennlp.textgrounder.geo.*;
-import opennlp.textgrounder.io.*;
+import opennlp.textgrounder.textstructs.*;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
@@ -30,7 +34,7 @@ public class BaselineModel extends Model {
     public BaselineModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
         barScale = bscale;
         gazetteer = gaz;
-        docSet = new DocumentSet(paragraphsAsDocs);
+        lexicon = new Lexicon();
     }
 
     public BaselineModel(CommandLineOptions options) throws Exception {
@@ -71,16 +75,16 @@ public class BaselineModel extends Model {
         degreesPerRegion = options.getDegreesPerRegion();
 
         if (!runWholeGazetteer) {
-            documentToponymArray = new SNERDocumentToponymArray();
-
             gazCache = new Hashtable<String, List<Location>>();
             paragraphsAsDocs = options.getParagraphsAsDocs();
-            docSet = new DocumentSet(options.getParagraphsAsDocs());
+            lexicon = new Lexicon();
+
+            textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
         }
 
         barScale = options.getBarScale();
 
-	windowSize = options.getWindowSize();
+        windowSize = options.getWindowSize();
     }
 
     public void initializeRegionArray() {
@@ -138,64 +142,65 @@ public class BaselineModel extends Model {
         /*	TObjectIntIterator<String> placeIterator = placeCounts.iterator();
         for (int i = placeCounts.size(); i-- > 0;) {
         placeIterator.advance();*/
-        assert (documentToponymArray.size() == docSet.size());
-	//int wvCounter = 0;
-	for(int i = 0; i < tokenArrayBuffer.documentVector.size(); i++) {
-	    /*for (int docIndex = 0; docIndex < docSet.size(); docIndex++) {
-            ArrayList<Integer> curDocSpans = documentToponymArray.get(docIndex);
+//        assert (textProcessor.size() == lexicon.size());
+        //int wvCounter = 0;
+        for (int i = 0; i < tokenArrayBuffer.size(); i++) {
+            /*for (int docIndex = 0; docIndex < lexicon.size(); docIndex++) {
+            ArrayList<Integer> curDocSpans = textProcessor.get(docIndex);
 
             for (int i = 0; i < curDocSpans.size(); i++) {//int topidx : curDocSpans) {*/
-	        if(tokenArrayBuffer.toponymVector.get(i) == 0)
-		    continue;
-		int topidx = tokenArrayBuffer.wordVector.get(i);
-                System.out.println("toponym (in int form): " + topidx);
+            if (tokenArrayBuffer.toponymVector[i] == 0) {
+                continue;
+            }
+            int topidx = tokenArrayBuffer.wordVector[i];
+            System.out.println("toponym (in int form): " + topidx);
 
-                String placename = docSet.getWordForInt(topidx).toLowerCase();
-                System.out.println(placename);
-		//assert(docSet.getWordForInt(docSet.getIntForWord(placename)).equalsIgnoreCase(placename));
+            String placename = lexicon.getWordForInt(topidx).toLowerCase();
+            System.out.println(placename);
+            //assert(lexicon.getWordForInt(lexicon.getIntForWord(placename)).equalsIgnoreCase(placename));
 		/*if(placename.contains(" "))
-		  System.out.println("CONTAINS SPACE");*/
+            System.out.println("CONTAINS SPACE");*/
 
-                if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
-                {
-                    continue;
-                }
+            if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
+            {
+                continue;
+            }
 
-                // try the cache first. if not in there, do a full DB lookup and add that pair to the cache:
-                List<Location> possibleLocations = gazCache.get(placename);
-                if (possibleLocations == null) {
-                    possibleLocations = gazetteer.get(placename);
-                    gazCache.put(placename, possibleLocations);
-                    addLocationsToRegionArray(possibleLocations);
-                }
+            // try the cache first. if not in there, do a full DB lookup and add that pair to the cache:
+            List<Location> possibleLocations = gazCache.get(placename);
+            if (possibleLocations == null) {
+                possibleLocations = gazetteer.get(placename);
+                gazCache.put(placename, possibleLocations);
+                addLocationsToRegionArray(possibleLocations);
+            }
 
-                Location curLocation = popBaselineDisambiguate(possibleLocations);
-                if (curLocation == null) {
-                    continue;
-                }
+            Location curLocation = popBaselineDisambiguate(possibleLocations);
+            if (curLocation == null) {
+                continue;
+            }
 
-                // instantiate the region containing curLocation
+            // instantiate the region containing curLocation
 
-                /*if(!locationsFound.contains(curLocation.id)) {
+            /*if(!locationsFound.contains(curLocation.id)) {
+            locations.add(curLocation);
+            locationsFound.add(curLocation.id);
+            }*/
+
+            int curCount = idsToCounts.get(curLocation.id);
+            if (curCount == 0) {// sentinel for not found in hashmap
                 locations.add(curLocation);
-                locationsFound.add(curLocation.id);
-                }*/
-
-                int curCount = idsToCounts.get(curLocation.id);
-                if (curCount == 0) {// sentinel for not found in hashmap
-                    locations.add(curLocation);
-		    curLocation.backPointers = new ArrayList<Integer>();
-                    idsToCounts.put(curLocation.id, 1);
-                    System.out.println("Found first " + curLocation.name + "; id = " + curLocation.id);
-                } else {
-                    idsToCounts.increment(curLocation.id);
-                    System.out.println("Found " + curLocation.name + " #" + idsToCounts.get(curLocation.id));
-                }
-		//DocIdAndIndex curDocIdAndIndex = new DocIdAndIndex(docIndex, i);
-		curLocation.backPointers.add(i);
-		//System.out.println(docSet.getContext(curDocIdAndIndex, 10));
-		//System.out.println(tokenArrayBuffer.wordVector
-		//}
+                curLocation.backPointers = new ArrayList<Integer>();
+                idsToCounts.put(curLocation.id, 1);
+                System.out.println("Found first " + curLocation.name + "; id = " + curLocation.id);
+            } else {
+                idsToCounts.increment(curLocation.id);
+                System.out.println("Found " + curLocation.name + " #" + idsToCounts.get(curLocation.id));
+            }
+            //DocIdAndIndex curDocIdAndIndex = new DocIdAndIndex(docIndex, i);
+            curLocation.backPointers.add(i);
+            //System.out.println(lexicon.getContext(curDocIdAndIndex, 10));
+            //System.out.println(tokenArrayBuffer.wordArrayList
+            //}
 
 
 
@@ -265,21 +270,8 @@ public class BaselineModel extends Model {
     }
 
     public void processPath() throws Exception {
-	tokenArrayBuffer = new TokenArrayBuffer(docSet);
-        processPath(getInputFile(), documentToponymArray, tokenArrayBuffer, new NullStopwordList());
-    }
-
-    public void processPath(File myPath,
-          SNERDocumentToponymArray documentToponymArray,
-          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws
-          Exception {
-        if (myPath.isDirectory()) {
-            for (String pathname : myPath.list()) {
-                processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), documentToponymArray, tokenArrayBuffer, stopwordList);
-            }
-        } else {
-            documentToponymArray.addToponymsFromFile(myPath.getCanonicalPath(), docSet, tokenArrayBuffer, stopwordList);
-        }
+        tokenArrayBuffer = new TokenArrayBuffer(lexicon);
+        processPath(inputFile, textProcessor, tokenArrayBuffer, new NullStopwordList());
     }
 
     /**
@@ -297,10 +289,10 @@ public class BaselineModel extends Model {
     }
 
     /**
-     * @return the documentToponymArray
+     * @return the textProcessor
      */
-    public SNERDocumentToponymArray getDocumentToponymArray() {
-        return documentToponymArray;
+    public TextProcessor getTextProcessor() {
+        return textProcessor;
     }
 
     @Override

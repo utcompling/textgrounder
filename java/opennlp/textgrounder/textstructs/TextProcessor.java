@@ -1,15 +1,11 @@
-package opennlp.textgrounder.ners;
+package opennlp.textgrounder.textstructs;
 
 import edu.stanford.nlp.ie.crf.*;
 import edu.stanford.nlp.ling.CoreAnnotations.*;
 
 import java.io.*;
-import java.util.ArrayList;
 import java.util.Properties;
 
-import opennlp.textgrounder.io.DocumentSet;
-import opennlp.textgrounder.models.callbacks.StopwordList;
-import opennlp.textgrounder.models.callbacks.TokenArrayBuffer;
 import opennlp.textgrounder.util.*;
 
 /**
@@ -18,7 +14,7 @@ import opennlp.textgrounder.util.*;
  * This class stores an array of sequences of toponym indexes. Any token that
  * has not been identified as a toponym is not retained in this class. The
  * indexes reference actual string toponyms, tables for which are maintained
- * in DocumentSet.
+ * in Lexicon.
  *
  * This class also processes all input text and identifies toponyms through
  * a named entity recognizer (NER) in addToponymsFromFile. It is the only
@@ -28,34 +24,82 @@ import opennlp.textgrounder.util.*;
  * 
  * @author 
  */
-public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
+public class TextProcessor {
 
     /**
      * NER system. This uses the Stanford NER system {@link TO COME}.
      */
     public CRFClassifier classifier;
+    /**
+     * Table of words and indexes.
+     */
+    protected Lexicon lexicon;
+    /**
+     * the index (or offset) of the current document being
+     * examined
+     */
+    protected static int currentDoc = 0;
+    /**
+     * The number of paragraphs to treat as a single document.
+     */
+    protected final int parAsDocSize;
 
     /**
      * Default constructor. Instantiate CRFClassifier.
-     *
+     * 
+     * @param lexicon lookup table for words and indexes
+     * @param parAsDocSize number of paragraphs to use as single document. if
+     * set to 0, it will process an entire file intact.
      */
-    public SNERDocumentToponymArray() throws ClassCastException, IOException,
-          ClassNotFoundException {
+    public TextProcessor(Lexicon lexicon, int parAsDocSize) throws
+          ClassCastException, IOException, ClassNotFoundException {
         Properties myClassifierProperties = new Properties();
         classifier = new CRFClassifier(myClassifierProperties);
         classifier.loadClassifier(Constants.STANFORD_NER_HOME + "/classifiers/ner-eng-ie.crf-3-all2008-distsim.ser.gz");
+
+        this.lexicon = lexicon;
+        if (parAsDocSize == 0) {
+            this.parAsDocSize = Integer.MAX_VALUE;
+        } else {
+            this.parAsDocSize = parAsDocSize;
+        }
     }
 
     /**
-     * Identify toponyms and populate docSet from input file. 
+     * Constructor only for classes which either specify their own classifier,
+     * or those which override and use the NullClassifier, which does not
+     * do any named entity recognition.
+     * 
+     * @param classifier named entity recognition system
+     * @param lexicon lookup table for words and indexes
+     * @param parAsDocSize number of paragraphs to use as single document. if
+     * set to 0, it will process an entire file intact.
+     * @throws ClassCastException
+     * @throws IOException
+     * @throws ClassNotFoundException
+     */
+    public TextProcessor(CRFClassifier classifier, Lexicon lexicon,
+          int parAsDocSize) throws ClassCastException, IOException,
+          ClassNotFoundException {
+        this.classifier = classifier;
+        this.lexicon = lexicon;
+        if (parAsDocSize == 0) {
+            this.parAsDocSize = Integer.MAX_VALUE;
+        } else {
+            this.parAsDocSize = parAsDocSize;
+        }
+    }
+
+    /**
+     * Identify toponyms and populate lexicon from input file.
      * 
      * This method only splits any incoming document into smaller 
-     * subdocuments based on DocumentSet.parAsDocSize. The actual work of
+     * subdocuments based on Lexicon.parAsDocSize. The actual work of
      * identifying toponyms, converting tokens to indexes, and populating
      * arrays is handled in addToponymSpans.
      * 
      * @param locationOfFile path to input. must be a single file
-     * @param docSet the DocumentSet instance that contains both the sequence
+     * @param lexicon the Lexicon instance that contains both the sequence
      * of token indexes and the lexicon.
      * @param tokenArrayBuffer buffer that holds the array of token indexes,
      * document indexes, and the toponym indexes. If this class object is
@@ -69,22 +113,16 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
      * @throws IOException
      */
     public void addToponymsFromFile(String locationOfFile,
-          DocumentSet docSet, TokenArrayBuffer tokenArrayBuffer,
-          StopwordList stopwordList) throws
+          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws
           FileNotFoundException, IOException {
 
         BufferedReader textIn = new BufferedReader(new FileReader(locationOfFile));
         System.out.println("Extracting toponym indices from " + locationOfFile + " ...");
 
-        int parAsDocSize = docSet.getParAsDocSize();
-        docSet.newDoc();
-        int currentDoc = docSet.size() - 1;
-
-        ArrayList<Integer> curSpanList = new ArrayList<Integer>();
         String curLine = null;
         StringBuffer buf = new StringBuffer();
         int counter = 1;
-        System.err.print("Processing document 0,");
+        System.err.print("Processing document:" + currentDoc + ",");
         while (true) {
             curLine = textIn.readLine();
             if (curLine == null || curLine.equals("")) {
@@ -96,12 +134,9 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
             if (counter < parAsDocSize) {
                 counter++;
             } else {
-                addToponymSpans(buf, curSpanList, docSet, tokenArrayBuffer, stopwordList, currentDoc);
-                add(curSpanList);
+                addToponymSpans(buf.toString(), tokenArrayBuffer, stopwordList);
 
-                curSpanList = new ArrayList<Integer>();
                 buf = new StringBuffer();
-                docSet.newDoc();
                 currentDoc += 1;
                 counter = 1;
                 System.err.print(currentDoc + ",");
@@ -112,19 +147,19 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
          * Add last lines if they have not been processed and added
          */
         if (counter > 1) {
-            addToponymSpans(buf, curSpanList, docSet, tokenArrayBuffer, stopwordList, currentDoc);
-            add(curSpanList);
-            System.err.print(currentDoc + 1 + ",");
+            addToponymSpans(buf.toString(), tokenArrayBuffer, stopwordList);
+            System.err.print(currentDoc + ",");
         }
         System.err.println();
 
-        assert (tokenArrayBuffer.toponymVector.size() == tokenArrayBuffer.wordVector.size());
+        assert (tokenArrayBuffer.toponymArrayList.size() == tokenArrayBuffer.wordArrayList.size());
+        tokenArrayBuffer.convertToPrimitiveArrays();        
     }
 
     /**
      * Identify toponyms and non-toponyms and process accordingly.
      *
-     * The entire input string (buf.toString) is passed to the NER classifier.
+     * The entire input string (text.toString) is passed to the NER classifier.
      * The output of the classifier will be of the form 
      * <p>token/LABEL token/LABELpunctuation/LABEL token/LABEL ...</p>.
      * If LABEL is LOCATION, it is processed as a toponym or as a
@@ -143,13 +178,13 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
      * index is one, it means the current token is a toponym. If it is zero,
      * the current token is not a toponym.
      *
-     * @param buf StringBuffer of input to be processed. This should always be
+     * @param text StringBuffer of input to be processed. This should always be
      * space delimited raw text.
      * @param curSpanList sequence of toponym indexes. memory is allocated
      * outside the method but is populated in this method. After being
      * processed here, it is appended to an instance of this class through
      * add.
-     * @param docSet the DocumentSet instance that contains both the sequence
+     * @param lexicon the Lexicon instance that contains both the sequence
      * of token indexes and the lexicon.
      * @param tokenArrayBuffer buffer that holds the array of token indexes,
      * document indexes, and the toponym indexes. If this class object is
@@ -159,15 +194,12 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
      * this is an instance of NullStopwordList, it will return false
      * through stopwordList.isStopWord for every string token examined
      * (i.e. the token is not a stopword).
-     * @param currentDoc the index (or offset) of the current document being
-     * examined
+     * @param currentDoc 
      */
-    public void addToponymSpans(StringBuffer buf,
-          ArrayList<Integer> curSpanList, DocumentSet docSet,
-          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList,
-          int currentDoc) {
+    public void addToponymSpans(String text,
+          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) {
 
-        String nerOutput = classifier.classifyToString(buf.toString());
+        String nerOutput = classifier.classifyToString(text);
 
         String[] tokens = nerOutput.split(" ");
         int toponymStartIndex = -1;
@@ -184,8 +216,7 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
                 if (token.endsWith("/O")) {
                     toponymEndIndex = i + 1;
                     String cur = StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/").toLowerCase();
-                    wordidx = docSet.addWordToSeq(cur);
-                    curSpanList.add(wordidx);
+                    wordidx = lexicon.addWord(cur);
                     tokenArrayBuffer.addElement(wordidx, currentDoc, 1, 0);
 
                     toponymStartIndex = -1;
@@ -198,8 +229,7 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
                  * toponymEndIndex. This does not include the current token
                  */
                 String cur = StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/").toLowerCase();
-                wordidx = docSet.addWordToSeq(cur);
-                curSpanList.add(wordidx);
+                wordidx = lexicon.addWord(cur);
                 tokenArrayBuffer.addElement(wordidx, currentDoc, 1, 0);
 
                 /**
@@ -210,7 +240,7 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
                 if (!stopwordList.isStopWord(cur)) {
                     isstop = 1;
                 }
-                wordidx = docSet.addWordToSeq(cur);
+                wordidx = lexicon.addWord(cur);
                 tokenArrayBuffer.addElement(wordidx, currentDoc, 0, isstop);
 
                 toponymStartIndex = -1;
@@ -221,15 +251,14 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
                 if (!stopwordList.isStopWord(cur)) {
                     isstop = 1;
                 }
-                wordidx = docSet.addWordToSeq(cur);
+                wordidx = lexicon.addWord(cur);
                 tokenArrayBuffer.addElement(wordidx, currentDoc, 0, isstop);
             }
         }
 
         //case where toponym ended at very end of document:
         if (toponymStartIndex != -1) {
-            int wordidx = docSet.addWordToSeq(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
-            curSpanList.add(wordidx);
+            int wordidx = lexicon.addWord(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
             tokenArrayBuffer.addElement(wordidx, currentDoc, 1, 0);
         }
     }
