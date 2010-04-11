@@ -27,13 +27,22 @@ import java.util.Set;
 import opennlp.textgrounder.util.Constants;
 
 /**
+ * A list of stopwords populated from a fixed table
  *
  * @author tsmoon
  */
 public class StopwordList {
 
-    Set<String> stopwords;
+    /**
+     * The list of stopwords
+     */
+    protected Set<String> stopwords;
 
+    /**
+     * 
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
     public StopwordList() throws FileNotFoundException, IOException {
         stopwords = new HashSet<String>();
 
@@ -51,11 +60,25 @@ public class StopwordList {
         }
     }
 
+    /**
+     * Check if a word is a stopword or not. Returns true if it is a stopword,
+     * false if not.
+     *
+     * @param word the word to examine
+     * @return Returns true if it is a stopword, false if not.
+     */
     public boolean isStopWord(String word) {
         if (stopwords.contains(word)) {
             return true;
         } else {
             return false;
         }
+    }
+
+    /**
+     * @return size of the stopword list
+     */
+    public int size() {
+        return stopwords.size();
     }
 }

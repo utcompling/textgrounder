@@ -13,10 +13,7 @@ import java.util.logging.Logger;
 import opennlp.textgrounder.gazetteers.*;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.io.*;
-import opennlp.textgrounder.models.callbacks.NullStopwordList;
-import opennlp.textgrounder.models.callbacks.NullTokenArrayBuffer;
-import opennlp.textgrounder.models.callbacks.StopwordList;
-import opennlp.textgrounder.models.callbacks.TokenArrayBuffer;
+import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
 
@@ -143,7 +140,7 @@ public class BaselineModel extends Model {
         placeIterator.advance();*/
         assert (documentToponymArray.size() == docSet.size());
 	//int wvCounter = 0;
-	for(int i = 0; i < tab.docVector.size(); i++) {
+	for(int i = 0; i < tab.documentVector.size(); i++) {
 	    /*for (int docIndex = 0; docIndex < docSet.size(); docIndex++) {
             ArrayList<Integer> curDocSpans = documentToponymArray.get(docIndex);
 

@@ -74,7 +74,7 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
           FileNotFoundException, IOException {
 
         BufferedReader textIn = new BufferedReader(new FileReader(locationOfFile));
-        System.out.print("Extracting toponym indices from " + locationOfFile + " ...");
+        System.out.println("Extracting toponym indices from " + locationOfFile + " ...");
 
         int parAsDocSize = docSet.getParAsDocSize();
         docSet.newDoc();
@@ -118,10 +118,7 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
         }
         System.err.println();
 
-	assert(tokenArrayBuffer.toponymVector.size() == tokenArrayBuffer.wordVector.size());
-	/*for(int i = 0; i < tokenArrayBuffer.wordVector.size(); i++) {
-	    System.out.println(tokenArrayBuffer.toponymVector.get(i) + ": " + tokenArrayBuffer.wordVector.get(i));
-	    }*/
+        assert (tokenArrayBuffer.toponymVector.size() == tokenArrayBuffer.wordVector.size());
     }
 
     /**
@@ -140,7 +137,7 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
      *
      * This method also adds to a sequence of document indexes and toponym
      * indexes maintained in tokenArrayBuffer. The sequences of token, document
-     * and toponym indexes are of the same length so that they are coindexed.
+     * and toponym indexes are of the same size so that they are coindexed.
      * The toponym sequence is slightly different from the other sequences
      * in that it is only populated by ones and zeros. If the current toponym
      * index is one, it means the current token is a toponym. If it is zero,
@@ -189,10 +186,7 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
                     String cur = StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/").toLowerCase();
                     wordidx = docSet.addWordToSeq(cur);
                     curSpanList.add(wordidx);
-                    tokenArrayBuffer.addWord(wordidx);
-                    tokenArrayBuffer.addDoc(currentDoc);
-                    tokenArrayBuffer.addToponym(1);
-		    //System.out.println("TOPONYM 1: " + docSet.getWordForInt(tokenArrayBuffer.wordVector.get(tokenArrayBuffer.wordVector.size()-1)));
+                    tokenArrayBuffer.addElement(wordidx, currentDoc, 1, 0);
 
                     toponymStartIndex = -1;
                     toponymEndIndex = -1;
@@ -206,35 +200,29 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
                 String cur = StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/").toLowerCase();
                 wordidx = docSet.addWordToSeq(cur);
                 curSpanList.add(wordidx);
-                tokenArrayBuffer.addWord(wordidx);
-                tokenArrayBuffer.addDoc(currentDoc);
-                tokenArrayBuffer.addToponym(1);
-		//System.out.println("TOPONYM 2: " + docSet.getWordForInt(tokenArrayBuffer.wordVector.get(tokenArrayBuffer.wordVector.size()-1)));
+                tokenArrayBuffer.addElement(wordidx, currentDoc, 1, 0);
 
                 /**
                  * Add the current token
                  */
                 cur = token.split("/")[0].toLowerCase();
+                int isstop = 0;
                 if (!stopwordList.isStopWord(cur)) {
-                    wordidx = docSet.addWordToSeq(cur);
-                    tokenArrayBuffer.addWord(wordidx);
-                    tokenArrayBuffer.addDoc(currentDoc);
-                    tokenArrayBuffer.addToponym(0);
-		    //System.out.println("NONTOPONYM 3: " + docSet.getWordForInt(tokenArrayBuffer.wordVector.get(tokenArrayBuffer.wordVector.size()-1)));
+                    isstop = 1;
                 }
+                wordidx = docSet.addWordToSeq(cur);
+                tokenArrayBuffer.addElement(wordidx, currentDoc, 0, isstop);
 
                 toponymStartIndex = -1;
                 toponymEndIndex = -1;
             } else {
                 String cur = token.split("/")[0].toLowerCase();
-		//System.out.println(cur);
+                int isstop = 0;
                 if (!stopwordList.isStopWord(cur)) {
-                    wordidx = docSet.addWordToSeq(cur);
-                    tokenArrayBuffer.addWord(wordidx);
-                    tokenArrayBuffer.addDoc(currentDoc);
-                    tokenArrayBuffer.addToponym(0);
-		    //System.out.println("NONTOPONYM 4: " + docSet.getWordForInt(tokenArrayBuffer.wordVector.get(tokenArrayBuffer.wordVector.size()-1)));
+                    isstop = 1;
                 }
+                wordidx = docSet.addWordToSeq(cur);
+                tokenArrayBuffer.addElement(wordidx, currentDoc, 0, isstop);
             }
         }
 
@@ -242,10 +230,7 @@ public class SNERDocumentToponymArray extends ArrayList<ArrayList<Integer>> {
         if (toponymStartIndex != -1) {
             int wordidx = docSet.addWordToSeq(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
             curSpanList.add(wordidx);
-            tokenArrayBuffer.addWord(wordidx);
-            tokenArrayBuffer.addDoc(currentDoc);
-            tokenArrayBuffer.addToponym(1);
-	    //System.out.println("TOPONYM 5: " + docSet.getWordForInt(tokenArrayBuffer.wordVector.get(tokenArrayBuffer.wordVector.size()-1)));
+            tokenArrayBuffer.addElement(wordidx, currentDoc, 1, 0);
         }
     }
 }

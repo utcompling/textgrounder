@@ -6,8 +6,6 @@ import gnu.trove.*;
 
 import edu.stanford.nlp.ling.CoreAnnotations.*;
 
-import opennlp.textgrounder.topostructs.*;
-
 /**
  * Class of documents as array of array of integers (i.e. indexes of word types).
  *

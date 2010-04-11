@@ -46,6 +46,10 @@ public class RegionModel extends TopicModel {
      */
     protected int[] toponymVector;
     /**
+     * Vector of stopwords. If 0, the word is not a stopword. If 1, it is.
+     */
+    protected int[] stopwordVector;
+    /**
      * An index of toponyms and possible regions. The goal is fast lookup and not
      * frugality with memory. The dimensions are equivalent to the wordByTopicCounts
      * array. Instead of counts, this array is populated with ones and zeros.
@@ -53,17 +57,22 @@ public class RegionModel extends TopicModel {
      */
     protected int[] regionByToponym;
     /**
-     * 
+     * The set of locations that have been observed with the model.
      */
     protected HashSet<Location> locationSet;
-
     /**
-     *
+     * Size of the vocabulary including stopwords.
      */
-    protected RegionModel() {
-    }
+    protected int fW;
+    /**
+     * Size of stopword list
+     */
+    protected int sW;
 
     /**
+     * Default constructor. Take input from commandline and default options
+     * and initialize class. Also, process input text and process so that
+     * toponyms, stopwords and other words are identified and collected.
      *
      * @param options
      */
@@ -79,14 +88,16 @@ public class RegionModel extends TopicModel {
     protected void initialize(CommandLineOptions options) {
 
         initializeFromOptions(options);
-        TokenArrayBuffer tokenArrayBuffer = new TokenArrayBuffer();
+        TokenArrayBuffer tokenArrayBuffer = new TokenArrayBuffer(docSet);
         BaselineModel baselineModel = null;
 
         try {
             baselineModel = new BaselineModel(options);
+            StopwordList stopwordList = new StopwordList();
+            sW = stopwordList.size();
             baselineModel.processPath(baselineModel.getInputFile(),
                   baselineModel.getDocumentToponymArray(), tokenArrayBuffer,
-                  new StopwordList());
+                  stopwordList);
         } catch (Exception ex) {
             ex.printStackTrace();
             System.exit(1);
@@ -119,25 +130,41 @@ public class RegionModel extends TopicModel {
      */
     protected void setAllocateRegions(TokenArrayBuffer tokenArrayBuffer,
           BaselineModel baselineModel) {
-        N = tokenArrayBuffer.wordVector.size();
-        W = docSet.getDictionarySize();
+        N = tokenArrayBuffer.size();
+        /**
+         * Here we distinguish between the full dictionary size (fW) and the
+         * dictionary size without stopwords (W). Normalization is conducted with
+         * the dictionary size without stopwords.
+         */
+        fW = docSet.getDictionarySize();
+        W = fW - sW;
         D = docSet.size();
         betaW = beta * W;
 
         wordVector = new int[N];
         copyToArray(wordVector, tokenArrayBuffer.wordVector);
         documentVector = new int[N];
-        copyToArray(documentVector, tokenArrayBuffer.docVector);
+        copyToArray(documentVector, tokenArrayBuffer.documentVector);
         toponymVector = new int[N];
         copyToArray(toponymVector, tokenArrayBuffer.toponymVector);
+        stopwordVector = new int[N];
+        copyToArray(stopwordVector, tokenArrayBuffer.stopwordVector);
+
         /**
          * There is no need to initialize the topicVector. It will be randomly
          * initialized
          */
         topicVector = new int[N];
 
-        System.err.print("Extracting words and placenames from document: ");
+        System.err.println();
+        System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
+        int curDoc = 0, prevDoc = -1;
         for (int i = 0; i < N; i++) {
+            curDoc = documentVector[i];
+            if (curDoc != prevDoc) {
+                System.err.print(curDoc + ",");
+            }
+            prevDoc = curDoc;
             if (toponymVector[i] == 1) {
                 String placename = docSet.getWordForInt(wordVector[i]);
                 if (gazetteer.contains(placename)) { // quick lookup to see if it has even 1 place by that name
@@ -151,13 +178,13 @@ public class RegionModel extends TopicModel {
                         }
                     }
 
-                    List<Location> tp = new ArrayList<Location>();
+                    List<Location> tempLocs = new ArrayList<Location>();
                     for (Location loc : possibleLocations) {
                         if (Math.abs(loc.coord.latitude) > Constants.EPSILON && Math.abs(loc.coord.longitude) > Constants.EPSILON) {
-                            tp.add(loc);
+                            tempLocs.add(loc);
                         }
                     }
-                    possibleLocations = tp;
+                    possibleLocations = tempLocs;
 
                     baselineModel.addLocationsToRegionArray(possibleLocations, regionMapperCallback);
                     regionMapperCallback.addAll(placename, docSet);
@@ -176,12 +203,12 @@ public class RegionModel extends TopicModel {
         for (int i = 0; i < D * T; ++i) {
             topicByDocumentCounts[i] = 0;
         }
-        wordByTopicCounts = new int[W * T];
-        for (int i = 0; i < W * T; ++i) {
+        wordByTopicCounts = new int[fW * T];
+        for (int i = 0; i < fW * T; ++i) {
             wordByTopicCounts[i] = 0;
         }
-        regionByToponym = new int[W * T];
-        for (int i = 0; i < W * T; ++i) {
+        regionByToponym = new int[fW * T];
+        for (int i = 0; i < fW * T; ++i) {
             regionByToponym[i] = 0;
         }
 
@@ -200,43 +227,46 @@ public class RegionModel extends TopicModel {
      */
     @Override
     public void randomInitialize() {
-        int wordid, docid, topicid;
+        int wordid, docid, topicid, stopid;
         int istop;
         int wordoff;
         double[] probs = new double[T];
         double totalprob, max, r;
 
         for (int i = 0; i < N; ++i) {
-            wordid = wordVector[i];
-            docid = documentVector[i];
-            istop = toponymVector[i];
+            stopid = stopwordVector[i];
+            if (stopid != 0) {
+                wordid = wordVector[i];
+                docid = documentVector[i];
+                istop = toponymVector[i];
 
-            if (istop == 1) {
-                wordoff = wordid * T;
-                totalprob = 0;
-                try {
-                    for (int j = 0;; ++j) {
-                        totalprob += probs[j] = regionByToponym[wordoff + j];
+                if (istop == 1) {
+                    wordoff = wordid * T;
+                    totalprob = 0;
+                    try {
+                        for (int j = 0;; ++j) {
+                            totalprob += probs[j] = regionByToponym[wordoff + j];
+                        }
+                    } catch (ArrayIndexOutOfBoundsException e) {
                     }
-                } catch (ArrayIndexOutOfBoundsException e) {
-                }
-                r = rand.nextDouble() * totalprob;
+                    r = rand.nextDouble() * totalprob;
 
-                max = probs[0];
-                topicid = 0;
-                while (r > max) {
-                    topicid++;
-                    max += probs[topicid];
+                    max = probs[0];
+                    topicid = 0;
+                    while (r > max) {
+                        topicid++;
+                        max += probs[topicid];
+                    }
+
+                } else {
+                    topicid = rand.nextInt(T);
                 }
 
-            } else {
-                topicid = rand.nextInt(T);
+                topicVector[i] = topicid;
+                topicCounts[topicid]++;
+                topicByDocumentCounts[docid * T + topicid]++;
+                wordByTopicCounts[wordid * T + topicid]++;
             }
-
-            topicVector[i] = topicid;
-            topicCounts[topicid]++;
-            topicByDocumentCounts[docid * T + topicid]++;
-            wordByTopicCounts[wordid * T + topicid]++;
         }
     }
 
@@ -247,56 +277,59 @@ public class RegionModel extends TopicModel {
      */
     @Override
     public void train(Annealer annealer) {
-        int wordid, docid, topicid;
+        int wordid, docid, topicid, stopid;
         int wordoff, docoff;
-        int istop;
+        int istoponym;
         double[] probs = new double[T];
         double totalprob, max, r;
 
         while (annealer.nextIter()) {
             for (int i = 0; i < N; ++i) {
-                wordid = wordVector[i];
-                docid = documentVector[i];
-                topicid = topicVector[i];
-                istop = toponymVector[i];
-                docoff = docid * T;
-                wordoff = wordid * T;
+                stopid = stopwordVector[i];
+                if (stopid != 0) {
+                    wordid = wordVector[i];
+                    docid = documentVector[i];
+                    topicid = topicVector[i];
+                    istoponym = toponymVector[i];
+                    docoff = docid * T;
+                    wordoff = wordid * T;
 
-                topicCounts[topicid]--;
-                topicByDocumentCounts[docoff + topicid]--;
-                wordByTopicCounts[wordoff + topicid]--;
+                    topicCounts[topicid]--;
+                    topicByDocumentCounts[docoff + topicid]--;
+                    wordByTopicCounts[wordoff + topicid]--;
 
-                try {
-                    if (istop == 1) {
-                        for (int j = 0;; ++j) {
-                            probs[j] = (wordByTopicCounts[wordoff + j] + beta)
-                                  / (topicCounts[j] + betaW)
-                                  * (topicByDocumentCounts[docoff + j] + alpha)
-                                  * regionByToponym[wordoff + j];
+                    try {
+                        if (istoponym == 1) {
+                            for (int j = 0;; ++j) {
+                                probs[j] = (wordByTopicCounts[wordoff + j] + beta)
+                                      / (topicCounts[j] + betaW)
+                                      * (topicByDocumentCounts[docoff + j] + alpha)
+                                      * regionByToponym[wordoff + j];
+                            }
+                        } else {
+                            for (int j = 0;; ++j) {
+                                probs[j] = (wordByTopicCounts[wordoff + j] + beta)
+                                      / (topicCounts[j] + betaW)
+                                      * (topicByDocumentCounts[docoff + j] + alpha);
+                            }
                         }
-                    } else {
-                        for (int j = 0;; ++j) {
-                            probs[j] = (wordByTopicCounts[wordoff + j] + beta)
-                                  / (topicCounts[j] + betaW)
-                                  * (topicByDocumentCounts[docoff + j] + alpha);
-                        }
+                    } catch (ArrayIndexOutOfBoundsException e) {
                     }
-                } catch (ArrayIndexOutOfBoundsException e) {
-                }
-                totalprob = annealer.annealProbs(probs);
-                r = rand.nextDouble() * totalprob;
+                    totalprob = annealer.annealProbs(probs);
+                    r = rand.nextDouble() * totalprob;
 
-                max = probs[0];
-                topicid = 0;
-                while (r > max) {
-                    topicid++;
-                    max += probs[topicid];
-                }
-                topicVector[i] = topicid;
+                    max = probs[0];
+                    topicid = 0;
+                    while (r > max) {
+                        topicid++;
+                        max += probs[topicid];
+                    }
+                    topicVector[i] = topicid;
 
-                topicCounts[topicid]++;
-                topicByDocumentCounts[docoff + topicid]++;
-                wordByTopicCounts[wordoff + topicid]++;
+                    topicCounts[topicid]++;
+                    topicByDocumentCounts[docoff + topicid]++;
+                    wordByTopicCounts[wordoff + topicid]++;
+                }
             }
         }
     }

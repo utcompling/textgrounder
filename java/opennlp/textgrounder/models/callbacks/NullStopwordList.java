@@ -21,17 +21,41 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 
 /**
- *
+ * Empty StopwordList class for models that do not require stopword removal.
+ * 
  * @author tsmoon
  */
 public class NullStopwordList extends StopwordList {
 
+    /**
+     * Default constructor.
+     * 
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
     public NullStopwordList() throws FileNotFoundException, IOException {
         stopwords = null;
     }
 
+    /**
+     * Empty override of isStopWord of base class. It returns false always.
+     * No word is a stopword.
+     *
+     * @param word word to (not) examine
+     * @return false always. no word is a stopword.
+     */
     @Override
     public boolean isStopWord(String word) {
         return false;
+    }
+
+    /**
+     * Size of the list of stopwords. Returns 0, meaning there are no stopwords.
+     *
+     * @return 0
+     */
+    @Override
+    public int size() {
+        return 0;
     }
 }
