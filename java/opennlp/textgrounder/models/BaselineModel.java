@@ -82,6 +82,8 @@ public class BaselineModel extends Model {
         }
 
         barScale = options.getBarScale();
+
+	windowSize = options.getWindowSize();
     }
 
     public void initializeRegionArray() {

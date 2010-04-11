@@ -120,6 +120,10 @@ public class CommandLineOptions {
      */
     protected double degreesPerRegion = 3.0;
     /**
+     * Context window size on either side
+     */
+    protected int windowSize = 20;
+    /**
      * Size of bars in kml kmlOutputFilename
      */
     protected int barScale = 50000;
@@ -213,6 +217,8 @@ public class CommandLineOptions {
                 case 'w':
 		    if(option.getOpt().equals("wg")) {
 			runWholeGazetteer = true;
+		    } else if(option.getOpt().equals("ws")) {
+			windowSize = Integer.parseInt(value);
 		    }
                     else {
 			outputPerClass = Integer.parseInt(value);
@@ -308,5 +314,9 @@ public class CommandLineOptions {
 
     public boolean getRunWholeGazetteer() {
 	return runWholeGazetteer;
+    }
+
+    public int getWindowSize() {
+	return windowSize;
     }
 }

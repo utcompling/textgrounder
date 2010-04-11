@@ -54,6 +54,7 @@ public class BaseApp {
         options.addOption("t", "topics", true, "number of topics for baseline topic model (default=50)");
         options.addOption("w", "output-per-class", true, "number of words to output to path specified in output-tabulated-probabilities (default=10)");
 	options.addOption("wg", "whole-gazetteer", false, "activate regions and run program for entire gazetteer (the -i flag will be ignored in this case)");
+	options.addOption("ws", "window-size", true, "size of context window (in either direction) (default=20)");
 
         options.addOption("h", "help", false, "print help");
     }

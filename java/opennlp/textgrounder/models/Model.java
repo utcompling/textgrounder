@@ -83,6 +83,8 @@ public abstract class Model {
      */
     protected boolean runWholeGazetteer = false;
 
+    protected int windowSize;
+
     protected TokenArrayBuffer tab;
     //protected int indexInTAB = 0;
 
@@ -187,13 +189,14 @@ public abstract class Model {
         out.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
               + "<kml xmlns=\"http://www.opengis.net/kml/2.2\" xmlns:gx=\"http://www.google.com/kml/ext/2.2\" xmlns:kml=\"http://www.opengis.net/kml/2.2\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n"
               + "\t<Document>\n"
-              + "\t\t<Style id=\"transBluePoly\">\n"
+              + "\t\t<Style id=\"bar\">\n"
               + "\t\t\t<PolyStyle>\n"
               + "\t\t\t\t<outline>0</outline>\n"
               + "\t\t\t</PolyStyle>\n"
               + "\t\t\t<IconStyle>\n"
               + "\t\t\t\t<Icon></Icon>\n"
-              + "\t\t\t</IconStyle>\n\t\t</Style>\n"
+              + "\t\t\t</IconStyle>\n"
+	      + "\t\t</Style>\n"
               + "\t\t<Folder>\n"
               + "\t\t\t<name>" + inputFilename + "</name>\n"
               + "\t\t\t<open>1</open>\n"
@@ -210,6 +213,11 @@ public abstract class Model {
 	contextOut.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
               + "<kml xmlns=\"http://www.opengis.net/kml/2.2\" xmlns:gx=\"http://www.google.com/kml/ext/2.2\" xmlns:kml=\"http://www.opengis.net/kml/2.2\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n"
 	      + "\t<Document>\n"
+	      + "\t\t<Style id=\"context\">\n"
+	      + "\t\t\t<LabelStyle>\n"
+	      + "\t\t\t\t<scale>0</scale>\n"
+	      + "\t\t\t</LabelStyle>\n"
+	      + "\t\t</Style>\n"
               + "\t\t<Folder>\n"
               + "\t\t\t<name>" + inputFilename + " CONTEXTS</name>\n"
               + "\t\t\t<open>1</open>\n"
@@ -262,7 +270,7 @@ public abstract class Model {
                   + "\t\t\t\t\t\t<minLodPixels>" + MIN_LOD_PIXELS + "</minLodPixels>"
                   + "\t\t\t\t\t</Lod>"
                   + "\t\t\t\t</Region>"
-                  + "\t\t\t\t<styleUrl>#transBluePoly</styleUrl>\n"
+                  + "\t\t\t\t<styleUrl>#bar</styleUrl>\n"
                   + "\t\t\t\t<Point>\n"
                   + "\t\t\t\t\t<coordinates>\n"
                   + "\t\t\t\t\t\t" + coord + ""
@@ -290,7 +298,7 @@ public abstract class Model {
 		}*/
 	    for(int j = 0; j < loc.backPointers.size(); j++) {
 		int index = loc.backPointers.get(j);
-		String context = tab.getContextAround(index, 10, true);
+		String context = tab.getContextAround(index, windowSize, true);
 		Coordinate spiralPoint = coord.getNthSpiralPoint(j, 0.1);
 
 		contextOut.write("\t\t\t<Placemark>\n"
@@ -307,7 +315,7 @@ public abstract class Model {
 				 + "\t\t\t\t\t\t<minLodPixels>" + MIN_LOD_PIXELS + "</minLodPixels>"
 				 + "\t\t\t\t\t</Lod>"
 				 + "\t\t\t\t</Region>"
-				 //+ "\t\t\t\t<styleUrl>http://mw1.google.com/mw-news/common_files/styles.kml#newsStyle</styleUrl>"
+				 + "\t\t\t\t<styleUrl>#context</styleUrl>\n"
 				 + "\t\t\t\t<Point>\n"
 				 + "\t\t\t\t\t<coordinates>" + spiralPoint + "</coordinates>\n"
 				 + "\t\t\t\t</Point>\n"

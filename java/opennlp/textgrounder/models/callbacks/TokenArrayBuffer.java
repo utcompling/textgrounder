@@ -73,7 +73,7 @@ public class TokenArrayBuffer {
 	    if(boldToponym && i == index)
 		context += "<b> " + docSet.getWordForInt(wordVector.get(i)) + "</b>";
 	    else
-		context += " " + docSet.getWordForInt(wordVector.get(i));
+		context += docSet.getWordForInt(wordVector.get(i)) + " ";
 	    //System.out.println("i: " + i + "; docSet thinks " + wordVector.get(i) + " translates to " + docSet.getWordForInt(wordVector.get(i)));
 	}
 
