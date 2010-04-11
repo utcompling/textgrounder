@@ -14,7 +14,7 @@ public class Location {
     /**
      * List of pack pointers into the DocumentSet so that context (snippets) can be extracted
      */
-    public ArrayList<DocIdAndIndex> backPointers;
+    public ArrayList<Integer> backPointers;
 
     /**
      * Counts of location in given text. Is double type to accomodate

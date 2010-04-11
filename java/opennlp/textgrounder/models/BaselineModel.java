@@ -140,11 +140,16 @@ public class BaselineModel extends Model {
         for (int i = placeCounts.size(); i-- > 0;) {
         placeIterator.advance();*/
         assert (documentToponymArray.size() == docSet.size());
-        for (int docIndex = 0; docIndex < docSet.size(); docIndex++) {
+	//int wvCounter = 0;
+	for(int i = 0; i < tab.docVector.size(); i++) {
+	    /*for (int docIndex = 0; docIndex < docSet.size(); docIndex++) {
             ArrayList<Integer> curDocSpans = documentToponymArray.get(docIndex);
 
-            for (int topidx : curDocSpans) {
-                System.out.println("topSpanIndex: " + topidx);
+            for (int i = 0; i < curDocSpans.size(); i++) {//int topidx : curDocSpans) {*/
+	        if(tab.toponymVector.get(i) == 0)
+		    continue;
+		int topidx = tab.wordVector.get(i);
+                System.out.println("toponym (in int form): " + topidx);
 
                 String placename = docSet.getWordForInt(topidx).toLowerCase();
                 System.out.println(placename);
@@ -180,17 +185,18 @@ public class BaselineModel extends Model {
                 int curCount = idsToCounts.get(curLocation.id);
                 if (curCount == 0) {// sentinel for not found in hashmap
                     locations.add(curLocation);
-		    curLocation.backPointers = new ArrayList<DocIdAndIndex>();
+		    curLocation.backPointers = new ArrayList<Integer>();
                     idsToCounts.put(curLocation.id, 1);
                     System.out.println("Found first " + curLocation.name + "; id = " + curLocation.id);
                 } else {
                     idsToCounts.increment(curLocation.id);
                     System.out.println("Found " + curLocation.name + " #" + idsToCounts.get(curLocation.id));
                 }
-		DocIdAndIndex curDocIdAndIndex = new DocIdAndIndex(docIndex, topidx);
-		curLocation.backPointers.add(curDocIdAndIndex);
+		//DocIdAndIndex curDocIdAndIndex = new DocIdAndIndex(docIndex, i);
+		curLocation.backPointers.add(i);
 		//System.out.println(docSet.getContext(curDocIdAndIndex, 10));
-            }
+		//System.out.println(tab.wordVector
+		//}
 
 
 
@@ -260,7 +266,7 @@ public class BaselineModel extends Model {
     }
 
     public void processPath() throws Exception {
-	TokenArrayBuffer tab = new TokenArrayBuffer();
+	tab = new TokenArrayBuffer(docSet);
         processPath(getInputFile(), documentToponymArray, tab, new NullStopwordList());
     }
 

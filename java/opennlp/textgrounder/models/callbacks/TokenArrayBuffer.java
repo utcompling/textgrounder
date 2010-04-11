@@ -18,6 +18,7 @@
 package opennlp.textgrounder.models.callbacks;
 
 import java.util.ArrayList;
+import opennlp.textgrounder.io.*;
 
 /**
  *
@@ -29,10 +30,22 @@ public class TokenArrayBuffer {
     public ArrayList<Integer> docVector;
     public ArrayList<Integer> toponymVector;
 
+    public DocumentSet docSet;
+
+    public TokenArrayBuffer(DocumentSet docSet) {
+        wordVector = new ArrayList<Integer>();
+        docVector = new ArrayList<Integer>();
+        toponymVector = new ArrayList<Integer>();
+
+	this.docSet = docSet;
+    }
+
     public TokenArrayBuffer() {
         wordVector = new ArrayList<Integer>();
         docVector = new ArrayList<Integer>();
         toponymVector = new ArrayList<Integer>();
+	
+	this.docSet = null;
     }
 
     public void addWord(int wordIdx) {
@@ -45,5 +58,25 @@ public class TokenArrayBuffer {
 
     public void addToponym(int topIdx) {
         toponymVector.add(topIdx);
+    }
+
+    /**
+     * Return the context (snippet) of up to window size n for the given doc id and index
+     */
+    public String getContextAround(int index, int windowSize, boolean boldToponym) {
+	String context = "...";
+
+	int i = index - windowSize;
+	if(i < 0) i = 0; // re-initialize the start of the window to be the start of the document if window too big
+	for(; i < index + windowSize; i++) {
+	    if(i >= wordVector.size()) break;
+	    if(boldToponym && i == index)
+		context += "<b> " + docSet.getWordForInt(wordVector.get(i)) + "</b>";
+	    else
+		context += " " + docSet.getWordForInt(wordVector.get(i));
+	    //System.out.println("i: " + i + "; docSet thinks " + wordVector.get(i) + " translates to " + docSet.getWordForInt(wordVector.get(i)));
+	}
+
+	return context.trim() + "...";
     }
 }

@@ -23,7 +23,7 @@ import opennlp.textgrounder.topostructs.*;
 public abstract class Model {
 
     // Minimum number of pixels the (small) square region (NOT our Region) represented by each city must occupy on the screen for its label to appear:
-    private final static int MIN_LOD_PIXELS = 8;
+    private final static int MIN_LOD_PIXELS = 16;
     /**
      * Number of paragraphs to consider as one document.
      */
@@ -82,6 +82,9 @@ public abstract class Model {
      * Flag that tells system to ignore the input file(s) and instead run on every locality in the gazetteer
      */
     protected boolean runWholeGazetteer = false;
+
+    protected TokenArrayBuffer tab;
+    //protected int indexInTAB = 0;
 
     /**
      * Remove punctuation from first and last characters of a string
@@ -177,6 +180,9 @@ public abstract class Model {
           List<Location> locations) throws Exception {
 
         BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));
+	int dotKmlIndex = outputFilename.lastIndexOf(".kml");
+	String contextFilename = outputFilename.substring(0, dotKmlIndex) + "-context.kml";
+	BufferedWriter contextOut = new BufferedWriter(new FileWriter(contextFilename));
 
         out.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
               + "<kml xmlns=\"http://www.opengis.net/kml/2.2\" xmlns:gx=\"http://www.google.com/kml/ext/2.2\" xmlns:kml=\"http://www.opengis.net/kml/2.2\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n"
@@ -201,6 +207,22 @@ public abstract class Model {
               + "\t\t\t\t<heading>0</heading>\n"
               + "\t\t\t</LookAt>\n");
 
+	contextOut.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+              + "<kml xmlns=\"http://www.opengis.net/kml/2.2\" xmlns:gx=\"http://www.google.com/kml/ext/2.2\" xmlns:kml=\"http://www.opengis.net/kml/2.2\" xmlns:atom=\"http://www.w3.org/2005/Atom\">\n"
+	      + "\t<Document>\n"
+              + "\t\t<Folder>\n"
+              + "\t\t\t<name>" + inputFilename + " CONTEXTS</name>\n"
+              + "\t\t\t<open>1</open>\n"
+              + "\t\t\t<description>Contexts of place names found in " + inputFilename + "</description>\n"
+	      + "\t\t\t<LookAt>\n"
+              + "\t\t\t\t<latitude>42</latitude>\n"
+              + "\t\t\t\t<longitude>-102</longitude>\n"
+              + "\t\t\t\t<altitude>0</altitude>\n"
+              + "\t\t\t\t<range>5000000</range>\n"
+              + "\t\t\t\t<tilt>53.454348562403</tilt>\n"
+              + "\t\t\t\t<heading>0</heading>\n"
+              + "\t\t\t</LookAt>\n");
+
         /*TObjectIntIterator<String> placeIterator = placeCounts.iterator();
         for (int i = placeCounts.size(); i-- > 0;) {
         placeIterator.advance();
@@ -216,7 +238,8 @@ public abstract class Model {
         if(coord.longitude == 9999.99) // sentinel
         continue;*/
 
-        for (Location loc : locations) {
+        for (int i = 0; i < locations.size(); i++) {//Location loc : locations) {
+	    Location loc = locations.get(i);
 
             double height = Math.log(loc.count) * barScale;
 
@@ -260,11 +283,47 @@ public abstract class Model {
                   + "\t\t\t\t\t</outerBoundaryIs>"
                   + "\t\t\t\t</Polygon>"
                   + "\t\t\t</Placemark>\n");
+
+	    //System.out.println("Contexts for " + placename);
+	    /*while(indexInTAB < tab.toponymVector.size() && tab.toponymVector.get(indexInTAB) == 0) {
+		indexInTAB++;
+		}*/
+	    for(int j = 0; j < loc.backPointers.size(); j++) {
+		int index = loc.backPointers.get(j);
+		String context = tab.getContextAround(index, 10, true);
+		Coordinate spiralPoint = coord.getNthSpiralPoint(j, 0.1);
+
+		contextOut.write("\t\t\t<Placemark>\n"
+				 + "\t\t\t\t<name>" + placename + " #" + (j + 1) + "</name>\n"
+				 + "\t\t\t\t<description>" + context + "</description>\n"
+				 + "\t\t\t\t<Region>"
+				 + "\t\t\t\t\t<LatLonAltBox>"
+				 + "\t\t\t\t\t\t<north>" + (spiralPoint.longitude + radius) + "</north>"
+				 + "\t\t\t\t\t\t<south>" + (spiralPoint.longitude - radius) + "</south>"
+				 + "\t\t\t\t\t\t<east>" + (spiralPoint.latitude + radius) + "</east>"
+				 + "\t\t\t\t\t\t<west>" + (spiralPoint.latitude - radius) + "</west>"
+				 + "\t\t\t\t\t</LatLonAltBox>"
+				 + "\t\t\t\t\t<Lod>"
+				 + "\t\t\t\t\t\t<minLodPixels>" + MIN_LOD_PIXELS + "</minLodPixels>"
+				 + "\t\t\t\t\t</Lod>"
+				 + "\t\t\t\t</Region>"
+				 //+ "\t\t\t\t<styleUrl>http://mw1.google.com/mw-news/common_files/styles.kml#newsStyle</styleUrl>"
+				 + "\t\t\t\t<Point>\n"
+				 + "\t\t\t\t\t<coordinates>" + spiralPoint + "</coordinates>\n"
+				 + "\t\t\t\t</Point>\n"
+				 + "\t\t\t</Placemark>\n");
+	    }
+	    //indexInTAB++;
+
+	    //if(i >= 10) System.exit(0);
+	    
         }
 
         out.write("\t\t</Folder>\n\t</Document>\n</kml>");
+	contextOut.write("\t\t</Folder>\n\t</Document>\n</kml>");
 
         out.close();
+	contextOut.close();
     }
 
     /**

@@ -27,6 +27,19 @@ public class Coordinate {
 	return sb.toString();
     }
 
+    public Coordinate getNthSpiralPoint(int n, double initRadius) {
+	if(n == 0)
+	  return this;
+	
+	final double radianUnit = twoPI/10;
+	
+	double radius = initRadius + (initRadius * .1) * n;
+
+	double angle = radianUnit/2 + n * radianUnit;
+
+	return new Coordinate(this.longitude + radius * Math.sin(angle), this.latitude + radius * Math.cos(angle));
+    }
+
     public String toString() {
 	return latitude + "," + longitude;
     }
