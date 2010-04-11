@@ -120,7 +120,7 @@ public class TokenArrayBuffer {
                 break;
             }
             if (boldToponym && i == index) {
-                context += "<b> " + docSet.getWordForInt(wordVector.get(i)) + "</b>";
+                context += "<b> " + docSet.getWordForInt(wordVector.get(i)) + "</b> ";
             } else {
                 context += docSet.getWordForInt(wordVector.get(i)) + " ";
             }
