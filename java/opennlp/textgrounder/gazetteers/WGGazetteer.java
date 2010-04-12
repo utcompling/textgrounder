@@ -33,8 +33,10 @@ public class WGGazetteer extends Gazetteer {
 	//System.out.println("after class");
 	//System.out.println(DriverManager.getLoginTimeout());
 	//System.out.println(DriverManager.getDrivers());
-	System.out.println("jdbc:sqlite:"+Constants.WGDB_PATH);
-	conn = DriverManager.getConnection("jdbc:sqlite:"+Constants.WGDB_PATH);
+        File wgtmp = File.createTempFile("wggaz", ".db");
+        wgtmp.deleteOnExit();
+	System.out.println("jdbc:sqlite:"+ wgtmp.getAbsolutePath());
+	conn = DriverManager.getConnection("jdbc:sqlite:"+ wgtmp.getAbsolutePath());
 	//System.out.println("after conn");
 
 	stat = conn.createStatement();

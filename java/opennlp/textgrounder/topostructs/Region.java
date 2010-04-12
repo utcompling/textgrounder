@@ -2,16 +2,27 @@ package opennlp.textgrounder.topostructs;
 
 public class Region {
 
-    double minLon;
-    double maxLon;
-    double minLat;
-    double maxLat;
+    public double minLon;
+    public double maxLon;
+    public double minLat;
+    public double maxLat;
+    /**
+     * The longitude center of the region
+     */
+    public double centLon;
+    /**
+     * The latitude center of the region
+     */
+    public double centLat;
 
     public Region(double minLon, double maxLon, double minLat, double maxLat) {
 	this.minLon = minLon;
 	this.maxLon = maxLon;
 	this.minLat = minLat;
 	this.maxLat = maxLat;
+
+        centLon = (maxLon + minLon) / 2;
+        centLat = (maxLat + minLat) / 2;
     }
 
     public boolean contains(Coordinate coord) {

@@ -19,7 +19,6 @@ package opennlp.textgrounder.models;
 
 import opennlp.textgrounder.textstructs.StopwordList;
 import opennlp.textgrounder.textstructs.TokenArrayBuffer;
-import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
