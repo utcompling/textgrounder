@@ -285,7 +285,7 @@ public abstract class Model {
                   + "\t\t\t</Placemark>"
                   + "\t\t\t<Placemark>"
                   + "\t\t\t\t<name>" + placename + " POLYGON</name>"
-                  + "\t\t\t\t<styleUrl>#transBluePoly</styleUrl>"
+                  + "\t\t\t\t<styleUrl>#bar</styleUrl>"
                   + "\t\t\t\t<Style><PolyStyle><color>dc0155ff</color></PolyStyle></Style>"
                   + "\t\t\t\t<Polygon>"
                   + "\t\t\t\t\t<extrude>1</extrude><tessellate>1</tessellate>"

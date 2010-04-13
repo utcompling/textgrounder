@@ -41,19 +41,23 @@ public class TRGazetteer extends Gazetteer {
 
 	int placeId = 1;
 	int ignoreCount = 0;
+
+	ResultSet rs;
+
+	
 	
 	// get places from CIA centroids section:
 	System.out.println(" Reading CIA centroids section...");
-	ResultSet rs = stat.executeQuery("select * from T_CIA_CENTROIDS");
+	rs = stat.executeQuery("select * from T_CIA_CENTROIDS");
 	while(rs.next()) {
 	    prep.setInt(1, placeId);
 	    String nameToInsert = rs.getString("COUNTRY").toLowerCase();
 	    if(nameToInsert != null)
 		prep.setString(2, nameToInsert);
 	    prep.setString(3, "cia_centroid");
-	    double latToInsert = DMDtoDD(rs.getInt("LAT_DEG"), rs.getInt("LAT_MIN"), rs.getString("LAT_DIR"));
+	    double latToInsert = DMDtoDD(rs.getInt("LONG_DEG"), rs.getInt("LONG_MIN"), rs.getString("LONG_DIR"));/////
 	    prep.setDouble(4, latToInsert);
-	    double longToInsert = DMDtoDD(rs.getInt("LONG_DEG"), rs.getInt("LONG_MIN"), rs.getString("LONG_DIR"));
+	    double longToInsert = DMDtoDD(rs.getInt("LAT_DEG"), rs.getInt("LAT_MIN"), rs.getString("LAT_DIR"));///////
 	    prep.setDouble(5, longToInsert);
 
 	    if(latToInsert < -180.0 || latToInsert > 180.0
@@ -74,6 +78,10 @@ public class TRGazetteer extends Gazetteer {
 	    put(nameToInsert, nullCoord);
 	}
 
+	
+
+	
+
 	// get places from USGS section:
 	System.out.println(" Reading USGS section...");
 	rs = stat.executeQuery("select * from T_USGS_PP");
@@ -93,9 +101,9 @@ public class TRGazetteer extends Gazetteer {
 	    String nameToInsert = rs.getString("FeatureName").toLowerCase();
 	    if(nameToInsert != null)
 		prep.setString(2, nameToInsert);
-	    double latToInsert = rs.getDouble("PrimaryLatitudeDD");
+	    double latToInsert = rs.getDouble("PrimaryLongitudeDD");///////
 	    prep.setDouble(4, latToInsert);
-	    double longToInsert = rs.getDouble("PrimaryLongitudeDD");
+	    double longToInsert = rs.getDouble("PrimaryLatitudeDD");//////
 	    prep.setDouble(5, longToInsert);
 
 	    if(latToInsert < -180.0 || latToInsert > 180.0
@@ -120,6 +128,10 @@ public class TRGazetteer extends Gazetteer {
 	    put(nameToInsert, nullCoord);
 	}
 
+	
+	
+	
+
 	// get places from NGA section:
 	System.out.println(" Reading NGA section...");
 	rs = stat.executeQuery("select * from T_NGA");
@@ -140,10 +152,10 @@ public class TRGazetteer extends Gazetteer {
 	    if(nameToInsert != null)
 		prep.setString(2, nameToInsert);
 	    
-	    double latToInsert = rs.getDouble("DD_LAT"); //switched?
+	    double latToInsert = rs.getDouble("DD_LONG");//"DD_LAT"); //switched?
 	    //if(latToInsert != null)
 	    prep.setDouble(4, latToInsert);
-	    double longToInsert = rs.getDouble("DD_LONG");
+	    double longToInsert = rs.getDouble("DD_LAT");//"DD_LONG");
 	    //if(longToInsert != null)
 	    prep.setDouble(5, longToInsert);
 
@@ -170,6 +182,8 @@ public class TRGazetteer extends Gazetteer {
 
 	    put(nameToInsert, nullCoord);
 	}
+
+	
 
 	if(ignoreCount > 0)
 	    System.out.println(ignoreCount + " (" + ((ignoreCount * 100) / (ignoreCount + placeId)) + "%) entries were ignored due to invalid coordinates (out of range)");
