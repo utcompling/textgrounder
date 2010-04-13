@@ -170,6 +170,10 @@ public class BaselineModel extends Model {
             List<Location> possibleLocations = gazCache.get(placename);
             if (possibleLocations == null) {
                 possibleLocations = gazetteer.get(placename);
+		/*System.out.println(possibleLocations.size());
+		for(Location temploc : possibleLocations) {
+		    System.out.println(temploc);
+		    }*/
                 gazCache.put(placename, possibleLocations);
                 addLocationsToRegionArray(possibleLocations);
             }
@@ -255,7 +259,7 @@ public class BaselineModel extends Model {
         // do the disambiguation:
         for (Location loc : possibleLocations) {
             if (loc.type.equals("locality")) {
-                if (loc.pop > maxPointPop && (maxRegion == null || loc.pop > maxRegionPop || loc.container.equals(maxRegion.name))) {
+                if (loc.pop > maxPointPop && (maxRegion == null || loc.pop > maxRegionPop || (loc.container != null && loc.container.equals(maxRegion.name)))) {
                     pointToReturn = loc;
                     maxPointPop = loc.pop;
                 }

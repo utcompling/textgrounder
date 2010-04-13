@@ -127,8 +127,19 @@ public abstract class Model {
     protected void addLocationsToRegionArray(List<Location> locs,
           RegionMapperCallback regionMapper) {
         for (Location loc : locs) {
+	    /*if(loc.coord.latitude < -180.0 || loc.coord.longitude > 180.0
+	       || loc.coord.longitude < -90.0 || loc.coord.longitude > 900) {
+		// switched?
+	       }*/
             int curX = (int) (loc.coord.latitude + 180) / (int) degreesPerRegion;
             int curY = (int) (loc.coord.longitude + 90) / (int) degreesPerRegion;
+	    //System.out.println(loc.coord.latitude + ", " + loc.coord.longitude + " goes to");
+	    //System.out.println(curX + " " + curY);
+	    if(curX < 0 || curY < 0) {
+		if(curX < 0) curX = 0;
+		if(curY < 0) curY = 0;
+		System.err.println("Warning: " + loc.name + " had invalid coordinates (" + loc.coord + "); mapping it to [" + curX + "][" + curY + "]");
+	    }
             if (regionArray[curX][curY] == null) {
                 double minLon = loc.coord.longitude - loc.coord.longitude % degreesPerRegion;
                 double maxLon = minLon + degreesPerRegion;

@@ -19,6 +19,8 @@ public class TRGazetteer extends Gazetteer {
     private Connection conn;
     private Statement stat;
 
+    private static Coordinate nullCoord = new Coordinate(0.0,0.0);
+
     public TRGazetteer () throws FileNotFoundException, IOException, Exception {
 	this("/tmp/toponym.db"/*Constants.TRDB_PATH*/);
     }
@@ -38,6 +40,7 @@ public class TRGazetteer extends Gazetteer {
 	PreparedStatement prep = conn.prepareStatement("insert into places values (?, ?, ?, ?, ?, ?, ?);");
 
 	int placeId = 1;
+	int ignoreCount = 0;
 	
 	// get places from CIA centroids section:
 	System.out.println(" Reading CIA centroids section...");
@@ -53,6 +56,12 @@ public class TRGazetteer extends Gazetteer {
 	    double longToInsert = DMDtoDD(rs.getInt("LONG_DEG"), rs.getInt("LONG_MIN"), rs.getString("LONG_DIR"));
 	    prep.setDouble(5, longToInsert);
 
+	    if(latToInsert < -180.0 || latToInsert > 180.0
+	       || longToInsert < -90.0 || longToInsert > 90.0) {
+		ignoreCount++;
+		continue;
+	    }
+
 	    prep.addBatch();
 
 	    if(placeId % 100 == 0) {
@@ -61,6 +70,8 @@ public class TRGazetteer extends Gazetteer {
 	    }
 
 	    placeId++;
+
+	    put(nameToInsert, nullCoord);
 	}
 
 	// get places from USGS section:
@@ -86,6 +97,13 @@ public class TRGazetteer extends Gazetteer {
 	    prep.setDouble(4, latToInsert);
 	    double longToInsert = rs.getDouble("PrimaryLongitudeDD");
 	    prep.setDouble(5, longToInsert);
+
+	    if(latToInsert < -180.0 || latToInsert > 180.0
+	       || longToInsert < -90.0 || longToInsert > 90.0) {
+		ignoreCount++;
+		continue;
+	    }
+
 	    int popToInsert = rs.getInt("EstimatedPopulation");
 	    if(popToInsert != 0)
 		prep.setDouble(6, popToInsert);
@@ -98,6 +116,8 @@ public class TRGazetteer extends Gazetteer {
 	    }
 
 	    placeId++;
+
+	    put(nameToInsert, nullCoord);
 	}
 
 	// get places from NGA section:
@@ -120,12 +140,19 @@ public class TRGazetteer extends Gazetteer {
 	    if(nameToInsert != null)
 		prep.setString(2, nameToInsert);
 	    
-	    double latToInsert = rs.getDouble("DD_LAT");
+	    double latToInsert = rs.getDouble("DD_LAT"); //switched?
 	    //if(latToInsert != null)
 	    prep.setDouble(4, latToInsert);
 	    double longToInsert = rs.getDouble("DD_LONG");
 	    //if(longToInsert != null)
 	    prep.setDouble(5, longToInsert);
+
+	    if(latToInsert < -180.0 || latToInsert > 180.0
+	       || longToInsert < -90.0 || longToInsert > 90.0) {
+		ignoreCount++;
+		continue;
+	    }
+
 	    int popToInsert = rs.getInt("DIM"); // note: DIM holds population for type P and elevation for all others
 	    if(popToInsert == 0 && rawType != null && rawType.equals("P"))
 		prep.setInt(6, popToInsert);
@@ -140,7 +167,12 @@ public class TRGazetteer extends Gazetteer {
 	    //  System.exit(0);//////////////////
 	    
 	    placeId++;
+
+	    put(nameToInsert, nullCoord);
 	}
+
+	if(ignoreCount > 0)
+	    System.out.println(ignoreCount + " (" + ((ignoreCount * 100) / (ignoreCount + placeId)) + "%) entries were ignored due to invalid coordinates (out of range)");
 
 	System.out.print("Executing batch insertion into database...");
 	conn.setAutoCommit(false);
