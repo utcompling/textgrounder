@@ -44,7 +44,7 @@ public class TRGazetteer extends Gazetteer {
 	ResultSet rs = stat.executeQuery("select * from T_CIA_CENTROIDS");
 	while(rs.next()) {
 	    prep.setInt(1, placeId);
-	    String nameToInsert = rs.getString("COUNTRY");
+	    String nameToInsert = rs.getString("COUNTRY").toLowerCase();
 	    if(nameToInsert != null)
 		prep.setString(2, nameToInsert);
 	    prep.setString(3, "cia_centroid");
@@ -79,7 +79,7 @@ public class TRGazetteer extends Gazetteer {
 		prep.setString(3, typeToInsert);
 	    }
 	    prep.setInt(1, placeId);
-	    String nameToInsert = rs.getString("FeatureName");
+	    String nameToInsert = rs.getString("FeatureName").toLowerCase();
 	    if(nameToInsert != null)
 		prep.setString(2, nameToInsert);
 	    double latToInsert = rs.getDouble("PrimaryLatitudeDD");
@@ -116,7 +116,7 @@ public class TRGazetteer extends Gazetteer {
 		prep.setString(3, typeToInsert);
 	    }
 	    prep.setInt(1, placeId);
-	    String nameToInsert = rs.getString("FULL_NAME_ND");
+	    String nameToInsert = rs.getString("FULL_NAME_ND").toLowerCase();
 	    if(nameToInsert != null)
 		prep.setString(2, nameToInsert);
 	    
@@ -149,6 +149,16 @@ public class TRGazetteer extends Gazetteer {
 	System.out.println("done.");
 
 	System.out.println("Number of entries in database = " + (placeId - 1));
+
+	/*List<Location> testloc = this.get("norway");
+	System.out.println(testloc.size());
+	for (Location loc : testloc)
+	    System.out.println(loc);
+	testloc = this.get("austin");
+	System.out.println(testloc.size());
+	for (Location loc : testloc)
+	    System.out.println(loc);
+	    System.exit(0);*/
 
 	//ResultSet rs = stat.executeQuery("show tables;");
 	//ResultSet rs = stat.executeQuery("select * from sqlite_master where type='table';");
@@ -423,7 +433,7 @@ public class TRGazetteer extends Gazetteer {
     public List<Location> get(String placename) throws Exception {
 	ArrayList<Location> locationsToReturn = new ArrayList<Location>();
 
-	ResultSet rs = stat.executeQuery("select * from T_USGS_PP where FeatureName like \"" + placename + "\";");
+	ResultSet rs = stat.executeQuery("select * from places where name = \"" + placename + "\";");
 	while(rs.next()) {
 	    Location locationToAdd = new Location(rs.getInt("id"),
 						  rs.getString("name"),
