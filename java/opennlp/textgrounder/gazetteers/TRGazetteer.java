@@ -113,14 +113,19 @@ public class TRGazetteer extends Gazetteer {
 	    }
 
 	    int popToInsert = rs.getInt("EstimatedPopulation");
-	    if(popToInsert != 0)
+	    if(popToInsert != 0) {
 		prep.setDouble(6, popToInsert);
+		//System.out.println(popToInsert);
+	    }
 	    
 	    prep.addBatch();
 
+	    /*if(nameToInsert.equals("texas") || nameToInsert.equals("california"))
+	      System.out.println(nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + "), " + popToInsert);*/
+
 	    if(placeId % 50000 == 0) {
 		System.out.println("  Added " + placeId + " places...");// gazetteer has " + populations.size() + " entries so far.");
-		System.out.println("    Last added: " + nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + ")");
+		System.out.println("    Last added: " + nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + "), " + popToInsert);
 	    }
 
 	    placeId++;
@@ -166,14 +171,20 @@ public class TRGazetteer extends Gazetteer {
 	    }
 
 	    int popToInsert = rs.getInt("DIM"); // note: DIM holds population for type P and elevation for all others
-	    if(popToInsert == 0 && rawType != null && rawType.equals("P"))
+	    if(popToInsert != 0 && rawType != null && rawType.equals("P")) {
 		prep.setInt(6, popToInsert);
+		//System.out.println(popToInsert);
+	    }
 	    // could use ADM2 for container, but those are counties, not countries, so probably a bad idea. leaving container field blank for now
 	    prep.addBatch();
 
+
+	    /*if(nameToInsert.equals("texas") || nameToInsert.equals("california"))
+	      System.out.println(nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + "), " + popToInsert);*/
+
 	    if(placeId % 100000 == 0) {
 	    	System.out.println("  Added " + placeId + " places...");// gazetteer has " + populations.size() + " entries so far.");
-		System.out.println("    Last added: " + nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + ")");
+		System.out.println("    Last added: " + nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + "), " + popToInsert);
 	    }
 	    //if(placeId == 1000)//////////////////
 	    //  System.exit(0);//////////////////

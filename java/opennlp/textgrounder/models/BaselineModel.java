@@ -246,25 +246,35 @@ public class BaselineModel extends Model {
         int maxRegionPop = -1;
         Location maxRegion = null;
 
-        // establish the biggest region by this name:
-        for (Location loc : possibleLocations) {
-            if (!loc.type.equals("locality")) {
-                if (loc.pop > maxRegionPop) {
-                    maxRegion = loc;
-                    maxRegionPop = loc.pop;
-                }
-            }
-        }
+	if(gazetteer instanceof WGGazetteer) {
+	    // establish the biggest region by this name:
+	    for (Location loc : possibleLocations) {
+		if (!loc.type.equals("locality")) {
+		    if (loc.pop > maxRegionPop) {
+			maxRegion = loc;
+			maxRegionPop = loc.pop;
+		    }
+		}
+	    }
 
-        // do the disambiguation:
-        for (Location loc : possibleLocations) {
-            if (loc.type.equals("locality")) {
-                if (loc.pop > maxPointPop && (maxRegion == null || loc.pop > maxRegionPop || (loc.container != null && loc.container.equals(maxRegion.name)))) {
-                    pointToReturn = loc;
-                    maxPointPop = loc.pop;
-                }
-            }
-        }
+	    // do the disambiguation:
+	    for (Location loc : possibleLocations) {
+		if (loc.type.equals("locality")) {
+		    if (loc.pop > maxPointPop && (maxRegion == null || loc.pop > maxRegionPop || (loc.container != null && loc.container.equals(maxRegion.name)))) {
+			pointToReturn = loc;
+			maxPointPop = loc.pop;
+		    }
+		}
+	    }
+	}
+	else { // just return the most populous Location:
+	    for(Location loc : possibleLocations) {
+		if(loc.pop > maxPointPop) {
+		    pointToReturn = loc;
+		    maxPointPop = loc.pop;
+		}
+	    }
+	}
 
         return pointToReturn;
     }
