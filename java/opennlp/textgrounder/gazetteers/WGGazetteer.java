@@ -157,8 +157,8 @@ public class WGGazetteer extends Gazetteer {
 
 
 	    // old disambiguation method; as of now still used just to keep a hashtable of places for quick lookup of whether the database has at least 1 mention of the place:
-	    if(placeType.equals("locality"))
-		put(placeName, new Coordinate(0.0, 0.0));
+	    if(placeType.equals("locality"))//////////////////////////
+	      put(placeName, new Coordinate(0.0, 0.0));
 
 	    /*int storedPop = populations.get(placeName);
 	    if(storedPop == 0) { // 0 is not-found sentinal for TObjectIntHashMap

@@ -305,7 +305,7 @@ public abstract class Model {
             for (int j = 0; j < loc.backPointers.size(); j++) {
                 int index = loc.backPointers.get(j);
                 String context = tokenArrayBuffer.getContextAround(index, windowSize, true);
-                Coordinate spiralPoint = coord.getNthSpiralPoint(j, 0.1);
+                Coordinate spiralPoint = coord.getNthSpiralPoint(j, 0.13);
 
                 contextOut.write("\t\t\t<Placemark>\n"
                       + "\t\t\t\t<name>" + placename + " #" + (j + 1) + "</name>\n"

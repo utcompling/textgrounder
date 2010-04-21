@@ -35,7 +35,7 @@ public class Coordinate {
 	
 	double radius = initRadius + (initRadius * .1) * n;
 
-	double angle = radianUnit/2 + n * radianUnit;
+	double angle = radianUnit/2 + 1.1 * radianUnit * n;
 
 	return new Coordinate(this.longitude + radius * Math.sin(angle), this.latitude + radius * Math.cos(angle));
     }
