@@ -48,6 +48,14 @@ for file in files:
         raw_writer = open(output_raw_dir+"/"+newname,"w")
         file_reader = open(directory_name+"/"+file)
         text = ""
+
+        header_end = False
+        while not header_end:
+            line = file_reader.readline()
+            m = re.search('\s*\]>', line)
+            if m:
+                header_end = True
+
         for line in file_reader.readlines():
             text = line.strip()
             text = strip_text(text).strip()
