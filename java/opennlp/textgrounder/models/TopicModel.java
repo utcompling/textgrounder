@@ -83,7 +83,7 @@ public class TopicModel extends Model {
      */
     protected int T;
     /**
-     * Number of word types
+     * Number of non-stopword word types. Equivalent to <p>fW-sW</p>.
      */
     protected int W;
     /**
@@ -147,6 +147,7 @@ public class TopicModel extends Model {
         StopwordList stopwordList = new StopwordList();
         sW = stopwordList.size();
         processPath(new File(inputPath), textProcessor, tokenArrayBuffer, stopwordList);
+        tokenArrayBuffer.convertToPrimitiveArrays();
         allocateFields();
     }
 

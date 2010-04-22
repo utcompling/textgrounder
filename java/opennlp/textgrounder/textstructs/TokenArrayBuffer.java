@@ -186,13 +186,6 @@ public class TokenArrayBuffer {
     }
 
     /**
-     * @param lexicon the lexicon to set
-     */
-    public void setDocSet(Lexicon lexicon) {
-        this.lexicon = lexicon;
-    }
-
-    /**
      * @return the number of documents in the training data. Need to add one
      * to the output since document counting starts at 0.
      */

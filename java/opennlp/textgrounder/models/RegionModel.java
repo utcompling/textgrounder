@@ -82,16 +82,17 @@ public class RegionModel extends TopicModel {
     protected void initialize(CommandLineOptions options) {
 
         initializeFromOptions(options);
-        tokenArrayBuffer = new TokenArrayBuffer(null);
         BaselineModel baselineModel = null;
 
         try {
             baselineModel = new BaselineModel(options);
+            tokenArrayBuffer = new TokenArrayBuffer(baselineModel.lexicon);
             StopwordList stopwordList = new StopwordList();
             sW = stopwordList.size();
             baselineModel.processPath(baselineModel.getInputFile(),
                   baselineModel.getTextProcessor(), tokenArrayBuffer,
                   stopwordList);
+            tokenArrayBuffer.convertToPrimitiveArrays();
         } catch (Exception ex) {
             ex.printStackTrace();
             System.exit(1);
@@ -103,7 +104,6 @@ public class RegionModel extends TopicModel {
         this.gazCache = baselineModel.gazCache;
         this.textProcessor = baselineModel.textProcessor;
         this.lexicon = baselineModel.lexicon;
-        tokenArrayBuffer.setDocSet(this.lexicon);
 
         locationSet = new HashSet<Location>();
 
@@ -151,6 +151,8 @@ public class RegionModel extends TopicModel {
         System.err.println();
         System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
         int curDoc = 0, prevDoc = -1;
+
+        HashSet<Integer> toponymsNotInGazetteer = new HashSet<Integer>();
         for (int i = 0; i < N; i++) {
             curDoc = documentVector[i];
             if (curDoc != prevDoc) {
@@ -181,6 +183,8 @@ public class RegionModel extends TopicModel {
                     baselineModel.addLocationsToRegionArray(possibleLocations, regionMapperCallback);
                     regionMapperCallback.addAll(placename, lexicon);
                     locationSet.addAll(possibleLocations);
+                } else {
+                    toponymsNotInGazetteer.add(wordVector[i]);
                 }
             }
         }
@@ -209,6 +213,13 @@ public class RegionModel extends TopicModel {
             int wordoff = lexicon.getIntForWord(placename) * T;
             for (int j : nameToRegionIndex.get(placename)) {
                 regionByToponym[wordoff + j] = 1;
+            }
+        }
+
+        for (int topid : toponymsNotInGazetteer) {
+            int topoff = topid * T;
+            for (int i = 0; i < T; ++i) {
+                regionByToponym[topoff + i] = 1;
             }
         }
     }
@@ -363,6 +374,9 @@ public class RegionModel extends TopicModel {
         int wordid, topicid;
         int istoponym, isstopword;
 
+        int newlocid = 708167195;
+        int curlocid = newlocid + 1;
+
         for (int i = 0; i < N; ++i) {
             isstopword = stopwordVector[i];
             if (isstopword == 0) {
@@ -376,8 +390,20 @@ public class RegionModel extends TopicModel {
                         for (Location loc : locs) {
                             Location tloc = locationIdToLocation.get(loc.id);
                             tloc.backPointers.add(i);
+                            if (tloc.id > newlocid)
+                                tloc.count += 1;
                         }
                     } catch (NullPointerException e) {
+                        locs = new HashSet<Location>();
+                        Region r = regionMapperCallback.getRegionMap().get(topicid);
+                        Coordinate coord = new Coordinate(r.centLon, r.centLat);
+                        Location loc = new Location(curlocid, lexicon.getWordForInt(wordid), null, coord, 0, null, 1);
+                        loc.backPointers = new ArrayList<Integer>();
+                        loc.backPointers.add(i);
+                        locs.add(loc);
+                        locationIdToLocation.put(loc.id, loc);
+                        toponymRegionToLocations.put(trp, locs);
+                        curlocid += 1;
                     }
                 }
             }
@@ -388,7 +414,6 @@ public class RegionModel extends TopicModel {
             if (loc.backPointers.size() != 0) {
                 locations.add(loc);
             }
-//            locations = new ArrayList<Location>(locationIdToLocation.values());
         }
     }
 

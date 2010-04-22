@@ -153,7 +153,6 @@ public class TextProcessor {
         System.err.println();
 
         assert (tokenArrayBuffer.toponymArrayList.size() == tokenArrayBuffer.wordArrayList.size());
-        tokenArrayBuffer.convertToPrimitiveArrays();        
     }
 
     /**

@@ -286,6 +286,7 @@ public class BaselineModel extends Model {
     public void processPath() throws Exception {
         tokenArrayBuffer = new TokenArrayBuffer(lexicon);
         processPath(inputFile, textProcessor, tokenArrayBuffer, new NullStopwordList());
+        tokenArrayBuffer.convertToPrimitiveArrays();
     }
 
     /**
