@@ -164,13 +164,22 @@ public class TokenArrayBuffer {
      * arrays.
      */
     public void convertToPrimitiveArrays() {
+        System.err.println("Converting arrays");
+        System.err.println("Allocating word vector");
         wordVector = new int[size];
+        System.err.println("Copying word vector");
         copyToArray(wordVector, wordArrayList);
+        System.err.println("Allocating document vector");
         documentVector = new int[size];
+        System.err.println("Copying document vector");
         copyToArray(documentVector, documentArrayList);
+        System.err.println("Allocating toponym vector");
         toponymVector = new int[size];
+        System.err.println("Copying toponym vector");
         copyToArray(toponymVector, toponymArrayList);
+        System.err.println("Allocating stopword vector");
         stopwordVector = new int[size];
+        System.err.println("Copying stopword vector");
         copyToArray(stopwordVector, stopwordArrayList);
 
         wordArrayList = documentArrayList = toponymArrayList = stopwordArrayList = null;
