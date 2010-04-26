@@ -1,9 +1,9 @@
 package opennlp.textgrounder.models;
 
-import opennlp.textgrounder.textstructs.StopwordList;
+/*import opennlp.textgrounder.textstructs.StopwordList;
 import opennlp.textgrounder.textstructs.NullStopwordList;
 import opennlp.textgrounder.textstructs.TokenArrayBuffer;
-import opennlp.textgrounder.textstructs.TextProcessor;
+import opennlp.textgrounder.textstructs.TextProcessor;*/
 import gnu.trove.TIntIntHashMap;
 
 import java.io.File;
@@ -27,18 +27,20 @@ import opennlp.textgrounder.topostructs.*;
  */
 public class BaselineModel extends Model {
 
-    protected File inputFile;
-    protected boolean initializedXMLFile = false;
-    protected boolean finalizedXMLFile = false;
+    //protected File inputFile;
+    //protected boolean initializedXMLFile = false;
+    //protected boolean finalizedXMLFile = false;
 
     public BaselineModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
-        barScale = bscale;
+	super(gaz, bscale, paragraphsAsDocs);
+        /*barScale = bscale;
         gazetteer = gaz;
-        lexicon = new Lexicon();
+        lexicon = new Lexicon();*/
     }
 
     public BaselineModel(CommandLineOptions options) throws Exception {
-
+	super(options);
+	/*
         runWholeGazetteer = options.getRunWholeGazetteer();
 
         if (!runWholeGazetteer) {
@@ -85,8 +87,11 @@ public class BaselineModel extends Model {
         barScale = options.getBarScale();
 
         windowSize = options.getWindowSize();
+
+	*/
     }
 
+    /*
     public void initializeRegionArray() {
         activeRegions = 0;
 
@@ -128,7 +133,7 @@ public class BaselineModel extends Model {
         addLocationsToRegionArray(locations);
         //locations = null; //////////////// uncomment this to get a null pointer but much faster termination
         //                                   if you only want to know the number of active regions :)
-    }
+    }*/
 
     public List<Location> disambiguateAndCountPlacenames() throws Exception {
 
@@ -279,7 +284,7 @@ public class BaselineModel extends Model {
         return pointToReturn;
     }
 
-    public void writeXMLFile(String inputFilename) throws Exception {
+    /*public void writeXMLFile(String inputFilename) throws Exception {
         writeXMLFile(inputFilename, kmlOutputFilename, locations);
     }
 
@@ -287,28 +292,28 @@ public class BaselineModel extends Model {
         tokenArrayBuffer = new TokenArrayBuffer(lexicon);
         processPath(inputFile, textProcessor, tokenArrayBuffer, new NullStopwordList());
         tokenArrayBuffer.convertToPrimitiveArrays();
-    }
+	}*/
 
     /**
      * @return the kmlOutputFilename
      */
-    public String getOutputFilename() {
-        return kmlOutputFilename;
-    }
+    //public String getOutputFilename() {
+    //    return kmlOutputFilename;
+    //}
 
     /**
      * @return the inputFile
      */
-    public File getInputFile() {
-        return inputFile;
-    }
+    //public File getInputFile() {
+    //   return inputFile;
+    //}
 
     /**
      * @return the textProcessor
      */
-    public TextProcessor getTextProcessor() {
-        return textProcessor;
-    }
+    //public TextProcessor getTextProcessor() {
+    //    return textProcessor;
+    // }
 
     @Override
     public void train() {

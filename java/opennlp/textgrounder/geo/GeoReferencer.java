@@ -2,7 +2,7 @@ package opennlp.textgrounder.geo;
 
 import org.apache.commons.cli.*;
 
-import opennlp.textgrounder.models.BaselineModel;
+import opennlp.textgrounder.models.*;
 
 public class GeoReferencer extends BaseApp {
 
@@ -22,7 +22,20 @@ public class GeoReferencer extends BaseApp {
         }
 
         CommandLineOptions modelOptions = new CommandLineOptions(cline);
-        BaselineModel grefUS = new BaselineModel(modelOptions);
+
+	Model grefUS = null;
+	if(modelOptions.model.toLowerCase().startsWith("p")) {
+	    System.out.println("Using POPULATION baseline model.");
+	    grefUS = new BaselineModel(modelOptions);
+	}
+	else if(modelOptions.model.toLowerCase().startsWith("r")) {
+	    System.out.println("Using RANDOM baseline model.");
+	    grefUS = new RandomBaselineModel(modelOptions);
+	}
+	else {
+	    System.err.println("Invalid model type: " + modelOptions.model);
+	    System.exit(0);
+	}
 
         //System.out.println(grefUS.getInputFile().getCanonicalPath());
         grefUS.train();

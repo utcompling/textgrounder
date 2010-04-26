@@ -12,6 +12,7 @@ import java.util.Hashtable;
 import java.util.List;
 
 import opennlp.textgrounder.gazetteers.*;
+import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.textstructs.*;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.ners.*;
@@ -85,10 +86,114 @@ public abstract class Model {
     /**
      * Flag that tells system to ignore the input file(s) and instead run on every locality in the gazetteer
      */
+
+    protected File inputFile;
     protected boolean runWholeGazetteer = false;
     protected int windowSize;
     protected TokenArrayBuffer tokenArrayBuffer;
     //protected int indexInTAB = 0;
+
+    public Model() {
+    }
+
+    public Model(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
+        barScale = bscale;
+        gazetteer = gaz;
+        lexicon = new Lexicon();
+    }
+
+    public Model(CommandLineOptions options) throws Exception {
+
+	runWholeGazetteer = options.getRunWholeGazetteer();
+
+        if (!runWholeGazetteer) {
+            inputPath = options.getTrainInputPath();
+            if (inputPath == null) {
+                System.out.println("Error: You must specify an input filename with the -i flag.");
+                System.exit(0);
+            }
+            inputFile = new File(inputPath);
+        } else {
+            inputPath = null;
+            inputFile = null;
+        }
+
+        String gazTypeArg = options.getGazetteType().toLowerCase();
+        if (gazTypeArg.startsWith("c")) {
+            gazetteer = new CensusGazetteer();
+        } else if (gazTypeArg.startsWith("n")) {
+            gazetteer = new NGAGazetteer();
+        } else if (gazTypeArg.startsWith("u")) {
+            gazetteer = new USGSGazetteer();
+        } else if (gazTypeArg.startsWith("w")) {
+            gazetteer = new WGGazetteer();
+        } else if (gazTypeArg.startsWith("t")) {
+            gazetteer = new TRGazetteer();
+        } else {
+            System.err.println("Error: unrecognized gazetteer type: " + gazTypeArg);
+            System.err.println("Please enter w, c, u, g, or t.");
+            System.exit(0);
+            //myGaz = new WGGazetteer();
+        }
+
+        kmlOutputFilename = options.getKMLOutputFilename();
+        degreesPerRegion = options.getDegreesPerRegion();
+
+        if (!runWholeGazetteer) {
+            gazCache = new Hashtable<String, List<Location>>();
+            paragraphsAsDocs = options.getParagraphsAsDocs();
+            lexicon = new Lexicon();
+
+            textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
+        }
+
+        barScale = options.getBarScale();
+
+        windowSize = options.getWindowSize();
+    }
+
+    public void initializeRegionArray() {
+        activeRegions = 0;
+
+        regionArrayWidth = 360 / (int) degreesPerRegion;
+        regionArrayHeight = 180 / (int) degreesPerRegion;
+
+        regionArray = new Region[regionArrayWidth][regionArrayHeight];
+        for (int w = 0; w < regionArrayWidth; w++) {
+            for (int h = 0; h < regionArrayHeight; h++) {
+                regionArray[w][h] = null;
+            }
+        }
+    }
+
+    public void printRegionArray() {
+        System.out.println();
+
+        for (int h = 0; h < regionArrayHeight; h++) {
+            for (int w = 0; w < regionArrayWidth; w++) {
+                if (regionArray[w][h] == null) {
+                    System.out.print("0");
+                } else {
+                    System.out.print("1");
+                }
+            }
+            System.out.println();
+        }
+
+        System.out.println(activeRegions + " active regions for this document out of a possible "
+              + (regionArrayHeight * regionArrayWidth) + " (region size = "
+              + degreesPerRegion + " x " + degreesPerRegion + " degrees).");
+    }
+
+    public void activateRegionsForWholeGaz() throws Exception {
+        System.out.println("Running whole gazetteer through system...");
+
+        //locations = new ArrayList<Location>();
+        locations = gazetteer.getAllLocalities();
+        addLocationsToRegionArray(locations);
+        //locations = null; //////////////// uncomment this to get a null pointer but much faster termination
+        //                                   if you only want to know the number of active regions :)
+    }
 
     /**
      * Remove punctuation from first and last characters of a string
@@ -150,6 +255,16 @@ public abstract class Model {
             }
             regionMapper.addToPlace(loc, regionArray[curX][curY]);
         }
+    }
+
+    public void writeXMLFile(String inputFilename) throws Exception {
+        writeXMLFile(inputFilename, kmlOutputFilename, locations);
+    }
+
+    public void processPath() throws Exception {
+        tokenArrayBuffer = new TokenArrayBuffer(lexicon);
+        processPath(inputFile, textProcessor, tokenArrayBuffer, new NullStopwordList());
+        tokenArrayBuffer.convertToPrimitiveArrays();
     }
 
     public void processPath(File myPath, TextProcessor textProcessor,
@@ -344,4 +459,25 @@ public abstract class Model {
      * Train model. For access from main routines.
      */
     public abstract void train();
+
+    /**
+     * @return the kmlOutputFilename
+     */
+    public String getOutputFilename() {
+        return kmlOutputFilename;
+    }
+
+    /**
+     * @return the inputFile
+     */
+    public File getInputFile() {
+        return inputFile;
+    }
+
+    /**
+     * @return the textProcessor
+     */
+    public TextProcessor getTextProcessor() {
+        return textProcessor;
+    }
 }

@@ -43,7 +43,7 @@ public class BaseApp {
         options.addOption("ie", "test-input", true, "input file or directory name for test data");
         options.addOption("ks", "samples", true, "number of samples to take (default=100)");
         options.addOption("kl", "lag", true, "number of iterations between samples (default=100)");
-        options.addOption("m", "model", true, "model [default = PopBaseline]"); // nothing is done with this yet
+        options.addOption("m", "model", true, "model (PopBaseline or RandomBaseline) [default = PopBaseline]");
         options.addOption("o", "output", true, "output filename [default = 'output.kml']");
         options.addOption("ot", "output-tabulated-probabilities", true, "path of tabulated probability output");
         options.addOption("p", "paragraphs-as-docs", true, "number of paragraphs to treat as a document. Set the argument to 0 if documents should be treated whole");
