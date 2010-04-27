@@ -31,7 +31,7 @@ public class Coordinate {
 	if(n == 0)
 	  return this;
 	
-	final double radianUnit = twoPI/10;
+	final double radianUnit = twoPI/20;//10
 	
 	double radius = initRadius + (initRadius * .1) * n;
 
