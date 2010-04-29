@@ -155,8 +155,9 @@ public class RandomBaselineModel extends Model {
         return locations;
     }
 
+    // return a random Location
     protected Location randomDisambiguate(List<Location> possibleLocations) throws Exception {
-
+	
 	int size = possibleLocations.size();
 
 	if(size == 0)
