@@ -15,6 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import opennlp.textgrounder.textstructs.StopwordList;
 import opennlp.textgrounder.textstructs.TokenArrayBuffer;
 import java.util.ArrayList;
@@ -28,6 +31,7 @@ import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.Constants;
+import opennlp.textgrounder.util.KMLUtil;
 
 /**
  * Topic model with region awareness. Toponyms are all unigrams. Multiword
@@ -388,8 +392,9 @@ public class RegionModel extends TopicModel {
                         for (Location loc : locs) {
                             Location tloc = locationIdToLocation.get(loc.id);
                             tloc.backPointers.add(i);
-                            if (tloc.id > newlocid)
+                            if (tloc.id > newlocid) {
                                 tloc.count += 1;
+                            }
                         }
                     } catch (NullPointerException e) {
                         locs = new HashSet<Location>();
@@ -413,6 +418,102 @@ public class RegionModel extends TopicModel {
                 locations.add(loc);
             }
         }
+    }
+
+    /**
+     * Print the normalized sample counts to tabularOutput. Print only the top {@link
+     * #outputPerClass} per given topic.
+     *
+     * @throws IOException
+     */
+    @Override
+    public void printTabulatedProbabilities() throws
+          IOException {
+        super.printTabulatedProbabilities();
+        writeRegionWordDistributionXMLFile(inputPath, tabularOutputFilename);
+    }
+
+    /**
+     * Print the normalized sample counts for each topic to out. Print only the top {@link
+     * #outputPerTopic} per given topic.
+     *
+     * @param out
+     * @throws IOException
+     */
+    @Override
+    protected void printTopics(BufferedWriter out) throws IOException {
+        int startt = 0, M = 4, endt = Math.min(M + startt, topicProbs.length);
+        out.write("***** Word Probabilities by Topic *****\n\n");
+
+        Map<Integer, Region> regionMap = regionMapperCallback.getRegionMap();
+
+        while (startt < T) {
+            for (int i = startt; i < endt; ++i) {
+
+                double lat = regionMap.get(i).centLat;
+                double lon = regionMap.get(i).centLon;
+
+                String header = "T_" + i;
+                header = String.format("%25s\t%6.5f\t", String.format("%s (%.0f,%.0f)", header, lat, lon), topicProbs[i]);
+                out.write(header);
+            }
+
+            out.newLine();
+            out.newLine();
+
+            for (int i = 0; i < outputPerClass; ++i) {
+                for (int c = startt; c < endt; ++c) {
+                    String line = String.format("%25s\t%6.5f\t",
+                          topWordsPerTopic[c][i].stringValue,
+                          topWordsPerTopic[c][i].doubleValue);
+                    out.write(line);
+                }
+                out.newLine();
+            }
+            out.newLine();
+            out.newLine();
+
+            startt = endt;
+            endt = java.lang.Math.min(T, startt + M);
+        }
+    }
+
+    /**
+     * Output word distributions over regions to Google Earth kml file.
+     *
+     * @param inputFilename
+     * @param outputFilename
+     * @throws IOException
+     */
+    public void writeRegionWordDistributionXMLFile(String inputFilename,
+          String outputFilename) throws IOException {
+
+        BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename + ".kml"));
+
+        out.write(KMLUtil.genKMLHeader(inputFilename));
+        Map<Integer, Region> regionMap = regionMapperCallback.getRegionMap();
+
+        double radius = .01;
+
+        for (int i = 0; i < T; ++i) {
+            double lat = regionMap.get(i).centLat;
+            double lon = regionMap.get(i).centLon;
+            Coordinate center = new Coordinate(lon, lat);
+
+            for (int j = 0; j < outputPerClass; ++j) {
+
+                Coordinate spiralPoint = center.getNthSpiralPoint(j, 0.03);
+
+                String word = topWordsPerTopic[i][j].stringValue;
+                double height = topWordsPerTopic[i][j].doubleValue * barScale * 20;
+                String kmlPolygon = spiralPoint.toKMLPolygon(10, radius, height);
+                out.write(KMLUtil.genPolygon(word, spiralPoint, radius, kmlPolygon));
+                out.write(KMLUtil.genFloatingPlacemark(word, spiralPoint, height));
+            }
+        }
+
+        out.write("\t\t</Folder>\n\t</Document>\n</kml>");
+        out.close();
     }
 
     /**

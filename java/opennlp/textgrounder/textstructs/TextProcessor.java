@@ -143,7 +143,7 @@ public class TextProcessor {
             if (curLine == null || curLine.equals("")) {
                 break;
             }
-            buf.append(curLine);
+            buf.append(curLine.replaceAll("<", "&lt;"));
             buf.append(" ");
 
             if (counter < parAsDocSize) {

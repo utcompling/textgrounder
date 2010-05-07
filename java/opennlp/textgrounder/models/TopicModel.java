@@ -120,7 +120,11 @@ public class TopicModel extends Model {
     /**
      * Output buffer to write normalized, tabulated data to.
      */
-    protected BufferedWriter tabulatedOutput;
+    protected BufferedWriter tabularOutput;
+    /**
+     * Name of output buffer to write normalized, tabulated data to
+     */
+    protected String tabularOutputFilename;
 
     /**
      * This is not the default constructor. It should only be called by
@@ -216,7 +220,8 @@ public class TopicModel extends Model {
         paragraphsAsDocs = options.getParagraphsAsDocs();
         outputPerClass = options.getOutputPerClass();
         inputPath = options.getTrainInputPath();
-        tabulatedOutput = options.getTabulatedOutput();
+        tabularOutput = options.getTabulatedOutput();
+        tabularOutputFilename = options.getTabularOutputFilename();
     }
 
     /**
@@ -308,6 +313,8 @@ public class TopicModel extends Model {
             topWordsPerTopic[i] = new StringDoublePair[outputPerClass];
         }
 
+        topicProbs = new double[T];
+        
         Double sum = 0.;
         for (int i = 0; i < T; ++i) {
             sum += topicProbs[i] = topicCounts[i] + betaW;
@@ -331,14 +338,14 @@ public class TopicModel extends Model {
     }
 
     /**
-     * Print the normalized sample counts to tabulatedOutput. Print only the top {@link
+     * Print the normalized sample counts to tabularOutput. Print only the top {@link
      * #outputPerClass} per given topic.
      *
      * @throws IOException
      */
     public void printTabulatedProbabilities() throws
           IOException {
-        printTopics(tabulatedOutput);
+        printTopics(tabularOutput);
     }
 
     /**
