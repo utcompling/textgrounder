@@ -102,6 +102,11 @@ public abstract class Model {
      * Flag that tells system to ignore the input file(s) and instead run on every locality in the gazetteer
      */
 
+    /**
+     * Evaluation directory; null if no evaluation is to be done.
+     */
+    protected String evalDir = null;
+
     protected File inputFile;
     protected boolean runWholeGazetteer = false;
     protected int windowSize;
@@ -120,18 +125,26 @@ public abstract class Model {
     public Model(CommandLineOptions options) throws Exception {
 
 	runWholeGazetteer = options.getRunWholeGazetteer();
+	evalDir = options.getEvalDir();
 
-        if (!runWholeGazetteer) {
+        if (!runWholeGazetteer && evalDir == null) {
             inputPath = options.getTrainInputPath();
             if (inputPath == null) {
                 System.out.println("Error: You must specify an input filename with the -i flag.");
                 System.exit(0);
             }
             inputFile = new File(inputPath);
-        } else {
+        } else if (runWholeGazetteer) {
             inputPath = null;
             inputFile = null;
-        }
+        } else if (evalDir != null) {
+	    //System.out.println(evalDir);
+	    //System.exit(0);
+	    inputPath = evalDir;
+	    inputFile = new File(inputPath);
+	    assert(inputFile.isDirectory());
+	    //System.exit(0);
+	}
 
         String gazTypeArg = options.getGazetteType().toLowerCase();
         if (gazTypeArg.startsWith("c")) {
@@ -159,7 +172,10 @@ public abstract class Model {
             paragraphsAsDocs = options.getParagraphsAsDocs();
             lexicon = new Lexicon();
 
-            textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
+	    if(evalDir == null)
+		textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
+	    else
+		textProcessor = new TextProcessor(lexicon, paragraphsAsDocs, true);
         }
 
         barScale = options.getBarScale();
@@ -284,13 +300,18 @@ public abstract class Model {
 
     public void processPath(File myPath, TextProcessor textProcessor,
           TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws IOException {
-        if (myPath.isDirectory()) {
-            for (String pathname : myPath.list()) {
-                processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer, stopwordList);
-            }
-        } else {
-            textProcessor.addToponymsFromFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
-        }
+	if (myPath.isDirectory()) {
+	    for (String pathname : myPath.list()) {
+		processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer, stopwordList);
+	    }
+	} else {
+	    if(evalDir == null) {
+		textProcessor.addToponymsFromFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
+	    }
+	    else {
+		textProcessor.addToponymsFromGoldFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
+	    }
+	}
     }
 
     /**
@@ -469,6 +490,60 @@ public abstract class Model {
 
         out.close();
         contextOut.close();
+    }
+
+    public void evaluate() {
+
+	if(tokenArrayBuffer.modelLocationArrayList.size() != tokenArrayBuffer.goldLocationArrayList.size()) {
+	    System.out.println("MISMATCH: model: " + tokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + tokenArrayBuffer.goldLocationArrayList.size());
+	    System.out.println(tokenArrayBuffer.wordVector.length);
+	    System.out.println(tokenArrayBuffer.size());
+	    System.exit(0);
+	}
+
+	//int numTrue = 0;
+	int tp = 0;
+	int fp = 0;
+	int fn = 0;
+
+	for(int i = 0; i < tokenArrayBuffer.size(); i++) {
+	    Location curModelLoc = tokenArrayBuffer.modelLocationArrayList.get(i);
+	    Location curGoldLoc = tokenArrayBuffer.goldLocationArrayList.get(i);
+	    if(curGoldLoc != null) {
+		if(curModelLoc != null) {
+		    if(curGoldLoc.looselyMatches(curModelLoc, 1.0)) {
+			tp++;
+		    }
+		    else {
+			fp++;
+			fn++;
+		    }
+		}
+		else {
+		    fn++;
+		}
+	    }
+	    else {
+		if(curModelLoc != null) {
+		    fp++;
+		}
+		else {
+		    //tn++;
+		}
+	    }
+	}
+
+	double precision = (double)tp/(tp+fp);
+	double recall = (double)tp/(tp+fn);
+	double f1 = 2 * ((precision * recall) / (precision + recall));
+
+	System.out.println("TP: " + tp);
+	System.out.println("FP: " + fp);
+	System.out.println("FN: " + fn);
+	System.out.println();
+	System.out.println("Precision: " + precision);
+	System.out.println("Recall: " + recall);
+	System.out.println("F-score: " + f1);
     }
 
     /**

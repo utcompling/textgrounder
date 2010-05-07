@@ -66,6 +66,7 @@ public class RandomBaselineModel extends Model {
 
             for (int i = 0; i < curDocSpans.size(); i++) {//int topidx : curDocSpans) {*/
             if (tokenArrayBuffer.toponymVector[i] == 0) {
+		tokenArrayBuffer.modelLocationArrayList.add(null);
                 continue;
             }
             int topidx = tokenArrayBuffer.wordVector[i];
@@ -79,6 +80,7 @@ public class RandomBaselineModel extends Model {
 
             if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
             {
+		tokenArrayBuffer.modelLocationArrayList.add(null);
                 continue;
             }
 
@@ -95,6 +97,7 @@ public class RandomBaselineModel extends Model {
             }
 
             Location curLocation = randomDisambiguate(possibleLocations);
+	    tokenArrayBuffer.modelLocationArrayList.add(curLocation);
             if (curLocation == null) {
                 continue;
             }

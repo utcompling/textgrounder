@@ -136,6 +136,11 @@ public class CommandLineOptions {
     protected boolean runWholeGazetteer = false;
 
     /**
+     * Evaluation directory; null if no evaluation is to be done.
+     */
+    protected String evalDir = null;
+
+    /**
      *
      * @param cline
      * @throws IOException
@@ -160,7 +165,11 @@ public class CommandLineOptions {
                     degreesPerRegion = Double.parseDouble(value);
                     break;
                 case 'e':
-                    iterations = Integer.parseInt(value);
+		    opt = option.getOpt();
+		    if(opt.equals("e"))
+			iterations = Integer.parseInt(value);
+		    else if(opt.equals("ev"))
+			evalDir = value;
                     break;
                 case 'g':
                     gazetteType = value;
@@ -312,6 +321,10 @@ public class CommandLineOptions {
 
     public boolean getRunWholeGazetteer() {
 	return runWholeGazetteer;
+    }
+
+    public String getEvalDir() {
+	return evalDir;
     }
 
     public int getWindowSize() {

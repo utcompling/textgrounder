@@ -38,6 +38,10 @@ public class GeoReferencer extends BaseApp {
 
         CommandLineOptions modelOptions = new CommandLineOptions(cline);
 
+	if(modelOptions.getEvalDir() != null) {
+	    System.out.println("Performing EVALUATION on " + modelOptions.getEvalDir());
+	}
+
 	Model grefUS = null;
 	if(modelOptions.model.toLowerCase().startsWith("p")) {
 	    System.out.println("Using POPULATION baseline model.");
@@ -58,5 +62,9 @@ public class GeoReferencer extends BaseApp {
 
         System.out.println("Writing KML file " + grefUS.getOutputFilename() + " ...");
         grefUS.writeXMLFile();
+
+	if(modelOptions.getEvalDir() != null) {
+	    grefUS.evaluate();
+	}
     }
 }

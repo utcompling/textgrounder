@@ -26,6 +26,10 @@ public class Coordinate {
 	latitude = lat;
     }
 
+    public boolean looselyMatches(Coordinate other, double maxDiff) {
+	return Math.abs(this.longitude - other.longitude) <= maxDiff && Math.abs(this.latitude - other.latitude) <= maxDiff;
+    }
+
     public String toKMLPolygon(int sides, double radius, double height) {
 	final double radianUnit = twoPI/sides;
 	final double startRadian = radianUnit/2;

@@ -48,6 +48,14 @@ public class Location {
         this.count = count;
     }
 
+    public boolean looselyMatches(Location other, double maxDiff) {
+	/*if(!this.name.equals(other.name)) {
+	    System.out.println(this.name);
+	    System.out.println(other.name);
+	    }*/
+	return this.name.equals(other.name) && this.coord.looselyMatches(other.coord, maxDiff);
+    }
+
     /*    public Location(int id, String name, String type, double lon, double lat, int pop, String container, int count) {
     Location(id, name, type, new Coordinate(lon, lat), pop, container, count);
     }*/

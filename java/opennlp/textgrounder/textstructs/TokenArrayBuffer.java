@@ -18,6 +18,8 @@ package opennlp.textgrounder.textstructs;
 import java.util.ArrayList;
 import java.util.List;
 
+import opennlp.textgrounder.topostructs.Location;
+
 /**
  * Class of integer sequences that indicate words in a stream of space
  * delimited tokens. The lengths of all sequences in this class are identical.
@@ -54,6 +56,19 @@ public class TokenArrayBuffer {
      * stopword, the element is one, zero otherwise.
      */
     public ArrayList<Integer> stopwordArrayList;
+
+    /**
+     * Stores the system/model's best guesses for the disambiguated Location for each
+     * toponym. Null for non-toponym indices.
+     */
+    public ArrayList<Location> modelLocationArrayList;
+
+    /**
+     * Stores the gold standard location information when running in evaluation mode.
+     * Indices corresponding to non-toponyms are null.
+     */
+    public ArrayList<Location> goldLocationArrayList;
+
     /**
      * Populated with the same elements as wordArrayList. Once input has been
      * populated in input stage with wordArrayList, the arraylist is converted
@@ -102,6 +117,8 @@ public class TokenArrayBuffer {
         documentArrayList = new ArrayList<Integer>();
         toponymArrayList = new ArrayList<Integer>();
         stopwordArrayList = new ArrayList<Integer>();
+	modelLocationArrayList = new ArrayList<Location>();
+	goldLocationArrayList = new ArrayList<Location>();
         size = 0;
 
         this.lexicon = lexicon;
@@ -180,7 +197,13 @@ public class TokenArrayBuffer {
         System.err.println("Copying stopword vector");
         copyToArray(stopwordVector, stopwordArrayList);
 
-        wordArrayList = documentArrayList = toponymArrayList = stopwordArrayList = null;
+	/*if(goldLocationArrayList.size() > 0) {
+	    goldLocationVector = new int[size];
+	    System.err.println("Copying gold locations vector");
+	    copyToArray(goldLocationVector, goldLocationArrayList);
+	    }*/
+
+        wordArrayList = documentArrayList = toponymArrayList = stopwordArrayList/* = goldLocationArrayList*/ = null;
     }
 
     /**

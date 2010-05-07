@@ -1,2 +1,2 @@
 #!/bin/sh
-./tg-georef.sh -i ~/textgrounder/data/travel/txt/tr_corpus -o tr-output.kml -g world -m PopBaseline -d 20
+./tg-georef.sh -ev /groups/projects/pcl_travel/data/trconlldevtest/dev -o tr-output.kml -g tr -m RandBaseline -d 3
