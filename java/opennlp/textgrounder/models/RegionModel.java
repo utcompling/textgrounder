@@ -537,11 +537,22 @@ public class RegionModel extends TopicModel {
         sp.saveParameters(outputFilename, this);
     }
 
+    /**
+     *
+     * @param inputFilename
+     * @throws IOException
+     */
     public void loadSimpleParameters(String inputFilename) throws IOException {
         SerializableParameters sp = new SerializableParameters();
         sp.loadParameters(inputFilename, this);
     }
 
+    /**
+     * 
+     * @param outputFilename
+     * @param word
+     * @throws IOException
+     */
     public void writeWordOverGlobeKML(String outputFilename, String word) throws
           IOException {
         writeWordOverGlobeKML(inputPath, outputFilename, word);
