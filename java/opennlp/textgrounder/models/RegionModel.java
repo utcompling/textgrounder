@@ -64,6 +64,10 @@ public class RegionModel extends TopicModel {
      * The set of locations that have been observed with the model.
      */
     protected HashSet<Location> locationSet;
+    /**
+     * Table from index to region
+     */
+    Map<Integer, Region> regionMap;
 
     /**
      * Default constructor. Take input from commandline and default options
@@ -75,6 +79,12 @@ public class RegionModel extends TopicModel {
     public RegionModel(CommandLineOptions options) {
         regionMapperCallback = new RegionMapperCallback();
         initialize(options);
+    }
+
+    /**
+     * 
+     */
+    public RegionModel() {
     }
 
     /**
@@ -430,7 +440,8 @@ public class RegionModel extends TopicModel {
     public void printTabulatedProbabilities() throws
           IOException {
         super.printTabulatedProbabilities();
-        writeRegionWordDistributionXMLFile(inputPath, tabularOutputFilename);
+        writeRegionWordDistributionKMLFile(inputPath, tabularOutputFilename);
+        saveSimpleParameters(tabularOutputFilename);
     }
 
     /**
@@ -445,7 +456,7 @@ public class RegionModel extends TopicModel {
         int startt = 0, M = 4, endt = Math.min(M + startt, topicProbs.length);
         out.write("***** Word Probabilities by Topic *****\n\n");
 
-        Map<Integer, Region> regionMap = regionMapperCallback.getRegionMap();
+        regionMap = regionMapperCallback.getRegionMap();
 
         while (startt < T) {
             for (int i = startt; i < endt; ++i) {
@@ -485,13 +496,13 @@ public class RegionModel extends TopicModel {
      * @param outputFilename
      * @throws IOException
      */
-    public void writeRegionWordDistributionXMLFile(String inputFilename,
+    public void writeRegionWordDistributionKMLFile(String inputFilename,
           String outputFilename) throws IOException {
 
         BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename + ".kml"));
 
         out.write(KMLUtil.genKMLHeader(inputFilename));
-        Map<Integer, Region> regionMap = regionMapperCallback.getRegionMap();
+        regionMap = regionMapperCallback.getRegionMap();
 
         double radius = .01;
 
@@ -510,6 +521,61 @@ public class RegionModel extends TopicModel {
                 out.write(KMLUtil.genPolygon(word, spiralPoint, radius, kmlPolygon));
                 out.write(KMLUtil.genFloatingPlacemark(word, spiralPoint, height));
             }
+        }
+
+        out.write("\t\t</Folder>\n\t</Document>\n</kml>");
+        out.close();
+    }
+
+    /**
+     * 
+     * @param outputFilename
+     * @throws IOException
+     */
+    public void saveSimpleParameters(String outputFilename) throws IOException {
+        SerializableParameters sp = new SerializableParameters();
+        sp.saveParameters(outputFilename, this);
+    }
+
+    public void loadSimpleParameters(String inputFilename) throws IOException {
+        SerializableParameters sp = new SerializableParameters();
+        sp.loadParameters(inputFilename, this);
+    }
+
+    public void writeWordOverGlobeKML(String outputFilename, String word) throws
+          IOException {
+        writeWordOverGlobeKML(inputPath, outputFilename, word);
+    }
+
+    /**
+     * 
+     * @param inputFilename
+     * @param outputFilename
+     * @throws IOException
+     */
+    public void writeWordOverGlobeKML(String inputFilename,
+          String outputFilename, String word) throws IOException {
+
+        int wordid = lexicon.getIntForWord(word);
+        if (wordid == 0) {
+            System.err.println("\"" + word + "\" is not in the text");
+            System.exit(1);
+        }
+
+        BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));
+
+        out.write(KMLUtil.genKMLHeader(inputFilename));
+
+        double radius = 1;
+        T = topicProbs.length;
+
+        for (int i = 0; i < T; ++i) {
+            double lat = regionMap.get(i).centLat;
+            double lon = regionMap.get(i).centLon;
+            Coordinate center = new Coordinate(lon, lat);
+            double height = wordByTopicProbs[wordid * T + i] * barScale * 0.1;
+            String kmlPolygon = center.toKMLPolygon(10, radius, height);
+            out.write(KMLUtil.genPolygon(word, center, radius, kmlPolygon));
         }
 
         out.write("\t\t</Folder>\n\t</Document>\n</kml>");

@@ -283,9 +283,9 @@ public abstract class Model {
             }
             if (regionArray[curX][curY] == null) {
                 double minLon = loc.coord.longitude - loc.coord.longitude % degreesPerRegion;
-                double maxLon = minLon + degreesPerRegion;
+                double maxLon = minLon + (loc.coord.longitude < 0 ? -1 : 1) * degreesPerRegion;
                 double minLat = loc.coord.latitude - loc.coord.latitude % degreesPerRegion;
-                double maxLat = minLat + degreesPerRegion;
+                double maxLat = minLat + (loc.coord.latitude < 0 ? -1 : 1) * degreesPerRegion;
                 regionArray[curX][curY] = new Region(minLon, maxLon, minLat, maxLat);
                 activeRegions++;
             }

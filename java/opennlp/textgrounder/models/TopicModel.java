@@ -65,6 +65,11 @@ public class TopicModel extends Model {
      */
     protected int[] topicByDocumentCounts;
     /**
+     * Probability of word given topic. since access more often occurs in
+     * terms of the tcount, it will be a topic by word matrix.
+     */
+    protected double[] wordByTopicProbs;
+    /**
      * Hyperparameter for topic*doc priors
      */
     protected double alpha;
@@ -308,13 +313,16 @@ public class TopicModel extends Model {
      * words and values.
      */
     public void normalize() {
+
+        wordByTopicProbs = new double[W * T];
+
         topWordsPerTopic = new StringDoublePair[T][];
         for (int i = 0; i < T; ++i) {
             topWordsPerTopic[i] = new StringDoublePair[outputPerClass];
         }
 
         topicProbs = new double[T];
-        
+
         Double sum = 0.;
         for (int i = 0; i < T; ++i) {
             sum += topicProbs[i] = topicCounts[i] + betaW;
@@ -323,6 +331,7 @@ public class TopicModel extends Model {
                 topWords.add(
                       new DoubleStringPair(wordByTopicCounts[j * T + i] + beta,
                       lexicon.getWordForInt(j)));
+                wordByTopicProbs[j * T + i] = wordByTopicCounts[j * T + i] + beta / topicProbs[i];
             }
             Collections.sort(topWords);
             for (int j = 0; j < outputPerClass; ++j) {

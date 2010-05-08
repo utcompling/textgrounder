@@ -102,6 +102,10 @@ public class CommandLineOptions {
      */
     protected String trainInputPath = null;
     /**
+     * Path of model that has been saved from previous training runs
+     */
+    protected String trainedModelPath = null;
+    /**
      * Path to test data. Can be directory or a single file.
      */
     protected String testInputPath = null;
@@ -128,13 +132,11 @@ public class CommandLineOptions {
     /**
      * Model type
      */
-    protected String model = null;
-
+    protected String model = "population";
     /**
      * A flag that runs the system on every locality in the gazetteer, ignoring the input text file(s), if set to true
      */
     protected boolean runWholeGazetteer = false;
-
     /**
      * Evaluation directory; null if no evaluation is to be done.
      */
@@ -165,11 +167,12 @@ public class CommandLineOptions {
                     degreesPerRegion = Double.parseDouble(value);
                     break;
                 case 'e':
-		    opt = option.getOpt();
-		    if(opt.equals("e"))
-			iterations = Integer.parseInt(value);
-		    else if(opt.equals("ev"))
-			evalDir = value;
+                    opt = option.getOpt();
+                    if (opt.equals("e")) {
+                        iterations = Integer.parseInt(value);
+                    } else if (opt.equals("ev")) {
+                        evalDir = value;
+                    }
                     break;
                 case 'g':
                     gazetteType = value;
@@ -189,6 +192,9 @@ public class CommandLineOptions {
                     } else if (opt.equals("kl")) {
                         lag = Integer.parseInt(value);
                     }
+                    break;
+                case 'l':
+                    trainedModelPath = value;
                     break;
                 case 'm':
                     model = value;
@@ -222,14 +228,13 @@ public class CommandLineOptions {
                     topics = Integer.parseInt(value);
                     break;
                 case 'w':
-		    if(option.getOpt().equals("wg")) {
-			runWholeGazetteer = true;
-		    } else if(option.getOpt().equals("ws")) {
-			windowSize = Integer.parseInt(value);
-		    }
-                    else {
-			outputPerClass = Integer.parseInt(value);
-		    }
+                    if (option.getOpt().equals("wg")) {
+                        runWholeGazetteer = true;
+                    } else if (option.getOpt().equals("ws")) {
+                        windowSize = Integer.parseInt(value);
+                    } else {
+                        outputPerClass = Integer.parseInt(value);
+                    }
                     break;
             }
         }
@@ -320,14 +325,18 @@ public class CommandLineOptions {
     }
 
     public boolean getRunWholeGazetteer() {
-	return runWholeGazetteer;
+        return runWholeGazetteer;
     }
 
     public String getEvalDir() {
-	return evalDir;
+        return evalDir;
     }
 
     public int getWindowSize() {
-	return windowSize;
+        return windowSize;
+    }
+
+    public String getTrainedModelPath() {
+        return trainedModelPath;
     }
 }

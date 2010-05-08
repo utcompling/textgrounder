@@ -18,14 +18,16 @@ package opennlp.textgrounder.textstructs;
 import gnu.trove.*;
 
 import edu.stanford.nlp.ling.CoreAnnotations.*;
+import java.io.Serializable;
 
 /**
  * Class of documents as array of array of integers (i.e. indexes of word types).
  *
  * @author
  */
-public class Lexicon {
+public class Lexicon implements Serializable {
 
+    static private final long serialVersionUID = 6390098L;
     /**
      * Map from token to integer (index). Tokens might not be unigrams. Placename
      * tokens may be one or more words.
