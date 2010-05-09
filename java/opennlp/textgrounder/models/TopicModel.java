@@ -331,7 +331,7 @@ public class TopicModel extends Model {
                 topWords.add(
                       new DoubleStringPair(wordByTopicCounts[j * T + i] + beta,
                       lexicon.getWordForInt(j)));
-                wordByTopicProbs[j * T + i] = wordByTopicCounts[j * T + i] + beta / topicProbs[i];
+                wordByTopicProbs[j * T + i] = (wordByTopicCounts[j * T + i] + beta) / topicProbs[i];
             }
             Collections.sort(topWords);
             for (int j = 0; j < outputPerClass; ++j) {

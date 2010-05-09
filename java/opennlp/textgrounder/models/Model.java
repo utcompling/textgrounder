@@ -387,7 +387,6 @@ public abstract class Model {
             for (int j = 0; j < loc.backPointers.size(); j++) {
                 int index = loc.backPointers.get(j);
                 String context = tokenArrayBuffer.getContextAround(index, windowSize, true);
-                context = context.replaceAll("<", "&lt;"); // sanitization
                 Coordinate spiralPoint = coord.getNthSpiralPoint(j, 0.13);
 
                 contextOut.write(KMLUtil.genSpiralpoint(placename, context, spiralPoint, j, radius));

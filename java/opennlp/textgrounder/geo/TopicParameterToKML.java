@@ -74,7 +74,11 @@ public class TopicParameterToKML {
         RegionModel rm = new RegionModel();
         try {
             rm.loadSimpleParameters(modelPath);
-            rm.writeWordOverGlobeKML(outputPath, word);
+            if (outputPath == null) {
+                rm.writeWordOverGlobeKML(word);
+            } else {
+                rm.writeWordOverGlobeKML(outputPath, word);
+            }
         } catch (IOException ex) {
             Logger.getLogger(TopicParameterToKML.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(0);

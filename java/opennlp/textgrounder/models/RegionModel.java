@@ -560,6 +560,16 @@ public class RegionModel extends TopicModel {
 
     /**
      * 
+     * @param word
+     * @throws IOException
+     */
+    public void writeWordOverGlobeKML(String word) throws
+          IOException {
+        writeWordOverGlobeKML(inputPath, word + ".kml", word);
+    }
+
+    /**
+     * 
      * @param inputFilename
      * @param outputFilename
      * @throws IOException
@@ -584,7 +594,7 @@ public class RegionModel extends TopicModel {
             double lat = regionMap.get(i).centLat;
             double lon = regionMap.get(i).centLon;
             Coordinate center = new Coordinate(lon, lat);
-            double height = wordByTopicProbs[wordid * T + i] * barScale * 0.1;
+            double height = wordByTopicProbs[wordid * T + i] * barScale * 20;
             String kmlPolygon = center.toKMLPolygon(10, radius, height);
             out.write(KMLUtil.genPolygon(word, center, radius, kmlPolygon));
         }
