@@ -15,9 +15,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models.callbacks;
 
+import gnu.trove.TIntHashSet;
+import gnu.trove.TIntObjectHashMap;
+import gnu.trove.TIntObjectIterator;
+
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 
 import opennlp.textgrounder.textstructs.Lexicon;
@@ -42,15 +45,15 @@ public class RegionMapperCallback {
      * Table from placename to set of region indexes. The indexes and their
      * referents are stored in regionMap.
      */
-    protected Map<String, HashSet<Integer>> nameToRegionIndex;
+    protected TIntObjectHashMap<TIntHashSet> nameToRegionIndex;
     /**
      *
      */
-    protected HashSet<LocationRegionPair> currentLocationRegions;
+    protected TIntObjectHashMap<LocationRegionPair> currentLocationRegions;
     /**
      * 
      */
-    protected Map<ToponymRegionPair, HashSet<Location>> toponymRegionToLocations;
+    protected TIntObjectHashMap<HashSet<Location>> toponymRegionToLocations;
     /**
      *
      */
@@ -63,9 +66,9 @@ public class RegionMapperCallback {
         numRegions = 0;
         regionMap = new HashMap<Integer, Region>();
         reverseRegionMap = new HashMap<Region, Integer>();
-        nameToRegionIndex = new HashMap<String, HashSet<Integer>>();
-        toponymRegionToLocations = new HashMap<ToponymRegionPair, HashSet<Location>>();
-        currentLocationRegions = new HashSet<LocationRegionPair>();
+        nameToRegionIndex = new TIntObjectHashMap<TIntHashSet>();
+        toponymRegionToLocations = new TIntObjectHashMap<HashSet<Location>>();
+        currentLocationRegions = new TIntObjectHashMap<LocationRegionPair>();
     }
 
     /**
@@ -80,32 +83,36 @@ public class RegionMapperCallback {
             numRegions += 1;
         }
         int regionid = reverseRegionMap.get(region);
-        currentLocationRegions.add(new LocationRegionPair(loc, regionid));
+        LocationRegionPair lrp = new LocationRegionPair(loc, regionid);
+        currentLocationRegions.put(lrp.hashCode(), lrp);
     }
 
     /**
      *
      * @param placename
-     * @param docSet
+     * @param lexicon
      */
-    public void addAll(String placename, Lexicon docSet) {
-        int wordid = docSet.getIntForWord(placename);
+    public void addAll(String placename, Lexicon lexicon) {
+        int wordid = lexicon.getIntForWord(placename);
 
-        if(!nameToRegionIndex.containsKey(placename)) {
-            nameToRegionIndex.put(placename, new HashSet<Integer>());
+        if (!nameToRegionIndex.containsKey(wordid)) {
+            nameToRegionIndex.put(wordid, new TIntHashSet());
         }
-        HashSet<Integer> currentRegions = nameToRegionIndex.get(placename);
+        TIntHashSet currentRegions = nameToRegionIndex.get(wordid);
 
-        for (LocationRegionPair lrp : currentLocationRegions) {
+        for (TIntObjectIterator<LocationRegionPair> it = currentLocationRegions.iterator();
+              it.hasNext();) {
+            it.advance();
+            LocationRegionPair lrp = it.value();
             ToponymRegionPair trp = new ToponymRegionPair(wordid, lrp.regionIndex);
-            if (!toponymRegionToLocations.containsKey(trp)) {
-                toponymRegionToLocations.put(trp, new HashSet<Location>());
+            if (!toponymRegionToLocations.containsKey(trp.hashCode())) {
+                toponymRegionToLocations.put(trp.hashCode(), new HashSet<Location>());
             }
-            toponymRegionToLocations.get(trp).add(lrp.location);
+            toponymRegionToLocations.get(trp.hashCode()).add(lrp.location);
             currentRegions.add(lrp.regionIndex);
         }
-        
-        currentLocationRegions = new HashSet<LocationRegionPair>();
+
+        currentLocationRegions = new TIntObjectHashMap<LocationRegionPair>();
     }
 
     /**
@@ -125,7 +132,7 @@ public class RegionMapperCallback {
     /**
      * @return the nameToRegionIndex
      */
-    public Map<String, HashSet<Integer>> getNameToRegionIndex() {
+    public TIntObjectHashMap<TIntHashSet> getNameToRegionIndex() {
         return nameToRegionIndex;
     }
 
@@ -139,7 +146,7 @@ public class RegionMapperCallback {
     /**
      * @return the toponymRegionToLocations
      */
-    public Map<ToponymRegionPair, HashSet<Location>> getToponymRegionToLocations() {
+    public TIntObjectHashMap<HashSet<Location>> getToponymRegionToLocations() {
         return toponymRegionToLocations;
     }
 }

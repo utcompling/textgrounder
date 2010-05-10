@@ -158,7 +158,7 @@ public class TextProcessor {
             if (curLine == null || curLine.equals("")) {
                 break;
             }
-            buf.append(curLine.replaceAll("<", "&lt;"));
+            buf.append(curLine.replaceAll("[<>]", "").replaceAll("&", "and"));
             buf.append(" ");
 
             if (counter < parAsDocSize) {
@@ -381,7 +381,7 @@ public class TextProcessor {
 
         String nerOutput = classifier.classifyToString(text);
 
-        String[] tokens = nerOutput.split(" ");
+        String[] tokens = nerOutput.replaceAll("-[LR]RB-", "").split(" ");
         int toponymStartIndex = -1;
         int toponymEndIndex = -1;
 

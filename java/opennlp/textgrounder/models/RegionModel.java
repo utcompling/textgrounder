@@ -15,6 +15,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
+import gnu.trove.TIntHashSet;
+import gnu.trove.TIntObjectHashMap;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -220,10 +222,10 @@ public class RegionModel extends TopicModel {
             regionByToponym[i] = 0;
         }
 
-        Map<String, HashSet<Integer>> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
-        for (String placename : nameToRegionIndex.keySet()) {
-            int wordoff = lexicon.getIntForWord(placename) * T;
-            for (int j : nameToRegionIndex.get(placename)) {
+        TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
+        for (int wordid : nameToRegionIndex.keys()) {
+            int wordoff = wordid * T;
+            for (int j : nameToRegionIndex.get(wordid).toArray()) {
                 regionByToponym[wordoff + j] = 1;
             }
         }
@@ -369,13 +371,12 @@ public class RegionModel extends TopicModel {
             locationIdToLocation.put(loc.id, loc);
         }
 
-        Map<String, HashSet<Integer>> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
-        Map<ToponymRegionPair, HashSet<Location>> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
-        for (String name : nameToRegionIndex.keySet()) {
-            int wordid = lexicon.getIntForWord(name);
-            for (int regid : nameToRegionIndex.get(name)) {
+        TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
+        TIntObjectHashMap<HashSet<Location>> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
+        for (int wordid : nameToRegionIndex.keys()) {
+            for (int regid : nameToRegionIndex.get(wordid).toArray()) {
                 ToponymRegionPair trp = new ToponymRegionPair(wordid, regid);
-                HashSet<Location> locs = toponymRegionToLocations.get(trp);
+                HashSet<Location> locs = toponymRegionToLocations.get(trp.hashCode());
                 for (Location loc : locs) {
                     Location tloc = locationIdToLocation.get(loc.id);
                     tloc.count += wordByTopicCounts[wordid * T + regid];
@@ -397,7 +398,7 @@ public class RegionModel extends TopicModel {
                     wordid = wordVector[i];
                     topicid = topicVector[i];
                     ToponymRegionPair trp = new ToponymRegionPair(wordid, topicid);
-                    HashSet<Location> locs = toponymRegionToLocations.get(trp);
+                    HashSet<Location> locs = toponymRegionToLocations.get(trp.hashCode());
                     try {
                         for (Location loc : locs) {
                             Location tloc = locationIdToLocation.get(loc.id);
@@ -415,7 +416,7 @@ public class RegionModel extends TopicModel {
                         loc.backPointers.add(i);
                         locs.add(loc);
                         locationIdToLocation.put(loc.id, loc);
-                        toponymRegionToLocations.put(trp, locs);
+                        toponymRegionToLocations.put(trp.hashCode(), locs);
                         curlocid += 1;
                     }
                 }
