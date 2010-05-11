@@ -43,7 +43,7 @@ public class RegexPlaceCounter extends TObjectIntHashMap<String> {
 	    while(m != null && m.find()) {
 		String potentialPlacename = m.group().toLowerCase();
 
-		if(gaz.containsKey(potentialPlacename)) {
+		if(gaz.contains(potentialPlacename)) {
 		    if (!increment(potentialPlacename))
 			put(potentialPlacename,1);
 

@@ -15,6 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
+import gnu.trove.TIntObjectHashMap;
 import java.io.IOException;
 import opennlp.textgrounder.textstructs.TokenArrayBuffer;
 import opennlp.textgrounder.textstructs.TextProcessor;
@@ -81,7 +82,12 @@ public abstract class Model {
     /**
      * Quick lookup table for gazetteer info based on toponym
      */
+//    protected TIntObjectHashMap<
     protected Hashtable<String, List<Location>> gazCache;
+    /**
+     * Lookup table for Location (hash)code to Location object
+     */
+    protected TIntObjectHashMap<Location> idxToLocationMap;
     /**
      * Size of regions on cartesian reduction of globe. Globe is defined to be
      * 360 degrees longitude and 180 degrees latitude
@@ -149,15 +155,15 @@ public abstract class Model {
 
         String gazTypeArg = options.getGazetteType().toLowerCase();
         if (gazTypeArg.startsWith("c")) {
-            gazetteer = new CensusGazetteer();
+            gazetteer = new CensusGazetteer(options);
         } else if (gazTypeArg.startsWith("n")) {
-            gazetteer = new NGAGazetteer();
+            gazetteer = new NGAGazetteer(options);
         } else if (gazTypeArg.startsWith("u")) {
-            gazetteer = new USGSGazetteer();
+            gazetteer = new USGSGazetteer(options);
         } else if (gazTypeArg.startsWith("w")) {
-            gazetteer = new WGGazetteer();
+            gazetteer = new WGGazetteer(options);
         } else if (gazTypeArg.startsWith("t")) {
-            gazetteer = new TRGazetteer();
+            gazetteer = new TRGazetteer(options);
         } else {
             System.err.println("Error: unrecognized gazetteer type: " + gazTypeArg);
             System.err.println("Please enter w, c, u, g, or t.");

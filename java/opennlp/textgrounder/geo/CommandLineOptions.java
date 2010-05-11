@@ -98,6 +98,10 @@ public class CommandLineOptions {
      */
     protected String gazetteType = "w";
     /**
+     * Path to gazetteer database
+     */
+    protected String gazetteerPath = "/tmp/toponym.db";
+    /**
      * Path to training data. Can be directory or a single file.
      */
     protected String trainInputPath = null;
@@ -183,6 +187,8 @@ public class CommandLineOptions {
                         trainInputPath = value;
                     } else if (opt.equals("ie")) {
                         testInputPath = value;
+                    } else if (opt.equals("id")) {
+                        gazetteerPath = value;
                     }
                     break;
                 case 'k':
@@ -206,7 +212,11 @@ public class CommandLineOptions {
                         tabulatedOutput = new BufferedWriter(new OutputStreamWriter(
                               new FileOutputStream(tabularOutputFilename)));
                     } else if (opt.equals("o")) {
-                        kmlOutputFilename = value;
+                        if (value.endsWith(".kml")) {
+                            kmlOutputFilename = value;
+                        } else {
+                            kmlOutputFilename = value + ".kml";
+                        }
                     }
                     break;
                 case 'p':
@@ -338,5 +348,9 @@ public class CommandLineOptions {
 
     public String getTrainedModelPath() {
         return trainedModelPath;
+    }
+
+    public String getGazetteerPath() {
+        return gazetteerPath;
     }
 }

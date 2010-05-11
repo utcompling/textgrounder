@@ -18,6 +18,7 @@ package opennlp.textgrounder.textstructs;
 import gnu.trove.*;
 
 import edu.stanford.nlp.ling.CoreAnnotations.*;
+
 import java.io.Serializable;
 
 /**
@@ -87,6 +88,16 @@ public class Lexicon implements Serializable {
             idx = wordsToInts.get(word);
         }
         return idx;
+    }
+
+    /**
+     * Check whether word is in lexicon
+     * 
+     * @param word word to examine
+     * @return truth value of whether word is in lexicon
+     */
+    public boolean contains(String word) {
+        return wordsToInts.containsKey(word);
     }
 
     /**

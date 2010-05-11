@@ -16,7 +16,9 @@
 package opennlp.textgrounder.models;
 
 import gnu.trove.TIntHashSet;
+import gnu.trove.TIntIterator;
 import gnu.trove.TIntObjectHashMap;
+import gnu.trove.TIntObjectIterator;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -48,11 +50,11 @@ public class RegionModel extends TopicModel {
      */
     protected RegionMapperCallback regionMapperCallback;
     /**
-     * Vector of toponyms. If 0, the word is not a toponym. If 1, it is.
+     * Vector of toponyms. If 0, the word is not a toponym. If 1, it1 is.
      */
     protected int[] toponymVector;
     /**
-     * Vector of stopwords. If 0, the word is not a stopword. If 1, it is.
+     * Vector of stopwords. If 0, the word is not a stopword. If 1, it1 is.
      */
     protected int[] stopwordVector;
     /**
@@ -166,7 +168,7 @@ public class RegionModel extends TopicModel {
         System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
         int curDoc = 0, prevDoc = -1;
 
-        HashSet<Integer> toponymsNotInGazetteer = new HashSet<Integer>();
+        TIntHashSet toponymsNotInGazetteer = new TIntHashSet();
         for (int i = 0; i < N; i++) {
             curDoc = documentVector[i];
             if (curDoc != prevDoc) {
@@ -175,7 +177,7 @@ public class RegionModel extends TopicModel {
             prevDoc = curDoc;
             if (toponymVector[i] == 1) {
                 String placename = lexicon.getWordForInt(wordVector[i]);
-                if (gazetteer.contains(placename)) { // quick lookup to see if it has even 1 place by that name
+                if (gazetteer.contains(placename)) { // quick lookup to see if it1 has even 1 place by that name
                     // try the cache first. if not in there, do a full DB lookup and add that pair to the cache:
                     List<Location> possibleLocations = gazCache.get(placename);
                     if (possibleLocations == null) {
@@ -223,14 +225,18 @@ public class RegionModel extends TopicModel {
         }
 
         TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
-        for (int wordid : nameToRegionIndex.keys()) {
-            int wordoff = wordid * T;
-            for (int j : nameToRegionIndex.get(wordid).toArray()) {
+        for (TIntObjectIterator<TIntHashSet> it1 = nameToRegionIndex.iterator();
+              it1.hasNext();) {
+            it1.advance();
+            int wordoff = it1.key() * T;
+            for (TIntIterator it2 = it1.value().iterator(); it2.hasNext();) {
+                int j = it2.next();
                 regionByToponym[wordoff + j] = 1;
             }
         }
 
-        for (int topid : toponymsNotInGazetteer) {
+        for (TIntIterator it = toponymsNotInGazetteer.iterator(); it.hasNext();) {
+            int topid = it.next();
             int topoff = topid * T;
             for (int i = 0; i < T; ++i) {
                 regionByToponym[topoff + i] = 1;
@@ -505,7 +511,7 @@ public class RegionModel extends TopicModel {
         out.write(KMLUtil.genKMLHeader(inputFilename));
         regionMap = regionMapperCallback.getRegionMap();
 
-        double radius = .01;
+        double radius = .2;
 
         for (int i = 0; i < T; ++i) {
             double lat = regionMap.get(i).centLat;
@@ -514,12 +520,12 @@ public class RegionModel extends TopicModel {
 
             for (int j = 0; j < outputPerClass; ++j) {
 
-                Coordinate spiralPoint = center.getNthSpiralPoint(j, 0.03);
+                Coordinate spiralPoint = center.getNthSpiralPoint(j, .5);
 
                 String word = topWordsPerTopic[i][j].stringValue;
-                double height = topWordsPerTopic[i][j].doubleValue * barScale * 20;
+                double height = topWordsPerTopic[i][j].doubleValue * barScale * 50;
                 String kmlPolygon = spiralPoint.toKMLPolygon(10, radius, height);
-                out.write(KMLUtil.genPolygon(word, spiralPoint, radius, kmlPolygon));
+                out.write(KMLUtil.genPolygon("", spiralPoint, radius, kmlPolygon));
                 out.write(KMLUtil.genFloatingPlacemark(word, spiralPoint, height));
             }
         }
