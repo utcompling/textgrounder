@@ -19,7 +19,9 @@ package opennlp.textgrounder.models;
 import opennlp.textgrounder.textstructs.NullStopwordList;
 import opennlp.textgrounder.textstructs.TokenArrayBuffer;
 import opennlp.textgrounder.textstructs.TextProcessor;*/
+import gnu.trove.TIntHashSet;
 import gnu.trove.TIntIntHashMap;
+import gnu.trove.TIntIterator;
 
 import java.io.File;
 
@@ -45,116 +47,114 @@ public class BaselineModel extends Model {
     //protected File inputFile;
     //protected boolean initializedXMLFile = false;
     //protected boolean finalizedXMLFile = false;
-
     public BaselineModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
-	super(gaz, bscale, paragraphsAsDocs);
+        super(gaz, bscale, paragraphsAsDocs);
         /*barScale = bscale;
         gazetteer = gaz;
         lexicon = new Lexicon();*/
     }
 
     public BaselineModel(CommandLineOptions options) throws Exception {
-	super(options);
-	/*
+        super(options);
+        /*
         runWholeGazetteer = options.getRunWholeGazetteer();
 
         if (!runWholeGazetteer) {
-            inputPath = options.getTrainInputPath();
-            if (inputPath == null) {
-                System.out.println("Error: You must specify an input filename with the -i flag.");
-                System.exit(0);
-            }
-            inputFile = new File(inputPath);
+        inputPath = options.getTrainInputPath();
+        if (inputPath == null) {
+        System.out.println("Error: You must specify an input filename with the -i flag.");
+        System.exit(0);
+        }
+        inputFile = new File(inputPath);
         } else {
-            inputPath = null;
-            inputFile = null;
+        inputPath = null;
+        inputFile = null;
         }
 
         String gazTypeArg = options.getGazetteType().toLowerCase();
         if (gazTypeArg.startsWith("c")) {
-            gazetteer = new CensusGazetteer();
+        gazetteer = new CensusGazetteer();
         } else if (gazTypeArg.startsWith("n")) {
-            gazetteer = new NGAGazetteer();
+        gazetteer = new NGAGazetteer();
         } else if (gazTypeArg.startsWith("u")) {
-            gazetteer = new USGSGazetteer();
+        gazetteer = new USGSGazetteer();
         } else if (gazTypeArg.startsWith("w")) {
-            gazetteer = new WGGazetteer();
+        gazetteer = new WGGazetteer();
         } else if (gazTypeArg.startsWith("t")) {
-            gazetteer = new TRGazetteer();
+        gazetteer = new TRGazetteer();
         } else {
-            System.err.println("Error: unrecognized gazetteer type: " + gazTypeArg);
-            System.err.println("Please enter w, c, u, g, or t.");
-            System.exit(0);
-            //myGaz = new WGGazetteer();
+        System.err.println("Error: unrecognized gazetteer type: " + gazTypeArg);
+        System.err.println("Please enter w, c, u, g, or t.");
+        System.exit(0);
+        //myGaz = new WGGazetteer();
         }
 
         kmlOutputFilename = options.getKMLOutputFilename();
         degreesPerRegion = options.getDegreesPerRegion();
 
         if (!runWholeGazetteer) {
-            gazCache = new Hashtable<String, List<Location>>();
-            paragraphsAsDocs = options.getParagraphsAsDocs();
-            lexicon = new Lexicon();
+        gazCache = new Hashtable<String, List<Location>>();
+        paragraphsAsDocs = options.getParagraphsAsDocs();
+        lexicon = new Lexicon();
 
-            textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
+        textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
         }
 
         barScale = options.getBarScale();
 
         windowSize = options.getWindowSize();
 
-	*/
+         */
     }
 
     /*
     public void initializeRegionArray() {
-        activeRegions = 0;
+    activeRegions = 0;
 
-        regionArrayWidth = 360 / (int) degreesPerRegion;
-        regionArrayHeight = 180 / (int) degreesPerRegion;
+    regionArrayWidth = 360 / (int) degreesPerRegion;
+    regionArrayHeight = 180 / (int) degreesPerRegion;
 
-        regionArray = new Region[regionArrayWidth][regionArrayHeight];
-        for (int w = 0; w < regionArrayWidth; w++) {
-            for (int h = 0; h < regionArrayHeight; h++) {
-                regionArray[w][h] = null;
-            }
-        }
+    regionArray = new Region[regionArrayWidth][regionArrayHeight];
+    for (int w = 0; w < regionArrayWidth; w++) {
+    for (int h = 0; h < regionArrayHeight; h++) {
+    regionArray[w][h] = null;
+    }
+    }
     }
 
     public void printRegionArray() {
-        System.out.println();
+    System.out.println();
 
-        for (int h = 0; h < regionArrayHeight; h++) {
-            for (int w = 0; w < regionArrayWidth; w++) {
-                if (regionArray[w][h] == null) {
-                    System.out.print("0");
-                } else {
-                    System.out.print("1");
-                }
-            }
-            System.out.println();
-        }
+    for (int h = 0; h < regionArrayHeight; h++) {
+    for (int w = 0; w < regionArrayWidth; w++) {
+    if (regionArray[w][h] == null) {
+    System.out.print("0");
+    } else {
+    System.out.print("1");
+    }
+    }
+    System.out.println();
+    }
 
-        System.out.println(activeRegions + " active regions for this document out of a possible "
-              + (regionArrayHeight * regionArrayWidth) + " (region size = "
-              + degreesPerRegion + " x " + degreesPerRegion + " degrees).");
+    System.out.println(activeRegions + " active regions for this document out of a possible "
+    + (regionArrayHeight * regionArrayWidth) + " (region size = "
+    + degreesPerRegion + " x " + degreesPerRegion + " degrees).");
     }
 
     public void activateRegionsForWholeGaz() throws Exception {
-        System.out.println("Running whole gazetteer through system...");
+    System.out.println("Running whole gazetteer through system...");
 
-        //locations = new ArrayList<Location>();
-        locations = gazetteer.getAllLocalities();
-        addLocationsToRegionArray(locations);
-        //locations = null; //////////////// uncomment this to get a null pointer but much faster termination
-        //                                   if you only want to know the number of active regions :)
+    //locations = new ArrayList<Location>();
+    locations = gazetteer.getAllLocalities();
+    addLocationsToRegionArray(locations);
+    //locations = null; //////////////// uncomment this to get a null pointer but much faster termination
+    //                                   if you only want to know the number of active regions :)
     }*/
-
-    public List<Location> disambiguateAndCountPlacenames() throws Exception {
+    public TIntHashSet disambiguateAndCountPlacenames() throws Exception {
 
         System.out.println("Disambiguating place names found...");
 
-        locations = new ArrayList<Location>();
+        locations = new TIntHashSet();
         //TIntHashSet locationsFound = new TIntHashSet();
 
         TIntIntHashMap idsToCounts = new TIntIntHashMap();
@@ -170,7 +170,7 @@ public class BaselineModel extends Model {
 
             for (int i = 0; i < curDocSpans.size(); i++) {//int topidx : curDocSpans) {*/
             if (tokenArrayBuffer.toponymVector[i] == 0) {
-		tokenArrayBuffer.modelLocationArrayList.add(null);
+                tokenArrayBuffer.modelLocationArrayList.add(null);
                 continue;
             }
             int topidx = tokenArrayBuffer.wordVector[i];
@@ -184,24 +184,16 @@ public class BaselineModel extends Model {
 
             if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
             {
-		tokenArrayBuffer.modelLocationArrayList.add(null);
+                tokenArrayBuffer.modelLocationArrayList.add(null);
                 continue;
             }
 
             // try the cache first. if not in there, do a full DB lookup and add that pair to the cache:
-            List<Location> possibleLocations = gazCache.get(placename);
-            if (possibleLocations == null) {
-                possibleLocations = gazetteer.get(placename);
-		/*System.out.println(possibleLocations.size());
-		for(Location temploc : possibleLocations) {
-		    System.out.println(temploc);
-		    }*/
-                gazCache.put(placename, possibleLocations);
-                addLocationsToRegionArray(possibleLocations);
-            }
+            TIntHashSet possibleLocations = gazetteer.get(placename);
+            addLocationsToRegionArray(possibleLocations);
 
             Location curLocation = popBaselineDisambiguate(possibleLocations);
-	    tokenArrayBuffer.modelLocationArrayList.add(curLocation);
+            tokenArrayBuffer.modelLocationArrayList.add(curLocation);
             if (curLocation == null) {
                 continue;
             }
@@ -215,7 +207,7 @@ public class BaselineModel extends Model {
 
             int curCount = idsToCounts.get(curLocation.id);
             if (curCount == 0) {// sentinel for not found in hashmap
-                locations.add(curLocation);
+                locations.add(curLocation.id);
                 curLocation.backPointers = new ArrayList<Integer>();
                 idsToCounts.put(curLocation.id, 1);
                 System.out.println("Found first " + curLocation.name + "; id = " + curLocation.id);
@@ -252,9 +244,10 @@ public class BaselineModel extends Model {
             continue;*/
         }
 
-        for (int i = 0; i < locations.size(); i++) // set all the counts properly
-        {
-            locations.get(i).count = idsToCounts.get(locations.get(i).id);
+        for (TIntIterator it = locations.iterator(); it.hasNext();) {
+            int locid = it.next();
+            Location loc = gazetteer.getLocation(locid);
+            loc.count = idsToCounts.get(locid);
         }
 
         System.out.println("Done.");
@@ -262,77 +255,78 @@ public class BaselineModel extends Model {
         return locations;
     }
 
-    protected Location popBaselineDisambiguate(List<Location> possibleLocations)
+    protected Location popBaselineDisambiguate(TIntHashSet possibleLocations)
           throws Exception {
         int maxPointPop = -1;
         Location pointToReturn = null;
         int maxRegionPop = -1;
         Location maxRegion = null;
 
-	if(gazetteer instanceof WGGazetteer) {
-	    // establish the biggest region by this name:
-	    for (Location loc : possibleLocations) {
-		if (!loc.type.equals("locality")) {
-		    if (loc.pop > maxRegionPop) {
-			maxRegion = loc;
-			maxRegionPop = loc.pop;
-		    }
-		}
-	    }
+        if (gazetteer instanceof WGGazetteer) {
+            // establish the biggest region by this name:
+            for (TIntIterator it = possibleLocations.iterator(); it.hasNext();) {
+                int locid = it.next();
+                Location loc = gazetteer.getLocation(locid);
+                if (!loc.type.equals("locality")) {
+                    if (loc.pop > maxRegionPop) {
+                        maxRegion = loc;
+                        maxRegionPop = loc.pop;
+                    }
+                }
+            }
 
-	    // do the disambiguation:
-	    for (Location loc : possibleLocations) {
-		if (loc.type.equals("locality")) {
-		    if (loc.pop > maxPointPop && (maxRegion == null || loc.pop > maxRegionPop || (loc.container != null && loc.container.equals(maxRegion.name)))) {
-			pointToReturn = loc;
-			maxPointPop = loc.pop;
-		    }
-		}
-	    }
-	}
-	else { // just return the most populous Location:
-	    for(Location loc : possibleLocations) {
-		if(loc.pop > maxPointPop) {
-		    pointToReturn = loc;
-		    maxPointPop = loc.pop;
-		}
-	    }
-	}
+            // do the disambiguation:
+            for (TIntIterator it = possibleLocations.iterator(); it.hasNext();) {
+                int locid = it.next();
+                Location loc = gazetteer.getLocation(locid);
+                if (loc.type.equals("locality")) {
+                    if (loc.pop > maxPointPop && (maxRegion == null || loc.pop > maxRegionPop || (loc.container != null && loc.container.equals(maxRegion.name)))) {
+                        pointToReturn = loc;
+                        maxPointPop = loc.pop;
+                    }
+                }
+            }
+        } else { // just return the most populous Location:
+            for (TIntIterator it = possibleLocations.iterator(); it.hasNext();) {
+                int locid = it.next();
+                Location loc = gazetteer.getLocation(locid);
+                if (loc.pop > maxPointPop) {
+                    pointToReturn = loc;
+                    maxPointPop = loc.pop;
+                }
+            }
+        }
 
         return pointToReturn;
     }
 
     /*public void writeXMLFile(String inputFilename) throws Exception {
-        writeXMLFile(inputFilename, kmlOutputFilename, locations);
+    writeXMLFile(inputFilename, kmlOutputFilename, locations);
     }
 
     public void processPath() throws Exception {
-        tokenArrayBuffer = new TokenArrayBuffer(lexicon);
-        processPath(inputFile, textProcessor, tokenArrayBuffer, new NullStopwordList());
-        tokenArrayBuffer.convertToPrimitiveArrays();
-	}*/
-
+    tokenArrayBuffer = new TokenArrayBuffer(lexicon);
+    processPath(inputFile, textProcessor, tokenArrayBuffer, new NullStopwordList());
+    tokenArrayBuffer.convertToPrimitiveArrays();
+    }*/
     /**
      * @return the kmlOutputFilename
      */
     //public String getOutputFilename() {
     //    return kmlOutputFilename;
     //}
-
     /**
      * @return the inputFile
      */
     //public File getInputFile() {
     //   return inputFile;
     //}
-
     /**
      * @return the textProcessor
      */
     //public TextProcessor getTextProcessor() {
     //    return textProcessor;
     // }
-
     @Override
     public void train() {
         initializeRegionArray();

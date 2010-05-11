@@ -15,6 +15,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
+import gnu.trove.TIntHashSet;
+import gnu.trove.TIntIterator;
 import gnu.trove.TIntObjectHashMap;
 import java.io.IOException;
 import opennlp.textgrounder.textstructs.TokenArrayBuffer;
@@ -57,7 +59,7 @@ public abstract class Model {
     /**
      * Array of locations that have been identified in training data
      */
-    protected List<Location> locations;
+    protected TIntHashSet locations;
     /**
      * Training data
      */
@@ -79,11 +81,6 @@ public abstract class Model {
      * toponyms and none of the non-toponyms.
      */
     protected TextProcessor textProcessor;
-    /**
-     * Quick lookup table for gazetteer info based on toponym
-     */
-//    protected TIntObjectHashMap<
-    protected Hashtable<String, List<Location>> gazCache;
     /**
      * Lookup table for Location (hash)code to Location object
      */
@@ -108,12 +105,10 @@ public abstract class Model {
     /**
      * Flag that tells system to ignore the input file(s) and instead run on every locality in the gazetteer
      */
-
     /**
      * Evaluation directory; null if no evaluation is to be done.
      */
     protected String evalDir = null;
-
     protected File inputFile;
     protected boolean runWholeGazetteer = false;
     protected int windowSize;
@@ -131,8 +126,8 @@ public abstract class Model {
 
     public Model(CommandLineOptions options) throws Exception {
 
-	runWholeGazetteer = options.getRunWholeGazetteer();
-	evalDir = options.getEvalDir();
+        runWholeGazetteer = options.getRunWholeGazetteer();
+        evalDir = options.getEvalDir();
 
         if (!runWholeGazetteer && evalDir == null) {
             inputPath = options.getTrainInputPath();
@@ -145,13 +140,13 @@ public abstract class Model {
             inputPath = null;
             inputFile = null;
         } else if (evalDir != null) {
-	    //System.out.println(evalDir);
-	    //System.exit(0);
-	    inputPath = evalDir;
-	    inputFile = new File(inputPath);
-	    assert(inputFile.isDirectory());
-	    //System.exit(0);
-	}
+            //System.out.println(evalDir);
+            //System.exit(0);
+            inputPath = evalDir;
+            inputFile = new File(inputPath);
+            assert (inputFile.isDirectory());
+            //System.exit(0);
+        }
 
         String gazTypeArg = options.getGazetteType().toLowerCase();
         if (gazTypeArg.startsWith("c")) {
@@ -175,14 +170,14 @@ public abstract class Model {
         degreesPerRegion = options.getDegreesPerRegion();
 
         if (!runWholeGazetteer) {
-            gazCache = new Hashtable<String, List<Location>>();
             paragraphsAsDocs = options.getParagraphsAsDocs();
             lexicon = new Lexicon();
 
-	    if(evalDir == null)
-		textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
-	    else
-		textProcessor = new TextProcessor(lexicon, paragraphsAsDocs, true);
+            if (evalDir == null) {
+                textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
+            } else {
+                textProcessor = new TextProcessor(lexicon, paragraphsAsDocs, true);
+            }
         }
 
         barScale = options.getBarScale();
@@ -255,8 +250,8 @@ public abstract class Model {
      *
      * @param locs list of locations.
      */
-    protected void addLocationsToRegionArray(List<Location> locs) {
-        addLocationsToRegionArray(locs, new NullRegionMapperCallback());
+    protected void addLocationsToRegionArray(TIntHashSet locs) {
+        addLocationsToRegionArray(locs, gazetteer, new NullRegionMapperCallback());
     }
 
     /**
@@ -267,9 +262,11 @@ public abstract class Model {
      * @param regionMapper callback class for handling mappings of locations
      * and regions
      */
-    protected void addLocationsToRegionArray(List<Location> locs,
+    protected void addLocationsToRegionArray(TIntHashSet locs, Gazetteer gaz,
           RegionMapperCallback regionMapper) {
-        for (Location loc : locs) {
+        for (TIntIterator it = locs.iterator(); it.hasNext();) {
+            int locid = it.next();
+            Location loc = gaz.getLocation(locid);
             /*if(loc.coord.latitude < -180.0 || loc.coord.longitude > 180.0
             || loc.coord.longitude < -90.0 || loc.coord.longitude > 900) {
             // switched?
@@ -310,19 +307,19 @@ public abstract class Model {
     }
 
     public void processPath(File myPath, TextProcessor textProcessor,
-          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws IOException {
-	if (myPath.isDirectory()) {
-	    for (String pathname : myPath.list()) {
-		processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer, stopwordList);
-	    }
-	} else {
-	    if(evalDir == null) {
-		textProcessor.addToponymsFromFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
-	    }
-	    else {
-		textProcessor.addToponymsFromGoldFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
-	    }
-	}
+          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws
+          IOException {
+        if (myPath.isDirectory()) {
+            for (String pathname : myPath.list()) {
+                processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer, stopwordList);
+            }
+        } else {
+            if (evalDir == null) {
+                textProcessor.addToponymsFromFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
+            } else {
+                textProcessor.addToponymsFromGoldFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
+            }
+        }
     }
 
     /**
@@ -339,15 +336,29 @@ public abstract class Model {
     }
 
     /**
+     * Wrapper for writeXMLFile when gazetteer is known
+     *
+     * @param inputFilename
+     * @param outputFilename
+     * @param locations
+     * @throws IOException
+     */
+    public void writeXMLFile(String inputFilename, String outputFilename,
+          TIntHashSet locations) throws IOException {
+        writeXMLFile(inputFilename, outputFilename, gazetteer, locations);
+    }
+
+    /**
      * Output tagged and disambiguated placenames to Google Earth kml file.
      *
      * @param inputPath
      * @param kmlOutputFilename
+     * @param gaz 
      * @param locations
      * @throws Exception
      */
     public void writeXMLFile(String inputFilename, String outputFilename,
-          List<Location> locations) throws Exception {
+          Gazetteer gaz, TIntHashSet locations) throws IOException {
 
         BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));
         int dotKmlIndex = outputFilename.lastIndexOf(".kml");
@@ -372,9 +383,9 @@ public abstract class Model {
 
         if(coord.longitude == 9999.99) // sentinel
         continue;*/
-
-        for (int i = 0; i < locations.size(); i++) {//Location loc : locations) {
-            Location loc = locations.get(i);
+        for (TIntIterator it = locations.iterator(); it.hasNext();) {
+            int locid = it.next();
+            Location loc = gaz.getIdxToLocationMap().get(locid);
 
             double height = Math.log(loc.count) * barScale;
 
@@ -412,56 +423,52 @@ public abstract class Model {
 
     public void evaluate() {
 
-	if(tokenArrayBuffer.modelLocationArrayList.size() != tokenArrayBuffer.goldLocationArrayList.size()) {
-	    System.out.println("MISMATCH: model: " + tokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + tokenArrayBuffer.goldLocationArrayList.size());
-	    System.out.println(tokenArrayBuffer.wordVector.length);
-	    System.out.println(tokenArrayBuffer.size());
-	    System.exit(0);
-	}
+        if (tokenArrayBuffer.modelLocationArrayList.size() != tokenArrayBuffer.goldLocationArrayList.size()) {
+            System.out.println("MISMATCH: model: " + tokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + tokenArrayBuffer.goldLocationArrayList.size());
+            System.out.println(tokenArrayBuffer.wordVector.length);
+            System.out.println(tokenArrayBuffer.size());
+            System.exit(0);
+        }
 
-	//int numTrue = 0;
-	int tp = 0;
-	int fp = 0;
-	int fn = 0;
+        //int numTrue = 0;
+        int tp = 0;
+        int fp = 0;
+        int fn = 0;
 
-	for(int i = 0; i < tokenArrayBuffer.size(); i++) {
-	    Location curModelLoc = tokenArrayBuffer.modelLocationArrayList.get(i);
-	    Location curGoldLoc = tokenArrayBuffer.goldLocationArrayList.get(i);
-	    if(curGoldLoc != null) {
-		if(curModelLoc != null) {
-		    if(curGoldLoc.looselyMatches(curModelLoc, 1.0)) {
-			tp++;
-		    }
-		    else {
-			fp++;
-			fn++;
-		    }
-		}
-		else {
-		    fn++;
-		}
-	    }
-	    else {
-		if(curModelLoc != null) {
-		    fp++;
-		}
-		else {
-		    //tn++;
-		}
-	    }
-	}
+        for (int i = 0; i < tokenArrayBuffer.size(); i++) {
+            Location curModelLoc = tokenArrayBuffer.modelLocationArrayList.get(i);
+            Location curGoldLoc = tokenArrayBuffer.goldLocationArrayList.get(i);
+            if (curGoldLoc != null) {
+                if (curModelLoc != null) {
+                    if (curGoldLoc.looselyMatches(curModelLoc, 1.0)) {
+                        tp++;
+                    } else {
+                        fp++;
+                        fn++;
+                    }
+                } else {
+                    fn++;
+                }
+            } else {
+                if (curModelLoc != null) {
+                    fp++;
+                } else {
+                    //tn++;
+                }
+            }
+        }
 
-	double precision = (double)tp/(tp+fp);
-	double recall = (double)tp/(tp+fn);
-	double f1 = 2 * ((precision * recall) / (precision + recall));
+        double precision = (double) tp / (tp + fp);
+        double recall = (double) tp / (tp + fn);
+        double f1 = 2 * ((precision * recall) / (precision + recall));
 
-	System.out.println("TP: " + tp);
-	System.out.println("FP: " + fp);
-	System.out.println("FN: " + fn);
-	System.out.println();
-	System.out.println("Precision: " + precision);
-	System.out.println("Recall: " + recall);
-	System.out.println("F-score: " + f1);
+        System.out.println("TP: " + tp);
+        System.out.println("FP: " + fp);
+        System.out.println("FN: " + fn);
+        System.out.println();
+        System.out.println("Precision: " + precision);
+        System.out.println("Recall: " + recall);
+        System.out.println("F-score: " + f1);
     }
 
     /**

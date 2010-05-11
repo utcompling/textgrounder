@@ -137,7 +137,7 @@ public class NGAGazetteer extends Gazetteer {
 
     }
 
-    public List<Location> get(String placename) {
-        return new ArrayList<Location>();
+    public TIntHashSet get(String placename) {
+        return new TIntHashSet();
     }
 }

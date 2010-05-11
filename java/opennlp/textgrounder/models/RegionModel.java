@@ -22,6 +22,7 @@ import gnu.trove.TIntObjectIterator;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.sql.SQLException;
 import opennlp.textgrounder.textstructs.StopwordList;
 import opennlp.textgrounder.textstructs.TokenArrayBuffer;
 import java.util.ArrayList;
@@ -67,11 +68,11 @@ public class RegionModel extends TopicModel {
     /**
      * The set of locations that have been observed with the model.
      */
-    protected HashSet<Location> locationSet;
+    protected TIntHashSet locationSet;
     /**
      * Table from index to region
      */
-    Map<Integer, Region> regionMap;
+    TIntObjectHashMap<Region> regionMap;
 
     /**
      * Default constructor. Take input from commandline and default options
@@ -117,11 +118,10 @@ public class RegionModel extends TopicModel {
         baselineModel.initializeRegionArray();
 
         this.gazetteer = baselineModel.gazetteer;
-        this.gazCache = baselineModel.gazCache;
         this.textProcessor = baselineModel.textProcessor;
         this.lexicon = baselineModel.lexicon;
 
-        locationSet = new HashSet<Location>();
+        locationSet = new TIntHashSet();
 
         setAllocateRegions(tokenArrayBuffer, baselineModel);
     }
@@ -177,28 +177,24 @@ public class RegionModel extends TopicModel {
             prevDoc = curDoc;
             if (toponymVector[i] == 1) {
                 String placename = lexicon.getWordForInt(wordVector[i]);
-                if (gazetteer.contains(placename)) { // quick lookup to see if it1 has even 1 place by that name
-                    // try the cache first. if not in there, do a full DB lookup and add that pair to the cache:
-                    List<Location> possibleLocations = gazCache.get(placename);
-                    if (possibleLocations == null) {
-                        try {
-                            possibleLocations = gazetteer.get(placename);
-                            gazCache.put(placename, possibleLocations);
-                        } catch (Exception ex) {
-                        }
-                    }
+                if (gazetteer.contains(placename)) {
+                    TIntHashSet possibleLocations = gazetteer.get(placename);
 
-                    List<Location> tempLocs = new ArrayList<Location>();
-                    for (Location loc : possibleLocations) {
+                    TIntHashSet tempLocs = new TIntHashSet();
+                    for (TIntIterator it = possibleLocations.iterator();
+                          it.hasNext();) {
+                        int locid = it.next();
+                        Location loc = gazetteer.getLocation(locid);
+
                         if (Math.abs(loc.coord.latitude) > Constants.EPSILON && Math.abs(loc.coord.longitude) > Constants.EPSILON) {
-                            tempLocs.add(loc);
+                            tempLocs.add(loc.id);
                         }
                     }
                     possibleLocations = tempLocs;
 
-                    baselineModel.addLocationsToRegionArray(possibleLocations, regionMapperCallback);
+                    baselineModel.addLocationsToRegionArray(possibleLocations, gazetteer, regionMapperCallback);
                     regionMapperCallback.addAll(placename, lexicon);
-                    locationSet.addAll(possibleLocations);
+                    locationSet.addAll(possibleLocations.toArray());
                 } else {
                     toponymsNotInGazetteer.add(wordVector[i]);
                 }
@@ -370,22 +366,23 @@ public class RegionModel extends TopicModel {
      * 
      */
     protected void normalizeLocations() {
-        Map<Integer, Location> locationIdToLocation = new HashMap<Integer, Location>();
-        for (Location loc : locationSet) {
+        for (TIntIterator it = locationSet.iterator(); it.hasNext();) {
+            int locid = it.next();
+            Location loc = gazetteer.getLocation(locid);
             loc.count += beta;
             loc.backPointers = new ArrayList<Integer>();
-            locationIdToLocation.put(loc.id, loc);
         }
 
         TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
-        TIntObjectHashMap<HashSet<Location>> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
+        TIntObjectHashMap<TIntHashSet> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
         for (int wordid : nameToRegionIndex.keys()) {
             for (int regid : nameToRegionIndex.get(wordid).toArray()) {
                 ToponymRegionPair trp = new ToponymRegionPair(wordid, regid);
-                HashSet<Location> locs = toponymRegionToLocations.get(trp.hashCode());
-                for (Location loc : locs) {
-                    Location tloc = locationIdToLocation.get(loc.id);
-                    tloc.count += wordByTopicCounts[wordid * T + regid];
+                TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
+                for (TIntIterator it = locs.iterator(); it.hasNext();) {
+                    int locid = it.next();
+                    Location loc = gazetteer.getLocation(locid);
+                    loc.count += wordByTopicCounts[wordid * T + regid];
                 }
             }
         }
@@ -393,7 +390,7 @@ public class RegionModel extends TopicModel {
         int wordid, topicid;
         int istoponym, isstopword;
 
-        int newlocid = 708167195;
+        int newlocid = gazetteer.getMaxLocId();
         int curlocid = newlocid + 1;
 
         for (int i = 0; i < N; ++i) {
@@ -404,24 +401,25 @@ public class RegionModel extends TopicModel {
                     wordid = wordVector[i];
                     topicid = topicVector[i];
                     ToponymRegionPair trp = new ToponymRegionPair(wordid, topicid);
-                    HashSet<Location> locs = toponymRegionToLocations.get(trp.hashCode());
+                    TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
                     try {
-                        for (Location loc : locs) {
-                            Location tloc = locationIdToLocation.get(loc.id);
-                            tloc.backPointers.add(i);
-                            if (tloc.id > newlocid) {
-                                tloc.count += 1;
+                        for (TIntIterator it = locs.iterator(); it.hasNext();) {
+                            int locid = it.next();
+                            Location loc = gazetteer.getLocation(locid);
+                            loc.backPointers.add(i);
+                            if (loc.id > newlocid) {
+                                loc.count += 1;
                             }
                         }
                     } catch (NullPointerException e) {
-                        locs = new HashSet<Location>();
+                        locs = new TIntHashSet();
                         Region r = regionMapperCallback.getRegionMap().get(topicid);
                         Coordinate coord = new Coordinate(r.centLon, r.centLat);
                         Location loc = new Location(curlocid, lexicon.getWordForInt(wordid), null, coord, 0, null, 1);
+                        gazetteer.putLocation(loc);
                         loc.backPointers = new ArrayList<Integer>();
                         loc.backPointers.add(i);
-                        locs.add(loc);
-                        locationIdToLocation.put(loc.id, loc);
+                        locs.add(loc.id);
                         toponymRegionToLocations.put(trp.hashCode(), locs);
                         curlocid += 1;
                     }
@@ -429,10 +427,13 @@ public class RegionModel extends TopicModel {
             }
         }
 
-        locations = new ArrayList<Location>();
-        for (Location loc : locationIdToLocation.values()) {
+        locations = new TIntHashSet();
+        for (TIntObjectIterator<Location> it = gazetteer.getIdxToLocationMap().iterator();
+              it.hasNext();) {
+            it.advance();
+            Location loc = it.value();
             if (loc.backPointers.size() != 0) {
-                locations.add(loc);
+                locations.add(loc.id);
             }
         }
     }

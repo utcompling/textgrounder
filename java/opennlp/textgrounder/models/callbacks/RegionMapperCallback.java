@@ -18,6 +18,7 @@ package opennlp.textgrounder.models.callbacks;
 import gnu.trove.TIntHashSet;
 import gnu.trove.TIntObjectHashMap;
 import gnu.trove.TIntObjectIterator;
+import gnu.trove.TObjectIntHashMap;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,11 +37,11 @@ public class RegionMapperCallback {
     /**
      * Table from index to region
      */
-    protected Map<Integer, Region> regionMap;
+    protected TIntObjectHashMap<Region> regionMap;
     /**
      * Table from region to index. Reverse storage table for regionMap.
      */
-    protected Map<Region, Integer> reverseRegionMap;
+    protected TObjectIntHashMap<Region> reverseRegionMap;
     /**
      * Table from placename to set of region indexes. The indexes and their
      * referents are stored in regionMap.
@@ -53,7 +54,7 @@ public class RegionMapperCallback {
     /**
      * 
      */
-    protected TIntObjectHashMap<HashSet<Location>> toponymRegionToLocations;
+    protected TIntObjectHashMap<TIntHashSet> toponymRegionToLocations;
     /**
      *
      */
@@ -64,10 +65,10 @@ public class RegionMapperCallback {
      */
     public RegionMapperCallback() {
         numRegions = 0;
-        regionMap = new HashMap<Integer, Region>();
-        reverseRegionMap = new HashMap<Region, Integer>();
+        regionMap = new TIntObjectHashMap<Region>();
+        reverseRegionMap = new TObjectIntHashMap<Region>();
         nameToRegionIndex = new TIntObjectHashMap<TIntHashSet>();
-        toponymRegionToLocations = new TIntObjectHashMap<HashSet<Location>>();
+        toponymRegionToLocations = new TIntObjectHashMap<TIntHashSet>();
         currentLocationRegions = new TIntObjectHashMap<LocationRegionPair>();
     }
 
@@ -106,9 +107,9 @@ public class RegionMapperCallback {
             LocationRegionPair lrp = it.value();
             ToponymRegionPair trp = new ToponymRegionPair(wordid, lrp.regionIndex);
             if (!toponymRegionToLocations.containsKey(trp.hashCode())) {
-                toponymRegionToLocations.put(trp.hashCode(), new HashSet<Location>());
+                toponymRegionToLocations.put(trp.hashCode(), new TIntHashSet());
             }
-            toponymRegionToLocations.get(trp.hashCode()).add(lrp.location);
+            toponymRegionToLocations.get(trp.hashCode()).add(lrp.location.id);
             currentRegions.add(lrp.regionIndex);
         }
 
@@ -118,14 +119,14 @@ public class RegionMapperCallback {
     /**
      * @return the regionMap
      */
-    public Map<Integer, Region> getRegionMap() {
+    public TIntObjectHashMap<Region> getRegionMap() {
         return regionMap;
     }
 
     /**
      * @return the reverseRegionMap
      */
-    public Map<Region, Integer> getReverseRegionMap() {
+    public TObjectIntHashMap<Region> getReverseRegionMap() {
         return reverseRegionMap;
     }
 
@@ -146,7 +147,7 @@ public class RegionMapperCallback {
     /**
      * @return the toponymRegionToLocations
      */
-    public TIntObjectHashMap<HashSet<Location>> getToponymRegionToLocations() {
+    public TIntObjectHashMap<TIntHashSet> getToponymRegionToLocations() {
         return toponymRegionToLocations;
     }
 }

@@ -300,8 +300,9 @@ public class WGGazetteer extends Gazetteer {
         }
     }
 
-    public List<Location> getAllLocalities() throws Exception {
-        ArrayList<Location> locationsToReturn = new ArrayList<Location>();
+    @Override
+    public TIntHashSet getAllLocalities() throws SQLException {
+        TIntHashSet locationsToReturn = new TIntHashSet();
 
         ResultSet rs = stat.executeQuery("select * from places where type = \"locality\";");
         while (rs.next()) {
@@ -312,7 +313,8 @@ public class WGGazetteer extends Gazetteer {
                   rs.getInt("pop"),
                   rs.getString("container"),
                   0);
-            locationsToReturn.add(locationToAdd);
+            idxToLocationMap.put(locationToAdd.id, locationToAdd);
+            locationsToReturn.add(locationToAdd.id);
         }
         rs.close();
         return locationsToReturn;

@@ -15,7 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
+import gnu.trove.TIntHashSet;
 import gnu.trove.TIntIntHashMap;
+import gnu.trove.TIntIterator;
 
 import java.io.File;
 
@@ -39,18 +41,18 @@ public class RandomBaselineModel extends Model {
     public static Random myRandom = new Random();
 
     public RandomBaselineModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
-	super(gaz, bscale, paragraphsAsDocs);
+        super(gaz, bscale, paragraphsAsDocs);
     }
 
     public RandomBaselineModel(CommandLineOptions options) throws Exception {
-	super(options);
+        super(options);
     }
 
-    public List<Location> disambiguateAndCountPlacenames() throws Exception {
+    public TIntHashSet disambiguateAndCountPlacenames() throws Exception {
 
         System.out.println("Disambiguating place names found...");
 
-        locations = new ArrayList<Location>();
+        locations = new TIntHashSet();
         //TIntHashSet locationsFound = new TIntHashSet();
 
         TIntIntHashMap idsToCounts = new TIntIntHashMap();
@@ -66,7 +68,7 @@ public class RandomBaselineModel extends Model {
 
             for (int i = 0; i < curDocSpans.size(); i++) {//int topidx : curDocSpans) {*/
             if (tokenArrayBuffer.toponymVector[i] == 0) {
-		tokenArrayBuffer.modelLocationArrayList.add(null);
+                tokenArrayBuffer.modelLocationArrayList.add(null);
                 continue;
             }
             int topidx = tokenArrayBuffer.wordVector[i];
@@ -80,24 +82,17 @@ public class RandomBaselineModel extends Model {
 
             if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
             {
-		tokenArrayBuffer.modelLocationArrayList.add(null);
+                tokenArrayBuffer.modelLocationArrayList.add(null);
                 continue;
             }
 
             // try the cache first. if not in there, do a full DB lookup and add that pair to the cache:
-            List<Location> possibleLocations = gazCache.get(placename);
-            if (possibleLocations == null) {
-                possibleLocations = gazetteer.get(placename);
-		/*System.out.println(possibleLocations.size());
-		for(Location temploc : possibleLocations) {
-		    System.out.println(temploc);
-		    }*/
-                gazCache.put(placename, possibleLocations);
-                addLocationsToRegionArray(possibleLocations);
-            }
+            TIntHashSet possibleLocations = gazetteer.get(placename);
+            addLocationsToRegionArray(possibleLocations);
 
-            Location curLocation = randomDisambiguate(possibleLocations);
-	    tokenArrayBuffer.modelLocationArrayList.add(curLocation);
+            int curLocationIdx = randomDisambiguate(possibleLocations);
+            Location curLocation = gazetteer.getLocation(curLocationIdx);
+            tokenArrayBuffer.modelLocationArrayList.add(curLocation);
             if (curLocation == null) {
                 continue;
             }
@@ -111,7 +106,7 @@ public class RandomBaselineModel extends Model {
 
             int curCount = idsToCounts.get(curLocation.id);
             if (curCount == 0) {// sentinel for not found in hashmap
-                locations.add(curLocation);
+                locations.add(curLocation.id);
                 curLocation.backPointers = new ArrayList<Integer>();
                 idsToCounts.put(curLocation.id, 1);
                 System.out.println("Found first " + curLocation.name + "; id = " + curLocation.id);
@@ -148,9 +143,10 @@ public class RandomBaselineModel extends Model {
             continue;*/
         }
 
-        for (int i = 0; i < locations.size(); i++) // set all the counts properly
-        {
-            locations.get(i).count = idsToCounts.get(locations.get(i).id);
+        for (TIntIterator it = locations.iterator(); it.hasNext();) {
+            int locid = it.next();
+            Location loc = gazetteer.getLocation(locid);
+            loc.count = idsToCounts.get(locid);
         }
 
         System.out.println("Done.");
@@ -158,22 +154,24 @@ public class RandomBaselineModel extends Model {
         return locations;
     }
 
-    // return a random Location
-    protected Location randomDisambiguate(List<Location> possibleLocations) throws Exception {
-	
-	int size = possibleLocations.size();
+    // return a random Location index
+    protected int randomDisambiguate(TIntHashSet possibleLocations)
+          throws Exception {
 
-	if(size == 0)
-	    return null;
+        int size = possibleLocations.size();
 
-	int randIndex = myRandom.nextInt(size);
+        if (size == 0) {
+            return -1;
+        }
 
-	Location toReturn = possibleLocations.get(randIndex);
+        int randIndex = myRandom.nextInt(size);
 
-	/*System.out.println("Random number " + randIndex + " yielded:");
-	  System.out.println(toReturn);*/
+        int toReturn = possibleLocations.toArray()[randIndex];
 
-	return toReturn;
+        /*System.out.println("Random number " + randIndex + " yielded:");
+        System.out.println(toReturn);*/
+
+        return toReturn;
     }
 
     @Override
