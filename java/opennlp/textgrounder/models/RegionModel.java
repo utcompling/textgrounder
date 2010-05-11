@@ -432,8 +432,11 @@ public class RegionModel extends TopicModel {
               it.hasNext();) {
             it.advance();
             Location loc = it.value();
-            if (loc.backPointers.size() != 0) {
-                locations.add(loc.id);
+            try {
+                if (loc.backPointers.size() != 0) {
+                    locations.add(loc.id);
+                }
+            } catch (NullPointerException e) {
             }
         }
     }
