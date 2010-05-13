@@ -103,13 +103,13 @@ public abstract class Model {
      */
     protected Lexicon lexicon;
     /**
-     * Flag that tells system to ignore the input file(s) and instead run on every locality in the gazetteer
-     */
-    /**
      * Evaluation directory; null if no evaluation is to be done.
      */
     protected String evalDir = null;
     protected File inputFile;
+    /**
+     * Flag that tells system to ignore the input file(s) and instead run on every locality in the gazetteer
+     */
     protected boolean runWholeGazetteer = false;
     protected int windowSize;
     protected TokenArrayBuffer tokenArrayBuffer;
