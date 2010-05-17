@@ -17,6 +17,7 @@ package opennlp.textgrounder.topostructs;
 
 public class Coordinate {
     private final static double twoPI = 2*Math.PI;
+    private final static double EARTH_RADIUS_MI = 3963.191;
 
     public double longitude;
     public double latitude;
@@ -61,5 +62,15 @@ public class Coordinate {
 
     public String toString() {
 	return latitude + "," + longitude;
+    }
+
+    public double computeDistanceTo(Coordinate other) {
+	double thisRadLat = (this.latitude / 180) * Math.PI;
+	double thisRadLong = (this.longitude / 180) * Math.PI;
+	double otherRadLat = (other.latitude / 180) * Math.PI;
+	double otherRadLong = (other.longitude / 180) * Math.PI;
+	
+	return EARTH_RADIUS_MI * Math.acos(Math.sin(thisRadLat)*Math.sin(otherRadLat)
+					   + Math.cos(thisRadLat)*Math.cos(otherRadLat)*Math.cos(otherRadLong-thisRadLong));
     }
 }
