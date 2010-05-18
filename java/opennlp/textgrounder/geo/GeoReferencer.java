@@ -51,6 +51,10 @@ public class GeoReferencer extends BaseApp {
 	    System.out.println("Using RANDOM baseline model.");
 	    grefUS = new RandomBaselineModel(modelOptions);
 	}
+	else if(modelOptions.model.toLowerCase().startsWith("basicmin")) {
+	    System.out.println("Using BASIC MIN DISTANCE model.");
+	    grefUS = new BasicMinDistanceModel(modelOptions);
+	}
 	else {
 	    System.err.println("Invalid model type: " + modelOptions.model);
 	    System.exit(0);

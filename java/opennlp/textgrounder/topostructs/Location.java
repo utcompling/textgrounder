@@ -83,4 +83,8 @@ public class Location {
         }
         return true;
     }
+
+    public double computeDistanceTo(Location other) {
+	return this.coord.computeDistanceTo(other.coord);
+    }
 }
