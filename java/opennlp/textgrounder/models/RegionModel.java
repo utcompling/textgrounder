@@ -51,11 +51,11 @@ public class RegionModel extends TopicModel {
      */
     protected RegionMapperCallback regionMapperCallback;
     /**
-     * Vector of toponyms. If 0, the word is not a toponym. If 1, it1 is.
+     * Vector of toponyms. If 0, the word is not a toponym. If 1, it is.
      */
     protected int[] toponymVector;
     /**
-     * Vector of stopwords. If 0, the word is not a stopword. If 1, it1 is.
+     * Vector of stopwords. If 0, the word is not a stopword. If 1, it is.
      */
     protected int[] stopwordVector;
     /**

@@ -71,11 +71,11 @@ public class Lexicon implements Serializable {
     }
 
     /**
-     * Add word to sequence of indices in Lexicon. If the word does not
-     * exist in the dictionary, add it to the dictionary as well.
+     * Add word to Lexicon and return the index value of the word. If the word
+     * already exists in the dictionary, retrieve the index and its value.
      *
-     * @param word
-     * @return index of the word that has been added
+     * @param word string to add and/or retrieve
+     * @return index of the word that has been added or is in the lexicon
      */
     public int addWord(String word) {
         int idx = 0;

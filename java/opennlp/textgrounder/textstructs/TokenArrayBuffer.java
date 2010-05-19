@@ -194,7 +194,11 @@ public class TokenArrayBuffer {
 	    copyToArray(goldLocationVector, goldLocationArrayList);
 	    }*/
 
-        wordArrayList = documentArrayList = toponymArrayList = stopwordArrayList/* = goldLocationArrayList*/ = null;
+        wordArrayList.clear();
+        documentArrayList.clear();
+        toponymArrayList.clear();
+        stopwordArrayList.clear();
+        wordArrayList = documentArrayList = toponymArrayList = stopwordArrayList= null;
     }
 
     /**

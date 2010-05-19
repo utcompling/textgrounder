@@ -30,6 +30,11 @@ import opennlp.textgrounder.textstructs.Lexicon;
 import opennlp.textgrounder.topostructs.Region;
 
 /**
+ * Serializable class for storing lexicon, path to input, regions and coordinates,
+ * probabilities of topics and probabilities of words given topics. The parameters
+ * are trained from the RegionModel. The parameters can then be read in from
+ * the command line through TopicParameterToKML and used to generate kml files
+ * that visualize the probabilities of individual words given regions.
  *
  * @author tsmoon
  */
@@ -37,11 +42,12 @@ public class SerializableParameters implements Serializable {
 
     static private final long serialVersionUID = 13114338L;
     /**
-     *
+     * 
      */
     protected SerializableParameters loadBuffer = null;
     /**
-     * Training data
+     * Location of training data. Not actually used to read data. Merely
+     * required to generate kml files that include inputPath in the header
      */
     protected String inputPath;
     /**
@@ -49,7 +55,7 @@ public class SerializableParameters implements Serializable {
      */
     TIntObjectHashMap<Region> regionMap;
     /**
-     * Probability of topics
+     * Probability of topics (regions)
      */
     protected double[] topicProbs;
     /**
@@ -58,10 +64,17 @@ public class SerializableParameters implements Serializable {
      */
     protected double[] wordByTopicProbs;
     /**
-     * Collection of training data
+     * Lexicon that stores mappings from word indices to words and back.
      */
     protected Lexicon lexicon;
 
+    /**
+     * Loads parameters stored in a file given a path and a RegionModel instance.
+     * 
+     * @param filename Path to stored model
+     * @param rm RegionModel instance that holds the loaded parameters as fields.
+     * @throws IOException
+     */
     public void loadParameters(String filename, RegionModel rm) throws
           IOException {
         ObjectInputStream modelIn =
@@ -80,6 +93,14 @@ public class SerializableParameters implements Serializable {
         loadBuffer = null;
     }
 
+    /**
+     * Stores parameters learned by running RegionModel on training data. The
+     * parameters are saved to the designated path.
+     *
+     * @param filename Path to store parameters to
+     * @param rm RegionModel instance that holds the learned parameters as fields.
+     * @throws IOException
+     */
     public void saveParameters(String filename, RegionModel rm) throws
           IOException {
         inputPath = rm.inputPath;
