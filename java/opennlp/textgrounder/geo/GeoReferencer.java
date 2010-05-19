@@ -43,7 +43,7 @@ public class GeoReferencer extends BaseApp {
 	}
 
 	Model grefUS = null;
-	if(modelOptions.model.toLowerCase().startsWith("p")) {
+	if(modelOptions.model.toLowerCase().startsWith("pop")) {
 	    System.out.println("Using POPULATION baseline model.");
 	    grefUS = new BaselineModel(modelOptions);
 	}
@@ -54,6 +54,10 @@ public class GeoReferencer extends BaseApp {
 	else if(modelOptions.model.toLowerCase().startsWith("basicmin")) {
 	    System.out.println("Using BASIC MIN DISTANCE model.");
 	    grefUS = new BasicMinDistanceModel(modelOptions);
+	}
+	else if(modelOptions.model.toLowerCase().startsWith("prob")) {
+	    System.out.println("Using PROBABILISTIC MIN DISTANCE model (" + modelOptions.modelIterations + " iterations).");
+	    grefUS = new ProbabilisticMinDistanceModel(modelOptions);
 	}
 	else {
 	    System.err.println("Invalid model type: " + modelOptions.model);

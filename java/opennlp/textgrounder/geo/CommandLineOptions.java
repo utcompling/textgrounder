@@ -138,6 +138,10 @@ public class CommandLineOptions {
      */
     protected String model = "population";
     /**
+     * Model iterations (e.g. for PopulationMinDistanceModel)
+     */
+    protected int modelIterations = 10;
+    /**
      * A flag that runs the system on every locality in the gazetteer, ignoring the input text file(s), if set to true
      */
     protected boolean runWholeGazetteer = false;
@@ -203,7 +207,13 @@ public class CommandLineOptions {
                     trainedModelPath = value;
                     break;
                 case 'm':
-                    model = value;
+		    opt = option.getOpt();
+		    if(opt.equals("m")) {
+			model = value;
+		    }
+		    else if(opt.equals("mi")) {
+			modelIterations = Integer.parseInt(value);
+		    }
                     break;
                 case 'o':
                     opt = option.getOpt();
@@ -328,6 +338,10 @@ public class CommandLineOptions {
 
     public String getModel() {
         return model;
+    }
+
+    public int getModelIterations() {
+	return modelIterations;
     }
 
     public String getTestInputPath() {

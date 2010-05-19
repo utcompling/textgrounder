@@ -106,6 +106,10 @@ public abstract class Model {
      * Flag that tells system to ignore the input file(s) and instead run on every locality in the gazetteer
      */
     /**
+     * Model iterations (e.g. for ProbabilisticMinDistanceModel)
+     */
+    protected int modelIterations;
+    /**
      * Evaluation directory; null if no evaluation is to be done.
      */
     protected String evalDir = null;
@@ -165,6 +169,8 @@ public abstract class Model {
             System.exit(0);
             //myGaz = new WGGazetteer();
         }
+
+	modelIterations = options.getModelIterations();
 
         kmlOutputFilename = options.getKMLOutputFilename();
         degreesPerRegion = options.getDegreesPerRegion();
@@ -425,8 +431,6 @@ public abstract class Model {
 
         if (tokenArrayBuffer.modelLocationArrayList.size() != tokenArrayBuffer.goldLocationArrayList.size()) {
             System.out.println("MISMATCH: model: " + tokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + tokenArrayBuffer.goldLocationArrayList.size());
-            System.out.println(tokenArrayBuffer.wordVector.length);
-            System.out.println(tokenArrayBuffer.size());
             System.exit(0);
         }
 
