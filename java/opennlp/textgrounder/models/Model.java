@@ -103,9 +103,6 @@ public abstract class Model {
      */
     protected Lexicon lexicon;
     /**
-     * Flag that tells system to ignore the input file(s) and instead run on every locality in the gazetteer
-     */
-    /**
      * Model iterations (e.g. for ProbabilisticMinDistanceModel)
      */
     protected int modelIterations;
@@ -114,6 +111,9 @@ public abstract class Model {
      */
     protected String evalDir = null;
     protected File inputFile;
+    /**
+     * Flag that tells system to ignore the input file(s) and instead run on every locality in the gazetteer
+     */
     protected boolean runWholeGazetteer = false;
     protected int windowSize;
     protected TokenArrayBuffer tokenArrayBuffer;

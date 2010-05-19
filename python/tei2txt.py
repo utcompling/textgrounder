@@ -8,10 +8,12 @@ import fnmatch
 
 from codecs import latin_1_decode
 from unicodedata import normalize
+from tei_entities import pcl_tei_entities
 
 commaRE = re.compile(",")
 nonAlpha = re.compile("[^A-Za-z]")
 
+pte = pcl_tei_entities()
 
 def cleanWord(word):
     word = word.lower()
@@ -19,18 +21,18 @@ def cleanWord(word):
         word = ""
     return word
 
-
 def strip_text (text):
     text = latin_1_decode(text)[0]
     text = normalize('NFD',text).encode('ascii','ignore')
 
     text = re.sub('&mdash+;', ' ', text)   # convert mdash to " "
-    text = re.sub('&[A-Za-z]+;', '', text)   # convert ampersand stuff to ""
+#    text = re.sub('&amp;', ' and ', text)   # convert mdash to " "
+    text = pte.replace_entities(text)
+#    text = re.sub('&[A-Za-z]+;', '', text)   # convert ampersand stuff to ""
     text = re.sub('<[^>]*>', ' ', text)   # strip HTML markup
     text = re.sub('\s+', ' ', text)      # strip whitespace
 
     return text
-
 
 directory_name = sys.argv[1]
 output_raw_dir = sys.argv[2]
