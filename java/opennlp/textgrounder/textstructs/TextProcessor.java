@@ -453,10 +453,19 @@ public class TextProcessor {
     }
 
     /**
-     * 
-     * @param sarray
-     * @param idx
-     * @return
+     * Retrieve first string of alphanumeric elements in an array of strings.
+     *
+     * The Stanford NER will add multiple /O, /LOCATION, /PERSON etc. tags to
+     * a single token if it includes punctuation (though there might be other
+     * character types that trigger the NER system to add multiple tags). We
+     * take this token with multiple tags and split it on the slashes. This
+     * method will find the first string that includes only characters
+     * that fit the regex <p>^\\W*$</p>. If no such string is found, it
+     * returns the empty string "".
+     *
+     * @param sarray Array of strings.
+     * @param idx Index value in array of strings to examine
+     * @return String that has only alphanumeric characters
      */
     protected String retrieveWord(String[] sarray, int idx) {
         String cur = null;
