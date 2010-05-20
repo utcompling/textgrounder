@@ -22,16 +22,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;
-import org.jdom.Namespace;
 import org.jdom.input.SAXBuilder;
-import org.jdom.xpath.XPath;
 
 /**
  * 
- * @author 
+ * @author tsmoon
  */
 public class TextProcessorPCLXML extends TextProcessor {
 
@@ -46,24 +45,10 @@ public class TextProcessorPCLXML extends TextProcessor {
     }
 
     /**
-     * Identify toponyms and populate lexicon from input file.
      * 
-     * This method only splits any incoming document into smaller 
-     * subdocuments based on Lexicon.parAsDocSize. The actual work of
-     * identifying toponyms, converting tokens to indexes, and populating
-     * arrays is handled in addToponymSpans.
-     * 
-     * @param locationOfFile path to input. must be a single file
-     * @param lexicon the Lexicon instance that contains both the sequence
-     * of token indexes and the lexicon.
-     * @param tokenArrayBuffer buffer that holds the array of token indexes,
-     * document indexes, and the toponym indexes. If this class object is
-     * not needed from the calling class, then a NullTokenArrayBuffer is
-     * instantiated and passed. Nothing happens inside this object.
-     * @param stopwordList table that contains the list of stopwords. if
-     * this is an instance of NullStopwordList, it will return false
-     * through stopwordList.isStopWord for every string token examined
-     * (i.e. the token is not a stopword).
+     * @param locationOfFile
+     * @param tokenArrayBuffer
+     * @param stopwordList
      * @throws FileNotFoundException
      * @throws IOException
      */

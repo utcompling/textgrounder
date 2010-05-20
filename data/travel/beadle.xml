@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<!DOCTYPE TEI.2 SYSTEM "http://www.library.unt.edu/digitalprojects/webref/travel.dtd"
+<!DOCTYPE TEI.2 SYSTEM "travel.dtd"
  [
       	<!ENTITY % TEI.XML   'INCLUDE' >
       	<!ENTITY % TEI.prose 'INCLUDE' >

@@ -113,31 +113,14 @@ public class RegionModel extends TopicModel {
         super.initialize(options);
 
         initializeFromOptions(options);
-//        BaselineModel baselineModel = null;
 
-//        try {
-//            baselineModel = new BaselineModel(options);
-//            tokenArrayBuffer = new TokenArrayBuffer(baselineModel.lexicon);
         tokenArrayBuffer = new TokenArrayBuffer(lexicon);
         StopwordList stopwordList = new StopwordList();
         sW = stopwordList.size();
-//            baselineModel.processPath(baselineModel.getInputFile(),
-//                  baselineModel.getTextProcessor(), tokenArrayBuffer,
-//                  stopwordList);
         processPath(inputFile, textProcessor, tokenArrayBuffer, stopwordList);
+
         tokenArrayBuffer.convertToPrimitiveArrays();
-//        } catch (Exception ex) {
-//            ex.printStackTrace();
-//            System.exit(1);
-//        }
-
-//        baselineModel.initializeRegionArray();
-
         initializeRegionArray();
-
-//        this.gazetteer = baselineModel.gazetteer;
-//        this.textProcessor = baselineModel.textProcessor;
-//        this.lexicon = baselineModel.lexicon;
 
         locationSet = new TIntHashSet();
 
