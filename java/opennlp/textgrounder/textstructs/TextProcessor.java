@@ -19,6 +19,8 @@ import edu.stanford.nlp.ie.crf.*;
 import edu.stanford.nlp.ling.CoreAnnotations.*;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 import opennlp.textgrounder.util.*;
@@ -59,6 +61,23 @@ public class TextProcessor {
      * The number of paragraphs to treat as a single document.
      */
     protected final int parAsDocSize;
+
+    /**
+     * Constructor only to be used with derived classes
+     * 
+     * @param lexicon
+     * @throws ClassCastException
+     * @throws IOException
+     * @throws ClassNotFoundException
+     */
+    protected TextProcessor(Lexicon lexicon) throws ClassCastException,
+          IOException, ClassNotFoundException {
+        parAsDocSize = Integer.MAX_VALUE;
+        Properties myClassifierProperties = new Properties();
+        classifier = new CRFClassifier(myClassifierProperties);
+        classifier.loadClassifier(Constants.STANFORD_NER_HOME + "/classifiers/ner-eng-ie.crf-3-all2008-distsim.ser.gz");
+        this.lexicon = lexicon;
+    }
 
     /**
      * Default constructor. Instantiate CRFClassifier.
@@ -420,27 +439,33 @@ public class TextProcessor {
                 /**
                  * Add the current token
                  */
-                cur = retrieveWord(token.split("/"), 0);//token.split("/")[0].toLowerCase();
-                if (!cur.isEmpty()) {
-                    int isstop = 0;
-                    if (stopwordList.isStopWord(cur)) {
-                        isstop = 1;
+                List<String> subtokes = retrieveWords(token);
+                for (String subtoke : subtokes) {
+                    if (!subtoke.isEmpty()) {
+                        subtoke = subtoke.trim().toLowerCase();
+                        int isstop = 0;
+                        if (stopwordList.isStopWord(subtoke)) {
+                            isstop = 1;
+                        }
+                        wordidx = lexicon.addWord(subtoke);
+                        tokenArrayBuffer.addElement(wordidx, currentDoc, 0, isstop);
                     }
-                    wordidx = lexicon.addWord(cur);
-                    tokenArrayBuffer.addElement(wordidx, currentDoc, 0, isstop);
                 }
 
                 toponymStartIndex = -1;
                 toponymEndIndex = -1;
             } else {
-                String cur = retrieveWord(token.split("/"), 0);//token.split("/")[0].toLowerCase();
-                if (!cur.isEmpty()) {
-                    int isstop = 0;
-                    if (stopwordList.isStopWord(cur)) {
-                        isstop = 1;
+                List<String> subtokes = retrieveWords(token);
+                for (String subtoke : subtokes) {
+                    if (!subtoke.isEmpty()) {
+                        subtoke = subtoke.trim().toLowerCase();
+                        int isstop = 0;
+                        if (stopwordList.isStopWord(subtoke)) {
+                            isstop = 1;
+                        }
+                        wordidx = lexicon.addWord(subtoke);
+                        tokenArrayBuffer.addElement(wordidx, currentDoc, 0, isstop);
                     }
-                    wordidx = lexicon.addWord(cur);
-                    tokenArrayBuffer.addElement(wordidx, currentDoc, 0, isstop);
                 }
             }
         }
@@ -450,6 +475,22 @@ public class TextProcessor {
             int wordidx = lexicon.addWord(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
             tokenArrayBuffer.addElement(wordidx, currentDoc, 1, 0);
         }
+    }
+
+    /**
+     * 
+     * @param token
+     * @return
+     */
+    protected List<String> retrieveWords(String token) {
+        String[] sarray = token.split("(/LOCATION|/PERSON|/ORGANIZATION|/O)");
+        List<String> valid_tokens = new ArrayList<String>();
+        for (String cur : sarray) {
+            if (!cur.matches("^\\W*$")) {
+                valid_tokens.add(cur);
+            }
+        }
+        return valid_tokens;
     }
 
     /**
@@ -467,14 +508,14 @@ public class TextProcessor {
      * @param idx Index value in array of strings to examine
      * @return String that has only alphanumeric characters
      */
-    protected String retrieveWord(String[] sarray, int idx) {
+    protected String retrieveWords(String[] sarray, int idx) {
         String cur = null;
         try {
             cur = sarray[idx];
         } catch (ArrayIndexOutOfBoundsException e) {
             return "";
         }
-        
+
         if (idx != 0 && cur.startsWith("O")) {
             cur = cur.substring(1);
         }
@@ -482,7 +523,7 @@ public class TextProcessor {
         if (!cur.matches("^\\W*$")) {
             return cur;
         } else {
-            return retrieveWord(sarray, idx + 1);
+            return retrieveWords(sarray, idx + 1);
         }
     }
 

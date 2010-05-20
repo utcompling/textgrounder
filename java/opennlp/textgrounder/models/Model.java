@@ -18,12 +18,17 @@ package opennlp.textgrounder.models;
 import gnu.trove.TIntHashSet;
 import gnu.trove.TIntIterator;
 import gnu.trove.TIntObjectHashMap;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.sql.SQLException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import opennlp.textgrounder.textstructs.TokenArrayBuffer;
 import opennlp.textgrounder.textstructs.TextProcessor;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.FilenameFilter;
 
 import java.util.ArrayList;
 import java.util.Hashtable;
@@ -128,8 +133,27 @@ public abstract class Model {
         lexicon = new Lexicon();
     }
 
-    public Model(CommandLineOptions options) throws Exception {
+    public Model(CommandLineOptions options) {
+        try {
+            initialize(options);
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(Model.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(Model.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(Model.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (SQLException ex) {
+            Logger.getLogger(Model.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
 
+    /**
+     *
+     * @param options
+     */
+    protected void initialize(CommandLineOptions options) throws
+          FileNotFoundException, IOException, ClassNotFoundException,
+          SQLException {
         runWholeGazetteer = options.getRunWholeGazetteer();
         evalDir = options.getEvalDir();
 
@@ -170,7 +194,7 @@ public abstract class Model {
             //myGaz = new WGGazetteer();
         }
 
-	modelIterations = options.getModelIterations();
+        modelIterations = options.getModelIterations();
 
         kmlOutputFilename = options.getKMLOutputFilename();
         degreesPerRegion = options.getDegreesPerRegion();
@@ -179,7 +203,12 @@ public abstract class Model {
             paragraphsAsDocs = options.getParagraphsAsDocs();
             lexicon = new Lexicon();
 
-            if (evalDir == null) {
+            String fname = inputFile.getName();
+            if (inputFile.isDirectory() && inputFile.list(new PCLXMLFilter()).length != 0) {
+                textProcessor = new TextProcessorPCLXML(lexicon);
+            } else if (fname.startsWith("txu") && fname.endsWith(".xml")) {
+                textProcessor = new TextProcessorPCLXML(lexicon);
+            } else if (evalDir == null) {
                 textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
             } else {
                 textProcessor = new TextProcessor(lexicon, paragraphsAsDocs, true);
@@ -499,5 +528,12 @@ public abstract class Model {
      */
     public TextProcessor getTextProcessor() {
         return textProcessor;
+    }
+
+    class PCLXMLFilter implements FilenameFilter {
+
+        public boolean accept(File dir, String name) {
+            return (name.startsWith("txu") && name.endsWith(".xml"));
+        }
     }
 }

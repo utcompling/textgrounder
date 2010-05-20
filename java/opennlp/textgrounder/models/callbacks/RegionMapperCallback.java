@@ -20,10 +20,6 @@ import gnu.trove.TIntObjectHashMap;
 import gnu.trove.TIntObjectIterator;
 import gnu.trove.TObjectIntHashMap;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-
 import opennlp.textgrounder.textstructs.Lexicon;
 import opennlp.textgrounder.topostructs.*;
 

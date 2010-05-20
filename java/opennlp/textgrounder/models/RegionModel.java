@@ -19,21 +19,21 @@ import gnu.trove.TIntHashSet;
 import gnu.trove.TIntIterator;
 import gnu.trove.TIntObjectHashMap;
 import gnu.trove.TIntObjectIterator;
+
 import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.SQLException;
-import opennlp.textgrounder.textstructs.StopwordList;
-import opennlp.textgrounder.textstructs.TokenArrayBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.models.callbacks.*;
+import opennlp.textgrounder.textstructs.StopwordList;
+import opennlp.textgrounder.textstructs.TokenArrayBuffer;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.Constants;
 import opennlp.textgrounder.util.KMLUtil;
@@ -83,7 +83,17 @@ public class RegionModel extends TopicModel {
      */
     public RegionModel(CommandLineOptions options) {
         regionMapperCallback = new RegionMapperCallback();
-        initialize(options);
+        try {
+            initialize(options);
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (SQLException ex) {
+            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     /**
@@ -96,34 +106,42 @@ public class RegionModel extends TopicModel {
      *
      * @param options
      */
-    protected void initialize(CommandLineOptions options) {
+    @Override
+    protected void initialize(CommandLineOptions options) throws
+          FileNotFoundException, IOException, ClassNotFoundException,
+          SQLException {
+        super.initialize(options);
 
         initializeFromOptions(options);
-        BaselineModel baselineModel = null;
+//        BaselineModel baselineModel = null;
 
-        try {
-            baselineModel = new BaselineModel(options);
-            tokenArrayBuffer = new TokenArrayBuffer(baselineModel.lexicon);
-            StopwordList stopwordList = new StopwordList();
-            sW = stopwordList.size();
-            baselineModel.processPath(baselineModel.getInputFile(),
-                  baselineModel.getTextProcessor(), tokenArrayBuffer,
-                  stopwordList);
-            tokenArrayBuffer.convertToPrimitiveArrays();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            System.exit(1);
-        }
+//        try {
+//            baselineModel = new BaselineModel(options);
+//            tokenArrayBuffer = new TokenArrayBuffer(baselineModel.lexicon);
+        tokenArrayBuffer = new TokenArrayBuffer(lexicon);
+        StopwordList stopwordList = new StopwordList();
+        sW = stopwordList.size();
+//            baselineModel.processPath(baselineModel.getInputFile(),
+//                  baselineModel.getTextProcessor(), tokenArrayBuffer,
+//                  stopwordList);
+        processPath(inputFile, textProcessor, tokenArrayBuffer, stopwordList);
+        tokenArrayBuffer.convertToPrimitiveArrays();
+//        } catch (Exception ex) {
+//            ex.printStackTrace();
+//            System.exit(1);
+//        }
 
-        baselineModel.initializeRegionArray();
+//        baselineModel.initializeRegionArray();
 
-        this.gazetteer = baselineModel.gazetteer;
-        this.textProcessor = baselineModel.textProcessor;
-        this.lexicon = baselineModel.lexicon;
+        initializeRegionArray();
+
+//        this.gazetteer = baselineModel.gazetteer;
+//        this.textProcessor = baselineModel.textProcessor;
+//        this.lexicon = baselineModel.lexicon;
 
         locationSet = new TIntHashSet();
 
-        setAllocateRegions(tokenArrayBuffer, baselineModel);
+        setAllocateRegions(tokenArrayBuffer);
     }
 
     /**
@@ -140,8 +158,7 @@ public class RegionModel extends TopicModel {
     /**
      *
      */
-    protected void setAllocateRegions(TokenArrayBuffer tokenArrayBuffer,
-          BaselineModel baselineModel) {
+    protected void setAllocateRegions(TokenArrayBuffer tokenArrayBuffer) {
         N = tokenArrayBuffer.size();
         /**
          * Here we distinguish between the full dictionary size (fW) and the
@@ -192,7 +209,7 @@ public class RegionModel extends TopicModel {
                     }
                     possibleLocations = tempLocs;
 
-                    baselineModel.addLocationsToRegionArray(possibleLocations, gazetteer, regionMapperCallback);
+                    addLocationsToRegionArray(possibleLocations, gazetteer, regionMapperCallback);
                     regionMapperCallback.addAll(placename, lexicon);
                     locationSet.addAll(possibleLocations.toArray());
                 } else {
