@@ -19,6 +19,8 @@ import edu.stanford.nlp.ling.CoreAnnotations.*;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -69,6 +71,7 @@ public class TextProcessorPCLXML extends TextProcessor {
             Element child = element.getChild("text").getChild("body");
             List<Element> divs = new ArrayList<Element>(child.getChildren("div"));
 
+//                        Collections.addAll(divs, (Element[]) child.getChildren("div").toArray());
             for (Element div : divs) {
                 StringBuffer buf = new StringBuffer();
                 List<Element> pars = new ArrayList<Element>(div.getChildren("p"));

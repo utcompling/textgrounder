@@ -18,27 +18,21 @@ package opennlp.textgrounder.models;
 import gnu.trove.TIntHashSet;
 import gnu.trove.TIntIterator;
 import gnu.trove.TIntObjectHashMap;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import opennlp.textgrounder.textstructs.TokenArrayBuffer;
-import opennlp.textgrounder.textstructs.TextProcessor;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.FilenameFilter;
-
-import java.util.ArrayList;
-import java.util.Hashtable;
-import java.util.List;
 
 import opennlp.textgrounder.gazetteers.*;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.textstructs.*;
 import opennlp.textgrounder.models.callbacks.*;
-import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.KMLUtil;
 
@@ -204,7 +198,9 @@ public abstract class Model {
             lexicon = new Lexicon();
 
             String fname = inputFile.getName();
-            if (inputFile.isDirectory() && inputFile.list(new PCLXMLFilter()).length != 0) {
+            if (options.isPCLXML()) {
+                textProcessor = new TextProcessorPCLXML(lexicon);
+            } else if (inputFile.isDirectory() && inputFile.list(new PCLXMLFilter()).length != 0) {
                 textProcessor = new TextProcessorPCLXML(lexicon);
             } else if (fname.startsWith("txu") && fname.endsWith(".xml")) {
                 textProcessor = new TextProcessorPCLXML(lexicon);

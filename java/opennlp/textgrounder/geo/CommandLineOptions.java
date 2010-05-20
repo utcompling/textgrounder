@@ -149,6 +149,10 @@ public class CommandLineOptions {
      * Evaluation directory; null if no evaluation is to be done.
      */
     protected String evalDir = null;
+    /**
+     * Whether format of input data is in tei encoded pcl-travel xml file
+     */
+    protected boolean PCLXML = false;
 
     /**
      *
@@ -255,6 +259,9 @@ public class CommandLineOptions {
                     } else {
                         outputPerClass = Integer.parseInt(value);
                     }
+                    break;
+                case 'x':
+                    PCLXML = true;
                     break;
             }
         }
@@ -366,5 +373,9 @@ public class CommandLineOptions {
 
     public String getGazetteerPath() {
         return gazetteerPath;
+    }
+
+    public boolean isPCLXML() {
+        return PCLXML;
     }
 }

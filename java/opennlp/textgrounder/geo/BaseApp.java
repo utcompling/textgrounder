@@ -55,6 +55,7 @@ public class BaseApp {
         options.addOption("w", "output-per-class", true, "number of words to output to path specified in output-tabulated-probabilities (default=10)");
 	options.addOption("wg", "whole-gazetteer", false, "activate regions and run program for entire gazetteer (the -i flag will be ignored in this case)");
 	options.addOption("ws", "window-size", true, "size of context window (in either direction) (default=20)");
+        options.addOption("x", "pclxml", false, "whether format of input file is pcl-travel xml format or not");
 
         options.addOption("h", "help", false, "print help");
     }
