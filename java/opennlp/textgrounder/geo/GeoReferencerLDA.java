@@ -50,6 +50,10 @@ public class GeoReferencerLDA extends BaseApp {
             rm.printTabulatedProbabilities();
         }
 
+        if(modelOptions.getEvalDir() != null) {
+            rm.evaluate();
+        }
+
         if (modelOptions.getKMLOutputFilename() != null) {
             rm.writeXMLFile();
         }

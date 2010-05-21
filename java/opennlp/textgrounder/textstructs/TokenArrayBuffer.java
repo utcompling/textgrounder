@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import opennlp.textgrounder.models.callbacks.NullTrainingMaterialCallback;
 import opennlp.textgrounder.models.callbacks.TrainingMaterialCallback;
+import opennlp.textgrounder.topostructs.Location;
 
 /**
  * Class of integer sequences that indicate words in a stream of space
@@ -162,6 +163,25 @@ public class TokenArrayBuffer {
      */
     public void addElement(int wordIdx, int docIdx, int topStatus,
           int stopStatus) {
+        addElement(wordIdx, docIdx, topStatus, stopStatus, null);
+    }
+
+    /**
+     * Add all indexes and indicators to the array fields and increment size
+     * by one.
+     *
+     * @param wordIdx index of token being added. may be a placename, a
+     * multiword placename, a stopword, or something else.
+     * @param docIdx the index of the document that the current token was
+     * found in. The index grows by unit increments whenever a new document
+     * has been opened.
+     * @param topStatus the status of the current (multiword) token as a
+     * toponym. This will be one if it is a toponym and zero otherwise.
+     * @param stopStatus the status of the current token as a stopword. This
+     * will be one if it is a stopword and zero otherwise.
+     */
+    public void addElement(int wordIdx, int docIdx, int topStatus,
+          int stopStatus, Location loc) {
         wordArrayList.add(wordIdx);
         documentArrayList.add(docIdx);
         toponymArrayList.add(topStatus);
@@ -248,5 +268,17 @@ public class TokenArrayBuffer {
         for (int i = 0; i < ta.size(); ++i) {
             ia[i] = ta.get(i).intValue();
         }
+    }
+
+    protected boolean sanityCheck1() {
+        return toponymArrayList.size() == wordArrayList.size();
+    }
+
+    protected boolean sanityCheck2() {
+        return true;
+    }
+
+    protected boolean verboseSanityCheck(String curLine) {
+        return true;
     }
 }

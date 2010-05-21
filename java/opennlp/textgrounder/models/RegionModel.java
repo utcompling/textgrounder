@@ -32,7 +32,10 @@ import java.util.logging.Logger;
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.models.callbacks.*;
+import opennlp.textgrounder.ners.NullClassifier;
+import opennlp.textgrounder.textstructs.EvalTokenArrayBuffer;
 import opennlp.textgrounder.textstructs.StopwordList;
+import opennlp.textgrounder.textstructs.TextProcessor;
 import opennlp.textgrounder.textstructs.TokenArrayBuffer;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.Constants;
@@ -116,29 +119,13 @@ public class RegionModel extends TopicModel {
           SQLException {
         super.initialize(options);
         initializeFromOptions(options);
-
         trainTokenArrayBuffer = new TokenArrayBuffer(lexicon, new TrainingMaterialCallback(lexicon));
         stopwordList = new StopwordList();
-        sW = stopwordList.size();
         processTrainInputPath(trainInputFile, textProcessor, trainTokenArrayBuffer, stopwordList);
-
         trainTokenArrayBuffer.convertToPrimitiveArrays();
         initializeRegionArray();
-
         locationSet = new TIntHashSet();
-
         setAllocateRegions(trainTokenArrayBuffer);
-    }
-
-    /**
-     * 
-     * @param options
-     */
-    @Override
-    protected void initializeFromOptions(CommandLineOptions options) {
-        super.initializeFromOptions(options);
-        windowSize = options.getWindowSize();
-        kmlOutputFilename = options.getKMLOutputFilename();
     }
 
     /**
@@ -149,8 +136,9 @@ public class RegionModel extends TopicModel {
         /**
          * Here we distinguish between the full dictionary size (fW) and the
          * dictionary size without stopwords (W). Normalization is conducted with
-         * the dictionary size without stopwords.
+         * the dictionary size without stopwords, the size of which is sW.
          */
+        sW = stopwordList.size();
         fW = lexicon.getDictionarySize();
         W = fW - sW;
         D = tokenArrayBuffer.getNumDocs();
@@ -443,6 +431,21 @@ public class RegionModel extends TopicModel {
     @Override
     public void normalize() {
         normalize(stopwordList);
+    }
+
+    /**
+     *
+     */
+    @Override
+    public void evaluate() {
+        evalTokenArrayBuffer = new EvalTokenArrayBuffer(lexicon);
+
+        try {
+            processEvalInputPath(evalInputFile, textProcessor, evalTokenArrayBuffer, stopwordList);
+        } catch (IOException ex) {
+            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        super.evaluate();
     }
 
     /**

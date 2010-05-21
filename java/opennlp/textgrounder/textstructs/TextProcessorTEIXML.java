@@ -34,14 +34,14 @@ import org.jdom.input.SAXBuilder;
  * 
  * @author tsmoon
  */
-public class TextProcessorPCLXML extends TextProcessor {
+public class TextProcessorTEIXML extends TextProcessor {
 
     /**
      * Default constructor. Instantiate CRFClassifier.
      * 
      * @param lexicon lookup table for words and indexes
      */
-    public TextProcessorPCLXML(Lexicon lexicon) throws
+    public TextProcessorTEIXML(Lexicon lexicon) throws
           ClassCastException, IOException, ClassNotFoundException {
         super(lexicon);
     }
@@ -86,7 +86,7 @@ public class TextProcessorPCLXML extends TextProcessor {
             }
 
         } catch (JDOMException ex) {
-            Logger.getLogger(TextProcessorPCLXML.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(TextProcessorTEIXML.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 }

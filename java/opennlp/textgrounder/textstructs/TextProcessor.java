@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Properties;
 
 import opennlp.textgrounder.util.*;
-import opennlp.textgrounder.topostructs.*;
 
 /**
  * Array of array of toponym indexes.
@@ -91,21 +90,6 @@ public class TextProcessor {
         Properties myClassifierProperties = new Properties();
         classifier = new CRFClassifier(myClassifierProperties);
         classifier.loadClassifier(Constants.STANFORD_NER_HOME + "/classifiers/ner-eng-ie.crf-3-all2008-distsim.ser.gz");
-
-        this.lexicon = lexicon;
-        if (parAsDocSize == 0) {
-            this.parAsDocSize = Integer.MAX_VALUE;
-        } else {
-            this.parAsDocSize = parAsDocSize;
-        }
-    }
-
-    public TextProcessor(Lexicon lexicon, int parAsDocSize, boolean doingEval)
-          throws
-          ClassCastException, IOException, ClassNotFoundException {
-        //Properties myClassifierProperties = new Properties();
-        classifier = null;//new CRFClassifier(myClassifierProperties);
-        //classifier.loadClassifier(Constants.STANFORD_NER_HOME + "/classifiers/ner-eng-ie.crf-3-all2008-distsim.ser.gz");
 
         this.lexicon = lexicon;
         if (parAsDocSize == 0) {
@@ -203,161 +187,6 @@ public class TextProcessor {
         System.err.println();
 
         assert (tokenArrayBuffer.toponymArrayList.size() == tokenArrayBuffer.wordArrayList.size());
-    }
-
-    public void addToponymsFromGoldFile(String locationOfFile,
-          EvalTokenArrayBuffer evalTokenArrayBuffer, StopwordList stopwordList) throws
-          FileNotFoundException, IOException {
-
-        if (locationOfFile.endsWith("d663.tr")) {
-            System.err.println(locationOfFile + " has incorrect format; skipping.");
-            return;
-        }
-
-        BufferedReader textIn = new BufferedReader(new FileReader(locationOfFile));
-
-        String curLine = null;
-        while (true) {
-            curLine = textIn.readLine();
-            if (curLine == null) {
-                break;
-            }
-
-            if ((curLine.startsWith("\t") && (!curLine.startsWith("\tc") && !curLine.startsWith("\t>")))
-                  || (curLine.startsWith("c") && curLine.length() >= 2 && Character.isDigit(curLine.charAt(1)))) {
-                //System.err.println(curLine);
-                System.err.println(locationOfFile + " has incorrect format; skipping.");
-                return;
-            }
-
-        }
-        textIn.close();
-
-        textIn = new BufferedReader(new FileReader(locationOfFile));
-
-        System.out.println("Extracting gold standard toponym indices from " + locationOfFile + " ...");
-
-        curLine = null;
-        //StringBuffer buf = new StringBuffer();
-        //int counter = 1;
-        int wordidx = 0;
-        boolean lookingForGoldLoc = false;
-        System.err.print("Processing document:" + currentDoc + ",");
-        while (true) {
-            curLine = textIn.readLine();
-            if (curLine == null /*|| curLine.equals("")*/) {
-                break;
-            }
-            //buf.append(curLine);
-            //buf.append(" ");
-
-            // no idea where paragraph breaks are in TR-CoNLL dev/test sets...
-
-            /*if (counter < parAsDocSize) {
-            counter++;
-            } else {*/
-            //addGoldToponymSpans(curLine, evalTokenArrayBuffer, stopwordList);
-
-            if (lookingForGoldLoc && curLine.startsWith("\t>")) {
-                evalTokenArrayBuffer.goldLocationArrayList.add(parseLocation(curLine));
-                lookingForGoldLoc = false;
-                continue;
-            } else if (curLine.startsWith("\t")) {
-                continue;
-            } else if (lookingForGoldLoc && !curLine.startsWith("\t")) {
-                //there was no correct gold Location for this toponym
-                evalTokenArrayBuffer.goldLocationArrayList.add(null);
-                continue;
-            }
-
-            String[] tokens = curLine.split("\\t");
-
-            if (tokens.length < 2) {
-
-                continue;
-            }
-
-            String cur = tokens[0].toLowerCase();
-
-            wordidx = lexicon.addWord(cur);
-            if (!tokens[1].equals("LOC")) {
-                evalTokenArrayBuffer.addElement(wordidx, currentDoc, 0, stopwordList.isStopWord(cur)
-                      ? 1 : 0);
-                evalTokenArrayBuffer.goldLocationArrayList.add(null);
-            } else {
-                evalTokenArrayBuffer.addElement(wordidx, currentDoc, 1, stopwordList.isStopWord(cur)
-                      ? 1 : 0);
-                lookingForGoldLoc = true;
-                //gold standard Location will be added later, when line starting with tab followed by > occurs
-            }
-
-            if (Math.abs(evalTokenArrayBuffer.toponymArrayList.size() - evalTokenArrayBuffer.goldLocationArrayList.size()) > 1) {
-                System.out.println(curLine);
-                System.out.println("toponym: " + evalTokenArrayBuffer.toponymArrayList.size());
-                System.out.println("word: " + evalTokenArrayBuffer.wordArrayList.size());
-                System.out.println("gold: " + evalTokenArrayBuffer.goldLocationArrayList.size());
-                System.exit(0);
-            }
-
-            //buf = new StringBuffer();
-            //currentDoc += 1;
-            //counter = 1;
-            //System.err.print(currentDoc + ",");
-            // }
-        }
-
-        /**
-         * Add last lines if they have not been processed and added
-         */
-        /*        if (counter > 1) {
-        //addToponymSpans(curLine, evalTokenArrayBuffer, stopwordList);
-        if(lookingForGoldLoc && curLine.startsWith("\t>")) {
-        evalTokenArrayBuffer.goldLocationArrayList.add(parseLocation(curLine));
-        lookingForGoldLoc = false;
-        }
-        else if(!curLine.startsWith("\t")) {
-        String[] tokens = curLine.split("\\t");
-
-        if(tokens.length >= 2) {
-        String cur = tokens[0].toLowerCase();
-
-        wordidx = lexicon.addWord(cur);
-        if(!tokens[1].equals("LOC")) {
-        evalTokenArrayBuffer.addElement(wordidx, currentDoc, 0, stopwordList.isStopWord(cur)?1:0);
-        evalTokenArrayBuffer.goldLocationArrayList.add(null);
-        }
-        }
-        }
-        System.err.print(currentDoc + ",");
-        }*/
-        System.err.println();
-
-        assert (evalTokenArrayBuffer.toponymArrayList.size() == evalTokenArrayBuffer.wordArrayList.size());
-        assert (evalTokenArrayBuffer.toponymArrayList.size() == evalTokenArrayBuffer.goldLocationArrayList.size());
-        /*System.out.println("toponym: " + evalTokenArrayBuffer.toponymArrayList.size());
-        System.out.println("word: " + evalTokenArrayBuffer.wordArrayList.size());
-        System.out.println("gold: " + evalTokenArrayBuffer.goldLocationArrayList.size());*/
-    }
-
-    public Location parseLocation(String line) {
-        String[] tokens = line.split("\\t");
-
-        if (tokens.length < 6) {
-            return null;
-        }
-
-        double lon = Double.parseDouble(tokens[3]);
-        double lat = Double.parseDouble(tokens[4]);
-
-        String placename;
-        int gtIndex = tokens[5].indexOf(">");
-        if (gtIndex != -1) {
-            placename = tokens[5].substring(0, gtIndex).trim().toLowerCase();
-        } else {
-            placename = tokens[5].trim().toLowerCase();
-        }
-
-        return new Location(-1, placename, "", new Coordinate(lon, lat), 0, "", -1);
     }
 
     /**
@@ -525,31 +354,5 @@ public class TextProcessor {
         } else {
             return retrieveWords(sarray, idx + 1);
         }
-    }
-
-    public void addGoldToponymSpans(String text,
-          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) {
-
-        /*if(text.startsWith("\t>")) {
-        evalTokenArrayBuffer.goldLocationArrayList.add(parseLocation(text));
-        continue;
-        }
-        else if(text.startsWith("\t")) continue;
-
-        String[] tokens = text.split("\\t");
-
-        if(tokens.length < 2) continue;
-
-        String cur = tokens[0].toLowerCase();
-
-        wordidx = lexicon.addWord(cur);
-        if(!tokens[1].equals("LOC")) {
-        evalTokenArrayBuffer.addElement(wordidx, currentDoc, 0, stopwordList.isStopWord(cur)?1:0);
-        evalTokenArrayBuffer.goldLocationArrayList.add(null);
-        }
-        else {
-        evalTokenArrayBuffer.addElement(wordidx, currentDoc, 1, stopwordList.isStopWord(cur)?1:0);
-        //gold standard Location will be added later, when line starting with tab followed by > occurs
-        }*/
     }
 }

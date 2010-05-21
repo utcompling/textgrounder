@@ -72,4 +72,41 @@ public class EvalTokenArrayBuffer extends TokenArrayBuffer {
         modelLocationArrayList = new ArrayList<Location>();
         goldLocationArrayList = new ArrayList<Location>();
     }
+
+    /**
+     * 
+     * @param wordIdx
+     * @param docIdx
+     * @param topStatus
+     * @param stopStatus
+     * @param loc
+     */
+    @Override
+    public void addElement(int wordIdx, int docIdx, int topStatus,
+          int stopStatus, Location loc) {
+        super.addElement(wordIdx, docIdx, topStatus, stopStatus);
+        goldLocationArrayList.add(loc);
+    }
+
+    /**
+     * 
+     * @return
+     */
+    @Override
+    protected boolean sanityCheck2() {
+        return toponymArrayList.size() == goldLocationArrayList.size();
+    }
+
+    @Override
+    protected boolean verboseSanityCheck(String curLine) {
+        if (Math.abs(toponymArrayList.size() - goldLocationArrayList.size()) > 1) {
+            System.out.println(curLine);
+            System.out.println("toponym: " + toponymArrayList.size());
+            System.out.println("word: " + wordArrayList.size());
+            System.out.println("gold: " + goldLocationArrayList.size());
+            System.exit(0);
+            return false;
+        }
+        return true;
+    }
 }

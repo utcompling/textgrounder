@@ -219,16 +219,14 @@ public abstract class Model {
 
             String fname = trainInputFile.getName();
             if (options.isPCLXML()) {
-                textProcessor = new TextProcessorPCLXML(lexicon);
+                textProcessor = new TextProcessorTEIXML(lexicon);
             } else if (trainInputFile.isDirectory() && trainInputFile.list(new PCLXMLFilter()).length != 0) {
-                textProcessor = new TextProcessorPCLXML(lexicon);
+                textProcessor = new TextProcessorTEIXML(lexicon);
             } else if (fname.startsWith("txu") && fname.endsWith(".xml")) {
-                textProcessor = new TextProcessorPCLXML(lexicon);
-            } else if (evalInputPath == null) {
-                textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
+                textProcessor = new TextProcessorTEIXML(lexicon);
             } else {
-                textProcessor = new TextProcessor(lexicon, paragraphsAsDocs, true);
-            }
+                textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
+            } 
         }
 
         barScale = options.getBarScale();
