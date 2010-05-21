@@ -58,13 +58,13 @@ public class ProbabilisticMinDistanceModel extends Model {
 
 	pseudoWeights = new ArrayList<ArrayList<Double>>();
 	allPossibleLocations = new ArrayList<TIntArrayList>();
-	for(int i = 0; i < trainTokenArrayBuffer.size(); i++) {
-	    if(trainTokenArrayBuffer.toponymVector[i] == 0) {
+	for(int i = 0; i < evalTokenArrayBuffer.size(); i++) {
+	    if(evalTokenArrayBuffer.toponymVector[i] == 0) {
 		pseudoWeights.add(null);
 		allPossibleLocations.add(null);
 	    }
 	    else {
-		String placename = lexicon.getWordForInt(trainTokenArrayBuffer.wordVector[i]).toLowerCase();
+		String placename = lexicon.getWordForInt(evalTokenArrayBuffer.wordVector[i]).toLowerCase();
 		TIntHashSet curPossibleLocations = gazetteer.get(placename);
 		TIntArrayList curPossibleLocationsAL = new TIntArrayList();
 		for(int possibleLocation : curPossibleLocations.toArray())
@@ -94,13 +94,13 @@ public class ProbabilisticMinDistanceModel extends Model {
 	    int curDocNumber = -1;
 	    int curDocBeginIndex = 0;
 
-	    for (int i = 0; i < trainTokenArrayBuffer.size(); i++) {
+	    for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
 
-		if(trainTokenArrayBuffer.documentVector[i] == curDocNumber) {
+		if(evalTokenArrayBuffer.documentVector[i] == curDocNumber) {
 		    continue;
 		}
 		else {
-		    curDocNumber = trainTokenArrayBuffer.documentVector[i];
+		    curDocNumber = evalTokenArrayBuffer.documentVector[i];
 		    curDocBeginIndex = i;
 		}
 
@@ -124,7 +124,7 @@ public class ProbabilisticMinDistanceModel extends Model {
 		TIntHashSet possibleLocations = gazetteer.get(placename);
 		addLocationsToRegionArray(possibleLocations); */
 		
-		assignWeights(trainTokenArrayBuffer, curDocBeginIndex);
+		assignWeights(evalTokenArrayBuffer, curDocBeginIndex);
 		/*Location curLocation = gazetteer.getLocation(curLocationIdx);
 		trainTokenArrayBuffer.modelLocationArrayList.add(curLocation);
 		if (curLocation == null) {
@@ -153,15 +153,15 @@ public class ProbabilisticMinDistanceModel extends Model {
 	System.out.println("Final step of disambiguation; pseudoWeights.size() == " + pseudoWeights.size());
 	for(int i = 0; i < pseudoWeights.size(); i++) {
 	    if(pseudoWeights.get(i) == null) {
-		trainTokenArrayBuffer.modelLocationArrayList.add(null);
+		evalTokenArrayBuffer.modelLocationArrayList.add(null);
 		continue;
 	    }
 
-	    String placename = lexicon.getWordForInt(trainTokenArrayBuffer.wordVector[i]).toLowerCase();
+	    String placename = lexicon.getWordForInt(evalTokenArrayBuffer.wordVector[i]).toLowerCase();
 
 	    if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
             {
-                trainTokenArrayBuffer.modelLocationArrayList.add(null);
+                evalTokenArrayBuffer.modelLocationArrayList.add(null);
                 continue;
             }
 
@@ -174,14 +174,14 @@ public class ProbabilisticMinDistanceModel extends Model {
 		}
 	    }
 	    if(maxIndex == -1) {
-		trainTokenArrayBuffer.modelLocationArrayList.add(null);
+		evalTokenArrayBuffer.modelLocationArrayList.add(null);
 		continue;
 	    }
 	    int curLocationIdx = allPossibleLocations.get(i).get(maxIndex);
 	    locations.add(curLocationIdx);
 
 	    Location curLocation = gazetteer.getLocation(curLocationIdx);
-	    trainTokenArrayBuffer.modelLocationArrayList.add(curLocation);
+	    evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
 	    if (curLocation == null) {
 		continue;
 	    }
@@ -406,7 +406,7 @@ public class ProbabilisticMinDistanceModel extends Model {
         initializeRegionArray();
         if (!runWholeGazetteer) {
             try {
-                processTrainInputPath();
+                processEvalInputPath();
             } catch (Exception ex) {
                 Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
             }

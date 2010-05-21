@@ -115,7 +115,6 @@ public class RegionModel extends TopicModel {
           FileNotFoundException, IOException, ClassNotFoundException,
           SQLException {
         super.initialize(options);
-
         initializeFromOptions(options);
 
         trainTokenArrayBuffer = new TokenArrayBuffer(lexicon, new TrainingMaterialCallback(lexicon));
@@ -354,6 +353,8 @@ public class RegionModel extends TopicModel {
                     wordByTopicCounts[wordoff + topicid]++;
                 }
             }
+
+            annealer.collectSamples(topicCounts, wordByTopicCounts, beta);
         }
     }
 
@@ -637,6 +638,6 @@ public class RegionModel extends TopicModel {
         System.err.println("Counting locations and smoothing");
         normalizeLocations();
         System.err.println("Writing output");
-        writeXMLFile(trainInputPath, kmlOutputFilename, locations);
+        writeXMLFile(trainInputPath, kmlOutputFilename, locations, trainTokenArrayBuffer);
     }
 }

@@ -132,7 +132,7 @@ public abstract class Model {
     /**
      * Array of token indices and associated information for eval data
      */
-    protected TokenArrayBuffer evalTokenArrayBuffer;
+    protected EvalTokenArrayBuffer evalTokenArrayBuffer;
     //protected int indexInTAB = 0;
 
     public Model() {
@@ -180,7 +180,9 @@ public abstract class Model {
         if (runWholeGazetteer) {
             trainInputPath = null;
             trainInputFile = null;
-        } else if (evalInputPath != null) {
+        }
+
+        if (evalInputPath != null) {
             //System.out.println(evalInputPath);
             //System.exit(0);
             evalInputFile = new File(evalInputPath);
@@ -360,7 +362,7 @@ public abstract class Model {
      * 
      * @param myPath
      * @param textProcessor
-     * @param trainTokenArrayBuffer
+     * @param tokenArrayBuffer
      * @param stopwordList
      * @throws IOException
      */
@@ -382,8 +384,8 @@ public abstract class Model {
      * @throws Exception
      */
     public void processEvalInputPath() throws Exception {
-        evalTokenArrayBuffer = new TokenArrayBuffer(lexicon);
-        processTrainInputPath(evalInputFile, textProcessor, evalTokenArrayBuffer, new NullStopwordList());
+        evalTokenArrayBuffer = new EvalTokenArrayBuffer(lexicon);
+        processEvalInputPath(evalInputFile, textProcessor, evalTokenArrayBuffer, new NullStopwordList());
         evalTokenArrayBuffer.convertToPrimitiveArrays();
     }
 
@@ -391,19 +393,20 @@ public abstract class Model {
      *
      * @param myPath
      * @param textProcessor
-     * @param trainTokenArrayBuffer
+     * @param tokenArrayBuffer
      * @param stopwordList
      * @throws IOException
      */
     public void processEvalInputPath(File myPath, TextProcessor textProcessor,
-          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws
+          EvalTokenArrayBuffer evalTokenArrayBuffer, StopwordList stopwordList)
+          throws
           IOException {
         if (myPath.isDirectory()) {
             for (String pathname : myPath.list()) {
-                processTrainInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer, stopwordList);
+                processEvalInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, evalTokenArrayBuffer, stopwordList);
             }
         } else {
-            textProcessor.addToponymsFromGoldFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
+            textProcessor.addToponymsFromGoldFile(myPath.getCanonicalPath(), evalTokenArrayBuffer, stopwordList);
         }
     }
 
@@ -414,23 +417,10 @@ public abstract class Model {
      */
     public void writeXMLFile() throws Exception {
         if (!runWholeGazetteer) {
-            writeXMLFile(trainInputPath, kmlOutputFilename, locations);
+            writeXMLFile(trainInputPath, kmlOutputFilename, locations, evalTokenArrayBuffer);
         } else {
-            writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, locations);
+            writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, locations, evalTokenArrayBuffer);
         }
-    }
-
-    /**
-     * Wrapper for writeXMLFile when gazetteer is known
-     *
-     * @param inputFilename
-     * @param outputFilename
-     * @param locations
-     * @throws IOException
-     */
-    public void writeXMLFile(String inputFilename, String outputFilename,
-          TIntHashSet locations) throws IOException {
-        writeXMLFile(inputFilename, outputFilename, gazetteer, locations);
     }
 
     /**
@@ -438,12 +428,12 @@ public abstract class Model {
      *
      * @param trainInputPath
      * @param kmlOutputFilename
-     * @param gaz 
      * @param locations
      * @throws Exception
      */
     public void writeXMLFile(String inputFilename, String outputFilename,
-          Gazetteer gaz, TIntHashSet locations) throws IOException {
+          TIntHashSet locations, TokenArrayBuffer tokenArrayBuffer) throws
+          IOException {
 
         BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));
         int dotKmlIndex = outputFilename.lastIndexOf(".kml");
@@ -454,23 +444,9 @@ public abstract class Model {
 
         contextOut.write(KMLUtil.genKMLHeader(inputFilename));
 
-        /*TObjectIntIterator<String> placeIterator = placeCounts.iterator();
-        for (int i = placeCounts.size(); i-- > 0;) {
-        placeIterator.advance();
-        String placename = placeIterator.key();
-        double height = Math.log(placeIterator.value()) * barScale;
-
-        Coordinate coord;
-        if(gazetteer instanceof WGGazetteer)
-        coord = ((WGGazetteer)gazetteer).baselineGet(placename);
-        else
-        coord = gazetteer.get(placename);
-
-        if(coord.longitude == 9999.99) // sentinel
-        continue;*/
         for (TIntIterator it = locations.iterator(); it.hasNext();) {
             int locid = it.next();
-            Location loc = gaz.getIdxToLocationMap().get(locid);
+            Location loc = gazetteer.getIdxToLocationMap().get(locid);
 
             double height = Math.log(loc.count) * barScale;
 
@@ -482,21 +458,13 @@ public abstract class Model {
             Coordinate coord = loc.coord;
             out.write(KMLUtil.genPolygon(placename, coord, radius, kmlPolygon));
 
-            //System.out.println("Contexts for " + placename);
-	    /*while(indexInTAB < trainTokenArrayBuffer.toponymVector.size() && trainTokenArrayBuffer.toponymVector.get(indexInTAB) == 0) {
-            indexInTAB++;
-            }*/
             for (int j = 0; j < loc.backPointers.size(); j++) {
                 int index = loc.backPointers.get(j);
-                String context = trainTokenArrayBuffer.getContextAround(index, windowSize, true);
+                String context = tokenArrayBuffer.getContextAround(index, windowSize, true);
                 Coordinate spiralPoint = coord.getNthSpiralPoint(j, 0.13);
 
                 contextOut.write(KMLUtil.genSpiralpoint(placename, context, spiralPoint, j, radius));
             }
-            //indexInTAB++;
-
-            //if(i >= 10) System.exit(0);
-
         }
 
         out.write(KMLUtil.genKMLFooter());
@@ -508,19 +476,18 @@ public abstract class Model {
 
     public void evaluate() {
 
-        if (trainTokenArrayBuffer.modelLocationArrayList.size() != trainTokenArrayBuffer.goldLocationArrayList.size()) {
-            System.out.println("MISMATCH: model: " + trainTokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + trainTokenArrayBuffer.goldLocationArrayList.size());
+        if (evalTokenArrayBuffer.modelLocationArrayList.size() != evalTokenArrayBuffer.goldLocationArrayList.size()) {
+            System.out.println("MISMATCH: model: " + evalTokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + evalTokenArrayBuffer.goldLocationArrayList.size());
             System.exit(0);
         }
 
-        //int numTrue = 0;
         int tp = 0;
         int fp = 0;
         int fn = 0;
 
-        for (int i = 0; i < trainTokenArrayBuffer.size(); i++) {
-            Location curModelLoc = trainTokenArrayBuffer.modelLocationArrayList.get(i);
-            Location curGoldLoc = trainTokenArrayBuffer.goldLocationArrayList.get(i);
+        for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
+            Location curModelLoc = evalTokenArrayBuffer.modelLocationArrayList.get(i);
+            Location curGoldLoc = evalTokenArrayBuffer.goldLocationArrayList.get(i);
             if (curGoldLoc != null) {
                 if (curModelLoc != null) {
                     if (curGoldLoc.looselyMatches(curModelLoc, 1.0)) {
@@ -566,22 +533,9 @@ public abstract class Model {
         return kmlOutputFilename;
     }
 
-    /**
-     * @return the trainInputFile
-     */
-    public File getInputFile() {
-        return trainInputFile;
-    }
-
-    /**
-     * @return the textProcessor
-     */
-    public TextProcessor getTextProcessor() {
-        return textProcessor;
-    }
-
     class PCLXMLFilter implements FilenameFilter {
 
+        @Override
         public boolean accept(File dir, String name) {
             return (name.startsWith("txu") && name.endsWith(".xml"));
         }

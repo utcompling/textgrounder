@@ -41,4 +41,10 @@ public class EmptyAnnealer extends Annealer {
         }
         return sum;
     }
+
+    @Override
+    public void collectSamples(int[] topicCounts, int[] wordByTopicCounts,
+          double beta) {
+        return;
+    }
 }

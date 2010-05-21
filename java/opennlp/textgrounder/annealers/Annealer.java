@@ -73,6 +73,10 @@ public abstract class Annealer {
      * The current temperature
      */
     protected double temperature;
+    /**
+     * 
+     */
+    protected boolean sampleiteration = false;
 
     protected Annealer() {
     }
@@ -121,6 +125,9 @@ public abstract class Annealer {
      */
     public abstract double annealProbs(int starti, double[] classes);
 
+    public abstract void collectSamples(int[] topicCounts,
+          int[] wordByTopicCounts, double beta);
+
     /**
      * Counts the number of innerIter. It decrements the number of innerIter
      * after each iteration. It maintains both the inner and outer loop
@@ -129,8 +136,23 @@ public abstract class Annealer {
      */
     public boolean nextIter() {
         if (outerIter == outerIterationsMax) {
-            System.err.print("\n");
-            return false;
+            System.err.println("");
+            System.err.println("Burn in complete!");
+            if (samples != 0) {
+                System.err.println("Beginning sampling!");
+
+                outerIter = 0;
+                innerIter = 0;
+
+                temperatureReciprocal = 1. / targetTemperature;
+                innerIterationsMax = samples * lag;
+                outerIterationsMax = 1;
+                sampleiteration = true;
+
+                return true;
+            } else {
+                return false;
+            }
         } else {
             if (innerIter == innerIterationsMax) {
                 outerIter++;
