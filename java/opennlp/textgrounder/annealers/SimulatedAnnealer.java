@@ -24,18 +24,6 @@ import opennlp.textgrounder.geo.CommandLineOptions;
  */
 public class SimulatedAnnealer extends Annealer {
 
-    /**
-     * Counts of topics
-     */
-    protected double[] topicCounts;
-    /**
-     * Counts of tcount per topic. However, since access more often occurs in
-     * terms of the tcount, it will be a topic by word matrix.
-     */
-    protected double[] wordByTopicCounts;
-    protected double beta;
-    protected double betaW;
-
     public SimulatedAnnealer(CommandLineOptions options) {
         super(options);
     }
@@ -71,30 +59,5 @@ public class SimulatedAnnealer extends Annealer {
          * For now, we set everything so that it sums to one.
          */
         return 1;
-    }
-
-    @Override
-    public void collectSamples(int[] tc, int[] wbtc, double b) {
-        if (sampleiteration && ((innerIter + 1) % lag == 0)) {
-            if (topicCounts == null) {
-                topicCounts = new double[tc.length];
-                wordByTopicCounts = new double[wbtc.length];
-                for (int i = 0; i < tc.length; ++i) {
-                    topicCounts[i] = 0;
-                }
-                for (int i = 0; i < wbtc.length; ++i) {
-                    wordByTopicCounts[i] = 0;
-                }
-                beta = b;
-                betaW = beta * wbtc.length / tc.length;
-            }
-
-            for (int i = 0; i < tc.length; ++i) {
-                topicCounts[i] += tc[i] + beta;
-            }
-            for (int i = 0; i < wbtc.length; ++i) {
-                wordByTopicCounts[i] += wbtc[i] + betaW;
-            }
-        }
     }
 }

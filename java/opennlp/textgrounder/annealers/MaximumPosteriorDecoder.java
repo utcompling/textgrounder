@@ -25,7 +25,7 @@ import opennlp.textgrounder.geo.CommandLineOptions;
 public class MaximumPosteriorDecoder extends Annealer {
 
     private int count = 1;
-    
+
     public MaximumPosteriorDecoder() {
     }
 
@@ -58,7 +58,7 @@ public class MaximumPosteriorDecoder extends Annealer {
 
     @Override
     public boolean nextIter() {
-        if(count != 0) {
+        if (count != 0) {
             count = 0;
             return true;
         } else {
@@ -67,8 +67,7 @@ public class MaximumPosteriorDecoder extends Annealer {
     }
 
     @Override
-    public void collectSamples(int[] topicCounts, int[] wordByTopicCounts,
-          double beta) {
+    public void collectSamples(double[] topicCounts, double[] wordByTopicCounts) {
         return;
     }
 }

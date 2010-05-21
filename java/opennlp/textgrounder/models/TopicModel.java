@@ -57,12 +57,12 @@ public class TopicModel extends Model {
     /**
      * Counts of topics
      */
-    protected int[] topicCounts;
+    protected double[] topicCounts;
     /**
      * Counts of tcount per topic. However, since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.
      */
-    protected int[] wordByTopicCounts;
+    protected double[] wordByTopicCounts;
     /**
      * Counts of topics per document
      */
@@ -178,7 +178,7 @@ public class TopicModel extends Model {
         for (int i = 0; i < N; ++i) {
             documentVector[i] = wordVector[i] = topicVector[i] = 0;
         }
-        topicCounts = new int[T];
+        topicCounts = new double[T];
         for (int i = 0; i < T; ++i) {
             topicCounts[i] = 0;
         }
@@ -186,7 +186,7 @@ public class TopicModel extends Model {
         for (int i = 0; i < D * T; ++i) {
             topicByDocumentCounts[i] = 0;
         }
-        wordByTopicCounts = new int[fW * T];
+        wordByTopicCounts = new double[fW * T];
         for (int i = 0; i < fW * T; ++i) {
             wordByTopicCounts[i] = 0;
         }
@@ -307,6 +307,19 @@ public class TopicModel extends Model {
         randomInitialize();
         System.err.println(String.format("Beginning training with %d tokens, %d words, %d regions, %d documents", N, W, T, D));
         train(annealer);
+        if(annealer.getSamples() != 0) {
+            topicCounts = annealer.getTopicCounts();
+            wordByTopicCounts = annealer.getWordByTopicCounts();
+        }
+    }
+
+    /**
+     * Maximum posterior decoding of topic assignments.
+     */
+    public void decode() {
+        System.err.println(String.format("Decoding maximum posterior topics"));
+        Annealer mpd = new MaximumPosteriorDecoder();
+        train(mpd);
     }
 
     /**

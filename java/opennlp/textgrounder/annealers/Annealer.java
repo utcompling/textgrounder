@@ -74,9 +74,26 @@ public abstract class Annealer {
      */
     protected double temperature;
     /**
-     * 
+     * Counts of topics
+     */
+    protected double[] topicCounts;
+    /**
+     * Counts of tcount per topic. However, since access more often occurs in
+     * terms of the tcount, it will be a topic by word matrix.
+     */
+    protected double[] wordByTopicCounts;
+    /**
+     * To sample or not to sample
      */
     protected boolean sampleiteration = false;
+    /**
+     * Indicates whether sample collection is done or not
+     */
+    protected boolean finishedCollection = false;
+    /**
+     * Number of samples collected
+     */
+    protected int sampleCount = 0;
 
     protected Annealer() {
     }
@@ -125,9 +142,6 @@ public abstract class Annealer {
      */
     public abstract double annealProbs(int starti, double[] classes);
 
-    public abstract void collectSamples(int[] topicCounts,
-          int[] wordByTopicCounts, double beta);
-
     /**
      * Counts the number of innerIter. It decrements the number of innerIter
      * after each iteration. It maintains both the inner and outer loop
@@ -138,7 +152,7 @@ public abstract class Annealer {
         if (outerIter == outerIterationsMax) {
             System.err.println("");
             System.err.println("Burn in complete!");
-            if (samples != 0) {
+            if (samples != 0 && !finishedCollection) {
                 System.err.println("Beginning sampling!");
 
                 outerIter = 0;
@@ -158,7 +172,7 @@ public abstract class Annealer {
                 outerIter++;
                 if (outerIter == outerIterationsMax) {
                     System.err.print("\n");
-                    return false;
+                    return nextIter();
                 }
                 innerIter = 0;
                 temperature -= temperatureDecrement;
@@ -188,5 +202,76 @@ public abstract class Annealer {
      */
     public double annealProbs(double[] classes) {
         return annealProbs(0, classes);
+    }
+
+    /**
+     * 
+     * @param tc
+     * @param wbtc
+     * @param b
+     */
+    public void collectSamples(double[] tc, double[] wbtc) {
+        if (sampleiteration && (innerIter % lag == 0)) {
+            sampleCount += 1;
+            if (samples == sampleCount) {
+                finishedCollection = true;
+            }
+
+            System.err.print("(sample:" + (innerIter + 1) / lag + ")");
+            if (topicCounts == null) {
+                topicCounts = new double[tc.length];
+                wordByTopicCounts = new double[wbtc.length];
+                for (int i = 0; i < tc.length; ++i) {
+                    topicCounts[i] = 0;
+                }
+                for (int i = 0; i < wbtc.length; ++i) {
+                    wordByTopicCounts[i] = 0;
+                }
+            }
+
+            for (int i = 0; i < tc.length; ++i) {
+                topicCounts[i] += tc[i];
+            }
+            for (int i = 0; i < wbtc.length; ++i) {
+                wordByTopicCounts[i] += wbtc[i];
+            }
+        }
+
+        if(finishedCollection) {
+            normalizeSamples();
+        }
+    }
+
+    /**
+     * 
+     */
+    protected void normalizeSamples() {
+        for (int i = 0; i < topicCounts.length; ++i) {
+            topicCounts[i] /= sampleCount;
+        }
+        for (int i = 0; i < wordByTopicCounts.length; ++i) {
+            wordByTopicCounts[i] /= sampleCount;
+        }
+    }
+
+    /**
+     * @return the samples
+     */
+    public int getSamples() {
+        return samples;
+    }
+
+    /**
+     * @return the topicCounts
+     */
+    public double[] getTopicCounts() {
+        return topicCounts;
+    }
+
+    /**
+     * @return the wordByTopicCounts
+     */
+    public double[] getWordByTopicCounts() {
+        return wordByTopicCounts;
     }
 }

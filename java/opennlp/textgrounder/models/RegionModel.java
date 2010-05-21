@@ -206,7 +206,7 @@ public class RegionModel extends TopicModel {
         System.err.println();
 
         T = regionMapperCallback.getNumRegions();
-        topicCounts = new int[T];
+        topicCounts = new double[T];
         for (int i = 0; i < T; ++i) {
             topicCounts[i] = 0;
         }
@@ -214,7 +214,7 @@ public class RegionModel extends TopicModel {
         for (int i = 0; i < D * T; ++i) {
             topicByDocumentCounts[i] = 0;
         }
-        wordByTopicCounts = new int[fW * T];
+        wordByTopicCounts = new double[fW * T];
         for (int i = 0; i < fW * T; ++i) {
             wordByTopicCounts[i] = 0;
         }
@@ -354,17 +354,8 @@ public class RegionModel extends TopicModel {
                 }
             }
 
-            annealer.collectSamples(topicCounts, wordByTopicCounts, beta);
+            annealer.collectSamples(topicCounts, wordByTopicCounts);
         }
-    }
-
-    /**
-     * Maximum posterior decoding of topic assignments. 
-     */
-    public void decode() {
-        System.err.println(String.format("Decoding maximum posterior topics"));
-        Annealer ann = new MaximumPosteriorDecoder();
-        train(ann);
     }
 
     /**
