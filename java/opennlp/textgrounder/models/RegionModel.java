@@ -118,17 +118,17 @@ public class RegionModel extends TopicModel {
 
         initializeFromOptions(options);
 
-        tokenArrayBuffer = new TokenArrayBuffer(lexicon, new TrainingMaterialCallback(lexicon));
+        trainTokenArrayBuffer = new TokenArrayBuffer(lexicon, new TrainingMaterialCallback(lexicon));
         stopwordList = new StopwordList();
         sW = stopwordList.size();
-        processPath(inputFile, textProcessor, tokenArrayBuffer, stopwordList);
+        processTrainInputPath(trainInputFile, textProcessor, trainTokenArrayBuffer, stopwordList);
 
-        tokenArrayBuffer.convertToPrimitiveArrays();
+        trainTokenArrayBuffer.convertToPrimitiveArrays();
         initializeRegionArray();
 
         locationSet = new TIntHashSet();
 
-        setAllocateRegions(tokenArrayBuffer);
+        setAllocateRegions(trainTokenArrayBuffer);
     }
 
     /**
@@ -463,7 +463,7 @@ public class RegionModel extends TopicModel {
     public void printTabulatedProbabilities() throws
           IOException {
         super.printTabulatedProbabilities();
-        writeRegionWordDistributionKMLFile(inputPath, tabularOutputFilename);
+        writeRegionWordDistributionKMLFile(trainInputPath, tabularOutputFilename);
         saveSimpleParameters(tabularOutputFilename);
     }
 
@@ -578,7 +578,7 @@ public class RegionModel extends TopicModel {
      */
     public void writeWordOverGlobeKML(String outputFilename, String word) throws
           IOException {
-        writeWordOverGlobeKML(inputPath, outputFilename, word);
+        writeWordOverGlobeKML(trainInputPath, outputFilename, word);
     }
 
     /**
@@ -588,7 +588,7 @@ public class RegionModel extends TopicModel {
      */
     public void writeWordOverGlobeKML(String word) throws
           IOException {
-        writeWordOverGlobeKML(inputPath, word + ".kml", word);
+        writeWordOverGlobeKML(trainInputPath, word + ".kml", word);
     }
 
     /**
@@ -637,6 +637,6 @@ public class RegionModel extends TopicModel {
         System.err.println("Counting locations and smoothing");
         normalizeLocations();
         System.err.println("Writing output");
-        writeXMLFile(inputPath, kmlOutputFilename, locations);
+        writeXMLFile(trainInputPath, kmlOutputFilename, locations);
     }
 }

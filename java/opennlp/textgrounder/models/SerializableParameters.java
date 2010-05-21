@@ -47,7 +47,7 @@ public class SerializableParameters implements Serializable {
     protected SerializableParameters loadBuffer = null;
     /**
      * Location of training data. Not actually used to read data. Merely
-     * required to generate kml files that include inputPath in the header
+     * required to generate kml files that include trainInputPath in the header
      */
     protected String inputPath;
     /**
@@ -85,7 +85,7 @@ public class SerializableParameters implements Serializable {
             e.printStackTrace();
         }
 
-        rm.inputPath = loadBuffer.inputPath;
+        rm.trainInputPath = loadBuffer.inputPath;
         rm.regionMap = loadBuffer.regionMap;
         rm.topicProbs = loadBuffer.topicProbs;
         rm.wordByTopicProbs = loadBuffer.wordByTopicProbs;
@@ -103,7 +103,7 @@ public class SerializableParameters implements Serializable {
      */
     public void saveParameters(String filename, RegionModel rm) throws
           IOException {
-        inputPath = rm.inputPath;
+        inputPath = rm.trainInputPath;
         regionMap = rm.regionMap;
         topicProbs = rm.topicProbs;
         wordByTopicProbs = rm.wordByTopicProbs;

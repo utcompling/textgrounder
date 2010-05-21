@@ -60,9 +60,13 @@ public abstract class Model {
      */
     protected TIntHashSet locations;
     /**
-     * Training data
+     * Path to training data. May be directory or file
      */
-    protected String inputPath;
+    protected String trainInputPath;
+    /**
+     * File instantiation of trainInputPath
+     */
+    protected File trainInputFile;
     /**
      * Name of kml file (i.e. Google Earth format xml) to generate output to
      */
@@ -108,14 +112,27 @@ public abstract class Model {
     /**
      * Evaluation directory; null if no evaluation is to be done.
      */
-    protected String evalDir = null;
-    protected File inputFile;
+    protected String evalInputPath = null;
+    /**
+     * File instantiation of evalInputPath
+     */
+    protected File evalInputFile;
     /**
      * Flag that tells system to ignore the input file(s) and instead run on every locality in the gazetteer
      */
     protected boolean runWholeGazetteer = false;
+    /**
+     * Number of words to print on both sides of toponym in kml context output
+     */
     protected int windowSize;
-    protected TokenArrayBuffer tokenArrayBuffer;
+    /**
+     * Array of token indices and associated information for training data
+     */
+    protected TokenArrayBuffer trainTokenArrayBuffer;
+    /**
+     * Array of token indices and associated information for eval data
+     */
+    protected TokenArrayBuffer evalTokenArrayBuffer;
     //protected int indexInTAB = 0;
 
     public Model() {
@@ -149,24 +166,25 @@ public abstract class Model {
           FileNotFoundException, IOException, ClassNotFoundException,
           SQLException {
         runWholeGazetteer = options.getRunWholeGazetteer();
-        evalDir = options.getEvalDir();
+        evalInputPath = options.getEvalDir();
 
-        if (!runWholeGazetteer && evalDir == null) {
-            inputPath = options.getTrainInputPath();
-            if (inputPath == null) {
+        if (options.getTrainInputPath() != null) {
+            trainInputPath = options.getTrainInputPath();
+            if (trainInputPath == null) {
                 System.out.println("Error: You must specify an input filename with the -i flag.");
                 System.exit(0);
             }
-            inputFile = new File(inputPath);
-        } else if (runWholeGazetteer) {
-            inputPath = null;
-            inputFile = null;
-        } else if (evalDir != null) {
-            //System.out.println(evalDir);
+            trainInputFile = new File(trainInputPath);
+        }
+
+        if (runWholeGazetteer) {
+            trainInputPath = null;
+            trainInputFile = null;
+        } else if (evalInputPath != null) {
+            //System.out.println(evalInputPath);
             //System.exit(0);
-            inputPath = evalDir;
-            inputFile = new File(inputPath);
-            assert (inputFile.isDirectory());
+            evalInputFile = new File(evalInputPath);
+            assert (evalInputFile.isDirectory());
             //System.exit(0);
         }
 
@@ -197,14 +215,14 @@ public abstract class Model {
             paragraphsAsDocs = options.getParagraphsAsDocs();
             lexicon = new Lexicon();
 
-            String fname = inputFile.getName();
+            String fname = trainInputFile.getName();
             if (options.isPCLXML()) {
                 textProcessor = new TextProcessorPCLXML(lexicon);
-            } else if (inputFile.isDirectory() && inputFile.list(new PCLXMLFilter()).length != 0) {
+            } else if (trainInputFile.isDirectory() && trainInputFile.list(new PCLXMLFilter()).length != 0) {
                 textProcessor = new TextProcessorPCLXML(lexicon);
             } else if (fname.startsWith("txu") && fname.endsWith(".xml")) {
                 textProcessor = new TextProcessorPCLXML(lexicon);
-            } else if (evalDir == null) {
+            } else if (evalInputPath == null) {
                 textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
             } else {
                 textProcessor = new TextProcessor(lexicon, paragraphsAsDocs, true);
@@ -327,29 +345,65 @@ public abstract class Model {
         }
     }
 
-    public void writeXMLFile(String inputFilename) throws Exception {
-        writeXMLFile(inputFilename, kmlOutputFilename, locations);
+    /**
+     * Process training data. Populate lexicon, identify toponyms, build arrays.
+     *
+     * @throws Exception
+     */
+    public void processTrainInputPath() throws Exception {
+        trainTokenArrayBuffer = new TokenArrayBuffer(lexicon);
+        processTrainInputPath(trainInputFile, textProcessor, trainTokenArrayBuffer, new NullStopwordList());
+        trainTokenArrayBuffer.convertToPrimitiveArrays();
     }
 
-    public void processPath() throws Exception {
-        tokenArrayBuffer = new TokenArrayBuffer(lexicon);
-        processPath(inputFile, textProcessor, tokenArrayBuffer, new NullStopwordList());
-        tokenArrayBuffer.convertToPrimitiveArrays();
-    }
-
-    public void processPath(File myPath, TextProcessor textProcessor,
+    /**
+     * 
+     * @param myPath
+     * @param textProcessor
+     * @param trainTokenArrayBuffer
+     * @param stopwordList
+     * @throws IOException
+     */
+    public void processTrainInputPath(File myPath, TextProcessor textProcessor,
           TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws
           IOException {
         if (myPath.isDirectory()) {
             for (String pathname : myPath.list()) {
-                processPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer, stopwordList);
+                processTrainInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer, stopwordList);
             }
         } else {
-            if (evalDir == null) {
-                textProcessor.addToponymsFromFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
-            } else {
-                textProcessor.addToponymsFromGoldFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
+            textProcessor.addToponymsFromFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
+        }
+    }
+
+    /**
+     * Process training data. Populate lexicon, identify toponyms, build arrays.
+     *
+     * @throws Exception
+     */
+    public void processEvalInputPath() throws Exception {
+        evalTokenArrayBuffer = new TokenArrayBuffer(lexicon);
+        processTrainInputPath(evalInputFile, textProcessor, evalTokenArrayBuffer, new NullStopwordList());
+        evalTokenArrayBuffer.convertToPrimitiveArrays();
+    }
+
+    /**
+     *
+     * @param myPath
+     * @param textProcessor
+     * @param trainTokenArrayBuffer
+     * @param stopwordList
+     * @throws IOException
+     */
+    public void processEvalInputPath(File myPath, TextProcessor textProcessor,
+          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws
+          IOException {
+        if (myPath.isDirectory()) {
+            for (String pathname : myPath.list()) {
+                processTrainInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer, stopwordList);
             }
+        } else {
+            textProcessor.addToponymsFromGoldFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
         }
     }
 
@@ -360,7 +414,7 @@ public abstract class Model {
      */
     public void writeXMLFile() throws Exception {
         if (!runWholeGazetteer) {
-            writeXMLFile(inputPath, kmlOutputFilename, locations);
+            writeXMLFile(trainInputPath, kmlOutputFilename, locations);
         } else {
             writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, locations);
         }
@@ -382,7 +436,7 @@ public abstract class Model {
     /**
      * Output tagged and disambiguated placenames to Google Earth kml file.
      *
-     * @param inputPath
+     * @param trainInputPath
      * @param kmlOutputFilename
      * @param gaz 
      * @param locations
@@ -429,12 +483,12 @@ public abstract class Model {
             out.write(KMLUtil.genPolygon(placename, coord, radius, kmlPolygon));
 
             //System.out.println("Contexts for " + placename);
-	    /*while(indexInTAB < tokenArrayBuffer.toponymVector.size() && tokenArrayBuffer.toponymVector.get(indexInTAB) == 0) {
+	    /*while(indexInTAB < trainTokenArrayBuffer.toponymVector.size() && trainTokenArrayBuffer.toponymVector.get(indexInTAB) == 0) {
             indexInTAB++;
             }*/
             for (int j = 0; j < loc.backPointers.size(); j++) {
                 int index = loc.backPointers.get(j);
-                String context = tokenArrayBuffer.getContextAround(index, windowSize, true);
+                String context = trainTokenArrayBuffer.getContextAround(index, windowSize, true);
                 Coordinate spiralPoint = coord.getNthSpiralPoint(j, 0.13);
 
                 contextOut.write(KMLUtil.genSpiralpoint(placename, context, spiralPoint, j, radius));
@@ -454,8 +508,8 @@ public abstract class Model {
 
     public void evaluate() {
 
-        if (tokenArrayBuffer.modelLocationArrayList.size() != tokenArrayBuffer.goldLocationArrayList.size()) {
-            System.out.println("MISMATCH: model: " + tokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + tokenArrayBuffer.goldLocationArrayList.size());
+        if (trainTokenArrayBuffer.modelLocationArrayList.size() != trainTokenArrayBuffer.goldLocationArrayList.size()) {
+            System.out.println("MISMATCH: model: " + trainTokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + trainTokenArrayBuffer.goldLocationArrayList.size());
             System.exit(0);
         }
 
@@ -464,9 +518,9 @@ public abstract class Model {
         int fp = 0;
         int fn = 0;
 
-        for (int i = 0; i < tokenArrayBuffer.size(); i++) {
-            Location curModelLoc = tokenArrayBuffer.modelLocationArrayList.get(i);
-            Location curGoldLoc = tokenArrayBuffer.goldLocationArrayList.get(i);
+        for (int i = 0; i < trainTokenArrayBuffer.size(); i++) {
+            Location curModelLoc = trainTokenArrayBuffer.modelLocationArrayList.get(i);
+            Location curGoldLoc = trainTokenArrayBuffer.goldLocationArrayList.get(i);
             if (curGoldLoc != null) {
                 if (curModelLoc != null) {
                     if (curGoldLoc.looselyMatches(curModelLoc, 1.0)) {
@@ -513,10 +567,10 @@ public abstract class Model {
     }
 
     /**
-     * @return the inputFile
+     * @return the trainInputFile
      */
     public File getInputFile() {
-        return inputFile;
+        return trainInputFile;
     }
 
     /**

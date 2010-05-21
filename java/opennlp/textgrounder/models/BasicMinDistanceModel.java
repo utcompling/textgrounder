@@ -59,18 +59,18 @@ public class BasicMinDistanceModel extends Model {
 	int curDocNumber = 0;
 	int curDocBeginIndex = 0;
 
-        for (int i = 0; i < tokenArrayBuffer.size(); i++) {
+        for (int i = 0; i < trainTokenArrayBuffer.size(); i++) {
 
-	    if(tokenArrayBuffer.documentVector[i] != curDocNumber) {
-		curDocNumber = tokenArrayBuffer.documentVector[i];
+	    if(trainTokenArrayBuffer.documentVector[i] != curDocNumber) {
+		curDocNumber = trainTokenArrayBuffer.documentVector[i];
 		curDocBeginIndex = i;
 	    }
 
-            if (tokenArrayBuffer.toponymVector[i] == 0) {
-                tokenArrayBuffer.modelLocationArrayList.add(null);
+            if (trainTokenArrayBuffer.toponymVector[i] == 0) {
+                trainTokenArrayBuffer.modelLocationArrayList.add(null);
                 continue;
             }
-            int topidx = tokenArrayBuffer.wordVector[i];
+            int topidx = trainTokenArrayBuffer.wordVector[i];
             System.out.println("toponym (in int form): " + topidx);
 
             String placename = lexicon.getWordForInt(topidx).toLowerCase();
@@ -78,7 +78,7 @@ public class BasicMinDistanceModel extends Model {
 
             if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
             {
-                tokenArrayBuffer.modelLocationArrayList.add(null);
+                trainTokenArrayBuffer.modelLocationArrayList.add(null);
                 continue;
             }
 
@@ -86,9 +86,9 @@ public class BasicMinDistanceModel extends Model {
             TIntHashSet possibleLocations = gazetteer.get(placename);
             addLocationsToRegionArray(possibleLocations);
 
-            int curLocationIdx = basicMinDistanceDisambiguate(possibleLocations, tokenArrayBuffer, i, curDocBeginIndex);
+            int curLocationIdx = basicMinDistanceDisambiguate(possibleLocations, trainTokenArrayBuffer, i, curDocBeginIndex);
             Location curLocation = gazetteer.getLocation(curLocationIdx);
-            tokenArrayBuffer.modelLocationArrayList.add(curLocation);
+            trainTokenArrayBuffer.modelLocationArrayList.add(curLocation);
             if (curLocation == null) {
                 continue;
             }
@@ -106,7 +106,7 @@ public class BasicMinDistanceModel extends Model {
             //DocIdAndIndex curDocIdAndIndex = new DocIdAndIndex(docIndex, i);
             curLocation.backPointers.add(i);
             //System.out.println(lexicon.getContext(curDocIdAndIndex, 10));
-            //System.out.println(tokenArrayBuffer.wordArrayList
+            //System.out.println(trainTokenArrayBuffer.wordArrayList
             //}
 
         }
@@ -225,7 +225,7 @@ public class BasicMinDistanceModel extends Model {
         initializeRegionArray();
         if (!runWholeGazetteer) {
             try {
-                processPath();
+                processTrainInputPath();
             } catch (Exception ex) {
                 Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
             }

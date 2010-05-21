@@ -153,11 +153,11 @@ public class TopicModel extends Model {
         initializeFromOptions(options);
         lexicon = new Lexicon();
         textProcessor = new TextProcessor(new NullClassifier(), lexicon, paragraphsAsDocs);
-        tokenArrayBuffer = new TokenArrayBuffer(lexicon);
+        trainTokenArrayBuffer = new TokenArrayBuffer(lexicon);
         StopwordList stopwordList = new StopwordList();
         sW = stopwordList.size();
-        processPath(new File(inputPath), textProcessor, tokenArrayBuffer, stopwordList);
-        tokenArrayBuffer.convertToPrimitiveArrays();
+        processTrainInputPath(new File(trainInputPath), textProcessor, trainTokenArrayBuffer, stopwordList);
+        trainTokenArrayBuffer.convertToPrimitiveArrays();
         allocateFields();
     }
 
@@ -169,8 +169,8 @@ public class TopicModel extends Model {
         fW = lexicon.wordsToInts.size();
         W = fW - sW;
         betaW = beta * W;
-        N = tokenArrayBuffer.size();
-        D = tokenArrayBuffer.getNumDocs();
+        N = trainTokenArrayBuffer.size();
+        D = trainTokenArrayBuffer.getNumDocs();
 
         documentVector = new int[N];
         wordVector = new int[N];
@@ -191,8 +191,8 @@ public class TopicModel extends Model {
             wordByTopicCounts[i] = 0;
         }
 
-        wordVector = tokenArrayBuffer.wordVector;
-        documentVector = tokenArrayBuffer.documentVector;
+        wordVector = trainTokenArrayBuffer.wordVector;
+        documentVector = trainTokenArrayBuffer.documentVector;
     }
 
     /**
@@ -227,7 +227,7 @@ public class TopicModel extends Model {
 
         paragraphsAsDocs = options.getParagraphsAsDocs();
         outputPerClass = options.getOutputPerClass();
-        inputPath = options.getTrainInputPath();
+        trainInputPath = options.getTrainInputPath();
         tabularOutput = options.getTabulatedOutput();
         tabularOutputFilename = options.getTabularOutputFilename();
     }
