@@ -29,7 +29,7 @@ public abstract class Annealer {
     /**
      * Exponent in the annealing process. Is the reciprocal of the temperature.
      */
-    protected double temperatureReciprocal;
+    protected double temperatureReciprocal = 1;
     /**
      * Temperature at which to start annealing process
      */
@@ -64,15 +64,15 @@ public abstract class Annealer {
     /**
      * Number of samples to take after burn-in
      */
-    protected int samples;
+    protected int samples = 0;
     /**
      * Number of innerIter between samples
      */
-    protected int lag;
+    protected int lag = 0;
     /**
      * The current temperature
      */
-    protected double temperature;
+    protected double temperature = 1;
     /**
      * Counts of topics
      */
@@ -237,7 +237,7 @@ public abstract class Annealer {
             }
         }
 
-        if(finishedCollection) {
+        if (finishedCollection) {
             normalizeSamples();
         }
     }

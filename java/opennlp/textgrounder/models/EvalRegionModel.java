@@ -48,39 +48,7 @@ import opennlp.textgrounder.util.KMLUtil;
  * 
  * @author tsmoon
  */
-public class RegionModel extends TopicModel {
-
-    /**
-     * Callback class for handling mappings between regions, locations and placenames
-     */
-    protected RegionMapperCallback regionMapperCallback;
-    /**
-     * Vector of toponyms. If 0, the word is not a toponym. If 1, it is.
-     */
-    protected int[] toponymVector;
-    /**
-     * Vector of stopwords. If 0, the word is not a stopword. If 1, it is.
-     */
-    protected int[] stopwordVector;
-    /**
-     * An index of toponyms and possible regions. The goal is fast lookup and not
-     * frugality with memory. The dimensions are equivalent to the wordByTopicCounts
-     * array. Instead of counts, this array is populated with ones and zeros.
-     * If a toponym occurs in a certain region, the cell value is one, zero if not.
-     */
-    protected int[] regionByToponym;
-    /**
-     * The set of locations that have been observed with the model.
-     */
-    protected TIntHashSet locationSet;
-    /**
-     * Table from index to region
-     */
-    TIntObjectHashMap<Region> regionMap;
-    /**
-     * 
-     */
-    StopwordList stopwordList;
+public class EvalRegionModel extends RegionModel {
 
     /**
      * Default constructor. Take input from commandline and default options
@@ -89,25 +57,25 @@ public class RegionModel extends TopicModel {
      *
      * @param options
      */
-    public RegionModel(CommandLineOptions options) {
+    public EvalRegionModel(CommandLineOptions options) {
         regionMapperCallback = new RegionMapperCallback();
         try {
             initialize(options);
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(EvalRegionModel.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
-            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(EvalRegionModel.class.getName()).log(Level.SEVERE, null, ex);
         } catch (ClassNotFoundException ex) {
-            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(EvalRegionModel.class.getName()).log(Level.SEVERE, null, ex);
         } catch (SQLException ex) {
-            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(EvalRegionModel.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
     /**
      * 
      */
-    public RegionModel() {
+    public EvalRegionModel() {
     }
 
     /**
@@ -132,8 +100,8 @@ public class RegionModel extends TopicModel {
     /**
      *
      */
-    protected void setAllocateRegions(TokenArrayBuffer tokenArrayBuffer) {
-        N = tokenArrayBuffer.size();
+    protected void setAllocateRegions(EvalTokenArrayBuffer evalTokenArrayBuffer) {
+        N = evalTokenArrayBuffer.size();
         /**
          * Here we distinguish between the full dictionary size (fW) and the
          * dictionary size without stopwords (W). Normalization is conducted with
@@ -142,13 +110,13 @@ public class RegionModel extends TopicModel {
         sW = stopwordList.size();
         fW = lexicon.getDictionarySize();
         W = fW - sW;
-        D = tokenArrayBuffer.getNumDocs();
+        D = evalTokenArrayBuffer.getNumDocs();
         betaW = beta * W;
 
-        wordVector = tokenArrayBuffer.wordVector;
-        documentVector = tokenArrayBuffer.documentVector;
-        toponymVector = tokenArrayBuffer.toponymVector;
-        stopwordVector = tokenArrayBuffer.stopwordVector;
+        wordVector = evalTokenArrayBuffer.wordVector;
+        documentVector = evalTokenArrayBuffer.documentVector;
+        toponymVector = evalTokenArrayBuffer.toponymVector;
+        stopwordVector = evalTokenArrayBuffer.stopwordVector;
 
         /**
          * There is no need to initialize the topicVector. It will be randomly
@@ -427,14 +395,6 @@ public class RegionModel extends TopicModel {
     }
 
     /**
-     * Remove stopwords from normalization process
-     */
-    @Override
-    public void normalize() {
-        normalize(stopwordList);
-    }
-
-    /**
      *
      */
     @Override
@@ -444,201 +404,14 @@ public class RegionModel extends TopicModel {
         try {
             processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon), evalTokenArrayBuffer, stopwordList);
         } catch (IOException ex) {
-            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(EvalRegionModel.class.getName()).log(Level.SEVERE, null, ex);
         } catch (ClassCastException ex) {
-            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(EvalRegionModel.class.getName()).log(Level.SEVERE, null, ex);
         } catch (ClassNotFoundException ex) {
-            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(EvalRegionModel.class.getName()).log(Level.SEVERE, null, ex);
         }
         evalTokenArrayBuffer.convertToPrimitiveArrays();
         
         super.evaluate();
-    }
-
-    /**
-     * Print the normalized sample counts to tabularOutput. Print only the top {@link
-     * #outputPerClass} per given topic.
-     *
-     * @throws IOException
-     */
-    @Override
-    public void printTabulatedProbabilities() throws
-          IOException {
-        super.printTabulatedProbabilities();
-        writeRegionWordDistributionKMLFile(trainInputPath, tabularOutputFilename);
-        saveSimpleParameters(tabularOutputFilename);
-    }
-
-    /**
-     * Print the normalized sample counts for each topic to out. Print only the top {@link
-     * #outputPerTopic} per given topic.
-     *
-     * @param out
-     * @throws IOException
-     */
-    @Override
-    protected void printTopics(BufferedWriter out) throws IOException {
-        int startt = 0, M = 4, endt = Math.min(M + startt, topicProbs.length);
-        out.write("***** Word Probabilities by Topic *****\n\n");
-
-        regionMap = regionMapperCallback.getRegionMap();
-
-        while (startt < T) {
-            for (int i = startt; i < endt; ++i) {
-
-                double lat = regionMap.get(i).centLat;
-                double lon = regionMap.get(i).centLon;
-
-                String header = "T_" + i;
-                header = String.format("%25s\t%6.5f\t", String.format("%s (%.0f,%.0f)", header, lat, lon), topicProbs[i]);
-                out.write(header);
-            }
-
-            out.newLine();
-            out.newLine();
-
-            for (int i = 0; i < outputPerClass; ++i) {
-                for (int c = startt; c < endt; ++c) {
-                    String line = String.format("%25s\t%6.5f\t",
-                          topWordsPerTopic[c][i].stringValue,
-                          topWordsPerTopic[c][i].doubleValue);
-                    out.write(line);
-                }
-                out.newLine();
-            }
-            out.newLine();
-            out.newLine();
-
-            startt = endt;
-            endt = java.lang.Math.min(T, startt + M);
-        }
-    }
-
-    /**
-     * Output word distributions over regions to Google Earth kml file.
-     *
-     * @param inputFilename
-     * @param outputFilename
-     * @throws IOException
-     */
-    public void writeRegionWordDistributionKMLFile(String inputFilename,
-          String outputFilename) throws IOException {
-
-        BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename + ".kml"));
-
-        out.write(KMLUtil.genKMLHeader(inputFilename));
-        regionMap = regionMapperCallback.getRegionMap();
-
-        double radius = .2;
-
-        for (int i = 0; i < T; ++i) {
-            double lat = regionMap.get(i).centLat;
-            double lon = regionMap.get(i).centLon;
-            Coordinate center = new Coordinate(lon, lat);
-
-            for (int j = 0; j < outputPerClass; ++j) {
-
-                Coordinate spiralPoint = center.getNthSpiralPoint(j, .5);
-
-                String word = topWordsPerTopic[i][j].stringValue;
-                double height = topWordsPerTopic[i][j].doubleValue * barScale * 50;
-                String kmlPolygon = spiralPoint.toKMLPolygon(10, radius, height);
-                out.write(KMLUtil.genPolygon("", spiralPoint, radius, kmlPolygon));
-                out.write(KMLUtil.genFloatingPlacemark(word, spiralPoint, height));
-            }
-        }
-
-        out.write("\t\t</Folder>\n\t</Document>\n</kml>");
-        out.close();
-    }
-
-    /**
-     * 
-     * @param outputFilename
-     * @throws IOException
-     */
-    public void saveSimpleParameters(String outputFilename) throws IOException {
-        SerializableParameters sp = new SerializableParameters();
-        sp.saveParameters(outputFilename, this);
-    }
-
-    /**
-     *
-     * @param inputFilename
-     * @throws IOException
-     */
-    public void loadSimpleParameters(String inputFilename) throws IOException {
-        SerializableParameters sp = new SerializableParameters();
-        sp.loadParameters(inputFilename, this);
-    }
-
-    /**
-     * 
-     * @param outputFilename
-     * @param word
-     * @throws IOException
-     */
-    public void writeWordOverGlobeKML(String outputFilename, String word) throws
-          IOException {
-        writeWordOverGlobeKML(trainInputPath, outputFilename, word);
-    }
-
-    /**
-     * 
-     * @param word
-     * @throws IOException
-     */
-    public void writeWordOverGlobeKML(String word) throws
-          IOException {
-        writeWordOverGlobeKML(trainInputPath, word + ".kml", word);
-    }
-
-    /**
-     * 
-     * @param inputFilename
-     * @param outputFilename
-     * @throws IOException
-     */
-    public void writeWordOverGlobeKML(String inputFilename,
-          String outputFilename, String word) throws IOException {
-
-        int wordid = lexicon.getIntForWord(word);
-        if (wordid == 0) {
-            System.err.println("\"" + word + "\" is not in the text");
-            System.exit(1);
-        }
-
-        BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));
-
-        out.write(KMLUtil.genKMLHeader(inputFilename));
-
-        double radius = 1;
-        T = topicProbs.length;
-
-        for (int i = 0; i < T; ++i) {
-            double lat = regionMap.get(i).centLat;
-            double lon = regionMap.get(i).centLon;
-            Coordinate center = new Coordinate(lon, lat);
-            double height = wordByTopicProbs[wordid * T + i] * barScale * 20;
-            String kmlPolygon = center.toKMLPolygon(10, radius, height);
-            out.write(KMLUtil.genPolygon(word, center, radius, kmlPolygon));
-        }
-
-        out.write("\t\t</Folder>\n\t</Document>\n</kml>");
-        out.close();
-    }
-
-    /**
-     * Write assignments to Google Earth KML file.
-     * 
-     * @throws Exception
-     */
-    @Override
-    public void writeXMLFile() throws Exception {
-        System.err.println();
-        System.err.println("Counting locations and smoothing");
-        normalizeLocations();
-        System.err.println("Writing output");
-        writeXMLFile(trainInputPath, kmlOutputFilename, locations, trainTokenArrayBuffer);
     }
 }

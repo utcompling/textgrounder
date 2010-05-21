@@ -15,33 +15,16 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.annealers;
 
-import opennlp.textgrounder.geo.CommandLineOptions;
-
 /**
- * Class for no annealing regime. If the initial and target temperature are
- * equal, this class is called. In this case, the outer iteration is set to one
- * and the inner iterations are all the iterations there are.
+ * Class for conducting simulated annealing. This class also controls the burn-in
+ * and the number of samples taken.
  * 
  * @author tsmoon
  */
-public class EmptyAnnealer extends Annealer {
+public class EvalAnnealer extends EmptyAnnealer {
 
-    protected EmptyAnnealer() {
-    }
-
-    public EmptyAnnealer(CommandLineOptions options) {
-        super(options);
-    }
-
-    @Override
-    public double annealProbs(int starti, double[] classes) {
-        double sum = 0;
-        try {
-            for (int i = starti;; ++i) {
-                sum += classes[i];
-            }
-        } catch (ArrayIndexOutOfBoundsException e) {
-        }
-        return sum;
+    public EvalAnnealer() {
+        innerIterationsMax = 100;
+        outerIterationsMax = 1;
     }
 }

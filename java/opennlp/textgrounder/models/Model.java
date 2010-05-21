@@ -383,7 +383,7 @@ public abstract class Model {
      */
     public void processEvalInputPath() throws Exception {
         evalTokenArrayBuffer = new EvalTokenArrayBuffer(lexicon);
-        processEvalInputPath(evalInputFile, textProcessor, evalTokenArrayBuffer, new NullStopwordList());
+        processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon), evalTokenArrayBuffer, new NullStopwordList());
         evalTokenArrayBuffer.convertToPrimitiveArrays();
     }
 
@@ -404,7 +404,7 @@ public abstract class Model {
                 processEvalInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, evalTokenArrayBuffer, stopwordList);
             }
         } else {
-            textProcessor.addToponymsFromGoldFile(myPath.getCanonicalPath(), evalTokenArrayBuffer, stopwordList);
+            textProcessor.addToponymsFromFile(myPath.getCanonicalPath(), evalTokenArrayBuffer, stopwordList);
         }
     }
 
