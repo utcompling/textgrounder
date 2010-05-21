@@ -73,6 +73,10 @@ public class RegionModel extends TopicModel {
      * Table from index to region
      */
     TIntObjectHashMap<Region> regionMap;
+    /**
+     * 
+     */
+    StopwordList stopwordList;
 
     /**
      * Default constructor. Take input from commandline and default options
@@ -114,8 +118,8 @@ public class RegionModel extends TopicModel {
 
         initializeFromOptions(options);
 
-        tokenArrayBuffer = new TokenArrayBuffer(lexicon);
-        StopwordList stopwordList = new StopwordList();
+        tokenArrayBuffer = new TokenArrayBuffer(lexicon, new TrainingMaterialCallback(lexicon));
+        stopwordList = new StopwordList();
         sW = stopwordList.size();
         processPath(inputFile, textProcessor, tokenArrayBuffer, stopwordList);
 
@@ -439,6 +443,14 @@ public class RegionModel extends TopicModel {
             } catch (NullPointerException e) {
             }
         }
+    }
+
+    /**
+     * Remove stopwords from normalization process
+     */
+    @Override
+    public void normalize() {
+        normalize(stopwordList);
     }
 
     /**

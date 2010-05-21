@@ -17,9 +17,12 @@ package opennlp.textgrounder.models;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.ec.util.MersenneTwisterFast;
@@ -313,6 +316,22 @@ public class TopicModel extends Model {
      * words and values.
      */
     public void normalize() {
+        try {
+            normalize(new NullStopwordList());
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(TopicModel.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(TopicModel.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    /**
+     * Create two normalized probability tables, {@link #TopWordsPerTopic} and
+     * {@link #topicProbs}. {@link #topicProbs} overwrites previous values.
+     * {@link #TopWordsPerTopic} only retains first {@link #outputPerTopic}
+     * words and values.
+     */
+    public void normalize(StopwordList stopWordList) {
 
         wordByTopicProbs = new double[W * T];
 
@@ -328,10 +347,13 @@ public class TopicModel extends Model {
             sum += topicProbs[i] = topicCounts[i] + betaW;
             ArrayList<DoubleStringPair> topWords = new ArrayList<DoubleStringPair>();
             for (int j = 0; j < W; ++j) {
-                topWords.add(
-                      new DoubleStringPair(wordByTopicCounts[j * T + i] + beta,
-                      lexicon.getWordForInt(j)));
-                wordByTopicProbs[j * T + i] = (wordByTopicCounts[j * T + i] + beta) / topicProbs[i];
+                String word = lexicon.getWordForInt(j);
+                if (!stopWordList.isStopWord(word)) {
+                    topWords.add(
+                          new DoubleStringPair(wordByTopicCounts[j * T + i] + beta,
+                          lexicon.getWordForInt(j)));
+                    wordByTopicProbs[j * T + i] = (wordByTopicCounts[j * T + i] + beta) / topicProbs[i];
+                }
             }
             Collections.sort(topWords);
             for (int j = 0; j < outputPerClass; ++j) {
