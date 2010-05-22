@@ -142,7 +142,11 @@ public class EvalRegionModel extends RegionModel {
             } else {
                 for (int j = 0; j < T; ++j) {
                     int tregid = regionIdToRegionId[j];
-                    priorWordByTopicCounts[ewordoff + j] = rm.wordByTopicCounts[twordoff + tregid] + beta;
+                    if (tregid < 0) {
+                        priorWordByTopicCounts[ewordoff + j] = beta;
+                    } else {
+                        priorWordByTopicCounts[ewordoff + j] = rm.wordByTopicCounts[twordoff + tregid] + beta;
+                    }
                 }
             }
         }
