@@ -176,24 +176,7 @@ public class RegionModel extends TopicModel {
             regionByToponym[i] = 0;
         }
 
-        TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
-        for (TIntObjectIterator<TIntHashSet> it1 = nameToRegionIndex.iterator();
-              it1.hasNext();) {
-            it1.advance();
-            int wordoff = it1.key() * T;
-            for (TIntIterator it2 = it1.value().iterator(); it2.hasNext();) {
-                int j = it2.next();
-                regionByToponym[wordoff + j] = 1;
-            }
-        }
-
-        for (TIntIterator it = toponymsNotInGazetteer.iterator(); it.hasNext();) {
-            int topid = it.next();
-            int topoff = topid * T;
-            for (int i = 0; i < T; ++i) {
-                regionByToponym[topoff + i] = 1;
-            }
-        }
+        buildTopoFilter(toponymsNotInGazetteer);
     }
 
     /**
@@ -239,6 +222,27 @@ public class RegionModel extends TopicModel {
         }
         System.err.println();
         return toponymsNotInGazetteer;
+    }
+
+    protected void buildTopoFilter(TIntHashSet toponymsNotInGazetteer) {
+        TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
+        for (TIntObjectIterator<TIntHashSet> it1 = nameToRegionIndex.iterator();
+              it1.hasNext();) {
+            it1.advance();
+            int wordoff = it1.key() * T;
+            for (TIntIterator it2 = it1.value().iterator(); it2.hasNext();) {
+                int j = it2.next();
+                regionByToponym[wordoff + j] = 1;
+            }
+        }
+
+        for (TIntIterator it = toponymsNotInGazetteer.iterator(); it.hasNext();) {
+            int topid = it.next();
+            int topoff = topid * T;
+            for (int i = 0; i < T; ++i) {
+                regionByToponym[topoff + i] = 1;
+            }
+        }
     }
 
     /**
