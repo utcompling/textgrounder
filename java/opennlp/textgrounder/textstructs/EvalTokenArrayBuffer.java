@@ -84,7 +84,7 @@ public class EvalTokenArrayBuffer extends TokenArrayBuffer {
     @Override
     public void addElement(int wordIdx, int docIdx, int topStatus,
           int stopStatus, Location loc) {
-        super.addElement(wordIdx, docIdx, topStatus, stopStatus);
+        super.addElement(wordIdx, docIdx, topStatus, stopStatus, null);
         goldLocationArrayList.add(loc);
     }
 

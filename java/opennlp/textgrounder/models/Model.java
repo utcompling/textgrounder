@@ -62,11 +62,11 @@ public abstract class Model {
     /**
      * Path to training data. May be directory or file
      */
-    protected String trainInputPath;
+    protected String trainInputPath = null;
     /**
      * File instantiation of trainInputPath
      */
-    protected File trainInputFile;
+    protected File trainInputFile = null;
     /**
      * Name of kml file (i.e. Google Earth format xml) to generate output to
      */
@@ -212,10 +212,10 @@ public abstract class Model {
 
         kmlOutputFilename = options.getKMLOutputFilename();
         degreesPerRegion = options.getDegreesPerRegion();
+        lexicon = new Lexicon();
 
-        if (!runWholeGazetteer) {
+        if (!runWholeGazetteer && trainInputPath != null) {
             paragraphsAsDocs = options.getParagraphsAsDocs();
-            lexicon = new Lexicon();
 
             String fname = trainInputFile.getName();
             if (options.isPCLXML()) {
