@@ -346,7 +346,7 @@ public class TopicModel extends Model {
      */
     public void normalize(StopwordList stopWordList) {
 
-        wordByTopicProbs = new double[W * T];
+        wordByTopicProbs = new double[fW * T];
 
         topWordsPerTopic = new StringDoublePair[T][];
         for (int i = 0; i < T; ++i) {
@@ -359,7 +359,7 @@ public class TopicModel extends Model {
         for (int i = 0; i < T; ++i) {
             sum += topicProbs[i] = topicCounts[i] + betaW;
             ArrayList<DoubleStringPair> topWords = new ArrayList<DoubleStringPair>();
-            for (int j = 0; j < W; ++j) {
+            for (int j = 0; j < fW; ++j) {
                 String word = lexicon.getWordForInt(j);
                 if (!stopWordList.isStopWord(word)) {
                     topWords.add(
