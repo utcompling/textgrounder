@@ -454,6 +454,7 @@ public class RegionModel extends TopicModel {
     public void evaluate() {
         EvalRegionModel evalRegionModel = new EvalRegionModel(this);
         evalRegionModel.train();
+        evalRegionModel.normalizeLocations();
         evalRegionModel.evaluate();
     }
 

@@ -55,7 +55,7 @@ public class TextProcessor {
      * the index (or offset) of the current document being
      * examined
      */
-    protected static int currentDoc = 0;
+    protected int currentDoc = 0;
     /**
      * The number of paragraphs to treat as a single document.
      */

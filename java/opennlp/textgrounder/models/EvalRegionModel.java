@@ -83,12 +83,14 @@ public class EvalRegionModel extends RegionModel {
 
         locationSet = new TIntHashSet();
         beta = rm.beta;
+        alpha = rm.alpha;
         gazetteer = rm.gazetteer;
         regionMapperCallback = new RegionMapperCallback();
         regionArrayHeight = rm.regionArrayHeight;
         regionArrayWidth = rm.regionArrayWidth;
         setAllocateFields(evalTokenArrayBuffer);
         annealer = new EvalAnnealer();
+        rand = rm.rand;
     }
 
     /**
@@ -114,12 +116,12 @@ public class EvalRegionModel extends RegionModel {
         topicVector = new int[N];
 
         TIntHashSet toponymsNotInGazetteer = buildTopoTable();
+        T = regionMapperCallback.getNumRegions();
 
         RegionModelBridge regionModelBridge = new RegionModelBridge(this, rm);
         int[] regionIdToRegionId = regionModelBridge.matchRegionId();
         int[] wordIdToWordId = regionModelBridge.matchWordId();
 
-        T = regionMapperCallback.getNumRegions();
         topicByDocumentCounts = new int[D * T];
         for (int i = 0; i < D * T; ++i) {
             topicByDocumentCounts[i] = 0;
@@ -308,6 +310,7 @@ public class EvalRegionModel extends RegionModel {
 
         for (int i = 0; i < N; ++i) {
             isstopword = stopwordVector[i];
+            boolean added = false;
             if (isstopword == 0) {
                 istoponym = toponymVector[i];
                 if (istoponym == 1) {
@@ -330,8 +333,10 @@ public class EvalRegionModel extends RegionModel {
                         locs.add(loc.id);
                         toponymRegionToLocations.put(trp.hashCode(), locs);
                     }
+                    added = true;
                 }
-            } else {
+            }
+            if (!added) {
                 evalTokenArrayBuffer.modelLocationArrayList.add(null);
             }
         }
