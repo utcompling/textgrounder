@@ -34,7 +34,7 @@ import opennlp.textgrounder.topostructs.*;
  *
  * @author 
  */
-public class BasicMinDistanceModel extends Model {
+public class BasicMinDistanceModel extends SelfTrainedModelBase {
 
     public static Random myRandom = new Random();
 

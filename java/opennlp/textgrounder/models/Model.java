@@ -76,15 +76,6 @@ public abstract class Model {
      */
     protected int barScale = 50000;
     /**
-     * Gazetteer that holds geographic information
-     */
-    protected Gazetteer gazetteer;
-    /**
-     * Array of array of toponym indices by document. This includes only the
-     * toponyms and none of the non-toponyms.
-     */
-    protected TextProcessor textProcessor;
-    /**
      * Lookup table for Location (hash)code to Location object
      */
     protected TIntObjectHashMap<Location> idxToLocationMap;
@@ -136,12 +127,6 @@ public abstract class Model {
     //protected int indexInTAB = 0;
 
     public Model() {
-    }
-
-    public Model(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
-        barScale = bscale;
-        gazetteer = gaz;
-        lexicon = new Lexicon();
     }
 
     public Model(CommandLineOptions options) {
@@ -214,20 +199,7 @@ public abstract class Model {
         degreesPerRegion = options.getDegreesPerRegion();
         lexicon = new Lexicon();
 
-        if (!runWholeGazetteer && trainInputPath != null) {
-            paragraphsAsDocs = options.getParagraphsAsDocs();
-
-            String fname = trainInputFile.getName();
-            if (options.isPCLXML()) {
-                textProcessor = new TextProcessorTEIXML(lexicon);
-            } else if (trainInputFile.isDirectory() && trainInputFile.list(new PCLXMLFilter()).length != 0) {
-                textProcessor = new TextProcessorTEIXML(lexicon);
-            } else if (fname.startsWith("txu") && fname.endsWith(".xml")) {
-                textProcessor = new TextProcessorTEIXML(lexicon);
-            } else {
-                textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
-            }
-        }
+        paragraphsAsDocs = options.getParagraphsAsDocs();
 
         barScale = options.getBarScale();
 
@@ -267,16 +239,6 @@ public abstract class Model {
               + degreesPerRegion + " x " + degreesPerRegion + " degrees).");
     }
 
-    public void activateRegionsForWholeGaz() throws Exception {
-        System.out.println("Running whole gazetteer through system...");
-
-        //locations = new ArrayList<Location>();
-        locations = gazetteer.getAllLocalities();
-        addLocationsToRegionArray(locations);
-        //locations = null; //////////////// uncomment this to get a null pointer but much faster termination
-        //                                   if you only want to know the number of active regions :)
-    }
-
     /**
      * Remove punctuation from first and last characters of a string
      *
@@ -291,16 +253,6 @@ public abstract class Model {
             aString = aString.substring(0, aString.length() - 1);
         }
         return aString;
-    }
-
-    /**
-     * Add locations to the 2D regionArray. To be used by classes that
-     * do not use a RegionMapperCallback.
-     *
-     * @param locs list of locations.
-     */
-    protected void addLocationsToRegionArray(TIntHashSet locs) {
-        addLocationsToRegionArray(locs, gazetteer, new NullRegionMapperCallback());
     }
 
     /**
@@ -352,7 +304,7 @@ public abstract class Model {
      */
     public void processTrainInputPath() throws Exception {
         trainTokenArrayBuffer = new TokenArrayBuffer(lexicon);
-        processTrainInputPath(trainInputFile, textProcessor, trainTokenArrayBuffer, new NullStopwordList());
+        processTrainInputPath(trainInputFile, new TextProcessor(lexicon, paragraphsAsDocs), trainTokenArrayBuffer, new NullStopwordList());
         trainTokenArrayBuffer.convertToPrimitiveArrays();
     }
 
@@ -410,19 +362,6 @@ public abstract class Model {
 
     /**
      * Output tagged and disambiguated placenames to Google Earth kml file.
-     * 
-     * @throws Exception
-     */
-    public void writeXMLFile() throws Exception {
-        if (!runWholeGazetteer) {
-            writeXMLFile(trainInputPath, kmlOutputFilename, locations, evalTokenArrayBuffer);
-        } else {
-            writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, locations, evalTokenArrayBuffer);
-        }
-    }
-
-    /**
-     * Output tagged and disambiguated placenames to Google Earth kml file.
      *
      * @param trainInputPath
      * @param kmlOutputFilename
@@ -430,7 +369,7 @@ public abstract class Model {
      * @throws Exception
      */
     public void writeXMLFile(String inputFilename, String outputFilename,
-          TIntHashSet locations, TokenArrayBuffer tokenArrayBuffer) throws
+          Gazetteer gazetteer, TIntHashSet locations, TokenArrayBuffer tokenArrayBuffer) throws
           IOException {
 
         BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));

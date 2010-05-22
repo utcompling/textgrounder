@@ -42,7 +42,7 @@ import opennlp.textgrounder.topostructs.*;
  *
  * @author 
  */
-public class BaselineModel extends Model {
+public class BaselineModel extends SelfTrainedModelBase {
 
     //protected File trainInputFile;
     //protected boolean initializedXMLFile = false;

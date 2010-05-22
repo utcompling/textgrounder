@@ -21,16 +21,15 @@ import java.util.regex.*;
 import java.util.zip.*;
 
 import gnu.trove.*;
-import opennlp.textgrounder.geo.CommandLineOptions;
 
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.*;
 
 public class CensusGazetteer extends Gazetteer {
 
-    public CensusGazetteer(CommandLineOptions options) throws
+    public CensusGazetteer(String location) throws
           FileNotFoundException, IOException {
-        super(options);
+        super(location);
         initialize(Constants.TEXTGROUNDER_DATA + "/gazetteer/places2k.txt.gz");
     }
 

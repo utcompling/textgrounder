@@ -73,10 +73,10 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
 
     /**
      * Default constructor. Allocates memory for internal collections.
-     * 
-     * @param options empty parameter only to be overridden in derived classes
+     *
+     * @param location empty parameter only to be overridden in derived classes
      */
-    public Gazetteer(CommandLineOptions options) {
+    public Gazetteer(String location) {
         idxToLocationMap = new TIntObjectHashMap<Location>();
         toponymLexicon = new Lexicon();
     }
@@ -126,7 +126,7 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
                           0);
                     idxToLocationMap.put(locationToAdd.id, locationToAdd);
                     locationsToReturn.add(locationToAdd.id);
-                    if(locationToAdd.id > maxLocId) {
+                    if (locationToAdd.id > maxLocId) {
                         maxLocId = locationToAdd.id;
                     }
                 }

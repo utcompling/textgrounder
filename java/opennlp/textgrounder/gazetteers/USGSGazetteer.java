@@ -28,9 +28,9 @@ import opennlp.textgrounder.util.*;
 
 public class USGSGazetteer extends Gazetteer {
 
-    public USGSGazetteer(CommandLineOptions options) throws
+    public USGSGazetteer(String location) throws
           FileNotFoundException, IOException {
-        super(options);
+        super(location);
         initialize(Constants.TEXTGROUNDER_DATA + "/gazetteer/pop_places_plaintext.txt.gz");
     }
 

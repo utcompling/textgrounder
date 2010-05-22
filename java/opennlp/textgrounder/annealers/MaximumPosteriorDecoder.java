@@ -67,7 +67,7 @@ public class MaximumPosteriorDecoder extends Annealer {
     }
 
     @Override
-    public void collectSamples(double[] topicCounts, double[] wordByTopicCounts) {
+    public void collectSamples(int[] topicCounts, int[] wordByTopicCounts) {
         return;
     }
 }

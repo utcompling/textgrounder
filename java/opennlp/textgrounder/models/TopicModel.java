@@ -57,12 +57,12 @@ public class TopicModel extends Model {
     /**
      * Counts of topics
      */
-    protected double[] topicCounts;
+    protected int[] topicCounts;
     /**
      * Counts of tcount per topic. However, since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.
      */
-    protected double[] wordByTopicCounts;
+    protected int[] wordByTopicCounts;
     /**
      * Counts of topics per document
      */
@@ -152,7 +152,7 @@ public class TopicModel extends Model {
           IOException, ClassNotFoundException {
         initializeFromOptions(options);
         lexicon = new Lexicon();
-        textProcessor = new TextProcessor(new NullClassifier(), lexicon, paragraphsAsDocs);
+        TextProcessor textProcessor = new TextProcessor(new NullClassifier(), lexicon, paragraphsAsDocs);
         trainTokenArrayBuffer = new TokenArrayBuffer(lexicon);
         StopwordList stopwordList = new StopwordList();
         sW = stopwordList.size();
@@ -178,7 +178,7 @@ public class TopicModel extends Model {
         for (int i = 0; i < N; ++i) {
             documentVector[i] = wordVector[i] = topicVector[i] = 0;
         }
-        topicCounts = new double[T];
+        topicCounts = new int[T];
         for (int i = 0; i < T; ++i) {
             topicCounts[i] = 0;
         }
@@ -186,7 +186,7 @@ public class TopicModel extends Model {
         for (int i = 0; i < D * T; ++i) {
             topicByDocumentCounts[i] = 0;
         }
-        wordByTopicCounts = new double[fW * T];
+        wordByTopicCounts = new int[fW * T];
         for (int i = 0; i < fW * T; ++i) {
             wordByTopicCounts[i] = 0;
         }
@@ -308,8 +308,8 @@ public class TopicModel extends Model {
         System.err.println(String.format("Beginning training with %d tokens, %d words, %d regions, %d documents", N, W, T, D));
         train(annealer);
         if(annealer.getSamples() != 0) {
-            topicCounts = annealer.getTopicCounts();
-            wordByTopicCounts = annealer.getWordByTopicCounts();
+            topicProbs = annealer.getTopicSampleCounts();
+            wordByTopicProbs = annealer.getWordByTopicSampleCounts();
         }
     }
 

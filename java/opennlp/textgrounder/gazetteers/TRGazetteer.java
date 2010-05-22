@@ -34,10 +34,10 @@ public class TRGazetteer extends Gazetteer {
 
     private static Coordinate nullCoord = new Coordinate(0.0, 0.0);
 
-    public TRGazetteer(CommandLineOptions options) throws FileNotFoundException,
+    public TRGazetteer(String location) throws FileNotFoundException,
           IOException, ClassNotFoundException, SQLException {
-        super(options);
-        initialize(options.getGazetteerPath());
+        super(location);
+        initialize(location);
     }
 
     @Override

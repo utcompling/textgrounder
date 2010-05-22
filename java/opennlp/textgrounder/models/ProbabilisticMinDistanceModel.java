@@ -34,7 +34,7 @@ import opennlp.textgrounder.topostructs.*;
  *
  * @author 
  */
-public class ProbabilisticMinDistanceModel extends Model {
+public class ProbabilisticMinDistanceModel extends SelfTrainedModelBase {
 
     //private static int NUM_ITERATIONS = 10; // replaced by model-iterations option from command line
     private static ArrayList<ArrayList<Double>> pseudoWeights;// = new ArrayList<ArrayList<Double>>();

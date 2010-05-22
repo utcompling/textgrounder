@@ -32,12 +32,7 @@ import java.util.logging.Logger;
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.models.callbacks.*;
-import opennlp.textgrounder.ners.NullClassifier;
-import opennlp.textgrounder.textstructs.EvalTokenArrayBuffer;
-import opennlp.textgrounder.textstructs.StopwordList;
-import opennlp.textgrounder.textstructs.TextProcessor;
-import opennlp.textgrounder.textstructs.TextProcessorTR;
-import opennlp.textgrounder.textstructs.TokenArrayBuffer;
+import opennlp.textgrounder.textstructs.*;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.Constants;
 import opennlp.textgrounder.util.KMLUtil;
@@ -120,6 +115,19 @@ public class RegionModel extends TopicModel {
           SQLException {
         super.initialize(options);
         initializeFromOptions(options);
+
+        TextProcessor textProcessor = null;
+        String fname = trainInputFile.getName();
+        if (options.isPCLXML()) {
+            textProcessor = new TextProcessorTEIXML(lexicon);
+        } else if (trainInputFile.isDirectory() && trainInputFile.list(new PCLXMLFilter()).length != 0) {
+            textProcessor = new TextProcessorTEIXML(lexicon);
+        } else if (fname.startsWith("txu") && fname.endsWith(".xml")) {
+            textProcessor = new TextProcessorTEIXML(lexicon);
+        } else {
+            textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
+        }
+
         trainTokenArrayBuffer = new TokenArrayBuffer(lexicon, new TrainingMaterialCallback(lexicon));
         stopwordList = new StopwordList();
         processTrainInputPath(trainInputFile, textProcessor, trainTokenArrayBuffer, stopwordList);
@@ -159,7 +167,7 @@ public class RegionModel extends TopicModel {
         TIntHashSet toponymsNotInGazetteer = buildTopoTable();
 
         T = regionMapperCallback.getNumRegions();
-        topicCounts = new double[T];
+        topicCounts = new int[T];
         for (int i = 0; i < T; ++i) {
             topicCounts[i] = 0;
         }
@@ -167,7 +175,7 @@ public class RegionModel extends TopicModel {
         for (int i = 0; i < D * T; ++i) {
             topicByDocumentCounts[i] = 0;
         }
-        wordByTopicCounts = new double[fW * T];
+        wordByTopicCounts = new int[fW * T];
         for (int i = 0; i < fW * T; ++i) {
             wordByTopicCounts[i] = 0;
         }

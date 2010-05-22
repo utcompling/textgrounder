@@ -36,7 +36,7 @@ import opennlp.textgrounder.topostructs.*;
  *
  * @author 
  */
-public class RandomBaselineModel extends Model {
+public class RandomBaselineModel extends SelfTrainedModelBase {
 
     public static Random myRandom = new Random();
 

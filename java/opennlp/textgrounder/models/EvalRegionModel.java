@@ -44,11 +44,11 @@ public class EvalRegionModel extends RegionModel {
     /**
      *
      */
-    protected double[] priorWordByTopicCounts;
+    protected double[] hyperWordByTopicProbs;
     /**
      * 
      */
-    protected double[] priorTopicCounts;
+    protected double[] hyperTopicProbs;
 
     /**
      * 
@@ -127,40 +127,41 @@ public class EvalRegionModel extends RegionModel {
             topicByDocumentCounts[i] = 0;
         }
 
-        wordByTopicCounts = new double[fW * T];
-        priorWordByTopicCounts = new double[fW * T];
+        wordByTopicCounts = new int[fW * T];
+        hyperWordByTopicProbs = new double[fW * T];
+        double[] trainWordByTopicParams = rm.annealer.getWordByTopicSampleCounts();
         for (int i = 0; i < fW * T; ++i) {
-            priorWordByTopicCounts[i] = wordByTopicCounts[i] = 0;
+            hyperWordByTopicProbs[i] = wordByTopicCounts[i] = 0;
         }
         for (int i = 0; i < fW; ++i) {
             int ewordoff = i * T;
             int twordoff = wordIdToWordId[i] * rm.T;
             if (twordoff < 0) {
                 for (int j = 0; j < T; ++j) {
-                    priorWordByTopicCounts[ewordoff + j] = beta;
+                    hyperWordByTopicProbs[ewordoff + j] = beta;
                 }
             } else {
                 for (int j = 0; j < T; ++j) {
                     int tregid = regionIdToRegionId[j];
                     if (tregid < 0) {
-                        priorWordByTopicCounts[ewordoff + j] = beta;
+                        hyperWordByTopicProbs[ewordoff + j] = beta;
                     } else {
-                        priorWordByTopicCounts[ewordoff + j] = rm.wordByTopicCounts[twordoff + tregid] + beta;
+                        hyperWordByTopicProbs[ewordoff + j] = trainWordByTopicParams[twordoff + tregid] + beta;
                     }
                 }
             }
         }
 
-        topicCounts = new double[T];
-        priorTopicCounts = new double[T];
+        topicCounts = new int[T];
+        hyperTopicProbs = new double[T];
         for (int i = 0; i < T; ++i) {
-            priorTopicCounts[i] = topicCounts[i] = 0;
+            hyperTopicProbs[i] = topicCounts[i] = 0;
         }
         for (int i = 0; i < fW; ++i) {
             if (!stopwordList.isStopWord(lexicon.getWordForInt(i))) {
                 int wordoff = i * T;
                 for (int j = 0; j < T; ++j) {
-                    priorTopicCounts[j] += priorWordByTopicCounts[wordoff + j];
+                    hyperTopicProbs[j] += hyperWordByTopicProbs[wordoff + j];
                 }
             }
         }
@@ -197,15 +198,15 @@ public class EvalRegionModel extends RegionModel {
                 try {
                     if (istoponym == 1) {
                         for (int j = 0;; ++j) {
-                            probs[j] = (wordByTopicCounts[wordoff + j] + priorWordByTopicCounts[wordoff + j])
-                                  / (topicCounts[j] + priorTopicCounts[j])
+                            probs[j] = (wordByTopicCounts[wordoff + j] + hyperWordByTopicProbs[wordoff + j])
+                                  / (topicCounts[j] + hyperTopicProbs[j])
                                   * (topicByDocumentCounts[docoff + j] + alpha)
                                   * regionByToponym[wordoff + j];
                         }
                     } else {
                         for (int j = 0;; ++j) {
-                            probs[j] = (wordByTopicCounts[wordoff + j] + priorWordByTopicCounts[wordoff + j])
-                                  / (topicCounts[j] + priorTopicCounts[j])
+                            probs[j] = (wordByTopicCounts[wordoff + j] + hyperWordByTopicProbs[wordoff + j])
+                                  / (topicCounts[j] + hyperTopicProbs[j])
                                   * (topicByDocumentCounts[docoff + j] + alpha);
                         }
                     }
@@ -260,15 +261,15 @@ public class EvalRegionModel extends RegionModel {
                     try {
                         if (istoponym == 1) {
                             for (int j = 0;; ++j) {
-                                probs[j] = (wordByTopicCounts[wordoff + j] + priorWordByTopicCounts[wordoff + j])
-                                      / (topicCounts[j] + priorTopicCounts[j])
+                                probs[j] = (wordByTopicCounts[wordoff + j] + hyperWordByTopicProbs[wordoff + j])
+                                      / (topicCounts[j] + hyperTopicProbs[j])
                                       * (topicByDocumentCounts[docoff + j] + alpha)
                                       * regionByToponym[wordoff + j];
                             }
                         } else {
                             for (int j = 0;; ++j) {
-                                probs[j] = (wordByTopicCounts[wordoff + j] + priorWordByTopicCounts[wordoff + j])
-                                      / (topicCounts[j] + priorTopicCounts[j])
+                                probs[j] = (wordByTopicCounts[wordoff + j] + hyperWordByTopicProbs[wordoff + j])
+                                      / (topicCounts[j] + hyperTopicProbs[j])
                                       * (topicByDocumentCounts[docoff + j] + alpha);
                             }
                         }
