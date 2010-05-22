@@ -44,6 +44,11 @@ public class TRGazetteer extends Gazetteer {
     protected void initialize(String location) throws FileNotFoundException,
           IOException, ClassNotFoundException, SQLException {
 
+        File trf = new File(location);
+        if(!trf.exists()) {
+            throw new FileNotFoundException(location + " does not exist!");
+        }
+
         System.out.println("Populating TR-Gazetteer from " + location + " ...");
 
         Class.forName("org.sqlite.JDBC");
