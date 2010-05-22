@@ -52,198 +52,204 @@ public class TRGazetteer extends Gazetteer {
 
         stat = conn.createStatement();
 
-	//ResultSet rs = stat.executeQuery("select * from places");
-	ResultSet rs = stat.executeQuery("select count(*) as rowcount from places");
-	rs.next();
-	int rowCount = rs.getInt("rowcount");
-	if(rowCount > 0) {
-	    System.out.println("Using pre-populated TRGazetteer database with " + rowCount + " entries.");
-	    System.out.print("  Adding location IDs to Gazetteer hashset for quick checking...");
-	    rs.close();
-	    rs = stat.executeQuery("select * from places");
-	    while(rs.next()) {
-		String name = rs.getString("name");
-		if(name != null) {
-		    int topidx = toponymLexicon.addWord(name);
-		    put(topidx, null);
-		}
-	    }
-	    System.out.println("done.");
-	    return;
-	}
-	rs.close();
+        //ResultSet rs = stat.executeQuery("select * from places");
+        ResultSet rs = null;
 
-        stat.executeUpdate("drop table if exists places;");
-        stat.executeUpdate("create table places (id integer primary key, name, type, lat float, lon float, pop int, container);");
-        PreparedStatement prep = conn.prepareStatement("insert into places values (?, ?, ?, ?, ?, ?, ?);");
-
-        int placeId = 1;
-        int ignoreCount = 0;
-
-
-        // get places from CIA centroids section:
-        System.out.println(" Reading CIA centroids section...");
-        rs = stat.executeQuery("select * from T_CIA_CENTROIDS");
-        while (rs.next()) {
-            prep.setInt(1, placeId);
-            String nameToInsert = rs.getString("COUNTRY").toLowerCase();
-            if (nameToInsert != null) {
-                prep.setString(2, nameToInsert);
-            }
-            prep.setString(3, "cia_centroid");
-            double latToInsert = DMDtoDD(rs.getInt("LONG_DEG"), rs.getInt("LONG_MIN"), rs.getString("LONG_DIR"));/////
-            prep.setDouble(4, latToInsert);
-            double longToInsert = DMDtoDD(rs.getInt("LAT_DEG"), rs.getInt("LAT_MIN"), rs.getString("LAT_DIR"));///////
-            prep.setDouble(5, longToInsert);
-
-            if (latToInsert < -180.0 || latToInsert > 180.0
-                  || longToInsert < -90.0 || longToInsert > 90.0) {
-                ignoreCount++;
-                continue;
-            }
-
-            prep.addBatch();
-
-            if (placeId % 100 == 0) {
-                System.out.println("  Added " + placeId + " places...");// gazetteer has " + populations.size() + " entries so far.");
-                System.out.println("    Last added: " + nameToInsert + ", cia_centroid, (" + latToInsert + ", " + longToInsert + ")");
-            }
-
-            placeId++;
-
-            int topidx = toponymLexicon.addWord(nameToInsert);
-            put(topidx, null);
-        }
-
-
-        // get places from USGS section:
-        System.out.println(" Reading USGS section...");
-        rs = stat.executeQuery("select * from T_USGS_PP");
-        while (rs.next()) {
-            String rawType = rs.getString("FeatureType");
-            String typeToInsert = "";
-            if (rawType != null) {
-                if (rawType.equals("ppl")) {
-                    typeToInsert = "locality";
-                } else {
-                    continue; // skipping non-localities for now
-                    //typeToInsert = "NON-locality";
+        try {
+            rs = stat.executeQuery("select count(*) as rowcount from places");
+            rs.next();
+            int rowCount = rs.getInt("rowcount");
+            if (rowCount > 0) {
+                System.out.println("Using pre-populated TRGazetteer database with " + rowCount + " entries.");
+                System.out.print("  Adding location IDs to Gazetteer hashset for quick checking...");
+                rs.close();
+                rs = stat.executeQuery("select * from places");
+                while (rs.next()) {
+                    String name = rs.getString("name");
+                    if (name != null) {
+                        int topidx = toponymLexicon.addWord(name);
+                        put(topidx, null);
+                    }
                 }
-                prep.setString(3, typeToInsert);
+                System.out.println("done.");
+                return;
             }
-            prep.setInt(1, placeId);
-            String nameToInsert = rs.getString("FeatureName").toLowerCase();
-            if (nameToInsert != null) {
-                prep.setString(2, nameToInsert);
-            }
-            double latToInsert = rs.getDouble("PrimaryLongitudeDD");///////
-            prep.setDouble(4, latToInsert);
-            double longToInsert = rs.getDouble("PrimaryLatitudeDD");//////
-            prep.setDouble(5, longToInsert);
-
-            if (latToInsert < -180.0 || latToInsert > 180.0
-                  || longToInsert < -90.0 || longToInsert > 90.0) {
-                ignoreCount++;
-                continue;
-            }
-
-            int popToInsert = rs.getInt("EstimatedPopulation");
-            if (popToInsert != 0) {
-                prep.setDouble(6, popToInsert);
-                //System.out.println(popToInsert);
-            }
-
-            prep.addBatch();
-
-            /*if(nameToInsert.equals("texas") || nameToInsert.equals("california"))
-            System.out.println(nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + "), " + popToInsert);*/
-
-            if (placeId % 50000 == 0) {
-                System.out.println("  Added " + placeId + " places...");// gazetteer has " + populations.size() + " entries so far.");
-                System.out.println("    Last added: " + nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + "), " + popToInsert);
-            }
-
-            placeId++;
-
-            int topidx = toponymLexicon.addWord(nameToInsert);
-            put(topidx, null);
-        }
+            rs.close();
+        } catch (SQLException e) {
 
 
-        // get places from NGA section:
-        System.out.println(" Reading NGA section...");
-        rs = stat.executeQuery("select * from T_NGA");
-        while (rs.next()) {
-            String rawType = rs.getString("FC");
-            String typeToInsert = "";
-            if (rawType != null) {
-                if (rawType.equals("P")) {
-                    typeToInsert = "locality";
-                } else {
-                    continue; // skipping non-localities for now
-                    //typeToInsert = "NON-locality";
+            stat.executeUpdate("drop table if exists places;");
+            stat.executeUpdate("create table places (id integer primary key, name, type, lat float, lon float, pop int, container);");
+            PreparedStatement prep = conn.prepareStatement("insert into places values (?, ?, ?, ?, ?, ?, ?);");
+
+            int placeId = 1;
+            int ignoreCount = 0;
+
+
+            // get places from CIA centroids section:
+            System.out.println(" Reading CIA centroids section...");
+            rs = stat.executeQuery("select * from T_CIA_CENTROIDS");
+            while (rs.next()) {
+                prep.setInt(1, placeId);
+                String nameToInsert = rs.getString("COUNTRY").toLowerCase();
+                if (nameToInsert != null) {
+                    prep.setString(2, nameToInsert);
                 }
-                prep.setString(3, typeToInsert);
+                prep.setString(3, "cia_centroid");
+                double latToInsert = DMDtoDD(rs.getInt("LONG_DEG"), rs.getInt("LONG_MIN"), rs.getString("LONG_DIR"));/////
+                prep.setDouble(4, latToInsert);
+                double longToInsert = DMDtoDD(rs.getInt("LAT_DEG"), rs.getInt("LAT_MIN"), rs.getString("LAT_DIR"));///////
+                prep.setDouble(5, longToInsert);
+
+                if (latToInsert < -180.0 || latToInsert > 180.0
+                      || longToInsert < -90.0 || longToInsert > 90.0) {
+                    ignoreCount++;
+                    continue;
+                }
+
+                prep.addBatch();
+
+                if (placeId % 100 == 0) {
+                    System.out.println("  Added " + placeId + " places...");// gazetteer has " + populations.size() + " entries so far.");
+                    System.out.println("    Last added: " + nameToInsert + ", cia_centroid, (" + latToInsert + ", " + longToInsert + ")");
+                }
+
+                placeId++;
+
+                int topidx = toponymLexicon.addWord(nameToInsert);
+                put(topidx, null);
             }
-            prep.setInt(1, placeId);
-            String nameToInsert = rs.getString("FULL_NAME_ND").toLowerCase();
-            if (nameToInsert != null) {
-                prep.setString(2, nameToInsert);
+
+
+            // get places from USGS section:
+            System.out.println(" Reading USGS section...");
+            rs = stat.executeQuery("select * from T_USGS_PP");
+            while (rs.next()) {
+                String rawType = rs.getString("FeatureType");
+                String typeToInsert = "";
+                if (rawType != null) {
+                    if (rawType.equals("ppl")) {
+                        typeToInsert = "locality";
+                    } else {
+                        continue; // skipping non-localities for now
+                        //typeToInsert = "NON-locality";
+                    }
+                    prep.setString(3, typeToInsert);
+                }
+                prep.setInt(1, placeId);
+                String nameToInsert = rs.getString("FeatureName").toLowerCase();
+                if (nameToInsert != null) {
+                    prep.setString(2, nameToInsert);
+                }
+                double latToInsert = rs.getDouble("PrimaryLongitudeDD");///////
+                prep.setDouble(4, latToInsert);
+                double longToInsert = rs.getDouble("PrimaryLatitudeDD");//////
+                prep.setDouble(5, longToInsert);
+
+                if (latToInsert < -180.0 || latToInsert > 180.0
+                      || longToInsert < -90.0 || longToInsert > 90.0) {
+                    ignoreCount++;
+                    continue;
+                }
+
+                int popToInsert = rs.getInt("EstimatedPopulation");
+                if (popToInsert != 0) {
+                    prep.setDouble(6, popToInsert);
+                    //System.out.println(popToInsert);
+                }
+
+                prep.addBatch();
+
+                /*if(nameToInsert.equals("texas") || nameToInsert.equals("california"))
+                System.out.println(nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + "), " + popToInsert);*/
+
+                if (placeId % 50000 == 0) {
+                    System.out.println("  Added " + placeId + " places...");// gazetteer has " + populations.size() + " entries so far.");
+                    System.out.println("    Last added: " + nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + "), " + popToInsert);
+                }
+
+                placeId++;
+
+                int topidx = toponymLexicon.addWord(nameToInsert);
+                put(topidx, null);
             }
 
-            double latToInsert = rs.getDouble("DD_LONG");//"DD_LAT"); //switched?
-            //if(latToInsert != null)
-            prep.setDouble(4, latToInsert);
-            double longToInsert = rs.getDouble("DD_LAT");//"DD_LONG");
-            //if(longToInsert != null)
-            prep.setDouble(5, longToInsert);
 
-            if (latToInsert < -180.0 || latToInsert > 180.0
-                  || longToInsert < -90.0 || longToInsert > 90.0) {
-                ignoreCount++;
-                continue;
+            // get places from NGA section:
+            System.out.println(" Reading NGA section...");
+            rs = stat.executeQuery("select * from T_NGA");
+            while (rs.next()) {
+                String rawType = rs.getString("FC");
+                String typeToInsert = "";
+                if (rawType != null) {
+                    if (rawType.equals("P")) {
+                        typeToInsert = "locality";
+                    } else {
+                        continue; // skipping non-localities for now
+                        //typeToInsert = "NON-locality";
+                    }
+                    prep.setString(3, typeToInsert);
+                }
+                prep.setInt(1, placeId);
+                String nameToInsert = rs.getString("FULL_NAME_ND").toLowerCase();
+                if (nameToInsert != null) {
+                    prep.setString(2, nameToInsert);
+                }
+
+                double latToInsert = rs.getDouble("DD_LONG");//"DD_LAT"); //switched?
+                //if(latToInsert != null)
+                prep.setDouble(4, latToInsert);
+                double longToInsert = rs.getDouble("DD_LAT");//"DD_LONG");
+                //if(longToInsert != null)
+                prep.setDouble(5, longToInsert);
+
+                if (latToInsert < -180.0 || latToInsert > 180.0
+                      || longToInsert < -90.0 || longToInsert > 90.0) {
+                    ignoreCount++;
+                    continue;
+                }
+
+                int popToInsert = rs.getInt("DIM"); // note: DIM holds population for type P and elevation for all others
+                if (popToInsert != 0 && rawType != null && rawType.equals("P")) {
+                    prep.setInt(6, popToInsert);
+                    //System.out.println(popToInsert);
+                }
+                // could use ADM2 for container, but those are counties, not countries, so probably a bad idea. leaving container field blank for now
+                prep.addBatch();
+
+
+                /*if(nameToInsert.equals("texas") || nameToInsert.equals("california"))
+                System.out.println(nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + "), " + popToInsert);*/
+
+                if (placeId % 100000 == 0) {
+                    System.out.println("  Added " + placeId + " places...");// gazetteer has " + populations.size() + " entries so far.");
+                    System.out.println("    Last added: " + nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + "), " + popToInsert);
+                }
+                //if(placeId == 1000)//////////////////
+                //  System.exit(0);//////////////////
+
+                placeId++;
+
+                int topidx = toponymLexicon.addWord(nameToInsert);
+                put(topidx, null);
             }
 
-            int popToInsert = rs.getInt("DIM"); // note: DIM holds population for type P and elevation for all others
-            if (popToInsert != 0 && rawType != null && rawType.equals("P")) {
-                prep.setInt(6, popToInsert);
-                //System.out.println(popToInsert);
+
+
+            if (ignoreCount > 0) {
+                System.out.println(ignoreCount + " (" + ((ignoreCount * 100) / (ignoreCount + placeId)) + "%) entries were ignored due to invalid coordinates (out of range)");
             }
-            // could use ADM2 for container, but those are counties, not countries, so probably a bad idea. leaving container field blank for now
-            prep.addBatch();
 
+            System.out.print("Executing batch insertion into database...");
+            conn.setAutoCommit(false);
+            prep.executeBatch();
+            conn.setAutoCommit(true);
+            System.out.println("done.");
 
-            /*if(nameToInsert.equals("texas") || nameToInsert.equals("california"))
-            System.out.println(nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + "), " + popToInsert);*/
-
-            if (placeId % 100000 == 0) {
-                System.out.println("  Added " + placeId + " places...");// gazetteer has " + populations.size() + " entries so far.");
-                System.out.println("    Last added: " + nameToInsert + ", " + typeToInsert + ", (" + latToInsert + ", " + longToInsert + "), " + popToInsert);
-            }
-            //if(placeId == 1000)//////////////////
-            //  System.exit(0);//////////////////
-
-            placeId++;
-
-            int topidx = toponymLexicon.addWord(nameToInsert);
-            put(topidx, null);
+            System.out.println("Number of entries in database = " + (placeId - 1));
         }
-
-
-
-        if (ignoreCount > 0) {
-            System.out.println(ignoreCount + " (" + ((ignoreCount * 100) / (ignoreCount + placeId)) + "%) entries were ignored due to invalid coordinates (out of range)");
-        }
-
-        System.out.print("Executing batch insertion into database...");
-        conn.setAutoCommit(false);
-        prep.executeBatch();
-        conn.setAutoCommit(true);
-        System.out.println("done.");
-
-        System.out.println("Number of entries in database = " + (placeId - 1));
-
     }
+
     /**
      * Converts (half) a coordinate from degrees-minutes-direction to decimal degrees
      */
