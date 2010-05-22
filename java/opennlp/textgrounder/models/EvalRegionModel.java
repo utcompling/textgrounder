@@ -16,14 +16,10 @@
 package opennlp.textgrounder.models;
 
 import gnu.trove.TIntHashSet;
-import gnu.trove.TIntIntHashMap;
 import gnu.trove.TIntIterator;
 import gnu.trove.TIntObjectHashMap;
-import gnu.trove.TIntObjectIterator;
 
-import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -31,18 +27,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import opennlp.textgrounder.annealers.*;
-import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.models.callbacks.*;
-import opennlp.textgrounder.ners.NullClassifier;
-import opennlp.textgrounder.textstructs.EvalTokenArrayBuffer;
-import opennlp.textgrounder.textstructs.Lexicon;
-import opennlp.textgrounder.textstructs.StopwordList;
-import opennlp.textgrounder.textstructs.TextProcessor;
-import opennlp.textgrounder.textstructs.TextProcessorTR;
-import opennlp.textgrounder.textstructs.TokenArrayBuffer;
+import opennlp.textgrounder.textstructs.*;
 import opennlp.textgrounder.topostructs.*;
-import opennlp.textgrounder.util.Constants;
-import opennlp.textgrounder.util.KMLUtil;
 
 /**
  * 
@@ -54,7 +41,13 @@ public class EvalRegionModel extends RegionModel {
      *
      */
     protected RegionModel rm;
+    /**
+     *
+     */
     protected double[] priorWordByTopicCounts;
+    /**
+     * 
+     */
     protected double[] priorTopicCounts;
 
     /**
@@ -95,6 +88,7 @@ public class EvalRegionModel extends RegionModel {
         regionArrayHeight = rm.regionArrayHeight;
         regionArrayWidth = rm.regionArrayWidth;
         setAllocateFields(evalTokenArrayBuffer);
+        annealer = new EvalAnnealer();
     }
 
     /**
@@ -293,5 +287,58 @@ public class EvalRegionModel extends RegionModel {
 
             annealer.collectSamples(topicCounts, wordByTopicCounts);
         }
+    }
+
+    /**
+     *
+     */
+    @Override
+    protected void normalizeLocations() {
+        for (TIntIterator it = locationSet.iterator(); it.hasNext();) {
+            int locid = it.next();
+            Location loc = gazetteer.getLocation(locid);
+            loc.count += beta;
+            loc.backPointers = new ArrayList<Integer>();
+        }
+
+        TIntObjectHashMap<TIntHashSet> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
+
+        int wordid, topicid;
+        int istoponym, isstopword;
+
+        for (int i = 0; i < N; ++i) {
+            isstopword = stopwordVector[i];
+            if (isstopword == 0) {
+                istoponym = toponymVector[i];
+                if (istoponym == 1) {
+                    wordid = wordVector[i];
+                    topicid = topicVector[i];
+                    ToponymRegionPair trp = new ToponymRegionPair(wordid, topicid);
+                    TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
+                    try {
+                        int size = locs.size();
+                        int randIndex = rand.nextInt(size);
+                        int curLocationIdx = locs.toArray()[randIndex];
+                        Location curLocation = gazetteer.getLocation(curLocationIdx);
+                        evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
+                    } catch (NullPointerException e) {
+                        locs = new TIntHashSet();
+                        Region r = regionMapperCallback.getRegionMap().get(topicid);
+                        Coordinate coord = new Coordinate(r.centLon, r.centLat);
+                        Location loc = new Location(-1, lexicon.getWordForInt(wordid), null, coord, 0, null, 1);
+                        evalTokenArrayBuffer.modelLocationArrayList.add(loc);
+                        locs.add(loc.id);
+                        toponymRegionToLocations.put(trp.hashCode(), locs);
+                    }
+                }
+            } else {
+                evalTokenArrayBuffer.modelLocationArrayList.add(null);
+            }
+        }
+    }
+
+    @Override
+    public void evaluate() {
+        evaluate(evalTokenArrayBuffer);
     }
 }

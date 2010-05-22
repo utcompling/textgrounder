@@ -39,6 +39,7 @@ public class BaseApp {
 	options.addOption("ev", "evaluate", true, "specifies evaluation directory and enables evaluation mode");
         options.addOption("g", "gazetteer", true, "gazetteer to use [world, census, NGA, USGS; default = world]");
         options.addOption("i", "train-input", true, "input file or directory name for training data");
+        options.addOption("id", "gazetteer-path", true, "path to gazetteer db");
         options.addOption("ie", "test-input", true, "input file or directory name for test data");
         options.addOption("ks", "samples", true, "number of samples to take (default=100)");
         options.addOption("kl", "lag", true, "number of iterations between samples (default=100)");

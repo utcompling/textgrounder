@@ -15,7 +15,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
-import gnu.trove.TIntIntHashMap;
 import opennlp.textgrounder.models.callbacks.RegionMapperCallback;
 import opennlp.textgrounder.topostructs.Region;
 

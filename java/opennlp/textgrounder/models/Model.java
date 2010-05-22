@@ -226,7 +226,7 @@ public abstract class Model {
                 textProcessor = new TextProcessorTEIXML(lexicon);
             } else {
                 textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
-            } 
+            }
         }
 
         barScale = options.getBarScale();
@@ -473,7 +473,14 @@ public abstract class Model {
     }
 
     public void evaluate() {
+        evaluate(evalTokenArrayBuffer);
+    }
 
+    /**
+     * 
+     * @param evalTokenArrayBuffer
+     */
+    public void evaluate(EvalTokenArrayBuffer evalTokenArrayBuffer) {
         if (evalTokenArrayBuffer.modelLocationArrayList.size() != evalTokenArrayBuffer.goldLocationArrayList.size()) {
             System.out.println("MISMATCH: model: " + evalTokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + evalTokenArrayBuffer.goldLocationArrayList.size());
             System.exit(0);
