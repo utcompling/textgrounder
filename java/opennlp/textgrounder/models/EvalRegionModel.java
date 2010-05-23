@@ -305,9 +305,8 @@ public class EvalRegionModel extends RegionModel {
         Gazetteer gazetteer = gazetteerGenerator.generateGazetteer();
         for (TIntIterator it = locationSet.iterator(); it.hasNext();) {
             int locid = it.next();
-            Location loc = gazetteer.getLocation(locid);
+            Location loc = gazetteer.safeGetLocation(locid);
             loc.count += beta;
-            loc.backPointers = new ArrayList<Integer>();
         }
 
         TIntObjectHashMap<TIntHashSet> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
