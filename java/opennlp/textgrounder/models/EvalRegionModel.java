@@ -27,6 +27,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import opennlp.textgrounder.annealers.*;
+import opennlp.textgrounder.gazetteers.Gazetteer;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.textstructs.*;
 import opennlp.textgrounder.topostructs.*;
@@ -84,7 +85,7 @@ public class EvalRegionModel extends RegionModel {
         locationSet = new TIntHashSet();
         beta = rm.beta;
         alpha = rm.alpha;
-        gazetteer = rm.gazetteer;
+        gazetteerGenerator = rm.gazetteerGenerator;
         regionMapperCallback = new RegionMapperCallback();
         regionArrayHeight = rm.regionArrayHeight;
         regionArrayWidth = rm.regionArrayWidth;
@@ -300,7 +301,8 @@ public class EvalRegionModel extends RegionModel {
      *
      */
     @Override
-    protected void normalizeLocations() {
+    protected TIntObjectHashMap<Location> normalizeLocations() {
+        Gazetteer gazetteer = gazetteerGenerator.generateGazetteer();
         for (TIntIterator it = locationSet.iterator(); it.hasNext();) {
             int locid = it.next();
             Location loc = gazetteer.getLocation(locid);
@@ -345,6 +347,7 @@ public class EvalRegionModel extends RegionModel {
                 evalTokenArrayBuffer.modelLocationArrayList.add(null);
             }
         }
+        return gazetteer.getIdxToLocationMap();
     }
 
     @Override

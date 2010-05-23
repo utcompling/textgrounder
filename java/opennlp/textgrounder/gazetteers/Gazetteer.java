@@ -24,6 +24,8 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.*;
 
 import opennlp.textgrounder.geo.CommandLineOptions;
@@ -69,7 +71,7 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      * The largest location id value that has been activated. Needed for creating
      * pseudo locations later in region model
      */
-    protected int maxLocId = 0;
+    protected static int maxLocId = 0;
 
     /**
      * Default constructor. Allocates memory for internal collections.
@@ -143,6 +145,46 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
     }
 
     /**
+     * Same as get(String) except does not add locationsToReturn to the
+     * gazetteer
+     *
+     * @param placename
+     * @return
+     */
+    public TIntHashSet frugalGet(String placename) {
+        try {
+            int topid = toponymLexicon.getIntForWord(placename);
+            TIntHashSet locationsToReturn = get(topid);
+            if (locationsToReturn == null) {
+
+                locationsToReturn = new TIntHashSet();
+                ResultSet rs = stat.executeQuery("select * from places where name = \"" + placename + "\";");
+                while (rs.next()) {
+                    Location locationToAdd = new Location(rs.getInt("id"),
+                          rs.getString("name"),
+                          rs.getString("type"),
+                          new Coordinate(rs.getDouble("lon"), rs.getDouble("lat")),
+                          rs.getInt("pop"),
+                          rs.getString("container"),
+                          0);
+                    idxToLocationMap.put(locationToAdd.id, locationToAdd);
+                    locationsToReturn.add(locationToAdd.id);
+                    if (locationToAdd.id > maxLocId) {
+                        maxLocId = locationToAdd.id;
+                    }
+                }
+                rs.close();
+            }
+
+            return locationsToReturn;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            System.exit(1);
+            return null;
+        }
+    }
+
+    /**
      * 
      * @return
      * @throws Exception
@@ -165,6 +207,46 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      */
     public Location getLocation(int locid) {
         return idxToLocationMap.get(locid);
+    }
+
+    /**
+     * Same as getLocation(int) except checks whether location exists in
+     * idxToLocaationMap
+     *
+     * @param locid
+     * @return
+     */
+    public Location safeGetLocation(int locid) {
+        if (idxToLocationMap.contains(locid)) {
+            return idxToLocationMap.get(locid);
+        } else {
+            Location loc = null;
+            try {
+                ResultSet rs = stat.executeQuery("select * from places where id = \"" + locid + "\";");
+                while (rs.next()) {
+                    loc = new Location(rs.getInt("id"),
+                          rs.getString("name"),
+                          rs.getString("type"),
+                          new Coordinate(rs.getDouble("lon"), rs.getDouble("lat")),
+                          rs.getInt("pop"),
+                          rs.getString("container"),
+                          0);
+                    idxToLocationMap.put(loc.id, loc);
+                    if (loc.id > maxLocId) {
+                        maxLocId = loc.id;
+                    }
+                    rs.close();
+                    /**
+                     * Collect one and let go. If the id is a proper key value
+                     * there will be only one record anyway
+                     */
+                    break;
+                }
+            } catch (SQLException ex) {
+                Logger.getLogger(Gazetteer.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            return loc;
+        }
     }
 
     /**

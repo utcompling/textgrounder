@@ -124,6 +124,11 @@ public abstract class Model {
      * Array of token indices and associated information for eval data
      */
     protected EvalTokenArrayBuffer evalTokenArrayBuffer;
+    /**
+     * Generates gazetteers as local variables. Global if necessary. Reduces
+     * memory consumption
+     */
+    protected GazetteerGenerator gazetteerGenerator;
     //protected int indexInTAB = 0;
 
     public Model() {
@@ -175,35 +180,15 @@ public abstract class Model {
             //System.exit(0);
         }
 
-        String gazTypeArg = options.getGazetteType().toLowerCase();
-        if (gazTypeArg.startsWith("c")) {
-            gazetteer = new CensusGazetteer(options);
-        } else if (gazTypeArg.startsWith("n")) {
-            gazetteer = new NGAGazetteer(options);
-        } else if (gazTypeArg.startsWith("u")) {
-            gazetteer = new USGSGazetteer(options);
-        } else if (gazTypeArg.startsWith("w")) {
-            gazetteer = new WGGazetteer(options);
-        } else if (gazTypeArg.startsWith("t")) {
-            gazetteer = new TRGazetteer(options);
-        } else {
-            System.err.println("Error: unrecognized gazetteer type: " + gazTypeArg);
-            System.err.println("Please enter w, c, u, g, or t.");
-            System.exit(0);
-            //myGaz = new WGGazetteer();
-        }
-
         modelIterations = options.getModelIterations();
-
         kmlOutputFilename = options.getKMLOutputFilename();
         degreesPerRegion = options.getDegreesPerRegion();
-        lexicon = new Lexicon();
-
         paragraphsAsDocs = options.getParagraphsAsDocs();
-
         barScale = options.getBarScale();
-
         windowSize = options.getWindowSize();
+
+        lexicon = new Lexicon();
+        gazetteerGenerator = new GazetteerGenerator(options);
     }
 
     public void initializeRegionArray() {
@@ -369,7 +354,7 @@ public abstract class Model {
      * @throws Exception
      */
     public void writeXMLFile(String inputFilename, String outputFilename,
-          Gazetteer gazetteer, TIntHashSet locations, TokenArrayBuffer tokenArrayBuffer) throws
+          TIntObjectHashMap<Location> idxToLocationMap, TIntHashSet locations, TokenArrayBuffer tokenArrayBuffer) throws
           IOException {
 
         BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));
@@ -383,7 +368,7 @@ public abstract class Model {
 
         for (TIntIterator it = locations.iterator(); it.hasNext();) {
             int locid = it.next();
-            Location loc = gazetteer.getIdxToLocationMap().get(locid);
+            Location loc = idxToLocationMap.get(locid);
 
             double height = Math.log(loc.count) * barScale;
 

@@ -40,6 +40,7 @@ public abstract class SelfTrainedModelBase extends Model {
 
     public SelfTrainedModelBase(CommandLineOptions options) {
         super(options);
+        gazetteer = gazetteerGenerator.generateGazetteer();
     }
 
     public void activateRegionsForWholeGaz() throws Exception {
@@ -69,9 +70,9 @@ public abstract class SelfTrainedModelBase extends Model {
      */
     public void writeXMLFile() throws Exception {
         if (!runWholeGazetteer) {
-            writeXMLFile(trainInputPath, kmlOutputFilename, gazetteer,locations, evalTokenArrayBuffer);
+            writeXMLFile(trainInputPath, kmlOutputFilename, gazetteer.getIdxToLocationMap(),locations, evalTokenArrayBuffer);
         } else {
-            writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, gazetteer, locations, evalTokenArrayBuffer);
+            writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, gazetteer.getIdxToLocationMap(), locations, evalTokenArrayBuffer);
         }
     }
 }

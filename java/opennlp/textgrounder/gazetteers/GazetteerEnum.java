@@ -22,7 +22,10 @@ package opennlp.textgrounder.gazetteers;
  */
 public class GazetteerEnum {
 
-    public enum GazetteerTypes {
+    /**
+     * 
+     */
+    public static enum GazetteerTypes {
 
         CG, //census gazetteer
         NGAG, // ? national geographic?

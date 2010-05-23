@@ -30,6 +30,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import opennlp.textgrounder.annealers.*;
+import opennlp.textgrounder.gazetteers.Gazetteer;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.textstructs.*;
@@ -197,6 +198,7 @@ public class RegionModel extends TopicModel {
         int curDoc = 0, prevDoc = -1;
 
         TIntHashSet toponymsNotInGazetteer = new TIntHashSet();
+        Gazetteer gazetteer = gazetteerGenerator.generateGazetteer();
         for (int i = 0; i < N; i++) {
             curDoc = documentVector[i];
             if (curDoc != prevDoc) {
@@ -206,7 +208,7 @@ public class RegionModel extends TopicModel {
             if (toponymVector[i] == 1) {
                 String placename = lexicon.getWordForInt(wordVector[i]);
                 if (gazetteer.contains(placename)) {
-                    TIntHashSet possibleLocations = gazetteer.get(placename);
+                    TIntHashSet possibleLocations = gazetteer.frugalGet(placename);
 
                     TIntHashSet tempLocs = new TIntHashSet();
                     for (TIntIterator it = possibleLocations.iterator();
@@ -371,10 +373,12 @@ public class RegionModel extends TopicModel {
     /**
      * 
      */
-    protected void normalizeLocations() {
+    protected TIntObjectHashMap<Location> normalizeLocations() {
+        Gazetteer gazetteer = gazetteerGenerator.generateGazetteer();
+
         for (TIntIterator it = locationSet.iterator(); it.hasNext();) {
             int locid = it.next();
-            Location loc = gazetteer.getLocation(locid);
+            Location loc = gazetteer.safeGetLocation(locid);
             loc.count += beta;
             loc.backPointers = new ArrayList<Integer>();
         }
@@ -387,7 +391,7 @@ public class RegionModel extends TopicModel {
                 TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
                 for (TIntIterator it = locs.iterator(); it.hasNext();) {
                     int locid = it.next();
-                    Location loc = gazetteer.getLocation(locid);
+                    Location loc = gazetteer.safeGetLocation(locid);
                     loc.count += wordByTopicCounts[wordid * T + regid];
                 }
             }
@@ -411,7 +415,7 @@ public class RegionModel extends TopicModel {
                     try {
                         for (TIntIterator it = locs.iterator(); it.hasNext();) {
                             int locid = it.next();
-                            Location loc = gazetteer.getLocation(locid);
+                            Location loc = gazetteer.safeGetLocation(locid);
                             loc.backPointers.add(i);
                             if (loc.id > newlocid) {
                                 loc.count += 1;
@@ -445,6 +449,7 @@ public class RegionModel extends TopicModel {
             } catch (NullPointerException e) {
             }
         }
+        return gazetteer.getIdxToLocationMap();
     }
 
     /**
@@ -644,12 +649,11 @@ public class RegionModel extends TopicModel {
      * 
      * @throws Exception
      */
-    @Override
     public void writeXMLFile() throws Exception {
         System.err.println();
         System.err.println("Counting locations and smoothing");
-        normalizeLocations();
+        TIntObjectHashMap<Location> idxToLocationMap = normalizeLocations();
         System.err.println("Writing output");
-        writeXMLFile(trainInputPath, kmlOutputFilename, locations, trainTokenArrayBuffer);
+        writeXMLFile(trainInputPath, kmlOutputFilename, idxToLocationMap, locations, trainTokenArrayBuffer);
     }
 }
