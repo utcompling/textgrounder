@@ -40,6 +40,8 @@ public class ProbabilisticMinDistanceModel extends SelfTrainedModelBase {
     private static ArrayList<ArrayList<Double>> pseudoWeights;// = new ArrayList<ArrayList<Double>>();
     private static ArrayList<TIntArrayList> allPossibleLocations;
 
+    private static TIntDoubleHashMap locationWeightsAcrossCorpus = new TIntDoubleHashMap();
+
     public static Random myRandom = new Random();
 
     public static TObjectDoubleHashMap<String> distanceCache = new TObjectDoubleHashMap<String>();
@@ -66,9 +68,14 @@ public class ProbabilisticMinDistanceModel extends SelfTrainedModelBase {
 	    else {
 		String placename = lexicon.getWordForInt(evalTokenArrayBuffer.wordVector[i]).toLowerCase();
 		TIntHashSet curPossibleLocations = gazetteer.get(placename);
+		/*if(curPossibleLocations.size() == 1) {
+		    System.out.println(curPossibleLocations.toArray()[0]);
+		    System.out.println(gazetteer.getLocation(curPossibleLocations.toArray()[0]));
+		    }*/
 		TIntArrayList curPossibleLocationsAL = new TIntArrayList();
-		for(int possibleLocation : curPossibleLocations.toArray())
+		for(int possibleLocation : curPossibleLocations.toArray()) {
 		    curPossibleLocationsAL.add(possibleLocation);
+		}
 		allPossibleLocations.add(curPossibleLocationsAL);
 
 		ArrayList<Double> initWeights = new ArrayList<Double>();
@@ -81,6 +88,10 @@ public class ProbabilisticMinDistanceModel extends SelfTrainedModelBase {
 	}
 
 	System.out.println("done.");
+
+	updateLocationWeightsAcrossCorpus(pseudoWeights, locationWeightsAcrossCorpus);
+	//System.out.println(pseudoWeights);
+	System.exit(0);
 
         System.out.println("Disambiguating place names found...");
 
@@ -215,6 +226,71 @@ public class ProbabilisticMinDistanceModel extends SelfTrainedModelBase {
 	*/
 
         return locations;
+    }
+
+    // "weight step"
+    protected void updateLocationWeightsAcrossCorpus(ArrayList<ArrayList<Double>> pseudoWeights,
+						     TIntDoubleHashMap locationWeightsAcrossCorpus) {
+
+	TObjectDoubleHashMap<String> sums = new TObjectDoubleHashMap<String>(); // for normalization
+
+	// initialize to 0
+	for(int i = 0; i < pseudoWeights.size(); i++) {
+	    ArrayList<Double> curTopWeights = pseudoWeights.get(i);
+	    if(curTopWeights == null) continue;
+	    
+	    for(int j = 0; j < curTopWeights.size(); j++) {
+		int curLocationID = allPossibleLocations.get(i).get(j);
+		locationWeightsAcrossCorpus.putIfAbsent(curLocationID, 0.0);
+	    }
+	    String placename = lexicon.getWordForInt(evalTokenArrayBuffer.wordVector[i]).toLowerCase();
+	    sums.putIfAbsent(placename, 0.0);
+	}
+
+	// update
+	for(int i = 0; i < pseudoWeights.size(); i++) {
+	    ArrayList<Double> curTopWeights = pseudoWeights.get(i);
+	    if(curTopWeights == null) continue;
+
+	    String placename = lexicon.getWordForInt(evalTokenArrayBuffer.wordVector[i]).toLowerCase();
+ 
+	    for(int j = 0; j < curTopWeights.size(); j++) {
+		int curLocationID = allPossibleLocations.get(i).get(j);
+		double valueToAdd = pseudoWeights.get(i).get(j);
+		locationWeightsAcrossCorpus.put(curLocationID, locationWeightsAcrossCorpus.get(curLocationID) + valueToAdd);
+		sums.put(placename, sums.get(placename) + valueToAdd);
+		//if(curTopWeights.size() == 1) {
+		/*
+		if(j == 0) {
+		    System.out.println("placename = " + placename);
+		    System.out.println("curLocationID = " + curLocationID);
+		    System.out.println("valueToAdd = " + valueToAdd);
+		    System.out.println("updated locationWeightsAcrossCorpus.get(" + curLocationID + ") = " +
+				       locationWeightsAcrossCorpus.get(curLocationID));
+		    System.out.println("updated sums.get(" + placename + ") = " + sums.get(placename));
+		}
+		*/
+	    }
+	}
+
+	
+	// normalize
+	for(int curLocationID : locationWeightsAcrossCorpus.keys()) {
+	    double Z = sums.get(gazetteer.getLocation(curLocationID).name);
+	    locationWeightsAcrossCorpus.put(curLocationID, locationWeightsAcrossCorpus.get(curLocationID) / Z);
+	}
+
+	// reset pseudoWeights
+	for(int i = 0; i < pseudoWeights.size(); i++) {
+	    ArrayList<Double> curTopWeights = pseudoWeights.get(i);
+	    if(curTopWeights == null) continue;
+	    
+	    for(int j = 0; j < curTopWeights.size(); j++) {
+		int curLocationID = allPossibleLocations.get(i).get(j);
+		
+		pseudoWeights.get(i).set(j, locationWeightsAcrossCorpus.get(curLocationID));
+	    }
+	}
     }
 
     // assigns weights for this document (1 iteration)
