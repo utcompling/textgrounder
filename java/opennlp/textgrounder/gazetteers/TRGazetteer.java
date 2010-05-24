@@ -53,22 +53,25 @@ public class TRGazetteer extends Gazetteer {
         stat = conn.createStatement();
 
 	//ResultSet rs = stat.executeQuery("select * from places");
-	ResultSet rs = stat.executeQuery("select count(*) as rowcount from places");
-	rs.next();
-	int rowCount = rs.getInt("rowcount");
-	if(rowCount > 0) {
-	    System.out.println("Using pre-populated TRGazetteer database with " + rowCount + " entries.");
+	//ResultSet rs = stat.executeQuery("select count(*) as rowcount from places");
+	ResultSet rs = stat.executeQuery("SELECT name FROM sqlite_master WHERE name='places'");
+	if(rs.next()) {
+	    int rowCount = 0;
+	    //int rowCount = rs.getInt("rowcount");
+	    //if(rowCount > 0) {
+	    System.out.println("Using pre-populated TRGazetteer database.");
 	    System.out.print("  Adding location IDs to Gazetteer hashset for quick checking...");
 	    rs.close();
 	    rs = stat.executeQuery("select * from places");
 	    while(rs.next()) {
+		rowCount++;
 		String name = rs.getString("name");
 		if(name != null) {
 		    int topidx = toponymLexicon.addWord(name);
 		    put(topidx, null);
 		}
 	    }
-	    System.out.println("done.");
+	    System.out.println("done. " + rowCount + " total entries.");
 	    return;
 	}
 	rs.close();
