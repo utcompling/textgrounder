@@ -26,6 +26,9 @@ import opennlp.textgrounder.geo.CommandLineOptions;
  */
 public class EmptyAnnealer extends Annealer {
 
+    protected EmptyAnnealer() {
+    }
+
     public EmptyAnnealer(CommandLineOptions options) {
         super(options);
     }

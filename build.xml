@@ -34,6 +34,7 @@
       <pathelement location="${lib.dir}/stanford-ner.jar"/>
       <pathelement location="${lib.dir}/sqlitejdbc-v056.jar"/>
       <pathelement location="${lib.dir}/commons-cli-1.2.jar"/>
+      <pathelement location="${lib.dir}/jdom.jar"/>
     </path>
 
     <filter token="year" value="${year}"/>

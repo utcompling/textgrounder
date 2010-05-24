@@ -29,7 +29,7 @@ public abstract class Annealer {
     /**
      * Exponent in the annealing process. Is the reciprocal of the temperature.
      */
-    protected double temperatureReciprocal;
+    protected double temperatureReciprocal = 1;
     /**
      * Temperature at which to start annealing process
      */
@@ -64,15 +64,36 @@ public abstract class Annealer {
     /**
      * Number of samples to take after burn-in
      */
-    protected int samples;
+    protected int samples = 0;
     /**
      * Number of innerIter between samples
      */
-    protected int lag;
+    protected int lag = 0;
     /**
      * The current temperature
      */
-    protected double temperature;
+    protected double temperature = 1;
+    /**
+     * Counts of topics
+     */
+    protected double[] topicSampleCounts;
+    /**
+     * Counts of tcount per topic. However, since access more often occurs in
+     * terms of the tcount, it will be a topic by word matrix.
+     */
+    protected double[] wordByTopicSampleCounts;
+    /**
+     * To sample or not to sample
+     */
+    protected boolean sampleiteration = false;
+    /**
+     * Indicates whether sample collection is done or not
+     */
+    protected boolean finishedCollection = false;
+    /**
+     * Number of samples collected
+     */
+    protected int sampleCount = 0;
 
     protected Annealer() {
     }
@@ -129,14 +150,29 @@ public abstract class Annealer {
      */
     public boolean nextIter() {
         if (outerIter == outerIterationsMax) {
-            System.err.print("\n");
-            return false;
+            System.err.println("");
+            System.err.println("Burn in complete!");
+            if (samples != 0 && !finishedCollection) {
+                System.err.println("Beginning sampling!");
+
+                outerIter = 0;
+                innerIter = 0;
+
+                temperatureReciprocal = 1. / targetTemperature;
+                innerIterationsMax = samples * lag;
+                outerIterationsMax = 1;
+                sampleiteration = true;
+
+                return true;
+            } else {
+                return false;
+            }
         } else {
             if (innerIter == innerIterationsMax) {
                 outerIter++;
                 if (outerIter == outerIterationsMax) {
                     System.err.print("\n");
-                    return false;
+                    return nextIter();
                 }
                 innerIter = 0;
                 temperature -= temperatureDecrement;
@@ -166,5 +202,76 @@ public abstract class Annealer {
      */
     public double annealProbs(double[] classes) {
         return annealProbs(0, classes);
+    }
+
+    /**
+     * 
+     * @param tc
+     * @param wbtc
+     * @param b
+     */
+    public void collectSamples(int[] tc, int[] wbtc) {
+        if (sampleiteration && (innerIter % lag == 0)) {
+            sampleCount += 1;
+            if (samples == sampleCount) {
+                finishedCollection = true;
+            }
+
+            System.err.print("(sample:" + (innerIter + 1) / lag + ")");
+            if (topicSampleCounts == null) {
+                topicSampleCounts = new double[tc.length];
+                wordByTopicSampleCounts = new double[wbtc.length];
+                for (int i = 0; i < tc.length; ++i) {
+                    topicSampleCounts[i] = 0;
+                }
+                for (int i = 0; i < wbtc.length; ++i) {
+                    wordByTopicSampleCounts[i] = 0;
+                }
+            }
+
+            for (int i = 0; i < tc.length; ++i) {
+                topicSampleCounts[i] += tc[i];
+            }
+            for (int i = 0; i < wbtc.length; ++i) {
+                wordByTopicSampleCounts[i] += wbtc[i];
+            }
+        }
+
+        if (finishedCollection) {
+            normalizeSamples();
+        }
+    }
+
+    /**
+     * 
+     */
+    protected void normalizeSamples() {
+        for (int i = 0; i < topicSampleCounts.length; ++i) {
+            topicSampleCounts[i] /= sampleCount;
+        }
+        for (int i = 0; i < wordByTopicSampleCounts.length; ++i) {
+            wordByTopicSampleCounts[i] /= sampleCount;
+        }
+    }
+
+    /**
+     * @return the samples
+     */
+    public int getSamples() {
+        return samples;
+    }
+
+    /**
+     * @return the topicSampleCounts
+     */
+    public double[] getTopicSampleCounts() {
+        return topicSampleCounts;
+    }
+
+    /**
+     * @return the wordByTopicSampleCounts
+     */
+    public double[] getWordByTopicSampleCounts() {
+        return wordByTopicSampleCounts;
     }
 }

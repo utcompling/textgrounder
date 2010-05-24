@@ -28,9 +28,9 @@ import opennlp.textgrounder.util.*;
 
 public class NGAGazetteer extends Gazetteer {
 
-    public NGAGazetteer(CommandLineOptions options) throws FileNotFoundException,
+    public NGAGazetteer(String location) throws FileNotFoundException,
           IOException {
-        super(options);
+        super(location);
         initialize(Constants.TEXTGROUNDER_DATA + "/gazetteer/geonames_dd_dms_date_20091102.txt.gz");
     }
 
