@@ -32,9 +32,9 @@ import opennlp.textgrounder.util.*;
 
 public class WGGazetteer extends Gazetteer {
 
-    public WGGazetteer(CommandLineOptions options) throws FileNotFoundException,
+    public WGGazetteer(String location) throws FileNotFoundException,
           IOException, ClassNotFoundException, SQLException {
-        super(options);
+        super(location);
         initialize(Constants.TEXTGROUNDER_DATA + "/gazetteer/dataen-fixed.txt.gz");
     }
 

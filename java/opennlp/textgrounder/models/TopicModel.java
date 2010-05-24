@@ -17,9 +17,12 @@ package opennlp.textgrounder.models;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.ec.util.MersenneTwisterFast;
@@ -149,12 +152,12 @@ public class TopicModel extends Model {
           IOException, ClassNotFoundException {
         initializeFromOptions(options);
         lexicon = new Lexicon();
-        textProcessor = new TextProcessor(new NullClassifier(), lexicon, paragraphsAsDocs);
-        tokenArrayBuffer = new TokenArrayBuffer(lexicon);
+        TextProcessor textProcessor = new TextProcessor(new NullClassifier(), lexicon, paragraphsAsDocs);
+        trainTokenArrayBuffer = new TokenArrayBuffer(lexicon);
         StopwordList stopwordList = new StopwordList();
         sW = stopwordList.size();
-        processPath(new File(inputPath), textProcessor, tokenArrayBuffer, stopwordList);
-        tokenArrayBuffer.convertToPrimitiveArrays();
+        processTrainInputPath(new File(trainInputPath), textProcessor, trainTokenArrayBuffer, stopwordList);
+        trainTokenArrayBuffer.convertToPrimitiveArrays();
         allocateFields();
     }
 
@@ -166,8 +169,8 @@ public class TopicModel extends Model {
         fW = lexicon.wordsToInts.size();
         W = fW - sW;
         betaW = beta * W;
-        N = tokenArrayBuffer.size();
-        D = tokenArrayBuffer.getNumDocs();
+        N = trainTokenArrayBuffer.size();
+        D = trainTokenArrayBuffer.getNumDocs();
 
         documentVector = new int[N];
         wordVector = new int[N];
@@ -188,8 +191,8 @@ public class TopicModel extends Model {
             wordByTopicCounts[i] = 0;
         }
 
-        wordVector = tokenArrayBuffer.wordVector;
-        documentVector = tokenArrayBuffer.documentVector;
+        wordVector = trainTokenArrayBuffer.wordVector;
+        documentVector = trainTokenArrayBuffer.documentVector;
     }
 
     /**
@@ -224,7 +227,7 @@ public class TopicModel extends Model {
 
         paragraphsAsDocs = options.getParagraphsAsDocs();
         outputPerClass = options.getOutputPerClass();
-        inputPath = options.getTrainInputPath();
+        trainInputPath = options.getTrainInputPath();
         tabularOutput = options.getTabulatedOutput();
         tabularOutputFilename = options.getTabularOutputFilename();
     }
@@ -304,6 +307,19 @@ public class TopicModel extends Model {
         randomInitialize();
         System.err.println(String.format("Beginning training with %d tokens, %d words, %d regions, %d documents", N, W, T, D));
         train(annealer);
+        if(annealer.getSamples() != 0) {
+            topicProbs = annealer.getTopicSampleCounts();
+            wordByTopicProbs = annealer.getWordByTopicSampleCounts();
+        }
+    }
+
+    /**
+     * Maximum posterior decoding of topic assignments.
+     */
+    public void decode() {
+        System.err.println(String.format("Decoding maximum posterior topics"));
+        Annealer mpd = new MaximumPosteriorDecoder();
+        train(mpd);
     }
 
     /**
@@ -313,8 +329,24 @@ public class TopicModel extends Model {
      * words and values.
      */
     public void normalize() {
+        try {
+            normalize(new NullStopwordList());
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(TopicModel.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(TopicModel.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
 
-        wordByTopicProbs = new double[W * T];
+    /**
+     * Create two normalized probability tables, {@link #TopWordsPerTopic} and
+     * {@link #topicProbs}. {@link #topicProbs} overwrites previous values.
+     * {@link #TopWordsPerTopic} only retains first {@link #outputPerTopic}
+     * words and values.
+     */
+    public void normalize(StopwordList stopWordList) {
+
+        wordByTopicProbs = new double[fW * T];
 
         topWordsPerTopic = new StringDoublePair[T][];
         for (int i = 0; i < T; ++i) {
@@ -327,11 +359,14 @@ public class TopicModel extends Model {
         for (int i = 0; i < T; ++i) {
             sum += topicProbs[i] = topicCounts[i] + betaW;
             ArrayList<DoubleStringPair> topWords = new ArrayList<DoubleStringPair>();
-            for (int j = 0; j < W; ++j) {
-                topWords.add(
-                      new DoubleStringPair(wordByTopicCounts[j * T + i] + beta,
-                      lexicon.getWordForInt(j)));
-                wordByTopicProbs[j * T + i] = (wordByTopicCounts[j * T + i] + beta) / topicProbs[i];
+            for (int j = 0; j < fW; ++j) {
+                String word = lexicon.getWordForInt(j);
+                if (!stopWordList.isStopWord(word)) {
+                    topWords.add(
+                          new DoubleStringPair(wordByTopicCounts[j * T + i] + beta,
+                          lexicon.getWordForInt(j)));
+                    wordByTopicProbs[j * T + i] = (wordByTopicCounts[j * T + i] + beta) / topicProbs[i];
+                }
             }
             Collections.sort(topWords);
             for (int j = 0; j < outputPerClass; ++j) {

@@ -36,7 +36,7 @@ import opennlp.textgrounder.topostructs.*;
  *
  * @author 
  */
-public class RandomBaselineModel extends Model {
+public class RandomBaselineModel extends SelfTrainedModelBase {
 
     public static Random myRandom = new Random();
 
@@ -62,16 +62,16 @@ public class RandomBaselineModel extends Model {
         placeIterator.advance();*/
 //        assert (textProcessor.size() == lexicon.size());
         //int wvCounter = 0;
-        for (int i = 0; i < tokenArrayBuffer.size(); i++) {
+        for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
             /*for (int docIndex = 0; docIndex < lexicon.size(); docIndex++) {
             ArrayList<Integer> curDocSpans = textProcessor.get(docIndex);
 
             for (int i = 0; i < curDocSpans.size(); i++) {//int topidx : curDocSpans) {*/
-            if (tokenArrayBuffer.toponymVector[i] == 0) {
-                tokenArrayBuffer.modelLocationArrayList.add(null);
+            if (evalTokenArrayBuffer.toponymVector[i] == 0) {
+                evalTokenArrayBuffer.modelLocationArrayList.add(null);
                 continue;
             }
-            int topidx = tokenArrayBuffer.wordVector[i];
+            int topidx = evalTokenArrayBuffer.wordVector[i];
             System.out.println("toponym (in int form): " + topidx);
 
             String placename = lexicon.getWordForInt(topidx).toLowerCase();
@@ -82,7 +82,7 @@ public class RandomBaselineModel extends Model {
 
             if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
             {
-                tokenArrayBuffer.modelLocationArrayList.add(null);
+                evalTokenArrayBuffer.modelLocationArrayList.add(null);
                 continue;
             }
 
@@ -92,7 +92,7 @@ public class RandomBaselineModel extends Model {
 
             int curLocationIdx = randomDisambiguate(possibleLocations);
             Location curLocation = gazetteer.getLocation(curLocationIdx);
-            tokenArrayBuffer.modelLocationArrayList.add(curLocation);
+            evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
             if (curLocation == null) {
                 continue;
             }
@@ -117,7 +117,7 @@ public class RandomBaselineModel extends Model {
             //DocIdAndIndex curDocIdAndIndex = new DocIdAndIndex(docIndex, i);
             curLocation.backPointers.add(i);
             //System.out.println(lexicon.getContext(curDocIdAndIndex, 10));
-            //System.out.println(tokenArrayBuffer.wordArrayList
+            //System.out.println(evalTokenArrayBuffer.wordArrayList
             //}
 
 
@@ -179,7 +179,7 @@ public class RandomBaselineModel extends Model {
         initializeRegionArray();
         if (!runWholeGazetteer) {
             try {
-                processPath();
+                processEvalInputPath();
             } catch (Exception ex) {
                 Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
             }

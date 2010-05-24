@@ -19,21 +19,21 @@ import gnu.trove.TIntHashSet;
 import gnu.trove.TIntIterator;
 import gnu.trove.TIntObjectHashMap;
 import gnu.trove.TIntObjectIterator;
+
 import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.SQLException;
-import opennlp.textgrounder.textstructs.StopwordList;
-import opennlp.textgrounder.textstructs.TokenArrayBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import opennlp.textgrounder.annealers.*;
+import opennlp.textgrounder.gazetteers.Gazetteer;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.models.callbacks.*;
+import opennlp.textgrounder.textstructs.*;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.Constants;
 import opennlp.textgrounder.util.KMLUtil;
@@ -73,6 +73,10 @@ public class RegionModel extends TopicModel {
      * Table from index to region
      */
     TIntObjectHashMap<Region> regionMap;
+    /**
+     * 
+     */
+    StopwordList stopwordList;
 
     /**
      * Default constructor. Take input from commandline and default options
@@ -83,7 +87,17 @@ public class RegionModel extends TopicModel {
      */
     public RegionModel(CommandLineOptions options) {
         regionMapperCallback = new RegionMapperCallback();
-        initialize(options);
+        try {
+            initialize(options);
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (SQLException ex) {
+            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     /**
@@ -96,58 +110,45 @@ public class RegionModel extends TopicModel {
      *
      * @param options
      */
-    protected void initialize(CommandLineOptions options) {
-
+    @Override
+    protected void initialize(CommandLineOptions options) throws
+          FileNotFoundException, IOException, ClassNotFoundException,
+          SQLException {
+        super.initialize(options);
         initializeFromOptions(options);
-        BaselineModel baselineModel = null;
 
-        try {
-            baselineModel = new BaselineModel(options);
-            tokenArrayBuffer = new TokenArrayBuffer(baselineModel.lexicon);
-            StopwordList stopwordList = new StopwordList();
-            sW = stopwordList.size();
-            baselineModel.processPath(baselineModel.getInputFile(),
-                  baselineModel.getTextProcessor(), tokenArrayBuffer,
-                  stopwordList);
-            tokenArrayBuffer.convertToPrimitiveArrays();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            System.exit(1);
+        TextProcessor textProcessor = null;
+        String fname = trainInputFile.getName();
+        if (options.isPCLXML()) {
+            textProcessor = new TextProcessorTEIXML(lexicon);
+        } else if (trainInputFile.isDirectory() && trainInputFile.list(new PCLXMLFilter()).length != 0) {
+            textProcessor = new TextProcessorTEIXML(lexicon);
+        } else if (fname.startsWith("txu") && fname.endsWith(".xml")) {
+            textProcessor = new TextProcessorTEIXML(lexicon);
+        } else {
+            textProcessor = new TextProcessor(lexicon, paragraphsAsDocs);
         }
 
-        baselineModel.initializeRegionArray();
-
-        this.gazetteer = baselineModel.gazetteer;
-        this.textProcessor = baselineModel.textProcessor;
-        this.lexicon = baselineModel.lexicon;
-
+        trainTokenArrayBuffer = new TokenArrayBuffer(lexicon, new TrainingMaterialCallback(lexicon));
+        stopwordList = new StopwordList();
+        processTrainInputPath(trainInputFile, textProcessor, trainTokenArrayBuffer, stopwordList);
+        trainTokenArrayBuffer.convertToPrimitiveArrays();
+        initializeRegionArray();
         locationSet = new TIntHashSet();
-
-        setAllocateRegions(tokenArrayBuffer, baselineModel);
-    }
-
-    /**
-     * 
-     * @param options
-     */
-    @Override
-    protected void initializeFromOptions(CommandLineOptions options) {
-        super.initializeFromOptions(options);
-        windowSize = options.getWindowSize();
-        kmlOutputFilename = options.getKMLOutputFilename();
+        setAllocateRegions(trainTokenArrayBuffer);
     }
 
     /**
      *
      */
-    protected void setAllocateRegions(TokenArrayBuffer tokenArrayBuffer,
-          BaselineModel baselineModel) {
+    protected void setAllocateRegions(TokenArrayBuffer tokenArrayBuffer) {
         N = tokenArrayBuffer.size();
         /**
          * Here we distinguish between the full dictionary size (fW) and the
          * dictionary size without stopwords (W). Normalization is conducted with
-         * the dictionary size without stopwords.
+         * the dictionary size without stopwords, the size of which is sW.
          */
+        sW = stopwordList.size();
         fW = lexicon.getDictionarySize();
         W = fW - sW;
         D = tokenArrayBuffer.getNumDocs();
@@ -164,43 +165,7 @@ public class RegionModel extends TopicModel {
          */
         topicVector = new int[N];
 
-        System.err.println();
-        System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
-        int curDoc = 0, prevDoc = -1;
-
-        TIntHashSet toponymsNotInGazetteer = new TIntHashSet();
-        for (int i = 0; i < N; i++) {
-            curDoc = documentVector[i];
-            if (curDoc != prevDoc) {
-                System.err.print(curDoc + ",");
-            }
-            prevDoc = curDoc;
-            if (toponymVector[i] == 1) {
-                String placename = lexicon.getWordForInt(wordVector[i]);
-                if (gazetteer.contains(placename)) {
-                    TIntHashSet possibleLocations = gazetteer.get(placename);
-
-                    TIntHashSet tempLocs = new TIntHashSet();
-                    for (TIntIterator it = possibleLocations.iterator();
-                          it.hasNext();) {
-                        int locid = it.next();
-                        Location loc = gazetteer.getLocation(locid);
-
-                        if (Math.abs(loc.coord.latitude) > Constants.EPSILON && Math.abs(loc.coord.longitude) > Constants.EPSILON) {
-                            tempLocs.add(loc.id);
-                        }
-                    }
-                    possibleLocations = tempLocs;
-
-                    baselineModel.addLocationsToRegionArray(possibleLocations, gazetteer, regionMapperCallback);
-                    regionMapperCallback.addAll(placename, lexicon);
-                    locationSet.addAll(possibleLocations.toArray());
-                } else {
-                    toponymsNotInGazetteer.add(wordVector[i]);
-                }
-            }
-        }
-        System.err.println();
+        TIntHashSet toponymsNotInGazetteer = buildTopoTable();
 
         T = regionMapperCallback.getNumRegions();
         topicCounts = new int[T];
@@ -220,6 +185,56 @@ public class RegionModel extends TopicModel {
             regionByToponym[i] = 0;
         }
 
+        buildTopoFilter(toponymsNotInGazetteer);
+    }
+
+    /**
+     * 
+     * @return
+     */
+    protected TIntHashSet buildTopoTable() {
+        System.err.println();
+        System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
+        int curDoc = 0, prevDoc = -1;
+
+        TIntHashSet toponymsNotInGazetteer = new TIntHashSet();
+        Gazetteer gazetteer = gazetteerGenerator.generateGazetteer();
+        for (int i = 0; i < N; i++) {
+            curDoc = documentVector[i];
+            if (curDoc != prevDoc) {
+                System.err.print(curDoc + ",");
+            }
+            prevDoc = curDoc;
+            if (toponymVector[i] == 1) {
+                String placename = lexicon.getWordForInt(wordVector[i]);
+                if (gazetteer.contains(placename)) {
+                    TIntHashSet possibleLocations = gazetteer.frugalGet(placename);
+
+                    TIntHashSet tempLocs = new TIntHashSet();
+                    for (TIntIterator it = possibleLocations.iterator();
+                          it.hasNext();) {
+                        int locid = it.next();
+                        Location loc = gazetteer.getLocation(locid);
+
+                        if (Math.abs(loc.coord.latitude) > Constants.EPSILON && Math.abs(loc.coord.longitude) > Constants.EPSILON) {
+                            tempLocs.add(loc.id);
+                        }
+                    }
+                    possibleLocations = tempLocs;
+
+                    addLocationsToRegionArray(possibleLocations, gazetteer, regionMapperCallback);
+                    regionMapperCallback.addAll(placename, lexicon);
+                    locationSet.addAll(possibleLocations.toArray());
+                } else {
+                    toponymsNotInGazetteer.add(wordVector[i]);
+                }
+            }
+        }
+        System.err.println();
+        return toponymsNotInGazetteer;
+    }
+
+    protected void buildTopoFilter(TIntHashSet toponymsNotInGazetteer) {
         TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
         for (TIntObjectIterator<TIntHashSet> it1 = nameToRegionIndex.iterator();
               it1.hasNext();) {
@@ -350,25 +365,20 @@ public class RegionModel extends TopicModel {
                     wordByTopicCounts[wordoff + topicid]++;
                 }
             }
-        }
-    }
 
-    /**
-     * Maximum posterior decoding of topic assignments. 
-     */
-    public void decode() {
-        System.err.println(String.format("Decoding maximum posterior topics"));
-        Annealer ann = new MaximumPosteriorDecoder();
-        train(ann);
+            annealer.collectSamples(topicCounts, wordByTopicCounts);
+        }
     }
 
     /**
      * 
      */
-    protected void normalizeLocations() {
+    protected TIntObjectHashMap<Location> normalizeLocations() {
+        Gazetteer gazetteer = gazetteerGenerator.generateGazetteer();
+
         for (TIntIterator it = locationSet.iterator(); it.hasNext();) {
             int locid = it.next();
-            Location loc = gazetteer.getLocation(locid);
+            Location loc = gazetteer.safeGetLocation(locid);
             loc.count += beta;
             loc.backPointers = new ArrayList<Integer>();
         }
@@ -381,7 +391,7 @@ public class RegionModel extends TopicModel {
                 TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
                 for (TIntIterator it = locs.iterator(); it.hasNext();) {
                     int locid = it.next();
-                    Location loc = gazetteer.getLocation(locid);
+                    Location loc = gazetteer.safeGetLocation(locid);
                     loc.count += wordByTopicCounts[wordid * T + regid];
                 }
             }
@@ -405,7 +415,7 @@ public class RegionModel extends TopicModel {
                     try {
                         for (TIntIterator it = locs.iterator(); it.hasNext();) {
                             int locid = it.next();
-                            Location loc = gazetteer.getLocation(locid);
+                            Location loc = gazetteer.safeGetLocation(locid);
                             loc.backPointers.add(i);
                             if (loc.id > newlocid) {
                                 loc.count += 1;
@@ -439,6 +449,26 @@ public class RegionModel extends TopicModel {
             } catch (NullPointerException e) {
             }
         }
+        return gazetteer.getIdxToLocationMap();
+    }
+
+    /**
+     * Remove stopwords from normalization process
+     */
+    @Override
+    public void normalize() {
+        normalize(stopwordList);
+    }
+
+    /**
+     *
+     */
+    @Override
+    public void evaluate() {
+        EvalRegionModel evalRegionModel = new EvalRegionModel(this);
+        evalRegionModel.train();
+        evalRegionModel.normalizeLocations();
+        evalRegionModel.evaluate();
     }
 
     /**
@@ -451,7 +481,7 @@ public class RegionModel extends TopicModel {
     public void printTabulatedProbabilities() throws
           IOException {
         super.printTabulatedProbabilities();
-        writeRegionWordDistributionKMLFile(inputPath, tabularOutputFilename);
+        writeRegionWordDistributionKMLFile(trainInputPath, tabularOutputFilename);
         saveSimpleParameters(tabularOutputFilename);
     }
 
@@ -566,7 +596,7 @@ public class RegionModel extends TopicModel {
      */
     public void writeWordOverGlobeKML(String outputFilename, String word) throws
           IOException {
-        writeWordOverGlobeKML(inputPath, outputFilename, word);
+        writeWordOverGlobeKML(trainInputPath, outputFilename, word);
     }
 
     /**
@@ -576,7 +606,7 @@ public class RegionModel extends TopicModel {
      */
     public void writeWordOverGlobeKML(String word) throws
           IOException {
-        writeWordOverGlobeKML(inputPath, word + ".kml", word);
+        writeWordOverGlobeKML(trainInputPath, word + ".kml", word);
     }
 
     /**
@@ -619,12 +649,11 @@ public class RegionModel extends TopicModel {
      * 
      * @throws Exception
      */
-    @Override
     public void writeXMLFile() throws Exception {
         System.err.println();
         System.err.println("Counting locations and smoothing");
-        normalizeLocations();
+        TIntObjectHashMap<Location> idxToLocationMap = normalizeLocations();
         System.err.println("Writing output");
-        writeXMLFile(inputPath, kmlOutputFilename, locations);
+        writeXMLFile(trainInputPath, kmlOutputFilename, idxToLocationMap, locations, trainTokenArrayBuffer);
     }
 }

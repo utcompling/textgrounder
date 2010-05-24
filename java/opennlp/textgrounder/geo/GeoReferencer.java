@@ -42,7 +42,7 @@ public class GeoReferencer extends BaseApp {
 	    System.out.println("Performing EVALUATION on " + modelOptions.getEvalDir());
 	}
 
-	Model grefUS = null;
+	SelfTrainedModelBase grefUS = null;
 	if(modelOptions.model.toLowerCase().startsWith("pop")) {
 	    System.out.println("Using POPULATION baseline model.");
 	    grefUS = new BaselineModel(modelOptions);

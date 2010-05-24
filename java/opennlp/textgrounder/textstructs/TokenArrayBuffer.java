@@ -17,7 +17,8 @@ package opennlp.textgrounder.textstructs;
 
 import java.util.ArrayList;
 import java.util.List;
-
+import opennlp.textgrounder.models.callbacks.NullTrainingMaterialCallback;
+import opennlp.textgrounder.models.callbacks.TrainingMaterialCallback;
 import opennlp.textgrounder.topostructs.Location;
 
 /**
@@ -38,6 +39,11 @@ public class TokenArrayBuffer {
      */
     public ArrayList<Integer> wordArrayList;
     /**
+     * List of token indices removed of numerals (for now) and (in the future)
+     * maybe hapax legomena and words with punctuation in 'em
+     */
+    public ArrayList<Integer> trainingArrayList;
+    /**
      * Array of document indexes. Each element references the document which
      * the corresponding token in wordArrayList was located in. It is a monotonic
      * sequence, e.g. <p>0,0,...,0,1,1,1,1...,1,2,....,D</p> where <p>D</p>
@@ -56,19 +62,6 @@ public class TokenArrayBuffer {
      * stopword, the element is one, zero otherwise.
      */
     public ArrayList<Integer> stopwordArrayList;
-
-    /**
-     * Stores the system/model's best guesses for the disambiguated Location for each
-     * toponym. Null for non-toponym indices.
-     */
-    public ArrayList<Location> modelLocationArrayList;
-
-    /**
-     * Stores the gold standard location information when running in evaluation mode.
-     * Indices corresponding to non-toponyms are null.
-     */
-    public ArrayList<Location> goldLocationArrayList;
-
     /**
      * Populated with the same elements as wordArrayList. Once input has been
      * populated in input stage with wordArrayList, the arraylist is converted
@@ -106,6 +99,17 @@ public class TokenArrayBuffer {
      * The lexicon of token indexes to tokens.
      */
     protected Lexicon lexicon;
+    /**
+     * Callback class for determing whether a word should be included as
+     * training material or not
+     */
+    protected TrainingMaterialCallback trainingMaterialCallback;
+
+    /**
+     * Constructor for derived classes only
+     */
+    protected TokenArrayBuffer() {
+    }
 
     /**
      * Default constructor. Allocates memory for arrays and assigns lexicon.
@@ -113,14 +117,33 @@ public class TokenArrayBuffer {
      * @param lexicon
      */
     public TokenArrayBuffer(Lexicon lexicon) {
+        initialize(lexicon, new NullTrainingMaterialCallback(lexicon));
+    }
+
+    /**
+     * Default constructor. Allocates memory for arrays and assigns lexicon.
+     *
+     * @param lexicon
+     */
+    public TokenArrayBuffer(Lexicon lexicon,
+          TrainingMaterialCallback trainingMaterialCallback) {
+        initialize(lexicon, trainingMaterialCallback);
+    }
+
+    /**
+     * Allocation of fields, initialization of values and object assignments.
+     *
+     * @param lexicon
+     */
+    protected void initialize(Lexicon lexicon,
+          TrainingMaterialCallback trainingMaterialCallback) {
         wordArrayList = new ArrayList<Integer>();
         documentArrayList = new ArrayList<Integer>();
         toponymArrayList = new ArrayList<Integer>();
         stopwordArrayList = new ArrayList<Integer>();
-	modelLocationArrayList = new ArrayList<Location>();
-	goldLocationArrayList = new ArrayList<Location>();
         size = 0;
 
+        this.trainingMaterialCallback = trainingMaterialCallback;
         this.lexicon = lexicon;
     }
 
@@ -140,10 +163,32 @@ public class TokenArrayBuffer {
      */
     public void addElement(int wordIdx, int docIdx, int topStatus,
           int stopStatus) {
+        addElement(wordIdx, docIdx, topStatus, stopStatus, null);
+    }
+
+    /**
+     * Add all indexes and indicators to the array fields and increment size
+     * by one.
+     *
+     * @param wordIdx index of token being added. may be a placename, a
+     * multiword placename, a stopword, or something else.
+     * @param docIdx the index of the document that the current token was
+     * found in. The index grows by unit increments whenever a new document
+     * has been opened.
+     * @param topStatus the status of the current (multiword) token as a
+     * toponym. This will be one if it is a toponym and zero otherwise.
+     * @param stopStatus the status of the current token as a stopword. This
+     * will be one if it is a stopword and zero otherwise.
+     */
+    public void addElement(int wordIdx, int docIdx, int topStatus,
+          int stopStatus, Location loc) {
         wordArrayList.add(wordIdx);
         documentArrayList.add(docIdx);
         toponymArrayList.add(topStatus);
-        stopwordArrayList.add(stopStatus);
+
+        String word = lexicon.getWordForInt(wordIdx);
+        int notTrainable = trainingMaterialCallback.isTrainable(word) ? 0 : 1;
+        stopwordArrayList.add(stopStatus | notTrainable);
         size += 1;
         numDocs = docIdx;
     }
@@ -188,17 +233,11 @@ public class TokenArrayBuffer {
         stopwordVector = new int[size];
         copyToArray(stopwordVector, stopwordArrayList);
 
-	/*if(goldLocationArrayList.size() > 0) {
-	    goldLocationVector = new int[size];
-	    System.err.println("Copying gold locations vector");
-	    copyToArray(goldLocationVector, goldLocationArrayList);
-	    }*/
-
         wordArrayList.clear();
         documentArrayList.clear();
         toponymArrayList.clear();
         stopwordArrayList.clear();
-        wordArrayList = documentArrayList = toponymArrayList = stopwordArrayList= null;
+        wordArrayList = documentArrayList = toponymArrayList = stopwordArrayList = null;
     }
 
     /**
@@ -229,5 +268,17 @@ public class TokenArrayBuffer {
         for (int i = 0; i < ta.size(); ++i) {
             ia[i] = ta.get(i).intValue();
         }
+    }
+
+    protected boolean sanityCheck1() {
+        return toponymArrayList.size() == wordArrayList.size();
+    }
+
+    protected boolean sanityCheck2() {
+        return true;
+    }
+
+    protected boolean verboseSanityCheck(String curLine) {
+        return true;
     }
 }
