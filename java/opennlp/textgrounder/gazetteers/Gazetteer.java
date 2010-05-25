@@ -112,7 +112,7 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      */
     public TIntHashSet get(String placename) {
         try {
-            int topid = toponymLexicon.getIntForWord(placename);
+            int topid = toponymLexicon.addWord(placename);
 	    /*
 	    System.out.println("u.s. topid = " + toponymLexicon.getIntForWord("u.s."));
 	    System.out.println("pakistan topid = " + toponymLexicon.getIntForWord("pakistan"));
