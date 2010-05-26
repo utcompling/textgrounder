@@ -89,15 +89,13 @@ public class ProbabilisticMinDistanceModel extends SelfTrainedModelBase {
 
 	System.out.println("done.");
 
-	updateLocationWeightsAcrossCorpus(pseudoWeights, locationWeightsAcrossCorpus);
+	//updateLocationWeightsAcrossCorpus(pseudoWeights, locationWeightsAcrossCorpus);
 	//System.out.println(pseudoWeights);
-	System.exit(0);
+	//System.exit(0);
 
         System.out.println("Disambiguating place names found...");
 
         locations = new TIntHashSet();
-
-        TIntIntHashMap idsToCounts = new TIntIntHashMap();
 
 	for(int j = 0; j < modelIterations; j++) {
 	    System.out.println("Iteration: " + j);
@@ -114,118 +112,180 @@ public class ProbabilisticMinDistanceModel extends SelfTrainedModelBase {
 		    curDocNumber = evalTokenArrayBuffer.documentVector[i];
 		    curDocBeginIndex = i;
 		}
-
-		/*if (trainTokenArrayBuffer.toponymVector[i] == 0) {
-		    trainTokenArrayBuffer.modelLocationArrayList.add(null);
-		    continue;
-		    }
-		int topidx = trainTokenArrayBuffer.wordVector[i];
-		System.out.println("toponym (in int form): " + topidx);
-
-		String placename = lexicon.getWordForInt(topidx).toLowerCase();
-		System.out.println(placename);
-
-		if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
-		    {
-			trainTokenArrayBuffer.modelLocationArrayList.add(null);
-			continue;
-		    }
-
-		// try the cache first. if not in there, do a full DB lookup and add that pair to the cache:
-		TIntHashSet possibleLocations = gazetteer.get(placename);
-		addLocationsToRegionArray(possibleLocations); */
 		
 		assignWeights(evalTokenArrayBuffer, curDocBeginIndex);
-		/*Location curLocation = gazetteer.getLocation(curLocationIdx);
-		trainTokenArrayBuffer.modelLocationArrayList.add(curLocation);
-		if (curLocation == null) {
-		    continue;
-		}
-		
-		int curCount = idsToCounts.get(curLocation.id);
-		if (curCount == 0) {// sentinel for not found in hashmap
-		    locations.add(curLocation.id);
-		    curLocation.backPointers = new ArrayList<Integer>();
-		    idsToCounts.put(curLocation.id, 1);
-		    System.out.println("Found first " + curLocation.name + "; id = " + curLocation.id);
-		} else {
-		    idsToCounts.increment(curLocation.id);
-		    System.out.println("Found " + curLocation.name + " #" + idsToCounts.get(curLocation.id));
-		}
-		//DocIdAndIndex curDocIdAndIndex = new DocIdAndIndex(docIndex, i);
-		curLocation.backPointers.add(i);
-		//System.out.println(lexicon.getContext(curDocIdAndIndex, 10));
-		//System.out.println(trainTokenArrayBuffer.wordArrayList
-		//}
-		*/
+		updateLocationWeightsAcrossCorpus(pseudoWeights, locationWeightsAcrossCorpus);
+		//System.out.println(pseudoWeights);
+		//System.exit(0);
 	    }
 	}
 
-	System.out.println("Final step of disambiguation; pseudoWeights.size() == " + pseudoWeights.size());
-	for(int i = 0; i < pseudoWeights.size(); i++) {
-	    if(pseudoWeights.get(i) == null) {
-		evalTokenArrayBuffer.modelLocationArrayList.add(null);
-		continue;
-	    }
+	System.out.println("Final step of disambiguation...");
 
-	    String placename = lexicon.getWordForInt(evalTokenArrayBuffer.wordVector[i]).toLowerCase();
-
-	    if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
-            {
-                evalTokenArrayBuffer.modelLocationArrayList.add(null);
-                continue;
-            }
-
-	    double maxWeight = 0;
-	    int maxIndex = -1;
-	    for(int j = 0; j < pseudoWeights.get(i).size(); j++) {
-		if(pseudoWeights.get(i).get(j) > maxWeight) {
-		    maxWeight = pseudoWeights.get(i).get(j);
-		    maxIndex = j;
-		}
-	    }
-	    if(maxIndex == -1) {
-		evalTokenArrayBuffer.modelLocationArrayList.add(null);
-		continue;
-	    }
-	    int curLocationIdx = allPossibleLocations.get(i).get(maxIndex);
-	    locations.add(curLocationIdx);
-
-	    Location curLocation = gazetteer.getLocation(curLocationIdx);
-	    evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
-	    if (curLocation == null) {
-		continue;
-	    }
-	    
-	    int curCount = idsToCounts.get(curLocation.id);
-	    if (curCount == 0) {// sentinel for not found in hashmap
-		locations.add(curLocation.id);
-		curLocation.backPointers = new ArrayList<Integer>();
-		idsToCounts.put(curLocation.id, 1);
-		System.out.println("Found first " + curLocation.name + "; id = " + curLocation.id);
-	    } else {
-		idsToCounts.increment(curLocation.id);
-		System.out.println("Found " + curLocation.name + " #" + idsToCounts.get(curLocation.id));
-	    }
-	}
-
-	for (TIntIterator it = locations.iterator(); it.hasNext();) {
-	  int locid = it.next();
-	  Location loc = gazetteer.getLocation(locid);
-	  loc.count = idsToCounts.get(locid);
-	}
-
-	addLocationsToRegionArray(locations);
+	locations = doFinalDisambiguate(evalTokenArrayBuffer);
 
         System.out.println("Done. Returning " + locations.size() + " locations.");
 
-	/*
-	for(int curLocation : locations.toArray()) {
-	    System.out.println(gazetteer.getLocation(curLocation));
-	}
-	*/
-
         return locations;
+    }
+
+    protected TIntHashSet doFinalDisambiguate(TokenArrayBuffer tokenArrayBuffer) throws Exception {
+
+	TIntHashSet locations = new TIntHashSet();
+	TIntIntHashMap idsToCounts = new TIntIntHashMap();
+	int curDocNumber = -1;
+	int curDocBeginIndex = 0;
+
+	TIntIntHashMap modelGuesses = new TIntIntHashMap();
+
+	for (int p = 0; p < tokenArrayBuffer.size(); p++) {
+
+	    if(tokenArrayBuffer.documentVector[p] == curDocNumber) {
+		continue;
+	    }
+	    else {
+		curDocNumber = tokenArrayBuffer.documentVector[p];
+		curDocBeginIndex = p;
+	    }
+	    
+	    for(int j = curDocBeginIndex; j < tokenArrayBuffer.size() && tokenArrayBuffer.documentVector[j] == curDocNumber; j++) {
+		if(tokenArrayBuffer.toponymVector[j] == 0) {
+		    //System.out.println("ignoring non-toponym " + tokenArrayBuffer.wordVector[j]);
+		    //evalTokenArrayBuffer.modelLocationArrayList.add(null);
+		    //System.out.println("null 1");
+		    continue; // ignore non-toponyms
+		}
+		int curTopidx = tokenArrayBuffer.wordVector[j];
+
+		String thisPlacename = lexicon.getWordForInt(tokenArrayBuffer.wordVector[j]).toLowerCase();
+		
+		TIntHashSet possibleLocations = gazetteer.get(thisPlacename);
+		
+		/*if(possibleLocations == null) {
+		    //System.out.println("null possibleLocations for " + thisPlacename);
+		    evalTokenArrayBuffer.modelLocationArrayList.add(null);
+		    //System.out.println("null 2");
+		    continue;
+		    }*/
+		
+		int[] possibleLocationIds = possibleLocations.toArray();
+		TIntDoubleHashMap totalWeightedDistances = new TIntDoubleHashMap();
+		
+		//System.out.println("line 337");
+		for(int curLocId : possibleLocationIds) {
+		    Location curLoc = gazetteer.getLocation(curLocId);
+		    if(curLoc == null) continue;
+		    
+		    //int otherToponymCounter = 0;
+		    
+		    //System.out.println("line 344");
+		    for(int i = curDocBeginIndex; i < tokenArrayBuffer.size() && tokenArrayBuffer.documentVector[i] == curDocNumber; i++) {
+			if(tokenArrayBuffer.toponymVector[i] == 0) {
+			    //System.out.println("Skipping non-toponym " + tokenArrayBuffer.wordVector[i]);
+			    continue;
+			}
+			if(i == j) {
+			    //System.out.println("i == j; skipping");
+			    continue; // don't measure distance to yourself
+			}
+			
+			String placename = lexicon.getWordForInt(tokenArrayBuffer.wordVector[i]).toLowerCase();
+			if(!gazetteer.contains(placename)) {
+			    //System.out.println(placename + " not found in gazetteer; skipping");
+			    continue;
+			}
+			//System.out.println("made it past the skips");
+			//otherToponymCounter++;
+			
+			// seems like we can't use distanceCache here due to weights
+			
+			//System.out.println("Calculating pseudoweights for " + thisPlacename + " based on " + placename + "...");
+			
+			TIntHashSet otherPossibleLocs = gazetteer.get(placename);
+			
+			double minWeightedDistance = Double.MAX_VALUE;
+			int[] otherPossibleLocsArray = otherPossibleLocs.toArray();
+			for(int k = 0; k < otherPossibleLocsArray.length; k++) {
+			    int otherPossibleLoc = otherPossibleLocsArray[k];
+			    Location otherLoc = gazetteer.getLocation(otherPossibleLoc);
+			    double curWeightedDistance = curLoc.computeDistanceTo(otherLoc) / pseudoWeights.get(i).get(k);
+			    //System.out.println("curWeightedDistance = " + curWeightedDistance);
+			    
+			    if(curWeightedDistance > 0 && curWeightedDistance < minWeightedDistance) {
+				minWeightedDistance = curWeightedDistance;
+			    }
+			}
+			if(minWeightedDistance < Double.MAX_VALUE) {
+			    totalWeightedDistances.put(curLocId, totalWeightedDistances.get(curLocId) + minWeightedDistance);
+			    //System.out.println("Adding " + minWeightedDistance + " to " + placename);
+			}
+		    }
+		    
+		    double minTotalWeightedDistance = Double.MAX_VALUE;
+		    int locIdToReturn = -1;
+		    for(int curLocIdx : totalWeightedDistances.keys()) {
+			double curTotalWeightedDistance = totalWeightedDistances.get(curLocIdx);
+			if(curTotalWeightedDistance < minTotalWeightedDistance) {
+			    minTotalWeightedDistance = curTotalWeightedDistance;
+			    locIdToReturn = curLocIdx;
+			}
+		    }
+		    if(locIdToReturn == -1) {
+			//evalTokenArrayBuffer.modelLocationArrayList.add(null);
+			continue;
+		    }
+		    locations.add(locIdToReturn);
+		    
+		    Location curLocation = gazetteer.getLocation(locIdToReturn);
+		    //evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
+		    /*if(curLocation != null
+		       && !evalTokenArrayBuffer.goldLocationArrayList.get(j-1).name.equals(evalTokenArrayBuffer.modelLocationArrayList.get(j-1).name)) {
+			System.out.println(evalTokenArrayBuffer.goldLocationArrayList.get(j-1).name);
+			System.out.println(evalTokenArrayBuffer.modelLocationArrayList.get(j-1).name);
+			System.out.println(j-1);
+			System.exit(0);
+			}*/
+		    if (curLocation == null) {
+			//System.out.println("null 3");
+			continue;
+		    }
+		    else {
+			modelGuesses.put(j, locIdToReturn);
+		    }
+		    
+		    int curCount = idsToCounts.get(curLocation.id);
+		    if (curCount == 0) {// sentinel for not found in hashmap
+			locations.add(curLocation.id);
+			curLocation.backPointers = new ArrayList<Integer>();
+			idsToCounts.put(curLocation.id, 1);
+			System.out.println("Found first " + curLocation.name + "; id = " + curLocation.id);
+		    } else {
+			idsToCounts.increment(curLocation.id);
+			System.out.println("Found " + curLocation.name + " #" + idsToCounts.get(curLocation.id));
+		    }
+		}
+	    }
+	    
+	    for (TIntIterator it = locations.iterator(); it.hasNext();) {
+		int locid = it.next();
+		Location loc = gazetteer.getLocation(locid);
+		loc.count = idsToCounts.get(locid);
+	    }
+
+	    addLocationsToRegionArray(locations);
+	}
+
+	for(int i = 0; i < evalTokenArrayBuffer.size(); i++) {
+	    if(modelGuesses.contains(i)) {
+		int modelGuess = modelGuesses.get(i);
+		evalTokenArrayBuffer.modelLocationArrayList.add(gazetteer.getLocation(modelGuess));
+	    }
+	    else {
+		evalTokenArrayBuffer.modelLocationArrayList.add(null);
+	    }
+	}
+
+	return locations;
     }
 
     // "weight step"
@@ -293,7 +353,7 @@ public class ProbabilisticMinDistanceModel extends SelfTrainedModelBase {
 	}
     }
 
-    // assigns weights for this document (1 iteration)
+    // assigns weights for this document (1 iteration) - "distance step"
     protected void assignWeights(TokenArrayBuffer tokenArrayBuffer, int curDocBeginIndex) throws Exception {
 
 	int curDocNumber = tokenArrayBuffer.documentVector[curDocBeginIndex];
@@ -320,36 +380,57 @@ public class ProbabilisticMinDistanceModel extends SelfTrainedModelBase {
 	    }
 	}
 
+	//System.out.println("line 323");
 	for(int j = curDocBeginIndex; j < tokenArrayBuffer.size() && tokenArrayBuffer.documentVector[j] == curDocNumber; j++) {
-	    if(tokenArrayBuffer.toponymVector[j] == 0) continue; // ignore non-toponyms
+	    if(tokenArrayBuffer.toponymVector[j] == 0) {
+		//System.out.println("ignoring non-toponym " + tokenArrayBuffer.wordVector[j]);
+		continue; // ignore non-toponyms
+	    }
 	    int curTopidx = tokenArrayBuffer.wordVector[j];
 
 	    String thisPlacename = lexicon.getWordForInt(tokenArrayBuffer.wordVector[j]).toLowerCase();
 
-	    TIntHashSet possibleLocations = gazetteer.get(curTopidx);
+	    TIntHashSet possibleLocations = gazetteer.get(thisPlacename);
 
-	    if(possibleLocations == null) continue;
+	    if(possibleLocations == null) {
+		//System.out.println("null possibleLocations for " + thisPlacename);
+		continue;
+	    }
 
 	    int[] possibleLocationIds = possibleLocations.toArray();
 	    TIntDoubleHashMap totalWeightedDistances = new TIntDoubleHashMap();
 
+	    System.out.println("Calculating pseudoweights for " + thisPlacename);
+
+	    //System.out.println("line 337");
 	    for(int curLocId : possibleLocationIds) {
 		Location curLoc = gazetteer.getLocation(curLocId);
 		if(curLoc == null) continue;
 
 		//int otherToponymCounter = 0;
 
+		//System.out.println("line 344");
 		for(int i = curDocBeginIndex; i < tokenArrayBuffer.size() && tokenArrayBuffer.documentVector[i] == curDocNumber; i++) {
-		    if(tokenArrayBuffer.toponymVector[i] == 0) continue;
-		    if(i == j) continue; // don't measure distance to yourself
+		    if(tokenArrayBuffer.toponymVector[i] == 0) {
+			//System.out.println("Skipping non-toponym " + tokenArrayBuffer.wordVector[i]);
+			continue;
+		    }
+		    if(i == j) {
+			//System.out.println("i == j; skipping");
+			continue; // don't measure distance to yourself
+		    }
 
 		    String placename = lexicon.getWordForInt(tokenArrayBuffer.wordVector[i]).toLowerCase();
-		    if(!gazetteer.contains(placename)) continue;
+		    if(!gazetteer.contains(placename)) {
+			//System.out.println(placename + " not found in gazetteer; skipping");
+			continue;
+		    }
+		    //System.out.println("made it past the skips");
 		    //otherToponymCounter++;
 
 		    // seems like we can't use distanceCache here due to weights
 
-		    System.out.println("Calculating pseudoweights for " + thisPlacename + " based on " + placename + "...");
+		    //System.out.println("Calculating pseudoweights for " + thisPlacename + " based on " + placename + "...");
 
 		    TIntHashSet otherPossibleLocs = gazetteer.get(placename);
 
@@ -359,36 +440,46 @@ public class ProbabilisticMinDistanceModel extends SelfTrainedModelBase {
 			int otherPossibleLoc = otherPossibleLocsArray[k];
 			Location otherLoc = gazetteer.getLocation(otherPossibleLoc);
 			double curWeightedDistance = curLoc.computeDistanceTo(otherLoc) / pseudoWeights.get(i).get(k);
-
-			if(curWeightedDistance < minWeightedDistance)
+			//System.out.println("curWeightedDistance = " + curWeightedDistance);
+			
+			if(curWeightedDistance > 0 && curWeightedDistance < minWeightedDistance)
 			    minWeightedDistance = curWeightedDistance;
 		    }
-		    totalWeightedDistances.put(curLocId, totalWeightedDistances.get(curLocId) + minWeightedDistance);
+		    if(minWeightedDistance < Double.MAX_VALUE) {
+			totalWeightedDistances.put(curLocId, totalWeightedDistances.get(curLocId) + minWeightedDistance);
+			//System.out.println("Adding " + minWeightedDistance + " to " + placename);
+		    }
 		}
 	    }
 
 	    // set new weights:
 	    for(int n = 0; n < allPossibleLocations.get(j).size(); n++) {
-		newWeights.get(j-curDocBeginIndex).set(n, 1.0/totalWeightedDistances.get(allPossibleLocations.get(j).get(n)));
+		double weightToSet = totalWeightedDistances.get(allPossibleLocations.get(j).get(n));
+		newWeights.get(j-curDocBeginIndex).set(n, weightToSet);
 	    }
 	}
 
-	System.out.println("Normalizing pseudoweights...");
+	//System.out.println("Normalizing pseudoweights...");
 
-	System.out.println("pseudoWeights.size() == " + pseudoWeights.size());
-	System.out.println("newWeights.size() == " + newWeights.size());
+	//System.out.println("pseudoWeights.size() == " + pseudoWeights.size());
+	//System.out.println("newWeights.size() == " + newWeights.size());
+
+	//System.out.println(newWeights);
+	//System.exit(0);
 	
-	// normalize new weights and overwrite old weights:
+	// set pseudoWeights to newWeights:
 	for(int m = curDocBeginIndex; m < pseudoWeights.size() && tokenArrayBuffer.documentVector[m] == curDocNumber; m++) {
 	    if(pseudoWeights.get(m) == null) continue;
 
-	    double Z = 0; // normalization factor
-	    for(int n = 0; n < pseudoWeights.get(m).size(); n++)
-		Z += newWeights.get(m-curDocBeginIndex).get(n);
+	    //double Z = 0; // normalization factor
+	    //for(int n = 0; n < pseudoWeights.get(m).size(); n++)
+	    //  Z += newWeights.get(m-curDocBeginIndex).get(n);
 	    for(int n = 0; n < pseudoWeights.get(m).size(); n++) {
-		pseudoWeights.get(m).set(n, newWeights.get(m-curDocBeginIndex).get(n) / Z);
+		pseudoWeights.get(m).set(n, newWeights.get(m-curDocBeginIndex).get(n)/* / Z*/);
+		//System.out.println(pseudoWeights.get(m));
 	    }
 	}
+	//System.exit(0);
 
 	/*
 	int[] possibleLocationIds = possibleLocations.toArray();

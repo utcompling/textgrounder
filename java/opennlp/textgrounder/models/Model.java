@@ -407,7 +407,12 @@ public abstract class Model {
     public void evaluate(EvalTokenArrayBuffer evalTokenArrayBuffer) {
         if (evalTokenArrayBuffer.modelLocationArrayList.size() != evalTokenArrayBuffer.goldLocationArrayList.size()) {
             System.out.println("MISMATCH: model: " + evalTokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + evalTokenArrayBuffer.goldLocationArrayList.size());
-            System.exit(0);
+	    /*	    for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
+		Location curModelLoc = evalTokenArrayBuffer.modelLocationArrayList.get(i);
+		Location curGoldLoc = evalTokenArrayBuffer.goldLocationArrayList.get(i);
+		if(curModelLoc != null && curGoldLoc != null && curMode
+		}*/
+            System.exit(1);
         }
 
         int tp = 0;

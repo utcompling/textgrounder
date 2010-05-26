@@ -118,6 +118,7 @@ public class WGGazetteer extends Gazetteer {
             } else {
                 rawLat = "999999"; // sentinel values for entries with no coordinates
                 rawLon = "999999";
+		continue; // let's just skip entries with no coordinate information; they are useless
             }
 
             if (rawLat.equals("") || rawLon.equals("")
@@ -128,6 +129,7 @@ public class WGGazetteer extends Gazetteer {
                 //continue;
                 rawLat = "999999";
                 rawLon = "999999";
+		continue; // let's just skip entries with no coordinate information; they are useless
             }
 
             //System.out.println(placeName);
@@ -149,9 +151,10 @@ public class WGGazetteer extends Gazetteer {
                 //   System.out.println(placeName + ": " + population);
             } else {
                 //population = -1 // sentinal value in database for unlisted population
-                System.out.println("bad pop");
-                System.out.println(curLine);
-                continue; // no population was listed, so skip this entry
+                //System.out.println("bad pop");
+                //System.out.println(curLine);
+                //continue; // no population was listed, so skip this entry
+		population = 0;
             }
 
 
@@ -176,11 +179,11 @@ public class WGGazetteer extends Gazetteer {
 
 
             // old disambiguation method; as of now still used just to keep a hashtable of places for quick lookup of whether the database has at least 1 mention of the place:
-            if (placeType.equals("locality"))//////////////////////////
-            {
-                int topidx = toponymLexicon.addWord(placeName);
-                put(topidx, null);
-            }
+            //if (placeType.equals("locality"))//////////////////////////
+            //{
+	    int topidx = toponymLexicon.addWord(placeName);
+	    put(topidx, null);
+	    //}
 
             /*int storedPop = populations.get(placeName);
             if(storedPop == 0) { // 0 is not-found sentinal for TObjectIntHashMap
