@@ -98,6 +98,10 @@ public class CommandLineOptions {
      */
     protected String gazetteType = "w";
     /**
+     * Flag for refreshing gazetteer from original database
+     */
+    protected boolean gazetteerRefresh = false;
+    /**
      * Path to gazetteer database
      */
     protected String gazetteerPath = "/tmp/toponym.db";
@@ -187,7 +191,12 @@ public class CommandLineOptions {
                     }
                     break;
                 case 'g':
-                    gazetteType = value;
+                    opt = option.getOpt();
+                    if(opt.equals("g")) {
+                        gazetteType = value;
+                    } else if(opt.equals("gr")) {
+                        gazetteerRefresh = true;
+                    }
                     break;
                 case 'i':
                     opt = option.getOpt();
@@ -321,6 +330,10 @@ public class CommandLineOptions {
 
     public String getGazetteType() {
         return gazetteType;
+    }
+
+    public boolean getGazetteerRefresh() {
+        return gazetteerRefresh;
     }
 
     public String getTrainInputPath() {

@@ -130,6 +130,10 @@ public abstract class Model {
      */
     protected GazetteerGenerator gazetteerGenerator;
     //protected int indexInTAB = 0;
+    /**
+     * Flag for refreshing gazetteer from original database
+     */
+    protected boolean gazetteerRefresh = false;
 
     public Model() {
     }
@@ -157,6 +161,8 @@ public abstract class Model {
           SQLException {
         runWholeGazetteer = options.getRunWholeGazetteer();
         evalInputPath = options.getEvalDir();
+
+        gazetteerRefresh = options.getGazetteerRefresh();
 
         if (options.getTrainInputPath() != null) {
             trainInputPath = options.getTrainInputPath();

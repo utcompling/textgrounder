@@ -34,6 +34,8 @@ public class TRGazetteer extends Gazetteer {
 
     private static Coordinate nullCoord = new Coordinate(0.0, 0.0);
 
+    private static final double MAX_DIFF = 0.1; // for comparing two coordinates; if lat and lon both differ by <= MAX_DIFF, they are considered equal
+
     /*public TRGazetteer(CommandLineOptions options) throws FileNotFoundException,
           IOException, ClassNotFoundException, SQLException {
         super(options);
@@ -42,6 +44,18 @@ public class TRGazetteer extends Gazetteer {
 
     public TRGazetteer(String location) {
 	super(location);
+	try {
+	    initialize(location);
+	}
+	catch(Exception e) {
+	    e.printStackTrace();
+	    System.exit(1);
+	}
+    }
+
+    public TRGazetteer(String location, boolean gazetteerRefresh) {
+	super(location);
+        this.gazetteerRefresh = gazetteerRefresh;
 	try {
 	    initialize(location);
 	}
@@ -66,7 +80,7 @@ public class TRGazetteer extends Gazetteer {
 	//ResultSet rs = stat.executeQuery("select * from places");
 	//ResultSet rs = stat.executeQuery("select count(*) as rowcount from places");
 	ResultSet rs = stat.executeQuery("SELECT name FROM sqlite_master WHERE name='places'");
-	if(rs.next()) {
+	if(rs.next() && !gazetteerRefresh) {
 	    int rowCount = 0;
 	    //int rowCount = rs.getInt("rowcount");
 	    //if(rowCount > 0) {
@@ -87,6 +101,12 @@ public class TRGazetteer extends Gazetteer {
 	}
 	rs.close();
 
+
+        if(gazetteerRefresh)
+            System.out.println("REFRESHING gazetteer from original database.");
+
+        TIntObjectHashMap<Coordinate> uniqueLocations = new TIntObjectHashMap<Coordinate>();
+
         stat.executeUpdate("drop table if exists places;");
         stat.executeUpdate("create table places (id integer primary key, name, type, lat float, lon float, pop int, container);");
         PreparedStatement prep = conn.prepareStatement("insert into places values (?, ?, ?, ?, ?, ?, ?);");
@@ -106,9 +126,7 @@ public class TRGazetteer extends Gazetteer {
             }
             prep.setString(3, "cia_centroid");
             double latToInsert = DMDtoDD(rs.getInt("LONG_DEG"), rs.getInt("LONG_MIN"), rs.getString("LONG_DIR"));/////
-            prep.setDouble(4, latToInsert);
             double longToInsert = DMDtoDD(rs.getInt("LAT_DEG"), rs.getInt("LAT_MIN"), rs.getString("LAT_DIR"));///////
-            prep.setDouble(5, longToInsert);
 
             if (latToInsert < -180.0 || latToInsert > 180.0
                   || longToInsert < -90.0 || longToInsert > 90.0) {
@@ -116,6 +134,20 @@ public class TRGazetteer extends Gazetteer {
                 continue;
             }
 
+            int topidx = toponymLexicon.addWord(nameToInsert);
+            Coordinate prevCoord = uniqueLocations.get(topidx);
+            Coordinate newCoord = new Coordinate(longToInsert, latToInsert);
+            if(prevCoord != null) {
+                if(prevCoord.looselyMatches(newCoord, MAX_DIFF)) {
+                    ignoreCount++;
+                    continue; // skip entries with the same name and coordinate
+                }
+            }
+            else
+                uniqueLocations.put(topidx, newCoord);
+
+            prep.setDouble(4, latToInsert);
+            prep.setDouble(5, longToInsert);
             prep.addBatch();
 
             if (placeId % 100 == 0) {
@@ -125,7 +157,6 @@ public class TRGazetteer extends Gazetteer {
 
             placeId++;
 
-            int topidx = toponymLexicon.addWord(nameToInsert);
             put(topidx, null);
         }
 
@@ -151,15 +182,28 @@ public class TRGazetteer extends Gazetteer {
                 prep.setString(2, nameToInsert);
             }
             double latToInsert = rs.getDouble("PrimaryLongitudeDD");///////
-            prep.setDouble(4, latToInsert);
             double longToInsert = rs.getDouble("PrimaryLatitudeDD");//////
-            prep.setDouble(5, longToInsert);
 
             if (latToInsert < -180.0 || latToInsert > 180.0
                   || longToInsert < -90.0 || longToInsert > 90.0) {
                 ignoreCount++;
                 continue;
             }
+
+            int topidx = toponymLexicon.addWord(nameToInsert);
+            Coordinate prevCoord = uniqueLocations.get(topidx);
+            Coordinate newCoord = new Coordinate(longToInsert, latToInsert);
+            if(prevCoord != null) {
+                if(prevCoord.looselyMatches(newCoord, MAX_DIFF)) {
+                    ignoreCount++;
+                    continue; // skip entries with the same name and coordinate
+                }
+            }
+            else
+                uniqueLocations.put(topidx, newCoord);
+
+            prep.setDouble(4, latToInsert);
+            prep.setDouble(5, longToInsert);
 
             int popToInsert = rs.getInt("EstimatedPopulation");
             if (popToInsert != 0) {
@@ -179,7 +223,6 @@ public class TRGazetteer extends Gazetteer {
 
             placeId++;
 
-            int topidx = toponymLexicon.addWord(nameToInsert);
             put(topidx, null);
         }
 
@@ -206,17 +249,28 @@ public class TRGazetteer extends Gazetteer {
             }
 
             double latToInsert = rs.getDouble("DD_LONG");//"DD_LAT"); //switched?
-            //if(latToInsert != null)
-            prep.setDouble(4, latToInsert);
             double longToInsert = rs.getDouble("DD_LAT");//"DD_LONG");
-            //if(longToInsert != null)
-            prep.setDouble(5, longToInsert);
 
             if (latToInsert < -180.0 || latToInsert > 180.0
                   || longToInsert < -90.0 || longToInsert > 90.0) {
                 ignoreCount++;
                 continue;
             }
+            
+            int topidx = toponymLexicon.addWord(nameToInsert);
+            Coordinate prevCoord = uniqueLocations.get(topidx);
+            Coordinate newCoord = new Coordinate(longToInsert, latToInsert);
+            if(prevCoord != null) {
+                if(prevCoord.looselyMatches(newCoord, MAX_DIFF)) {
+                    ignoreCount++;
+                    continue; // skip entries with the same name and coordinate
+                }
+            }
+            else
+                uniqueLocations.put(topidx, newCoord);
+
+            prep.setDouble(4, latToInsert);
+            prep.setDouble(5, longToInsert);
 
             int popToInsert = rs.getInt("DIM"); // note: DIM holds population for type P and elevation for all others
             if (popToInsert != 0 && rawType != null && rawType.equals("P")) {
@@ -239,14 +293,13 @@ public class TRGazetteer extends Gazetteer {
 
             placeId++;
 
-            int topidx = toponymLexicon.addWord(nameToInsert);
             put(topidx, null);
         }
 
 
 
         if (ignoreCount > 0) {
-            System.out.println(ignoreCount + " (" + ((ignoreCount * 100) / (ignoreCount + placeId)) + "%) entries were ignored due to invalid coordinates (out of range)");
+            System.out.println(ignoreCount + " (" + ((ignoreCount * 100) / (ignoreCount + placeId)) + "%) entries were ignored due to invalid coordinates (out of range) or duplicate entries");
         }
 
         System.out.print("Executing batch insertion into database...");

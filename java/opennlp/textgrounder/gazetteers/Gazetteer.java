@@ -58,6 +58,12 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      * Lookup table for Location (hash)code to Location object
      */
     protected TIntObjectHashMap<Location> idxToLocationMap;
+
+    /**
+     * Flag for refreshing gazetteer from original database
+     */
+    public boolean gazetteerRefresh = false;
+
     /**
      * Internal lexicon for maintaining lookups between toponyms in gazetteer
      * and indices

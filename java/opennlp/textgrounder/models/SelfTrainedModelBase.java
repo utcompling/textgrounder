@@ -35,12 +35,14 @@ public abstract class SelfTrainedModelBase extends Model {
     public SelfTrainedModelBase(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
         barScale = bscale;
         gazetteer = gaz;
+        gazetteer.gazetteerRefresh = gazetteerRefresh;
         lexicon = new Lexicon();
     }
 
     public SelfTrainedModelBase(CommandLineOptions options) {
         super(options);
         gazetteer = gazetteerGenerator.generateGazetteer();
+        gazetteer.gazetteerRefresh = gazetteerRefresh;
     }
 
     public void activateRegionsForWholeGaz() throws Exception {

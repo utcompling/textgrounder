@@ -36,8 +36,10 @@ public class GazetteerGenerator {
      *
      */
     protected static String gazPath;
+    protected CommandLineOptions options;
 
     public GazetteerGenerator(CommandLineOptions options) {
+        this.options = options;
         String gazTypeArg = options.getGazetteType().toLowerCase();
         if (gazTypeArg.startsWith("c")) {
             gazType = GazetteerEnum.GazetteerTypes.CG;
@@ -76,7 +78,7 @@ public class GazetteerGenerator {
                     gazetteer = new WGGazetteer(gazPath);
                     break;
                 case TRG:
-                    gazetteer = new TRGazetteer(gazPath);
+                    gazetteer = new TRGazetteer(gazPath, options.getGazetteerRefresh());
                     break;
             }
         } catch (FileNotFoundException ex) {
