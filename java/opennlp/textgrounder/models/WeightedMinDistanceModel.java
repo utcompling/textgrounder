@@ -34,7 +34,7 @@ import opennlp.textgrounder.topostructs.*;
  *
  * @author 
  */
-public class ProbabilisticMinDistanceModel extends SelfTrainedModelBase {
+public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 
     //private static int NUM_ITERATIONS = 10; // replaced by model-iterations option from command line
     private static ArrayList<ArrayList<Double>> pseudoWeights;// = new ArrayList<ArrayList<Double>>();
@@ -46,11 +46,11 @@ public class ProbabilisticMinDistanceModel extends SelfTrainedModelBase {
 
     public static TObjectDoubleHashMap<String> distanceCache = new TObjectDoubleHashMap<String>();
 
-    public ProbabilisticMinDistanceModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
+    public WeightedMinDistanceModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
         super(gaz, bscale, paragraphsAsDocs);
     }
 
-    public ProbabilisticMinDistanceModel(CommandLineOptions options) throws Exception {
+    public WeightedMinDistanceModel(CommandLineOptions options) throws Exception {
         super(options);
     }
 
@@ -400,7 +400,7 @@ public class ProbabilisticMinDistanceModel extends SelfTrainedModelBase {
 	    int[] possibleLocationIds = possibleLocations.toArray();
 	    TIntDoubleHashMap totalWeightedDistances = new TIntDoubleHashMap();
 
-	    System.out.println("Calculating pseudoweights for " + thisPlacename);
+	    //System.out.println("Calculating pseudoweights for " + thisPlacename);
 
 	    //System.out.println("line 337");
 	    for(int curLocId : possibleLocationIds) {

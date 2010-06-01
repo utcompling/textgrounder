@@ -55,9 +55,9 @@ public class GeoReferencer extends BaseApp {
 	    System.out.println("Using BASIC MIN DISTANCE model.");
 	    grefUS = new BasicMinDistanceModel(modelOptions);
 	}
-	else if(modelOptions.model.toLowerCase().startsWith("prob")) {
-	    System.out.println("Using PROBABILISTIC MIN DISTANCE model (" + modelOptions.modelIterations + " iterations).");
-	    grefUS = new ProbabilisticMinDistanceModel(modelOptions);
+	else if(modelOptions.model.toLowerCase().startsWith("w")) {
+	    System.out.println("Using WEIGHTED MIN DISTANCE model (" + modelOptions.modelIterations + " iterations).");
+	    grefUS = new WeightedMinDistanceModel(modelOptions);
 	}
 	else {
 	    System.err.println("Invalid model type: " + modelOptions.model);

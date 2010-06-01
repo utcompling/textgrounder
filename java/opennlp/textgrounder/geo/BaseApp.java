@@ -44,7 +44,7 @@ public class BaseApp {
         options.addOption("ie", "test-input", true, "input file or directory name for test data");
         options.addOption("ks", "samples", true, "number of samples to take (default=100)");
         options.addOption("kl", "lag", true, "number of iterations between samples (default=100)");
-        options.addOption("m", "model", true, "model (PopBaseline, RandomBaseline, BasicMinDistance, ProbabilisticMinDistance) [default = PopBaseline]");
+        options.addOption("m", "model", true, "model (PopBaseline, RandomBaseline, BasicMinDistance, WeightedMinDistance) [default = PopBaseline]");
 	options.addOption("mi", "model-iterations", true, "number of iterations for models that are iterative (ProbabilisticMinDistance) [default = 10]");
         options.addOption("o", "output", true, "output filename [default = 'output.kml']");
         options.addOption("ot", "output-tabulated-probabilities", true, "path of tabulated probability output");
