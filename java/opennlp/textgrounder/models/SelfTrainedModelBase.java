@@ -38,12 +38,16 @@ public abstract class SelfTrainedModelBase extends Model {
         gazetteer = gaz;
         gazetteer.gazetteerRefresh = gazetteerRefresh;
         lexicon = new Lexicon();
+        if(evalInputPath != null)
+            trainTokenArrayBuffer = evalTokenArrayBuffer;
     }
 
     public SelfTrainedModelBase(CommandLineOptions options) {
         super(options);
         gazetteer = gazetteerGenerator.generateGazetteer();
         gazetteer.gazetteerRefresh = gazetteerRefresh;
+        if(evalInputPath != null)
+            trainTokenArrayBuffer = evalTokenArrayBuffer;
     }
 
     public void activateRegionsForWholeGaz() throws Exception {
@@ -90,18 +94,18 @@ public abstract class SelfTrainedModelBase extends Model {
                 else
                     processTrainInputPath();
             } catch (Exception ex) {
-                Logger.getLogger(ProbabilisticBaselineModel.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(PopulationBaselineModel.class.getName()).log(Level.SEVERE, null, ex);
             }
             try {
                 disambiguateAndCountPlacenames();
             } catch (Exception ex) {
-                Logger.getLogger(ProbabilisticBaselineModel.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(PopulationBaselineModel.class.getName()).log(Level.SEVERE, null, ex);
             }
         } else {
             try {
                 activateRegionsForWholeGaz();
             } catch (Exception ex) {
-                Logger.getLogger(ProbabilisticBaselineModel.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(PopulationBaselineModel.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
     }

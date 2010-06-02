@@ -60,13 +60,13 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 
 	pseudoWeights = new ArrayList<ArrayList<Double>>();
 	allPossibleLocations = new ArrayList<TIntArrayList>();
-	for(int i = 0; i < evalTokenArrayBuffer.size(); i++) {
-	    if(evalTokenArrayBuffer.toponymVector[i] == 0) {
+	for(int i = 0; i < trainTokenArrayBuffer.size(); i++) {
+	    if(trainTokenArrayBuffer.toponymVector[i] == 0) {
 		pseudoWeights.add(null);
 		allPossibleLocations.add(null);
 	    }
 	    else {
-		String placename = lexicon.getWordForInt(evalTokenArrayBuffer.wordVector[i]).toLowerCase();
+		String placename = lexicon.getWordForInt(trainTokenArrayBuffer.wordVector[i]).toLowerCase();
 		TIntHashSet curPossibleLocations = gazetteer.get(placename);
 		/*if(curPossibleLocations.size() == 1) {
 		    System.out.println(curPossibleLocations.toArray()[0]);
@@ -103,17 +103,17 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 	    int curDocNumber = -1;
 	    int curDocBeginIndex = 0;
 
-	    for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
+	    for (int i = 0; i < trainTokenArrayBuffer.size(); i++) {
 
-		if(evalTokenArrayBuffer.documentVector[i] == curDocNumber) {
+		if(trainTokenArrayBuffer.documentVector[i] == curDocNumber) {
 		    continue;
 		}
 		else {
-		    curDocNumber = evalTokenArrayBuffer.documentVector[i];
+		    curDocNumber = trainTokenArrayBuffer.documentVector[i];
 		    curDocBeginIndex = i;
 		}
 		
-		assignWeights(evalTokenArrayBuffer, curDocBeginIndex);
+		assignWeights(trainTokenArrayBuffer, curDocBeginIndex);
 		updateLocationWeightsAcrossCorpus(pseudoWeights, locationWeightsAcrossCorpus);
 		//System.out.println(pseudoWeights);
 		//System.exit(0);
@@ -122,7 +122,7 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 
 	System.out.println("Final step of disambiguation...");
 
-	locations = doFinalDisambiguate(evalTokenArrayBuffer);
+	locations = doFinalDisambiguate(trainTokenArrayBuffer);
 
         System.out.println("Done. Returning " + locations.size() + " locations.");
 
@@ -151,7 +151,7 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 	    for(int j = curDocBeginIndex; j < tokenArrayBuffer.size() && tokenArrayBuffer.documentVector[j] == curDocNumber; j++) {
 		if(tokenArrayBuffer.toponymVector[j] == 0) {
 		    //System.out.println("ignoring non-toponym " + tokenArrayBuffer.wordVector[j]);
-		    //evalTokenArrayBuffer.modelLocationArrayList.add(null);
+		    //trainTokenArrayBuffer.modelLocationArrayList.add(null);
 		    //System.out.println("null 1");
 		    continue; // ignore non-toponyms
 		}
@@ -163,7 +163,7 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 		
 		/*if(possibleLocations == null) {
 		    //System.out.println("null possibleLocations for " + thisPlacename);
-		    evalTokenArrayBuffer.modelLocationArrayList.add(null);
+		    trainTokenArrayBuffer.modelLocationArrayList.add(null);
 		    //System.out.println("null 2");
 		    continue;
 		    }*/
@@ -231,17 +231,17 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 			}
 		    }
 		    if(locIdToReturn == -1) {
-			//evalTokenArrayBuffer.modelLocationArrayList.add(null);
+			//trainTokenArrayBuffer.modelLocationArrayList.add(null);
 			continue;
 		    }
 		    locations.add(locIdToReturn);
 		    
 		    Location curLocation = gazetteer.getLocation(locIdToReturn);
-		    //evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
+		    //trainTokenArrayBuffer.modelLocationArrayList.add(curLocation);
 		    /*if(curLocation != null
-		       && !evalTokenArrayBuffer.goldLocationArrayList.get(j-1).name.equals(evalTokenArrayBuffer.modelLocationArrayList.get(j-1).name)) {
-			System.out.println(evalTokenArrayBuffer.goldLocationArrayList.get(j-1).name);
-			System.out.println(evalTokenArrayBuffer.modelLocationArrayList.get(j-1).name);
+		       && !trainTokenArrayBuffer.goldLocationArrayList.get(j-1).name.equals(trainTokenArrayBuffer.modelLocationArrayList.get(j-1).name)) {
+			System.out.println(trainTokenArrayBuffer.goldLocationArrayList.get(j-1).name);
+			System.out.println(trainTokenArrayBuffer.modelLocationArrayList.get(j-1).name);
 			System.out.println(j-1);
 			System.exit(0);
 			}*/
@@ -275,15 +275,17 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 	    addLocationsToRegionArray(locations);
 	}
 
-	for(int i = 0; i < evalTokenArrayBuffer.size(); i++) {
-	    if(modelGuesses.contains(i)) {
-		int modelGuess = modelGuesses.get(i);
-		evalTokenArrayBuffer.modelLocationArrayList.add(gazetteer.getLocation(modelGuess));
-	    }
-	    else {
-		evalTokenArrayBuffer.modelLocationArrayList.add(null);
-	    }
-	}
+        if(evalInputPath != null) {
+            for(int i = 0; i < trainTokenArrayBuffer.size(); i++) {
+                if(modelGuesses.contains(i)) {
+                    int modelGuess = modelGuesses.get(i);
+                    evalTokenArrayBuffer.modelLocationArrayList.add(gazetteer.getLocation(modelGuess));
+                }
+                else {
+                    evalTokenArrayBuffer.modelLocationArrayList.add(null);
+                }
+            }
+        }
 
 	return locations;
     }
@@ -303,7 +305,7 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 		int curLocationID = allPossibleLocations.get(i).get(j);
 		locationWeightsAcrossCorpus.putIfAbsent(curLocationID, 0.0);
 	    }
-	    String placename = lexicon.getWordForInt(evalTokenArrayBuffer.wordVector[i]).toLowerCase();
+	    String placename = lexicon.getWordForInt(trainTokenArrayBuffer.wordVector[i]).toLowerCase();
 	    sums.putIfAbsent(placename, 0.0);
 	}
 
@@ -312,7 +314,7 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 	    ArrayList<Double> curTopWeights = pseudoWeights.get(i);
 	    if(curTopWeights == null) continue;
 
-	    String placename = lexicon.getWordForInt(evalTokenArrayBuffer.wordVector[i]).toLowerCase();
+	    String placename = lexicon.getWordForInt(trainTokenArrayBuffer.wordVector[i]).toLowerCase();
  
 	    for(int j = 0; j < curTopWeights.size(); j++) {
 		int curLocationID = allPossibleLocations.get(i).get(j);

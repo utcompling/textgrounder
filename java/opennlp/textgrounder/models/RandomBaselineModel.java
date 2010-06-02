@@ -62,16 +62,17 @@ public class RandomBaselineModel extends SelfTrainedModelBase {
         placeIterator.advance();*/
 //        assert (textProcessor.size() == lexicon.size());
         //int wvCounter = 0;
-        for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
+        for (int i = 0; i < trainTokenArrayBuffer.size(); i++) {
             /*for (int docIndex = 0; docIndex < lexicon.size(); docIndex++) {
             ArrayList<Integer> curDocSpans = textProcessor.get(docIndex);
 
             for (int i = 0; i < curDocSpans.size(); i++) {//int topidx : curDocSpans) {*/
-            if (evalTokenArrayBuffer.toponymVector[i] == 0) {
-                evalTokenArrayBuffer.modelLocationArrayList.add(null);
+            if (trainTokenArrayBuffer.toponymVector[i] == 0) {
+                if(evalInputPath != null)
+                    evalTokenArrayBuffer.modelLocationArrayList.add(null);
                 continue;
             }
-            int topidx = evalTokenArrayBuffer.wordVector[i];
+            int topidx = trainTokenArrayBuffer.wordVector[i];
             System.out.println("toponym (in int form): " + topidx);
 
             String placename = lexicon.getWordForInt(topidx).toLowerCase();
@@ -82,7 +83,8 @@ public class RandomBaselineModel extends SelfTrainedModelBase {
 
             if (!gazetteer.contains(placename)) // quick lookup to see if it has even 1 place by that name
             {
-                evalTokenArrayBuffer.modelLocationArrayList.add(null);
+                if(evalInputPath != null)
+                    evalTokenArrayBuffer.modelLocationArrayList.add(null);
                 continue;
             }
 
@@ -92,7 +94,8 @@ public class RandomBaselineModel extends SelfTrainedModelBase {
 
             int curLocationIdx = randomDisambiguate(possibleLocations);
             Location curLocation = gazetteer.getLocation(curLocationIdx);
-            evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
+            if(evalInputPath != null)
+                evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
             if (curLocation == null) {
                 continue;
             }
@@ -117,7 +120,7 @@ public class RandomBaselineModel extends SelfTrainedModelBase {
             //DocIdAndIndex curDocIdAndIndex = new DocIdAndIndex(docIndex, i);
             curLocation.backPointers.add(i);
             //System.out.println(lexicon.getContext(curDocIdAndIndex, 10));
-            //System.out.println(evalTokenArrayBuffer.wordArrayList
+            //System.out.println(trainTokenArrayBuffer.wordArrayList
             //}
 
 
