@@ -570,24 +570,6 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 
     @Override
     public void train() {
-        initializeRegionArray();
-        if (!runWholeGazetteer) {
-            try {
-                processEvalInputPath();
-            } catch (Exception ex) {
-                Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            try {
-                disambiguateAndCountPlacenames();
-            } catch (Exception ex) {
-                Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        } else {
-            try {
-                activateRegionsForWholeGaz();
-            } catch (Exception ex) {
-                Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
+        super.train();
     }
 }

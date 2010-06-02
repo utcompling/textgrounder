@@ -20,6 +20,7 @@ import opennlp.textgrounder.gazetteers.*;
 import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.textstructs.*;
+import java.util.logging.*;
 
 /**
  *
@@ -75,6 +76,33 @@ public abstract class SelfTrainedModelBase extends Model {
             writeXMLFile(trainInputPath, kmlOutputFilename, gazetteer.getIdxToLocationMap(),locations, evalTokenArrayBuffer);
         } else {
             writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, gazetteer.getIdxToLocationMap(), locations, evalTokenArrayBuffer);
+        }
+    }
+
+    public abstract TIntHashSet disambiguateAndCountPlacenames() throws Exception;
+
+    public void train() {
+        initializeRegionArray();
+        if (!runWholeGazetteer) {
+            try {
+                if(evalInputPath != null)
+                    processEvalInputPath();
+                else
+                    processTrainInputPath();
+            } catch (Exception ex) {
+                Logger.getLogger(ProbabilisticBaselineModel.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            try {
+                disambiguateAndCountPlacenames();
+            } catch (Exception ex) {
+                Logger.getLogger(ProbabilisticBaselineModel.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        } else {
+            try {
+                activateRegionsForWholeGaz();
+            } catch (Exception ex) {
+                Logger.getLogger(ProbabilisticBaselineModel.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
     }
 }

@@ -45,7 +45,7 @@ public class GeoReferencer extends BaseApp {
 	SelfTrainedModelBase grefUS = null;
 	if(modelOptions.model.toLowerCase().startsWith("pop")) {
 	    System.out.println("Using POPULATION baseline model.");
-	    grefUS = new BaselineModel(modelOptions);
+	    grefUS = new ProbabilisticBaselineModel(modelOptions);
 	}
 	else if(modelOptions.model.toLowerCase().startsWith("r")) {
 	    System.out.println("Using RANDOM baseline model.");

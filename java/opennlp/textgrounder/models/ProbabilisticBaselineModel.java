@@ -42,19 +42,19 @@ import opennlp.textgrounder.topostructs.*;
  *
  * @author 
  */
-public class BaselineModel extends SelfTrainedModelBase {
+public class ProbabilisticBaselineModel extends SelfTrainedModelBase {
 
     //protected File trainInputFile;
     //protected boolean initializedXMLFile = false;
     //protected boolean finalizedXMLFile = false;
-    public BaselineModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
+    public ProbabilisticBaselineModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
         super(gaz, bscale, paragraphsAsDocs);
         /*barScale = bscale;
         gazetteer = gaz;
         lexicon = new Lexicon();*/
     }
 
-    public BaselineModel(CommandLineOptions options) throws Exception {
+    public ProbabilisticBaselineModel(CommandLineOptions options) throws Exception {
         super(options);
         /*
         runWholeGazetteer = options.getRunWholeGazetteer();
@@ -329,24 +329,6 @@ public class BaselineModel extends SelfTrainedModelBase {
     // }
     @Override
     public void train() {
-        initializeRegionArray();
-        if (!runWholeGazetteer) {
-            try {
-                processTrainInputPath();
-            } catch (Exception ex) {
-                Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            try {
-                disambiguateAndCountPlacenames();
-            } catch (Exception ex) {
-                Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        } else {
-            try {
-                activateRegionsForWholeGaz();
-            } catch (Exception ex) {
-                Logger.getLogger(BaselineModel.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
+        super.train();
     }
 }
