@@ -38,16 +38,16 @@ public abstract class SelfTrainedModelBase extends Model {
         gazetteer = gaz;
         gazetteer.gazetteerRefresh = gazetteerRefresh;
         lexicon = new Lexicon();
-        if(evalInputPath != null)
-            trainTokenArrayBuffer = evalTokenArrayBuffer;
+        //if(evalInputPath != null)
+        //    trainTokenArrayBuffer = evalTokenArrayBuffer;
     }
 
     public SelfTrainedModelBase(CommandLineOptions options) {
         super(options);
         gazetteer = gazetteerGenerator.generateGazetteer();
         gazetteer.gazetteerRefresh = gazetteerRefresh;
-        if(evalInputPath != null)
-            trainTokenArrayBuffer = evalTokenArrayBuffer;
+        //if(evalInputPath != null)
+        //    trainTokenArrayBuffer = evalTokenArrayBuffer;
     }
 
     public void activateRegionsForWholeGaz() throws Exception {

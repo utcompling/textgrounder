@@ -52,6 +52,9 @@ public class BasicMinDistanceModel extends SelfTrainedModelBase {
 
         System.out.println("Disambiguating place names found...");
 
+        if(trainTokenArrayBuffer == null)
+            trainTokenArrayBuffer = evalTokenArrayBuffer;
+
         locations = new TIntHashSet();
 
         TIntIntHashMap idsToCounts = new TIntIntHashMap();

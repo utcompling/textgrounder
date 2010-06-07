@@ -154,6 +154,9 @@ public class PopulationBaselineModel extends SelfTrainedModelBase {
 
         System.out.println("Disambiguating place names found...");
 
+        if(trainTokenArrayBuffer == null)
+            trainTokenArrayBuffer = evalTokenArrayBuffer;
+
         locations = new TIntHashSet();
         //TIntHashSet locationsFound = new TIntHashSet();
 

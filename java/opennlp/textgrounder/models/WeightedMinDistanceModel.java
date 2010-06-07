@@ -58,6 +58,9 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 
 	System.out.print("Initializing probabilistic minimum distance model data structure (this probably involves lots of SQLite lookups, so may take a while, but then all necessary information from the database will be cached so the rest should be fast)...");
 
+        if(trainTokenArrayBuffer == null)
+            trainTokenArrayBuffer = evalTokenArrayBuffer;
+
 	pseudoWeights = new ArrayList<ArrayList<Double>>();
 	allPossibleLocations = new ArrayList<TIntArrayList>();
 	for(int i = 0; i < trainTokenArrayBuffer.size(); i++) {
@@ -204,18 +207,21 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 			TIntHashSet otherPossibleLocs = gazetteer.get(placename);
 			
 			double minWeightedDistance = Double.MAX_VALUE;
+                        //double sumWeightedDistance = 0;
 			int[] otherPossibleLocsArray = otherPossibleLocs.toArray();
 			for(int k = 0; k < otherPossibleLocsArray.length; k++) {
 			    int otherPossibleLoc = otherPossibleLocsArray[k];
 			    Location otherLoc = gazetteer.getLocation(otherPossibleLoc);
-			    double curWeightedDistance = curLoc.computeDistanceTo(otherLoc) / pseudoWeights.get(i).get(k);
+			    double curWeightedDistance = curLoc.computeDistanceTo(otherLoc) * pseudoWeights.get(i).get(k); // used to divide here
 			    //System.out.println("curWeightedDistance = " + curWeightedDistance);
 			    
 			    if(curWeightedDistance > 0 && curWeightedDistance < minWeightedDistance) {
 				minWeightedDistance = curWeightedDistance;
+                                //sumWeightedDistance += curWeightedDistance;
 			    }
 			}
 			if(minWeightedDistance < Double.MAX_VALUE) {
+                            //minWeightedDistance /= sumWeightedDistance; // pseudo-weight normalization
 			    totalWeightedDistances.put(curLocId, totalWeightedDistances.get(curLocId) + minWeightedDistance);
 			    //System.out.println("Adding " + minWeightedDistance + " to " + placename);
 			}
@@ -437,17 +443,21 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 		    TIntHashSet otherPossibleLocs = gazetteer.get(placename);
 
 		    double minWeightedDistance = Double.MAX_VALUE;
+                    //double sumWeightedDistance = 0;
 		    int[] otherPossibleLocsArray = otherPossibleLocs.toArray();
 		    for(int k = 0; k < otherPossibleLocsArray.length; k++) {
 			int otherPossibleLoc = otherPossibleLocsArray[k];
 			Location otherLoc = gazetteer.getLocation(otherPossibleLoc);
-			double curWeightedDistance = curLoc.computeDistanceTo(otherLoc) / pseudoWeights.get(i).get(k);
+			double curWeightedDistance = curLoc.computeDistanceTo(otherLoc) * pseudoWeights.get(i).get(k); // used to divide here
 			//System.out.println("curWeightedDistance = " + curWeightedDistance);
 			
-			if(curWeightedDistance > 0 && curWeightedDistance < minWeightedDistance)
+			if(curWeightedDistance > 0 && curWeightedDistance < minWeightedDistance) {
 			    minWeightedDistance = curWeightedDistance;
+                            //sumWeightedDistance += curWeightedDistance;
+                        }
 		    }
 		    if(minWeightedDistance < Double.MAX_VALUE) {
+                        //minWeightedDistance /= sumWeightedDistance; // pseudo-weight normalization
 			totalWeightedDistances.put(curLocId, totalWeightedDistances.get(curLocId) + minWeightedDistance);
 			//System.out.println("Adding " + minWeightedDistance + " to " + placename);
 		    }
