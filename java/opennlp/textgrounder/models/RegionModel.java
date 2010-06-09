@@ -574,7 +574,7 @@ public class RegionModel extends TopicModel {
      * @throws IOException
      */
     public void saveSimpleParameters(String outputFilename) throws IOException {
-        SerializableParameters sp = new SerializableParameters();
+        SerializableRegionParameters sp = new SerializableRegionParameters();
         sp.saveParameters(outputFilename, this);
     }
 
@@ -584,7 +584,7 @@ public class RegionModel extends TopicModel {
      * @throws IOException
      */
     public void loadSimpleParameters(String inputFilename) throws IOException {
-        SerializableParameters sp = new SerializableParameters();
+        SerializableRegionParameters sp = new SerializableRegionParameters();
         sp.loadParameters(inputFilename, this);
     }
 

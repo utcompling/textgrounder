@@ -38,13 +38,13 @@ import opennlp.textgrounder.topostructs.Region;
  *
  * @author tsmoon
  */
-public class SerializableParameters implements Serializable {
+public class SerializableRegionParameters implements Serializable {
 
     static private final long serialVersionUID = 13114338L;
     /**
      * 
      */
-    protected SerializableParameters loadBuffer = null;
+    protected SerializableRegionParameters loadBuffer = null;
     /**
      * Location of training data. Not actually used to read data. Merely
      * required to generate kml files that include trainInputPath in the header
@@ -80,7 +80,7 @@ public class SerializableParameters implements Serializable {
         ObjectInputStream modelIn =
               new ObjectInputStream(new GZIPInputStream(new FileInputStream(filename)));
         try {
-            loadBuffer = (SerializableParameters) modelIn.readObject();
+            loadBuffer = (SerializableRegionParameters) modelIn.readObject();
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
