@@ -15,7 +15,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.topostructs;
 
-public class Coordinate {
+import java.io.*;
+
+public class Coordinate implements Serializable {
+
+    static private final long serialVersionUID = 10427645L;
+
     private final static double twoPI = 2*Math.PI;
     private final static double EARTH_RADIUS_MI = 3963.191;
 

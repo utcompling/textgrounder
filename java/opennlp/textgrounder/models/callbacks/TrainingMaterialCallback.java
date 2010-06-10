@@ -23,6 +23,7 @@ package opennlp.textgrounder.models.callbacks;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import opennlp.textgrounder.textstructs.Lexicon;
+import java.io.*;
 
 /**
  * A class for filtering whether words should be considered as training material
@@ -30,7 +31,9 @@ import opennlp.textgrounder.textstructs.Lexicon;
  * 
  * @author tsmoon
  */
-public class TrainingMaterialCallback {
+public class TrainingMaterialCallback implements Serializable {
+
+    static private final long serialVersionUID = 12375981L;
 
     protected Lexicon lexicon;
 

@@ -157,6 +157,7 @@ public class CommandLineOptions {
      * Whether format of input data is in tei encoded pcl-travel xml file
      */
     protected boolean PCLXML = false;
+    protected String serializedEvalTokenArrayBufferFilename = "evalTokenArrayBuffer.ser";
 
     /**
      *
@@ -257,6 +258,11 @@ public class CommandLineOptions {
                 case 'r':
                     randomSeed = Integer.valueOf(value);
                     break;
+                case 's':
+                    opt = option.getOpt();
+                    if(opt.equals("se")) {
+                        serializedEvalTokenArrayBufferFilename = value;
+                    }
                 case 't':
                     topics = Integer.parseInt(value);
                     break;
@@ -390,5 +396,9 @@ public class CommandLineOptions {
 
     public boolean isPCLXML() {
         return PCLXML;
+    }
+
+    public String getSerializedEvalTokenArrayBufferFilename() {
+        return serializedEvalTokenArrayBufferFilename;
     }
 }

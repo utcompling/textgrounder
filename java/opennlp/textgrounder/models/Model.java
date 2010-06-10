@@ -19,12 +19,8 @@ import gnu.trove.TIntHashSet;
 import gnu.trove.TIntIterator;
 import gnu.trove.TIntObjectHashMap;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.FilenameFilter;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
+import java.util.zip.*;
 import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -459,6 +455,15 @@ public abstract class Model {
         System.out.println("Precision: " + precision);
         System.out.println("Recall: " + recall);
         System.out.println("F-score: " + f1);
+    }
+
+    public void serializeEvalTokenArrayBuffer(String filename) throws Exception {
+        System.out.print("\nSerializing evaluation token array buffer to " + filename + ".gz ...");
+        ObjectOutputStream evalTokenArrayBufferOut =
+              new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(filename + ".gz")));
+        evalTokenArrayBufferOut.writeObject(evalTokenArrayBuffer);
+        evalTokenArrayBufferOut.close();
+        System.out.println("done.");
     }
 
     /**

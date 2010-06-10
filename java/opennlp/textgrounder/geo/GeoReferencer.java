@@ -73,6 +73,7 @@ public class GeoReferencer extends BaseApp {
 
 	if(modelOptions.getEvalDir() != null) {
 	    grefUS.evaluate();
+            grefUS.serializeEvalTokenArrayBuffer(modelOptions.getSerializedEvalTokenArrayBufferFilename());
 	}
     }
 }

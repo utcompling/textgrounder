@@ -15,6 +15,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.textstructs;
 
+import java.io.*;
+
 import java.util.ArrayList;
 import java.util.List;
 import opennlp.textgrounder.models.callbacks.NullTrainingMaterialCallback;
@@ -29,7 +31,9 @@ import opennlp.textgrounder.topostructs.Location;
  * 
  * @author tsmoon
  */
-public class TokenArrayBuffer {
+public class TokenArrayBuffer implements Serializable {
+
+    static private final long serialVersionUID = 10772114L;
 
     /**
      * Array of word indexes. The elements are integers which reference word

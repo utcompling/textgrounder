@@ -53,6 +53,7 @@ public class BaseApp {
         options.addOption("pd", "temperature-decrement", true, "temperature decrement steps (default=0.1)");
         options.addOption("pt", "target-temperature", true, "temperature at which to stop annealing (default=1)");
         options.addOption("r", "random-seed", true, "seed for random number generator. set argument to 0 to seed with the current time (default=1)");
+        options.addOption("se", "serialize-eval", true, "filename for serialized evaluation token array buffer (default=evalTokenArrayBuffer.ser)");
         options.addOption("t", "topics", true, "number of topics for baseline topic model (default=50)");
         options.addOption("w", "output-per-class", true, "number of words to output to path specified in output-tabulated-probabilities (default=10)");
 	options.addOption("wg", "whole-gazetteer", false, "activate regions and run program for entire gazetteer (the -i flag will be ignored in this case)");

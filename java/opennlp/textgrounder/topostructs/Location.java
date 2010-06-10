@@ -16,8 +16,11 @@
 package opennlp.textgrounder.topostructs;
 
 import java.util.*;
+import java.io.*;
 
-public class Location {
+public class Location implements Serializable {
+
+    static private final long serialVersionUID = 13371572L;
 
     public int id;
     public String name;
