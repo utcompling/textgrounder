@@ -434,7 +434,7 @@ public abstract class Model {
                         tp++;
                     } else {
                         fp++;
-                        //fn++; // just a FP according to Jason
+                        fn++; // reinstated
                     }
                 } else {
                     fn++;

@@ -36,7 +36,8 @@ import opennlp.textgrounder.topostructs.*;
  */
 public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 
-    protected static final boolean INCLUDE_CORPUS_LEVEL_WEIGHTS = true;
+    protected static final boolean INCLUDE_CORPUS_LEVEL_WEIGHTS = true; // true gives best results
+    protected static final boolean FINAL_DISAMBIGUATE_ON_CORPUS_LEVEL_WEIGHTS_ONLY = false; // false gives best results
 
     //private static int NUM_ITERATIONS = 10; // replaced by model-iterations option from command line
     private static ArrayList<ArrayList<Double>> pseudoWeights;// = new ArrayList<ArrayList<Double>>();
@@ -437,9 +438,6 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 	    
 	    for(int j = curDocBeginIndex; j < tokenArrayBuffer.size() && tokenArrayBuffer.documentVector[j] == curDocNumber; j++) {
 		if(tokenArrayBuffer.toponymVector[j] == 0) {
-		    //System.out.println("ignoring non-toponym " + tokenArrayBuffer.wordVector[j]);
-		    //trainTokenArrayBuffer.modelLocationArrayList.add(null);
-		    //System.out.println("null 1");
 		    continue; // ignore non-toponyms
 		}
 		int curTopidx = tokenArrayBuffer.wordVector[j];
@@ -448,24 +446,15 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 		
 		TIntHashSet possibleLocations = gazetteer.get(thisPlacename);
 		
-		/*if(possibleLocations == null) {
-		    //System.out.println("null possibleLocations for " + thisPlacename);
-		    trainTokenArrayBuffer.modelLocationArrayList.add(null);
-		    //System.out.println("null 2");
-		    continue;
-		    }*/
-		
 		int[] possibleLocationIds = possibleLocations.toArray();
 		TIntDoubleHashMap totalWeightedDistances = new TIntDoubleHashMap();
-		
-		//System.out.println("line 337");
+
 		for(int curLocId : possibleLocationIds) {
 		    Location curLoc = gazetteer.getLocation(curLocId);
 		    if(curLoc == null) continue;
 		    
 		    //int otherToponymCounter = 0;
-		    
-		    //System.out.println("line 344");
+
 		    for(int i = curDocBeginIndex; i < tokenArrayBuffer.size() && tokenArrayBuffer.documentVector[i] == curDocNumber; i++) {
 			if(tokenArrayBuffer.toponymVector[i] == 0) {
 			    //System.out.println("Skipping non-toponym " + tokenArrayBuffer.wordVector[i]);
@@ -496,7 +485,11 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 			for(int k = 0; k < otherPossibleLocsArray.length; k++) {
 			    int otherPossibleLoc = otherPossibleLocsArray[k];
 			    Location otherLoc = gazetteer.getLocation(otherPossibleLoc);
-			    double curWeightedDistance = curLoc.computeDistanceTo(otherLoc) * pseudoWeights.get(i).get(k); // used to divide here
+                            double curWeightedDistance;
+                            if(FINAL_DISAMBIGUATE_ON_CORPUS_LEVEL_WEIGHTS_ONLY)
+                                curWeightedDistance = pseudoWeights.get(i).get(k); // used to divide here
+                            else
+                                curWeightedDistance = curLoc.computeDistanceTo(otherLoc) * pseudoWeights.get(i).get(k); // used to divide here
 			    //System.out.println("curWeightedDistance = " + curWeightedDistance);
 			    
 			    if(curWeightedDistance > 0 && curWeightedDistance < minWeightedDistance) {
