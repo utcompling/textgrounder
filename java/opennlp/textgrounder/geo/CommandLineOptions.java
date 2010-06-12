@@ -16,9 +16,13 @@
 package opennlp.textgrounder.geo;
 
 import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.apache.commons.cli.*;
 
@@ -193,9 +197,9 @@ public class CommandLineOptions {
                     break;
                 case 'g':
                     opt = option.getOpt();
-                    if(opt.equals("g")) {
+                    if (opt.equals("g")) {
                         gazetteType = value;
-                    } else if(opt.equals("gr")) {
+                    } else if (opt.equals("gr")) {
                         gazetteerRefresh = true;
                     }
                     break;
@@ -206,7 +210,7 @@ public class CommandLineOptions {
                     } else if (opt.equals("ie")) {
                         testInputPath = value;
                     } else if (opt.equals("id")) {
-                        gazetteerPath = value;
+                        gazetteerPath = canonicalPath(value);
                     }
                     break;
                 case 'k':
@@ -221,13 +225,12 @@ public class CommandLineOptions {
                     trainedModelPath = value;
                     break;
                 case 'm':
-		    opt = option.getOpt();
-		    if(opt.equals("m")) {
-			model = value;
-		    }
-		    else if(opt.equals("mi")) {
-			modelIterations = Integer.parseInt(value);
-		    }
+                    opt = option.getOpt();
+                    if (opt.equals("m")) {
+                        model = value;
+                    } else if (opt.equals("mi")) {
+                        modelIterations = Integer.parseInt(value);
+                    }
                     break;
                 case 'o':
                     opt = option.getOpt();
@@ -260,7 +263,7 @@ public class CommandLineOptions {
                     break;
                 case 's':
                     opt = option.getOpt();
-                    if(opt.equals("se")) {
+                    if (opt.equals("se")) {
                         serializedEvalTokenArrayBufferFilename = value;
                     }
                 case 't':
@@ -367,7 +370,7 @@ public class CommandLineOptions {
     }
 
     public int getModelIterations() {
-	return modelIterations;
+        return modelIterations;
     }
 
     public String getTestInputPath() {
@@ -400,5 +403,19 @@ public class CommandLineOptions {
 
     public String getSerializedEvalTokenArrayBufferFilename() {
         return serializedEvalTokenArrayBufferFilename;
+    }
+
+    protected String canonicalPath(String _path) {
+        try {
+            String home = System.getProperty("user.home");
+            String path = "";
+            path = _path.replaceAll("~", home);
+            path = (new File(path)).getCanonicalPath();
+            return path;
+        } catch (IOException ex) {
+            Logger.getLogger(CommandLineOptions.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+        return null;
     }
 }

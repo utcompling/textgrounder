@@ -23,12 +23,10 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.SQLException;
-import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.*;
 
-import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.textstructs.Lexicon;
 import opennlp.textgrounder.topostructs.*;
 

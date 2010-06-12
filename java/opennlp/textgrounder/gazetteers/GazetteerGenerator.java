@@ -83,12 +83,16 @@ public class GazetteerGenerator {
             }
         } catch (FileNotFoundException ex) {
             Logger.getLogger(GazetteerGenerator.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
         } catch (IOException ex) {
             Logger.getLogger(GazetteerGenerator.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
         } catch (ClassNotFoundException ex) {
             Logger.getLogger(GazetteerGenerator.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
         } catch (SQLException ex) {
             Logger.getLogger(GazetteerGenerator.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
         }
         return gazetteer;
     }

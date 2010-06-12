@@ -18,9 +18,8 @@ package opennlp.textgrounder.textstructs;
 import edu.stanford.nlp.ling.CoreAnnotations.*;
 
 import java.io.*;
+import java.text.Normalizer;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -75,7 +74,13 @@ public class TextProcessorTEIXML extends TextProcessor {
                 StringBuffer buf = new StringBuffer();
                 List<Element> pars = new ArrayList<Element>(div.getChildren("p"));
                 for (Element par : pars) {
-                    buf.append(par.getText());
+                    for (char c :
+                          Normalizer.normalize(par.getTextNormalize(), Normalizer.Form.NFKC).toCharArray()) {
+                        if (((int) c) < 0x7F) {
+                            buf.append(c);
+                        }
+                    }
+                    buf.append(System.getProperty("line.separator"));
                 }
                 String text = buf.toString().trim();
                 if (!text.isEmpty()) {

@@ -78,4 +78,30 @@ public class Coordinate implements Serializable {
 	return EARTH_RADIUS_MI * Math.acos(Math.sin(thisRadLat)*Math.sin(otherRadLat)
 					   + Math.cos(thisRadLat)*Math.cos(otherRadLat)*Math.cos(otherRadLong-thisRadLong));
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final Coordinate other = (Coordinate) obj;
+        if (this.longitude != other.longitude) {
+            return false;
+        }
+        if (this.latitude != other.latitude) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 3;
+        hash = 29 * hash + (int) (Double.doubleToLongBits(this.longitude) ^ (Double.doubleToLongBits(this.longitude) >>> 32));
+        hash = 29 * hash + (int) (Double.doubleToLongBits(this.latitude) ^ (Double.doubleToLongBits(this.latitude) >>> 32));
+        return hash;
+    }
 }
