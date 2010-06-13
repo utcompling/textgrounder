@@ -21,12 +21,13 @@ import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import opennlp.textgrounder.geo.CommandLineOptions;
+import opennlp.textgrounder.topostructs.SmallLocation;
 
 /**
  *
  * @author tsmoon
  */
-public class GazetteerGenerator {
+public class GazetteerGenerator<E extends SmallLocation> {
 
     /**
      *
@@ -61,24 +62,24 @@ public class GazetteerGenerator {
         gazPath = options.getGazetteerPath();
     }
 
-    public Gazetteer generateGazetteer() {
-        Gazetteer gazetteer = null;
+    public Gazetteer<E> generateGazetteer() {
+        Gazetteer<E> gazetteer = null;
         try {
             switch (gazType) {
                 case CG:
-                    gazetteer = new CensusGazetteer(gazPath);
+                    gazetteer = new CensusGazetteer<E>(gazPath);
                     break;
                 case NGAG:
-                    gazetteer = new NGAGazetteer(gazPath);
+                    gazetteer = new NGAGazetteer<E>(gazPath);
                     break;
                 case USGSG:
-                    gazetteer = new USGSGazetteer(gazPath);
+                    gazetteer = new USGSGazetteer<E>(gazPath);
                     break;
                 case WG:
-                    gazetteer = new WGGazetteer(gazPath);
+                    gazetteer = new WGGazetteer<E>(gazPath);
                     break;
                 case TRG:
-                    gazetteer = new TRGazetteer(gazPath, options.getGazetteerRefresh());
+                    gazetteer = new TRGazetteer<E>(gazPath, options.getGazetteerRefresh());
                     break;
             }
         } catch (FileNotFoundException ex) {

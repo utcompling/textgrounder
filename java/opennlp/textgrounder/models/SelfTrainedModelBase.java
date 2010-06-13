@@ -21,17 +21,18 @@ import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.textstructs.*;
 import java.util.logging.*;
+import opennlp.textgrounder.topostructs.Location;
 
 /**
  *
  * @author tsmoon
  */
-public abstract class SelfTrainedModelBase extends Model {
+public abstract class SelfTrainedModelBase extends Model<Location> {
 
     /**
      * Gazetteer that holds geographic information
      */
-    protected Gazetteer gazetteer;
+    protected Gazetteer<Location> gazetteer;
 
     public SelfTrainedModelBase(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
         barScale = bscale;

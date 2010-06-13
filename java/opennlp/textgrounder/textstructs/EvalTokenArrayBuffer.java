@@ -25,18 +25,18 @@ import opennlp.textgrounder.topostructs.*;
  * 
  * @author tsmoon
  */
-public class EvalTokenArrayBuffer extends TokenArrayBuffer {
+public class EvalTokenArrayBuffer<E extends SmallLocation> extends TokenArrayBuffer<E> {
 
     /**
      * Stores the system/model's best guesses for the disambiguated Location for each
      * toponym. Null for non-toponym indices.
      */
-    public ArrayList<SmallLocation> modelLocationArrayList;
+    public ArrayList<E> modelLocationArrayList;
     /**
      * Stores the gold standard location information when running in evaluation mode.
      * Indices corresponding to non-toponyms are null.
      */
-    public ArrayList<SmallLocation> goldLocationArrayList;
+    public ArrayList<E> goldLocationArrayList;
 
     /**
      * Default constructor. Allocates memory for arrays and assigns lexicon.
@@ -68,8 +68,8 @@ public class EvalTokenArrayBuffer extends TokenArrayBuffer {
     protected void initialize(Lexicon lexicon,
           TrainingMaterialCallback trainingMaterialCallback) {
         super.initialize(lexicon, trainingMaterialCallback);
-        modelLocationArrayList = new ArrayList<SmallLocation>();
-        goldLocationArrayList = new ArrayList<SmallLocation>();
+        modelLocationArrayList = new ArrayList<E>();
+        goldLocationArrayList = new ArrayList<E>();
     }
 
     /**
@@ -82,7 +82,7 @@ public class EvalTokenArrayBuffer extends TokenArrayBuffer {
      */
     @Override
     public void addElement(int wordIdx, int docIdx, int topStatus,
-          int stopStatus, Location loc) {
+          int stopStatus, E loc) {
         super.addElement(wordIdx, docIdx, topStatus, stopStatus, null);
         goldLocationArrayList.add(loc);
     }

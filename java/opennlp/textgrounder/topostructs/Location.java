@@ -65,6 +65,26 @@ public class Location extends SmallLocation {
         return id + ", " + name + ", " + type + ", (" + coord + "), " + pop + ", " + container;
     }
 
+    @Override
+    public int hashCode() {
+        return id;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final SmallLocation other = (SmallLocation) obj;
+        if (this.id != other.id) {
+            return false;
+        }
+        return true;
+    }
+
     /**
      * @return the backPointers
      */

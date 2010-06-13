@@ -19,12 +19,12 @@ package opennlp.textgrounder.topostructs;
  *
  * @author tsmoon
  */
-public class LocationRegionPair {
+public class LocationRegionPair<E extends SmallLocation> {
 
-    public final Location location;
+    public final E location;
     public final int regionIndex;
 
-    public LocationRegionPair(Location loc, int ridx) {
+    public LocationRegionPair(E loc, int ridx) {
         location = loc;
         regionIndex = ridx;
     }

@@ -39,7 +39,7 @@ import opennlp.textgrounder.util.KMLUtil;
  * 
  * @author 
  */
-public abstract class Model {
+public abstract class Model<E extends SmallLocation> {
 
     // Minimum number of pixels the (small) square region (NOT our Region) represented by each city must occupy on the screen for its label to appear:
     public final static int MIN_LOD_PIXELS = 16;
@@ -74,7 +74,7 @@ public abstract class Model {
     /**
      * Lookup table for Location (hash)code to Location object
      */
-    protected TIntObjectHashMap<Location> idxToLocationMap;
+    protected TIntObjectHashMap<E> idxToLocationMap;
     /**
      * Size of regions on cartesian reduction of globe. Globe is defined to be
      * 360 degrees longitude and 180 degrees latitude
@@ -115,16 +115,16 @@ public abstract class Model {
     /**
      * Array of token indices and associated information for training data
      */
-    protected TokenArrayBuffer trainTokenArrayBuffer;
+    protected TokenArrayBuffer<E> trainTokenArrayBuffer;
     /**
      * Array of token indices and associated information for eval data
      */
-    protected EvalTokenArrayBuffer evalTokenArrayBuffer;
+    protected EvalTokenArrayBuffer<E> evalTokenArrayBuffer;
     /**
      * Generates gazetteers as local variables. Global if necessary. Reduces
      * memory consumption
      */
-    protected GazetteerGenerator gazetteerGenerator;
+    protected GazetteerGenerator<E> gazetteerGenerator;
     //protected int indexInTAB = 0;
     /**
      * Flag for refreshing gazetteer from original database
@@ -250,11 +250,11 @@ public abstract class Model {
      * @param regionMapper callback class for handling mappings of locations
      * and regions
      */
-    protected void addLocationsToRegionArray(TIntHashSet locs, Gazetteer gaz,
+    protected void addLocationsToRegionArray(TIntHashSet locs, Gazetteer<E> gaz,
           RegionMapperCallback regionMapper) {
         for (TIntIterator it = locs.iterator(); it.hasNext();) {
             int locid = it.next();
-            SmallLocation loc = gaz.getLocation(locid);
+            E loc = gaz.getLocation(locid);
             /*if(loc.coord.latitude < -180.0 || loc.coord.longitude > 180.0
             || loc.coord.longitude < -90.0 || loc.coord.longitude > 900) {
             // switched?
@@ -356,7 +356,7 @@ public abstract class Model {
      * @throws Exception
      */
     public void writeXMLFile(String inputFilename, String outputFilename,
-          TIntObjectHashMap<Location> idxToLocationMap, TIntHashSet locations, TokenArrayBuffer tokenArrayBuffer) throws
+          TIntObjectHashMap<E> idxToLocationMap, TIntHashSet locations, TokenArrayBuffer tokenArrayBuffer) throws
           IOException {
 
         BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));
@@ -370,7 +370,7 @@ public abstract class Model {
 
         for (TIntIterator it = locations.iterator(); it.hasNext();) {
             int locid = it.next();
-            Location loc = idxToLocationMap.get(locid);
+            E loc = idxToLocationMap.get(locid);
 
             double height = Math.log(loc.getCount()) * barScale;
 
@@ -406,7 +406,7 @@ public abstract class Model {
      * 
      * @param evalTokenArrayBuffer
      */
-    public void evaluate(EvalTokenArrayBuffer evalTokenArrayBuffer) {
+    public void evaluate(EvalTokenArrayBuffer<E> evalTokenArrayBuffer) {
         if (evalTokenArrayBuffer.modelLocationArrayList.size() != evalTokenArrayBuffer.goldLocationArrayList.size()) {
             System.out.println("MISMATCH: model: " + evalTokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + evalTokenArrayBuffer.goldLocationArrayList.size());
 	    /*	    for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
@@ -422,8 +422,8 @@ public abstract class Model {
         int fn = 0;
 
         for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
-            Location curModelLoc = evalTokenArrayBuffer.modelLocationArrayList.get(i);
-            Location curGoldLoc = evalTokenArrayBuffer.goldLocationArrayList.get(i);
+            E curModelLoc = evalTokenArrayBuffer.modelLocationArrayList.get(i);
+            E curGoldLoc = evalTokenArrayBuffer.goldLocationArrayList.get(i);
             if (curGoldLoc != null) {
                 if (curModelLoc != null) {
                     if (curGoldLoc.looselyMatches(curModelLoc, 1.0)) {

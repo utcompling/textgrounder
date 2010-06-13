@@ -44,7 +44,7 @@ import opennlp.textgrounder.util.Constants;
  * 
  * @author tsmoon
  */
-public class RegionModelSerializer extends RegionModel {
+public class RegionModelSerializer extends RegionModel<SmallLocation> {
 
     /**
      * Default constructor. Take input from commandline and default options
@@ -139,12 +139,11 @@ public class RegionModelSerializer extends RegionModel {
                         for (TIntIterator it = possibleLocations.iterator();
                               it.hasNext();) {
                             int locid = it.next();
-                            Location loc = gazetteer.getLocation(locid);
-                            SmallLocation tloc = new SmallLocation(locid, topid, loc.getCoord(), 0);
+                            SmallLocation loc = gazetteer.getLocation(locid);
 
                             if (Math.abs(loc.getCoord().latitude) > Constants.EPSILON && Math.abs(loc.getCoord().longitude) > Constants.EPSILON) {
                                 tempLocs.add(loc.getId());
-                                dataSpecificLocationMap.put(loc.getId(), tloc);
+                                dataSpecificLocationMap.put(loc.getId(), loc);
                             }
                         }
                         dataSpecificGazetteer.put(topid, tempLocs);

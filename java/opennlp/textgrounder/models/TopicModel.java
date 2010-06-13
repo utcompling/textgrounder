@@ -29,6 +29,7 @@ import opennlp.textgrounder.ec.util.MersenneTwisterFast;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.ners.NullClassifier;
 import opennlp.textgrounder.textstructs.*;
+import opennlp.textgrounder.topostructs.SmallLocation;
 import opennlp.textgrounder.util.*;
 
 /**
@@ -36,7 +37,7 @@ import opennlp.textgrounder.util.*;
  *
  * @author tsmoon
  */
-public class TopicModel extends Model {
+public class TopicModel<E extends SmallLocation> extends Model<E> {
 
     /**
      * Random number generator. Implements the fast Mersenne Twister.

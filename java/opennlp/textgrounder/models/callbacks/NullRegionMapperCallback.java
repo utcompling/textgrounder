@@ -15,17 +15,16 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models.callbacks;
 
-import java.util.List;
 import opennlp.textgrounder.textstructs.Lexicon;
-import opennlp.textgrounder.topostructs.Location;
 import opennlp.textgrounder.topostructs.Region;
+import opennlp.textgrounder.topostructs.SmallLocation;
 
 /**
  * A callback class to 
  *
  * @author tsmoon
  */
-public class NullRegionMapperCallback extends RegionMapperCallback {
+public class NullRegionMapperCallback<E extends SmallLocation> extends RegionMapperCallback<E> {
 
     public NullRegionMapperCallback() {
     }
@@ -35,6 +34,6 @@ public class NullRegionMapperCallback extends RegionMapperCallback {
     }
 
     @Override
-    public void addToPlace(Location loc, Region region) {
+    public void addToPlace(E loc, Region region) {
     }
 }

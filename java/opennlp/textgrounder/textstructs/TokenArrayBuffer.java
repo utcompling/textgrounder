@@ -22,6 +22,7 @@ import java.util.List;
 import opennlp.textgrounder.models.callbacks.NullTrainingMaterialCallback;
 import opennlp.textgrounder.models.callbacks.TrainingMaterialCallback;
 import opennlp.textgrounder.topostructs.Location;
+import opennlp.textgrounder.topostructs.SmallLocation;
 
 /**
  * Class of integer sequences that indicate words in a stream of space
@@ -31,10 +32,9 @@ import opennlp.textgrounder.topostructs.Location;
  * 
  * @author tsmoon
  */
-public class TokenArrayBuffer implements Serializable {
+public class TokenArrayBuffer<E extends SmallLocation> implements Serializable {
 
     static private final long serialVersionUID = 10772114L;
-
     /**
      * Array of word indexes. The elements are integers which reference word
      * types maintained in Lexicon. The "word types" may not be unigrams.
@@ -185,7 +185,7 @@ public class TokenArrayBuffer implements Serializable {
      * will be one if it is a stopword and zero otherwise.
      */
     public void addElement(int wordIdx, int docIdx, int topStatus,
-          int stopStatus, Location loc) {
+          int stopStatus, E loc) {
         wordArrayList.add(wordIdx);
         documentArrayList.add(docIdx);
         toponymArrayList.add(topStatus);

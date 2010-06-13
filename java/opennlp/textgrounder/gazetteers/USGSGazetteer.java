@@ -26,7 +26,7 @@ import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.*;
 
-public class USGSGazetteer extends Gazetteer {
+public class USGSGazetteer<E extends SmallLocation> extends Gazetteer<E> {
 
     public USGSGazetteer(String location) throws
           FileNotFoundException, IOException {

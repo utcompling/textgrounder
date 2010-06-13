@@ -30,7 +30,7 @@ import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.*;
 
-public class TRGazetteer extends Gazetteer {
+public class TRGazetteer<E extends SmallLocation> extends Gazetteer<E> {
 
     private static Coordinate nullCoord = new Coordinate(0.0, 0.0);
 

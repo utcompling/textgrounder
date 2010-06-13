@@ -40,7 +40,7 @@ public class BasicMinDistanceModel extends SelfTrainedModelBase {
 
     public static TObjectDoubleHashMap<String> distanceCache = new TObjectDoubleHashMap<String>();
 
-    public BasicMinDistanceModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
+    public BasicMinDistanceModel(Gazetteer<Location> gaz, int bscale, int paragraphsAsDocs) {
         super(gaz, bscale, paragraphsAsDocs);
     }
 
@@ -102,15 +102,15 @@ public class BasicMinDistanceModel extends SelfTrainedModelBase {
             int curCount = idsToCounts.get(curLocation.getId());
             if (curCount == 0) {// sentinel for not found in hashmap
                 locations.add(curLocation.getId());
-                curLocation.backPointers = new ArrayList<Integer>();
+                curLocation.setBackPointers(new ArrayList<Integer>());
                 idsToCounts.put(curLocation.getId(), 1);
-                System.out.println("Found first " + curLocation.name + "; id = " + curLocation.getId());
+                System.out.println("Found first " + curLocation.getName() + "; id = " + curLocation.getId());
             } else {
                 idsToCounts.increment(curLocation.getId());
-                System.out.println("Found " + curLocation.name + " #" + idsToCounts.get(curLocation.getId()));
+                System.out.println("Found " + curLocation.getName() + " #" + idsToCounts.get(curLocation.getId()));
             }
             //DocIdAndIndex curDocIdAndIndex = new DocIdAndIndex(docIndex, i);
-            curLocation.backPointers.add(i);
+            curLocation.getBackPointers().add(i);
             //System.out.println(lexicon.getContext(curDocIdAndIndex, 10));
             //System.out.println(trainTokenArrayBuffer.wordArrayList
             //}

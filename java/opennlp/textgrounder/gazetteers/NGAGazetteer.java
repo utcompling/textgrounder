@@ -26,7 +26,7 @@ import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.*;
 
-public class NGAGazetteer extends Gazetteer {
+public class NGAGazetteer<E extends SmallLocation> extends Gazetteer<E> {
 
     public NGAGazetteer(String location) throws FileNotFoundException,
           IOException {

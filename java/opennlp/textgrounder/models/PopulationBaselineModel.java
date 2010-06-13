@@ -273,7 +273,7 @@ public class PopulationBaselineModel extends SelfTrainedModelBase {
             for (TIntIterator it = possibleLocations.iterator(); it.hasNext();) {
                 int locid = it.next();
                 Location loc = gazetteer.getLocation(locid);
-                if (!loc.type.equals("locality")) {
+                if (!loc.getType().equals("locality")) {
                     if (loc.getPop() > maxRegionPop) {
                         maxRegion = loc;
                         maxRegionPop = loc.getPop();

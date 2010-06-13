@@ -49,7 +49,7 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 
     public static TObjectDoubleHashMap<String> distanceCache = new TObjectDoubleHashMap<String>();
 
-    public WeightedMinDistanceModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
+    public WeightedMinDistanceModel(Gazetteer<Location> gaz, int bscale, int paragraphsAsDocs) {
         super(gaz, bscale, paragraphsAsDocs);
     }
 
@@ -396,7 +396,7 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
         
 	// normalize corpus-level weights
 	for(int curLocationID : locationWeightsAcrossCorpus.keys()) {
-	    double Z = sums.get(gazetteer.getLocation(curLocationID).name);
+	    double Z = sums.get(gazetteer.getLocation(curLocationID).getName());
 	    locationWeightsAcrossCorpus.put(curLocationID, locationWeightsAcrossCorpus.get(curLocationID) / Z);
 	}
 

@@ -30,7 +30,7 @@ import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.*;
 
-public class WGGazetteer extends Gazetteer {
+public class WGGazetteer<E extends SmallLocation> extends Gazetteer<E> {
 
     public WGGazetteer(String location) throws FileNotFoundException,
           IOException, ClassNotFoundException, SQLException {
@@ -309,13 +309,7 @@ public class WGGazetteer extends Gazetteer {
 
         ResultSet rs = stat.executeQuery("select * from places where type = \"locality\";");
         while (rs.next()) {
-            Location locationToAdd = new Location(rs.getInt("id"),
-                  rs.getString("name"),
-                  rs.getString("type"),
-                  new Coordinate(rs.getDouble("lon"), rs.getDouble("lat")),
-                  rs.getInt("pop"),
-                  rs.getString("container"),
-                  0);
+            E locationToAdd = generateLocation(rs, 0);
             idxToLocationMap.put(locationToAdd.getId(), locationToAdd);
             locationsToReturn.add(locationToAdd.getId());
         }

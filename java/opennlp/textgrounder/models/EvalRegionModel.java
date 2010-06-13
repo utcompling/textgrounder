@@ -36,7 +36,7 @@ import opennlp.textgrounder.topostructs.*;
  * 
  * @author tsmoon
  */
-public class EvalRegionModel extends RegionModel {
+public class EvalRegionModel<E extends SmallLocation> extends RegionModel<E> {
 
     /**
      *
@@ -301,11 +301,11 @@ public class EvalRegionModel extends RegionModel {
      *
      */
     @Override
-    protected TIntObjectHashMap<SmallLocation> normalizeLocations() {
-        Gazetteer gazetteer = gazetteerGenerator.generateGazetteer();
+    protected TIntObjectHashMap<E> normalizeLocations() {
+        Gazetteer<E> gazetteer = gazetteerGenerator.generateGazetteer();
         for (TIntIterator it = locationSet.iterator(); it.hasNext();) {
             int locid = it.next();
-            SmallLocation loc = gazetteer.safeGetLocation(locid);
+            E loc = gazetteer.safeGetLocation(locid);
             loc.setCount(loc.getCount() + beta);
         }
 
@@ -328,13 +328,13 @@ public class EvalRegionModel extends RegionModel {
                         int size = locs.size();
                         int randIndex = rand.nextInt(size);
                         int curLocationIdx = locs.toArray()[randIndex];
-                        SmallLocation curLocation = gazetteer.getLocation(curLocationIdx);
+                        E curLocation = gazetteer.getLocation(curLocationIdx);
                         evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
                     } catch (NullPointerException e) {
                         locs = new TIntHashSet();
                         Region r = regionMapperCallback.getRegionMap().get(topicid);
                         Coordinate coord = new Coordinate(r.centLon, r.centLat);
-                        Location loc = new Location(-1, lexicon.getWordForInt(wordid), null, coord, 0, null, 1);
+                        E loc = generateLocation(-1, lexicon.getWordForInt(wordid), null, coord, 0, null, 1, wordid);
                         evalTokenArrayBuffer.modelLocationArrayList.add(loc);
                         locs.add(loc.getId());
                         toponymRegionToLocations.put(trp.hashCode(), locs);

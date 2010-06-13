@@ -44,12 +44,12 @@ import opennlp.textgrounder.util.KMLUtil;
  * 
  * @author tsmoon
  */
-public class RegionModel extends TopicModel {
+public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
 
     /**
      * Callback class for handling mappings between regions, locations and placenames
      */
-    protected RegionMapperCallback regionMapperCallback;
+    protected RegionMapperCallback<E> regionMapperCallback;
     /**
      * Vector of toponyms. If 0, the word is not a toponym. If 1, it is.
      */
@@ -76,7 +76,7 @@ public class RegionModel extends TopicModel {
     /**
      * Table from index to location
      */
-    TIntObjectHashMap<SmallLocation> dataSpecificLocationMap;
+    TIntObjectHashMap<E> dataSpecificLocationMap;
     /**
      * 
      */
@@ -206,7 +206,7 @@ public class RegionModel extends TopicModel {
         int curDoc = 0, prevDoc = -1;
 
         TIntHashSet toponymsNotInGazetteer = new TIntHashSet();
-        Gazetteer gazetteer = gazetteerGenerator.generateGazetteer();
+        Gazetteer<E> gazetteer = gazetteerGenerator.generateGazetteer();
         for (int i = 0; i < N; i++) {
             curDoc = documentVector[i];
             if (curDoc != prevDoc) {
@@ -222,7 +222,7 @@ public class RegionModel extends TopicModel {
                     for (TIntIterator it = possibleLocations.iterator();
                           it.hasNext();) {
                         int locid = it.next();
-                        SmallLocation loc = gazetteer.getLocation(locid);
+                        E loc = gazetteer.getLocation(locid);
 
                         if (Math.abs(loc.getCoord().latitude) > Constants.EPSILON && Math.abs(loc.getCoord().longitude) > Constants.EPSILON) {
                             tempLocs.add(loc.getId());
@@ -381,14 +381,14 @@ public class RegionModel extends TopicModel {
     /**
      * 
      */
-    protected TIntObjectHashMap<SmallLocation> normalizeLocations() {
-        Gazetteer gazetteer = gazetteerGenerator.generateGazetteer();
+    protected TIntObjectHashMap<E> normalizeLocations() {
+        Gazetteer<E> gazetteer = gazetteerGenerator.generateGazetteer();
 
         for (TIntIterator it = locationSet.iterator(); it.hasNext();) {
             int locid = it.next();
-            SmallLocation loc = gazetteer.safeGetLocation(locid);
+            E loc = gazetteer.safeGetLocation(locid);
             loc.setCount(loc.getCount() + beta);
-            loc.backPointers = new ArrayList<Integer>();
+            loc.setBackPointers(new ArrayList<Integer>());
         }
 
         TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
@@ -399,7 +399,7 @@ public class RegionModel extends TopicModel {
                 TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
                 for (TIntIterator it = locs.iterator(); it.hasNext();) {
                     int locid = it.next();
-                    SmallLocation loc = gazetteer.safeGetLocation(locid);
+                    E loc = gazetteer.safeGetLocation(locid);
                     loc.setCount(loc.getCount() + wordByTopicCounts[wordid * T + regid]);
                 }
             }
@@ -423,7 +423,7 @@ public class RegionModel extends TopicModel {
                     try {
                         for (TIntIterator it = locs.iterator(); it.hasNext();) {
                             int locid = it.next();
-                            Location loc = gazetteer.safeGetLocation(locid);
+                            E loc = gazetteer.safeGetLocation(locid);
                             loc.getBackPointers().add(i);
                             if (loc.getId() > newlocid) {
                                 loc.setCount(loc.getCount() + 1);
@@ -433,7 +433,7 @@ public class RegionModel extends TopicModel {
                         locs = new TIntHashSet();
                         Region r = regionMapperCallback.getRegionMap().get(topicid);
                         Coordinate coord = new Coordinate(r.centLon, r.centLat);
-                        Location loc = new Location(curlocid, lexicon.getWordForInt(wordid), null, coord, 0, null, 1);
+                        E loc = generateLocation(curlocid, lexicon.getWordForInt(wordid), null, coord, 0, null, 1, wordid);
                         gazetteer.putLocation(loc);
                         loc.setBackPointers(new ArrayList<Integer>());
                         loc.getBackPointers().add(i);
@@ -446,10 +446,10 @@ public class RegionModel extends TopicModel {
         }
 
         locations = new TIntHashSet();
-        for (TIntObjectIterator<Location> it = gazetteer.getIdxToLocationMap().iterator();
+        for (TIntObjectIterator<E> it = gazetteer.getIdxToLocationMap().iterator();
               it.hasNext();) {
             it.advance();
-            Location loc = it.value();
+            E loc = it.value();
             try {
                 if (loc.getBackPointers().size() != 0) {
                     locations.add(loc.getId());
@@ -660,8 +660,20 @@ public class RegionModel extends TopicModel {
     public void writeXMLFile() throws Exception {
         System.err.println();
         System.err.println("Counting locations and smoothing");
-        TIntObjectHashMap<Location> idxToLocationMap = normalizeLocations();
+        idxToLocationMap = normalizeLocations();
         System.err.println("Writing output");
         writeXMLFile(trainInputPath, kmlOutputFilename, idxToLocationMap, locations, trainTokenArrayBuffer);
+    }
+
+    protected E generateLocation(int _id, String _name, String _type,
+          Coordinate _coord, int _pop, String _container, int _count,
+          int _nameid) {
+        E locationToAdd = (E) new Object();
+        if (locationToAdd.getClass().isInstance(new Location())) {
+            locationToAdd = (E) new Location(_id, _name, _type, _coord, _pop, _container, _count);
+        } else if (locationToAdd.getClass().isInstance(new SmallLocation())) {
+            locationToAdd = (E) new SmallLocation(_id, _nameid, _coord, _count);
+        }
+        return locationToAdd;
     }
 }

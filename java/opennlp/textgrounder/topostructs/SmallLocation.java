@@ -22,7 +22,7 @@ public class SmallLocation implements Serializable {
 
     static private final long serialVersionUID = 13371511L;
     protected int id;
-    private int nameid;
+    protected int nameid;
     protected Coordinate coord;
     /**
      * Counts of location in given text. Is double type to accomodate
