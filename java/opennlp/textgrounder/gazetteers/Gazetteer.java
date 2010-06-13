@@ -46,7 +46,7 @@ import opennlp.textgrounder.topostructs.*;
  * A separate lookup table from location ids to locations is maintained in
  * idxToLocationMap.
  */
-public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
+public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashMap<TIntHashSet> {
 
     /*public final static int USGS_TYPE = 0;
     public final static int US_CENSUS_TYPE = 1;
@@ -55,13 +55,11 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
     /**
      * Lookup table for Location (hash)code to Location object
      */
-    protected TIntObjectHashMap<Location> idxToLocationMap;
-
+    protected TIntObjectHashMap<E> idxToLocationMap;
     /**
      * Flag for refreshing gazetteer from original database
      */
     public boolean gazetteerRefresh = false;
-
     /**
      * Internal lexicon for maintaining lookups between toponyms in gazetteer
      * and indices
@@ -77,13 +75,16 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      */
     protected static int maxLocId = 0;
 
+    protected Gazetteer() {
+    }
+
     /**
      * Default constructor. Allocates memory for internal collections.
      *
      * @param location empty parameter only to be overridden in derived classes
      */
     public Gazetteer(String location) {
-        idxToLocationMap = new TIntObjectHashMap<Location>();
+        idxToLocationMap = new TIntObjectHashMap<E>();
         toponymLexicon = new Lexicon();
     }
 
@@ -117,32 +118,41 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
     public TIntHashSet get(String placename) {
         try {
             int topid = toponymLexicon.addWord(placename);
-	    /*
-	    System.out.println("u.s. topid = " + toponymLexicon.getIntForWord("u.s."));
-	    System.out.println("pakistan topid = " + toponymLexicon.getIntForWord("pakistan"));
-	    System.out.println("cyprus topid = " + toponymLexicon.getIntForWord("cyprus"));
-	    */
-	    /*if(placename.equals("pakistan"))
-		System.out.println("PAKISTAN " + topid);
-	    else if(placename.equals("nepal"))
-	    System.out.println("NEPAL " + topid);*/
+            /*
+            System.out.println("u.s. topid = " + toponymLexicon.getIntForWord("u.s."));
+            System.out.println("pakistan topid = " + toponymLexicon.getIntForWord("pakistan"));
+            System.out.println("cyprus topid = " + toponymLexicon.getIntForWord("cyprus"));
+             */
+            /*if(placename.equals("pakistan"))
+            System.out.println("PAKISTAN " + topid);
+            else if(placename.equals("nepal"))
+            System.out.println("NEPAL " + topid);*/
             TIntHashSet locationsToReturn = get(topid);
             if (locationsToReturn == null) {
 
                 locationsToReturn = new TIntHashSet();
                 ResultSet rs = stat.executeQuery("select * from places where name = \"" + placename + "\";");
                 while (rs.next()) {
-                    Location locationToAdd = new Location(rs.getInt("id"),
-                          rs.getString("name"),
+                    E locationToAdd = (E) new Object();
+                    locationToAdd.setId(rs.getInt("id"));
+                    locationToAdd.setCoord(new Coordinate(rs.getDouble("lon"), rs.getDouble("lat")));
+                    if(locationToAdd.getClass().isInstance(new Location())) {
+                        locationToAdd.setName(rs.getString("name"));
+                        locationToAdd.setPop(rs.getInt("pop"));
+                    } else if (locationToAdd.getClass().isInstance(new SmallLocation())) {
+                    }
+                    
+                    E locationToAdd = new Location<E extends SmallLocation>(,
+                          ,
                           rs.getString("type"),
-                          new Coordinate(rs.getDouble("lon"), rs.getDouble("lat")),
-                          rs.getInt("pop"),
+                          ,
+                          ,
                           rs.getString("container"),
                           0);
-                    idxToLocationMap.put(locationToAdd.id, locationToAdd);
-                    locationsToReturn.add(locationToAdd.id);
-                    if (locationToAdd.id > maxLocId) {
-                        maxLocId = locationToAdd.id;
+                    idxToLocationMap.put(locationToAdd.getId(), locationToAdd);
+                    locationsToReturn.add(locationToAdd.getId());
+                    if (locationToAdd.getId() > maxLocId) {
+                        maxLocId = locationToAdd.getId();
                     }
                 }
                 rs.close();
@@ -153,8 +163,8 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
         } catch (SQLException e) {
             e.printStackTrace();
             System.exit(1);
-            return null;
         }
+        return null;
     }
 
     /**
@@ -167,34 +177,30 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
     public TIntHashSet frugalGet(String placename) {
         try {
             int topid = toponymLexicon.getIntForWord(placename);
-            TIntHashSet locationsToReturn = get(topid);
-            if (locationsToReturn == null) {
-
-                locationsToReturn = new TIntHashSet();
-                ResultSet rs = stat.executeQuery("select * from places where name = \"" + placename + "\";");
-                while (rs.next()) {
-                    Location locationToAdd = new Location(rs.getInt("id"),
-                          rs.getString("name"),
-                          rs.getString("type"),
-                          new Coordinate(rs.getDouble("lon"), rs.getDouble("lat")),
-                          rs.getInt("pop"),
-                          rs.getString("container"),
-                          0);
-                    idxToLocationMap.put(locationToAdd.id, locationToAdd);
-                    locationsToReturn.add(locationToAdd.id);
-                    if (locationToAdd.id > maxLocId) {
-                        maxLocId = locationToAdd.id;
-                    }
+            TIntHashSet locationsToReturn = new TIntHashSet();
+            ResultSet rs = stat.executeQuery("select * from places where name = \"" + placename + "\";");
+            while (rs.next()) {
+                E locationToAdd = new <E extends SmallLocation>(rs.getInt("id"),
+                      rs.getString("name"),
+                      rs.getString("type"),
+                      new Coordinate(rs.getDouble("lon"), rs.getDouble("lat")),
+                      rs.getInt("pop"),
+                      rs.getString("container"),
+                      0);
+                idxToLocationMap.put(locationToAdd.getId(), locationToAdd);
+                locationsToReturn.add(locationToAdd.getId());
+                if (locationToAdd.getId() > maxLocId) {
+                    maxLocId = locationToAdd.getId();
                 }
-                rs.close();
             }
-
+            rs.close();
+            put(topid, null);
             return locationsToReturn;
         } catch (SQLException e) {
             e.printStackTrace();
             System.exit(1);
-            return null;
         }
+        return null;
     }
 
     /**
@@ -209,7 +215,7 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
     /**
      * @return the idxToLocationMap
      */
-    public TIntObjectHashMap<Location> getIdxToLocationMap() {
+    public TIntObjectHashMap<E> getIdxToLocationMap() {
         return idxToLocationMap;
     }
 
@@ -218,7 +224,7 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      * @param locid
      * @return
      */
-    public Location getLocation(int locid) {
+    public E getLocation(int locid) {
         return idxToLocationMap.get(locid);
     }
 
@@ -229,11 +235,11 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      * @param locid
      * @return
      */
-    public Location safeGetLocation(int locid) {
+    public SmallLocation safeGetLocation(int locid) {
         if (idxToLocationMap.contains(locid)) {
             return idxToLocationMap.get(locid);
         } else {
-            Location loc = null;
+            E loc = null;
             try {
                 ResultSet rs = stat.executeQuery("select * from places where id = \"" + locid + "\";");
                 while (rs.next()) {
@@ -244,9 +250,9 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
                           rs.getInt("pop"),
                           rs.getString("container"),
                           0);
-                    idxToLocationMap.put(loc.id, loc);
-                    if (loc.id > maxLocId) {
-                        maxLocId = loc.id;
+                    idxToLocationMap.put(loc.getId(), loc);
+                    if (loc.getId() > maxLocId) {
+                        maxLocId = loc.getId();
                     }
                     rs.close();
                     /**
@@ -270,9 +276,9 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      * @param loc
      * @return
      */
-    public int putLocation(Location loc) {
-        idxToLocationMap.put(loc.id, loc);
-        return loc.id;
+    public int putLocation(E loc) {
+        idxToLocationMap.put(loc.getId(), loc);
+        return loc.getId();
     }
 
     /**

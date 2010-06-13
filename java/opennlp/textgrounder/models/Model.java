@@ -254,13 +254,13 @@ public abstract class Model {
           RegionMapperCallback regionMapper) {
         for (TIntIterator it = locs.iterator(); it.hasNext();) {
             int locid = it.next();
-            Location loc = gaz.getLocation(locid);
+            SmallLocation loc = gaz.getLocation(locid);
             /*if(loc.coord.latitude < -180.0 || loc.coord.longitude > 180.0
             || loc.coord.longitude < -90.0 || loc.coord.longitude > 900) {
             // switched?
             }*/
-            int curX = (int) (loc.coord.latitude + 180) / (int) degreesPerRegion;
-            int curY = (int) (loc.coord.longitude + 90) / (int) degreesPerRegion;
+            int curX = (int) (loc.getCoord().latitude + 180) / (int) degreesPerRegion;
+            int curY = (int) (loc.getCoord().longitude + 90) / (int) degreesPerRegion;
             //System.out.println(loc.coord.latitude + ", " + loc.coord.longitude + " goes to");
             //System.out.println(curX + " " + curY);
             if (curX < 0 || curY < 0) {
@@ -270,13 +270,13 @@ public abstract class Model {
                 if (curY < 0) {
                     curY = 0;
                 }
-                System.err.println("Warning: " + loc.name + " had invalid coordinates (" + loc.coord + "); mapping it to [" + curX + "][" + curY + "]");
+                System.err.println("Warning: " + loc.getName() + " had invalid coordinates (" + loc.getCoord() + "); mapping it to [" + curX + "][" + curY + "]");
             }
             if (regionArray[curX][curY] == null) {
-                double minLon = loc.coord.longitude - loc.coord.longitude % degreesPerRegion;
-                double maxLon = minLon + (loc.coord.longitude < 0 ? -1 : 1) * degreesPerRegion;
-                double minLat = loc.coord.latitude - loc.coord.latitude % degreesPerRegion;
-                double maxLat = minLat + (loc.coord.latitude < 0 ? -1 : 1) * degreesPerRegion;
+                double minLon = loc.getCoord().longitude - loc.getCoord().longitude % degreesPerRegion;
+                double maxLon = minLon + (loc.getCoord().longitude < 0 ? -1 : 1) * degreesPerRegion;
+                double minLat = loc.getCoord().latitude - loc.getCoord().latitude % degreesPerRegion;
+                double maxLat = minLat + (loc.getCoord().latitude < 0 ? -1 : 1) * degreesPerRegion;
                 regionArray[curX][curY] = new Region(minLon, maxLon, minLat, maxLat);
                 activeRegions++;
             }
@@ -372,18 +372,18 @@ public abstract class Model {
             int locid = it.next();
             Location loc = idxToLocationMap.get(locid);
 
-            double height = Math.log(loc.count) * barScale;
+            double height = Math.log(loc.getCount()) * barScale;
 
             double radius = .15;
             //String kmlPolygon = coord.toKMLPolygon(4,radius,height);  // a square
-            String kmlPolygon = loc.coord.toKMLPolygon(10, radius, height);
+            String kmlPolygon = loc.getCoord().toKMLPolygon(10, radius, height);
 
-            String placename = loc.name;
-            Coordinate coord = loc.coord;
+            String placename = loc.getName();
+            Coordinate coord = loc.getCoord();
             out.write(KMLUtil.genPolygon(placename, coord, radius, kmlPolygon));
 
-            for (int j = 0; j < loc.backPointers.size(); j++) {
-                int index = loc.backPointers.get(j);
+            for (int j = 0; j < loc.getBackPointers().size(); j++) {
+                int index = loc.getBackPointers().get(j);
                 String context = tokenArrayBuffer.getContextAround(index, windowSize, true);
                 Coordinate spiralPoint = coord.getNthSpiralPoint(j, 0.13);
 

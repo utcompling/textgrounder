@@ -301,12 +301,12 @@ public class EvalRegionModel extends RegionModel {
      *
      */
     @Override
-    protected TIntObjectHashMap<Location> normalizeLocations() {
+    protected TIntObjectHashMap<SmallLocation> normalizeLocations() {
         Gazetteer gazetteer = gazetteerGenerator.generateGazetteer();
         for (TIntIterator it = locationSet.iterator(); it.hasNext();) {
             int locid = it.next();
-            Location loc = gazetteer.safeGetLocation(locid);
-            loc.count += beta;
+            SmallLocation loc = gazetteer.safeGetLocation(locid);
+            loc.setCount(loc.getCount() + beta);
         }
 
         TIntObjectHashMap<TIntHashSet> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
@@ -328,7 +328,7 @@ public class EvalRegionModel extends RegionModel {
                         int size = locs.size();
                         int randIndex = rand.nextInt(size);
                         int curLocationIdx = locs.toArray()[randIndex];
-                        Location curLocation = gazetteer.getLocation(curLocationIdx);
+                        SmallLocation curLocation = gazetteer.getLocation(curLocationIdx);
                         evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
                     } catch (NullPointerException e) {
                         locs = new TIntHashSet();
@@ -336,7 +336,7 @@ public class EvalRegionModel extends RegionModel {
                         Coordinate coord = new Coordinate(r.centLon, r.centLat);
                         Location loc = new Location(-1, lexicon.getWordForInt(wordid), null, coord, 0, null, 1);
                         evalTokenArrayBuffer.modelLocationArrayList.add(loc);
-                        locs.add(loc.id);
+                        locs.add(loc.getId());
                         toponymRegionToLocations.put(trp.hashCode(), locs);
                     }
                     added = true;

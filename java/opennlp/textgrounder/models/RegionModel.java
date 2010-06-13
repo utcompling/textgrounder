@@ -74,9 +74,17 @@ public class RegionModel extends TopicModel {
      */
     TIntObjectHashMap<Region> regionMap;
     /**
+     * Table from index to location
+     */
+    TIntObjectHashMap<SmallLocation> dataSpecificLocationMap;
+    /**
      * 
      */
-    StopwordList stopwordList;
+    TIntObjectHashMap<TIntHashSet> dataSpecificGazetteer;
+    /**
+     * 
+     */
+    protected StopwordList stopwordList;
 
     /**
      * Default constructor. Take input from commandline and default options
@@ -214,10 +222,10 @@ public class RegionModel extends TopicModel {
                     for (TIntIterator it = possibleLocations.iterator();
                           it.hasNext();) {
                         int locid = it.next();
-                        Location loc = gazetteer.getLocation(locid);
+                        SmallLocation loc = gazetteer.getLocation(locid);
 
-                        if (Math.abs(loc.coord.latitude) > Constants.EPSILON && Math.abs(loc.coord.longitude) > Constants.EPSILON) {
-                            tempLocs.add(loc.id);
+                        if (Math.abs(loc.getCoord().latitude) > Constants.EPSILON && Math.abs(loc.getCoord().longitude) > Constants.EPSILON) {
+                            tempLocs.add(loc.getId());
                         }
                     }
                     possibleLocations = tempLocs;
@@ -373,13 +381,13 @@ public class RegionModel extends TopicModel {
     /**
      * 
      */
-    protected TIntObjectHashMap<Location> normalizeLocations() {
+    protected TIntObjectHashMap<SmallLocation> normalizeLocations() {
         Gazetteer gazetteer = gazetteerGenerator.generateGazetteer();
 
         for (TIntIterator it = locationSet.iterator(); it.hasNext();) {
             int locid = it.next();
-            Location loc = gazetteer.safeGetLocation(locid);
-            loc.count += beta;
+            SmallLocation loc = gazetteer.safeGetLocation(locid);
+            loc.setCount(loc.getCount() + beta);
             loc.backPointers = new ArrayList<Integer>();
         }
 
@@ -391,8 +399,8 @@ public class RegionModel extends TopicModel {
                 TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
                 for (TIntIterator it = locs.iterator(); it.hasNext();) {
                     int locid = it.next();
-                    Location loc = gazetteer.safeGetLocation(locid);
-                    loc.count += wordByTopicCounts[wordid * T + regid];
+                    SmallLocation loc = gazetteer.safeGetLocation(locid);
+                    loc.setCount(loc.getCount() + wordByTopicCounts[wordid * T + regid]);
                 }
             }
         }
@@ -416,9 +424,9 @@ public class RegionModel extends TopicModel {
                         for (TIntIterator it = locs.iterator(); it.hasNext();) {
                             int locid = it.next();
                             Location loc = gazetteer.safeGetLocation(locid);
-                            loc.backPointers.add(i);
-                            if (loc.id > newlocid) {
-                                loc.count += 1;
+                            loc.getBackPointers().add(i);
+                            if (loc.getId() > newlocid) {
+                                loc.setCount(loc.getCount() + 1);
                             }
                         }
                     } catch (NullPointerException e) {
@@ -427,9 +435,9 @@ public class RegionModel extends TopicModel {
                         Coordinate coord = new Coordinate(r.centLon, r.centLat);
                         Location loc = new Location(curlocid, lexicon.getWordForInt(wordid), null, coord, 0, null, 1);
                         gazetteer.putLocation(loc);
-                        loc.backPointers = new ArrayList<Integer>();
-                        loc.backPointers.add(i);
-                        locs.add(loc.id);
+                        loc.setBackPointers(new ArrayList<Integer>());
+                        loc.getBackPointers().add(i);
+                        locs.add(loc.getId());
                         toponymRegionToLocations.put(trp.hashCode(), locs);
                         curlocid += 1;
                     }
@@ -443,8 +451,8 @@ public class RegionModel extends TopicModel {
             it.advance();
             Location loc = it.value();
             try {
-                if (loc.backPointers.size() != 0) {
-                    locations.add(loc.id);
+                if (loc.getBackPointers().size() != 0) {
+                    locations.add(loc.getId());
                 }
             } catch (NullPointerException e) {
             }

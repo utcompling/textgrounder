@@ -45,12 +45,6 @@ public class Lexicon implements Serializable {
     protected int nextInt = 0;
 
     /**
-     * Default constructor. Does nothing.
-     */
-    public Lexicon() {
-    }
-
-    /**
      * Get string value of some index
      *
      * @param someInt index to look up

@@ -16,11 +16,10 @@
 package opennlp.textgrounder.textstructs;
 
 import java.util.ArrayList;
-import java.util.List;
 import opennlp.textgrounder.models.callbacks.NullTrainingMaterialCallback;
 import opennlp.textgrounder.models.callbacks.TrainingMaterialCallback;
 
-import opennlp.textgrounder.topostructs.Location;
+import opennlp.textgrounder.topostructs.*;
 
 /**
  * 
@@ -32,12 +31,12 @@ public class EvalTokenArrayBuffer extends TokenArrayBuffer {
      * Stores the system/model's best guesses for the disambiguated Location for each
      * toponym. Null for non-toponym indices.
      */
-    public ArrayList<Location> modelLocationArrayList;
+    public ArrayList<SmallLocation> modelLocationArrayList;
     /**
      * Stores the gold standard location information when running in evaluation mode.
      * Indices corresponding to non-toponyms are null.
      */
-    public ArrayList<Location> goldLocationArrayList;
+    public ArrayList<SmallLocation> goldLocationArrayList;
 
     /**
      * Default constructor. Allocates memory for arrays and assigns lexicon.
@@ -69,8 +68,8 @@ public class EvalTokenArrayBuffer extends TokenArrayBuffer {
     protected void initialize(Lexicon lexicon,
           TrainingMaterialCallback trainingMaterialCallback) {
         super.initialize(lexicon, trainingMaterialCallback);
-        modelLocationArrayList = new ArrayList<Location>();
-        goldLocationArrayList = new ArrayList<Location>();
+        modelLocationArrayList = new ArrayList<SmallLocation>();
+        goldLocationArrayList = new ArrayList<SmallLocation>();
     }
 
     /**

@@ -16,32 +16,24 @@
 package opennlp.textgrounder.topostructs;
 
 import java.util.*;
-import java.io.*;
 
-public class Location implements Serializable {
+public class Location extends SmallLocation {
 
-    static private final long serialVersionUID = 13371572L;
-
-    public int id;
-    public String name;
-    public String type;
-    public Coordinate coord;
-    public int pop;
-    public String container;
-
+    protected String name;
+    protected String type;
+    protected int pop;
+    protected String container;
     /**
      * List of pack pointers into the DocumentSet so that context (snippets) can be extracted
      */
-    public ArrayList<Integer> backPointers;
+    protected ArrayList<Integer> backPointers;
 
-    /**
-     * Counts of location in given text. Is double type to accomodate
-     * hyperparameters and fractional counts;
-     */
-    public double count;
+    public Location() {
+    }
 
     public Location(int id, String name, String type, Coordinate coord, int pop,
-		    String container, int count) {
+          String container, int count) {
+        super();
         this.id = id;
         this.name = name;
         this.type = type;
@@ -51,12 +43,18 @@ public class Location implements Serializable {
         this.count = count;
     }
 
-    public boolean looselyMatches(Location other, double maxDiff) {
-	/*if(!this.name.equals(other.name)) {
-	    System.out.println(this.name);
-	    System.out.println(other.name);
-	    }*/
-	return this.name.equals(other.name) && this.coord.looselyMatches(other.coord, maxDiff);
+    @Override
+    public boolean looselyMatches(SmallLocation other, double maxDiff) {
+        /*if(!this.name.equals(other.name)) {
+        System.out.println(this.name);
+        System.out.println(other.name);
+        }*/
+        return this.name.equals(other.getName()) && this.coord.looselyMatches(other.coord, maxDiff);
+    }
+
+    @Override
+    public String getName() {
+        return name;
     }
 
     /*    public Location(int id, String name, String type, double lon, double lat, int pop, String container, int count) {
@@ -67,27 +65,75 @@ public class Location implements Serializable {
         return id + ", " + name + ", " + type + ", (" + coord + "), " + pop + ", " + container;
     }
 
+    /**
+     * @return the backPointers
+     */
     @Override
-    public int hashCode() {
-        return id;
+    public ArrayList<Integer> getBackPointers() {
+        return backPointers;
     }
 
+    /**
+     * @param backPointers the backPointers to set
+     */
     @Override
-    public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final Location other = (Location) obj;
-        if (this.id != other.id) {
-            return false;
-        }
-        return true;
+    public void setBackPointers(ArrayList<Integer> backPointers) {
+        this.backPointers = backPointers;
     }
 
-    public double computeDistanceTo(Location other) {
-	return this.coord.computeDistanceTo(other.coord);
+    /**
+     * @return the container
+     */
+    @Override
+    public String getContainer() {
+        return container;
+    }
+
+    /**
+     * @param container the container to set
+     */
+    @Override
+    public void setContainer(String container) {
+        this.container = container;
+    }
+
+    /**
+     * @return the pop
+     */
+    @Override
+    public int getPop() {
+        return pop;
+    }
+
+    /**
+     * @param pop the pop to set
+     */
+    @Override
+    public void setPop(int pop) {
+        this.pop = pop;
+    }
+
+    /**
+     * @return the type
+     */
+    @Override
+    public String getType() {
+        return type;
+    }
+
+    /**
+     * @param type the type to set
+     */
+    @Override
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    /**
+     * @param name the name to set
+     */
+    @Override
+    public void setName(String name) {
+        this.name = name;
     }
 }

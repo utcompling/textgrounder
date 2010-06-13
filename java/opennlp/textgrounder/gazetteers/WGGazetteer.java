@@ -316,8 +316,8 @@ public class WGGazetteer extends Gazetteer {
                   rs.getInt("pop"),
                   rs.getString("container"),
                   0);
-            idxToLocationMap.put(locationToAdd.id, locationToAdd);
-            locationsToReturn.add(locationToAdd.id);
+            idxToLocationMap.put(locationToAdd.getId(), locationToAdd);
+            locationsToReturn.add(locationToAdd.getId());
         }
         rs.close();
         return locationsToReturn;

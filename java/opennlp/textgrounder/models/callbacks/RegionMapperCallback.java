@@ -73,7 +73,7 @@ public class RegionMapperCallback {
      * @param loc 
      * @param region
      */
-    public void addToPlace(Location loc, Region region) {
+    public void addToPlace(SmallLocation loc, Region region) {
         if (!reverseRegionMap.containsKey(region)) {
             reverseRegionMap.put(region, numRegions);
             regionMap.put(numRegions, region);
@@ -105,7 +105,7 @@ public class RegionMapperCallback {
             if (!toponymRegionToLocations.containsKey(trp.hashCode())) {
                 toponymRegionToLocations.put(trp.hashCode(), new TIntHashSet());
             }
-            toponymRegionToLocations.get(trp.hashCode()).add(lrp.location.id);
+            toponymRegionToLocations.get(trp.hashCode()).add(lrp.location.getId());
             currentRegions.add(lrp.regionIndex);
         }
 

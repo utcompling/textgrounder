@@ -42,20 +42,7 @@ public class GeoReferencerSerializer extends BaseApp {
         }
 
         CommandLineOptions modelOptions = new CommandLineOptions(cline);
-        RegionModel rm = new RegionModel(modelOptions);
-        rm.train();
-        rm.decode();
-        if (modelOptions.getTabularOutputFilename() != null) {
-            rm.normalize();
-            rm.printTabulatedProbabilities();
-        }
-
-        if(modelOptions.getEvalDir() != null) {
-            rm.evaluate();
-        }
-
-        if (modelOptions.getKMLOutputFilename() != null) {
-            rm.writeXMLFile();
-        }
+        RegionModelSerializer rm = new RegionModelSerializer(modelOptions);
+        rm.serialize();
     }
 }

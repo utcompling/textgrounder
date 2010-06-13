@@ -99,15 +99,15 @@ public class BasicMinDistanceModel extends SelfTrainedModelBase {
                 continue;
             }
 
-            int curCount = idsToCounts.get(curLocation.id);
+            int curCount = idsToCounts.get(curLocation.getId());
             if (curCount == 0) {// sentinel for not found in hashmap
-                locations.add(curLocation.id);
+                locations.add(curLocation.getId());
                 curLocation.backPointers = new ArrayList<Integer>();
-                idsToCounts.put(curLocation.id, 1);
-                System.out.println("Found first " + curLocation.name + "; id = " + curLocation.id);
+                idsToCounts.put(curLocation.getId(), 1);
+                System.out.println("Found first " + curLocation.name + "; id = " + curLocation.getId());
             } else {
-                idsToCounts.increment(curLocation.id);
-                System.out.println("Found " + curLocation.name + " #" + idsToCounts.get(curLocation.id));
+                idsToCounts.increment(curLocation.getId());
+                System.out.println("Found " + curLocation.name + " #" + idsToCounts.get(curLocation.getId()));
             }
             //DocIdAndIndex curDocIdAndIndex = new DocIdAndIndex(docIndex, i);
             curLocation.backPointers.add(i);
@@ -120,7 +120,7 @@ public class BasicMinDistanceModel extends SelfTrainedModelBase {
         for (TIntIterator it = locations.iterator(); it.hasNext();) {
             int locid = it.next();
             Location loc = gazetteer.getLocation(locid);
-            loc.count = idsToCounts.get(locid);
+            loc.setCount(idsToCounts.get(locid));
         }
 
         System.out.println("Done. Returning " + locations.size() + " locations.");
