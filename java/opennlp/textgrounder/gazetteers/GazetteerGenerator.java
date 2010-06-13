@@ -32,7 +32,7 @@ public class GazetteerGenerator<E extends SmallLocation> {
     /**
      * kludge field to make instantiation of E possible within the class
      */
-    public E genericsKludgeFactor;
+    protected E genericsKludgeFactor;
     /**
      *
      */
@@ -41,10 +41,21 @@ public class GazetteerGenerator<E extends SmallLocation> {
      *
      */
     protected static String gazPath;
-    protected CommandLineOptions options;
+    /**
+     * 
+     */
+    protected boolean gazetteerRefresh;
 
     public GazetteerGenerator(CommandLineOptions options) {
-        this.options = options;
+        initialize(options);
+    }
+
+    public GazetteerGenerator(CommandLineOptions _options, E _genericsKludgeFactor) {
+        initialize(_options);
+        genericsKludgeFactor = _genericsKludgeFactor;
+    }
+
+    protected void initialize(CommandLineOptions options) {
         String gazTypeArg = options.getGazetteType().toLowerCase();
         if (gazTypeArg.startsWith("c")) {
             gazType = GazetteerEnum.GazetteerTypes.CG;
@@ -63,6 +74,7 @@ public class GazetteerGenerator<E extends SmallLocation> {
             //myGaz = new WGGazetteer();
         }
 
+        gazetteerRefresh = options.getGazetteerRefresh();
         gazPath = options.getGazetteerPath();
     }
 
@@ -83,7 +95,7 @@ public class GazetteerGenerator<E extends SmallLocation> {
                     gazetteer = new WGGazetteer<E>(gazPath);
                     break;
                 case TRG:
-                    gazetteer = new TRGazetteer<E>(gazPath, options.getGazetteerRefresh());
+                    gazetteer = new TRGazetteer<E>(gazPath, gazetteerRefresh);
                     break;
             }
         } catch (FileNotFoundException ex) {
@@ -101,5 +113,19 @@ public class GazetteerGenerator<E extends SmallLocation> {
         }
         gazetteer.genericsKludgeFactor = genericsKludgeFactor;
         return gazetteer;
+    }
+
+    /**
+     * @return the genericsKludgeFactor
+     */
+    public E getGenericsKludgeFactor() {
+        return genericsKludgeFactor;
+    }
+
+    /**
+     * @param genericsKludgeFactor the genericsKludgeFactor to set
+     */
+    public void setGenericsKludgeFactor(E genericsKludgeFactor) {
+        this.genericsKludgeFactor = genericsKludgeFactor;
     }
 }

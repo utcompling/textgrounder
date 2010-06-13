@@ -161,7 +161,13 @@ public class CommandLineOptions {
      * Whether format of input data is in tei encoded pcl-travel xml file
      */
     protected boolean PCLXML = false;
-    protected String serializedDataParameters = "abc";
+    /**
+     * 
+     */
+    protected String serializedDataParametersFilename = "seriaiized-data-parameters";
+    /**
+     *
+     */
     protected String serializedEvalTokenArrayBufferFilename = "evalTokenArrayBuffer.ser";
 
     /**
@@ -267,8 +273,9 @@ public class CommandLineOptions {
                     if (opt.equals("se")) {
                         serializedEvalTokenArrayBufferFilename = value;
                     } else if (opt.equals("sp")) {
-                        serializedDataParameters = value;
+                        serializedDataParametersFilename = value;
                     }
+                    break;
                 case 't':
                     topics = Integer.parseInt(value);
                     break;
@@ -409,10 +416,10 @@ public class CommandLineOptions {
     }
 
     /**
-     * @return the serializedDataParameters
+     * @return the serializedDataParametersFilename
      */
-    public String getSerializedDataParameters() {
-        return serializedDataParameters;
+    public String getSerializedDataParametersFilename() {
+        return serializedDataParametersFilename;
     }
 
     protected String canonicalPath(String _path) {

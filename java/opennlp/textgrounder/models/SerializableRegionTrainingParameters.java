@@ -62,7 +62,7 @@ public class SerializableRegionTrainingParameters<E extends SmallLocation>
      * @param rm RegionModel instance that holds the loaded parameters as fields.
      * @throws IOException
      */
-    public void loadParameters(String filename, RegionModelSerializer<E> rm)
+    public void loadParameters(String filename, RegionModel<E> rm)
           throws IOException {
         ObjectInputStream modelIn =
               new ObjectInputStream(new GZIPInputStream(new FileInputStream(filename)));
@@ -94,8 +94,11 @@ public class SerializableRegionTrainingParameters<E extends SmallLocation>
         dataSpecificGazetteer = rm.dataSpecificGazetteer;
         dataSpecificLocationMap = rm.dataSpecificLocationMap;
 
+        if(!filename.endsWith(".gz")) {
+            filename += ".gz";
+        }
         ObjectOutputStream modelOut =
-              new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(filename + ".gz")));
+              new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(filename)));
         modelOut.writeObject(this);
         modelOut.close();
     }

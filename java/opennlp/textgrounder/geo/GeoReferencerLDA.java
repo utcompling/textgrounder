@@ -18,6 +18,7 @@ package opennlp.textgrounder.geo;
 import org.apache.commons.cli.*;
 
 import opennlp.textgrounder.models.*;
+import opennlp.textgrounder.topostructs.SmallLocation;
 
 /**
  * App to be called from command line. Runs LDA based georeferencing models
@@ -42,7 +43,7 @@ public class GeoReferencerLDA extends BaseApp {
         }
 
         CommandLineOptions modelOptions = new CommandLineOptions(cline);
-        RegionModel rm = new RegionModel(modelOptions);
+        RegionModel<SmallLocation> rm = new RegionModel<SmallLocation>(modelOptions, new SmallLocation());
         rm.train();
         rm.decode();
         if (modelOptions.getTabularOutputFilename() != null) {

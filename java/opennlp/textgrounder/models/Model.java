@@ -44,7 +44,7 @@ public abstract class Model<E extends SmallLocation> {
     /**
      * kludge field to make instantiation of E possible within the class
      */
-    public E genericsKludgeFactor;
+    protected E genericsKludgeFactor;
     // Minimum number of pixels the (small) square region (NOT our Region) represented by each city must occupy on the screen for its label to appear:
     public final static int MIN_LOD_PIXELS = 16;
     /**
@@ -256,36 +256,36 @@ public abstract class Model<E extends SmallLocation> {
      */
     protected void addLocationsToRegionArray(TIntHashSet locs, Gazetteer<E> gaz,
           RegionMapperCallback regionMapper) {
-        for (TIntIterator it = locs.iterator(); it.hasNext();) {
-            int locid = it.next();
+        for (int locid : locs.toArray()) {
             E loc = gaz.getLocation(locid);
-            /*if(loc.coord.latitude < -180.0 || loc.coord.longitude > 180.0
-            || loc.coord.longitude < -90.0 || loc.coord.longitude > 900) {
-            // switched?
-            }*/
-            int curX = (int) (loc.getCoord().latitude + 180) / (int) degreesPerRegion;
-            int curY = (int) (loc.getCoord().longitude + 90) / (int) degreesPerRegion;
-            //System.out.println(loc.coord.latitude + ", " + loc.coord.longitude + " goes to");
-            //System.out.println(curX + " " + curY);
-            if (curX < 0 || curY < 0) {
-                if (curX < 0) {
-                    curX = 0;
-                }
-                if (curY < 0) {
-                    curY = 0;
-                }
-                System.err.println("Warning: " + loc.getName() + " had invalid coordinates (" + loc.getCoord() + "); mapping it to [" + curX + "][" + curY + "]");
-            }
-            if (regionArray[curX][curY] == null) {
-                double minLon = loc.getCoord().longitude - loc.getCoord().longitude % degreesPerRegion;
-                double maxLon = minLon + (loc.getCoord().longitude < 0 ? -1 : 1) * degreesPerRegion;
-                double minLat = loc.getCoord().latitude - loc.getCoord().latitude % degreesPerRegion;
-                double maxLat = minLat + (loc.getCoord().latitude < 0 ? -1 : 1) * degreesPerRegion;
-                regionArray[curX][curY] = new Region(minLon, maxLon, minLat, maxLat);
-                activeRegions++;
-            }
-            regionMapper.addToPlace(loc, regionArray[curX][curY]);
+            addLocationsToRegionArray(loc, regionMapper);
         }
+    }
+
+    protected void addLocationsToRegionArray(E loc,
+          RegionMapperCallback regionMapper) {
+        int curX = (int) (loc.getCoord().latitude + 180) / (int) degreesPerRegion;
+        int curY = (int) (loc.getCoord().longitude + 90) / (int) degreesPerRegion;
+        //System.out.println(loc.coord.latitude + ", " + loc.coord.longitude + " goes to");
+        //System.out.println(curX + " " + curY);
+        if (curX < 0 || curY < 0) {
+            if (curX < 0) {
+                curX = 0;
+            }
+            if (curY < 0) {
+                curY = 0;
+            }
+            System.err.println("Warning: " + loc.getName() + " had invalid coordinates (" + loc.getCoord() + "); mapping it to [" + curX + "][" + curY + "]");
+        }
+        if (regionArray[curX][curY] == null) {
+            double minLon = loc.getCoord().longitude - loc.getCoord().longitude % degreesPerRegion;
+            double maxLon = minLon + (loc.getCoord().longitude < 0 ? -1 : 1) * degreesPerRegion;
+            double minLat = loc.getCoord().latitude - loc.getCoord().latitude % degreesPerRegion;
+            double maxLat = minLat + (loc.getCoord().latitude < 0 ? -1 : 1) * degreesPerRegion;
+            regionArray[curX][curY] = new Region(minLon, maxLon, minLat, maxLat);
+            activeRegions++;
+        }
+        regionMapper.addToPlace(loc, regionArray[curX][curY]);
     }
 
     /**

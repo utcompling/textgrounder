@@ -43,7 +43,7 @@ public class GeoReferencerSerializer extends BaseApp {
             }
             CommandLineOptions modelOptions = new CommandLineOptions(cline);
             RegionModelSerializer<SmallLocation> rm = new RegionModelSerializer<SmallLocation>(modelOptions, new SmallLocation());
-            rm.serialize(modelOptions.getSerializedDataParameters());
+            rm.serialize(modelOptions.getSerializedDataParametersFilename());
         } catch (IOException ex) {
             Logger.getLogger(GeoReferencerSerializer.class.getName()).log(Level.SEVERE, null, ex);
         } catch (ParseException ex) {

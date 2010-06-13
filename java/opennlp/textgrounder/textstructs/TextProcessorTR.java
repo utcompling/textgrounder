@@ -31,7 +31,7 @@ public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
     /**
      *
      */
-    public E genericsKludgeFactor;
+    protected E genericsKludgeFactor;
 
     /**
      * Default constructor. Instantiate CRFClassifier.
@@ -100,7 +100,7 @@ public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
 
             if (lookingForGoldLoc && curLine.startsWith("\t>")) {
                 evalTokenArrayBuffer.addElement(wordidx, currentDoc, 1, stopwordList.isStopWord(cur)
-                      ? 1 : 0, parseLocation(curLine, wordidx));
+                      ? 1 : 0, (E) parseLocation(curLine, wordidx));
                 lookingForGoldLoc = false;
                 continue;
             } else if (curLine.startsWith("\t")) {

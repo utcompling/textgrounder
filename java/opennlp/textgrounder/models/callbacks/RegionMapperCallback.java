@@ -19,6 +19,7 @@ import gnu.trove.TIntHashSet;
 import gnu.trove.TIntObjectHashMap;
 import gnu.trove.TIntObjectIterator;
 import gnu.trove.TObjectIntHashMap;
+import java.util.HashSet;
 
 import opennlp.textgrounder.textstructs.Lexicon;
 import opennlp.textgrounder.topostructs.*;
@@ -44,9 +45,10 @@ public class RegionMapperCallback<E extends SmallLocation> {
      */
     protected TIntObjectHashMap<TIntHashSet> nameToRegionIndex;
     /**
-     *
+     * Temporary variable for keeping track of regions that have been assigned
+     * to the current location
      */
-    protected TIntObjectHashMap<LocationRegionPair<E>> currentLocationRegions;
+    protected HashSet<LocationRegionPair<E>> currentLocationRegions;
     /**
      * 
      */
@@ -65,23 +67,23 @@ public class RegionMapperCallback<E extends SmallLocation> {
         reverseRegionMap = new TObjectIntHashMap<Region>();
         nameToRegionIndex = new TIntObjectHashMap<TIntHashSet>();
         toponymRegionToLocations = new TIntObjectHashMap<TIntHashSet>();
-        currentLocationRegions = new TIntObjectHashMap<LocationRegionPair<E>>();
+        currentLocationRegions = new HashSet<LocationRegionPair<E>>();
     }
 
     /**
      *
-     * @param loc 
-     * @param region
+     * @param _loc
+     * @param _region
      */
-    public void addToPlace(E loc, Region region) {
-        if (!reverseRegionMap.containsKey(region)) {
-            reverseRegionMap.put(region, numRegions);
-            regionMap.put(numRegions, region);
+    public void addToPlace(E _loc, Region _region) {
+        if (!reverseRegionMap.containsKey(_region)) {
+            reverseRegionMap.put(_region, numRegions);
+            regionMap.put(numRegions, _region);
             numRegions += 1;
         }
-        int regionid = reverseRegionMap.get(region);
-        LocationRegionPair<E> lrp = new LocationRegionPair<E>(loc, regionid);
-        currentLocationRegions.put(lrp.hashCode(), lrp);
+        int regionid = reverseRegionMap.get(_region);
+        LocationRegionPair<E> locationRegionPair = new LocationRegionPair<E>(_loc, regionid);
+        currentLocationRegions.add(locationRegionPair);
     }
 
     /**
@@ -91,25 +93,24 @@ public class RegionMapperCallback<E extends SmallLocation> {
      */
     public void addAll(String placename, Lexicon lexicon) {
         int wordid = lexicon.getIntForWord(placename);
+        addAll(wordid);
+    }
 
-        if (!nameToRegionIndex.containsKey(wordid)) {
-            nameToRegionIndex.put(wordid, new TIntHashSet());
+    public void addAll(int placeid) {
+        if (!nameToRegionIndex.containsKey(placeid)) {
+            nameToRegionIndex.put(placeid, new TIntHashSet());
         }
-        TIntHashSet currentRegions = nameToRegionIndex.get(wordid);
+        TIntHashSet currentRegions = nameToRegionIndex.get(placeid);
 
-        for (TIntObjectIterator<LocationRegionPair<E>> it = currentLocationRegions.iterator();
-              it.hasNext();) {
-            it.advance();
-            LocationRegionPair<E> lrp = it.value();
-            ToponymRegionPair trp = new ToponymRegionPair(wordid, lrp.regionIndex);
-            if (!toponymRegionToLocations.containsKey(trp.hashCode())) {
-                toponymRegionToLocations.put(trp.hashCode(), new TIntHashSet());
+        for (LocationRegionPair<E> locationRegionPair : currentLocationRegions) {
+            ToponymRegionPair toponymRegionPair = new ToponymRegionPair(placeid, locationRegionPair.regionIndex);
+            if (!toponymRegionToLocations.containsKey(toponymRegionPair.hashCode())) {
+                toponymRegionToLocations.put(toponymRegionPair.hashCode(), new TIntHashSet());
             }
-            toponymRegionToLocations.get(trp.hashCode()).add(lrp.location.getId());
-            currentRegions.add(lrp.regionIndex);
+            toponymRegionToLocations.get(toponymRegionPair.hashCode()).add(locationRegionPair.location.getId());
+            currentRegions.add(locationRegionPair.regionIndex);
         }
-
-        currentLocationRegions = new TIntObjectHashMap<LocationRegionPair<E>>();
+        currentLocationRegions = new HashSet<LocationRegionPair<E>>();
     }
 
     /**

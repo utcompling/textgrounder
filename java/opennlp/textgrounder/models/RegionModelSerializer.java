@@ -53,9 +53,9 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
      *
      * @param options
      */
-    public RegionModelSerializer(CommandLineOptions options, E _genericsKludgeFactor) {
-        genericsKludgeFactor=_genericsKludgeFactor;
-        regionMapperCallback = new RegionMapperCallback();
+    public RegionModelSerializer(CommandLineOptions options,
+          E _genericsKludgeFactor) {
+        genericsKludgeFactor = _genericsKludgeFactor;
         try {
             initialize(options);
         } catch (FileNotFoundException ex) {
@@ -84,7 +84,7 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
 
         degreesPerRegion = options.getDegreesPerRegion();
         lexicon = new Lexicon();
-        gazetteerGenerator = new GazetteerGenerator(options);
+        gazetteerGenerator = new GazetteerGenerator(options, genericsKludgeFactor);
         TextProcessor textProcessor = null;
         String fname = trainInputFile.getName();
         if (options.isPCLXML()) {
@@ -120,7 +120,8 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
      * 
      * @return
      */
-    protected TIntHashSet buildTopoTable(TokenArrayBuffer<E> _tokenArrayBuffer, Gazetteer<E> gazetteer) {
+    protected TIntHashSet buildTopoTable(TokenArrayBuffer<E> _tokenArrayBuffer,
+          Gazetteer<E> gazetteer) {
         System.err.println();
         System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
         int curDoc = 0, prevDoc = -1;
@@ -138,20 +139,14 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
                     if (gazetteer.contains(placename)) {
                         TIntHashSet possibleLocations = gazetteer.get(placename);
                         TIntHashSet tempLocs = new TIntHashSet();
-                        for (TIntIterator it = possibleLocations.iterator();
-                              it.hasNext();) {
-                            int locid = it.next();
+                        for (int locid : possibleLocations.toArray()) {
                             E loc = gazetteer.getLocation(locid);
-
                             if (Math.abs(loc.getCoord().latitude) > Constants.EPSILON && Math.abs(loc.getCoord().longitude) > Constants.EPSILON) {
                                 tempLocs.add(loc.getId());
                                 dataSpecificLocationMap.put(loc.getId(), loc);
                             }
                         }
                         dataSpecificGazetteer.put(topid, tempLocs);
-
-                        addLocationsToRegionArray(tempLocs, gazetteer, regionMapperCallback);
-                        regionMapperCallback.addAll(placename, lexicon);
                     }
                 }
             }

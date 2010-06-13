@@ -34,13 +34,14 @@ public abstract class SelfTrainedModelBase extends Model<Location> {
      */
     protected Gazetteer<Location> gazetteer;
 
-    public SelfTrainedModelBase(Gazetteer<Location> gaz, int bscale, int paragraphsAsDocs) {
+    public SelfTrainedModelBase(Gazetteer<Location> gaz, int bscale,
+          int paragraphsAsDocs) {
         barScale = bscale;
         gazetteer = gaz;
         gazetteer.gazetteerRefresh = gazetteerRefresh;
         lexicon = new Lexicon();
         genericsKludgeFactor = new Location();
-        gazetteerGenerator.genericsKludgeFactor = genericsKludgeFactor;
+        gazetteerGenerator = new GazetteerGenerator<Location>(null, genericsKludgeFactor);
         //if(evalInputPath != null)
         //    trainTokenArrayBuffer = evalTokenArrayBuffer;
     }
@@ -48,7 +49,7 @@ public abstract class SelfTrainedModelBase extends Model<Location> {
     public SelfTrainedModelBase(CommandLineOptions options) {
         super(options);
         genericsKludgeFactor = new Location();
-        gazetteerGenerator.genericsKludgeFactor = genericsKludgeFactor;
+        gazetteerGenerator.setGenericsKludgeFactor(genericsKludgeFactor);
         gazetteer = gazetteerGenerator.generateGazetteer();
         gazetteer.gazetteerRefresh = gazetteerRefresh;
         //if(evalInputPath != null)
@@ -82,22 +83,24 @@ public abstract class SelfTrainedModelBase extends Model<Location> {
      */
     public void writeXMLFile() throws Exception {
         if (!runWholeGazetteer) {
-            writeXMLFile(trainInputPath, kmlOutputFilename, gazetteer.getIdxToLocationMap(),locations, evalTokenArrayBuffer);
+            writeXMLFile(trainInputPath, kmlOutputFilename, gazetteer.getIdxToLocationMap(), locations, evalTokenArrayBuffer);
         } else {
             writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, gazetteer.getIdxToLocationMap(), locations, evalTokenArrayBuffer);
         }
     }
 
-    public abstract TIntHashSet disambiguateAndCountPlacenames() throws Exception;
+    public abstract TIntHashSet disambiguateAndCountPlacenames() throws
+          Exception;
 
     public void train() {
         initializeRegionArray();
         if (!runWholeGazetteer) {
             try {
-                if(evalInputPath != null)
+                if (evalInputPath != null) {
                     processEvalInputPath();
-                else
+                } else {
                     processTrainInputPath();
+                }
             } catch (Exception ex) {
                 Logger.getLogger(PopulationBaselineModel.class.getName()).log(Level.SEVERE, null, ex);
             }
