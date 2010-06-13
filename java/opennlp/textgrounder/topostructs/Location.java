@@ -42,7 +42,8 @@ public class Location extends SmallLocation {
         this.count = count;
     }
 
-    public boolean looselyMatches(Location other, double maxDiff) {
+    @Override
+    public boolean looselyMatches(SmallLocation other, double maxDiff) {
         /*if(!this.name.equals(other.name)) {
         System.out.println(this.name);
         System.out.println(other.name);

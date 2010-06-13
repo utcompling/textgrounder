@@ -50,7 +50,7 @@ public class SmallLocation implements Serializable {
     }
 
     public boolean looselyMatches(SmallLocation other, double maxDiff) {
-        throw new UnsupportedOperationException();
+        return this.nameid == other.nameid && this.coord.looselyMatches(other.coord, maxDiff);
     }
 
     @Override

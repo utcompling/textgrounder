@@ -120,7 +120,7 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
      * 
      * @return
      */
-    protected TIntHashSet buildTopoTable(TokenArrayBuffer<E> _tokenArrayBuffer,
+    protected void buildTopoTable(TokenArrayBuffer<E> _tokenArrayBuffer,
           Gazetteer<E> gazetteer) {
         System.err.println();
         System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
@@ -152,7 +152,13 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
             }
         }
         System.err.println();
-        return null;
+
+        for (int locnameid : dataSpecificLocationMap.keys()) {
+            E loc = dataSpecificLocationMap.get(locnameid);
+            String placename = gazetteer.getToponymLexicon().getWordForInt(loc.getNameid());
+            int newlocnameid = lexicon.getIntForWord(placename);
+            loc.setNameid(newlocnameid);
+        }
     }
 
     public void serialize(String filename) throws IOException {
