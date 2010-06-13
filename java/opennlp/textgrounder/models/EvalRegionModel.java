@@ -116,7 +116,7 @@ public class EvalRegionModel<E extends SmallLocation> extends RegionModel<E> {
          */
         topicVector = new int[N];
 
-        TIntHashSet toponymsNotInGazetteer = buildTopoTable();
+        TIntHashSet toponymsNotInGazetteer = null; //buildTopoTable();
         T = regionMapperCallback.getNumRegions();
 
         RegionModelBridge regionModelBridge = new RegionModelBridge(this, rm);
@@ -167,12 +167,12 @@ public class EvalRegionModel<E extends SmallLocation> extends RegionModel<E> {
             }
         }
 
-        regionByToponym = new int[fW * T];
+        regionByToponymFilter = new int[fW * T];
         for (int i = 0; i < fW * T; ++i) {
-            regionByToponym[i] = 0;
+            regionByToponymFilter[i] = 0;
         }
 
-        buildTopoFilter(toponymsNotInGazetteer);
+//        buildTopoFilter(toponymsNotInGazetteer);
     }
 
     /**
@@ -202,7 +202,7 @@ public class EvalRegionModel<E extends SmallLocation> extends RegionModel<E> {
                             probs[j] = (wordByTopicCounts[wordoff + j] + hyperWordByTopicProbs[wordoff + j])
                                   / (topicCounts[j] + hyperTopicProbs[j])
                                   * (topicByDocumentCounts[docoff + j] + alpha)
-                                  * regionByToponym[wordoff + j];
+                                  * regionByToponymFilter[wordoff + j];
                         }
                     } else {
                         for (int j = 0;; ++j) {
@@ -265,7 +265,7 @@ public class EvalRegionModel<E extends SmallLocation> extends RegionModel<E> {
                                 probs[j] = (wordByTopicCounts[wordoff + j] + hyperWordByTopicProbs[wordoff + j])
                                       / (topicCounts[j] + hyperTopicProbs[j])
                                       * (topicByDocumentCounts[docoff + j] + alpha)
-                                      * regionByToponym[wordoff + j];
+                                      * regionByToponymFilter[wordoff + j];
                             }
                         } else {
                             for (int j = 0;; ++j) {

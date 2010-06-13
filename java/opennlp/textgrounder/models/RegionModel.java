@@ -31,12 +31,10 @@ import java.util.logging.Logger;
 
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.gazetteers.Gazetteer;
-import opennlp.textgrounder.gazetteers.GazetteerGenerator;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.textstructs.*;
 import opennlp.textgrounder.topostructs.*;
-import opennlp.textgrounder.util.Constants;
 import opennlp.textgrounder.util.KMLUtil;
 
 /**
@@ -65,7 +63,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
      * array. Instead of counts, this array is populated with ones and zeros.
      * If a toponym occurs in a certain region, the cell value is one, zero if not.
      */
-    protected int[] regionByToponym;
+    protected int[] regionByToponymFilter;
     /**
      * The set of locations that have been observed with the model.
      */
@@ -91,7 +89,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
      */
     protected int[] wordIdMapper;
     /**
-     *
+     * 
      */
     protected int[] activeRegionByDocumentFilter;
 
@@ -141,8 +139,8 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
 
         initializeFromOptions(_options);
 
-        SerializableRegionTrainingParameters<E> srtp = new SerializableRegionTrainingParameters<E>();
-        srtp.loadParameters(_options.getSerializedDataParametersFilename(), this);
+        SerializableRegionTrainingParameters<E> serializableRegionTrainingParameters = new SerializableRegionTrainingParameters<E>();
+        serializableRegionTrainingParameters.loadParameters(_options.getSerializedDataParametersFilename(), this);
 
         stopwordList = new StopwordList();
         initializeRegionArray();
@@ -170,10 +168,14 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
         System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
         int curDoc = 0, prevDoc = -1;
 
+        /**
+         * Here, find
+         * <li> 
+         */
         TIntHashSet toponymsNotInGazetteer = new TIntHashSet();
-        TIntHashSet tempVocab = new TIntHashSet();
+        TIntHashSet localDataVocab = new TIntHashSet();
 
-        int maxwordid = 0;
+        int inputVocabSize = 0;
         for (int i = 0; i < N; i++) {
             curDoc = documentVector[i];
             if (curDoc != prevDoc) {
@@ -191,15 +193,16 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
                     regionMapperCallback.addAll(wordid);
                     locationSet.addAll(possibleLocations.toArray());
                 } else {
-                    toponymsNotInGazetteer.add(wordVector[i]);
+                    toponymsNotInGazetteer.add(wordid);
                 }
             }
-            tempVocab.add(wordid);
-            if (wordid > maxwordid) {
-                maxwordid = wordid;
+            localDataVocab.add(wordid);
+            if (wordid > inputVocabSize) {
+                inputVocabSize = wordid;
             }
         }
         System.err.println();
+        inputVocabSize += 1;
 
         D = _tokenArrayBuffer.getNumDocs();
         /**
@@ -207,22 +210,18 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
          * dictionary size without stopwords (W). Normalization is conducted with
          * the dictionary size without stopwords, the size of which is sW.
          */
-        fW = (maxwordid += 1);
+        fW = localDataVocab.size();
         sW = stopwordList.size();
         W = fW - sW;
         betaW = beta * W;
 
-        wordIdMapper = new int[fW];
-        if (maxwordid != tempVocab.size()) {
-            /**
-             * means there are wordids that did not occur in this data set
-             */
-            int counter = 0;
-            for (int wordid : tempVocab.toArray()) {
-                wordIdMapper[wordid] = counter;
-                counter += 1;
-            }
+        wordIdMapper = new int[inputVocabSize];
+        int counter = 0;
+        for (int wordid : localDataVocab.toArray()) {
+            wordIdMapper[wordid] = counter;
+            counter += 1;
         }
+        assert (counter == fW);
 
         T = regionMapperCallback.getNumRegions();
         topicCounts = new int[T];
@@ -238,9 +237,9 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
         for (int i = 0; i < fW * T; ++i) {
             wordByTopicCounts[i] = 0;
         }
-        regionByToponym = new int[fW * T];
+        regionByToponymFilter = new int[fW * T];
         for (int i = 0; i < fW * T; ++i) {
-            regionByToponym[i] = 0;
+            regionByToponymFilter[i] = 0;
         }
 
         /**
@@ -250,28 +249,30 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
         for (int i = 0; i < N; i++) {
             int docid = documentVector[i];
             int docoff = docid * T;
-            int wordid = wordVector[i];
+            int wordid = wordIdMapper[wordVector[i]];
             if (toponymVector[i] == 1) {
-                for (int regionid : nameToRegionIndex.get(wordid).toArray()) {
-                    activeRegionByDocumentFilter[docoff + regionid] = 1;
+                if (dataSpecificGazetteer.contains(wordid)) {
+                    for (int regionid : nameToRegionIndex.get(wordid).toArray()) {
+                        activeRegionByDocumentFilter[docoff + regionid] = 1;
+                    }
                 }
             }
         }
 
         /**
-         * build filters for regionByToponym
+         * build filters for regionByToponymFilter
          */
         for (int wordid : nameToRegionIndex.keys()) {
             int wordoff = wordid * T;
             for (int regionid : nameToRegionIndex.get(wordid).toArray()) {
-                regionByToponym[wordoff + regionid] = 1;
+                regionByToponymFilter[wordoff + regionid] = 1;
             }
         }
 
         for (int wordid : toponymsNotInGazetteer.toArray()) {
             int wordoff = wordid * T;
             for (int i = 0; i < T; ++i) {
-                regionByToponym[wordoff + i] = 1;
+                regionByToponymFilter[wordoff + i] = 1;
             }
         }
     }
@@ -284,36 +285,46 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
     public void randomInitialize() {
         int wordid, docid, topicid;
         int istoponym, isstopword;
-        int wordoff;
+        int wordoff, docoff;
         double[] probs = new double[T];
         double totalprob, max, r;
 
         for (int i = 0; i < N; ++i) {
             isstopword = stopwordVector[i];
             if (isstopword == 0) {
-                wordid = wordVector[i];
+                wordid = wordIdMapper[wordVector[i]];
                 docid = documentVector[i];
+                docoff = docid * T;
                 istoponym = toponymVector[i];
 
+                totalprob = 0;
                 if (istoponym == 1) {
                     wordoff = wordid * T;
-                    totalprob = 0;
                     try {
                         for (int j = 0;; ++j) {
-                            totalprob += probs[j] = regionByToponym[wordoff + j];
+                            totalprob += probs[j] =
+                                  regionByToponymFilter[wordoff + j]
+                                  * activeRegionByDocumentFilter[docoff + j];
                         }
                     } catch (ArrayIndexOutOfBoundsException e) {
                     }
-                    r = rand.nextDouble() * totalprob;
-
-                    max = probs[0];
-                    topicid = 0;
-                    while (r > max) {
-                        topicid++;
-                        max += probs[topicid];
-                    }
                 } else {
-                    topicid = rand.nextInt(T);
+                    try {
+                        for (int j = 0;; ++j) {
+                            totalprob += probs[j] =
+                                  activeRegionByDocumentFilter[docoff + j];
+                        }
+                    } catch (ArrayIndexOutOfBoundsException e) {
+                    }
+                }
+
+                r = rand.nextDouble() * totalprob;
+
+                max = probs[0];
+                topicid = 0;
+                while (r > max) {
+                    topicid++;
+                    max += probs[topicid];
                 }
 
                 topicVector[i] = topicid;
@@ -341,7 +352,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
             for (int i = 0; i < N; ++i) {
                 isstopword = stopwordVector[i];
                 if (isstopword == 0) {
-                    wordid = wordVector[i];
+                    wordid = wordIdMapper[wordVector[i]];
                     docid = documentVector[i];
                     topicid = topicVector[i];
                     istoponym = toponymVector[i];
@@ -358,13 +369,15 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
                                 probs[j] = (wordByTopicCounts[wordoff + j] + beta)
                                       / (topicCounts[j] + betaW)
                                       * (topicByDocumentCounts[docoff + j] + alpha)
-                                      * regionByToponym[wordoff + j];
+                                      * regionByToponymFilter[wordoff + j]
+                                      * activeRegionByDocumentFilter[docoff + j];
                             }
                         } else {
                             for (int j = 0;; ++j) {
                                 probs[j] = (wordByTopicCounts[wordoff + j] + beta)
                                       / (topicCounts[j] + betaW)
-                                      * (topicByDocumentCounts[docoff + j] + alpha);
+                                      * (topicByDocumentCounts[docoff + j] + alpha)
+                                      * activeRegionByDocumentFilter[docoff + j];
                             }
                         }
                     } catch (ArrayIndexOutOfBoundsException e) {
