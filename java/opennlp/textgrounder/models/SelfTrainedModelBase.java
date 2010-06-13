@@ -34,7 +34,7 @@ public abstract class SelfTrainedModelBase extends Model<Location> {
      */
     protected Gazetteer<Location> gazetteer;
 
-    public SelfTrainedModelBase(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
+    public SelfTrainedModelBase(Gazetteer<Location> gaz, int bscale, int paragraphsAsDocs) {
         barScale = bscale;
         gazetteer = gaz;
         gazetteer.gazetteerRefresh = gazetteerRefresh;

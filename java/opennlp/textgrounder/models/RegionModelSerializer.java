@@ -111,7 +111,7 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
         buildTopoTable(trainTokenArrayBuffer, gazetteer);
 
         evalTokenArrayBuffer = new EvalTokenArrayBuffer(lexicon, new TrainingMaterialCallback(lexicon));
-        processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon), evalTokenArrayBuffer, stopwordList);
+        processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon, genericsKludgeFactor), evalTokenArrayBuffer, stopwordList);
         evalTokenArrayBuffer.convertToPrimitiveArrays();
         buildTopoTable(evalTokenArrayBuffer, gazetteer);
     }

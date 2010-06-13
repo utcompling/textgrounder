@@ -47,7 +47,7 @@ public class PopulationBaselineModel extends SelfTrainedModelBase {
     //protected File trainInputFile;
     //protected boolean initializedXMLFile = false;
     //protected boolean finalizedXMLFile = false;
-    public PopulationBaselineModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
+    public PopulationBaselineModel(Gazetteer<Location> gaz, int bscale, int paragraphsAsDocs) {
         super(gaz, bscale, paragraphsAsDocs);
         /*barScale = bscale;
         gazetteer = gaz;

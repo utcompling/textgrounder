@@ -33,7 +33,6 @@ public class Location extends SmallLocation {
 
     public Location(int id, String name, String type, Coordinate coord, int pop,
           String container, int count) {
-        super();
         this.id = id;
         this.name = name;
         this.type = type;
@@ -43,8 +42,7 @@ public class Location extends SmallLocation {
         this.count = count;
     }
 
-    @Override
-    public boolean looselyMatches(SmallLocation other, double maxDiff) {
+    public boolean looselyMatches(Location other, double maxDiff) {
         /*if(!this.name.equals(other.name)) {
         System.out.println(this.name);
         System.out.println(other.name);
@@ -78,7 +76,7 @@ public class Location extends SmallLocation {
         if (getClass() != obj.getClass()) {
             return false;
         }
-        final SmallLocation other = (SmallLocation) obj;
+        final Location other = (Location) obj;
         if (this.id != other.id) {
             return false;
         }

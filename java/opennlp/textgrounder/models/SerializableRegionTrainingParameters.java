@@ -26,7 +26,6 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
-import opennlp.textgrounder.models.callbacks.RegionMapperCallback;
 import opennlp.textgrounder.textstructs.EvalTokenArrayBuffer;
 import opennlp.textgrounder.textstructs.TokenArrayBuffer;
 import opennlp.textgrounder.topostructs.SmallLocation;
@@ -39,7 +38,13 @@ public class SerializableRegionTrainingParameters<E extends SmallLocation>
       implements Serializable {
 
     protected SerializableRegionTrainingParameters loadBuffer = null;
+    /**
+     *
+     */
     protected EvalTokenArrayBuffer<E> evalTokenArrayBuffer;
+    /**
+     * 
+     */
     protected TokenArrayBuffer<E> trainTokenArrayBuffer;
     /**
      * Table from index to location
@@ -49,7 +54,6 @@ public class SerializableRegionTrainingParameters<E extends SmallLocation>
      *
      */
     protected TIntObjectHashMap<TIntHashSet> dataSpecificGazetteer;
-    protected RegionMapperCallback<E> regionMapperCallback;
 
     /**
      * Loads parameters stored in a file given a path and a RegionModel instance.
@@ -73,7 +77,6 @@ public class SerializableRegionTrainingParameters<E extends SmallLocation>
         rm.evalTokenArrayBuffer = loadBuffer.evalTokenArrayBuffer;
         rm.dataSpecificLocationMap = loadBuffer.dataSpecificLocationMap;
         rm.dataSpecificGazetteer = loadBuffer.dataSpecificGazetteer;
-        rm.regionMapperCallback = loadBuffer.regionMapperCallback;
     }
 
     /**
@@ -90,7 +93,6 @@ public class SerializableRegionTrainingParameters<E extends SmallLocation>
         evalTokenArrayBuffer = rm.evalTokenArrayBuffer;
         dataSpecificGazetteer = rm.dataSpecificGazetteer;
         dataSpecificLocationMap = rm.dataSpecificLocationMap;
-        regionMapperCallback = rm.regionMapperCallback;
 
         ObjectOutputStream modelOut =
               new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(filename + ".gz")));

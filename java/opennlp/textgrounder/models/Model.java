@@ -326,7 +326,7 @@ public abstract class Model<E extends SmallLocation> {
      */
     public void processEvalInputPath() throws Exception {
         evalTokenArrayBuffer = new EvalTokenArrayBuffer(lexicon);
-        processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon), evalTokenArrayBuffer, new NullStopwordList());
+        processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon, genericsKludgeFactor), evalTokenArrayBuffer, new NullStopwordList());
         evalTokenArrayBuffer.convertToPrimitiveArrays();
     }
 

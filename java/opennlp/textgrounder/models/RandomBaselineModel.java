@@ -40,7 +40,7 @@ public class RandomBaselineModel extends SelfTrainedModelBase {
 
     public static Random myRandom = new Random();
 
-    public RandomBaselineModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
+    public RandomBaselineModel(Gazetteer<Location> gaz, int bscale, int paragraphsAsDocs) {
         super(gaz, bscale, paragraphsAsDocs);
     }
 

@@ -26,7 +26,12 @@ import opennlp.textgrounder.topostructs.*;
  * 
  * @author 
  */
-public class TextProcessorTR extends TextProcessor {
+public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
+
+    /**
+     *
+     */
+    public E genericsKludgeFactor;
 
     /**
      * Default constructor. Instantiate CRFClassifier.
@@ -35,9 +40,10 @@ public class TextProcessorTR extends TextProcessor {
      * @param parAsDocSize number of paragraphs to use as single document. if
      * set to 0, it will process an entire file intact.
      */
-    public TextProcessorTR(Lexicon lexicon) throws
+    public TextProcessorTR(Lexicon lexicon, E _genericsKludgeFactor) throws
           ClassCastException, IOException, ClassNotFoundException {
         super(new NullClassifier(), lexicon, 0);
+        genericsKludgeFactor = _genericsKludgeFactor;
     }
 
     /**
@@ -94,7 +100,7 @@ public class TextProcessorTR extends TextProcessor {
 
             if (lookingForGoldLoc && curLine.startsWith("\t>")) {
                 evalTokenArrayBuffer.addElement(wordidx, currentDoc, 1, stopwordList.isStopWord(cur)
-                      ? 1 : 0, parseLocation(curLine));
+                      ? 1 : 0, parseLocation(curLine, wordidx));
                 lookingForGoldLoc = false;
                 continue;
             } else if (curLine.startsWith("\t")) {
@@ -129,14 +135,14 @@ public class TextProcessorTR extends TextProcessor {
         }
 
         currentDoc += 1;
-        
+
         System.err.println();
 
         assert (evalTokenArrayBuffer.sanityCheck1());
         assert (evalTokenArrayBuffer.sanityCheck2());
     }
 
-    public Location parseLocation(String line) {
+    public E parseLocation(String line, int wordidx) {
         String[] tokens = line.split("\\t");
 
         if (tokens.length < 6) {
@@ -154,6 +160,18 @@ public class TextProcessorTR extends TextProcessor {
             placename = tokens[5].trim().toLowerCase();
         }
 
-        return new Location(-1, placename, "", new Coordinate(lon, lat), 0, "", -1);
+        return generateLocation(-1, placename, "", new Coordinate(lon, lat), 0, "", -1, wordidx);
+    }
+
+    protected E generateLocation(int _id, String _name, String _type,
+          Coordinate _coord, int _pop, String _container, int _count,
+          int _nameid) {
+        E locationToAdd;
+        if (genericsKludgeFactor instanceof Location) {
+            locationToAdd = (E) new Location(_id, _name, _type, _coord, _pop, _container, _count);
+        } else {
+            locationToAdd = (E) new SmallLocation(_id, _nameid, _coord, _count);
+        }
+        return locationToAdd;
     }
 }

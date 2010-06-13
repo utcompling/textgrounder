@@ -76,7 +76,7 @@ public class EvalRegionModel<E extends SmallLocation> extends RegionModel<E> {
         stopwordList = rm.stopwordList;
         evalInputFile = rm.evalInputFile;
         evalTokenArrayBuffer = new EvalTokenArrayBuffer(lexicon, new TrainingMaterialCallback(lexicon));
-        processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon), evalTokenArrayBuffer, stopwordList);
+        processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon, genericsKludgeFactor), evalTokenArrayBuffer, stopwordList);
         evalTokenArrayBuffer.convertToPrimitiveArrays();
 
         degreesPerRegion = rm.degreesPerRegion;
