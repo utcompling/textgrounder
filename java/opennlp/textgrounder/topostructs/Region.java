@@ -55,4 +55,30 @@ public class Region implements Serializable {
     public boolean contains(double lon, double lat) {
         return contains(new Coordinate(lon, lat));
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final Region other = (Region) obj;
+        if (this.centLon != other.centLon) {
+            return false;
+        }
+        if (this.centLat != other.centLat) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 3;
+        hash = 41 * hash + (int) (Double.doubleToLongBits(this.centLon) ^ (Double.doubleToLongBits(this.centLon) >>> 32));
+        hash = 41 * hash + (int) (Double.doubleToLongBits(this.centLat) ^ (Double.doubleToLongBits(this.centLat) >>> 32));
+        return hash;
+    }
 }

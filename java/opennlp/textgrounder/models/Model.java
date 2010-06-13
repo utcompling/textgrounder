@@ -41,6 +41,10 @@ import opennlp.textgrounder.util.KMLUtil;
  */
 public abstract class Model<E extends SmallLocation> {
 
+    /**
+     * kludge field to make instantiation of E possible within the class
+     */
+    public E genericsKludgeFactor;
     // Minimum number of pixels the (small) square region (NOT our Region) represented by each city must occupy on the screen for its label to appear:
     public final static int MIN_LOD_PIXELS = 16;
     /**
@@ -356,7 +360,8 @@ public abstract class Model<E extends SmallLocation> {
      * @throws Exception
      */
     public void writeXMLFile(String inputFilename, String outputFilename,
-          TIntObjectHashMap<E> idxToLocationMap, TIntHashSet locations, TokenArrayBuffer tokenArrayBuffer) throws
+          TIntObjectHashMap<E> idxToLocationMap, TIntHashSet locations,
+          TokenArrayBuffer tokenArrayBuffer) throws
           IOException {
 
         BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));
@@ -409,11 +414,11 @@ public abstract class Model<E extends SmallLocation> {
     public void evaluate(EvalTokenArrayBuffer<E> evalTokenArrayBuffer) {
         if (evalTokenArrayBuffer.modelLocationArrayList.size() != evalTokenArrayBuffer.goldLocationArrayList.size()) {
             System.out.println("MISMATCH: model: " + evalTokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + evalTokenArrayBuffer.goldLocationArrayList.size());
-	    /*	    for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
-		Location curModelLoc = evalTokenArrayBuffer.modelLocationArrayList.get(i);
-		Location curGoldLoc = evalTokenArrayBuffer.goldLocationArrayList.get(i);
-		if(curModelLoc != null && curGoldLoc != null && curMode
-		}*/
+            /*	    for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
+            Location curModelLoc = evalTokenArrayBuffer.modelLocationArrayList.get(i);
+            Location curGoldLoc = evalTokenArrayBuffer.goldLocationArrayList.get(i);
+            if(curModelLoc != null && curGoldLoc != null && curMode
+            }*/
             System.exit(1);
         }
 

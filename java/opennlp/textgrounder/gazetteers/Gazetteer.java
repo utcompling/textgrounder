@@ -74,6 +74,10 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
      * pseudo locations later in region model
      */
     protected static int maxLocId = 0;
+    /**
+     *
+     */
+    public E genericsKludgeFactor;
 
     protected Gazetteer() {
     }
@@ -173,7 +177,6 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
                 }
             }
             rs.close();
-            put(topid, null);
             return locationsToReturn;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -278,9 +281,9 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
     }
 
     protected E generateLocation(ResultSet rs, int topid) throws SQLException {
-        E locationToAdd = (E) new Object();
+        E locationToAdd;// = (E) new SmallLocation();
 
-        if (locationToAdd.getClass().isInstance(new Location())) {
+        if (genericsKludgeFactor instanceof Location) {
             locationToAdd = (E) new Location(rs.getInt("id"),
                   rs.getString("name"),
                   rs.getString("type"),

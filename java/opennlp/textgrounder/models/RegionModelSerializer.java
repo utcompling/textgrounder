@@ -44,7 +44,7 @@ import opennlp.textgrounder.util.Constants;
  * 
  * @author tsmoon
  */
-public class RegionModelSerializer extends RegionModel<SmallLocation> {
+public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<E> {
 
     /**
      * Default constructor. Take input from commandline and default options
@@ -53,7 +53,8 @@ public class RegionModelSerializer extends RegionModel<SmallLocation> {
      *
      * @param options
      */
-    public RegionModelSerializer(CommandLineOptions options) {
+    public RegionModelSerializer(CommandLineOptions options, E _genericsKludgeFactor) {
+        genericsKludgeFactor=_genericsKludgeFactor;
         regionMapperCallback = new RegionMapperCallback();
         try {
             initialize(options);
@@ -78,6 +79,7 @@ public class RegionModelSerializer extends RegionModel<SmallLocation> {
           SQLException {
         trainInputPath = options.getTrainInputPath();
         trainInputFile = new File(trainInputPath);
+        evalInputPath = options.getEvalDir();
         evalInputFile = new File(evalInputPath);
 
         degreesPerRegion = options.getDegreesPerRegion();
@@ -101,28 +103,28 @@ public class RegionModelSerializer extends RegionModel<SmallLocation> {
         trainTokenArrayBuffer.convertToPrimitiveArrays();
         initializeRegionArray();
         locationSet = new TIntHashSet();
-        dataSpecificLocationMap = new TIntObjectHashMap<SmallLocation>();
+        dataSpecificLocationMap = new TIntObjectHashMap<E>();
         dataSpecificGazetteer = new TIntObjectHashMap<TIntHashSet>();
 
-        buildTopoTable(trainTokenArrayBuffer);
+        Gazetteer<E> gazetteer = gazetteerGenerator.generateGazetteer();
+        gazetteer.genericsKludgeFactor = genericsKludgeFactor;
+        buildTopoTable(trainTokenArrayBuffer, gazetteer);
 
         evalTokenArrayBuffer = new EvalTokenArrayBuffer(lexicon, new TrainingMaterialCallback(lexicon));
         processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon), evalTokenArrayBuffer, stopwordList);
         evalTokenArrayBuffer.convertToPrimitiveArrays();
-
-        buildTopoTable(evalTokenArrayBuffer);
+        buildTopoTable(evalTokenArrayBuffer, gazetteer);
     }
 
     /**
      * 
      * @return
      */
-    protected TIntHashSet buildTopoTable(TokenArrayBuffer _tokenArrayBuffer) {
+    protected TIntHashSet buildTopoTable(TokenArrayBuffer<E> _tokenArrayBuffer, Gazetteer<E> gazetteer) {
         System.err.println();
         System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
         int curDoc = 0, prevDoc = -1;
 
-        Gazetteer gazetteer = gazetteerGenerator.generateGazetteer();
         for (int i = 0; i < _tokenArrayBuffer.size(); i++) {
             curDoc = _tokenArrayBuffer.documentVector[i];
             if (curDoc != prevDoc) {
@@ -134,12 +136,12 @@ public class RegionModelSerializer extends RegionModel<SmallLocation> {
                 if (!dataSpecificGazetteer.contains(topid)) {
                     String placename = lexicon.getWordForInt(_tokenArrayBuffer.wordVector[i]);
                     if (gazetteer.contains(placename)) {
-                        TIntHashSet possibleLocations = gazetteer.frugalGet(placename);
+                        TIntHashSet possibleLocations = gazetteer.get(placename);
                         TIntHashSet tempLocs = new TIntHashSet();
                         for (TIntIterator it = possibleLocations.iterator();
                               it.hasNext();) {
                             int locid = it.next();
-                            SmallLocation loc = gazetteer.getLocation(locid);
+                            E loc = gazetteer.getLocation(locid);
 
                             if (Math.abs(loc.getCoord().latitude) > Constants.EPSILON && Math.abs(loc.getCoord().longitude) > Constants.EPSILON) {
                                 tempLocs.add(loc.getId());
@@ -148,9 +150,8 @@ public class RegionModelSerializer extends RegionModel<SmallLocation> {
                         }
                         dataSpecificGazetteer.put(topid, tempLocs);
 
-                        addLocationsToRegionArray(possibleLocations, gazetteer, regionMapperCallback);
+                        addLocationsToRegionArray(tempLocs, gazetteer, regionMapperCallback);
                         regionMapperCallback.addAll(placename, lexicon);
-                        locationSet.addAll(possibleLocations.toArray());
                     }
                 }
             }
@@ -159,27 +160,8 @@ public class RegionModelSerializer extends RegionModel<SmallLocation> {
         return null;
     }
 
-    protected void buildTopoFilter(TIntHashSet toponymsNotInGazetteer) {
-        TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
-        for (TIntObjectIterator<TIntHashSet> it1 = nameToRegionIndex.iterator();
-              it1.hasNext();) {
-            it1.advance();
-            int wordoff = it1.key() * T;
-            for (TIntIterator it2 = it1.value().iterator(); it2.hasNext();) {
-                int j = it2.next();
-                regionByToponym[wordoff + j] = 1;
-            }
-        }
-
-        for (TIntIterator it = toponymsNotInGazetteer.iterator(); it.hasNext();) {
-            int topid = it.next();
-            int topoff = topid * T;
-            for (int i = 0; i < T; ++i) {
-                regionByToponym[topoff + i] = 1;
-            }
-        }
-    }
-
-    public void serialize() {
+    public void serialize(String filename) throws IOException {
+        SerializableRegionTrainingParameters<E> srp = new SerializableRegionTrainingParameters<E>();
+        srp.saveParameters(filename, this);
     }
 }

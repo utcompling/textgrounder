@@ -39,12 +39,16 @@ public abstract class SelfTrainedModelBase extends Model<Location> {
         gazetteer = gaz;
         gazetteer.gazetteerRefresh = gazetteerRefresh;
         lexicon = new Lexicon();
+        genericsKludgeFactor = new Location();
+        gazetteerGenerator.genericsKludgeFactor = genericsKludgeFactor;
         //if(evalInputPath != null)
         //    trainTokenArrayBuffer = evalTokenArrayBuffer;
     }
 
     public SelfTrainedModelBase(CommandLineOptions options) {
         super(options);
+        genericsKludgeFactor = new Location();
+        gazetteerGenerator.genericsKludgeFactor = genericsKludgeFactor;
         gazetteer = gazetteerGenerator.generateGazetteer();
         gazetteer.gazetteerRefresh = gazetteerRefresh;
         //if(evalInputPath != null)

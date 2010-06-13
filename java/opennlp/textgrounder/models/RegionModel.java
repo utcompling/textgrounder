@@ -668,10 +668,10 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
     protected E generateLocation(int _id, String _name, String _type,
           Coordinate _coord, int _pop, String _container, int _count,
           int _nameid) {
-        E locationToAdd = (E) new Object();
-        if (locationToAdd.getClass().isInstance(new Location())) {
+        E locationToAdd;
+        if (genericsKludgeFactor instanceof Location) {
             locationToAdd = (E) new Location(_id, _name, _type, _coord, _pop, _container, _count);
-        } else if (locationToAdd.getClass().isInstance(new SmallLocation())) {
+        } else {
             locationToAdd = (E) new SmallLocation(_id, _nameid, _coord, _count);
         }
         return locationToAdd;

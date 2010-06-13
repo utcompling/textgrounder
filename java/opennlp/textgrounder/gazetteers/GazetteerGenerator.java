@@ -30,6 +30,10 @@ import opennlp.textgrounder.topostructs.SmallLocation;
 public class GazetteerGenerator<E extends SmallLocation> {
 
     /**
+     * kludge field to make instantiation of E possible within the class
+     */
+    public E genericsKludgeFactor;
+    /**
      *
      */
     protected static GazetteerEnum.GazetteerTypes gazType;
@@ -95,6 +99,7 @@ public class GazetteerGenerator<E extends SmallLocation> {
             Logger.getLogger(GazetteerGenerator.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
+        gazetteer.genericsKludgeFactor = genericsKludgeFactor;
         return gazetteer;
     }
 }

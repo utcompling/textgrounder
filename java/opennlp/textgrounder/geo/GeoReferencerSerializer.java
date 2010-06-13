@@ -15,9 +15,13 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.geo;
 
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.cli.*;
 
 import opennlp.textgrounder.models.*;
+import opennlp.textgrounder.topostructs.*;
 
 /**
  * App to be called from command line. Runs LDA based georeferencing models
@@ -26,23 +30,24 @@ import opennlp.textgrounder.models.*;
  */
 public class GeoReferencerSerializer extends BaseApp {
 
-    public static void main(String[] args) throws Exception {
-
-        CommandLineParser optparse = new PosixParser();
-
-        Options options = new Options();
-        setOptions(options);
-
-        CommandLine cline = optparse.parse(options, args);
-
-        if (cline.hasOption('h')) {
-            HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp("java GeoReferencerSerializer", options);
-            System.exit(0);
+    public static void main(String[] args) {
+        try {
+            CommandLineParser optparse = new PosixParser();
+            Options options = new Options();
+            setOptions(options);
+            CommandLine cline = optparse.parse(options, args);
+            if (cline.hasOption('h')) {
+                HelpFormatter formatter = new HelpFormatter();
+                formatter.printHelp("java GeoReferencerSerializer", options);
+                System.exit(0);
+            }
+            CommandLineOptions modelOptions = new CommandLineOptions(cline);
+            RegionModelSerializer<SmallLocation> rm = new RegionModelSerializer<SmallLocation>(modelOptions, new SmallLocation());
+            rm.serialize(modelOptions.getSerializedDataParameters());
+        } catch (IOException ex) {
+            Logger.getLogger(GeoReferencerSerializer.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (ParseException ex) {
+            Logger.getLogger(GeoReferencerSerializer.class.getName()).log(Level.SEVERE, null, ex);
         }
-
-        CommandLineOptions modelOptions = new CommandLineOptions(cline);
-        RegionModelSerializer rm = new RegionModelSerializer(modelOptions);
-        rm.serialize();
     }
 }

@@ -16,6 +16,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
+import gnu.trove.TIntHashSet;
+import gnu.trove.TIntObjectHashMap;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -24,35 +26,30 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
-import opennlp.textgrounder.textstructs.Lexicon;
+import opennlp.textgrounder.models.callbacks.RegionMapperCallback;
+import opennlp.textgrounder.textstructs.EvalTokenArrayBuffer;
+import opennlp.textgrounder.textstructs.TokenArrayBuffer;
+import opennlp.textgrounder.topostructs.SmallLocation;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class SerializableRegionTrainingParameters implements Serializable {
+public class SerializableRegionTrainingParameters<E extends SmallLocation>
+      implements Serializable {
 
     protected SerializableRegionTrainingParameters loadBuffer = null;
+    protected EvalTokenArrayBuffer<E> evalTokenArrayBuffer;
+    protected TokenArrayBuffer<E> trainTokenArrayBuffer;
     /**
-     * Vector of document indices
+     * Table from index to location
      */
-    protected int[] documentVector;
+    protected TIntObjectHashMap<E> dataSpecificLocationMap;
     /**
-     * Vector of word indices
+     *
      */
-    protected int[] wordVector;
-    /**
-     * Vector of topics
-     */
-    protected int[] topicVector;
-    /**
-     * Counts of topics
-     */
-    protected int[] topicCounts;
-    /**
-     * 
-     */
-    protected Lexicon lexicon;
+    protected TIntObjectHashMap<TIntHashSet> dataSpecificGazetteer;
+    protected RegionMapperCallback<E> regionMapperCallback;
 
     /**
      * Loads parameters stored in a file given a path and a RegionModel instance.
@@ -61,8 +58,8 @@ public class SerializableRegionTrainingParameters implements Serializable {
      * @param rm RegionModel instance that holds the loaded parameters as fields.
      * @throws IOException
      */
-    public void loadParameters(String filename, RegionModelSerializer rm) throws
-          IOException {
+    public void loadParameters(String filename, RegionModelSerializer<E> rm)
+          throws IOException {
         ObjectInputStream modelIn =
               new ObjectInputStream(new GZIPInputStream(new FileInputStream(filename)));
         try {
@@ -71,7 +68,12 @@ public class SerializableRegionTrainingParameters implements Serializable {
             e.printStackTrace();
         }
 
-        rm.lexicon = loadBuffer.lexicon;
+        rm.lexicon = loadBuffer.trainTokenArrayBuffer.getLexicon();
+        rm.trainTokenArrayBuffer = loadBuffer.trainTokenArrayBuffer;
+        rm.evalTokenArrayBuffer = loadBuffer.evalTokenArrayBuffer;
+        rm.dataSpecificLocationMap = loadBuffer.dataSpecificLocationMap;
+        rm.dataSpecificGazetteer = loadBuffer.dataSpecificGazetteer;
+        rm.regionMapperCallback = loadBuffer.regionMapperCallback;
     }
 
     /**
@@ -82,9 +84,13 @@ public class SerializableRegionTrainingParameters implements Serializable {
      * @param rm RegionModel instance that holds the learned parameters as fields.
      * @throws IOException
      */
-    public void saveParameters(String filename, RegionModelSerializer rm) throws
-          IOException {
-        lexicon = rm.lexicon;
+    public void saveParameters(String filename, RegionModelSerializer<E> rm)
+          throws IOException {
+        trainTokenArrayBuffer = rm.trainTokenArrayBuffer;
+        evalTokenArrayBuffer = rm.evalTokenArrayBuffer;
+        dataSpecificGazetteer = rm.dataSpecificGazetteer;
+        dataSpecificLocationMap = rm.dataSpecificLocationMap;
+        regionMapperCallback = rm.regionMapperCallback;
 
         ObjectOutputStream modelOut =
               new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(filename + ".gz")));

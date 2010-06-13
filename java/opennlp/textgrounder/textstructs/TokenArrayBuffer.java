@@ -285,4 +285,11 @@ public class TokenArrayBuffer<E extends SmallLocation> implements Serializable {
     protected boolean verboseSanityCheck(String curLine) {
         return true;
     }
+
+    /**
+     * @return the lexicon
+     */
+    public Lexicon getLexicon() {
+        return lexicon;
+    }
 }
