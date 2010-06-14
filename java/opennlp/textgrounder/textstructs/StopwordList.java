@@ -45,7 +45,7 @@ public class StopwordList {
     public StopwordList() throws FileNotFoundException, IOException {
         stopwords = new HashSet<String>();
 
-        String stopwordPath = Constants.TEXTGROUNDER_HOME + "/data/lists/stopwords.english";
+        String stopwordPath = Constants.TEXTGROUNDER_DIR + "/data/lists/stopwords.english";
         BufferedReader textIn = new BufferedReader(new FileReader(stopwordPath));
         String curLine = null;
         while ((curLine = textIn.readLine()) != null) {

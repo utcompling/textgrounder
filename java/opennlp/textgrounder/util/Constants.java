@@ -32,7 +32,7 @@ public class Constants {
     public static final double EPSILON = 1e-6;
 
     // the location of TextGrounder
-    public final static String TEXTGROUNDER_HOME = System.getenv("TEXTGROUNDER_HOME");
+    public final static String TEXTGROUNDER_DIR = System.getenv("TEXTGROUNDER_DIR");
     public final static String TEXTGROUNDER_DATA = System.getenv("TEXTGROUNDER_DATA");
 
     // the location of the Stanford NER system
