@@ -274,4 +274,108 @@ public abstract class Annealer {
     public double[] getWordByTopicSampleCounts() {
         return wordByTopicSampleCounts;
     }
+
+    public boolean isFinishedCollection() {
+        return finishedCollection;
+    }
+
+    public void setFinishedCollection(boolean finishedCollection) {
+        this.finishedCollection = finishedCollection;
+    }
+
+    public double getInitialTemperature() {
+        return initialTemperature;
+    }
+
+    public void setInitialTemperature(double initialTemperature) {
+        this.initialTemperature = initialTemperature;
+    }
+
+    public int getInnerIter() {
+        return innerIter;
+    }
+
+    public void setInnerIter(int innerIter) {
+        this.innerIter = innerIter;
+    }
+
+    public int getInnerIterationsMax() {
+        return innerIterationsMax;
+    }
+
+    public void setInnerIterationsMax(int innerIterationsMax) {
+        this.innerIterationsMax = innerIterationsMax;
+    }
+
+    public int getLag() {
+        return lag;
+    }
+
+    public void setLag(int lag) {
+        this.lag = lag;
+    }
+
+    public int getOuterIter() {
+        return outerIter;
+    }
+
+    public void setOuterIter(int outerIter) {
+        this.outerIter = outerIter;
+    }
+
+    public int getOuterIterationsMax() {
+        return outerIterationsMax;
+    }
+
+    public void setOuterIterationsMax(int outerIterationsMax) {
+        this.outerIterationsMax = outerIterationsMax;
+    }
+
+    public int getSampleCount() {
+        return sampleCount;
+    }
+
+    public void setSampleCount(int sampleCount) {
+        this.sampleCount = sampleCount;
+    }
+
+    public boolean isSampleiteration() {
+        return sampleiteration;
+    }
+
+    public void setSampleiteration(boolean sampleiteration) {
+        this.sampleiteration = sampleiteration;
+    }
+
+    public double getTargetTemperature() {
+        return targetTemperature;
+    }
+
+    public void setTargetTemperature(double targetTemperature) {
+        this.targetTemperature = targetTemperature;
+    }
+
+    public double getTemperature() {
+        return temperature;
+    }
+
+    public void setTemperature(double temperature) {
+        this.temperature = temperature;
+    }
+
+    public double getTemperatureDecrement() {
+        return temperatureDecrement;
+    }
+
+    public void setTemperatureDecrement(double temperatureDecrement) {
+        this.temperatureDecrement = temperatureDecrement;
+    }
+
+    public double getTemperatureReciprocal() {
+        return temperatureReciprocal;
+    }
+
+    public void setTemperatureReciprocal(double temperatureReciprocal) {
+        this.temperatureReciprocal = temperatureReciprocal;
+    }
 }

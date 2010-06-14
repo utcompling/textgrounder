@@ -29,6 +29,10 @@ public class SmallLocation implements Serializable {
      * hyperparameters and fractional counts;
      */
     protected double count;
+    /**
+     * List of pack pointers into the DocumentSet so that context (snippets) can be extracted
+     */
+    protected ArrayList<Integer> backPointers = null;
 
     public SmallLocation() {
     }
@@ -123,14 +127,14 @@ public class SmallLocation implements Serializable {
      * @return the backPointers
      */
     public ArrayList<Integer> getBackPointers() {
-        throw new UnsupportedOperationException();
+        return backPointers;
     }
 
     /**
      * @param backPointers the backPointers to set
      */
     public void setBackPointers(ArrayList<Integer> backPointers) {
-        throw new UnsupportedOperationException();
+        this.backPointers = backPointers;
     }
 
     /**
