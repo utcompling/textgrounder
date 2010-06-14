@@ -22,12 +22,10 @@ import gnu.trove.TIntObjectHashMap;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import opennlp.textgrounder.annealers.*;
-import opennlp.textgrounder.gazetteers.Gazetteer;
 import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.textstructs.*;
@@ -46,11 +44,11 @@ public class EvalRegionModel<E extends SmallLocation> extends RegionModel<E> {
     /**
      *
      */
-    protected double[] hyperWordByTopicProbs;
+    protected float[] hyperWordByTopicProbs;
     /**
      * 
      */
-    protected double[] hyperTopicProbs;
+    protected float[] hyperTopicProbs;
     /**
      * 
      */
@@ -138,32 +136,38 @@ public class EvalRegionModel<E extends SmallLocation> extends RegionModel<E> {
         }
 
         wordByTopicCounts = new int[fW * T];
-        hyperWordByTopicProbs = new double[fW * T];
-        double[] trainWordByTopicParams = trainRegionModel.annealer.getWordByTopicSampleCounts();
+        hyperWordByTopicProbs = new float[fW * T];
+        float[] trainWordByTopicParams = trainRegionModel.annealer.getWordByTopicSampleCounts();
         for (int i = 0; i < fW * T; ++i) {
             wordByTopicCounts[i] = 0;
-            hyperWordByTopicProbs[i] = beta;
+            hyperWordByTopicProbs[i] = (float) beta;
         }
 
         for (int i = 0; i < wordIdMapper.length; ++i) {
             int evalwordid = wordIdMapper[i];
-            if (evalwordid > -1) {
-                int trainwordid = trainRegionModel.wordIdMapper[i];
-                if (trainwordid > -1) {
-                    int evalwordoff = evalwordid * T;
-                    int trainwordoff = trainwordid * trainRegionModel.T;
-                    for (int j = 0; j < trainRegionModel.T; ++j) {
-                        int evalregionid = regionIdMapper[j];
-                        if (evalregionid > -1) {
-                            hyperWordByTopicProbs[evalwordoff + evalregionid] += trainWordByTopicParams[trainwordoff + j];
+            try {
+                if (evalwordid > -1) {
+                    int trainwordid = trainRegionModel.wordIdMapper[i];
+                    if (trainwordid > -1) {
+                        int evalwordoff = evalwordid * T;
+                        int trainwordoff = trainwordid * trainRegionModel.T;
+                        for (int j = 0; j < trainRegionModel.T; ++j) {
+                            int evalregionid = regionIdMapper[j];
+                            if (evalregionid > -1) {
+                                hyperWordByTopicProbs[evalwordoff + evalregionid] += trainWordByTopicParams[trainwordoff + j];
+                            }
                         }
                     }
                 }
+            } catch (ArrayIndexOutOfBoundsException e) {
+                System.err.println("Training material vocabulary count stops at " + i);
+                System.err.println("Eval material vocabulary extends to " + wordIdMapper.length);
+                break;
             }
         }
 
         topicCounts = new int[T];
-        hyperTopicProbs = new double[T];
+        hyperTopicProbs = new float[T];
         for (int i = 0; i < T; ++i) {
             hyperTopicProbs[i] = topicCounts[i] = 0;
         }

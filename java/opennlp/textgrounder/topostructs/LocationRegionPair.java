@@ -19,14 +19,19 @@ package opennlp.textgrounder.topostructs;
  *
  * @author tsmoon
  */
-public class LocationRegionPair<E extends SmallLocation> {
+public class LocationRegionPair {
 
-    public final E location;
+    public final int locationIndex;
     public final int regionIndex;
 
-    public LocationRegionPair(E loc, int ridx) {
-        location = loc;
+    public LocationRegionPair(SmallLocation loc, int ridx) {
+        locationIndex = loc.getId();
         regionIndex = ridx;
+    }
+
+    public LocationRegionPair(int _locationIndex, int _regionIndex) {
+        locationIndex = _locationIndex;
+        regionIndex = _regionIndex;
     }
 
     @Override
@@ -38,7 +43,7 @@ public class LocationRegionPair<E extends SmallLocation> {
             return false;
         }
         final LocationRegionPair other = (LocationRegionPair) obj;
-        if (!this.location.equals(other.location)) {
+        if (this.locationIndex != other.locationIndex) {
             return false;
         }
         if (this.regionIndex != other.regionIndex) {
@@ -49,9 +54,9 @@ public class LocationRegionPair<E extends SmallLocation> {
 
     @Override
     public int hashCode() {
-        int hash = 3;
-        hash = 59 * hash + this.location.id;
-        hash = 59 * hash + this.regionIndex;
+        int hash = 7;
+        hash = 47 * hash + this.locationIndex;
+        hash = 47 * hash + this.regionIndex;
         return hash;
     }
 }

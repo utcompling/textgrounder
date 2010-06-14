@@ -334,7 +334,7 @@ public abstract class Model<E extends SmallLocation> {
      * @param stopwordList
      * @throws IOException
      */
-    public void processEvalInputPath(File myPath, TextProcessor textProcessor,
+    public void processEvalInputPath(File myPath, TextProcessorTR textProcessor,
           EvalTokenArrayBuffer evalTokenArrayBuffer, StopwordList stopwordList)
           throws
           IOException {
@@ -379,7 +379,12 @@ public abstract class Model<E extends SmallLocation> {
             //String kmlPolygon = coord.toKMLPolygon(4,radius,height);  // a square
             String kmlPolygon = loc.getCoord().toKMLPolygon(10, radius, height);
 
-            String placename = loc.getName();
+            String placename = null;
+            try {
+                placename = loc.getName();
+            } catch (UnsupportedOperationException e) {
+                placename = lexicon.getWordForInt(loc.getNameid());
+            }
             Coordinate coord = loc.getCoord();
             out.write(KMLUtil.genPolygon(placename, coord, radius, kmlPolygon));
 

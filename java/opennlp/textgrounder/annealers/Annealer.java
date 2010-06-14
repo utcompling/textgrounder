@@ -76,12 +76,12 @@ public abstract class Annealer {
     /**
      * Counts of topics
      */
-    protected double[] topicSampleCounts;
+    protected float[] topicSampleCounts = null;
     /**
      * Counts of tcount per topic. However, since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.
      */
-    protected double[] wordByTopicSampleCounts;
+    protected float[] wordByTopicSampleCounts = null;
     /**
      * To sample or not to sample
      */
@@ -206,39 +206,41 @@ public abstract class Annealer {
 
     /**
      * 
-     * @param tc
-     * @param wbtc
+     * @param _topicCounts
+     * @param _wordByTopicCounts
      * @param b
      */
-    public void collectSamples(int[] tc, int[] wbtc) {
-        if (sampleiteration && (innerIter % lag == 0)) {
-            sampleCount += 1;
-            if (samples == sampleCount) {
-                finishedCollection = true;
-            }
-
-            System.err.print("(sample:" + (innerIter + 1) / lag + ")");
-            if (topicSampleCounts == null) {
-                topicSampleCounts = new double[tc.length];
-                wordByTopicSampleCounts = new double[wbtc.length];
-                for (int i = 0; i < tc.length; ++i) {
-                    topicSampleCounts[i] = 0;
+    public void collectSamples(int[] _topicCounts, int[] _wordByTopicCounts) {
+        if (sampleCount < samples) {
+            if (sampleiteration && (innerIter % lag == 0)) {
+                sampleCount += 1;
+                if (samples == sampleCount) {
+                    finishedCollection = true;
                 }
-                for (int i = 0; i < wbtc.length; ++i) {
-                    wordByTopicSampleCounts[i] = 0;
+
+                System.err.print("(sample:" + (innerIter + 1) / lag + ")");
+                if (topicSampleCounts == null) {
+                    topicSampleCounts = new float[_topicCounts.length];
+                    wordByTopicSampleCounts = new float[_wordByTopicCounts.length];
+                    for (int i = 0; i < _topicCounts.length; ++i) {
+                        topicSampleCounts[i] = 0;
+                    }
+                    for (int i = 0; i < _wordByTopicCounts.length; ++i) {
+                        wordByTopicSampleCounts[i] = 0;
+                    }
+                }
+
+                for (int i = 0; i < _topicCounts.length; ++i) {
+                    topicSampleCounts[i] += _topicCounts[i];
+                }
+                for (int i = 0; i < _wordByTopicCounts.length; ++i) {
+                    wordByTopicSampleCounts[i] += _wordByTopicCounts[i];
                 }
             }
 
-            for (int i = 0; i < tc.length; ++i) {
-                topicSampleCounts[i] += tc[i];
+            if (finishedCollection) {
+                normalizeSamples();
             }
-            for (int i = 0; i < wbtc.length; ++i) {
-                wordByTopicSampleCounts[i] += wbtc[i];
-            }
-        }
-
-        if (finishedCollection) {
-            normalizeSamples();
         }
     }
 
@@ -264,14 +266,14 @@ public abstract class Annealer {
     /**
      * @return the topicSampleCounts
      */
-    public double[] getTopicSampleCounts() {
+    public float[] getTopicSampleCounts() {
         return topicSampleCounts;
     }
 
     /**
      * @return the wordByTopicSampleCounts
      */
-    public double[] getWordByTopicSampleCounts() {
+    public float[] getWordByTopicSampleCounts() {
         return wordByTopicSampleCounts;
     }
 

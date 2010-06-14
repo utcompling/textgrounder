@@ -102,11 +102,11 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends EvalRegi
         }
 
         wordByTopicCounts = new int[fW * T];
-        hyperWordByTopicProbs = new double[fW * T];
-        double[] trainWordByTopicParams = trainRegionModel.annealer.getWordByTopicSampleCounts();
+        hyperWordByTopicProbs = new float[fW * T];
+        float[] trainWordByTopicParams = trainRegionModel.annealer.getWordByTopicSampleCounts();
         for (int i = 0; i < fW * T; ++i) {
             wordByTopicCounts[i] = 0;
-            hyperWordByTopicProbs[i] = beta;
+            hyperWordByTopicProbs[i] = (float) beta;
         }
 
         for (int i = 0; i < wordIdMapper.length; ++i) {
@@ -127,7 +127,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends EvalRegi
         }
 
         topicCounts = new int[T];
-        hyperTopicProbs = new double[T];
+        hyperTopicProbs = new float[T];
         for (int i = 0; i < T; ++i) {
             hyperTopicProbs[i] = topicCounts[i] = 0;
         }
