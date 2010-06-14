@@ -164,16 +164,10 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
         stopwordVector = _tokenArrayBuffer.stopwordVector;
 
         System.err.println();
-        System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
+        System.err.print("Buildng vocabulary index mapping from old lexicon to local lexicon for docs: ");
         int curDoc = 0, prevDoc = -1;
 
-        /**
-         * Here, find
-         * <li> 
-         */
-        TIntHashSet toponymsNotInGazetteer = new TIntHashSet();
         TIntHashSet inputDataVocab = new TIntHashSet();
-
         int inputVocabMaxId = 0;
         for (int i = 0; i < N; i++) {
             curDoc = documentVector[i];
@@ -182,28 +176,60 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
             }
             prevDoc = curDoc;
             int wordid = wordVector[i];
-            if (toponymVector[i] == 1) {
-                if (dataSpecificGazetteer.contains(wordid)) {
-                    TIntHashSet possibleLocations = dataSpecificGazetteer.get(wordid);
-                    for (int locid : possibleLocations.toArray()) {
-                        E loc = dataSpecificLocationMap.get(locid);
-                        addLocationsToRegionArray(loc, regionMapperCallback);
-                    }
-                    regionMapperCallback.addAll(wordid);
-                    locationSet.addAll(possibleLocations.toArray());
-                } else {
-                    toponymsNotInGazetteer.add(wordid);
-                }
-            }
             inputDataVocab.add(wordid);
             if (wordid > inputVocabMaxId) {
                 inputVocabMaxId = wordid;
             }
         }
+        inputVocabMaxId += 1;
+        wordIdMapper = new int[inputVocabMaxId];
+        for (int i = 0; i < inputVocabMaxId; ++i) {
+            wordIdMapper[i] = -1;
+        }
+        int counter = 0;
+        for (int wordid : inputDataVocab.toArray()) {
+            wordIdMapper[wordid] = counter;
+            counter += 1;
+        }
+
+        System.err.println();
+        System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
+        /**
+         * Here, find
+         * <li> 
+         */
+        TIntHashSet toponymsNotInGazetteer = new TIntHashSet();
+
+        for (int i = 0; i < N; i++) {
+            curDoc = documentVector[i];
+            if (curDoc != prevDoc) {
+                System.err.print(curDoc + ",");
+            }
+            prevDoc = curDoc;
+            int originalwordid = wordVector[i];
+            if (toponymVector[i] == 1) {
+                if (dataSpecificGazetteer.contains(originalwordid)) {
+                    TIntHashSet possibleLocations = dataSpecificGazetteer.get(originalwordid);
+                    for (int locid : possibleLocations.toArray()) {
+                        E loc = dataSpecificLocationMap.get(locid);
+                        addLocationsToRegionArray(loc, regionMapperCallback);
+                    }
+                    /**
+                     * IMPORTANT: THESE STRUCTURES ARE REFERENCED BY THEIR ORIGINAL WORDIDS
+                     */
+                    regionMapperCallback.addAll(originalwordid);
+                    locationSet.addAll(possibleLocations.toArray());
+                } else {
+                    /**
+                     * IMPORTANT: THESE STRUCTURES ARE REFERENCED BY THEIR ORIGINAL WORDIDS
+                     */
+                    toponymsNotInGazetteer.add(originalwordid);
+                }
+            }
+        }
         System.err.println();
         System.err.println("Reducing size of region mapper callback objects");
         regionMapperCallback.trimToSize();
-        inputVocabMaxId += 1;
 
         D = _tokenArrayBuffer.getNumDocs();
         /**
@@ -215,16 +241,6 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
         sW = stopwordList.size();
         W = fW - sW;
         betaW = beta * W;
-
-        wordIdMapper = new int[inputVocabMaxId];
-        for (int i = 0; i < inputVocabMaxId; ++i) {
-            wordIdMapper[i] = -1;
-        }
-        int counter = 0;
-        for (int wordid : inputDataVocab.toArray()) {
-            wordIdMapper[wordid] = counter;
-            counter += 1;
-        }
 
         T = regionMapperCallback.getNumRegions();
         topicCounts = new int[T];
@@ -258,16 +274,16 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
             prevDoc = curDoc;
 
             int docoff = docid * T;
-            int wordid = wordIdMapper[wordVector[i]];
+            int originalwordid = wordVector[i];
             if (toponymVector[i] == 1) {
-                if (dataSpecificGazetteer.contains(wordid)) {
+                if (dataSpecificGazetteer.contains(originalwordid)) {
                     try {
                         for (int regionid :
-                              placenameIdxToRegionIndexSet.get(wordid).toArray()) {
+                              placenameIdxToRegionIndexSet.get(originalwordid).toArray()) {
                             activeRegionByDocumentFilter[docoff + regionid] = 1;
                         }
                     } catch (NullPointerException e) {
-                        System.err.println("NullPointerException occurred with (why?): " + lexicon.getWordForInt(wordid));
+                        System.err.println("NullPointerException occurred with (why?): " + lexicon.getWordForInt(originalwordid));
                     }
                 }
             }
@@ -279,17 +295,25 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
          */
         System.err.println("Building filters for regionByToponymFilter");
         for (int wordid : placenameIdxToRegionIndexSet.keys()) {
-            int wordoff = wordid * T;
-            for (int regionid :
-                  placenameIdxToRegionIndexSet.get(wordid).toArray()) {
-                regionByToponymFilter[wordoff + regionid] = 1;
+            int wordoff = wordIdMapper[wordid] * T;
+            if (wordoff < 0) {
+                System.err.println(lexicon.getWordForInt(wordid) + "is not in local data set. Why?");
+            } else {
+                for (int regionid :
+                      placenameIdxToRegionIndexSet.get(wordid).toArray()) {
+                    regionByToponymFilter[wordoff + regionid] = 1;
+                }
             }
         }
 
         for (int wordid : toponymsNotInGazetteer.toArray()) {
-            int wordoff = wordid * T;
-            for (int i = 0; i < T; ++i) {
-                regionByToponymFilter[wordoff + i] = 1;
+            int wordoff = wordIdMapper[wordid] * T;
+            if (wordoff < 0) {
+                System.err.println(lexicon.getWordForInt(wordid) + "is not in local data set. Why?");
+            } else {
+                for (int i = 0; i < T; ++i) {
+                    regionByToponymFilter[wordoff + i] = 1;
+                }
             }
         }
     }
@@ -440,7 +464,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
                 for (TIntIterator it = locs.iterator(); it.hasNext();) {
                     int locid = it.next();
                     E loc = dataSpecificLocationMap.get(locid);
-                    loc.setCount(loc.getCount() + wordByTopicCounts[wordid * T + regid]);
+                    loc.setCount(loc.getCount() + wordByTopicCounts[wordIdMapper[wordid] * T + regid]);
                 }
             }
         }

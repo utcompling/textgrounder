@@ -96,14 +96,14 @@ public class RegionMapperCallback<E extends SmallLocation> {
         addAll(wordid);
     }
 
-    public void addAll(int placeid) {
-        if (!placenameIdxToRegionIndexSet.containsKey(placeid)) {
-            placenameIdxToRegionIndexSet.put(placeid, new TIntHashSet());
+    public void addAll(int _placenameid) {
+        if (!placenameIdxToRegionIndexSet.containsKey(_placenameid)) {
+            placenameIdxToRegionIndexSet.put(_placenameid, new TIntHashSet());
         }
-        TIntHashSet currentRegions = placenameIdxToRegionIndexSet.get(placeid);
+        TIntHashSet currentRegions = placenameIdxToRegionIndexSet.get(_placenameid);
 
         for (LocationRegionPair locationRegionPair : currentLocationRegions) {
-            ToponymRegionPair toponymRegionPair = new ToponymRegionPair(placeid, locationRegionPair.regionIndex);
+            ToponymRegionPair toponymRegionPair = new ToponymRegionPair(_placenameid, locationRegionPair.regionIndex);
             if (!toponymRegionToLocationIndexSet.containsKey(toponymRegionPair.hashCode())) {
                 toponymRegionToLocationIndexSet.put(toponymRegionPair.hashCode(), new TIntHashSet());
             }

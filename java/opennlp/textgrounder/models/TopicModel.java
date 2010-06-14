@@ -72,7 +72,7 @@ public class TopicModel<E extends SmallLocation> extends Model<E> {
      * Probability of word given topic. since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.
      */
-    protected double[] wordByTopicProbs;
+    protected float[] wordByTopicProbs;
     /**
      * Hyperparameter for topic*doc priors
      */
@@ -120,7 +120,7 @@ public class TopicModel<E extends SmallLocation> extends Model<E> {
     /**
      * Posterior probabilities for topics.
      */
-    protected double[] topicProbs;
+    protected float[] topicProbs;
     /**
      * Table of top {@link #outputPerTopic} words per topic. Used in
      * normalization and printing.
@@ -296,6 +296,8 @@ public class TopicModel<E extends SmallLocation> extends Model<E> {
                 topicByDocumentCounts[docoff + topicid]++;
                 wordByTopicCounts[wordoff + topicid]++;
             }
+
+            annealer.collectSamples(topicCounts, wordByTopicCounts);
         }
     }
 
@@ -348,18 +350,18 @@ public class TopicModel<E extends SmallLocation> extends Model<E> {
      */
     public void normalize(StopwordList stopWordList) {
 
-        wordByTopicProbs = new double[fW * T];
+        wordByTopicProbs = new float[fW * T];
 
         topWordsPerTopic = new StringDoublePair[T][];
         for (int i = 0; i < T; ++i) {
             topWordsPerTopic[i] = new StringDoublePair[outputPerClass];
         }
 
-        topicProbs = new double[T];
+        topicProbs = new float[T];
 
         Double sum = 0.;
         for (int i = 0; i < T; ++i) {
-            sum += topicProbs[i] = topicCounts[i] + betaW;
+            sum += topicProbs[i] = topicCounts[i] + (float) betaW;
             ArrayList<DoubleStringPair> topWords = new ArrayList<DoubleStringPair>();
             for (int j = 0; j < fW; ++j) {
                 String word = lexicon.getWordForInt(j);
@@ -367,7 +369,7 @@ public class TopicModel<E extends SmallLocation> extends Model<E> {
                     topWords.add(
                           new DoubleStringPair(wordByTopicCounts[j * T + i] + beta,
                           lexicon.getWordForInt(j)));
-                    wordByTopicProbs[j * T + i] = (wordByTopicCounts[j * T + i] + beta) / topicProbs[i];
+                    wordByTopicProbs[j * T + i] = (wordByTopicCounts[j * T + i] + (float) beta) / topicProbs[i];
                 }
             }
             Collections.sort(topWords);

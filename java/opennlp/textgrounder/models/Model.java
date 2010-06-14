@@ -334,7 +334,7 @@ public abstract class Model<E extends SmallLocation> {
      * @param stopwordList
      * @throws IOException
      */
-    public void processEvalInputPath(File myPath, TextProcessor textProcessor,
+    public void processEvalInputPath(File myPath, TextProcessorTR textProcessor,
           EvalTokenArrayBuffer evalTokenArrayBuffer, StopwordList stopwordList)
           throws
           IOException {

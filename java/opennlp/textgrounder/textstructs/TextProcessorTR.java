@@ -100,7 +100,7 @@ public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
 
             if (lookingForGoldLoc && curLine.startsWith("\t>")) {
                 evalTokenArrayBuffer.addElement(wordidx, currentDoc, 1, stopwordList.isStopWord(cur)
-                      ? 1 : 0, (E) parseLocation(curLine, wordidx));
+                      ? 1 : 0, (E) parseLocation(curLine));
                 lookingForGoldLoc = false;
                 continue;
             } else if (curLine.startsWith("\t")) {
@@ -142,7 +142,7 @@ public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
         assert (evalTokenArrayBuffer.sanityCheck2());
     }
 
-    public E parseLocation(String line, int wordidx) {
+    public E parseLocation(String line) {
         String[] tokens = line.split("\\t");
 
         if (tokens.length < 6) {
@@ -160,7 +160,7 @@ public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
             placename = tokens[5].trim().toLowerCase();
         }
 
-        return generateLocation(-1, placename, "", new Coordinate(lon, lat), 0, "", -1, wordidx);
+        return generateLocation(-1, placename, "", new Coordinate(lon, lat), 0, "", -1, lexicon.getIntForWord(placename));
     }
 
     protected E generateLocation(int _id, String _name, String _type,
