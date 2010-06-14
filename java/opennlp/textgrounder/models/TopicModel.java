@@ -305,6 +305,7 @@ public class TopicModel<E extends SmallLocation> extends Model<E> {
      */
     @Override
     public void train() {
+        System.err.println(String.format("Randomly initializing with %d tokens, %d words, %d regions, %d documents", N, W, T, D));
         randomInitialize();
         System.err.println(String.format("Beginning training with %d tokens, %d words, %d regions, %d documents", N, W, T, D));
         train(annealer);

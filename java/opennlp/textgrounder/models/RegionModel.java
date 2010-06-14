@@ -201,6 +201,8 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
             }
         }
         System.err.println();
+        System.err.println("Reducing size of region mapper callback objects");
+        regionMapperCallback.trimToSize();
         inputVocabMaxId += 1;
 
         D = _tokenArrayBuffer.getNumDocs();
@@ -223,7 +225,6 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
             wordIdMapper[wordid] = counter;
             counter += 1;
         }
-        assert (counter == fW);
 
         T = regionMapperCallback.getNumRegions();
         topicCounts = new int[T];
@@ -247,26 +248,40 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
         /**
          * Build active regions by document filter
          */
-        TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getPlacenameIdxToRegionIndexSet();
+        System.err.print("Building active regions by document filter for docs: ");
+        TIntObjectHashMap<TIntHashSet> placenameIdxToRegionIndexSet = regionMapperCallback.getPlacenameIdxToRegionIndexSet();
         for (int i = 0; i < N; i++) {
-            int docid = documentVector[i];
+            int docid = curDoc = documentVector[i];
+            if (curDoc != prevDoc) {
+                System.err.print(curDoc + ",");
+            }
+            prevDoc = curDoc;
+
             int docoff = docid * T;
             int wordid = wordIdMapper[wordVector[i]];
             if (toponymVector[i] == 1) {
                 if (dataSpecificGazetteer.contains(wordid)) {
-                    for (int regionid : nameToRegionIndex.get(wordid).toArray()) {
-                        activeRegionByDocumentFilter[docoff + regionid] = 1;
+                    try {
+                        for (int regionid :
+                              placenameIdxToRegionIndexSet.get(wordid).toArray()) {
+                            activeRegionByDocumentFilter[docoff + regionid] = 1;
+                        }
+                    } catch (NullPointerException e) {
+                        System.err.println("NullPointerException occurred with (why?): " + lexicon.getWordForInt(wordid));
                     }
                 }
             }
         }
+        System.err.println();
 
         /**
          * build filters for regionByToponymFilter
          */
-        for (int wordid : nameToRegionIndex.keys()) {
+        System.err.println("Building filters for regionByToponymFilter");
+        for (int wordid : placenameIdxToRegionIndexSet.keys()) {
             int wordoff = wordid * T;
-            for (int regionid : nameToRegionIndex.get(wordid).toArray()) {
+            for (int regionid :
+                  placenameIdxToRegionIndexSet.get(wordid).toArray()) {
                 regionByToponymFilter[wordoff + regionid] = 1;
             }
         }
