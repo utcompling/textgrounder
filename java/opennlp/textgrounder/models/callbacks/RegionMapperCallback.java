@@ -34,16 +34,16 @@ public class RegionMapperCallback<E extends SmallLocation> {
     /**
      * Table from index to region
      */
-    protected TIntObjectHashMap<Region> regionMap;
+    protected TIntObjectHashMap<Region> idxToRegionMap;
     /**
-     * Table from region to index. Reverse storage table for regionMap.
+     * Table from region to index. Reverse storage table for idxToRegionMap.
      */
-    protected TObjectIntHashMap<Region> reverseRegionMap;
+    protected TObjectIntHashMap<Region> regionToIdxMap;
     /**
      * Table from placename to set of region indexes. The indexes and their
-     * referents are stored in regionMap.
+     * referents are stored in idxToRegionMap.
      */
-    protected TIntObjectHashMap<TIntHashSet> nameToRegionIndex;
+    protected TIntObjectHashMap<TIntHashSet> placenameIdxToRegionIndexSet;
     /**
      * Temporary variable for keeping track of regions that have been assigned
      * to the current location
@@ -63,9 +63,9 @@ public class RegionMapperCallback<E extends SmallLocation> {
      */
     public RegionMapperCallback() {
         numRegions = 0;
-        regionMap = new TIntObjectHashMap<Region>();
-        reverseRegionMap = new TObjectIntHashMap<Region>();
-        nameToRegionIndex = new TIntObjectHashMap<TIntHashSet>();
+        idxToRegionMap = new TIntObjectHashMap<Region>();
+        regionToIdxMap = new TObjectIntHashMap<Region>();
+        placenameIdxToRegionIndexSet = new TIntObjectHashMap<TIntHashSet>();
         toponymRegionToLocations = new TIntObjectHashMap<TIntHashSet>();
         currentLocationRegions = new HashSet<LocationRegionPair<E>>();
     }
@@ -76,12 +76,12 @@ public class RegionMapperCallback<E extends SmallLocation> {
      * @param _region
      */
     public void addToPlace(E _loc, Region _region) {
-        if (!reverseRegionMap.containsKey(_region)) {
-            reverseRegionMap.put(_region, numRegions);
-            regionMap.put(numRegions, _region);
+        if (!regionToIdxMap.containsKey(_region)) {
+            regionToIdxMap.put(_region, numRegions);
+            idxToRegionMap.put(numRegions, _region);
             numRegions += 1;
         }
-        int regionid = reverseRegionMap.get(_region);
+        int regionid = regionToIdxMap.get(_region);
         LocationRegionPair<E> locationRegionPair = new LocationRegionPair<E>(_loc, regionid);
         currentLocationRegions.add(locationRegionPair);
     }
@@ -97,10 +97,10 @@ public class RegionMapperCallback<E extends SmallLocation> {
     }
 
     public void addAll(int placeid) {
-        if (!nameToRegionIndex.containsKey(placeid)) {
-            nameToRegionIndex.put(placeid, new TIntHashSet());
+        if (!placenameIdxToRegionIndexSet.containsKey(placeid)) {
+            placenameIdxToRegionIndexSet.put(placeid, new TIntHashSet());
         }
-        TIntHashSet currentRegions = nameToRegionIndex.get(placeid);
+        TIntHashSet currentRegions = placenameIdxToRegionIndexSet.get(placeid);
 
         for (LocationRegionPair<E> locationRegionPair : currentLocationRegions) {
             ToponymRegionPair toponymRegionPair = new ToponymRegionPair(placeid, locationRegionPair.regionIndex);
@@ -114,24 +114,24 @@ public class RegionMapperCallback<E extends SmallLocation> {
     }
 
     /**
-     * @return the regionMap
+     * @return the idxToRegionMap
      */
-    public TIntObjectHashMap<Region> getRegionMap() {
-        return regionMap;
+    public TIntObjectHashMap<Region> getIdxToRegionMap() {
+        return idxToRegionMap;
     }
 
     /**
-     * @return the reverseRegionMap
+     * @return the regionToIdxMap
      */
-    public TObjectIntHashMap<Region> getReverseRegionMap() {
-        return reverseRegionMap;
+    public TObjectIntHashMap<Region> getRegionToIdxMap() {
+        return regionToIdxMap;
     }
 
     /**
-     * @return the nameToRegionIndex
+     * @return the placenameIdxToRegionIndexSet
      */
-    public TIntObjectHashMap<TIntHashSet> getNameToRegionIndex() {
-        return nameToRegionIndex;
+    public TIntObjectHashMap<TIntHashSet> getPlacenameIdxToRegionIndexSet() {
+        return placenameIdxToRegionIndexSet;
     }
 
     /**

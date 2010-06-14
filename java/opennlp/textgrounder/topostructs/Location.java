@@ -23,10 +23,6 @@ public class Location extends SmallLocation {
     protected String type;
     protected int pop;
     protected String container;
-    /**
-     * List of pack pointers into the DocumentSet so that context (snippets) can be extracted
-     */
-    protected ArrayList<Integer> backPointers;
 
     public Location() {
     }
@@ -42,7 +38,8 @@ public class Location extends SmallLocation {
         this.count = count;
     }
 
-    public boolean looselyMatches(Location other, double maxDiff) {
+    @Override
+    public boolean looselyMatches(SmallLocation other, double maxDiff) {
         /*if(!this.name.equals(other.name)) {
         System.out.println(this.name);
         System.out.println(other.name);
@@ -81,22 +78,6 @@ public class Location extends SmallLocation {
             return false;
         }
         return true;
-    }
-
-    /**
-     * @return the backPointers
-     */
-    @Override
-    public ArrayList<Integer> getBackPointers() {
-        return backPointers;
-    }
-
-    /**
-     * @param backPointers the backPointers to set
-     */
-    @Override
-    public void setBackPointers(ArrayList<Integer> backPointers) {
-        this.backPointers = backPointers;
     }
 
     /**

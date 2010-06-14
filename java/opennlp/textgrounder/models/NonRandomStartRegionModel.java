@@ -37,46 +37,10 @@ import opennlp.textgrounder.topostructs.*;
  * 
  * @author tsmoon
  */
-public class EvalRegionModel<E extends SmallLocation> extends RegionModel<E> {
+public class NonRandomStartRegionModel<E extends SmallLocation> extends EvalRegionModel<E> {
 
-    /**
-     *
-     */
-    protected RegionModel trainRegionModel;
-    /**
-     *
-     */
-    protected double[] hyperWordByTopicProbs;
-    /**
-     * 
-     */
-    protected double[] hyperTopicProbs;
-    /**
-     * 
-     */
-    protected int[] regionIdMapper;
-
-    public EvalRegionModel(CommandLineOptions _options, E _genericsKludgeFactor) {
+    public NonRandomStartRegionModel(CommandLineOptions _options, E _genericsKludgeFactor) {
         super(_options, _genericsKludgeFactor);
-    }
-
-    /**
-     * 
-     * @param trainRegionModel
-     */
-    public EvalRegionModel(RegionModel _regionModel) {
-        trainRegionModel = _regionModel;
-        try {
-            initialize();
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(EvalRegionModel.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IOException ex) {
-            Logger.getLogger(EvalRegionModel.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (ClassNotFoundException ex) {
-            Logger.getLogger(EvalRegionModel.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (SQLException ex) {
-            Logger.getLogger(EvalRegionModel.class.getName()).log(Level.SEVERE, null, ex);
-        }
     }
 
     protected void initialize() throws FileNotFoundException, IOException,

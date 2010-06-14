@@ -76,10 +76,6 @@ public abstract class Model<E extends SmallLocation> {
      */
     protected int barScale = 50000;
     /**
-     * Lookup table for Location (hash)code to Location object
-     */
-    protected TIntObjectHashMap<E> idxToLocationMap;
-    /**
      * Size of regions on cartesian reduction of globe. Globe is defined to be
      * 360 degrees longitude and 180 degrees latitude
      */

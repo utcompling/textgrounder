@@ -30,7 +30,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import opennlp.textgrounder.annealers.*;
-import opennlp.textgrounder.gazetteers.Gazetteer;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.textstructs.*;
@@ -173,9 +172,9 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
          * <li> 
          */
         TIntHashSet toponymsNotInGazetteer = new TIntHashSet();
-        TIntHashSet localDataVocab = new TIntHashSet();
+        TIntHashSet inputDataVocab = new TIntHashSet();
 
-        int inputVocabSize = 0;
+        int inputVocabMaxId = 0;
         for (int i = 0; i < N; i++) {
             curDoc = documentVector[i];
             if (curDoc != prevDoc) {
@@ -196,13 +195,13 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
                     toponymsNotInGazetteer.add(wordid);
                 }
             }
-            localDataVocab.add(wordid);
-            if (wordid > inputVocabSize) {
-                inputVocabSize = wordid;
+            inputDataVocab.add(wordid);
+            if (wordid > inputVocabMaxId) {
+                inputVocabMaxId = wordid;
             }
         }
         System.err.println();
-        inputVocabSize += 1;
+        inputVocabMaxId += 1;
 
         D = _tokenArrayBuffer.getNumDocs();
         /**
@@ -210,14 +209,17 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
          * dictionary size without stopwords (W). Normalization is conducted with
          * the dictionary size without stopwords, the size of which is sW.
          */
-        fW = localDataVocab.size();
+        fW = inputDataVocab.size();
         sW = stopwordList.size();
         W = fW - sW;
         betaW = beta * W;
 
-        wordIdMapper = new int[inputVocabSize];
+        wordIdMapper = new int[inputVocabMaxId];
+        for (int i = 0; i < inputVocabMaxId; ++i) {
+            wordIdMapper[i] = -1;
+        }
         int counter = 0;
-        for (int wordid : localDataVocab.toArray()) {
+        for (int wordid : inputDataVocab.toArray()) {
             wordIdMapper[wordid] = counter;
             counter += 1;
         }
@@ -245,7 +247,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
         /**
          * Build active regions by document filter
          */
-        TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
+        TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getPlacenameIdxToRegionIndexSet();
         for (int i = 0; i < N; i++) {
             int docid = documentVector[i];
             int docoff = docid * T;
@@ -407,16 +409,14 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
      * 
      */
     protected TIntObjectHashMap<E> normalizeLocations() {
-        Gazetteer<E> gazetteer = gazetteerGenerator.generateGazetteer();
-
         for (TIntIterator it = locationSet.iterator(); it.hasNext();) {
             int locid = it.next();
-            E loc = gazetteer.safeGetLocation(locid);
+            E loc = dataSpecificLocationMap.get(locid);
             loc.setCount(loc.getCount() + beta);
             loc.setBackPointers(new ArrayList<Integer>());
         }
 
-        TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getNameToRegionIndex();
+        TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getPlacenameIdxToRegionIndexSet();
         TIntObjectHashMap<TIntHashSet> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
         for (int wordid : nameToRegionIndex.keys()) {
             for (int regid : nameToRegionIndex.get(wordid).toArray()) {
@@ -424,7 +424,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
                 TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
                 for (TIntIterator it = locs.iterator(); it.hasNext();) {
                     int locid = it.next();
-                    E loc = gazetteer.safeGetLocation(locid);
+                    E loc = dataSpecificLocationMap.get(locid);
                     loc.setCount(loc.getCount() + wordByTopicCounts[wordid * T + regid]);
                 }
             }
@@ -433,7 +433,12 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
         int wordid, topicid;
         int istoponym, isstopword;
 
-        int newlocid = gazetteer.getMaxLocId();
+        int newlocid = 0;
+        for (int locid : dataSpecificLocationMap.keys()) {
+            if (locid > newlocid) {
+                newlocid = locid;
+            }
+        }
         int curlocid = newlocid + 1;
 
         for (int i = 0; i < N; ++i) {
@@ -448,7 +453,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
                     try {
                         for (TIntIterator it = locs.iterator(); it.hasNext();) {
                             int locid = it.next();
-                            E loc = gazetteer.safeGetLocation(locid);
+                            E loc = dataSpecificLocationMap.get(locid);
                             loc.getBackPointers().add(i);
                             if (loc.getId() > newlocid) {
                                 loc.setCount(loc.getCount() + 1);
@@ -456,10 +461,10 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
                         }
                     } catch (NullPointerException e) {
                         locs = new TIntHashSet();
-                        Region r = regionMapperCallback.getRegionMap().get(topicid);
+                        Region r = regionMapperCallback.getIdxToRegionMap().get(topicid);
                         Coordinate coord = new Coordinate(r.centLon, r.centLat);
                         E loc = generateLocation(curlocid, lexicon.getWordForInt(wordid), null, coord, 0, null, 1, wordid);
-                        gazetteer.putLocation(loc);
+                        dataSpecificLocationMap.put(curlocid, loc);
                         loc.setBackPointers(new ArrayList<Integer>());
                         loc.getBackPointers().add(i);
                         locs.add(loc.getId());
@@ -471,7 +476,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
         }
 
         locations = new TIntHashSet();
-        for (TIntObjectIterator<E> it = gazetteer.getIdxToLocationMap().iterator();
+        for (TIntObjectIterator<E> it = dataSpecificLocationMap.iterator();
               it.hasNext();) {
             it.advance();
             E loc = it.value();
@@ -482,7 +487,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
             } catch (NullPointerException e) {
             }
         }
-        return gazetteer.getIdxToLocationMap();
+        return dataSpecificLocationMap;
     }
 
     /**
@@ -530,7 +535,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
         int startt = 0, M = 4, endt = Math.min(M + startt, topicProbs.length);
         out.write("***** Word Probabilities by Topic *****\n\n");
 
-        regionMap = regionMapperCallback.getRegionMap();
+        regionMap = regionMapperCallback.getIdxToRegionMap();
 
         while (startt < T) {
             for (int i = startt; i < endt; ++i) {
@@ -576,7 +581,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
         BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename + ".kml"));
 
         out.write(KMLUtil.genKMLHeader(inputFilename));
-        regionMap = regionMapperCallback.getRegionMap();
+        regionMap = regionMapperCallback.getIdxToRegionMap();
 
         double radius = .2;
 
@@ -685,9 +690,9 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
     public void writeXMLFile() throws Exception {
         System.err.println();
         System.err.println("Counting locations and smoothing");
-        idxToLocationMap = normalizeLocations();
+        normalizeLocations();
         System.err.println("Writing output");
-        writeXMLFile(trainInputPath, kmlOutputFilename, idxToLocationMap, locations, trainTokenArrayBuffer);
+        writeXMLFile(trainInputPath, kmlOutputFilename, dataSpecificLocationMap, locations, trainTokenArrayBuffer);
     }
 
     protected E generateLocation(int _id, String _name, String _type,
