@@ -57,12 +57,12 @@ public class SerializableRegionParameters implements Serializable {
     /**
      * Probability of topics (regions)
      */
-    protected double[] topicProbs;
+    protected float[] topicProbs;
     /**
      * Probability of word given topic. since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.
      */
-    protected double[] wordByTopicProbs;
+    protected float[] wordByTopicProbs;
     /**
      * Lexicon that stores mappings from word indices to words and back.
      */

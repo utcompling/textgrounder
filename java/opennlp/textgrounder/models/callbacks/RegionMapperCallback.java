@@ -48,11 +48,11 @@ public class RegionMapperCallback<E extends SmallLocation> {
      * Temporary variable for keeping track of regions that have been assigned
      * to the current location
      */
-    protected HashSet<LocationRegionPair<E>> currentLocationRegions;
+    protected HashSet<LocationRegionPair> currentLocationRegions;
     /**
      * 
      */
-    protected TIntObjectHashMap<TIntHashSet> toponymRegionToLocations;
+    protected TIntObjectHashMap<TIntHashSet> toponymRegionToLocationIndexSet;
     /**
      *
      */
@@ -66,8 +66,8 @@ public class RegionMapperCallback<E extends SmallLocation> {
         idxToRegionMap = new TIntObjectHashMap<Region>();
         regionToIdxMap = new TObjectIntHashMap<Region>();
         placenameIdxToRegionIndexSet = new TIntObjectHashMap<TIntHashSet>();
-        toponymRegionToLocations = new TIntObjectHashMap<TIntHashSet>();
-        currentLocationRegions = new HashSet<LocationRegionPair<E>>();
+        toponymRegionToLocationIndexSet = new TIntObjectHashMap<TIntHashSet>();
+        currentLocationRegions = new HashSet<LocationRegionPair>();
     }
 
     /**
@@ -82,7 +82,7 @@ public class RegionMapperCallback<E extends SmallLocation> {
             numRegions += 1;
         }
         int regionid = regionToIdxMap.get(_region);
-        LocationRegionPair<E> locationRegionPair = new LocationRegionPair<E>(_loc, regionid);
+        LocationRegionPair locationRegionPair = new LocationRegionPair(_loc, regionid);
         currentLocationRegions.add(locationRegionPair);
     }
 
@@ -96,21 +96,39 @@ public class RegionMapperCallback<E extends SmallLocation> {
         addAll(wordid);
     }
 
-    public void addAll(int placeid) {
-        if (!placenameIdxToRegionIndexSet.containsKey(placeid)) {
-            placenameIdxToRegionIndexSet.put(placeid, new TIntHashSet());
+    public void addAll(int _placenameid) {
+        if (!placenameIdxToRegionIndexSet.containsKey(_placenameid)) {
+            placenameIdxToRegionIndexSet.put(_placenameid, new TIntHashSet());
         }
-        TIntHashSet currentRegions = placenameIdxToRegionIndexSet.get(placeid);
+        TIntHashSet currentRegions = placenameIdxToRegionIndexSet.get(_placenameid);
 
-        for (LocationRegionPair<E> locationRegionPair : currentLocationRegions) {
-            ToponymRegionPair toponymRegionPair = new ToponymRegionPair(placeid, locationRegionPair.regionIndex);
-            if (!toponymRegionToLocations.containsKey(toponymRegionPair.hashCode())) {
-                toponymRegionToLocations.put(toponymRegionPair.hashCode(), new TIntHashSet());
+        for (LocationRegionPair locationRegionPair : currentLocationRegions) {
+            ToponymRegionPair toponymRegionPair = new ToponymRegionPair(_placenameid, locationRegionPair.regionIndex);
+            if (!toponymRegionToLocationIndexSet.containsKey(toponymRegionPair.hashCode())) {
+                toponymRegionToLocationIndexSet.put(toponymRegionPair.hashCode(), new TIntHashSet());
             }
-            toponymRegionToLocations.get(toponymRegionPair.hashCode()).add(locationRegionPair.location.getId());
+            toponymRegionToLocationIndexSet.get(toponymRegionPair.hashCode()).add(locationRegionPair.locationIndex);
             currentRegions.add(locationRegionPair.regionIndex);
         }
-        currentLocationRegions = new HashSet<LocationRegionPair<E>>();
+        currentLocationRegions = new HashSet<LocationRegionPair>();
+    }
+
+    public void trimToSize() {
+        idxToRegionMap.trimToSize();
+        regionToIdxMap.trimToSize();
+        for (TIntObjectIterator<TIntHashSet> it = placenameIdxToRegionIndexSet.iterator();
+              it.hasNext();) {
+            it.advance();
+            it.value().trimToSize();
+        }
+        placenameIdxToRegionIndexSet.trimToSize();
+
+        for (TIntObjectIterator<TIntHashSet> it = toponymRegionToLocationIndexSet.iterator();
+              it.hasNext();) {
+            it.advance();
+            it.value().trimToSize();
+        }
+        toponymRegionToLocationIndexSet.trimToSize();
     }
 
     /**
@@ -142,9 +160,9 @@ public class RegionMapperCallback<E extends SmallLocation> {
     }
 
     /**
-     * @return the toponymRegionToLocations
+     * @return the toponymRegionToLocationIndexSet
      */
     public TIntObjectHashMap<TIntHashSet> getToponymRegionToLocations() {
-        return toponymRegionToLocations;
+        return toponymRegionToLocationIndexSet;
     }
 }
