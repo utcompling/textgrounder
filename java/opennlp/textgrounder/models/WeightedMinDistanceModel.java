@@ -57,12 +57,38 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
         super(options);
     }
 
+    public void printArray(int[] array) {
+        System.out.print("[");
+        for(int o : array) {
+            System.out.print(o + ",");
+        }
+        System.out.println("]");
+    }
+
     public TIntHashSet disambiguateAndCountPlacenames() throws Exception {
 
 	System.out.print("Initializing probabilistic minimum distance model data structure (this probably involves lots of SQLite lookups, so may take a while, but then all necessary information from the database will be cached so the rest should be fast)...");
 
-        if(trainTokenArrayBuffer == null)
-            trainTokenArrayBuffer = evalTokenArrayBuffer;
+        if(trainTokenArrayBuffer == null) {
+            if(evalTokenArrayBuffer != null)
+                trainTokenArrayBuffer = evalTokenArrayBuffer;
+            else {
+                System.err.println("Error: Both trainTokenArrayBuffer and evalTokenArrayBuffer are NULL.");
+                System.exit(1);
+            }
+        }
+        else {
+            if(evalTokenArrayBuffer != null) {
+                //System.out.println("Concatenating trainTokenArrayBuffer [" + trainTokenArrayBuffer.size() + "] and evalTokenArrayBuffer [" + evalTokenArrayBuffer.size() + "]");
+                trainTokenArrayBuffer = evalTokenArrayBuffer.concatenate(trainTokenArrayBuffer);
+                //System.out.println("New size: " + trainTokenArrayBuffer.size());
+                //printArray(trainTokenArrayBuffer.wordVector);
+                //printArray(trainTokenArrayBuffer.toponymVector);
+                //printArray(trainTokenArrayBuffer.documentVector);
+                //printArray(trainTokenArrayBuffer.stopwordVector);
+                //System.exit(0);
+            }
+        }
 
 	pseudoWeights = new ArrayList<ArrayList<Double>>();
 	allPossibleLocations = new ArrayList<TIntArrayList>();

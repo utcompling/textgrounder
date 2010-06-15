@@ -57,6 +57,15 @@ public class RandomBaselineModel extends SelfTrainedModelBase {
 
         TIntIntHashMap idsToCounts = new TIntIntHashMap();
 
+        if(trainTokenArrayBuffer == null) {
+            if(evalTokenArrayBuffer != null)
+                trainTokenArrayBuffer = evalTokenArrayBuffer;
+            else {
+                System.err.println("Error: Both trainTokenArrayBuffer and evalTokenArrayBuffer are NULL.");
+                System.exit(1);
+            }
+        }
+
         /*	TObjectIntIterator<String> placeIterator = placeCounts.iterator();
         for (int i = placeCounts.size(); i-- > 0;) {
         placeIterator.advance();*/

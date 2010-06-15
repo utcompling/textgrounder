@@ -427,31 +427,64 @@ public abstract class Model<E extends SmallLocation> {
         int fp = 0;
         int fn = 0;
 
+        int goldLocationCount = 0;
+        int modelLocationCount = 0;
+
+        int noModelGuessCount = 0;
+        //int noGoldCount = 0;
+
+        // these correspond exactly with Jochen's thesis:
+        int t_n = 0;
+        int t_c = 0;
+        int t_i = 0;
+        int t_u = 0;
+
         for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
             E curModelLoc = evalTokenArrayBuffer.modelLocationArrayList.get(i);
             E curGoldLoc = evalTokenArrayBuffer.goldLocationArrayList.get(i);
             if (curGoldLoc != null) {
+                goldLocationCount++;
+                t_n++;
                 if (curModelLoc != null) {
+                    modelLocationCount++;
                     if (curGoldLoc.looselyMatches(curModelLoc, 1.0)) {
                         tp++;
+                        t_c++;
                     } else {
                         fp++;
                         fn++; // reinstated
+                        t_i++;
                     }
                 } else {
                     fn++;
+                    t_u++;
+                    noModelGuessCount++;
                 }
-            } else {
+            } /*else {
                 if (curModelLoc != null) {
-                    fp++;
+                    //fp++; // curGoldLoc is null, which we shouldn't be punished for. Now treating these as non-toponyms.
+                    noGoldCount++;
                 } else {
                     //tn++;
                 }
-            }
+            }*/
         }
 
+        /*
         double precision = (double) tp / (tp + fp);
         double recall = (double) tp / (tp + fn);
+        */
+
+        // equivalent, but maybe simpler:
+        /*
+        double precision = (double) tp / modelLocationCount;
+        double recall = (double) tp / goldLocationCount;
+        */
+
+        // in jochen's terms:
+        double precision = (double) t_c / (t_c + t_i);
+        double recall = (double) t_c / (t_n);
+
         double f1 = 2 * ((precision * recall) / (precision + recall));
 
         System.out.println("TP: " + tp);
@@ -461,6 +494,9 @@ public abstract class Model<E extends SmallLocation> {
         System.out.println("Precision: " + precision);
         System.out.println("Recall: " + recall);
         System.out.println("F-score: " + f1);
+        System.out.println();
+        System.out.println("The model abstained on " + noModelGuessCount + " toponyms where there was a gold label given.");
+        //System.out.println("The gold standard had no correct location labeled for " + noGoldCount + " toponyms.");
     }
 
     public void serializeEvalTokenArrayBuffer(String filename) throws Exception {

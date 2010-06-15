@@ -40,6 +40,8 @@ public class GeoReferencer extends BaseApp {
 
 	if(modelOptions.getEvalDir() != null) {
 	    System.out.println("Performing EVALUATION on " + modelOptions.getEvalDir());
+            if(modelOptions.getTrainInputPath() != null)
+                System.out.println("  with ADDITIONAL training data from " + modelOptions.getTrainInputPath());
 	}
 
 	SelfTrainedModelBase grefUS = null;

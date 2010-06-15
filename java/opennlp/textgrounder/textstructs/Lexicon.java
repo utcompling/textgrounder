@@ -45,6 +45,18 @@ public class Lexicon implements Serializable {
     protected int nextInt = 0;
 
     /**
+     * Combine two lexicons
+     */
+     public Lexicon concatenate(Lexicon otherLexicon) {
+         Lexicon toReturn = new Lexicon();
+         for(String w : this.wordsToInts.keys(new String[0]))
+             toReturn.addWord(w);
+         for(String w : otherLexicon.wordsToInts.keys(new String[0]))
+             toReturn.addWord(w);
+         return toReturn;
+     }
+
+    /**
      * Get string value of some index
      *
      * @param someInt index to look up

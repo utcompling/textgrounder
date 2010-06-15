@@ -152,6 +152,29 @@ public class TokenArrayBuffer<E extends SmallLocation> implements Serializable {
     }
 
     /**
+     * Concatenates two TokenArrayBuffers for use when an evaluation TokenArrayBuffer
+     * and additional unlabeled training data are desired.
+     * @param otherTokenArrayBuffer the TokenArrayBuffer to be concatenated with this
+     * @return the concatenated TokenArrayBuffer
+     */
+    public TokenArrayBuffer<E> concatenate(TokenArrayBuffer<E> otherTokenArrayBuffer) {
+        TokenArrayBuffer<E> toReturn = new TokenArrayBuffer<E>(this.lexicon.concatenate(otherTokenArrayBuffer.lexicon));
+
+        int docNumOffset = 0;
+        for(int i = 0; i < this.size(); i++) {
+            toReturn.addElement(this.wordVector[i], this.documentVector[i], this.toponymVector[i], this.stopwordVector[i]);
+        }
+        docNumOffset = this.documentVector[this.size()-1] + 1; // need to continue document numbers where they left off, not restart at 0
+        for(int i = 0; i < otherTokenArrayBuffer.size(); i++)
+            toReturn.addElement(otherTokenArrayBuffer.wordVector[i], otherTokenArrayBuffer.documentVector[i] + docNumOffset,
+                    otherTokenArrayBuffer.toponymVector[i], otherTokenArrayBuffer.stopwordVector[i]);
+
+        toReturn.convertToPrimitiveArrays();
+
+        return toReturn;
+    }
+
+    /**
      * Add all indexes and indicators to the array fields and increment size
      * by one.
      *

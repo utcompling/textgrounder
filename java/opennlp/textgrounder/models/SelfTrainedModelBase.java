@@ -96,10 +96,11 @@ public abstract class SelfTrainedModelBase extends Model<Location> {
         initializeRegionArray();
         if (!runWholeGazetteer) {
             try {
-                if (evalInputPath != null) {
-                    processEvalInputPath();
-                } else {
+                if(trainInputFile != null) {
                     processTrainInputPath();
+                }
+                if(evalInputPath != null) {
+                    processEvalInputPath();
                 }
             } catch (Exception ex) {
                 Logger.getLogger(PopulationBaselineModel.class.getName()).log(Level.SEVERE, null, ex);
