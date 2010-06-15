@@ -54,6 +54,9 @@ public class EvalRegionModel<E extends SmallLocation> extends RegionModel<E> {
      */
     protected int[] regionIdMapper;
 
+    public EvalRegionModel() {
+    }
+
     public EvalRegionModel(CommandLineOptions _options, E _genericsKludgeFactor) {
         super(_options, _genericsKludgeFactor);
     }
@@ -100,7 +103,7 @@ public class EvalRegionModel<E extends SmallLocation> extends RegionModel<E> {
 
         setAllocateRegions(evalTokenArrayBuffer);
 
-        annealer = new EvalAnnealer();
+        annealer = new EvalAnnealer(trainRegionModel.evalIterations);
         rand = trainRegionModel.rand;
     }
 
@@ -163,6 +166,10 @@ public class EvalRegionModel<E extends SmallLocation> extends RegionModel<E> {
                 System.err.println("Training material vocabulary count stops at " + i);
                 System.err.println("Eval material vocabulary extends to " + wordIdMapper.length);
                 break;
+            } catch (NullPointerException e) {
+                /**
+                 * Case where no sampling was conducted and so trainWordByTopicParams is null
+                 */
             }
         }
 

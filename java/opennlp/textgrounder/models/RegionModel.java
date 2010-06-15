@@ -86,6 +86,10 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
     /**
      * 
      */
+    protected int evalIterations;
+    /**
+     * 
+     */
     protected int[] wordIdMapper;
     /**
      * 
@@ -131,6 +135,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
           SQLException {
 
         modelIterations = _options.getModelIterations();
+        evalIterations = _options.getEvalIterations();
         kmlOutputFilename = _options.getKMLOutputFilename();
         degreesPerRegion = _options.getDegreesPerRegion();
         barScale = _options.getBarScale();

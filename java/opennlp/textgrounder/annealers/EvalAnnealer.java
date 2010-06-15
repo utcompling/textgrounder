@@ -24,7 +24,12 @@ package opennlp.textgrounder.annealers;
 public class EvalAnnealer extends EmptyAnnealer {
 
     public EvalAnnealer() {
-        innerIterationsMax = 1;
+        innerIterationsMax = 100;
+        outerIterationsMax = 1;
+    }
+
+    public EvalAnnealer(int _innerIterationsMax) {
+        innerIterationsMax = _innerIterationsMax;
         outerIterationsMax = 1;
     }
 }

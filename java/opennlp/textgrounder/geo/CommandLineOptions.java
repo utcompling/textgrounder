@@ -49,7 +49,11 @@ public class CommandLineOptions {
     /**
      * Number of training iterations
      */
-    protected int iterations = 100;
+    protected int trainIterations = 100;
+    /**
+     * Number of evaluation burn-in iterations
+     */
+    protected int evalIterations = 100;
     /**
      * Number to seed random number generator. If 0 is passed from the commandline,
      * it means that a true random seed will be used (i.e. one based on the current time).
@@ -87,7 +91,7 @@ public class CommandLineOptions {
      */
     protected int samples = 100;
     /**
-     * Number of iterations between samples
+     * Number of trainIterations between samples
      */
     protected int lag = 10;
     /**
@@ -146,7 +150,7 @@ public class CommandLineOptions {
      */
     protected String model = "population";
     /**
-     * Model iterations (e.g. for PopulationMinDistanceModel)
+     * Model trainIterations (e.g. for PopulationMinDistanceModel)
      */
     protected int modelIterations = 10;
     /**
@@ -197,9 +201,11 @@ public class CommandLineOptions {
                 case 'e':
                     opt = option.getOpt();
                     if (opt.equals("e")) {
-                        iterations = Integer.parseInt(value);
+                        trainIterations = Integer.parseInt(value);
                     } else if (opt.equals("ev")) {
                         evalDir = value;
+                    } else if (opt.equals("ei")) {
+                        evalIterations = Integer.parseInt(value);
                     }
                     break;
                 case 'g':
@@ -304,7 +310,7 @@ public class CommandLineOptions {
     }
 
     public int getIterations() {
-        return iterations;
+        return trainIterations;
     }
 
     public String getTabularOutputFilename() {
@@ -434,5 +440,12 @@ public class CommandLineOptions {
             System.exit(1);
         }
         return null;
+    }
+
+    /**
+     * @return the evalIterations
+     */
+    public int getEvalIterations() {
+        return evalIterations;
     }
 }

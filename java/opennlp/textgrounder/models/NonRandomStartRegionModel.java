@@ -40,7 +40,24 @@ import opennlp.textgrounder.topostructs.*;
 public class NonRandomStartRegionModel<E extends SmallLocation> extends EvalRegionModel<E> {
 
     public NonRandomStartRegionModel(CommandLineOptions _options, E _genericsKludgeFactor) {
-        super(_options, _genericsKludgeFactor);
+        try {
+            regionMapperCallback = new RegionMapperCallback();
+            genericsKludgeFactor = _genericsKludgeFactor;
+            modelIterations = _options.getModelIterations();
+            degreesPerRegion = _options.getDegreesPerRegion();
+
+            initializeFromOptions(_options);
+            SerializableRegionTrainingParameters<E> serializableRegionTrainingParameters = new SerializableRegionTrainingParameters<E>();
+            serializableRegionTrainingParameters.loadParameters(_options.getSerializedDataParametersFilename(), this);
+            stopwordList = new StopwordList();
+            initializeRegionArray();
+            locationSet = new TIntHashSet();
+            setAllocateRegions(trainTokenArrayBuffer);
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(EvalRegionModel.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(EvalRegionModel.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     protected void initialize() throws FileNotFoundException, IOException,
@@ -66,7 +83,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends EvalRegi
 
         setAllocateRegions(evalTokenArrayBuffer);
 
-        annealer = new EvalAnnealer();
+        annealer = new EvalAnnealer(trainRegionModel.evalIterations);
         rand = trainRegionModel.rand;
     }
 

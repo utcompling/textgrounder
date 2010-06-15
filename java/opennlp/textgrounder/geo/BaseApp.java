@@ -36,6 +36,7 @@ public class BaseApp {
         options.addOption("c", "bar-scale", true, "height of bars in kml output (default=50000)");
         options.addOption("d", "degrees-per-region", true, "size of Region squares in degrees [default = 3.0]");
         options.addOption("e", "training-iterations", true, "number of training iterations (default=100)");
+	options.addOption("ei", "evaluation-iterations", true, "number of evaluation iterations (default=100)");
 	options.addOption("ev", "evaluate", true, "specifies evaluation directory and enables evaluation mode");
         options.addOption("g", "gazetteer", true, "gazetteer to use [world, census, NGA, USGS; default = world]");
         options.addOption("gr", "gazetteer-refresh", false, "read gazetteer afresh from original database");
