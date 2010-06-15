@@ -99,8 +99,7 @@ public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
             }
 
             if (lookingForGoldLoc && curLine.startsWith("\t>")) {
-                evalTokenArrayBuffer.addElement(wordidx, currentDoc, 1, stopwordList.isStopWord(cur)
-                      ? 1 : 0, (E) parseLocation(cur, curLine, wordidx));
+                evalTokenArrayBuffer.addElement(wordidx, currentDoc, 1, 0, (E) parseLocation(cur, curLine, wordidx));
                 lookingForGoldLoc = false;
                 continue;
             } else if (curLine.startsWith("\t")) {

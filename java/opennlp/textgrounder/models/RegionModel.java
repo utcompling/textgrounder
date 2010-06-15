@@ -198,7 +198,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
         }
 
         System.err.println();
-        System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
+        System.err.print("Building lookup tables for locations, regions and toponyms for document: ");
         /**
          * Here, find
          * <li> 

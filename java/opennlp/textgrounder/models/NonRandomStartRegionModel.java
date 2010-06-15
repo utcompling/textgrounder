@@ -106,7 +106,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
             modelIn =
                   new ObjectInputStream(new GZIPInputStream(new FileInputStream(weightedEvalTokenArrayBufferFilename + ".gz")));
         }
-        weightedEvalTokenArrayBuffer = (EvalTokenArrayBuffer<Location>) modelIn.readObject();        
+        weightedEvalTokenArrayBuffer = (EvalTokenArrayBuffer<Location>) modelIn.readObject();
 
         annealer = new EvalAnnealer(_options.getEvalIterations());
     }
