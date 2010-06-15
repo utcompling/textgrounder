@@ -38,12 +38,14 @@ public class GeoReferencerWeightedBaselineLDA extends BaseApp {
 
         if (cline.hasOption('h')) {
             HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp("java GeoReferencerLDA", options);
+            formatter.printHelp("java GeoReferencerWeightedBaselineLDA", options);
             System.exit(0);
         }
 
         CommandLineOptions modelOptions = new CommandLineOptions(cline);
-        EvalRegionModel<SmallLocation> rm = new EvalRegionModel<SmallLocation>(modelOptions, new SmallLocation());
+        NonRandomStartRegionModel<SmallLocation> rm = new NonRandomStartRegionModel<SmallLocation>(modelOptions, new SmallLocation());
+        rm.train();
+        rm.normalize();
         rm.evaluate();
     }
 }

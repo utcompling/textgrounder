@@ -330,35 +330,42 @@ public class EvalRegionModel<E extends SmallLocation> extends RegionModel<E> {
         int wordid, topicid;
         int istoponym, isstopword;
 
-        for (int i = 0; i < N; ++i) {
-            isstopword = stopwordVector[i];
-            boolean added = false;
-            if (isstopword == 0) {
-                istoponym = toponymVector[i];
-                if (istoponym == 1) {
-                    wordid = wordVector[i];
-                    topicid = topicVector[i];
-                    ToponymRegionPair trp = new ToponymRegionPair(wordid, topicid);
-                    TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
-                    try {
-                        int size = locs.size();
-                        int randIndex = rand.nextInt(size);
-                        int curLocationIdx = locs.toArray()[randIndex];
-                        E curLocation = dataSpecificLocationMap.get(curLocationIdx);
-                        evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
-                    } catch (NullPointerException e) {
-                        locs = new TIntHashSet();
-                        Region r = regionMapperCallback.getIdxToRegionMap().get(topicid);
-                        Coordinate coord = new Coordinate(r.centLon, r.centLat);
-                        E loc = generateLocation(-1, lexicon.getWordForInt(wordid), null, coord, 0, null, 1, wordid);
-                        evalTokenArrayBuffer.modelLocationArrayList.add(loc);
-                        locs.add(loc.getId());
-                        toponymRegionToLocations.put(trp.hashCode(), locs);
-                    }
-                    added = true;
-                }
+        int newlocid = 0;
+        for (int locid : dataSpecificLocationMap.keys()) {
+            if (locid > newlocid) {
+                newlocid = locid;
             }
-            if (!added) {
+        }
+        int curlocid = newlocid + 1;
+
+        for (int i = 0; i < N; ++i) {
+            istoponym = toponymVector[i];
+            if (istoponym == 1) {
+                wordid = wordVector[i];
+                topicid = topicVector[i];
+                ToponymRegionPair trp = new ToponymRegionPair(wordid, topicid);
+                TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
+                try {
+                    int size = locs.size();
+                    int randIndex = rand.nextInt(size);
+                    int curLocationIdx = locs.toArray()[randIndex];
+                    E curLocation = dataSpecificLocationMap.get(curLocationIdx);
+                    if (curLocation == null) {
+                        throw new NullPointerException();
+                    }
+                    evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
+                } catch (NullPointerException e) {
+                    locs = new TIntHashSet();
+                    Region r = regionMapperCallback.getIdxToRegionMap().get(topicid);
+                    Coordinate coord = new Coordinate(r.centLon, r.centLat);
+                    E curLocation = generateLocation(curlocid, lexicon.getWordForInt(wordid), null, coord, 0, null, 1, wordid);
+                    dataSpecificLocationMap.put(curlocid, curLocation);
+                    evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
+                    locs.add(curLocation.getId());
+                    toponymRegionToLocations.put(trp.hashCode(), locs);
+                    curlocid += 1;
+                }
+            } else {
                 evalTokenArrayBuffer.modelLocationArrayList.add(null);
             }
         }
