@@ -483,7 +483,7 @@ public abstract class Model<E extends SmallLocation> {
 
         // in jochen's terms:
         double precision = (double) t_c / (t_c + t_i);
-        double recall = (double) t_c / (t_n);
+        double recall = (double) t_c / (t_n); 
 
         double f1 = 2 * ((precision * recall) / (precision + recall));
 
