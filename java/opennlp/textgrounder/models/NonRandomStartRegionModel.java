@@ -137,7 +137,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
                 if (istoponym == 1) {
                     Location modelLoc = weightedModelLocationArray.get(i);
                     int regid = getRegionForLocation(modelLoc);
-                    if (regid > 0) {
+                    if (regid > -1) {
                         try {
                             for (int j = 0;; ++j) {
                                 totalprob += probs[j] = 0;
@@ -213,7 +213,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
         TIntObjectHashMap<TIntHashSet> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
 
         int wordid, topicid;
-        int istoponym, isstopword;
+        int istoponym;
 
         int newlocid = 0;
         for (int locid : dataSpecificLocationMap.keys()) {
