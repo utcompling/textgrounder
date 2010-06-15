@@ -585,7 +585,7 @@ public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 	}
 
         if(evalInputPath != null) {
-            for(int i = 0; i < trainTokenArrayBuffer.size(); i++) {
+            for(int i = 0; i < evalTokenArrayBuffer.size(); i++) {
                 if(modelGuesses.contains(i)) {
                     int modelGuess = modelGuesses.get(i);
                     evalTokenArrayBuffer.modelLocationArrayList.add(gazetteer.getLocation(modelGuess));
