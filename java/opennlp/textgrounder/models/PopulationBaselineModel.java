@@ -303,6 +303,9 @@ public class PopulationBaselineModel extends SelfTrainedModelBase {
             }
         }
 
+        if(maxPointPop <= 0) // abstain if no population information was known
+            return null;
+
         return pointToReturn;
     }
 
