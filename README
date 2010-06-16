@@ -98,19 +98,8 @@ more info:
 
 http://code.google.com/p/textgrounder/wiki/DevelTips
 
-If you've managed to configure and build the system, you should be
-able to change to the /data/conll200 directory and run the tagger with
-atag.sh.
-
-$ cd data/conll2000
-$ atag.sh -t train.txt -e test.txt -o my_tagged_sentences.txt
-$ ascore_tags.sh test.txt my_tagged_sentences.txt
-
-These sh scripts are just simple frontends to Java or Python programs
-that ensure some environment variables are set up, including taking
-care of otherwise annoying classpath setup. (These all start with an
-"a" to make them unique from other utilities for tagging and parsing,
-etc.)
+When we make an actual release, things will be shifted to a getting
+started page.
 
 
 Bug Reports
