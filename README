@@ -5,6 +5,8 @@ See CHANGES for a description of the project status.
 
 This file contains the configuration and build instructions. 
 
+TextGrounder website: http://code.google.com/p/textgrounder/
+
 
 Requirements
 ============
@@ -114,5 +116,4 @@ Special Note
 Parts of this README and some of the directory structure and the build
 system for this project were borrowed from the JDOM project (kudos!).
 See www.jdom.org for more details.
-
 
