@@ -439,36 +439,68 @@ public abstract class Model<E extends SmallLocation> {
         int t_i = 0;
         int t_u = 0;
 
-        for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
-            E curModelLoc = evalTokenArrayBuffer.modelLocationArrayList.get(i);
-            E curGoldLoc = evalTokenArrayBuffer.goldLocationArrayList.get(i);
-            if (curGoldLoc != null) {
-                goldLocationCount++;
-                t_n++;
-                if (curModelLoc != null) {
-                    modelLocationCount++;
-                    if (curGoldLoc.looselyMatches(curModelLoc, 1.0)) {
-                        tp++;
-                        t_c++;
+        try {
+
+            BufferedWriter errorDump = new BufferedWriter(new FileWriter("error-dump.txt"));
+
+            for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
+                E curModelLoc = evalTokenArrayBuffer.modelLocationArrayList.get(i);
+                E curGoldLoc = evalTokenArrayBuffer.goldLocationArrayList.get(i);
+
+                if (curGoldLoc != null) {
+                    goldLocationCount++;
+                    t_n++;
+                    if (curModelLoc != null) {
+                        modelLocationCount++;
+                        if (curGoldLoc.looselyMatches(curModelLoc, 1.0)) {
+                            tp++;
+                            t_c++;
+                            //System.out.println("t_c | Gold: " + curGoldLoc.getName() + " (" + curGoldLoc.getCoord() + ") | Model: "
+                            //                       + curModelLoc.getName() + " (" + curModelLoc.getCoord() + ") p = " + curModelLoc.getPop());
+                            errorDump.write("t_c | Gold: " + curGoldLoc.getName() + " (" + curGoldLoc.getCoord() + ") | Model: "
+                                            + curModelLoc.getName() + " (" + curModelLoc.getCoord() + ") p = " + curModelLoc.getPop() + "\n");
+                        } else {
+                            fp++;
+                            fn++; // reinstated
+                            t_i++;
+                            //if(this instanceof PopulationBaselineModel) {
+                                //System.out.println("t_i | Gold: " + curGoldLoc.getName() + " (" + curGoldLoc.getCoord() + ") | Model: "
+                                //                   + curModelLoc.getName() + " (" + curModelLoc.getCoord() + ") p = " + curModelLoc.getPop());
+                                //}
+                                errorDump.write("t_i | Gold: " + curGoldLoc.getName() + " (" + curGoldLoc.getCoord() + ") | Model: "
+                                            + curModelLoc.getName() + " (" + curModelLoc.getCoord() + ") p = " + curModelLoc.getPop() + "\n");
+                        }
                     } else {
-                        fp++;
-                        fn++; // reinstated
-                        t_i++;
+                        fn++;
+                        t_u++;
+                        //if(this instanceof PopulationBaselineModel) {
+                            //System.out.println("t_u | Gold: " + curGoldLoc.getName() + " (" + curGoldLoc.getCoord() + ") | Model: "
+                            //                   + curModelLoc);
+                            errorDump.write("t_c | Gold: " + curGoldLoc.getName() + " (" + curGoldLoc.getCoord() + ") | Model: "
+                                            + curModelLoc + "\n");
+                            //}
+                        noModelGuessCount++;
                     }
-                } else {
-                    fn++;
-                    t_u++;
-                    noModelGuessCount++;
+                } /*else {
+                    if (curModelLoc != null) {
+                        //fp++; // curGoldLoc is null, which we shouldn't be punished for. Now treating these as non-toponyms.
+                        noGoldCount++;
+                    } else {
+                        //tn++;
+                    }
+                }*/
+                if(i < evalTokenArrayBuffer.size()-1 && evalTokenArrayBuffer.documentVector[i] != evalTokenArrayBuffer.documentVector[i+1]) {
+                    //System.out.println("#############################################");
+                    errorDump.write("#############################################\n");
                 }
-            } /*else {
-                if (curModelLoc != null) {
-                    //fp++; // curGoldLoc is null, which we shouldn't be punished for. Now treating these as non-toponyms.
-                    noGoldCount++;
-                } else {
-                    //tn++;
-                }
-            }*/
+            }
+
+            errorDump.close();
+
+        } catch(Exception e) {
+            e.printStackTrace();
         }
+
 
         /*
         double precision = (double) tp / (tp + fp);

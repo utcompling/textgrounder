@@ -104,7 +104,7 @@ public class BasicMinDistanceModel extends SelfTrainedModelBase {
                 locations.add(curLocation.getId());
                 curLocation.setBackPointers(new ArrayList<Integer>());
                 idsToCounts.put(curLocation.getId(), 1);
-                System.out.println("Found first " + curLocation.getName() + "; id = " + curLocation.getId());
+                System.out.println("Found first " + curLocation.getName() + ": " + curLocation);
             } else {
                 idsToCounts.increment(curLocation.getId());
                 System.out.println("Found " + curLocation.getName() + " #" + idsToCounts.get(curLocation.getId()));
@@ -158,19 +158,19 @@ public class BasicMinDistanceModel extends SelfTrainedModelBase {
 		if(tokenArrayBuffer.toponymVector[i] == 0) continue; // ignore non-toponyms
 		if(i == curIndex) continue; // don't measure distance to yourself
 		
-		String placename = lexicon.getWordForInt(tokenArrayBuffer.wordVector[i]).toLowerCase();
-		if(!gazetteer.contains(placename)) continue;
+		String otherPlacename = lexicon.getWordForInt(tokenArrayBuffer.wordVector[i]).toLowerCase();
+		if(!gazetteer.contains(otherPlacename)) continue;
 		otherToponymCounter++;
 
 		//System.out.println("Computing minimum distance from " + thisPlacename
 		//		   + " to any possible disambiguation of " + placename);
 
-		if(distanceCache.contains(thisPlacename + ";" + placename)) {
-		    totalDistances.put(curLocId, totalDistances.get(curLocId) + distanceCache.get(thisPlacename + ";" + placename));
+		/*if(distanceCache.contains(thisPlacename + ";" + otherPlacename)) {
+		    totalDistances.put(curLocId, totalDistances.get(curLocId) + distanceCache.get(thisPlacename + ";" + otherPlacename));
 		    continue;
-		}
+		}*/
 
-		TIntHashSet otherPossibleLocs = gazetteer.get(placename);
+		TIntHashSet otherPossibleLocs = gazetteer.get(otherPlacename);
 
 		double minDistance = Double.MAX_VALUE;
 		for(int otherPossibleLoc : otherPossibleLocs.toArray()) {
@@ -181,8 +181,8 @@ public class BasicMinDistanceModel extends SelfTrainedModelBase {
 		    }
 		}
 		totalDistances.put(curLocId, totalDistances.get(curLocId) + minDistance);
-		distanceCache.put(thisPlacename + ";" + placename, minDistance);
-		distanceCache.put(placename + ";" + thisPlacename, minDistance); // insert doubly since distance is symmetric
+		//distanceCache.put(thisPlacename + ";" + otherPlacename, minDistance);
+		//distanceCache.put(otherPlacename + ";" + thisPlacename, minDistance); // insert doubly since distance is symmetric
 	    }
 	    if(otherToponymCounter == 0) {
 		//System.out.println("No other toponyms to compare to; backing off to random baseline.");
@@ -200,6 +200,8 @@ public class BasicMinDistanceModel extends SelfTrainedModelBase {
 		toReturn = curLocId;
 	    }
 	}
+
+        //if(toReturn == -1)
 
 	System.out.println("Returning location ID " + toReturn + " which had min total distance " + minTotalDistance);
 

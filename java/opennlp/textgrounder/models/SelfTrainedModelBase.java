@@ -82,10 +82,19 @@ public abstract class SelfTrainedModelBase extends Model<Location> {
      * @throws Exception
      */
     public void writeXMLFile() throws Exception {
-        if (!runWholeGazetteer) {
-            writeXMLFile(trainInputPath, kmlOutputFilename, gazetteer.getIdxToLocationMap(), locations, evalTokenArrayBuffer);
-        } else {
-            writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, gazetteer.getIdxToLocationMap(), locations, evalTokenArrayBuffer);
+        if(evalTokenArrayBuffer != null) {
+            if (!runWholeGazetteer) {
+                writeXMLFile(trainInputPath, kmlOutputFilename, gazetteer.getIdxToLocationMap(), locations, evalTokenArrayBuffer);
+            } else {
+                writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, gazetteer.getIdxToLocationMap(), locations, evalTokenArrayBuffer);
+            }
+        }
+        else {
+            if (!runWholeGazetteer) {
+                writeXMLFile(trainInputPath, kmlOutputFilename, gazetteer.getIdxToLocationMap(), locations, trainTokenArrayBuffer);
+            } else {
+                writeXMLFile("WHOLE_GAZETTEER", kmlOutputFilename, gazetteer.getIdxToLocationMap(), locations, trainTokenArrayBuffer);
+            }
         }
     }
 
