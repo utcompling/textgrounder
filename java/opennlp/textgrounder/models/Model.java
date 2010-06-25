@@ -134,6 +134,11 @@ public abstract class Model<E extends SmallLocation> {
     public Model() {
     }
 
+    /**
+     * Normal constructor. Initialize member variables based on command-line
+     * options. See initialize().
+     * 
+     */
     public Model(CommandLineOptions options) {
         try {
             initialize(options);
@@ -149,7 +154,9 @@ public abstract class Model<E extends SmallLocation> {
     }
 
     /**
-     *
+     * Initialize member variables based on command-line options.
+     * Creates a gazetteer generator but doesn't generate the gazetteer.
+     * (That happens e.g. in the constructor for SelfTrainedModelBase.)
      * @param options
      */
     protected void initialize(CommandLineOptions options) throws

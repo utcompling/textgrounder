@@ -17,7 +17,7 @@
 package opennlp.textgrounder.gazetteers;
 
 /**
- *
+ * Class holding gazetteer-related enumerations.
  * @author tsmoon
  */
 public class GazetteerEnum {

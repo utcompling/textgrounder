@@ -34,17 +34,23 @@ import opennlp.textgrounder.topostructs.*;
  * Base class for Gazetteer objects. Links to gazetteer databases (i.e. db's
  * that contain names of places around the world and geographic information),
  * extracts information from them, and dumps them into internally accessible
- * collections. The Gazetteer class itself is hashmap from integer keys to
- * hashsets of integers. The keys are placenames in a gazetteer that have been
- * converted to dictionary indices (records for which are maintained in
- * toponymLexicon). The values of the hashmap, the hashsets are not populated
- * until corpus is processed and relevant toponyms have been identified in
- * the corpus. For each toponym in the corpus, a db query is conducted and if
- * the toponym is successfully found, all locations that have been selected from
- * the db are converted to Location objects and added to a TIntHashSet object,
- * whose hashset keys are the ids inherent to the locations in the gazetteer.
- * A separate lookup table from location ids to locations is maintained in
- * idxToLocationMap.
+ * collections.
+ * 
+ * The Gazetteer class itself is a hashmap from integer keys to hashsets of
+ * integers. Logically, this maps toponyms to locations that can "ground" the
+ * toponym. However, we only do the work of looking up the possible locations
+ * for toponyms that are found in a corpus, i.e. the gazetteer is populated
+ * lazily from the underlying database that stores the full gazetteer info. The
+ * keys of the hashmap are placenames in a gazetteer that have been converted to
+ * dictionary indices (records for which are maintained in toponymLexicon). The
+ * values of the hashmap are hashsets, which are not populated until a corpus is
+ * processed and relevant toponyms have been identified in the corpus. For each
+ * toponym in the corpus, a db query is conducted and if the toponym is
+ * successfully found, all locations that have been selected from the db are
+ * converted to Location objects and added to a TIntHashSet object, whose
+ * hashset keys are the ids inherent to the locations in the gazetteer; the
+ * TIntHashSet object is set as the value of the hashmap. A separate lookup
+ * table from location ids to locations is maintained in idxToLocationMap.
  */
 public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashMap<TIntHashSet> {
 

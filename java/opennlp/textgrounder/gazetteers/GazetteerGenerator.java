@@ -24,7 +24,14 @@ import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.topostructs.SmallLocation;
 
 /**
- *
+ * Factory class to generate the appropriate subclass of Gazetteer based on the
+ * setting of the -g (--gazetteer) option. See also the -id (--gazetteer-path)
+ * option, which tells where to find the file holding the gazetteer. The
+ * creation method just sets `gazPath' from the command-line options. The
+ * generateGazetteer() method actually creates the gazetteer. The creation
+ * method of the gazetteer reads the file and initializes the data
+ * appropriately.
+ * 
  * @author tsmoon
  */
 public class GazetteerGenerator<E extends SmallLocation> {
@@ -78,6 +85,11 @@ public class GazetteerGenerator<E extends SmallLocation> {
         gazPath = options.getGazetteerPath();
     }
 
+    /**
+     * Create the appropriate type of gazetteer using class var `gazPath'.
+     * Its creation method will read in the gazetteer info from the file. 
+     * @return the created gazetteer object
+     */
     public Gazetteer<E> generateGazetteer() {
         Gazetteer<E> gazetteer = null;
         try {

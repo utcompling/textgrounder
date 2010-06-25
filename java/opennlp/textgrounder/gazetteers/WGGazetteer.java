@@ -30,6 +30,16 @@ import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.*;
 
+/**
+ * Read in a gazetteer in World Gazetteer format. Processing happens at creation
+ * time. The file is in .../gazetteer/dataen-fixed.txt.gz under the path
+ * specified in the TEXTGROUNDER_DATA env var. The original is available from
+ * http://www.world-gazetteer.com/dataen.zip
+ * 
+ * @author Taesun Moon
+ * 
+ * @param <E>
+ */
 public class WGGazetteer<E extends SmallLocation> extends Gazetteer<E> {
 
     public WGGazetteer(String location) throws FileNotFoundException,
@@ -38,6 +48,9 @@ public class WGGazetteer<E extends SmallLocation> extends Gazetteer<E> {
         initialize(Constants.TEXTGROUNDER_DATA + "/gazetteer/dataen-fixed.txt.gz");
     }
 
+    /**
+     * Do all the work of the creation method -- read the file and populate the 
+     */
     @Override
     protected void initialize(String location) throws FileNotFoundException,
           IOException, ClassNotFoundException, SQLException {
