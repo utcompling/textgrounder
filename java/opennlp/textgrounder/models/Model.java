@@ -125,7 +125,6 @@ public abstract class Model<E extends SmallLocation> {
      * memory consumption
      */
     protected GazetteerGenerator<E> gazetteerGenerator;
-    //protected int indexInTAB = 0;
     /**
      * Flag for refreshing gazetteer from original database
      */
@@ -231,22 +230,6 @@ public abstract class Model<E extends SmallLocation> {
         System.out.println(activeRegions + " active regions for this document out of a possible "
               + (regionArrayHeight * regionArrayWidth) + " (region size = "
               + degreesPerRegion + " x " + degreesPerRegion + " degrees).");
-    }
-
-    /**
-     * Remove punctuation from first and last characters of a string
-     *
-     * @param aString String to strip
-     * @return Input stripped of punctuation
-     */
-    protected String stripPunc(String aString) {
-        while (aString.length() > 0 && !Character.isLetterOrDigit(aString.charAt(0))) {
-            aString = aString.substring(1);
-        }
-        while (aString.length() > 0 && !Character.isLetterOrDigit(aString.charAt(aString.length() - 1))) {
-            aString = aString.substring(0, aString.length() - 1);
-        }
-        return aString;
     }
 
     /**

@@ -31,7 +31,6 @@ import java.util.zip.GZIPInputStream;
 
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.ec.util.MersenneTwisterFast;
-import opennlp.textgrounder.gazetteers.Gazetteer;
 import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.textstructs.*;
