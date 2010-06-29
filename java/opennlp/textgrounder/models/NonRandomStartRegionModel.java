@@ -87,6 +87,9 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
             rand = new MersenneTwisterFast(randSeed);
         }
 
+        alpha = _options.getAlpha();
+        beta = _options.getBeta();
+
         SerializableRegionTrainingParameters<E> serializableRegionTrainingParameters = new SerializableRegionTrainingParameters<E>();
         serializableRegionTrainingParameters.loadParameters(_options.getSerializedDataParametersFilename(), this);
 
@@ -139,7 +142,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
                     if (regid > -1) {
                         try {
                             for (int j = 0;; ++j) {
-                                totalprob += probs[j] = 0;
+                                totalprob = probs[j] = 0;
                             }
                         } catch (ArrayIndexOutOfBoundsException e) {
                         }
