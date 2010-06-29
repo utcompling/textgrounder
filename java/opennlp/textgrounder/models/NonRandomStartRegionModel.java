@@ -110,7 +110,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
         }
         weightedEvalTokenArrayBuffer = (EvalTokenArrayBuffer<Location>) modelIn.readObject();
 
-        annealer = new EvalAnnealer(_options.getEvalIterations());
+        annealer = new EvalAnnealer(_options);
     }
 
     /**

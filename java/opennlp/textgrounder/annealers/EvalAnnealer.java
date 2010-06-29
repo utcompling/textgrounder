@@ -15,6 +15,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.annealers;
 
+import opennlp.textgrounder.geo.CommandLineOptions;
+
 /**
  * Class for conducting simulated annealing. This class also controls the burn-in
  * and the number of samples taken.
@@ -31,5 +33,9 @@ public class EvalAnnealer extends EmptyAnnealer {
     public EvalAnnealer(int _innerIterationsMax) {
         innerIterationsMax = _innerIterationsMax;
         outerIterationsMax = 1;
+    }
+
+    public EvalAnnealer(CommandLineOptions _options) {
+        super(_options);
     }
 }
