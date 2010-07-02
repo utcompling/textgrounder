@@ -1,5 +1,5 @@
 <!-- $Id: build.xml,v 1.50 2007/04/13 21:59:25 coffeeblack Exp $ -->
-<!-- Copyright (C) 2009 Jason Baldridge -->
+<!-- Copyright (C) 2010 Jason Baldridge, Taesun Moon, Mike Speriosu -->
 <project name="TextGrounder" default="compile" basedir=".">
 	
   <!-- =================================================================== -->
@@ -9,8 +9,8 @@
     <tstamp/>
     <property name="Name" value="TextGrounder"/>
     <property name="name" value="textgrounder"/>
-    <property name="year" value="2009"/>
-    <property name="version" value="0.0.1"/>
+    <property name="year" value="2010"/>
+    <property name="version" value="0.0.2"/>
 
     <echo message="----------- ${Name} ${version} [${year}] ------------"/>
 
@@ -23,7 +23,7 @@
     <property name="bin.dir" value="./bin"/>
     <property name="lib.dir" value="./lib"/>
     <property name="docs.dir" value="./docs"/>
-    <property name="packages" value="textgrounder.*"/>
+    <property name="packages" value="opennlp.textgrounder.*"/>
 
     <property name="build.dir" value="./output"/>
     <property name="build.dest" value="./output/classes"/>
@@ -135,7 +135,7 @@
              noindex="false"
              windowtitle="${name}"
              doctitle="The ${Name} API v${version}"
-             bottom="Copyright &#169; ${year} Mike Speriosu and Jason Baldridge, The University of Texas at Austin. All Rights Reserved."
+             bottom="Copyright &#169; ${year} Jason Baldridge, Taesun Moon, and Mike Speriosu. All Rights Reserved."
     />
   </target>
 
