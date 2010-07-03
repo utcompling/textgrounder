@@ -21,7 +21,7 @@ import opennlp.textgrounder.models.*;
 import opennlp.textgrounder.topostructs.SmallLocation;
 
 /**
- * 
+ * Main routine for running model that is initialized from weighted baseline
  *
  * @author tsmoon
  */
