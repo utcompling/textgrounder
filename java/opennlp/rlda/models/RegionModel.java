@@ -23,17 +23,13 @@ package opennlp.rlda.models;
  */
 public class RegionModel {
     /**
-     * Callback class for handling mappings between regions, locations and placenames
-     */
-    protected RegionMapperCallback<E> regionMapperCallback;
-    /**
      * Vector of toponyms. If 0, the word is not a toponym. If 1, it is.
      */
-    protected int[] toponymVector;
+    protected transient int[] toponymVector;
     /**
      * Vector of stopwords. If 0, the word is not a stopword. If 1, it is.
      */
-    protected int[] stopwordVector;
+    protected transient int[] stopwordVector;
     /**
      * An index of toponyms and possible regions. The goal is fast lookup and not
      * frugality with memory. The dimensions are equivalent to the wordByTopicCounts
@@ -41,26 +37,6 @@ public class RegionModel {
      * If a toponym occurs in a certain region, the cell value is one, zero if not.
      */
     protected int[] regionByToponymFilter;
-    /**
-     * The set of locations that have been observed with the model.
-     */
-    protected TIntHashSet locationSet;
-    /**
-     * Table from index to region
-     */
-    TIntObjectHashMap<Region> regionMap;
-    /**
-     * Table from index to location
-     */
-    TIntObjectHashMap<E> dataSpecificLocationMap;
-    /**
-     *
-     */
-    TIntObjectHashMap<TIntHashSet> dataSpecificGazetteer;
-    /**
-     *
-     */
-    protected StopwordList stopwordList;
     /**
      *
      */
@@ -81,9 +57,7 @@ public class RegionModel {
      *
      * @param _options
      */
-    public RegionModel(CommandLineOptions _options, E _genericsKludgeFactor) {
-        regionMapperCallback = new RegionMapperCallback();
-        genericsKludgeFactor = _genericsKludgeFactor;
+    public RegionModel(CommandLineOptions _options) {
         try {
             initialize(_options);
         } catch (FileNotFoundException ex) {
@@ -113,20 +87,9 @@ public class RegionModel {
           SQLException {
 
         modelIterations = _options.getModelIterations();
-        evalIterations = _options.getEvalIterations();
-        kmlOutputFilename = _options.getKMLOutputFilename();
-        degreesPerRegion = _options.getDegreesPerRegion();
-        barScale = _options.getBarScale();
-        windowSize = _options.getWindowSize();
 
         initializeFromOptions(_options);
 
-        SerializableRegionTrainingParameters<E> serializableRegionTrainingParameters = new SerializableRegionTrainingParameters<E>();
-        serializableRegionTrainingParameters.loadParameters(_options.getSerializedDataParametersFilename(), this);
-
-        stopwordList = new StopwordList();
-        initializeRegionArray();
-        locationSet = new TIntHashSet();
         setAllocateRegions(trainTokenArrayBuffer);
     }
 
@@ -425,91 +388,6 @@ public class RegionModel {
 
             annealer.collectSamples(topicCounts, wordByTopicCounts);
         }
-    }
-
-    /**
-     *
-     */
-    protected TIntObjectHashMap<E> normalizeLocations() {
-        for (TIntIterator it = locationSet.iterator(); it.hasNext();) {
-            int locid = it.next();
-            E loc = dataSpecificLocationMap.get(locid);
-            loc.setCount(loc.getCount() + beta);
-            loc.setBackPointers(new ArrayList<Integer>());
-        }
-
-        TIntObjectHashMap<TIntHashSet> placenameIdxToRegionIndexSet = regionMapperCallback.getPlacenameIdxToRegionIndexSet();
-        TIntObjectHashMap<TIntHashSet> placenameRegionToLocationIndexSet = regionMapperCallback.getPlacenameRegionToLocationIndexSet();
-        for (int wordid : placenameIdxToRegionIndexSet.keys()) {
-            for (int regid : placenameIdxToRegionIndexSet.get(wordid).toArray()) {
-                ToponymRegionPair trp = new ToponymRegionPair(wordid, regid);
-                TIntHashSet locs = placenameRegionToLocationIndexSet.get(trp.hashCode());
-                for (TIntIterator it = locs.iterator(); it.hasNext();) {
-                    int locid = it.next();
-                    E loc = dataSpecificLocationMap.get(locid);
-                    loc.setCount(loc.getCount() + wordByTopicCounts[wordIdMapper[wordid] * T + regid]);
-                }
-            }
-        }
-
-        int wordid, topicid;
-        int istoponym, isstopword;
-
-        int newlocid = 0;
-        for (int locid : dataSpecificLocationMap.keys()) {
-            if (locid > newlocid) {
-                newlocid = locid;
-            }
-        }
-        int curlocid = newlocid + 1;
-
-        for (int i = 0; i < N; ++i) {
-            isstopword = stopwordVector[i];
-            if (isstopword == 0) {
-                istoponym = toponymVector[i];
-                if (istoponym == 1) {
-                    wordid = wordVector[i];
-                    topicid = topicVector[i];
-                    ToponymRegionPair trp = new ToponymRegionPair(wordid, topicid);
-                    TIntHashSet locs = placenameRegionToLocationIndexSet.get(trp.hashCode());
-                    try {
-                        for (TIntIterator it = locs.iterator(); it.hasNext();) {
-                            int locid = it.next();
-                            E loc = dataSpecificLocationMap.get(locid);
-                            loc.getBackPointers().add(i);
-                            if (loc.getId() > newlocid) {
-                                loc.setCount(loc.getCount() + 1);
-                            }
-                        }
-                    } catch (NullPointerException e) {
-                        locs = new TIntHashSet();
-                        Region r = regionMapperCallback.getIdxToRegionMap().get(topicid);
-                        Coordinate coord = new Coordinate(r.centLon, r.centLat);
-                        E loc = generateLocation(curlocid, lexicon.getWordForInt(wordid), null, coord, 0, null, 1, wordid);
-                        dataSpecificLocationMap.put(curlocid, loc);
-                        loc.setBackPointers(new ArrayList<Integer>());
-                        loc.getBackPointers().add(i);
-                        locs.add(loc.getId());
-                        placenameRegionToLocationIndexSet.put(trp.hashCode(), locs);
-                        curlocid += 1;
-                    }
-                }
-            }
-        }
-
-        locations = new TIntHashSet();
-        for (TIntObjectIterator<E> it = dataSpecificLocationMap.iterator();
-              it.hasNext();) {
-            it.advance();
-            E loc = it.value();
-            try {
-                if (loc.getBackPointers().size() != 0) {
-                    locations.add(loc.getId());
-                }
-            } catch (NullPointerException e) {
-            }
-        }
-        return dataSpecificLocationMap;
     }
 
     /**
