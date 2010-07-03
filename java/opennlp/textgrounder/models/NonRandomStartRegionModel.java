@@ -212,7 +212,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
             loc.setCount(loc.getCount() + beta);
         }
 
-        TIntObjectHashMap<TIntHashSet> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
+        TIntObjectHashMap<TIntHashSet> placenameRegionToLocationIndexSet = regionMapperCallback.getPlacenameRegionToLocationIndexSet();
 
         int wordid, topicid;
         int istoponym;
@@ -231,7 +231,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
                 wordid = wordVector[i];
                 topicid = topicVector[i];
                 ToponymRegionPair trp = new ToponymRegionPair(wordid, topicid);
-                TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
+                TIntHashSet locs = placenameRegionToLocationIndexSet.get(trp.hashCode());
                 try {
                     int size = locs.size();
                     int randIndex = rand.nextInt(size);
@@ -249,7 +249,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
                     dataSpecificLocationMap.put(curlocid, curLocation);
                     evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
                     locs.add(curLocation.getId());
-                    toponymRegionToLocations.put(trp.hashCode(), locs);
+                    placenameRegionToLocationIndexSet.put(trp.hashCode(), locs);
                     curlocid += 1;
                 }
             } else {

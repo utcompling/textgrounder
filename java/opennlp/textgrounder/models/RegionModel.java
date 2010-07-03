@@ -460,12 +460,12 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
             loc.setBackPointers(new ArrayList<Integer>());
         }
 
-        TIntObjectHashMap<TIntHashSet> nameToRegionIndex = regionMapperCallback.getPlacenameIdxToRegionIndexSet();
-        TIntObjectHashMap<TIntHashSet> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
-        for (int wordid : nameToRegionIndex.keys()) {
-            for (int regid : nameToRegionIndex.get(wordid).toArray()) {
+        TIntObjectHashMap<TIntHashSet> placenameIdxToRegionIndexSet = regionMapperCallback.getPlacenameIdxToRegionIndexSet();
+        TIntObjectHashMap<TIntHashSet> placenameRegionToLocationIndexSet = regionMapperCallback.getPlacenameRegionToLocationIndexSet();
+        for (int wordid : placenameIdxToRegionIndexSet.keys()) {
+            for (int regid : placenameIdxToRegionIndexSet.get(wordid).toArray()) {
                 ToponymRegionPair trp = new ToponymRegionPair(wordid, regid);
-                TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
+                TIntHashSet locs = placenameRegionToLocationIndexSet.get(trp.hashCode());
                 for (TIntIterator it = locs.iterator(); it.hasNext();) {
                     int locid = it.next();
                     E loc = dataSpecificLocationMap.get(locid);
@@ -493,7 +493,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
                     wordid = wordVector[i];
                     topicid = topicVector[i];
                     ToponymRegionPair trp = new ToponymRegionPair(wordid, topicid);
-                    TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
+                    TIntHashSet locs = placenameRegionToLocationIndexSet.get(trp.hashCode());
                     try {
                         for (TIntIterator it = locs.iterator(); it.hasNext();) {
                             int locid = it.next();
@@ -512,7 +512,7 @@ public class RegionModel<E extends SmallLocation> extends TopicModel<E> {
                         loc.setBackPointers(new ArrayList<Integer>());
                         loc.getBackPointers().add(i);
                         locs.add(loc.getId());
-                        toponymRegionToLocations.put(trp.hashCode(), locs);
+                        placenameRegionToLocationIndexSet.put(trp.hashCode(), locs);
                         curlocid += 1;
                     }
                 }

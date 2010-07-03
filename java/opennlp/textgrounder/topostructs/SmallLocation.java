@@ -83,7 +83,7 @@ public class SmallLocation implements Serializable {
      * @return
      */
     public boolean looselyMatches(SmallLocation other, double maxDiff) {
-        return this.nameid == other.nameid && this.coord.looselyMatches(other.coord, maxDiff);
+        return /*this.nameid == other.nameid &&*/ this.coord.looselyMatches(other.coord, maxDiff);
     }
 
     @Override

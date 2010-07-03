@@ -118,7 +118,7 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
     protected void buildTopoTable(TokenArrayBuffer<E> _tokenArrayBuffer,
           Gazetteer<E> _gazetteer) {
         System.err.println();
-        System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
+        System.err.print("Building lookup tables for locations, regions and toponyms for document: ");
         int curDoc = 0, prevDoc = -1;
 
         for (int i = 0; i < _tokenArrayBuffer.size(); i++) {
