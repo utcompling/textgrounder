@@ -301,7 +301,7 @@ public abstract class Model<E extends SmallLocation> {
                 processTrainInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer, stopwordList);
             }
         } else {
-            textProcessor.addToponymsFromFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
+            textProcessor.processFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
         }
     }
 
@@ -333,7 +333,7 @@ public abstract class Model<E extends SmallLocation> {
                 processEvalInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, evalTokenArrayBuffer, stopwordList);
             }
         } else {
-            textProcessor.addToponymsFromFile(myPath.getCanonicalPath(), evalTokenArrayBuffer, stopwordList);
+            textProcessor.processFile(myPath.getCanonicalPath(), evalTokenArrayBuffer, stopwordList);
         }
     }
 

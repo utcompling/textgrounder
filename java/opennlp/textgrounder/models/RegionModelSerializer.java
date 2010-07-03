@@ -34,8 +34,8 @@ import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.Constants;
 
 /**
- * Topic model with region awareness. Toponyms are all unigrams. Multiword
- * toponyms are split into space delimited tokens.
+ * Region model derivative that handles serialization only. All region model experiments
+ * with new data must serialize the input before experiments can be run.
  * 
  * @author tsmoon
  */
@@ -65,6 +65,9 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
     }
 
     /**
+     * Initialize all fields necessary for serialization. Get command line
+     * arguments or default arguments, allocate memory, open training and eval
+     * documents, identify toponyms, start up gazetteer, and idenfity locations,
      *
      * @param _options
      */
@@ -112,8 +115,10 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
     }
 
     /**
-     * 
-     * @return
+     * Build tables for toponyms, locations and regions.
+     *
+     * @param _tokenArrayBuffer
+     * @param _gazetteer
      */
     protected void buildTopoTable(TokenArrayBuffer<E> _tokenArrayBuffer,
           Gazetteer<E> _gazetteer) {

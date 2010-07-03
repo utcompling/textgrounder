@@ -30,10 +30,19 @@ import org.jdom.JDOMException;
 import org.jdom.input.SAXBuilder;
 
 /**
- * 
+ * Text processing class for TEI (text encoding initiative) encoded XML files.
+ *
+ * The PCL travel corpus is encoded in TEI format and this class is to be
+ * used with pcl travel. By using the named entity definitions that come
+ * with the dtd for pcl travel, all encoding issues are handled within this
+ * class. Any non-lower ascii characters are normalized by first normalizing
+ * according to unicode standards and then stripping non-lower ascii portions.
+ *
  * @author tsmoon
  */
 public class TextProcessorTEIXML extends TextProcessor {
+
+    protected static SAXBuilder builder = new SAXBuilder();
 
     /**
      * Default constructor. Instantiate CRFClassifier.
@@ -46,15 +55,17 @@ public class TextProcessorTEIXML extends TextProcessor {
     }
 
     /**
-     * 
-     * @param locationOfFile
-     * @param tokenArrayBuffer
-     * @param stopwordList
+     * Process texts, identify toponyms and store in arrays.
+     *
+     * @param locationOfFile path to input
+     * @param tokenArrayBuffer collection of arrays for storing word ids, toponym
+     * status, document ids and stopword status
+     * @param stopwordList list of stopwords
      * @throws FileNotFoundException
      * @throws IOException
      */
     @Override
-    public void addToponymsFromFile(String locationOfFile,
+    public void processFile(String locationOfFile,
           TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws
           FileNotFoundException, IOException {
 
@@ -62,7 +73,6 @@ public class TextProcessorTEIXML extends TextProcessor {
             return;
         }
         File file = new File(locationOfFile);
-        SAXBuilder builder = new SAXBuilder();
         Document doc = null;
         try {
             doc = builder.build(file);
@@ -71,7 +81,7 @@ public class TextProcessorTEIXML extends TextProcessor {
             List<Element> divs = new ArrayList<Element>(child.getChildren("div"));
 
             for (Element div : divs) {
-                StringBuffer buf = new StringBuffer();
+                StringBuilder buf = new StringBuilder();
                 List<Element> pars = new ArrayList<Element>(div.getChildren("p"));
                 for (Element par : pars) {
                     for (char c :
@@ -84,7 +94,7 @@ public class TextProcessorTEIXML extends TextProcessor {
                 }
                 String text = buf.toString().trim();
                 if (!text.isEmpty()) {
-                    addToponymSpans(text, tokenArrayBuffer, stopwordList);
+                    processText(text, tokenArrayBuffer, stopwordList);
                     currentDoc += 1;
                     System.err.print(currentDoc + ",");
                 }

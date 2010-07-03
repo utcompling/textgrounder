@@ -23,7 +23,8 @@ import opennlp.textgrounder.ners.NullClassifier;
 import opennlp.textgrounder.topostructs.*;
 
 /**
- * 
+ * Text processing class for handling TR-CoNLL data.
+ *
  * @author 
  */
 public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
@@ -55,7 +56,7 @@ public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
      * @throws IOException
      */
     @Override
-    public void addToponymsFromFile(String locationOfFile,
+    public void processFile(String locationOfFile,
           TokenArrayBuffer evalTokenArrayBuffer, StopwordList stopwordList)
           throws
           FileNotFoundException, IOException {

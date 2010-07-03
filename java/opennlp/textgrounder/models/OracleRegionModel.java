@@ -126,9 +126,13 @@ public class OracleRegionModel extends NonRandomStartRegionModel<SmallLocation> 
                 wordByTopicCounts[wordid * T + topicid]++;
             }
         }
+
+        normalize();
+        evaluate(evalTokenArrayBuffer);
+        evalTokenArrayBuffer.modelLocationArrayList.clear();
     }
 
-        /**
+    /**
      * Train topics
      *
      * @param annealer Annealing scheme to use
@@ -197,7 +201,7 @@ public class OracleRegionModel extends NonRandomStartRegionModel<SmallLocation> 
             evalTokenArrayBuffer.modelLocationArrayList.clear();
         }
     }
-    
+
     protected int getRegionForLocationOracle(SmallLocation loc) {
         if (loc == null) {
             return -1;
@@ -228,7 +232,8 @@ public class OracleRegionModel extends NonRandomStartRegionModel<SmallLocation> 
      * @param evalTokenArrayBuffer
      */
     @Override
-    public void evaluate(EvalTokenArrayBuffer<SmallLocation> evalTokenArrayBuffer) {
+    public void evaluate(
+          EvalTokenArrayBuffer<SmallLocation> evalTokenArrayBuffer) {
         if (evalTokenArrayBuffer.modelLocationArrayList.size() != evalTokenArrayBuffer.goldLocationArrayList.size()) {
             System.out.println("MISMATCH: model: " + evalTokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + evalTokenArrayBuffer.goldLocationArrayList.size());
             System.exit(1);

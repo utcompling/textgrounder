@@ -62,7 +62,7 @@ public class GazetteerGenerator<E extends SmallLocation> {
         genericsKludgeFactor = _genericsKludgeFactor;
     }
 
-    protected void initialize(CommandLineOptions options) {
+    protected final void initialize(CommandLineOptions options) {
         String gazTypeArg = options.getGazetteType().toLowerCase();
         if (gazTypeArg.startsWith("c")) {
             gazType = GazetteerEnum.GazetteerTypes.CG;
