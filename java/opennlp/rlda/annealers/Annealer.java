@@ -14,14 +14,20 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-
 package opennlp.rlda.annealers;
+
+import opennlp.rlda.apps.CommandLineOptions;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
 public abstract class Annealer {
+
+    /**
+     * Machine epsilon for comparing equality in floating point numbers.
+     */
+    public static final double EPSILON = 1e-6;
     /**
      * Exponent in the annealing process. Is the reciprocal of the temperature.
      */
@@ -72,12 +78,12 @@ public abstract class Annealer {
     /**
      * Counts of topics
      */
-    protected float[] topicSampleCounts = null;
+    protected double[] topicSampleCounts = null;
     /**
      * Counts of tcount per topic. However, since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.
      */
-    protected float[] wordByTopicSampleCounts = null;
+    protected double[] wordByTopicSampleCounts = null;
     /**
      * To sample or not to sample
      */
@@ -117,7 +123,7 @@ public abstract class Annealer {
      * @return Whether temperature has been set to one
      */
     public boolean stabilizeTemperature() {
-        if (Math.abs(temperatureReciprocal - 1) < Constants.EPSILON) {
+        if (Math.abs(temperatureReciprocal - 1) < EPSILON) {
             System.err.println("Temperature stabilized to 1!");
             temperatureReciprocal = 1;
             return true;
@@ -216,8 +222,8 @@ public abstract class Annealer {
 
                 System.err.print("(sample:" + (innerIter + 1) / lag + ")");
                 if (topicSampleCounts == null) {
-                    topicSampleCounts = new float[_topicCounts.length];
-                    wordByTopicSampleCounts = new float[_wordByTopicCounts.length];
+                    topicSampleCounts = new double[_topicCounts.length];
+                    wordByTopicSampleCounts = new double[_wordByTopicCounts.length];
                     for (int i = 0; i < _topicCounts.length; ++i) {
                         topicSampleCounts[i] = 0;
                     }
@@ -262,14 +268,14 @@ public abstract class Annealer {
     /**
      * @return the topicSampleCounts
      */
-    public float[] getTopicSampleCounts() {
+    public double[] getTopicSampleCounts() {
         return topicSampleCounts;
     }
 
     /**
      * @return the wordByTopicSampleCounts
      */
-    public float[] getWordByTopicSampleCounts() {
+    public double[] getWordByTopicSampleCounts() {
         return wordByTopicSampleCounts;
     }
 
