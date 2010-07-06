@@ -115,6 +115,10 @@ public class Coordinate implements Serializable {
 	return latitude + "," + longitude;
     }
 
+    public String toLonLatString() {
+        return longitude + "," + latitude;
+    }
+
     /**
      * Compute distance between two coordinates (along a great circle?), in
      * miles.
