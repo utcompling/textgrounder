@@ -34,26 +34,32 @@ import opennlp.textgrounder.topostructs.*;
  * Base class for Gazetteer objects. Links to gazetteer databases (i.e. db's
  * that contain names of places around the world and geographic information),
  * extracts information from them, and dumps them into internally accessible
- * collections. The Gazetteer class itself is hashmap from integer keys to
- * hashsets of integers. The keys are placenames in a gazetteer that have been
- * converted to dictionary indices (records for which are maintained in
- * toponymLexicon). The values of the hashmap, the hashsets are not populated
- * until corpus is processed and relevant toponyms have been identified in
- * the corpus. For each toponym in the corpus, a db query is conducted and if
- * the toponym is successfully found, all locations that have been selected from
- * the db are converted to Location objects and added to a TIntHashSet object,
- * whose hashset keys are the ids inherent to the locations in the gazetteer.
- * A separate lookup table from location ids to locations is maintained in
- * idxToLocationMap.
+ * collections. The Gazetteer class itself is essentially a mapping from
+ * toponyms (words that name a place, e.g. "London") to a set of locations
+ * (stored in Location objects) that have the toponym as their name. Both
+ * toponyms and locations are identified by unique ID's (integers), with the
+ * mappings from ID's to toponyms or locations stored separately.
+ * (`toponymLexicon' stores the mapping from ID's to toponym strings, and
+ * `idxToLocationMap' stores the mapping from ID's to Location objects.) Thus,
+ * the implementation of the Gazetteer is actually a hashmap from integer keys
+ * (toponyms) to hashsets of integers (sets of locations). Note that the
+ * Gazetteer object isn't actually populated until a corpus is read in, and it's
+ * populated only with toponyms that appear in the corpus, mapped to all
+ * possible locations for the toponym.
  */
-public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashMap<TIntHashSet> {
+public abstract class Gazetteer<E extends SmallLocation> extends
+        TIntObjectHashMap<TIntHashSet> {
 
-    /*public final static int USGS_TYPE = 0;
-    public final static int US_CENSUS_TYPE = 1;
-    
-    public final static int DEFAULT_TYPE = USGS_TYPE;*/
+    /*
+     * public final static int USGS_TYPE = 0; public final static int
+     * US_CENSUS_TYPE = 1;
+     * 
+     * public final static int DEFAULT_TYPE = USGS_TYPE;
+     */
     /**
-     * Lookup table for Location (hash)code to Location object
+     * Cache that maps location ID's to Location objects. Only holds locations
+     * that we've already encountered in the corpus. Location ID's are used as
+     * hash keys; see above.
      */
     protected TIntObjectHashMap<E> idxToLocationMap;
     /**
@@ -61,8 +67,9 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
      */
     public boolean gazetteerRefresh = false;
     /**
-     * Internal lexicon for maintaining lookups between toponyms in gazetteer
-     * and indices
+     * Lookup table mapping toponym ID's to toponym strings. Only holds toponyms
+     * we've already encountered in the corpus. Toponym ID's are used as hash
+     * keys; see above.
      */
     protected Lexicon toponymLexicon;
     protected Connection conn;
@@ -70,8 +77,8 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
     protected static Pattern allDigits = Pattern.compile("^[0-9]+$");
     protected static Pattern rawCoord = Pattern.compile("^\\-?[0-9]+$");
     /**
-     * The largest location id value that has been activated. Needed for creating
-     * pseudo locations later in region model
+     * The largest location id value that has been activated. Needed for
+     * creating pseudo locations later in region model
      */
     protected static int maxLocId = 0;
     /**
@@ -84,8 +91,9 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
 
     /**
      * Default constructor. Allocates memory for internal collections.
-     *
-     * @param location empty parameter only to be overridden in derived classes
+     * 
+     * @param location
+     *            empty parameter only to be overridden in derived classes
      */
     public Gazetteer(String location) {
         idxToLocationMap = new TIntObjectHashMap<E>();
@@ -93,9 +101,9 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
     }
 
     /**
-     * Abstract initialization function. Generally includes db building and reading,
-     * and population of collections and the gazetteer.
-     *
+     * Abstract initialization function. Generally includes db building and
+     * reading, and population of collections and the gazetteer.
+     * 
      * @param location
      * @throws FileNotFoundException
      * @throws IOException
@@ -103,20 +111,18 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
      * @throws SQLException
      */
     abstract void initialize(String location) throws FileNotFoundException,
-          IOException, ClassNotFoundException, SQLException;
+            IOException, ClassNotFoundException, SQLException;
 
     /**
-     * Search for a placename and return locations associated with it. This is
-     * done by first looking up the index of the placename in toponymLexicon,
-     * then querying the native get(int) method to see if the location hashset
-     * associated with it is null or not. If it is null, it means that the
-     * placename has previously been unobserved in the text and the appropriate
-     * hashset is built and added to the map and returned. If it is not null, the corresponding
-     * hashset is retrieved and return.
-     *
-     * @param placename the placename to lookup in the gazetteer
+     * Search for a toponym in the Gazetteer object and return the set of
+     * locations associated with it. If the toponym hasn't been seen, look in
+     * the underlying database to find the set of locations associated with the
+     * toponym and add a new toponym->locations mapping in the Gazetteer.
+     * 
+     * @param placename
+     *            the placename to lookup in the gazetteer
      * @return the indexes of the locations that are associated with the current
-     * placename
+     *         placename
      * @throws SQLException
      */
     public TIntHashSet get(String placename) {
@@ -125,6 +131,11 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
     }
 
     /**
+     * Same as get(placename) but is also passed in the integer ID of the
+     * placename. Actually implements the logic of get(placename).
+     * 
+     * FIXME: This should actually be calling frugalGet() rather than
+     * duplicating the code to do the database lookup.
      * 
      * @param placename
      * @param topid
@@ -135,7 +146,9 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
             TIntHashSet locationsToReturn = get(topid);
             if (locationsToReturn == null) {
                 locationsToReturn = new TIntHashSet();
-                ResultSet rs = stat.executeQuery("select * from places where name = \"" + placename + "\";");
+                ResultSet rs = stat
+                        .executeQuery("select * from places where name = \""
+                                + placename + "\";");
                 while (rs.next()) {
                     E locationToAdd = generateLocation(rs, topid);
                     idxToLocationMap.put(locationToAdd.getId(), locationToAdd);
@@ -157,9 +170,12 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
     }
 
     /**
-     * Same as get(String) except does not add locationsToReturn to the
-     * gazetteer
-     *
+     * Given a toponym, look up the set of associated locations in the
+     * underlying database and return the set. This is similar to get(toponym)
+     * but without any caching -- i.e. it doesn't check the Gazetteer object to
+     * see if the toponym's set of locations is already cached, and it doesn't
+     * cache the result.
+     * 
      * @param placename
      * @return
      */
@@ -167,7 +183,9 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
         try {
             int topid = toponymLexicon.getIntForWord(placename);
             TIntHashSet locationsToReturn = new TIntHashSet();
-            ResultSet rs = stat.executeQuery("select * from places where name = \"" + placename + "\";");
+            ResultSet rs = stat
+                    .executeQuery("select * from places where name = \""
+                            + placename + "\";");
             while (rs.next()) {
                 E locationToAdd = generateLocation(rs, topid);
                 idxToLocationMap.put(locationToAdd.getId(), locationToAdd);
@@ -186,15 +204,22 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
     }
 
     /**
+     * Return a set of all locations in the underlying gazetteer database.
+     * FIXME: This should probably throw an error rather than providing a wrong
+     * default implementation.
      * 
      * @return
      * @throws Exception
      */
-    public TIntHashSet getAllLocalities() throws Exception { // overridden by WGGazetteer only right now
+    public TIntHashSet getAllLocalities() throws Exception { // overridden by
+                                                             // WGGazetteer only
+                                                             // right now
         return new TIntHashSet();
     }
 
     /**
+     * Return the cache mapping location ID's to Location objects.
+     * 
      * @return the idxToLocationMap
      */
     public TIntObjectHashMap<E> getIdxToLocationMap() {
@@ -202,6 +227,8 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
     }
 
     /**
+     * Return the Location object corresponding to a location ID, for ID's that
+     * have been cached in `idxToLocationMap'.
      * 
      * @param locid
      * @return
@@ -211,9 +238,11 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
     }
 
     /**
-     * Same as getLocation(int) except checks whether location exists in
-     * idxToLocaationMap
-     *
+     * Return the Location object corresponding to a location ID. If the object
+     * is not cached in `idxToLocationMap', query the underlying database to
+     * find the location info, construct a Location object, and cache the
+     * results in `idxToLocationMap'.
+     * 
      * @param locid
      * @return
      */
@@ -223,7 +252,9 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
         } else {
             E loc = null;
             try {
-                ResultSet rs = stat.executeQuery("select * from places where id = \"" + locid + "\";");
+                ResultSet rs = stat
+                        .executeQuery("select * from places where id = \""
+                                + locid + "\";");
                 while (rs.next()) {
                     loc = generateLocation(rs, locid);
                     idxToLocationMap.put(loc.getId(), loc);
@@ -238,17 +269,20 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
                     break;
                 }
             } catch (SQLException ex) {
-                Logger.getLogger(Gazetteer.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(Gazetteer.class.getName()).log(Level.SEVERE,
+                        null, ex);
             }
             return loc;
         }
     }
 
     /**
-     * Add location to idxToLocationMap. Only for pseudo-locations that 
-     * must be resolved after training on corpus is complete. These locations
-     * do not actually have any corresponding points in the gazetteer.
-     *
+     * Add location to idxToLocationMap, using a newly generated location ID.
+     * Only for pseudo-locations that must be resolved after training on corpus
+     * is complete. These locations do not actually have any corresponding
+     * points in the gazetteer. (Locations in the gazetteer come with a
+     * predefined ID.)
+     * 
      * @param loc
      * @return
      */
@@ -258,6 +292,8 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
     }
 
     /**
+     * Return the cache that maps location ID's to Location objects.
+     * 
      * @return the toponymLexicon
      */
     public Lexicon getToponymLexicon() {
@@ -265,6 +301,7 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
     }
 
     /**
+     * Return whether a given toponym exists in the `toponymLexicon' cache.
      * 
      * @param placename
      * @return
@@ -280,22 +317,27 @@ public abstract class Gazetteer<E extends SmallLocation> extends TIntObjectHashM
         return maxLocId;
     }
 
+    /**
+     * Generate a new Location or SmallLocation object with the specified ID and
+     * containing fields based on the given ResultSet (i.e. data returned from
+     * an SQL query done to the underlying database).
+     * 
+     * @param rs
+     * @param topid
+     * @return
+     * @throws SQLException
+     */
     protected E generateLocation(ResultSet rs, int topid) throws SQLException {
         E locationToAdd;// = (E) new SmallLocation();
 
         if (genericsKludgeFactor instanceof Location) {
             locationToAdd = (E) new Location(rs.getInt("id"),
-                  rs.getString("name"),
-                  rs.getString("type"),
-                  new Coordinate(rs.getDouble("lon"), rs.getDouble("lat")),
-                  rs.getInt("pop"),
-                  rs.getString("container"),
-                  0);
+                    rs.getString("name"), rs.getString("type"), new Coordinate(
+                            rs.getDouble("lon"), rs.getDouble("lat")),
+                    rs.getInt("pop"), rs.getString("container"), 0);
         } else {
-            locationToAdd = (E) new SmallLocation(rs.getInt("id"),
-                  topid,
-                  new Coordinate(rs.getDouble("lon"), rs.getDouble("lat")),
-                  0);
+            locationToAdd = (E) new SmallLocation(rs.getInt("id"), topid,
+                    new Coordinate(rs.getDouble("lon"), rs.getDouble("lat")), 0);
         }
         return locationToAdd;
     }
