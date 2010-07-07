@@ -17,6 +17,22 @@ package opennlp.textgrounder.topostructs;
 
 import java.util.*;
 
+/**
+ * A class encapsulating a location on a sphere along with various properties.
+ * This is an extension of SmallLocation and adds a number of new properties:
+ * <ul>
+ * <li>The name of the location
+ * <li>The type of the location (FIXME which types can occur?)
+ * <li>The location's population
+ * <li>The container of the location (FIXME document this)
+ * </ul>
+ * <p>
+ * The methods of this class are basically uninteresting -- mostly just getter
+ * and setter methods.
+ * 
+ * @author Taesun Moon
+ * 
+ */
 public class Location extends SmallLocation {
 
     protected String name;
@@ -38,6 +54,11 @@ public class Location extends SmallLocation {
         this.count = count;
     }
 
+    /**
+     * Override looselyMatches() so that the names must compare the same. FIXME:
+     * This has the same problem as is documented in the superclass method of
+     * the same name.
+     */
     @Override
     public boolean looselyMatches(SmallLocation other, double maxDiff) {
         /*if(!this.name.equals(other.name)) {
@@ -65,6 +86,9 @@ public class Location extends SmallLocation {
         return id;
     }
 
+    /**
+     * Two Locations are the same if they have the same class and same ID.
+     */
     @Override
     public boolean equals(Object obj) {
         if (obj == null) {

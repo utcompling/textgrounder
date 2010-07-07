@@ -18,6 +18,25 @@ package opennlp.textgrounder.topostructs;
 import java.io.*;
 import java.util.ArrayList;
 
+/**
+ * A simple class for encapsulating a location on a sphere along with (1) a
+ * count of how many times a location has been seen in a text; (2) a list of
+ * places where the location was seen.
+ * <p>
+ * The following properties define the location itself:
+ * <ul>
+ * <li>A Coordinate object specifying the latitude and longitude
+ * <li>An integer identifying the location, for fast storage/lookup in tables
+ * <li>An integer identifying the name of the location
+ * </ul>
+ * <p>
+ * The methods are mostly getters and setters. The only interesting method is
+ * looselyMatches(), which compares two locations approximately, allowing them
+ * to differ slightly in position.
+ * 
+ * @author Taesun Moon
+ * 
+ */
 public class SmallLocation implements Serializable {
 
     static private final long serialVersionUID = 13371511L;
@@ -30,7 +49,7 @@ public class SmallLocation implements Serializable {
      */
     protected double count;
     /**
-     * List of pack pointers into the DocumentSet so that context (snippets) can be extracted
+     * List of back pointers into the DocumentSet so that context (snippets) can be extracted
      */
     protected ArrayList<Integer> backPointers = null;
 
@@ -53,8 +72,18 @@ public class SmallLocation implements Serializable {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Compare two locations approximately, allowing the latitude or longitutde
+     * to differ by up to `maxDiff'. FIXME: This also requires that the name
+     * ID's are the same, which seems to defeat the whole purpose of allowing
+     * approximate matching on the coordinate.
+     * 
+     * @param other
+     * @param maxDiff
+     * @return
+     */
     public boolean looselyMatches(SmallLocation other, double maxDiff) {
-        return this.nameid == other.nameid && this.coord.looselyMatches(other.coord, maxDiff);
+        return /*this.nameid == other.nameid &&*/ this.coord.looselyMatches(other.coord, maxDiff);
     }
 
     @Override

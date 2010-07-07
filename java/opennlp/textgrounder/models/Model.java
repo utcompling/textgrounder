@@ -125,7 +125,6 @@ public abstract class Model<E extends SmallLocation> {
      * memory consumption
      */
     protected GazetteerGenerator<E> gazetteerGenerator;
-    //protected int indexInTAB = 0;
     /**
      * Flag for refreshing gazetteer from original database
      */
@@ -134,6 +133,11 @@ public abstract class Model<E extends SmallLocation> {
     public Model() {
     }
 
+    /**
+     * Normal constructor. Initialize member variables based on command-line
+     * options. See initialize().
+     * 
+     */
     public Model(CommandLineOptions options) {
         try {
             initialize(options);
@@ -149,7 +153,9 @@ public abstract class Model<E extends SmallLocation> {
     }
 
     /**
-     *
+     * Initialize member variables based on command-line options.
+     * Creates a gazetteer generator but doesn't generate the gazetteer.
+     * (That happens e.g. in the constructor for SelfTrainedModelBase.)
      * @param options
      */
     protected void initialize(CommandLineOptions options) throws
@@ -227,22 +233,6 @@ public abstract class Model<E extends SmallLocation> {
     }
 
     /**
-     * Remove punctuation from first and last characters of a string
-     *
-     * @param aString String to strip
-     * @return Input stripped of punctuation
-     */
-    protected String stripPunc(String aString) {
-        while (aString.length() > 0 && !Character.isLetterOrDigit(aString.charAt(0))) {
-            aString = aString.substring(1);
-        }
-        while (aString.length() > 0 && !Character.isLetterOrDigit(aString.charAt(aString.length() - 1))) {
-            aString = aString.substring(0, aString.length() - 1);
-        }
-        return aString;
-    }
-
-    /**
      * Add locations to 2D regionArray. To be used by classes and methods that
      * use a RegionMapperCallback
      *
@@ -311,7 +301,7 @@ public abstract class Model<E extends SmallLocation> {
                 processTrainInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer, stopwordList);
             }
         } else {
-            textProcessor.addToponymsFromFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
+            textProcessor.processFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
         }
     }
 
@@ -343,7 +333,7 @@ public abstract class Model<E extends SmallLocation> {
                 processEvalInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, evalTokenArrayBuffer, stopwordList);
             }
         } else {
-            textProcessor.addToponymsFromFile(myPath.getCanonicalPath(), evalTokenArrayBuffer, stopwordList);
+            textProcessor.processFile(myPath.getCanonicalPath(), evalTokenArrayBuffer, stopwordList);
         }
     }
 

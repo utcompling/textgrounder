@@ -24,7 +24,11 @@ import opennlp.textgrounder.models.*;
 import opennlp.textgrounder.topostructs.*;
 
 /**
- * App to be called from command line. Runs LDA based georeferencing models
+ * App to be called from command line. Processes input and dumps into a serialized
+ * file. For both pcl travel and tr-dev (whose locations must be specified from
+ * the command line), toponyms are identified, their locations are identified
+ * through a gazetteer (which in most case is more than one location), the words
+ * are converted to numbers, then all of this is dumped to a gzipped file.
  *
  * @author tsmoon
  */

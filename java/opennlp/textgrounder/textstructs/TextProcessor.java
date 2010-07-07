@@ -34,7 +34,7 @@ import opennlp.textgrounder.util.*;
  * in Lexicon.
  *
  * This class also processes all input text and identifies toponyms through
- * a named entity recognizer (NER) in addToponymsFromFile. It is the only
+ * a named entity recognizer (NER) in processFile. It is the only
  * method in the entire project that processes input text and as such any
  * other classes which need to be populated from input is data is processed
  * here.
@@ -130,12 +130,10 @@ public class TextProcessor {
      * This method only splits any incoming document into smaller 
      * subdocuments based on Lexicon.parAsDocSize. The actual work of
      * identifying toponyms, converting tokens to indexes, and populating
-     * arrays is handled in addToponymSpans.
+     * arrays is handled in processText.
      * 
      * @param locationOfFile path to input. must be a single file
-     * @param lexicon the Lexicon instance that contains both the sequence
-     * of token indexes and the lexicon.
-     * @param evalTokenArrayBuffer buffer that holds the array of token indexes,
+     * @param tokenArrayBuffer buffer that holds the array of token indexes,
      * document indexes, and the toponym indexes. If this class object is
      * not needed from the calling class, then a NullTokenArrayBuffer is
      * instantiated and passed. Nothing happens inside this object.
@@ -146,7 +144,7 @@ public class TextProcessor {
      * @throws FileNotFoundException
      * @throws IOException
      */
-    public void addToponymsFromFile(String locationOfFile,
+    public void processFile(String locationOfFile,
           TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws
           FileNotFoundException, IOException {
 
@@ -168,7 +166,7 @@ public class TextProcessor {
             if (counter < parAsDocSize) {
                 counter++;
             } else {
-                addToponymSpans(buf.toString(), tokenArrayBuffer, stopwordList);
+                processText(buf.toString(), tokenArrayBuffer, stopwordList);
 
                 buf = new StringBuffer();
                 currentDoc += 1;
@@ -181,7 +179,7 @@ public class TextProcessor {
          * Add last lines if they have not been processed and added
          */
         if (counter > 1) {
-            addToponymSpans(buf.toString(), tokenArrayBuffer, stopwordList);
+            processText(buf.toString(), tokenArrayBuffer, stopwordList);
             System.err.print(currentDoc + ",");
         }
         System.err.println();
@@ -213,13 +211,7 @@ public class TextProcessor {
      *
      * @param text StringBuffer of input to be processed. This should always be
      * space delimited raw text.
-     * @param curSpanList sequence of toponym indexes. memory is allocated
-     * outside the method but is populated in this method. After being
-     * processed here, it is appended to an instance of this class through
-     * add.
-     * @param lexicon the Lexicon instance that contains both the sequence
-     * of token indexes and the lexicon.
-     * @param evalTokenArrayBuffer buffer that holds the array of token indexes,
+     * @param tokenArrayBuffer buffer that holds the array of token indexes,
      * document indexes, and the toponym indexes. If this class object is
      * not needed from the calling class, then a NullTokenArrayBuffer is
      * instantiated and passed. Nothing happens inside this object.
@@ -229,8 +221,8 @@ public class TextProcessor {
      * (i.e. the token is not a stopword).
      * @param currentDoc 
      */
-    public void addToponymSpans(String text,
-          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) {
+    public void processText(String text, TokenArrayBuffer tokenArrayBuffer,
+          StopwordList stopwordList) {
 
         String nerOutput = classifier.classifyToString(text);
 
@@ -307,7 +299,9 @@ public class TextProcessor {
     }
 
     /**
-     * 
+     * Find the non-label tokens in a single string with multiple tokens
+     * that does not have whitespace boundaries
+     *
      * @param token
      * @return
      */

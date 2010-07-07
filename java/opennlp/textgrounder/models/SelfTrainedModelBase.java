@@ -24,7 +24,7 @@ import java.util.logging.*;
 import opennlp.textgrounder.topostructs.Location;
 
 /**
- *
+ * Abstract class for models that don't need training data.
  * @author tsmoon
  */
 public abstract class SelfTrainedModelBase extends Model<Location> {

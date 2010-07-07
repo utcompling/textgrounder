@@ -17,11 +17,22 @@ package opennlp.textgrounder.topostructs;
 
 import java.io.*;
 
+/**
+ * A Coordinate represents a location somewhere on a sphere and just
+ * encapsulates a latitude and longitude. Various additional methods are created
+ * to compare coordinates loosely and exactly, return points along a spiral radiating outward from the coordinate, 
+ * 
+ * @author Taesun Moon
+ * 
+ */
 public class Coordinate implements Serializable {
 
     static private final long serialVersionUID = 10427645L;
 
     private final static double twoPI = 2*Math.PI;
+    /**
+     * Radius of the Earth in miles
+     */
     private final static double EARTH_RADIUS_MI = 3963.191;
 
     public double longitude;
@@ -32,10 +43,30 @@ public class Coordinate implements Serializable {
 	latitude = lat;
     }
 
+    /**
+     * Compare two coordinates to see if they're sufficiently close together.
+     * @param other The other coordinate being compared
+     * @param maxDiff Both latitude and longitude must be within this value
+     * @return Whether the two coordinates are sufficiently close
+     */
     public boolean looselyMatches(Coordinate other, double maxDiff) {
 	return Math.abs(this.longitude - other.longitude) <= maxDiff && Math.abs(this.latitude - other.latitude) <= maxDiff;
     }
 
+    /**
+     * Create a KML expression corresponding to a polygonal cylinder (i.e. a
+     * cylinder with a polygon as its base instead of a circle) located around
+     * the given coordinate.
+     * 
+     * @param sides
+     *            Number of sides of the polygon
+     * @param radius
+     *            Radius of the circle that circumscribes the polygon
+     * @param height
+     *            Height of the cylinder
+     * @return A string representing a KML expression describing the coordinates
+     *         of the cylinder
+     */
     public String toKMLPolygon(int sides, double radius, double height) {
 	final double radianUnit = twoPI/sides;
 	final double startRadian = radianUnit/2;
@@ -52,6 +83,21 @@ public class Coordinate implements Serializable {
 	return sb.toString();
     }
 
+    /**
+     * Generate a new Coordinate that is the `n'th point along a spiral
+     * radiating outward from the given coordinate. `initRadius' controls where
+     * on the spiral the zeroth point is located. The constant local variable
+     * `radianUnit' controls the spacing of the points (FIXME, should be an
+     * optional parameter). The radius of the spiral increases by 1/10 (FIXME,
+     * should be controllable) of `initRadius' every point.
+     * 
+     * @param n
+     *            How far along the spiral to return a coordinate for
+     * @param initRadius
+     *            Where along the spiral the 0th point is located; this also
+     *            controls how quickly the spiral grows outward
+     * @return A new coordinate along the spiral
+     */
     public Coordinate getNthSpiralPoint(int n, double initRadius) {
 	if(n == 0)
 	  return this;
@@ -69,6 +115,13 @@ public class Coordinate implements Serializable {
 	return latitude + "," + longitude;
     }
 
+    /**
+     * Compute distance between two coordinates (along a great circle?), in
+     * miles.
+     * 
+     * @param other
+     * @return
+     */
     public double computeDistanceTo(Coordinate other) {
 	double thisRadLat = (this.latitude / 180) * Math.PI;
 	double thisRadLong = (this.longitude / 180) * Math.PI;
@@ -79,6 +132,10 @@ public class Coordinate implements Serializable {
 					   + Math.cos(thisRadLat)*Math.cos(otherRadLat)*Math.cos(otherRadLong-thisRadLong));
     }
 
+    /**
+     * Two coordinates are the same if they have the same type as well as
+     * latitude and longitude.
+     */
     @Override
     public boolean equals(Object obj) {
         if (obj == null) {

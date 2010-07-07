@@ -21,11 +21,25 @@ import opennlp.textgrounder.models.*;
 import opennlp.textgrounder.topostructs.SmallLocation;
 
 /**
- * Main routine for running model that is initialized from weighted baseline
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * IGNORE THIS CLASS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  *
  * @author tsmoon
  */
-public class GeoReferencerWeightedBaselineLDA extends BaseApp {
+public class GeoReferencerOracleLDA extends BaseApp {
 
     public static void main(String[] args) throws Exception {
 
@@ -43,9 +57,7 @@ public class GeoReferencerWeightedBaselineLDA extends BaseApp {
         }
 
         CommandLineOptions modelOptions = new CommandLineOptions(cline);
-        NonRandomStartRegionModel<SmallLocation> rm = new NonRandomStartRegionModel<SmallLocation>(modelOptions, new SmallLocation());
+        OracleRegionModel rm = new OracleRegionModel(modelOptions, new SmallLocation());
         rm.train();
-        rm.normalize();
-        rm.evaluate();
     }
 }

@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import opennlp.textgrounder.models.callbacks.NullTrainingMaterialCallback;
 import opennlp.textgrounder.models.callbacks.TrainingMaterialCallback;
-import opennlp.textgrounder.topostructs.Location;
 import opennlp.textgrounder.topostructs.SmallLocation;
 
 /**

@@ -31,7 +31,6 @@ import java.util.zip.GZIPInputStream;
 
 import opennlp.textgrounder.annealers.*;
 import opennlp.textgrounder.ec.util.MersenneTwisterFast;
-import opennlp.textgrounder.gazetteers.Gazetteer;
 import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.textstructs.*;
@@ -88,6 +87,9 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
             rand = new MersenneTwisterFast(randSeed);
         }
 
+        alpha = _options.getAlpha();
+        beta = _options.getBeta();
+
         SerializableRegionTrainingParameters<E> serializableRegionTrainingParameters = new SerializableRegionTrainingParameters<E>();
         serializableRegionTrainingParameters.loadParameters(_options.getSerializedDataParametersFilename(), this);
 
@@ -108,7 +110,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
         }
         weightedEvalTokenArrayBuffer = (EvalTokenArrayBuffer<Location>) modelIn.readObject();
 
-        annealer = new EvalAnnealer(_options.getEvalIterations());
+        annealer = new EvalAnnealer(evalIterations);
     }
 
     /**
@@ -140,7 +142,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
                     if (regid > -1) {
                         try {
                             for (int j = 0;; ++j) {
-                                totalprob += probs[j] = 0;
+                                totalprob = probs[j] = 0;
                             }
                         } catch (ArrayIndexOutOfBoundsException e) {
                         }
@@ -210,7 +212,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
             loc.setCount(loc.getCount() + beta);
         }
 
-        TIntObjectHashMap<TIntHashSet> toponymRegionToLocations = regionMapperCallback.getToponymRegionToLocations();
+        TIntObjectHashMap<TIntHashSet> placenameRegionToLocationIndexSet = regionMapperCallback.getPlacenameRegionToLocationIndexSet();
 
         int wordid, topicid;
         int istoponym;
@@ -229,7 +231,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
                 wordid = wordVector[i];
                 topicid = topicVector[i];
                 ToponymRegionPair trp = new ToponymRegionPair(wordid, topicid);
-                TIntHashSet locs = toponymRegionToLocations.get(trp.hashCode());
+                TIntHashSet locs = placenameRegionToLocationIndexSet.get(trp.hashCode());
                 try {
                     int size = locs.size();
                     int randIndex = rand.nextInt(size);
@@ -247,7 +249,7 @@ public class NonRandomStartRegionModel<E extends SmallLocation> extends RegionMo
                     dataSpecificLocationMap.put(curlocid, curLocation);
                     evalTokenArrayBuffer.modelLocationArrayList.add(curLocation);
                     locs.add(curLocation.getId());
-                    toponymRegionToLocations.put(trp.hashCode(), locs);
+                    placenameRegionToLocationIndexSet.put(trp.hashCode(), locs);
                     curlocid += 1;
                 }
             } else {

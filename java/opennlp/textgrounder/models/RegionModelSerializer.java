@@ -16,17 +16,12 @@
 package opennlp.textgrounder.models;
 
 import gnu.trove.TIntHashSet;
-import gnu.trove.TIntIterator;
 import gnu.trove.TIntObjectHashMap;
-import gnu.trove.TIntObjectIterator;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -39,25 +34,25 @@ import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.Constants;
 
 /**
- * Topic model with region awareness. Toponyms are all unigrams. Multiword
- * toponyms are split into space delimited tokens.
+ * Region model derivative that handles serialization only. All region model experiments
+ * with new data must serialize the input before experiments can be run.
  * 
  * @author tsmoon
  */
 public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<E> {
 
     /**
-     * Default constructor. Take input from commandline and default options
+     * Default constructor. Take input from commandline and default _options
      * and initialize class. Also, process input text and process so that
      * toponyms, stopwords and other words are identified and collected.
      *
-     * @param options
+     * @param _options
      */
-    public RegionModelSerializer(CommandLineOptions options,
+    public RegionModelSerializer(CommandLineOptions _options,
           E _genericsKludgeFactor) {
         genericsKludgeFactor = _genericsKludgeFactor;
         try {
-            initialize(options);
+            initialize(_options);
         } catch (FileNotFoundException ex) {
             Logger.getLogger(RegionModelSerializer.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
@@ -70,24 +65,27 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
     }
 
     /**
+     * Initialize all fields necessary for serialization. Get command line
+     * arguments or default arguments, allocate memory, open training and eval
+     * documents, identify toponyms, start up gazetteer, and idenfity locations,
      *
-     * @param options
+     * @param _options
      */
     @Override
-    protected void initialize(CommandLineOptions options) throws
+    protected void initialize(CommandLineOptions _options) throws
           FileNotFoundException, IOException, ClassNotFoundException,
           SQLException {
-        trainInputPath = options.getTrainInputPath();
+        trainInputPath = _options.getTrainInputPath();
         trainInputFile = new File(trainInputPath);
-        evalInputPath = options.getEvalDir();
+        evalInputPath = _options.getEvalDir();
         evalInputFile = new File(evalInputPath);
 
-        degreesPerRegion = options.getDegreesPerRegion();
+        degreesPerRegion = _options.getDegreesPerRegion();
         lexicon = new Lexicon();
-        gazetteerGenerator = new GazetteerGenerator(options, genericsKludgeFactor);
+        gazetteerGenerator = new GazetteerGenerator(_options, genericsKludgeFactor);
         TextProcessor textProcessor = null;
         String fname = trainInputFile.getName();
-        if (options.isPCLXML()) {
+        if (_options.isPCLXML()) {
             textProcessor = new TextProcessorTEIXML(lexicon);
         } else if (trainInputFile.isDirectory() && trainInputFile.list(new PCLXMLFilter()).length != 0) {
             textProcessor = new TextProcessorTEIXML(lexicon);
@@ -117,13 +115,15 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
     }
 
     /**
-     * 
-     * @return
+     * Build tables for toponyms, locations and regions.
+     *
+     * @param _tokenArrayBuffer
+     * @param _gazetteer
      */
     protected void buildTopoTable(TokenArrayBuffer<E> _tokenArrayBuffer,
-          Gazetteer<E> gazetteer) {
+          Gazetteer<E> _gazetteer) {
         System.err.println();
-        System.err.print("Buildng lookup tables for locations, regions and toponyms for document: ");
+        System.err.print("Building lookup tables for locations, regions and toponyms for document: ");
         int curDoc = 0, prevDoc = -1;
 
         for (int i = 0; i < _tokenArrayBuffer.size(); i++) {
@@ -136,11 +136,11 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
                 int topid = _tokenArrayBuffer.wordVector[i];
                 if (!dataSpecificGazetteer.contains(topid)) {
                     String placename = lexicon.getWordForInt(_tokenArrayBuffer.wordVector[i]);
-                    if (gazetteer.contains(placename)) {
-                        TIntHashSet possibleLocations = gazetteer.get(placename);
+                    if (_gazetteer.contains(placename)) {
+                        TIntHashSet possibleLocations = _gazetteer.get(placename);
                         TIntHashSet tempLocs = new TIntHashSet();
                         for (int locid : possibleLocations.toArray()) {
-                            E loc = gazetteer.getLocation(locid);
+                            E loc = _gazetteer.getLocation(locid);
                             if (Math.abs(loc.getCoord().latitude) > Constants.EPSILON && Math.abs(loc.getCoord().longitude) > Constants.EPSILON) {
                                 tempLocs.add(loc.getId());
                                 dataSpecificLocationMap.put(loc.getId(), loc);
@@ -155,14 +155,14 @@ public class RegionModelSerializer<E extends SmallLocation> extends RegionModel<
 
         for (int locnameid : dataSpecificLocationMap.keys()) {
             E loc = dataSpecificLocationMap.get(locnameid);
-            String placename = gazetteer.getToponymLexicon().getWordForInt(loc.getNameid());
+            String placename = _gazetteer.getToponymLexicon().getWordForInt(loc.getNameid());
             int newlocnameid = lexicon.getIntForWord(placename);
             loc.setNameid(newlocnameid);
         }
     }
 
-    public void serialize(String filename) throws IOException {
+    public void serialize(String _filename) throws IOException {
         SerializableRegionTrainingParameters<E> srp = new SerializableRegionTrainingParameters<E>();
-        srp.saveParameters(filename, this);
+        srp.saveParameters(_filename, this);
     }
 }
