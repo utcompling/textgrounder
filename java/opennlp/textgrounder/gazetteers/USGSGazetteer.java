@@ -26,6 +26,13 @@ import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.*;
 
+/**
+ * USGS Gazetteer type.  FIXME: Document me!
+ * 
+ * @author Taesun Moon
+ *
+ * @param <E>
+ */
 public class USGSGazetteer<E extends SmallLocation> extends Gazetteer<E> {
 
     public USGSGazetteer(String location) throws

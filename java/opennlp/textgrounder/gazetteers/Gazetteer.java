@@ -31,21 +31,32 @@ import opennlp.textgrounder.textstructs.Lexicon;
 import opennlp.textgrounder.topostructs.*;
 
 /**
- * Base class for Gazetteer objects. Links to gazetteer databases (i.e. db's
- * that contain names of places around the world and geographic information),
+ * Base class for Gazetteer objects. Creates gazetteer databases (i.e. db's that
+ * contain names of places around the world and geographic information),
  * extracts information from them, and dumps them into internally accessible
- * collections. The Gazetteer class itself is essentially a mapping from
- * toponyms (words that name a place, e.g. "London") to a set of locations
- * (stored in Location objects) that have the toponym as their name. Both
- * toponyms and locations are identified by unique ID's (integers), with the
- * mappings from ID's to toponyms or locations stored separately.
- * (`toponymLexicon' stores the mapping from ID's to toponym strings, and
- * `idxToLocationMap' stores the mapping from ID's to Location objects.) Thus,
- * the implementation of the Gazetteer is actually a hashmap from integer keys
- * (toponyms) to hashsets of integers (sets of locations). Note that the
- * Gazetteer object isn't actually populated until a corpus is read in, and it's
- * populated only with toponyms that appear in the corpus, mapped to all
- * possible locations for the toponym.
+ * collections.
+ * 
+ * The Gazetteer class itself is essentially a mapping from toponyms (words that
+ * name a place, e.g. "London") to a set of locations (stored in Location
+ * objects) that have the toponym as their name. Both toponyms and locations are
+ * identified by unique ID's (integers), with the mappings from ID's to toponyms
+ * or locations stored separately. (`toponymLexicon' stores the mapping from
+ * ID's to toponym strings, and `idxToLocationMap' stores the mapping from ID's
+ * to Location objects.) Thus, the implementation of the Gazetteer is actually a
+ * hashmap from integer keys (toponyms) to hashsets of integers (sets of
+ * locations).
+ * 
+ * During creation time (specifically, in the initialize() funtion), the
+ * gazetteer data is read from a source file, which contains geographic
+ * information in some format that is specific to the particular file. The data
+ * is then dumped to a temporary database file (`.db' extension, SQLite format).
+ * 
+ * Note, however, that the Gazetteer object isn't actually populated from the
+ * database until a corpus is read in, and it's populated only with toponyms
+ * that appear in the corpus, mapped to all possible locations for the toponym.
+ * 
+ * The various subtypes of this class handle data in different formats, from
+ * gazetteers obtained from various sources.
  */
 public abstract class Gazetteer<E extends SmallLocation> extends
         TIntObjectHashMap<TIntHashSet> {
