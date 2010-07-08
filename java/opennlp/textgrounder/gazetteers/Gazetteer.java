@@ -61,12 +61,10 @@ import opennlp.textgrounder.topostructs.*;
 public abstract class Gazetteer<E extends SmallLocation> extends
         TIntObjectHashMap<TIntHashSet> {
 
-    /*
-     * public final static int USGS_TYPE = 0; public final static int
-     * US_CENSUS_TYPE = 1;
-     * 
-     * public final static int DEFAULT_TYPE = USGS_TYPE;
-     */
+    /*public final static int USGS_TYPE = 0;
+    public final static int US_CENSUS_TYPE = 1;
+    
+    public final static int DEFAULT_TYPE = USGS_TYPE;*/
     /**
      * Cache that maps location ID's to Location objects. Only holds locations
      * that we've already encountered in the corpus. Location ID's are used as
