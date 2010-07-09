@@ -31,8 +31,13 @@ import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
 
 /**
- *
- * @author 
+ * Model that disambiguates toponyms by picking the location with minimum total
+ * distance to some resolution of the other toponyms in this document. Falls
+ * back on random disambiguator if there are no other toponyms to compare to.
+ * 
+ * FIXME: Explain better how the algorithm works.
+ * 
+ * @author Taesun Moon
  */
 public class BasicMinDistanceModel extends SelfTrainedModelBase {
 

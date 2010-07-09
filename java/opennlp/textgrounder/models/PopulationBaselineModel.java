@@ -39,8 +39,10 @@ import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
 
 /**
- *
- * @author 
+ * Baseline model that disambiguates toponyms by picking the location with the
+ * highest population.
+ * 
+ * @author
  */
 public class PopulationBaselineModel extends SelfTrainedModelBase {
 

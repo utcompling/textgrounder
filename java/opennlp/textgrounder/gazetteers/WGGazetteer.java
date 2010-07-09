@@ -43,7 +43,7 @@ import opennlp.textgrounder.util.*;
  * which maps to
  * 
  * ID              NAME                    TYPE         POPULATION LAT.    LONG.   COUNTRY CONTAINER
- *
+ *    
  * The 'type' field of the locations can be either 'agglomeration' or
  * 'locality'.  The 'container' field seems to refer to an agglomeration.
  * The latitude and longitude are in a strange format, e.g. '-7673' means

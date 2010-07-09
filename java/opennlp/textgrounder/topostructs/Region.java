@@ -17,10 +17,25 @@ package opennlp.textgrounder.topostructs;
 
 import java.io.Serializable;
 
+/**
+ * A rectangular region somewhere on the surface of the earth (most commonly,
+ * 3x3 in degrees). Regions have the following properties:
+ * <ul>
+ * <li>minimum and maximum latitude
+ * <li>minimum and maximum longitude
+ * <li>center latitude and longitude (derived from the previous two)
+ * </ul>
+ * 
+ * The only interesting method is `contains()', to determine whether the region
+ * contains a specified point.
+ * 
+ * @author Taesun Moon
+ * 
+ */
 public class Region implements Serializable {
 
     static private final long serialVersionUID = 490772635L;
-    
+
     public double minLon;
     public double maxLon;
     public double minLat;

@@ -33,14 +33,16 @@ import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
 
 /**
- *
- * @author 
+ * Baseline model that disambiguates toponyms by picking a random location.
+ * 
+ * @author
  */
 public class RandomBaselineModel extends SelfTrainedModelBase {
 
     public static Random myRandom = new Random();
 
-    public RandomBaselineModel(Gazetteer<Location> gaz, int bscale, int paragraphsAsDocs) {
+    public RandomBaselineModel(Gazetteer<Location> gaz, int bscale,
+            int paragraphsAsDocs) {
         super(gaz, bscale, paragraphsAsDocs);
     }
 

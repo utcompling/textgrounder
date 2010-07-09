@@ -31,8 +31,14 @@ import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
 
 /**
- *
- * @author 
+ * Model that disambiguates toponyms in a similar fashion to
+ * BasicMinDistanceModel.java, but assigns weights so that the distance info
+ * from some toponyms is considered more important than the info from other
+ * toponyms.
+ * 
+ * FIXME: Explain better how the algorithm works.
+ * 
+ * @author Taesun Moon
  */
 public class WeightedMinDistanceModel extends SelfTrainedModelBase {
 

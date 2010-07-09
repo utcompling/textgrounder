@@ -33,16 +33,24 @@ import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.KMLUtil;
 
 /**
- * Base abstract class for all training models. Defines some methods for
- * interfacing with gazetteers. Declares some fields that deal with regions
- * and placenames.
- * 
- * @author 
+ * Base abstract class for all models. A "model" is a class that defines methods
+ * that determine how to map a toponym to a location. A toponym is a string
+ * naming a location, potentially ambiguous in that many locations may have the
+ * same name. Some models use a built-in heuristic (e.g. pick the location with
+ * the highest population), and some learn the mapping using training data. The
+ * former type of model has special methods that are encapsulated in the
+ * SelfTrainedModelBase subclass.
+ *
+ * Defines some methods for interfacing with gazetteers. Declares some fields
+ * that deal with regions and placenames.
+ *
+ * @author
  */
 public abstract class Model<E extends SmallLocation> {
 
     /**
-     * kludge field to make instantiation of E possible within the class
+     * Kludge field to make instantiation of E possible within the class. See
+     * the long comment in Gazetteer.java under `genericsKludgeFactor'.
      */
     protected E genericsKludgeFactor;
     // Minimum number of pixels the (small) square region (NOT our Region) represented by each city must occupy on the screen for its label to appear:
@@ -220,6 +228,10 @@ public abstract class Model<E extends SmallLocation> {
         regionArrayHeight = 180 / (int) degreesPerRegion;
 
         regionArray = new Region[regionArrayWidth][regionArrayHeight];
+        /*
+         * FIXME: Why are we setting the values to null? Surely they must
+         * already start out this way?
+         */
         for (int w = 0; w < regionArrayWidth; w++) {
             for (int h = 0; h < regionArrayHeight; h++) {
                 regionArray[w][h] = null;
@@ -245,33 +257,48 @@ public abstract class Model<E extends SmallLocation> {
             System.out.println();
         }
 
-        System.out.println(activeRegions + " active regions for this document out of a possible "
-              + (regionArrayHeight * regionArrayWidth) + " (region size = "
-              + degreesPerRegion + " x " + degreesPerRegion + " degrees).");
+        System.out.println(activeRegions
+                + " active regions for this document out of a possible "
+                + (regionArrayHeight * regionArrayWidth) + " (region size = "
+                + degreesPerRegion + " x " + degreesPerRegion + " degrees).");
     }
 
     /**
      * Add locations to 2D regionArray. To be used by classes and methods that
-     * use a RegionMapperCallback
-     *
-     * @param locs list of locations
-     * @param regionMapper callback class for handling mappings of locations
-     * and regions
+     * use a RegionMapperCallback.
+     * 
+     * @see addLocationsToRegionArray(E loc, RegionMapperCallback regionMapper)
+     * 
+     * @param locs
+     *            list of locations
+     * @param regionMapper
+     *            callback class for handling mappings of locations and regions
      */
-    protected void addLocationsToRegionArray(TIntHashSet locs, Gazetteer<E> gaz,
-          RegionMapperCallback regionMapper) {
+    protected void addLocationsToRegionArray(TIntHashSet locs,
+            Gazetteer<E> gaz, RegionMapperCallback regionMapper) {
         for (int locid : locs.toArray()) {
             E loc = gaz.getLocation(locid);
             addLocationsToRegionArray(loc, regionMapper);
         }
     }
 
+    /**
+     * Add a single location to the Region object in the region array that
+     * corresp. This uses the latitude and longitude stored in the location
+     * object
+     * 
+     * @param loc
+     * @param regionMapper
+     */
     protected void addLocationsToRegionArray(E loc,
-          RegionMapperCallback regionMapper) {
-        int curX = (int) (loc.getCoord().latitude + 180) / (int) degreesPerRegion;
-        int curY = (int) (loc.getCoord().longitude + 90) / (int) degreesPerRegion;
-        //System.out.println(loc.coord.latitude + ", " + loc.coord.longitude + " goes to");
-        //System.out.println(curX + " " + curY);
+            RegionMapperCallback regionMapper) {
+        int curX = (int) (loc.getCoord().latitude + 180)
+                / (int) degreesPerRegion;
+        int curY = (int) (loc.getCoord().longitude + 90)
+                / (int) degreesPerRegion;
+        // System.out.println(loc.coord.latitude + ", " + loc.coord.longitude +
+        // " goes to");
+        // System.out.println(curX + " " + curY);
         if (curX < 0 || curY < 0) {
             if (curX < 0) {
                 curX = 0;

@@ -57,6 +57,10 @@ import opennlp.textgrounder.topostructs.*;
  * 
  * The various subtypes of this class handle data in different formats, from
  * gazetteers obtained from various sources.
+ * 
+ * The Gazetteer class is a template because it can work either with Location or
+ * SmallLocation objects. FIXME: Why the distinction? Presumably to reduce
+ * memory space?
  */
 public abstract class Gazetteer<E extends SmallLocation> extends
         TIntObjectHashMap<TIntHashSet> {
@@ -91,7 +95,20 @@ public abstract class Gazetteer<E extends SmallLocation> extends
      */
     protected static int maxLocId = 0;
     /**
-     *
+     * A nasty hack to make it possible to create new locations of the
+     * appropriate type. This is necessary because of a limitation in Java
+     * w.r.t. the way that it treats template types. A template type E in a
+     * construct like `class Gazetteer<E>' *should* just be a syntactic
+     * construct that substitutes for the name of a particular class. But in
+     * fact there are all sorts of obnoxious limitations, apparently related to
+     * type erasure of template types. For example, if you want to convert a
+     * type name to a class object, you can say e.g. `int.class' or
+     * `String.class'. But if E is a template type, you can't say `E.class'; nor
+     * can you say `new E()' and then examine the type of the created object.
+     * 
+     * Thus, the only way to create an object of type E is to have an object of
+     * type E already around -- a bootstrapping problem. To kludge around this,
+     * we have a variable holding an object of type E, which is passed in.
      */
     public E genericsKludgeFactor;
 
