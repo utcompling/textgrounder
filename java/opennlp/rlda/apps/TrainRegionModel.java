@@ -26,7 +26,7 @@ public class TrainRegionModel {
 
     public static void main(String[] args) throws Exception {
 
-        ExperimentParameters experimentParameters = ExperimentParametersLoader.loadParameters(args[0]);
+        ExperimentParameters experimentParameters = ExperimentParameterManipulator.loadParameters(args[0]);
 
         RegionModel rm = new RegionModel(experimentParameters);
 

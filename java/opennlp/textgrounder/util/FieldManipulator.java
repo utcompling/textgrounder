@@ -14,26 +14,81 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.apps;
+package opennlp.textgrounder.util;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import opennlp.rlda.apps.ExperimentParameters;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;
 import org.jdom.input.SAXBuilder;
+import org.jdom.output.Format;
+import org.jdom.output.XMLOutputter;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class ExperimentParametersLoader {
+public class FieldManipulator {
 
-    static ExperimentParameters loadParameters(String _path) {
-        ExperimentParameters experimentParameters = new ExperimentParameters();
+    public static void dumpFieldsToXML(Object _object, String _outputPath,
+          String _stageName) {
+        Document doc = new Document();
+        Element stage = new Element(_stageName);
+        doc.addContent(stage);
+
+        try {
+            for (Field field : _object.getClass().getDeclaredFields()) {
+                String fieldName = field.getName();
+                String fieldValue = "";
+                Object o = field.getType();
+                String fieldTypeName = field.getType().getName();
+                if (fieldTypeName.equals("int")) {
+                    fieldValue = String.format("%d", field.getInt(_object));
+                } else if (fieldTypeName.equals("double")) {
+                    fieldValue = String.format("%f", field.getDouble(_object));
+                } else if (fieldTypeName.equals("java.lang.String")) {
+                    String s = (String) field.get(_object);
+                    fieldValue = s;
+                    fieldTypeName = "string";
+                } else {
+                    continue;
+                }
+
+                Element element = new Element(fieldName);
+                element.setText(fieldValue);
+                element.setAttribute("type", fieldTypeName);
+                stage.addContent(element);
+            }
+        } catch (IllegalArgumentException ex) {
+            Logger.getLogger(FieldManipulator.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        } catch (IllegalAccessException ex) {
+            Logger.getLogger(FieldManipulator.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+
+        serialize(doc, new File(_outputPath));
+    }
+
+    static void serialize(Document doc,
+          File _file) {
+        try {
+            XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
+            xout.output(doc, new FileOutputStream(_file));
+        } catch (IOException ex) {
+            Logger.getLogger(FieldManipulator.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+    }
+
+    public static void loadFieldsFromXML(Object _object, String _path) {
 
         File file = new File(_path);
 
@@ -50,12 +105,12 @@ public class ExperimentParametersLoader {
                     String fieldTypeName = param.getAttributeValue("type");
                     if (fieldTypeName.equals("int")) {
                         int value = Integer.parseInt(fieldValue);
-                        experimentParameters.getClass().getDeclaredField(fieldName).setInt(experimentParameters, value);
+                        _object.getClass().getDeclaredField(fieldName).setInt(_object, value);
                     } else if (fieldTypeName.equals("double")) {
                         double value = Double.parseDouble(fieldValue);
-                        experimentParameters.getClass().getDeclaredField(fieldName).setDouble(experimentParameters, value);
+                        _object.getClass().getDeclaredField(fieldName).setDouble(_object, value);
                     } else if (fieldTypeName.equals("string")) {
-                        experimentParameters.getClass().getDeclaredField(fieldName).set(experimentParameters, fieldValue);
+                        _object.getClass().getDeclaredField(fieldName).set(_object, fieldValue);
                     } else {
                         continue;
                     }
@@ -76,12 +131,10 @@ public class ExperimentParametersLoader {
             }
 
         } catch (JDOMException ex) {
-            Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(FieldManipulator.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(ExperimentParametersLoader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(FieldManipulator.class.getName()).log(Level.SEVERE, null, ex);
         }
-
-        return experimentParameters;
     }
 }

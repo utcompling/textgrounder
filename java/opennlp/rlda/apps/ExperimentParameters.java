@@ -19,15 +19,11 @@ package opennlp.rlda.apps;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.IllegalFormatConversionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.jdom.Document;
 import org.jdom.Element;
-import org.jdom.JDOMException;
 import org.jdom.input.SAXBuilder;
 import org.jdom.output.Format;
 import org.jdom.output.XMLOutputter;
@@ -97,58 +93,6 @@ public class ExperimentParameters {
     protected String trainedModelPath = null;
 
     public ExperimentParameters() {
-    }
-
-    public void dumpFieldsToXML(String _outputPath) {
-        Element root = new Element("root");
-        Document doc = new Document(root);
-
-        Element stage = new Element("ExperimentStage");
-        root.addContent(stage);
-
-        try {
-            for (Field field : this.getClass().getDeclaredFields()) {
-                String fieldName = field.getName();
-                String fieldValue = "";
-                Object o = field.getType();
-                String fieldTypeName = field.getType().getName();
-                if (fieldTypeName.equals("int")) {
-                    fieldValue = String.format("%d", field.getInt(this));
-                } else if (fieldTypeName.equals("double")) {
-                    fieldValue = String.format("%f", field.getDouble(this));
-                } else if (fieldTypeName.equals("java.lang.String")) {
-                    String s = (String) field.get(this);
-                    fieldValue = s;
-                    fieldTypeName = "string";
-                } else {
-                    continue;
-                }
-
-                Element element = new Element(fieldName);
-                element.setText(fieldValue);
-                element.setAttribute("type", fieldTypeName);
-                stage.addContent(element);
-            }
-        } catch (IllegalArgumentException ex) {
-            Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        } catch (IllegalAccessException ex) {
-            Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
-
-        serialize(doc, new File(_outputPath));
-    }
-
-    static void serialize(Document doc,
-          File _file) {
-        try {
-            XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
-            xout.output(doc, new FileOutputStream(_file));
-        } catch (IOException ex) {
-            Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
     }
 
     public double getAlpha() {
