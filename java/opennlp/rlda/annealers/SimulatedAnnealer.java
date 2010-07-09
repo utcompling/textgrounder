@@ -15,7 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.annealers;
 
-import opennlp.rlda.apps.CommandLineOptions;
+import opennlp.rlda.apps.ExperimentParameters;
 
 /**
  * A full simulated annealer
@@ -24,8 +24,8 @@ import opennlp.rlda.apps.CommandLineOptions;
  */
 public class SimulatedAnnealer extends Annealer {
 
-    public SimulatedAnnealer(CommandLineOptions options) {
-        super(options);
+    public SimulatedAnnealer(ExperimentParameters _experimentParameters) {
+        super(_experimentParameters);
     }
 
     @Override

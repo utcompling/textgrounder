@@ -61,10 +61,33 @@ public class RegionModel extends RegionModelFields {
      *
      * @param _options
      */
-    protected final void initialize(ExperimentParameters _parameters) {
-        readTokenFile(_parameters.getTrainInputPath());
-        alpha = _parameters.getAlpha();
-        beta = _parameters.getBeta();
+    protected final void initialize(ExperimentParameters _experimentParameters) {
+        readTokenFile(_experimentParameters.tokenArrayInputPath());
+
+        alpha = _experimentParameters.getAlpha();
+        beta = _experimentParameters.getBeta();
+        betaW = beta * W;
+
+        int randSeed = _experimentParameters.getRandomSeed();
+        if (randSeed == 0) {
+            /**
+             * Case for complete random seeding
+             */
+            rand = new MersenneTwisterFast();
+        } else {
+            /**
+             * Case for non-random seeding. For debugging. Also, the default
+             */
+            rand = new MersenneTwisterFast(randSeed);
+        }
+
+        double targetTemp = _experimentParameters.getTargetTemperature();
+        double initialTemp = _experimentParameters.getInitialTemperature();
+        if (Math.abs(initialTemp - targetTemp) < Annealer.EPSILON) {
+            annealer = new EmptyAnnealer(_experimentParameters);
+        } else {
+            annealer = new SimulatedAnnealer(_experimentParameters);
+        }
     }
 
     public void initialize() {

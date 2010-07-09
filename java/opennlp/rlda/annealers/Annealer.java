@@ -16,7 +16,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.annealers;
 
-import opennlp.rlda.apps.CommandLineOptions;
+import opennlp.rlda.apps.ExperimentParameters;
 
 /**
  *
@@ -100,18 +100,18 @@ public abstract class Annealer {
     protected Annealer() {
     }
 
-    public Annealer(CommandLineOptions options) {
-        initialTemperature = options.getInitialTemperature();
+    public Annealer(ExperimentParameters _experimentParameters) {
+        initialTemperature = _experimentParameters.getInitialTemperature();
         temperature = initialTemperature;
         temperatureReciprocal = 1 / temperature;
-        temperatureDecrement = options.getTemperatureDecrement();
-        targetTemperature = options.getTargetTemperature();
-        innerIterationsMax = options.getIterations();
+        temperatureDecrement = _experimentParameters.getTemperatureDecrement();
+        targetTemperature = _experimentParameters.getTargetTemperature();
+        innerIterationsMax = _experimentParameters.getIterations();
         outerIterationsMax =
               (int) Math.round((initialTemperature - targetTemperature)
               / temperatureDecrement) + 1;
-        samples = options.getSamples();
-        lag = options.getLag();
+        samples = _experimentParameters.getSamples();
+        lag = _experimentParameters.getLag();
     }
 
     /**

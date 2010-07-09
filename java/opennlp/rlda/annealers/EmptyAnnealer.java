@@ -18,56 +18,30 @@ package opennlp.rlda.annealers;
 import opennlp.rlda.apps.ExperimentParameters;
 
 /**
- * Maximum posterior decoder. Simply returns the largest value among the arrays.
+ * Class for no annealing regime. If the initial and target temperature are
+ * equal, this class is called. In this case, the outer iteration is set to one
+ * and the inner iterations are all the iterations there are.
  * 
  * @author tsmoon
  */
-public class MaximumPosteriorDecoder extends Annealer {
+public class EmptyAnnealer extends Annealer {
 
-    private int count = 1;
-
-    public MaximumPosteriorDecoder() {
+    protected EmptyAnnealer() {
     }
 
-    public MaximumPosteriorDecoder(ExperimentParameters _experimentParameters) {
+    public EmptyAnnealer(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
     }
 
     @Override
     public double annealProbs(int starti, double[] classes) {
-        double max = 0;
-        int maxid = 0;
+        double sum = 0;
         try {
             for (int i = starti;; ++i) {
-                if (classes[i] > max) {
-                    max = classes[i];
-                    maxid = i;
-                }
+                sum += classes[i];
             }
         } catch (ArrayIndexOutOfBoundsException e) {
         }
-        try {
-            for (int i = starti;; ++i) {
-                classes[i] = 0;
-            }
-        } catch (ArrayIndexOutOfBoundsException e) {
-        }
-        classes[maxid] = 1;
-        return 1;
-    }
-
-    @Override
-    public boolean nextIter() {
-        if (count != 0) {
-            count = 0;
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    @Override
-    public void collectSamples(int[] topicCounts, int[] wordByTopicCounts) {
-        return;
+        return sum;
     }
 }

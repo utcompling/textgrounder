@@ -18,6 +18,7 @@ package opennlp.rlda.apps;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -78,9 +79,13 @@ public class ExperimentParameters {
      */
     protected int lag = 10;
     /**
-     * Path to training data. Can be directory or a single file.
+     * Path to array of tokens, toponym status. Should be a file.
      */
-    protected String trainInputPath = null;
+    protected String tokenArrayInputPath = null;
+    /**
+     * Path to array of tokens, toponym status. Should be a file.
+     */
+    protected String tokenArrayOutputPath = null;
     /**
      * Path of model that has been saved from previous training runs
      */
@@ -136,6 +141,51 @@ public class ExperimentParameters {
         }
     }
 
+    public ExperimentParameters() {
+    }
+
+    public void dumpFieldsToXML(String _outputPath) {
+        Element root = new Element("root");
+        Document doc = new Document(root);
+
+        for (Field field : this.getClass().getFields()) {
+            String fieldName = field.getName();
+            String fieldValue = null;
+        }
+
+        ArrayList<Element> params = new ArrayList<Element>(root.getChild("root").getChildren("params"));
+        for (Element param : params) {
+            try {
+                String fieldName = param.getName();
+                String fieldValue = param.getValue();
+                try {
+                    int value = Integer.parseInt(fieldValue);
+                    this.getClass().getField(fieldName).set(fieldName, value);
+                } catch (NumberFormatException ei) {
+                    try {
+                        double value = Double.parseDouble(fieldValue);
+                        this.getClass().getField(fieldName).set(fieldName, value);
+                    } catch (NumberFormatException ed) {
+                        this.getClass().getField(fieldName).set(fieldName, fieldValue);
+                    }
+                }
+            } catch (NoSuchFieldException ex) {
+                Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
+                System.exit(1);
+            } catch (SecurityException ex) {
+                Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
+                System.exit(1);
+            } catch (IllegalArgumentException ex) {
+                Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
+                System.exit(1);
+            } catch (IllegalAccessException ex) {
+                Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
+                System.exit(1);
+            }
+        }
+
+    }
+
     public double getAlpha() {
         return alpha;
     }
@@ -176,25 +226,11 @@ public class ExperimentParameters {
         return lag;
     }
 
-    public String getTrainInputPath() {
-        return trainInputPath;
+    public String tokenArrayInputPath() {
+        return tokenArrayInputPath;
     }
 
     public String getTrainedModelPath() {
         return trainedModelPath;
-    }
-
-    protected String canonicalPath(String _path) {
-        try {
-            String home = System.getProperty("user.home");
-            String path = "";
-            path = _path.replaceAll("~", home);
-            path = (new File(path)).getCanonicalPath();
-            return path;
-        } catch (IOException ex) {
-            Logger.getLogger(CommandLineOptions.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
-        return null;
     }
 }
