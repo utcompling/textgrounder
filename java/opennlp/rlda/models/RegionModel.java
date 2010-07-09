@@ -344,6 +344,12 @@ public class RegionModel extends RegionModelFields {
         }
     }
 
+    public void decode() {
+        System.err.println(String.format("Decoding maximum posterior topics"));
+        Annealer mpd = new MaximumPosteriorDecoder();
+        train(mpd);
+    }
+
     public void normalize() {
     }
 

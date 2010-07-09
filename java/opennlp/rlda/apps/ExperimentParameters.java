@@ -17,15 +17,20 @@
 package opennlp.rlda.apps;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.IllegalFormatConversionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;
 import org.jdom.input.SAXBuilder;
+import org.jdom.output.Format;
+import org.jdom.output.XMLOutputter;
 
 /**
  *
@@ -104,22 +109,25 @@ public class ExperimentParameters {
         try {
             doc = builder.build(file);
             Element root = doc.getRootElement();
-            ArrayList<Element> params = new ArrayList<Element>(root.getChild("root").getChildren("params"));
+            ArrayList<Element> params = new ArrayList<Element>(root.getChild("ExperimentStage").getChildren());
             for (Element param : params) {
                 try {
                     String fieldName = param.getName();
                     String fieldValue = param.getValue();
-                    try {
+
+                    String fieldTypeName = param.getAttributeValue("type");
+                    if (fieldTypeName.equals("int")) {
                         int value = Integer.parseInt(fieldValue);
-                        this.getClass().getField(fieldName).set(fieldName, value);
-                    } catch (NumberFormatException ei) {
-                        try {
-                            double value = Double.parseDouble(fieldValue);
-                            this.getClass().getField(fieldName).set(fieldName, value);
-                        } catch (NumberFormatException ed) {
-                            this.getClass().getField(fieldName).set(fieldName, fieldValue);
-                        }
+                        this.getClass().getField(fieldName).setInt(root, lag);
+                    } else if (fieldTypeName.equals("double")) {
+                        double value = Double.parseDouble(fieldValue);
+                        this.getClass().getField(fieldName).setDouble(this, value);
+                    } else if (fieldTypeName.equals("string")) {
+                        this.getClass().getField(fieldName).set(this, fieldValue);
+                    } else {
+                        continue;
                     }
+                    
                 } catch (NoSuchFieldException ex) {
                     Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
                     System.exit(1);
@@ -148,42 +156,52 @@ public class ExperimentParameters {
         Element root = new Element("root");
         Document doc = new Document(root);
 
-        for (Field field : this.getClass().getFields()) {
-            String fieldName = field.getName();
-            String fieldValue = null;
-        }
+        Element stage = new Element("ExperimentStage");
+        root.addContent(stage);
 
-        ArrayList<Element> params = new ArrayList<Element>(root.getChild("root").getChildren("params"));
-        for (Element param : params) {
-            try {
-                String fieldName = param.getName();
-                String fieldValue = param.getValue();
-                try {
-                    int value = Integer.parseInt(fieldValue);
-                    this.getClass().getField(fieldName).set(fieldName, value);
-                } catch (NumberFormatException ei) {
-                    try {
-                        double value = Double.parseDouble(fieldValue);
-                        this.getClass().getField(fieldName).set(fieldName, value);
-                    } catch (NumberFormatException ed) {
-                        this.getClass().getField(fieldName).set(fieldName, fieldValue);
-                    }
+        try {
+            for (Field field : this.getClass().getDeclaredFields()) {
+                String fieldName = field.getName();
+                String fieldValue = "";
+                Object o = field.getType();
+                String fieldTypeName = field.getType().getName();
+                if (fieldTypeName.equals("int")) {
+                    fieldValue = String.format("%d", field.getInt(this));
+                } else if (fieldTypeName.equals("double")) {
+                    fieldValue = String.format("%f", field.getDouble(this));
+                } else if (fieldTypeName.equals("java.lang.String")) {
+                    String s = (String) field.get(this);
+                    fieldValue = s;
+                    fieldTypeName = "string";
+                } else {
+                    continue;
                 }
-            } catch (NoSuchFieldException ex) {
-                Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-                System.exit(1);
-            } catch (SecurityException ex) {
-                Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-                System.exit(1);
-            } catch (IllegalArgumentException ex) {
-                Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-                System.exit(1);
-            } catch (IllegalAccessException ex) {
-                Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-                System.exit(1);
+
+                Element element = new Element(fieldName);
+                element.setText(fieldValue);
+                element.setAttribute("type", fieldTypeName);
+                stage.addContent(element);
             }
+        } catch (IllegalArgumentException ex) {
+            Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        } catch (IllegalAccessException ex) {
+            Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
         }
 
+        serialize(doc, new File(_outputPath));
+    }
+
+    static void serialize(Document doc,
+          File _file) {
+        try {
+            XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
+            xout.output(doc, new FileOutputStream(_file));
+        } catch (IOException ex) {
+            Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
     }
 
     public double getAlpha() {
