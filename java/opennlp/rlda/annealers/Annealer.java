@@ -25,7 +25,7 @@ import opennlp.rlda.apps.CommandLineOptions;
 public abstract class Annealer {
 
     /**
-     * Machine epsilon for comparing equality in floating point numbers.
+     * epsilon for comparing equality in floating point numbers.
      */
     public static final double EPSILON = 1e-6;
     /**
@@ -83,7 +83,7 @@ public abstract class Annealer {
      * Counts of tcount per topic. However, since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.
      */
-    protected double[] wordByTopicSampleCounts = null;
+    protected double[] wordByTopicSampledProbs = null;
     /**
      * To sample or not to sample
      */
@@ -223,12 +223,12 @@ public abstract class Annealer {
                 System.err.print("(sample:" + (innerIter + 1) / lag + ")");
                 if (topicSampleCounts == null) {
                     topicSampleCounts = new double[_topicCounts.length];
-                    wordByTopicSampleCounts = new double[_wordByTopicCounts.length];
+                    wordByTopicSampledProbs = new double[_wordByTopicCounts.length];
                     for (int i = 0; i < _topicCounts.length; ++i) {
                         topicSampleCounts[i] = 0;
                     }
                     for (int i = 0; i < _wordByTopicCounts.length; ++i) {
-                        wordByTopicSampleCounts[i] = 0;
+                        wordByTopicSampledProbs[i] = 0;
                     }
                 }
 
@@ -236,7 +236,7 @@ public abstract class Annealer {
                     topicSampleCounts[i] += _topicCounts[i];
                 }
                 for (int i = 0; i < _wordByTopicCounts.length; ++i) {
-                    wordByTopicSampleCounts[i] += _wordByTopicCounts[i];
+                    wordByTopicSampledProbs[i] += _wordByTopicCounts[i];
                 }
             }
 
@@ -253,8 +253,8 @@ public abstract class Annealer {
         for (int i = 0; i < topicSampleCounts.length; ++i) {
             topicSampleCounts[i] /= sampleCount;
         }
-        for (int i = 0; i < wordByTopicSampleCounts.length; ++i) {
-            wordByTopicSampleCounts[i] /= sampleCount;
+        for (int i = 0; i < wordByTopicSampledProbs.length; ++i) {
+            wordByTopicSampledProbs[i] /= sampleCount;
         }
     }
 
@@ -273,10 +273,10 @@ public abstract class Annealer {
     }
 
     /**
-     * @return the wordByTopicSampleCounts
+     * @return the wordByTopicSampledProbs
      */
-    public double[] getWordByTopicSampleCounts() {
-        return wordByTopicSampleCounts;
+    public double[] getWordByTopicSampledProbs() {
+        return wordByTopicSampledProbs;
     }
 
     public boolean isFinishedCollection() {
