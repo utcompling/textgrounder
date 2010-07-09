@@ -96,59 +96,6 @@ public class ExperimentParameters {
      */
     protected String trainedModelPath = null;
 
-    /**
-     *
-     * @param cline
-     * @throws IOException
-     */
-    public ExperimentParameters(String _paramFilepath) throws IOException {
-
-        File file = new File(_paramFilepath);
-
-        Document doc = null;
-        try {
-            doc = builder.build(file);
-            Element root = doc.getRootElement();
-            ArrayList<Element> params = new ArrayList<Element>(root.getChild("ExperimentStage").getChildren());
-            for (Element param : params) {
-                try {
-                    String fieldName = param.getName();
-                    String fieldValue = param.getValue();
-
-                    String fieldTypeName = param.getAttributeValue("type");
-                    if (fieldTypeName.equals("int")) {
-                        int value = Integer.parseInt(fieldValue);
-                        this.getClass().getField(fieldName).setInt(root, lag);
-                    } else if (fieldTypeName.equals("double")) {
-                        double value = Double.parseDouble(fieldValue);
-                        this.getClass().getField(fieldName).setDouble(this, value);
-                    } else if (fieldTypeName.equals("string")) {
-                        this.getClass().getField(fieldName).set(this, fieldValue);
-                    } else {
-                        continue;
-                    }
-                    
-                } catch (NoSuchFieldException ex) {
-                    Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-                    System.exit(1);
-                } catch (SecurityException ex) {
-                    Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-                    System.exit(1);
-                } catch (IllegalArgumentException ex) {
-                    Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-                    System.exit(1);
-                } catch (IllegalAccessException ex) {
-                    Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-                    System.exit(1);
-                }
-            }
-
-        } catch (JDOMException ex) {
-            Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
-    }
-
     public ExperimentParameters() {
     }
 
