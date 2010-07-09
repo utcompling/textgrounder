@@ -132,11 +132,9 @@ public class TextProcessor {
      * identifying toponyms, converting tokens to indexes, and populating
      * arrays is handled in processText.
      * 
-     * @param locationOfFile path to input. must be a single file
-     * @param tokenArrayBuffer buffer that holds the array of token indexes,
-     * document indexes, and the toponym indexes. If this class object is
-     * not needed from the calling class, then a NullTokenArrayBuffer is
-     * instantiated and passed. Nothing happens inside this object.
+     * @param locationOfFile Path to input. Must be a single file.
+     * @param tokenArrayBuffer Buffer that holds the array of token indexes,
+     * document indexes, and the toponym indexes.
      * @param stopwordList table that contains the list of stopwords. if
      * this is an instance of NullStopwordList, it will return false
      * through stopwordList.isStopWord for every string token examined
@@ -188,38 +186,46 @@ public class TextProcessor {
     }
 
     /**
-     * Identify toponyms and non-toponyms and process accordingly.
-     *
-     * The entire input string (text.toString) is passed to the NER classifier.
-     * The output of the classifier will be of the form 
-     * <p>token/LABEL token/LABELpunctuation/LABEL token/LABEL ...</p>.
-     * If LABEL is LOCATION, it is processed as a toponym or as a
-     * multiword toponym if necessary. Any word that is not identified as a
-     * toponym is processed as a regular token.
-     *
-     * When adding tokens and toponyms, all LABELs and the preceding slashes
-     * are removed and the token is lowercased before being added to the
-     * lexicon and the array of indexes.
-     *
+     * Split `text' into tokens (potentially multi-word). Determine whether each
+     * token is a toponym and whether it's a stopword (using `stopwordList').
+     * Add each token along with its properties (e.g. whether toponym, stopword,
+     * etc.) to `tokenArrayBuffer', which is a sequential list of all tokens
+     * seen in all documents processed.
+     * 
+     * First, the entire input string in `text' is passed to the NER classifier.
+     * This splits the text into tokens and determines which ones are toponyms.
+     * The output of the classifier will be of the form
+     * <p>
+     * token/LABEL token/LABEL punctuation/LABEL token/LABEL ...
+     * </p>
+     * If LABEL is `LOCATION', it is processed as a toponym or as a multiword
+     * toponym if necessary. Any word that is not identified as a toponym is
+     * processed as a regular token.
+     * 
+     * When adding tokens and toponyms, all LABELs and the preceding slashes are
+     * removed and the token is lowercased before being added to the lexicon and
+     * to `tokenArrayBuffer'.
+     * 
      * This method also adds to a sequence of document indexes and toponym
-     * indexes maintained in evalTokenArrayBuffer. The sequences of token, document
-     * and toponym indexes are of the same size so that they are coindexed.
-     * The toponym sequence is slightly different from the other sequences
-     * in that it is only populated by ones and zeros. If the current toponym
-     * index is one, it means the current token is a toponym. If it is zero,
-     * the current token is not a toponym.
-     *
-     * @param text StringBuffer of input to be processed. This should always be
-     * space delimited raw text.
-     * @param tokenArrayBuffer buffer that holds the array of token indexes,
-     * document indexes, and the toponym indexes. If this class object is
-     * not needed from the calling class, then a NullTokenArrayBuffer is
-     * instantiated and passed. Nothing happens inside this object.
-     * @param stopwordList table that contains the list of stopwords. if
-     * this is an instance of NullStopwordList, it will return false
-     * through stopwordList.isStopWord for every string token examined
-     * (i.e. the token is not a stopword).
-     * @param currentDoc 
+     * indexes maintained in evalTokenArrayBuffer. The sequences of token,
+     * document and toponym indexes are of the same size so that they are
+     * coindexed. The toponym sequence is slightly different from the other
+     * sequences in that it is only populated by ones and zeros. If the current
+     * toponym index is one, it means the current token is a toponym. If it is
+     * zero, the current token is not a toponym.
+     * 
+     * @param text
+     *            StringBuffer of input to be processed. This should always be
+     *            space delimited raw text.
+     * @param tokenArrayBuffer
+     *            buffer that holds the array of token indexes, document
+     *            indexes, and the toponym indexes.
+     * @param stopwordList
+     *            table that contains the list of stopwords. if this is an
+     *            instance of NullStopwordList, it will return false through
+     *            stopwordList.isStopWord for every string token examined (i.e.
+     *            the token is not a stopword).
+     * @param currentDoc
      */
     public void processText(String text, TokenArrayBuffer tokenArrayBuffer,
           StopwordList stopwordList) {

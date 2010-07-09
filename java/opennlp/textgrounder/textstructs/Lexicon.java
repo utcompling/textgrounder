@@ -22,8 +22,16 @@ import edu.stanford.nlp.ling.CoreAnnotations.*;
 import java.io.Serializable;
 
 /**
- * Class of documents as array of array of integers (i.e. indexes of word types).
- *
+ * Class that maps between integers and word types. This is conceptually much
+ * like a symbol table. (For efficiency purposes, words are stored in most
+ * places as integers rather than strings.)
+ * 
+ * NOTE: "Words" (properly, tokens) as stored in this table may actually be
+ * multiword strings (space-separated), particularly in the case of multi-word
+ * place names.
+ * 
+ * Internally, we store mappings in both directions.
+ * 
  * @author
  */
 public class Lexicon implements Serializable {

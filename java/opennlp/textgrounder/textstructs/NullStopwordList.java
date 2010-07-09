@@ -20,6 +20,8 @@ import java.io.IOException;
 
 /**
  * Empty StopwordList class for models that do not require stopword removal.
+ * FIXME: Delete me. This class isn't necessary at all. Just add a no-arg
+ * constructor onto StopwordList.
  * 
  * @author tsmoon
  */
@@ -36,10 +38,12 @@ public class NullStopwordList extends StopwordList {
     }
 
     /**
-     * Empty override of isStopWord of base class. It returns false always.
-     * No word is a stopword.
-     *
-     * @param word word to (not) examine
+     * Empty override of isStopWord of base class. It returns false always. No
+     * word is a stopword. FIXME: Delete me. Purely an optimization and unlikely
+     * to gain much.
+     * 
+     * @param word
+     *            word to (not) examine
      * @return false always. no word is a stopword.
      */
     @Override
@@ -49,7 +53,8 @@ public class NullStopwordList extends StopwordList {
 
     /**
      * Size of the list of stopwords. Returns 0, meaning there are no stopwords.
-     *
+     * FIXME: Delete me. Purely an optimization and unlikely to gain much.
+     * 
      * @return 0
      */
     @Override

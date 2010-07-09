@@ -284,8 +284,9 @@ public abstract class Model<E extends SmallLocation> {
 
     /**
      * Add a single location to the Region object in the region array that
-     * corresp. This uses the latitude and longitude stored in the location
-     * object
+     * corresponds to the latitude and longitude stored in the location object.
+     * Create the Region object if necessary. Uses `regionMapper' to actually
+     * create the location.
      * 
      * @param loc
      * @param regionMapper
