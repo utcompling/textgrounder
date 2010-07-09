@@ -25,8 +25,9 @@ import java.util.Set;
 import opennlp.textgrounder.util.Constants;
 
 /**
- * A list of stopwords populated from a fixed table
- *
+ * A list of stopwords populated from a file (.../data/lists/stopwords.english).
+ * The file has one stopword per line.
+ * 
  * @author tsmoon
  */
 public class StopwordList {
