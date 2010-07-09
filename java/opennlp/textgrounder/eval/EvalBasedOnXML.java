@@ -32,7 +32,7 @@ public class EvalBasedOnXML {
         dbf = DocumentBuilderFactory.newInstance();
         db = dbf.newDocumentBuilder();
 
-        //TRXMLtoSingleFile(TRXMLPath, "tr-gold.xml");
+        TRXMLtoSingleFile(TRXMLPath, "tr-gold.xml");
         
         doEval("tr-gold.xml", modelXMLPath);
     }
@@ -89,12 +89,6 @@ public class EvalBasedOnXML {
             Node trContextN = TRTopN.getChildNodes().item(3);
             String trContextSignature = convertContextToSignature(trContextN.getTextContent(), CONTEXT_SIGNATURE_WINDOW_SIZE);
 
-            /*if(trDocId == 99) {
-                System.out.println("Looking for: ");
-                System.out.println(trLocation);
-                System.out.println(trContextSignature);
-            }*/
-
             for(int j = 0; j < modelToponyms.getLength(); j++) {
 
                 Node ModelTopN = modelToponyms.item(j);
@@ -110,14 +104,8 @@ public class EvalBasedOnXML {
                 String modelContextSignature = convertContextToSignature(modelContextN.getTextContent(), CONTEXT_SIGNATURE_WINDOW_SIZE);
 
                 if(!trContextSignature.equals(modelContextSignature)) {
-                    /*if(trDocId == 99 && modelDocId == 99) {
-                        System.out.println(trContextSignature + " DID NOT MATCH " + modelContextSignature
-                                + "; j = " + j + "; trDocId = " + trDocId + "; modelDocId = " + modelDocId);
-                    }*/
                     continue;
                 }
-                /*if(trDocId == 99 && modelDocId == 99)
-                    System.out.println(trContextSignature + " MATCHED " + modelContextSignature);*/
 
                 // by this point, document IDs and context signatures match, so go ahead and compare locations:
 
@@ -139,9 +127,6 @@ public class EvalBasedOnXML {
             }
             t_n++;
         }
-
-        //System.out.println(trUnmatched.size());
-        //System.out.println(modelUnmatched.size());
 
         // in jochen's terms:
         //double precision = (double) t_c / (t_c + t_i);
@@ -217,7 +202,6 @@ public class EvalBasedOnXML {
                 Node tokenNode = tokens.item(j);
                 if(tokenNode.getNodeName().equals("toponym")) {
                     tokenIndex++;
-                    //System.out.println(tokenNode.getAttributes().getNamedItem("term").getNodeValue());
 
                     // checks if this toponym is unresolved (selected="NoneFromList") or not really a location (selected="NotALocation")
                     if(tokenNode.getAttributes().getNamedItem("selected") != null)
@@ -255,7 +239,6 @@ public class EvalBasedOnXML {
                 }
                 else if(tokenNode.getNodeName().equals("w")) {
                     tokenIndex++;
-                    //System.out.println(tokenNode.getAttributes().getNamedItem("tok").getNodeValue());
                 }
             }
         }
