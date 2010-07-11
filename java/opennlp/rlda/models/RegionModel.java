@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import opennlp.rlda.annealers.*;
 import opennlp.rlda.apps.ExperimentParameters;
@@ -92,6 +91,10 @@ public class RegionModel extends RegionModelFields {
 
     public void initialize() {
         initialize(experimentParameters);
+
+
+        DataInputStream dis = new DataInputStream(null);
+        
     }
 
     public void readTokenFile(String _filename) {
