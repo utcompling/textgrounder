@@ -16,6 +16,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.wrapper.rlda.apps;
 
+import opennlp.wrapper.rlda.converters.Converter;
+
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
@@ -24,6 +26,7 @@ public class ConvertRegionModel {
 
     public static void main(String[] args) throws Exception {
 
-        ExperimentParameters experimentParameters = ExperimentParameterManipulator.loadParameters(args[0]);
+        Converter converter = new Converter(args[0]);
+        converter.convert();
     }
 }

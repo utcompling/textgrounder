@@ -34,54 +34,6 @@ import org.jdom.output.XMLOutputter;
  */
 public class ExperimentParameters {
 
-    protected static SAXBuilder builder = new SAXBuilder();
-    /**
-     * Hyperparameter of topic prior
-     */
-    protected double alpha = 1;
-    /**
-     * Hyperparameter for word/topic prior
-     */
-    protected double beta = 0.1;
-    /**
-     * Number of training iterations
-     */
-    protected int trainIterations = 100;
-    /**
-     * Number to seed random number generator. If 0 is passed from the commandline,
-     * it means that a true random seed will be used (i.e. one based on the current time).
-     * Otherwise, any value that has been passed to it from the command line be
-     * used. If nothing is passed from the commandline, the random number
-     * generator will be seeded with 1.
-     */
-    protected int randomSeed = 1;
-    /**
-     * Temperature at which to start annealing process
-     */
-    protected double initialTemperature = 1;
-    /**
-     * Decrement at which to reduce the temperature in annealing process
-     */
-    protected double temperatureDecrement = 0.1;
-    /**
-     * Stop changing temperature after the following temp has been reached.
-     */
-    protected double targetTemperature = 1;
-    /**
-     * Number of regions
-     */
-    protected int regions = 50;
-    /**
-     * Number of samples to take
-     */
-    protected int samples = 100;
-    /**
-     * Number of trainIterations between samples
-     */
-    protected int lag = 10;
-    /**
-     * Path to array of tokens, toponym status. Should be a file.
-     */
     protected String tokenArrayInputPath = null;
     /**
      * Path to array of tokens, toponym status. Should be a file.
@@ -93,46 +45,6 @@ public class ExperimentParameters {
     protected String trainedModelPath = null;
 
     public ExperimentParameters() {
-    }
-
-    public double getAlpha() {
-        return alpha;
-    }
-
-    public double getBeta() {
-        return beta;
-    }
-
-    public int getIterations() {
-        return trainIterations;
-    }
-
-    public int getRandomSeed() {
-        return randomSeed;
-    }
-
-    public double getInitialTemperature() {
-        return initialTemperature;
-    }
-
-    public double getTargetTemperature() {
-        return targetTemperature;
-    }
-
-    public double getTemperatureDecrement() {
-        return temperatureDecrement;
-    }
-
-    public int getRegions() {
-        return regions;
-    }
-
-    public int getSamples() {
-        return samples;
-    }
-
-    public int getLag() {
-        return lag;
     }
 
     public String tokenArrayInputPath() {

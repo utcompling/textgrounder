@@ -22,7 +22,6 @@ package opennlp.wrapper.rlda.converters.callbacks;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.io.*;
 import opennlp.wrapper.rlda.textstructs.Lexicon;
 
 /**
@@ -31,9 +30,7 @@ import opennlp.wrapper.rlda.textstructs.Lexicon;
  * 
  * @author tsmoon
  */
-public class TrainingMaterialCallback implements Serializable {
-
-    static private final long serialVersionUID = 12375981L;
+public class TrainingMaterialCallback {
 
     protected Lexicon lexicon;
 
