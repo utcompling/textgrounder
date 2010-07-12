@@ -15,6 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.textstructs;
 
+// FIXME: Doesn't appear that the following code is used
 import edu.stanford.nlp.ling.CoreAnnotations.*;
 
 import java.io.*;
@@ -23,9 +24,41 @@ import opennlp.textgrounder.ners.NullClassifier;
 import opennlp.textgrounder.topostructs.*;
 
 /**
- * Text processing class for handling TR-CoNLL data.
- *
- * @author 
+ * Class that reads from a file in TR-CoNLL format, extracts tokens and (for
+ * tokens that are toponyms) gold-standard location information, and adds the
+ * token data to a TokenArrayBuffer.
+ * 
+ * Files in TR-CoNLL format look like this: <code>
+Turkey  LOC
+        c1      NGA     -24.35  30.4333333      Turkey > (SF04) > South Africa
+        c2      NGA     -24.3333333     30.45   Turkey > (SF04) > South Africa
+        c3      NGA     -24.1   151.65  Turkey > Queensland > Australia
+        c4      NGA     -24.1   151.6333333     Turkey > Queensland > Australia
+        >c5     NGA     39      35      Turkey
+        c6      USGS_PP 36.24444        -92.76361       Turkey > Marion > AR > US > North America
+        c7      USGS_PP 37.47917        -83.50778       Turkey > Breathitt > KY > US > North America
+        c8      USGS_PP 34.99222        -78.18333       Turkey > Sampson > NC > US > North America
+        c9      USGS_PP 39.10833        -83.44889       Turkey > Highland > OH > US > North America
+        c10     USGS_PP 34.3925 -100.89722      Turkey > Hall > TX > US > North America
+        c11     USGS_PP 37.64028        -81.57833       Turkey > Wyoming > WV > US > North America
+        c12     CIAWFB  39      -0      Turkey
+says    O       I-VP    VBZ
+killed  O       I-VP    VBN
+17      O       I-NP    CD
+Kurd    I-MISC  I-NP    NNP
+rebels  O       I-NP    NNS
+in      O       I-PP    IN
+clashes O       I-NP    NNS
+.       O       O       .
+ * </code>
+ * 
+ * Note that we only extract the gold-standard location from the list of all
+ * possible locations.
+ * 
+ * FIXME: This class is a subclass of TextProcessor but in reality it's almost
+ * completely independent.
+ * 
+ * @author
  */
 public class TextProcessorTR extends TextProcessor {
 

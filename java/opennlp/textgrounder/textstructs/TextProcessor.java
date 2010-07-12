@@ -26,20 +26,21 @@ import java.util.Properties;
 import opennlp.textgrounder.util.*;
 
 /**
- * Array of array of toponym indexes.
- *
- * This class stores an array of sequences of toponym indexes. Any token that
- * has not been identified as a toponym is not retained in this class. The
- * indexes reference actual string toponyms, tables for which are maintained
- * in Lexicon.
- *
- * This class also processes all input text and identifies toponyms through
- * a named entity recognizer (NER) in processFile. It is the only
- * method in the entire project that processes input text and as such any
- * other classes which need to be populated from input is data is processed
- * here.
+ * Class that reads raw text from a file, runs it through a named-entity
+ * recognizer (NER) to split the text into tokens and identify which tokens are
+ * locations (toponyms), and extract the resulting tokens and their properties
+ * (e.g. whether toponym, stopword, etc.), adding them to a TokenArrayBuffer
+ * (which sequentially accumulates tokens across multiple documents).
  * 
- * @author 
+ * Multi-word location tokens (e.g. New York) are joined by the code below into
+ * a single token.
+ * 
+ * Actual processing of a file is done in the processFile() method.
+ * 
+ * FIXME: This code is specific to the Stanford NER. Code to interface to
+ * different NER's should be abstracted into separate classes.
+ * 
+ * @author
  */
 public class TextProcessor {
 
@@ -132,11 +133,9 @@ public class TextProcessor {
      * identifying toponyms, converting tokens to indexes, and populating
      * arrays is handled in processText.
      * 
-     * @param locationOfFile path to input. must be a single file
-     * @param tokenArrayBuffer buffer that holds the array of token indexes,
-     * document indexes, and the toponym indexes. If this class object is
-     * not needed from the calling class, then a NullTokenArrayBuffer is
-     * instantiated and passed. Nothing happens inside this object.
+     * @param locationOfFile Path to input. Must be a single file.
+     * @param tokenArrayBuffer Buffer that holds the array of token indexes,
+     * document indexes, and the toponym indexes.
      * @param stopwordList table that contains the list of stopwords. if
      * this is an instance of NullStopwordList, it will return false
      * through stopwordList.isStopWord for every string token examined
@@ -188,58 +187,103 @@ public class TextProcessor {
     }
 
     /**
-     * Identify toponyms and non-toponyms and process accordingly.
-     *
-     * The entire input string (text.toString) is passed to the NER classifier.
-     * The output of the classifier will be of the form 
-     * <p>token/LABEL token/LABELpunctuation/LABEL token/LABEL ...</p>.
-     * If LABEL is LOCATION, it is processed as a toponym or as a
-     * multiword toponym if necessary. Any word that is not identified as a
-     * toponym is processed as a regular token.
-     *
-     * When adding tokens and toponyms, all LABELs and the preceding slashes
-     * are removed and the token is lowercased before being added to the
-     * lexicon and the array of indexes.
-     *
+     * Split `text' into tokens (potentially multi-word). Determine whether each
+     * token is a toponym and whether it's a stopword (using `stopwordList').
+     * Add each token along with its properties (e.g. whether toponym, stopword,
+     * etc.) to `tokenArrayBuffer', which is a sequential list of all tokens
+     * seen in all documents processed.
+     * 
+     * FIXME: This code is specific to the Stanford NER. Code to interface to
+     * different NER's should be abstracted into separate classes.
+     * 
+     * First, the entire input string in `text' is passed to the NER classifier.
+     * This splits the text into tokens and determines which ones are toponyms.
+     * The output of the classifier will be of the form
+     * <p>
+     * token/LABEL token/LABELpunctuation/LABEL token/LABEL ...
+     * </p>
+     * Here's an example:
+     * <p>
+     * I/O complained/O to/O Microsoft/ORGANIZATION about/O Bill/PERSON
+     * Gates/PERSON ./O They/O told/O me/O to/O see/O the/O mayor/O of/O
+     * New/LOCATION York/LOCATION ./O
+     * </p>
+     * 
+     * FIXME: The code below, and the first example above, indicates that
+     * punctuation is joined to a preceding token without whitespace. The second
+     * example (from the Stanford NER FAQ at
+     * `http://nlp.stanford.edu/software/crf-faq.shtml') indicates otherwise.
+     * What's really going on?
+     * 
+     * If LABEL is `LOCATION', it is processed as a toponym or as a multiword
+     * toponym if necessary. Any word that is not identified as a toponym is
+     * processed as a regular token. Note that multi-word locations are output
+     * as separate tokens (e.g. "New York" in the above example), but we combine
+     * them into a single token.
+     * 
+     * When adding tokens and toponyms, all LABELs and the preceding slashes are
+     * removed and the token is lowercased before being added to the lexicon and
+     * to `tokenArrayBuffer'.
+     * 
      * This method also adds to a sequence of document indexes and toponym
-     * indexes maintained in evalTokenArrayBuffer. The sequences of token, document
-     * and toponym indexes are of the same size so that they are coindexed.
-     * The toponym sequence is slightly different from the other sequences
-     * in that it is only populated by ones and zeros. If the current toponym
-     * index is one, it means the current token is a toponym. If it is zero,
-     * the current token is not a toponym.
-     *
-     * @param text StringBuffer of input to be processed. This should always be
-     * space delimited raw text.
-     * @param tokenArrayBuffer buffer that holds the array of token indexes,
-     * document indexes, and the toponym indexes. If this class object is
-     * not needed from the calling class, then a NullTokenArrayBuffer is
-     * instantiated and passed. Nothing happens inside this object.
-     * @param stopwordList table that contains the list of stopwords. if
-     * this is an instance of NullStopwordList, it will return false
-     * through stopwordList.isStopWord for every string token examined
-     * (i.e. the token is not a stopword).
-     * @param currentDoc 
+     * indexes maintained in evalTokenArrayBuffer. The sequences of token,
+     * document and toponym indexes are of the same size so that they are
+     * coindexed. The toponym sequence is slightly different from the other
+     * sequences in that it is only populated by ones and zeros. If the current
+     * toponym index is one, it means the current token is a toponym. If it is
+     * zero, the current token is not a toponym.
+     * 
+     * @param text
+     *            StringBuffer of input to be processed. This should always be
+     *            space delimited raw text.
+     * @param tokenArrayBuffer
+     *            buffer that holds the array of token indexes, document
+     *            indexes, and the toponym indexes.
+     * @param stopwordList
+     *            table that contains the list of stopwords. if this is an
+     *            instance of NullStopwordList, it will return false through
+     *            stopwordList.isStopWord for every string token examined (i.e.
+     *            the token is not a stopword).
+     * @param currentDoc
      */
     public void processText(String text, TokenArrayBuffer tokenArrayBuffer) {
 
+        /* Get NER output */
         String nerOutput = classifier.classifyToString(text);
 
+        /*
+         * Split NER output into space-separated "tokens" (may not correspond
+         * with the tokens we store into TokenArrayBuffer, see above)
+         */
         String[] tokens = nerOutput.replaceAll("-[LR]RB-", "").split(" ");
         int toponymStartIndex = -1;
         int toponymEndIndex = -1;
 
+        /* For each NER "token", process it */
         for (int i = 0; i < tokens.length; i++) {
             String token = tokens[i];
             int wordidx = 0;
             boolean isLocationToken = token.contains("/LOCATION");
             if (isLocationToken) {
+                /*
+                 * We've seen a location token. We have to deal with multi-word
+                 * location tokens, so if we see a location token, don't add it
+                 * yet to the TokenArrayBuffer, just remember the position
+                 */
                 if (toponymStartIndex == -1) {
                     toponymStartIndex = i;
                 }
+                /*
+                 * Handle location tokens ending in /O (?)
+                 * 
+                 * FIXME: When does this happen? Does the output really include
+                 * tokens like `foo/LOCATION/O' ?
+                 */
                 if (token.endsWith("/O")) {
                     toponymEndIndex = i + 1;
-                    String cur = StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/").toLowerCase();
+                    String cur = StringUtil.join(tokens, " ",
+                            toponymStartIndex, toponymEndIndex, "/")
+                            .toLowerCase();
                     wordidx = lexicon.addWord(cur);
                     tokenArrayBuffer.addElement(wordidx, currentDoc, 1);
 
@@ -247,17 +291,28 @@ public class TextProcessor {
                     toponymEndIndex = -1;
                 }
             } else if (toponymStartIndex != -1) {
+                /*
+                 * We've seen a non-location token, and there was a location
+                 * token before us. Add both the location (potentially
+                 * multi-word) and the current non-location token.
+                 */
                 toponymEndIndex = i;
                 /**
                  * Add the toponym that spans from toponymStartIndex to
                  * toponymEndIndex. This does not include the current token
                  */
-                String cur = StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/").toLowerCase();
+                String cur = StringUtil.join(tokens, " ", toponymStartIndex,
+                        toponymEndIndex, "/").toLowerCase();
                 wordidx = lexicon.addWord(cur);
                 tokenArrayBuffer.addElement(wordidx, currentDoc, 1);
 
                 /**
-                 * Add the current token
+                 * Add the current token.
+                 * 
+                 * According to the code below, multiple non-word tokens can be
+                 * joined together without spaces, e.g. 'here/O/./O'.
+                 * 
+                 * See comment above.
                  */
                 List<String> subtokes = retrieveWords(token);
                 for (String subtoke : subtokes) {
@@ -271,6 +326,12 @@ public class TextProcessor {
                 toponymStartIndex = -1;
                 toponymEndIndex = -1;
             } else {
+                /*
+                 * A non-location token, no location token preceding. Just add
+                 * it.
+                 * 
+                 * FIXME: Duplicated code.
+                 */
                 List<String> subtokes = retrieveWords(token);
                 for (String subtoke : subtokes) {
                     if (!subtoke.isEmpty()) {
@@ -282,7 +343,7 @@ public class TextProcessor {
             }
         }
 
-        //case where toponym ended at very end of document:
+        // case where toponym ended at very end of document:
         if (toponymStartIndex != -1) {
             int wordidx = lexicon.addWord(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
             tokenArrayBuffer.addElement(wordidx, currentDoc, 1);
@@ -290,9 +351,11 @@ public class TextProcessor {
     }
 
     /**
-     * Find the non-label tokens in a single string with multiple tokens
-     * that does not have whitespace boundaries
-     *
+     * Find the non-label tokens in a single string with multiple tokens that
+     * does not have whitespace boundaries.
+     * 
+     * FIXME: Duplicated functionality with two-arg version of function below.
+     * 
      * @param token
      * @return
      */

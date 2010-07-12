@@ -66,6 +66,7 @@ public class BasicMinDistanceModel extends SelfTrainedModelBase {
 	int curDocNumber = 0;
 	int curDocBeginIndex = 0;
 
+	
         for (int i = 0; i < trainTokenArrayBuffer.size(); i++) {
 
 	    if(trainTokenArrayBuffer.documentVector[i] != curDocNumber) {

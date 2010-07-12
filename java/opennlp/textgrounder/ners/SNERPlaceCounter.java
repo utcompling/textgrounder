@@ -28,6 +28,20 @@ import edu.stanford.nlp.ling.CoreAnnotations.*;
 import opennlp.textgrounder.gazetteers.Gazetteer;
 import opennlp.textgrounder.util.*;
 
+/**
+ * A class that counts the number of occurrences of each toponym (place name) in
+ * a file of raw text. This is similar to the basic PlaceCounter class but
+ * rather than treating all sequences of capitalized letters as potential
+ * toponyms, it runs the raw text through the Stanford NER (named entity
+ * recognizer) and only considers as potential toponyms those word sequences
+ * identified as locations by the NER. It still looks up each resulting
+ * potential toponym in the gazetteer to determine if it's really a place name.
+ * 
+ * NOTE NOTE NOTE: Not currently used.
+ * 
+ * @author tsmoon
+ * 
+ */
 public class SNERPlaceCounter extends TObjectIntHashMap<String> {
 
     public static final Pattern locationPattern = Pattern.compile("(\\w+/LOCATION(\\s*\\w+/LOCATION)*)");

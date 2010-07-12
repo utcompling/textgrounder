@@ -23,6 +23,17 @@ import gnu.trove.*;
 
 import opennlp.textgrounder.gazetteers.Gazetteer;
 
+/**
+ * A simple class that counts the number of occurrences of each toponym (place
+ * name) in a file of raw text. File is assumed to contain one potential
+ * (possibly multiword) toponym per line. Looks up each potential toponym in the
+ * gazetteer to determine if it's really a place name.
+ * 
+ * NOTE NOTE NOTE: Not currently used.
+ * 
+ * @author tsmoon
+ * 
+ */
 public class ListPlaceCounter extends TObjectIntHashMap<String> {
 
     //private static Pattern placeNamePattern = Pattern.compile("[A-Z][\\w]*([\\s][A-Z][\\w]*)*");

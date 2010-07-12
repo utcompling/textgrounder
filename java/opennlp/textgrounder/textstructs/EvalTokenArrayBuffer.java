@@ -20,6 +20,9 @@ import java.util.ArrayList;
 import opennlp.textgrounder.topostructs.*;
 
 /**
+ * Subclass of TokenArrayBuffer that also holds the disambiguated Locations for
+ * each toponym. We store both the model's guess for the Location and the actual
+ * Location as determined from gold-standard data.
  * 
  * @author tsmoon
  */
@@ -38,6 +41,7 @@ public class EvalTokenArrayBuffer extends TokenArrayBuffer {
 
     /**
      * Default constructor. Allocates memory for arrays and assigns lexicon.
+     * FIXME: Not necessary, delete me.  See below.
      *
      * @param lexicon
      */
@@ -59,6 +63,10 @@ public class EvalTokenArrayBuffer extends TokenArrayBuffer {
     }
 
     /**
+     * Same as superclass version but also adds the passed-in gold standard
+     * Location (which disambiguates the toponym). FIXME: No method to set the
+     * model's guess, presumably is handled by `modelLocationArrayList' being
+     * public.
      * 
      * @param wordIdx
      * @param docIdx
@@ -74,6 +82,8 @@ public class EvalTokenArrayBuffer extends TokenArrayBuffer {
     }
 
     /**
+     * Used by assert()s in TextProcessorTR.
+     * FIXME: Ugly.
      * 
      * @return
      */
@@ -82,6 +92,12 @@ public class EvalTokenArrayBuffer extends TokenArrayBuffer {
         return toponymArrayList.size() == goldLocationArrayList.size();
     }
 
+    /**
+     * Used by assert()s in TextProcessorTR.
+     * FIXME: Ugly.
+     * 
+     * @return
+     */
     @Override
     protected boolean verboseSanityCheck(String curLine) {
         if (Math.abs(toponymArrayList.size() - goldLocationArrayList.size()) > 1) {

@@ -22,10 +22,20 @@ import java.util.List;
 import opennlp.textgrounder.topostructs.*;
 
 /**
- * Class of integer sequences that indicate words in a stream of space
- * delimited tokens. The lengths of all sequences in this class are identical.
- * Each element of the same offset in each sequence contains different
- * pieces of information about the same
+ * Class that stores data about a sequence of tokens. All tokens in all
+ * documents are concatenated into a single TokenArrayBuffer. Logically the data
+ * is a list of objects, one per token. For efficiency purposes, however, we
+ * store the data as separate sequences of integers, one per specific piece of
+ * info about the token. The lengths of all sequences in this class are
+ * identical.
+ * 
+ * NOTE: A single "token" may correspond to multiple words, particularly in the
+ * case of multi-word place names. FIXME: What process splits up the word
+ * sequence into tokens?
+ * 
+ * FIXME: Is it really true that all arrays are the same length?
+ * `trainingArrayList' is a list of tokens with numerals etc. removed; surely
+ * this is shorter?
  * 
  * @author tsmoon
  */
@@ -34,7 +44,7 @@ public class TokenArrayBuffer implements Serializable {
     static private final long serialVersionUID = 10772114L;
     /**
      * Array of word indexes. The elements are integers which reference word
-     * types maintained in Lexicon. The "word types" may not be unigrams.
+     * types maintained in Lexicon. The "word types" might not be unigrams.
      * If they are multiword placenames, the index will still be unary, but
      * the lexicon will reference space delimited multiple tokens.
      */
@@ -90,7 +100,7 @@ public class TokenArrayBuffer implements Serializable {
     protected Lexicon lexicon;
 
     /**
-     * Constructor for derived classes only
+     * Constructor for derived classes only.  FIXME: Not necessary, delete me.
      */
     protected TokenArrayBuffer() {
     }
@@ -119,9 +129,12 @@ public class TokenArrayBuffer implements Serializable {
     }
 
     /**
-     * Concatenates two TokenArrayBuffers for use when an evaluation TokenArrayBuffer
+     * Concatenates another TokenArrayBuffer onto this one and returns a new,
+     * combined TokenArrayBuffer. For use when an evaluation TokenArrayBuffer
      * and additional unlabeled training data are desired.
-     * @param otherTokenArrayBuffer the TokenArrayBuffer to be concatenated with this
+     * 
+     * @param otherTokenArrayBuffer
+     *            the TokenArrayBuffer to be concatenated with this
      * @return the concatenated TokenArrayBuffer
      */
     public TokenArrayBuffer concatenate(TokenArrayBuffer otherTokenArrayBuffer) {
@@ -142,7 +155,8 @@ public class TokenArrayBuffer implements Serializable {
     }
 
     /**
-     * Add all indexes and indicators to the array fields and increment size
+     * Add a single logical element (i.e. all info associated with a token).
+     * Adds all indexes and indicators to the array fields and increments size
      * by one.
      *
      * @param wordIdx index of token being added. may be a placename, a
@@ -160,18 +174,27 @@ public class TokenArrayBuffer implements Serializable {
     }
 
     /**
-     * Add all indexes and indicators to the array fields and increment size
-     * by one.
-     *
-     * @param wordIdx index of token being added. may be a placename, a
-     * multiword placename, a stopword, or something else.
-     * @param docIdx the index of the document that the current token was
-     * found in. The index grows by unit increments whenever a new document
-     * has been opened.
-     * @param topStatus the status of the current (multiword) token as a
-     * toponym. This will be one if it is a toponym and zero otherwise.
-     * @param stopStatus the status of the current token as a stopword. This
-     * will be one if it is a stopword and zero otherwise.
+     * Add a single logical element (i.e. all info associated with a token).
+     * Adds all indexes and indicators to the array fields and increments size
+     * by one. Same as four-argument version but takes an additional Location
+     * object indicating the resolution of the toponym.
+     * 
+     * NOTE: The Location param is ignored in this code, but not in overridden
+     * versions of this method in subclasses.
+     * 
+     * @param wordIdx
+     *            index of token being added. may be a placename, a multiword
+     *            placename, a stopword, or something else.
+     * @param docIdx
+     *            the index of the document that the current token was found in.
+     *            The index grows by unit increments whenever a new document has
+     *            been opened.
+     * @param topStatus
+     *            the status of the current (multiword) token as a toponym. This
+     *            will be one if it is a toponym and zero otherwise.
+     * @param stopStatus
+     *            the status of the current token as a stopword. This will be
+     *            one if it is a stopword and zero otherwise.
      */
     public void addElement(int wordIdx, int docIdx, int topStatus,
           Location loc) {
@@ -231,7 +254,7 @@ public class TokenArrayBuffer implements Serializable {
     /**
      * @return the size of the arrays in class. In other words, the size
      * in tokens of all documents combined (give or take some words, since
-     * multiword placenames are considered to be a single token)
+     * multiword placenames are considered to be a single token).
      */
     public int size() {
         return size;
@@ -246,11 +269,15 @@ public class TokenArrayBuffer implements Serializable {
     }
 
     /**
-     * Copy a sequence of numbers from ta to array ia.
-     *
-     * @param <T>   Any number type
-     * @param ia    Target array of integers to be copied to
-     * @param ta    Source List<T> of numbers to be copied from
+     * Copy a sequence of numbers from an array to a list. FIXME: Should be in a
+     * util class, not here.
+     * 
+     * @param <T>
+     *            Any number type
+     * @param ia
+     *            Target array of integers to be copied to
+     * @param ta
+     *            Source List<T> of numbers to be copied from
      */
     protected static <T extends Number> void copyToArray(int[] ia, List<T> ta) {
         for (int i = 0; i < ta.size(); ++i) {
@@ -258,6 +285,12 @@ public class TokenArrayBuffer implements Serializable {
         }
     }
 
+    /**
+     * Used as part of assert()s in TextProcessorTR. FIXME: This is ugly, should
+     * be better way.
+     * 
+     * @return
+     */
     protected boolean sanityCheck1() {
         return toponymArrayList.size() == wordArrayList.size();
     }

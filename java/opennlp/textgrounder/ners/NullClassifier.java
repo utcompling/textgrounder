@@ -18,8 +18,15 @@ package opennlp.textgrounder.ners;
 import edu.stanford.nlp.ie.crf.*;
 
 /**
- * An override of the CRFClassifier for use in the base TopicModel which
- * does not need placename identification.
+ * An override of the CRFClassifier that doesn't really do anything. It can be
+ * passed as the `classifier' argument to TextProcessor() when to actual NER
+ * classification is needed. This is used, for example, in the base TopicModel.
+ * 
+ * The overridden `classifyToString()' method outputs its input text unmodified
+ * except for lowercasing each word and removing non-alphanumeric characters.
+ * 
+ * FIXME: This depends on the non-obvious behavior of TextProcessor() of
+ * allowing non-toponym tokens to have their '/O' tag omitted.
  * 
  * @author tsmoon
  */
