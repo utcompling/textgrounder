@@ -23,6 +23,12 @@ import gnu.trove.*;
 
 import opennlp.textgrounder.gazetteers.Gazetteer;
 
+/**
+ * An unused class that appears no different than PlaceCounter.
+ * 
+ * @author tsmoon
+ *
+ */
 public class RegexPlaceCounter extends TObjectIntHashMap<String> {
 
     private static Pattern placeNamePattern = Pattern.compile("[A-Z][\\w]*([\\s][A-Z][\\w]*)*");

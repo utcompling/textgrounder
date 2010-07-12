@@ -31,13 +31,19 @@ import org.jdom.input.SAXBuilder;
 
 /**
  * Text processing class for TEI (text encoding initiative) encoded XML files.
- *
- * The PCL travel corpus is encoded in TEI format and this class is to be
- * used with pcl travel. By using the named entity definitions that come
- * with the dtd for pcl travel, all encoding issues are handled within this
- * class. Any non-lower ascii characters are normalized by first normalizing
- * according to unicode standards and then stripping non-lower ascii portions.
- *
+ * 
+ * Basically, this class reads in TEI-encoded XML files, ignores everything but
+ * the actual text, and runs the text through the Stanford NER to get toponym
+ * and non-toponym tokens, the same way that the base TextProcessor class does.
+ * There's only one method (besides the constructor), processFile(), which
+ * processes a specific file as just described.
+ * 
+ * The PCL travel corpus is encoded in TEI format and this class is to be used
+ * with pcl travel. By using the named entity definitions that come with the dtd
+ * for pcl travel, all encoding issues are handled within this class. Any
+ * non-lower ascii characters are normalized by first normalizing according to
+ * unicode standards and then stripping non-lower ascii portions.
+ * 
  * @author tsmoon
  */
 public class TextProcessorTEIXML extends TextProcessor {
@@ -55,12 +61,16 @@ public class TextProcessorTEIXML extends TextProcessor {
     }
 
     /**
-     * Process texts, identify toponyms and store in arrays.
-     *
-     * @param locationOfFile path to input
-     * @param tokenArrayBuffer collection of arrays for storing word ids, toponym
-     * status, document ids and stopword status
-     * @param stopwordList list of stopwords
+     * Process texts, identify toponyms and store in arrays. See comment at top
+     * of class for more info.
+     * 
+     * @param locationOfFile
+     *            path to input
+     * @param tokenArrayBuffer
+     *            collection of arrays for storing word ids, toponym status,
+     *            document ids and stopword status
+     * @param stopwordList
+     *            list of stopwords
      * @throws FileNotFoundException
      * @throws IOException
      */

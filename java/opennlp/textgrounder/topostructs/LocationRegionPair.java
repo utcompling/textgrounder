@@ -16,7 +16,11 @@
 package opennlp.textgrounder.topostructs;
 
 /**
- *
+ * As expected, simply encapsulates a pair of (Location, Region).
+ * 
+ * FIXME: Takes an enormous amount of Java code! In Python or Lisp you don't
+ * even need a class at all for something so simple.
+ * 
  * @author tsmoon
  */
 public class LocationRegionPair {

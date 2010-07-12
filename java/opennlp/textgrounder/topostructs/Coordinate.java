@@ -20,7 +20,10 @@ import java.io.*;
 /**
  * A Coordinate represents a location somewhere on a sphere and just
  * encapsulates a latitude and longitude. Various additional methods are created
- * to compare coordinates loosely and exactly, return points along a spiral radiating outward from the coordinate, 
+ * to compare coordinates loosely and exactly, return points along a spiral
+ * radiating outward from the coordinate, create a KML expression corresponding
+ * to a polygonal cylinder located around a given coordinate, and compute the
+ * distance between two coordinates.
  * 
  * @author Taesun Moon
  * 
