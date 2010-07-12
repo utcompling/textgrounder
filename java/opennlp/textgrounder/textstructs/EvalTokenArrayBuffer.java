@@ -16,8 +16,6 @@
 package opennlp.textgrounder.textstructs;
 
 import java.util.ArrayList;
-import opennlp.textgrounder.models.callbacks.NullTrainingMaterialCallback;
-import opennlp.textgrounder.models.callbacks.TrainingMaterialCallback;
 
 import opennlp.textgrounder.topostructs.*;
 
@@ -25,18 +23,18 @@ import opennlp.textgrounder.topostructs.*;
  * 
  * @author tsmoon
  */
-public class EvalTokenArrayBuffer<E extends SmallLocation> extends TokenArrayBuffer<E> {
+public class EvalTokenArrayBuffer extends TokenArrayBuffer {
 
     /**
      * Stores the system/model's best guesses for the disambiguated Location for each
      * toponym. Null for non-toponym indices.
      */
-    public ArrayList<E> modelLocationArrayList;
+    public ArrayList<Location> modelLocationArrayList;
     /**
      * Stores the gold standard location information when running in evaluation mode.
      * Indices corresponding to non-toponyms are null.
      */
-    public ArrayList<E> goldLocationArrayList;
+    public ArrayList<Location> goldLocationArrayList;
 
     /**
      * Default constructor. Allocates memory for arrays and assigns lexicon.
@@ -45,18 +43,7 @@ public class EvalTokenArrayBuffer<E extends SmallLocation> extends TokenArrayBuf
      */
     public EvalTokenArrayBuffer(Lexicon lexicon) {
         super();
-        initialize(lexicon, new NullTrainingMaterialCallback(lexicon));
-    }
-
-    /**
-     * Default constructor. Allocates memory for arrays and assigns lexicon.
-     *
-     * @param lexicon
-     */
-    public EvalTokenArrayBuffer(Lexicon lexicon,
-          TrainingMaterialCallback trainingMaterialCallback) {
-        super();
-        initialize(lexicon, trainingMaterialCallback);
+        initialize(lexicon);
     }
 
     /**
@@ -65,11 +52,10 @@ public class EvalTokenArrayBuffer<E extends SmallLocation> extends TokenArrayBuf
      * @param lexicon
      */
     @Override
-    protected void initialize(Lexicon lexicon,
-          TrainingMaterialCallback trainingMaterialCallback) {
-        super.initialize(lexicon, trainingMaterialCallback);
-        modelLocationArrayList = new ArrayList<E>();
-        goldLocationArrayList = new ArrayList<E>();
+    protected void initialize(Lexicon lexicon) {
+        super.initialize(lexicon);
+        modelLocationArrayList = new ArrayList<Location>();
+        goldLocationArrayList = new ArrayList<Location>();
     }
 
     /**
@@ -82,8 +68,8 @@ public class EvalTokenArrayBuffer<E extends SmallLocation> extends TokenArrayBuf
      */
     @Override
     public void addElement(int wordIdx, int docIdx, int topStatus,
-          int stopStatus, E loc) {
-        super.addElement(wordIdx, docIdx, topStatus, stopStatus, null);
+          Location loc) {
+        super.addElement(wordIdx, docIdx, topStatus, null);
         goldLocationArrayList.add(loc);
     }
 

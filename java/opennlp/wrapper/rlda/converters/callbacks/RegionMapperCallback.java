@@ -20,16 +20,15 @@ import gnu.trove.TIntObjectHashMap;
 import gnu.trove.TIntObjectIterator;
 import gnu.trove.TObjectIntHashMap;
 import java.util.HashSet;
-
-import opennlp.textgrounder.textstructs.Lexicon;
-import opennlp.textgrounder.topostructs.*;
+import opennlp.wrapper.rlda.textstructs.*;
+import opennlp.wrapper.rlda.topostructs.*;
 
 /**
  * A callback class to 
  *
  * @author tsmoon
  */
-public class RegionMapperCallback<E extends SmallLocation> {
+public class RegionMapperCallback {
 
     /**
      * Table from index to region
@@ -75,7 +74,7 @@ public class RegionMapperCallback<E extends SmallLocation> {
      * @param _loc
      * @param _region
      */
-    public void addToPlace(E _loc, Region _region) {
+    public void addToPlace(Location _loc, Region _region) {
         if (!regionToIdxMap.containsKey(_region)) {
             regionToIdxMap.put(_region, numRegions);
             idxToRegionMap.put(numRegions, _region);

@@ -25,7 +25,7 @@ import gnu.trove.*;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.*;
 
-public class CensusGazetteer<E extends SmallLocation> extends Gazetteer<E> {
+public class CensusGazetteer extends Gazetteer {
 
     public CensusGazetteer(String location) throws
           FileNotFoundException, IOException {

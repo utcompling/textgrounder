@@ -18,7 +18,6 @@ package opennlp.textgrounder.models;
 import gnu.trove.TIntHashSet;
 import opennlp.textgrounder.gazetteers.*;
 import opennlp.textgrounder.geo.CommandLineOptions;
-import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.textstructs.*;
 import java.util.logging.*;
 import opennlp.textgrounder.topostructs.Location;
@@ -27,29 +26,26 @@ import opennlp.textgrounder.topostructs.Location;
  * Abstract class for models that don't need training data.
  * @author tsmoon
  */
-public abstract class SelfTrainedModelBase extends Model<Location> {
+public abstract class SelfTrainedModelBase extends Model {
 
     /**
      * Gazetteer that holds geographic information
      */
-    protected Gazetteer<Location> gazetteer;
+    protected Gazetteer gazetteer;
 
-    public SelfTrainedModelBase(Gazetteer<Location> gaz, int bscale,
+    public SelfTrainedModelBase(Gazetteer gaz, int bscale,
           int paragraphsAsDocs) {
         barScale = bscale;
         gazetteer = gaz;
         gazetteer.gazetteerRefresh = gazetteerRefresh;
         lexicon = new Lexicon();
-        genericsKludgeFactor = new Location();
-        gazetteerGenerator = new GazetteerGenerator<Location>(null, genericsKludgeFactor);
+        gazetteerGenerator = new GazetteerGenerator(null);
         //if(evalInputPath != null)
         //    trainTokenArrayBuffer = evalTokenArrayBuffer;
     }
 
     public SelfTrainedModelBase(CommandLineOptions options) {
         super(options);
-        genericsKludgeFactor = new Location();
-        gazetteerGenerator.setGenericsKludgeFactor(genericsKludgeFactor);
         gazetteer = gazetteerGenerator.generateGazetteer();
         gazetteer.gazetteerRefresh = gazetteerRefresh;
         //if(evalInputPath != null)
@@ -73,7 +69,7 @@ public abstract class SelfTrainedModelBase extends Model<Location> {
      * @param locs list of locations.
      */
     protected void addLocationsToRegionArray(TIntHashSet locs) {
-        addLocationsToRegionArray(locs, gazetteer, new NullRegionMapperCallback());
+        addLocationsToRegionArray(locs, gazetteer);
     }
 
     /**

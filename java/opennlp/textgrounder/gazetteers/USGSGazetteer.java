@@ -33,7 +33,7 @@ import opennlp.textgrounder.util.*;
  *
  * @param <E>
  */
-public class USGSGazetteer<E extends SmallLocation> extends Gazetteer<E> {
+public class USGSGazetteer extends Gazetteer {
 
     public USGSGazetteer(String location) throws
           FileNotFoundException, IOException {

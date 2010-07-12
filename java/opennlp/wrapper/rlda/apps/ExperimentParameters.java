@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.apps;
+package opennlp.wrapper.rlda.apps;
 
 import java.io.File;
 import java.io.FileOutputStream;

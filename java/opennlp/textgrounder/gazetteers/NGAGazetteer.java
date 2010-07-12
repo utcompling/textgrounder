@@ -33,7 +33,7 @@ import opennlp.textgrounder.util.*;
  *
  * @param <E>
  */
-public class NGAGazetteer<E extends SmallLocation> extends Gazetteer<E> {
+public class NGAGazetteer extends Gazetteer {
 
     public NGAGazetteer(String location) throws FileNotFoundException,
           IOException {

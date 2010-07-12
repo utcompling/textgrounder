@@ -28,7 +28,6 @@ import java.util.logging.Logger;
 import opennlp.textgrounder.gazetteers.*;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.textstructs.*;
-import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.KMLUtil;
 
@@ -46,13 +45,8 @@ import opennlp.textgrounder.util.KMLUtil;
  *
  * @author
  */
-public abstract class Model<E extends SmallLocation> {
+public abstract class Model {
 
-    /**
-     * Kludge field to make instantiation of E possible within the class. See
-     * the long comment in Gazetteer.java under `genericsKludgeFactor'.
-     */
-    protected E genericsKludgeFactor;
     // Minimum number of pixels the (small) square region (NOT our Region) represented by each city must occupy on the screen for its label to appear:
     public final static int MIN_LOD_PIXELS = 16;
     /**
@@ -127,16 +121,16 @@ public abstract class Model<E extends SmallLocation> {
     /**
      * Array of token indices and associated information for training data
      */
-    protected TokenArrayBuffer<E> trainTokenArrayBuffer;
+    protected TokenArrayBuffer trainTokenArrayBuffer;
     /**
      * Array of token indices and associated information for eval data
      */
-    protected EvalTokenArrayBuffer<E> evalTokenArrayBuffer;
+    protected EvalTokenArrayBuffer evalTokenArrayBuffer;
     /**
      * Generates gazetteers as local variables. Global if necessary. Reduces
      * memory consumption
      */
-    protected GazetteerGenerator<E> gazetteerGenerator;
+    protected GazetteerGenerator gazetteerGenerator;
     /**
      * Flag for refreshing gazetteer from original database
      */
@@ -275,10 +269,10 @@ public abstract class Model<E extends SmallLocation> {
      *            callback class for handling mappings of locations and regions
      */
     protected void addLocationsToRegionArray(TIntHashSet locs,
-            Gazetteer<E> gaz, RegionMapperCallback regionMapper) {
+            Gazetteer gaz) {
         for (int locid : locs.toArray()) {
-            E loc = gaz.getLocation(locid);
-            addLocationsToRegionArray(loc, regionMapper);
+            Location loc = gaz.getLocation(locid);
+            addLocationsToRegionArray(loc);
         }
     }
 
@@ -290,8 +284,7 @@ public abstract class Model<E extends SmallLocation> {
      * @param loc
      * @param regionMapper
      */
-    protected void addLocationsToRegionArray(E loc,
-            RegionMapperCallback regionMapper) {
+    protected void addLocationsToRegionArray(Location loc) {
         int curX = (int) (loc.getCoord().latitude + 180)
                 / (int) degreesPerRegion;
         int curY = (int) (loc.getCoord().longitude + 90)
@@ -316,7 +309,6 @@ public abstract class Model<E extends SmallLocation> {
             regionArray[curX][curY] = new Region(minLon, maxLon, minLat, maxLat);
             activeRegions++;
         }
-        regionMapper.addToPlace(loc, regionArray[curX][curY]);
     }
 
     /**
@@ -326,7 +318,7 @@ public abstract class Model<E extends SmallLocation> {
      */
     public void processTrainInputPath() throws Exception {
         trainTokenArrayBuffer = new TokenArrayBuffer(lexicon);
-        processTrainInputPath(trainInputFile, new TextProcessor(lexicon, paragraphsAsDocs), trainTokenArrayBuffer, new NullStopwordList());
+        processTrainInputPath(trainInputFile, new TextProcessor(lexicon, paragraphsAsDocs), trainTokenArrayBuffer);
         trainTokenArrayBuffer.convertToPrimitiveArrays();
     }
 
@@ -339,14 +331,14 @@ public abstract class Model<E extends SmallLocation> {
      * @throws IOException
      */
     public void processTrainInputPath(File myPath, TextProcessor textProcessor,
-          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws
+          TokenArrayBuffer tokenArrayBuffer) throws
           IOException {
         if (myPath.isDirectory()) {
             for (String pathname : myPath.list()) {
-                processTrainInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer, stopwordList);
+                processTrainInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer);
             }
         } else {
-            textProcessor.processFile(myPath.getCanonicalPath(), tokenArrayBuffer, stopwordList);
+            textProcessor.processFile(myPath.getCanonicalPath(), tokenArrayBuffer);
         }
     }
 
@@ -357,7 +349,7 @@ public abstract class Model<E extends SmallLocation> {
      */
     public void processEvalInputPath() throws Exception {
         evalTokenArrayBuffer = new EvalTokenArrayBuffer(lexicon);
-        processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon, genericsKludgeFactor), evalTokenArrayBuffer, new NullStopwordList());
+        processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon), evalTokenArrayBuffer);
         evalTokenArrayBuffer.convertToPrimitiveArrays();
     }
 
@@ -370,15 +362,15 @@ public abstract class Model<E extends SmallLocation> {
      * @throws IOException
      */
     public void processEvalInputPath(File myPath, TextProcessorTR textProcessor,
-          EvalTokenArrayBuffer evalTokenArrayBuffer, StopwordList stopwordList)
+          EvalTokenArrayBuffer evalTokenArrayBuffer)
           throws
           IOException {
         if (myPath.isDirectory()) {
             for (String pathname : myPath.list()) {
-                processEvalInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, evalTokenArrayBuffer, stopwordList);
+                processEvalInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, evalTokenArrayBuffer);
             }
         } else {
-            textProcessor.processFile(myPath.getCanonicalPath(), evalTokenArrayBuffer, stopwordList);
+            textProcessor.processFile(myPath.getCanonicalPath(), evalTokenArrayBuffer);
         }
     }
 
@@ -391,7 +383,7 @@ public abstract class Model<E extends SmallLocation> {
      * @throws Exception
      */
     public void writeXMLFile(String inputFilename, String outputFilename,
-          TIntObjectHashMap<E> idxToLocationMap, TIntHashSet locations,
+          TIntObjectHashMap<Location> idxToLocationMap, TIntHashSet locations,
           TokenArrayBuffer tokenArrayBuffer) throws
           IOException {
 
@@ -406,7 +398,7 @@ public abstract class Model<E extends SmallLocation> {
 
         for (TIntIterator it = locations.iterator(); it.hasNext();) {
             int locid = it.next();
-            E loc = idxToLocationMap.get(locid);
+            Location loc = idxToLocationMap.get(locid);
 
             double height = Math.log(loc.getCount()) * barScale;
 
@@ -447,7 +439,7 @@ public abstract class Model<E extends SmallLocation> {
      * 
      * @param evalTokenArrayBuffer
      */
-    public void evaluate(EvalTokenArrayBuffer<E> evalTokenArrayBuffer) {
+    public void evaluate(EvalTokenArrayBuffer evalTokenArrayBuffer) {
         if (evalTokenArrayBuffer.modelLocationArrayList.size() != evalTokenArrayBuffer.goldLocationArrayList.size()) {
             System.out.println("MISMATCH: model: " + evalTokenArrayBuffer.modelLocationArrayList.size() + "; gold: " + evalTokenArrayBuffer.goldLocationArrayList.size());
             /*	    for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
@@ -479,8 +471,8 @@ public abstract class Model<E extends SmallLocation> {
             BufferedWriter errorDump = new BufferedWriter(new FileWriter("error-dump.txt"));
 
             for (int i = 0; i < evalTokenArrayBuffer.size(); i++) {
-                E curModelLoc = evalTokenArrayBuffer.modelLocationArrayList.get(i);
-                E curGoldLoc = evalTokenArrayBuffer.goldLocationArrayList.get(i);
+                Location curModelLoc = evalTokenArrayBuffer.modelLocationArrayList.get(i);
+                Location curGoldLoc = evalTokenArrayBuffer.goldLocationArrayList.get(i);
 
                 if (curGoldLoc != null) {
                     goldLocationCount++;

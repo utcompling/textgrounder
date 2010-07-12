@@ -15,16 +15,16 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.wrapper.rlda.converters.callbacks;
 
-import opennlp.textgrounder.textstructs.Lexicon;
-import opennlp.textgrounder.topostructs.Region;
-import opennlp.textgrounder.topostructs.SmallLocation;
+import opennlp.wrapper.rlda.textstructs.Lexicon;
+import opennlp.wrapper.rlda.topostructs.Location;
+import opennlp.wrapper.rlda.topostructs.Region;
 
 /**
  * A callback class to 
  *
  * @author tsmoon
  */
-public class NullRegionMapperCallback<E extends SmallLocation> extends RegionMapperCallback<E> {
+public class NullRegionMapperCallback extends RegionMapperCallback {
 
     public NullRegionMapperCallback() {
     }
@@ -34,6 +34,6 @@ public class NullRegionMapperCallback<E extends SmallLocation> extends RegionMap
     }
 
     @Override
-    public void addToPlace(E loc, Region region) {
+    public void addToPlace(Location loc, Region region) {
     }
 }

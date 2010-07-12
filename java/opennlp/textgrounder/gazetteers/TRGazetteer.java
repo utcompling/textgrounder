@@ -34,7 +34,7 @@ import opennlp.textgrounder.util.*;
  * Read in a TR-CoNLL gazetteer, described in Toponym Resolution in Text by
  * Jochen Leidner.
  */
-public class TRGazetteer<E extends SmallLocation> extends Gazetteer<E> {
+public class TRGazetteer extends Gazetteer {
 
     private static Coordinate nullCoord = new Coordinate(0.0, 0.0);
 

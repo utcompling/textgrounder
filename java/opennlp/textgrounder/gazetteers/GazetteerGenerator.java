@@ -21,7 +21,6 @@ import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import opennlp.textgrounder.geo.CommandLineOptions;
-import opennlp.textgrounder.topostructs.SmallLocation;
 
 /**
  * Factory class to generate the appropriate subclass of Gazetteer based on the
@@ -34,12 +33,8 @@ import opennlp.textgrounder.topostructs.SmallLocation;
  * 
  * @author tsmoon
  */
-public class GazetteerGenerator<E extends SmallLocation> {
+public class GazetteerGenerator {
 
-    /**
-     * kludge field to make instantiation of E possible within the class
-     */
-    protected E genericsKludgeFactor;
     /**
      *
      */
@@ -55,11 +50,6 @@ public class GazetteerGenerator<E extends SmallLocation> {
 
     public GazetteerGenerator(CommandLineOptions options) {
         initialize(options);
-    }
-
-    public GazetteerGenerator(CommandLineOptions _options, E _genericsKludgeFactor) {
-        initialize(_options);
-        genericsKludgeFactor = _genericsKludgeFactor;
     }
 
     protected final void initialize(CommandLineOptions options) {
@@ -90,24 +80,24 @@ public class GazetteerGenerator<E extends SmallLocation> {
      * Its creation method will read in the gazetteer info from the file. 
      * @return the created gazetteer object
      */
-    public Gazetteer<E> generateGazetteer() {
-        Gazetteer<E> gazetteer = null;
+    public Gazetteer generateGazetteer() {
+        Gazetteer gazetteer = null;
         try {
             switch (gazType) {
                 case CG:
-                    gazetteer = new CensusGazetteer<E>(gazPath);
+                    gazetteer = new CensusGazetteer(gazPath);
                     break;
                 case NGAG:
-                    gazetteer = new NGAGazetteer<E>(gazPath);
+                    gazetteer = new NGAGazetteer(gazPath);
                     break;
                 case USGSG:
-                    gazetteer = new USGSGazetteer<E>(gazPath);
+                    gazetteer = new USGSGazetteer(gazPath);
                     break;
                 case WG:
-                    gazetteer = new WGGazetteer<E>(gazPath);
+                    gazetteer = new WGGazetteer(gazPath);
                     break;
                 case TRG:
-                    gazetteer = new TRGazetteer<E>(gazPath, gazetteerRefresh);
+                    gazetteer = new TRGazetteer(gazPath, gazetteerRefresh);
                     break;
             }
         } catch (FileNotFoundException ex) {
@@ -123,21 +113,6 @@ public class GazetteerGenerator<E extends SmallLocation> {
             Logger.getLogger(GazetteerGenerator.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
-        gazetteer.genericsKludgeFactor = genericsKludgeFactor;
         return gazetteer;
-    }
-
-    /**
-     * @return the genericsKludgeFactor
-     */
-    public E getGenericsKludgeFactor() {
-        return genericsKludgeFactor;
-    }
-
-    /**
-     * @param genericsKludgeFactor the genericsKludgeFactor to set
-     */
-    public void setGenericsKludgeFactor(E genericsKludgeFactor) {
-        this.genericsKludgeFactor = genericsKludgeFactor;
     }
 }

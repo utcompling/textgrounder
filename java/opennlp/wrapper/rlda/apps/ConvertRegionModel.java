@@ -14,24 +14,16 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.apps;
-
-import opennlp.rlda.models.RegionModel;
+package opennlp.wrapper.rlda.apps;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class TrainRegionModel {
+public class ConvertRegionModel {
 
     public static void main(String[] args) throws Exception {
 
         ExperimentParameters experimentParameters = ExperimentParameterManipulator.loadParameters(args[0]);
-
-        RegionModel rm = new RegionModel(experimentParameters);
-
-        rm.initialize();
-        rm.train();
-        rm.decode();
     }
 }

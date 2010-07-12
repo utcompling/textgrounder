@@ -34,7 +34,6 @@ import java.util.logging.Logger;
 import opennlp.textgrounder.gazetteers.*;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.textstructs.*;
-import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
 
@@ -49,7 +48,7 @@ public class PopulationBaselineModel extends SelfTrainedModelBase {
     //protected File trainInputFile;
     //protected boolean initializedXMLFile = false;
     //protected boolean finalizedXMLFile = false;
-    public PopulationBaselineModel(Gazetteer<Location> gaz, int bscale, int paragraphsAsDocs) {
+    public PopulationBaselineModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
         super(gaz, bscale, paragraphsAsDocs);
         /*barScale = bscale;
         gazetteer = gaz;

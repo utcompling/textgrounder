@@ -26,7 +26,6 @@ import java.util.logging.Logger;
 import opennlp.textgrounder.gazetteers.*;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.textstructs.*;
-import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
 
@@ -45,7 +44,7 @@ public class BasicMinDistanceModel extends SelfTrainedModelBase {
 
     public static TObjectDoubleHashMap<String> distanceCache = new TObjectDoubleHashMap<String>();
 
-    public BasicMinDistanceModel(Gazetteer<Location> gaz, int bscale, int paragraphsAsDocs) {
+    public BasicMinDistanceModel(Gazetteer gaz, int bscale, int paragraphsAsDocs) {
         super(gaz, bscale, paragraphsAsDocs);
     }
 

@@ -28,7 +28,6 @@ import java.util.logging.Logger;
 import opennlp.textgrounder.gazetteers.*;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.textstructs.*;
-import opennlp.textgrounder.models.callbacks.*;
 import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.*;
 
@@ -41,7 +40,7 @@ public class RandomBaselineModel extends SelfTrainedModelBase {
 
     public static Random myRandom = new Random();
 
-    public RandomBaselineModel(Gazetteer<Location> gaz, int bscale,
+    public RandomBaselineModel(Gazetteer gaz, int bscale,
             int paragraphsAsDocs) {
         super(gaz, bscale, paragraphsAsDocs);
     }

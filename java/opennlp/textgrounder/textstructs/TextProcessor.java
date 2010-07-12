@@ -145,7 +145,7 @@ public class TextProcessor {
      * @throws IOException
      */
     public void processFile(String locationOfFile,
-          TokenArrayBuffer tokenArrayBuffer, StopwordList stopwordList) throws
+          TokenArrayBuffer tokenArrayBuffer) throws
           FileNotFoundException, IOException {
 
         BufferedReader textIn = new BufferedReader(new FileReader(locationOfFile));
@@ -166,7 +166,7 @@ public class TextProcessor {
             if (counter < parAsDocSize) {
                 counter++;
             } else {
-                processText(buf.toString(), tokenArrayBuffer, stopwordList);
+                processText(buf.toString(), tokenArrayBuffer);
 
                 buf = new StringBuffer();
                 currentDoc += 1;
@@ -179,7 +179,7 @@ public class TextProcessor {
          * Add last lines if they have not been processed and added
          */
         if (counter > 1) {
-            processText(buf.toString(), tokenArrayBuffer, stopwordList);
+            processText(buf.toString(), tokenArrayBuffer);
             System.err.print(currentDoc + ",");
         }
         System.err.println();
@@ -221,8 +221,7 @@ public class TextProcessor {
      * (i.e. the token is not a stopword).
      * @param currentDoc 
      */
-    public void processText(String text, TokenArrayBuffer tokenArrayBuffer,
-          StopwordList stopwordList) {
+    public void processText(String text, TokenArrayBuffer tokenArrayBuffer) {
 
         String nerOutput = classifier.classifyToString(text);
 
@@ -242,7 +241,7 @@ public class TextProcessor {
                     toponymEndIndex = i + 1;
                     String cur = StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/").toLowerCase();
                     wordidx = lexicon.addWord(cur);
-                    tokenArrayBuffer.addElement(wordidx, currentDoc, 1, 0);
+                    tokenArrayBuffer.addElement(wordidx, currentDoc, 1);
 
                     toponymStartIndex = -1;
                     toponymEndIndex = -1;
@@ -255,7 +254,7 @@ public class TextProcessor {
                  */
                 String cur = StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/").toLowerCase();
                 wordidx = lexicon.addWord(cur);
-                tokenArrayBuffer.addElement(wordidx, currentDoc, 1, 0);
+                tokenArrayBuffer.addElement(wordidx, currentDoc, 1);
 
                 /**
                  * Add the current token
@@ -264,12 +263,8 @@ public class TextProcessor {
                 for (String subtoke : subtokes) {
                     if (!subtoke.isEmpty()) {
                         subtoke = subtoke.trim().toLowerCase();
-                        int isstop = 0;
-                        if (stopwordList.isStopWord(subtoke)) {
-                            isstop = 1;
-                        }
                         wordidx = lexicon.addWord(subtoke);
-                        tokenArrayBuffer.addElement(wordidx, currentDoc, 0, isstop);
+                        tokenArrayBuffer.addElement(wordidx, currentDoc, 0);
                     }
                 }
 
@@ -280,12 +275,8 @@ public class TextProcessor {
                 for (String subtoke : subtokes) {
                     if (!subtoke.isEmpty()) {
                         subtoke = subtoke.trim().toLowerCase();
-                        int isstop = 0;
-                        if (stopwordList.isStopWord(subtoke)) {
-                            isstop = 1;
-                        }
                         wordidx = lexicon.addWord(subtoke);
-                        tokenArrayBuffer.addElement(wordidx, currentDoc, 0, isstop);
+                        tokenArrayBuffer.addElement(wordidx, currentDoc, 0);
                     }
                 }
             }
@@ -294,7 +285,7 @@ public class TextProcessor {
         //case where toponym ended at very end of document:
         if (toponymStartIndex != -1) {
             int wordidx = lexicon.addWord(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
-            tokenArrayBuffer.addElement(wordidx, currentDoc, 1, 0);
+            tokenArrayBuffer.addElement(wordidx, currentDoc, 1);
         }
     }
 

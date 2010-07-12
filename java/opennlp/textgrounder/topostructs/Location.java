@@ -15,6 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.topostructs;
 
+import java.io.Serializable;
 import java.util.*;
 
 /**
@@ -33,12 +34,24 @@ import java.util.*;
  * @author Taesun Moon
  * 
  */
-public class Location extends SmallLocation {
+public class Location implements Serializable {
 
     protected String name;
     protected String type;
     protected int pop;
     protected String container;
+    protected int id;
+    protected int nameid;
+    protected Coordinate coord;
+    /**
+     * Counts of location in given text. Is double type to accomodate
+     * hyperparameters and fractional counts;
+     */
+    protected double count;
+    /**
+     * List of back pointers into the DocumentSet so that context (snippets) can be extracted
+     */
+    protected ArrayList<Integer> backPointers = null;
 
     public Location() {
     }
@@ -59,8 +72,7 @@ public class Location extends SmallLocation {
      * This has the same problem as is documented in the superclass method of
      * the same name.
      */
-    @Override
-    public boolean looselyMatches(SmallLocation other, double maxDiff) {
+    public boolean looselyMatches(Location other, double maxDiff) {
         /*if(!this.name.equals(other.name)) {
         System.out.println(this.name);
         System.out.println(other.name);
@@ -68,14 +80,107 @@ public class Location extends SmallLocation {
         return this.name.equals(other.getName()) && this.coord.looselyMatches(other.coord, maxDiff);
     }
 
-    @Override
     public String getName() {
         return name;
+    }
+
+    public double computeDistanceTo(Location other) {
+        return this.coord.computeDistanceTo(other.coord);
+    }
+
+    /**
+     * @return the container
+     */
+    public String getContainer() {
+        return container;
+    }
+
+    /**
+     * @param container the container to set
+     */
+    public void setContainer(String container) {
+        this.container = container;
+    }
+
+    /**
+     * @return the pop
+     */
+    public int getPop() {
+        return pop;
+    }
+
+    /**
+     * @param pop the pop to set
+     */
+    public void setPop(int pop) {
+        this.pop = pop;
+    }
+
+    /**
+     * @return the type
+     */
+    public String getType() {
+        return type;
+    }
+
+    /**
+     * @param type the type to set
+     */
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    /**
+     * @param name the name to set
+     */
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public ArrayList<Integer> getBackPointers() {
+        return backPointers;
+    }
+
+    public void setBackPointers(ArrayList<Integer> backPointers) {
+        this.backPointers = backPointers;
+    }
+
+    public Coordinate getCoord() {
+        return coord;
+    }
+
+    public void setCoord(Coordinate coord) {
+        this.coord = coord;
+    }
+
+    public double getCount() {
+        return count;
+    }
+
+    public void setCount(double count) {
+        this.count = count;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public int getNameid() {
+        return nameid;
+    }
+
+    public void setNameid(int nameid) {
+        this.nameid = nameid;
     }
 
     /*    public Location(int id, String name, String type, double lon, double lat, int pop, String container, int count) {
     Location(id, name, type, new Coordinate(lon, lat), pop, container, count);
     }*/
+
     @Override
     public String toString() {
         return id + ", " + name + ", " + type + ", (" + coord + "), " + pop + ", " + container;
@@ -102,61 +207,5 @@ public class Location extends SmallLocation {
             return false;
         }
         return true;
-    }
-
-    /**
-     * @return the container
-     */
-    @Override
-    public String getContainer() {
-        return container;
-    }
-
-    /**
-     * @param container the container to set
-     */
-    @Override
-    public void setContainer(String container) {
-        this.container = container;
-    }
-
-    /**
-     * @return the pop
-     */
-    @Override
-    public int getPop() {
-        return pop;
-    }
-
-    /**
-     * @param pop the pop to set
-     */
-    @Override
-    public void setPop(int pop) {
-        this.pop = pop;
-    }
-
-    /**
-     * @return the type
-     */
-    @Override
-    public String getType() {
-        return type;
-    }
-
-    /**
-     * @param type the type to set
-     */
-    @Override
-    public void setType(String type) {
-        this.type = type;
-    }
-
-    /**
-     * @param name the name to set
-     */
-    @Override
-    public void setName(String name) {
-        this.name = name;
     }
 }

@@ -27,12 +27,7 @@ import opennlp.textgrounder.topostructs.*;
  *
  * @author 
  */
-public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
-
-    /**
-     *
-     */
-    protected E genericsKludgeFactor;
+public class TextProcessorTR extends TextProcessor {
 
     /**
      * Default constructor. Instantiate CRFClassifier.
@@ -41,10 +36,9 @@ public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
      * @param parAsDocSize number of paragraphs to use as single document. if
      * set to 0, it will process an entire file intact.
      */
-    public TextProcessorTR(Lexicon lexicon, E _genericsKludgeFactor) throws
+    public TextProcessorTR(Lexicon lexicon) throws
           ClassCastException, IOException, ClassNotFoundException {
         super(new NullClassifier(), lexicon, 0);
-        genericsKludgeFactor = _genericsKludgeFactor;
     }
 
     /**
@@ -55,9 +49,8 @@ public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
      * @throws FileNotFoundException
      * @throws IOException
      */
-    @Override
     public void processFile(String locationOfFile,
-          TokenArrayBuffer evalTokenArrayBuffer, StopwordList stopwordList)
+          TokenArrayBuffer evalTokenArrayBuffer)
           throws
           FileNotFoundException, IOException {
 
@@ -100,15 +93,14 @@ public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
             }
 
             if (lookingForGoldLoc && curLine.startsWith("\t>")) {
-                evalTokenArrayBuffer.addElement(wordidx, currentDoc, 1, 0, (E) parseLocation(cur, curLine, wordidx));
+                evalTokenArrayBuffer.addElement(wordidx, currentDoc, 1, parseLocation(cur, curLine, wordidx));
                 lookingForGoldLoc = false;
                 continue;
             } else if (curLine.startsWith("\t")) {
                 continue;
             } else if (lookingForGoldLoc && !curLine.startsWith("\t")) {
                 //there was no correct gold Location for this toponym
-                evalTokenArrayBuffer.addElement(wordidx, currentDoc, 1, stopwordList.isStopWord(cur)
-                      ? 1 : 0, null);
+                evalTokenArrayBuffer.addElement(wordidx, currentDoc, 1, null);
                 lookingForGoldLoc = false;
 //                continue;
             }
@@ -124,8 +116,7 @@ public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
 
             wordidx = lexicon.addWord(cur);
             if (!tokens[1].equals("LOC")) {
-                evalTokenArrayBuffer.addElement(wordidx, currentDoc, 0, stopwordList.isStopWord(cur)
-                      ? 1 : 0, null);
+                evalTokenArrayBuffer.addElement(wordidx, currentDoc, 0, null);
             } else {
                 lookingForGoldLoc = true;
                 //gold standard Location will be added later, when line starting with tab followed by > occurs
@@ -142,7 +133,7 @@ public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
         assert (evalTokenArrayBuffer.sanityCheck2());
     }
 
-    public E parseLocation(String token, String line, int wordidx) {
+    public Location parseLocation(String token, String line, int wordidx) {
         String[] tokens = line.split("\\t");
 
         if (tokens.length < 6) {
@@ -160,18 +151,6 @@ public class TextProcessorTR<E extends SmallLocation> extends TextProcessor {
             placename = tokens[5].trim().toLowerCase();
         }
 
-        return generateLocation(-1, token, "", new Coordinate(lon, lat), 0, "", -1, wordidx);
-    }
-
-    protected E generateLocation(int _id, String _name, String _type,
-          Coordinate _coord, int _pop, String _container, int _count,
-          int _nameid) {
-        E locationToAdd;
-        if (genericsKludgeFactor instanceof Location) {
-            locationToAdd = (E) new Location(_id, _name, _type, _coord, _pop, _container, _count);
-        } else {
-            locationToAdd = (E) new SmallLocation(_id, _nameid, _coord, _count);
-        }
-        return locationToAdd;
+        return new Location(-1, placename, "", new Coordinate(lon, lat), 0, "", -1);
     }
 }

@@ -19,9 +19,7 @@ import java.io.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import opennlp.textgrounder.models.callbacks.NullTrainingMaterialCallback;
-import opennlp.textgrounder.models.callbacks.TrainingMaterialCallback;
-import opennlp.textgrounder.topostructs.SmallLocation;
+import opennlp.textgrounder.topostructs.*;
 
 /**
  * Class of integer sequences that indicate words in a stream of space
@@ -31,7 +29,7 @@ import opennlp.textgrounder.topostructs.SmallLocation;
  * 
  * @author tsmoon
  */
-public class TokenArrayBuffer<E extends SmallLocation> implements Serializable {
+public class TokenArrayBuffer implements Serializable {
 
     static private final long serialVersionUID = 10772114L;
     /**
@@ -60,12 +58,6 @@ public class TokenArrayBuffer<E extends SmallLocation> implements Serializable {
      */
     public ArrayList<Integer> toponymArrayList;
     /**
-     * Array of stopword indicators. It is populated only with ones and zeros.
-     * For a given element, if the corresponding token in wordArrayList is a
-     * stopword, the element is one, zero otherwise.
-     */
-    public ArrayList<Integer> stopwordArrayList;
-    /**
      * Populated with the same elements as wordArrayList. Once input has been
      * populated in input stage with wordArrayList, the arraylist is converted
      * to this primitive array for memory and speed.
@@ -84,12 +76,6 @@ public class TokenArrayBuffer<E extends SmallLocation> implements Serializable {
      */
     public int[] toponymVector;
     /**
-     * Populated with the same elements as stopwordArrayList. Once input has been
-     * populated in input stage with stopwordArrayList, the arraylist is converted
-     * to this primitive array for memory and speed.
-     */
-    public int[] stopwordVector;
-    /**
      * The size of the the array fields in this class. All arrays have the
      * same size.
      */
@@ -102,11 +88,6 @@ public class TokenArrayBuffer<E extends SmallLocation> implements Serializable {
      * The lexicon of token indexes to tokens.
      */
     protected Lexicon lexicon;
-    /**
-     * Callback class for determing whether a word should be included as
-     * training material or not
-     */
-    protected TrainingMaterialCallback trainingMaterialCallback;
 
     /**
      * Constructor for derived classes only
@@ -120,17 +101,7 @@ public class TokenArrayBuffer<E extends SmallLocation> implements Serializable {
      * @param lexicon
      */
     public TokenArrayBuffer(Lexicon lexicon) {
-        initialize(lexicon, new NullTrainingMaterialCallback(lexicon));
-    }
-
-    /**
-     * Default constructor. Allocates memory for arrays and assigns lexicon.
-     *
-     * @param lexicon
-     */
-    public TokenArrayBuffer(Lexicon lexicon,
-          TrainingMaterialCallback trainingMaterialCallback) {
-        initialize(lexicon, trainingMaterialCallback);
+        initialize(lexicon);
     }
 
     /**
@@ -138,15 +109,12 @@ public class TokenArrayBuffer<E extends SmallLocation> implements Serializable {
      *
      * @param lexicon
      */
-    protected void initialize(Lexicon lexicon,
-          TrainingMaterialCallback trainingMaterialCallback) {
+    protected void initialize(Lexicon lexicon) {
         wordArrayList = new ArrayList<Integer>();
         documentArrayList = new ArrayList<Integer>();
         toponymArrayList = new ArrayList<Integer>();
-        stopwordArrayList = new ArrayList<Integer>();
         size = 0;
 
-        this.trainingMaterialCallback = trainingMaterialCallback;
         this.lexicon = lexicon;
     }
 
@@ -156,17 +124,17 @@ public class TokenArrayBuffer<E extends SmallLocation> implements Serializable {
      * @param otherTokenArrayBuffer the TokenArrayBuffer to be concatenated with this
      * @return the concatenated TokenArrayBuffer
      */
-    public TokenArrayBuffer<E> concatenate(TokenArrayBuffer<E> otherTokenArrayBuffer) {
-        TokenArrayBuffer<E> toReturn = new TokenArrayBuffer<E>(this.lexicon.concatenate(otherTokenArrayBuffer.lexicon));
+    public TokenArrayBuffer concatenate(TokenArrayBuffer otherTokenArrayBuffer) {
+        TokenArrayBuffer toReturn = new TokenArrayBuffer(this.lexicon.concatenate(otherTokenArrayBuffer.lexicon));
 
         int docNumOffset = 0;
         for(int i = 0; i < this.size(); i++) {
-            toReturn.addElement(this.wordVector[i], this.documentVector[i], this.toponymVector[i], this.stopwordVector[i]);
+            toReturn.addElement(this.wordVector[i], this.documentVector[i], this.toponymVector[i]);
         }
         docNumOffset = this.documentVector[this.size()-1] + 1; // need to continue document numbers where they left off, not restart at 0
         for(int i = 0; i < otherTokenArrayBuffer.size(); i++)
             toReturn.addElement(otherTokenArrayBuffer.wordVector[i], otherTokenArrayBuffer.documentVector[i] + docNumOffset,
-                    otherTokenArrayBuffer.toponymVector[i], otherTokenArrayBuffer.stopwordVector[i]);
+                    otherTokenArrayBuffer.toponymVector[i]);
 
         toReturn.convertToPrimitiveArrays();
 
@@ -187,9 +155,8 @@ public class TokenArrayBuffer<E extends SmallLocation> implements Serializable {
      * @param stopStatus the status of the current token as a stopword. This
      * will be one if it is a stopword and zero otherwise.
      */
-    public void addElement(int wordIdx, int docIdx, int topStatus,
-          int stopStatus) {
-        addElement(wordIdx, docIdx, topStatus, stopStatus, null);
+    public void addElement(int wordIdx, int docIdx, int topStatus) {
+        addElement(wordIdx, docIdx, topStatus, null);
     }
 
     /**
@@ -207,14 +174,12 @@ public class TokenArrayBuffer<E extends SmallLocation> implements Serializable {
      * will be one if it is a stopword and zero otherwise.
      */
     public void addElement(int wordIdx, int docIdx, int topStatus,
-          int stopStatus, E loc) {
+          Location loc) {
         wordArrayList.add(wordIdx);
         documentArrayList.add(docIdx);
         toponymArrayList.add(topStatus);
 
         String word = lexicon.getWordForInt(wordIdx);
-        int notTrainable = trainingMaterialCallback.isTrainable(word) ? 0 : 1;
-        stopwordArrayList.add(stopStatus | notTrainable);
         size += 1;
         numDocs = docIdx;
     }
@@ -256,14 +221,11 @@ public class TokenArrayBuffer<E extends SmallLocation> implements Serializable {
         copyToArray(documentVector, documentArrayList);
         toponymVector = new int[size];
         copyToArray(toponymVector, toponymArrayList);
-        stopwordVector = new int[size];
-        copyToArray(stopwordVector, stopwordArrayList);
 
         wordArrayList.clear();
         documentArrayList.clear();
         toponymArrayList.clear();
-        stopwordArrayList.clear();
-        wordArrayList = documentArrayList = toponymArrayList = stopwordArrayList = null;
+        wordArrayList = documentArrayList = toponymArrayList = null;
     }
 
     /**
