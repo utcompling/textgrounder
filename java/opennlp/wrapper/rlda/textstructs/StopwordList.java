@@ -21,6 +21,8 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import opennlp.textgrounder.util.Constants;
 
@@ -42,15 +44,27 @@ public class StopwordList {
      * @throws FileNotFoundException
      * @throws IOException
      */
-    public StopwordList() throws FileNotFoundException, IOException {
+    public StopwordList() {
         stopwords = new HashSet<String>();
 
         String stopwordPath = Constants.TEXTGROUNDER_DIR + "/data/lists/stopwords.english";
-        BufferedReader textIn = new BufferedReader(new FileReader(stopwordPath));
+        BufferedReader textIn = null;
+        try {
+            textIn = new BufferedReader(new FileReader(stopwordPath));
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(StopwordList.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+        
         String curLine = null;
-        while ((curLine = textIn.readLine()) != null) {
-            curLine = curLine.trim();
-            stopwords.add(curLine);
+        try {
+            while ((curLine = textIn.readLine()) != null) {
+                curLine = curLine.trim();
+                stopwords.add(curLine);
+            }
+        } catch (IOException ex) {
+            Logger.getLogger(StopwordList.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
         }
     }
 

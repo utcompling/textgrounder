@@ -150,29 +150,6 @@ public class TokenArrayBuffer implements Serializable {
     }
 
     /**
-     * Concatenates two TokenArrayBuffers for use when an evaluation TokenArrayBuffer
-     * and additional unlabeled training data are desired.
-     * @param otherTokenArrayBuffer the TokenArrayBuffer to be concatenated with this
-     * @return the concatenated TokenArrayBuffer
-     */
-    public TokenArrayBuffer concatenate(TokenArrayBuffer otherTokenArrayBuffer) {
-        TokenArrayBuffer toReturn = new TokenArrayBuffer(this.lexicon.concatenate(otherTokenArrayBuffer.lexicon));
-
-        int docNumOffset = 0;
-        for(int i = 0; i < this.size(); i++) {
-            toReturn.addElement(this.wordVector[i], this.documentVector[i], this.toponymVector[i], this.stopwordVector[i]);
-        }
-        docNumOffset = this.documentVector[this.size()-1] + 1; // need to continue document numbers where they left off, not restart at 0
-        for(int i = 0; i < otherTokenArrayBuffer.size(); i++)
-            toReturn.addElement(otherTokenArrayBuffer.wordVector[i], otherTokenArrayBuffer.documentVector[i] + docNumOffset,
-                    otherTokenArrayBuffer.toponymVector[i], otherTokenArrayBuffer.stopwordVector[i]);
-
-        toReturn.convertToPrimitiveArrays();
-
-        return toReturn;
-    }
-
-    /**
      * Add all indexes and indicators to the array fields and increment size
      * by one.
      *
@@ -188,25 +165,6 @@ public class TokenArrayBuffer implements Serializable {
      */
     public void addElement(int wordIdx, int docIdx, int topStatus,
           int stopStatus) {
-        addElement(wordIdx, docIdx, topStatus, stopStatus, null);
-    }
-
-    /**
-     * Add all indexes and indicators to the array fields and increment size
-     * by one.
-     *
-     * @param wordIdx index of token being added. may be a placename, a
-     * multiword placename, a stopword, or something else.
-     * @param docIdx the index of the document that the current token was
-     * found in. The index grows by unit increments whenever a new document
-     * has been opened.
-     * @param topStatus the status of the current (multiword) token as a
-     * toponym. This will be one if it is a toponym and zero otherwise.
-     * @param stopStatus the status of the current token as a stopword. This
-     * will be one if it is a stopword and zero otherwise.
-     */
-    public void addElement(int wordIdx, int docIdx, int topStatus,
-          int stopStatus, Location loc) {
         wordArrayList.add(wordIdx);
         documentArrayList.add(docIdx);
         toponymArrayList.add(topStatus);

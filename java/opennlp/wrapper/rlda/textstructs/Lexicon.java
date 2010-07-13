@@ -42,18 +42,6 @@ public class Lexicon implements Serializable {
     protected int nextInt = 0;
 
     /**
-     * Combine two lexicons
-     */
-     public Lexicon concatenate(Lexicon otherLexicon) {
-         Lexicon toReturn = new Lexicon();
-         for(String w : this.wordsToInts.keys(new String[0]))
-             toReturn.addWord(w);
-         for(String w : otherLexicon.wordsToInts.keys(new String[0]))
-             toReturn.addWord(w);
-         return toReturn;
-     }
-
-    /**
      * Get string value of some index
      *
      * @param someInt index to look up
@@ -80,7 +68,7 @@ public class Lexicon implements Serializable {
      * @param word string to add and/or retrieve
      * @return index of the word that has been added or is in the lexicon
      */
-    public int addWord(String word) {
+    public int addOrGetWord(String word) {
         int idx = 0;
         if (!wordsToInts.containsKey(word)) {
             wordsToInts.put(word, nextInt);
