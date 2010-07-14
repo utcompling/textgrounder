@@ -14,12 +14,16 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.wrapper.rlda.io;
+
+package opennlp.wrapper.rlda.topostructs;
+
+import java.util.HashMap;
+import java.util.HashSet;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class InputReader {
+public class ToponymToRegionIDsMap extends HashMap<Integer, HashSet<Integer>>{
 
 }

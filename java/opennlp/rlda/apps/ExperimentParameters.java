@@ -75,7 +75,7 @@ public class ExperimentParameters {
     /**
      * Path to array of tokens, toponym status. Should be a file.
      */
-    protected String tokenArrayInputPath = null;
+    protected String tokenArrayPath = null;
     /**
      * Path to array of tokens, toponym status. Should be a file.
      */
@@ -83,7 +83,7 @@ public class ExperimentParameters {
     /**
      * 
      */
-    protected String toponymRegionInputPath = null;
+    protected String toponymRegionPath = null;
     /**
      * Path of model that has been saved from previous training runs
      */
@@ -136,16 +136,16 @@ public class ExperimentParameters {
         return lag;
     }
 
-    public String getTokenArrayInputPath() {
-        return tokenArrayInputPath;
+    public String getTokenArrayPath() {
+        return tokenArrayPath;
     }
 
     public String getTrainedModelPath() {
         return trainedModelPath;
     }
 
-    public String getToponymRegionInputPath() {
-        return toponymRegionInputPath;
+    public String getToponymRegionPath() {
+        return toponymRegionPath;
     }
 
     public int getTrainIterations() {
