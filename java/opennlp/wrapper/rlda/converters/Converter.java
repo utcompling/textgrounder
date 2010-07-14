@@ -150,13 +150,11 @@ public class Converter {
                     if (token.getName().equals("w")) {
                         word = token.getAttributeValue("tok");
                         wordid = lexicon.addOrGetWord(word);
-                        tokenArrayBuffer.addElement(wordid, docid, istoponym, stopwordList.isStopWord(word)
-                              ? 1 : 0);
+                        isstopword = stopwordList.isStopWord(word) ? 1 : 0;
                     } else if (token.getName().equals("toponym")) {
                         word = token.getAttributeValue("term");
                         istoponym = 1;
                         wordid = lexicon.addOrGetWord(word);
-                        tokenArrayBuffer.addElement(wordid, docid, istoponym, 0);
                         ArrayList<Element> candidates = new ArrayList<Element>(token.getChildren());
                         for (Element candidate : candidates) {
                             double lon = Double.parseDouble(candidate.getAttributeValue("long"));
@@ -176,6 +174,7 @@ public class Converter {
                     } else {
                         continue;
                     }
+                    tokenArrayBuffer.addElement(wordid, docid, istoponym, isstopword);
                 }
             }
             docid += 1;
