@@ -89,7 +89,6 @@ public class Token extends DocumentComponent {
                 /* Java sucks.  Why can't I just call toString() on a double? */
                 cand.setAttribute("lat", "" + coord.latitude);
                 cand.setAttribute("long", "" + coord.longitude);
-                cand.setAttribute("name", loc.getName());
                 if (loc.getType() != null)
                     cand.setAttribute("type", loc.getType());
                 if (loc.getContainer() != null)
