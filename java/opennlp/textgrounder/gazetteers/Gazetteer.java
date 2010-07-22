@@ -57,10 +57,6 @@ import opennlp.textgrounder.topostructs.*;
  * 
  * The various subtypes of this class handle data in different formats, from
  * gazetteers obtained from various sources.
- * 
- * The Gazetteer class is a template because it can work either with Location or
- * SmallLocation objects. FIXME: Why the distinction? Presumably to reduce
- * memory space?
  */
 public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
 

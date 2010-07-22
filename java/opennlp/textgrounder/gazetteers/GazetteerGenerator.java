@@ -18,9 +18,8 @@ package opennlp.textgrounder.gazetteers;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import opennlp.textgrounder.geo.CommandLineOptions;
+// import java.util.logging.Level;
+// import java.util.logging.Logger;
 
 /**
  * Factory class to generate the appropriate subclass of Gazetteer based on the
@@ -48,12 +47,14 @@ public class GazetteerGenerator {
      */
     protected boolean gazetteerRefresh;
 
-    public GazetteerGenerator(CommandLineOptions options) {
-        initialize(options);
+    public GazetteerGenerator(String gazTypeArg,
+                              String gazPath, boolean gazetteerRefresh) {
+        initialize(gazTypeArg, gazPath, gazetteerRefresh);
     }
 
-    protected final void initialize(CommandLineOptions options) {
-        String gazTypeArg = options.getGazetteType().toLowerCase();
+    protected final void initialize(String gazTypeArg,
+            String gazPath, boolean gazetteerRefresh) {
+        gazTypeArg = gazTypeArg.toLowerCase();
         if (gazTypeArg.startsWith("c")) {
             gazType = GazetteerEnum.GazetteerTypes.CG;
         } else if (gazTypeArg.startsWith("n")) {
@@ -65,14 +66,15 @@ public class GazetteerGenerator {
         } else if (gazTypeArg.startsWith("t")) {
             gazType = GazetteerEnum.GazetteerTypes.TRG;
         } else {
-            System.err.println("Error: unrecognized gazetteer type: " + gazTypeArg);
+            System.err.println("Error: unrecognized gazetteer type: "
+                    + gazTypeArg);
             System.err.println("Please enter w, c, u, g, or t.");
             System.exit(0);
-            //myGaz = new WGGazetteer();
+            // myGaz = new WGGazetteer();
         }
 
-        gazetteerRefresh = options.getGazetteerRefresh();
-        gazPath = options.getGazetteerPath();
+        this.gazetteerRefresh = gazetteerRefresh;
+        this.gazPath = gazPath;
     }
 
     /**
@@ -101,17 +103,14 @@ public class GazetteerGenerator {
                     break;
             }
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(GazetteerGenerator.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
+            // Logger.getLogger(GazetteerGenerator.class.getName()).log(Level.SEVERE, null, ex);
+            throw new RuntimeException(ex);
         } catch (IOException ex) {
-            Logger.getLogger(GazetteerGenerator.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
+            throw new RuntimeException(ex);
         } catch (ClassNotFoundException ex) {
-            Logger.getLogger(GazetteerGenerator.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
+            throw new RuntimeException(ex);
         } catch (SQLException ex) {
-            Logger.getLogger(GazetteerGenerator.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
+            throw new RuntimeException(ex);
         }
         return gazetteer;
     }

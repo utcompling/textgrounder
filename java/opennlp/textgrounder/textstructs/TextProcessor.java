@@ -15,145 +15,58 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.textstructs;
 
-import edu.stanford.nlp.ie.crf.*;
-import edu.stanford.nlp.ling.CoreAnnotations.*;
-
 import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
 
-import opennlp.textgrounder.util.*;
+import opennlp.textgrounder.ners.*;
+import opennlp.textgrounder.topostructs.Coordinate;
+import opennlp.textgrounder.topostructs.Location;
 
 /**
- * Class that reads raw text from a file, runs it through a named-entity
- * recognizer (NER) to split the text into tokens and identify which tokens are
- * locations (toponyms), and extract the resulting tokens and their properties
- * (e.g. whether toponym, stopword, etc.), adding them to a TokenArrayBuffer
- * (which sequentially accumulates tokens across multiple documents).
+ * Class that reads from a file and generates tokens, identified as to whether
+ * they are locations (toponyms), possibly with additional properties.  Tokens
+ * are added to a Document object.
  * 
  * Multi-word location tokens (e.g. New York) are joined by the code below into
  * a single token.
  * 
  * Actual processing of a file is done in the processFile() method.
  * 
- * FIXME: This code is specific to the Stanford NER. Code to interface to
- * different NER's should be abstracted into separate classes.
- * 
  * @author
  */
-public class TextProcessor {
-
-    /**
-     * NER system. This uses the Stanford NER system {@link TO COME}.
-     */
-    public CRFClassifier classifier;
-    /**
-     * Table of words and indexes.
-     */
-    protected Lexicon lexicon;
-    /**
-     * the index (or offset) of the current document being
-     * examined
-     */
-    protected int currentDoc = 0;
-    /**
-     * The number of paragraphs to treat as a single document.
-     */
-    protected final int parAsDocSize;
-
-    /**
-     * Constructor only to be used with derived classes
-     * 
-     * @param lexicon
-     * @throws ClassCastException
-     * @throws IOException
-     * @throws ClassNotFoundException
-     */
-    protected TextProcessor(Lexicon lexicon) throws ClassCastException,
-          IOException, ClassNotFoundException {
-        parAsDocSize = Integer.MAX_VALUE;
-        Properties myClassifierProperties = new Properties();
-        classifier = new CRFClassifier(myClassifierProperties);
-        classifier.loadClassifier(Constants.STANFORD_NER_HOME + "/classifiers/ner-eng-ie.crf-3-all2008-distsim.ser.gz");
-        this.lexicon = lexicon;
-    }
-
-    /**
-     * Default constructor. Instantiate CRFClassifier.
-     * 
-     * @param lexicon lookup table for words and indexes
-     * @param parAsDocSize number of paragraphs to use as single document. if
-     * set to 0, it will process an entire file intact.
-     */
-    public TextProcessor(Lexicon lexicon, int parAsDocSize) throws
-          ClassCastException, IOException, ClassNotFoundException {
-        Properties myClassifierProperties = new Properties();
-        classifier = new CRFClassifier(myClassifierProperties);
-        classifier.loadClassifier(Constants.STANFORD_NER_HOME + "/classifiers/ner-eng-ie.crf-3-all2008-distsim.ser.gz");
-
-        this.lexicon = lexicon;
-        if (parAsDocSize == 0) {
-            this.parAsDocSize = Integer.MAX_VALUE;
-        } else {
-            this.parAsDocSize = parAsDocSize;
-        }
-    }
-
-    /**
-     * Constructor only for classes which either specify their own classifier,
-     * or those which override and use the NullClassifier, which does not
-     * do any named entity recognition.
-     * 
-     * @param classifier named entity recognition system
-     * @param lexicon lookup table for words and indexes
-     * @param parAsDocSize number of paragraphs to use as single document. if
-     * set to 0, it will process an entire file intact.
-     * @throws ClassCastException
-     * @throws IOException
-     * @throws ClassNotFoundException
-     */
-    public TextProcessor(CRFClassifier classifier, Lexicon lexicon,
-          int parAsDocSize) throws ClassCastException, IOException,
-          ClassNotFoundException {
-        this.classifier = classifier;
-        this.lexicon = lexicon;
-        if (parAsDocSize == 0) {
-            this.parAsDocSize = Integer.MAX_VALUE;
-        } else {
-            this.parAsDocSize = parAsDocSize;
-        }
-    }
-
+public abstract class TextProcessor {
     /**
      * Identify toponyms and populate lexicon from input file.
      * 
-     * This method only splits any incoming document into smaller 
-     * subdocuments based on Lexicon.parAsDocSize. The actual work of
-     * identifying toponyms, converting tokens to indexes, and populating
-     * arrays is handled in processText.
+     * This method only splits any incoming document into smaller subdocuments
+     * based on Lexicon.parAsDocSize. The actual work of identifying toponyms,
+     * converting tokens to indexes, and populating arrays is handled in
+     * processText.
      * 
-     * @param locationOfFile Path to input. Must be a single file.
-     * @param tokenArrayBuffer Buffer that holds the array of token indexes,
-     * document indexes, and the toponym indexes.
-     * @param stopwordList table that contains the list of stopwords. if
-     * this is an instance of NullStopwordList, it will return false
-     * through stopwordList.isStopWord for every string token examined
-     * (i.e. the token is not a stopword).
+     * @param locationOfFile
+     *            Path to input. Must be a single file.
+     * @param stopwordList
+     *            table that contains the list of stopwords. if this is an
+     *            instance of NullStopwordList, it will return false through
+     *            stopwordList.isStopWord for every string token examined (i.e.
+     *            the token is not a stopword).
      * @throws FileNotFoundException
      * @throws IOException
      */
-    public void processFile(String locationOfFile,
-          TokenArrayBuffer tokenArrayBuffer) throws
-          FileNotFoundException, IOException {
+    public static void processNER(String locationOfFile, Corpus corpus,
+            NamedEntityRecognizer ner, int parAsDocSize)
+            throws FileNotFoundException, IOException {
 
-        BufferedReader textIn = new BufferedReader(new FileReader(locationOfFile));
-        System.out.println("Extracting toponym indices from " + locationOfFile + " ...");
+        CorpusDocument doc = new CorpusDocument(corpus, locationOfFile);
+        BufferedReader textIn = new BufferedReader(new FileReader(
+                locationOfFile));
+        System.out.println("Extracting toponym indices from " + locationOfFile
+                + " ...");
 
         String curLine = null;
         StringBuffer buf = new StringBuffer();
         int counter = 1;
-        System.err.print("Processing document:" + currentDoc + ",");
+        int currentDoc = 0;
+        System.err.print("Processing document:" + locationOfFile + ",");
         while (true) {
             curLine = textIn.readLine();
             if (curLine == null || curLine.equals("")) {
@@ -165,7 +78,7 @@ public class TextProcessor {
             if (counter < parAsDocSize) {
                 counter++;
             } else {
-                processText(buf.toString(), tokenArrayBuffer);
+                ner.processText(doc, buf.toString());
 
                 buf = new StringBuffer();
                 currentDoc += 1;
@@ -178,229 +91,138 @@ public class TextProcessor {
          * Add last lines if they have not been processed and added
          */
         if (counter > 1) {
-            processText(buf.toString(), tokenArrayBuffer);
+            ner.processText(doc, buf.toString());
             System.err.print(currentDoc + ",");
         }
         System.err.println();
 
-        assert (tokenArrayBuffer.toponymArrayList.size() == tokenArrayBuffer.wordArrayList.size());
+        corpus.add(doc);
     }
 
     /**
-     * Split `text' into tokens (potentially multi-word). Determine whether each
-     * token is a toponym and whether it's a stopword (using `stopwordList').
-     * Add each token along with its properties (e.g. whether toponym, stopword,
-     * etc.) to `tokenArrayBuffer', which is a sequential list of all tokens
-     * seen in all documents processed.
      * 
-     * FIXME: This code is specific to the Stanford NER. Code to interface to
-     * different NER's should be abstracted into separate classes.
-     * 
-     * First, the entire input string in `text' is passed to the NER classifier.
-     * This splits the text into tokens and determines which ones are toponyms.
-     * The output of the classifier will be of the form
-     * <p>
-     * token/LABEL token/LABELpunctuation/LABEL token/LABEL ...
-     * </p>
-     * Here's an example:
-     * <p>
-     * I/O complained/O to/O Microsoft/ORGANIZATION about/O Bill/PERSON
-     * Gates/PERSON ./O They/O told/O me/O to/O see/O the/O mayor/O of/O
-     * New/LOCATION York/LOCATION ./O
-     * </p>
-     * 
-     * FIXME: The code below, and the first example above, indicates that
-     * punctuation is joined to a preceding token without whitespace. The second
-     * example (from the Stanford NER FAQ at
-     * `http://nlp.stanford.edu/software/crf-faq.shtml') indicates otherwise.
-     * What's really going on?
-     * 
-     * If LABEL is `LOCATION', it is processed as a toponym or as a multiword
-     * toponym if necessary. Any word that is not identified as a toponym is
-     * processed as a regular token. Note that multi-word locations are output
-     * as separate tokens (e.g. "New York" in the above example), but we combine
-     * them into a single token.
-     * 
-     * When adding tokens and toponyms, all LABELs and the preceding slashes are
-     * removed and the token is lowercased before being added to the lexicon and
-     * to `tokenArrayBuffer'.
-     * 
-     * This method also adds to a sequence of document indexes and toponym
-     * indexes maintained in evalTokenArrayBuffer. The sequences of token,
-     * document and toponym indexes are of the same size so that they are
-     * coindexed. The toponym sequence is slightly different from the other
-     * sequences in that it is only populated by ones and zeros. If the current
-     * toponym index is one, it means the current token is a toponym. If it is
-     * zero, the current token is not a toponym.
-     * 
-     * @param text
-     *            StringBuffer of input to be processed. This should always be
-     *            space delimited raw text.
-     * @param tokenArrayBuffer
-     *            buffer that holds the array of token indexes, document
-     *            indexes, and the toponym indexes.
-     * @param stopwordList
-     *            table that contains the list of stopwords. if this is an
-     *            instance of NullStopwordList, it will return false through
-     *            stopwordList.isStopWord for every string token examined (i.e.
-     *            the token is not a stopword).
-     * @param currentDoc
+     * @param locationOfFile
+     * @throws FileNotFoundException
+     * @throws IOException
      */
-    public void processText(String text, TokenArrayBuffer tokenArrayBuffer) {
+    public static void processTR(String locationOfFile, Corpus corpus)
+            throws FileNotFoundException, IOException {
 
-        /* Get NER output */
-        String nerOutput = classifier.classifyToString(text);
+        int currentDoc = 0;
+        if (locationOfFile.endsWith("d663.tr")) {
+            System.err.println(locationOfFile
+                    + " has incorrect format; skipping.");
+            return;
+        }
 
-        /*
-         * Split NER output into space-separated "tokens" (may not correspond
-         * with the tokens we store into TokenArrayBuffer, see above)
-         */
-        String[] tokens = nerOutput.replaceAll("-[LR]RB-", "").split(" ");
-        int toponymStartIndex = -1;
-        int toponymEndIndex = -1;
+        BufferedReader textIn = new BufferedReader(new FileReader(
+                locationOfFile));
+        CorpusDocument doc = new CorpusDocument(corpus, locationOfFile);
+        String curLine = null, cur = null;
+        while (true) {
+            curLine = textIn.readLine();
+            if (curLine == null) {
+                break;
+            }
 
-        /* For each NER "token", process it */
-        for (int i = 0; i < tokens.length; i++) {
-            String token = tokens[i];
-            int wordidx = 0;
-            boolean isLocationToken = token.contains("/LOCATION");
-            if (isLocationToken) {
-                /*
-                 * We've seen a location token. We have to deal with multi-word
-                 * location tokens, so if we see a location token, don't add it
-                 * yet to the TokenArrayBuffer, just remember the position
-                 */
-                if (toponymStartIndex == -1) {
-                    toponymStartIndex = i;
-                }
-                /*
-                 * Handle location tokens ending in /O (?)
-                 * 
-                 * FIXME: When does this happen? Does the output really include
-                 * tokens like `foo/LOCATION/O' ?
-                 */
-                if (token.endsWith("/O")) {
-                    toponymEndIndex = i + 1;
-                    String cur = StringUtil.join(tokens, " ",
-                            toponymStartIndex, toponymEndIndex, "/")
-                            .toLowerCase();
-                    wordidx = lexicon.addWord(cur);
-                    tokenArrayBuffer.addElement(wordidx, currentDoc, 1);
+            if ((curLine.startsWith("\t") && (!curLine.startsWith("\tc") && !curLine
+                    .startsWith("\t>")))
+                    || (curLine.startsWith("c") && curLine.length() >= 2 && Character
+                            .isDigit(curLine.charAt(1)))) {
+                System.err.println(locationOfFile
+                        + " has incorrect format; skipping.");
+                return;
+            }
 
-                    toponymStartIndex = -1;
-                    toponymEndIndex = -1;
-                }
-            } else if (toponymStartIndex != -1) {
-                /*
-                 * We've seen a non-location token, and there was a location
-                 * token before us. Add both the location (potentially
-                 * multi-word) and the current non-location token.
-                 */
-                toponymEndIndex = i;
-                /**
-                 * Add the toponym that spans from toponymStartIndex to
-                 * toponymEndIndex. This does not include the current token
-                 */
-                String cur = StringUtil.join(tokens, " ", toponymStartIndex,
-                        toponymEndIndex, "/").toLowerCase();
-                wordidx = lexicon.addWord(cur);
-                tokenArrayBuffer.addElement(wordidx, currentDoc, 1);
+        }
+        textIn.close();
 
-                /**
-                 * Add the current token.
-                 * 
-                 * According to the code below, multiple non-word tokens can be
-                 * joined together without spaces, e.g. 'here/O/./O'.
-                 * 
-                 * See comment above.
-                 */
-                List<String> subtokes = retrieveWords(token);
-                for (String subtoke : subtokes) {
-                    if (!subtoke.isEmpty()) {
-                        subtoke = subtoke.trim().toLowerCase();
-                        wordidx = lexicon.addWord(subtoke);
-                        tokenArrayBuffer.addElement(wordidx, currentDoc, 0);
-                    }
-                }
+        textIn = new BufferedReader(new FileReader(locationOfFile));
 
-                toponymStartIndex = -1;
-                toponymEndIndex = -1;
+        System.out.println("Extracting gold standard toponym indices from "
+                + locationOfFile + " ...");
+
+        curLine = null;
+
+        int wordidx = 0;
+        boolean lookingForGoldLoc = false;
+        System.err.print("Processing document:" + currentDoc + ",");
+        while (true) {
+            curLine = textIn.readLine();
+            if (curLine == null) {
+                break;
+            }
+
+            if (lookingForGoldLoc && curLine.startsWith("\t>")) {
+                Token tok = new Token(doc, wordidx, true);
+                tok.goldLocation = parseLocation(cur, curLine, wordidx);
+                doc.add(tok);
+                lookingForGoldLoc = false;
+                continue;
+            } else if (curLine.startsWith("\t")) {
+                continue;
+            } else if (lookingForGoldLoc && !curLine.startsWith("\t")) {
+                // there was no correct gold Location for this toponym
+                doc.add(new Token(doc, wordidx, true));
+                lookingForGoldLoc = false;
+                // continue;
+            }
+
+            String[] tokens = curLine.split("\\t");
+
+            if (tokens.length < 2) {
+
+                continue;
+            }
+
+            cur = tokens[0].toLowerCase();
+
+            wordidx = corpus.lexicon.addWord(cur);
+            if (!tokens[1].equals("LOC")) {
+                doc.add(new Token(doc, wordidx, false));
             } else {
-                /*
-                 * A non-location token, no location token preceding. Just add
-                 * it.
-                 * 
-                 * FIXME: Duplicated code.
-                 */
-                List<String> subtokes = retrieveWords(token);
-                for (String subtoke : subtokes) {
-                    if (!subtoke.isEmpty()) {
-                        subtoke = subtoke.trim().toLowerCase();
-                        wordidx = lexicon.addWord(subtoke);
-                        tokenArrayBuffer.addElement(wordidx, currentDoc, 0);
-                    }
-                }
+                lookingForGoldLoc = true;
+                // gold standard Location will be added later, when line
+                // starting with tab followed by > occurs
             }
         }
 
-        // case where toponym ended at very end of document:
-        if (toponymStartIndex != -1) {
-            int wordidx = lexicon.addWord(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
-            tokenArrayBuffer.addElement(wordidx, currentDoc, 1);
-        }
+        currentDoc += 1;
+
+        System.err.println();
     }
 
-    /**
-     * Find the non-label tokens in a single string with multiple tokens that
-     * does not have whitespace boundaries.
-     * 
-     * FIXME: Duplicated functionality with two-arg version of function below.
-     * 
-     * @param token
-     * @return
-     */
-    protected List<String> retrieveWords(String token) {
-        String[] sarray = token.split("(/LOCATION|/PERSON|/ORGANIZATION|/O)");
-        List<String> valid_tokens = new ArrayList<String>();
-        for (String cur : sarray) {
-            if (!cur.matches("^\\W*$")) {
-                valid_tokens.add(cur);
-            }
-        }
-        return valid_tokens;
-    }
+    public static Location parseLocation(String token, String line, int wordidx) {
+        String[] tokens = line.split("\\t");
 
-    /**
-     * Retrieve first string of alphanumeric elements in an array of strings.
-     *
-     * The Stanford NER will add multiple /O, /LOCATION, /PERSON etc. tags to
-     * a single token if it includes punctuation (though there might be other
-     * character types that trigger the NER system to add multiple tags). We
-     * take this token with multiple tags and split it on the slashes. This
-     * method will find the first string that includes only characters
-     * that fit the regex <p>^\\W*$</p>. If no such string is found, it
-     * returns the empty string "".
-     *
-     * @param sarray Array of strings.
-     * @param idx Index value in array of strings to examine
-     * @return String that has only alphanumeric characters
-     */
-    protected String retrieveWords(String[] sarray, int idx) {
-        String cur = null;
-        try {
-            cur = sarray[idx];
-        } catch (ArrayIndexOutOfBoundsException e) {
-            return "";
+        if (tokens.length < 6) {
+            return null;
         }
 
-        if (idx != 0 && cur.startsWith("O")) {
-            cur = cur.substring(1);
-        }
+        double lon = Double.parseDouble(tokens[3]);
+        double lat = Double.parseDouble(tokens[4]);
 
-        if (!cur.matches("^\\W*$")) {
-            return cur;
+        String placename;
+        int gtIndex = tokens[5].indexOf(">");
+        if (gtIndex != -1) {
+            placename = tokens[5].substring(0, gtIndex).trim().toLowerCase();
         } else {
-            return retrieveWords(sarray, idx + 1);
+            placename = tokens[5].trim().toLowerCase();
         }
+
+        return new Location(-1, placename, "", new Coordinate(lon, lat), 0, "", -1);
+    }
+
+    /**
+     * 
+     * @param locationOfFile
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
+    public static void processXML(String locationOfFile, Corpus corpus)
+            throws FileNotFoundException, IOException {
+        CorpusDocument doc = new CorpusDocument(corpus, locationOfFile);
+        doc.loadFromXML(locationOfFile);
+        corpus.add(doc);
     }
 }
