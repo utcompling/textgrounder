@@ -63,13 +63,6 @@ public class CorpusDocument extends DocumentComponent {
         tokens = new ArrayList<Token>();
     }
     
-    public boolean add(DocumentComponent o) {
-        if (o instanceof Token) {
-            tokens.add((Token) o); 
-        }
-        return super.add(o);
-    }
-
     public void processElement(Element e) {
         if (!e.getName().equals("doc"))
             throw new RuntimeException("Unknown top-level element type: " + e.getName());

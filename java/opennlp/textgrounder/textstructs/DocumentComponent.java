@@ -59,6 +59,13 @@ public abstract class DocumentComponent extends ArrayList<DocumentComponent> {
         this.type = type;
     }
 
+    public boolean add(DocumentComponent o) {
+        if (o instanceof Token) {
+            document.tokens.add((Token) o); 
+        }
+        return super.add(o);
+    }
+
     /**
      * Create a new XML Element corresponding to the current component
      * (including its children).
