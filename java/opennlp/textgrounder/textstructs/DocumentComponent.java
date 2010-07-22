@@ -109,4 +109,12 @@ public abstract class DocumentComponent extends ArrayList<DocumentComponent> {
         for (Attribute att : (List<Attribute>) e.getAttributes())
             props.put(att.getName(), att.getValue());
     }
+    
+    public String toString() {
+        String retval = "<" + type;
+        // copy properties
+        for (String name : props.keySet())
+            retval += " " + name + "=" + props.get(name);
+        return retval + "/>";
+    }
 }

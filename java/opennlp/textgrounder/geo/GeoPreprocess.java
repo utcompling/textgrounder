@@ -15,14 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.geo;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.io.*;
 
 import org.apache.commons.cli.*;
 
@@ -75,6 +68,13 @@ public class GeoPreprocess {
      * Whether format of input data is in tei encoded pcl-travel xml file
      */
     protected boolean PCLXML = false;
+
+    /**
+     * NamedEntityRecognizer object.
+     * 
+     * FIXME: Should be specifiable by command-line option.
+     */
+    protected NamedEntityRecognizer ner = new StanfordNER();
 
     /**
      * 
@@ -130,10 +130,23 @@ public class GeoPreprocess {
             path = (new File(path)).getCanonicalPath();
             return path;
         } catch (IOException ex) {
-            Logger.getLogger(CommandLineOptions.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
+            throw new RuntimeException(ex);
         }
-        return null;
+    }
+
+    protected void processFile(String filename, Corpus corpus) {
+        try {
+            if (filename.endsWith(".xml"))
+                TextProcessor.processXML(filename, corpus);
+            else if (filename.endsWith(".tr"))
+                TextProcessor.processTR(filename, corpus);
+            else if (!filename.endsWith(".DS_Store") && !filename.endsWith(".dtd"))
+                TextProcessor.processNER(filename, corpus, ner,
+                        paragraphsAsDocs);
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+
     }
 
     /**
@@ -175,20 +188,22 @@ public class GeoPreprocess {
         Gazetteer gazetteer = new GazetteerGenerator(gp.gazetteType,
                 gp.gazetteerPath, gp.gazetteerRefresh).generateGazetteer();
         Corpus corpus = new Corpus(gazetteer, lexicon);
-        NamedEntityRecognizer ner = new StanfordNER();
         
         for (String filename : cline.getArgs()) {
             System.out.println("Processing: " + filename);
-            if (filename.endsWith(".xml"))
-                TextProcessor.processXML(filename, corpus);
-            else if (filename.endsWith(".tr"))
-                TextProcessor.processTR(filename, corpus);
-            else
-                TextProcessor.processNER(filename, corpus, ner,
-                        gp.paragraphsAsDocs);
+            File file = new File(filename);
+            if (file.isDirectory()) {
+                for (String pathname : file.list()) {
+                    System.out.println("Processing: " + pathname);
+                    gp.processFile(file.getCanonicalPath() + File.separator + pathname,
+                            corpus);
+                }
+            } else
+                gp.processFile(filename, corpus);
         }
 
         System.out.println("Writing output file " + gp.outputPath);
         corpus.outputXML(new File(gp.outputPath));
     }
+        
 }

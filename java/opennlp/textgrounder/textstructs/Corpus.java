@@ -21,7 +21,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import org.jdom.Document;
+import org.jdom.*;
 import org.jdom.output.Format;
 import org.jdom.output.XMLOutputter;
 
@@ -52,8 +52,12 @@ public class Corpus extends ArrayList<CorpusDocument> {
      */
     public void outputXML(File file) {
         Document doc = new Document();
-        for (CorpusDocument cdoc : this)
-            doc.addContent(cdoc.outputElement());
+        Element root = new Element("corpus");
+        doc.addContent(root);
+        for (CorpusDocument cdoc : this) {
+            System.out.println("Outputting XML for " + cdoc);
+            root.addContent(cdoc.outputElement());
+        }
         try {
             XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
             xout.output(doc, new FileOutputStream(file));
