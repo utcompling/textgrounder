@@ -146,6 +146,7 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      * @return
      */
     public TIntHashSet get(String placename, int topid) {
+        placename = placename.toLowerCase();
         try {
             TIntHashSet locationsToReturn = get(topid);
             if (locationsToReturn == null) {
@@ -160,6 +161,7 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
                           rs.getInt("pop"),
                           rs.getString("container"),
                           0);
+                    // System.out.println("Location: " + locationToAdd);
                     idxToLocationMap.put(locationToAdd.getId(), locationToAdd);
                     locationsToReturn.add(locationToAdd.getId());
                     if (locationToAdd.getId() > maxLocId) {

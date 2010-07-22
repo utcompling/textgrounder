@@ -89,7 +89,9 @@ public abstract class DocumentComponent extends ArrayList<DocumentComponent> {
         for (Element child : (List<Element>) e.getChildren()) {
             String elname = child.getName();
             if (elname.equals("w"))
-                comp = new Token(document);
+                comp = new Token(document, false);
+            else if (elname.equals("toponym"))
+                comp = new Token(document, true);
             else
                 comp = new Division(document, elname);
             comp.processElement(child);

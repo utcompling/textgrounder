@@ -140,8 +140,8 @@ public class WGGazetteer extends Gazetteer {
 
             String rawLat, rawLon;
             if (tokens.length >= 8) {
-                rawLat = tokens[7].trim();
-                rawLon = tokens[6].trim();
+                rawLat = tokens[6].trim();
+                rawLon = tokens[7].trim();
             } else {
                 rawLat = "999999"; // sentinel values for entries with no coordinates
                 rawLon = "999999";
