@@ -16,6 +16,16 @@
 package opennlp.textgrounder.textstructs;
 
 import java.io.*;
+import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.jdom.Document;
+import org.jdom.Element;
+import org.jdom.JDOMException;
+import org.jdom.input.SAXBuilder;
 
 import opennlp.textgrounder.ners.*;
 import opennlp.textgrounder.topostructs.Coordinate;
@@ -97,6 +107,72 @@ public abstract class TextProcessor {
         System.err.println();
 
         corpus.add(doc);
+    }
+
+    /**
+     * Function to processing TEI (text encoding initiative) encoded XML files.
+     * 
+     * Basically, this function reads in TEI-encoded XML files, ignores
+     * everything but the actual text, and runs the text through the Stanford
+     * NER to get toponym and non-toponym tokens, the same way that the base
+     * TextProcessor class does. There's only one method (besides the
+     * constructor), processFile(), which processes a specific file as just
+     * described.
+     * 
+     * The PCL travel corpus is encoded in TEI format and this class is to be
+     * used with pcl travel. By using the named entity definitions that come
+     * with the dtd for pcl travel, all encoding issues are handled within this
+     * class. Any non-lower ascii characters are normalized by first normalizing
+     * according to unicode standards and then stripping non-lower ascii
+     * portions.
+     * 
+     * @author tsmoon
+     */
+    public static void processTEIXML(String locationOfFile, Corpus corpus,
+            NamedEntityRecognizer ner, int parAsDocSize)
+            throws FileNotFoundException, IOException {
+
+        if (!locationOfFile.endsWith(".xml")) {
+            return;
+        }
+
+        SAXBuilder builder = new SAXBuilder();
+        File file = new File(locationOfFile);
+        CorpusDocument cdoc = new CorpusDocument(corpus, locationOfFile);
+        Document doc = null;
+        int currentDoc = 0;
+        try {
+            doc = builder.build(file);
+            Element element = doc.getRootElement();
+            Element child = element.getChild("text").getChild("body");
+            List<Element> divs = new ArrayList<Element>(
+                    child.getChildren("div"));
+
+            for (Element div : divs) {
+                StringBuilder buf = new StringBuilder();
+                List<Element> pars = new ArrayList<Element>(
+                        div.getChildren("p"));
+                for (Element par : pars) {
+                    for (char c : Normalizer.normalize(par.getTextNormalize(),
+                            Normalizer.Form.NFKC).toCharArray()) {
+                        if (((int) c) < 0x7F) {
+                            buf.append(c);
+                        }
+                    }
+                    buf.append(System.getProperty("line.separator"));
+                }
+                String text = buf.toString().trim();
+                if (!text.isEmpty()) {
+                    ner.processText(cdoc, text);
+                    currentDoc += 1;
+                    System.err.print(currentDoc + ",");
+                }
+            }
+
+        } catch (JDOMException ex) {
+            Logger.getLogger(TextProcessorTEIXML.class.getName()).log(
+                    Level.SEVERE, null, ex);
+        }
     }
 
     /**
