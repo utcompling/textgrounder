@@ -28,5 +28,6 @@ public class ConvertRegionModel {
 
         Converter converter = new Converter(args[0]);
         converter.convert();
+        converter.writeToFiles();
     }
 }

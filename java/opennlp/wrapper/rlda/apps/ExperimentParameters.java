@@ -16,42 +16,36 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.wrapper.rlda.apps;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.lang.reflect.Field;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.jdom.Document;
-import org.jdom.Element;
-import org.jdom.input.SAXBuilder;
-import org.jdom.output.Format;
-import org.jdom.output.XMLOutputter;
-
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
 public class ExperimentParameters {
 
-    protected String tokenArrayInputPath = null;
+    protected String inputPath = null;
+    protected int degreesPerRegion = 3;
     /**
      * Path to array of tokens, toponym status. Should be a file.
      */
-    protected String tokenArrayOutputPath = null;
+    protected String tokenArrayPath = null;
     /**
-     * Path of model that has been saved from previous training runs
+     *
      */
-    protected String trainedModelPath = null;
+    protected String toponymRegionPath = null;
 
-    public ExperimentParameters() {
+    public int getDegreesPerRegion() {
+        return degreesPerRegion;
     }
 
-    public String tokenArrayInputPath() {
-        return tokenArrayInputPath;
+    public String getInputPath() {
+        return inputPath;
     }
 
-    public String getTrainedModelPath() {
-        return trainedModelPath;
+    public String getTokenArrayPath() {
+        return tokenArrayPath;
+    }
+
+    public String getToponymRegionPath() {
+        return toponymRegionPath;
     }
 }

@@ -25,6 +25,9 @@ import java.util.zip.GZIPOutputStream;
 import opennlp.rlda.annealers.*;
 import opennlp.rlda.apps.ExperimentParameters;
 import opennlp.rlda.ec.util.MersenneTwisterFast;
+import opennlp.rlda.io.BinaryInputReader;
+import opennlp.rlda.io.InputReader;
+import opennlp.rlda.io.TextInputReader;
 
 /**
  *
@@ -44,6 +47,7 @@ public class RegionModel extends RegionModelFields {
      * 
      */
     protected ExperimentParameters experimentParameters;
+    protected InputReader inputReader;
 
     /**
      * Default constructor. Take input from commandline and default _options
@@ -61,7 +65,15 @@ public class RegionModel extends RegionModelFields {
      * @param _options
      */
     protected final void initialize(ExperimentParameters _experimentParameters) {
-        readTokenFile(_experimentParameters.tokenArrayInputPath());
+
+        switch (_experimentParameters.getInputFormat()) {
+            case BINARY:
+                inputReader = new BinaryInputReader(_experimentParameters);
+                break;
+            case TEXT:
+                inputReader = new TextInputReader(_experimentParameters);
+                break;
+        }
 
         alpha = _experimentParameters.getAlpha();
         beta = _experimentParameters.getBeta();
@@ -87,28 +99,15 @@ public class RegionModel extends RegionModelFields {
         } else {
             annealer = new SimulatedAnnealer(_experimentParameters);
         }
+
+        readTokenArrayFile();
     }
 
     public void initialize() {
         initialize(experimentParameters);
-
-
-        DataInputStream dis = new DataInputStream(null);
-        
     }
 
-    public void readTokenFile(String _filename) {
-        readTokenFile(new File(_filename));
-    }
-
-    public void readTokenFile(File _file) {
-        BufferedReader textIn = null;
-        try {
-            textIn = new BufferedReader(new FileReader(_file));
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
+    protected void readTokenArrayFile() {
 
         HashSet<Integer> stopwordSet = new HashSet<Integer>();
         ArrayList<Integer> wordArray = new ArrayList<Integer>(),
@@ -117,31 +116,29 @@ public class RegionModel extends RegionModelFields {
               stopwordArray = new ArrayList<Integer>();
 
         try {
-            String line = null;
-            while ((line = textIn.readLine()) != null) {
-                String[] fields = line.split("\\w+");
-                if (fields.length > 2) {
-                    int wordidx = Integer.parseInt(fields[0]);
-                    wordArray.add(wordidx);
-                    int docidx = Integer.parseInt(fields[1]);
-                    docArray.add(docidx);
-                    toponymArray.add(Integer.parseInt(fields[2]));
-                    try {
-                        stopwordArray.add(Integer.parseInt(fields[3]));
-                        stopwordSet.add(wordidx);
-                    } catch (ArrayIndexOutOfBoundsException e) {
+            while (true) {
+                int[] record = inputReader.nextTokenArrayRecord();
+                if (record != null) {
+                    int wordid = record[0];
+                    wordArray.add(wordid);
+                    int docid = record[1];
+                    docArray.add(docid);
+                    int topstatus = record[2];
+                    toponymArray.add(topstatus);
+                    int stopstatus = record[3];
+                    stopwordArray.add(stopstatus);
+                    if (stopstatus == 1) {
+                        stopwordSet.add(wordid);
                     }
-                    if (W < wordidx) {
-                        W = wordidx;
+                    if (W < wordid) {
+                        W = wordid;
                     }
-                    if (D < docidx) {
-                        D = docidx;
+                    if (D < docid) {
+                        D = docid;
                     }
                 }
             }
-        } catch (IOException ex) {
-            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
+        } catch (EOFException ex) {
         }
 
         W -= stopwordSet.size();
@@ -164,32 +161,17 @@ public class RegionModel extends RegionModelFields {
                 stopwordVector[i] = 0;
             }
         }
-
         regionVector = new int[N];
-    }
-
-    /**
-     *
-     * @param _filename
-     */
-    public void readRegionToponymFilter(String _filename) {
-        readRegionToponymFilter(new File(_filename));
     }
 
     /**
      * 
      * @param _file
      */
-    public void readRegionToponymFilter(File _file) {
-        BufferedReader textin = null;
-        try {
-            textin = new BufferedReader(new FileReader(_file));
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
+    public void readRegionToponymFilter() {
 
-        String line = null;
+        R = inputReader.getMaxRegionID();
+        inputReader.resetToponymRegionReader();
 
         regionByToponymFilter = new int[R * W];
         for (int i = 0; i < R * W; ++i) {
@@ -197,18 +179,17 @@ public class RegionModel extends RegionModelFields {
         }
 
         try {
-            while ((line = textin.readLine()) != null) {
-                if (!line.isEmpty()) {
-                    String[] fields = line.split("\\w+");
-                    int wordoff = Integer.parseInt(fields[0]) * R;
-                    for (int i = 1; i < fields.length; ++i) {
-                        regionByToponymFilter[wordoff + i] = 1;
-                    }
+            while (true) {
+                int[] regions = inputReader.nextToponymRegionFilter();
+
+                int topid = regions[0];
+                int topoff = topid * R;
+
+                for (int i = 1; i < regions.length; ++i) {
+                    regionByToponymFilter[topoff + regions[i]] = 1;
                 }
             }
-        } catch (IOException ex) {
-            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
+        } catch (EOFException e) {
         }
     }
 

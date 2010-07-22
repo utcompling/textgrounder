@@ -35,15 +35,10 @@ import java.io.Serializable;
  */
 public class Location implements Serializable {
 
-    public int id;
     public int nameid;
     public Coordinate coord;
 
-    public Location() {
-    }
-
-    public Location(int _id, int _nameid, Coordinate _coord) {
-        id = _id;
+    public Location(int _nameid, Coordinate _coord) {
         nameid = _nameid;
         coord = _coord;
     }
@@ -57,7 +52,10 @@ public class Location implements Serializable {
             return false;
         }
         final Location other = (Location) obj;
-        if (this.id != other.id) {
+        if (this.nameid != other.nameid) {
+            return false;
+        }
+        if (this.coord != other.coord && (this.coord == null || !this.coord.equals(other.coord))) {
             return false;
         }
         return true;
@@ -65,6 +63,9 @@ public class Location implements Serializable {
 
     @Override
     public int hashCode() {
-        return this.id;
+        int hash = 3;
+        hash = 37 * hash + this.nameid;
+        hash = 37 * hash + (this.coord != null ? this.coord.hashCode() : 0);
+        return hash;
     }
 }

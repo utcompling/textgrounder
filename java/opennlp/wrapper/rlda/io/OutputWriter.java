@@ -14,24 +14,26 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.io;
 
-import java.io.EOFException;
+package opennlp.wrapper.rlda.io;
+
 import java.io.File;
-import opennlp.rlda.apps.ExperimentParameters;
+import opennlp.wrapper.rlda.apps.ExperimentParameters;
+import opennlp.wrapper.rlda.textstructs.TokenArrayBuffer;
+import opennlp.wrapper.rlda.topostructs.ToponymToRegionIDsMap;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class InputReader {
+public abstract class OutputWriter {
 
-    /**
+        /**
      *
      */
     protected File tokenArrayFile;
     /**
-     * 
+     *
      */
     protected File toponymRegionFile;
     /**
@@ -40,10 +42,10 @@ public abstract class InputReader {
     protected ExperimentParameters experimentParameters;
 
     /**
-     * 
+     *
      * @param _experimentParameters
      */
-    public InputReader(ExperimentParameters _experimentParameters) {
+    public OutputWriter(ExperimentParameters _experimentParameters) {
         experimentParameters = _experimentParameters;
         tokenArrayFile = new File(experimentParameters.getTokenArrayPath());
         toponymRegionFile = new File(experimentParameters.getToponymRegionPath());
@@ -51,51 +53,21 @@ public abstract class InputReader {
 
     /**
      *
-     * @return
-     * @throws EOFException
      */
-    public abstract int[] nextTokenArrayRecord() throws EOFException;
-
-    /**
-     * 
-     * @return
-     * @throws EOFException
-     */
-    public abstract int[] nextToponymRegionFilter() throws EOFException;
+    public abstract void openTokenArrayWriter();
 
     /**
      *
      */
-    public abstract void openTokenArrayReader();
-
-    /**
-     * 
-     */
-    public abstract void openToponymRegionReader();
+    public abstract void openToponymRegionWriter();
 
     /**
      *
      */
-    public abstract void closeTokenArrayReader();
+    public abstract void writeTokenArrayWriter(TokenArrayBuffer _tokenArrayBuffer);
 
     /**
      *
      */
-    public abstract void closeToponymRegionReader();
-
-    /**
-     *
-     */
-    public abstract void resetTokenArrayReader();
-
-    /**
-     *
-     */
-    public abstract void resetToponymRegionReader();
-
-    /**
-     * 
-     * @return
-     */
-    public abstract int getMaxRegionID();
+    public abstract void writeToponymRegionWriter(ToponymToRegionIDsMap _toponymToRegionIDsMap);
 }

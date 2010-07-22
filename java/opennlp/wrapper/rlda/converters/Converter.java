@@ -19,12 +19,16 @@ package opennlp.wrapper.rlda.converters;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import opennlp.wrapper.rlda.converters.callbacks.TrainingMaterialCallback;
-import opennlp.wrapper.rlda.textstructs.Lexicon;
-import opennlp.wrapper.rlda.textstructs.StopwordList;
-import opennlp.wrapper.rlda.textstructs.TokenArrayBuffer;
+import opennlp.wrapper.rlda.apps.ExperimentParameters;
+import opennlp.wrapper.rlda.converters.callbacks.*;
+import opennlp.wrapper.rlda.io.OutputWriter;
+import opennlp.wrapper.rlda.io.TextOutputWriter;
+import opennlp.wrapper.rlda.textstructs.*;
+import opennlp.wrapper.rlda.topostructs.*;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;
@@ -41,6 +45,11 @@ public class Converter {
     protected Lexicon lexicon;
     protected StopwordList stopwordList;
     protected TrainingMaterialCallback trainingMaterialCallback;
+    protected int activeRegions;
+    protected int degreesPerRegion;
+    protected ExperimentParameters experimentParameters;
+    protected Region[][] regionArray;
+    protected ToponymToRegionIDsMap toponymToRegionIDsMap;
 
     public Converter(String _path) {
         pathToInput = _path;
@@ -50,7 +59,65 @@ public class Converter {
         trainingMaterialCallback = new TrainingMaterialCallback(lexicon);
     }
 
+    public Converter(ExperimentParameters _experimentParameters) {
+        experimentParameters = _experimentParameters;
+
+        pathToInput = experimentParameters.getInputPath();
+
+        lexicon = new Lexicon();
+        tokenArrayBuffer = new TokenArrayBuffer(lexicon);
+        stopwordList = new StopwordList();
+        trainingMaterialCallback = new TrainingMaterialCallback(lexicon);
+
+        degreesPerRegion = experimentParameters.getDegreesPerRegion();
+
+        toponymToRegionIDsMap = new ToponymToRegionIDsMap();
+        activeRegions = 0;
+    }
+
+    /**
+     * Initialize the region array to be of the right size and contain null
+     * pointers.
+     */
+    public void initializeRegionArray() {
+        activeRegions = 0;
+
+        int regionArrayWidth = 360 / (int) degreesPerRegion;
+        int regionArrayHeight = 180 / (int) degreesPerRegion;
+
+        regionArray = new Region[regionArrayWidth][regionArrayHeight];
+
+        for (int w = 0; w < regionArrayWidth; w++) {
+            for (int h = 0; h < regionArrayHeight; h++) {
+                regionArray[w][h] = null;
+            }
+        }
+    }
+
+    /**
+     * Add a single location to the Region object in the region array that
+     * corresponds to the latitude and longitude stored in the location object.
+     * Create the Region object if necessary. 
+     *
+     * @param loc
+     */
+    protected Region addOrGetLocationsToRegionArray(Location loc) {
+        int curX = (int) (loc.coord.latitude + 180) / (int) degreesPerRegion;
+        int curY = (int) (loc.coord.longitude + 90) / (int) degreesPerRegion;
+
+        if (regionArray[curX][curY] == null) {
+            double minLon = loc.coord.longitude - loc.coord.longitude % degreesPerRegion;
+            double maxLon = minLon + (loc.coord.longitude < 0 ? -1 : 1) * degreesPerRegion;
+            double minLat = loc.coord.latitude - loc.coord.latitude % degreesPerRegion;
+            double maxLat = minLat + (loc.coord.latitude < 0 ? -1 : 1) * degreesPerRegion;
+            activeRegions += 1;
+            regionArray[curX][curY] = new Region(activeRegions, minLon, maxLon, minLat, maxLat);
+        }
+        return regionArray[curX][curY];
+    }
+
     public void convert() {
+        initializeRegionArray();
         convert(pathToInput);
     }
 
@@ -69,7 +136,7 @@ public class Converter {
             System.exit(1);
         }
 
-        int docidx = 0;
+        int docid = 0;
         Element root = trdoc.getRootElement();
         ArrayList<Element> documents = new ArrayList<Element>(root.getChildren());
         for (Element document : documents) {
@@ -78,28 +145,45 @@ public class Converter {
                 ArrayList<Element> tokens = new ArrayList<Element>(sentence.getChildren());
                 for (Element token : tokens) {
                     int istoponym = 0, isstopword = 0;
-                    int wordidx = 0;
+                    int wordid = 0;
                     String word = "";
                     if (token.getName().equals("w")) {
                         word = token.getAttributeValue("tok");
-                        wordidx = lexicon.addOrGetWord(word);
-                        tokenArrayBuffer.addElement(wordidx, docidx, istoponym, stopwordList.isStopWord(word)
-                              ? 1 : 0);
+                        wordid = lexicon.addOrGetWord(word);
+                        isstopword = stopwordList.isStopWord(word) ? 1 : 0;
                     } else if (token.getName().equals("toponym")) {
                         word = token.getAttributeValue("term");
                         istoponym = 1;
-                        wordidx = lexicon.addOrGetWord(word);
-                        tokenArrayBuffer.addElement(wordidx, docidx, istoponym, 0);
+                        wordid = lexicon.addOrGetWord(word);
                         ArrayList<Element> candidates = new ArrayList<Element>(token.getChildren());
                         for (Element candidate : candidates) {
-                            
+                            double lon = Double.parseDouble(candidate.getAttributeValue("long"));
+                            double lat = Double.parseDouble(candidate.getAttributeValue("lat"));
+                            Location loc = new Location(wordid, new Coordinate(lon, lat));
+
+                            Region region = addOrGetLocationsToRegionArray(loc);
+
+                            int regid = region.id;
+
+                            if (!toponymToRegionIDsMap.containsKey(wordid)) {
+                                toponymToRegionIDsMap.put(wordid, new HashSet<Integer>());
+                            }
+
+                            toponymToRegionIDsMap.get(wordid).add(regid);
                         }
                     } else {
                         continue;
                     }
+                    tokenArrayBuffer.addElement(wordid, docid, istoponym, isstopword);
                 }
             }
-            docidx += 1;
+            docid += 1;
         }
+    }
+
+    public void writeToFiles() {
+        OutputWriter outputWriter = new TextOutputWriter(experimentParameters);
+        outputWriter.writeTokenArrayWriter(tokenArrayBuffer);
+        outputWriter.writeToponymRegionWriter(toponymToRegionIDsMap);
     }
 }

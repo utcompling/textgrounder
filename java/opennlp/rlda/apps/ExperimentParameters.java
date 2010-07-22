@@ -16,25 +16,18 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.apps;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.lang.reflect.Field;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.jdom.Document;
-import org.jdom.Element;
-import org.jdom.input.SAXBuilder;
-import org.jdom.output.Format;
-import org.jdom.output.XMLOutputter;
-
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
 public class ExperimentParameters {
 
-    protected static SAXBuilder builder = new SAXBuilder();
+    public static enum INPUT_FORMAT {
+
+        BINARY,
+        TEXT,
+        XML
+    }
     /**
      * Hyperparameter of topic prior
      */
@@ -82,15 +75,23 @@ public class ExperimentParameters {
     /**
      * Path to array of tokens, toponym status. Should be a file.
      */
-    protected String tokenArrayInputPath = null;
+    protected String tokenArrayPath = null;
     /**
      * Path to array of tokens, toponym status. Should be a file.
      */
     protected String tokenArrayOutputPath = null;
     /**
+     * 
+     */
+    protected String toponymRegionPath = null;
+    /**
      * Path of model that has been saved from previous training runs
      */
     protected String trainedModelPath = null;
+    /**
+     *
+     */
+    protected INPUT_FORMAT inputFormat = INPUT_FORMAT.BINARY;
 
     public ExperimentParameters() {
     }
@@ -135,11 +136,23 @@ public class ExperimentParameters {
         return lag;
     }
 
-    public String tokenArrayInputPath() {
-        return tokenArrayInputPath;
+    public String getTokenArrayPath() {
+        return tokenArrayPath;
     }
 
     public String getTrainedModelPath() {
         return trainedModelPath;
+    }
+
+    public String getToponymRegionPath() {
+        return toponymRegionPath;
+    }
+
+    public int getTrainIterations() {
+        return trainIterations;
+    }
+
+    public INPUT_FORMAT getInputFormat() {
+        return inputFormat;
     }
 }

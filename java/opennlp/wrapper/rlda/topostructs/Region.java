@@ -34,39 +34,31 @@ import java.io.Serializable;
  */
 public class Region implements Serializable {
 
-    public double minLon;
-    public double maxLon;
-    public double minLat;
-    public double maxLat;
+    public final int id;
+    public final double minLon;
+    public final double maxLon;
+    public final double minLat;
+    public final double maxLat;
     /**
      * The longitude center of the region
      */
-    public double centLon;
+    public final double centLon;
     /**
      * The latitude center of the region
      */
-    public double centLat;
+    public final double centLat;
 
-    public Region(double minLon, double maxLon, double minLat, double maxLat) {
-        this.minLon = minLon;
-        this.maxLon = maxLon;
-        this.minLat = minLat;
-        this.maxLat = maxLat;
+    public Region(int _id, double _minLon, double _maxLon, double _minLat,
+          double _maxLat) {
+        id = _id;
 
-        centLon = (maxLon + minLon) / 2;
-        centLat = (maxLat + minLat) / 2;
-    }
+        minLon = _minLon;
+        maxLon = _maxLon;
+        minLat = _minLat;
+        maxLat = _maxLat;
 
-    public boolean contains(Coordinate coord) {
-        if (coord.longitude >= minLon && coord.longitude <= maxLon
-              && coord.latitude >= minLat && coord.latitude <= maxLat) {
-            return true;
-        }
-        return false;
-    }
-
-    public boolean contains(double lon, double lat) {
-        return contains(new Coordinate(lon, lat));
+        centLon = (_maxLon + _minLon) / 2;
+        centLat = (_maxLat + _minLat) / 2;
     }
 
     @Override

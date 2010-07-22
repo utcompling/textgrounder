@@ -8,12 +8,10 @@ package opennlp.textgrounder.eval;
 import java.io.*;
 import java.util.*;
 import javax.xml.parsers.*;
-import javax.xml.transform.*;
-import javax.xml.transform.dom.*;
-import javax.xml.transform.stream.*;
 import org.w3c.dom.*;
 
 import opennlp.textgrounder.topostructs.*;
+import opennlp.textgrounder.util.*;
 
 public class EvalBasedOnXML {
 
@@ -23,7 +21,7 @@ public class EvalBasedOnXML {
     private static DocumentBuilderFactory dbf;
     private static DocumentBuilder db;
 
-    public static void main(String args[]) throws Exception {
+    public static void main(String[] args) throws Exception {
         EvalBasedOnXML eval = new EvalBasedOnXML(args[0], args[1]);
     }
 
@@ -163,7 +161,7 @@ public class EvalBasedOnXML {
     public void TRXMLtoSingleFile(String TRXMLPath, String outputPath) throws Exception {
         Document outputDoc = db.newDocument();
         TRXMLtoSingleFileHelper(TRXMLPath, outputDoc);
-        writeDocToFile(outputDoc, outputPath);
+        XMLUtil.writeDocToFile(outputDoc, outputPath);
     }
 
     private void TRXMLtoSingleFileHelper(String TRXMLPath, Document outputDoc) throws Exception {
@@ -189,7 +187,7 @@ public class EvalBasedOnXML {
     private void addToponymsToDoc(String TRXMLPath, Document outputDoc, Element toponymsE) throws Exception {
         Document inputDoc = db.parse(TRXMLPath);
 
-        String[] allTokens = getAllTokens(inputDoc);
+        String[] allTokens = XMLUtil.getAllTokens(inputDoc);
         int tokenIndex = -1;
 
         NodeList sentences = inputDoc.getChildNodes().item(1).getChildNodes();
@@ -232,7 +230,7 @@ public class EvalBasedOnXML {
                     if(!foundSelectedLocation) // no selected location was found
                         break;
 
-                    contextE.setTextContent(arrayToString(getContextWindow(allTokens, tokenIndex, CONTEXT_WINDOW_SIZE), " "));
+                    contextE.setTextContent(StringUtil.join(XMLUtil.getContextWindow(allTokens, tokenIndex, CONTEXT_WINDOW_SIZE)));
                     toponymNode.appendChild(contextE);
 
                     toponymsE.appendChild(toponymNode);
@@ -267,76 +265,5 @@ public class EvalBasedOnXML {
             afterHead = afterHead.substring(0, windowSize);
 
         return beforeHead + head + afterHead;
-    }
-
-    private static String[] getAllTokens(Document doc) {
-        ArrayList<String> toReturnAL = new ArrayList<String>();
-
-        NodeList sentences = doc.getChildNodes().item(1).getChildNodes();
-
-        for(int i = 0; i < sentences.getLength(); i++) {
-            if(!sentences.item(i).getNodeName().equals("s"))
-                continue;
-            NodeList tokens = sentences.item(i).getChildNodes();
-            for(int j = 0; j < tokens.getLength(); j++) {
-                Node tokenNode = tokens.item(j);
-                if(tokenNode.getNodeName().equals("toponym")) {
-                    toReturnAL.add(tokenNode.getAttributes().getNamedItem("term").getNodeValue());
-                }
-                else if(tokenNode.getNodeName().equals("w")) {
-                    toReturnAL.add(tokenNode.getAttributes().getNamedItem("tok").getNodeValue());
-                }
-
-            }
-        }
-        
-        return toReturnAL.toArray(new String[0]);
-    }
-
-    private static String[] getContextWindow(String[] a, int index, int windowSize) {
-        ArrayList<String> toReturnAL = new ArrayList<String>();
-
-        int begin = Math.max(0, index - windowSize);
-        int end = Math.min(a.length, index + windowSize + 1);
-
-        for(int i = begin; i < end; i++) {
-            if(i == index)
-                toReturnAL.add("[h]" + a[i] + "[/h]");
-            else
-                toReturnAL.add(a[i]);
-        }
-        
-        return toReturnAL.toArray(new String[0]);
-    }
-
-    private static void writeDocToFile(Document doc, String filename) throws Exception {
-        Source source = new DOMSource(doc);
-        File file = new File(filename);
-        Result result = new StreamResult(file);
-        TransformerFactory tFactory = TransformerFactory.newInstance();
-        tFactory.setAttribute("indent-number", 2);
-        Transformer xformer = tFactory.newTransformer();
-        xformer.setOutputProperty(OutputKeys.INDENT, "yes");
-        //xformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
-        xformer.transform(source, result);
-
-        /*OutputFormat format = new OutputFormat(doc);
-        format.setIndenting(true);
-        format.setIndent(2);
-        Writer output = new BufferedWriter( new FileWriter(filename) );
-        XMLSerializer serializer = new XMLSerializer(output, format);
-        serializer.serialize(doc);*/
-    }
-
-    private static String arrayToString(String[] a, String separator) {
-        StringBuffer result = new StringBuffer();
-        if (a.length > 0) {
-            result.append(a[0]);
-            for (int i=1; i<a.length; i++) {
-                result.append(separator);
-                result.append(a[i]);
-            }
-        }
-        return result.toString();
     }
 }

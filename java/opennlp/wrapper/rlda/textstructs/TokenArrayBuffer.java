@@ -18,9 +18,7 @@ package opennlp.wrapper.rlda.textstructs;
 import java.io.*;
 
 import java.util.ArrayList;
-import java.util.List;
 import opennlp.wrapper.rlda.converters.callbacks.*;
-import opennlp.wrapper.rlda.topostructs.Location;
 
 /**
  * Class of integer sequences that indicate words in a stream of space
@@ -32,7 +30,6 @@ import opennlp.wrapper.rlda.topostructs.Location;
  */
 public class TokenArrayBuffer implements Serializable {
 
-    static private final long serialVersionUID = 10772114L;
     /**
      * Array of word indexes. The elements are integers which reference word
      * types maintained in Lexicon. The "word types" may not be unigrams.
@@ -40,11 +37,6 @@ public class TokenArrayBuffer implements Serializable {
      * the lexicon will reference space delimited multiple tokens.
      */
     public ArrayList<Integer> wordArrayList;
-    /**
-     * List of token indices removed of numerals (for now) and (in the future)
-     * maybe hapax legomena and words with punctuation in 'em
-     */
-    public ArrayList<Integer> trainingArrayList;
     /**
      * Array of document indexes. Each element references the document which
      * the corresponding token in wordArrayList was located in. It is a monotonic
@@ -64,30 +56,6 @@ public class TokenArrayBuffer implements Serializable {
      * stopword, the element is one, zero otherwise.
      */
     public ArrayList<Integer> stopwordArrayList;
-    /**
-     * Populated with the same elements as wordArrayList. Once input has been
-     * populated in input stage with wordArrayList, the arraylist is converted
-     * to this primitive array for memory and speed.
-     */
-    public int[] wordVector;
-    /**
-     * Populated with the same elements as documentArrayList. Once input has been
-     * populated in input stage with documentArrayList, the arraylist is converted
-     * to this primitive array for memory and speed.
-     */
-    public int[] documentVector;
-    /**
-     * Populated with the same elements as toponymArrayList. Once input has been
-     * populated in input stage with toponymArrayList, the arraylist is converted
-     * to this primitive array for memory and speed.
-     */
-    public int[] toponymVector;
-    /**
-     * Populated with the same elements as stopwordArrayList. Once input has been
-     * populated in input stage with stopwordArrayList, the arraylist is converted
-     * to this primitive array for memory and speed.
-     */
-    public int[] stopwordVector;
     /**
      * The size of the the array fields in this class. All arrays have the
      * same size.
@@ -137,7 +105,7 @@ public class TokenArrayBuffer implements Serializable {
      *
      * @param lexicon
      */
-    protected void initialize(Lexicon lexicon,
+    protected final void initialize(Lexicon lexicon,
           TrainingMaterialCallback trainingMaterialCallback) {
         wordArrayList = new ArrayList<Integer>();
         documentArrayList = new ArrayList<Integer>();
@@ -177,53 +145,6 @@ public class TokenArrayBuffer implements Serializable {
     }
 
     /**
-     * Return the context (snippet) of up to window size n for the given doc id and index
-     */
-    public String getContextAround(int index, int windowSize,
-          boolean boldToponym) {
-        String context = "...";
-
-        int i = index - windowSize;
-        if (i < 0) {
-            i = 0; // re-initialize the start of the window to be the start of the document if window too big
-        }
-        for (; i < index + windowSize; i++) {
-            if (i >= size) {
-                break;
-            }
-            if (boldToponym && i == index) {
-                context += "<b> " + lexicon.getWordForInt(wordVector[i]) + "</b> ";
-            } else {
-                context += lexicon.getWordForInt(wordVector[i]) + " ";
-            }
-            //System.out.println("i: " + i + "; lexicon thinks " + wordArrayList.get(i) + " translates to " + lexicon.getWordForInt(wordArrayList.get(i)));
-        }
-
-        return context.trim() + "...";
-    }
-
-    /**
-     * Call this after initial population to convert arraylists to primitive
-     * arrays.
-     */
-    public void convertToPrimitiveArrays() {
-        wordVector = new int[size];
-        copyToArray(wordVector, wordArrayList);
-        documentVector = new int[size];
-        copyToArray(documentVector, documentArrayList);
-        toponymVector = new int[size];
-        copyToArray(toponymVector, toponymArrayList);
-        stopwordVector = new int[size];
-        copyToArray(stopwordVector, stopwordArrayList);
-
-        wordArrayList.clear();
-        documentArrayList.clear();
-        toponymArrayList.clear();
-        stopwordArrayList.clear();
-        wordArrayList = documentArrayList = toponymArrayList = stopwordArrayList = null;
-    }
-
-    /**
      * @return the size of the arrays in class. In other words, the size
      * in tokens of all documents combined (give or take some words, since
      * multiword placenames are considered to be a single token)
@@ -238,37 +159,5 @@ public class TokenArrayBuffer implements Serializable {
      */
     public int getNumDocs() {
         return numDocs + 1;
-    }
-
-    /**
-     * Copy a sequence of numbers from ta to array ia.
-     *
-     * @param <T>   Any number type
-     * @param ia    Target array of integers to be copied to
-     * @param ta    Source List<T> of numbers to be copied from
-     */
-    protected static <T extends Number> void copyToArray(int[] ia, List<T> ta) {
-        for (int i = 0; i < ta.size(); ++i) {
-            ia[i] = ta.get(i).intValue();
-        }
-    }
-
-    protected boolean sanityCheck1() {
-        return toponymArrayList.size() == wordArrayList.size();
-    }
-
-    protected boolean sanityCheck2() {
-        return true;
-    }
-
-    protected boolean verboseSanityCheck(String curLine) {
-        return true;
-    }
-
-    /**
-     * @return the lexicon
-     */
-    public Lexicon getLexicon() {
-        return lexicon;
     }
 }

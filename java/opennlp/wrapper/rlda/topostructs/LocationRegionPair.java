@@ -25,7 +25,7 @@ public class LocationRegionPair {
     public final int regionIndex;
 
     public LocationRegionPair(Location loc, int ridx) {
-        locationIndex = loc.id;
+        locationIndex = loc.hashCode();
         regionIndex = ridx;
     }
 
