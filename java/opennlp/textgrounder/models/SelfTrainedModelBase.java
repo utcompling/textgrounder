@@ -39,7 +39,7 @@ public abstract class SelfTrainedModelBase extends Model {
         gazetteer = gaz;
         gazetteer.gazetteerRefresh = gazetteerRefresh;
         lexicon = new Lexicon();
-        System.out.println("Warning: code is broken! Can't create GazetteerGenerator() without options");
+        System.err.println("Warning: code is broken! Can't create GazetteerGenerator() without options");
         // gazetteerGenerator = new GazetteerGenerator(null);
         //if(evalInputPath != null)
         //    trainTokenArrayBuffer = evalTokenArrayBuffer;

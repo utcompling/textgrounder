@@ -342,7 +342,7 @@ public abstract class Model {
                 processTrainInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer);
             }
         } else {
-            System.out.println("Warning: code is broken! Can't process " + myPath.getCanonicalPath());
+            System.err.println("Warning: code is broken! Can't process " + myPath.getCanonicalPath());
             // textProcessor.processFile(myPath.getCanonicalPath(), tokenArrayBuffer);
         }
     }
@@ -354,7 +354,7 @@ public abstract class Model {
      */
     public void processEvalInputPath() throws Exception {
         evalTokenArrayBuffer = new EvalTokenArrayBuffer(lexicon);
-        System.out.println("Warning: code is broken! Can't process " + evalInputFile.getCanonicalPath());
+        System.err.println("Warning: code is broken! Can't process " + evalInputFile.getCanonicalPath());
         // processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon), evalTokenArrayBuffer);
         evalTokenArrayBuffer.convertToPrimitiveArrays();
     }
@@ -376,7 +376,7 @@ public abstract class Model {
                 processEvalInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, evalTokenArrayBuffer);
             }
         } else {
-            System.out.println("Warning: code is broken! Can't process " + myPath.getCanonicalPath());
+            System.err.println("Warning: code is broken! Can't process " + myPath.getCanonicalPath());
             // textProcessor.processFile(myPath.getCanonicalPath(), evalTokenArrayBuffer);
         }
     }
