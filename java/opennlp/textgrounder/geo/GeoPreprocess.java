@@ -49,10 +49,6 @@ public class GeoPreprocess {
      */
     protected String gazetteerPath = "/tmp/toponym.db";
     /**
-     * Path to input data. Can be directory or a single file.
-     */
-    protected String inputPath = null;
-    /**
      * Path of output data.
      */
     protected String outputPath = null;
@@ -65,16 +61,31 @@ public class GeoPreprocess {
      */
     protected boolean runWholeGazetteer = false;
     /**
-     * Whether format of input data is in tei encoded pcl-travel xml file
+     * Format of input. The possible formats are:
+     * <pre>
+     * "auto": Figure out the format based on the file's extension and possibly its contents
+     * "raw": Raw text (will be passed through NER)
+     * "teixml": TEI-encoded PCL-travel XML format (will be passed through NER)
+     * "tr": TR-CONLL format
+     * "trxml": TR-CONLL XML format (also used for output)
+     * </pre>
      */
-    protected boolean PCLXML = false;
+    protected String format = "auto";
+    /**
+     * Named entity recognizer (NER) used to process raw text, etc. The possible types are:
+     * <pre>
+     * "stanford": The Stanford NER
+     * "opennlp": The NER that comes as part of OpenNLP
+     * </pre>
+     */
+    protected String nerType = "stanford";
 
     /**
      * NamedEntityRecognizer object.
      * 
      * FIXME: Should be specifiable by command-line option.
      */
-    protected NamedEntityRecognizer ner = new StanfordNER();
+    protected NamedEntityRecognizer ner;
 
     /**
      * 
@@ -88,6 +99,9 @@ public class GeoPreprocess {
         for (Option option : cline.getOptions()) {
             String value = option.getValue();
             switch (option.getOpt().charAt(0)) {
+            case 'f':
+                format = value;
+                break;
             case 'g':
                 opt = option.getOpt();
                 if (opt.equals("g")) {
@@ -97,12 +111,10 @@ public class GeoPreprocess {
                 }
                 break;
             case 'i':
-                opt = option.getOpt();
-                if (opt.equals("i")) {
-                    inputPath = value;
-                } else if (opt.equals("id")) {
-                    gazetteerPath = canonicalPath(value);
-                }
+                gazetteerPath = canonicalPath(value);
+                break;
+            case 'n':
+                nerType = value;
                 break;
             case 'o':
                 outputPath = value;
@@ -115,11 +127,13 @@ public class GeoPreprocess {
                     runWholeGazetteer = true;
                 }
                 break;
-            case 'x':
-                PCLXML = true;
-                break;
             }
         }
+        
+        if (nerType.equals("stanford"))
+            ner = new StanfordNER();
+        else
+            ner = new OpenNLPNER();
     }
 
     protected String canonicalPath(String _path) {
@@ -135,18 +149,23 @@ public class GeoPreprocess {
     }
 
     protected void processFile(String filename, Corpus corpus) {
-        try {
+        if (format.equals("auto")) {
             if (filename.endsWith(".xml"))
                 TextProcessor.processXML(filename, corpus);
             else if (filename.endsWith(".tr"))
                 TextProcessor.processTR(filename, corpus);
-            else if (!filename.endsWith(".DS_Store") && !filename.endsWith(".dtd"))
+            else if (!filename.endsWith(".DS_Store")
+                    && !filename.endsWith(".dtd"))
                 TextProcessor.processNER(filename, corpus, ner,
                         paragraphsAsDocs);
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
-        }
-
+        } else if (format.equals("raw"))
+            TextProcessor.processNER(filename, corpus, ner, paragraphsAsDocs);
+        else if (format.equals("teixml"))
+            TextProcessor.processTEIXML(filename, corpus, ner);
+        else if (format.equals("tr"))
+            TextProcessor.processTR(filename, corpus);
+        else if (format.equals("trxml"))
+            TextProcessor.processXML(filename, corpus);
     }
 
     /**
@@ -155,15 +174,14 @@ public class GeoPreprocess {
      * @param options Command line options
      */
     protected static void setOptions(Options options) {
-        options.addOption("ev", "evaluate", true, "specifies evaluation directory and enables evaluation mode");
         options.addOption("g", "gazetteer", true, "gazetteer to use [world, census, NGA, USGS; default = world]");
         options.addOption("gr", "gazetteer-refresh", false, "read gazetteer afresh from original database");
-        options.addOption("i", "nput", true, "input file or directory name");
         options.addOption("id", "gazetteer-path", true, "path to gazetteer db");
         options.addOption("o", "output", true, "output filename");
         options.addOption("p", "paragraphs-as-docs", true, "number of paragraphs to treat as a document. Set the argument to 0 if documents should be treated whole");
         options.addOption("wg", "whole-gazetteer", false, "activate regions and run program for entire gazetteer (the -i flag will be ignored in this case)");
-        options.addOption("x", "pclxml", false, "whether format of input file is pcl-travel xml format or not");
+        options.addOption("f", "format", true, "format of input [auto, tr, teixml, raw, trxml, default = auto]");
+        options.addOption("n", "ner", true, "named entity recognizer to use [stanford, opennlp, default = stanford]");
 
         options.addOption("h", "help", false, "print help");
     }

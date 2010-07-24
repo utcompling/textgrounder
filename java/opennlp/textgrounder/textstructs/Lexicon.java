@@ -17,8 +17,6 @@ package opennlp.textgrounder.textstructs;
 
 import gnu.trove.*;
 
-import edu.stanford.nlp.ling.CoreAnnotations.*;
-
 import java.io.Serializable;
 
 /**

@@ -15,11 +15,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.textstructs;
 
-import org.jdom.Attribute;
-import org.jdom.Element;
-
-import java.util.List;
-
 /**
  * Class that stores data about a division of a document, greater than a single
  * token. This can include sentences, paragraphs, chapters, etc. The children of

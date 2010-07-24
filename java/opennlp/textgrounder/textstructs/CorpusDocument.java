@@ -16,15 +16,12 @@
 package opennlp.textgrounder.textstructs;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.ArrayList;
 
 import org.jdom.*;
 import org.jdom.input.SAXBuilder;
-import org.jdom.output.Format;
-import org.jdom.output.XMLOutputter;
 
 /**
  * Class that stores data about a document (sequence of tokens) in a corpus. I

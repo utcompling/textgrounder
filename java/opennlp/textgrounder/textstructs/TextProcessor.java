@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  Copyright (C) 2010 Taesun Moon, The University of Texas at Austin
+//  Copyright (C) 2010 Ben Wing, Taesun Moon, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -19,12 +19,8 @@ import java.io.*;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import org.jdom.Document;
-import org.jdom.Element;
-import org.jdom.JDOMException;
+import org.jdom.*;
 import org.jdom.input.SAXBuilder;
 
 import opennlp.textgrounder.ners.*;
@@ -32,105 +28,118 @@ import opennlp.textgrounder.topostructs.Coordinate;
 import opennlp.textgrounder.topostructs.Location;
 
 /**
- * Class that reads from a file and generates tokens, identified as to whether
- * they are locations (toponyms), possibly with additional properties.  Tokens
- * are added to a Document object.
+ * Class of static methods that read from a file containing text in some format,
+ * possibly along with tags identifying whether they are toponyms (i.e.
+ * locations) or other such information; generates a CorpusDocument object; and
+ * populates it with tokens (mostly words, but can be multiword place-name
+ * collocations). Each token is identified as to whether it is a toponym and
+ * possibly also what type of token it is from a named-entity-recognition (NER)
+ * perspective. If the text doesn't explicitly indicate which words are
+ * toponyms, a named-entity recognizer (NER) is run to determine this info.
+ * 
+ * In addition, the CorpusDocument object has a mid-level structure made up of
+ * Division objects that reflect the internal structure of the source file (e.g.
+ * chapters, paragraphs, sentences). Furthermore, each CorpusDocument is itself
+ * part of a Corpus (i.e. a collection of documents with common Lexicon and
+ * Gazetteer objects). they are locations (toponyms), possibly with additional
+ * properties. Tokens are added to a Document object.
  * 
  * Multi-word location tokens (e.g. New York) are joined by the code below into
  * a single token.
  * 
- * Actual processing of a file is done in the processFile() method.
- * 
- * @author
+ * @author Ben Wing partially based on earlier code by Taesun Moon
  */
 public abstract class TextProcessor {
     /**
-     * Identify toponyms and populate lexicon from input file.
+     * Process a raw-text file, running it through an NER to identify toponyms.
+     * See comment at top of class.
      * 
-     * This method only splits any incoming document into smaller subdocuments
-     * based on Lexicon.parAsDocSize. The actual work of identifying toponyms,
-     * converting tokens to indexes, and populating arrays is handled in
-     * processText.
+     * This function works by splitting any incoming document into smaller
+     * subdocuments based on parAsDocSize. These subdocuments are then passed to
+     * the NER to do the actual work of generating Token objects and populating
+     * the CorpusDocument with them.
      * 
      * @param locationOfFile
      *            Path to input. Must be a single file.
-     * @param stopwordList
-     *            table that contains the list of stopwords. if this is an
-     *            instance of NullStopwordList, it will return false through
-     *            stopwordList.isStopWord for every string token examined (i.e.
-     *            the token is not a stopword).
+     * @param corpus
+     * @param ner
+     * @param parAsDocSize
      * @throws FileNotFoundException
      * @throws IOException
      */
     public static void processNER(String locationOfFile, Corpus corpus,
-            NamedEntityRecognizer ner, int parAsDocSize)
-            throws FileNotFoundException, IOException {
+            NamedEntityRecognizer ner, int parAsDocSize) {
 
-        CorpusDocument doc = new CorpusDocument(corpus, locationOfFile);
-        BufferedReader textIn = new BufferedReader(new FileReader(
-                locationOfFile));
-        System.out.println("Extracting toponym indices from " + locationOfFile
-                + " ...");
+        try {
+            CorpusDocument doc = new CorpusDocument(corpus, locationOfFile);
+            BufferedReader textIn = new BufferedReader(new FileReader(
+                    locationOfFile));
+            System.out.println("Extracting toponym indices from "
+                    + locationOfFile + " ...");
 
-        String curLine = null;
-        StringBuffer buf = new StringBuffer();
-        int counter = 1;
-        int currentDoc = 0;
-        System.err.print("Processing document:" + locationOfFile + ",");
-        while (true) {
-            curLine = textIn.readLine();
-            if (curLine == null || curLine.equals("")) {
-                break;
+            String curLine = null;
+            StringBuffer buf = new StringBuffer();
+            int counter = 1;
+            int currentDoc = 0;
+            System.err.print("Processing document:" + locationOfFile + ",");
+            while (true) {
+                curLine = textIn.readLine();
+                if (curLine == null || curLine.equals("")) {
+                    break;
+                }
+                buf.append(curLine.replaceAll("[<>]", "")
+                        .replaceAll("&", "and"));
+                buf.append(" ");
+
+                if (counter < parAsDocSize) {
+                    counter++;
+                } else {
+                    ner.processText(doc, buf.toString());
+
+                    buf = new StringBuffer();
+                    currentDoc += 1;
+                    counter = 1;
+                    System.err.print(currentDoc + ",");
+                }
             }
-            buf.append(curLine.replaceAll("[<>]", "").replaceAll("&", "and"));
-            buf.append(" ");
 
-            if (counter < parAsDocSize) {
-                counter++;
-            } else {
+            /**
+             * Add last lines if they have not been processed and added
+             */
+            if (counter > 1) {
                 ner.processText(doc, buf.toString());
-
-                buf = new StringBuffer();
-                currentDoc += 1;
-                counter = 1;
                 System.err.print(currentDoc + ",");
             }
-        }
+            System.err.println();
 
-        /**
-         * Add last lines if they have not been processed and added
-         */
-        if (counter > 1) {
-            ner.processText(doc, buf.toString());
-            System.err.print(currentDoc + ",");
+            corpus.add(doc);
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
         }
-        System.err.println();
-
-        corpus.add(doc);
     }
 
     /**
-     * Function to processing TEI (text encoding initiative) encoded XML files.
+     * Function to process TEI (text encoding initiative) encoded XML files,
+     * which are used to encode the PCL travel corpus. This function reads in
+     * the files, ignores everything but the actual text, and runs the text
+     * through a named entity recognizer (NER) to get toponym and non-toponym
+     * tokens, the same way that the function processNER() does. By using the
+     * named entity definitions that come with the dtd for pcl travel, all
+     * encoding issues are handled within this function. The text is normalized
+     * according to Unicode standards and then any characters not within the
+     * ASCII range (0x00-0x7E) are stripped out.
      * 
-     * Basically, this function reads in TEI-encoded XML files, ignores
-     * everything but the actual text, and runs the text through the Stanford
-     * NER to get toponym and non-toponym tokens, the same way that the base
-     * TextProcessor class does. There's only one method (besides the
-     * constructor), processFile(), which processes a specific file as just
-     * described.
-     * 
-     * The PCL travel corpus is encoded in TEI format and this class is to be
-     * used with pcl travel. By using the named entity definitions that come
-     * with the dtd for pcl travel, all encoding issues are handled within this
-     * class. Any non-lower ascii characters are normalized by first normalizing
-     * according to unicode standards and then stripping non-lower ascii
-     * portions.
-     * 
+     * @param locationOfFile
+     *            Path of file to be processsed.
+     * @param corpus
+     *            Corpus to add newly created CorpusDocument to.
+     * @param ner
+     *            Named-entity recognizer to be used to process the text of the
+     *            file.
      * @author tsmoon
      */
     public static void processTEIXML(String locationOfFile, Corpus corpus,
-            NamedEntityRecognizer ner, int parAsDocSize)
-            throws FileNotFoundException, IOException {
+            NamedEntityRecognizer ner) {
 
         if (!locationOfFile.endsWith(".xml")) {
             return;
@@ -170,105 +179,111 @@ public abstract class TextProcessor {
             }
 
         } catch (JDOMException ex) {
-            Logger.getLogger(TextProcessorTEIXML.class.getName()).log(
-                    Level.SEVERE, null, ex);
+            throw new RuntimeException(ex);
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
         }
     }
 
     /**
      * 
-     * @param locationOfFile
-     * @throws FileNotFoundException
-     * @throws IOException
+     * @param locationOfFile Path of file to be processsed.
+     * @param corpus Corpus to add newly created CorpusDocument to.
      */
-    public static void processTR(String locationOfFile, Corpus corpus)
-            throws FileNotFoundException, IOException {
+    public static void processTR(String locationOfFile, Corpus corpus) {
 
-        int currentDoc = 0;
         if (locationOfFile.endsWith("d663.tr")) {
             System.err.println(locationOfFile
                     + " has incorrect format; skipping.");
             return;
         }
 
-        BufferedReader textIn = new BufferedReader(new FileReader(
-                locationOfFile));
-        CorpusDocument doc = new CorpusDocument(corpus, locationOfFile);
-        String curLine = null, cur = null;
-        while (true) {
-            curLine = textIn.readLine();
-            if (curLine == null) {
-                break;
-            }
+        try {
+            BufferedReader textIn = new BufferedReader(new FileReader(
+                    locationOfFile));
+            CorpusDocument doc = new CorpusDocument(corpus, locationOfFile);
+            String curLine = null, cur = null;
+            while (true) {
+                curLine = textIn.readLine();
+                if (curLine == null) {
+                    break;
+                }
 
-            if ((curLine.startsWith("\t") && (!curLine.startsWith("\tc") && !curLine
-                    .startsWith("\t>")))
-                    || (curLine.startsWith("c") && curLine.length() >= 2 && Character
-                            .isDigit(curLine.charAt(1)))) {
-                System.err.println(locationOfFile
-                        + " has incorrect format; skipping.");
-                return;
-            }
+                if ((curLine.startsWith("\t") && (!curLine.startsWith("\tc") && !curLine
+                        .startsWith("\t>")))
+                        || (curLine.startsWith("c") && curLine.length() >= 2 && Character
+                                .isDigit(curLine.charAt(1)))) {
+                    System.err.println(locationOfFile
+                            + " has incorrect format; skipping.");
+                    return;
+                }
 
+            }
+            textIn.close();
+
+            textIn = new BufferedReader(new FileReader(locationOfFile));
+
+            System.out.println("Extracting gold standard toponym indices from "
+                    + locationOfFile + " ...");
+
+            curLine = null;
+
+            int wordidx = 0;
+            boolean lookingForGoldLoc = false;
+            while (true) {
+                curLine = textIn.readLine();
+                if (curLine == null) {
+                    break;
+                }
+
+                if (lookingForGoldLoc && curLine.startsWith("\t>")) {
+                    Token tok = new Token(doc, wordidx, true);
+                    tok.goldLocation = parseTRLocation(cur, curLine, wordidx);
+                    doc.add(tok);
+                    lookingForGoldLoc = false;
+                    continue;
+                } else if (curLine.startsWith("\t")) {
+                    continue;
+                } else if (lookingForGoldLoc && !curLine.startsWith("\t")) {
+                    // there was no correct gold Location for this toponym
+                    doc.add(new Token(doc, wordidx, true));
+                    lookingForGoldLoc = false;
+                    // continue;
+                }
+
+                String[] tokens = curLine.split("\\t");
+
+                if (tokens.length < 2) {
+
+                    continue;
+                }
+
+                cur = tokens[0].toLowerCase();
+
+                wordidx = corpus.lexicon.addWord(cur);
+                if (!tokens[1].equals("LOC")) {
+                    doc.add(new Token(doc, wordidx, false));
+                } else {
+                    lookingForGoldLoc = true;
+                    // gold standard Location will be added later, when line
+                    // starting with tab followed by > occurs
+                }
+            }
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
         }
-        textIn.close();
-
-        textIn = new BufferedReader(new FileReader(locationOfFile));
-
-        System.out.println("Extracting gold standard toponym indices from "
-                + locationOfFile + " ...");
-
-        curLine = null;
-
-        int wordidx = 0;
-        boolean lookingForGoldLoc = false;
-        System.err.print("Processing document:" + currentDoc + ",");
-        while (true) {
-            curLine = textIn.readLine();
-            if (curLine == null) {
-                break;
-            }
-
-            if (lookingForGoldLoc && curLine.startsWith("\t>")) {
-                Token tok = new Token(doc, wordidx, true);
-                tok.goldLocation = parseLocation(cur, curLine, wordidx);
-                doc.add(tok);
-                lookingForGoldLoc = false;
-                continue;
-            } else if (curLine.startsWith("\t")) {
-                continue;
-            } else if (lookingForGoldLoc && !curLine.startsWith("\t")) {
-                // there was no correct gold Location for this toponym
-                doc.add(new Token(doc, wordidx, true));
-                lookingForGoldLoc = false;
-                // continue;
-            }
-
-            String[] tokens = curLine.split("\\t");
-
-            if (tokens.length < 2) {
-
-                continue;
-            }
-
-            cur = tokens[0].toLowerCase();
-
-            wordidx = corpus.lexicon.addWord(cur);
-            if (!tokens[1].equals("LOC")) {
-                doc.add(new Token(doc, wordidx, false));
-            } else {
-                lookingForGoldLoc = true;
-                // gold standard Location will be added later, when line
-                // starting with tab followed by > occurs
-            }
-        }
-
-        currentDoc += 1;
 
         System.err.println();
     }
 
-    public static Location parseLocation(String token, String line, int wordidx) {
+    /**
+     * 
+     * @param token
+     * @param line
+     * @param wordidx
+     * @return
+     */
+    public static Location parseTRLocation(String token, String line, int wordidx) {
         String[] tokens = line.split("\\t");
 
         if (tokens.length < 6) {
@@ -291,12 +306,10 @@ public abstract class TextProcessor {
 
     /**
      * 
-     * @param locationOfFile
-     * @throws FileNotFoundException
-     * @throws IOException
+     * @param locationOfFile Path of file to be processsed.
+     * @param corpus Corpus to add newly created CorpusDocument to.
      */
-    public static void processXML(String locationOfFile, Corpus corpus)
-            throws FileNotFoundException, IOException {
+    public static void processXML(String locationOfFile, Corpus corpus) {
         CorpusDocument doc = new CorpusDocument(corpus, locationOfFile);
         doc.loadFromXML(locationOfFile);
         corpus.add(doc);

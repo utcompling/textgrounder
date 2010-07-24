@@ -159,15 +159,15 @@ public abstract class Model {
     }
 
     /**
-     * Initialize member variables based on command-line options.  Creates a
+     * Initialize member variables based on command-line options. Creates a
      * Lexicon and a gazetteer generator but doesn't generate the gazetteer.
      * (That happens e.g. in the constructor for SelfTrainedModelBase.)
-     *
+     * 
      * @param options
      */
-    protected void initialize(CommandLineOptions options) throws
-          FileNotFoundException, IOException, ClassNotFoundException,
-          SQLException {
+    protected void initialize(CommandLineOptions options)
+            throws FileNotFoundException, IOException, ClassNotFoundException,
+            SQLException {
         runWholeGazetteer = options.getRunWholeGazetteer();
         evalInputPath = options.getEvalDir();
 
@@ -180,7 +180,8 @@ public abstract class Model {
         if (options.getTrainInputPath() != null) {
             trainInputPath = options.getTrainInputPath();
             if (trainInputPath == null) {
-                System.out.println("Error: You must specify an input filename with the -i flag.");
+                System.out
+                        .println("Error: You must specify an input filename with the -i flag.");
                 System.exit(0);
             }
             trainInputFile = new File(trainInputPath);
@@ -193,11 +194,11 @@ public abstract class Model {
 
         /* Same thing for the eval directory, if it exists */
         if (evalInputPath != null) {
-            //System.out.println(evalInputPath);
-            //System.exit(0);
+            // System.out.println(evalInputPath);
+            // System.exit(0);
             evalInputFile = new File(evalInputPath);
             assert (evalInputFile.isDirectory());
-            //System.exit(0);
+            // System.exit(0);
         }
 
         modelIterations = options.getModelIterations();
@@ -208,7 +209,8 @@ public abstract class Model {
         windowSize = options.getWindowSize();
 
         lexicon = new Lexicon();
-        gazetteerGenerator = new GazetteerGenerator(options);
+        gazetteerGenerator = new GazetteerGenerator(options.getGazetteType(),
+                options.getGazetteerPath(), options.getGazetteerRefresh());
     }
 
     /**
@@ -319,7 +321,8 @@ public abstract class Model {
      */
     public void processTrainInputPath() throws Exception {
         trainTokenArrayBuffer = new TokenArrayBuffer(lexicon);
-        processTrainInputPath(trainInputFile, new TextProcessor(lexicon, paragraphsAsDocs), trainTokenArrayBuffer);
+        System.out.println("Warning: code is broken! Can't process " + trainInputFile.getCanonicalPath());
+        // processTrainInputPath(trainInputFile, new TextProcessor(lexicon, paragraphsAsDocs), trainTokenArrayBuffer);
         trainTokenArrayBuffer.convertToPrimitiveArrays();
     }
 
@@ -339,7 +342,8 @@ public abstract class Model {
                 processTrainInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, tokenArrayBuffer);
             }
         } else {
-            textProcessor.processFile(myPath.getCanonicalPath(), tokenArrayBuffer);
+            System.out.println("Warning: code is broken! Can't process " + myPath.getCanonicalPath());
+            // textProcessor.processFile(myPath.getCanonicalPath(), tokenArrayBuffer);
         }
     }
 
@@ -350,7 +354,8 @@ public abstract class Model {
      */
     public void processEvalInputPath() throws Exception {
         evalTokenArrayBuffer = new EvalTokenArrayBuffer(lexicon);
-        processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon), evalTokenArrayBuffer);
+        System.out.println("Warning: code is broken! Can't process " + evalInputFile.getCanonicalPath());
+        // processEvalInputPath(evalInputFile, new TextProcessorTR(lexicon), evalTokenArrayBuffer);
         evalTokenArrayBuffer.convertToPrimitiveArrays();
     }
 
@@ -362,7 +367,7 @@ public abstract class Model {
      * @param stopwordList
      * @throws IOException
      */
-    public void processEvalInputPath(File myPath, TextProcessorTR textProcessor,
+    public void processEvalInputPath(File myPath, TextProcessor textProcessor,
           EvalTokenArrayBuffer evalTokenArrayBuffer)
           throws
           IOException {
@@ -371,7 +376,8 @@ public abstract class Model {
                 processEvalInputPath(new File(myPath.getCanonicalPath() + File.separator + pathname), textProcessor, evalTokenArrayBuffer);
             }
         } else {
-            textProcessor.processFile(myPath.getCanonicalPath(), evalTokenArrayBuffer);
+            System.out.println("Warning: code is broken! Can't process " + myPath.getCanonicalPath());
+            // textProcessor.processFile(myPath.getCanonicalPath(), evalTokenArrayBuffer);
         }
     }
 
