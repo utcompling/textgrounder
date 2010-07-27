@@ -31,7 +31,7 @@ public class IOUtil {
      * @param  contents  The string containing the contents of the file
      * @param  outfile   The File object identifying the location of the file
      */
-    public static void writeStringToFile (String contents, File outfile) {
+    public static void writeStringToFile(String contents, File outfile) {
 	try {
 	    BufferedWriter bw = new BufferedWriter(new FileWriter(outfile));
 	    bw.write(contents);
@@ -44,14 +44,15 @@ public class IOUtil {
     }
 
     /**
-     * Reads a file as a single String all in one. From code snippet
-     * found on web (http://snippets.dzone.com/posts/show/1335).
+     * Reads a file as a single String all in one. Based on code snippet
+     * found on web (http://snippets.dzone.com/posts/show/1335).  Reads raw bytes;
+     * doesn't do any conversion (e.g. using UTF-8 or whatever).
      *
-     * @param  filePath  The File object identifying the location of the file
+     * @param  infile  The File object identifying the location of the file
      */
-    public static String readFileAsString(String filePath) throws java.io.IOException {
-	byte[] buffer = new byte[(int) new File(filePath).length()];
-	FileInputStream f = new FileInputStream(filePath);
+    public static String readFileAsString(File infile) throws java.io.IOException {
+	byte[] buffer = new byte[(int) infile.length()];
+	FileInputStream f = new FileInputStream(infile);
 	f.read(buffer);
 	return new String(buffer);
     }

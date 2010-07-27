@@ -35,6 +35,10 @@
       <pathelement location="${lib.dir}/sqlitejdbc-v056.jar"/>
       <pathelement location="${lib.dir}/commons-cli-1.2.jar"/>
       <pathelement location="${lib.dir}/jdom.jar"/>
+      <!-- OpenNLP libraries -->
+      <pathelement location="${lib.dir}/jwnl-1.3.3.jar"/>
+      <pathelement location="${lib.dir}/maxent-2.5.2.jar"/>
+      <pathelement location="${lib.dir}/opennlp-tools-1.4.3.jar"/>
     </path>
 
     <filter token="year" value="${year}"/>
@@ -51,12 +55,12 @@
   <target name="usage">
     <echo message=""/>
     <echo message=""/>
-    <echo message="TextGrounder build file"/>
+    <echo message="${Name} build file"/>
     <echo message="-------------------------------------------------------------"/>
     <echo message=""/>
     <echo message=" Available targets are:"/>
     <echo message=""/>
-    <echo message="   package  --> generates the textgrounder.jar file"/>
+    <echo message="   package  --> generates the ${name}.jar file"/>
     <echo message="   compile  --> compiles the source code (default)"/>
     <echo message="   javadoc  --> generates the API documentation"/>
     <echo message="   clean    --> cleans up the compilation directory"/>
@@ -98,7 +102,7 @@
   <!-- =================================================================== -->
   <target name="package" 
           depends="compile"
-          description="generates the textgrounder.jar file (default)">
+          description="generates the ${name}.jar file (default)">
       <jar jarfile="${lib.dir}/${name}.jar">
       <fileset dir="${build.dest}" includes="**"/>
     </jar>

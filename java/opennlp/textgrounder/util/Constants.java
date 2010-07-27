@@ -38,6 +38,9 @@ public class Constants {
     // the location of the Stanford NER system
     public final static String STANFORD_NER_HOME = System.getenv("STANFORD_NER_HOME");
 
+    // the location of the OpenNLP models
+    public final static String OPENNLP_MODELS = System.getenv("OPENNLP_MODELS");
+    
     // the location of the World Gazetteer database file
 //    public final static String WGDB_PATH = System.getenv("WGDB_PATH");
 
