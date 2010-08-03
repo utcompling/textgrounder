@@ -1,5 +1,5 @@
 <!-- $Id: build.xml,v 1.50 2007/04/13 21:59:25 coffeeblack Exp $ -->
-<!-- Copyright (C) 2010 Jason Baldridge, Taesun Moon, Mike Speriosu -->
+<!-- Copyright (C) 2010 Jason Baldridge, Taesun Moon, Mike Speriosu, Ben Wing -->
 <project name="TextGrounder" default="compile" basedir=".">
 	
   <!-- =================================================================== -->
@@ -11,6 +11,7 @@
     <property name="name" value="textgrounder"/>
     <property name="year" value="2010"/>
     <property name="version" value="0.0.2"/>
+    <property name="author" value="Jason Baldridge, Taesun Moon, Mike Speriosu and Ben Wing"/>
 
     <echo message="----------- ${Name} ${version} [${year}] ------------"/>
 
@@ -139,7 +140,7 @@
              noindex="false"
              windowtitle="${name}"
              doctitle="The ${Name} API v${version}"
-             bottom="Copyright &#169; ${year} Jason Baldridge, Taesun Moon, and Mike Speriosu. All Rights Reserved."
+             bottom="Copyright &#169; ${year} ${author}. All Rights Reserved."
     />
   </target>
 
