@@ -28,6 +28,7 @@ import opennlp.rlda.wrapper.io.OutputWriter;
 import opennlp.rlda.wrapper.io.TextOutputWriter;
 import opennlp.rlda.textstructs.*;
 import opennlp.rlda.topostructs.*;
+import opennlp.rlda.wrapper.io.BinaryOutputWriter;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;
@@ -46,7 +47,7 @@ public class Converter {
     protected TrainingMaterialCallback trainingMaterialCallback;
     protected int activeRegions;
     protected int degreesPerRegion;
-    protected ConverterExperimentParameters experimentParameters;
+    protected ConverterExperimentParameters converterExperimentParameters;
     protected Region[][] regionArray;
     protected ToponymToRegionIDsMap toponymToRegionIDsMap;
 
@@ -58,17 +59,18 @@ public class Converter {
         trainingMaterialCallback = new TrainingMaterialCallback(lexicon);
     }
 
-    public Converter(ConverterExperimentParameters _experimentParameters) {
-        experimentParameters = _experimentParameters;
+    public Converter(
+          ConverterExperimentParameters _converterExperimentParameters) {
+        converterExperimentParameters = _converterExperimentParameters;
 
-        pathToInput = experimentParameters.getInputPath();
+        pathToInput = converterExperimentParameters.getInputPath();
 
         lexicon = new Lexicon();
         tokenArrayBuffer = new TokenArrayBuffer(lexicon);
         stopwordList = new StopwordList();
         trainingMaterialCallback = new TrainingMaterialCallback(lexicon);
 
-        degreesPerRegion = experimentParameters.getDegreesPerRegion();
+        degreesPerRegion = converterExperimentParameters.getDegreesPerRegion();
 
         toponymToRegionIDsMap = new ToponymToRegionIDsMap();
         activeRegions = 0;
@@ -159,20 +161,25 @@ public class Converter {
                         istoponym = 1;
                         wordid = lexicon.addOrGetWord(word);
                         ArrayList<Element> candidates = new ArrayList<Element>(token.getChildren());
-                        for (Element candidate : candidates) {
-                            double lon = Double.parseDouble(candidate.getAttributeValue("long"));
-                            double lat = Double.parseDouble(candidate.getAttributeValue("lat"));
-                            Location loc = new Location(wordid, new Coordinate(lon, lat));
+                        if (candidates.isEmpty()) {
+                            for (Element candidate : candidates) {
+                                double lon = Double.parseDouble(candidate.getAttributeValue("long"));
+                                double lat = Double.parseDouble(candidate.getAttributeValue("lat"));
+                                Location loc = new Location(wordid, new Coordinate(lon, lat));
 
-                            Region region = addOrGetLocationsToRegionArray(loc);
+                                Region region = addOrGetLocationsToRegionArray(loc);
 
-                            int regid = region.id;
+                                int regid = region.id;
 
-                            if (!toponymToRegionIDsMap.containsKey(wordid)) {
-                                toponymToRegionIDsMap.put(wordid, new HashSet<Integer>());
+                                if (!toponymToRegionIDsMap.containsKey(wordid)) {
+                                    toponymToRegionIDsMap.put(wordid, new HashSet<Integer>());
+                                }
+
+                                toponymToRegionIDsMap.get(wordid).add(regid);
                             }
-
-                            toponymToRegionIDsMap.get(wordid).add(regid);
+                        } else {
+                            istoponym = 0;
+                            isstopword = stopwordList.isStopWord(word) ? 1 : 0;
                         }
                     } else {
                         continue;
@@ -188,7 +195,15 @@ public class Converter {
      * 
      */
     public void writeToFiles() {
-        OutputWriter outputWriter = new TextOutputWriter(experimentParameters);
+        OutputWriter outputWriter = null;
+        switch (converterExperimentParameters.getInputFormat()) {
+            case TEXT:
+                outputWriter = new TextOutputWriter(converterExperimentParameters);
+                break;
+            case BINARY:
+                outputWriter = new BinaryOutputWriter(converterExperimentParameters);
+        }
+
         outputWriter.writeTokenArrayWriter(tokenArrayBuffer);
         outputWriter.writeToponymRegionWriter(toponymToRegionIDsMap);
     }

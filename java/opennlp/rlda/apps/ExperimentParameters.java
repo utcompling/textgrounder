@@ -79,11 +79,23 @@ public class ExperimentParameters {
     /**
      *
      */
-    protected String corpusFileName = null;
+    protected int degreesPerRegion = 3;
+    /**
+     *
+     */
+    protected String inputPath = null;
+    /**
+     * 
+     */
+    protected String outputPath = null;
+    /**
+     *
+     */
+    protected String corpusFileName = "input.xml";
     /**
      * Path to array of tokens, toponym status. Should be a file.
      */
-    protected String tokenArrayPath = null;
+    protected String tokenArrayFileName = "token-array.dat";
     /**
      * Path to array of tokens, toponym status. Should be a file.
      */
@@ -91,11 +103,11 @@ public class ExperimentParameters {
     /**
      * 
      */
-    protected String toponymRegionPath = null;
+    protected String toponymRegionFileName = "toponym-region.dat";
     /**
      * Path of model that has been saved from previous training runs
      */
-    protected String trainedModelPath = null;
+    protected String trainedModelPath = "trained-model.model";
     /**
      *
      */
@@ -160,7 +172,7 @@ public class ExperimentParameters {
     }
 
     public String getTokenArrayPath() {
-        return tokenArrayPath;
+        return tokenArrayFileName;
     }
 
     public String getTrainedModelPath() {
@@ -168,7 +180,7 @@ public class ExperimentParameters {
     }
 
     public String getToponymRegionPath() {
-        return toponymRegionPath;
+        return toponymRegionFileName;
     }
 
     public int getTrainIterations() {

@@ -28,32 +28,7 @@ import java.util.logging.Logger;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class ConverterExperimentParameters {
-
-    /**
-     * 
-     */
-    protected String inputPath = null;
-    /**
-     * 
-     */
-    protected int degreesPerRegion = 3;
-    /**
-     * Path to array of tokens, toponym status. Should be a file.
-     */
-    protected String tokenArrayPath = null;
-    /**
-     *
-     */
-    protected String toponymRegionPath = null;
-    /**
-     *
-     */
-    protected String corpusPath = null;
-    /**
-     *
-     */
-    protected String corpusFileName = null;
+public class ConverterExperimentParameters extends ExperimentParameters {
 
     public int getDegreesPerRegion() {
         return degreesPerRegion;
@@ -70,14 +45,6 @@ public class ConverterExperimentParameters {
         return null;
     }
 
-    public String getTokenArrayPath() {
-        return tokenArrayPath;
-    }
-
-    public String getToponymRegionPath() {
-        return toponymRegionPath;
-    }
-
     /**
      * Joins to path related strings. The first argument should always be
      * a directory and the second argument should always be a filename.
@@ -87,7 +54,7 @@ public class ConverterExperimentParameters {
      * @param _name name of file
      * @return canonical path of joined filename
      */
-    protected String joinPath(String _root, String _name) throws
+    protected String joinPath(String _root, String _name, String... _names) throws
           FileNotFoundException, IOException {
         StringBuilder sb = new StringBuilder();
         String sep = File.separator;
