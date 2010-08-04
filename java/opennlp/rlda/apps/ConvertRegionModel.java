@@ -16,23 +16,21 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.apps;
 
-import opennlp.rlda.models.RegionModel;
+import opennlp.wrapper.rlda.apps.ExperimentParameterManipulator;
+import opennlp.rlda.converters.Converter;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class TrainRegionModel {
+public class ConvertRegionModel {
 
     public static void main(String[] args) throws Exception {
 
-        ExperimentParameters experimentParameters = new ExperimentParameters();
-        opennlp.wrapper.rlda.apps.ExperimentParameterManipulator.loadParameters(experimentParameters, args[0], "RLDA");
-
-        RegionModel rm = new RegionModel(experimentParameters);
-
-        rm.initialize();
-        rm.train();
-        rm.decode();
+        ConverterExperimentParameters experimentParameters = new ConverterExperimentParameters();
+        ExperimentParameterManipulator.loadParameters(experimentParameters, args[0], "RLDA");
+        Converter converter = new Converter(experimentParameters);
+        converter.convert();
+        converter.writeToFiles();
     }
 }

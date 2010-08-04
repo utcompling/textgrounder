@@ -1,4 +1,8 @@
 ///////////////////////////////////////////////////////////////////////////////
+// To change this template, choose Tools | Templates
+// and open the template in the editor.
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 //  Copyright (C) 2010 Taesun Moon, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,27 +17,31 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.wrapper.rlda.converters.callbacks;
+
+package opennlp.rlda.converters.callbacks;
 
 import opennlp.wrapper.rlda.textstructs.Lexicon;
-import opennlp.wrapper.rlda.topostructs.Location;
-import opennlp.wrapper.rlda.topostructs.Region;
 
 /**
- * A callback class to 
- *
+ * An empty placeholder class for projects that do not require validation
+ * of training material
+ * 
  * @author tsmoon
  */
-public class NullRegionMapperCallback extends RegionMapperCallback {
+public class NullTrainingMaterialCallback extends TrainingMaterialCallback {
 
-    public NullRegionMapperCallback() {
+    public NullTrainingMaterialCallback(Lexicon lexicon) {
+        super(lexicon);
     }
 
+    /**
+     * returns true all the time.
+     * 
+     * @param word
+     * @return
+     */
     @Override
-    public void addAll(String placename, Lexicon docSet) {
-    }
-
-    @Override
-    public void addToPlace(Location loc, Region region) {
+    public boolean isTrainable(String word) {
+        return true;
     }
 }

@@ -14,21 +14,12 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.wrapper.rlda.apps;
-
-import opennlp.wrapper.rlda.converters.Converter;
+package opennlp.rlda.wrapper.io;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class ConvertRegionModel {
+public abstract class InputReader {
 
-    public static void main(String[] args) throws Exception {
-
-        ExperimentParameters experimentParameters = ExperimentParameterManipulator.loadParameters(args[0]);
-        Converter converter = new Converter(experimentParameters);
-        converter.convert();
-        converter.writeToFiles();
-    }
 }

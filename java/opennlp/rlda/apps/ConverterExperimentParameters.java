@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.wrapper.rlda.apps;
+package opennlp.rlda.apps;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -28,8 +28,14 @@ import java.util.logging.Logger;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class ExperimentParameters {
+public class ConverterExperimentParameters {
 
+    public static enum INPUT_FORMAT {
+
+        BINARY,
+        TEXT,
+        XML
+    }
     /**
      * 
      */
@@ -63,9 +69,9 @@ public class ExperimentParameters {
         try {
             return joinPath(corpusPath, corpusFileName);
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(ConverterExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
-            Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(ConverterExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
         }
         return null;
     }

@@ -101,6 +101,9 @@ public class ExperimentParameters {
      */
     protected INPUT_FORMAT inputFormat = INPUT_FORMAT.BINARY;
 
+    /**
+     * Default constructor
+     */
     public ExperimentParameters() {
     }
 

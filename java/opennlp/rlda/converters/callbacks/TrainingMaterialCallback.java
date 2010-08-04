@@ -18,7 +18,7 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.wrapper.rlda.converters.callbacks;
+package opennlp.rlda.converters.callbacks;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

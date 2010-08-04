@@ -13,7 +13,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.wrapper.rlda.topostructs;
+package opennlp.rlda.topostructs;
 
 import java.io.Serializable;
 

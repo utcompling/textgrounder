@@ -27,6 +27,6 @@ public class WriteParameters {
     public static void main(String[] args) throws Exception {
 
         ExperimentParameters experimentParameters = new ExperimentParameters();
-        ExperimentParameterManipulator.dumpFieldsToXML(experimentParameters, args[0], "LDA");
+        ExperimentParameterManipulator.dumpFieldsToXML(experimentParameters, args[0], "RLDA");
     }
 }

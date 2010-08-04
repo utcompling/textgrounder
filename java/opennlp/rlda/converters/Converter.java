@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.wrapper.rlda.converters;
+package opennlp.rlda.converters;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import opennlp.wrapper.rlda.apps.ExperimentParameters;
+import opennlp.rlda.apps.ConverterExperimentParameters;
 import opennlp.wrapper.rlda.converters.callbacks.*;
 import opennlp.wrapper.rlda.io.OutputWriter;
 import opennlp.wrapper.rlda.io.TextOutputWriter;
@@ -47,7 +47,7 @@ public class Converter {
     protected TrainingMaterialCallback trainingMaterialCallback;
     protected int activeRegions;
     protected int degreesPerRegion;
-    protected ExperimentParameters experimentParameters;
+    protected ConverterExperimentParameters experimentParameters;
     protected Region[][] regionArray;
     protected ToponymToRegionIDsMap toponymToRegionIDsMap;
 
@@ -59,7 +59,7 @@ public class Converter {
         trainingMaterialCallback = new TrainingMaterialCallback(lexicon);
     }
 
-    public Converter(ExperimentParameters _experimentParameters) {
+    public Converter(ConverterExperimentParameters _experimentParameters) {
         experimentParameters = _experimentParameters;
 
         pathToInput = experimentParameters.getInputPath();

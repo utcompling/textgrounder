@@ -15,12 +15,12 @@
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.wrapper.rlda.io;
+package opennlp.rlda.wrapper.io;
 
 import java.io.File;
-import opennlp.wrapper.rlda.apps.ExperimentParameters;
-import opennlp.wrapper.rlda.textstructs.TokenArrayBuffer;
-import opennlp.wrapper.rlda.topostructs.ToponymToRegionIDsMap;
+import opennlp.rlda.apps.ConverterExperimentParameters;
+import opennlp.rlda.textstructs.TokenArrayBuffer;
+import opennlp.rlda.topostructs.ToponymToRegionIDsMap;
 
 /**
  *
@@ -39,13 +39,13 @@ public abstract class OutputWriter {
     /**
      *
      */
-    protected ExperimentParameters experimentParameters;
+    protected ConverterExperimentParameters experimentParameters;
 
     /**
      *
      * @param _experimentParameters
      */
-    public OutputWriter(ExperimentParameters _experimentParameters) {
+    public OutputWriter(ConverterExperimentParameters _experimentParameters) {
         experimentParameters = _experimentParameters;
         tokenArrayFile = new File(experimentParameters.getTokenArrayPath());
         toponymRegionFile = new File(experimentParameters.getToponymRegionPath());

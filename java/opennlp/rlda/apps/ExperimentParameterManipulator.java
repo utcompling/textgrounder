@@ -36,12 +36,8 @@ import org.jdom.output.XMLOutputter;
  */
 public class ExperimentParameterManipulator {
 
-    public static ExperimentParameters loadParameters(String _path) {
-        return loadParameters(_path, "RLDA");
-    }
-
-    public static ExperimentParameters loadParameters(String _path, String _stageName) {
-        ExperimentParameters experimentParameters = new ExperimentParameters();
+    public static void loadParameters(Object _experimentParameters, String _path,
+          String _stageName) {
 
         File file = new File(_path);
 
@@ -58,19 +54,18 @@ public class ExperimentParameterManipulator {
                     String fieldTypeName = param.getAttributeValue("type");
                     if (fieldTypeName.equals("int")) {
                         int value = Integer.parseInt(fieldValue);
-                        experimentParameters.getClass().getDeclaredField(fieldName).setInt(experimentParameters, value);
+                        _experimentParameters.getClass().getDeclaredField(fieldName).setInt(_experimentParameters, value);
                     } else if (fieldTypeName.equals("double")) {
                         double value = Double.parseDouble(fieldValue);
-                        experimentParameters.getClass().getDeclaredField(fieldName).setDouble(experimentParameters, value);
+                        _experimentParameters.getClass().getDeclaredField(fieldName).setDouble(_experimentParameters, value);
                     } else if (fieldTypeName.equals("string")) {
-                        experimentParameters.getClass().getDeclaredField(fieldName).set(experimentParameters, fieldValue);
+                        _experimentParameters.getClass().getDeclaredField(fieldName).set(_experimentParameters, fieldValue);
                     } else {
                         continue;
                     }
 
                 } catch (NoSuchFieldException ex) {
-                    Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-                    System.exit(1);
+                    System.err.println(ex.getMessage() + " is not a relevant field");
                 } catch (SecurityException ex) {
                     Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
                     System.exit(1);
@@ -89,15 +84,10 @@ public class ExperimentParameterManipulator {
         } catch (IOException ex) {
             Logger.getLogger(ExperimentParameterManipulator.class.getName()).log(Level.SEVERE, null, ex);
         }
-
-        return experimentParameters;
     }
 
-    public static void dumpFieldsToXML(ExperimentParameters _experimentParameters, String _outputPath) {
-        dumpFieldsToXML(_experimentParameters, _outputPath, "RLDA");
-    }
-
-    public static void dumpFieldsToXML(ExperimentParameters _experimentParameters, String _outputPath,
+    public static void dumpFieldsToXML(Object _experimentParameters,
+          String _outputPath,
           String _stageName) {
         Document doc = new Document();
         Element root = new Element("experiments");
@@ -120,6 +110,10 @@ public class ExperimentParameterManipulator {
                     String s = (String) field.get(_experimentParameters);
                     fieldValue = s;
                     fieldTypeName = "string";
+                } else if (fieldTypeName.endsWith("INPUT_FORMAT")) {
+                    String s = field.get(_experimentParameters).toString();
+                    fieldValue = s;
+                    fieldTypeName = "string";
                 } else {
                     continue;
                 }
@@ -140,7 +134,7 @@ public class ExperimentParameterManipulator {
         serialize(doc, new File(_outputPath));
     }
 
-    static void serialize(Document doc,
+    public static void serialize(Document doc,
           File _file) {
         try {
             XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
