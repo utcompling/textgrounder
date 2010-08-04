@@ -273,35 +273,6 @@ public class XMLToInternalConverter {
 
         outputWriter.writeTokenArrayWriter(tokenArrayBuffer);
         outputWriter.writeToponymRegionWriter(toponymToRegionIDsMap);
-    }
-
-    public void loadLexicon(String _filename) {
-        ObjectInputStream lexiconIn = null;
-        try {
-            lexiconIn = new ObjectInputStream(new GZIPInputStream(new FileInputStream(_filename)));
-            lexicon = (Lexicon) lexiconIn.readObject();
-        } catch (IOException ex) {
-            Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        } catch (ClassNotFoundException ex) {
-            Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
-    }
-
-    public void saveLexicon(String _filename) {
-
-        if (!_filename.endsWith(".gz")) {
-            _filename += ".gz";
-        }
-        ObjectOutputStream modelOut = null;
-        try {
-            modelOut = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(_filename)));
-            modelOut.writeObject(this);
-            modelOut.close();
-        } catch (IOException ex) {
-            Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
+        outputWriter.writeLexicon(lexicon);
     }
 }

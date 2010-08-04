@@ -14,32 +14,38 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.apps;
+package opennlp.rlda.wrapper.io;
+
+import java.io.File;
+import opennlp.rlda.apps.ConverterExperimentParameters;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class ConverterExperimentParameters extends ExperimentParameters {
+public abstract class IOBase {
 
     /**
-     * Path to file that has been converted to internal format
      *
-     * @return
      */
-    public String getInputPath() {
-        return joinPath(projectRoot, corpusFilename);
-    }
+    protected File tokenArrayFile;
+    /**
+     *
+     */
+    protected File toponymRegionFile;
+    /**
+     *
+     */
+    protected File lexiconFile;
+    /**
+     *
+     */
+    protected ConverterExperimentParameters experimentParameters;
 
-    public String getLexiconPath() {
-        return joinPath(projectRoot,lexiconFilename);
-    }
-
-    public int getCountCutoff() {
-        return countCutoff;
-    }
-
-    public int getDegreesPerRegion() {
-        return degreesPerRegion;
+    public IOBase(ConverterExperimentParameters _experimentParameters) {
+        experimentParameters = _experimentParameters;
+        tokenArrayFile = new File(experimentParameters.getTokenArrayInputPath());
+        toponymRegionFile = new File(experimentParameters.getToponymRegionPath());
+        lexiconFile = new File(experimentParameters.getLexiconPath());
     }
 }

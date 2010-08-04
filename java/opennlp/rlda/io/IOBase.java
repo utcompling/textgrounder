@@ -16,70 +16,31 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.io;
 
-import java.io.EOFException;
+import java.io.File;
 import opennlp.rlda.apps.ExperimentParameters;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class InputReader extends IOBase {
+public abstract class IOBase {
 
     /**
-     * 
-     * @param _experimentParameters
+     *
      */
-    public InputReader(ExperimentParameters _experimentParameters) {
-        super(_experimentParameters);
+    protected File tokenArrayFile;
+    /**
+     *
+     */
+    protected File toponymRegionFile;
+    /**
+     *
+     */
+    protected ExperimentParameters experimentParameters;
+
+    public IOBase(ExperimentParameters _experimentParameters) {
+        experimentParameters = _experimentParameters;
+        tokenArrayFile = new File(experimentParameters.getTokenArrayInputPath());
+        toponymRegionFile = new File(experimentParameters.getToponymRegionPath());
     }
-
-    /**
-     *
-     * @return
-     * @throws EOFException
-     */
-    public abstract int[] nextTokenArrayRecord() throws EOFException;
-
-    /**
-     * 
-     * @return
-     * @throws EOFException
-     */
-    public abstract int[] nextToponymRegionFilter() throws EOFException;
-
-    /**
-     *
-     */
-    public abstract void openTokenArrayReader();
-
-    /**
-     * 
-     */
-    public abstract void openToponymRegionReader();
-
-    /**
-     *
-     */
-    public abstract void closeTokenArrayReader();
-
-    /**
-     *
-     */
-    public abstract void closeToponymRegionReader();
-
-    /**
-     *
-     */
-    public abstract void resetTokenArrayReader();
-
-    /**
-     *
-     */
-    public abstract void resetToponymRegionReader();
-
-    /**
-     * 
-     * @return
-     */
-    public abstract int getMaxRegionID();
 }

@@ -16,10 +16,36 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.wrapper.io;
 
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.zip.GZIPInputStream;
+import opennlp.rlda.apps.ConverterExperimentParameters;
+import opennlp.rlda.textstructs.Lexicon;
+
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class InputReader {
+public abstract class InputReader extends IOBase {
 
+    public InputReader(ConverterExperimentParameters _experimentParameters) {
+        super(_experimentParameters);
+    }
+
+    public void readLexicon(Lexicon _lexicon) {
+        ObjectInputStream lexiconIn = null;
+        try {
+            lexiconIn = new ObjectInputStream(new GZIPInputStream(new FileInputStream(lexiconFile.getCanonicalPath())));
+            _lexicon = (Lexicon) lexiconIn.readObject();
+        } catch (IOException ex) {
+            Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+    }
 }

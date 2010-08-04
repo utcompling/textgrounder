@@ -14,11 +14,17 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-
 package opennlp.rlda.wrapper.io;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.zip.GZIPOutputStream;
 import opennlp.rlda.apps.ConverterExperimentParameters;
+import opennlp.rlda.textstructs.Lexicon;
 import opennlp.rlda.textstructs.TokenArrayBuffer;
 import opennlp.rlda.topostructs.ToponymToRegionIDsMap;
 
@@ -26,29 +32,14 @@ import opennlp.rlda.topostructs.ToponymToRegionIDsMap;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class OutputWriter {
-
-        /**
-     *
-     */
-    protected File tokenArrayFile;
-    /**
-     *
-     */
-    protected File toponymRegionFile;
-    /**
-     *
-     */
-    protected ConverterExperimentParameters experimentParameters;
+public abstract class OutputWriter extends IOBase {
 
     /**
      *
      * @param _experimentParameters
      */
     public OutputWriter(ConverterExperimentParameters _experimentParameters) {
-        experimentParameters = _experimentParameters;
-        tokenArrayFile = new File(experimentParameters.getTokenArrayPath());
-        toponymRegionFile = new File(experimentParameters.getToponymRegionPath());
+        super(_experimentParameters);
     }
 
     /**
@@ -64,10 +55,25 @@ public abstract class OutputWriter {
     /**
      *
      */
-    public abstract void writeTokenArrayWriter(TokenArrayBuffer _tokenArrayBuffer);
+    public abstract void writeTokenArrayWriter(
+          TokenArrayBuffer _tokenArrayBuffer);
 
     /**
      *
      */
-    public abstract void writeToponymRegionWriter(ToponymToRegionIDsMap _toponymToRegionIDsMap);
+    public abstract void writeToponymRegionWriter(
+          ToponymToRegionIDsMap _toponymToRegionIDsMap);
+
+    public void writeLexicon(Lexicon _lexicon) {
+
+        ObjectOutputStream modelOut = null;
+        try {
+            modelOut = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(lexiconFile.getCanonicalPath())));
+            modelOut.writeObject(this);
+            modelOut.close();
+        } catch (IOException ex) {
+            Logger.getLogger(OutputWriter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+    }
 }
