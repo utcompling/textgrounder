@@ -27,7 +27,7 @@ public class TrainRegionModel {
     public static void main(String[] args) throws Exception {
 
         ExperimentParameters experimentParameters = new ExperimentParameters();
-        opennlp.wrapper.rlda.apps.ExperimentParameterManipulator.loadParameters(experimentParameters, args[0], "RLDA");
+        ExperimentParameterManipulator.loadParameters(experimentParameters, args[0], "RLDA");
 
         RegionModel rm = new RegionModel(experimentParameters);
 

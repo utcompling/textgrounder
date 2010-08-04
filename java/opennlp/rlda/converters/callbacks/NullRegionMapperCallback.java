@@ -15,9 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.converters.callbacks;
 
-import opennlp.wrapper.rlda.textstructs.Lexicon;
-import opennlp.wrapper.rlda.topostructs.Location;
-import opennlp.wrapper.rlda.topostructs.Region;
+import opennlp.rlda.textstructs.Lexicon;
+import opennlp.rlda.topostructs.Location;
+import opennlp.rlda.topostructs.Region;
 
 /**
  * A callback class to 

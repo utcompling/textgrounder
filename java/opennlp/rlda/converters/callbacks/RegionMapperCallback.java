@@ -20,8 +20,8 @@ import gnu.trove.TIntObjectHashMap;
 import gnu.trove.TIntObjectIterator;
 import gnu.trove.TObjectIntHashMap;
 import java.util.HashSet;
-import opennlp.wrapper.rlda.textstructs.*;
-import opennlp.wrapper.rlda.topostructs.*;
+import opennlp.rlda.textstructs.*;
+import opennlp.rlda.topostructs.*;
 
 /**
  * A callback class to 

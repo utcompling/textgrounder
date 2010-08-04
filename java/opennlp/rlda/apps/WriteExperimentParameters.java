@@ -22,7 +22,7 @@ package opennlp.rlda.apps;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class WriteParameters {
+public class WriteExperimentParameters {
 
     public static void main(String[] args) throws Exception {
 

@@ -16,7 +16,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.apps;
 
-import opennlp.wrapper.rlda.apps.ExperimentParameterManipulator;
 import opennlp.rlda.converters.Converter;
 
 /**

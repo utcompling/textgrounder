@@ -30,12 +30,6 @@ import java.util.logging.Logger;
  */
 public class ConverterExperimentParameters {
 
-    public static enum INPUT_FORMAT {
-
-        BINARY,
-        TEXT,
-        XML
-    }
     /**
      * 
      */

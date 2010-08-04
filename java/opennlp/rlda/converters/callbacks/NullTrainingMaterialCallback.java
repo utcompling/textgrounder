@@ -20,7 +20,7 @@
 
 package opennlp.rlda.converters.callbacks;
 
-import opennlp.wrapper.rlda.textstructs.Lexicon;
+import opennlp.rlda.textstructs.Lexicon;
 
 /**
  * An empty placeholder class for projects that do not require validation
