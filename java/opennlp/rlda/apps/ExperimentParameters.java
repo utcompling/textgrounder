@@ -17,10 +17,6 @@
 package opennlp.rlda.apps;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
 
 /**
  *
@@ -93,23 +89,17 @@ public class ExperimentParameters {
     /**
      *
      */
-    protected String inputSubPath = "input";
-    /**
-     * 
-     */
-    protected String outputSubPath = "output";
-    /**
-     *
-     */
     protected String corpusFilename = "input.xml";
     /**
      * Path to array of tokens, toponym status. Should be a file.
      */
-    protected String tokenArrayFilename = "token-array.dat.gz";
+    protected String tokenArrayInputFilename = "token-array-input.dat.gz";
     /**
      * Path to array of tokens, toponym status. Should be a file.
      */
-    protected String tokenArrayOutputPath = null;
+    protected String tokenArrayOutputPath = "token-array-output.dat.gz";
+
+    ;
     /**
      * 
      */
@@ -118,6 +108,10 @@ public class ExperimentParameters {
      * Path of model that has been saved from previous training runs
      */
     protected String trainedModelFilename = "trained-model.model.gz";
+    /**
+     * 
+     */
+    protected String regionFilename = "region.data.gz";
     /**
      * 
      */
@@ -167,23 +161,19 @@ public class ExperimentParameters {
         return lag;
     }
 
-    public String getCorpusFileName() {
-        return corpusFilename;
-    }
-
     public String getTokenArrayOutputPath() {
-        return tokenArrayOutputPath;
+        return joinPath(projectRoot, tokenArrayOutputPath);
     }
 
     public String getTokenArrayInputPath() {
-        return tokenArrayFilename;
+        return joinPath(projectRoot, tokenArrayInputFilename);
     }
 
     /**
      * Path of input to rlda component
      */
     public String getTrainedModelOutputPath() {
-        return joinPath(projectRoot, outputSubPath, trainedModelFilename);
+        return joinPath(projectRoot, trainedModelFilename);
     }
 
     /**

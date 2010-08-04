@@ -22,7 +22,7 @@ package opennlp.rlda.converters.callbacks;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import opennlp.wrapper.rlda.textstructs.Lexicon;
+import opennlp.rlda.textstructs.Lexicon;
 
 /**
  * A class for filtering whether words should be considered as training material

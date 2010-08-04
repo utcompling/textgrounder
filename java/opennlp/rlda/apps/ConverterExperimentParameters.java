@@ -35,6 +35,10 @@ public class ConverterExperimentParameters extends ExperimentParameters {
         return joinPath(projectRoot,lexiconFilename);
     }
 
+    public String getRegionPath() {
+        return joinPath(projectRoot, regionFilename);
+    }
+
     public int getCountCutoff() {
         return countCutoff;
     }

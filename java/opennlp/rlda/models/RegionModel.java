@@ -101,6 +101,8 @@ public class RegionModel extends RegionModelFields {
         }
 
         readTokenArrayFile();
+        readRegionToponymFilter();
+        buildActiveRegionByDocumentFilter();
     }
 
     public void initialize() {
@@ -139,6 +141,8 @@ public class RegionModel extends RegionModelFields {
                 }
             }
         } catch (EOFException ex) {
+        } catch (IOException ex) {
+            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         W -= stopwordSet.size();
@@ -190,6 +194,30 @@ public class RegionModel extends RegionModelFields {
                 }
             }
         } catch (EOFException e) {
+        } catch (IOException ex) {
+            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    protected void buildActiveRegionByDocumentFilter() {
+        activeRegionByDocumentFilter = new int[D * R];
+
+        for (int i = 0; i < D * R; ++i) {
+            activeRegionByDocumentFilter[i] = 0;
+        }
+
+        for (int i = 0; i < N; ++i) {
+            int docid = documentVector[i];
+            int docoff = docid * R;
+            int wordid = wordVector[i];
+            int topoff = wordid * R;
+            int topstatus = toponymVector[i];
+
+            if (topstatus == 1) {
+                for (int j = 0; j < R; ++j) {
+                    activeRegionByDocumentFilter[docoff + j] = regionByToponymFilter[topoff + j];
+                }
+            }
         }
     }
 
@@ -290,8 +318,7 @@ public class RegionModel extends RegionModelFields {
                             for (int j = 0;; ++j) {
                                 probs[j] = (wordByRegionCounts[wordoff + j] + beta)
                                       / (regionCounts[j] + betaW)
-                                      * (regionByDocumentCounts[docoff + j] + alpha)
-                                      * activeRegionByDocumentFilter[docoff + j];
+                                      * (regionByDocumentCounts[docoff + j] + alpha);
                             }
                         }
                     } catch (ArrayIndexOutOfBoundsException e) {

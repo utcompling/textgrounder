@@ -26,17 +26,21 @@ import opennlp.rlda.apps.ConverterExperimentParameters;
 public abstract class IOBase {
 
     /**
-     *
+     * File of tokens, toponym status, stopword status and whatnot
      */
     protected File tokenArrayFile;
     /**
-     *
+     * File linking toponym indexes to regions
      */
     protected File toponymRegionFile;
     /**
-     *
+     * File for lexicon dump
      */
     protected File lexiconFile;
+    /**
+     * File for 2D region array dump
+     */
+    protected File regionFile;
     /**
      *
      */
@@ -47,5 +51,6 @@ public abstract class IOBase {
         tokenArrayFile = new File(experimentParameters.getTokenArrayInputPath());
         toponymRegionFile = new File(experimentParameters.getToponymRegionPath());
         lexiconFile = new File(experimentParameters.getLexiconPath());
+        regionFile = new File(experimentParameters.getRegionPath());
     }
 }

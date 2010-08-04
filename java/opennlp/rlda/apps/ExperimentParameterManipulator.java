@@ -52,17 +52,19 @@ public class ExperimentParameterManipulator {
                     String fieldName = param.getName();
                     String fieldValue = param.getValue();
                     String fieldTypeName = param.getAttributeValue("type");
-                    if (fieldTypeName.equals("int")) {
-                        int value = Integer.parseInt(fieldValue);
-                        _experimentParameters.getClass().getDeclaredField(fieldName).setInt(_experimentParameters, value);
-                    } else if (fieldTypeName.equals("double")) {
-                        double value = Double.parseDouble(fieldValue);
-                        _experimentParameters.getClass().getDeclaredField(fieldName).setDouble(_experimentParameters, value);
-                    } else if (fieldTypeName.equals("string")) {
-                        _experimentParameters.getClass().getDeclaredField(fieldName).set(_experimentParameters, fieldValue);
-                    } else {
-                        continue;
-                    }
+                    recursiveFind(_experimentParameters.getClass(), _experimentParameters, fieldName, fieldTypeName, fieldValue);
+
+//                    if (fieldTypeName.equals("int")) {
+//                        int value = Integer.parseInt(fieldValue);
+//                        _experimentParameters.getClass().getDeclaredField(fieldName).setInt(_experimentParameters, value);
+//                    } else if (fieldTypeName.equals("double")) {
+//                        double value = Double.parseDouble(fieldValue);
+//                        _experimentParameters.getClass().getDeclaredField(fieldName).setDouble(_experimentParameters, value);
+//                    } else if (fieldTypeName.equals("string")) {
+//                        _experimentParameters.getClass().getDeclaredField(fieldName).set(_experimentParameters, fieldValue);
+//                    } else {
+//                        continue;
+//                    }
 
                 } catch (NoSuchFieldException ex) {
                     System.err.println(ex.getMessage() + " is not a relevant field");
@@ -113,7 +115,7 @@ public class ExperimentParameterManipulator {
                 } else if (fieldTypeName.endsWith("INPUT_FORMAT")) {
                     String s = field.get(_experimentParameters).toString();
                     fieldValue = s;
-                    fieldTypeName = "string";
+                    fieldTypeName = "INPUT_FORMAT";
                 } else {
                     continue;
                 }
@@ -142,6 +144,32 @@ public class ExperimentParameterManipulator {
         } catch (IOException ex) {
             Logger.getLogger(ExperimentParameterManipulator.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
+        }
+    }
+
+    protected static void recursiveFind(Class _class,
+          Object _experimentParameters, String _fieldName, String _fieldTypeName,
+          String _fieldValue) throws IllegalArgumentException,
+          IllegalAccessException, NoSuchFieldException {
+
+        try {
+            if (_fieldTypeName.equals("int")) {
+                int value = Integer.parseInt(_fieldValue);
+                _class.getDeclaredField(_fieldName).setInt(_experimentParameters, value);
+            } else if (_fieldTypeName.equals("double")) {
+                double value = Double.parseDouble(_fieldValue);
+                _class.getDeclaredField(_fieldName).setDouble(_experimentParameters, value);
+            } else if (_fieldTypeName.equals("string")) {
+                _class.getDeclaredField(_fieldName).set(_experimentParameters, _fieldValue);
+            } else {
+                return;
+            }
+        } catch (NoSuchFieldException ex) {
+            if (_class.getSuperclass() != null) {
+                recursiveFind(_class.getSuperclass(), _experimentParameters, _fieldName, _fieldTypeName, _fieldValue);
+            } else {
+                throw new NoSuchFieldException(ex.getMessage());
+            }
         }
     }
 }

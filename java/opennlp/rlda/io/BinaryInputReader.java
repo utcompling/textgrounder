@@ -43,41 +43,32 @@ public class BinaryInputReader extends InputReader {
     }
 
     @Override
-    public int[] nextTokenArrayRecord() throws EOFException {
+    public int[] nextTokenArrayRecord() throws EOFException, IOException {
         int[] record = new int[4];
-        try {
-            int wordid = tokenArrayInputStream.readInt();
-            int docid = tokenArrayInputStream.readInt();
-            int topstatus = (int) tokenArrayInputStream.readByte();
-            int stopstatus = (int) tokenArrayInputStream.readByte();
-            record[0] = wordid;
-            record[1] = docid;
-            record[2] = topstatus;
-            record[3] = stopstatus;
-            return record;
-        } catch (IOException ex) {
-            Logger.getLogger(BinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        return null;
+
+        int wordid = tokenArrayInputStream.readInt();
+        int docid = tokenArrayInputStream.readInt();
+        int topstatus = (int) tokenArrayInputStream.readByte();
+        int stopstatus = (int) tokenArrayInputStream.readByte();
+        record[0] = wordid;
+        record[1] = docid;
+        record[2] = topstatus;
+        record[3] = stopstatus;
+        return record;
     }
 
     @Override
-    public int[] nextToponymRegionFilter() throws EOFException {
+    public int[] nextToponymRegionFilter() throws EOFException, IOException {
 
-        try {
-            int topid = toponymRegionInputStream.readInt();
-            int fieldsize = toponymRegionInputStream.readInt();
-            int[] record = new int[fieldsize + 1];
-            record[0] = topid;
-            for (int i = 0; i < fieldsize; ++i) {
-                record[i + 1] = toponymRegionInputStream.readInt();
-            }
-
-            return record;
-        } catch (IOException ex) {
-            Logger.getLogger(BinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+        int topid = toponymRegionInputStream.readInt();
+        int fieldsize = toponymRegionInputStream.readInt();
+        int[] record = new int[fieldsize + 1];
+        record[0] = topid;
+        for (int i = 0; i < fieldsize; ++i) {
+            record[i + 1] = toponymRegionInputStream.readInt();
         }
-        return null;
+
+        return record;
     }
 
     @Override

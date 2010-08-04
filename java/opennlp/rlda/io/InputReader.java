@@ -17,6 +17,7 @@
 package opennlp.rlda.io;
 
 import java.io.EOFException;
+import java.io.IOException;
 import opennlp.rlda.apps.ExperimentParameters;
 
 /**
@@ -38,14 +39,14 @@ public abstract class InputReader extends IOBase {
      * @return
      * @throws EOFException
      */
-    public abstract int[] nextTokenArrayRecord() throws EOFException;
+    public abstract int[] nextTokenArrayRecord() throws EOFException, IOException;
 
     /**
      * 
      * @return
      * @throws EOFException
      */
-    public abstract int[] nextToponymRegionFilter() throws EOFException;
+    public abstract int[] nextToponymRegionFilter() throws EOFException, IOException;
 
     /**
      *

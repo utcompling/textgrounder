@@ -48,18 +48,53 @@ import org.jdom.input.SAXBuilder;
  */
 public class XMLToInternalConverter {
 
+    /**
+     *
+     */
     protected String pathToInput;
+    /**
+     *
+     */
     protected TokenArrayBuffer tokenArrayBuffer;
+    /**
+     * 
+     */
     protected Lexicon lexicon;
     protected StopwordList stopwordList;
     protected TrainingMaterialCallback trainingMaterialCallback;
+    /**
+     *
+     */
     protected int activeRegions;
+    /**
+     *
+     */
     protected int degreesPerRegion;
+    /**
+     *
+     */
     protected int countCutoff = -1;
+    /**
+     *
+     */
+    protected int maxvalidid = 0;
+    /**
+     *
+     */
     protected ConverterExperimentParameters converterExperimentParameters;
+    /**
+     *
+     */
     protected Region[][] regionArray;
+    /**
+     * 
+     */
     protected ToponymToRegionIDsMap toponymToRegionIDsMap;
 
+    /**
+     * 
+     * @param _path
+     */
     public XMLToInternalConverter(String _path) {
         pathToInput = _path;
         lexicon = new Lexicon();
@@ -68,6 +103,10 @@ public class XMLToInternalConverter {
         trainingMaterialCallback = new TrainingMaterialCallback(lexicon);
     }
 
+    /**
+     *
+     * @param _converterExperimentParameters
+     */
     public XMLToInternalConverter(
           ConverterExperimentParameters _converterExperimentParameters) {
         converterExperimentParameters = _converterExperimentParameters;
@@ -127,6 +166,9 @@ public class XMLToInternalConverter {
         return regionArray[curX][curY];
     }
 
+    /**
+     * 
+     */
     public void convert() {
         initializeRegionArray();
         preprocess(pathToInput);
@@ -166,7 +208,8 @@ public class XMLToInternalConverter {
                     if (token.getName().equals("w")) {
                         word = token.getAttributeValue("tok");
                         wordid = lexicon.addOrGetWord(word);
-                        isstopword = stopwordList.isStopWord(word) ? 1 : 0;
+                        isstopword = (stopwordList.isStopWord(word) ? 1 : 0) | (wordid > maxvalidid
+                              ? 1 : 0);
                     } else if (token.getName().equals("toponym")) {
                         word = token.getAttributeValue("term");
                         istoponym = 1;
@@ -231,15 +274,17 @@ public class XMLToInternalConverter {
                 ArrayList<Element> tokens = new ArrayList<Element>(sentence.getChildren());
                 for (Element token : tokens) {
                     String word = "";
+                    boolean istoponym = false;
                     if (token.getName().equals("w")) {
                         word = token.getAttributeValue("tok");
                     } else if (token.getName().equals("toponym")) {
                         word = token.getAttributeValue("term");
+                        istoponym = true;
                     } else {
                         continue;
                     }
 
-                    if (stopwordList.isStopWord(word)) {
+                    if (!stopwordList.isStopWord(word) || istoponym) {
                         if (countLexicon.containsKey(word)) {
                             int count = countLexicon.get(word) + 1;
                             countLexicon.put(word, count);
@@ -256,6 +301,8 @@ public class XMLToInternalConverter {
                 lexicon.addOrGetWord(entry.getKey());
             }
         }
+
+        maxvalidid = lexicon.getDictionarySize() - 1;
     }
 
     /**
@@ -274,5 +321,6 @@ public class XMLToInternalConverter {
         outputWriter.writeTokenArrayWriter(tokenArrayBuffer);
         outputWriter.writeToponymRegionWriter(toponymToRegionIDsMap);
         outputWriter.writeLexicon(lexicon);
+        outputWriter.writeRegions(regionArray);
     }
 }
