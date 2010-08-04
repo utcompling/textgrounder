@@ -16,6 +16,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.apps;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
@@ -79,27 +85,27 @@ public class ExperimentParameters {
     /**
      *
      */
-    protected String corpusPath = null;
-    /**
-     *
-     */
     protected int degreesPerRegion = 3;
     /**
      *
      */
-    protected String inputPath = null;
-    /**
-     * 
-     */
-    protected String outputPath = null;
+    protected String projectRoot = null;
     /**
      *
      */
-    protected String corpusFileName = "input.xml";
+    protected String inputSubPath = "input";
+    /**
+     * 
+     */
+    protected String outputSubPath = "output";
+    /**
+     *
+     */
+    protected String corpusFilename = "input.xml";
     /**
      * Path to array of tokens, toponym status. Should be a file.
      */
-    protected String tokenArrayFileName = "token-array.dat";
+    protected String tokenArrayFilename = "token-array.dat.gz";
     /**
      * Path to array of tokens, toponym status. Should be a file.
      */
@@ -107,21 +113,19 @@ public class ExperimentParameters {
     /**
      * 
      */
-    protected String toponymRegionFileName = "toponym-region.dat";
+    protected String toponymRegionFilename = "toponym-region.dat.gz";
     /**
      * Path of model that has been saved from previous training runs
      */
-    protected String trainedModelPath = "trained-model.model";
+    protected String trainedModelFilename = "trained-model.model.gz";
+    /**
+     * 
+     */
+    protected String lexiconFilename = "lexicon.dat.gz";
     /**
      *
      */
     protected INPUT_FORMAT inputFormat = INPUT_FORMAT.BINARY;
-
-    /**
-     * Default constructor
-     */
-    public ExperimentParameters() {
-    }
 
     public double getAlpha() {
         return alpha;
@@ -164,27 +168,26 @@ public class ExperimentParameters {
     }
 
     public String getCorpusFileName() {
-        return corpusFileName;
-    }
-
-    public String getCorpusPath() {
-        return corpusPath;
+        return corpusFilename;
     }
 
     public String getTokenArrayOutputPath() {
         return tokenArrayOutputPath;
     }
 
-    public String getTokenArrayPath() {
-        return tokenArrayFileName;
+    public String getTokenArrayInputPath() {
+        return tokenArrayFilename;
     }
 
-    public String getTrainedModelPath() {
-        return trainedModelPath;
+    /**
+     * Path of input to rlda component
+     */
+    public String getTrainedModelOutputPath() {
+        return joinPath(projectRoot, outputSubPath, trainedModelFilename);
     }
 
     public String getToponymRegionPath() {
-        return toponymRegionFileName;
+        return toponymRegionFilename;
     }
 
     public int getTrainIterations() {
@@ -193,5 +196,62 @@ public class ExperimentParameters {
 
     public INPUT_FORMAT getInputFormat() {
         return inputFormat;
+    }
+
+    /**
+     * Joins to path related strings. The first argument should always be
+     * a directory and the second argument should always be a filename.
+     *
+     * @param _root directory where file is located. this may be either canonical
+     * or absolute
+     * @param _name name of file
+     * @return canonical path of joined filename
+     */
+    protected String joinPath(String _root, String _name)
+          throws FileNotFoundException, IOException {
+        StringBuilder sb = new StringBuilder();
+        String sep = File.separator;
+        ArrayList<String> names = new ArrayList<String>();
+        if (_root == null) {
+            File f = new File(_name);
+            if (f.exists()) {
+                sb.append(_name);
+            } else {
+                throw new FileNotFoundException();
+            }
+        } else {
+            _root = (new File(_root)).getCanonicalPath();
+            names.addAll(Arrays.asList(_root.split(sep)));
+            names.addAll(Arrays.asList(_name.split(sep)));
+            for (String name : names) {
+                if (!name.isEmpty()) {
+                    sb.append(sep).append(name);
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     *
+     * @param _names
+     * @return
+     */
+    protected String joinPath(String... _names) {
+        StringBuilder sb = new StringBuilder();
+        String sep = File.separator;
+        if (_names[0].startsWith("~")) {
+            _names[0].replaceFirst("~", System.getProperty("user.dir"));
+        }
+
+        for (String name : _names) {
+            for (String comp : name.split(sep)) {
+                if (!comp.isEmpty()) {
+                    sb.append(sep).append(comp);
+                }
+            }
+        }
+
+        return sb.toString();
     }
 }

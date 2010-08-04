@@ -46,7 +46,7 @@ import org.jdom.input.SAXBuilder;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class Converter {
+public class XMLToInternalConverter {
 
     protected String pathToInput;
     protected TokenArrayBuffer tokenArrayBuffer;
@@ -60,7 +60,7 @@ public class Converter {
     protected Region[][] regionArray;
     protected ToponymToRegionIDsMap toponymToRegionIDsMap;
 
-    public Converter(String _path) {
+    public XMLToInternalConverter(String _path) {
         pathToInput = _path;
         lexicon = new Lexicon();
         tokenArrayBuffer = new TokenArrayBuffer(lexicon);
@@ -68,7 +68,7 @@ public class Converter {
         trainingMaterialCallback = new TrainingMaterialCallback(lexicon);
     }
 
-    public Converter(
+    public XMLToInternalConverter(
           ConverterExperimentParameters _converterExperimentParameters) {
         converterExperimentParameters = _converterExperimentParameters;
 
@@ -129,6 +129,7 @@ public class Converter {
 
     public void convert() {
         initializeRegionArray();
+        preprocess(pathToInput);
         convert(pathToInput);
     }
 
@@ -144,10 +145,10 @@ public class Converter {
         try {
             trdoc = builder.build(TRXMLPathFile);
         } catch (JDOMException ex) {
-            Logger.getLogger(Converter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(Converter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
 
@@ -201,6 +202,10 @@ public class Converter {
         }
     }
 
+    /**
+     * 
+     * @param TRXMLPath
+     */
     protected void preprocess(String TRXMLPath) {
         HashMap<String, Integer> countLexicon = new HashMap<String, Integer>();
 
@@ -211,10 +216,10 @@ public class Converter {
         try {
             trdoc = builder.build(TRXMLPathFile);
         } catch (JDOMException ex) {
-            Logger.getLogger(Converter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(Converter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
 
@@ -270,21 +275,21 @@ public class Converter {
         outputWriter.writeToponymRegionWriter(toponymToRegionIDsMap);
     }
 
-    public void loadParameters(String _filename) {
+    public void loadLexicon(String _filename) {
         ObjectInputStream lexiconIn = null;
         try {
             lexiconIn = new ObjectInputStream(new GZIPInputStream(new FileInputStream(_filename)));
             lexicon = (Lexicon) lexiconIn.readObject();
         } catch (IOException ex) {
-            Logger.getLogger(Converter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (ClassNotFoundException ex) {
-            Logger.getLogger(Converter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }
 
-    public void saveParameters(String _filename) {
+    public void saveLexicon(String _filename) {
 
         if (!_filename.endsWith(".gz")) {
             _filename += ".gz";
@@ -295,7 +300,7 @@ public class Converter {
             modelOut.writeObject(this);
             modelOut.close();
         } catch (IOException ex) {
-            Logger.getLogger(Converter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }

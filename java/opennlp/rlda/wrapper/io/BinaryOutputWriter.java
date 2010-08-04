@@ -78,7 +78,6 @@ public class BinaryOutputWriter extends OutputWriter {
             Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
-
     }
 
     @Override

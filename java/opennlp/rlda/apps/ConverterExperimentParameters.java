@@ -40,46 +40,12 @@ public class ConverterExperimentParameters extends ExperimentParameters {
 
     public String getInputPath() {
         try {
-            return joinPath(corpusPath, corpusFileName);
+            return joinPath(corpusPath, corpusFilename);
         } catch (FileNotFoundException ex) {
             Logger.getLogger(ConverterExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
             Logger.getLogger(ConverterExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
         }
         return null;
-    }
-
-    /**
-     * Joins to path related strings. The first argument should always be
-     * a directory and the second argument should always be a filename.
-     *
-     * @param _root directory where file is located. this may be either canonical
-     * or absolute
-     * @param _name name of file
-     * @return canonical path of joined filename
-     */
-    protected String joinPath(String _root, String _name, String... _names) throws
-          FileNotFoundException, IOException {
-        StringBuilder sb = new StringBuilder();
-        String sep = File.separator;
-        ArrayList<String> names = new ArrayList<String>();
-        if (_root == null) {
-            File f = new File(_name);
-            if (f.exists()) {
-                sb.append(_name);
-            } else {
-                throw new FileNotFoundException();
-            }
-        } else {
-            _root = (new File(_root)).getCanonicalPath();
-            names.addAll(Arrays.asList(_root.split(sep)));
-            names.addAll(Arrays.asList(_name.split(sep)));
-            for (String name : names) {
-                if (!name.isEmpty()) {
-                    sb.append(sep).append(name);
-                }
-            }
-        }
-        return sb.toString();
     }
 }
