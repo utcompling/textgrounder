@@ -17,13 +17,19 @@
 package opennlp.rlda.converters;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import opennlp.rlda.apps.ConverterExperimentParameters;
 import opennlp.rlda.converters.callbacks.*;
 import opennlp.rlda.wrapper.io.OutputWriter;
@@ -262,5 +268,35 @@ public class Converter {
 
         outputWriter.writeTokenArrayWriter(tokenArrayBuffer);
         outputWriter.writeToponymRegionWriter(toponymToRegionIDsMap);
+    }
+
+    public void loadParameters(String _filename) {
+        ObjectInputStream lexiconIn = null;
+        try {
+            lexiconIn = new ObjectInputStream(new GZIPInputStream(new FileInputStream(_filename)));
+            lexicon = (Lexicon) lexiconIn.readObject();
+        } catch (IOException ex) {
+            Logger.getLogger(Converter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(Converter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+    }
+
+    public void saveParameters(String _filename) {
+
+        if (!_filename.endsWith(".gz")) {
+            _filename += ".gz";
+        }
+        ObjectOutputStream modelOut = null;
+        try {
+            modelOut = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(_filename)));
+            modelOut.writeObject(this);
+            modelOut.close();
+        } catch (IOException ex) {
+            Logger.getLogger(Converter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
     }
 }
