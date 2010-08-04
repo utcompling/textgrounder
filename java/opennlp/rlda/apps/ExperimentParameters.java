@@ -73,6 +73,14 @@ public class ExperimentParameters {
      */
     protected int lag = 10;
     /**
+     *
+     */
+    protected String corpusPath = null;
+    /**
+     *
+     */
+    protected String corpusFileName = null;
+    /**
      * Path to array of tokens, toponym status. Should be a file.
      */
     protected String tokenArrayPath = null;
@@ -134,6 +142,18 @@ public class ExperimentParameters {
 
     public int getLag() {
         return lag;
+    }
+
+    public String getCorpusFileName() {
+        return corpusFileName;
+    }
+
+    public String getCorpusPath() {
+        return corpusPath;
+    }
+
+    public String getTokenArrayOutputPath() {
+        return tokenArrayOutputPath;
     }
 
     public String getTokenArrayPath() {

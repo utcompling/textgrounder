@@ -37,6 +37,10 @@ import org.jdom.output.XMLOutputter;
 public class ExperimentParameterManipulator {
 
     public static ExperimentParameters loadParameters(String _path) {
+        return loadParameters(_path, "RLDA");
+    }
+
+    public static ExperimentParameters loadParameters(String _path, String _stageName) {
         ExperimentParameters experimentParameters = new ExperimentParameters();
 
         File file = new File(_path);
@@ -46,7 +50,7 @@ public class ExperimentParameterManipulator {
         try {
             doc = builder.build(file);
             Element root = doc.getRootElement();
-            ArrayList<Element> params = new ArrayList<Element>(root.getChild("ExperimentStage").getChildren());
+            ArrayList<Element> params = new ArrayList<Element>(root.getChild(_stageName).getChildren());
             for (Element param : params) {
                 try {
                     String fieldName = param.getName();
@@ -65,8 +69,7 @@ public class ExperimentParameterManipulator {
                     }
 
                 } catch (NoSuchFieldException ex) {
-                    Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
-                    System.exit(1);
+                    System.err.println(ex.getMessage()+" is not a relevant field");
                 } catch (SecurityException ex) {
                     Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
                     System.exit(1);
@@ -89,14 +92,21 @@ public class ExperimentParameterManipulator {
         return experimentParameters;
     }
 
+    public static void dumpFieldsToXML(ExperimentParameters _experimentParameters, String _outputPath) {
+        dumpFieldsToXML(_experimentParameters, _outputPath, "RLDA");
+    }
+
     public static void dumpFieldsToXML(ExperimentParameters _experimentParameters, String _outputPath,
           String _stageName) {
         Document doc = new Document();
+        Element root = new Element("experiments");
+        doc.addContent(root);
         Element stage = new Element(_stageName);
-        doc.addContent(stage);
+        root.addContent(stage);
 
         try {
-            for (Field field : _experimentParameters.getClass().getDeclaredFields()) {
+            for (Field field :
+                  _experimentParameters.getClass().getDeclaredFields()) {
                 String fieldName = field.getName();
                 String fieldValue = "";
                 Object o = field.getType();

@@ -14,21 +14,19 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.wrapper.rlda.apps;
-
-import opennlp.wrapper.rlda.converters.Converter;
+package opennlp.rlda.apps;
 
 /**
+ * Main class for taking an ExperimentParameters class and writing it to an XML
+ * file.
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class ConvertRegionModel {
+public class WriteParameters {
 
     public static void main(String[] args) throws Exception {
 
-        ExperimentParameters experimentParameters = ExperimentParameterManipulator.loadParameters(args[0]);
-        Converter converter = new Converter(experimentParameters);
-        converter.convert();
-        converter.writeToFiles();
+        ExperimentParameters experimentParameters = new ExperimentParameters();
+        ExperimentParameterManipulator.dumpFieldsToXML(experimentParameters, args[0], "LDA");
     }
 }

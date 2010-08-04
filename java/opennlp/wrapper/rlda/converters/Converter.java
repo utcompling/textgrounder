@@ -121,6 +121,10 @@ public class Converter {
         convert(pathToInput);
     }
 
+    /**
+     * 
+     * @param TRXMLPath
+     */
     public void convert(String TRXMLPath) {
         File TRXMLPathFile = new File(TRXMLPath);
 
@@ -181,6 +185,9 @@ public class Converter {
         }
     }
 
+    /**
+     * 
+     */
     public void writeToFiles() {
         OutputWriter outputWriter = new TextOutputWriter(experimentParameters);
         outputWriter.writeTokenArrayWriter(tokenArrayBuffer);
