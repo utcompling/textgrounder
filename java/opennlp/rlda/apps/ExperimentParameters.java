@@ -73,6 +73,10 @@ public class ExperimentParameters {
      */
     protected int lag = 10;
     /**
+     * 
+     */
+    protected int countCutoff = 5;
+    /**
      *
      */
     protected String corpusPath = null;

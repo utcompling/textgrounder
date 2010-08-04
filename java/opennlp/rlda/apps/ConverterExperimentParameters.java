@@ -30,6 +30,10 @@ import java.util.logging.Logger;
  */
 public class ConverterExperimentParameters extends ExperimentParameters {
 
+    public int getCountCutoff() {
+        return countCutoff;
+    }
+
     public int getDegreesPerRegion() {
         return degreesPerRegion;
     }

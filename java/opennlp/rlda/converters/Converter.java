@@ -19,7 +19,9 @@ package opennlp.rlda.converters;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import opennlp.rlda.apps.ConverterExperimentParameters;
@@ -47,6 +49,7 @@ public class Converter {
     protected TrainingMaterialCallback trainingMaterialCallback;
     protected int activeRegions;
     protected int degreesPerRegion;
+    protected int countCutoff = -1;
     protected ConverterExperimentParameters converterExperimentParameters;
     protected Region[][] regionArray;
     protected ToponymToRegionIDsMap toponymToRegionIDsMap;
@@ -71,6 +74,7 @@ public class Converter {
         trainingMaterialCallback = new TrainingMaterialCallback(lexicon);
 
         degreesPerRegion = converterExperimentParameters.getDegreesPerRegion();
+        countCutoff = converterExperimentParameters.getCountCutoff();
 
         toponymToRegionIDsMap = new ToponymToRegionIDsMap();
         activeRegions = 0;
@@ -188,6 +192,58 @@ public class Converter {
                 }
             }
             docid += 1;
+        }
+    }
+
+    protected void preprocess(String TRXMLPath) {
+        HashMap<String, Integer> countLexicon = new HashMap<String, Integer>();
+
+        File TRXMLPathFile = new File(TRXMLPath);
+
+        SAXBuilder builder = new SAXBuilder();
+        Document trdoc = null;
+        try {
+            trdoc = builder.build(TRXMLPathFile);
+        } catch (JDOMException ex) {
+            Logger.getLogger(Converter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        } catch (IOException ex) {
+            Logger.getLogger(Converter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+
+        Element root = trdoc.getRootElement();
+        ArrayList<Element> documents = new ArrayList<Element>(root.getChildren());
+        for (Element document : documents) {
+            ArrayList<Element> sentences = new ArrayList<Element>(document.getChildren());
+            for (Element sentence : sentences) {
+                ArrayList<Element> tokens = new ArrayList<Element>(sentence.getChildren());
+                for (Element token : tokens) {
+                    String word = "";
+                    if (token.getName().equals("w")) {
+                        word = token.getAttributeValue("tok");
+                    } else if (token.getName().equals("toponym")) {
+                        word = token.getAttributeValue("term");
+                    } else {
+                        continue;
+                    }
+
+                    if (stopwordList.isStopWord(word)) {
+                        if (countLexicon.containsKey(word)) {
+                            int count = countLexicon.get(word) + 1;
+                            countLexicon.put(word, count);
+                        } else {
+                            countLexicon.put(word, 1);
+                        }
+                    }
+                }
+            }
+        }
+
+        for (Map.Entry<String, Integer> entry : countLexicon.entrySet()) {
+            if (entry.getValue() > countCutoff) {
+                lexicon.addOrGetWord(entry.getKey());
+            }
         }
     }
 
