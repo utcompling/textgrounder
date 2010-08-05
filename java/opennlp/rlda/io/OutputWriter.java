@@ -14,26 +14,35 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.apps;
+package opennlp.rlda.io;
 
-import opennlp.rlda.models.RegionModel;
+import java.io.File;
+import opennlp.rlda.apps.ExperimentParameters;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class TrainRegionModel {
+public abstract class OutputWriter extends IOBase {
 
-    public static void main(String[] args) throws Exception {
-
-        ExperimentParameters experimentParameters = new ExperimentParameters();
-        ExperimentParameterManipulator.loadParameters(experimentParameters, args[0], "RLDA");
-
-        RegionModel rm = new RegionModel(experimentParameters);
-
-        rm.initialize();
-        rm.train();
-        rm.decode();
-        rm.write();
+    /**
+     * 
+     * @param _experimentParameters
+     */
+    public OutputWriter(ExperimentParameters _experimentParameters) {
+        super(_experimentParameters);
+        tokenArrayFile = new File(experimentParameters.getTokenArrayOutputPath());
     }
+
+    /**
+     *
+     */
+    public abstract void openTokenArrayWriter();
+
+    /**
+     *
+     */
+    public abstract void writeTokenArrayWriter(
+          int[] _wordVector, int[] _documentVector, int[] _toponymVector,
+          int[] _regionVector);
 }

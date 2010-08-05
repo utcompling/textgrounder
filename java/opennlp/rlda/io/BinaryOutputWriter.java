@@ -14,20 +14,17 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.wrapper.io;
+package opennlp.rlda.io;
 
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
-import opennlp.rlda.apps.ConverterExperimentParameters;
-import opennlp.rlda.textstructs.TokenArrayBuffer;
-import opennlp.rlda.topostructs.ToponymToRegionIDsMap;
+import opennlp.rlda.apps.ExperimentParameters;
 
 /**
  *
@@ -35,15 +32,23 @@ import opennlp.rlda.topostructs.ToponymToRegionIDsMap;
  */
 public class BinaryOutputWriter extends OutputWriter {
 
+    /**
+     * 
+     */
     protected DataOutputStream tokenArrayOutputStream;
-    protected DataOutputStream toponymRegionOutputStream;
 
-    public BinaryOutputWriter(ConverterExperimentParameters _experimentParameters) {
+    /**
+     * 
+     * @param _experimentParameters
+     */
+    public BinaryOutputWriter(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         openTokenArrayWriter();
-        openToponymRegionWriter();
     }
 
+    /**
+     *
+     */
     @Override
     public final void openTokenArrayWriter() {
         try {
@@ -62,61 +67,26 @@ public class BinaryOutputWriter extends OutputWriter {
         }
     }
 
+    /**
+     *
+     */
     @Override
-    public final void openToponymRegionWriter() {
+    public void writeTokenArrayWriter(
+          int[] _wordVector, int[] _documentVector, int[] _toponymVector,
+          int[] _regionVector) {
         try {
-            if (toponymRegionFile.getName().endsWith(".gz")) {
-                toponymRegionOutputStream = new DataOutputStream(
-                      new BufferedOutputStream(new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(toponymRegionFile)))));
-            } else {
-                toponymRegionOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(toponymRegionFile)));
-            }
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        } catch (IOException ex) {
-            Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
-    }
-
-    @Override
-    public void writeTokenArrayWriter(TokenArrayBuffer _tokenArrayBuffer) {
-        try {
-            for (int i = 0; i < _tokenArrayBuffer.size(); ++i) {
-                int wordid = _tokenArrayBuffer.wordArrayList.get(i);
+            for (int i = 0; i < _wordVector.length; ++i) {
+                int wordid = _wordVector[i];
                 tokenArrayOutputStream.writeInt(wordid);
-                int docid = _tokenArrayBuffer.documentArrayList.get(i);
+                int docid = _documentVector[i];
                 tokenArrayOutputStream.writeInt(docid);
-                byte topostatus = (byte) (int) _tokenArrayBuffer.toponymArrayList.get(i);
+                byte topostatus = (byte) _toponymVector[i];
                 tokenArrayOutputStream.writeByte(topostatus);
-                byte stopstatus = (byte) (int) _tokenArrayBuffer.stopwordArrayList.get(i);
-                tokenArrayOutputStream.writeByte(stopstatus);
+                int regid = _regionVector[i];
+                tokenArrayOutputStream.writeInt(regid);
             }
 
             tokenArrayOutputStream.close();
-        } catch (IOException ex) {
-            Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
-    }
-
-    @Override
-    public void writeToponymRegionWriter(
-          ToponymToRegionIDsMap _toponymToRegionIDsMap) {
-        
-        try {
-            for (int topid : _toponymToRegionIDsMap.keySet()) {
-                HashSet<Integer> regids = _toponymToRegionIDsMap.get(topid);
-                int fieldsize = regids.size();
-                toponymRegionOutputStream.writeInt(topid);
-                toponymRegionOutputStream.writeInt(fieldsize);
-                for (int regid : regids) {
-                    toponymRegionOutputStream.writeInt(regid);
-                }
-            }
-
-            toponymRegionOutputStream.close();
         } catch (IOException ex) {
             Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);

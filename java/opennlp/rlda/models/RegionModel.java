@@ -26,7 +26,9 @@ import opennlp.rlda.annealers.*;
 import opennlp.rlda.apps.ExperimentParameters;
 import opennlp.rlda.ec.util.MersenneTwisterFast;
 import opennlp.rlda.io.BinaryInputReader;
+import opennlp.rlda.io.BinaryOutputWriter;
 import opennlp.rlda.io.InputReader;
+import opennlp.rlda.io.OutputWriter;
 import opennlp.rlda.io.TextInputReader;
 
 /**
@@ -47,7 +49,14 @@ public class RegionModel extends RegionModelFields {
      * 
      */
     protected ExperimentParameters experimentParameters;
+    /**
+     * 
+     */
     protected InputReader inputReader;
+    /**
+     * 
+     */
+    protected OutputWriter outputWriter;
 
     /**
      * Default constructor. Take input from commandline and default _options
@@ -131,9 +140,10 @@ public class RegionModel extends RegionModelFields {
                     stopwordArray.add(stopstatus);
                     if (stopstatus == 1) {
                         stopwordSet.add(wordid);
-                    }
-                    if (W < wordid) {
-                        W = wordid;
+                    } else {
+                        if (W < wordid) {
+                            W = wordid;
+                        }
                     }
                     if (D < docid) {
                         D = docid;
@@ -145,7 +155,8 @@ public class RegionModel extends RegionModelFields {
             Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        W -= stopwordSet.size();
+        W += 1;
+        D += 1;
         N = wordArray.size();
 
         wordVector = new int[N];
@@ -197,6 +208,19 @@ public class RegionModel extends RegionModelFields {
         } catch (IOException ex) {
             Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
         }
+
+        regionCounts = new int[R];
+        for (int i = 0; i < R; ++i) {
+            regionCounts[i] = 0;
+        }
+        regionByDocumentCounts = new int[D * R];
+        for (int i = 0; i < D * R; ++i) {
+            regionByDocumentCounts[i] = 0;
+        }
+        wordByRegionCounts = new int[W * R];
+        for (int i = 0; i < W * R; ++i) {
+            wordByRegionCounts[i] = 0;
+        }
     }
 
     protected void buildActiveRegionByDocumentFilter() {
@@ -212,11 +236,16 @@ public class RegionModel extends RegionModelFields {
             int wordid = wordVector[i];
             int topoff = wordid * R;
             int topstatus = toponymVector[i];
+            int stopstatus = stopwordVector[i];
 
-            if (topstatus == 1) {
-                for (int j = 0; j < R; ++j) {
-                    activeRegionByDocumentFilter[docoff + j] = regionByToponymFilter[topoff + j];
+            try {
+                if (topstatus == 1 && stopstatus == 0) {
+                    for (int j = 0; j < R; ++j) {
+                        activeRegionByDocumentFilter[docoff + j] = regionByToponymFilter[topoff + j];
+                    }
                 }
+            } catch (ArrayIndexOutOfBoundsException e) {
+                System.err.println(String.format("%d\t%d\t%d\t%d", docid, docoff, wordid, topoff));
             }
         }
     }
@@ -376,6 +405,11 @@ public class RegionModel extends RegionModelFields {
         modelOut.close();
     }
 
+    public void write() {
+        outputWriter = new BinaryOutputWriter(experimentParameters);
+        outputWriter.writeTokenArrayWriter(wordVector, documentVector, toponymVector, regionVector);
+    }
+    
 //    /**
 //     *
 //     * @param _inputFilename

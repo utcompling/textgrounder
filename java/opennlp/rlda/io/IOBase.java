@@ -40,7 +40,6 @@ public abstract class IOBase {
 
     public IOBase(ExperimentParameters _experimentParameters) {
         experimentParameters = _experimentParameters;
-        tokenArrayFile = new File(experimentParameters.getTokenArrayInputPath());
         toponymRegionFile = new File(experimentParameters.getToponymRegionPath());
     }
 }

@@ -17,19 +17,13 @@
 package opennlp.rlda.converters;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 import opennlp.rlda.apps.ConverterExperimentParameters;
 import opennlp.rlda.converters.callbacks.*;
 import opennlp.rlda.wrapper.io.OutputWriter;
@@ -60,7 +54,13 @@ public class XMLToInternalConverter {
      * 
      */
     protected Lexicon lexicon;
+    /**
+     *
+     */
     protected StopwordList stopwordList;
+    /**
+     * 
+     */
     protected TrainingMaterialCallback trainingMaterialCallback;
     /**
      *
@@ -152,16 +152,16 @@ public class XMLToInternalConverter {
      * @param loc
      */
     protected Region addOrGetLocationsToRegionArray(Location loc) {
-        int curX = (int) (loc.coord.latitude + 180) / (int) degreesPerRegion;
-        int curY = (int) (loc.coord.longitude + 90) / (int) degreesPerRegion;
+        int curX = (int) (loc.coord.longitude + 180) / (int) degreesPerRegion;
+        int curY = (int) (loc.coord.latitude + 90) / (int) degreesPerRegion;
 
         if (regionArray[curX][curY] == null) {
             double minLon = loc.coord.longitude - loc.coord.longitude % degreesPerRegion;
             double maxLon = minLon + (loc.coord.longitude < 0 ? -1 : 1) * degreesPerRegion;
             double minLat = loc.coord.latitude - loc.coord.latitude % degreesPerRegion;
             double maxLat = minLat + (loc.coord.latitude < 0 ? -1 : 1) * degreesPerRegion;
-            activeRegions += 1;
             regionArray[curX][curY] = new Region(activeRegions, minLon, maxLon, minLat, maxLat);
+            activeRegions += 1;
         }
         return regionArray[curX][curY];
     }
@@ -206,16 +206,16 @@ public class XMLToInternalConverter {
                     int wordid = 0;
                     String word = "";
                     if (token.getName().equals("w")) {
-                        word = token.getAttributeValue("tok");
+                        word = token.getAttributeValue("tok").toLowerCase();
                         wordid = lexicon.addOrGetWord(word);
                         isstopword = (stopwordList.isStopWord(word) ? 1 : 0) | (wordid > maxvalidid
                               ? 1 : 0);
                     } else if (token.getName().equals("toponym")) {
-                        word = token.getAttributeValue("term");
+                        word = token.getAttributeValue("term").toLowerCase();
                         istoponym = 1;
                         wordid = lexicon.addOrGetWord(word);
-                        ArrayList<Element> candidates = new ArrayList<Element>(token.getChildren());
-                        if (candidates.isEmpty()) {
+                        ArrayList<Element> candidates = new ArrayList<Element>(token.getChild("candidates").getChildren());
+                        if (!candidates.isEmpty()) {
                             for (Element candidate : candidates) {
                                 double lon = Double.parseDouble(candidate.getAttributeValue("long"));
                                 double lat = Double.parseDouble(candidate.getAttributeValue("lat"));
@@ -233,7 +233,8 @@ public class XMLToInternalConverter {
                             }
                         } else {
                             istoponym = 0;
-                            isstopword = stopwordList.isStopWord(word) ? 1 : 0;
+                            isstopword = (stopwordList.isStopWord(word) ? 1 : 0) | (wordid > maxvalidid
+                                  ? 1 : 0);
                         }
                     } else {
                         continue;
@@ -251,6 +252,7 @@ public class XMLToInternalConverter {
      */
     protected void preprocess(String TRXMLPath) {
         HashMap<String, Integer> countLexicon = new HashMap<String, Integer>();
+        HashSet<String> toponymSet = new HashSet<String>();
 
         File TRXMLPathFile = new File(TRXMLPath);
 
@@ -276,10 +278,14 @@ public class XMLToInternalConverter {
                     String word = "";
                     boolean istoponym = false;
                     if (token.getName().equals("w")) {
-                        word = token.getAttributeValue("tok");
+                        word = token.getAttributeValue("tok").toLowerCase();
                     } else if (token.getName().equals("toponym")) {
-                        word = token.getAttributeValue("term");
-                        istoponym = true;
+                        word = token.getAttributeValue("term").toLowerCase();
+                        ArrayList<Element> candidates = new ArrayList<Element>(token.getChild("candidates").getChildren());
+                        if (!candidates.isEmpty()) {
+                            toponymSet.add(word);
+                            istoponym = true;
+                        }
                     } else {
                         continue;
                     }
@@ -302,6 +308,10 @@ public class XMLToInternalConverter {
             }
         }
 
+        for (String word : toponymSet) {
+            lexicon.addOrGetWord(word);
+        }
+
         maxvalidid = lexicon.getDictionarySize() - 1;
     }
 
@@ -316,6 +326,7 @@ public class XMLToInternalConverter {
                 break;
             case BINARY:
                 outputWriter = new BinaryOutputWriter(converterExperimentParameters);
+                break;
         }
 
         outputWriter.writeTokenArrayWriter(tokenArrayBuffer);
