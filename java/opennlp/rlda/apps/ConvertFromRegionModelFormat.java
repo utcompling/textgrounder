@@ -16,22 +16,20 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.apps;
 
-import java.io.File;
 import opennlp.rlda.converters.InternalToXMLConverter;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class ConvertFromRegionModelFormat {
+public class ConvertFromRegionModelFormat extends BaseApp {
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
+
+        helpMessage = "";
         
-        String root = (new File(args[0])).getCanonicalPath() + File.separator;
-
         ConverterExperimentParameters experimentParameters = new ConverterExperimentParameters();
-        ExperimentParameterManipulator.loadParameters(experimentParameters, root + "exp-parameters.xml", "RLDA");
-        experimentParameters.setProjectRoot(root);
+        processRawCommandline(args, experimentParameters);
 
         InternalToXMLConverter converter = new InternalToXMLConverter(experimentParameters);
         converter.convert();

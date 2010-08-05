@@ -16,22 +16,20 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.apps;
 
-import java.io.File;
 import opennlp.rlda.models.RegionModel;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class TrainRegionModel {
+public class TrainRegionModel extends BaseApp {
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
 
-        String root = (new File(args[0])).getCanonicalPath() + File.separator;
+        helpMessage = "";
 
         ExperimentParameters experimentParameters = new ExperimentParameters();
-        ExperimentParameterManipulator.loadParameters(experimentParameters, root + "exp-parameters.xml", "RLDA");
-        experimentParameters.setProjectRoot(root);
+        processRawCommandline(args, experimentParameters);
 
         RegionModel rm = new RegionModel(experimentParameters);
 
