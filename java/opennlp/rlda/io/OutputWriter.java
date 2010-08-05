@@ -44,5 +44,5 @@ public abstract class OutputWriter extends IOBase {
      */
     public abstract void writeTokenArrayWriter(
           int[] _wordVector, int[] _documentVector, int[] _toponymVector,
-          int[] _regionVector);
+          int[] _stopwordVector, int[] _regionVector);
 }

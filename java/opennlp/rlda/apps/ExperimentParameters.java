@@ -91,6 +91,10 @@ public class ExperimentParameters {
      */
     protected String corpusFilename = "input.xml";
     /**
+     * 
+     */
+    protected String processedOutputFilename = "output.xml";
+    /**
      * Path to array of tokens, toponym status. Should be a file.
      */
     protected String tokenArrayInputFilename = "token-array-input.dat.gz";
@@ -98,8 +102,6 @@ public class ExperimentParameters {
      * Path to array of tokens, toponym status. Should be a file.
      */
     protected String tokenArrayOutputPath = "token-array-output.dat.gz";
-
-    ;
     /**
      * 
      */
@@ -111,7 +113,7 @@ public class ExperimentParameters {
     /**
      * 
      */
-    protected String regionFilename = "region.data.gz";
+    protected String regionFilename = "region.dat.gz";
     /**
      * 
      */

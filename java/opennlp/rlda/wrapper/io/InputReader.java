@@ -16,6 +16,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.wrapper.io;
 
+import java.io.EOFException;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -24,6 +26,7 @@ import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
 import opennlp.rlda.apps.ConverterExperimentParameters;
 import opennlp.rlda.textstructs.Lexicon;
+import opennlp.rlda.topostructs.Region;
 
 /**
  *
@@ -33,6 +36,7 @@ public abstract class InputReader extends IOBase {
 
     public InputReader(ConverterExperimentParameters _experimentParameters) {
         super(_experimentParameters);
+        tokenArrayFile = new File(experimentParameters.getTokenArrayOutputPath());
     }
 
     public void readLexicon(Lexicon _lexicon) {
@@ -48,4 +52,23 @@ public abstract class InputReader extends IOBase {
             System.exit(1);
         }
     }
+
+    public void readRegions(Region[][] _regions) {
+        ObjectInputStream regionIn = null;
+        try {
+            regionIn = new ObjectInputStream(new GZIPInputStream(new FileInputStream(regionFile.getCanonicalPath())));
+            _regions = (Region[][]) regionIn.readObject();
+        } catch (IOException ex) {
+            Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+    }
+
+    public abstract void openTokenArrayReader();
+
+    public abstract int[] nextTokenArrayRecord() throws EOFException,
+          IOException;
 }

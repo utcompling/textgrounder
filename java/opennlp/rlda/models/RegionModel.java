@@ -407,7 +407,7 @@ public class RegionModel extends RegionModelFields {
 
     public void write() {
         outputWriter = new BinaryOutputWriter(experimentParameters);
-        outputWriter.writeTokenArrayWriter(wordVector, documentVector, toponymVector, regionVector);
+        outputWriter.writeTokenArrayWriter(wordVector, documentVector, toponymVector, stopwordVector, regionVector);
     }
     
 //    /**

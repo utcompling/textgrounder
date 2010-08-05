@@ -48,7 +48,6 @@ public abstract class IOBase {
 
     public IOBase(ConverterExperimentParameters _experimentParameters) {
         experimentParameters = _experimentParameters;
-        tokenArrayFile = new File(experimentParameters.getTokenArrayInputPath());
         toponymRegionFile = new File(experimentParameters.getToponymRegionPath());
         lexiconFile = new File(experimentParameters.getLexiconPath());
         regionFile = new File(experimentParameters.getRegionPath());

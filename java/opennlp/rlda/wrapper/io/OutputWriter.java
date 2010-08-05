@@ -41,6 +41,7 @@ public abstract class OutputWriter extends IOBase {
      */
     public OutputWriter(ConverterExperimentParameters _experimentParameters) {
         super(_experimentParameters);
+        tokenArrayFile = new File(experimentParameters.getTokenArrayInputPath());
     }
 
     /**

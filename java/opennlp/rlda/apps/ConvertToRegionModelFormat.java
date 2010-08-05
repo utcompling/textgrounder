@@ -16,38 +16,20 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.apps;
 
+import opennlp.rlda.converters.XMLToInternalConverter;
+
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class ConverterExperimentParameters extends ExperimentParameters {
+public class ConvertToRegionModelFormat {
 
-    /**
-     * Path to file that has been converted to internal format
-     *
-     * @return
-     */
-    public String getInputPath() {
-        return joinPath(projectRoot, corpusFilename);
-    }
+    public static void main(String[] args) throws Exception {
 
-    public String getOutputPath() {
-        return joinPath(projectRoot, processedOutputFilename);
-    }
-
-    public String getLexiconPath() {
-        return joinPath(projectRoot,lexiconFilename);
-    }
-
-    public String getRegionPath() {
-        return joinPath(projectRoot, regionFilename);
-    }
-
-    public int getCountCutoff() {
-        return countCutoff;
-    }
-
-    public int getDegreesPerRegion() {
-        return degreesPerRegion;
+        ConverterExperimentParameters experimentParameters = new ConverterExperimentParameters();
+        ExperimentParameterManipulator.loadParameters(experimentParameters, args[0], "RLDA");
+        XMLToInternalConverter converter = new XMLToInternalConverter(experimentParameters);
+        converter.convert();
+        converter.writeToFiles();
     }
 }
