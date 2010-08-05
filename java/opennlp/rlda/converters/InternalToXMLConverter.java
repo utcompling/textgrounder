@@ -191,11 +191,12 @@ public class InternalToXMLConverter {
                     copyAttributes(token, outtoken);
                     outsentence.addContent(outtoken);
 
-                    int istoponym = toponymArray.get(counter);
                     int isstopword = stopwordArray.get(counter);
                     int regid = regionArray.get(counter);
+                    int wordid = wordArray.get(counter);
                     String word = "";
                     if (token.getName().equals("w")) {
+                        word = token.getAttributeValue("tok").toLowerCase();
                         if (isstopword == 0) {
                             Region reg = regionIdToRegionMap.get(regid);
                             outtoken.setAttribute("long", String.format("%.2f", reg.centLon));
@@ -203,6 +204,7 @@ public class InternalToXMLConverter {
                         }
                         counter += 1;
                     } else if (token.getName().equals("toponym")) {
+                        word = token.getAttributeValue("term").toLowerCase();
                         ArrayList<Element> candidates = new ArrayList<Element>(token.getChild("candidates").getChildren());
                         if (!candidates.isEmpty()) {
                             Coordinate coord = matchCandidate(candidates, regid);
@@ -212,6 +214,19 @@ public class InternalToXMLConverter {
                         counter += 1;
                     } else {
                         continue;
+                    }
+
+                    String outword = lexicon.getWordForInt(wordid);
+                    if (!word.equals(outword)) {
+                        String did = document.getAttributeValue("id");
+                        String sid = sentence.getAttributeValue("id");
+                        int outdocid = docArray.get(counter);
+                        System.err.println(String.format("Mismatch between "
+                              + "tokens. Occurred at source document %s, "
+                              + "sentence %s, token %s and target document %d, "
+                              + "offset %d, token %s, token id %d",
+                              did, sid, word, outdocid, counter, outword, wordid));
+                        System.exit(1);
                     }
                 }
             }
