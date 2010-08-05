@@ -23,94 +23,101 @@ import org.w3c.dom.*;
 
 import opennlp.textgrounder.util.*;
 
-public class RandomModelXML {
-
-    private static final int CONTEXT_WINDOW_SIZE = 20;
+public class RandomModelXML extends ModelXML {
 
     private static Random myRandom = new Random();
 
-    private static DocumentBuilderFactory dbf;
-    private static DocumentBuilder db;
-
     public static void main(String[] args) throws Exception {
         RandomModelXML randomModelXML = new RandomModelXML(args[0], args[1]);
+        //ModelXML.main(args);
     }
-
+    
     public RandomModelXML(String inputXMLPath, String outputXMLPath) throws Exception {
-        dbf = DocumentBuilderFactory.newInstance();
+        super(inputXMLPath, outputXMLPath);
+        /*dbf = DocumentBuilderFactory.newInstance();
         db = dbf.newDocumentBuilder();
 
-        disambiguateToponyms(inputXMLPath, outputXMLPath);
+        disambiguateToponyms(inputXMLPath, outputXMLPath);*/
     }
 
-    private void disambiguateToponyms(String inputXMLPath, String outputXMLPath) throws Exception {
+    @Override
+    protected void disambiguateToponyms(String inputXMLPath, String outputXMLPath) throws Exception {
         Document outputDoc = db.newDocument();
         File inputXMLFile = new File(inputXMLPath);
-        if(inputXMLFile.isDirectory()) {
 
-            Element toponymsE = outputDoc.createElement("toponyms");
+        Element toponymsE = outputDoc.createElement("toponyms");
+
+        if(inputXMLFile.isDirectory()) {
 
             for(String filename : inputXMLFile.list()) {
                 if(filename.toLowerCase().endsWith(".xml")) {
                     disambiguateToponymsInSingleFile(inputXMLFile.getCanonicalPath() + File.separator + filename, outputDoc, toponymsE);
                 }
             }
-
-            outputDoc.appendChild(toponymsE);
-
-            XMLUtil.writeDocToFile(outputDoc, outputXMLPath);
         }
         else {
-            System.out.println(inputXMLPath + " isn't a directory.");
+            disambiguateToponymsInSingleFile(inputXMLPath, outputDoc, toponymsE);
         }
+
+        outputDoc.appendChild(toponymsE);
+
+        XMLUtil.writeDocToFile(outputDoc, outputXMLPath);
     }
 
     private void disambiguateToponymsInSingleFile(String inputXMLPath, Document outputDoc, Element toponymsE) throws Exception {
         Document inputDoc = db.parse(inputXMLPath);
 
-        String[] allTokens = XMLUtil.getAllTokens(inputDoc);
+        String[] allTokens = XMLUtil.getAllTokens(inputDoc, true);
         int tokenIndex = -1;
 
-        NodeList sentences = inputDoc.getChildNodes().item(1).getChildNodes();
+        //NodeList sentences = inputDoc.getChildNodes().item(1).getChildNodes();
+        NodeList corpusDocs = inputDoc.getChildNodes().item(0).getChildNodes();
 
-        for(int i = 0; i < sentences.getLength(); i++) {
-            if(!sentences.item(i).getNodeName().equals("s"))
+        for(int d = 0; d < corpusDocs.getLength(); d++) {
+            if(!corpusDocs.item(d).getNodeName().equals("doc"))
                 continue;
-            NodeList tokens = sentences.item(i).getChildNodes();
-            for(int j = 0; j < tokens.getLength(); j++) {
-                Node tokenNode = tokens.item(j);
-                if(tokenNode.getNodeName().equals("toponym")) {
-                    tokenIndex++;
 
-                    // checks if this toponym is unresolved (selected="NoneFromList") or not really a location (selected="NotALocation")
-                    if(tokenNode.getAttributes().getNamedItem("selected") != null)
-                        continue;
+            NodeList sentences = corpusDocs.item(d).getChildNodes();
 
-                    Node candidatesNode = tokenNode.getChildNodes().item(1);
-                    NodeList candidates = candidatesNode.getChildNodes();
-                    if(candidates.getLength() < 3)
-                        continue;
+            for(int i = 0; i < sentences.getLength(); i++) {
+                if(!sentences.item(i).getNodeName().equals("s"))
+                    continue;
+                NodeList tokens = sentences.item(i).getChildNodes();
+                for(int j = 0; j < tokens.getLength(); j++) {
+                    Node tokenNode = tokens.item(j);
+                    if(tokenNode.getNodeName().equals("toponym")) {
+                        tokenIndex++;
 
-                    int selectedIndex = disambiguateFromCandidateSet(candidates);
+                        // checks if this toponym is unresolved (selected="NoneFromList") or not really a location (selected="NotALocation")
+                        if(tokenNode.getAttributes().getNamedItem("selected") != null)
+                            continue;
 
-                    Node toponymNode = outputDoc.importNode(tokenNode, false);
-                    Element locationE = outputDoc.createElement("location");
-                    Element contextE = outputDoc.createElement("context");
-                    
-                    Node candidateNode = candidates.item(selectedIndex);
-                    assert(candidateNode.getNodeName().equals("cand"));
+                        Node candidatesNode = tokenNode.getChildNodes().item(1);
+                        NodeList candidates = candidatesNode.getChildNodes();
+                        if(candidates.getLength() < 3)
+                            continue;
 
-                    locationE.setAttribute("lat", candidateNode.getAttributes().getNamedItem("lat").getNodeValue());
-                    locationE.setAttribute("long", candidateNode.getAttributes().getNamedItem("long").getNodeValue());
-                    toponymNode.appendChild(locationE);
+                        int selectedIndex = disambiguateFromCandidateSet(candidates);
 
-                    contextE.setTextContent(StringUtil.join(XMLUtil.getContextWindow(allTokens, tokenIndex, CONTEXT_WINDOW_SIZE)));
-                    toponymNode.appendChild(contextE);
+                        Node toponymNode = outputDoc.importNode(tokenNode, false);
+                        Element locationE = outputDoc.createElement("location");
+                        Element contextE = outputDoc.createElement("context");
 
-                    toponymsE.appendChild(toponymNode);
-                }
-                else if(tokenNode.getNodeName().equals("w")) {
-                    tokenIndex++;
+                        Node candidateNode = candidates.item(selectedIndex);
+                        assert(candidateNode.getNodeName().equals("cand"));
+
+                        locationE.setAttribute("lat", candidateNode.getAttributes().getNamedItem("lat").getNodeValue());
+                        locationE.setAttribute("long", candidateNode.getAttributes().getNamedItem("long").getNodeValue());
+                        toponymNode.appendChild(locationE);
+
+                        contextE.setTextContent(StringUtil.join(XMLUtil.getContextWindow(allTokens, tokenIndex, CONTEXT_WINDOW_SIZE)));
+                        toponymNode.appendChild(contextE);
+
+                        toponymsE.appendChild(toponymNode);
+                    }
+                    else if(tokenNode.getNodeName().equals("w")) {
+                        tokenIndex++;
+                    }
                 }
             }
         }
@@ -118,7 +125,7 @@ public class RandomModelXML {
 
     private int disambiguateFromCandidateSet(NodeList candidates) {
         // These math acrobatics are necessary due to the #text elements between each cand element:
-        int randIndex = randIndex = myRandom.nextInt((candidates.getLength()-1)/2);
+        int randIndex = myRandom.nextInt((candidates.getLength()-1)/2);
         randIndex = (randIndex * 2) + 1;
 
         return randIndex;

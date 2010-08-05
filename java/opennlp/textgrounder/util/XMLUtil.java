@@ -14,8 +14,6 @@ import org.w3c.dom.*;
 
 public class XMLUtil {
 
-    
-
     public static void writeDocToFile(Document doc, String filename) throws Exception {
         Source source = new DOMSource(doc);
         File file = new File(filename);
@@ -35,8 +33,64 @@ public class XMLUtil {
         serializer.serialize(doc);*/
     }
 
-    public static String[] getAllTokens(Document doc) {
+    public static String[] getAllTokens(Document doc, boolean hasCorpusElement) {
         ArrayList<String> toReturnAL = new ArrayList<String>();
+
+        if(hasCorpusElement) {
+
+            NodeList corpusDocs = doc.getChildNodes().item(0).getChildNodes();
+
+            for(int d = 0; d < corpusDocs.getLength(); d++) {
+                if(!corpusDocs.item(d).getNodeName().equals("doc"))
+                    continue;
+
+                //System.out.println(doc.getChildNodes().getLength());
+
+                NodeList sentences = corpusDocs.item(d).getChildNodes();
+
+                for(int i = 0; i < sentences.getLength(); i++) {
+                    if(!sentences.item(i).getNodeName().equals("s"))
+                        continue;
+                    NodeList tokens = sentences.item(i).getChildNodes();
+                    for(int j = 0; j < tokens.getLength(); j++) {
+                        Node tokenNode = tokens.item(j);
+                        if(tokenNode.getNodeName().equals("toponym")) {
+                            toReturnAL.add(tokenNode.getAttributes().getNamedItem("term").getNodeValue());
+                        }
+                        else if(tokenNode.getNodeName().equals("w")) {
+                            toReturnAL.add(tokenNode.getAttributes().getNamedItem("tok").getNodeValue());
+                        }
+
+                    }
+                }
+            }
+        }
+        else {
+            NodeList sentences = doc.getChildNodes().item(1).getChildNodes();
+
+            for(int i = 0; i < sentences.getLength(); i++) {
+                if(!sentences.item(i).getNodeName().equals("s"))
+                    continue;
+                NodeList tokens = sentences.item(i).getChildNodes();
+                for(int j = 0; j < tokens.getLength(); j++) {
+                    Node tokenNode = tokens.item(j);
+                    if(tokenNode.getNodeName().equals("toponym")) {
+                        toReturnAL.add(tokenNode.getAttributes().getNamedItem("term").getNodeValue());
+                    }
+                    else if(tokenNode.getNodeName().equals("w")) {
+                        toReturnAL.add(tokenNode.getAttributes().getNamedItem("tok").getNodeValue());
+                    }
+
+                }
+            }
+        }
+
+        return toReturnAL.toArray(new String[0]);
+    }
+
+    public static String[] getAllTokens(Document doc) {
+        return getAllTokens(doc, false);
+        /*ArrayList<String> toReturnAL = new ArrayList<String>();
 
         NodeList sentences = doc.getChildNodes().item(1).getChildNodes();
 
@@ -57,6 +111,7 @@ public class XMLUtil {
         }
 
         return toReturnAL.toArray(new String[0]);
+        */
     }
 
     public static String[] getContextWindow(String[] a, int index, int windowSize) {

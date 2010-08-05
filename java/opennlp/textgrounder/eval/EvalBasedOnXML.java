@@ -30,7 +30,7 @@ public class EvalBasedOnXML {
         dbf = DocumentBuilderFactory.newInstance();
         db = dbf.newDocumentBuilder();
 
-        TRXMLtoSingleFile(TRXMLPath, "tr-gold.xml");
+        //TRXMLtoSingleFile(TRXMLPath, "tr-gold.xml");
         
         doEval("tr-gold.xml", modelXMLPath);
     }
@@ -71,6 +71,8 @@ public class EvalBasedOnXML {
         int numTopsInTR = trUnmatched.size();
         int numTopsInModel = modelUnmatched.size();
 
+        //int matchCount = 0;
+
         for(int i = 0; i < trToponyms.getLength(); i++) {
 
             Node TRTopN = trToponyms.item(i);
@@ -102,6 +104,7 @@ public class EvalBasedOnXML {
                 String modelContextSignature = convertContextToSignature(modelContextN.getTextContent(), CONTEXT_SIGNATURE_WINDOW_SIZE);
 
                 if(!trContextSignature.equals(modelContextSignature)) {
+                    //System.out.println(trContextSignature + " did not match " + modelContextSignature);
                     continue;
                 }
 
@@ -110,8 +113,13 @@ public class EvalBasedOnXML {
                 Node modelLocationN = ModelTopN.getChildNodes().item(1);
                 Location modelLocation = new Location();
                 modelLocation.setName(ModelTopN.getAttributes().getNamedItem("term").getNodeValue());
-                modelLocation.setCoord(new Coordinate(Double.parseDouble(modelLocationN.getAttributes().getNamedItem("long").getNodeValue()),
-                                                    Double.parseDouble(modelLocationN.getAttributes().getNamedItem("lat").getNodeValue())));
+                modelLocation.setCoord(new Coordinate(Double.parseDouble(modelLocationN.getAttributes().getNamedItem("lat").getNodeValue()),
+                                                    Double.parseDouble(modelLocationN.getAttributes().getNamedItem("long").getNodeValue())));// flipped
+
+                //System.out.println(trContextSignature + " matched " + modelContextSignature);
+                //matchCount++;
+
+
                 
                 if(trLocation.looselyMatches(modelLocation, 1.0)) {
                     t_c++;
@@ -138,6 +146,9 @@ public class EvalBasedOnXML {
         System.out.println("Precision: " + precision);
         System.out.println("Recall: " + recall);
         System.out.println("F-score: " + f1);
+
+        //System.out.println("t_n = " + t_n);
+        //System.out.println("matchCount = " + matchCount);
     }
 
     private HashSet<Integer> getToponymSet(String xmlPath) throws Exception {
