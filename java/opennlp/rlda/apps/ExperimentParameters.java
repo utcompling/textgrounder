@@ -17,6 +17,9 @@
 package opennlp.rlda.apps;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -215,5 +218,15 @@ public class ExperimentParameters {
         }
 
         return sb.toString();
+    }
+
+    public void setProjectRoot(String root) {
+        if (projectRoot.equals(".")) {
+            try {
+                projectRoot = (new File(root)).getCanonicalPath();
+            } catch (IOException ex) {
+                Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
     }
 }
