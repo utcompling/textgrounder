@@ -18,20 +18,23 @@ package opennlp.rlda.converters;
 
 import java.io.EOFException;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import opennlp.rlda.apps.ConverterExperimentParameters;
 import opennlp.rlda.textstructs.*;
 import opennlp.rlda.topostructs.*;
 import opennlp.rlda.wrapper.io.*;
+import org.jdom.Attribute;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;
 import org.jdom.input.SAXBuilder;
+import org.jdom.output.Format;
+import org.jdom.output.XMLOutputter;
 
 /**
  *
@@ -82,8 +85,6 @@ public class InternalToXMLConverter {
 
         pathToInput = converterExperimentParameters.getInputPath();
         pathToOutput = converterExperimentParameters.getOutputPath();
-
-        degreesPerRegion = converterExperimentParameters.getDegreesPerRegion();
     }
 
     /**
@@ -104,8 +105,16 @@ public class InternalToXMLConverter {
          */
         InputReader inputReader = new BinaryInputReader(converterExperimentParameters);
 
-        inputReader.readLexicon(lexicon);
-        inputReader.readRegions(regionMatrix);
+        lexicon = inputReader.readLexicon();
+        regionMatrix = inputReader.readRegions();
+
+        for (Region[] regions : regionMatrix) {
+            for (Region region : regions) {
+                if (region != null) {
+                    regionIdToRegionMap.put(region.id, region);
+                }
+            }
+        }
 
         /**
          * Read in processed tokens
@@ -165,52 +174,41 @@ public class InternalToXMLConverter {
         ArrayList<Element> documents = new ArrayList<Element>(inroot.getChildren());
         for (Element document : documents) {
             Element outdocument = new Element(document.getName());
-            outdocument.setAttributes(document.getAttributes());
+            copyAttributes(document, outdocument);
             outroot.addContent(outdocument);
 
             ArrayList<Element> sentences = new ArrayList<Element>(document.getChildren());
             for (Element sentence : sentences) {
 
                 Element outsentence = new Element(sentence.getName());
-                outsentence.setAttributes(sentence.getAttributes());
+                copyAttributes(sentence, outsentence);
                 outdocument.addContent(outsentence);
 
                 ArrayList<Element> tokens = new ArrayList<Element>(sentence.getChildren());
                 for (Element token : tokens) {
 
                     Element outtoken = new Element(token.getName());
-                    outtoken.setAttributes(token.getAttributes());
+                    copyAttributes(token, outtoken);
                     outsentence.addContent(outtoken);
 
                     int istoponym = toponymArray.get(counter);
                     int isstopword = stopwordArray.get(counter);
-                    int wordid = 0;
+                    int regid = regionArray.get(counter);
                     String word = "";
                     if (token.getName().equals("w")) {
-                        word = token.getAttributeValue("tok").toLowerCase();
-                        wordid = lexicon.addOrGetWord(word);
-
+                        if (isstopword == 0) {
+                            Region reg = regionIdToRegionMap.get(regid);
+                            outtoken.setAttribute("long", String.format("%.2f", reg.centLon));
+                            outtoken.setAttribute("lat", String.format("%.2f", reg.centLat));
+                        }
                         counter += 1;
                     } else if (token.getName().equals("toponym")) {
-                        word = token.getAttributeValue("term").toLowerCase();
-                        istoponym = 1;
-                        wordid = lexicon.addOrGetWord(word);
                         ArrayList<Element> candidates = new ArrayList<Element>(token.getChild("candidates").getChildren());
                         if (!candidates.isEmpty()) {
-                            for (Element candidate : candidates) {
-                                double lon = Double.parseDouble(candidate.getAttributeValue("long"));
-                                double lat = Double.parseDouble(candidate.getAttributeValue("lat"));
-                                Location loc = new Location(wordid, new Coordinate(lon, lat));
-
-                                if (!toponymToRegionIDsMap.containsKey(wordid)) {
-                                    toponymToRegionIDsMap.put(wordid, new HashSet<Integer>());
-                                }
-
-                                toponymToRegionIDsMap.get(wordid).add(regid);
-                            }
-                        } else {
+                            Coordinate coord = matchCandidate(candidates, regid);
+                            outtoken.setAttribute("long", String.format("%.2f", coord.longitude));
+                            outtoken.setAttribute("lat", String.format("%.2f", coord.latitude));
                         }
-
                         counter += 1;
                     } else {
                         continue;
@@ -218,6 +216,39 @@ public class InternalToXMLConverter {
                 }
             }
             docid += 1;
+        }
+
+        try {
+            XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
+            xout.output(outdoc, new FileOutputStream(new File(pathToOutput)));
+        } catch (IOException ex) {
+            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+    }
+
+    protected Coordinate matchCandidate(ArrayList<Element> _candidates,
+          int _regionid) {
+        Region candregion = regionIdToRegionMap.get(_regionid);
+        Coordinate candcoord = new Coordinate(candregion.centLon, candregion.centLat);
+
+        for (Element candidate : _candidates) {
+            double lon = Double.parseDouble(candidate.getAttributeValue("long"));
+            double lat = Double.parseDouble(candidate.getAttributeValue("lat"));
+
+            if (lon <= candregion.maxLon && lon >= candregion.minLon) {
+                if (lat <= candregion.maxLat && lat >= candregion.minLat) {
+                    candcoord = new Coordinate(lon, lat);
+                }
+            }
+        }
+
+        return candcoord;
+    }
+
+    protected void copyAttributes(Element src, Element trg) {
+        for (Attribute attr : new ArrayList<Attribute>(src.getAttributes())) {
+            trg.setAttribute(attr.getName(), attr.getValue());
         }
     }
 }

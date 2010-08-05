@@ -39,11 +39,12 @@ public abstract class InputReader extends IOBase {
         tokenArrayFile = new File(experimentParameters.getTokenArrayOutputPath());
     }
 
-    public void readLexicon(Lexicon _lexicon) {
+    public Lexicon readLexicon() {
         ObjectInputStream lexiconIn = null;
+        Lexicon lexicon = null;
         try {
             lexiconIn = new ObjectInputStream(new GZIPInputStream(new FileInputStream(lexiconFile.getCanonicalPath())));
-            _lexicon = (Lexicon) lexiconIn.readObject();
+            lexicon = (Lexicon) lexiconIn.readObject();
         } catch (IOException ex) {
             Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
@@ -51,13 +52,15 @@ public abstract class InputReader extends IOBase {
             Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
+        return lexicon;
     }
 
-    public void readRegions(Region[][] _regions) {
+    public Region[][] readRegions() {
         ObjectInputStream regionIn = null;
+        Region[][] regionMatrix = null;
         try {
             regionIn = new ObjectInputStream(new GZIPInputStream(new FileInputStream(regionFile.getCanonicalPath())));
-            _regions = (Region[][]) regionIn.readObject();
+            regionMatrix = (Region[][]) regionIn.readObject();
         } catch (IOException ex) {
             Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
@@ -65,6 +68,7 @@ public abstract class InputReader extends IOBase {
             Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
+        return regionMatrix;
     }
 
     public abstract void openTokenArrayReader();

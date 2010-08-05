@@ -30,6 +30,5 @@ public class ConvertFromRegionModelFormat {
         ExperimentParameterManipulator.loadParameters(experimentParameters, args[0], "RLDA");
         InternalToXMLConverter converter = new InternalToXMLConverter(experimentParameters);
         converter.convert();
-        converter.writeToFiles();
     }
 }
