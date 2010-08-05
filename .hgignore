@@ -4,6 +4,10 @@ syntax: glob
 output
 netbeans
 *.kml
+*.gz
+**/*.orig
 data/pcl_travel
 data/trdev
+data/xml-trdev
+data/raw-trdev
 api
