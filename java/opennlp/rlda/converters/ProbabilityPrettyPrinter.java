@@ -16,20 +16,29 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.rlda.converters;
 
+import java.io.BufferedWriter;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.OutputStreamWriter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import opennlp.rlda.apps.ConverterExperimentParameters;
 import opennlp.rlda.apps.ExperimentParameters;
 import opennlp.rlda.structs.IntDoublePair;
 import opennlp.rlda.wrapper.io.InputReader;
 import opennlp.rlda.structs.NormalizedProbabilityWrapper;
 import opennlp.rlda.textstructs.Lexicon;
+import opennlp.rlda.topostructs.Coordinate;
 import opennlp.rlda.topostructs.Region;
 import opennlp.rlda.wrapper.io.BinaryInputReader;
 
@@ -83,7 +92,14 @@ public class ProbabilityPrettyPrinter {
      * 
      */
     protected Lexicon lexicon = null;
+    /**
+     *
+     */
     protected Region[][] regionMatrix = null;
+    /**
+     *
+     */
+    protected HashMap<Integer, Region> regionIdToRegionMap;
     /**
      *
      */
@@ -114,86 +130,99 @@ public class ProbabilityPrettyPrinter {
 
         lexicon = inputReader.readLexicon();
         regionMatrix = inputReader.readRegions();
+
+        regionIdToRegionMap = new HashMap<Integer, Region>();
+        for (Region[] regions : regionMatrix) {
+            for (Region region : regions) {
+                if (region != null) {
+                    regionIdToRegionMap.put(region.id, region);
+                }
+            }
+        }
     }
 
     /**
-     * Create two normalized probability tables, {@link #TopWordsPerTopic} and
-     * {@link #topicProbs}. {@link #topicProbs} overwrites previous values.
-     * {@link #TopWordsPerTopic} only retains first {@link #outputPerTopic}
-     * words and values.
+     * 
      */
     public void normalizeAndPrintWordByRegion() {
+        try {
+            String wordByRegionFilename = experimentParameters.getWordByRegionProbabilitiesPath();
+            BufferedWriter wordByRegionWriter = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(wordByRegionFilename))));
 
-//        wordByRegionProbs = new double[W * R];
-
-        topWordsPerRegion = new IntDoublePair[R][];
-        for (int i = 0; i < R; ++i) {
-            topWordsPerRegion[i] = new IntDoublePair[outputPerClass];
-        }
-
-        regionProbs = new double[R];
-
-        Double sum = 0.;
-        for (int i = 0; i < R; ++i) {
-            sum += regionProbs[i] = normalizedRegionCounts[i] + betaW;
-            ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
-            for (int j = 0; j < W; ++j) {
-                topWords.add(new IntDoublePair(j, normalizedWordByRegionCounts[j * R + i] + beta));
-                wordByRegionProbs[j * R + i] = (normalizedWordByRegionCounts[j * R + i] + beta) / regionProbs[i];
+            double sum = 0.;
+            for (int i = 0; i < R; ++i) {
+                sum += normalizedRegionCounts[i];
             }
-            Collections.sort(topWords);
-            int j = 0;
-            try {
-                for (; j < outputPerClass; ++j) {
-                    topWordsPerRegion[i][j] =
-                          new IntDoublePair(topWords.get(j).wordid, topWords.get(j).count / regionProbs[i]);
-                }
-            } catch (IndexOutOfBoundsException e) {
-                for (; j < outputPerClass; ++j) {
-                    topWordsPerRegion[i][j] = new IntDoublePair(-1, 0);
-                }
-            }
-        }
 
-        for (int i = 0; i < R; ++i) {
-            regionProbs[i] /= sum;
+            for (int i = 0; i < R; ++i) {
+                ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
+                for (int j = 0; j < W; ++j) {
+                    topWords.add(new IntDoublePair(j, normalizedWordByRegionCounts[j * R + i]));
+                }
+                Collections.sort(topWords);
+
+                Region region = regionIdToRegionMap.get(i);
+                wordByRegionWriter.write(String.format("Region%04d\t%.2f\t%.2f\t%.8e", i, region.centLon, region.centLat, normalizedRegionCounts[i] / sum));
+                wordByRegionWriter.newLine();
+                for (IntDoublePair pair : topWords) {
+                    wordByRegionWriter.write(String.format("%s\t%.8e", lexicon.getWordForInt(pair.index), pair.count / normalizedRegionCounts[i]));
+                    wordByRegionWriter.newLine();
+                }
+                wordByRegionWriter.newLine();
+            }
+
+            wordByRegionWriter.close();
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        } catch (IOException ex) {
+            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
         }
     }
-//    /**
-//     * Print the normalized sample counts for each topic to out. Print only the top {@link
-//     * #outputPerTopic} per given topic.
-//     *
-//     * @param out
-//     * @throws IOException
-//     */
-//    protected void printTopics(BufferedWriter out) throws IOException {
-//        int startt = 0, M = 4, endt = Math.min(M + startt, topicProbs.length);
-//        out.write("***** Word Probabilities by Topic *****\n\n");
-//        while (startt < T) {
-//            for (int i = startt; i < endt; ++i) {
-//                String header = "T_" + i;
-//                header = String.format("%25s\t%6.5f\t", header, topicProbs[i]);
-//                out.write(header);
-//            }
-//
-//            out.newLine();
-//            out.newLine();
-//
-//            for (int i = 0;
-//                  i < outputPerClass; ++i) {
-//                for (int c = startt; c < endt; ++c) {
-//                    String line = String.format("%25s\t%6.5f\t",
-//                          topWordsPerTopic[c][i].stringValue,
-//                          topWordsPerTopic[c][i].doubleValue);
-//                    out.write(line);
-//                }
-//                out.newLine();
-//            }
-//            out.newLine();
-//            out.newLine();
-//
-//            startt = endt;
-//            endt = java.lang.Math.min(T, startt + M);
-//        }
-//    }
+
+    /**
+     *
+     */
+    public void normalizeAndPrintRegionByWord() {
+        try {
+            String regionByWordFilename = experimentParameters.getRegionByWordProbabilitiesPath();
+            BufferedWriter regionByWordWriter = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(regionByWordFilename))));
+
+            double[] wordCounts = new double[W];
+
+            for (int i = 0; i < W; ++i) {
+                wordCounts[i] = 0;
+                int wordoff = i * R;
+                for (int j = 0; j < R; ++j) {
+                    wordCounts[i] += normalizedWordByRegionCounts[wordoff + j];
+                }
+            }
+
+            for (int i = 0; i < W; ++i) {
+                int wordoff = i * R;
+                ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
+                for (int j = 0; j < R; ++j) {
+                    topRegions.add(new IntDoublePair(j, normalizedWordByRegionCounts[wordoff + i]));
+                }
+                Collections.sort(topRegions);
+
+                regionByWordWriter.write(String.format("%s", lexicon.getWordForInt(i)));
+                for (IntDoublePair pair : topRegions) {
+                    Region region = regionIdToRegionMap.get(pair.index);
+                    regionByWordWriter.write(String.format("%.2f\t%.2f\t%.8e", region.centLon, region.centLat, pair.count / wordCounts[i]));
+                    regionByWordWriter.newLine();
+                }
+                regionByWordWriter.newLine();
+            }
+
+            regionByWordWriter.close();
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        } catch (IOException ex) {
+            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+    }
 }

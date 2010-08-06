@@ -14,37 +14,24 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.structs;
+package opennlp.rlda.apps;
+
+import opennlp.rlda.converters.ProbabilityPrettyPrinter;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class IntDoublePair implements Comparable<IntDoublePair> {
+public class PrettyPrintProbabilities extends BaseApp {
 
-    public int index = 0;
-    public double count = 0;
+    public static void main(String[] args) {
 
-    public IntDoublePair(int _wordid, double _count) {
-        index = _wordid;
-        count = _count;
-    }
+        ConverterExperimentParameters experimentParameters = new ConverterExperimentParameters();
+        processRawCommandline(args, experimentParameters);
 
-    /**
-     * sorting order is reversed -- higher (double) values come first
-     *
-     * @param p
-     * @return
-     */
-    @Override
-    public int compareTo(IntDoublePair p) {
-        if (count < p.count) {
-            return 1;
-        } else if (count > p.count) {
-            return -1;
-        } else {
-            return 0;
-        }
-
+        ProbabilityPrettyPrinter probabilityPrettyPrinter = new ProbabilityPrettyPrinter(experimentParameters);
+        probabilityPrettyPrinter.readFiles();
+        probabilityPrettyPrinter.normalizeAndPrintRegionByWord();
+        probabilityPrettyPrinter.normalizeAndPrintWordByRegion();
     }
 }
