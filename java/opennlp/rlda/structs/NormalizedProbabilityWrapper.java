@@ -14,41 +14,25 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.io;
 
-import java.io.File;
-import opennlp.rlda.apps.ExperimentParameters;
+package opennlp.rlda.structs;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class OutputWriter extends IOBase {
-
-    /**
-     * 
-     * @param _experimentParameters
-     */
-    public OutputWriter(ExperimentParameters _experimentParameters) {
-        super(_experimentParameters);
-        tokenArrayFile = new File(experimentParameters.getTokenArrayOutputPath());
-    }
-
+public class NormalizedProbabilityWrapper {
     /**
      *
      */
-    public abstract void openTokenArrayWriter();
-
+    public double[] normalizedRegionCounts;
     /**
      *
      */
-    public abstract void writeTokenArray(
-          int[] _wordVector, int[] _documentVector, int[] _toponymVector,
-          int[] _stopwordVector, int[] _regionVector);
+    public double[] normalizedWordByRegionCounts;
+    /**
+     *
+     */
+    public double[] normalizedRegionByDocumentCounts;
 
-    public abstract void writeWordByRegionProbs();
-
-    public abstract void writeRegionByWordProbs();
-
-    public abstract void writeRegionByDocumentProbs();
 }

@@ -31,7 +31,18 @@ public class BaseApp {
     /**
      * 
      */
-    protected static String helpMessage = null;
+    protected static String helpMessage = "To run:\n"
+          + "\tcommand PATH_TO_INPUT [PARAMETER_FILE]\n\n"
+          + "PATH_TO_INPUT is a required argument. It specifies a directory to \n"
+          + "the files required for running rlda experiments. Two files must \n"
+          + "exist in this directory. One is a parameters file for experiments \n"
+          + "and the other is the input file, which by default should be named \n"
+          + "\"input.xml\". It is possible to change the name of this input \n"
+          + "file from within the parameters file.\n\n"
+          + "PARAMETER_FILE is an optional parameter. If you do not supply this, \n"
+          + "it will default to \"exp-parameters.xml\" which must exist in \n"
+          + "PATH_TO_INPUT. Even if you do designate your own filename for the \n"
+          + "parameters, it must still reside in the input path.";
 
     /**
      * Takes an Options instance and adds/sets command line options.
@@ -69,6 +80,7 @@ public class BaseApp {
             System.exit(1);
         } catch(ArrayIndexOutOfBoundsException ex) {
             System.err.println(helpMessage);
+            System.exit(1);
         }
 
         String paramFilename = null;

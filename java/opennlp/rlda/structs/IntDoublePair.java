@@ -14,41 +14,37 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.io;
-
-import java.io.File;
-import opennlp.rlda.apps.ExperimentParameters;
+package opennlp.rlda.structs;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class OutputWriter extends IOBase {
+public class IntDoublePair implements Comparable<IntDoublePair> {
 
-    /**
-     * 
-     * @param _experimentParameters
-     */
-    public OutputWriter(ExperimentParameters _experimentParameters) {
-        super(_experimentParameters);
-        tokenArrayFile = new File(experimentParameters.getTokenArrayOutputPath());
+    public int wordid = 0;
+    public double count = 0;
+
+    public IntDoublePair(int _wordid, double _count) {
+        wordid = _wordid;
+        count = _count;
     }
 
     /**
+     * sorting order is reversed -- higher (double) values come first
      *
+     * @param p
+     * @return
      */
-    public abstract void openTokenArrayWriter();
+    @Override
+    public int compareTo(IntDoublePair p) {
+        if (count < p.count) {
+            return 1;
+        } else if (count > p.count) {
+            return -1;
+        } else {
+            return 0;
+        }
 
-    /**
-     *
-     */
-    public abstract void writeTokenArray(
-          int[] _wordVector, int[] _documentVector, int[] _toponymVector,
-          int[] _stopwordVector, int[] _regionVector);
-
-    public abstract void writeWordByRegionProbs();
-
-    public abstract void writeRegionByWordProbs();
-
-    public abstract void writeRegionByDocumentProbs();
+    }
 }

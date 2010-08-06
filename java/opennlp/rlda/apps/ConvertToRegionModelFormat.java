@@ -26,8 +26,6 @@ public class ConvertToRegionModelFormat extends BaseApp {
 
     public static void main(String[] args) {
 
-        helpMessage = "";
-
         ConverterExperimentParameters experimentParameters = new ConverterExperimentParameters();
         processRawCommandline(args, experimentParameters);
 

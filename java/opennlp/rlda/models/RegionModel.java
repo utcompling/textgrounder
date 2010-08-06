@@ -18,6 +18,7 @@ package opennlp.rlda.models;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -30,6 +31,7 @@ import opennlp.rlda.io.BinaryOutputWriter;
 import opennlp.rlda.io.InputReader;
 import opennlp.rlda.io.OutputWriter;
 import opennlp.rlda.io.TextInputReader;
+import opennlp.rlda.structs.IntDoublePair;
 
 /**
  *
@@ -48,15 +50,23 @@ public class RegionModel extends RegionModelFields {
     /**
      * 
      */
-    protected ExperimentParameters experimentParameters;
+    protected transient ExperimentParameters experimentParameters;
     /**
      * 
      */
-    protected InputReader inputReader;
+    protected transient InputReader inputReader;
     /**
      * 
      */
-    protected OutputWriter outputWriter;
+    protected transient OutputWriter outputWriter;
+    /**
+     *
+     */
+    protected transient final static int outputPerClass = 1000;
+    /**
+     * 
+     */
+    protected transient IntDoublePair[][] topWordsPerRegion = null;
 
     /**
      * Default constructor. Take input from commandline and default _options
@@ -310,16 +320,16 @@ public class RegionModel extends RegionModelFields {
     /**
      * Train topics
      *
-     * @param annealer Annealing scheme to use
+     * @param decoder Annealing scheme to use
      */
-    public void train(Annealer annealer) {
+    public void train(Annealer _annealer) {
         int wordid, docid, regionid;
         int wordoff, docoff;
         int istoponym, isstopword;
         double[] probs = new double[R];
         double totalprob, max, r;
 
-        while (annealer.nextIter()) {
+        while (_annealer.nextIter()) {
             for (int i = 0; i < N; ++i) {
                 isstopword = stopwordVector[i];
                 if (isstopword == 0) {
@@ -340,8 +350,8 @@ public class RegionModel extends RegionModelFields {
                                 probs[j] = (wordByRegionCounts[wordoff + j] + beta)
                                       / (regionCounts[j] + betaW)
                                       * (regionByDocumentCounts[docoff + j] + alpha)
-                                      * regionByToponymFilter[wordoff + j]
-                                      * activeRegionByDocumentFilter[docoff + j];
+                                      * regionByToponymFilter[wordoff + j];
+//                                      * activeRegionByDocumentFilter[docoff + j];
                             }
                         } else {
                             for (int j = 0;; ++j) {
@@ -352,7 +362,7 @@ public class RegionModel extends RegionModelFields {
                         }
                     } catch (ArrayIndexOutOfBoundsException e) {
                     }
-                    totalprob = annealer.annealProbs(probs);
+                    totalprob = _annealer.annealProbs(probs);
                     r = rand.nextDouble() * totalprob;
 
                     max = probs[0];
@@ -369,7 +379,7 @@ public class RegionModel extends RegionModelFields {
                 }
             }
 
-            annealer.collectSamples(regionCounts, wordByRegionCounts);
+            _annealer.collectSamples(regionCounts, wordByRegionCounts, regionByDocumentCounts);
         }
     }
 
@@ -379,15 +389,61 @@ public class RegionModel extends RegionModelFields {
         System.err.println(String.format("Beginning training with %d tokens, %d words, %d regions, %d documents", N, W, R, D));
         train(annealer);
         if (annealer.getSamples() != 0) {
-            regionProbs = annealer.getTopicSampleCounts();
-            wordByRegionProbs = annealer.getWordByTopicSampledProbs();
+            normalizedRegionCounts = annealer.getNormalizedTopicSampleCounts();
+            normalizedWordByRegionCounts = annealer.getNormalizedWordByTopicSampledProbs();
+            normalizedRegionByDocumentCounts = annealer.getNormalizedRegionByDocumentSampledCounts();
         }
     }
 
     public void decode() {
         System.err.println(String.format("Decoding maximum posterior topics"));
-        Annealer mpd = new MaximumPosteriorDecoder();
-        train(mpd);
+        Annealer decoder = new MaximumPosteriorDecoder();
+        int wordid, docid, regionid;
+        int wordoff, docoff;
+        int istoponym, isstopword;
+        double[] probs = new double[R];
+        double totalprob, max, r;
+
+        for (int i = 0; i < N; ++i) {
+            isstopword = stopwordVector[i];
+            if (isstopword == 0) {
+                wordid = wordVector[i];
+                docid = documentVector[i];
+                regionid = regionVector[i];
+                istoponym = toponymVector[i];
+                docoff = docid * R;
+                wordoff = wordid * R;
+
+                try {
+                    if (istoponym == 1) {
+                        for (int j = 0;; ++j) {
+                            probs[j] = (normalizedWordByRegionCounts[wordoff + j] + beta)
+                                  / (normalizedRegionCounts[j] + betaW)
+                                  * (normalizedRegionByDocumentCounts[docoff + j] + alpha)
+                                  * regionByToponymFilter[wordoff + j];
+//                                      * activeRegionByDocumentFilter[docoff + j];
+                        }
+                    } else {
+                        for (int j = 0;; ++j) {
+                            probs[j] = (normalizedWordByRegionCounts[wordoff + j] + beta)
+                                  / (normalizedRegionCounts[j] + betaW)
+                                  * (normalizedRegionByDocumentCounts[docoff + j] + alpha);
+                        }
+                    }
+                } catch (ArrayIndexOutOfBoundsException e) {
+                }
+                totalprob = decoder.annealProbs(probs);
+                r = rand.nextDouble() * totalprob;
+
+                max = probs[0];
+                regionid = 0;
+                while (r > max) {
+                    regionid++;
+                    max += probs[regionid];
+                }
+                regionVector[i] = regionid;
+            }
+        }
     }
 
     public void normalize() {
@@ -407,23 +463,9 @@ public class RegionModel extends RegionModelFields {
 
     public void write() {
         outputWriter = new BinaryOutputWriter(experimentParameters);
-        outputWriter.writeTokenArrayWriter(wordVector, documentVector, toponymVector, stopwordVector, regionVector);
+        outputWriter.writeTokenArray(wordVector, documentVector, toponymVector, stopwordVector, regionVector);
     }
-    
-//    /**
-//     *
-//     * @param _inputFilename
-//     * @throws IOException
-//     */
-//    public void loadModel(String _inputFilename) throws IOException {
-//        ObjectInputStream modelIn =
-//              new ObjectInputStream(new GZIPInputStream(new FileInputStream(_inputFilename)));
-//        try {
-//            this = (RegionModel) modelIn.readObject();
-//        } catch (ClassNotFoundException ex) {
-//            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
-//        }
-//    }
+
     /**
      * Copy a sequence of numbers from ta to array ia.
      *

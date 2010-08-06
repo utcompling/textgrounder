@@ -25,8 +25,6 @@ import opennlp.rlda.converters.InternalToXMLConverter;
 public class ConvertFromRegionModelFormat extends BaseApp {
 
     public static void main(String[] args) {
-
-        helpMessage = "";
         
         ConverterExperimentParameters experimentParameters = new ConverterExperimentParameters();
         processRawCommandline(args, experimentParameters);

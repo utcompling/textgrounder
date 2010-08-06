@@ -14,41 +14,13 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.io;
 
-import java.io.File;
-import opennlp.rlda.apps.ExperimentParameters;
+package opennlp.sphericalballs.textstructs;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class OutputWriter extends IOBase {
+public class Lexicon {
 
-    /**
-     * 
-     * @param _experimentParameters
-     */
-    public OutputWriter(ExperimentParameters _experimentParameters) {
-        super(_experimentParameters);
-        tokenArrayFile = new File(experimentParameters.getTokenArrayOutputPath());
-    }
-
-    /**
-     *
-     */
-    public abstract void openTokenArrayWriter();
-
-    /**
-     *
-     */
-    public abstract void writeTokenArray(
-          int[] _wordVector, int[] _documentVector, int[] _toponymVector,
-          int[] _stopwordVector, int[] _regionVector);
-
-    public abstract void writeWordByRegionProbs();
-
-    public abstract void writeRegionByWordProbs();
-
-    public abstract void writeRegionByDocumentProbs();
 }

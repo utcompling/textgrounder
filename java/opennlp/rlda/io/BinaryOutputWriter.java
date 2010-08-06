@@ -71,9 +71,8 @@ public class BinaryOutputWriter extends OutputWriter {
      *
      */
     @Override
-    public void writeTokenArrayWriter(
-          int[] _wordVector, int[] _documentVector, int[] _toponymVector,
-          int[] _stopwordVector, int[] _regionVector) {
+    public void writeTokenArray(int[] _wordVector, int[] _documentVector,
+          int[] _toponymVector, int[] _stopwordVector, int[] _regionVector) {
         try {
             for (int i = 0; i < _wordVector.length; ++i) {
                 int wordid = _wordVector[i];
@@ -93,5 +92,20 @@ public class BinaryOutputWriter extends OutputWriter {
             Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
+    }
+
+    @Override
+    public void writeWordByRegionProbs() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void writeRegionByWordProbs() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void writeRegionByDocumentProbs() {
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 }

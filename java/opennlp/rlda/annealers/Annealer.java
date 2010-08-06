@@ -83,7 +83,11 @@ public abstract class Annealer {
      * Counts of tcount per topic. However, since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.
      */
-    protected double[] wordByTopicSampledProbs = null;
+    protected double[] wordByTopicSampledCounts = null;
+    /**
+     * 
+     */
+    protected double[] regionByDocumentSampledCounts = null;
     /**
      * To sample or not to sample
      */
@@ -212,7 +216,7 @@ public abstract class Annealer {
      * @param _wordByTopicCounts
      * @param b
      */
-    public void collectSamples(int[] _topicCounts, int[] _wordByTopicCounts) {
+    public void collectSamples(int[] _topicCounts, int[] _wordByTopicCounts, int[] _regionByDocumentCounts) {
         if (sampleCount < samples) {
             if (sampleiteration && (innerIter % lag == 0)) {
                 sampleCount += 1;
@@ -223,12 +227,16 @@ public abstract class Annealer {
                 System.err.print("(sample:" + (innerIter + 1) / lag + ")");
                 if (topicSampleCounts == null) {
                     topicSampleCounts = new double[_topicCounts.length];
-                    wordByTopicSampledProbs = new double[_wordByTopicCounts.length];
+                    wordByTopicSampledCounts = new double[_wordByTopicCounts.length];
+                    regionByDocumentSampledCounts = new double[_regionByDocumentCounts.length];
                     for (int i = 0; i < _topicCounts.length; ++i) {
                         topicSampleCounts[i] = 0;
                     }
                     for (int i = 0; i < _wordByTopicCounts.length; ++i) {
-                        wordByTopicSampledProbs[i] = 0;
+                        wordByTopicSampledCounts[i] = 0;
+                    }
+                    for(int i = 0; i < _regionByDocumentCounts.length; ++i) {
+                        regionByDocumentSampledCounts[i] = 0;
                     }
                 }
 
@@ -236,7 +244,10 @@ public abstract class Annealer {
                     topicSampleCounts[i] += _topicCounts[i];
                 }
                 for (int i = 0; i < _wordByTopicCounts.length; ++i) {
-                    wordByTopicSampledProbs[i] += _wordByTopicCounts[i];
+                    wordByTopicSampledCounts[i] += _wordByTopicCounts[i];
+                }
+                for(int i = 0; i < _regionByDocumentCounts.length; ++i) {
+                    regionByDocumentSampledCounts[i] += _regionByDocumentCounts[i];
                 }
             }
 
@@ -253,8 +264,11 @@ public abstract class Annealer {
         for (int i = 0; i < topicSampleCounts.length; ++i) {
             topicSampleCounts[i] /= sampleCount;
         }
-        for (int i = 0; i < wordByTopicSampledProbs.length; ++i) {
-            wordByTopicSampledProbs[i] /= sampleCount;
+        for (int i = 0; i < wordByTopicSampledCounts.length; ++i) {
+            wordByTopicSampledCounts[i] /= sampleCount;
+        }
+        for(int i = 0; i < regionByDocumentSampledCounts.length; ++i) {
+            regionByDocumentSampledCounts[i] /= sampleCount;
         }
     }
 
@@ -268,15 +282,19 @@ public abstract class Annealer {
     /**
      * @return the topicSampleCounts
      */
-    public double[] getTopicSampleCounts() {
+    public double[] getNormalizedTopicSampleCounts() {
         return topicSampleCounts;
     }
 
     /**
-     * @return the wordByTopicSampledProbs
+     * @return the wordByTopicSampledCounts
      */
-    public double[] getWordByTopicSampledProbs() {
-        return wordByTopicSampledProbs;
+    public double[] getNormalizedWordByTopicSampledProbs() {
+        return wordByTopicSampledCounts;
+    }
+
+    public double[] getNormalizedRegionByDocumentSampledCounts() {
+        return regionByDocumentSampledCounts;
     }
 
     public boolean isFinishedCollection() {

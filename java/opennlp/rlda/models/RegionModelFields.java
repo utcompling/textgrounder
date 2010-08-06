@@ -27,92 +27,100 @@ public abstract class RegionModelFields implements Serializable {
     /**
      * Hyperparameter for region*doc priors
      */
-    protected transient double alpha;
+    protected double alpha;
     /**
      * Hyperparameter for word*region priors
      */
-    protected transient double beta;
+    protected double beta;
     /**
      * Normalization term for word*region gibbs sampler
      */
-    protected transient double betaW;
+    protected double betaW;
     /**
      * Number of documents
      */
-    protected transient int D;
+    protected int D;
     /**
      * Number of tokens
      */
-    protected transient int N;
+    protected int N;
     /**
      * Number of regions
      */
-    protected transient int R;
-    /**
-     * Size of stopword list
-     */
-    protected transient int sW;
-    /**
-     * Size of the vocabulary including stopwords.
-     */
-    protected transient int fW;
+    protected int R;
     /**
      * Number of non-stopword word types. Equivalent to <p>fW-sW</p>.
      */
-    protected transient int W;
+    protected int W;
     /**
      * An index of toponyms and possible regions. The goal is fast lookup and not
      * frugality with memory. The dimensions are equivalent to the wordByRegionCounts
      * array. Instead of counts, this array is populated with ones and zeros.
      * If a toponym occurs in a certain region, the cell value is one, zero if not.
      */
-    protected transient int[] regionByToponymFilter;
+    protected int[] regionByToponymFilter;
     /**
      *
      */
-    protected transient int[] activeRegionByDocumentFilter;
+    protected int[] activeRegionByDocumentFilter;
     /**
      * Vector of document indices
      */
-    protected transient int[] documentVector;
+    protected int[] documentVector;
     /**
      * Counts of topics per document
      */
-    protected transient int[] regionByDocumentCounts;
+    protected int[] regionByDocumentCounts;
     /**
      * Counts of tcount per topic. However, since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.
      */
-    protected transient int[] wordByRegionCounts;
+    protected int[] wordByRegionCounts;
     /**
      * Counts of topics
      */
-    protected transient int[] regionCounts;
+    protected int[] regionCounts;
     /**
      * Vector of topics
      */
-    protected transient int[] regionVector;
+    protected int[] regionVector;
     /**
      * Vector of stopwords. If 0, the word is not a stopword. If 1, it is.
      */
-    protected transient int[] stopwordVector;
+    protected int[] stopwordVector;
     /**
      * Vector of toponyms. If 0, the word is not a toponym. If 1, it is.
      */
-    protected transient int[] toponymVector;
+    protected int[] toponymVector;
     /**
      * Vector of word indices
      */
-    protected transient int[] wordVector;
+    protected int[] wordVector;
+    /**
+     *
+     */
+    protected double[] normalizedRegionCounts;
+    /**
+     * 
+     */
+    protected double[] normalizedWordByRegionCounts;
+    /**
+     * 
+     */
+    protected double[] normalizedRegionByDocumentCounts;
     /**
      * Posterior probabilities for topics.
      */
-    protected transient double[] regionProbs;
+    protected double[] regionProbs;
     /**
      * Probability of word given topic. since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.
      */
-    protected transient double[] wordByRegionProbs;
+    protected double[] wordByRegionProbs;
+    /**
+     *
+     */
+    protected double[] regionByDocumentProbs;
 
     public int getD() {
         return D;
@@ -187,14 +195,6 @@ public abstract class RegionModelFields implements Serializable {
         this.documentVector = documentVector;
     }
 
-    public int getfW() {
-        return fW;
-    }
-
-    public void setfW(int fW) {
-        this.fW = fW;
-    }
-
     public int[] getRegionByDocumentCounts() {
         return regionByDocumentCounts;
     }
@@ -220,11 +220,11 @@ public abstract class RegionModelFields implements Serializable {
     }
 
     public double[] getRegionProbs() {
-        return regionProbs;
+        return normalizedRegionCounts;
     }
 
     public void setRegionProbs(double[] regionProbs) {
-        this.regionProbs = regionProbs;
+        this.normalizedRegionCounts = regionProbs;
     }
 
     public int[] getRegionVector() {
@@ -233,14 +233,6 @@ public abstract class RegionModelFields implements Serializable {
 
     public void setRegionVector(int[] regionVector) {
         this.regionVector = regionVector;
-    }
-
-    public int getsW() {
-        return sW;
-    }
-
-    public void setsW(int sW) {
-        this.sW = sW;
     }
 
     public int[] getStopwordVector() {
@@ -268,11 +260,11 @@ public abstract class RegionModelFields implements Serializable {
     }
 
     public double[] getWordByRegionProbs() {
-        return wordByRegionProbs;
+        return normalizedWordByRegionCounts;
     }
 
     public void setWordByRegionProbs(double[] wordByRegionProbs) {
-        this.wordByRegionProbs = wordByRegionProbs;
+        this.normalizedWordByRegionCounts = wordByRegionProbs;
     }
 
     public int[] getWordVector() {

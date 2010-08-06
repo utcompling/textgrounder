@@ -26,8 +26,6 @@ public class TrainRegionModel extends BaseApp {
 
     public static void main(String[] args) {
 
-        helpMessage = "";
-
         ExperimentParameters experimentParameters = new ExperimentParameters();
         processRawCommandline(args, experimentParameters);
 
