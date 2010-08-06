@@ -24,6 +24,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import opennlp.rlda.apps.ConverterExperimentParameters;
 import opennlp.rlda.converters.callbacks.*;
 import opennlp.rlda.wrapper.io.OutputWriter;
@@ -90,6 +92,10 @@ public class XMLToInternalConverter {
      * 
      */
     protected ToponymToRegionIDsMap toponymToRegionIDsMap;
+    /**
+     * 
+     */
+    protected Pattern wordPattern = Pattern.compile("[a-z]+");
 
     /**
      * 
@@ -290,7 +296,9 @@ public class XMLToInternalConverter {
                         continue;
                     }
 
-                    if (!stopwordList.isStopWord(word) || istoponym) {
+                    Matcher matcher = wordPattern.matcher(word);
+                    boolean found = matcher.find();
+                    if ((!stopwordList.isStopWord(word) || istoponym) && found) {
                         if (countLexicon.containsKey(word)) {
                             int count = countLexicon.get(word) + 1;
                             countLexicon.put(word, count);
