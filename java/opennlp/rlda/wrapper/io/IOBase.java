@@ -42,6 +42,10 @@ public abstract class IOBase {
      */
     protected File regionFile;
     /**
+     * 
+     */
+    protected File probabilityFile;
+    /**
      *
      */
     protected ConverterExperimentParameters experimentParameters;

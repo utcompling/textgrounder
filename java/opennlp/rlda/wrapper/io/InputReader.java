@@ -25,6 +25,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
 import opennlp.rlda.apps.ConverterExperimentParameters;
+import opennlp.rlda.structs.NormalizedProbabilityWrapper;
 import opennlp.rlda.textstructs.Lexicon;
 import opennlp.rlda.topostructs.Region;
 
@@ -37,6 +38,7 @@ public abstract class InputReader extends IOBase {
     public InputReader(ConverterExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         tokenArrayFile = new File(experimentParameters.getTokenArrayOutputPath());
+        probabilityFile = new File(experimentParameters.getSampledProbabilitiesPath());
     }
 
     public Lexicon readLexicon() {
@@ -69,6 +71,24 @@ public abstract class InputReader extends IOBase {
             System.exit(1);
         }
         return regionMatrix;
+    }
+
+    public NormalizedProbabilityWrapper readProbabilities() {
+        NormalizedProbabilityWrapper normalizedProbabilityWrapper = null;
+
+        ObjectInputStream probIn = null;
+        try {
+            probIn = new ObjectInputStream(new GZIPInputStream(new FileInputStream(probabilityFile.getCanonicalPath())));
+            normalizedProbabilityWrapper = (NormalizedProbabilityWrapper) probIn.readObject();
+        } catch (IOException ex) {
+            Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+
+        return normalizedProbabilityWrapper;
     }
 
     public abstract void openTokenArrayReader();

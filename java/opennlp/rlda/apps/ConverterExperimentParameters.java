@@ -32,7 +32,7 @@ public class ConverterExperimentParameters extends ExperimentParameters {
     }
 
     public String getOutputPath() {
-        return joinPath(projectRoot, processedOutputFilename);
+        return joinPath(projectRoot, processedCorpusFilename);
     }
 
     public String getLexiconPath() {

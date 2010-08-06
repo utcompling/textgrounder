@@ -57,13 +57,13 @@ public abstract class OutputWriter extends IOBase {
     /**
      *
      */
-    public abstract void writeTokenArrayWriter(
+    public abstract void writeTokenArray(
           TokenArrayBuffer _tokenArrayBuffer);
 
     /**
      *
      */
-    public abstract void writeToponymRegionWriter(
+    public abstract void writeToponymRegion(
           ToponymToRegionIDsMap _toponymToRegionIDsMap);
 
     public void writeLexicon(Lexicon _lexicon) {

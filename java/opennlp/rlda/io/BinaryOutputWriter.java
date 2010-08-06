@@ -93,19 +93,4 @@ public class BinaryOutputWriter extends OutputWriter {
             System.exit(1);
         }
     }
-
-    @Override
-    public void writeWordByRegionProbs() {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void writeRegionByWordProbs() {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void writeRegionByDocumentProbs() {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
 }

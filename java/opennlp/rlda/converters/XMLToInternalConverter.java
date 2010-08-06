@@ -157,15 +157,15 @@ public class XMLToInternalConverter {
      *
      * @param loc
      */
-    protected Region addOrGetLocationsToRegionArray(Location loc) {
-        int curX = (int) (loc.coord.longitude + 180) / (int) degreesPerRegion;
-        int curY = (int) (loc.coord.latitude + 90) / (int) degreesPerRegion;
+    protected Region getRegion(Coordinate coord) {
+        int curX = (int) (coord.longitude + 180) / (int) degreesPerRegion;
+        int curY = (int) (coord.latitude + 90) / (int) degreesPerRegion;
 
         if (regionArray[curX][curY] == null) {
-            double minLon = loc.coord.longitude - loc.coord.longitude % degreesPerRegion;
-            double maxLon = minLon + (loc.coord.longitude < 0 ? -1 : 1) * degreesPerRegion;
-            double minLat = loc.coord.latitude - loc.coord.latitude % degreesPerRegion;
-            double maxLat = minLat + (loc.coord.latitude < 0 ? -1 : 1) * degreesPerRegion;
+            double minLon = coord.longitude - coord.longitude % degreesPerRegion;
+            double maxLon = minLon + (coord.longitude < 0 ? -1 : 1) * degreesPerRegion;
+            double minLat = coord.latitude - coord.latitude % degreesPerRegion;
+            double maxLat = minLat + (coord.latitude < 0 ? -1 : 1) * degreesPerRegion;
             regionArray[curX][curY] = new Region(activeRegions, minLon, maxLon, minLat, maxLat);
             activeRegions += 1;
         }
@@ -225,9 +225,9 @@ public class XMLToInternalConverter {
                             for (Element candidate : candidates) {
                                 double lon = Double.parseDouble(candidate.getAttributeValue("long"));
                                 double lat = Double.parseDouble(candidate.getAttributeValue("lat"));
-                                Location loc = new Location(wordid, new Coordinate(lon, lat));
+                                Coordinate coord = new Coordinate(lon, lat);
 
-                                Region region = addOrGetLocationsToRegionArray(loc);
+                                Region region = getRegion(coord);
 
                                 int regid = region.id;
 
@@ -337,8 +337,8 @@ public class XMLToInternalConverter {
                 break;
         }
 
-        outputWriter.writeTokenArrayWriter(tokenArrayBuffer);
-        outputWriter.writeToponymRegionWriter(toponymToRegionIDsMap);
+        outputWriter.writeTokenArray(tokenArrayBuffer);
+        outputWriter.writeToponymRegion(toponymToRegionIDsMap);
         outputWriter.writeLexicon(lexicon);
         outputWriter.writeRegions(regionArray);
     }

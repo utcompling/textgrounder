@@ -88,7 +88,7 @@ public class ExperimentParameters {
     /**
      *
      */
-    protected String projectRoot = null;
+    protected String projectRoot = ".";
     /**
      *
      */
@@ -96,7 +96,7 @@ public class ExperimentParameters {
     /**
      * 
      */
-    protected String processedOutputFilename = "output.xml";
+    protected String processedCorpusFilename = "output.xml";
     /**
      * Path to array of tokens, toponym status. Should be a file.
      */
@@ -113,6 +113,18 @@ public class ExperimentParameters {
      * Path of model that has been saved from previous training runs
      */
     protected String trainedModelFilename = "trained-model.model.gz";
+    /**
+     * 
+     */
+    protected String sampledProbabilitiesFilename = "probabilities.dat.gz";
+    /**
+     *
+     */
+    protected String wordByRegionProbsFilename = "word-by-region-probabilities.dat.gz";
+    /**
+     * 
+     */
+    protected String regionByWordProbsFilename = "region-by-word-probabilities.dat.gz";
     /**
      * 
      */
@@ -172,6 +184,18 @@ public class ExperimentParameters {
 
     public String getTokenArrayInputPath() {
         return joinPath(projectRoot, tokenArrayInputFilename);
+    }
+
+    public String getSampledProbabilitiesPath() {
+        return joinPath(projectRoot, sampledProbabilitiesFilename);
+    }
+
+    public String getRegionByWordProbabilitiesPath() {
+        return joinPath(projectRoot, regionByWordProbsFilename);
+    }
+
+    public String getWordByRegionProbabilitiesPath() {
+        return joinPath(projectRoot, wordByRegionProbsFilename);
     }
 
     /**

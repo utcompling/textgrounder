@@ -32,6 +32,7 @@ import opennlp.rlda.io.InputReader;
 import opennlp.rlda.io.OutputWriter;
 import opennlp.rlda.io.TextInputReader;
 import opennlp.rlda.structs.IntDoublePair;
+import opennlp.rlda.structs.NormalizedProbabilityWrapper;
 
 /**
  *
@@ -447,6 +448,7 @@ public class RegionModel extends RegionModelFields {
     }
 
     public void normalize() {
+        throw new UnsupportedOperationException("Normalization not a valid operation in this program");
     }
 
     /**
@@ -464,6 +466,11 @@ public class RegionModel extends RegionModelFields {
     public void write() {
         outputWriter = new BinaryOutputWriter(experimentParameters);
         outputWriter.writeTokenArray(wordVector, documentVector, toponymVector, stopwordVector, regionVector);
+
+        NormalizedProbabilityWrapper normalizedProbabilityWrapper = new NormalizedProbabilityWrapper(this);
+        normalizedProbabilityWrapper.addHyperparameters();
+
+        outputWriter.writeProbabilities(normalizedProbabilityWrapper);
     }
 
     /**

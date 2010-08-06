@@ -274,4 +274,28 @@ public abstract class RegionModelFields implements Serializable {
     public void setWordVector(int[] wordVector) {
         this.wordVector = wordVector;
     }
+
+    public double[] getNormalizedRegionByDocumentCounts() {
+        return normalizedRegionByDocumentCounts;
+    }
+
+    public void setNormalizedRegionByDocumentCounts(double[] normalizedRegionByDocumentCounts) {
+        this.normalizedRegionByDocumentCounts = normalizedRegionByDocumentCounts;
+    }
+
+    public double[] getNormalizedRegionCounts() {
+        return normalizedRegionCounts;
+    }
+
+    public void setNormalizedRegionCounts(double[] normalizedRegionCounts) {
+        this.normalizedRegionCounts = normalizedRegionCounts;
+    }
+
+    public double[] getNormalizedWordByRegionCounts() {
+        return normalizedWordByRegionCounts;
+    }
+
+    public void setNormalizedWordByRegionCounts(double[] normalizedWordByRegionCounts) {
+        this.normalizedWordByRegionCounts = normalizedWordByRegionCounts;
+    }
 }

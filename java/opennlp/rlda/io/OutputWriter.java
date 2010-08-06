@@ -17,7 +17,14 @@
 package opennlp.rlda.io;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.zip.GZIPOutputStream;
 import opennlp.rlda.apps.ExperimentParameters;
+import opennlp.rlda.structs.NormalizedProbabilityWrapper;
 
 /**
  *
@@ -32,6 +39,7 @@ public abstract class OutputWriter extends IOBase {
     public OutputWriter(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         tokenArrayFile = new File(experimentParameters.getTokenArrayOutputPath());
+        probabilitiesFile = new File(experimentParameters.getSampledProbabilitiesPath());
     }
 
     /**
@@ -46,9 +54,20 @@ public abstract class OutputWriter extends IOBase {
           int[] _wordVector, int[] _documentVector, int[] _toponymVector,
           int[] _stopwordVector, int[] _regionVector);
 
-    public abstract void writeWordByRegionProbs();
-
-    public abstract void writeRegionByWordProbs();
-
-    public abstract void writeRegionByDocumentProbs();
+    /**
+     * 
+     * @param _normalizedProbabilityWrapper
+     */
+    public void writeProbabilities(
+          NormalizedProbabilityWrapper _normalizedProbabilityWrapper) {
+        ObjectOutputStream probOut = null;
+        try {
+            probOut = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(probabilitiesFile.getCanonicalPath())));
+            probOut.writeObject(_normalizedProbabilityWrapper);
+            probOut.close();
+        } catch (IOException ex) {
+            Logger.getLogger(OutputWriter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+    }
 }

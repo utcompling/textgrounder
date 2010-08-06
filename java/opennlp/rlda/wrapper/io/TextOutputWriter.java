@@ -80,7 +80,7 @@ public class TextOutputWriter extends OutputWriter {
     }
 
     @Override
-    public void writeTokenArrayWriter(TokenArrayBuffer _tokenArrayBuffer) {
+    public void writeTokenArray(TokenArrayBuffer _tokenArrayBuffer) {
         try {
             for (int i = 0; i < _tokenArrayBuffer.size(); ++i) {
                 int wordid = _tokenArrayBuffer.wordArrayList.get(i);
@@ -99,7 +99,7 @@ public class TextOutputWriter extends OutputWriter {
     }
 
     @Override
-    public void writeToponymRegionWriter(
+    public void writeToponymRegion(
           ToponymToRegionIDsMap _toponymToRegionIDsMap) {
         try {
             for (int topid : _toponymToRegionIDsMap.keySet()) {
