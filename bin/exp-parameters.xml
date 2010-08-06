@@ -15,10 +15,14 @@
     <degreesPerRegion type="int">3</degreesPerRegion>
     <projectRoot type="string">.</projectRoot>
     <corpusFilename type="string">input.xml</corpusFilename>
+    <processedCorpusFilename type="string">output.xml</processedCorpusFilename>
     <tokenArrayInputFilename type="string">token-array-input.dat.gz</tokenArrayInputFilename>
     <tokenArrayOutputPath type="string">token-array-output.dat.gz</tokenArrayOutputPath>
     <toponymRegionFilename type="string">toponym-region.dat.gz</toponymRegionFilename>
     <trainedModelFilename type="string">trained-model.model.gz</trainedModelFilename>
+    <sampledProbabilitiesFilename type="string">probabilities.dat.gz</sampledProbabilitiesFilename>
+    <wordByRegionProbsFilename type="string">word-by-region-probabilities.gz</wordByRegionProbsFilename>
+    <regionByWordProbsFilename type="string">region-by-word-probabilities.gz</regionByWordProbsFilename>
     <regionFilename type="string">region.dat.gz</regionFilename>
     <lexiconFilename type="string">lexicon.dat.gz</lexiconFilename>
     <inputFormat type="INPUT_FORMAT">BINARY</inputFormat>
