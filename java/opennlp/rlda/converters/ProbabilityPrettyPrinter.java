@@ -41,6 +41,10 @@ import opennlp.rlda.textstructs.Lexicon;
 import opennlp.rlda.topostructs.Coordinate;
 import opennlp.rlda.topostructs.Region;
 import opennlp.rlda.wrapper.io.BinaryInputReader;
+import org.jdom.Document;
+import org.jdom.Element;
+import org.jdom.JDOMException;
+import org.jdom.input.SAXBuilder;
 
 /**
  *
@@ -208,6 +212,7 @@ public class ProbabilityPrettyPrinter {
                 Collections.sort(topRegions);
 
                 regionByWordWriter.write(String.format("%s", lexicon.getWordForInt(i)));
+                regionByWordWriter.newLine();
                 for (IntDoublePair pair : topRegions) {
                     Region region = regionIdToRegionMap.get(pair.index);
                     regionByWordWriter.write(String.format("%.2f\t%.2f\t%.8e", region.centLon, region.centLat, pair.count / wordCounts[i]));
@@ -217,6 +222,73 @@ public class ProbabilityPrettyPrinter {
             }
 
             regionByWordWriter.close();
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        } catch (IOException ex) {
+            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+    }
+
+    /**
+     *
+     */
+    public void normalizeAndPrintRegionByDocument() {
+        try {
+            String regionByDocumentFilename = experimentParameters.getRegionByDocumentProbabilitiesPath();
+            BufferedWriter regionByDocumentWriter = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(regionByDocumentFilename))));
+
+            SAXBuilder builder = new SAXBuilder();
+            Document trdoc = null;
+            try {
+                trdoc = builder.build(experimentParameters.getInputPath());
+            } catch (JDOMException ex) {
+                Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
+                System.exit(1);
+            } catch (IOException ex) {
+                Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
+                System.exit(1);
+            }
+
+            HashMap<Integer, String> docidToName = new HashMap<Integer, String>();
+            int docid = 0;
+            Element root = trdoc.getRootElement();
+            ArrayList<Element> documents = new ArrayList<Element>(root.getChildren());
+            for (Element document : documents) {
+                docidToName.put(docid, document.getAttributeValue("id"));
+                docid += 1;
+            }
+
+            double[] docWordCounts = new double[D];
+
+            for (int i = 0; i < D; ++i) {
+                docWordCounts[i] = 0;
+                int docoff = i * R;
+                for (int j = 0; j < R; ++j) {
+                    docWordCounts[i] += normalizedRegionByDocumentCounts[docoff + j];
+                }
+            }
+
+            for (int i = 0; i < D; ++i) {
+                int docoff = i * R;
+                ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
+                for (int j = 0; j < R; ++j) {
+                    topRegions.add(new IntDoublePair(j, normalizedRegionByDocumentCounts[docoff + i]));
+                }
+                Collections.sort(topRegions);
+
+                regionByDocumentWriter.write(String.format("%s", docidToName.get(i)));
+                regionByDocumentWriter.newLine();
+                for (IntDoublePair pair : topRegions) {
+                    Region region = regionIdToRegionMap.get(pair.index);
+                    regionByDocumentWriter.write(String.format("%.2f\t%.2f\t%.8e", region.centLon, region.centLat, pair.count / docWordCounts[i]));
+                    regionByDocumentWriter.newLine();
+                }
+                regionByDocumentWriter.newLine();
+            }
+
+            regionByDocumentWriter.close();
         } catch (FileNotFoundException ex) {
             Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);

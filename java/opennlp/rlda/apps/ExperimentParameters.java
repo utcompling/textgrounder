@@ -202,6 +202,10 @@ public class ExperimentParameters {
         return joinPath(projectRoot, wordByRegionProbsFilename);
     }
 
+    public String getRegionByDocumentProbabilitiesPath() {
+        return joinPath(projectRoot, regionByDocumentProbsFilename);
+    }
+
     /**
      * Path of input to rlda component
      */

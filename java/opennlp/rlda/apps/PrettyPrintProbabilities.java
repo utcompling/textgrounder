@@ -33,5 +33,6 @@ public class PrettyPrintProbabilities extends BaseApp {
         probabilityPrettyPrinter.readFiles();
         probabilityPrettyPrinter.normalizeAndPrintRegionByWord();
         probabilityPrettyPrinter.normalizeAndPrintWordByRegion();
+        probabilityPrettyPrinter.normalizeAndPrintRegionByDocument();
     }
 }
