@@ -30,7 +30,7 @@ public class EvalBasedOnXML {
         dbf = DocumentBuilderFactory.newInstance();
         db = dbf.newDocumentBuilder();
 
-        //TRXMLtoSingleFile(TRXMLPath, "tr-gold.xml");
+        TRXMLtoSingleFile(TRXMLPath, "tr-gold.xml");
         
         doEval("tr-gold.xml", modelXMLPath);
     }
