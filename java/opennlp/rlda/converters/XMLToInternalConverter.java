@@ -158,14 +158,14 @@ public class XMLToInternalConverter {
      * @param loc
      */
     protected Region getRegion(Coordinate coord) {
-        int curX = (int) (coord.longitude + 180) / (int) degreesPerRegion;
-        int curY = (int) (coord.latitude + 90) / (int) degreesPerRegion;
+        int curX = ((int) Math.floor(coord.longitude + 180)) / degreesPerRegion;
+        int curY = ((int) Math.floor(coord.latitude + 90)) / degreesPerRegion;
 
         if (regionArray[curX][curY] == null) {
-            double minLon = coord.longitude - coord.longitude % degreesPerRegion;
-            double maxLon = minLon + (coord.longitude < 0 ? -1 : 1) * degreesPerRegion;
-            double minLat = coord.latitude - coord.latitude % degreesPerRegion;
-            double maxLat = minLat + (coord.latitude < 0 ? -1 : 1) * degreesPerRegion;
+            double minLon = coord.longitude - (coord.longitude + 180) % degreesPerRegion;
+            double maxLon = minLon + degreesPerRegion;
+            double minLat = coord.latitude - (coord.latitude + 90) % degreesPerRegion;
+            double maxLat = minLat + degreesPerRegion;
             regionArray[curX][curY] = new Region(activeRegions, minLon, maxLon, minLat, maxLat);
             activeRegions += 1;
         }

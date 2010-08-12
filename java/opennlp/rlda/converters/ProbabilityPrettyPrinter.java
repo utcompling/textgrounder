@@ -207,7 +207,7 @@ public class ProbabilityPrettyPrinter {
                 int wordoff = i * R;
                 ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                 for (int j = 0; j < R; ++j) {
-                    topRegions.add(new IntDoublePair(j, normalizedWordByRegionCounts[wordoff + i]));
+                    topRegions.add(new IntDoublePair(j, normalizedWordByRegionCounts[wordoff + j]));
                 }
                 Collections.sort(topRegions);
 
@@ -274,7 +274,7 @@ public class ProbabilityPrettyPrinter {
                 int docoff = i * R;
                 ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                 for (int j = 0; j < R; ++j) {
-                    topRegions.add(new IntDoublePair(j, normalizedRegionByDocumentCounts[docoff + i]));
+                    topRegions.add(new IntDoublePair(j, normalizedRegionByDocumentCounts[docoff + j]));
                 }
                 Collections.sort(topRegions);
 

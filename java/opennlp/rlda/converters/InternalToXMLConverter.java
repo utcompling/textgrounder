@@ -254,6 +254,7 @@ public class InternalToXMLConverter {
             if (lon <= candregion.maxLon && lon >= candregion.minLon) {
                 if (lat <= candregion.maxLat && lat >= candregion.minLat) {
                     candcoord = new Coordinate(lon, lat);
+                    break;
                 }
             }
         }
