@@ -13,12 +13,12 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.textstructs;
+package opennlp.textgrounder.bayesian.rlda.textstructs;
 
 import java.io.*;
 
 import java.util.ArrayList;
-import opennlp.rlda.converters.callbacks.*;
+import opennlp.textgrounder.bayesian.rlda.converters.callbacks.*;
 
 /**
  * Class of integer sequences that indicate words in a stream of space

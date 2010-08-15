@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.converters;
+package opennlp.textgrounder.bayesian.rlda.converters;
 
 import java.io.EOFException;
 import java.io.File;
@@ -24,10 +24,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import opennlp.rlda.apps.ConverterExperimentParameters;
-import opennlp.rlda.textstructs.*;
-import opennlp.rlda.topostructs.*;
-import opennlp.rlda.wrapper.io.*;
+import opennlp.textgrounder.bayesian.rlda.apps.ConverterExperimentParameters;
+import opennlp.textgrounder.bayesian.rlda.textstructs.*;
+import opennlp.textgrounder.bayesian.rlda.topostructs.*;
+import opennlp.textgrounder.bayesian.rlda.wrapper.io.*;
 import org.jdom.Attribute;
 import org.jdom.Document;
 import org.jdom.Element;

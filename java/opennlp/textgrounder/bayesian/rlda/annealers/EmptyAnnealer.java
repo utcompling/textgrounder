@@ -13,9 +13,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.annealers;
+package opennlp.textgrounder.bayesian.rlda.annealers;
 
-import opennlp.rlda.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.rlda.apps.ExperimentParameters;
 
 /**
  * Class for no annealing regime. If the initial and target temperature are

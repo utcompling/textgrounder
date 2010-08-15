@@ -13,7 +13,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.topostructs;
+package opennlp.textgrounder.bayesian.rlda.topostructs;
 
 import opennlp.textgrounder.topostructs.*;
 import java.io.*;

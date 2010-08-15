@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.models;
+package opennlp.textgrounder.bayesian.rlda.models;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -23,16 +23,16 @@ import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
-import opennlp.rlda.annealers.*;
-import opennlp.rlda.apps.ExperimentParameters;
-import opennlp.rlda.ec.util.MersenneTwisterFast;
-import opennlp.rlda.io.BinaryInputReader;
-import opennlp.rlda.io.BinaryOutputWriter;
-import opennlp.rlda.io.InputReader;
-import opennlp.rlda.io.OutputWriter;
-import opennlp.rlda.io.TextInputReader;
-import opennlp.rlda.structs.IntDoublePair;
-import opennlp.rlda.structs.NormalizedProbabilityWrapper;
+import opennlp.textgrounder.bayesian.rlda.annealers.*;
+import opennlp.textgrounder.bayesian.rlda.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.rlda.ec.util.MersenneTwisterFast;
+import opennlp.textgrounder.bayesian.rlda.io.BinaryInputReader;
+import opennlp.textgrounder.bayesian.rlda.io.BinaryOutputWriter;
+import opennlp.textgrounder.bayesian.rlda.io.InputReader;
+import opennlp.textgrounder.bayesian.rlda.io.OutputWriter;
+import opennlp.textgrounder.bayesian.rlda.io.TextInputReader;
+import opennlp.textgrounder.bayesian.rlda.structs.IntDoublePair;
+import opennlp.textgrounder.bayesian.rlda.structs.NormalizedProbabilityWrapper;
 
 /**
  *

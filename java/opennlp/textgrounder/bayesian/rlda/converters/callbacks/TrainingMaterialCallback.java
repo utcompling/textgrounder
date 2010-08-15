@@ -18,11 +18,11 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.rlda.converters.callbacks;
+package opennlp.textgrounder.bayesian.rlda.converters.callbacks;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import opennlp.rlda.textstructs.Lexicon;
+import opennlp.textgrounder.bayesian.rlda.textstructs.Lexicon;
 
 /**
  * A class for filtering whether words should be considered as training material

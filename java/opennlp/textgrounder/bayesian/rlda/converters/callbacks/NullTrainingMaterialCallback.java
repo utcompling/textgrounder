@@ -18,9 +18,9 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.rlda.converters.callbacks;
+package opennlp.textgrounder.bayesian.rlda.converters.callbacks;
 
-import opennlp.rlda.textstructs.Lexicon;
+import opennlp.textgrounder.bayesian.rlda.textstructs.Lexicon;
 
 /**
  * An empty placeholder class for projects that do not require validation

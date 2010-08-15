@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.converters;
+package opennlp.textgrounder.bayesian.rlda.converters;
 
 import java.io.BufferedWriter;
 import java.io.EOFException;
@@ -32,15 +32,15 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
-import opennlp.rlda.apps.ConverterExperimentParameters;
-import opennlp.rlda.apps.ExperimentParameters;
-import opennlp.rlda.structs.IntDoublePair;
-import opennlp.rlda.wrapper.io.InputReader;
-import opennlp.rlda.structs.NormalizedProbabilityWrapper;
-import opennlp.rlda.textstructs.Lexicon;
-import opennlp.rlda.topostructs.Coordinate;
-import opennlp.rlda.topostructs.Region;
-import opennlp.rlda.wrapper.io.BinaryInputReader;
+import opennlp.textgrounder.bayesian.rlda.apps.ConverterExperimentParameters;
+import opennlp.textgrounder.bayesian.rlda.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.rlda.structs.IntDoublePair;
+import opennlp.textgrounder.bayesian.rlda.wrapper.io.InputReader;
+import opennlp.textgrounder.bayesian.rlda.structs.NormalizedProbabilityWrapper;
+import opennlp.textgrounder.bayesian.rlda.textstructs.Lexicon;
+import opennlp.textgrounder.bayesian.rlda.topostructs.Coordinate;
+import opennlp.textgrounder.bayesian.rlda.topostructs.Region;
+import opennlp.textgrounder.bayesian.rlda.wrapper.io.BinaryInputReader;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;

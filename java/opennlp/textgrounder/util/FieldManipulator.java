@@ -23,7 +23,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import opennlp.rlda.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.rlda.apps.ExperimentParameters;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;

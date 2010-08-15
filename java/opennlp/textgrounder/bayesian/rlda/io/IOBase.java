@@ -14,10 +14,10 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.io;
+package opennlp.textgrounder.bayesian.rlda.io;
 
 import java.io.File;
-import opennlp.rlda.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.rlda.apps.ExperimentParameters;
 
 /**
  *

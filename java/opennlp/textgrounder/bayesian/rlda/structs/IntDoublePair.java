@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.structs;
+package opennlp.textgrounder.bayesian.rlda.structs;
 
 /**
  *

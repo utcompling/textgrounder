@@ -13,9 +13,9 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.annealers;
+package opennlp.textgrounder.bayesian.rlda.annealers;
 
-import opennlp.rlda.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.rlda.apps.ExperimentParameters;
 
 /**
  * Maximum posterior decoder. Simply returns the largest value among the arrays.

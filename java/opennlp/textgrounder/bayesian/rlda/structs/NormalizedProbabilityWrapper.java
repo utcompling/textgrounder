@@ -14,10 +14,10 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.structs;
+package opennlp.textgrounder.bayesian.rlda.structs;
 
 import java.io.Serializable;
-import opennlp.rlda.models.RegionModel;
+import opennlp.textgrounder.bayesian.rlda.models.RegionModel;
 
 /**
  *

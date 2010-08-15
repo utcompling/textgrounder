@@ -15,7 +15,7 @@
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.rlda.topostructs;
+package opennlp.textgrounder.bayesian.rlda.topostructs;
 
 import java.util.HashMap;
 import java.util.HashSet;

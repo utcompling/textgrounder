@@ -14,9 +14,9 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.rlda.annealers;
+package opennlp.textgrounder.bayesian.rlda.annealers;
 
-import opennlp.rlda.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.rlda.apps.ExperimentParameters;
 
 /**
  *

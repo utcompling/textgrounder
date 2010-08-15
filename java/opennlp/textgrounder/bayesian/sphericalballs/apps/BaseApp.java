@@ -15,7 +15,7 @@
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.sphericalballs.apps;
+package opennlp.textgrounder.bayesian.sphericalballs.apps;
 
 /**
  *
