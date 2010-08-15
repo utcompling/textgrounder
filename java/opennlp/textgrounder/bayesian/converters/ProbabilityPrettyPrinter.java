@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.bayesian.rlda.converters;
+package opennlp.textgrounder.bayesian.converters;
 
 import java.io.BufferedWriter;
 import java.io.EOFException;

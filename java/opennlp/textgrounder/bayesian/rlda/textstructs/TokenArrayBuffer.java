@@ -18,7 +18,7 @@ package opennlp.textgrounder.bayesian.rlda.textstructs;
 import java.io.*;
 
 import java.util.ArrayList;
-import opennlp.textgrounder.bayesian.rlda.converters.callbacks.*;
+import opennlp.textgrounder.bayesian.converters.callbacks.*;
 
 /**
  * Class of integer sequences that indicate words in a stream of space

@@ -1,3 +1,3 @@
 #!/bin/sh
 . textgrounder-env
-$JAVA_CMD opennlp.rlda.apps.ConvertFromRegionModelFormat $@
+$JAVA_CMD opennlp.bayesian.apps.ConvertFromRegionModelFormat $@

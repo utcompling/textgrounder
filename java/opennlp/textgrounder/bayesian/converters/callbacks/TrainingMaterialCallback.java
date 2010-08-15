@@ -18,7 +18,7 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.bayesian.rlda.converters.callbacks;
+package opennlp.textgrounder.bayesian.converters.callbacks;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

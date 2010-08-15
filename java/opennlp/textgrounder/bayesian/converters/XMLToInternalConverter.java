@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.bayesian.rlda.converters;
+package opennlp.textgrounder.bayesian.converters;
 
 import java.io.File;
 import java.io.IOException;
@@ -26,13 +26,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import opennlp.textgrounder.bayesian.rlda.apps.ConverterExperimentParameters;
-import opennlp.textgrounder.bayesian.rlda.converters.callbacks.*;
-import opennlp.textgrounder.bayesian.rlda.wrapper.io.OutputWriter;
-import opennlp.textgrounder.bayesian.rlda.wrapper.io.TextOutputWriter;
+import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
+import opennlp.textgrounder.bayesian.converters.callbacks.*;
+import opennlp.textgrounder.bayesian.wrapper.io.*;
 import opennlp.textgrounder.bayesian.rlda.textstructs.*;
 import opennlp.textgrounder.bayesian.rlda.topostructs.*;
-import opennlp.textgrounder.bayesian.rlda.wrapper.io.BinaryOutputWriter;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;

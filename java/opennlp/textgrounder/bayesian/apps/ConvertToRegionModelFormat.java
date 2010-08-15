@@ -16,7 +16,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.apps;
 
-import opennlp.textgrounder.bayesian.rlda.converters.XMLToInternalConverter;
+import opennlp.textgrounder.bayesian.converters.XMLToInternalConverter;
 
 /**
  *
