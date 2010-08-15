@@ -24,10 +24,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
-import opennlp.textgrounder.bayesian.rlda.textstructs.Lexicon;
-import opennlp.textgrounder.bayesian.rlda.textstructs.TokenArrayBuffer;
-import opennlp.textgrounder.bayesian.rlda.topostructs.Region;
-import opennlp.textgrounder.bayesian.rlda.topostructs.ToponymToRegionIDsMap;
+import opennlp.textgrounder.bayesian.textstructs.Lexicon;
+import opennlp.textgrounder.bayesian.textstructs.TokenArrayBuffer;
+import opennlp.textgrounder.bayesian.topostructs.Region;
+import opennlp.textgrounder.bayesian.topostructs.ToponymToRegionIDsMap;
 
 /**
  *

@@ -30,8 +30,8 @@ import opennlp.textgrounder.bayesian.rlda.io.BinaryOutputWriter;
 import opennlp.textgrounder.bayesian.rlda.io.InputReader;
 import opennlp.textgrounder.bayesian.rlda.io.OutputWriter;
 import opennlp.textgrounder.bayesian.rlda.io.TextInputReader;
-import opennlp.textgrounder.bayesian.rlda.structs.IntDoublePair;
-import opennlp.textgrounder.bayesian.rlda.structs.NormalizedProbabilityWrapper;
+import opennlp.textgrounder.bayesian.structs.IntDoublePair;
+import opennlp.textgrounder.bayesian.structs.NormalizedProbabilityWrapper;
 
 /**
  *

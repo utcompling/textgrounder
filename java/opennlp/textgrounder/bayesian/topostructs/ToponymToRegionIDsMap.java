@@ -14,37 +14,16 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.bayesian.rlda.structs;
+
+package opennlp.textgrounder.bayesian.topostructs;
+
+import java.util.HashMap;
+import java.util.HashSet;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class IntDoublePair implements Comparable<IntDoublePair> {
+public class ToponymToRegionIDsMap extends HashMap<Integer, HashSet<Integer>>{
 
-    public int index = 0;
-    public double count = 0;
-
-    public IntDoublePair(int _wordid, double _count) {
-        index = _wordid;
-        count = _count;
-    }
-
-    /**
-     * sorting order is reversed -- higher (double) values come first
-     *
-     * @param p
-     * @return
-     */
-    @Override
-    public int compareTo(IntDoublePair p) {
-        if (count < p.count) {
-            return 1;
-        } else if (count > p.count) {
-            return -1;
-        } else {
-            return 0;
-        }
-
-    }
 }

@@ -22,7 +22,7 @@ package opennlp.textgrounder.bayesian.converters.callbacks;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import opennlp.textgrounder.bayesian.rlda.textstructs.Lexicon;
+import opennlp.textgrounder.bayesian.textstructs.Lexicon;
 
 /**
  * A class for filtering whether words should be considered as training material

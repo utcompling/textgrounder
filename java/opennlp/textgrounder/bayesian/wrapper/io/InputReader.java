@@ -25,9 +25,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
-import opennlp.textgrounder.bayesian.rlda.structs.NormalizedProbabilityWrapper;
-import opennlp.textgrounder.bayesian.rlda.textstructs.Lexicon;
-import opennlp.textgrounder.bayesian.rlda.topostructs.Region;
+import opennlp.textgrounder.bayesian.structs.NormalizedProbabilityWrapper;
+import opennlp.textgrounder.bayesian.textstructs.Lexicon;
+import opennlp.textgrounder.bayesian.topostructs.Region;
 
 /**
  *

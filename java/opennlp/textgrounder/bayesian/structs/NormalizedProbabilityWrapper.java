@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.bayesian.rlda.structs;
+package opennlp.textgrounder.bayesian.structs;
 
 import java.io.Serializable;
 import opennlp.textgrounder.bayesian.rlda.models.RegionModel;

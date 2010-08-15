@@ -13,7 +13,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.bayesian.rlda.textstructs;
+package opennlp.textgrounder.bayesian.textstructs;
 
 import gnu.trove.*;
 

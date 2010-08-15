@@ -20,7 +20,7 @@
 
 package opennlp.textgrounder.bayesian.converters.callbacks;
 
-import opennlp.textgrounder.bayesian.rlda.textstructs.Lexicon;
+import opennlp.textgrounder.bayesian.textstructs.Lexicon;
 
 /**
  * An empty placeholder class for projects that do not require validation
