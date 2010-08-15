@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.bayesian.rlda.apps;
+package opennlp.textgrounder.bayesian.apps;
 
 /**
  * Main class for taking an ExperimentParameters class and writing it to an XML

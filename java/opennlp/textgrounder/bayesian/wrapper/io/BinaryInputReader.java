@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.bayesian.rlda.wrapper.io;
+package opennlp.textgrounder.bayesian.wrapper.io;
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
@@ -25,7 +25,7 @@ import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
-import opennlp.textgrounder.bayesian.rlda.apps.ConverterExperimentParameters;
+import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 
 /**
  *

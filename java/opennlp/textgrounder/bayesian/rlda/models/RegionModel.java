@@ -18,14 +18,13 @@ package opennlp.textgrounder.bayesian.rlda.models;
 
 import java.io.*;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
 import opennlp.textgrounder.bayesian.rlda.annealers.*;
-import opennlp.textgrounder.bayesian.rlda.apps.ExperimentParameters;
-import opennlp.textgrounder.bayesian.rlda.ec.util.MersenneTwisterFast;
+import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
 import opennlp.textgrounder.bayesian.rlda.io.BinaryInputReader;
 import opennlp.textgrounder.bayesian.rlda.io.BinaryOutputWriter;
 import opennlp.textgrounder.bayesian.rlda.io.InputReader;

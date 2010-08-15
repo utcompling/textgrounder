@@ -19,7 +19,7 @@ package opennlp.textgrounder.bayesian.rlda.io;
 import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
-import opennlp.textgrounder.bayesian.rlda.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 
 /**
  *

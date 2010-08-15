@@ -1,4 +1,4 @@
-package opennlp.textgrounder.bayesian.rlda.ec.util;
+package opennlp.textgrounder.bayesian.ec.util;
 import java.io.*;
 import java.util.*;
 

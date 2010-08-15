@@ -26,7 +26,7 @@ import java.io.InputStreamReader;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
-import opennlp.textgrounder.bayesian.rlda.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 
 /**
  *

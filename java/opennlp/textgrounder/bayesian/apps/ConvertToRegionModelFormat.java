@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.bayesian.rlda.apps;
+package opennlp.textgrounder.bayesian.apps;
 
 import opennlp.textgrounder.bayesian.rlda.converters.XMLToInternalConverter;
 
