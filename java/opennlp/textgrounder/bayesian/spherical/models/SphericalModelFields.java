@@ -68,7 +68,7 @@ public class SphericalModelFields {
      * array. Instead of counts, this array is populated with ones and zeros.
      * If a toponym occurs in a certain region, the cell value is one, zero if not.
      */
-    protected double[][] regionByCoordinateLexicon;
+    protected double[][] toponymCoordinateLexicon;
     /**
      * Vector of document indices
      */
@@ -86,6 +86,10 @@ public class SphericalModelFields {
      * 
      */
     protected int[] toponymByRegionCounts;
+    /**
+     * 
+     */
+    protected int[][][] regionToponymCoordinateCounts;
     /**
      * 
      */

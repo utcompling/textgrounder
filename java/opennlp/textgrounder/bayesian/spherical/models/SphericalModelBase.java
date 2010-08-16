@@ -117,7 +117,7 @@ public class SphericalModelBase extends SphericalModelFields {
     public void initialize() {
         initialize(experimentParameters);
 
-        expectedR = (int) Math.ceil(alpha * Math.log(1 + N / alpha));
+        expectedR = (int) Math.ceil(alpha * Math.log(1 + N / alpha)) * 2;
 
         regionCounts = new int[expectedR];
         for (int i = 0; i < expectedR; ++i) {
@@ -142,6 +142,20 @@ public class SphericalModelBase extends SphericalModelFields {
                 means[j] = 0;
             }
             regionMeans[i] = means;
+        }
+
+        regionToponymCoordinateCounts = new int[expectedR][][];
+        for (int i = 0; i < expectedR; ++i) {
+            int[][] toponymCoordinateCounts = new int[T][];
+            for (int j = 0; j < T; ++j) {
+                int coordinates = toponymCoordinateLexicon[j].length;
+                int[] coordcounts = new int[coordinates];
+                for (int k = 0; k < coordinates; ++k) {
+                    coordcounts[k] = 0;
+                }
+                toponymCoordinateCounts[j] = coordcounts;
+            }
+            regionToponymCoordinateCounts[i] = toponymCoordinateCounts;
         }
     }
 
@@ -233,19 +247,21 @@ public class SphericalModelBase extends SphericalModelFields {
         }
 
         T = maxtopid + 1;
-        regionByCoordinateLexicon = new double[T][];
+        toponymCoordinateLexicon = new double[T][];
 
         for (Entry<Integer, double[]> entry : toprecords.entrySet()) {
             int topid = entry.getKey();
             double[] sphericalrecord = entry.getValue();
             double[] cartesianrecord = new double[sphericalrecord.length / 2 * 3];
+            int[] coordcounts = new int[sphericalrecord.length / 2];
             for (int i = 0; i < sphericalrecord.length / 2; i++) {
                 double[] crec = TGMath.sphericalToCartesian(sphericalrecord[2 * i], sphericalrecord[2 * i + 1]);
                 for (int j = 0; j < 3; ++j) {
                     cartesianrecord[3 * i + j] = crec[j];
                 }
+                coordcounts[i] = 0;
             }
-            regionByCoordinateLexicon[topid] = cartesianrecord;
+            toponymCoordinateLexicon[topid] = cartesianrecord;
         }
     }
 
@@ -254,6 +270,7 @@ public class SphericalModelBase extends SphericalModelFields {
      * random region only from regions aligned to name.
      */
     public void randomInitialize() {
+        currentR = 0;
         int wordid, docid, regionid;
         int istoponym, isstopword;
         int wordoff, docoff;
@@ -266,28 +283,16 @@ public class SphericalModelBase extends SphericalModelFields {
                 wordid = wordVector[i];
                 docid = documentVector[i];
                 docoff = docid * expectedR;
+                wordoff = wordid * expectedR;
                 istoponym = toponymVector[i];
 
                 totalprob = 0;
-                if (istoponym == 1) {
-                    wordoff = wordid * R;
-                    try {
-                        for (int j = 0;; ++j) {
-                            totalprob += probs[j] =
-                                  regionByCoordinateLexicon[wordoff + j];
-                        }
-                    } catch (ArrayIndexOutOfBoundsException e) {
-                    }
-                } else {
-                    try {
-                        for (int j = 0;; ++j) {
-                            totalprob += probs[j] = 0;
-                        }
-                    } catch (ArrayIndexOutOfBoundsException e) {
-                    }
+                for (int j = 0; j < currentR; ++j) {
+                    totalprob += probs[j] = 1;
                 }
 
-                r = rand.nextDouble() * totalprob;
+                r = rand.nextDouble() * totalprob + alpha / 2;
+                probs[currentR] = alpha / 2;
 
                 max = probs[0];
                 regionid = 0;
@@ -295,12 +300,47 @@ public class SphericalModelBase extends SphericalModelFields {
                     regionid++;
                     max += probs[regionid];
                 }
+                if (regionid == currentR) {
+                    currentR += 1;
+                }
 
                 regionVector[i] = regionid;
                 regionCounts[regionid]++;
-                regionByDocumentCounts[docid * R + regionid]++;
-                wordByRegionCounts[wordid * R + regionid]++;
+                regionByDocumentCounts[docoff + regionid]++;
+                wordByRegionCounts[wordoff + regionid]++;
+
+                if (istoponym == 1) {
+                    toponymByRegionCounts[wordoff + regionid]++;
+                    int coordinates = toponymCoordinateLexicon[wordid].length / 3;
+                    int coordid = rand.nextInt(coordinates);
+                    regionToponymCoordinateCounts[regionid][wordid][coordid] += 1;
+                }
             }
+        }
+    }
+
+    protected void calculateMeans() {
+        double[] mean = new double[3];
+        for (int i = 0; i < 3; ++i) {
+            mean[i] = 0;
+        }
+
+        for (int i = 0; i < currentR; ++i) {
+            for (int j = 0; j < T; ++j) {
+                int[] coordcounts = _toponymCoordinateCounts[j];
+                double[] coords = _toponymCoordinateLexicon[j];
+                for (int k = 0; k < coordcounts.length; ++k) {
+                    int count = coordcounts[k];
+                    for (int l = 0; l < 3; ++l) {
+                        mean[l] += count * coords[3 * k + l];
+                    }
+                }
+            }
+        }
+
+        double norm = TGMath.l2Norm(mean);
+        for (int i = 0; i < 3; ++i) {
+            mean[i] /= norm;
         }
     }
 
@@ -313,7 +353,7 @@ public class SphericalModelBase extends SphericalModelFields {
         int wordid, docid, regionid;
         int wordoff, docoff;
         int istoponym, isstopword;
-        double[] probs = new double[R];
+        double[] probs = new double[expectedR];
         double totalprob, max, r;
 
         while (_annealer.nextIter()) {
@@ -324,8 +364,8 @@ public class SphericalModelBase extends SphericalModelFields {
                     docid = documentVector[i];
                     regionid = regionVector[i];
                     istoponym = toponymVector[i];
-                    docoff = docid * R;
-                    wordoff = wordid * R;
+                    docoff = docid * expectedR;
+                    wordoff = wordid * expectedR;
 
                     regionCounts[regionid]--;
                     regionByDocumentCounts[docoff + regionid]--;
@@ -337,7 +377,7 @@ public class SphericalModelBase extends SphericalModelFields {
                                 probs[j] = (wordByRegionCounts[wordoff + j] + beta)
                                       / (regionCounts[j] + betaW)
                                       * (regionByDocumentCounts[docoff + j] + alpha)
-                                      * regionByCoordinateLexicon[wordoff + j];
+                                      * toponymCoordinateLexicon[wordoff + j];
 //                                      * activeRegionByDocumentFilter[docoff + j];
                             }
                         } else {
@@ -407,7 +447,7 @@ public class SphericalModelBase extends SphericalModelFields {
                             probs[j] = (normalizedWordByRegionCounts[wordoff + j] + beta)
                                   / (normalizedRegionCounts[j] + betaW)
                                   * (normalizedRegionByDocumentCounts[docoff + j] + alpha)
-                                  * regionByCoordinateLexicon[wordoff + j];
+                                  * toponymCoordinateLexicon[wordoff + j];
 //                                      * activeRegionByDocumentFilter[docoff + j];
                         }
                     } else {
