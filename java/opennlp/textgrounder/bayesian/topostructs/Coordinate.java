@@ -15,7 +15,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.topostructs;
 
-import opennlp.textgrounder.topostructs.*;
 import java.io.*;
 
 /**
@@ -28,7 +27,6 @@ import java.io.*;
  */
 public class Coordinate implements Serializable {
 
-    private final static double twoPI = 2 * Math.PI;
     public double longitude;
     public double latitude;
 

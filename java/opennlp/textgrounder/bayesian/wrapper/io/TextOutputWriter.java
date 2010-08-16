@@ -28,6 +28,7 @@ import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.textstructs.TokenArrayBuffer;
+import opennlp.textgrounder.bayesian.topostructs.ToponymToCoordinateMap;
 import opennlp.textgrounder.bayesian.topostructs.ToponymToRegionIDsMap;
 
 /**
@@ -121,5 +122,15 @@ public class TextOutputWriter extends OutputWriter {
             Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
+    }
+
+    @Override
+    public void openToponymCoordinateWriter() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void writeToponymCoordinate(ToponymToCoordinateMap _toponymToCoordinateMap) {
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 }

@@ -27,6 +27,8 @@ import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.textstructs.TokenArrayBuffer;
+import opennlp.textgrounder.bayesian.topostructs.Coordinate;
+import opennlp.textgrounder.bayesian.topostructs.ToponymToCoordinateMap;
 import opennlp.textgrounder.bayesian.topostructs.ToponymToRegionIDsMap;
 
 /**
@@ -35,10 +37,21 @@ import opennlp.textgrounder.bayesian.topostructs.ToponymToRegionIDsMap;
  */
 public class BinaryOutputWriter extends OutputWriter {
 
+    /**
+     *
+     */
     protected DataOutputStream tokenArrayOutputStream;
+    /**
+     *
+     */
     protected DataOutputStream toponymRegionOutputStream;
+    /**
+     * 
+     */
+    protected DataOutputStream toponymCoordinateOutputStream;
 
-    public BinaryOutputWriter(ConverterExperimentParameters _experimentParameters) {
+    public BinaryOutputWriter(
+          ConverterExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         openTokenArrayWriter();
         openToponymRegionWriter();
@@ -81,6 +94,24 @@ public class BinaryOutputWriter extends OutputWriter {
     }
 
     @Override
+    public void openToponymCoordinateWriter() {
+        try {
+            if (toponymCoordinateFile.getName().endsWith(".gz")) {
+                toponymCoordinateOutputStream = new DataOutputStream(
+                      new BufferedOutputStream(new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(toponymCoordinateFile)))));
+            } else {
+                toponymCoordinateOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(toponymCoordinateFile)));
+            }
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        } catch (IOException ex) {
+            Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+    }
+
+    @Override
     public void writeTokenArray(TokenArrayBuffer _tokenArrayBuffer) {
         try {
             for (int i = 0; i < _tokenArrayBuffer.size(); ++i) {
@@ -104,7 +135,7 @@ public class BinaryOutputWriter extends OutputWriter {
     @Override
     public void writeToponymRegion(
           ToponymToRegionIDsMap _toponymToRegionIDsMap) {
-        
+
         try {
             for (int topid : _toponymToRegionIDsMap.keySet()) {
                 HashSet<Integer> regids = _toponymToRegionIDsMap.get(topid);
@@ -117,6 +148,27 @@ public class BinaryOutputWriter extends OutputWriter {
             }
 
             toponymRegionOutputStream.close();
+        } catch (IOException ex) {
+            Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+    }
+
+    @Override
+    public void writeToponymCoordinate(ToponymToCoordinateMap _toponymToCoordinateMap) {
+        try {
+            for (int topid : _toponymToCoordinateMap.keySet()) {
+                HashSet<Coordinate> coords = _toponymToCoordinateMap.get(topid);
+                int fieldsize = coords.size();
+                toponymCoordinateOutputStream.writeInt(topid);
+                toponymCoordinateOutputStream.writeInt(fieldsize);
+                for (Coordinate coord : coords) {
+                    toponymCoordinateOutputStream.writeDouble(coord.longitude);
+                    toponymCoordinateOutputStream.writeDouble(coord.latitude);
+                }
+            }
+
+            toponymCoordinateOutputStream.close();
         } catch (IOException ex) {
             Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);

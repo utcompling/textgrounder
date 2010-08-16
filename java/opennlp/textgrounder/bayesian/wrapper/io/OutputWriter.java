@@ -27,6 +27,7 @@ import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.textstructs.Lexicon;
 import opennlp.textgrounder.bayesian.textstructs.TokenArrayBuffer;
 import opennlp.textgrounder.bayesian.topostructs.Region;
+import opennlp.textgrounder.bayesian.topostructs.ToponymToCoordinateMap;
 import opennlp.textgrounder.bayesian.topostructs.ToponymToRegionIDsMap;
 
 /**
@@ -57,6 +58,11 @@ public abstract class OutputWriter extends IOBase {
     /**
      *
      */
+    public abstract void openToponymCoordinateWriter();
+
+    /**
+     *
+     */
     public abstract void writeTokenArray(
           TokenArrayBuffer _tokenArrayBuffer);
 
@@ -65,6 +71,12 @@ public abstract class OutputWriter extends IOBase {
      */
     public abstract void writeToponymRegion(
           ToponymToRegionIDsMap _toponymToRegionIDsMap);
+
+    /**
+     *
+     */
+    public abstract void writeToponymCoordinate(
+          ToponymToCoordinateMap _toponymToCoordinateMap);
 
     public void writeLexicon(Lexicon _lexicon) {
 

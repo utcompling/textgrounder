@@ -53,19 +53,6 @@ public class ExperimentParameterManipulator {
                     String fieldValue = param.getValue();
                     String fieldTypeName = param.getAttributeValue("type");
                     recursiveFind(_experimentParameters.getClass(), _experimentParameters, fieldName, fieldTypeName, fieldValue);
-
-//                    if (fieldTypeName.equals("int")) {
-//                        int value = Integer.parseInt(fieldValue);
-//                        _experimentParameters.getClass().getDeclaredField(fieldName).setInt(_experimentParameters, value);
-//                    } else if (fieldTypeName.equals("double")) {
-//                        double value = Double.parseDouble(fieldValue);
-//                        _experimentParameters.getClass().getDeclaredField(fieldName).setDouble(_experimentParameters, value);
-//                    } else if (fieldTypeName.equals("string")) {
-//                        _experimentParameters.getClass().getDeclaredField(fieldName).set(_experimentParameters, fieldValue);
-//                    } else {
-//                        continue;
-//                    }
-
                 } catch (NoSuchFieldException ex) {
                     System.err.println(ex.getMessage() + " is not a relevant field");
                 } catch (SecurityException ex) {

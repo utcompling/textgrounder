@@ -91,6 +91,10 @@ public class XMLToInternalConverter {
      */
     protected ToponymToRegionIDsMap toponymToRegionIDsMap;
     /**
+     *
+     */
+    protected ToponymToCoordinateMap toponymToCoordinateMap;
+    /**
      * 
      */
     protected Pattern wordPattern = Pattern.compile("[a-z]+");
@@ -126,6 +130,7 @@ public class XMLToInternalConverter {
         countCutoff = converterExperimentParameters.getCountCutoff();
 
         toponymToRegionIDsMap = new ToponymToRegionIDsMap();
+        toponymToCoordinateMap = new ToponymToCoordinateMap();
         activeRegions = 0;
     }
 
@@ -231,9 +236,11 @@ public class XMLToInternalConverter {
 
                                 if (!toponymToRegionIDsMap.containsKey(wordid)) {
                                     toponymToRegionIDsMap.put(wordid, new HashSet<Integer>());
+                                    toponymToCoordinateMap.put(wordid, new HashSet<Coordinate>());
                                 }
 
                                 toponymToRegionIDsMap.get(wordid).add(regid);
+                                toponymToCoordinateMap.get(wordid).add(coord);
                             }
                         } else {
                             istoponym = 0;
@@ -337,6 +344,7 @@ public class XMLToInternalConverter {
 
         outputWriter.writeTokenArray(tokenArrayBuffer);
         outputWriter.writeToponymRegion(toponymToRegionIDsMap);
+        outputWriter.writeToponymCoordinate(toponymToCoordinateMap);
         outputWriter.writeLexicon(lexicon);
         outputWriter.writeRegions(regionArray);
     }

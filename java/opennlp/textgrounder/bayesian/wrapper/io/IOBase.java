@@ -34,6 +34,10 @@ public abstract class IOBase {
      */
     protected File toponymRegionFile;
     /**
+     * File linking toponym coordinates to regions
+     */
+    protected File toponymCoordinateFile;
+    /**
      * File for lexicon dump
      */
     protected File lexiconFile;

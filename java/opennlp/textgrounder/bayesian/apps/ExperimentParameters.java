@@ -110,6 +110,10 @@ public class ExperimentParameters {
      */
     protected String toponymRegionFilename = "toponym-region.dat.gz";
     /**
+     *
+     */
+    protected String toponymCoordinateFilename = "toponym-coordinate.dat.gz";
+    /**
      * Path of model that has been saved from previous training runs
      */
     protected String trainedModelFilename = "trained-model.model.gz";
@@ -219,6 +223,10 @@ public class ExperimentParameters {
      */
     public String getToponymRegionPath() {
         return joinPath(projectRoot, toponymRegionFilename);
+    }
+
+    public String getToponymCoordinatePath() {
+        return joinPath(projectRoot, toponymCoordinateFilename);
     }
 
     public int getTrainIterations() {
