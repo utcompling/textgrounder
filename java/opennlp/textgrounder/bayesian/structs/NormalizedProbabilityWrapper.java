@@ -18,6 +18,7 @@ package opennlp.textgrounder.bayesian.structs;
 
 import java.io.Serializable;
 import opennlp.textgrounder.bayesian.rlda.models.RegionModel;
+import opennlp.textgrounder.bayesian.spherical.models.SphericalModelBase;
 
 /**
  *
@@ -70,6 +71,20 @@ public class NormalizedProbabilityWrapper implements Serializable {
     }
 
     public NormalizedProbabilityWrapper(RegionModel _regionModel) {
+        normalizedRegionCounts = _regionModel.getNormalizedRegionCounts();
+        normalizedWordByRegionCounts = _regionModel.getNormalizedWordByRegionCounts();
+        normalizedRegionByDocumentCounts = _regionModel.getNormalizedRegionByDocumentCounts();
+
+        alpha = _regionModel.getAlpha();
+        beta = _regionModel.getBeta();
+        betaW = _regionModel.getBetaW();
+        D = _regionModel.getD();
+        N = _regionModel.getN();
+        R = _regionModel.getR();
+        W = _regionModel.getW();
+    }
+
+    public NormalizedProbabilityWrapper(SphericalModelBase _regionModel) {
         normalizedRegionCounts = _regionModel.getNormalizedRegionCounts();
         normalizedWordByRegionCounts = _regionModel.getNormalizedWordByRegionCounts();
         normalizedRegionByDocumentCounts = _regionModel.getNormalizedRegionByDocumentCounts();

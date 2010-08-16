@@ -158,6 +158,10 @@ public class ExperimentParameters {
         return beta;
     }
 
+    public double getKappa() {
+        return kappa;
+    }
+
     public int getIterations() {
         return trainIterations;
     }

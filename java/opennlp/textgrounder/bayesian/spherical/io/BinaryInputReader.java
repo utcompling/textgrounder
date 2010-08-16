@@ -22,6 +22,7 @@ import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
@@ -34,7 +35,7 @@ import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 public class BinaryInputReader extends InputReader {
 
     protected DataInputStream tokenArrayInputStream;
-    protected DataInputStream toponymRegionInputStream;
+    protected DataInputStream toponymCoordinateInputStream;
 
     public BinaryInputReader(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
@@ -57,18 +58,31 @@ public class BinaryInputReader extends InputReader {
         return record;
     }
 
+    /**
+     *
+     * @return
+     * @throws EOFException
+     * @throws IOException
+     */
     @Override
-    public int[] nextToponymRegionFilter() throws EOFException, IOException {
+    public ArrayList<Object> nextToponymCoordinateRecord() throws EOFException,
+          IOException {
 
-        int topid = toponymRegionInputStream.readInt();
-        int fieldsize = toponymRegionInputStream.readInt();
-        int[] record = new int[fieldsize + 1];
+        ArrayList<Object> toprecord = new ArrayList<Object>();
+
+        int topid = toponymCoordinateInputStream.readInt();
+        toprecord.add(new Integer(topid));
+
+        int fieldsize = toponymCoordinateInputStream.readInt();
+        double[] record = new double[fieldsize * 2];
         record[0] = topid;
-        for (int i = 0; i < fieldsize; ++i) {
-            record[i + 1] = toponymRegionInputStream.readInt();
+        for (int i = 0; i < fieldsize; i += 2) {
+            record[i] = toponymCoordinateInputStream.readDouble();
+            record[i + 1] = toponymCoordinateInputStream.readDouble();
         }
+        toprecord.add(record);
 
-        return record;
+        return toprecord;
     }
 
     @Override
@@ -93,10 +107,10 @@ public class BinaryInputReader extends InputReader {
     public final void openToponymCoordinateReader() {
         try {
             if (toponymCoordinateFile.getName().endsWith(".gz")) {
-                toponymRegionInputStream = new DataInputStream(
+                toponymCoordinateInputStream = new DataInputStream(
                       new BufferedInputStream(new GZIPInputStream(new BufferedInputStream(new FileInputStream(toponymCoordinateFile)))));
             } else {
-                toponymRegionInputStream = new DataInputStream(new BufferedInputStream(new FileInputStream(toponymCoordinateFile)));
+                toponymCoordinateInputStream = new DataInputStream(new BufferedInputStream(new FileInputStream(toponymCoordinateFile)));
             }
         } catch (FileNotFoundException ex) {
             Logger.getLogger(BinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
@@ -118,7 +132,7 @@ public class BinaryInputReader extends InputReader {
     @Override
     public void closeToponymCoordinateReader() {
         try {
-            toponymRegionInputStream.close();
+            toponymCoordinateInputStream.close();
         } catch (IOException ex) {
         }
     }

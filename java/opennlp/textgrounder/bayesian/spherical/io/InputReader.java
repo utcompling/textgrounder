@@ -19,6 +19,7 @@ package opennlp.textgrounder.bayesian.spherical.io;
 import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 
 /**
@@ -49,7 +50,7 @@ public abstract class InputReader extends IOBase {
      * @return
      * @throws EOFException
      */
-    public abstract int[] nextToponymRegionFilter() throws EOFException,
+    public abstract ArrayList<Object> nextToponymCoordinateRecord() throws EOFException,
           IOException;
 
     /**

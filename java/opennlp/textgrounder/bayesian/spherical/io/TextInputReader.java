@@ -23,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
@@ -76,39 +77,6 @@ public class TextInputReader extends InputReader {
             return record;
         }
         return null;
-    }
-
-    /**
-     * 
-     * @return
-     * @throws EOFException
-     */
-    @Override
-    public int[] nextToponymRegionFilter() throws EOFException {
-
-        String line = null;
-        try {
-            line = toponymCoordinateReader.readLine();
-            if (line == null) {
-                throw new EOFException();
-            }
-        } catch (IOException ex) {
-            Logger.getLogger(TextInputReader.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
-
-        String[] fields = line.split("\\w+");
-        int[] record = new int[fields.length];
-        for (int i = 0; i < fields.length; ++i) {
-            int token = Integer.parseInt(fields[i]);
-            record[i] = token;
-        }
-
-        if (fields.length == 0) {
-            return null;
-        } else {
-            return record;
-        }
     }
 
     /**
@@ -183,5 +151,11 @@ public class TextInputReader extends InputReader {
     public void resetToponymCoordinateReader() {
         closeToponymCoordinateReader();
         openToponymCoordinateReader();
+    }
+
+    @Override
+    public ArrayList<Object> nextToponymCoordinateRecord() throws EOFException,
+          IOException {
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 }

@@ -18,12 +18,16 @@ package opennlp.textgrounder.bayesian.spherical.models;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map.Entry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
+import opennlp.textgrounder.bayesian.mathutils.TGMath;
+import opennlp.textgrounder.bayesian.rlda.annealers.*;
 import opennlp.textgrounder.bayesian.spherical.io.*;
 import opennlp.textgrounder.bayesian.structs.*;
 
@@ -49,6 +53,10 @@ public class SphericalModelBase extends SphericalModelFields {
      * 
      */
     protected transient OutputWriter outputWriter;
+    /**
+     * 
+     */
+    protected transient Annealer annealer;
 
     /**
      * Default constructor. Take input from commandline and default _options
@@ -65,7 +73,7 @@ public class SphericalModelBase extends SphericalModelFields {
      *
      * @param _options
      */
-    protected final void initialize(ExperimentParameters _experimentParameters) {
+    protected void initialize(ExperimentParameters _experimentParameters) {
 
         switch (_experimentParameters.getInputFormat()) {
             case BINARY:
@@ -79,6 +87,7 @@ public class SphericalModelBase extends SphericalModelFields {
         alpha = _experimentParameters.getAlpha();
         beta = _experimentParameters.getBeta();
         betaW = beta * W;
+        kappa = _experimentParameters.getKappa();
 
         int randSeed = _experimentParameters.getRandomSeed();
         if (randSeed == 0) {
@@ -93,12 +102,47 @@ public class SphericalModelBase extends SphericalModelFields {
             rand = new MersenneTwisterFast(randSeed);
         }
 
+        double targetTemp = _experimentParameters.getTargetTemperature();
+        double initialTemp = _experimentParameters.getInitialTemperature();
+        if (Math.abs(initialTemp - targetTemp) < Annealer.EPSILON) {
+            annealer = new EmptyAnnealer(_experimentParameters);
+        } else {
+            annealer = new SimulatedAnnealer(_experimentParameters);
+        }
+
         readTokenArrayFile();
-        readRegionToponymFilter();
+        readRegionCoordinateList();
     }
 
     public void initialize() {
         initialize(experimentParameters);
+
+        expectedR = (int) Math.ceil(alpha * Math.log(1 + N / alpha));
+
+        regionCounts = new int[expectedR];
+        for (int i = 0; i < expectedR; ++i) {
+            regionCounts[i] = 0;
+        }
+        regionByDocumentCounts = new int[D * expectedR];
+        for (int i = 0; i < D * expectedR; ++i) {
+            regionByDocumentCounts[i] = 0;
+        }
+        wordByRegionCounts = new int[W * expectedR];
+        for (int i = 0; i < W * expectedR; ++i) {
+            wordByRegionCounts[i] = 0;
+        }
+        toponymByRegionCounts = new int[T * expectedR];
+        for (int i = 0; i < T * expectedR; ++i) {
+            toponymByRegionCounts[i] = 0;
+        }
+        regionMeans = new double[expectedR][];
+        for (int i = 0; i < expectedR; ++i) {
+            double[] means = new double[3];
+            for (int j = 0; j < 3; ++j) {
+                means[j] = 0;
+            }
+            regionMeans[i] = means;
+        }
     }
 
     protected void readTokenArrayFile() {
@@ -166,22 +210,21 @@ public class SphericalModelBase extends SphericalModelFields {
      * 
      * @param _file
      */
-    public void readRegionToponymFilter() {
+    public void readRegionCoordinateList() {
 
-        regionByToponymFilter = new int[R * W];
-        for (int i = 0; i < R * W; ++i) {
-            regionByToponymFilter[i] = 0;
-        }
+        HashMap<Integer, double[]> toprecords = new HashMap<Integer, double[]>();
+        int maxtopid = 0;
 
         try {
             while (true) {
-                int[] regions = inputReader.nextToponymRegionFilter();
+                ArrayList<Object> toprecord = inputReader.nextToponymCoordinateRecord();
 
-                int topid = regions[0];
-                int topoff = topid * R;
+                int topid = (Integer) toprecord.get(0);
+                double[] record = (double[]) toprecord.get(1);
 
-                for (int i = 1; i < regions.length; ++i) {
-                    regionByToponymFilter[topoff + regions[i]] = 1;
+                toprecords.put(topid, record);
+                if (topid > maxtopid) {
+                    maxtopid = topid;
                 }
             }
         } catch (EOFException e) {
@@ -189,17 +232,20 @@ public class SphericalModelBase extends SphericalModelFields {
             Logger.getLogger(SphericalModelBase.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        regionCounts = new int[R];
-        for (int i = 0; i < R; ++i) {
-            regionCounts[i] = 0;
-        }
-        regionByDocumentCounts = new int[D * R];
-        for (int i = 0; i < D * R; ++i) {
-            regionByDocumentCounts[i] = 0;
-        }
-        wordByRegionCounts = new int[W * R];
-        for (int i = 0; i < W * R; ++i) {
-            wordByRegionCounts[i] = 0;
+        T = maxtopid + 1;
+        regionByCoordinateLexicon = new double[T][];
+
+        for (Entry<Integer, double[]> entry : toprecords.entrySet()) {
+            int topid = entry.getKey();
+            double[] sphericalrecord = entry.getValue();
+            double[] cartesianrecord = new double[sphericalrecord.length / 2 * 3];
+            for (int i = 0; i < sphericalrecord.length / 2; i++) {
+                double[] crec = TGMath.sphericalToCartesian(sphericalrecord[2 * i], sphericalrecord[2 * i + 1]);
+                for (int j = 0; j < 3; ++j) {
+                    cartesianrecord[3 * i + j] = crec[j];
+                }
+            }
+            regionByCoordinateLexicon[topid] = cartesianrecord;
         }
     }
 
@@ -211,7 +257,7 @@ public class SphericalModelBase extends SphericalModelFields {
         int wordid, docid, regionid;
         int istoponym, isstopword;
         int wordoff, docoff;
-        double[] probs = new double[R];
+        double[] probs = new double[expectedR];
         double totalprob, max, r;
 
         for (int i = 0; i < N; ++i) {
@@ -219,7 +265,7 @@ public class SphericalModelBase extends SphericalModelFields {
             if (isstopword == 0) {
                 wordid = wordVector[i];
                 docid = documentVector[i];
-                docoff = docid * R;
+                docoff = docid * expectedR;
                 istoponym = toponymVector[i];
 
                 totalprob = 0;
@@ -228,16 +274,14 @@ public class SphericalModelBase extends SphericalModelFields {
                     try {
                         for (int j = 0;; ++j) {
                             totalprob += probs[j] =
-                                  regionByToponymFilter[wordoff + j]
-                                  * activeRegionByDocumentFilter[docoff + j];
+                                  regionByCoordinateLexicon[wordoff + j];
                         }
                     } catch (ArrayIndexOutOfBoundsException e) {
                     }
                 } else {
                     try {
                         for (int j = 0;; ++j) {
-                            totalprob += probs[j] =
-                                  activeRegionByDocumentFilter[docoff + j];
+                            totalprob += probs[j] = 0;
                         }
                     } catch (ArrayIndexOutOfBoundsException e) {
                     }
@@ -293,7 +337,7 @@ public class SphericalModelBase extends SphericalModelFields {
                                 probs[j] = (wordByRegionCounts[wordoff + j] + beta)
                                       / (regionCounts[j] + betaW)
                                       * (regionByDocumentCounts[docoff + j] + alpha)
-                                      * regionByToponymFilter[wordoff + j];
+                                      * regionByCoordinateLexicon[wordoff + j];
 //                                      * activeRegionByDocumentFilter[docoff + j];
                             }
                         } else {
@@ -327,9 +371,9 @@ public class SphericalModelBase extends SphericalModelFields {
     }
 
     public void train() {
-        System.err.println(String.format("Randomly initializing with %d tokens, %d words, %d regions, %d documents", N, W, R, D));
+        System.err.println(String.format("Randomly initializing with %d tokens, %d words, %d documents, and %d expected regions", N, W, D, expectedR));
         randomInitialize();
-        System.err.println(String.format("Beginning training with %d tokens, %d words, %d regions, %d documents", N, W, R, D));
+        System.err.println(String.format("Beginning training with %d tokens, %d words, %d documents, and %d expected regions", N, W, D, expectedR));
         train(annealer);
         if (annealer.getSamples() != 0) {
             normalizedRegionCounts = annealer.getNormalizedTopicSampleCounts();
@@ -363,7 +407,7 @@ public class SphericalModelBase extends SphericalModelFields {
                             probs[j] = (normalizedWordByRegionCounts[wordoff + j] + beta)
                                   / (normalizedRegionCounts[j] + betaW)
                                   * (normalizedRegionByDocumentCounts[docoff + j] + alpha)
-                                  * regionByToponymFilter[wordoff + j];
+                                  * regionByCoordinateLexicon[wordoff + j];
 //                                      * activeRegionByDocumentFilter[docoff + j];
                         }
                     } else {

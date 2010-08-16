@@ -35,6 +35,10 @@ public class SphericalModelFields {
      */
     protected double betaW;
     /**
+     * 
+     */
+    protected double kappa;
+    /**
      * Number of documents
      */
     protected int D;
@@ -43,24 +47,28 @@ public class SphericalModelFields {
      */
     protected int N;
     /**
-     * Current maximum number of regions/tables in the chinese restaurant
+     * Expected maximum number of regions/tables in the chinese restaurant
      */
-    protected int maxR;
+    protected int expectedR;
+    /**
+     * Current number of regions/tables in the chinese restaurant
+     */
+    protected int currentR;
     /**
      * Number of non-stopword word types.
      */
     protected int W;
+    /**
+     * Number of toponyms
+     */
+    protected int T;
     /**
      * An index of toponyms and possible regions. The goal is fast lookup and not
      * frugality with memory. The dimensions are equivalent to the wordByRegionCounts
      * array. Instead of counts, this array is populated with ones and zeros.
      * If a toponym occurs in a certain region, the cell value is one, zero if not.
      */
-    protected int[] regionByToponymFilter;
-    /**
-     *
-     */
-    protected int[] activeRegionByDocumentFilter;
+    protected double[][] regionByCoordinateLexicon;
     /**
      * Vector of document indices
      */
@@ -74,6 +82,14 @@ public class SphericalModelFields {
      * terms of the tcount, it will be a topic by word matrix.
      */
     protected int[] wordByRegionCounts;
+    /**
+     * 
+     */
+    protected int[] toponymByRegionCounts;
+    /**
+     * 
+     */
+    protected double[][] regionMeans;
     /**
      * Counts of topics
      */
@@ -137,7 +153,7 @@ public class SphericalModelFields {
     }
 
     public int getR() {
-        return maxR;
+        return expectedR;
     }
 
     public int getW() {
