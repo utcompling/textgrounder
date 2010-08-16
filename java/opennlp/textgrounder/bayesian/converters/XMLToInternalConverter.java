@@ -77,7 +77,11 @@ public class XMLToInternalConverter {
     /**
      *
      */
-    protected int maxvalidid = 0;
+    protected int validwords = 0;
+    /**
+     * 
+     */
+    protected int validtoponyms = 0;
     /**
      *
      */
@@ -217,7 +221,7 @@ public class XMLToInternalConverter {
                     if (token.getName().equals("w")) {
                         word = token.getAttributeValue("tok").toLowerCase();
                         wordid = lexicon.addOrGetWord(word);
-                        isstopword = (stopwordList.isStopWord(word) ? 1 : 0) | (wordid > maxvalidid
+                        isstopword = (stopwordList.isStopWord(word) ? 1 : 0) | (wordid >= validwords
                               ? 1 : 0);
                     } else if (token.getName().equals("toponym")) {
                         word = token.getAttributeValue("term").toLowerCase();
@@ -244,7 +248,7 @@ public class XMLToInternalConverter {
                             }
                         } else {
                             istoponym = 0;
-                            isstopword = (stopwordList.isStopWord(word) ? 1 : 0) | (wordid > maxvalidid
+                            isstopword = (stopwordList.isStopWord(word) ? 1 : 0) | (wordid >= validwords
                                   ? 1 : 0);
                         }
                     } else {
@@ -315,17 +319,18 @@ public class XMLToInternalConverter {
             }
         }
 
+        for (String word : toponymSet) {
+            lexicon.addOrGetWord(word);
+        }
+        validtoponyms = lexicon.getDictionarySize();
+
         for (Map.Entry<String, Integer> entry : countLexicon.entrySet()) {
             if (entry.getValue() > countCutoff) {
                 lexicon.addOrGetWord(entry.getKey());
             }
         }
 
-        for (String word : toponymSet) {
-            lexicon.addOrGetWord(word);
-        }
-
-        maxvalidid = lexicon.getDictionarySize() - 1;
+        validwords = lexicon.getDictionarySize();
     }
 
     /**

@@ -42,6 +42,10 @@ public class ExperimentParameters {
      */
     protected double beta = 0.1;
     /**
+     * 
+     */
+    protected double kappa = 20;
+    /**
      * Number of training iterations
      */
     protected int trainIterations = 100;
