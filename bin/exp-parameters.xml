@@ -19,6 +19,7 @@
     <tokenArrayInputFilename type="string">token-array-input.dat.gz</tokenArrayInputFilename>
     <tokenArrayOutputPath type="string">token-array-output.dat.gz</tokenArrayOutputPath>
     <toponymRegionFilename type="string">toponym-region.dat.gz</toponymRegionFilename>
+    <toponymCoordinateFilename type="string">toponym-coordinate.dat.gz</toponymCoordinateFilename>
     <trainedModelFilename type="string">trained-model.model.gz</trainedModelFilename>
     <sampledProbabilitiesFilename type="string">probabilities.dat.gz</sampledProbabilitiesFilename>
     <wordByRegionProbsFilename type="string">word-by-region-probabilities.gz</wordByRegionProbsFilename>
