@@ -108,194 +108,92 @@ public abstract class RegionModelFields implements Serializable {
      * 
      */
     protected double[] normalizedRegionByDocumentCounts;
-    /**
-     * Posterior probabilities for topics.
-     */
-    protected double[] regionProbs;
-    /**
-     * Probability of word given topic. since access more often occurs in
-     * terms of the tcount, it will be a topic by word matrix.
-     */
-    protected double[] wordByRegionProbs;
-    /**
-     *
-     */
-    protected double[] regionByDocumentProbs;
 
     public int getD() {
         return D;
-    }
-
-    public void setD(int D) {
-        this.D = D;
     }
 
     public int getN() {
         return N;
     }
 
-    public void setN(int N) {
-        this.N = N;
-    }
-
     public int getR() {
         return R;
-    }
-
-    public void setR(int R) {
-        this.R = R;
     }
 
     public int getW() {
         return W;
     }
 
-    public void setW(int W) {
-        this.W = W;
-    }
-
     public int[] getActiveRegionByDocumentFilter() {
         return activeRegionByDocumentFilter;
-    }
-
-    public void setActiveRegionByDocumentFilter(
-          int[] activeRegionByDocumentFilter) {
-        this.activeRegionByDocumentFilter = activeRegionByDocumentFilter;
     }
 
     public double getAlpha() {
         return alpha;
     }
 
-    public void setAlpha(double alpha) {
-        this.alpha = alpha;
-    }
-
     public double getBeta() {
         return beta;
-    }
-
-    public void setBeta(double beta) {
-        this.beta = beta;
     }
 
     public double getBetaW() {
         return betaW;
     }
 
-    public void setBetaW(double betaW) {
-        this.betaW = betaW;
-    }
-
     public int[] getDocumentVector() {
         return documentVector;
-    }
-
-    public void setDocumentVector(int[] documentVector) {
-        this.documentVector = documentVector;
     }
 
     public int[] getRegionByDocumentCounts() {
         return regionByDocumentCounts;
     }
 
-    public void setRegionByDocumentCounts(int[] regionByDocumentCounts) {
-        this.regionByDocumentCounts = regionByDocumentCounts;
-    }
-
     public int[] getRegionByToponymFilter() {
         return regionByToponymFilter;
-    }
-
-    public void setRegionByToponymFilter(int[] regionByToponymFilter) {
-        this.regionByToponymFilter = regionByToponymFilter;
     }
 
     public int[] getRegionCounts() {
         return regionCounts;
     }
 
-    public void setRegionCounts(int[] regionCounts) {
-        this.regionCounts = regionCounts;
-    }
-
     public double[] getRegionProbs() {
         return normalizedRegionCounts;
-    }
-
-    public void setRegionProbs(double[] regionProbs) {
-        this.normalizedRegionCounts = regionProbs;
     }
 
     public int[] getRegionVector() {
         return regionVector;
     }
 
-    public void setRegionVector(int[] regionVector) {
-        this.regionVector = regionVector;
-    }
-
     public int[] getStopwordVector() {
         return stopwordVector;
-    }
-
-    public void setStopwordVector(int[] stopwordVector) {
-        this.stopwordVector = stopwordVector;
     }
 
     public int[] getToponymVector() {
         return toponymVector;
     }
 
-    public void setToponymVector(int[] toponymVector) {
-        this.toponymVector = toponymVector;
-    }
-
     public int[] getWordByRegionCounts() {
         return wordByRegionCounts;
-    }
-
-    public void setWordByRegionCounts(int[] wordByRegionCounts) {
-        this.wordByRegionCounts = wordByRegionCounts;
     }
 
     public double[] getWordByRegionProbs() {
         return normalizedWordByRegionCounts;
     }
 
-    public void setWordByRegionProbs(double[] wordByRegionProbs) {
-        this.normalizedWordByRegionCounts = wordByRegionProbs;
-    }
-
     public int[] getWordVector() {
         return wordVector;
-    }
-
-    public void setWordVector(int[] wordVector) {
-        this.wordVector = wordVector;
     }
 
     public double[] getNormalizedRegionByDocumentCounts() {
         return normalizedRegionByDocumentCounts;
     }
 
-    public void setNormalizedRegionByDocumentCounts(double[] normalizedRegionByDocumentCounts) {
-        this.normalizedRegionByDocumentCounts = normalizedRegionByDocumentCounts;
-    }
-
     public double[] getNormalizedRegionCounts() {
         return normalizedRegionCounts;
     }
 
-    public void setNormalizedRegionCounts(double[] normalizedRegionCounts) {
-        this.normalizedRegionCounts = normalizedRegionCounts;
-    }
-
     public double[] getNormalizedWordByRegionCounts() {
         return normalizedWordByRegionCounts;
-    }
-
-    public void setNormalizedWordByRegionCounts(double[] normalizedWordByRegionCounts) {
-        this.normalizedWordByRegionCounts = normalizedWordByRegionCounts;
     }
 }

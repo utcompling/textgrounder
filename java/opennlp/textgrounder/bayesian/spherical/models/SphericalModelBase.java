@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.bayesian.rlda.models;
+package opennlp.textgrounder.bayesian.spherical.models;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -22,26 +22,21 @@ import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
-import opennlp.textgrounder.bayesian.rlda.annealers.*;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
-import opennlp.textgrounder.bayesian.rlda.io.*;
-import opennlp.textgrounder.bayesian.structs.NormalizedProbabilityWrapper;
+import opennlp.textgrounder.bayesian.spherical.io.*;
+import opennlp.textgrounder.bayesian.structs.*;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class RegionModel extends RegionModelFields {
+public class SphericalModelBase extends SphericalModelFields {
 
     /**
      * Random number generator. Implements the fast Mersenne Twister.
      */
     protected transient MersenneTwisterFast rand;
-    /**
-     * Handles simulated annealing, burn-in, and full sampling cycle
-     */
-    protected transient Annealer annealer;
     /**
      * 
      */
@@ -62,7 +57,7 @@ public class RegionModel extends RegionModelFields {
      *
      * @param _options
      */
-    public RegionModel(ExperimentParameters _parameters) {
+    public SphericalModelBase(ExperimentParameters _parameters) {
         experimentParameters = _parameters;
     }
 
@@ -98,17 +93,8 @@ public class RegionModel extends RegionModelFields {
             rand = new MersenneTwisterFast(randSeed);
         }
 
-        double targetTemp = _experimentParameters.getTargetTemperature();
-        double initialTemp = _experimentParameters.getInitialTemperature();
-        if (Math.abs(initialTemp - targetTemp) < Annealer.EPSILON) {
-            annealer = new EmptyAnnealer(_experimentParameters);
-        } else {
-            annealer = new SimulatedAnnealer(_experimentParameters);
-        }
-
         readTokenArrayFile();
         readRegionToponymFilter();
-        buildActiveRegionByDocumentFilter();
     }
 
     public void initialize() {
@@ -149,7 +135,7 @@ public class RegionModel extends RegionModelFields {
             }
         } catch (EOFException ex) {
         } catch (IOException ex) {
-            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalModelBase.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         W += 1;
@@ -182,9 +168,6 @@ public class RegionModel extends RegionModelFields {
      */
     public void readRegionToponymFilter() {
 
-        R = inputReader.getMaxRegionID();
-        inputReader.resetToponymRegionReader();
-
         regionByToponymFilter = new int[R * W];
         for (int i = 0; i < R * W; ++i) {
             regionByToponymFilter[i] = 0;
@@ -203,7 +186,7 @@ public class RegionModel extends RegionModelFields {
             }
         } catch (EOFException e) {
         } catch (IOException ex) {
-            Logger.getLogger(RegionModel.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalModelBase.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         regionCounts = new int[R];
@@ -217,33 +200,6 @@ public class RegionModel extends RegionModelFields {
         wordByRegionCounts = new int[W * R];
         for (int i = 0; i < W * R; ++i) {
             wordByRegionCounts[i] = 0;
-        }
-    }
-
-    protected void buildActiveRegionByDocumentFilter() {
-        activeRegionByDocumentFilter = new int[D * R];
-
-        for (int i = 0; i < D * R; ++i) {
-            activeRegionByDocumentFilter[i] = 0;
-        }
-
-        for (int i = 0; i < N; ++i) {
-            int docid = documentVector[i];
-            int docoff = docid * R;
-            int wordid = wordVector[i];
-            int topoff = wordid * R;
-            int topstatus = toponymVector[i];
-            int stopstatus = stopwordVector[i];
-
-            try {
-                if (topstatus == 1 && stopstatus == 0) {
-                    for (int j = 0; j < R; ++j) {
-                        activeRegionByDocumentFilter[docoff + j] = regionByToponymFilter[topoff + j];
-                    }
-                }
-            } catch (ArrayIndexOutOfBoundsException e) {
-                System.err.println(String.format("%d\t%d\t%d\t%d", docid, docoff, wordid, topoff));
-            }
         }
     }
 
