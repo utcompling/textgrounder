@@ -24,31 +24,9 @@ import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
  */
 public class TGMath {
 
-    public static double dotProduct(double[] _v1, double[] _v2) {
-        double sum = 0;
-        try {
-            for (int i = 0;; ++i) {
-                sum += _v1[i] * _v2[i];
-            }
-        } catch (ArrayIndexOutOfBoundsException e) {
-        }
-        return sum;
-    }
-
-    public static double l2Norm(double[] _vec) {
-        double sum = 0;
-        try {
-            for (int i = 0;; ++i) {
-                sum += Math.pow(_vec[i], 2);
-            }
-        } catch (ArrayIndexOutOfBoundsException e) {
-        }
-        return Math.sqrt(sum);
-    }
-
     public static double sphericalDensity(double[] _x, double[] _mu,
           double _kappa) {
-        return _kappa * Math.exp(_kappa * dotProduct(_x, _mu)) / (4 * Math.PI * Math.sinh(_kappa));
+        return _kappa * Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, _mu, 1)) / (4 * Math.PI * Math.sinh(_kappa));
     }
 
     public static double sphericalDensity(double _alpha, double _beta,
@@ -61,7 +39,17 @@ public class TGMath {
 
     public static double proportionalSphericalDensity(double[] _x, double[] _mu,
           double _kappa) {
-        return Math.exp(_kappa * dotProduct(_x, _mu));
+        return Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, _mu, 1));
+    }
+
+    public static double unnormalizedProportionalSphericalDensity(double[] _x,
+          double[] _mu, double _kappa) {
+        double[] nrmmean = new double[3];
+        for (int i = 0; i < 3; ++i) {
+            nrmmean[i] = 0;
+        }
+        TGBLAS.daxpy(0, 1 / TGBLAS.dnrm2(0, _mu, 1), _mu, 1, nrmmean, 1);
+        return Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, nrmmean, 1));
     }
 
     public static double proportionalSphericalDensity(double _alpha,
@@ -98,13 +86,14 @@ public class TGMath {
     }
 
     public static double[] sampleFromFisher(MersenneTwisterFast _mtf, int _N) {
-        double[] samples = new double[_N];
-        try {
-            for (int i = 0;; ++i) {
-                samples[i] = _mtf.nextDouble();
-            }
-        } catch (ArrayIndexOutOfBoundsException e) {
-        }
-        return samples;
+        throw new UnsupportedOperationException("Not yet supported");
+//        double[] samples = new double[_N];
+//        try {
+//            for (int i = 0;; ++i) {
+//                samples[i] = _mtf.nextDouble();
+//            }
+//        } catch (ArrayIndexOutOfBoundsException e) {
+//        }
+//        return samples;
     }
 }

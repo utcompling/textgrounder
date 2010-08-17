@@ -68,7 +68,7 @@ public class SphericalModelFields {
      * array. Instead of counts, this array is populated with ones and zeros.
      * If a toponym occurs in a certain region, the cell value is one, zero if not.
      */
-    protected double[][] toponymCoordinateLexicon;
+    protected double[][][] toponymCoordinateLexicon;
     /**
      * Vector of document indices
      */
@@ -107,6 +107,10 @@ public class SphericalModelFields {
      */
     protected int[] stopwordVector;
     /**
+     * 
+     */
+    protected int[] coordinateVector;
+    /**
      * Vector of toponyms. If 0, the word is not a toponym. If 1, it is.
      */
     protected int[] toponymVector;
@@ -126,19 +130,6 @@ public class SphericalModelFields {
      *
      */
     protected double[] normalizedRegionByDocumentCounts;
-    /**
-     * Posterior probabilities for topics.
-     */
-    protected double[] regionProbs;
-    /**
-     * Probability of word given topic. since access more often occurs in
-     * terms of the tcount, it will be a topic by word matrix.
-     */
-    protected double[] wordByRegionProbs;
-    /**
-     *
-     */
-    protected double[] regionByDocumentProbs;
 
     public int getD() {
         return D;
