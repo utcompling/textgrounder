@@ -55,6 +55,14 @@ public class SphericalModelFields {
      */
     protected int currentR;
     /**
+     *
+     */
+    protected int emptyR;
+    /**
+     *
+     */
+    protected int maxCoord;
+    /**
      * Number of non-stopword word types.
      */
     protected int W;
@@ -77,6 +85,10 @@ public class SphericalModelFields {
      * Counts of topics per document
      */
     protected int[] regionByDocumentCounts;
+    /**
+     * 
+     */
+    protected int[] regionCoordinateCounts;
     /**
      * Counts of tcount per topic. However, since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.

@@ -85,17 +85,17 @@ public class NormalizedProbabilityWrapper implements Serializable {
     }
 
     public NormalizedProbabilityWrapper(SphericalModelBase _regionModel) {
-        normalizedRegionCounts = _regionModel.getNormalizedRegionCounts();
-        normalizedWordByRegionCounts = _regionModel.getNormalizedWordByRegionCounts();
-        normalizedRegionByDocumentCounts = _regionModel.getNormalizedRegionByDocumentCounts();
-
-        alpha = _regionModel.getAlpha();
-        beta = _regionModel.getBeta();
-        betaW = _regionModel.getBetaW();
-        D = _regionModel.getD();
-        N = _regionModel.getN();
-        R = _regionModel.getR();
-        W = _regionModel.getW();
+//        normalizedRegionCounts = _regionModel.getNormalizedRegionCounts();
+//        normalizedWordByRegionCounts = _regionModel.getNormalizedWordByRegionCounts();
+//        normalizedRegionByDocumentCounts = _regionModel.getNormalizedRegionByDocumentCounts();
+//
+//        alpha = _regionModel.getAlpha();
+//        beta = _regionModel.getBeta();
+//        betaW = _regionModel.getBetaW();
+//        D = _regionModel.getD();
+//        N = _regionModel.getN();
+//        R = _regionModel.getR();
+//        W = _regionModel.getW();
     }
 
     public void addHyperparameters() {
