@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <experiments>
   <RLDA>
+    <crpalpha type="double">20.000000</crpalpha>
     <alpha type="double">1.000000</alpha>
     <beta type="double">0.100000</beta>
+    <kappa type="double">20.000000</kappa>
     <trainIterations type="int">100</trainIterations>
     <randomSeed type="int">1</randomSeed>
     <initialTemperature type="double">1.000000</initialTemperature>
