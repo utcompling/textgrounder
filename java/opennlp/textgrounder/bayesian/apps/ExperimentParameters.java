@@ -34,6 +34,10 @@ public class ExperimentParameters {
         XML
     }
     /**
+     * alpha for the chinese restaurant process
+     */
+    protected double crpalpha = 20;
+    /**
      * Hyperparameter of topic prior
      */
     protected double alpha = 1;
@@ -149,6 +153,10 @@ public class ExperimentParameters {
      *
      */
     protected INPUT_FORMAT inputFormat = INPUT_FORMAT.BINARY;
+
+    public double getCrpalpha() {
+        return crpalpha;
+    }
 
     public double getAlpha() {
         return alpha;

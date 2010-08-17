@@ -23,6 +23,10 @@ package opennlp.textgrounder.bayesian.spherical.models;
  */
 public class SphericalModelFields {
     /**
+     * Hyperparameter for CRP
+     */
+    protected double crpalpha;
+    /**
      * Hyperparameter for region*doc priors
      */
     protected double alpha;
@@ -110,6 +114,10 @@ public class SphericalModelFields {
      * Counts of topics
      */
     protected int[] regionCounts;
+    /**
+     * 
+     */
+    protected int[] nonToponymRegionCounts;
     /**
      * Vector of topics
      */

@@ -85,6 +85,7 @@ public class SphericalModelBase extends SphericalModelFields {
                 break;
         }
 
+        crpalpha = _experimentParameters.getCrpalpha();
         alpha = _experimentParameters.getAlpha();
         beta = _experimentParameters.getBeta();
         betaW = beta * W;
@@ -118,7 +119,7 @@ public class SphericalModelBase extends SphericalModelFields {
     public void initialize() {
         initialize(experimentParameters);
 
-        expectedR = (int) Math.ceil(alpha * Math.log(1 + N / alpha)) * 2;
+        expectedR = (int) Math.ceil(crpalpha * Math.log(1 + N / crpalpha)) * 2;
 
         regionCounts = new int[expectedR];
         for (int i = 0; i < expectedR; ++i) {
@@ -217,6 +218,7 @@ public class SphericalModelBase extends SphericalModelFields {
         regionVector = new int[N];
         coordinateVector = new int[N];
         for (int i = 0; i < N; ++i) {
+            regionVector[i] = -1;
             coordinateVector[i] = -1;
         }
     }
@@ -293,8 +295,8 @@ public class SphericalModelBase extends SphericalModelFields {
                     totalprob += probs[j] = 1;
                 }
 
-                r = rand.nextDouble() * totalprob + alpha;
-                probs[currentR] = alpha;
+                r = rand.nextDouble() * totalprob + crpalpha;
+                probs[currentR] = crpalpha;
 
                 max = probs[0];
                 regionid = 0;
@@ -307,7 +309,7 @@ public class SphericalModelBase extends SphericalModelFields {
                 }
 
                 regionVector[i] = regionid;
-                regionCounts[regionid]++;
+                nonToponymRegionCounts[regionid] = regionCounts[regionid]++;
                 regionByDocumentCounts[docoff + regionid]++;
                 wordByRegionCounts[wordoff + regionid]++;
 
@@ -341,6 +343,11 @@ public class SphericalModelBase extends SphericalModelFields {
                     regionid++;
                     max += probs[regionid];
                 }
+
+                regionVector[i] = regionid;
+                nonToponymRegionCounts[regionid]++;
+                regionByDocumentCounts[docoff + regionid]++;
+                wordByRegionCounts[wordoff + regionid]++;
             }
         }
 
@@ -387,63 +394,150 @@ public class SphericalModelBase extends SphericalModelFields {
             for (int i = 0; i < N; ++i) {
                 isstopword = stopwordVector[i];
                 istoponym = toponymVector[i];
-                if (isstopword == 0 && istoponym == 1) {
-                    wordid = wordVector[i];
-                    docid = documentVector[i];
-                    regionid = regionVector[i];
-                    coordid = coordinateVector[i];
-                    docoff = docid * expectedR;
-                    wordoff = wordid * expectedR;
+                if (isstopword == 0) {
+                    if (istoponym == 1) {
+                        wordid = wordVector[i];
+                        docid = documentVector[i];
+                        regionid = regionVector[i];
+                        coordid = coordinateVector[i];
+                        docoff = docid * expectedR;
+                        wordoff = wordid * expectedR;
 
-                    regionCounts[regionid]--;
-                    regionByDocumentCounts[docoff + regionid]--;
-                    wordByRegionCounts[wordoff + regionid]--;
-                    regionToponymCoordinateCounts[regionid][wordid][coordid]--;
-                    regionmean = regionMeans[regionid];
-                    TGBLAS.daxpy(0, -1, toponymCoordinateLexicon[wordid][coordid], 1, regionmean, 1);
-                    curCoordCount = toponymCoordinateLexicon[wordid].length;
-                    curCoords = toponymCoordinateLexicon[wordid];
+                        regionCounts[regionid]--;
+                        nonToponymRegionCounts[regionid]--;
+                        regionByDocumentCounts[docoff + regionid]--;
+                        wordByRegionCounts[wordoff + regionid]--;
+                        regionToponymCoordinateCounts[regionid][wordid][coordid]--;
+                        regionmean = regionMeans[regionid];
+                        TGBLAS.daxpy(0, -1, toponymCoordinateLexicon[wordid][coordid], 1, regionmean, 1);
+                        curCoordCount = toponymCoordinateLexicon[wordid].length;
+                        curCoords = toponymCoordinateLexicon[wordid];
 
-                    totalprob = 0;
-                    for (int j = 0; j < currentR; ++j) {
-                        regionmean = regionMeans[j];
-                        int doccount = regionByDocumentCounts[docoff + j];
-                        for (int k = 0; k < curCoordCount; ++k) {
-                            totalprob += probs[j * maxCoord + k] =
-                                  doccount
-                                  * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
+                        totalprob = 0;
+                        for (int j = 0; j < currentR; ++j) {
+                            regionmean = regionMeans[j];
+                            int doccount = regionByDocumentCounts[docoff + j];
+                            for (int k = 0; k < curCoordCount; ++k) {
+                                totalprob += probs[j * maxCoord + k] =
+                                      doccount
+                                      * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
+                            }
                         }
-                    }
 
-                    totalprob += alpha;
-                    if (emptyR != currentR) {
+                        totalprob += crpalpha;
                         for (int j = 0; j < curCoordCount; ++j) {
-                            probs[emptyR * maxCoord + j] = alpha / curCoordCount;
+                            probs[emptyR * maxCoord + j] = crpalpha / curCoordCount;
                         }
-                    }
 
-                    r = rand.nextDouble() * totalprob;
+                        r = rand.nextDouble() * totalprob;
 
-                    max = probs[0];
-                    regionid = 0;
-                    coordid = 0;
-                    while (r > max) {
-                        coordid++;
-                        if (coordid == curCoordCount) {
+                        max = probs[0];
+                        regionid = 0;
+                        coordid = 0;
+                        while (r > max) {
+                            coordid++;
+                            if (coordid == curCoordCount) {
+                                regionid++;
+                                coordid = 0;
+                            }
+                            max += probs[regionid * maxCoord + coordid];
+                        }
+                        regionVector[i] = regionid;
+                        coordinateVector[i] = coordid;
+
+                        for (int j = 0; j < currentR; ++j) {
+                            if (regionCounts[j] == 0) {
+                                emptyR = j;
+                                resetRegionID(regionid, docid);
+                                break;
+                            }
+                        }
+
+                        regionCounts[regionid]++;
+                        nonToponymRegionCounts[regionid]++;
+                        regionByDocumentCounts[docoff + regionid]++;
+                        wordByRegionCounts[wordoff + regionid]++;
+                        regionToponymCoordinateCounts[regionid][wordid][coordid]++;
+                        regionmean = regionMeans[regionid];
+                        TGBLAS.daxpy(0, 1, toponymCoordinateLexicon[wordid][coordid], 1, regionmean, 1);
+
+                        if (regionid == currentR) {
+                            currentR += 1;
+                            emptyR = currentR;
+                        }
+                    } else {
+                        wordid = wordVector[i];
+                        docid = documentVector[i];
+                        regionid = regionVector[i];
+                        istoponym = toponymVector[i];
+                        docoff = docid * expectedR;
+                        wordoff = wordid * expectedR;
+
+                        nonToponymRegionCounts[regionid]--;
+                        regionByDocumentCounts[docoff + regionid]--;
+                        wordByRegionCounts[wordoff + regionid]--;
+
+                        for (int j = 0; j < currentR; ++j) {
+                            probs[j] = (wordByRegionCounts[wordoff + j] + beta)
+                                  / (nonToponymRegionCounts[j] + betaW)
+                                  * (regionByDocumentCounts[docoff + j] + alpha);
+                        }
+
+                        totalprob = _annealer.annealProbs(probs);
+                        r = rand.nextDouble() * totalprob;
+
+                        max = probs[0];
+                        regionid = 0;
+                        while (r > max) {
                             regionid++;
-                            coordid = 0;
+                            max += probs[regionid];
                         }
-                        max += probs[regionid * maxCoord + coordid];
+                        regionVector[i] = regionid;
+
+                        nonToponymRegionCounts[regionid]++;
+                        regionByDocumentCounts[docoff + regionid]++;
+                        wordByRegionCounts[wordoff + regionid]++;
+                    }
+                }
+            }
+        }
+    }
+
+    protected void resetRegionID(int curregionid, int curdocid) {
+        double[] probs = new double[currentR];
+        nonToponymRegionCounts[curregionid] = 0;
+        for (int i = 0; i < D; ++i) {
+            regionByDocumentCounts[i * expectedR + curregionid] = 0;
+        }
+        for (int i = 0; i < W; ++i) {
+            wordByRegionCounts[i * expectedR + curregionid] = 0;
+        }
+
+        for (int i = 0; i < N; ++i) {
+            if (regionVector[i] == curregionid) {
+                if (stopwordVector[i] == 0 && toponymVector[i] == 0) {
+                    int wordid = wordVector[i];
+                    int docid = documentVector[i];
+                    int docoff = docid * expectedR;
+                    int wordoff = wordid * expectedR;
+                    double totalprob = 0;
+                    for (int j = 0; j < currentR; ++j) {
+                        totalprob += probs[j] = (wordByRegionCounts[wordoff + j] + beta)
+                              / (nonToponymRegionCounts[j] + betaW)
+                              * (regionByDocumentCounts[docoff + j] + alpha);
+                    }
+                    double r = rand.nextDouble() * totalprob;
+                    double max = probs[0];
+                    int regionid = 0;
+                    while (r > max) {
+                        regionid++;
+                        max += probs[regionid];
                     }
                     regionVector[i] = regionid;
-                    coordinateVector[i] = coordid;
 
-                    regionCounts[regionid]++;
+                    nonToponymRegionCounts[regionid]++;
                     regionByDocumentCounts[docoff + regionid]++;
                     wordByRegionCounts[wordoff + regionid]++;
-                    regionToponymCoordinateCounts[regionid][wordid][coordid]++;
-                    regionmean = regionMeans[regionid];
-                    TGBLAS.daxpy(0, 1, toponymCoordinateLexicon[wordid][coordid], 1, regionmean, 1);
                 }
             }
         }
@@ -462,48 +556,7 @@ public class SphericalModelBase extends SphericalModelFields {
     }
 
     public void decode() {
-        System.err.println(String.format("Decoding maximum posterior topics"));
-        Annealer decoder = new MaximumPosteriorDecoder();
-        int wordid, docid, regionid;
-        int wordoff, docoff;
-        int istoponym, isstopword;
-        double[] probs = new double[currentR];
-        double totalprob, max, r;
-
-        for (int i = 0; i < N; ++i) {
-            isstopword = stopwordVector[i];
-            if (isstopword == 0) {
-                wordid = wordVector[i];
-                docid = documentVector[i];
-                regionid = regionVector[i];
-                istoponym = toponymVector[i];
-                docoff = docid * expectedR;
-                wordoff = wordid * expectedR;
-
-                try {
-                    if (istoponym == 1) {
-                        for (int j = 0;; ++j) {
-                            probs[j] = (normalizedWordByRegionCounts[wordoff + j] + beta);
-                        }
-                    } else {
-                        for (int j = 0;; ++j) {
-                            probs[j] = (normalizedWordByRegionCounts[wordoff + j] + beta);
-                        }
-                    }
-                } catch (ArrayIndexOutOfBoundsException e) {
-                }
-                totalprob = decoder.annealProbs(probs);
-                r = rand.nextDouble() * totalprob;
-
-                max = probs[0];
-                regionid = 0;
-                while (r > max) {
-                    regionid++;
-                    max += probs[regionid];
-                }
-                regionVector[i] = regionid;
-            }
-        }
+        throw new UnsupportedOperationException("Not yet supported");
     }
 
     public void normalize() {
