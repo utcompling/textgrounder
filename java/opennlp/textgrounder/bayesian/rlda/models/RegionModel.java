@@ -83,7 +83,6 @@ public class RegionModel extends RegionModelFields {
 
         alpha = _experimentParameters.getAlpha();
         beta = _experimentParameters.getBeta();
-        betaW = beta * W;
 
         int randSeed = _experimentParameters.getRandomSeed();
         if (randSeed == 0) {
@@ -117,7 +116,6 @@ public class RegionModel extends RegionModelFields {
 
     protected void readTokenArrayFile() {
 
-        HashSet<Integer> stopwordSet = new HashSet<Integer>();
         ArrayList<Integer> wordArray = new ArrayList<Integer>(),
               docArray = new ArrayList<Integer>(),
               toponymArray = new ArrayList<Integer>(),
@@ -135,9 +133,7 @@ public class RegionModel extends RegionModelFields {
                     toponymArray.add(topstatus);
                     int stopstatus = record[3];
                     stopwordArray.add(stopstatus);
-                    if (stopstatus == 1) {
-                        stopwordSet.add(wordid);
-                    } else {
+                    if (stopstatus == 0) {
                         if (W < wordid) {
                             W = wordid;
                         }
@@ -153,6 +149,7 @@ public class RegionModel extends RegionModelFields {
         }
 
         W += 1;
+        betaW = beta * W;
         D += 1;
         N = wordArray.size();
 
@@ -166,13 +163,8 @@ public class RegionModel extends RegionModelFields {
         copyToArray(toponymVector, toponymArray);
 
         stopwordVector = new int[N];
-        if (stopwordArray.size() == N) {
-            copyToArray(stopwordVector, stopwordArray);
-        } else {
-            for (int i = 0; i < N; ++i) {
-                stopwordVector[i] = 0;
-            }
-        }
+        copyToArray(stopwordVector, stopwordArray);
+
         regionVector = new int[N];
     }
 
