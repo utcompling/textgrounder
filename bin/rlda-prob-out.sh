@@ -1,3 +1,3 @@
 #!/bin/sh
 . textgrounder-env
-$JAVA_CMD opennlp.bayesian.apps.PrettyPrintProbabilities $@
+$JAVA_CMD opennlp.textgrounder.bayesian.apps.PrettyPrintProbabilities $@

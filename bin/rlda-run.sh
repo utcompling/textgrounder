@@ -1,3 +1,3 @@
 #!/bin/sh
 . textgrounder-env
-$JAVA_CMD opennlp.bayesian.apps.TrainRegionModel $@
+$JAVA_CMD opennlp.textgrounder.bayesian.apps.TrainRegionModel $@
