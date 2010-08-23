@@ -18,7 +18,6 @@ package opennlp.textgrounder.bayesian.rlda.models;
 
 import java.io.*;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
@@ -272,8 +271,7 @@ public class RegionModel extends RegionModelFields {
                 } else {
                     try {
                         for (int j = 0;; ++j) {
-                            totalprob += probs[j] =
-                                  activeRegionByDocumentFilter[docoff + j];
+                            totalprob += probs[j] = 1;
                         }
                     } catch (ArrayIndexOutOfBoundsException e) {
                     }
@@ -330,7 +328,6 @@ public class RegionModel extends RegionModelFields {
                                       / (regionCounts[j] + betaW)
                                       * (regionByDocumentCounts[docoff + j] + alpha)
                                       * regionByToponymFilter[wordoff + j];
-//                                      * activeRegionByDocumentFilter[docoff + j];
                             }
                         } else {
                             for (int j = 0;; ++j) {
@@ -400,7 +397,6 @@ public class RegionModel extends RegionModelFields {
                                   / (normalizedRegionCounts[j] + betaW)
                                   * (normalizedRegionByDocumentCounts[docoff + j] + alpha)
                                   * regionByToponymFilter[wordoff + j];
-//                                      * activeRegionByDocumentFilter[docoff + j];
                         }
                     } else {
                         for (int j = 0;; ++j) {

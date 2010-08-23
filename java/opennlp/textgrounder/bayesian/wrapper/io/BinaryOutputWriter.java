@@ -55,6 +55,7 @@ public class BinaryOutputWriter extends OutputWriter {
         super(_experimentParameters);
         openTokenArrayWriter();
         openToponymRegionWriter();
+        openToponymCoordinateWriter();
     }
 
     @Override
@@ -94,7 +95,7 @@ public class BinaryOutputWriter extends OutputWriter {
     }
 
     @Override
-    public void openToponymCoordinateWriter() {
+    public final void openToponymCoordinateWriter() {
         try {
             if (toponymCoordinateFile.getName().endsWith(".gz")) {
                 toponymCoordinateOutputStream = new DataOutputStream(
