@@ -17,32 +17,29 @@
 package opennlp.textgrounder.bayesian.converters;
 
 import java.io.BufferedWriter;
-import java.io.EOFException;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import opennlp.textgrounder.bayesian.apps.*;
 import opennlp.textgrounder.bayesian.structs.IntDoublePair;
 import opennlp.textgrounder.bayesian.structs.NormalizedProbabilityWrapper;
 import opennlp.textgrounder.bayesian.textstructs.Lexicon;
-import opennlp.textgrounder.bayesian.topostructs.Coordinate;
 import opennlp.textgrounder.bayesian.topostructs.Region;
 import opennlp.textgrounder.bayesian.wrapper.io.*;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;
 import org.jdom.input.SAXBuilder;
+import org.jdom.output.Format;
+import org.jdom.output.XMLOutputter;
 
 /**
  *
@@ -140,6 +137,168 @@ public class ProbabilityPrettyPrinter {
                     regionIdToRegionMap.put(region.id, region);
                 }
             }
+        }
+    }
+
+    public void normalizeAndPrintXMLProbabilities() {
+        int outputPerClass = experimentParameters.getOutputPerClass();
+
+        Document doc = new Document();
+
+        String rootName = "probabilities";
+        String wordByRegionName = "word-by-region";
+        String regionByWordName = "region-by-word";
+        String regionByDocumentName = "region-by-document";
+        Element root = new Element(rootName);
+        doc.addContent(root);
+
+        {
+            Element wordByRegionElement = new Element(wordByRegionName);
+            root.addContent(wordByRegionElement);
+
+            double sum = 0.;
+            for (int i = 0; i < R; ++i) {
+                sum += normalizedRegionCounts[i];
+            }
+
+            for (int i = 0; i < R; ++i) {
+                ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
+                for (int j = 0; j < W; ++j) {
+                    topWords.add(new IntDoublePair(j, normalizedWordByRegionCounts[j * R + i]));
+                }
+                Collections.sort(topWords);
+
+                Region region = regionIdToRegionMap.get(i);
+                Element regionElement = new Element("region");
+                wordByRegionElement.addContent(regionElement);
+
+                regionElement.setAttribute("id", String.format("%04d", i));
+                regionElement.setAttribute("lat", String.format("%.2f", region.centLat));
+                regionElement.setAttribute("lon", String.format("%.2f", region.centLon));
+                regionElement.setAttribute("prob", String.format("%.8e", normalizedRegionCounts[i] / sum));
+
+                for (int j = 0; j < outputPerClass; ++j) {
+                    Element wordElement = new Element("word");
+                    regionElement.addContent(wordElement);
+
+                    IntDoublePair pair = topWords.get(j);
+                    wordElement.setAttribute("term", lexicon.getWordForInt(pair.index));
+                    wordElement.setAttribute("prob", String.format("%.8e", pair.count / normalizedRegionCounts[i]));
+                }
+            }
+        }
+
+        {
+            Element regionByWordElement = new Element(regionByWordName);
+            root.addContent(regionByWordElement);
+
+            double[] wordCounts = new double[W];
+
+            for (int i = 0; i < W; ++i) {
+                wordCounts[i] = 0;
+                int wordoff = i * R;
+                for (int j = 0; j < R; ++j) {
+                    wordCounts[i] += normalizedWordByRegionCounts[wordoff + j];
+                }
+            }
+
+            for (int i = 0; i < W; ++i) {
+                int wordoff = i * R;
+                ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
+                for (int j = 0; j < R; ++j) {
+                    topRegions.add(new IntDoublePair(j, normalizedWordByRegionCounts[wordoff + j]));
+                }
+                Collections.sort(topRegions);
+
+                Element wordElement = new Element("word");
+                regionByWordElement.addContent(wordElement);
+
+                wordElement.setAttribute("term", lexicon.getWordForInt(i));
+
+
+                for (int j = 0; j < outputPerClass; ++j) {
+                    Element regionElement = new Element("region");
+                    wordElement.addContent(regionElement);
+
+                    IntDoublePair pair = topRegions.get(j);
+                    Region region = regionIdToRegionMap.get(pair.index);
+                    regionElement.setAttribute("id", String.format("%04d", pair.index));
+                    regionElement.setAttribute("lat", String.format("%.2f", region.centLat));
+                    regionElement.setAttribute("lon", String.format("%.2f", region.centLon));
+                    regionElement.setAttribute("prob", String.format("%.8e", pair.count / wordCounts[i]));
+                }
+            }
+        }
+
+        {
+            Document trdoc = null;
+            try {
+                trdoc = (new SAXBuilder()).build(experimentParameters.getInputPath());
+            } catch (JDOMException ex) {
+                Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
+                System.exit(1);
+            } catch (IOException ex) {
+                Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
+                System.exit(1);
+            }
+
+            HashMap<Integer, String> docidToName = new HashMap<Integer, String>();
+            int docid = 0;
+            Element trroot = trdoc.getRootElement();
+            ArrayList<Element> documents = new ArrayList<Element>(trroot.getChildren());
+            for (Element document : documents) {
+                docidToName.put(docid, document.getAttributeValue("id"));
+                docid += 1;
+            }
+
+            Element regionByDocumentElement = new Element(regionByDocumentName);
+            root.addContent(regionByDocumentElement);
+
+            double[] docWordCounts = new double[D];
+
+            for (int i = 0; i < D; ++i) {
+                docWordCounts[i] = 0;
+                int docoff = i * R;
+                for (int j = 0; j < R; ++j) {
+                    docWordCounts[i] += normalizedRegionByDocumentCounts[docoff + j];
+                }
+            }
+
+            for (int i = 0; i < D; ++i) {
+                int docoff = i * R;
+                ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
+                for (int j = 0; j < R; ++j) {
+                    topRegions.add(new IntDoublePair(j, normalizedRegionByDocumentCounts[docoff + j]));
+                }
+                Collections.sort(topRegions);
+
+                Element documentElement = new Element("document");
+                regionByDocumentElement.addContent(documentElement);
+
+                documentElement.setAttribute("id", docidToName.get(i));
+
+                for (int j = 0; j < outputPerClass; ++j) {
+                    Element regionElement = new Element("region");
+                    documentElement.addContent(regionElement);
+
+                    IntDoublePair pair = topRegions.get(j);
+                    Region region = regionIdToRegionMap.get(pair.index);
+                    regionElement.setAttribute("id", String.format("%04d", pair.index));
+                    regionElement.setAttribute("lat", String.format("%.2f", region.centLat));
+                    regionElement.setAttribute("lon", String.format("%.2f", region.centLon));
+                    regionElement.setAttribute("prob", String.format("%.8e", pair.count / docWordCounts[i]));
+                }
+            }
+        }
+
+        try {
+            String outputPath = experimentParameters.getXmlConditionalProbabilitiesFilename();
+            XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
+            xout.output(doc, new FileOutputStream(new File(outputPath)));
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 

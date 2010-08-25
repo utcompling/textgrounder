@@ -15,6 +15,7 @@
     <lag type="int">10</lag>
     <countCutoff type="int">5</countCutoff>
     <degreesPerRegion type="int">3</degreesPerRegion>
+    <outputPerClass type="int">20</outputPerClass>
     <projectRoot type="string">.</projectRoot>
     <corpusFilename type="string">input.xml</corpusFilename>
     <processedCorpusFilename type="string">output.xml</processedCorpusFilename>
@@ -24,6 +25,7 @@
     <toponymCoordinateFilename type="string">toponym-coordinate.dat.gz</toponymCoordinateFilename>
     <trainedModelFilename type="string">trained-model.model.gz</trainedModelFilename>
     <sampledProbabilitiesFilename type="string">probabilities.dat.gz</sampledProbabilitiesFilename>
+    <xmlConditionalProbabilitiesFilename type="string">sorted-conditional-probabilities.xml</xmlConditionalProbabilitiesFilename>
     <wordByRegionProbsFilename type="string">word-by-region-probabilities.gz</wordByRegionProbsFilename>
     <regionByWordProbsFilename type="string">region-by-word-probabilities.gz</regionByWordProbsFilename>
     <regionByDocumentProbsFilename type="string">region-by-document-probabilities.gz</regionByDocumentProbsFilename>

@@ -94,6 +94,10 @@ public class ExperimentParameters {
      */
     protected int degreesPerRegion = 3;
     /**
+     * 
+     */
+    protected int outputPerClass = 20;
+    /**
      *
      */
     protected String projectRoot = ".";
@@ -129,6 +133,10 @@ public class ExperimentParameters {
      * 
      */
     protected String sampledProbabilitiesFilename = "probabilities.dat.gz";
+    /**
+     *
+     */
+    protected String xmlConditionalProbabilitiesFilename = "sorted-conditional-probabilities.xml";
     /**
      *
      */
@@ -212,6 +220,14 @@ public class ExperimentParameters {
 
     public String getSampledProbabilitiesPath() {
         return joinPath(projectRoot, sampledProbabilitiesFilename);
+    }
+
+    public int getOutputPerClass() {
+        return outputPerClass;
+    }
+
+    public String getXmlConditionalProbabilitiesFilename() {
+        return joinPath(projectRoot, xmlConditionalProbabilitiesFilename);
     }
 
     public String getRegionByWordProbabilitiesPath() {
