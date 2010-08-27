@@ -39,7 +39,14 @@ public class RegionTopicXMLtoKML {
         XPathFactory factory = XPathFactory.newInstance();
         XPath xpath = factory.newXPath();
 
-        XPathExpression regionExpr = xpath.compile("//region");
+        XPathExpression regionExpr = xpath.compile("//word-by-region/region");
+	XPathExpression regionIdExpr = xpath.compile("@id");
+	XPathExpression regionLatExpr = xpath.compile("@lat");
+	XPathExpression regionLonExpr = xpath.compile("@lon");
+	
+	XPathExpression wordExpr = xpath.compile("word");
+	XPathExpression wordTermExpr = xpath.compile("@term");
+	XPathExpression wordProbExpr = xpath.compile("@prob");
 
         Object regionResult = regionExpr.evaluate(doc, XPathConstants.NODESET);
         NodeList regionNodes = (NodeList) regionResult;
@@ -47,22 +54,17 @@ public class RegionTopicXMLtoKML {
             Node regionNode = regionNodes.item(regionNodeIndex);
             //System.out.println(regionNode.getNodeName());
 
-            XPathExpression regionIdExpr = xpath.compile("@id");
             Object regionIdResult = regionIdExpr.evaluate(regionNode, XPathConstants.STRING);
             int regionId = Integer.parseInt((String) regionIdResult);
             //System.out.println(regionId);
 
-            XPathExpression regionLatExpr = xpath.compile("@lat");
             Object regionLatResult = regionLatExpr.evaluate(regionNode, XPathConstants.NUMBER);
             double regionLat = (Double) regionLatResult;
             //System.out.println(regionLat);
 
-            XPathExpression regionLonExpr = xpath.compile("@lon");
             Object regionLonResult = regionLonExpr.evaluate(regionNode, XPathConstants.NUMBER);
             double regionLon = (Double) regionLonResult;
             //System.out.println(regionLon);
-
-            XPathExpression wordExpr = xpath.compile("word");
 
             Object wordResult = wordExpr.evaluate(regionNode, XPathConstants.NODESET);
             NodeList wordNodes = (NodeList) wordResult;
@@ -70,12 +72,10 @@ public class RegionTopicXMLtoKML {
                 Node wordNode = wordNodes.item(wordNodeIndex);
                 //System.out.println(wordNode.getNodeName());
 
-                XPathExpression wordTermExpr = xpath.compile("@term");
                 Object wordTermResult = wordTermExpr.evaluate(wordNode, XPathConstants.STRING);
                 String wordTerm = (String) wordTermResult;
                 //System.out.println(wordTerm);
 
-                XPathExpression wordProbExpr = xpath.compile("@prob");
                 Object wordProbResult = wordProbExpr.evaluate(wordNode, XPathConstants.STRING);
                 Double wordProb = Double.parseDouble((String)wordProbResult);
                 //System.out.println(wordProb);

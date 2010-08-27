@@ -7,6 +7,7 @@ package opennlp.textgrounder.eval;
 import java.io.*;
 import java.util.*;
 import javax.xml.parsers.*;
+import javax.xml.xpath.*;
 import org.w3c.dom.*;
 
 import opennlp.textgrounder.util.*;
@@ -24,6 +25,7 @@ public class GenerateKML {
     public GenerateKML(String modelOutputXMLPath, String kmlOutputPath) throws Exception {
 
         dbf = DocumentBuilderFactory.newInstance();
+	dbf.setNamespaceAware(true);
         db = dbf.newDocumentBuilder();
 
         outputKML(modelOutputXMLPath, kmlOutputPath);
@@ -41,7 +43,14 @@ public class GenerateKML {
 
         Document modeldoc = db.parse(modelOutputXMLPath);
 
-        NodeList modelToponyms = modeldoc.getChildNodes().item(0).getChildNodes();
+	XPathFactory factory = XPathFactory.newInstance();
+        XPath xpath = factory.newXPath();
+
+	XPathExpression toponymExpr = xpath.compile("//toponym");
+
+        //NodeList modelToponyms = modeldoc.getChildNodes().item(0).getChildNodes();
+	Object toponymResult = toponymExpr.evaluate(modeldoc, XPathConstants.NODESET);
+        NodeList modelToponyms = (NodeList) toponymResult;
 
         HashMap<String, ArrayList<String>> locationsToContexts = new HashMap<String, ArrayList<String>>();
         HashMap<String, Location> locationsToLocationData = new HashMap<String, Location>();
