@@ -113,8 +113,8 @@ public class EvalBasedOnXML {
                 Node modelLocationN = ModelTopN.getChildNodes().item(1);
                 Location modelLocation = new Location();
                 modelLocation.setName(ModelTopN.getAttributes().getNamedItem("term").getNodeValue());
-                modelLocation.setCoord(new Coordinate(Double.parseDouble(modelLocationN.getAttributes().getNamedItem("lat").getNodeValue()),
-                                                    Double.parseDouble(modelLocationN.getAttributes().getNamedItem("long").getNodeValue())));// flipped
+                modelLocation.setCoord(new Coordinate(Double.parseDouble(modelLocationN.getAttributes().getNamedItem("long").getNodeValue()),
+						      Double.parseDouble(modelLocationN.getAttributes().getNamedItem("lat").getNodeValue())));/////////////////
 
                 //System.out.println(trContextSignature + " matched " + modelContextSignature);
                 //matchCount++;

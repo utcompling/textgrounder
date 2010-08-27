@@ -132,8 +132,8 @@ public class BasicMinDistanceModelXML extends ModelXML {
 
             String outerCandId = outerCandNode.getAttributes().getNamedItem("id").getNodeValue();
             idsToIndeces.put(outerCandId, outerCandIndex);
-            Coordinate outerCandCoord = new Coordinate(Double.parseDouble(outerCandNode.getAttributes().getNamedItem("lat").getNodeValue()),
-                                                    Double.parseDouble(outerCandNode.getAttributes().getNamedItem("long").getNodeValue()));
+            Coordinate outerCandCoord = new Coordinate(Double.parseDouble(outerCandNode.getAttributes().getNamedItem("long").getNodeValue()),
+						       Double.parseDouble(outerCandNode.getAttributes().getNamedItem("lat").getNodeValue())); ///////////////////
 
             for(int innerSentIndex = 0; innerSentIndex < sentences.getLength(); innerSentIndex++) {
                 if(!sentences.item(innerSentIndex).getNodeName().equals("s"))
@@ -164,8 +164,8 @@ public class BasicMinDistanceModelXML extends ModelXML {
                                 continue;
 
                             //String innerCandId = innerCandNode.getAttributes().getNamedItem("id").getNodeValue();
-                            Coordinate innerCandCoord = new Coordinate(Double.parseDouble(innerCandNode.getAttributes().getNamedItem("lat").getNodeValue()),
-                                                    Double.parseDouble(innerCandNode.getAttributes().getNamedItem("long").getNodeValue()));
+                            Coordinate innerCandCoord = new Coordinate(Double.parseDouble(innerCandNode.getAttributes().getNamedItem("long").getNodeValue()),
+								       Double.parseDouble(innerCandNode.getAttributes().getNamedItem("lat").getNodeValue())); ///////////////////
 
                             
                             double curDistance = outerCandCoord.computeDistanceTo(innerCandCoord);

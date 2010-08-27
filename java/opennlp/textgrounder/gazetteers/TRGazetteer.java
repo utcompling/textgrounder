@@ -129,8 +129,8 @@ public class TRGazetteer extends Gazetteer {
                 prep.setString(2, nameToInsert);
             }
             prep.setString(3, "cia_centroid");
-            double latToInsert = DMDtoDD(rs.getInt("LONG_DEG"), rs.getInt("LONG_MIN"), rs.getString("LONG_DIR"));/////
-            double longToInsert = DMDtoDD(rs.getInt("LAT_DEG"), rs.getInt("LAT_MIN"), rs.getString("LAT_DIR"));///////
+            double latToInsert = DMDtoDD(rs.getInt("LAT_DEG"), rs.getInt("LAT_MIN"), rs.getString("LAT_DIR"));/////
+            double longToInsert = DMDtoDD(rs.getInt("LONG_DEG"), rs.getInt("LONG_MIN"), rs.getString("LONG_DIR"));///////
 
             if (latToInsert < -180.0 || latToInsert > 180.0
                   || longToInsert < -90.0 || longToInsert > 90.0) {
@@ -185,8 +185,8 @@ public class TRGazetteer extends Gazetteer {
             if (nameToInsert != null) {
                 prep.setString(2, nameToInsert);
             }
-            double latToInsert = rs.getDouble("PrimaryLongitudeDD");///////
-            double longToInsert = rs.getDouble("PrimaryLatitudeDD");//////
+            double latToInsert = rs.getDouble("PrimaryLatitudeDD");///////
+            double longToInsert = rs.getDouble("PrimaryLongitudeDD");//////
 
             if (latToInsert < -180.0 || latToInsert > 180.0
                   || longToInsert < -90.0 || longToInsert > 90.0) {
@@ -252,8 +252,8 @@ public class TRGazetteer extends Gazetteer {
                 prep.setString(2, nameToInsert);
             }
 
-            double latToInsert = rs.getDouble("DD_LONG");//"DD_LAT"); //switched?
-            double longToInsert = rs.getDouble("DD_LAT");//"DD_LONG");
+            double latToInsert = rs.getDouble("DD_LAT");//"DD_LAT"); //switched?
+            double longToInsert = rs.getDouble("DD_LONG");//"DD_LONG");
 
             if (latToInsert < -180.0 || latToInsert > 180.0
                   || longToInsert < -90.0 || longToInsert > 90.0) {

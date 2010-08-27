@@ -69,7 +69,7 @@ public class GenerateKML {
             if(curLocationData == null) {
                 curLocationData = new Location();
                 curLocationData.setName(ModelTopN.getAttributes().getNamedItem("term").getNodeValue().toLowerCase());
-                curLocationData.setCoord(new Coordinate(Double.parseDouble(modelLat), Double.parseDouble(modelLon)));
+                curLocationData.setCoord(new Coordinate(Double.parseDouble(modelLon), Double.parseDouble(modelLat)));//////////////
                 locationsToLocationData.put(modelLat + ";" + modelLon, curLocationData);
             }
             
