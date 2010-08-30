@@ -80,7 +80,7 @@ public class RegionTopicXMLtoKML {
                 Double wordProb = Double.parseDouble((String)wordProbResult);
                 //System.out.println(wordProb);
 
-                Coordinate center = new Coordinate(regionLon, regionLat);
+                Coordinate center = new Coordinate(regionLat, regionLon);/////
                 Coordinate spiralPoint = center.getNthSpiralPoint(wordNodeIndex, .5);
 
                 double height = wordProb * BARSCALE;
