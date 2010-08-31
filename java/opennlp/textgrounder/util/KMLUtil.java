@@ -88,7 +88,7 @@ public class KMLUtil {
       w.writeCharacters(String.format("%f,%f,%f\n", lat, lon, height));
     }
 
-    w.writeEndElement(); // coordinate
+    w.writeEndElement(); // coordinates
   }
 
   public static void writeRegion(XMLStreamWriter w, Coordinate coord, double radius)

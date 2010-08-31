@@ -8,6 +8,14 @@ import java.io.*;
 import java.util.*;
 import javax.xml.parsers.*;
 import javax.xml.xpath.*;
+
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import javax.xml.stream.XMLStreamWriter;
+import javax.xml.stream.events.*;
+
 import org.w3c.dom.*;
 
 import opennlp.textgrounder.util.*;
@@ -22,14 +30,68 @@ public class RegionTopicXMLtoKML {
     private static DocumentBuilderFactory dbf;
     private static DocumentBuilder db;
 
-    public static void main(String[] args) throws Exception {
-        RegionTopicXMLtoKML regionTopicXMLtoKML = new RegionTopicXMLtoKML(args[0], args[1]);
+    public static void main(String[] args)
+      throws FileNotFoundException, IOException, XMLStreamException {
+      RegionTopicXMLtoKML.convert(args[0], args[1]);
     }
 
+    public static void convert(String xmlInputPath, String kmlOutputPath)
+      throws FileNotFoundException, IOException, XMLStreamException {
+      XMLInputFactory inFactory = XMLInputFactory.newInstance();
+      XMLOutputFactory outFactory = XMLOutputFactory.newInstance();
+
+      XMLStreamReader in = inFactory.createXMLStreamReader(new BufferedReader(new FileReader(xmlInputPath)));
+      XMLStreamWriter out = outFactory.createXMLStreamWriter(new BufferedWriter(new FileWriter(kmlOutputPath)));
+
+      RegionTopicXMLtoKML.convert(in, out, xmlInputPath);
+    }
+
+    public static void convert(XMLStreamReader in, XMLStreamWriter out, String name)
+      throws XMLStreamException {
+      KMLUtil.writeHeader(out, name);
+
+      in.nextTag();
+      assert in.isStartElement() && in.getLocalName().equals("probabilities");
+      in.nextTag();
+      assert in.isStartElement() && in.getLocalName().equals("word-by-region");
+      in.nextTag();
+
+      while (in.isStartElement() && in.getLocalName().equals("region")) {
+        double regionLat = Double.parseDouble(in.getAttributeValue(null, "lat"));
+        double regionLon = Double.parseDouble(in.getAttributeValue(null, "lon"));
+        Coordinate center = new Coordinate(regionLat, regionLon);
+
+        in.nextTag();
+
+        int i = 0;
+        while (in.isStartElement() && in.getLocalName().equals("word")) {
+          String term = in.getAttributeValue(null, "term");
+          double prob = Double.parseDouble(in.getAttributeValue(null, "prob"));
+          double height = prob * BARSCALE;
+
+          Coordinate spiralPoint = center.getNthSpiralPoint(i, .5);
+
+          KMLUtil.writePolygon(out, "", spiralPoint, SIDES, RADIUS, height);
+          KMLUtil.writeFloatingPlacemark(out, term, spiralPoint, height);
+
+          i++;
+          in.nextTag();
+          assert in.isEndElement() && in.getLocalName().equals("word");
+          in.nextTag();
+        }
+
+        assert in.isEndElement() && in.getLocalName().equals("region");
+        in.nextTag();
+      }
+
+      in.close();
+
+      KMLUtil.writeFooter(out);
+      out.close();
+    }
+
+    @Deprecated
     public RegionTopicXMLtoKML(String xmlInputPath, String kmlOutputPath) throws Exception {
-        dbf = DocumentBuilderFactory.newInstance();
-        dbf.setNamespaceAware(true);
-        db = dbf.newDocumentBuilder();
 
         Document doc = db.parse(xmlInputPath);
 
