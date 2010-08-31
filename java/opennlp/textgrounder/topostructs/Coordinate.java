@@ -70,6 +70,7 @@ public class Coordinate implements Serializable {
      * @return A string representing a KML expression describing the coordinates
      *         of the cylinder
      */
+    @Deprecated
     public String toKMLPolygon(int sides, double radius, double height) {
 	final double radianUnit = twoPI/sides;
 	final double startRadian = radianUnit/2;
