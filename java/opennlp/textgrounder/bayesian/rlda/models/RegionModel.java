@@ -229,7 +229,7 @@ public class RegionModel extends RegionModelFields {
             try {
                 if (topstatus == 1 && stopstatus == 0) {
                     for (int j = 0; j < R; ++j) {
-                        activeRegionByDocumentFilter[docoff + j] = regionByToponymFilter[topoff + j];
+                        activeRegionByDocumentFilter[docoff + j] |= regionByToponymFilter[topoff + j];
                     }
                 }
             } catch (ArrayIndexOutOfBoundsException e) {
