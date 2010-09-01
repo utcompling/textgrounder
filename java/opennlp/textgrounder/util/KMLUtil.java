@@ -27,6 +27,9 @@ import opennlp.textgrounder.topostructs.Coordinate;
  * @author tsmoon
  */
 public class KMLUtil {
+  // Minimum number of pixels the (small) square region (NOT our Region) represented by each city must occupy on the screen for its label to appear:
+  public final static int MIN_LOD_PIXELS = 16;
+
   protected static void writeWithCharacters(XMLStreamWriter w, String localName, String text)
     throws XMLStreamException {
     w.writeStartElement(localName);
@@ -101,7 +104,7 @@ public class KMLUtil {
     KMLUtil.writeWithCharacters(w, "west", String.format("%f", coord.longitude - radius));
     w.writeEndElement(); // LatLonAltBox
     w.writeStartElement("Lod");
-    KMLUtil.writeWithCharacters(w, "minLodPixels", Integer.toString(Model.MIN_LOD_PIXELS));
+    KMLUtil.writeWithCharacters(w, "minLodPixels", Integer.toString(KMLUtil.MIN_LOD_PIXELS));
     w.writeEndElement(); // Lod
     w.writeEndElement(); // Region
   }
@@ -232,7 +235,7 @@ public class KMLUtil {
               + "\t\t\t\t\t\t<west>" + (coord.longitude - radius) + "</west>\n"
               + "\t\t\t\t\t</LatLonAltBox>\n"
               + "\t\t\t\t\t<Lod>\n"
-              + "\t\t\t\t\t\t<minLodPixels>" + Model.MIN_LOD_PIXELS + "</minLodPixels>\n"
+              + "\t\t\t\t\t\t<minLodPixels>" + KMLUtil.MIN_LOD_PIXELS + "</minLodPixels>\n"
               + "\t\t\t\t\t</Lod>\n"
               + "\t\t\t\t</Region>\n"
               + "\t\t\t\t<styleUrl>#bar</styleUrl>\n"
@@ -272,7 +275,7 @@ public class KMLUtil {
               + "\t\t\t\t\t\t<west>" + (spiralPoint.longitude - radius) + "</west>\n"
               + "\t\t\t\t\t</LatLonAltBox>\n"
               + "\t\t\t\t\t<Lod>\n"
-              + "\t\t\t\t\t\t<minLodPixels>" + Model.MIN_LOD_PIXELS + "</minLodPixels>\n"
+              + "\t\t\t\t\t\t<minLodPixels>" + KMLUtil.MIN_LOD_PIXELS + "</minLodPixels>\n"
               + "\t\t\t\t\t</Lod>\n"
               + "\t\t\t\t</Region>\n"
               + "\t\t\t\t<styleUrl>#context</styleUrl>\n"

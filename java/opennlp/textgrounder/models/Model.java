@@ -47,8 +47,6 @@ import opennlp.textgrounder.util.KMLUtil;
  */
 public abstract class Model {
 
-    // Minimum number of pixels the (small) square region (NOT our Region) represented by each city must occupy on the screen for its label to appear:
-    public final static int MIN_LOD_PIXELS = 16;
     /**
      * Number of paragraphs to consider as one document.
      */
