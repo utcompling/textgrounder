@@ -75,6 +75,11 @@ public class SphericalModelFields {
      */
     protected int T;
     /**
+     * cartesian coordinates is the default. see no reason to move to slower (but cheaper)
+     * spherical coordinates
+     */
+    protected int coordParamLen = 3;
+    /**
      * An index of toponyms and possible regions. The goal is fast lookup and not
      * frugality with memory. The dimensions are equivalent to the wordByRegionCounts
      * array. Instead of counts, this array is populated with ones and zeros.

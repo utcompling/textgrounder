@@ -27,6 +27,9 @@ public class TGArrays {
         for (int i = 0; i < _prevC; ++i) {
             target[i] = _source[i];
         }
+        for (int i = _prevC; i < _C; ++i) {
+            target[i] = 0;
+        }
         return target;
     }
 
@@ -35,6 +38,9 @@ public class TGArrays {
         double[] target = new double[_C];
         for (int i = 0; i < _prevC; ++i) {
             target[i] = _source[i];
+        }
+        for (int i = _prevC; i < _C; ++i) {
+            target[i] = 0;
         }
         return target;
     }
@@ -47,6 +53,9 @@ public class TGArrays {
             int prevoff = i * _prevC;
             for (int j = 0; j < _prevC; ++j) {
                 target[off + j] = _source[prevoff + j];
+            }
+            for (int j = _prevC; j < _C; ++j) {
+                target[off + j] = 0;
             }
         }
         return target;
@@ -61,26 +70,38 @@ public class TGArrays {
             for (int j = 0; j < _prevC; ++j) {
                 target[off + j] = _source[prevoff + j];
             }
+            for (int j = _prevC; j < _C; ++j) {
+                target[off + j] = 0;
+            }
         }
         return target;
     }
 
     public static double[][] expandSingleTierR(double[][] _source, int _R,
-          int _prevR) {
+          int _prevR, int _C) {
         double[][] target = new double[_R][];
         for (int i = 0; i < _prevR; ++i) {
             target[i] = _source[i];
+        }
+        for (int i = _prevR; i < _R; ++i) {
+            double[] sub = new double[_C];
+            for (int j = 0; j < _C; ++j) {
+                sub[j] = 0;
+            }
+            target[i] = sub;
         }
         return target;
     }
 
     public static double[] expandDoubleTierR(double[] _source, int _R,
-          int _prevR,
-          int _C) {
+          int _prevR, int _C) {
         double[] target = new double[_R * _C];
         for (int i = 0; i < _C; ++i) {
             for (int j = 0; j < _prevR; ++j) {
                 target[j * _C + i] = _source[j * _C + i];
+            }
+            for (int j = _prevR; j < _R; ++j) {
+                target[j * _C + i] = 0;
             }
         }
         return target;

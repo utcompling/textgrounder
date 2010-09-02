@@ -497,7 +497,9 @@ public class SphericalModelBase extends SphericalModelFields {
                 }
             }
 
-            _annealer.collectSamples(wordByRegionCounts, regionByDocumentCounts,/*toponymByRegionCounts, nonToponymRegionCounts, */ regionToponymCoordinateCounts);
+            _annealer.collectSamples(wordByRegionCounts, regionByDocumentCounts,
+                  allWordsRegionCounts, regionMeans,/*toponymByRegionCounts, nonToponymRegionCounts, */
+                  regionToponymCoordinateCounts);
 
             if (expectedR - currentR < EXPANSION_FACTOR / (1 + EXPANSION_FACTOR) * expectedR) {
                 expandExpectedR();
@@ -555,7 +557,7 @@ public class SphericalModelBase extends SphericalModelFields {
         wordByRegionCounts = TGArrays.expandDoubleTierC(wordByRegionCounts, W, newExpectedR, expectedR);
 //        toponymByRegionCounts = TGArrays.expandDoubleTierC(toponymByRegionCounts, T, newExpectedR, expectedR);
 
-        regionMeans = TGArrays.expandSingleTierR(regionMeans, newExpectedR, currentR);
+        regionMeans = TGArrays.expandSingleTierR(regionMeans, newExpectedR, currentR, coordParamLen);
 
         int[][][] newRegionToponymCoordinateCounts = new int[newExpectedR][][];
         for (int i = 0; i < expectedR; ++i) {
@@ -597,16 +599,6 @@ public class SphericalModelBase extends SphericalModelFields {
         double[][][] newSampleRegionToponymCoordinateCounts = new double[newExpectedR][][];
         for (int i = 0; i < expectedR; ++i) {
             newSampleRegionToponymCoordinateCounts[i] = sampleRegionToponymCoordinateCounts[i];
-            double[][] toponymCoordinateCounts = new double[T][];
-            for (int j = 0; j < T; ++j) {
-                int coordinates = toponymCoordinateLexicon[j].length;
-                double[] coordcounts = new double[coordinates];
-                for (int k = 0; k < coordinates; ++k) {
-                    coordcounts[k] = sampleRegionToponymCoordinateCounts[i][j][k];
-                }
-                toponymCoordinateCounts[j] = coordcounts;
-            }
-            newSampleRegionToponymCoordinateCounts[i] = toponymCoordinateCounts;
         }
 
         for (int i = expectedR; i < newExpectedR; ++i) {
@@ -624,10 +616,8 @@ public class SphericalModelBase extends SphericalModelFields {
         annealer.setRegionToponymCoordinateCounts(sampleRegionToponymCoordinateCounts);
 
         double[][] sampleRegionMeans = annealer.getRegionMeans();
-        double[][] newRegionMeans = new double[newExpectedR][];
-        for(int i = 0; i < expectedR;++i) {
-            
-        }
+        sampleRegionMeans = TGArrays.expandSingleTierR(sampleRegionMeans, newExpectedR, currentR, coordParamLen);
+        annealer.setRegionMeans(sampleRegionMeans);
 
 //        int[] newRegionCoordinateCounts = new int[newExpectedR * maxCoord];
 //        for(int i = 0; i <expectedR;++i) {
