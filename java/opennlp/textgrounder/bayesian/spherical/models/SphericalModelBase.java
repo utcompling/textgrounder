@@ -19,7 +19,6 @@ package opennlp.textgrounder.bayesian.spherical.models;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -28,6 +27,7 @@ import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
 import opennlp.textgrounder.bayesian.mathutils.*;
 import opennlp.textgrounder.bayesian.rlda.annealers.*;
+import opennlp.textgrounder.bayesian.spherical.annealers.*;
 import opennlp.textgrounder.bayesian.spherical.io.*;
 import opennlp.textgrounder.bayesian.structs.*;
 import opennlp.textgrounder.bayesian.utils.TGArrays;
@@ -58,7 +58,7 @@ public class SphericalModelBase extends SphericalModelFields {
     /**
      * 
      */
-    protected transient Annealer annealer;
+    protected transient SphericalAnnealer annealer;
 
     /**
      * Default constructor. Take input from commandline and default _options
@@ -107,9 +107,9 @@ public class SphericalModelBase extends SphericalModelFields {
         double targetTemp = _experimentParameters.getTargetTemperature();
         double initialTemp = _experimentParameters.getInitialTemperature();
         if (Math.abs(initialTemp - targetTemp) < Annealer.EPSILON) {
-            annealer = new EmptyAnnealer(_experimentParameters);
+            annealer = new SphericalEmptyAnnealer(_experimentParameters);
         } else {
-            annealer = new SimulatedAnnealer(_experimentParameters);
+            annealer = new SphericalSimulatedAnnealer(_experimentParameters);
         }
 
         readTokenArrayFile();
@@ -570,12 +570,12 @@ public class SphericalModelBase extends SphericalModelFields {
         System.err.println(String.format("Randomly initializing with %d tokens, %d words, %d documents, and %d expected regions", N, W, D, expectedR));
         randomInitialize();
         System.err.println(String.format("Beginning training with %d tokens, %d words, %d documents, and %d expected regions", N, W, D, expectedR));
-        train(annealer);
-        if (annealer.getSamples() != 0) {
-            normalizedRegionCounts = annealer.getNormalizedTopicSampleCounts();
-            normalizedWordByRegionCounts = annealer.getNormalizedWordByTopicSampledProbs();
-            normalizedRegionByDocumentCounts = annealer.getNormalizedRegionByDocumentSampledCounts();
-        }
+//        train(annealer);
+//        if (annealer.getSamples() != 0) {
+//            normalizedRegionCounts = annealer.getNormalizedTopicSampleCounts();
+//            normalizedWordByRegionCounts = annealer.getNormalizedWordByTopicSampledProbs();
+//            normalizedRegionByDocumentCounts = annealer.getNormalizedRegionByDocumentSampledCounts();
+//        }
     }
 
     public void decode() {

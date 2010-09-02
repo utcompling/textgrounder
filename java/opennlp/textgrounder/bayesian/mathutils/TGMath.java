@@ -64,9 +64,9 @@ public class TGMath {
         double[] cart = new double[3];
         double theta = latToRadians(_lat);
         double phi = longToRadians(_long);
-        cart[0] = Math.cos(theta);
-        cart[1] = Math.sin(theta) * Math.cos(phi);
-        cart[2] = Math.sin(theta) * Math.sin(phi);
+        cart[0] = Math.sin(theta) * Math.cos(phi);
+        cart[1] = Math.sin(theta) * Math.sin(phi);
+        cart[2] = Math.cos(theta);
         return cart;
     }
 
@@ -77,8 +77,15 @@ public class TGMath {
         return spher;
     }
 
+    public static double[] sphericalToGeographic(double[] _spher) {
+        double[] geo = new double[2];
+        geo[0] = (_spher[0] / -Math.PI + Math.PI / 4) * 180;
+        geo[1] = (_spher[1] / Math.PI - Math.PI / 2) * 180;
+        return geo;
+    }
+
     public static double latToRadians(double _lat) {
-        return (_lat / 180 + 0.5) * Math.PI;
+        return (_lat / -180 + 0.5) * Math.PI;
     }
 
     public static double longToRadians(double _long) {

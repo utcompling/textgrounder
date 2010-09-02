@@ -34,19 +34,53 @@ public class ExperimentParameters {
         XML
     }
     /**
+     * Switch for whether hyperparameters should be reestimated or not.
+     * 0 is no, 1 is yes.
+     */
+    protected int estimateHyperparameter = 0;
+    /**
      * alpha for the chinese restaurant process
      */
     protected double crpalpha = 20;
+    /**
+     * gamma prior rate parameter a for crpalpha
+     */
+    protected double crpalpha_a = 20;
+    /**
+     * gamma prior shape parameter b for crpalpha
+     */
+    protected double crpalpha_b = 20;
     /**
      * Hyperparameter of topic prior
      */
     protected double alpha = 1;
     /**
+     * gamma prior rate parameter a for alpha
+     */
+    protected double alpha_a = 1;
+    /**
+     * gamma prior shape parameter b for alpha
+     */
+    protected double alpha_b = 0.1;
+    /**
      * Hyperparameter for word/topic prior
      */
     protected double beta = 0.1;
     /**
-     * 
+     * gamma prior rate parameter a for beta
+     */
+    protected double beta_a = 0.1;
+    /**
+     * gamma prior shape parameter b for beta
+     */
+    protected double beta_b = 0.1;
+    /**
+     * Switch for whether kappa should be reestimated or not.
+     * 0 is no, 1 is yes.
+     */
+    protected int estimateKappa = 0;
+    /**
+     * kappa (spread) for spherical model. Higher means more peaked.
      */
     protected double kappa = 20;
     /**
@@ -164,6 +198,62 @@ public class ExperimentParameters {
 
     public double getCrpalpha() {
         return crpalpha;
+    }
+
+    /**
+     * @return the estimateHyperparameter
+     */
+    public int getEstimateHyperparameter() {
+        return estimateHyperparameter;
+    }
+
+    /**
+     * @return the crpalpha_a
+     */
+    public double getCrpalpha_a() {
+        return crpalpha_a;
+    }
+
+    /**
+     * @return the crpalpha_b
+     */
+    public double getCrpalpha_b() {
+        return crpalpha_b;
+    }
+
+    /**
+     * @return the alpha_a
+     */
+    public double getAlpha_a() {
+        return alpha_a;
+    }
+
+    /**
+     * @return the alpha_b
+     */
+    public double getAlpha_b() {
+        return alpha_b;
+    }
+
+    /**
+     * @return the beta_a
+     */
+    public double getBeta_a() {
+        return beta_a;
+    }
+
+    /**
+     * @return the beta_b
+     */
+    public double getBeta_b() {
+        return beta_b;
+    }
+
+    /**
+     * @return the estimateKappa
+     */
+    public int getEstimateKappa() {
+        return estimateKappa;
     }
 
     public double getAlpha() {
