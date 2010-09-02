@@ -14,7 +14,6 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-
 package opennlp.textgrounder.bayesian.spherical.models;
 
 /**
@@ -22,6 +21,7 @@ package opennlp.textgrounder.bayesian.spherical.models;
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
 public class SphericalModelFields {
+
     /**
      * Hyperparameter for CRP
      */
@@ -92,7 +92,7 @@ public class SphericalModelFields {
     /**
      * 
      */
-    protected int[] regionCoordinateCounts;
+//    protected int[] regionCoordinateCounts;
     /**
      * Counts of tcount per topic. However, since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.
@@ -101,7 +101,7 @@ public class SphericalModelFields {
     /**
      * 
      */
-    protected int[] toponymByRegionCounts;
+//    protected int[] toponymByRegionCounts;
     /**
      * 
      */
@@ -117,7 +117,7 @@ public class SphericalModelFields {
     /**
      * 
      */
-    protected int[] nonToponymRegionCounts;
+    protected int[] allWordsRegionCounts;
     /**
      * Vector of topics
      */
@@ -141,7 +141,7 @@ public class SphericalModelFields {
     /**
      *
      */
-    protected double[] normalizedRegionCounts;
+//    protected double[] normalizedRegionCounts;
     /**
      *
      */
@@ -150,6 +150,18 @@ public class SphericalModelFields {
      *
      */
     protected double[] normalizedRegionByDocumentCounts;
+    /**
+     * 
+     */
+    protected double[] normalizedAllWordsRegionCounts;
+    /**
+     *
+     */
+    protected double[][] normalizedRegionMeans;
+    /**
+     * 
+     */
+    protected double[][][] normalizedRegionToponymCoordinateCounts;
 
     public int getD() {
         return D;
@@ -178,5 +190,4 @@ public class SphericalModelFields {
     public void setW(int W) {
         this.W = W;
     }
-
 }
