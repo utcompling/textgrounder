@@ -30,13 +30,14 @@ import opennlp.textgrounder.ners.*;
  */
 public class GeoPreprocess {
     /**
-     * Type of gazette. The gazette shorthands from the commandline are:
+     * Type of gazette. The gazette shorthands from the command line are:
      * <pre>
      * "c": CensusGazetteer
      * "n": NGAGazetteer
      * "u": USGSGazetteer
      * "w": WGGazetteer (default)
      * "t": TRGazetteer
+     * "g": NGGazetteer
      * </pre>
      */
     protected String gazetteType = "w";
@@ -174,7 +175,7 @@ public class GeoPreprocess {
      * @param options Command line options
      */
     protected static void setOptions(Options options) {
-        options.addOption("g", "gazetteer", true, "gazetteer to use [world, census, NGA, USGS; default = world]");
+        options.addOption("g", "gazetteer", true, "gazetteer to use [world, census, NGA, USGS, GeoNames; default = world]");
         options.addOption("gr", "gazetteer-refresh", false, "read gazetteer afresh from original database");
         options.addOption("id", "gazetteer-path", true, "path to gazetteer db");
         options.addOption("o", "output", true, "output filename");

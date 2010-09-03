@@ -31,6 +31,7 @@ public class GazetteerEnum {
         NGAG, // ? national geographic?
         TRG, // TR-CoNLL Gazetteer
         USGSG, // ? us geological survey?
-        WG // World gazetteer
+        WG, // World gazetteer
+        GN // GeoNames
     };
 }
