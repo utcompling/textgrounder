@@ -1,3 +1,3 @@
 #!/bin/sh
-. textgrounder-env
+. ./textgrounder-env
 $JAVA_CMD opennlp.textgrounder.geo.GeoPreprocess $@

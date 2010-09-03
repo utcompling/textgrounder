@@ -16,7 +16,7 @@ STANFORD_NER_CP="$TG_LIB/stanford-ner.jar"
 #### FIXME! trove.jar and stanford-ner.jar duplicated.
 
 # Create the combined CLASSPATH
-CP="$TG_CP:STANFORD_NER_CP:$OPENNLP_CP"
+CP="$TG_CP:$STANFORD_NER_CP:$OPENNLP_CP"
 JAVA="$JAVA_HOME/bin/java"
 
 # Determine the heap-size flag
