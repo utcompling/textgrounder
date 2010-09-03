@@ -65,6 +65,8 @@ public class GazetteerGenerator {
             gazType = GazetteerEnum.GazetteerTypes.WG;
         } else if (gazTypeArg.startsWith("t")) {
             gazType = GazetteerEnum.GazetteerTypes.TRG;
+        } else if (gazTypeArg.startsWith("g")) {
+            gazType = GazetteerEnum.GazetteerTypes.GN;
         } else {
             System.err.println("Error: unrecognized gazetteer type: "
                     + gazTypeArg);
@@ -100,6 +102,9 @@ public class GazetteerGenerator {
                     break;
                 case TRG:
                     gazetteer = new TRGazetteer(gazPath, gazetteerRefresh);
+                    break;
+                case GN:
+                    gazetteer = new GNGazetteer(gazPath);
                     break;
             }
         } catch (FileNotFoundException ex) {
