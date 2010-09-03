@@ -18,6 +18,8 @@ package opennlp.textgrounder.textstructs;
 import gnu.trove.TIntIterator;
 
 import java.util.List;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
 
 import org.jdom.Attribute;
 import org.jdom.Element;
@@ -63,6 +65,53 @@ public class Token extends DocumentComponent {
                 props.put(name, value);
         }
         assert (id != 0);
+    }
+
+    protected void writeElement(XMLStreamWriter w) throws XMLStreamException {
+      w.writeStartElement(this.istop ? "toponym" : "w");
+      // copy properties
+      for (String name : props.keySet()) {
+        w.writeAttribute(name, props.get(name));
+      }
+      String word = this.document.corpus.lexicon.getWordForInt(id);
+      if (this.istop) {
+        w.writeAttribute("term", word);
+        w.writeStartElement("candidates");
+
+        Gazetteer gazetteer = document.corpus.gazetteer;
+        /* This totally sucks.  Why can't I iterate in the obvious way? */
+        // System.out.println("Toponym is " + word);
+        for (TIntIterator it = gazetteer.get(word).iterator(); it.hasNext();) {
+          int locid = it.next();
+          Location loc = gazetteer.getLocation(locid);
+          w.writeStartElement("cand");
+          w.writeAttribute("id", "c" + locid);
+
+          Coordinate coord = loc.getCoord();
+          /* Java sucks.  Why can't I just call toString() on a double? */
+          w.writeAttribute("lat", "" + coord.latitude);
+          w.writeAttribute("long", "" + coord.longitude);
+          if (loc.getType() != null) {
+            w.writeAttribute("type", loc.getType());
+          }
+          if (loc.getContainer() != null) {
+            w.writeAttribute("container", loc.getContainer());
+          }
+          if (loc.getPop() > 0) {
+            w.writeAttribute("population", "" + loc.getPop());
+          }
+          w.writeEndElement();
+        }
+        w.writeEndElement();
+      } else {
+        assert (word != null);
+        w.writeAttribute("tok", word);
+      }
+      w.writeEndElement();
+      // there should be no children
+      for (DocumentComponent child : this) {
+        assert (false);
+      }
     }
 
     /**

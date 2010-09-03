@@ -20,6 +20,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.ArrayList;
 
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
+
 import org.jdom.*;
 import org.jdom.input.SAXBuilder;
 
@@ -60,6 +63,20 @@ public class CorpusDocument extends DocumentComponent {
         tokens = new ArrayList<Token>();
     }
     
+    protected void writeElement(XMLStreamWriter w) throws XMLStreamException {
+      w.writeStartElement(this.type);
+      /* This is a hack. */
+      w.writeStartElement("s");
+      for (String name : this.props.keySet()) {
+        w.writeAttribute(name, props.get(name));
+      }
+      for (DocumentComponent child : this) {
+        child.writeElement(w);
+      }
+      w.writeEndElement();
+      w.writeEndElement();
+    }
+
     public void processElement(Element e) {
         if (!e.getName().equals("doc"))
             throw new RuntimeException("Unknown top-level element type: " + e.getName());

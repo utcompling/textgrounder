@@ -16,14 +16,20 @@
 package opennlp.textgrounder.textstructs;
 
 import opennlp.textgrounder.gazetteers.Gazetteer;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 
 import org.jdom.*;
 import org.jdom.output.Format;
 import org.jdom.output.XMLOutputter;
+
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
 
 /**
  * Class that stores data about a corpus (sequence of documents).
@@ -43,6 +49,29 @@ public class Corpus extends ArrayList<CorpusDocument> {
         gazetteer = g;
         lexicon = l;
     }
+
+    /**
+     * Output the corpus in XML to the given file using an XML output stream to
+     * conserve memory.
+     * 
+     * @param file
+     * @throws IOException
+     */
+    public void writeXML(File file) throws IOException, XMLStreamException {
+      XMLOutputFactory outFactory = XMLOutputFactory.newInstance();
+      XMLStreamWriter out = outFactory.createXMLStreamWriter(new BufferedWriter(new FileWriter(file)));
+
+      out.writeStartDocument("UTF-8", "1.0");
+      out.writeStartElement("corpus");
+
+      for (CorpusDocument cdoc : this) {
+        System.out.println("Outputting XML for " + cdoc);
+        cdoc.writeElement(out);
+      }
+
+      out.writeEndElement();
+      out.close();
+    } 
 
     /**
      * Output the corpus in XML to the given file.

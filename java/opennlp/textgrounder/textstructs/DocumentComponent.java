@@ -21,6 +21,9 @@ import java.util.List;
 import org.jdom.Attribute;
 import org.jdom.Element;
 
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
+
 import gnu.trove.*;
 
 /**
@@ -64,6 +67,17 @@ public abstract class DocumentComponent extends ArrayList<DocumentComponent> {
             document.tokens.add((Token) o); 
         }
         return super.add(o);
+    }
+
+    protected void writeElement(XMLStreamWriter w) throws XMLStreamException {
+      w.writeStartElement(this.type);
+      for (String name : this.props.keySet()) {
+        w.writeAttribute(name, props.get(name));
+      }
+      for (DocumentComponent child : this) {
+        child.writeElement(w);
+      }
+      w.writeEndElement();
     }
 
     /**
