@@ -95,6 +95,8 @@ public abstract class TextProcessor {
                     counter++;
                 } else {
                     ner.processText(doc, buf.toString());
+                    corpus.add(doc);
+                    doc = new CorpusDocument(corpus, locationOfFile);
 
                     buf = new StringBuffer();
                     currentDoc += 1;
