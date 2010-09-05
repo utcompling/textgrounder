@@ -20,6 +20,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
@@ -40,6 +41,10 @@ import org.jdom.JDOMException;
 import org.jdom.input.SAXBuilder;
 import org.jdom.output.Format;
 import org.jdom.output.XMLOutputter;
+
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
 
 /**
  *
@@ -142,19 +147,22 @@ public class ProbabilityPrettyPrinter {
 
     public void normalizeAndPrintXMLProbabilities() {
         int outputPerClass = experimentParameters.getOutputPerClass();
+        String outputPath = experimentParameters.getXmlConditionalProbabilitiesFilename();
 
-        Document doc = new Document();
+        try {
+
+        XMLOutputFactory factory = XMLOutputFactory.newInstance();
+        XMLStreamWriter w = factory.createXMLStreamWriter(new BufferedWriter(new FileWriter(outputPath)));
 
         String rootName = "probabilities";
         String wordByRegionName = "word-by-region";
         String regionByWordName = "region-by-word";
         String regionByDocumentName = "region-by-document";
-        Element root = new Element(rootName);
-        doc.addContent(root);
+        w.writeStartDocument("UTF-8", "1.0");
+        w.writeStartElement(rootName);
 
         {
-            Element wordByRegionElement = new Element(wordByRegionName);
-            root.addContent(wordByRegionElement);
+            w.writeStartElement(wordByRegionName);
 
             double sum = 0.;
             for (int i = 0; i < R; ++i) {
@@ -169,28 +177,28 @@ public class ProbabilityPrettyPrinter {
                 Collections.sort(topWords);
 
                 Region region = regionIdToRegionMap.get(i);
-                Element regionElement = new Element("region");
-                wordByRegionElement.addContent(regionElement);
+                w.writeStartElement("region");
 
-                regionElement.setAttribute("id", String.format("%04d", i));
-                regionElement.setAttribute("lat", String.format("%.2f", region.centLat));
-                regionElement.setAttribute("lon", String.format("%.2f", region.centLon));
-                regionElement.setAttribute("prob", String.format("%.8e", normalizedRegionCounts[i] / sum));
+                w.writeAttribute("id", String.format("%04d", i));
+                w.writeAttribute("lat", String.format("%.2f", region.centLat));
+                w.writeAttribute("lon", String.format("%.2f", region.centLon));
+                w.writeAttribute("prob", String.format("%.8e", normalizedRegionCounts[i] / sum));
 
                 for (int j = 0; j < outputPerClass; ++j) {
-                    Element wordElement = new Element("word");
-                    regionElement.addContent(wordElement);
+                    w.writeStartElement("word");
 
                     IntDoublePair pair = topWords.get(j);
-                    wordElement.setAttribute("term", lexicon.getWordForInt(pair.index));
-                    wordElement.setAttribute("prob", String.format("%.8e", pair.count / normalizedRegionCounts[i]));
+                    w.writeAttribute("term", lexicon.getWordForInt(pair.index));
+                    w.writeAttribute("prob", String.format("%.8e", pair.count / normalizedRegionCounts[i]));
+                    w.writeEndElement();
                 }
+                w.writeEndElement();
             }
+            w.writeEndElement();
         }
 
         {
-            Element regionByWordElement = new Element(regionByWordName);
-            root.addContent(regionByWordElement);
+            w.writeStartElement(regionByWordName);
 
             double[] wordCounts = new double[W];
 
@@ -210,24 +218,23 @@ public class ProbabilityPrettyPrinter {
                 }
                 Collections.sort(topRegions);
 
-                Element wordElement = new Element("word");
-                regionByWordElement.addContent(wordElement);
-
-                wordElement.setAttribute("term", lexicon.getWordForInt(i));
-
+                w.writeStartElement("word");
+                w.writeAttribute("term", lexicon.getWordForInt(i));
 
                 for (int j = 0; j < outputPerClass; ++j) {
-                    Element regionElement = new Element("region");
-                    wordElement.addContent(regionElement);
+                    w.writeStartElement("region");
 
                     IntDoublePair pair = topRegions.get(j);
                     Region region = regionIdToRegionMap.get(pair.index);
-                    regionElement.setAttribute("id", String.format("%04d", pair.index));
-                    regionElement.setAttribute("lat", String.format("%.2f", region.centLat));
-                    regionElement.setAttribute("lon", String.format("%.2f", region.centLon));
-                    regionElement.setAttribute("prob", String.format("%.8e", pair.count / wordCounts[i]));
+                    w.writeAttribute("id", String.format("%04d", pair.index));
+                    w.writeAttribute("lat", String.format("%.2f", region.centLat));
+                    w.writeAttribute("lon", String.format("%.2f", region.centLon));
+                    w.writeAttribute("prob", String.format("%.8e", pair.count / wordCounts[i]));
+                    w.writeEndElement();
                 }
+                w.writeEndElement();
             }
+            w.writeEndElement();
         }
 
         {
@@ -247,12 +254,15 @@ public class ProbabilityPrettyPrinter {
             Element trroot = trdoc.getRootElement();
             ArrayList<Element> documents = new ArrayList<Element>(trroot.getChildren());
             for (Element document : documents) {
-                docidToName.put(docid, document.getAttributeValue("id"));
+                String docidName = document.getAttributeValue("id");
+                if (docidName == null) {
+                    docidName = String.format("doc%06d", docid);
+                }
+                docidToName.put(docid, docidName);
                 docid += 1;
             }
 
-            Element regionByDocumentElement = new Element(regionByDocumentName);
-            root.addContent(regionByDocumentElement);
+            w.writeStartElement(regionByDocumentName);
 
             double[] docWordCounts = new double[D];
 
@@ -272,32 +282,33 @@ public class ProbabilityPrettyPrinter {
                 }
                 Collections.sort(topRegions);
 
-                Element documentElement = new Element("document");
-                regionByDocumentElement.addContent(documentElement);
-
-                documentElement.setAttribute("id", docidToName.get(i));
+                w.writeStartElement("document");
+                w.writeAttribute("id", docidToName.get(i));
 
                 for (int j = 0; j < outputPerClass; ++j) {
-                    Element regionElement = new Element("region");
-                    documentElement.addContent(regionElement);
+                    w.writeStartElement("region");
 
                     IntDoublePair pair = topRegions.get(j);
                     Region region = regionIdToRegionMap.get(pair.index);
-                    regionElement.setAttribute("id", String.format("%04d", pair.index));
-                    regionElement.setAttribute("lat", String.format("%.2f", region.centLat));
-                    regionElement.setAttribute("lon", String.format("%.2f", region.centLon));
-                    regionElement.setAttribute("prob", String.format("%.8e", pair.count / docWordCounts[i]));
+                    w.writeAttribute("id", String.format("%04d", pair.index));
+                    w.writeAttribute("lat", String.format("%.2f", region.centLat));
+                    w.writeAttribute("lon", String.format("%.2f", region.centLon));
+                    w.writeAttribute("prob", String.format("%.8e", pair.count / docWordCounts[i]));
+                    w.writeEndElement();
                 }
+                w.writeEndElement();
             }
+            w.writeEndElement();
         }
 
-        try {
-            String outputPath = experimentParameters.getXmlConditionalProbabilitiesFilename();
-            XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
-            xout.output(doc, new FileOutputStream(new File(outputPath)));
+        w.writeEndElement();
+        w.close();
+
         } catch (FileNotFoundException ex) {
             Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
+            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (XMLStreamException ex) {
             Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
