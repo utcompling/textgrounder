@@ -23,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -143,6 +144,69 @@ public class ProbabilityPrettyPrinter {
                 }
             }
         }
+    }
+
+    public void writeTfIdfWords(XMLStreamWriter w) throws XMLStreamException {
+      int outputPerClass = experimentParameters.getOutputPerClass();
+      String outputPath = experimentParameters.getXmlConditionalProbabilitiesFilename();
+
+      w.writeStartDocument("UTF-8", "1.0");
+      w.writeStartElement("probabilities");
+      w.writeStartElement("word-by-region");
+
+      double sum = 0.0;
+
+      double[] idfs = new double[W];
+      Arrays.fill(idfs, 0.0);
+
+      for (int i = 0; i < R; ++i) {
+        sum += normalizedRegionCounts[i];
+
+        for (int j = 0; j < W; ++j) {
+          idfs[j] += Math.log(R / normalizedWordByRegionCounts[j * R + i]);
+        }
+      }
+
+      double[] normalizedTfIdfs = new double[R * W];
+      for (int i = 0; i < R; ++i) {
+        double total = 0.0;
+        for (int j = 0; j < W; ++j) {
+          total += normalizedWordByRegionCounts[j * R + i] * idfs[j];
+        }
+
+        for (int j = 0; j < W; ++j) {
+          normalizedTfIdfs[j * R + i] = normalizedWordByRegionCounts[j * R + i] * idfs[j] / total;
+        }
+      }
+
+      for (int i = 0; i < R; ++i) {
+        ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
+        for (int j = 0; j < W; ++j) {
+          topWords.add(new IntDoublePair(j, normalizedTfIdfs[j * R + i]));
+        }
+
+        Collections.sort(topWords);
+
+        Region region = regionIdToRegionMap.get(i);
+        w.writeStartElement("region");
+        w.writeAttribute("id", String.format("%04d", i));
+        w.writeAttribute("lat", String.format("%.2f", region.centLat));
+        w.writeAttribute("lon", String.format("%.2f", region.centLon));
+        w.writeAttribute("prob", String.format("%.8e", normalizedRegionCounts[i] / sum));
+
+        for (int j = 0; j < outputPerClass; ++j) {
+          w.writeStartElement("word");
+
+          IntDoublePair pair = topWords.get(j);
+          w.writeAttribute("term", lexicon.getWordForInt(pair.index));
+          w.writeAttribute("prob", String.format("%.8e", pair.count / normalizedRegionCounts[i]));
+          w.writeEndElement();
+        }
+        w.writeEndElement();
+      }
+      w.writeEndElement();
+      w.writeEndElement();
+      w.close();
     }
 
     public void normalizeAndPrintXMLProbabilities() {
