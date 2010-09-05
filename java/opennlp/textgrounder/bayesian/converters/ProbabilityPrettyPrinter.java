@@ -156,15 +156,20 @@ public class ProbabilityPrettyPrinter {
 
       double sum = 0.0;
 
-      double[] idfs = new double[W];
-      Arrays.fill(idfs, 0.0);
+      double[] wordFreqTotals = new double[W];
+      Arrays.fill(wordFreqTotals, 0.0);
 
       for (int i = 0; i < R; ++i) {
         sum += normalizedRegionCounts[i];
 
         for (int j = 0; j < W; ++j) {
-          idfs[j] += Math.log(R / normalizedWordByRegionCounts[j * R + i]);
+          wordFreqTotals[j] += normalizedWordByRegionCounts[j * R + i];
         }
+      }
+
+      double[] idfs = new double[W];
+      for (int i = 0; i < W; ++i) {
+        idfs[i] = Math.log(R / wordFreqTotals[i]);
       }
 
       double[] normalizedTfIdfs = new double[R * W];
