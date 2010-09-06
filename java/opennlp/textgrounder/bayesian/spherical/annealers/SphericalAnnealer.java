@@ -68,6 +68,8 @@ public abstract class SphericalAnnealer extends Annealer {
         super(_experimentParameters);
     }
 
+    public abstract double annealProbs(int _starti, int _endi, double[] _classes);
+
     public void collectSamples(int[] _wordByRegionCounts, int[] _regionByDocumentCounts,
           int[] _allWordsRegionCounts, double[][] _regionMeans,
           //          int[] _toponymByRegionCounts, int[] _nonToponymRegionCounts,

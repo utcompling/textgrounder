@@ -42,4 +42,13 @@ public class SphericalEmptyAnnealer extends SphericalAnnealer {
         }
         return sum;
     }
+
+    @Override
+    public double annealProbs(int _starti, int _endi, double[] _classes) {
+        double sum = 0;
+        for (int i = _starti; i < _endi; ++i) {
+            sum += _classes[i];
+        }
+        return sum;
+    }
 }

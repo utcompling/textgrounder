@@ -46,6 +46,7 @@ public class KMLUtil {
     w.writeNamespace("kml", "http://www.opengis.net/kml/2.2");
     w.writeNamespace("atom", "http://www.w3.org/2005/Atom");
     w.writeStartElement("Document");
+
     w.writeStartElement("Style");
     w.writeAttribute("id", "bar");
     w.writeStartElement("PolyStyle");
@@ -55,6 +56,7 @@ public class KMLUtil {
     w.writeEmptyElement("Icon");
     w.writeEndElement(); // IconStyle
     w.writeEndElement(); // Style
+
     w.writeStartElement("Style");
     w.writeAttribute("id", "downArrowIcon");
     w.writeStartElement("IconStyle");
@@ -63,6 +65,24 @@ public class KMLUtil {
     w.writeEndElement(); // Icon
     w.writeEndElement(); // IconStyle
     w.writeEndElement(); // Style
+
+    w.writeStartElement("Style");
+    w.writeAttribute("id", "smallDownArrowIcon");
+    w.writeStartElement("IconStyle");
+    KMLUtil.writeWithCharacters(w, "scale", "0.25");
+    w.writeStartElement("Icon");
+    KMLUtil.writeWithCharacters(w, "href", "http://maps.google.com/mapfiles/kml/pal4/icon28.png");
+    w.writeEndElement(); // Icon
+    w.writeEndElement(); // IconStyle
+    w.writeEndElement(); // Style
+
+    w.writeStartElement("Style");
+    w.writeAttribute("id", "noIcon");
+    w.writeStartElement("IconStyle");
+    w.writeEmptyElement("Icon");
+    w.writeEndElement(); // IconStyle
+    w.writeEndElement(); // Style
+
     w.writeStartElement("Folder");
     KMLUtil.writeWithCharacters(w, "name", name);
     KMLUtil.writeWithCharacters(w, "open", "1");
@@ -171,11 +191,18 @@ public class KMLUtil {
   public static void writeFloatingPlacemark(XMLStreamWriter w, String name,
                                             Coordinate coord, double height)
     throws XMLStreamException {
+    KMLUtil.writeFloatingPlacemark(w, name, coord, height, "#smallDownArrowIcon");
+  }
+
+  public static void writeFloatingPlacemark(XMLStreamWriter w, String name,
+                                            Coordinate coord, double height,
+                                            String styleUrl)
+    throws XMLStreamException {
     w.writeStartElement("Placemark");
     KMLUtil.writeWithCharacters(w, "name", name);
     KMLUtil.writeWithCharacters(w, "visibility", "1");
     KMLUtil.writeLookAt(w, coord.latitude, coord.longitude, height, 500.6566641072245, 40.5575073395506, -148.4122922628044);
-    KMLUtil.writeWithCharacters(w, "styleUrl", "#downArrowIcon");
+    KMLUtil.writeWithCharacters(w, "styleUrl", styleUrl);
     w.writeStartElement("Point");
     KMLUtil.writeWithCharacters(w, "altitudeMode", "relativeToGround");
     KMLUtil.writeWithCharacters(w, "coordinates", String.format("%s,%f", coord, height));

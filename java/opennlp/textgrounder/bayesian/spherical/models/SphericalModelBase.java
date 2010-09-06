@@ -416,21 +416,21 @@ public class SphericalModelBase extends SphericalModelFields {
                             resetRegionID(regionid, docid);
                         }
 
-                        totalprob = 0;
                         for (int j = 0; j < currentR; ++j) {
                             regionmean = regionMeans[j];
                             int doccount = regionByDocumentCounts[docoff + j];
                             for (int k = 0; k < curCoordCount; ++k) {
-                                totalprob += probs[j * maxCoord + k] =
+                                probs[j * maxCoord + k] =
                                       doccount
                                       * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
                             }
                         }
 
-                        totalprob += crpalpha_mod;
                         for (int j = 0; j < curCoordCount; ++j) {
                             probs[emptyR * maxCoord + j] = crpalpha_mod / curCoordCount;
                         }
+
+                        totalprob = annealer.annealProbs(0, expectedR * maxCoord, probs);
 
                         r = rand.nextDouble() * totalprob;
 
@@ -478,7 +478,7 @@ public class SphericalModelBase extends SphericalModelFields {
                                   * (regionByDocumentCounts[docoff + j] + alpha);
                         }
 
-                        totalprob = _annealer.annealProbs(probs);
+                        totalprob = _annealer.annealProbs(0, currentR, probs);
                         r = rand.nextDouble() * totalprob;
 
                         max = probs[0];
@@ -554,7 +554,6 @@ public class SphericalModelBase extends SphericalModelFields {
         allWordsRegionCounts = TGArrays.expandSingleTierC(allWordsRegionCounts, newExpectedR, expectedR);
         regionByDocumentCounts = TGArrays.expandDoubleTierC(regionByDocumentCounts, D, newExpectedR, expectedR);
         wordByRegionCounts = TGArrays.expandDoubleTierC(wordByRegionCounts, W, newExpectedR, expectedR);
-//        toponymByRegionCounts = TGArrays.expandDoubleTierC(toponymByRegionCounts, T, newExpectedR, expectedR);
 
         regionMeans = TGArrays.expandSingleTierR(regionMeans, newExpectedR, currentR, coordParamLen);
 
@@ -618,11 +617,6 @@ public class SphericalModelBase extends SphericalModelFields {
         sampleRegionMeans = TGArrays.expandSingleTierR(sampleRegionMeans, newExpectedR, currentR, coordParamLen);
         annealer.setRegionMeans(sampleRegionMeans);
 
-//        int[] newRegionCoordinateCounts = new int[newExpectedR * maxCoord];
-//        for(int i = 0; i <expectedR;++i) {
-//
-//        }
-
         expectedR = newExpectedR;
     }
 
@@ -639,6 +633,7 @@ public class SphericalModelBase extends SphericalModelFields {
     }
 
     public void decode() {
+        SphericalAnnealer decoder = new SphericalMaximumPosteriorDecoder();
         int wordid, docid, regionid, coordid;
         int wordoff, docoff;
         int istoponym, isstopword;
@@ -664,27 +659,30 @@ public class SphericalModelBase extends SphericalModelFields {
                     curCoordCount = toponymCoordinateLexicon[wordid].length;
                     curCoords = toponymCoordinateLexicon[wordid];
 
-                    totalprob = 0;
                     for (int j = 0; j < currentR; ++j) {
                         regionmean = normalizedRegionMeans[j];
                         double doccount = normalizedRegionByDocumentCounts[docoff + j];
                         for (int k = 0; k < curCoordCount; ++k) {
-                            totalprob += probs[j * maxCoord + k] =
+                            probs[j * maxCoord + k] =
                                   doccount
                                   * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
                         }
                     }
 
-                    max = coordid = regionid = 0;
-                    for (int j = 0; j < currentR; ++j) {
-                        for (int k = 0; k < curCoordCount; ++k) {
-                            double cur = probs[j * maxCoord + k];
-                            if (cur > max) {
-                                max = cur;
-                                regionid = j;
-                                coordid = k;
-                            }
+                    totalprob = decoder.annealProbs(0, expectedR * maxCoord, probs);
+
+                    r = rand.nextDouble() * totalprob;
+
+                    max = probs[0];
+                    regionid = 0;
+                    coordid = 0;
+                    while (r > max) {
+                        coordid++;
+                        if (coordid == curCoordCount) {
+                            regionid++;
+                            coordid = 0;
                         }
+                        max += probs[regionid * maxCoord + coordid];
                     }
 
                     regionVector[i] = regionid;
@@ -698,22 +696,22 @@ public class SphericalModelBase extends SphericalModelFields {
                     docoff = docid * expectedR;
                     wordoff = wordid * expectedR;
 
-                    totalprob = 0;
                     for (int j = 0; j < currentR; ++j) {
-                        totalprob += probs[j] = (normalizedWordByRegionCounts[wordoff + j] + beta)
+                        probs[j] = (normalizedWordByRegionCounts[wordoff + j] + beta)
                               / (allWordsRegionCounts[j] + betaW)
                               * (normalizedRegionByDocumentCounts[docoff + j] + alpha);
                     }
 
-                    max = regionid = 0;
-                    for (int j = 0; j < currentR; ++j) {
-                        double cur = probs[j];
-                        if (cur > max) {
-                            max = cur;
-                            regionid = j;
-                        }
+                    totalprob = decoder.annealProbs(0, currentR, probs);
+
+                    r = rand.nextDouble() * totalprob;
+                    max = probs[0];
+                    regionid = 0;
+                    while (r > max) {
+                        regionid++;
+                        max += probs[regionid];
                     }
-                    
+
                     regionVector[i] = regionid;
                 }
             }

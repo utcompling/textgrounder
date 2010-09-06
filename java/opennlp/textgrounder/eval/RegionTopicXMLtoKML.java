@@ -39,6 +39,11 @@ public class RegionTopicXMLtoKML {
 
     public static void convert(XMLStreamReader in, XMLStreamWriter out, String name)
       throws XMLStreamException {
+      convert(in, out, name, false);
+    }
+
+    public static void convert(XMLStreamReader in, XMLStreamWriter out, String name, boolean showPolys)
+      throws XMLStreamException {
       KMLUtil.writeHeader(out, name);
 
       in.nextTag();
@@ -59,9 +64,12 @@ public class RegionTopicXMLtoKML {
           double prob = Double.parseDouble(in.getAttributeValue(null, "prob"));
           double height = prob * BARSCALE;
 
-          Coordinate spiralPoint = center.getNthSpiralPoint(i, .5);
+          Coordinate spiralPoint = center.getNthSpiralPoint(i, 0.5);
 
-          KMLUtil.writePolygon(out, "", spiralPoint, SIDES, RADIUS, height);
+          if (showPolys) {
+            KMLUtil.writePolygon(out, "", spiralPoint, SIDES, RADIUS, height);
+          }
+
           KMLUtil.writeFloatingPlacemark(out, term, spiralPoint, height);
 
           in.nextTag();
