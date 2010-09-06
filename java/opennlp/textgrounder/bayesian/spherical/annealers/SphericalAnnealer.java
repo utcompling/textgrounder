@@ -16,6 +16,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.spherical.annealers;
 
+import java.util.Arrays;
 import opennlp.textgrounder.bayesian.annealers.Annealer;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 import opennlp.textgrounder.bayesian.mathutils.TGBLAS;
@@ -84,26 +85,10 @@ public abstract class SphericalAnnealer extends Annealer {
                     wordByRegionCounts = new double[_wordByRegionCounts.length];
                     regionByDocumentCounts = new double[_regionByDocumentCounts.length];
                     allWordsRegionCounts = new double[_allWordsRegionCounts.length];
-//                    toponymByRegionCounts = new double[_toponymByRegionCounts.length];
-//                    nonToponymRegionCounts = new double[_nonToponymRegionCounts.length];
-                    for (int i = 0; i < _wordByRegionCounts.length; ++i) {
-                        wordByRegionCounts[i] = 0;
-                    }
 
-                    for (int i = 0; i < _regionByDocumentCounts.length; ++i) {
-                        regionByDocumentCounts[i] = 0;
-                    }
-
-                    for (int i = 0; i < allWordsRegionCounts.length; ++i) {
-                        allWordsRegionCounts[i] = 0;
-                    }
-
-//                    for (int i = 0; i < _toponymByRegionCounts.length; ++i) {
-//                        toponymByRegionCounts[i] = 0;
-//                    }
-//                    for (int i = 0; i < _nonToponymRegionCounts.length; ++i) {
-//                        _nonToponymRegionCounts[i] = 0;
-//                    }
+                    Arrays.fill(wordByRegionCounts, 0);
+                    Arrays.fill(regionByDocumentCounts, 0);
+                    Arrays.fill(allWordsRegionCounts, 0);
 
                     regionToponymCoordinateCounts = new double[_regionToponymCoordinateCounts.length][][];
                     for (int i = 0; i < _regionToponymCoordinateCounts.length; ++i) {
@@ -139,14 +124,6 @@ public abstract class SphericalAnnealer extends Annealer {
                     allWordsRegionCounts[i] = _allWordsRegionCounts[i];
                 }
 
-//                for (int i = 0; i < toponymByRegionCounts.length; ++i) {
-//                    toponymByRegionCounts[i] += _toponymByRegionCounts[i];
-//                }
-//
-//                for (int i = 0; i < nonToponymRegionCounts.length; ++i) {
-//                    nonToponymRegionCounts[i] += _nonToponymRegionCounts[i];
-//                }
-
                 for (int i = 0; i < regionToponymCoordinateCounts.length; ++i) {
                     for (int j = 0; j < regionToponymCoordinateCounts[i].length; ++j) {
                         for (int k = 0; k < regionToponymCoordinateCounts[i][j].length; ++k) {
@@ -160,31 +137,15 @@ public abstract class SphericalAnnealer extends Annealer {
                 }
             }
             if (finishedCollection) {
-                normalizeSamples();
+                averageSamples();
             }
         }
     }
 
-    protected void normalizeSamples() {
-        for (int i = 0; i < wordByRegionCounts.length; ++i) {
-            wordByRegionCounts[i] /= sampleCount;
-        }
-
-        for (int i = 0; i < regionByDocumentCounts.length; ++i) {
-            regionByDocumentCounts[i] /= sampleCount;
-        }
-
-        for (int i = 0; i < allWordsRegionCounts.length; ++i) {
-            allWordsRegionCounts[i] /= sampleCount;
-        }
-
-//        for (int i = 0; i < toponymByRegionCounts.length; ++i) {
-//            toponymByRegionCounts[i] /= sampleCount;
-//        }
-//
-//        for (int i = 0; i < nonToponymRegionCounts.length; ++i) {
-//            nonToponymRegionCounts[i] /= sampleCount;
-//        }
+    protected void averageSamples() {
+        averageSamples(wordByRegionCounts);
+        averageSamples(regionByDocumentCounts);
+        averageSamples(allWordsRegionCounts);
 
         for (int i = 0; i < regionToponymCoordinateCounts.length;
               ++i) {

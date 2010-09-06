@@ -26,7 +26,6 @@ import java.util.zip.GZIPOutputStream;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
 import opennlp.textgrounder.bayesian.mathutils.*;
-import opennlp.textgrounder.bayesian.rlda.annealers.*;
 import opennlp.textgrounder.bayesian.spherical.annealers.*;
 import opennlp.textgrounder.bayesian.spherical.io.*;
 import opennlp.textgrounder.bayesian.structs.*;
@@ -111,7 +110,7 @@ public class SphericalModelBase extends SphericalModelFields {
 
         double targetTemp = _experimentParameters.getTargetTemperature();
         double initialTemp = _experimentParameters.getInitialTemperature();
-        if (Math.abs(initialTemp - targetTemp) < Annealer.EPSILON) {
+        if (Math.abs(initialTemp - targetTemp) < SphericalAnnealer.EPSILON) {
             annealer = new SphericalEmptyAnnealer(_experimentParameters);
         } else {
             annealer = new SphericalSimulatedAnnealer(_experimentParameters);
@@ -640,7 +639,6 @@ public class SphericalModelBase extends SphericalModelFields {
     }
 
     public void decode() {
-        Annealer decoder = new MaximumPosteriorDecoder();
         int wordid, docid, regionid, coordid;
         int wordoff, docoff;
         int istoponym, isstopword;
@@ -683,7 +681,7 @@ public class SphericalModelBase extends SphericalModelFields {
                             double cur = probs[j * maxCoord + k];
                             if (cur > max) {
                                 max = cur;
-                                regionid = i;
+                                regionid = j;
                                 coordid = k;
                             }
                         }
@@ -700,21 +698,22 @@ public class SphericalModelBase extends SphericalModelFields {
                     docoff = docid * expectedR;
                     wordoff = wordid * expectedR;
 
+                    totalprob = 0;
                     for (int j = 0; j < currentR; ++j) {
-                        probs[j] = (normalizedWordByRegionCounts[wordoff + j] + beta)
+                        totalprob += probs[j] = (normalizedWordByRegionCounts[wordoff + j] + beta)
                               / (allWordsRegionCounts[j] + betaW)
                               * (normalizedRegionByDocumentCounts[docoff + j] + alpha);
                     }
 
-                    totalprob = decoder.annealProbs(probs);
-                    r = rand.nextDouble() * totalprob;
-
-                    max = probs[0];
-                    regionid = 0;
-                    while (r > max) {
-                        regionid++;
-                        max += probs[regionid];
+                    max = regionid = 0;
+                    for (int j = 0; j < currentR; ++j) {
+                        double cur = probs[j];
+                        if (cur > max) {
+                            max = cur;
+                            regionid = j;
+                        }
                     }
+                    
                     regionVector[i] = regionid;
                 }
             }

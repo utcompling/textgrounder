@@ -197,6 +197,12 @@ public abstract class Annealer {
         return annealProbs(0, classes);
     }
 
+    protected void averageSamples(double[] _v) {
+        for(int i = 0; i < _v.length;++i) {
+            _v[i] /= sampleCount;
+        }
+    }
+
     /**
      * @return the samples
      */

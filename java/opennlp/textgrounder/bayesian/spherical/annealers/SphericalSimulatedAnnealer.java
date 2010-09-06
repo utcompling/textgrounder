@@ -33,6 +33,34 @@ public class SphericalSimulatedAnnealer extends SphericalAnnealer {
 
     @Override
     public double annealProbs(int starti, double[] classes) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        double sum = 0, sumw = 0;
+        try {
+            for (int i = starti;; ++i) {
+                sum += classes[i];
+            }
+        } catch (ArrayIndexOutOfBoundsException e) {
+        }
+        if (temperatureReciprocal != 1) {
+            try {
+                for (int i = starti;; ++i) {
+                    classes[i] /= sum;
+                    sumw += classes[i] = Math.pow(classes[i],
+                          temperatureReciprocal);
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
+            }
+        } else {
+            sumw = sum;
+        }
+        try {
+            for (int i = starti;; ++i) {
+                classes[i] /= sumw;
+            }
+        } catch (ArrayIndexOutOfBoundsException e) {
+        }
+        /**
+         * For now, we set everything so that it sums to one.
+         */
+        return 1;
     }
 }

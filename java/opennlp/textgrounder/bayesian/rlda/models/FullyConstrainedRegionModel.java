@@ -93,7 +93,7 @@ public class FullyConstrainedRegionModel extends RegionModel {
      * @param decoder Annealing scheme to use
      */
     @Override
-    public void train(Annealer _annealer) {
+    public void train(RLDAAnnealer _annealer) {
         int wordid, docid, regionid;
         int wordoff, docoff;
         int istoponym, isstopword;
@@ -157,7 +157,7 @@ public class FullyConstrainedRegionModel extends RegionModel {
     @Override
     public void decode() {
         System.err.println(String.format("Decoding maximum posterior topics"));
-        Annealer decoder = new MaximumPosteriorDecoder();
+        RLDAAnnealer decoder = new RLDAMaximumPosteriorDecoder();
         int wordid, docid, regionid;
         int wordoff, docoff;
         int istoponym, isstopword;

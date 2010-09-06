@@ -33,6 +33,13 @@ public class SphericalEmptyAnnealer extends SphericalAnnealer {
 
     @Override
     public double annealProbs(int starti, double[] classes) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        double sum = 0;
+        try {
+            for (int i = starti;; ++i) {
+                sum += classes[i];
+            }
+        } catch (ArrayIndexOutOfBoundsException e) {
+        }
+        return sum;
     }
 }

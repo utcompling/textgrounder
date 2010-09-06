@@ -13,35 +13,51 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.bayesian.annealers;
+package opennlp.textgrounder.bayesian.rlda.annealers;
 
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 
 /**
- * Class for no annealing regime. If the initial and target temperature are
- * equal, this class is called. In this case, the outer iteration is set to one
- * and the inner iterations are all the iterations there are.
+ * A full simulated annealer
  * 
  * @author tsmoon
  */
-public class EmptyAnnealer extends Annealer {
+public class RLDASimulatedAnnealer extends RLDAAnnealer {
 
-    protected EmptyAnnealer() {
-    }
-
-    public EmptyAnnealer(ExperimentParameters _experimentParameters) {
+    public RLDASimulatedAnnealer(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
     }
 
     @Override
     public double annealProbs(int starti, double[] classes) {
-        double sum = 0;
+        double sum = 0, sumw = 0;
         try {
             for (int i = starti;; ++i) {
                 sum += classes[i];
             }
         } catch (ArrayIndexOutOfBoundsException e) {
         }
-        return sum;
+        if (temperatureReciprocal != 1) {
+            try {
+                for (int i = starti;; ++i) {
+                    classes[i] /= sum;
+                    sumw += classes[i] = Math.pow(classes[i],
+                          temperatureReciprocal);
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
+            }
+        } else {
+            sumw = sum;
+        }
+        try {
+            for (int i = starti;; ++i) {
+                classes[i] /= sumw;
+            }
+        } catch (ArrayIndexOutOfBoundsException e) {
+        }
+        /**
+         * For now, we set everything so that it sums to one.
+         */
+        return 1;
     }
 }

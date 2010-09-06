@@ -22,14 +22,14 @@ import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
  * 
  * @author tsmoon
  */
-public class MaximumPosteriorDecoder extends Annealer {
+public class RLDAMaximumPosteriorDecoder extends RLDAAnnealer {
 
     private int count = 1;
 
-    public MaximumPosteriorDecoder() {
+    public RLDAMaximumPosteriorDecoder() {
     }
 
-    public MaximumPosteriorDecoder(ExperimentParameters _experimentParameters) {
+    public RLDAMaximumPosteriorDecoder(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
     }
 

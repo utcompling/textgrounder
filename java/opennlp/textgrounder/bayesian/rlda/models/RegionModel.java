@@ -40,7 +40,7 @@ public class RegionModel extends RegionModelFields {
     /**
      * Handles simulated annealing, burn-in, and full sampling cycle
      */
-    protected transient Annealer annealer;
+    protected transient RLDAAnnealer annealer;
     /**
      * 
      */
@@ -98,10 +98,10 @@ public class RegionModel extends RegionModelFields {
 
         double targetTemp = _experimentParameters.getTargetTemperature();
         double initialTemp = _experimentParameters.getInitialTemperature();
-        if (Math.abs(initialTemp - targetTemp) < Annealer.EPSILON) {
-            annealer = new EmptyAnnealer(_experimentParameters);
+        if (Math.abs(initialTemp - targetTemp) < RLDAAnnealer.EPSILON) {
+            annealer = new RLDAEmptyAnnealer(_experimentParameters);
         } else {
-            annealer = new SimulatedAnnealer(_experimentParameters);
+            annealer = new RLDASimulatedAnnealer(_experimentParameters);
         }
 
         readTokenArrayFile();
@@ -255,16 +255,15 @@ public class RegionModel extends RegionModelFields {
                 wordid = wordVector[i];
                 docid = documentVector[i];
                 docoff = docid * R;
+                wordoff = wordid * R;
                 istoponym = toponymVector[i];
 
                 totalprob = 0;
                 if (istoponym == 1) {
-                    wordoff = wordid * R;
                     try {
                         for (int j = 0;; ++j) {
                             totalprob += probs[j] =
-                                  regionByToponymFilter[wordoff + j]
-                                  * activeRegionByDocumentFilter[docoff + j];
+                                  regionByToponymFilter[wordoff + j];
                         }
                     } catch (ArrayIndexOutOfBoundsException e) {
                     }
@@ -288,8 +287,8 @@ public class RegionModel extends RegionModelFields {
 
                 regionVector[i] = regionid;
                 regionCounts[regionid]++;
-                regionByDocumentCounts[docid * R + regionid]++;
-                wordByRegionCounts[wordid * R + regionid]++;
+                regionByDocumentCounts[docoff + regionid]++;
+                wordByRegionCounts[wordoff + regionid]++;
             }
         }
     }
@@ -299,7 +298,7 @@ public class RegionModel extends RegionModelFields {
      *
      * @param decoder Annealing scheme to use
      */
-    public void train(Annealer _annealer) {
+    public void train(RLDAAnnealer _annealer) {
         int wordid, docid, regionid;
         int wordoff, docoff;
         int istoponym, isstopword;
@@ -365,15 +364,15 @@ public class RegionModel extends RegionModelFields {
         System.err.println(String.format("Beginning training with %d tokens, %d words, %d regions, %d documents", N, W, R, D));
         train(annealer);
         if (annealer.getSamples() != 0) {
-            normalizedRegionCounts = annealer.getNormalizedTopicSampleCounts();
-            normalizedWordByRegionCounts = annealer.getNormalizedWordByTopicSampledProbs();
-            normalizedRegionByDocumentCounts = annealer.getNormalizedRegionByDocumentSampledCounts();
+            normalizedRegionCounts = annealer.getAveragedTopicSampleCounts();
+            normalizedWordByRegionCounts = annealer.getAveragedWordByTopicSampledProbs();
+            normalizedRegionByDocumentCounts = annealer.getAveragedRegionByDocumentSampledCounts();
         }
     }
 
     public void decode() {
         System.err.println(String.format("Decoding maximum posterior topics"));
-        Annealer decoder = new MaximumPosteriorDecoder();
+        RLDAAnnealer decoder = new RLDAMaximumPosteriorDecoder();
         int wordid, docid, regionid;
         int wordoff, docoff;
         int istoponym, isstopword;
