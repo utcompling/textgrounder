@@ -18,9 +18,15 @@ package opennlp.textgrounder.bayesian.spherical.io;
 
 import java.io.EOFException;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.zip.GZIPInputStream;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.structs.AveragedSphericalCountWrapper;
 
 /**
  *
@@ -82,4 +88,22 @@ public abstract class InputReader extends IOBase {
      *
      */
     public abstract void resetToponymCoordinateReader();
+
+    public AveragedSphericalCountWrapper readProbabilities() {
+        AveragedSphericalCountWrapper normalizedProbabilityWrapper = null;
+
+        ObjectInputStream probIn = null;
+        try {
+            probIn = new ObjectInputStream(new GZIPInputStream(new FileInputStream(probabilitiesFile.getCanonicalPath())));
+            normalizedProbabilityWrapper = (AveragedSphericalCountWrapper) probIn.readObject();
+        } catch (IOException ex) {
+            Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
+        }
+
+        return normalizedProbabilityWrapper;
+    }
 }

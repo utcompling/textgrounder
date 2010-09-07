@@ -116,11 +116,11 @@ public class SphericalModelFields {
      */
     protected double[][] regionMeans;
     /**
-     * Counts of topics
+     * Counts of regions but only for toponyms
      */
-    protected int[] regionCounts;
+    protected int[] toponymRegionCounts;
     /**
-     * 
+     * Counts of regions for all words
      */
     protected int[] allWordsRegionCounts;
     /**
@@ -150,23 +150,23 @@ public class SphericalModelFields {
     /**
      *
      */
-    protected double[] normalizedWordByRegionCounts;
+    protected double[] averagedWordByRegionCounts;
     /**
      *
      */
-    protected double[] normalizedRegionByDocumentCounts;
-    /**
-     * 
-     */
-    protected double[] normalizedAllWordsRegionCounts;
+    protected double[] averagedAllWordsRegionCounts;
     /**
      *
      */
-    protected double[][] normalizedRegionMeans;
+    protected double[] averagedRegionByDocumentCounts;
+    /**
+     *
+     */
+    protected double[][] averagedRegionMeans;
     /**
      * 
      */
-    protected double[][][] normalizedRegionToponymCoordinateCounts;
+    protected double[][][] averagedRegionToponymCoordinateCounts;
 
     public int getD() {
         return D;
@@ -184,15 +184,243 @@ public class SphericalModelFields {
         this.N = N;
     }
 
-    public int getR() {
-        return expectedR;
-    }
-
     public int getW() {
         return W;
     }
 
     public void setW(int W) {
         this.W = W;
+    }
+
+    public int getT() {
+        return T;
+    }
+
+    public void setT(int T) {
+        this.T = T;
+    }
+
+    public int[] getAllWordsRegionCounts() {
+        return allWordsRegionCounts;
+    }
+
+    public void setAllWordsRegionCounts(int[] allWordsRegionCounts) {
+        this.allWordsRegionCounts = allWordsRegionCounts;
+    }
+
+    public double getAlpha() {
+        return alpha;
+    }
+
+    public void setAlpha(double alpha) {
+        this.alpha = alpha;
+    }
+
+    public double[] getAveragedAllWordsRegionCounts() {
+        return averagedAllWordsRegionCounts;
+    }
+
+    public void setAveragedAllWordsRegionCounts(double[] averagedAllWordsRegionCounts) {
+        this.averagedAllWordsRegionCounts = averagedAllWordsRegionCounts;
+    }
+
+    public double[] getAveragedRegionByDocumentCounts() {
+        return averagedRegionByDocumentCounts;
+    }
+
+    public void setAveragedRegionByDocumentCounts(double[] averagedRegionByDocumentCounts) {
+        this.averagedRegionByDocumentCounts = averagedRegionByDocumentCounts;
+    }
+
+    public double[][] getAveragedRegionMeans() {
+        return averagedRegionMeans;
+    }
+
+    public void setAveragedRegionMeans(double[][] averagedRegionMeans) {
+        this.averagedRegionMeans = averagedRegionMeans;
+    }
+
+    public double[][][] getAveragedRegionToponymCoordinateCounts() {
+        return averagedRegionToponymCoordinateCounts;
+    }
+
+    public void setAveragedRegionToponymCoordinateCounts(double[][][] averagedRegionToponymCoordinateCounts) {
+        this.averagedRegionToponymCoordinateCounts = averagedRegionToponymCoordinateCounts;
+    }
+
+    public double[] getAveragedWordByRegionCounts() {
+        return averagedWordByRegionCounts;
+    }
+
+    public void setAveragedWordByRegionCounts(double[] averagedWordByRegionCounts) {
+        this.averagedWordByRegionCounts = averagedWordByRegionCounts;
+    }
+
+    public double getBeta() {
+        return beta;
+    }
+
+    public void setBeta(double beta) {
+        this.beta = beta;
+    }
+
+    public double getBetaW() {
+        return betaW;
+    }
+
+    public void setBetaW(double betaW) {
+        this.betaW = betaW;
+    }
+
+    public int getCoordParamLen() {
+        return coordParamLen;
+    }
+
+    public void setCoordParamLen(int coordParamLen) {
+        this.coordParamLen = coordParamLen;
+    }
+
+    public int[] getCoordinateVector() {
+        return coordinateVector;
+    }
+
+    public void setCoordinateVector(int[] coordinateVector) {
+        this.coordinateVector = coordinateVector;
+    }
+
+    public double getCrpalpha() {
+        return crpalpha;
+    }
+
+    public void setCrpalpha(double crpalpha) {
+        this.crpalpha = crpalpha;
+    }
+
+    public int getCurrentR() {
+        return currentR;
+    }
+
+    public void setCurrentR(int currentR) {
+        this.currentR = currentR;
+    }
+
+    public int[] getDocumentVector() {
+        return documentVector;
+    }
+
+    public void setDocumentVector(int[] documentVector) {
+        this.documentVector = documentVector;
+    }
+
+    public int getEmptyR() {
+        return emptyR;
+    }
+
+    public void setEmptyR(int emptyR) {
+        this.emptyR = emptyR;
+    }
+
+    public int getExpectedR() {
+        return expectedR;
+    }
+
+    public void setExpectedR(int expectedR) {
+        this.expectedR = expectedR;
+    }
+
+    public double getKappa() {
+        return kappa;
+    }
+
+    public void setKappa(double kappa) {
+        this.kappa = kappa;
+    }
+
+    public int getMaxCoord() {
+        return maxCoord;
+    }
+
+    public void setMaxCoord(int maxCoord) {
+        this.maxCoord = maxCoord;
+    }
+
+    public int[] getRegionByDocumentCounts() {
+        return regionByDocumentCounts;
+    }
+
+    public void setRegionByDocumentCounts(int[] regionByDocumentCounts) {
+        this.regionByDocumentCounts = regionByDocumentCounts;
+    }
+
+    public int[] getRegionCounts() {
+        return toponymRegionCounts;
+    }
+
+    public void setRegionCounts(int[] regionCounts) {
+        this.toponymRegionCounts = regionCounts;
+    }
+
+    public double[][] getRegionMeans() {
+        return regionMeans;
+    }
+
+    public void setRegionMeans(double[][] regionMeans) {
+        this.regionMeans = regionMeans;
+    }
+
+    public int[][][] getRegionToponymCoordinateCounts() {
+        return regionToponymCoordinateCounts;
+    }
+
+    public void setRegionToponymCoordinateCounts(int[][][] regionToponymCoordinateCounts) {
+        this.regionToponymCoordinateCounts = regionToponymCoordinateCounts;
+    }
+
+    public int[] getRegionVector() {
+        return regionVector;
+    }
+
+    public void setRegionVector(int[] regionVector) {
+        this.regionVector = regionVector;
+    }
+
+    public int[] getStopwordVector() {
+        return stopwordVector;
+    }
+
+    public void setStopwordVector(int[] stopwordVector) {
+        this.stopwordVector = stopwordVector;
+    }
+
+    public double[][][] getToponymCoordinateLexicon() {
+        return toponymCoordinateLexicon;
+    }
+
+    public void setToponymCoordinateLexicon(double[][][] toponymCoordinateLexicon) {
+        this.toponymCoordinateLexicon = toponymCoordinateLexicon;
+    }
+
+    public int[] getToponymVector() {
+        return toponymVector;
+    }
+
+    public void setToponymVector(int[] toponymVector) {
+        this.toponymVector = toponymVector;
+    }
+
+    public int[] getWordByRegionCounts() {
+        return wordByRegionCounts;
+    }
+
+    public void setWordByRegionCounts(int[] wordByRegionCounts) {
+        this.wordByRegionCounts = wordByRegionCounts;
+    }
+
+    public int[] getWordVector() {
+        return wordVector;
+    }
+
+    public void setWordVector(int[] wordVector) {
+        this.wordVector = wordVector;
     }
 }

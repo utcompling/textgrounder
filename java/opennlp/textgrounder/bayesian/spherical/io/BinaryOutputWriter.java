@@ -72,7 +72,7 @@ public class BinaryOutputWriter extends OutputWriter {
      */
     @Override
     public void writeTokenArray(int[] _wordVector, int[] _documentVector,
-          int[] _toponymVector, int[] _stopwordVector, int[] _regionVector) {
+          int[] _toponymVector, int[] _stopwordVector, int[] _regionVector, int[] _coordVector) {
         try {
             for (int i = 0; i < _wordVector.length; ++i) {
                 int wordid = _wordVector[i];
@@ -85,6 +85,8 @@ public class BinaryOutputWriter extends OutputWriter {
                 tokenArrayOutputStream.writeByte(stopstatus);
                 int regid = _regionVector[i];
                 tokenArrayOutputStream.writeInt(regid);
+                int coordid = _coordVector[i];
+                tokenArrayOutputStream.writeInt(coordid);
             }
 
             tokenArrayOutputStream.close();

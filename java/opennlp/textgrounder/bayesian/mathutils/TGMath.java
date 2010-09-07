@@ -52,6 +52,16 @@ public class TGMath {
         return Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, nrmmean, 1));
     }
 
+    public static double[] normalizeVector(double[] _mu) {
+        double[] nrmmean = new double[_mu.length];
+        for (int i = 0; i < _mu.length; ++i) {
+            nrmmean[i] = 0;
+        }
+
+        TGBLAS.daxpy(0, 1 / TGBLAS.dnrm2(0, _mu, 1), _mu, 1, nrmmean, 1);
+        return nrmmean;
+    }
+
     public static double proportionalSphericalDensity(double _alpha,
           double _beta,
           double _theta, double _phi, double _kappa) {

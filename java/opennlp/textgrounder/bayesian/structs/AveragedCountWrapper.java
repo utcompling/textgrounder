@@ -24,7 +24,7 @@ import opennlp.textgrounder.bayesian.spherical.models.SphericalModelBase;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class NormalizedProbabilityWrapper implements Serializable {
+public class AveragedCountWrapper implements Serializable {
 
     /**
      * Hyperparameter for region*doc priors
@@ -57,23 +57,23 @@ public class NormalizedProbabilityWrapper implements Serializable {
     /**
      *
      */
-    public double[] normalizedRegionCounts;
+    public double[] averagedRegionCounts;
     /**
      *
      */
-    public double[] normalizedWordByRegionCounts;
+    public double[] averagedWordByRegionCounts;
     /**
      *
      */
-    public double[] normalizedRegionByDocumentCounts;
+    public double[] averagedRegionByDocumentCounts;
 
-    public NormalizedProbabilityWrapper() {
+    public AveragedCountWrapper() {
     }
 
-    public NormalizedProbabilityWrapper(RegionModel _regionModel) {
-        normalizedRegionCounts = _regionModel.getNormalizedRegionCounts();
-        normalizedWordByRegionCounts = _regionModel.getNormalizedWordByRegionCounts();
-        normalizedRegionByDocumentCounts = _regionModel.getNormalizedRegionByDocumentCounts();
+    public AveragedCountWrapper(RegionModel _regionModel) {
+        averagedRegionCounts = _regionModel.getNormalizedRegionCounts();
+        averagedWordByRegionCounts = _regionModel.getNormalizedWordByRegionCounts();
+        averagedRegionByDocumentCounts = _regionModel.getNormalizedRegionByDocumentCounts();
 
         alpha = _regionModel.getAlpha();
         beta = _regionModel.getBeta();
@@ -84,30 +84,16 @@ public class NormalizedProbabilityWrapper implements Serializable {
         W = _regionModel.getW();
     }
 
-    public NormalizedProbabilityWrapper(SphericalModelBase _regionModel) {
-//        normalizedRegionCounts = _regionModel.getNormalizedRegionCounts();
-//        normalizedWordByRegionCounts = _regionModel.getNormalizedWordByRegionCounts();
-//        normalizedRegionByDocumentCounts = _regionModel.getNormalizedRegionByDocumentCounts();
-//
-//        alpha = _regionModel.getAlpha();
-//        beta = _regionModel.getBeta();
-//        betaW = _regionModel.getBetaW();
-//        D = _regionModel.getD();
-//        N = _regionModel.getN();
-//        R = _regionModel.getR();
-//        W = _regionModel.getW();
-    }
-
     public void addHyperparameters() {
 
-        for (int i = 0; i < normalizedRegionByDocumentCounts.length; ++i) {
-            normalizedRegionByDocumentCounts[i] += alpha;
+        for (int i = 0; i < averagedRegionByDocumentCounts.length; ++i) {
+            averagedRegionByDocumentCounts[i] += alpha;
         }
-        for (int i = 0; i < normalizedWordByRegionCounts.length; ++i) {
-            normalizedWordByRegionCounts[i] += beta;
+        for (int i = 0; i < averagedWordByRegionCounts.length; ++i) {
+            averagedWordByRegionCounts[i] += beta;
         }
-        for (int i = 0; i < normalizedRegionCounts.length; ++i) {
-            normalizedRegionCounts[i] += betaW;
+        for (int i = 0; i < averagedRegionCounts.length; ++i) {
+            averagedRegionCounts[i] += betaW;
         }
     }
 }

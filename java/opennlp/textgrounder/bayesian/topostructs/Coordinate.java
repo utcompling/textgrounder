@@ -35,6 +35,11 @@ public class Coordinate implements Serializable {
         latitude = lat;
     }
 
+    public Coordinate(double[] coord) {
+        longitude = coord[1];
+        latitude = coord[0];
+    }
+
     /**
      * Two coordinates are the same if they have the same type as well as
      * latitude and longitude.

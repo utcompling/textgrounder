@@ -25,7 +25,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
-import opennlp.textgrounder.bayesian.structs.NormalizedProbabilityWrapper;
+import opennlp.textgrounder.bayesian.structs.AveragedCountWrapper;
 import opennlp.textgrounder.bayesian.textstructs.Lexicon;
 import opennlp.textgrounder.bayesian.topostructs.Region;
 
@@ -73,13 +73,13 @@ public abstract class InputReader extends IOBase {
         return regionMatrix;
     }
 
-    public NormalizedProbabilityWrapper readProbabilities() {
-        NormalizedProbabilityWrapper normalizedProbabilityWrapper = null;
+    public AveragedCountWrapper readProbabilities() {
+        AveragedCountWrapper normalizedProbabilityWrapper = null;
 
         ObjectInputStream probIn = null;
         try {
             probIn = new ObjectInputStream(new GZIPInputStream(new FileInputStream(probabilityFile.getCanonicalPath())));
-            normalizedProbabilityWrapper = (NormalizedProbabilityWrapper) probIn.readObject();
+            normalizedProbabilityWrapper = (AveragedCountWrapper) probIn.readObject();
         } catch (IOException ex) {
             Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);

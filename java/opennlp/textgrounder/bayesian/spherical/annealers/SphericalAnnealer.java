@@ -32,14 +32,14 @@ public abstract class SphericalAnnealer extends Annealer {
      */
     protected int geoMeanVecLen;
     /**
-     *
-     */
-    protected double[] allWordsRegionCounts;
-    /**
      * Counts of tcount per topic. However, since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.
      */
     protected double[] wordByRegionCounts;
+    /**
+     *
+     */
+    protected double[] allWordsRegionCounts;
     /**
      * 
      */
@@ -51,11 +51,11 @@ public abstract class SphericalAnnealer extends Annealer {
     /**
      *
      */
-    protected double[][][] regionToponymCoordinateCounts;
-    /**
-     * 
-     */
     protected double[][] regionMeans;
+    /**
+     *
+     */
+    protected double[][][] regionToponymCoordinateCounts;
 
     /**
      *

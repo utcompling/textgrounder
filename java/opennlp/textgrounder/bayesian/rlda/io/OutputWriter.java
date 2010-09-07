@@ -24,7 +24,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
-import opennlp.textgrounder.bayesian.structs.NormalizedProbabilityWrapper;
+import opennlp.textgrounder.bayesian.structs.AveragedCountWrapper;
 
 /**
  *
@@ -59,11 +59,11 @@ public abstract class OutputWriter extends IOBase {
      * @param _normalizedProbabilityWrapper
      */
     public void writeProbabilities(
-          NormalizedProbabilityWrapper _normalizedProbabilityWrapper) {
+          AveragedCountWrapper _averagedCountWrapper) {
         ObjectOutputStream probOut = null;
         try {
             probOut = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(probabilitiesFile.getCanonicalPath())));
-            probOut.writeObject(_normalizedProbabilityWrapper);
+            probOut.writeObject(_averagedCountWrapper);
             probOut.close();
         } catch (IOException ex) {
             Logger.getLogger(OutputWriter.class.getName()).log(Level.SEVERE, null, ex);

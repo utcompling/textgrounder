@@ -17,7 +17,6 @@
 package opennlp.textgrounder.bayesian.converters;
 
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
@@ -32,7 +31,7 @@ import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
 import opennlp.textgrounder.bayesian.apps.*;
 import opennlp.textgrounder.bayesian.structs.IntDoublePair;
-import opennlp.textgrounder.bayesian.structs.NormalizedProbabilityWrapper;
+import opennlp.textgrounder.bayesian.structs.AveragedCountWrapper;
 import opennlp.textgrounder.bayesian.textstructs.Lexicon;
 import opennlp.textgrounder.bayesian.topostructs.Region;
 import opennlp.textgrounder.bayesian.wrapper.io.*;
@@ -40,8 +39,6 @@ import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;
 import org.jdom.input.SAXBuilder;
-import org.jdom.output.Format;
-import org.jdom.output.XMLOutputter;
 
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -84,15 +81,15 @@ public class ProbabilityPrettyPrinter {
     /**
      *
      */
-    protected double[] normalizedRegionCounts;
+    protected double[] averagedRegionCounts;
     /**
      *
      */
-    protected double[] normalizedWordByRegionCounts;
+    protected double[] averagedWordByRegionCounts;
     /**
      *
      */
-    protected double[] normalizedRegionByDocumentCounts;
+    protected double[] averagedRegionByDocumentCounts;
     /**
      * 
      */
@@ -120,18 +117,18 @@ public class ProbabilityPrettyPrinter {
     }
 
     public void readFiles() {
-        NormalizedProbabilityWrapper normalizedProbabilityWrapper = inputReader.readProbabilities();
+        AveragedCountWrapper averagedCountWrapper = inputReader.readProbabilities();
 
-        alpha = normalizedProbabilityWrapper.alpha;
-        beta = normalizedProbabilityWrapper.beta;
-        betaW = normalizedProbabilityWrapper.betaW;
-        D = normalizedProbabilityWrapper.D;
-        N = normalizedProbabilityWrapper.N;
-        R = normalizedProbabilityWrapper.R;
-        W = normalizedProbabilityWrapper.W;
-        normalizedRegionByDocumentCounts = normalizedProbabilityWrapper.normalizedRegionByDocumentCounts;
-        normalizedRegionCounts = normalizedProbabilityWrapper.normalizedRegionCounts;
-        normalizedWordByRegionCounts = normalizedProbabilityWrapper.normalizedWordByRegionCounts;
+        alpha = averagedCountWrapper.alpha;
+        beta = averagedCountWrapper.beta;
+        betaW = averagedCountWrapper.betaW;
+        D = averagedCountWrapper.D;
+        N = averagedCountWrapper.N;
+        R = averagedCountWrapper.R;
+        W = averagedCountWrapper.W;
+        averagedRegionByDocumentCounts = averagedCountWrapper.averagedRegionByDocumentCounts;
+        averagedRegionCounts = averagedCountWrapper.averagedRegionCounts;
+        averagedWordByRegionCounts = averagedCountWrapper.averagedWordByRegionCounts;
 
         lexicon = inputReader.readLexicon();
         regionMatrix = inputReader.readRegions();
@@ -160,10 +157,10 @@ public class ProbabilityPrettyPrinter {
       Arrays.fill(wordFreqTotals, 0.0);
 
       for (int i = 0; i < R; ++i) {
-        sum += normalizedRegionCounts[i];
+        sum += averagedRegionCounts[i];
 
         for (int j = 0; j < W; ++j) {
-          wordFreqTotals[j] += normalizedWordByRegionCounts[j * R + i];
+          wordFreqTotals[j] += averagedWordByRegionCounts[j * R + i];
         }
       }
 
@@ -176,11 +173,11 @@ public class ProbabilityPrettyPrinter {
       for (int i = 0; i < R; ++i) {
         double total = 0.0;
         for (int j = 0; j < W; ++j) {
-          total += normalizedWordByRegionCounts[j * R + i] * idfs[j];
+          total += averagedWordByRegionCounts[j * R + i] * idfs[j];
         }
 
         for (int j = 0; j < W; ++j) {
-          normalizedTfIdfs[j * R + i] = normalizedWordByRegionCounts[j * R + i] * idfs[j] / total;
+          normalizedTfIdfs[j * R + i] = averagedWordByRegionCounts[j * R + i] * idfs[j] / total;
         }
       }
 
@@ -197,14 +194,14 @@ public class ProbabilityPrettyPrinter {
         w.writeAttribute("id", String.format("%04d", i));
         w.writeAttribute("lat", String.format("%.2f", region.centLat));
         w.writeAttribute("lon", String.format("%.2f", region.centLon));
-        w.writeAttribute("prob", String.format("%.8e", normalizedRegionCounts[i] / sum));
+        w.writeAttribute("prob", String.format("%.8e", averagedRegionCounts[i] / sum));
 
         for (int j = 0; j < outputPerClass; ++j) {
           w.writeStartElement("word");
 
           IntDoublePair pair = topWords.get(j);
           w.writeAttribute("term", lexicon.getWordForInt(pair.index));
-          w.writeAttribute("prob", String.format("%.8e", pair.count / normalizedRegionCounts[i]));
+          w.writeAttribute("prob", String.format("%.8e", pair.count / averagedRegionCounts[i]));
           w.writeEndElement();
         }
         w.writeEndElement();
@@ -235,13 +232,13 @@ public class ProbabilityPrettyPrinter {
 
             double sum = 0.;
             for (int i = 0; i < R; ++i) {
-                sum += normalizedRegionCounts[i];
+                sum += averagedRegionCounts[i];
             }
 
             for (int i = 0; i < R; ++i) {
                 ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
                 for (int j = 0; j < W; ++j) {
-                    topWords.add(new IntDoublePair(j, normalizedWordByRegionCounts[j * R + i]));
+                    topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * R + i]));
                 }
                 Collections.sort(topWords);
 
@@ -251,14 +248,14 @@ public class ProbabilityPrettyPrinter {
                 w.writeAttribute("id", String.format("%04d", i));
                 w.writeAttribute("lat", String.format("%.2f", region.centLat));
                 w.writeAttribute("lon", String.format("%.2f", region.centLon));
-                w.writeAttribute("prob", String.format("%.8e", normalizedRegionCounts[i] / sum));
+                w.writeAttribute("prob", String.format("%.8e", averagedRegionCounts[i] / sum));
 
                 for (int j = 0; j < outputPerClass; ++j) {
                     w.writeStartElement("word");
 
                     IntDoublePair pair = topWords.get(j);
                     w.writeAttribute("term", lexicon.getWordForInt(pair.index));
-                    w.writeAttribute("prob", String.format("%.8e", pair.count / normalizedRegionCounts[i]));
+                    w.writeAttribute("prob", String.format("%.8e", pair.count / averagedRegionCounts[i]));
                     w.writeEndElement();
                 }
                 w.writeEndElement();
@@ -275,7 +272,7 @@ public class ProbabilityPrettyPrinter {
                 wordCounts[i] = 0;
                 int wordoff = i * R;
                 for (int j = 0; j < R; ++j) {
-                    wordCounts[i] += normalizedWordByRegionCounts[wordoff + j];
+                    wordCounts[i] += averagedWordByRegionCounts[wordoff + j];
                 }
             }
 
@@ -283,7 +280,7 @@ public class ProbabilityPrettyPrinter {
                 int wordoff = i * R;
                 ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                 for (int j = 0; j < R; ++j) {
-                    topRegions.add(new IntDoublePair(j, normalizedWordByRegionCounts[wordoff + j]));
+                    topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j]));
                 }
                 Collections.sort(topRegions);
 
@@ -339,7 +336,7 @@ public class ProbabilityPrettyPrinter {
                 docWordCounts[i] = 0;
                 int docoff = i * R;
                 for (int j = 0; j < R; ++j) {
-                    docWordCounts[i] += normalizedRegionByDocumentCounts[docoff + j];
+                    docWordCounts[i] += averagedRegionByDocumentCounts[docoff + j];
                 }
             }
 
@@ -347,7 +344,7 @@ public class ProbabilityPrettyPrinter {
                 int docoff = i * R;
                 ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                 for (int j = 0; j < R; ++j) {
-                    topRegions.add(new IntDoublePair(j, normalizedRegionByDocumentCounts[docoff + j]));
+                    topRegions.add(new IntDoublePair(j, averagedRegionByDocumentCounts[docoff + j]));
                 }
                 Collections.sort(topRegions);
 
@@ -392,21 +389,21 @@ public class ProbabilityPrettyPrinter {
 
             double sum = 0.;
             for (int i = 0; i < R; ++i) {
-                sum += normalizedRegionCounts[i];
+                sum += averagedRegionCounts[i];
             }
 
             for (int i = 0; i < R; ++i) {
                 ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
                 for (int j = 0; j < W; ++j) {
-                    topWords.add(new IntDoublePair(j, normalizedWordByRegionCounts[j * R + i]));
+                    topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * R + i]));
                 }
                 Collections.sort(topWords);
 
                 Region region = regionIdToRegionMap.get(i);
-                wordByRegionWriter.write(String.format("Region%04d\t%.2f\t%.2f\t%.8e", i, region.centLon, region.centLat, normalizedRegionCounts[i] / sum));
+                wordByRegionWriter.write(String.format("Region%04d\t%.2f\t%.2f\t%.8e", i, region.centLon, region.centLat, averagedRegionCounts[i] / sum));
                 wordByRegionWriter.newLine();
                 for (IntDoublePair pair : topWords) {
-                    wordByRegionWriter.write(String.format("%s\t%.8e", lexicon.getWordForInt(pair.index), pair.count / normalizedRegionCounts[i]));
+                    wordByRegionWriter.write(String.format("%s\t%.8e", lexicon.getWordForInt(pair.index), pair.count / averagedRegionCounts[i]));
                     wordByRegionWriter.newLine();
                 }
                 wordByRegionWriter.newLine();
@@ -436,7 +433,7 @@ public class ProbabilityPrettyPrinter {
                 wordCounts[i] = 0;
                 int wordoff = i * R;
                 for (int j = 0; j < R; ++j) {
-                    wordCounts[i] += normalizedWordByRegionCounts[wordoff + j];
+                    wordCounts[i] += averagedWordByRegionCounts[wordoff + j];
                 }
             }
 
@@ -444,7 +441,7 @@ public class ProbabilityPrettyPrinter {
                 int wordoff = i * R;
                 ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                 for (int j = 0; j < R; ++j) {
-                    topRegions.add(new IntDoublePair(j, normalizedWordByRegionCounts[wordoff + j]));
+                    topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j]));
                 }
                 Collections.sort(topRegions);
 
@@ -503,7 +500,7 @@ public class ProbabilityPrettyPrinter {
                 docWordCounts[i] = 0;
                 int docoff = i * R;
                 for (int j = 0; j < R; ++j) {
-                    docWordCounts[i] += normalizedRegionByDocumentCounts[docoff + j];
+                    docWordCounts[i] += averagedRegionByDocumentCounts[docoff + j];
                 }
             }
 
@@ -511,7 +508,7 @@ public class ProbabilityPrettyPrinter {
                 int docoff = i * R;
                 ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                 for (int j = 0; j < R; ++j) {
-                    topRegions.add(new IntDoublePair(j, normalizedRegionByDocumentCounts[docoff + j]));
+                    topRegions.add(new IntDoublePair(j, averagedRegionByDocumentCounts[docoff + j]));
                 }
                 Collections.sort(topRegions);
 

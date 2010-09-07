@@ -25,7 +25,7 @@ import opennlp.textgrounder.bayesian.rlda.annealers.*;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
 import opennlp.textgrounder.bayesian.rlda.io.*;
-import opennlp.textgrounder.bayesian.structs.NormalizedProbabilityWrapper;
+import opennlp.textgrounder.bayesian.structs.AveragedCountWrapper;
 
 /**
  *
@@ -440,10 +440,10 @@ public class RegionModel extends RegionModelFields {
         outputWriter = new BinaryOutputWriter(experimentParameters);
         outputWriter.writeTokenArray(wordVector, documentVector, toponymVector, stopwordVector, regionVector);
 
-        NormalizedProbabilityWrapper normalizedProbabilityWrapper = new NormalizedProbabilityWrapper(this);
-        normalizedProbabilityWrapper.addHyperparameters();
+        AveragedCountWrapper averagedCountWrapper = new AveragedCountWrapper(this);
+        averagedCountWrapper.addHyperparameters();
 
-        outputWriter.writeProbabilities(normalizedProbabilityWrapper);
+        outputWriter.writeProbabilities(averagedCountWrapper);
     }
 
     /**

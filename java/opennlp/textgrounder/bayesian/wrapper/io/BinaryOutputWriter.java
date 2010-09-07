@@ -164,8 +164,8 @@ public class BinaryOutputWriter extends OutputWriter {
                 toponymCoordinateOutputStream.writeInt(topid);
                 toponymCoordinateOutputStream.writeInt(fieldsize);
                 for (Coordinate coord : coords) {
-                    toponymCoordinateOutputStream.writeDouble(coord.longitude);
                     toponymCoordinateOutputStream.writeDouble(coord.latitude);
+                    toponymCoordinateOutputStream.writeDouble(coord.longitude);
                 }
             }
 
