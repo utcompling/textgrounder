@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.bayesian.rlda.io;
+package opennlp.textgrounder.bayesian.spherical.io;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -24,19 +24,19 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
-import opennlp.textgrounder.bayesian.structs.AveragedCountWrapper;
+import opennlp.textgrounder.bayesian.structs.AveragedSphericalCountWrapper;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class OutputWriter extends IOBase {
+public abstract class SphericalOutputWriter extends SphericalIOBase {
 
     /**
      * 
      * @param _experimentParameters
      */
-    public OutputWriter(ExperimentParameters _experimentParameters) {
+    public SphericalOutputWriter(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         tokenArrayFile = new File(experimentParameters.getTokenArrayOutputPath());
         probabilitiesFile = new File(experimentParameters.getSampledProbabilitiesPath());
@@ -52,21 +52,21 @@ public abstract class OutputWriter extends IOBase {
      */
     public abstract void writeTokenArray(
           int[] _wordVector, int[] _documentVector, int[] _toponymVector,
-          int[] _stopwordVector, int[] _regionVector);
+          int[] _stopwordVector, int[] _regionVector, int[] _coordVector);
 
     /**
      * 
      * @param _normalizedProbabilityWrapper
      */
     public void writeProbabilities(
-          AveragedCountWrapper _averagedCountWrapper) {
+          AveragedSphericalCountWrapper _averagedSphericalCountWrapper) {
         ObjectOutputStream probOut = null;
         try {
             probOut = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(probabilitiesFile.getCanonicalPath())));
-            probOut.writeObject(_averagedCountWrapper);
+            probOut.writeObject(_averagedSphericalCountWrapper);
             probOut.close();
         } catch (IOException ex) {
-            Logger.getLogger(OutputWriter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }

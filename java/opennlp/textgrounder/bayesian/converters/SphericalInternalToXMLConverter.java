@@ -54,7 +54,7 @@ public class SphericalInternalToXMLConverter {
     /**
      *
      */
-    protected InputReader inputReader;
+    protected SphericalInputReader inputReader;
     /**
      *
      */
@@ -86,7 +86,7 @@ public class SphericalInternalToXMLConverter {
         opennlp.textgrounder.bayesian.wrapper.io.InputReader lReader = new opennlp.textgrounder.bayesian.wrapper.io.BinaryInputReader(_converterExperimentParameters);
         lexicon = lReader.readLexicon();
 
-        inputReader = new BinaryInputReader(_converterExperimentParameters);
+        inputReader = new SphericalBinaryInputReader(_converterExperimentParameters);
     }
 
     /**

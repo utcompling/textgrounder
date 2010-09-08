@@ -75,6 +75,10 @@ public class SphericalModelFields {
      */
     protected int T;
     /**
+     * number of non-toponym topics
+     */
+    protected int Z;
+    /**
      * cartesian coordinates is the default. see no reason to move to slower (but cheaper)
      * spherical coordinates
      */

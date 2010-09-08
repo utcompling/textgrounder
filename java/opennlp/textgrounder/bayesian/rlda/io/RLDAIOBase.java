@@ -23,7 +23,7 @@ import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class IOBase {
+public abstract class RLDAIOBase {
 
     /**
      *
@@ -42,7 +42,7 @@ public abstract class IOBase {
      */
     protected ExperimentParameters experimentParameters;
 
-    public IOBase(ExperimentParameters _experimentParameters) {
+    public RLDAIOBase(ExperimentParameters _experimentParameters) {
         experimentParameters = _experimentParameters;
         toponymRegionFile = new File(experimentParameters.getToponymRegionPath());
     }

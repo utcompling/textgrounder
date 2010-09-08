@@ -25,13 +25,13 @@ import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class InputReader extends IOBase {
+public abstract class RLDAInputReader extends RLDAIOBase {
 
     /**
      * 
      * @param _experimentParameters
      */
-    public InputReader(ExperimentParameters _experimentParameters) {
+    public RLDAInputReader(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         tokenArrayFile = new File(experimentParameters.getTokenArrayInputPath());
     }

@@ -31,12 +31,12 @@ import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class BinaryInputReader extends InputReader {
+public class RLDABinaryInputReader extends RLDAInputReader {
 
     protected DataInputStream tokenArrayInputStream;
     protected DataInputStream toponymRegionInputStream;
 
-    public BinaryInputReader(ExperimentParameters _experimentParameters) {
+    public RLDABinaryInputReader(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         openTokenArrayReader();
         openToponymRegionReader();
@@ -89,7 +89,7 @@ public class BinaryInputReader extends InputReader {
         } catch (EOFException e) {
             // do nothing and just continue
         } catch (IOException ex) {
-            Logger.getLogger(BinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RLDABinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
         }
         assert maxreg != 0;
 
@@ -106,10 +106,10 @@ public class BinaryInputReader extends InputReader {
                 tokenArrayInputStream = new DataInputStream(new BufferedInputStream(new FileInputStream(tokenArrayFile)));
             }
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(BinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RLDABinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(BinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RLDABinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }
@@ -124,10 +124,10 @@ public class BinaryInputReader extends InputReader {
                 toponymRegionInputStream = new DataInputStream(new BufferedInputStream(new FileInputStream(toponymRegionFile)));
             }
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(BinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RLDABinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(BinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RLDABinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }

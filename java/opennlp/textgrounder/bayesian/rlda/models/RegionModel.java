@@ -48,11 +48,11 @@ public class RegionModel extends RegionModelFields {
     /**
      * 
      */
-    protected transient InputReader inputReader;
+    protected transient RLDAInputReader inputReader;
     /**
      * 
      */
-    protected transient OutputWriter outputWriter;
+    protected transient RLDAOutputWriter outputWriter;
 
     /**
      * Default constructor. Take input from commandline and default _options
@@ -73,10 +73,10 @@ public class RegionModel extends RegionModelFields {
 
         switch (_experimentParameters.getInputFormat()) {
             case BINARY:
-                inputReader = new BinaryInputReader(_experimentParameters);
+                inputReader = new RLDABinaryInputReader(_experimentParameters);
                 break;
             case TEXT:
-                inputReader = new TextInputReader(_experimentParameters);
+                inputReader = new RLDATextInputReader(_experimentParameters);
                 break;
         }
 
@@ -437,7 +437,7 @@ public class RegionModel extends RegionModelFields {
     }
 
     public void write() {
-        outputWriter = new BinaryOutputWriter(experimentParameters);
+        outputWriter = new RLDABinaryOutputWriter(experimentParameters);
         outputWriter.writeTokenArray(wordVector, documentVector, toponymVector, stopwordVector, regionVector);
 
         AveragedCountWrapper averagedCountWrapper = new AveragedCountWrapper(this);

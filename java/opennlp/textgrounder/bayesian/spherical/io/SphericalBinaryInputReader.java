@@ -32,12 +32,12 @@ import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class BinaryInputReader extends InputReader {
+public class SphericalBinaryInputReader extends SphericalInputReader {
 
     protected DataInputStream tokenArrayInputStream;
     protected DataInputStream toponymCoordinateInputStream;
 
-    public BinaryInputReader(ExperimentParameters _experimentParameters) {
+    public SphericalBinaryInputReader(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         openTokenArrayReader();
         openToponymCoordinateReader();
@@ -95,10 +95,10 @@ public class BinaryInputReader extends InputReader {
                 tokenArrayInputStream = new DataInputStream(new BufferedInputStream(new FileInputStream(tokenArrayFile)));
             }
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(BinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalBinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(BinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalBinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }
@@ -113,10 +113,10 @@ public class BinaryInputReader extends InputReader {
                 toponymCoordinateInputStream = new DataInputStream(new BufferedInputStream(new FileInputStream(toponymCoordinateFile)));
             }
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(BinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalBinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(BinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalBinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }

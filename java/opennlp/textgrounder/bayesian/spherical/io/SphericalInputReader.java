@@ -32,13 +32,13 @@ import opennlp.textgrounder.bayesian.structs.AveragedSphericalCountWrapper;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class InputReader extends IOBase {
+public abstract class SphericalInputReader extends SphericalIOBase {
 
     /**
      * 
      * @param _experimentParameters
      */
-    public InputReader(ExperimentParameters _experimentParameters) {
+    public SphericalInputReader(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         tokenArrayFile = new File(experimentParameters.getTokenArrayInputPath());
     }
@@ -97,10 +97,10 @@ public abstract class InputReader extends IOBase {
             probIn = new ObjectInputStream(new GZIPInputStream(new FileInputStream(probabilitiesFile.getCanonicalPath())));
             normalizedProbabilityWrapper = (AveragedSphericalCountWrapper) probIn.readObject();
         } catch (IOException ex) {
-            Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (ClassNotFoundException ex) {
-            Logger.getLogger(InputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
 

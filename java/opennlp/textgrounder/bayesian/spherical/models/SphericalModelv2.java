@@ -35,33 +35,7 @@ import opennlp.textgrounder.bayesian.utils.TGArrays;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class SphericalModelBase extends SphericalModelFields {
-
-    protected final static double EXPANSION_FACTOR = 0.25;
-    /**
-     * Random number generator. Implements the fast Mersenne Twister.
-     */
-    protected transient MersenneTwisterFast rand;
-    /**
-     * 
-     */
-    protected transient ExperimentParameters experimentParameters;
-    /**
-     * 
-     */
-    protected transient SphericalInputReader inputReader;
-    /**
-     * 
-     */
-    protected transient SphericalOutputWriter outputWriter;
-    /**
-     * 
-     */
-    protected transient SphericalAnnealer annealer;
-    /**
-     * the crpalpha for use when spherical distributions are not normalized
-     */
-    protected transient double crpalpha_mod;
+public class SphericalModelv2 extends SphericalModelBase {
 
     /**
      * Default constructor. Take input from commandline and default _options
@@ -70,8 +44,8 @@ public class SphericalModelBase extends SphericalModelFields {
      *
      * @param _options
      */
-    public SphericalModelBase(ExperimentParameters _parameters) {
-        experimentParameters = _parameters;
+    public SphericalModelv2(ExperimentParameters _parameters) {
+        super(_parameters);
     }
 
     /**
@@ -94,8 +68,6 @@ public class SphericalModelBase extends SphericalModelFields {
         beta = _experimentParameters.getBeta();
         kappa = _experimentParameters.getKappa();
         crpalpha_mod = crpalpha * 4 * Math.PI * Math.sinh(kappa) / kappa;
-
-        Z = _experimentParameters.getTopics();
 
         int randSeed = _experimentParameters.getRandomSeed();
         if (randSeed == 0) {
@@ -139,6 +111,10 @@ public class SphericalModelBase extends SphericalModelFields {
         for (int i = 0; i < W * expectedR; ++i) {
             wordByRegionCounts[i] = 0;
         }
+//        toponymByRegionCounts = new int[T * expectedR];
+//        for (int i = 0; i < T * expectedR; ++i) {
+//            toponymByRegionCounts[i] = 0;
+//        }
 
         regionMeans = new double[expectedR][];
 
@@ -155,6 +131,8 @@ public class SphericalModelBase extends SphericalModelFields {
             }
             regionToponymCoordinateCounts[i] = toponymCoordinateCounts;
         }
+
+//        regionCoordinateCounts = new int[expectedR * maxCoord];
     }
 
     protected void readTokenArrayFile() {
@@ -188,7 +166,7 @@ public class SphericalModelBase extends SphericalModelFields {
             }
         } catch (EOFException ex) {
         } catch (IOException ex) {
-            Logger.getLogger(SphericalModelBase.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalModelv2.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         W += 1;
@@ -239,7 +217,7 @@ public class SphericalModelBase extends SphericalModelFields {
             }
         } catch (EOFException e) {
         } catch (IOException ex) {
-            Logger.getLogger(SphericalModelBase.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalModelv2.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         T = maxtopid + 1;

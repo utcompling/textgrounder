@@ -32,12 +32,12 @@ import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class TextInputReader extends InputReader {
+public class RLDATextInputReader extends RLDAInputReader {
 
     protected BufferedReader tokenArrayReader;
     protected BufferedReader toponymRegionReader;
 
-    public TextInputReader(ExperimentParameters _experimentParameters) {
+    public RLDATextInputReader(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
 
         openTokenArrayReader();
@@ -58,7 +58,7 @@ public class TextInputReader extends InputReader {
                 throw new EOFException();
             }
         } catch (IOException ex) {
-            Logger.getLogger(TextInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RLDATextInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
         String[] fields = line.split("\\w+");
@@ -93,7 +93,7 @@ public class TextInputReader extends InputReader {
                 throw new EOFException();
             }
         } catch (IOException ex) {
-            Logger.getLogger(TextInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RLDATextInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
 
@@ -127,7 +127,7 @@ public class TextInputReader extends InputReader {
                 }
             }
         } catch (IOException ex) {
-            Logger.getLogger(TextInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RLDATextInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
 
@@ -148,10 +148,10 @@ public class TextInputReader extends InputReader {
                 tokenArrayReader = new BufferedReader(new FileReader(tokenArrayFile));
             }
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(TextInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RLDATextInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(TextInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RLDATextInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }
@@ -168,10 +168,10 @@ public class TextInputReader extends InputReader {
                 toponymRegionReader = new BufferedReader(new FileReader(toponymRegionFile));
             }
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(TextInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RLDATextInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(TextInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(RLDATextInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }

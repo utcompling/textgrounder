@@ -14,7 +14,7 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.bayesian.rlda.io;
+package opennlp.textgrounder.bayesian.spherical.io;
 
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
@@ -30,7 +30,7 @@ import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class BinaryOutputWriter extends OutputWriter {
+public class SphericalBinaryOutputWriter extends SphericalOutputWriter {
 
     /**
      * 
@@ -41,7 +41,7 @@ public class BinaryOutputWriter extends OutputWriter {
      * 
      * @param _experimentParameters
      */
-    public BinaryOutputWriter(ExperimentParameters _experimentParameters) {
+    public SphericalBinaryOutputWriter(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         openTokenArrayWriter();
     }
@@ -59,10 +59,10 @@ public class BinaryOutputWriter extends OutputWriter {
                 tokenArrayOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(tokenArrayFile)));
             }
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalBinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalBinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }
@@ -72,7 +72,7 @@ public class BinaryOutputWriter extends OutputWriter {
      */
     @Override
     public void writeTokenArray(int[] _wordVector, int[] _documentVector,
-          int[] _toponymVector, int[] _stopwordVector, int[] _regionVector) {
+          int[] _toponymVector, int[] _stopwordVector, int[] _regionVector, int[] _coordVector) {
         try {
             for (int i = 0; i < _wordVector.length; ++i) {
                 int wordid = _wordVector[i];
@@ -85,11 +85,13 @@ public class BinaryOutputWriter extends OutputWriter {
                 tokenArrayOutputStream.writeByte(stopstatus);
                 int regid = _regionVector[i];
                 tokenArrayOutputStream.writeInt(regid);
+                int coordid = _coordVector[i];
+                tokenArrayOutputStream.writeInt(coordid);
             }
 
             tokenArrayOutputStream.close();
         } catch (IOException ex) {
-            Logger.getLogger(BinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalBinaryOutputWriter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }

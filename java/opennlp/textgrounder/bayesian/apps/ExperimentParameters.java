@@ -108,9 +108,9 @@ public class ExperimentParameters {
      */
     protected double targetTemperature = 1;
     /**
-     * Number of regions
+     * Number of non-region topics
      */
-    protected int regions = 50;
+    protected int topics = 50;
     /**
      * Number of samples to take
      */
@@ -288,8 +288,8 @@ public class ExperimentParameters {
         return temperatureDecrement;
     }
 
-    public int getRegions() {
-        return regions;
+    public int getTopics() {
+        return topics;
     }
 
     public int getSamples() {
