@@ -16,8 +16,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.apps;
 
-import opennlp.textgrounder.bayesian.converters.ProbabilityPrettyPrinter;
-
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
@@ -25,6 +23,7 @@ import java.io.IOException;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
+import opennlp.textgrounder.bayesian.converters.ProbabilityPrettyPrinterRLDA;
 
 /**
  *
@@ -37,7 +36,7 @@ public class PrettyPrintTfIdfXML extends BaseApp {
         ConverterExperimentParameters experimentParameters = new ConverterExperimentParameters();
         processRawCommandline(args, experimentParameters);
 
-        ProbabilityPrettyPrinter probabilityPrettyPrinter = new ProbabilityPrettyPrinter(experimentParameters);
+        ProbabilityPrettyPrinterRLDA probabilityPrettyPrinter = new ProbabilityPrettyPrinterRLDA(experimentParameters);
         probabilityPrettyPrinter.readFiles();
         probabilityPrettyPrinter.normalizeAndPrintXMLProbabilities();
 

@@ -16,6 +16,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.utils;
 
+import java.util.Arrays;
+import java.util.HashSet;
+
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
@@ -67,8 +70,14 @@ public class TGArrays {
         for (int i = 0; i < _R; ++i) {
             int off = i * _C;
             int prevoff = i * _prevC;
-            for (int j = 0; j < _prevC; ++j) {
-                target[off + j] = _source[prevoff + j];
+            try {
+                /**
+                 * for cases where _C < _prevC
+                 */
+                for (int j = 0; j < _prevC; ++j) {
+                    target[off + j] = _source[prevoff + j];
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
             }
             for (int j = _prevC; j < _C; ++j) {
                 target[off + j] = 0;
@@ -80,14 +89,18 @@ public class TGArrays {
     public static double[][] expandSingleTierR(double[][] _source, int _R,
           int _prevR, int _C) {
         double[][] target = new double[_R][];
-        for (int i = 0; i < _prevR; ++i) {
-            target[i] = _source[i];
+        try {
+            /**
+             * for cases where _R < _prevR
+             */
+            for (int i = 0; i < _prevR; ++i) {
+                target[i] = _source[i];
+            }
+        } catch (ArrayIndexOutOfBoundsException e) {
         }
         for (int i = _prevR; i < _R; ++i) {
             double[] sub = new double[_C];
-            for (int j = 0; j < _C; ++j) {
-                sub[j] = 0;
-            }
+            Arrays.fill(sub, 0);
             target[i] = sub;
         }
         return target;

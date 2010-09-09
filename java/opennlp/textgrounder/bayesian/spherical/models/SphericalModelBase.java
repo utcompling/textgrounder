@@ -319,7 +319,41 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      */
     public abstract void train(SphericalAnnealer _annealer);
 
+    /**
+     * 
+     */
+    public abstract void decode();
+
+    /**
+     * 
+     */
     protected abstract void expandExpectedR();
+
+    /**
+     *
+     */
+    protected void shrinkToCurrentR() {
+
+        double[] sampleRegionByDocumentCounts = annealer.getRegionByDocumentCounts();
+        sampleRegionByDocumentCounts = TGArrays.expandDoubleTierC(sampleRegionByDocumentCounts, D, currentR, expectedR);
+        annealer.setRegionByDocumentCounts(sampleRegionByDocumentCounts);
+
+        double[] sampleWordByRegionCounts = annealer.getWordByRegionCounts();
+        sampleWordByRegionCounts = TGArrays.expandDoubleTierC(sampleWordByRegionCounts, W, currentR, expectedR);
+        annealer.setWordByRegionCounts(sampleWordByRegionCounts);
+
+        double[][][] sampleRegionToponymCoordinateCounts = annealer.getRegionToponymCoordinateCounts();
+        double[][][] newSampleRegionToponymCoordinateCounts = new double[currentR][][];
+        for (int i = 0; i < currentR; ++i) {
+            newSampleRegionToponymCoordinateCounts[i] = sampleRegionToponymCoordinateCounts[i];
+        }
+
+        annealer.setRegionToponymCoordinateCounts(sampleRegionToponymCoordinateCounts);
+
+        double[][] sampleRegionMeans = annealer.getRegionMeans();
+        sampleRegionMeans = TGArrays.expandSingleTierR(sampleRegionMeans, currentR, expectedR, coordParamLen);
+        annealer.setRegionMeans(sampleRegionMeans);
+    }
 
     protected void resetRegionID(SphericalAnnealer _annealer, int curregionid, int curdocid) {
         double[] probs = new double[currentR];
@@ -375,8 +409,6 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             averagedRegionToponymCoordinateCounts = annealer.getRegionToponymCoordinateCounts();
         }
     }
-
-    public abstract void decode();
 
     /**
      *

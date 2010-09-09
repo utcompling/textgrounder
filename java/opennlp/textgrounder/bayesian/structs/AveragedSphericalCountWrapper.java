@@ -41,25 +41,28 @@ public class AveragedSphericalCountWrapper extends SphericalModelFields implemen
         beta = _regionModel.getBeta();
         betaW = _regionModel.getBetaW();
         kappa = _regionModel.getKappa();
-        currentR = _regionModel.getCurrentR();
 
+        currentR = _regionModel.getCurrentR();
+        expectedR = _regionModel.getExpectedR();
         D = _regionModel.getD();
         N = _regionModel.getN();
         T = _regionModel.getT();
         W = _regionModel.getW();
         Z = _regionModel.getZ();
+        
+        emptyRSet = _regionModel.getEmptyRSet();
     }
 
     public void addHyperparameters() {
-        for (int i = 0; i < averagedRegionByDocumentCounts.length; ++i) {
-            averagedRegionByDocumentCounts[i] += alpha;
-        }
-        for (int i = 0; i < averagedWordByRegionCounts.length; ++i) {
-            averagedWordByRegionCounts[i] += beta;
-        }
-
-        for (int i = 0; i < averagedAllWordsRegionCounts.length; ++i) {
-            averagedAllWordsRegionCounts[i] += betaW;
-        }
+//        for (int i = 0; i < averagedRegionByDocumentCounts.length; ++i) {
+//            averagedRegionByDocumentCounts[i] += alpha;
+//        }
+//        for (int i = 0; i < averagedWordByRegionCounts.length; ++i) {
+//            averagedWordByRegionCounts[i] += beta;
+//        }
+//
+//        for (int i = 0; i < averagedAllWordsRegionCounts.length; ++i) {
+//            averagedAllWordsRegionCounts[i] += betaW;
+//        }
     }
 }

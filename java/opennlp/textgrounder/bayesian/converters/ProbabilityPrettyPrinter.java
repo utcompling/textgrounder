@@ -16,39 +16,15 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.converters;
 
-import java.io.BufferedWriter;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.util.Arrays;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.zip.GZIPOutputStream;
 import opennlp.textgrounder.bayesian.apps.*;
-import opennlp.textgrounder.bayesian.structs.IntDoublePair;
-import opennlp.textgrounder.bayesian.structs.AveragedCountWrapper;
 import opennlp.textgrounder.bayesian.textstructs.Lexicon;
-import opennlp.textgrounder.bayesian.topostructs.Region;
 import opennlp.textgrounder.bayesian.wrapper.io.*;
-import org.jdom.Document;
-import org.jdom.Element;
-import org.jdom.JDOMException;
-import org.jdom.input.SAXBuilder;
-
-import javax.xml.stream.XMLOutputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamWriter;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class ProbabilityPrettyPrinter {
+public abstract class ProbabilityPrettyPrinter {
 
     /**
      * Hyperparameter for region*doc priors
@@ -79,35 +55,15 @@ public class ProbabilityPrettyPrinter {
      */
     protected int W;
     /**
-     *
-     */
-    protected double[] averagedRegionCounts;
-    /**
-     *
-     */
-    protected double[] averagedWordByRegionCounts;
-    /**
-     *
-     */
-    protected double[] averagedRegionByDocumentCounts;
-    /**
      * 
      */
     protected Lexicon lexicon = null;
     /**
      *
      */
-    protected Region[][] regionMatrix = null;
-    /**
-     *
-     */
-    protected HashMap<Integer, Region> regionIdToRegionMap;
-    /**
-     *
-     */
     protected ConverterExperimentParameters experimentParameters = null;
     /**
-     * 
+     *
      */
     protected InputReader inputReader = null;
 
@@ -116,419 +72,19 @@ public class ProbabilityPrettyPrinter {
         inputReader = new BinaryInputReader(experimentParameters);
     }
 
-    public void readFiles() {
-        AveragedCountWrapper averagedCountWrapper = inputReader.readProbabilities();
+    public abstract void readFiles();
 
-        alpha = averagedCountWrapper.alpha;
-        beta = averagedCountWrapper.beta;
-        betaW = averagedCountWrapper.betaW;
-        D = averagedCountWrapper.D;
-        N = averagedCountWrapper.N;
-        R = averagedCountWrapper.R;
-        W = averagedCountWrapper.W;
-        averagedRegionByDocumentCounts = averagedCountWrapper.averagedRegionByDocumentCounts;
-        averagedRegionCounts = averagedCountWrapper.averagedRegionCounts;
-        averagedWordByRegionCounts = averagedCountWrapper.averagedWordByRegionCounts;
+    public abstract void normalizeAndPrintXMLProbabilities();
 
-        lexicon = inputReader.readLexicon();
-        regionMatrix = inputReader.readRegions();
+    public abstract void normalizeAndPrintWordByRegion();
 
-        regionIdToRegionMap = new HashMap<Integer, Region>();
-        for (Region[] regions : regionMatrix) {
-            for (Region region : regions) {
-                if (region != null) {
-                    regionIdToRegionMap.put(region.id, region);
-                }
-            }
-        }
-    }
+    public abstract void normalizeAndPrintRegionByWord();
 
-    public void writeTfIdfWords(XMLStreamWriter w) throws XMLStreamException {
-      int outputPerClass = experimentParameters.getOutputPerClass();
-      String outputPath = experimentParameters.getXmlConditionalProbabilitiesFilename();
+    public abstract void normalizeAndPrintRegionByDocument();
 
-      w.writeStartDocument("UTF-8", "1.0");
-      w.writeStartElement("probabilities");
-      w.writeStartElement("word-by-region");
-
-      double sum = 0.0;
-
-      double[] wordFreqTotals = new double[W];
-      Arrays.fill(wordFreqTotals, 0.0);
-
-      for (int i = 0; i < R; ++i) {
-        sum += averagedRegionCounts[i];
-
-        for (int j = 0; j < W; ++j) {
-          wordFreqTotals[j] += averagedWordByRegionCounts[j * R + i];
-        }
-      }
-
-      double[] idfs = new double[W];
-      for (int i = 0; i < W; ++i) {
-        idfs[i] = Math.log(R / wordFreqTotals[i]);
-      }
-
-      double[] normalizedTfIdfs = new double[R * W];
-      for (int i = 0; i < R; ++i) {
-        double total = 0.0;
-        for (int j = 0; j < W; ++j) {
-          total += averagedWordByRegionCounts[j * R + i] * idfs[j];
-        }
-
-        for (int j = 0; j < W; ++j) {
-          normalizedTfIdfs[j * R + i] = averagedWordByRegionCounts[j * R + i] * idfs[j] / total;
-        }
-      }
-
-      for (int i = 0; i < R; ++i) {
-        ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
-        for (int j = 0; j < W; ++j) {
-          topWords.add(new IntDoublePair(j, normalizedTfIdfs[j * R + i]));
-        }
-
-        Collections.sort(topWords);
-
-        Region region = regionIdToRegionMap.get(i);
-        w.writeStartElement("region");
-        w.writeAttribute("id", String.format("%04d", i));
-        w.writeAttribute("lat", String.format("%.2f", region.centLat));
-        w.writeAttribute("lon", String.format("%.2f", region.centLon));
-        w.writeAttribute("prob", String.format("%.8e", averagedRegionCounts[i] / sum));
-
-        for (int j = 0; j < outputPerClass; ++j) {
-          w.writeStartElement("word");
-
-          IntDoublePair pair = topWords.get(j);
-          w.writeAttribute("term", lexicon.getWordForInt(pair.index));
-          w.writeAttribute("prob", String.format("%.8e", pair.count / averagedRegionCounts[i]));
-          w.writeEndElement();
-        }
-        w.writeEndElement();
-      }
-      w.writeEndElement();
-      w.writeEndElement();
-      w.close();
-    }
-
-    public void normalizeAndPrintXMLProbabilities() {
-        int outputPerClass = experimentParameters.getOutputPerClass();
-        String outputPath = experimentParameters.getXmlConditionalProbabilitiesFilename();
-
-        try {
-
-        XMLOutputFactory factory = XMLOutputFactory.newInstance();
-        XMLStreamWriter w = factory.createXMLStreamWriter(new BufferedWriter(new FileWriter(outputPath)));
-
-        String rootName = "probabilities";
-        String wordByRegionName = "word-by-region";
-        String regionByWordName = "region-by-word";
-        String regionByDocumentName = "region-by-document";
-        w.writeStartDocument("UTF-8", "1.0");
-        w.writeStartElement(rootName);
-
-        {
-            w.writeStartElement(wordByRegionName);
-
-            double sum = 0.;
-            for (int i = 0; i < R; ++i) {
-                sum += averagedRegionCounts[i];
-            }
-
-            for (int i = 0; i < R; ++i) {
-                ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
-                for (int j = 0; j < W; ++j) {
-                    topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * R + i]));
-                }
-                Collections.sort(topWords);
-
-                Region region = regionIdToRegionMap.get(i);
-                w.writeStartElement("region");
-
-                w.writeAttribute("id", String.format("%04d", i));
-                w.writeAttribute("lat", String.format("%.2f", region.centLat));
-                w.writeAttribute("lon", String.format("%.2f", region.centLon));
-                w.writeAttribute("prob", String.format("%.8e", averagedRegionCounts[i] / sum));
-
-                for (int j = 0; j < outputPerClass; ++j) {
-                    w.writeStartElement("word");
-
-                    IntDoublePair pair = topWords.get(j);
-                    w.writeAttribute("term", lexicon.getWordForInt(pair.index));
-                    w.writeAttribute("prob", String.format("%.8e", pair.count / averagedRegionCounts[i]));
-                    w.writeEndElement();
-                }
-                w.writeEndElement();
-            }
-            w.writeEndElement();
-        }
-
-        {
-            w.writeStartElement(regionByWordName);
-
-            double[] wordCounts = new double[W];
-
-            for (int i = 0; i < W; ++i) {
-                wordCounts[i] = 0;
-                int wordoff = i * R;
-                for (int j = 0; j < R; ++j) {
-                    wordCounts[i] += averagedWordByRegionCounts[wordoff + j];
-                }
-            }
-
-            for (int i = 0; i < W; ++i) {
-                int wordoff = i * R;
-                ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
-                for (int j = 0; j < R; ++j) {
-                    topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j]));
-                }
-                Collections.sort(topRegions);
-
-                w.writeStartElement("word");
-                w.writeAttribute("term", lexicon.getWordForInt(i));
-
-                for (int j = 0; j < outputPerClass; ++j) {
-                    w.writeStartElement("region");
-
-                    IntDoublePair pair = topRegions.get(j);
-                    Region region = regionIdToRegionMap.get(pair.index);
-                    w.writeAttribute("id", String.format("%04d", pair.index));
-                    w.writeAttribute("lat", String.format("%.2f", region.centLat));
-                    w.writeAttribute("lon", String.format("%.2f", region.centLon));
-                    w.writeAttribute("prob", String.format("%.8e", pair.count / wordCounts[i]));
-                    w.writeEndElement();
-                }
-                w.writeEndElement();
-            }
-            w.writeEndElement();
-        }
-
-        {
-            Document trdoc = null;
-            try {
-                trdoc = (new SAXBuilder()).build(experimentParameters.getInputPath());
-            } catch (JDOMException ex) {
-                Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
-                System.exit(1);
-            } catch (IOException ex) {
-                Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
-                System.exit(1);
-            }
-
-            HashMap<Integer, String> docidToName = new HashMap<Integer, String>();
-            int docid = 0;
-            Element trroot = trdoc.getRootElement();
-            ArrayList<Element> documents = new ArrayList<Element>(trroot.getChildren());
-            for (Element document : documents) {
-                String docidName = document.getAttributeValue("id");
-                if (docidName == null) {
-                    docidName = String.format("doc%06d", docid);
-                }
-                docidToName.put(docid, docidName);
-                docid += 1;
-            }
-
-            w.writeStartElement(regionByDocumentName);
-
-            double[] docWordCounts = new double[D];
-
-            for (int i = 0; i < D; ++i) {
-                docWordCounts[i] = 0;
-                int docoff = i * R;
-                for (int j = 0; j < R; ++j) {
-                    docWordCounts[i] += averagedRegionByDocumentCounts[docoff + j];
-                }
-            }
-
-            for (int i = 0; i < D; ++i) {
-                int docoff = i * R;
-                ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
-                for (int j = 0; j < R; ++j) {
-                    topRegions.add(new IntDoublePair(j, averagedRegionByDocumentCounts[docoff + j]));
-                }
-                Collections.sort(topRegions);
-
-                w.writeStartElement("document");
-                w.writeAttribute("id", docidToName.get(i));
-
-                for (int j = 0; j < outputPerClass; ++j) {
-                    w.writeStartElement("region");
-
-                    IntDoublePair pair = topRegions.get(j);
-                    Region region = regionIdToRegionMap.get(pair.index);
-                    w.writeAttribute("id", String.format("%04d", pair.index));
-                    w.writeAttribute("lat", String.format("%.2f", region.centLat));
-                    w.writeAttribute("lon", String.format("%.2f", region.centLon));
-                    w.writeAttribute("prob", String.format("%.8e", pair.count / docWordCounts[i]));
-                    w.writeEndElement();
-                }
-                w.writeEndElement();
-            }
-            w.writeEndElement();
-        }
-
-        w.writeEndElement();
-        w.close();
-
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IOException ex) {
-            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (XMLStreamException ex) {
-            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
-
-    /**
-     * 
-     */
-    public void normalizeAndPrintWordByRegion() {
-        try {
-            String wordByRegionFilename = experimentParameters.getWordByRegionProbabilitiesPath();
-            BufferedWriter wordByRegionWriter = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(wordByRegionFilename))));
-
-            double sum = 0.;
-            for (int i = 0; i < R; ++i) {
-                sum += averagedRegionCounts[i];
-            }
-
-            for (int i = 0; i < R; ++i) {
-                ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
-                for (int j = 0; j < W; ++j) {
-                    topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * R + i]));
-                }
-                Collections.sort(topWords);
-
-                Region region = regionIdToRegionMap.get(i);
-                wordByRegionWriter.write(String.format("Region%04d\t%.2f\t%.2f\t%.8e", i, region.centLon, region.centLat, averagedRegionCounts[i] / sum));
-                wordByRegionWriter.newLine();
-                for (IntDoublePair pair : topWords) {
-                    wordByRegionWriter.write(String.format("%s\t%.8e", lexicon.getWordForInt(pair.index), pair.count / averagedRegionCounts[i]));
-                    wordByRegionWriter.newLine();
-                }
-                wordByRegionWriter.newLine();
-            }
-
-            wordByRegionWriter.close();
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        } catch (IOException ex) {
-            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
-    }
-
-    /**
-     *
-     */
-    public void normalizeAndPrintRegionByWord() {
-        try {
-            String regionByWordFilename = experimentParameters.getRegionByWordProbabilitiesPath();
-            BufferedWriter regionByWordWriter = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(regionByWordFilename))));
-
-            double[] wordCounts = new double[W];
-
-            for (int i = 0; i < W; ++i) {
-                wordCounts[i] = 0;
-                int wordoff = i * R;
-                for (int j = 0; j < R; ++j) {
-                    wordCounts[i] += averagedWordByRegionCounts[wordoff + j];
-                }
-            }
-
-            for (int i = 0; i < W; ++i) {
-                int wordoff = i * R;
-                ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
-                for (int j = 0; j < R; ++j) {
-                    topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j]));
-                }
-                Collections.sort(topRegions);
-
-                regionByWordWriter.write(String.format("%s", lexicon.getWordForInt(i)));
-                regionByWordWriter.newLine();
-                for (IntDoublePair pair : topRegions) {
-                    Region region = regionIdToRegionMap.get(pair.index);
-                    regionByWordWriter.write(String.format("%.2f\t%.2f\t%.8e", region.centLon, region.centLat, pair.count / wordCounts[i]));
-                    regionByWordWriter.newLine();
-                }
-                regionByWordWriter.newLine();
-            }
-
-            regionByWordWriter.close();
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        } catch (IOException ex) {
-            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
-    }
-
-    /**
-     *
-     */
-    public void normalizeAndPrintRegionByDocument() {
-        try {
-            String regionByDocumentFilename = experimentParameters.getRegionByDocumentProbabilitiesPath();
-            BufferedWriter regionByDocumentWriter = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(regionByDocumentFilename))));
-
-            SAXBuilder builder = new SAXBuilder();
-            Document trdoc = null;
-            try {
-                trdoc = builder.build(experimentParameters.getInputPath());
-            } catch (JDOMException ex) {
-                Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
-                System.exit(1);
-            } catch (IOException ex) {
-                Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
-                System.exit(1);
-            }
-
-            HashMap<Integer, String> docidToName = new HashMap<Integer, String>();
-            int docid = 0;
-            Element root = trdoc.getRootElement();
-            ArrayList<Element> documents = new ArrayList<Element>(root.getChildren());
-            for (Element document : documents) {
-                docidToName.put(docid, document.getAttributeValue("id"));
-                docid += 1;
-            }
-
-            double[] docWordCounts = new double[D];
-
-            for (int i = 0; i < D; ++i) {
-                docWordCounts[i] = 0;
-                int docoff = i * R;
-                for (int j = 0; j < R; ++j) {
-                    docWordCounts[i] += averagedRegionByDocumentCounts[docoff + j];
-                }
-            }
-
-            for (int i = 0; i < D; ++i) {
-                int docoff = i * R;
-                ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
-                for (int j = 0; j < R; ++j) {
-                    topRegions.add(new IntDoublePair(j, averagedRegionByDocumentCounts[docoff + j]));
-                }
-                Collections.sort(topRegions);
-
-                regionByDocumentWriter.write(String.format("%s", docidToName.get(i)));
-                regionByDocumentWriter.newLine();
-                for (IntDoublePair pair : topRegions) {
-                    Region region = regionIdToRegionMap.get(pair.index);
-                    regionByDocumentWriter.write(String.format("%.2f\t%.2f\t%.8e", region.centLon, region.centLat, pair.count / docWordCounts[i]));
-                    regionByDocumentWriter.newLine();
-                }
-                regionByDocumentWriter.newLine();
-            }
-
-            regionByDocumentWriter.close();
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        } catch (IOException ex) {
-            Logger.getLogger(ProbabilityPrettyPrinter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
+    public void normalizeAndPrintAll() {
+        normalizeAndPrintRegionByDocument();
+        normalizeAndPrintRegionByWord();
+        normalizeAndPrintWordByRegion();
     }
 }
