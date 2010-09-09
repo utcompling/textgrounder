@@ -36,123 +36,21 @@ import opennlp.textgrounder.bayesian.utils.TGArrays;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class SphericalModelBase extends SphericalModelFields {
+public class SphericalModelV1 extends SphericalModelBase {
 
-    protected final static double EXPANSION_FACTOR = 0.25;
-    /**
-     * Random number generator. Implements the fast Mersenne Twister.
-     */
-    protected transient MersenneTwisterFast rand;
-    /**
-     * 
-     */
-    protected transient ExperimentParameters experimentParameters;
-    /**
-     * 
-     */
-    protected transient SphericalInputReader inputReader;
-    /**
-     * 
-     */
-    protected transient SphericalOutputWriter outputWriter;
-    /**
-     * 
-     */
-    protected transient SphericalAnnealer annealer;
-    /**
-     * the crpalpha for use when spherical distributions are not normalized
-     */
-    protected transient double crpalpha_mod;
-
-    /**
-     * Default constructor. Take input from commandline and default _options
-     * and initialize class. Also, process input text and process so that
-     * toponyms, stopwords and other words are identified and collected.
-     *
-     * @param _options
-     */
-    public SphericalModelBase(ExperimentParameters _parameters) {
-        experimentParameters = _parameters;
+    public SphericalModelV1(ExperimentParameters _parameters) {
+        super(_parameters);
     }
 
-    /**
-     *
-     * @param _options
-     */
-    protected void initialize(ExperimentParameters _experimentParameters) {
+    protected void baseSpecificInitialize() {
+        topicVector = new int[N];
+        Arrays.fill(topicVector, 0);
 
-        switch (_experimentParameters.getInputFormat()) {
-            case BINARY:
-                inputReader = new SphericalBinaryInputReader(_experimentParameters);
-                break;
-            case TEXT:
-                inputReader = new SphericalTextInputReader(_experimentParameters);
-                break;
-        }
+        topicByDocumentCounts = new int[D * Z];
+        Arrays.fill(topicByDocumentCounts, 0);
 
-        crpalpha = _experimentParameters.getCrpalpha();
-        alpha = _experimentParameters.getAlpha();
-        beta = _experimentParameters.getBeta();
-        kappa = _experimentParameters.getKappa();
-        crpalpha_mod = crpalpha * 4 * Math.PI * Math.sinh(kappa) / kappa;
-
-        Z = _experimentParameters.getTopics();
-
-        int randSeed = _experimentParameters.getRandomSeed();
-        if (randSeed == 0) {
-            /**
-             * Case for complete random seeding
-             */
-            rand = new MersenneTwisterFast();
-        } else {
-            /**
-             * Case for non-random seeding. For debugging. Also, the default
-             */
-            rand = new MersenneTwisterFast(randSeed);
-        }
-
-        double targetTemp = _experimentParameters.getTargetTemperature();
-        double initialTemp = _experimentParameters.getInitialTemperature();
-        if (Math.abs(initialTemp - targetTemp) < SphericalAnnealer.EPSILON) {
-            annealer = new SphericalEmptyAnnealer(_experimentParameters);
-        } else {
-            annealer = new SphericalSimulatedAnnealer(_experimentParameters);
-        }
-
-        readTokenArrayFile();
-        readRegionCoordinateList();
-    }
-
-    public void initialize() {
-        initialize(experimentParameters);
-
-        expectedR = (int) Math.ceil(crpalpha * Math.log(1 + N / crpalpha)) * 2;
-
-        toponymRegionCounts = new int[expectedR];
-        Arrays.fill(toponymRegionCounts, 0);
-
-        allWordsRegionCounts = new int[expectedR];
+        allWordsRegionCounts = new int[Z];
         Arrays.fill(allWordsRegionCounts, 0);
-
-        regionByDocumentCounts = new int[D * expectedR];
-        Arrays.fill(regionByDocumentCounts, 0);
-
-        wordByRegionCounts = new int[W * expectedR];
-        Arrays.fill(wordByRegionCounts, 0);
-
-        regionMeans = new double[expectedR][];
-
-        regionToponymCoordinateCounts = new int[expectedR][][];
-        for (int i = 0; i < expectedR; ++i) {
-            int[][] toponymCoordinateCounts = new int[T][];
-            for (int j = 0; j < T; ++j) {
-                int coordinates = toponymCoordinateLexicon[j].length;
-                int[] coordcounts = new int[coordinates];
-                Arrays.fill(coordcounts, 0);
-                toponymCoordinateCounts[j] = coordcounts;
-            }
-            regionToponymCoordinateCounts[i] = toponymCoordinateCounts;
-        }
     }
 
     protected void readTokenArrayFile() {
@@ -186,7 +84,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             }
         } catch (EOFException ex) {
         } catch (IOException ex) {
-            Logger.getLogger(SphericalModelBase.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalModelV1.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         W += 1;
@@ -237,7 +135,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             }
         } catch (EOFException e) {
         } catch (IOException ex) {
-            Logger.getLogger(SphericalModelBase.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalModelV1.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         T = maxtopid + 1;
@@ -264,7 +162,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * Randomly initialize fields for training. If word is a toponym, choose
      * random region only from regions aligned to name.
      */
-    public abstract void randomInitialize() {
+    public void randomInitialize() {
         baseSpecificInitialize();
 
         currentR = 0;

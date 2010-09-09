@@ -29,6 +29,7 @@ public class AveragedSphericalCountWrapper extends SphericalModelFields implemen
     public AveragedSphericalCountWrapper(SphericalModelBase _regionModel) {
         averagedAllWordsRegionCounts = _regionModel.getAveragedAllWordsRegionCounts();
         averagedRegionByDocumentCounts = _regionModel.getAveragedRegionByDocumentCounts();
+        averagedTopicByDocumentCounts = _regionModel.getAveragedTopicByDocumentCounts();
         averagedWordByRegionCounts = _regionModel.getAveragedWordByRegionCounts();
         averagedRegionMeans = _regionModel.getAveragedRegionMeans();
         averagedRegionToponymCoordinateCounts = _regionModel.getAveragedRegionToponymCoordinateCounts();
@@ -46,6 +47,7 @@ public class AveragedSphericalCountWrapper extends SphericalModelFields implemen
         N = _regionModel.getN();
         T = _regionModel.getT();
         W = _regionModel.getW();
+        Z = _regionModel.getZ();
     }
 
     public void addHyperparameters() {

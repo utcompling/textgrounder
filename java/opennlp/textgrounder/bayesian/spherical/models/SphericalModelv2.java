@@ -1,12 +1,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 //  Copyright 2010 Taesun Moon <tsunmoon@gmail.com>.
-// 
+//
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
 //  You may obtain a copy of the License at
-// 
+//
 //       http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 //  Unless required by applicable law or agreed to in writing, software
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -35,7 +35,7 @@ import opennlp.textgrounder.bayesian.utils.TGArrays;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class SphericalModelv2 extends SphericalModelBase {
+public class SphericalModelV2 extends SphericalModelBase {
 
     /**
      * Default constructor. Take input from commandline and default _options
@@ -44,7 +44,7 @@ public class SphericalModelv2 extends SphericalModelBase {
      *
      * @param _options
      */
-    public SphericalModelv2(ExperimentParameters _parameters) {
+    public SphericalModelV2(ExperimentParameters _parameters) {
         super(_parameters);
     }
 
@@ -166,7 +166,7 @@ public class SphericalModelv2 extends SphericalModelBase {
             }
         } catch (EOFException ex) {
         } catch (IOException ex) {
-            Logger.getLogger(SphericalModelv2.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalModelV2.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         W += 1;
@@ -195,7 +195,7 @@ public class SphericalModelv2 extends SphericalModelBase {
     }
 
     /**
-     * 
+     *
      * @param _file
      */
     public void readRegionCoordinateList() {
@@ -217,7 +217,7 @@ public class SphericalModelv2 extends SphericalModelBase {
             }
         } catch (EOFException e) {
         } catch (IOException ex) {
-            Logger.getLogger(SphericalModelv2.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalModelV2.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         T = maxtopid + 1;
@@ -323,7 +323,7 @@ public class SphericalModelv2 extends SphericalModelBase {
             }
         }
 
-        emptyR = currentR;
+        emptyRSet.add(currentR);
 
         for (int i = 0; i < currentR; ++i) {
             int[][] toponymCoordinateCounts = regionToponymCoordinateCounts[i];
@@ -386,7 +386,7 @@ public class SphericalModelv2 extends SphericalModelBase {
                         curCoords = toponymCoordinateLexicon[wordid];
 
                         if (toponymRegionCounts[regionid] == 0) {
-                            emptyR = regionid;
+                            emptyRSet.add(regionid);
                             resetRegionID(annealer, regionid, docid);
                         }
 
@@ -400,8 +400,10 @@ public class SphericalModelv2 extends SphericalModelBase {
                             }
                         }
 
-                        for (int j = 0; j < curCoordCount; ++j) {
-                            probs[emptyR * maxCoord + j] = crpalpha_mod / curCoordCount;
+                        for (int emptyR : emptyRSet) {
+                            for (int j = 0; j < curCoordCount; ++j) {
+                                probs[emptyR * maxCoord + j] = crpalpha_mod / curCoordCount;
+                            }
                         }
 
                         totalprob = annealer.annealProbs(0, expectedR * maxCoord, probs);
@@ -430,9 +432,13 @@ public class SphericalModelv2 extends SphericalModelBase {
                         regionmean = regionMeans[regionid];
                         TGBLAS.daxpy(0, 1, toponymCoordinateLexicon[wordid][coordid], 1, regionmean, 1);
 
-                        if (regionid == currentR) {
-                            currentR += 1;
-                            emptyR = currentR;
+                        if (emptyRSet.contains(regionid)) {
+                            emptyRSet.remove(regionid);
+
+                            if (emptyRSet.isEmpty()) {
+                                currentR += 1;
+                                emptyRSet.add(currentR);
+                            }
                         }
                     } else {
                         wordid = wordVector[i];

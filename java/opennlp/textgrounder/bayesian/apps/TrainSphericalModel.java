@@ -16,7 +16,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.apps;
 
-import opennlp.textgrounder.bayesian.spherical.models.SphericalModelBase;
+import opennlp.textgrounder.bayesian.spherical.models.*;
 
 /**
  *
@@ -29,7 +29,7 @@ public class TrainSphericalModel extends BaseApp {
         ExperimentParameters experimentParameters = new ExperimentParameters();
         processRawCommandline(args, experimentParameters);
 
-        SphericalModelBase rm = new SphericalModelBase(experimentParameters);
+        SphericalModelBase rm = new SphericalModelV1(experimentParameters);
 
         rm.initialize();
         rm.train();

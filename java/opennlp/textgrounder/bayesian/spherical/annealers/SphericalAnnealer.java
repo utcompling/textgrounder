@@ -45,6 +45,10 @@ public abstract class SphericalAnnealer extends Annealer {
      */
     protected double[] regionByDocumentCounts;
     /**
+     * 
+     */
+    protected double[] topicByDocumentCounts;
+    /**
      *
      */
 //    protected double[] toponymByRegionCounts;
@@ -70,6 +74,75 @@ public abstract class SphericalAnnealer extends Annealer {
 
     public abstract double annealProbs(int _starti, int _endi, double[] _classes);
 
+    /**
+     *
+     * @param _wordByRegionCounts
+     * @param _regionByDocumentCounts
+     * @param _allWordsRegionCounts
+     * @param _regionMeans
+     * @param _regionToponymCoordinateCounts
+     */
+    protected void initializeCollectionArrays(int[] _wordByRegionCounts, int[] _regionByDocumentCounts,
+          int[] _allWordsRegionCounts, double[][] _regionMeans,
+          int[][][] _regionToponymCoordinateCounts) {
+        wordByRegionCounts = new double[_wordByRegionCounts.length];
+        regionByDocumentCounts = new double[_regionByDocumentCounts.length];
+        allWordsRegionCounts = new double[_allWordsRegionCounts.length];
+
+        Arrays.fill(wordByRegionCounts, 0);
+        Arrays.fill(regionByDocumentCounts, 0);
+        Arrays.fill(allWordsRegionCounts, 0);
+
+        regionToponymCoordinateCounts = new double[_regionToponymCoordinateCounts.length][][];
+        for (int i = 0; i < _regionToponymCoordinateCounts.length; ++i) {
+            regionToponymCoordinateCounts[i] = new double[_regionToponymCoordinateCounts[i].length][];
+            for (int j = 0; j < _regionToponymCoordinateCounts[i].length; ++j) {
+                regionToponymCoordinateCounts[i][j] = new double[_regionToponymCoordinateCounts[i][j].length];
+                for (int k = 0; k < _regionToponymCoordinateCounts[i][j].length; ++k) {
+                    regionToponymCoordinateCounts[i][j][k] = 0;
+                }
+            }
+        }
+
+        regionMeans = new double[_regionMeans.length][];
+        geoMeanVecLen = _regionMeans[0].length;
+        for (int i = 0; i < _regionMeans.length; ++i) {
+            double[] mean = new double[geoMeanVecLen];
+            for (int j = 0; j < geoMeanVecLen; ++j) {
+                mean[j] = 0;
+            }
+            regionMeans[i] = mean;
+        }
+    }
+
+    protected void addToArrays(int[] _wordByRegionCounts, int[] _regionByDocumentCounts,
+          int[] _allWordsRegionCounts, double[][] _regionMeans,
+          int[][][] _regionToponymCoordinateCounts) {
+        addToArray(wordByRegionCounts, _wordByRegionCounts);
+        addToArray(regionByDocumentCounts, _regionByDocumentCounts);
+        addToArray(allWordsRegionCounts, _allWordsRegionCounts);
+
+        for (int i = 0; i < regionToponymCoordinateCounts.length; ++i) {
+            for (int j = 0; j < regionToponymCoordinateCounts[i].length; ++j) {
+                for (int k = 0; k < regionToponymCoordinateCounts[i][j].length; ++k) {
+                    regionToponymCoordinateCounts[i][j][k] += _regionToponymCoordinateCounts[i][j][k];
+                }
+            }
+        }
+
+        for (int i = 0; i < regionMeans.length; ++i) {
+            TGBLAS.daxpy(geoMeanVecLen, 1, _regionMeans[i], 1, regionMeans[i], 1);
+        }
+    }
+
+    /**
+     * 
+     * @param _wordByRegionCounts
+     * @param _regionByDocumentCounts
+     * @param _allWordsRegionCounts
+     * @param _regionMeans
+     * @param _regionToponymCoordinateCounts
+     */
     public void collectSamples(int[] _wordByRegionCounts, int[] _regionByDocumentCounts,
           int[] _allWordsRegionCounts, double[][] _regionMeans,
           //          int[] _toponymByRegionCounts, int[] _nonToponymRegionCounts,
@@ -84,59 +157,37 @@ public abstract class SphericalAnnealer extends Annealer {
 
                 System.err.print("(sample:" + (innerIter + 1) / lag + ")");
                 if (wordByRegionCounts == null) {
-                    wordByRegionCounts = new double[_wordByRegionCounts.length];
-                    regionByDocumentCounts = new double[_regionByDocumentCounts.length];
-                    allWordsRegionCounts = new double[_allWordsRegionCounts.length];
+                    initializeCollectionArrays(_wordByRegionCounts, _regionByDocumentCounts, _allWordsRegionCounts, _regionMeans, _regionToponymCoordinateCounts);
+                }
+                addToArrays(_wordByRegionCounts, _regionByDocumentCounts, _allWordsRegionCounts, _regionMeans, _regionToponymCoordinateCounts);
+            }
+            if (finishedCollection) {
+                averageSamples();
+            }
+        }
+    }
 
-                    Arrays.fill(wordByRegionCounts, 0);
-                    Arrays.fill(regionByDocumentCounts, 0);
-                    Arrays.fill(allWordsRegionCounts, 0);
+    public void collectSamples(int[] _wordByRegionCounts, int[] _regionByDocumentCounts,
+          int[] _topicByDocumentCounts, int[] _allWordsRegionCounts, double[][] _regionMeans,
+          int[][][] _regionToponymCoordinateCounts) {
 
-                    regionToponymCoordinateCounts = new double[_regionToponymCoordinateCounts.length][][];
-                    for (int i = 0; i < _regionToponymCoordinateCounts.length; ++i) {
-                        regionToponymCoordinateCounts[i] = new double[_regionToponymCoordinateCounts[i].length][];
-                        for (int j = 0; j < _regionToponymCoordinateCounts[i].length; ++j) {
-                            regionToponymCoordinateCounts[i][j] = new double[_regionToponymCoordinateCounts[i][j].length];
-                            for (int k = 0; k < _regionToponymCoordinateCounts[i][j].length; ++k) {
-                                regionToponymCoordinateCounts[i][j][k] = 0;
-                            }
-                        }
-                    }
-
-                    regionMeans = new double[_regionMeans.length][];
-                    geoMeanVecLen = _regionMeans[0].length;
-                    for (int i = 0; i < _regionMeans.length; ++i) {
-                        double[] mean = new double[geoMeanVecLen];
-                        for (int j = 0; j < geoMeanVecLen; ++j) {
-                            mean[j] = 0;
-                        }
-                        regionMeans[i] = mean;
-                    }
+        if (sampleCount < samples) {
+            if (sampleiteration && (innerIter % lag == 0)) {
+                sampleCount += 1;
+                if (samples == sampleCount) {
+                    finishedCollection = true;
                 }
 
-                for (int i = 0; i < wordByRegionCounts.length; ++i) {
-                    wordByRegionCounts[i] += _wordByRegionCounts[i];
+                System.err.print("(sample:" + (innerIter + 1) / lag + ")");
+                if (wordByRegionCounts == null) {
+                    initializeCollectionArrays(_wordByRegionCounts, _regionByDocumentCounts, _allWordsRegionCounts, _regionMeans, _regionToponymCoordinateCounts);
+
+                    topicByDocumentCounts = new double[_topicByDocumentCounts.length];
+                    Arrays.fill(topicByDocumentCounts, 0);
                 }
 
-                for (int i = 0; i < regionByDocumentCounts.length; ++i) {
-                    regionByDocumentCounts[i] += _regionByDocumentCounts[i];
-                }
-
-                for (int i = 0; i < allWordsRegionCounts.length; ++i) {
-                    allWordsRegionCounts[i] = _allWordsRegionCounts[i];
-                }
-
-                for (int i = 0; i < regionToponymCoordinateCounts.length; ++i) {
-                    for (int j = 0; j < regionToponymCoordinateCounts[i].length; ++j) {
-                        for (int k = 0; k < regionToponymCoordinateCounts[i][j].length; ++k) {
-                            regionToponymCoordinateCounts[i][j][k] += _regionToponymCoordinateCounts[i][j][k];
-                        }
-                    }
-                }
-
-                for (int i = 0; i < regionMeans.length; ++i) {
-                    TGBLAS.daxpy(geoMeanVecLen, 1, _regionMeans[i], 1, regionMeans[i], 1);
-                }
+                addToArrays(_wordByRegionCounts, _regionByDocumentCounts, _allWordsRegionCounts, _regionMeans, _regionToponymCoordinateCounts);
+                addToArray(topicByDocumentCounts, _topicByDocumentCounts);
             }
             if (finishedCollection) {
                 averageSamples();
@@ -148,6 +199,10 @@ public abstract class SphericalAnnealer extends Annealer {
         averageSamples(wordByRegionCounts);
         averageSamples(regionByDocumentCounts);
         averageSamples(allWordsRegionCounts);
+        try {
+            averageSamples(topicByDocumentCounts);
+        } catch (NullPointerException e) {
+        }
 
         for (int i = 0; i < regionToponymCoordinateCounts.length;
               ++i) {

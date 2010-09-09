@@ -16,6 +16,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.spherical.models;
 
+import java.util.HashSet;
+
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
@@ -61,7 +63,7 @@ public class SphericalModelFields {
     /**
      *
      */
-    protected int emptyR;
+    protected HashSet<Integer> emptyRSet;
     /**
      *
      */
@@ -101,7 +103,7 @@ public class SphericalModelFields {
     /**
      * 
      */
-//    protected int[] regionCoordinateCounts;
+    protected int[] topicByDocumentCounts;
     /**
      * Counts of tcount per topic. However, since access more often occurs in
      * terms of the tcount, it will be a topic by word matrix.
@@ -131,6 +133,10 @@ public class SphericalModelFields {
      * Vector of topics
      */
     protected int[] regionVector;
+    /**
+     * 
+     */
+    protected int[] topicVector;
     /**
      * Vector of stopwords. If 0, the word is not a stopword. If 1, it is.
      */
@@ -163,6 +169,10 @@ public class SphericalModelFields {
      *
      */
     protected double[] averagedRegionByDocumentCounts;
+    /**
+     * 
+     */
+    protected double[] averagedTopicByDocumentCounts;
     /**
      *
      */
@@ -316,12 +326,12 @@ public class SphericalModelFields {
         this.documentVector = documentVector;
     }
 
-    public int getEmptyR() {
-        return emptyR;
+    public HashSet<Integer> getEmptyRSet() {
+        return emptyRSet;
     }
 
-    public void setEmptyR(int emptyR) {
-        this.emptyR = emptyR;
+    public void setEmptyRSet(HashSet<Integer> emptyR) {
+        this.emptyRSet = emptyR;
     }
 
     public int getExpectedR() {
@@ -426,5 +436,37 @@ public class SphericalModelFields {
 
     public void setWordVector(int[] wordVector) {
         this.wordVector = wordVector;
+    }
+
+    public int getZ() {
+        return Z;
+    }
+
+    public void setZ(int Z) {
+        this.Z = Z;
+    }
+
+    public double[] getAveragedTopicByDocumentCounts() {
+        return averagedTopicByDocumentCounts;
+    }
+
+    public void setAveragedTopicByDocumentCounts(double[] averagedTopicByDocumentCounts) {
+        this.averagedTopicByDocumentCounts = averagedTopicByDocumentCounts;
+    }
+
+    public int[] getTopicByDocumentCounts() {
+        return topicByDocumentCounts;
+    }
+
+    public void setTopicByDocumentCounts(int[] topicByDocumentCounts) {
+        this.topicByDocumentCounts = topicByDocumentCounts;
+    }
+
+    public int[] getToponymRegionCounts() {
+        return toponymRegionCounts;
+    }
+
+    public void setToponymRegionCounts(int[] toponymRegionCounts) {
+        this.toponymRegionCounts = toponymRegionCounts;
     }
 }

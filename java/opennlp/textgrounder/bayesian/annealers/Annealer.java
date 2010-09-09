@@ -198,8 +198,17 @@ public abstract class Annealer {
     }
 
     protected void averageSamples(double[] _v) {
-        for(int i = 0; i < _v.length;++i) {
+        for (int i = 0; i < _v.length; ++i) {
             _v[i] /= sampleCount;
+        }
+    }
+
+    protected void addToArray(double[] _target, int[] _source) {
+        try {
+            for (int i = 0;; ++i) {
+                _target[i] += _source[i];
+            }
+        } catch (ArrayIndexOutOfBoundsException e) {
         }
     }
 
