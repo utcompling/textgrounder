@@ -16,18 +16,14 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.converters;
 
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.textstructs.*;
-import opennlp.textgrounder.bayesian.topostructs.*;
-import opennlp.textgrounder.bayesian.wrapper.io.*;
 import org.jdom.Attribute;
 import org.jdom.Document;
 import org.jdom.Element;
@@ -58,6 +54,14 @@ public abstract class InternalToXMLConverter {
      *
      */
     protected ConverterExperimentParameters converterExperimentParameters;
+    /**
+     * 
+     */
+    protected ArrayList<Integer> wordArray;
+    protected ArrayList<Integer> docArray;
+    protected ArrayList<Integer> toponymArray;
+    protected ArrayList<Integer> stopwordArray;
+    protected ArrayList<Integer> regionArray;
 
     /**
      *
@@ -80,38 +84,11 @@ public abstract class InternalToXMLConverter {
 
     public abstract void initialize();
 
-    protected abstract String writeTokenElements() throws NothingToSeeHereException;
+    protected abstract void setTokenAttribute(Element _token, int _wordid, int _regid, int _coordid);
+
+    protected abstract void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid);
 
     public void convert(String TRXMLPath) {
-        /**
-         * Read in processed tokens
-         */
-        ArrayList<Integer> wordArray = new ArrayList<Integer>(),
-              docArray = new ArrayList<Integer>(),
-              toponymArray = new ArrayList<Integer>(),
-              stopwordArray = new ArrayList<Integer>(),
-              regionArray = new ArrayList<Integer>();
-
-        try {
-            while (true) {
-                int[] record = inputReader.nextTokenArrayRecord();
-                if (record != null) {
-                    int wordid = record[0];
-                    wordArray.add(wordid);
-                    int docid = record[1];
-                    docArray.add(docid);
-                    int topstatus = record[2];
-                    toponymArray.add(topstatus);
-                    int stopstatus = record[3];
-                    stopwordArray.add(stopstatus);
-                    int regid = record[4];
-                    regionArray.add(regid);
-                }
-            }
-        } catch (EOFException ex) {
-        } catch (IOException ex) {
-            Logger.getLogger(InternalRLDAToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
-        }
 
         /**
          * read in xml
@@ -165,19 +142,13 @@ public abstract class InternalToXMLConverter {
                     if (token.getName().equals("w")) {
                         word = token.getAttributeValue("tok").toLowerCase();
                         if (isstopword == 0) {
-                            Region reg = regionIdToRegionMap.get(regid);
-                            outtoken.setAttribute("long", String.format("%.2f", reg.centLon));
-                            outtoken.setAttribute("lat", String.format("%.2f", reg.centLat));
+                            setTokenAttribute(token, wordid, regid, 0);
                         }
                         counter += 1;
                     } else if (token.getName().equals("toponym")) {
                         word = token.getAttributeValue("term").toLowerCase();
                         ArrayList<Element> candidates = new ArrayList<Element>(token.getChild("candidates").getChildren());
-                        if (!candidates.isEmpty()) {
-                            Coordinate coord = matchCandidate(candidates, regid);
-                            outtoken.setAttribute("long", String.format("%.2f", coord.longitude));
-                            outtoken.setAttribute("lat", String.format("%.2f", coord.latitude));
-                        }
+                        setToponymAttribute(candidates, token, wordid, regid, 0);
                         counter += 1;
                     } else {
                         continue;
@@ -213,8 +184,5 @@ public abstract class InternalToXMLConverter {
         for (Attribute attr : new ArrayList<Attribute>(src.getAttributes())) {
             trg.setAttribute(attr.getName(), attr.getValue());
         }
-    }
-
-    class NothingToSeeHereException extends Exception {
     }
 }

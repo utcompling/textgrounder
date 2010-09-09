@@ -16,7 +16,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.apps;
 
-import opennlp.textgrounder.bayesian.converters.InternalToXMLConverter;
+import opennlp.textgrounder.bayesian.converters.*;
 
 /**
  *
@@ -25,11 +25,11 @@ import opennlp.textgrounder.bayesian.converters.InternalToXMLConverter;
 public class ConvertFromRegionModelFormat extends BaseApp {
 
     public static void main(String[] args) {
-        
+
         ConverterExperimentParameters experimentParameters = new ConverterExperimentParameters();
         processRawCommandline(args, experimentParameters);
 
-        InternalToXMLConverter converter = new InternalToXMLConverter(experimentParameters);
+        InternalToXMLConverter converter = new InternalRLDAToXMLConverter(experimentParameters);
         converter.convert();
     }
 }
