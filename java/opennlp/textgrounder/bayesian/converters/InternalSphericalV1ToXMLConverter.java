@@ -21,12 +21,14 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
+import opennlp.textgrounder.bayesian.mathutils.TGMath;
 import opennlp.textgrounder.bayesian.textstructs.*;
 import opennlp.textgrounder.bayesian.topostructs.*;
+import opennlp.textgrounder.bayesian.spherical.io.*;
+import opennlp.textgrounder.bayesian.structs.AveragedSphericalCountWrapper;
 import opennlp.textgrounder.bayesian.wrapper.io.*;
 import org.jdom.Attribute;
 import org.jdom.Document;
@@ -40,8 +42,20 @@ import org.jdom.output.XMLOutputter;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class InternalToXMLConverter {
+public class InternalSphericalV1ToXMLConverter extends InternalToXMLConverter {
 
+    /**
+     * 
+     */
+    double[][][] toponymCoordinateLexicon;
+    /**
+     * 
+     */
+    double[][] regionMeans;
+    /**
+     *
+     */
+    protected SphericalInputReader inputReader;
     /**
      *
      */
@@ -51,7 +65,7 @@ public abstract class InternalToXMLConverter {
      */
     protected String pathToOutput;
     /**
-     *
+     * 
      */
     protected Lexicon lexicon;
     /**
@@ -63,26 +77,29 @@ public abstract class InternalToXMLConverter {
      *
      * @param _converterExperimentParameters
      */
-    public InternalToXMLConverter(
+    public InternalSphericalV1ToXMLConverter(
           ConverterExperimentParameters _converterExperimentParameters) {
         converterExperimentParameters = _converterExperimentParameters;
 
         pathToInput = converterExperimentParameters.getInputPath();
         pathToOutput = converterExperimentParameters.getOutputPath();
+
+        InputReader reader = new BinaryInputReader(_converterExperimentParameters);
+        lexicon = reader.readLexicon();
+
+        inputReader = new SphericalBinaryInputReader(_converterExperimentParameters);
     }
 
     /**
-     *
+     * 
      */
     public void convert() {
+        readCoordinateList();
         convert(pathToInput);
     }
 
-    public abstract void initialize();
-
-    protected abstract String writeTokenElements() throws NothingToSeeHereException;
-
     public void convert(String TRXMLPath) {
+
         /**
          * Read in processed tokens
          */
@@ -90,7 +107,8 @@ public abstract class InternalToXMLConverter {
               docArray = new ArrayList<Integer>(),
               toponymArray = new ArrayList<Integer>(),
               stopwordArray = new ArrayList<Integer>(),
-              regionArray = new ArrayList<Integer>();
+              regionArray = new ArrayList<Integer>(),
+              coordArray = new ArrayList<Integer>();
 
         try {
             while (true) {
@@ -106,11 +124,13 @@ public abstract class InternalToXMLConverter {
                     stopwordArray.add(stopstatus);
                     int regid = record[4];
                     regionArray.add(regid);
+                    int coordid = record[5];
+                    coordArray.add(coordid);
                 }
             }
         } catch (EOFException ex) {
         } catch (IOException ex) {
-            Logger.getLogger(InternalRLDAToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(InternalSphericalV1ToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         /**
@@ -124,10 +144,10 @@ public abstract class InternalToXMLConverter {
         try {
             indoc = builder.build(TRXMLPathFile);
         } catch (JDOMException ex) {
-            Logger.getLogger(InternalRLDAToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(InternalSphericalV1ToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(InternalRLDAToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(InternalSphericalV1ToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
 
@@ -136,7 +156,6 @@ public abstract class InternalToXMLConverter {
         outdoc.addContent(outroot);
 
         int counter = 0;
-        int docid = 0;
 
         ArrayList<Element> documents = new ArrayList<Element>(inroot.getChildren());
         for (Element document : documents) {
@@ -161,20 +180,25 @@ public abstract class InternalToXMLConverter {
                     int isstopword = stopwordArray.get(counter);
                     int regid = regionArray.get(counter);
                     int wordid = wordArray.get(counter);
+                    int coordid = coordArray.get(counter);
                     String word = "";
                     if (token.getName().equals("w")) {
                         word = token.getAttributeValue("tok").toLowerCase();
                         if (isstopword == 0) {
-                            Region reg = regionIdToRegionMap.get(regid);
-                            outtoken.setAttribute("long", String.format("%.2f", reg.centLon));
-                            outtoken.setAttribute("lat", String.format("%.2f", reg.centLat));
+                            Coordinate coord = new Coordinate(TGMath.cartesianToSpherical(TGMath.normalizeVector(regionMeans[regid])));
+                            outtoken.setAttribute("long", String.format("%.2f", coord.longitude));
+                            outtoken.setAttribute("lat", String.format("%.2f", coord.latitude));
                         }
                         counter += 1;
                     } else if (token.getName().equals("toponym")) {
                         word = token.getAttributeValue("term").toLowerCase();
                         ArrayList<Element> candidates = new ArrayList<Element>(token.getChild("candidates").getChildren());
                         if (!candidates.isEmpty()) {
-                            Coordinate coord = matchCandidate(candidates, regid);
+                            Coordinate coord = new Coordinate(TGMath.cartesianToSpherical(toponymCoordinateLexicon[wordid][coordid]));
+                            outtoken.setAttribute("long", String.format("%.2f", coord.longitude));
+                            outtoken.setAttribute("lat", String.format("%.2f", coord.latitude));
+                        } else {
+                            Coordinate coord = new Coordinate(TGMath.cartesianToSpherical(TGMath.normalizeVector(regionMeans[regid])));
                             outtoken.setAttribute("long", String.format("%.2f", coord.longitude));
                             outtoken.setAttribute("lat", String.format("%.2f", coord.latitude));
                         }
@@ -197,24 +221,24 @@ public abstract class InternalToXMLConverter {
                     }
                 }
             }
-            docid += 1;
         }
 
         try {
             XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
             xout.output(outdoc, new FileOutputStream(new File(pathToOutput)));
         } catch (IOException ex) {
-            Logger.getLogger(InternalRLDAToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(InternalSphericalV1ToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }
 
-    protected void copyAttributes(Element src, Element trg) {
-        for (Attribute attr : new ArrayList<Attribute>(src.getAttributes())) {
-            trg.setAttribute(attr.getName(), attr.getValue());
-        }
-    }
+    /**
+     *
+     */
+    public void readCoordinateList() {
+        AveragedSphericalCountWrapper ascw = inputReader.readProbabilities();
 
-    class NothingToSeeHereException extends Exception {
+        regionMeans = ascw.getAveragedRegionMeans();
+        toponymCoordinateLexicon = ascw.getToponymCoordinateLexicon();
     }
 }

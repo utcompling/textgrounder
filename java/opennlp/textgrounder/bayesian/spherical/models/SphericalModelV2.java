@@ -16,7 +16,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.spherical.models;
 
-import java.util.HashSet;
 import java.util.Iterator;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 import opennlp.textgrounder.bayesian.mathutils.*;

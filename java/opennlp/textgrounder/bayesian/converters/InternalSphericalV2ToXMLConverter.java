@@ -29,6 +29,7 @@ import opennlp.textgrounder.bayesian.textstructs.*;
 import opennlp.textgrounder.bayesian.topostructs.*;
 import opennlp.textgrounder.bayesian.spherical.io.*;
 import opennlp.textgrounder.bayesian.structs.AveragedSphericalCountWrapper;
+import opennlp.textgrounder.bayesian.wrapper.io.*;
 import org.jdom.Attribute;
 import org.jdom.Document;
 import org.jdom.Element;
@@ -41,7 +42,7 @@ import org.jdom.output.XMLOutputter;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class SphericalInternalToXMLConverter {
+public class InternalSphericalV2ToXMLConverter {
 
     /**
      * 
@@ -76,15 +77,15 @@ public class SphericalInternalToXMLConverter {
      *
      * @param _converterExperimentParameters
      */
-    public SphericalInternalToXMLConverter(
+    public InternalSphericalV2ToXMLConverter(
           ConverterExperimentParameters _converterExperimentParameters) {
         converterExperimentParameters = _converterExperimentParameters;
 
         pathToInput = converterExperimentParameters.getInputPath();
         pathToOutput = converterExperimentParameters.getOutputPath();
 
-        opennlp.textgrounder.bayesian.wrapper.io.InputReader lReader = new opennlp.textgrounder.bayesian.wrapper.io.BinaryInputReader(_converterExperimentParameters);
-        lexicon = lReader.readLexicon();
+        InputReader reader = new BinaryInputReader(_converterExperimentParameters);
+        lexicon = reader.readLexicon();
 
         inputReader = new SphericalBinaryInputReader(_converterExperimentParameters);
     }
@@ -129,7 +130,7 @@ public class SphericalInternalToXMLConverter {
             }
         } catch (EOFException ex) {
         } catch (IOException ex) {
-            Logger.getLogger(SphericalInternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(InternalSphericalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         /**
@@ -143,10 +144,10 @@ public class SphericalInternalToXMLConverter {
         try {
             indoc = builder.build(TRXMLPathFile);
         } catch (JDOMException ex) {
-            Logger.getLogger(SphericalInternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(InternalSphericalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(SphericalInternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(InternalSphericalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
 
@@ -226,7 +227,7 @@ public class SphericalInternalToXMLConverter {
             XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
             xout.output(outdoc, new FileOutputStream(new File(pathToOutput)));
         } catch (IOException ex) {
-            Logger.getLogger(SphericalInternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(InternalSphericalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }
@@ -235,40 +236,6 @@ public class SphericalInternalToXMLConverter {
      *
      */
     public void readCoordinateList() {
-//        HashMap<Integer, double[]> toprecords = new HashMap<Integer, double[]>();
-//        int maxtopid = 0;
-//
-//        try {
-//            while (true) {
-//                ArrayList<Object> toprecord = inputReader.nextToponymCoordinateRecord();
-//
-//                int topid = (Integer) toprecord.get(0);
-//                double[] record = (double[]) toprecord.get(1);
-//
-//                toprecords.put(topid, record);
-//                if (topid > maxtopid) {
-//                    maxtopid = topid;
-//                }
-//            }
-//        } catch (EOFException e) {
-//        } catch (IOException ex) {
-//            Logger.getLogger(SphericalInternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
-//        }
-//
-//        int T = maxtopid + 1;
-//        toponymCoordinateLexicon = new double[T][][];
-//
-//        for (Entry<Integer, double[]> entry : toprecords.entrySet()) {
-//            int topid = entry.getKey();
-//            double[] sphericalrecord = entry.getValue();
-//            double[][] geo = new double[sphericalrecord.length / 2][];
-//            for (int i = 0; i < sphericalrecord.length / 2; i++) {
-//                double[] crec = {sphericalrecord[2 * i], sphericalrecord[2 * i + 1]};
-//                geo[i] = crec;
-//            }
-//            toponymCoordinateLexicon[topid] = geo;
-//        }
-
         AveragedSphericalCountWrapper ascw = inputReader.readProbabilities();
 
         regionMeans = ascw.getAveragedRegionMeans();

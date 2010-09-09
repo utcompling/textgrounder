@@ -37,6 +37,14 @@ public class SphericalModelV1 extends SphericalModelBase {
      *
      */
     protected int[] wordByTopicCounts;
+    /**
+     *
+     */
+    protected double[] averagedWordByTopicCounts;
+    /**
+     * 
+     */
+    protected double[] averagedTopicCounts;
 
     public SphericalModelV1(ExperimentParameters _parameters) {
         super(_parameters);
@@ -173,7 +181,7 @@ public class SphericalModelV1 extends SphericalModelBase {
      */
     @Override
     public void train(SphericalAnnealer _annealer) {
-        int wordid, docid, regionid, coordid;
+        int wordid, docid, regionid, topicid, coordid;
         int wordoff, docoff;
         int istoponym, isstopword;
         int curCoordCount;
@@ -261,14 +269,14 @@ public class SphericalModelV1 extends SphericalModelBase {
                     } else {
                         wordid = wordVector[i];
                         docid = documentVector[i];
-                        regionid = regionVector[i];
+                        topicid = topicVector[i];
                         istoponym = toponymVector[i];
                         docoff = docid * Z;
                         wordoff = wordid * Z;
 
-                        topicCounts[regionid]--;
-                        topicByDocumentCounts[docoff + regionid]--;
-                        wordByTopicCounts[wordoff + regionid]--;
+                        topicCounts[topicid]--;
+                        topicByDocumentCounts[docoff + topicid]--;
+                        wordByTopicCounts[wordoff + topicid]--;
                         try {
                             for (int j = 0;; ++j) {
                                 topicProbs[j] = (wordByTopicCounts[wordoff + j] + beta)
@@ -282,23 +290,22 @@ public class SphericalModelV1 extends SphericalModelBase {
                         r = rand.nextDouble() * totalprob;
 
                         max = topicProbs[0];
-                        regionid = 0;
+                        topicid = 0;
                         while (r > max) {
-                            regionid++;
-                            max += topicProbs[regionid];
+                            topicid++;
+                            max += topicProbs[topicid];
                         }
-                        topicVector[i] = regionid;
+                        topicVector[i] = topicid;
 
-                        allWordsRegionCounts[regionid]++;
-                        topicByDocumentCounts[docoff + regionid]++;
-                        wordByRegionCounts[wordoff + regionid]++;
+                        topicCounts[topicid]++;
+                        topicByDocumentCounts[docoff + topicid]++;
+                        wordByTopicCounts[wordoff + topicid]++;
                     }
                 }
             }
 
-            _annealer.collectSamples(wordByRegionCounts, regionByDocumentCounts, topicByDocumentCounts,
-                  allWordsRegionCounts, regionMeans,/*toponymByRegionCounts, nonToponymRegionCounts, */
-                  regionToponymCoordinateCounts);
+            _annealer.collectSamples(wordByTopicCounts, regionByDocumentCounts, topicByDocumentCounts,
+                  topicCounts, regionMeans, regionToponymCoordinateCounts);
 
             if (expectedR - currentR < EXPANSION_FACTOR / (1 + EXPANSION_FACTOR) * expectedR) {
                 expandExpectedR();
@@ -313,7 +320,6 @@ public class SphericalModelV1 extends SphericalModelBase {
 
         toponymRegionCounts = TGArrays.expandSingleTierC(toponymRegionCounts, newExpectedR, expectedR);
         regionByDocumentCounts = TGArrays.expandDoubleTierC(regionByDocumentCounts, D, newExpectedR, expectedR);
-        wordByRegionCounts = TGArrays.expandDoubleTierC(wordByRegionCounts, W, newExpectedR, expectedR);
 
         regionMeans = TGArrays.expandSingleTierR(regionMeans, newExpectedR, currentR, coordParamLen);
 
@@ -383,7 +389,7 @@ public class SphericalModelV1 extends SphericalModelBase {
     @Override
     public void decode() {
         SphericalAnnealer decoder = new SphericalMaximumPosteriorDecoder();
-        int wordid, docid, regionid, coordid;
+        int wordid, docid, regionid, topicid, coordid;
         int wordoff, docoff;
         int istoponym, isstopword;
         int curCoordCount;
@@ -441,7 +447,7 @@ public class SphericalModelV1 extends SphericalModelBase {
                 } else {
                     wordid = wordVector[i];
                     docid = documentVector[i];
-                    regionid = regionVector[i];
+                    topicid = topicVector[i];
                     istoponym = toponymVector[i];
                     docoff = docid * Z;
                     wordoff = wordid * Z;
@@ -449,7 +455,7 @@ public class SphericalModelV1 extends SphericalModelBase {
                     try {
                         for (int j = 0;; ++j) {
                             topicProbs[j] = (averagedWordByRegionCounts[wordoff + j] + beta)
-                                  / (allWordsRegionCounts[j] + betaW)
+                                  / (averagedTopicCounts[j] + betaW)
                                   * (averagedTopicByDocumentCounts[docoff + j] + alpha);
                         }
                     } catch (ArrayIndexOutOfBoundsException e) {
@@ -459,15 +465,28 @@ public class SphericalModelV1 extends SphericalModelBase {
 
                     r = rand.nextDouble() * totalprob;
                     max = regionProbs[0];
-                    regionid = 0;
+                    topicid = 0;
                     while (r > max) {
-                        regionid++;
-                        max += regionProbs[regionid];
+                        topicid++;
+                        max += regionProbs[topicid];
                     }
 
-                    regionVector[i] = regionid;
+                    topicVector[i] = topicid;
                 }
             }
         }
+    }
+
+    /**
+     *
+     */
+    @Override
+    public void train() {
+        super.train();
+        if (annealer.getSamples() != 0) {
+            averagedWordByTopicCounts = averagedWordByRegionCounts;
+            averagedTopicCounts = averagedAllWordsRegionCounts;
+        }
+
     }
 }

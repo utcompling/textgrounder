@@ -40,49 +40,110 @@ import org.jdom.output.XMLOutputter;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class InternalToXMLConverter {
+public class InternalRLDAToXMLConverter extends InternalToXMLConverter {
 
     /**
      *
      */
-    protected String pathToInput;
-    /**
-     *
-     */
-    protected String pathToOutput;
-    /**
-     *
-     */
-    protected Lexicon lexicon;
+    protected int degreesPerRegion;
     /**
      *
      */
     protected ConverterExperimentParameters converterExperimentParameters;
+    /**
+     *
+     */
+    protected Region[][] regionMatrix;
+    /**
+     * 
+     */
+    protected HashMap<Integer, Region> regionIdToRegionMap;
+    /**
+     * 
+     */
+    protected ToponymToRegionIDsMap toponymToRegionIDsMap;
 
     /**
      *
      * @param _converterExperimentParameters
      */
-    public InternalToXMLConverter(
+    public InternalRLDAToXMLConverter(
           ConverterExperimentParameters _converterExperimentParameters) {
-        converterExperimentParameters = _converterExperimentParameters;
-
-        pathToInput = converterExperimentParameters.getInputPath();
-        pathToOutput = converterExperimentParameters.getOutputPath();
+        super(_converterExperimentParameters);
     }
 
-    /**
-     *
-     */
-    public void convert() {
-        convert(pathToInput);
+    @Override
+    public void initialize() {
+        /**
+         * initialize various fields
+         */
+        regionIdToRegionMap = new HashMap<Integer, Region>();
+
+        /**
+         * Read in binary data
+         */
+        InputReader inputReader = new BinaryInputReader(converterExperimentParameters);
+
+        lexicon = inputReader.readLexicon();
+        regionMatrix = inputReader.readRegions();
+
+        for (Region[] regions : regionMatrix) {
+            for (Region region : regions) {
+                if (region != null) {
+                    regionIdToRegionMap.put(region.id, region);
+                }
+            }
+        }
     }
 
-    public abstract void initialize();
-
-    protected abstract String writeTokenElements() throws NothingToSeeHereException;
+    @Override
+    protected String writeTokenElements(Element _intoken, Element _outtoken, int _counter, int _regid, int _isstopword) throws NothingToSeeHereException {
+        String word = "";
+        if (_intoken.getName().equals("w")) {
+            word = _intoken.getAttributeValue("tok").toLowerCase();
+            if (_isstopword == 0) {
+                Region reg = regionIdToRegionMap.get(_regid);
+                _outtoken.setAttribute("long", String.format("%.2f", reg.centLon));
+                _outtoken.setAttribute("lat", String.format("%.2f", reg.centLat));
+            }
+            _counter += 1;
+        } else if (_intoken.getName().equals("toponym")) {
+            word = _intoken.getAttributeValue("term").toLowerCase();
+            ArrayList<Element> candidates = new ArrayList<Element>(_intoken.getChild("candidates").getChildren());
+            if (!candidates.isEmpty()) {
+                Coordinate coord = matchCandidate(candidates, _regid);
+                _outtoken.setAttribute("long", String.format("%.2f", coord.longitude));
+                _outtoken.setAttribute("lat", String.format("%.2f", coord.latitude));
+            }
+            _counter += 1;
+        } else {
+            throw new NothingToSeeHereException();
+        }
+        return word;
+    }
 
     public void convert(String TRXMLPath) {
+        /**
+         * initialize various fields
+         */
+        regionIdToRegionMap = new HashMap<Integer, Region>();
+
+        /**
+         * Read in binary data
+         */
+        InputReader inputReader = new BinaryInputReader(converterExperimentParameters);
+
+        lexicon = inputReader.readLexicon();
+        regionMatrix = inputReader.readRegions();
+
+        for (Region[] regions : regionMatrix) {
+            for (Region region : regions) {
+                if (region != null) {
+                    regionIdToRegionMap.put(region.id, region);
+                }
+            }
+        }
+
         /**
          * Read in processed tokens
          */
@@ -209,12 +270,23 @@ public abstract class InternalToXMLConverter {
         }
     }
 
-    protected void copyAttributes(Element src, Element trg) {
-        for (Attribute attr : new ArrayList<Attribute>(src.getAttributes())) {
-            trg.setAttribute(attr.getName(), attr.getValue());
-        }
-    }
+    protected Coordinate matchCandidate(ArrayList<Element> _candidates,
+          int _regionid) {
+        Region candregion = regionIdToRegionMap.get(_regionid);
+        Coordinate candcoord = new Coordinate(candregion.centLon, candregion.centLat);
 
-    class NothingToSeeHereException extends Exception {
+        for (Element candidate : _candidates) {
+            double lon = Double.parseDouble(candidate.getAttributeValue("long"));
+            double lat = Double.parseDouble(candidate.getAttributeValue("lat"));
+
+            if (lon <= candregion.maxLon && lon >= candregion.minLon) {
+                if (lat <= candregion.maxLat && lat >= candregion.minLat) {
+                    candcoord = new Coordinate(lon, lat);
+                    break;
+                }
+            }
+        }
+
+        return candcoord;
     }
 }
