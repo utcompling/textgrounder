@@ -1,12 +1,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 //  Copyright 2010 Taesun Moon <tsunmoon@gmail.com>.
-// 
+//
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
 //  You may obtain a copy of the License at
-// 
+//
 //       http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 //  Unless required by applicable law or agreed to in writing, software
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,7 +16,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.spherical.models;
 
-import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 import opennlp.textgrounder.bayesian.mathutils.*;
@@ -27,34 +27,17 @@ import opennlp.textgrounder.bayesian.utils.TGArrays;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class SphericalModelV1 extends SphericalModelBase {
+public class SphericalModelV2 extends SphericalModelBase {
 
     /**
-     * 
-     */
-    protected int[] topicCounts;
-    /**
+     * Default constructor. Take input from commandline and default _options
+     * and initialize class. Also, process input text and process so that
+     * toponyms, stopwords and other words are identified and collected.
      *
+     * @param _options
      */
-    protected int[] wordByTopicCounts;
-
-    public SphericalModelV1(ExperimentParameters _parameters) {
+    public SphericalModelV2(ExperimentParameters _parameters) {
         super(_parameters);
-    }
-
-    protected void baseSpecificInitialize() {
-        topicVector = regionVector;
-
-        topicByDocumentCounts = new int[D * Z];
-        Arrays.fill(topicByDocumentCounts, 0);
-
-        allWordsRegionCounts = new int[Z];
-        Arrays.fill(allWordsRegionCounts, 0);
-        topicCounts = allWordsRegionCounts;
-
-        wordByRegionCounts = new int[W * Z];
-        Arrays.fill(wordByRegionCounts, 0);
-        wordByTopicCounts = wordByRegionCounts;
     }
 
     /**
@@ -63,14 +46,11 @@ public class SphericalModelV1 extends SphericalModelBase {
      */
     @Override
     public void randomInitialize() {
-        baseSpecificInitialize();
-
         currentR = 0;
-        int wordid, docid, regionid, topicid;
+        int wordid, docid, regionid;
         int istoponym, isstopword;
         int wordoff, docoff;
-        double[] regionProbs = new double[expectedR];
-        double[] topicProbs = new double[Z];
+        double[] probs = new double[expectedR];
         double totalprob, max, r;
 
         for (int i = 0; i < N; ++i) {
@@ -84,17 +64,17 @@ public class SphericalModelV1 extends SphericalModelBase {
 
                 totalprob = 0;
                 for (int j = 0; j < currentR; ++j) {
-                    totalprob += regionProbs[j] = 1;
+                    totalprob += probs[j] = 1;
                 }
 
                 r = rand.nextDouble() * totalprob + crpalpha;
-                regionProbs[currentR] = crpalpha;
+                probs[currentR] = crpalpha;
 
-                max = regionProbs[0];
+                max = probs[0];
                 regionid = 0;
                 while (r > max) {
                     regionid++;
-                    max += regionProbs[regionid];
+                    max += probs[regionid];
                 }
                 if (regionid == currentR) {
                     currentR += 1;
@@ -102,8 +82,11 @@ public class SphericalModelV1 extends SphericalModelBase {
 
                 regionVector[i] = regionid;
                 toponymRegionCounts[regionid]++;
+                allWordsRegionCounts[regionid] = toponymRegionCounts[regionid];
                 regionByDocumentCounts[docoff + regionid]++;
+                wordByRegionCounts[wordoff + regionid]++;
 
+//                toponymByRegionCounts[wordoff + regionid]++;
                 int coordinates = toponymCoordinateLexicon[wordid].length;
                 int coordid = rand.nextInt(coordinates);
                 regionToponymCoordinateCounts[regionid][wordid][coordid] += 1;
@@ -117,30 +100,27 @@ public class SphericalModelV1 extends SphericalModelBase {
             if (isstopword == 0 && istoponym == 0) {
                 wordid = wordVector[i];
                 docid = documentVector[i];
-                docoff = docid * Z;
-                wordoff = wordid * Z;
+                docoff = docid * expectedR;
+                wordoff = wordid * expectedR;
 
                 totalprob = 0;
-                try {
-                    for (int j = 0;; ++j) {
-                        totalprob += topicProbs[j] = 1;
-                    }
-                } catch (ArrayIndexOutOfBoundsException e) {
+                for (int j = 0; j < currentR; ++j) {
+                    totalprob += probs[j] = 1;
                 }
 
                 r = rand.nextDouble() * totalprob;
 
-                max = topicProbs[0];
-                topicid = 0;
+                max = probs[0];
+                regionid = 0;
                 while (r > max) {
-                    topicid++;
-                    max += topicProbs[topicid];
+                    regionid++;
+                    max += probs[regionid];
                 }
 
-                topicVector[i] = topicid;
-                topicCounts[topicid]++;
-                topicByDocumentCounts[docoff + topicid]++;
-                wordByTopicCounts[wordoff + topicid]++;
+                regionVector[i] = regionid;
+                allWordsRegionCounts[regionid]++;
+                regionByDocumentCounts[docoff + regionid]++;
+                wordByRegionCounts[wordoff + regionid]++;
             }
         }
 
@@ -149,7 +129,9 @@ public class SphericalModelV1 extends SphericalModelBase {
         for (int i = 0; i < currentR; ++i) {
             int[][] toponymCoordinateCounts = regionToponymCoordinateCounts[i];
             double[] mean = new double[3];
-            Arrays.fill(mean, 0);
+            for (int j = 0; j < 3; ++j) {
+                mean[j] = 0;
+            }
 
             for (int j = 0; j < T; ++j) {
                 int[] coordcounts = toponymCoordinateCounts[j];
@@ -178,8 +160,7 @@ public class SphericalModelV1 extends SphericalModelBase {
         int istoponym, isstopword;
         int curCoordCount;
         double[][] curCoords;
-        double[] regionProbs = new double[expectedR * maxCoord];
-        double[] topicProbs = new double[Z];
+        double[] probs = new double[expectedR * maxCoord];
         double[] regionmean;
         double totalprob = 0, max, r;
 
@@ -197,7 +178,9 @@ public class SphericalModelV1 extends SphericalModelBase {
                         wordoff = wordid * expectedR;
 
                         toponymRegionCounts[regionid]--;
+                        allWordsRegionCounts[regionid]--;
                         regionByDocumentCounts[docoff + regionid]--;
+                        wordByRegionCounts[wordoff + regionid]--;
                         regionToponymCoordinateCounts[regionid][wordid][coordid]--;
                         regionmean = regionMeans[regionid];
                         TGBLAS.daxpy(0, -1, toponymCoordinateLexicon[wordid][coordid], 1, regionmean, 1);
@@ -206,13 +189,14 @@ public class SphericalModelV1 extends SphericalModelBase {
 
                         if (toponymRegionCounts[regionid] == 0) {
                             emptyRSet.add(regionid);
+                            resetRegionID(annealer, regionid, docid);
                         }
 
                         for (int j = 0; j < currentR; ++j) {
                             regionmean = regionMeans[j];
                             int doccount = regionByDocumentCounts[docoff + j];
                             for (int k = 0; k < curCoordCount; ++k) {
-                                regionProbs[j * maxCoord + k] =
+                                probs[j * maxCoord + k] =
                                       doccount
                                       * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
                             }
@@ -222,15 +206,15 @@ public class SphericalModelV1 extends SphericalModelBase {
                         if (it.hasNext()) {
                             int emptyR = it.next();
                             for (int j = 0; j < curCoordCount; ++j) {
-                                regionProbs[emptyR * maxCoord + j] = crpalpha_mod / curCoordCount;
+                                probs[emptyR * maxCoord + j] = crpalpha_mod / curCoordCount;
                             }
                         }
 
-                        totalprob = annealer.annealProbs(0, currentR * maxCoord, regionProbs);
+                        totalprob = annealer.annealProbs(0, expectedR * maxCoord, probs);
 
                         r = rand.nextDouble() * totalprob;
 
-                        max = regionProbs[0];
+                        max = probs[0];
                         regionid = 0;
                         coordid = 0;
                         while (r > max) {
@@ -239,13 +223,15 @@ public class SphericalModelV1 extends SphericalModelBase {
                                 regionid++;
                                 coordid = 0;
                             }
-                            max += regionProbs[regionid * maxCoord + coordid];
+                            max += probs[regionid * maxCoord + coordid];
                         }
                         regionVector[i] = regionid;
                         coordinateVector[i] = coordid;
 
                         toponymRegionCounts[regionid]++;
+                        allWordsRegionCounts[regionid]++;
                         regionByDocumentCounts[docoff + regionid]++;
+                        wordByRegionCounts[wordoff + regionid]++;
                         regionToponymCoordinateCounts[regionid][wordid][coordid]++;
                         regionmean = regionMeans[regionid];
                         TGBLAS.daxpy(0, 1, toponymCoordinateLexicon[wordid][coordid], 1, regionmean, 1);
@@ -263,46 +249,44 @@ public class SphericalModelV1 extends SphericalModelBase {
                         docid = documentVector[i];
                         regionid = regionVector[i];
                         istoponym = toponymVector[i];
-                        docoff = docid * Z;
-                        wordoff = wordid * Z;
+                        docoff = docid * expectedR;
+                        wordoff = wordid * expectedR;
 
-                        topicCounts[regionid]--;
-                        topicByDocumentCounts[docoff + regionid]--;
-                        wordByTopicCounts[wordoff + regionid]--;
-                        try {
-                            for (int j = 0;; ++j) {
-                                topicProbs[j] = (wordByTopicCounts[wordoff + j] + beta)
-                                      / (topicCounts[j] + betaW)
-                                      * (topicByDocumentCounts[docoff + j] + alpha);
-                            }
-                        } catch (ArrayIndexOutOfBoundsException e) {
+                        allWordsRegionCounts[regionid]--;
+                        regionByDocumentCounts[docoff + regionid]--;
+                        wordByRegionCounts[wordoff + regionid]--;
+
+                        for (int j = 0; j < currentR; ++j) {
+                            probs[j] = (wordByRegionCounts[wordoff + j] + beta)
+                                  / (allWordsRegionCounts[j] + betaW)
+                                  * regionByDocumentCounts[docoff + j];
                         }
 
-                        totalprob = _annealer.annealProbs(topicProbs);
+                        totalprob = _annealer.annealProbs(0, currentR, probs);
                         r = rand.nextDouble() * totalprob;
 
-                        max = topicProbs[0];
+                        max = probs[0];
                         regionid = 0;
                         while (r > max) {
                             regionid++;
-                            max += topicProbs[regionid];
+                            max += probs[regionid];
                         }
-                        topicVector[i] = regionid;
+                        regionVector[i] = regionid;
 
                         allWordsRegionCounts[regionid]++;
-                        topicByDocumentCounts[docoff + regionid]++;
+                        regionByDocumentCounts[docoff + regionid]++;
                         wordByRegionCounts[wordoff + regionid]++;
                     }
                 }
             }
 
-            _annealer.collectSamples(wordByRegionCounts, regionByDocumentCounts, topicByDocumentCounts,
+            _annealer.collectSamples(wordByRegionCounts, regionByDocumentCounts,
                   allWordsRegionCounts, regionMeans,/*toponymByRegionCounts, nonToponymRegionCounts, */
                   regionToponymCoordinateCounts);
 
             if (expectedR - currentR < EXPANSION_FACTOR / (1 + EXPANSION_FACTOR) * expectedR) {
                 expandExpectedR();
-                regionProbs = new double[expectedR * maxCoord];
+                probs = new double[expectedR * maxCoord];
             }
         }
     }
@@ -312,6 +296,7 @@ public class SphericalModelV1 extends SphericalModelBase {
         int newExpectedR = (int) Math.ceil(expectedR * (1 + EXPANSION_FACTOR));
 
         toponymRegionCounts = TGArrays.expandSingleTierC(toponymRegionCounts, newExpectedR, expectedR);
+        allWordsRegionCounts = TGArrays.expandSingleTierC(allWordsRegionCounts, newExpectedR, expectedR);
         regionByDocumentCounts = TGArrays.expandDoubleTierC(regionByDocumentCounts, D, newExpectedR, expectedR);
         wordByRegionCounts = TGArrays.expandDoubleTierC(wordByRegionCounts, W, newExpectedR, expectedR);
 
@@ -388,8 +373,7 @@ public class SphericalModelV1 extends SphericalModelBase {
         int istoponym, isstopword;
         int curCoordCount;
         double[][] curCoords;
-        double[] regionProbs = new double[expectedR * maxCoord];
-        double[] topicProbs = new double[Z];
+        double[] probs = new double[expectedR * maxCoord];
         double[] regionmean;
         double totalprob = 0, max, r;
 
@@ -413,17 +397,17 @@ public class SphericalModelV1 extends SphericalModelBase {
                         regionmean = averagedRegionMeans[j];
                         double doccount = averagedRegionByDocumentCounts[docoff + j];
                         for (int k = 0; k < curCoordCount; ++k) {
-                            regionProbs[j * maxCoord + k] =
+                            probs[j * maxCoord + k] =
                                   doccount
                                   * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
                         }
                     }
 
-                    totalprob = decoder.annealProbs(0, expectedR * maxCoord, regionProbs);
+                    totalprob = decoder.annealProbs(0, expectedR * maxCoord, probs);
 
                     r = rand.nextDouble() * totalprob;
 
-                    max = regionProbs[0];
+                    max = probs[0];
                     regionid = 0;
                     coordid = 0;
                     while (r > max) {
@@ -432,7 +416,7 @@ public class SphericalModelV1 extends SphericalModelBase {
                             regionid++;
                             coordid = 0;
                         }
-                        max += regionProbs[regionid * maxCoord + coordid];
+                        max += probs[regionid * maxCoord + coordid];
                     }
 
                     regionVector[i] = regionid;
@@ -443,26 +427,23 @@ public class SphericalModelV1 extends SphericalModelBase {
                     docid = documentVector[i];
                     regionid = regionVector[i];
                     istoponym = toponymVector[i];
-                    docoff = docid * Z;
-                    wordoff = wordid * Z;
+                    docoff = docid * expectedR;
+                    wordoff = wordid * expectedR;
 
-                    try {
-                        for (int j = 0;; ++j) {
-                            topicProbs[j] = (averagedWordByRegionCounts[wordoff + j] + beta)
-                                  / (allWordsRegionCounts[j] + betaW)
-                                  * (averagedTopicByDocumentCounts[docoff + j] + alpha);
-                        }
-                    } catch (ArrayIndexOutOfBoundsException e) {
+                    for (int j = 0; j < currentR; ++j) {
+                        probs[j] = (averagedWordByRegionCounts[wordoff + j] + beta)
+                              / (allWordsRegionCounts[j] + betaW)
+                              * (averagedRegionByDocumentCounts[docoff + j] + alpha);
                     }
 
-                    totalprob = decoder.annealProbs(0, topicProbs);
+                    totalprob = decoder.annealProbs(0, currentR, probs);
 
                     r = rand.nextDouble() * totalprob;
-                    max = regionProbs[0];
+                    max = probs[0];
                     regionid = 0;
                     while (r > max) {
                         regionid++;
-                        max += regionProbs[regionid];
+                        max += probs[regionid];
                     }
 
                     regionVector[i] = regionid;

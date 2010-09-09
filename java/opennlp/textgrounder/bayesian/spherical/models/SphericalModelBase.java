@@ -118,14 +118,34 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         } else {
             annealer = new SphericalSimulatedAnnealer(_experimentParameters);
         }
-
-        readTokenArrayFile();
-        readRegionCoordinateList();
     }
 
     public void initialize() {
         initialize(experimentParameters);
+        readTokenArrayFile();
+        readRegionCoordinateList();
+        initializeCountArrays();
+    }
 
+    /**
+     * The following class variables are set in this procedure
+     *
+     * <p>
+     * expectedR
+     * </p>
+     *
+     * The following class variables are initialized in this procedure
+     *
+     * <p>
+     * toponymRegionCounts
+     * allWordsRegionCounts
+     * regionByDocumentCounts
+     * wordByRegionCounts
+     * regionMeans
+     * regionToponymCoordinateCounts
+     * </p>
+     */
+    protected void initializeCountArrays() {
         expectedR = (int) Math.ceil(crpalpha * Math.log(1 + N / crpalpha)) * 2;
 
         toponymRegionCounts = new int[expectedR];
@@ -155,6 +175,25 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         }
     }
 
+    /**
+     * The following class variables are set in this procedure
+     * <p>
+     * W
+     * D
+     * betaW
+     * N
+     * </p>
+     *
+     * The following class variables are initialized in this procedure
+     * <p>
+     * wordVector
+     * documentVector
+     * toponymVector
+     * stopwordVector
+     * regionVector
+     * coordinateVector
+     * </p>
+     */
     protected void readTokenArrayFile() {
 
         ArrayList<Integer> wordArray = new ArrayList<Integer>(),
@@ -215,13 +254,20 @@ public abstract class SphericalModelBase extends SphericalModelFields {
     }
 
     /**
-     * 
+     * The following class variables are set in this procedure
+     *
+     * <p>
+     * T
+     * toponymCoordinateLexicon
+     * maxCoord
+     * </p>
+     *
      * @param _file
      */
     public void readRegionCoordinateList() {
 
         HashMap<Integer, double[]> toprecords = new HashMap<Integer, double[]>();
-        int maxtopid = 0;
+        T = 0;
 
         try {
             while (true) {
@@ -231,8 +277,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                 double[] record = (double[]) toprecord.get(1);
 
                 toprecords.put(topid, record);
-                if (topid > maxtopid) {
-                    maxtopid = topid;
+                if (topid > T) {
+                    T = topid;
                 }
             }
         } catch (EOFException e) {
@@ -240,7 +286,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             Logger.getLogger(SphericalModelBase.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        T = maxtopid + 1;
+        T += 1;
         toponymCoordinateLexicon = new double[T][][];
         maxCoord = 0;
 

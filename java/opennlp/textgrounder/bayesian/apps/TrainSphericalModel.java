@@ -29,7 +29,7 @@ public class TrainSphericalModel extends BaseApp {
         ExperimentParameters experimentParameters = new ExperimentParameters();
         processRawCommandline(args, experimentParameters);
 
-        SphericalModelBase rm = new SphericalModelV1(experimentParameters);
+        SphericalModelBase rm = new SphericalModelV2(experimentParameters);
 
         rm.initialize();
         rm.train();
