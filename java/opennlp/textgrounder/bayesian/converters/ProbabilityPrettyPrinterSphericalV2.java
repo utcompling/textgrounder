@@ -26,16 +26,12 @@ import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.GZIPOutputStream;
 import opennlp.textgrounder.bayesian.apps.*;
 import opennlp.textgrounder.bayesian.structs.IntDoublePair;
-import opennlp.textgrounder.bayesian.textstructs.Lexicon;
-import opennlp.textgrounder.bayesian.wrapper.io.*;
 import opennlp.textgrounder.bayesian.mathutils.TGMath;
-import opennlp.textgrounder.bayesian.spherical.io.SphericalInputReader;
 import opennlp.textgrounder.bayesian.structs.AveragedSphericalCountWrapper;
 import opennlp.textgrounder.bayesian.topostructs.Coordinate;
 import org.jdom.Document;
@@ -69,6 +65,7 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
         N = averagedCountWrapper.getN();
         R = averagedCountWrapper.getCurrentR();
         W = averagedCountWrapper.getW();
+        T = averagedCountWrapper.getT();
 
         emptyRSet = averagedCountWrapper.getEmptyRSet();
         nonEmptyRArray = new int[R - emptyRSet.size()];
@@ -83,8 +80,11 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
         averagedRegionToponymCoordinateCounts = averagedCountWrapper.getAveragedRegionToponymCoordinateCounts();
         averagedRegionByDocumentCounts = averagedCountWrapper.getAveragedRegionByDocumentCounts();
         averagedWordByRegionCounts = averagedCountWrapper.getAveragedWordByRegionCounts();
-        averagedAllWordsRegionCounts = averagedCountWrapper.getAveragedAllWordsRegionCounts();
 
+        /**
+         * not yet used
+         */
+        averagedAllWordsRegionCounts = averagedCountWrapper.getAveragedAllWordsRegionCounts();
         toponymCoordinateLexicon = averagedCountWrapper.getToponymCoordinateLexicon();
 
         lexicon = inputReader.readLexicon();
@@ -114,7 +114,11 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
                 double[] averagedRegionCounts = new double[R];
                 Arrays.fill(averagedRegionCounts, 0);
                 for (int i : nonEmptyRArray) {
-                    for (int j = 0; j < W; ++j) {
+                    for (int j = 0; j < T; ++j) {
+                        sum += averagedWordByRegionCounts[j * R + i];
+                        averagedRegionCounts[i] += averagedWordByRegionCounts[j * R + i];
+                    }
+                    for (int j = T; j < W; ++j) {
                         sum += averagedWordByRegionCounts[j * R + i] + beta;
                         averagedRegionCounts[i] += averagedWordByRegionCounts[j * R + i] + beta;
                     }
@@ -122,7 +126,10 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
 
                 for (int i : nonEmptyRArray) {
                     ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
-                    for (int j = 0; j < W; ++j) {
+                    for (int j = 0; j < T; ++j) {
+                        topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * R + i] + beta));
+                    }
+                    for (int j = T; j < W; ++j) {
                         topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * R + i] + beta));
                     }
                     Collections.sort(topWords);
@@ -156,8 +163,14 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
                 for (int i = 0; i < W; ++i) {
                     wordCounts[i] = 0;
                     int wordoff = i * R;
-                    for (int j : nonEmptyRArray) {
-                        wordCounts[i] += averagedWordByRegionCounts[wordoff + j] + beta;
+                    if (i < T) {
+                        for (int j : nonEmptyRArray) {
+                            wordCounts[i] += averagedWordByRegionCounts[wordoff + j];
+                        }
+                    } else {
+                        for (int j : nonEmptyRArray) {
+                            wordCounts[i] += averagedWordByRegionCounts[wordoff + j] + beta;
+                        }
                     }
                 }
 
@@ -165,8 +178,14 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
                 for (int i = 0; i < W; ++i) {
                     int wordoff = i * R;
                     ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
-                    for (int j : nonEmptyRArray) {
-                        topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j] + beta));
+                    if (i < T) {
+                        for (int j : nonEmptyRArray) {
+                            topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j]));
+                        }
+                    } else {
+                        for (int j : nonEmptyRArray) {
+                            topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j] + beta));
+                        }
                     }
                     Collections.sort(topRegions);
 
@@ -225,7 +244,7 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
                     docWordCounts[i] = 0;
                     int docoff = i * R;
                     for (int j : nonEmptyRArray) {
-                        docWordCounts[i] += averagedRegionByDocumentCounts[docoff + j] + alpha;
+                        docWordCounts[i] += averagedRegionByDocumentCounts[docoff + j];
                     }
                 }
 
@@ -233,7 +252,7 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
                     int docoff = i * R;
                     ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                     for (int j : nonEmptyRArray) {
-                        topRegions.add(new IntDoublePair(j, averagedRegionByDocumentCounts[docoff + j] + alpha));
+                        topRegions.add(new IntDoublePair(j, averagedRegionByDocumentCounts[docoff + j]));
                     }
                     Collections.sort(topRegions);
 
@@ -281,7 +300,11 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
             double[] averagedRegionCounts = new double[R];
             Arrays.fill(averagedRegionCounts, 0);
             for (int i : nonEmptyRArray) {
-                for (int j = 0; j < W; ++j) {
+                for (int j = 0; j < T; ++j) {
+                    sum += averagedWordByRegionCounts[j * R + i] + beta;
+                    averagedRegionCounts[i] += averagedWordByRegionCounts[j * R + i];
+                }
+                for (int j = T; j < W; ++j) {
                     sum += averagedWordByRegionCounts[j * R + i] + beta;
                     averagedRegionCounts[i] += averagedWordByRegionCounts[j * R + i] + beta;
                 }
@@ -289,7 +312,10 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
 
             for (int i : nonEmptyRArray) {
                 ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
-                for (int j = 0; j < W; ++j) {
+                for (int j = 0; j < T; ++j) {
+                    topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * R + i]));
+                }
+                for (int j = T; j < W; ++j) {
                     topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * R + i] + beta));
                 }
                 Collections.sort(topWords);
@@ -328,16 +354,28 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
             for (int i = 0; i < W; ++i) {
                 wordCounts[i] = 0;
                 int wordoff = i * R;
-                for (int j : nonEmptyRArray) {
-                    wordCounts[i] += averagedWordByRegionCounts[wordoff + j] + beta;
+                if (i < T) {
+                    for (int j : nonEmptyRArray) {
+                        wordCounts[i] += averagedWordByRegionCounts[wordoff + j];
+                    }
+                } else {
+                    for (int j : nonEmptyRArray) {
+                        wordCounts[i] += averagedWordByRegionCounts[wordoff + j] + beta;
+                    }
                 }
             }
 
             for (int i = 0; i < W; ++i) {
                 int wordoff = i * R;
                 ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
-                for (int j : nonEmptyRArray) {
-                    topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j] + beta));
+                if (i < T) {
+                    for (int j : nonEmptyRArray) {
+                        topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j]));
+                    }
+                } else {
+                    for (int j : nonEmptyRArray) {
+                        topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j] + beta));
+                    }
                 }
                 Collections.sort(topRegions);
 
@@ -397,7 +435,7 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
                 docWordCounts[i] = 0;
                 int docoff = i * R;
                 for (int j : nonEmptyRArray) {
-                    docWordCounts[i] += averagedRegionByDocumentCounts[docoff + j] + alpha;
+                    docWordCounts[i] += averagedRegionByDocumentCounts[docoff + j];
                 }
             }
 
@@ -405,7 +443,7 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
                 int docoff = i * R;
                 ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                 for (int j : nonEmptyRArray) {
-                    topRegions.add(new IntDoublePair(j, averagedRegionByDocumentCounts[docoff + j] + alpha));
+                    topRegions.add(new IntDoublePair(j, averagedRegionByDocumentCounts[docoff + j]));
                 }
                 Collections.sort(topRegions);
 

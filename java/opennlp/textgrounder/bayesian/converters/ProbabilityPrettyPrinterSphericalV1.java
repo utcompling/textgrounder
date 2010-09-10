@@ -54,6 +54,14 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
     /**
      *
      */
+    protected int T;
+    /**
+     * 
+     */
+    protected int Z;
+    /**
+     *
+     */
     protected double kappa;
     /**
      *
@@ -109,6 +117,8 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
         N = averagedCountWrapper.getN();
         R = averagedCountWrapper.getCurrentR();
         W = averagedCountWrapper.getW();
+        T = averagedCountWrapper.getT();
+        Z = averagedCountWrapper.getZ();
 
         emptyRSet = averagedCountWrapper.getEmptyRSet();
         nonEmptyRArray = new int[R - emptyRSet.size()];
@@ -123,9 +133,6 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
         averagedRegionToponymCoordinateCounts = averagedCountWrapper.getAveragedRegionToponymCoordinateCounts();
         averagedRegionByDocumentCounts = averagedCountWrapper.getAveragedRegionByDocumentCounts();
         averagedWordByRegionCounts = averagedCountWrapper.getAveragedWordByRegionCounts();
-        averagedAllWordsRegionCounts = averagedCountWrapper.getAveragedAllWordsRegionCounts();
-
-        toponymCoordinateLexicon = averagedCountWrapper.getToponymCoordinateLexicon();
 
         lexicon = inputReader.readLexicon();
     }

@@ -176,6 +176,10 @@ public class ExperimentParameters {
      */
     protected String wordByRegionProbsFilename = "word-by-region-probabilities.gz";
     /**
+     *
+     */
+    protected String wordByTopicProbsFilename = "word-by-topic-probabilities.gz";
+    /**
      * 
      */
     protected String regionByWordProbsFilename = "region-by-word-probabilities.gz";
