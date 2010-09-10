@@ -71,6 +71,10 @@ public class EvalBasedOnXML {
         int numTopsInTR = trUnmatched.size();
         int numTopsInModel = modelUnmatched.size();
 
+        BufferedWriter errorDump = new BufferedWriter(new FileWriter("error-dump.txt"));
+
+        int prevDocId = -1;
+
         //int matchCount = 0;
 
         for(int i = 0; i < trToponyms.getLength(); i++) {
@@ -86,6 +90,12 @@ public class EvalBasedOnXML {
             trLocation.setCoord(new Coordinate(Double.parseDouble(trLocationN.getAttributes().getNamedItem("long").getNodeValue()),
                                                 Double.parseDouble(trLocationN.getAttributes().getNamedItem("lat").getNodeValue())));
             int trDocId = Integer.parseInt(TRTopN.getAttributes().getNamedItem("did").getNodeValue());
+            //System.out.println(trDocId + "  " + prevDocId);
+
+            if(trDocId != prevDocId)
+                errorDump.write("###################### d" + trDocId + " #######################\n");
+            prevDocId = trDocId;
+            
             Node trContextN = TRTopN.getChildNodes().item(3);
             String trContextSignature = convertContextToSignature(trContextN.getTextContent(), CONTEXT_SIGNATURE_WINDOW_SIZE);
 
@@ -125,9 +135,15 @@ public class EvalBasedOnXML {
                     t_c++;
                     trUnmatched.remove(i);
                     modelUnmatched.remove(j);
+
+                    errorDump.write("cor | Gold: " + trLocation.getName() + " (" + trLocation.getCoord() + ") | Model: "
+                                            + modelLocation.getName() + " (" + modelLocation.getCoord() + ") "/*p = " + modelLocation.getPop()*/ + "\n");
                 }
                 else {
                     t_i++;
+
+                    errorDump.write("inc | Gold: " + trLocation.getName() + " (" + trLocation.getCoord() + ") | Model: "
+                                            + modelLocation.getName() + " (" + modelLocation.getCoord() + ") "/*p = " + modelLocation.getPop()*/ + "\n");
                 }
                 break;
             }
@@ -149,6 +165,8 @@ public class EvalBasedOnXML {
 
         //System.out.println("t_n = " + t_n);
         //System.out.println("matchCount = " + matchCount);
+
+        errorDump.close();
     }
 
     private HashSet<Integer> getToponymSet(String xmlPath) throws Exception {
