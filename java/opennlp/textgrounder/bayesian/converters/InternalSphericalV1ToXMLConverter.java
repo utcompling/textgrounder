@@ -118,13 +118,9 @@ public class InternalSphericalV1ToXMLConverter extends InternalToXMLConverter {
     @Override
     protected void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid) {
         if (!_candidates.isEmpty()) {
-            Coordinate coord = new Coordinate(TGMath.cartesianToSpherical(toponymCoordinateLexicon[_wordid][_coordid]));
-            _token.setAttribute("long", String.format("%.2f", coord.longitude));
-            _token.setAttribute("lat", String.format("%.2f", coord.latitude));
-        } else {
-            Coordinate coord = new Coordinate(TGMath.cartesianToSpherical(TGMath.normalizeVector(regionMeans[_regid])));
-            _token.setAttribute("long", String.format("%.2f", coord.longitude));
-            _token.setAttribute("lat", String.format("%.2f", coord.latitude));
+            Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(toponymCoordinateLexicon[_wordid][_coordid]));
+            _token.setAttribute("long", String.format("%.6f", coord.longitude));
+            _token.setAttribute("lat", String.format("%.6f", coord.latitude));
         }
     }
 }

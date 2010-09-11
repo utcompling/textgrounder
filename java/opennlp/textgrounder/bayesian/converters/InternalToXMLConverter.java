@@ -142,13 +142,13 @@ public abstract class InternalToXMLConverter {
                     if (token.getName().equals("w")) {
                         word = token.getAttributeValue("tok").toLowerCase();
                         if (isstopword == 0) {
-                            setTokenAttribute(token, wordid, regid, 0);
+                            setTokenAttribute(outtoken, wordid, regid, 0);
                         }
                         counter += 1;
                     } else if (token.getName().equals("toponym")) {
                         word = token.getAttributeValue("term").toLowerCase();
                         ArrayList<Element> candidates = new ArrayList<Element>(token.getChild("candidates").getChildren());
-                        setToponymAttribute(candidates, token, wordid, regid, 0);
+                        setToponymAttribute(candidates, outtoken, wordid, regid, 0);
                         counter += 1;
                     } else {
                         continue;

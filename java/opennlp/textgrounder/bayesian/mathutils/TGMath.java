@@ -89,9 +89,13 @@ public class TGMath {
 
     public static double[] sphericalToGeographic(double[] _spher) {
         double[] geo = new double[2];
-        geo[0] = (_spher[0] / -Math.PI + Math.PI / 4) * 180;
-        geo[1] = (_spher[1] / Math.PI - Math.PI / 2) * 180;
+        geo[0] = (_spher[0] / -Math.PI) * 180 + 90;
+        geo[1] = (_spher[1] / Math.PI) * 180;
         return geo;
+    }
+
+    public static double[] cartesianToGeographic(double[] _x) {
+        return sphericalToGeographic(cartesianToSpherical(_x));
     }
 
     public static double latToRadians(double _lat) {
