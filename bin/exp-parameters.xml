@@ -1,16 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <experiments>
   <RLDA>
+    <estimateHyperparameter type="int">0</estimateHyperparameter>
     <crpalpha type="double">20.000000</crpalpha>
+    <crpalpha_a type="double">20.000000</crpalpha_a>
+    <crpalpha_b type="double">20.000000</crpalpha_b>
     <alpha type="double">1.000000</alpha>
+    <alpha_a type="double">1.000000</alpha_a>
+    <alpha_b type="double">0.100000</alpha_b>
     <beta type="double">0.100000</beta>
+    <beta_a type="double">0.100000</beta_a>
+    <beta_b type="double">0.100000</beta_b>
+    <estimateKappa type="int">0</estimateKappa>
     <kappa type="double">20.000000</kappa>
     <trainIterations type="int">100</trainIterations>
     <randomSeed type="int">1</randomSeed>
     <initialTemperature type="double">1.000000</initialTemperature>
     <temperatureDecrement type="double">0.100000</temperatureDecrement>
     <targetTemperature type="double">1.000000</targetTemperature>
-    <regions type="int">50</regions>
+    <topics type="int">50</topics>
     <samples type="int">100</samples>
     <lag type="int">10</lag>
     <countCutoff type="int">5</countCutoff>
@@ -20,18 +28,20 @@
     <corpusFilename type="string">input.xml</corpusFilename>
     <processedCorpusFilename type="string">output.xml</processedCorpusFilename>
     <tokenArrayInputFilename type="string">token-array-input.dat.gz</tokenArrayInputFilename>
-    <tokenArrayOutputPath type="string">token-array-output.dat.gz</tokenArrayOutputPath>
+    <tokenArrayOutputFilename type="string">token-array-output.dat.gz</tokenArrayOutputFilename>
     <toponymRegionFilename type="string">toponym-region.dat.gz</toponymRegionFilename>
     <toponymCoordinateFilename type="string">toponym-coordinate.dat.gz</toponymCoordinateFilename>
     <trainedModelFilename type="string">trained-model.model.gz</trainedModelFilename>
-    <sampledProbabilitiesFilename type="string">probabilities.dat.gz</sampledProbabilitiesFilename>
+    <averagedCountsFilename type="string">averaged-counts.dat.gz</averagedCountsFilename>
     <xmlConditionalProbabilitiesFilename type="string">sorted-conditional-probabilities.xml</xmlConditionalProbabilitiesFilename>
     <wordByRegionProbsFilename type="string">word-by-region-probabilities.gz</wordByRegionProbsFilename>
+    <wordByTopicProbsFilename type="string">word-by-topic-probabilities.gz</wordByTopicProbsFilename>
     <regionByWordProbsFilename type="string">region-by-word-probabilities.gz</regionByWordProbsFilename>
     <regionByDocumentProbsFilename type="string">region-by-document-probabilities.gz</regionByDocumentProbsFilename>
     <regionFilename type="string">region.dat.gz</regionFilename>
     <lexiconFilename type="string">lexicon.dat.gz</lexiconFilename>
-    <inputFormat type="INPUT_FORMAT">BINARY</inputFormat>
+    <inputFormat type="enum">BINARY</inputFormat>
+    <modelType type="enum">RLDA</modelType>
   </RLDA>
 </experiments>
 
