@@ -200,16 +200,15 @@ public class SphericalModelV3 extends SphericalModelV2 {
                         wordByRegionCounts[wordoff + regionid]++;
                     }
                 }
+                if (expectedR - currentR < EXPANSION_FACTOR / (1 + EXPANSION_FACTOR) * expectedR) {
+                    expandExpectedR();
+                    probs = new double[expectedR * maxCoord];
+                }
             }
 
             _annealer.collectSamples(wordByRegionCounts, regionByDocumentCounts,
                   regionCountsOfAllWords, regionMeans,/*toponymByRegionCounts, nonToponymRegionCounts, */
                   regionToponymCoordinateCounts);
-
-            if (expectedR - currentR < EXPANSION_FACTOR / (1 + EXPANSION_FACTOR) * expectedR) {
-                expandExpectedR();
-                probs = new double[expectedR * maxCoord];
-            }
         }
     }
 

@@ -338,15 +338,14 @@ public class SphericalModelV1 extends SphericalModelBase {
                         wordByTopicCounts[wordoff + topicid]++;
                     }
                 }
+                if (expectedR - currentR < EXPANSION_FACTOR / (1 + EXPANSION_FACTOR) * expectedR) {
+                    expandExpectedR();
+                    regionProbs = new double[expectedR * maxCoord];
+                }
             }
 
             _annealer.collectSamples(wordByTopicCounts, regionByDocumentCounts, topicByDocumentCounts,
                   topicCounts, regionMeans, regionToponymCoordinateCounts);
-
-            if (expectedR - currentR < EXPANSION_FACTOR / (1 + EXPANSION_FACTOR) * expectedR) {
-                expandExpectedR();
-                regionProbs = new double[expectedR * maxCoord];
-            }
         }
     }
 
@@ -388,36 +387,38 @@ public class SphericalModelV1 extends SphericalModelBase {
         regionToponymCoordinateCounts = newRegionToponymCoordinateCounts;
 
         double[] sampleRegionByDocumentCounts = annealer.getRegionByDocumentCounts();
-        sampleRegionByDocumentCounts = TGArrays.expandDoubleTierC(sampleRegionByDocumentCounts, D, newExpectedR, expectedR);
-        annealer.setRegionByDocumentCounts(sampleRegionByDocumentCounts);
+        if (sampleRegionByDocumentCounts != null) {
+            sampleRegionByDocumentCounts = TGArrays.expandDoubleTierC(sampleRegionByDocumentCounts, D, newExpectedR, expectedR);
+            annealer.setRegionByDocumentCounts(sampleRegionByDocumentCounts);
 
-        double[] sampleWordByRegionCounts = annealer.getWordByRegionCounts();
-        sampleWordByRegionCounts = TGArrays.expandDoubleTierC(sampleWordByRegionCounts, W, newExpectedR, expectedR);
-        annealer.setWordByRegionCounts(sampleWordByRegionCounts);
+            double[] sampleWordByRegionCounts = annealer.getWordByRegionCounts();
+            sampleWordByRegionCounts = TGArrays.expandDoubleTierC(sampleWordByRegionCounts, W, newExpectedR, expectedR);
+            annealer.setWordByRegionCounts(sampleWordByRegionCounts);
 
-        double[][][] sampleRegionToponymCoordinateCounts = annealer.getRegionToponymCoordinateCounts();
-        double[][][] newSampleRegionToponymCoordinateCounts = new double[newExpectedR][][];
-        for (int i = 0; i < expectedR; ++i) {
-            newSampleRegionToponymCoordinateCounts[i] = sampleRegionToponymCoordinateCounts[i];
-        }
-
-        for (int i = expectedR; i < newExpectedR; ++i) {
-            double[][] toponymCoordinateCounts = new double[T][];
-            for (int j = 0; j < T; ++j) {
-                int coordinates = toponymCoordinateLexicon[j].length;
-                double[] coordcounts = new double[coordinates];
-                for (int k = 0; k < coordinates; ++k) {
-                    coordcounts[k] = 0;
-                }
-                toponymCoordinateCounts[j] = coordcounts;
+            double[][][] sampleRegionToponymCoordinateCounts = annealer.getRegionToponymCoordinateCounts();
+            double[][][] newSampleRegionToponymCoordinateCounts = new double[newExpectedR][][];
+            for (int i = 0; i < expectedR; ++i) {
+                newSampleRegionToponymCoordinateCounts[i] = sampleRegionToponymCoordinateCounts[i];
             }
-            newSampleRegionToponymCoordinateCounts[i] = toponymCoordinateCounts;
-        }
-        annealer.setRegionToponymCoordinateCounts(sampleRegionToponymCoordinateCounts);
 
-        double[][] sampleRegionMeans = annealer.getRegionMeans();
-        sampleRegionMeans = TGArrays.expandSingleTierR(sampleRegionMeans, newExpectedR, currentR, coordParamLen);
-        annealer.setRegionMeans(sampleRegionMeans);
+            for (int i = expectedR; i < newExpectedR; ++i) {
+                double[][] toponymCoordinateCounts = new double[T][];
+                for (int j = 0; j < T; ++j) {
+                    int coordinates = toponymCoordinateLexicon[j].length;
+                    double[] coordcounts = new double[coordinates];
+                    for (int k = 0; k < coordinates; ++k) {
+                        coordcounts[k] = 0;
+                    }
+                    toponymCoordinateCounts[j] = coordcounts;
+                }
+                newSampleRegionToponymCoordinateCounts[i] = toponymCoordinateCounts;
+            }
+            annealer.setRegionToponymCoordinateCounts(sampleRegionToponymCoordinateCounts);
+
+            double[][] sampleRegionMeans = annealer.getRegionMeans();
+            sampleRegionMeans = TGArrays.expandSingleTierR(sampleRegionMeans, newExpectedR, currentR, coordParamLen);
+            annealer.setRegionMeans(sampleRegionMeans);
+        }
 
         expectedR = newExpectedR;
     }
