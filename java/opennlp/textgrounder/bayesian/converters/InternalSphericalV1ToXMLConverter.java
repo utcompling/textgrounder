@@ -46,7 +46,7 @@ public class InternalSphericalV1ToXMLConverter extends InternalToXMLConverter {
     /**
      *
      */
-    protected SphericalInputReader inputReader;
+    protected SphericalInternalToInternalInputReader inputReader;
     /**
      * 
      */
@@ -62,7 +62,7 @@ public class InternalSphericalV1ToXMLConverter extends InternalToXMLConverter {
         InputReader reader = new BinaryInputReader(_converterExperimentParameters);
         lexicon = reader.readLexicon();
 
-        inputReader = new SphericalBinaryInputReader(_converterExperimentParameters);
+        inputReader = new SphericalInternalToInternalBinaryInputReader(_converterExperimentParameters);
     }
 
     /**

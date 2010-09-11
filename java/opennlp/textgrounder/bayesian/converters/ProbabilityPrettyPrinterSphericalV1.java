@@ -44,7 +44,7 @@ import org.jdom.input.SAXBuilder;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
-import opennlp.textgrounder.bayesian.spherical.io.SphericalBinaryInputReader;
+import opennlp.textgrounder.bayesian.spherical.io.*;
 
 /**
  *
@@ -79,7 +79,7 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
     /**
      *
      */
-    protected double[] averagedAllWordsRegionCounts;
+    protected double[] averagedRegionCountsOfAllWords;
     /**
      *
      */
@@ -99,7 +99,18 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
     /**
      *
      */
-    protected SphericalInputReader sphericalInputReader = null;
+    protected SphericalInternalToInternalInputReader sphericalInputReader = null;
+    ////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////
+    /**
+     *
+     */
+    private double[] averagedWordByTopicCounts;
+    /**
+     *
+     */
+    private double[] averagedToponymByRegionCounts;
 
     public ProbabilityPrettyPrinterSphericalV1(ConverterExperimentParameters _parameters) {
         super(_parameters);
@@ -107,8 +118,8 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
 
     @Override
     public void readFiles() {
-        sphericalInputReader = new SphericalBinaryInputReader(experimentParameters);
-        
+        sphericalInputReader = new SphericalInternalToInternalBinaryInputReader(experimentParameters);
+
         AveragedSphericalCountWrapper averagedCountWrapper = sphericalInputReader.readProbabilities();
 
         alpha = averagedCountWrapper.getAlpha();
@@ -135,7 +146,7 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
         averagedRegionMeans = averagedCountWrapper.getAveragedRegionMeans();
         averagedRegionToponymCoordinateCounts = averagedCountWrapper.getAveragedRegionToponymCoordinateCounts();
         averagedRegionByDocumentCounts = averagedCountWrapper.getAveragedRegionByDocumentCounts();
-        averagedWordByRegionCounts = averagedCountWrapper.getAveragedWordByRegionCounts();
+        averagedToponymByRegionCounts = averagedWordByRegionCounts = averagedCountWrapper.getAveragedWordByRegionCounts();
 
         lexicon = inputReader.readLexicon();
     }
@@ -143,7 +154,7 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
     @Override
     public void normalizeAndPrintXMLProbabilities() {
         int outputPerClass = experimentParameters.getOutputPerClass();
-        String outputPath = experimentParameters.getXmlConditionalProbabilitiesFilename();
+        String outputPath = experimentParameters.getXmlConditionalProbabilitiesPath();
 
         try {
 
@@ -151,8 +162,8 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
             XMLStreamWriter w = factory.createXMLStreamWriter(new BufferedWriter(new FileWriter(outputPath)));
 
             String rootName = "probabilities";
-            String wordByRegionName = "word-by-region";
-            String regionByWordName = "region-by-word";
+            String wordByRegionName = "toponym-by-region";
+            String regionByWordName = "region-by-toponym";
             String regionByDocumentName = "region-by-document";
             w.writeStartDocument("UTF-8", "1.0");
             w.writeStartElement(rootName);
@@ -164,16 +175,16 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
                 double[] averagedRegionCounts = new double[R];
                 Arrays.fill(averagedRegionCounts, 0);
                 for (int i : nonEmptyRArray) {
-                    for (int j = 0; j < W; ++j) {
-                        sum += averagedWordByRegionCounts[j * R + i] + beta;
-                        averagedRegionCounts[i] += averagedWordByRegionCounts[j * R + i] + beta;
+                    for (int j = 0; j < T; ++j) {
+                        sum += averagedToponymByRegionCounts[j * R + i] + beta;
+                        averagedRegionCounts[i] += averagedToponymByRegionCounts[j * R + i] + beta;
                     }
                 }
 
                 for (int i : nonEmptyRArray) {
                     ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
-                    for (int j = 0; j < W; ++j) {
-                        topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * R + i] + beta));
+                    for (int j = 0; j < T; ++j) {
+                        topWords.add(new IntDoublePair(j, averagedToponymByRegionCounts[j * R + i] + beta));
                     }
                     Collections.sort(topWords);
 
@@ -201,22 +212,22 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
             {
                 w.writeStartElement(regionByWordName);
 
-                double[] wordCounts = new double[W];
+                double[] wordCounts = new double[T];
 
-                for (int i = 0; i < W; ++i) {
+                for (int i = 0; i < T; ++i) {
                     wordCounts[i] = 0;
                     int wordoff = i * R;
                     for (int j : nonEmptyRArray) {
-                        wordCounts[i] += averagedWordByRegionCounts[wordoff + j] + beta;
+                        wordCounts[i] += averagedToponymByRegionCounts[wordoff + j] + beta;
                     }
                 }
 
 
-                for (int i = 0; i < W; ++i) {
+                for (int i = 0; i < T; ++i) {
                     int wordoff = i * R;
                     ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                     for (int j : nonEmptyRArray) {
-                        topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j] + beta));
+                        topRegions.add(new IntDoublePair(j, averagedToponymByRegionCounts[wordoff + j] + beta));
                     }
                     Collections.sort(topRegions);
 
@@ -319,42 +330,42 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
     }
 
     /**
-     *
+     * Only for toponyms
      */
     @Override
     public void normalizeAndPrintWordByRegion() {
         try {
-            String wordByRegionFilename = experimentParameters.getWordByRegionProbabilitiesPath();
-            BufferedWriter wordByRegionWriter = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(wordByRegionFilename))));
+            String toponymByRegionFilename = experimentParameters.getWordByRegionProbabilitiesPath();
+            BufferedWriter toponymByRegionWriter = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(toponymByRegionFilename))));
 
             double sum = 0.;
             double[] averagedRegionCounts = new double[R];
             Arrays.fill(averagedRegionCounts, 0);
             for (int i : nonEmptyRArray) {
-                for (int j = 0; j < W; ++j) {
-                    sum += averagedWordByRegionCounts[j * R + i] + beta;
-                    averagedRegionCounts[i] += averagedWordByRegionCounts[j * R + i] + beta;
+                for (int j = 0; j < T; ++j) {
+                    sum += averagedToponymByRegionCounts[j * R + i] + beta;
+                    averagedRegionCounts[i] += averagedToponymByRegionCounts[j * R + i] + beta;
                 }
             }
 
             for (int i : nonEmptyRArray) {
                 ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
-                for (int j = 0; j < W; ++j) {
-                    topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * R + i] + beta));
+                for (int j = 0; j < T; ++j) {
+                    topWords.add(new IntDoublePair(j, averagedToponymByRegionCounts[j * R + i] + beta));
                 }
                 Collections.sort(topWords);
 
                 Coordinate coord = new Coordinate(TGMath.cartesianToSpherical(TGMath.normalizeVector(averagedRegionMeans[i])));
-                wordByRegionWriter.write(String.format("Region%04d\t%.6f\t%.6f\t%.2f\t%.8e", i, coord.longitude, coord.latitude, kappa, averagedRegionCounts[i] / sum));
-                wordByRegionWriter.newLine();
+                toponymByRegionWriter.write(String.format("Region%04d\t%.6f\t%.6f\t%.2f\t%.8e", i, coord.longitude, coord.latitude, kappa, averagedRegionCounts[i] / sum));
+                toponymByRegionWriter.newLine();
                 for (IntDoublePair pair : topWords) {
-                    wordByRegionWriter.write(String.format("%s\t%.8e", lexicon.getWordForInt(pair.index), pair.count / averagedRegionCounts[i]));
-                    wordByRegionWriter.newLine();
+                    toponymByRegionWriter.write(String.format("%s\t%.8e", lexicon.getWordForInt(pair.index), pair.count / averagedRegionCounts[i]));
+                    toponymByRegionWriter.newLine();
                 }
-                wordByRegionWriter.newLine();
+                toponymByRegionWriter.newLine();
             }
 
-            wordByRegionWriter.close();
+            toponymByRegionWriter.close();
         } catch (FileNotFoundException ex) {
             Logger.getLogger(ProbabilityPrettyPrinterSphericalV2.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
@@ -365,43 +376,43 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
     }
 
     /**
-     *
+     * Only for toponyms
      */
     @Override
     public void normalizeAndPrintRegionByWord() {
         try {
-            String regionByWordFilename = experimentParameters.getRegionByWordProbabilitiesPath();
-            BufferedWriter regionByWordWriter = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(regionByWordFilename))));
+            String regionByToponymFilename = experimentParameters.getRegionByWordProbabilitiesPath();
+            BufferedWriter regionByToponymWriter = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(regionByToponymFilename))));
 
-            double[] wordCounts = new double[W];
+            double[] wordCounts = new double[T];
 
-            for (int i = 0; i < W; ++i) {
+            for (int i = 0; i < T; ++i) {
                 wordCounts[i] = 0;
                 int wordoff = i * R;
                 for (int j : nonEmptyRArray) {
-                    wordCounts[i] += averagedWordByRegionCounts[wordoff + j] + beta;
+                    wordCounts[i] += averagedToponymByRegionCounts[wordoff + j] + beta;
                 }
             }
 
-            for (int i = 0; i < W; ++i) {
+            for (int i = 0; i < T; ++i) {
                 int wordoff = i * R;
                 ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                 for (int j : nonEmptyRArray) {
-                    topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j] + beta));
+                    topRegions.add(new IntDoublePair(j, averagedToponymByRegionCounts[wordoff + j] + beta));
                 }
                 Collections.sort(topRegions);
 
-                regionByWordWriter.write(String.format("%s", lexicon.getWordForInt(i)));
-                regionByWordWriter.newLine();
+                regionByToponymWriter.write(String.format("%s", lexicon.getWordForInt(i)));
+                regionByToponymWriter.newLine();
                 for (IntDoublePair pair : topRegions) {
                     Coordinate coord = new Coordinate(TGMath.cartesianToSpherical(TGMath.normalizeVector(averagedRegionMeans[pair.index])));
-                    regionByWordWriter.write(String.format("%.6f\t%.6f\t%.2f\t%.8e", coord.longitude, coord.latitude, kappa, pair.count / wordCounts[i]));
-                    regionByWordWriter.newLine();
+                    regionByToponymWriter.write(String.format("%.6f\t%.6f\t%.2f\t%.8e", coord.longitude, coord.latitude, kappa, pair.count / wordCounts[i]));
+                    regionByToponymWriter.newLine();
                 }
-                regionByWordWriter.newLine();
+                regionByToponymWriter.newLine();
             }
 
-            regionByWordWriter.close();
+            regionByToponymWriter.close();
         } catch (FileNotFoundException ex) {
             Logger.getLogger(ProbabilityPrettyPrinterSphericalV2.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);

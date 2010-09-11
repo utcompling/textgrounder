@@ -84,7 +84,7 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
         /**
          * not yet used
          */
-        averagedAllWordsRegionCounts = averagedCountWrapper.getAveragedAllWordsRegionCounts();
+        averagedRegionCountsOfAllWords = averagedCountWrapper.getAveragedAllWordsRegionCounts();
         toponymCoordinateLexicon = averagedCountWrapper.getToponymCoordinateLexicon();
 
         lexicon = inputReader.readLexicon();
@@ -93,7 +93,7 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
     @Override
     public void normalizeAndPrintXMLProbabilities() {
         int outputPerClass = experimentParameters.getOutputPerClass();
-        String outputPath = experimentParameters.getXmlConditionalProbabilitiesFilename();
+        String outputPath = experimentParameters.getXmlConditionalProbabilitiesPath();
 
         try {
 

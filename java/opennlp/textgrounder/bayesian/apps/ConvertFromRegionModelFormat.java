@@ -29,7 +29,23 @@ public class ConvertFromRegionModelFormat extends BaseApp {
         ConverterExperimentParameters experimentParameters = new ConverterExperimentParameters();
         processRawCommandline(args, experimentParameters);
 
-        InternalToXMLConverter converter = new InternalRLDAToXMLConverter(experimentParameters);
+        InternalToXMLConverter converter = null;
+
+        switch (experimentParameters.getModelType()) {
+            case RLDA:
+                converter = new InternalRLDAToXMLConverter(experimentParameters);
+                break;
+            case V1:
+            case V1_INDEPENDENT_REGIONS:
+                converter = new InternalSphericalV1ToXMLConverter(experimentParameters);
+                break;
+            case V2:
+            case V2_DEPENDENT_REGIONS:
+                converter = new InternalSphericalV2ToXMLConverter(experimentParameters);
+                break;
+        }
+
+        converter.initialize();
         converter.convert();
     }
 }

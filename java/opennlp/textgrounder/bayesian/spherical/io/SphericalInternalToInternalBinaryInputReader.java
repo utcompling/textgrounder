@@ -32,12 +32,12 @@ import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class SphericalBinaryInputReader extends SphericalInputReader {
+public class SphericalInternalToInternalBinaryInputReader extends SphericalInternalToInternalInputReader {
 
     protected DataInputStream tokenArrayInputStream;
     protected DataInputStream toponymCoordinateInputStream;
 
-    public SphericalBinaryInputReader(ExperimentParameters _experimentParameters) {
+    public SphericalInternalToInternalBinaryInputReader(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         openTokenArrayReader();
         openToponymCoordinateReader();
@@ -45,16 +45,20 @@ public class SphericalBinaryInputReader extends SphericalInputReader {
 
     @Override
     public int[] nextTokenArrayRecord() throws EOFException, IOException {
-        int[] record = new int[4];
+        int[] record = new int[6];
 
         int wordid = tokenArrayInputStream.readInt();
         int docid = tokenArrayInputStream.readInt();
         int topstatus = (int) tokenArrayInputStream.readByte();
         int stopstatus = (int) tokenArrayInputStream.readByte();
+        int regid = (int) tokenArrayInputStream.readInt();
+        int coordid = (int) tokenArrayInputStream.readInt();
         record[0] = wordid;
         record[1] = docid;
         record[2] = topstatus;
         record[3] = stopstatus;
+        record[4] = regid;
+        record[5] = coordid;
         return record;
     }
 
@@ -94,10 +98,10 @@ public class SphericalBinaryInputReader extends SphericalInputReader {
                 tokenArrayInputStream = new DataInputStream(new BufferedInputStream(new FileInputStream(tokenArrayFile)));
             }
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(SphericalBinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalInternalToInternalBinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(SphericalBinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalInternalToInternalBinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }
@@ -112,10 +116,10 @@ public class SphericalBinaryInputReader extends SphericalInputReader {
                 toponymCoordinateInputStream = new DataInputStream(new BufferedInputStream(new FileInputStream(toponymCoordinateFile)));
             }
         } catch (FileNotFoundException ex) {
-            Logger.getLogger(SphericalBinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalInternalToInternalBinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(SphericalBinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(SphericalInternalToInternalBinaryInputReader.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }

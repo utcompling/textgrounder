@@ -159,7 +159,7 @@ public class ExperimentParameters {
     /**
      * Path to array of tokens, toponym status. Should be a file.
      */
-    protected String tokenArrayOutputPath = "token-array-output.dat.gz";
+    protected String tokenArrayOutputFilename = "token-array-output.dat.gz";
     /**
      * 
      */
@@ -318,7 +318,7 @@ public class ExperimentParameters {
     }
 
     public String getTokenArrayOutputPath() {
-        return joinPath(projectRoot, tokenArrayOutputPath);
+        return joinPath(projectRoot, tokenArrayOutputFilename);
     }
 
     public String getTokenArrayInputPath() {
@@ -333,7 +333,7 @@ public class ExperimentParameters {
         return outputPerClass;
     }
 
-    public String getXmlConditionalProbabilitiesFilename() {
+    public String getXmlConditionalProbabilitiesPath() {
         return joinPath(projectRoot, xmlConditionalProbabilitiesFilename);
     }
 

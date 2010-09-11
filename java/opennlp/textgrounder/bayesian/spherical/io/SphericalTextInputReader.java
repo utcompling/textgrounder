@@ -33,7 +33,7 @@ import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class SphericalTextInputReader extends SphericalInputReader {
+public class SphericalTextInputReader extends SphericalGlobalToInternalInputReader {
 
     protected BufferedReader tokenArrayReader;
     protected BufferedReader toponymCoordinateReader;

@@ -83,7 +83,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
 
         switch (_experimentParameters.getInputFormat()) {
             case BINARY:
-                inputReader = new SphericalBinaryInputReader(_experimentParameters);
+                inputReader = new SphericalGlobalToInternalBinaryInputReader(_experimentParameters);
                 break;
             case TEXT:
                 inputReader = new SphericalTextInputReader(_experimentParameters);
@@ -148,11 +148,11 @@ public abstract class SphericalModelBase extends SphericalModelFields {
     protected void initializeCountArrays() {
         expectedR = (int) Math.ceil(crpalpha * Math.log(1 + N / crpalpha)) * 3;
 
-        toponymRegionCounts = new int[expectedR];
-        Arrays.fill(toponymRegionCounts, 0);
+        regionCountsOfToponyms = new int[expectedR];
+        Arrays.fill(regionCountsOfToponyms, 0);
 
-        allWordsRegionCounts = new int[expectedR];
-        Arrays.fill(allWordsRegionCounts, 0);
+        regionCountsOfAllWords = new int[expectedR];
+        Arrays.fill(regionCountsOfAllWords, 0);
 
         regionByDocumentCounts = new int[D * expectedR];
         Arrays.fill(regionByDocumentCounts, 0);
@@ -356,7 +356,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
 
     protected void resetRegionID(SphericalAnnealer _annealer, int curregionid, int curdocid) {
         double[] probs = new double[currentR];
-        allWordsRegionCounts[curregionid] = 0;
+        regionCountsOfAllWords[curregionid] = 0;
         for (int i = 0; i < D; ++i) {
             regionByDocumentCounts[i * expectedR + curregionid] = 0;
         }
@@ -373,7 +373,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                     int wordoff = wordid * expectedR;
                     for (int j = 0; j < currentR; ++j) {
                         probs[j] = (wordByRegionCounts[wordoff + j] + beta)
-                              / (allWordsRegionCounts[j] + betaW)
+                              / (regionCountsOfAllWords[j] + betaW)
                               * regionByDocumentCounts[docoff + j];
                     }
                     probs[curregionid] = 0;
@@ -387,7 +387,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                     }
                     regionVector[i] = regionid;
 
-                    allWordsRegionCounts[regionid]++;
+                    regionCountsOfAllWords[regionid]++;
                     regionByDocumentCounts[docoff + regionid]++;
                     wordByRegionCounts[wordoff + regionid]++;
                 }
@@ -402,7 +402,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         train(annealer);
         if (annealer.getSamples() != 0) {
             averagedWordByRegionCounts = annealer.getWordByRegionCounts();
-            averagedAllWordsRegionCounts = annealer.getAllWordsRegionCounts();
+            averagedRegionCountsOfAllWords = annealer.getAllWordsRegionCounts();
             averagedRegionByDocumentCounts = annealer.getRegionByDocumentCounts();
             averagedRegionMeans = annealer.getRegionMeans();
             averagedRegionToponymCoordinateCounts = annealer.getRegionToponymCoordinateCounts();

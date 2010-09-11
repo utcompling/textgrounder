@@ -103,7 +103,7 @@ public class ProbabilityPrettyPrinterRLDA extends ProbabilityPrettyPrinter {
 
     public void writeTfIdfWords(XMLStreamWriter w) throws XMLStreamException {
         int outputPerClass = experimentParameters.getOutputPerClass();
-        String outputPath = experimentParameters.getXmlConditionalProbabilitiesFilename();
+        String outputPath = experimentParameters.getXmlConditionalProbabilitiesPath();
 
         w.writeStartDocument("UTF-8", "1.0");
         w.writeStartElement("probabilities");
@@ -172,7 +172,7 @@ public class ProbabilityPrettyPrinterRLDA extends ProbabilityPrettyPrinter {
     @Override
     public void normalizeAndPrintXMLProbabilities() {
         int outputPerClass = experimentParameters.getOutputPerClass();
-        String outputPath = experimentParameters.getXmlConditionalProbabilitiesFilename();
+        String outputPath = experimentParameters.getXmlConditionalProbabilitiesPath();
 
         try {
 

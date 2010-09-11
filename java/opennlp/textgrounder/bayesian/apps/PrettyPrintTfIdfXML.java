@@ -40,7 +40,7 @@ public class PrettyPrintTfIdfXML extends BaseApp {
         probabilityPrettyPrinter.readFiles();
         probabilityPrettyPrinter.normalizeAndPrintXMLProbabilities();
 
-        String outputPath = experimentParameters.getXmlConditionalProbabilitiesFilename();
+        String outputPath = experimentParameters.getXmlConditionalProbabilitiesPath();
         XMLOutputFactory factory = XMLOutputFactory.newInstance();
         XMLStreamWriter w = factory.createXMLStreamWriter(new BufferedWriter(new FileWriter(outputPath)));
 

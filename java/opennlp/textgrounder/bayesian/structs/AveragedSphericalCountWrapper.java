@@ -27,7 +27,7 @@ import opennlp.textgrounder.bayesian.spherical.models.SphericalModelFields;
 public class AveragedSphericalCountWrapper extends SphericalModelFields implements Serializable {
 
     public AveragedSphericalCountWrapper(SphericalModelBase _regionModel) {
-        averagedAllWordsRegionCounts = _regionModel.getAveragedAllWordsRegionCounts();
+        averagedRegionCountsOfAllWords = _regionModel.getAveragedAllWordsRegionCounts();
         averagedRegionByDocumentCounts = _regionModel.getAveragedRegionByDocumentCounts();
         averagedTopicByDocumentCounts = _regionModel.getAveragedTopicByDocumentCounts();
         averagedWordByRegionCounts = _regionModel.getAveragedWordByRegionCounts();

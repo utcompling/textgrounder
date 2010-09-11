@@ -23,7 +23,7 @@ import java.util.HashSet;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class SphericalModelFields implements Serializable{
+public class SphericalModelFields implements Serializable {
 
     /**
      * Hyperparameter for CRP
@@ -87,22 +87,39 @@ public class SphericalModelFields implements Serializable{
      */
     protected int coordParamLen = 3;
     /**
-     * An index of toponyms and possible regions. The goal is fast lookup and not
-     * frugality with memory. The dimensions are equivalent to the wordByRegionCounts
-     * array. Instead of counts, this array is populated with ones and zeros.
-     * If a toponym occurs in a certain region, the cell value is one, zero if not.
+     * Vector of topics
      */
-    protected double[][][] toponymCoordinateLexicon;
+    protected int[] regionVector;
+    /**
+     *
+     */
+    protected int[] topicVector;
     /**
      * Vector of document indices
      */
     protected int[] documentVector;
     /**
+     * Vector of stopwords. If 0, the word is not a stopword. If 1, it is.
+     */
+    protected int[] stopwordVector;
+    /**
+     *
+     */
+    protected int[] coordinateVector;
+    /**
+     * Vector of toponyms. If 0, the word is not a toponym. If 1, it is.
+     */
+    protected int[] toponymVector;
+    /**
+     * Vector of word indices
+     */
+    protected int[] wordVector;
+    /**
      * Counts of topics per document
      */
     protected int[] regionByDocumentCounts;
     /**
-     * 
+     * only used if there is an independent topic model component to model
      */
     protected int[] topicByDocumentCounts;
     /**
@@ -119,41 +136,24 @@ public class SphericalModelFields implements Serializable{
      */
     protected int[][][] regionToponymCoordinateCounts;
     /**
+     * An index of toponyms and possible regions. The goal is fast lookup and not
+     * frugality with memory. The dimensions are equivalent to the wordByRegionCounts
+     * array. Instead of counts, this array is populated with ones and zeros.
+     * If a toponym occurs in a certain region, the cell value is one, zero if not.
+     */
+    protected double[][][] toponymCoordinateLexicon;
+    /**
      * 
      */
     protected double[][] regionMeans;
     /**
      * Counts of regions but only for toponyms
      */
-    protected int[] toponymRegionCounts;
+    protected int[] regionCountsOfToponyms;
     /**
      * Counts of regions for all words
      */
-    protected int[] allWordsRegionCounts;
-    /**
-     * Vector of topics
-     */
-    protected int[] regionVector;
-    /**
-     * 
-     */
-    protected int[] topicVector;
-    /**
-     * Vector of stopwords. If 0, the word is not a stopword. If 1, it is.
-     */
-    protected int[] stopwordVector;
-    /**
-     * 
-     */
-    protected int[] coordinateVector;
-    /**
-     * Vector of toponyms. If 0, the word is not a toponym. If 1, it is.
-     */
-    protected int[] toponymVector;
-    /**
-     * Vector of word indices
-     */
-    protected int[] wordVector;
+    protected int[] regionCountsOfAllWords;
     /**
      *
      */
@@ -165,7 +165,7 @@ public class SphericalModelFields implements Serializable{
     /**
      *
      */
-    protected double[] averagedAllWordsRegionCounts;
+    protected double[] averagedRegionCountsOfAllWords;
     /**
      *
      */
@@ -216,11 +216,11 @@ public class SphericalModelFields implements Serializable{
     }
 
     public int[] getAllWordsRegionCounts() {
-        return allWordsRegionCounts;
+        return regionCountsOfAllWords;
     }
 
     public void setAllWordsRegionCounts(int[] allWordsRegionCounts) {
-        this.allWordsRegionCounts = allWordsRegionCounts;
+        this.regionCountsOfAllWords = allWordsRegionCounts;
     }
 
     public double getAlpha() {
@@ -232,11 +232,11 @@ public class SphericalModelFields implements Serializable{
     }
 
     public double[] getAveragedAllWordsRegionCounts() {
-        return averagedAllWordsRegionCounts;
+        return averagedRegionCountsOfAllWords;
     }
 
     public void setAveragedAllWordsRegionCounts(double[] averagedAllWordsRegionCounts) {
-        this.averagedAllWordsRegionCounts = averagedAllWordsRegionCounts;
+        this.averagedRegionCountsOfAllWords = averagedAllWordsRegionCounts;
     }
 
     public double[] getAveragedRegionByDocumentCounts() {
@@ -368,11 +368,11 @@ public class SphericalModelFields implements Serializable{
     }
 
     public int[] getRegionCounts() {
-        return toponymRegionCounts;
+        return regionCountsOfToponyms;
     }
 
     public void setRegionCounts(int[] regionCounts) {
-        this.toponymRegionCounts = regionCounts;
+        this.regionCountsOfToponyms = regionCounts;
     }
 
     public double[][] getRegionMeans() {
@@ -464,10 +464,10 @@ public class SphericalModelFields implements Serializable{
     }
 
     public int[] getToponymRegionCounts() {
-        return toponymRegionCounts;
+        return regionCountsOfToponyms;
     }
 
     public void setToponymRegionCounts(int[] toponymRegionCounts) {
-        this.toponymRegionCounts = toponymRegionCounts;
+        this.regionCountsOfToponyms = toponymRegionCounts;
     }
 }
