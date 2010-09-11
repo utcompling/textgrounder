@@ -154,8 +154,6 @@ public class SphericalModelV1 extends SphericalModelBase {
             }
         }
 
-        emptyRSet.add(currentR);
-
         for (int i = 0; i < currentR; ++i) {
             int[][] toponymCoordinateCounts = regionToponymCoordinateCounts[i];
             double[] mean = new double[3];
@@ -190,7 +188,7 @@ public class SphericalModelV1 extends SphericalModelBase {
     @Override
     public void train(SphericalAnnealer _annealer) {
         int wordid, docid, regionid, topicid, coordid, emptyid = 0;
-        int wordoff, docoff,regoff;
+        int wordoff, docoff, regoff;
         int istoponym, isstopword;
         int curCoordCount;
         double[][] curCoords;
@@ -230,6 +228,13 @@ public class SphericalModelV1 extends SphericalModelBase {
                             regionmean = new double[3];
                             Arrays.fill(regionmean, 0);
                             regionMeans[regionid] = regionmean;
+                        } else {
+                            if (emptyRSet.isEmpty()) {
+                                emptyid = currentR;
+                            } else {
+                                Iterator<Integer> it = emptyRSet.iterator();
+                                emptyid = it.next();
+                            }
                         }
 
                         for (int j = 0; j < currentR; ++j) {
@@ -252,10 +257,8 @@ public class SphericalModelV1 extends SphericalModelBase {
                             }
                         }
 
-                        if (addedEmptyR) {
-                            for (int j = 0; j < curCoordCount; ++j) {
-                                regionProbs[emptyid * maxCoord + j] = crpalpha_mod / curCoordCount;
-                            }
+                        for (int j = 0; j < curCoordCount; ++j) {
+                            regionProbs[emptyid * maxCoord + j] = crpalpha_mod / curCoordCount;
                         }
 
                         totalprob = annealer.annealProbs(0, currentR * maxCoord, regionProbs);
@@ -284,11 +287,12 @@ public class SphericalModelV1 extends SphericalModelBase {
 
                         if (emptyRSet.contains(regionid)) {
                             emptyRSet.remove(regionid);
-
-                            if (emptyRSet.isEmpty()) {
-                                currentR += 1;
-                                emptyRSet.add(currentR);
-                            }
+                        } else if (regionid == currentR) {
+                            currentR += 1;
+                        }
+                        while (emptyRSet.contains(currentR - 1)) {
+                            currentR -= 1;
+                            emptyRSet.remove(currentR);
                         }
                     } else {
                         wordid = wordVector[i];
