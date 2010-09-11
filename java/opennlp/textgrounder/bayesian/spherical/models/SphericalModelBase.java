@@ -379,7 +379,10 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                               / (regionCountsOfAllWords[j] + betaW)
                               * regionByDocumentCounts[docoff + j];
                     }
-                    probs[curregionid] = 0;
+                    for (int j : emptyRSet) {
+                        probs[j] = 0;
+                    }
+
                     double totalprob = annealer.annealProbs(0, currentR, probs);
                     double r = rand.nextDouble() * totalprob;
                     double max = probs[0];

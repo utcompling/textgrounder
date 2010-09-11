@@ -16,7 +16,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.apps;
 
-import opennlp.textgrounder.bayesian.converters.XMLToInternalConverter;
+import opennlp.textgrounder.bayesian.converters.*;
 
 /**
  *
@@ -29,7 +29,23 @@ public class ConvertToRegionModelFormat extends BaseApp {
         ConverterExperimentParameters experimentParameters = new ConverterExperimentParameters();
         processRawCommandline(args, experimentParameters);
 
-        XMLToInternalConverter converter = new XMLToInternalConverter(experimentParameters);
+        XMLToInternalConverter converter = null;
+
+        switch(experimentParameters.getModelType()) {
+            case RLDA:
+            case RLDAC:
+                converter = new XMLToInternalConverterRLDA(experimentParameters);
+                break;
+            case V1:
+            case V1_INDEPENDENT_REGIONS:
+            case V2:
+            case V2_DEPENDENT_REGIONS:
+            case V3:
+            case V3_DEPENDENT_REGIONS:
+                converter = new XMLToInternalConverterSpherical(experimentParameters);
+                break;
+        }
+
         converter.convert();
         converter.writeToFiles();
     }

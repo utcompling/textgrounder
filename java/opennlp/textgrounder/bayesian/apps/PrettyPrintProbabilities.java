@@ -32,6 +32,7 @@ public class PrettyPrintProbabilities extends BaseApp {
         ProbabilityPrettyPrinter probabilityPrettyPrinter = null;
         switch (experimentParameters.getModelType()) {
             case RLDA:
+            case RLDAC:
                 probabilityPrettyPrinter = new ProbabilityPrettyPrinterRLDA(experimentParameters);
                 break;
             case V1:
@@ -40,6 +41,8 @@ public class PrettyPrintProbabilities extends BaseApp {
                 break;
             case V2:
             case V2_DEPENDENT_REGIONS:
+            case V3:
+            case V3_DEPENDENT_REGIONS:
                 probabilityPrettyPrinter = new ProbabilityPrettyPrinterSphericalV2(experimentParameters);
         }
 

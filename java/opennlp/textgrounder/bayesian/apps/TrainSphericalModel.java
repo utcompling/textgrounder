@@ -40,7 +40,13 @@ public class TrainSphericalModel extends BaseApp {
             case V2_DEPENDENT_REGIONS:
                 smb = new SphericalModelV2(experimentParameters);
                 break;
+            case V3:
+            case V3_DEPENDENT_REGIONS:
+                smb = new SphericalModelV3(experimentParameters);
+                break;
             default:
+                System.err.println(experimentParameters.getModelType().toString() + " is an invalid model for this experiment. Choose V1, V2 or V3.");
+                System.exit(1);
                 break;
         }
 

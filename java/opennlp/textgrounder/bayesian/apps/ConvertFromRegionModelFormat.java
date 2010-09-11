@@ -41,6 +41,8 @@ public class ConvertFromRegionModelFormat extends BaseApp {
                 break;
             case V2:
             case V2_DEPENDENT_REGIONS:
+            case V3:
+            case V3_DEPENDENT_REGIONS:
                 converter = new InternalSphericalV2ToXMLConverter(experimentParameters);
                 break;
         }

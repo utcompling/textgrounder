@@ -256,6 +256,13 @@ public class SphericalModelV1 extends SphericalModelBase {
                             }
                         }
 
+                        for (int j = 0; j < curCoordCount; ++j) {
+                            regionProbs[emptyid * maxCoord + j] = crpalpha_mod / curCoordCount;
+                        }
+                        for (int j = curCoordCount; j < maxCoord; ++j) {
+                            regionProbs[emptyid * maxCoord + j] = 0;
+                        }
+
                         if (emptyid == currentR) {
                             totalprob = annealer.annealProbs(0, (currentR + 1) * maxCoord, regionProbs);
                         } else {

@@ -37,10 +37,13 @@ public class ExperimentParameters {
     public static enum MODEL_TYPE {
 
         RLDA,
+        RLDAC,
         V1,
         V1_INDEPENDENT_REGIONS,
         V2,
-        V2_DEPENDENT_REGIONS
+        V2_DEPENDENT_REGIONS,
+        V3,
+        V3_DEPENDENT_REGIONS
     }
     /**
      * Switch for whether hyperparameters should be reestimated or not.

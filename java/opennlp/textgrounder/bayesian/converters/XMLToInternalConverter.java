@@ -28,7 +28,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.converters.callbacks.*;
-import opennlp.textgrounder.bayesian.wrapper.io.*;
 import opennlp.textgrounder.bayesian.textstructs.*;
 import opennlp.textgrounder.bayesian.topostructs.*;
 import org.jdom.Document;
@@ -40,7 +39,7 @@ import org.jdom.input.SAXBuilder;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class XMLToInternalConverter {
+public abstract class XMLToInternalConverter {
 
     /**
      *
@@ -65,14 +64,6 @@ public class XMLToInternalConverter {
     /**
      *
      */
-    protected int activeRegions;
-    /**
-     *
-     */
-    protected int degreesPerRegion;
-    /**
-     *
-     */
     protected int countCutoff = -1;
     /**
      *
@@ -86,18 +77,6 @@ public class XMLToInternalConverter {
      *
      */
     protected ConverterExperimentParameters converterExperimentParameters;
-    /**
-     *
-     */
-    protected Region[][] regionArray;
-    /**
-     * 
-     */
-    protected ToponymToRegionIDsMap toponymToRegionIDsMap;
-    /**
-     *
-     */
-    protected ToponymToCoordinateMap toponymToCoordinateMap;
     /**
      * 
      */
@@ -130,53 +109,7 @@ public class XMLToInternalConverter {
         stopwordList = new StopwordList();
         trainingMaterialCallback = new TrainingMaterialCallback(lexicon);
 
-        degreesPerRegion = converterExperimentParameters.getDegreesPerRegion();
         countCutoff = converterExperimentParameters.getCountCutoff();
-
-        toponymToRegionIDsMap = new ToponymToRegionIDsMap();
-        toponymToCoordinateMap = new ToponymToCoordinateMap();
-        activeRegions = 0;
-    }
-
-    /**
-     * Initialize the region array to be of the right size and contain null
-     * pointers.
-     */
-    public void initializeRegionArray() {
-        activeRegions = 0;
-
-        int regionArrayWidth = 360 / (int) degreesPerRegion;
-        int regionArrayHeight = 180 / (int) degreesPerRegion;
-
-        regionArray = new Region[regionArrayWidth][regionArrayHeight];
-
-        for (int w = 0; w < regionArrayWidth; w++) {
-            for (int h = 0; h < regionArrayHeight; h++) {
-                regionArray[w][h] = null;
-            }
-        }
-    }
-
-    /**
-     * Add a single location to the Region object in the region array that
-     * corresponds to the latitude and longitude stored in the location object.
-     * Create the Region object if necessary. 
-     *
-     * @param loc
-     */
-    protected Region getRegion(Coordinate coord) {
-        int curX = ((int) Math.floor(coord.longitude + 180)) / degreesPerRegion;
-        int curY = ((int) Math.floor(coord.latitude + 90)) / degreesPerRegion;
-
-        if (regionArray[curX][curY] == null) {
-            double minLon = coord.longitude - (coord.longitude + 180) % degreesPerRegion;
-            double maxLon = minLon + degreesPerRegion;
-            double minLat = coord.latitude - (coord.latitude + 90) % degreesPerRegion;
-            double maxLat = minLat + degreesPerRegion;
-            regionArray[curX][curY] = new Region(activeRegions, minLon, maxLon, minLat, maxLat);
-            activeRegions += 1;
-        }
-        return regionArray[curX][curY];
     }
 
     /**
@@ -234,17 +167,7 @@ public class XMLToInternalConverter {
                                 double lat = Double.parseDouble(candidate.getAttributeValue("lat"));
                                 Coordinate coord = new Coordinate(lon, lat);
 
-                                Region region = getRegion(coord);
-
-                                int regid = region.id;
-
-                                if (!toponymToRegionIDsMap.containsKey(wordid)) {
-                                    toponymToRegionIDsMap.put(wordid, new HashSet<Integer>());
-                                    toponymToCoordinateMap.put(wordid, new HashSet<Coordinate>());
-                                }
-
-                                toponymToRegionIDsMap.get(wordid).add(regid);
-                                toponymToCoordinateMap.get(wordid).add(coord);
+                                addToTopoStructs(wordid, coord);
                             }
                         } else {
                             istoponym = 0;
@@ -336,21 +259,9 @@ public class XMLToInternalConverter {
     /**
      * 
      */
-    public void writeToFiles() {
-        OutputWriter outputWriter = null;
-        switch (converterExperimentParameters.getInputFormat()) {
-            case TEXT:
-                outputWriter = new TextOutputWriter(converterExperimentParameters);
-                break;
-            case BINARY:
-                outputWriter = new BinaryOutputWriter(converterExperimentParameters);
-                break;
-        }
+    public abstract void writeToFiles();
 
-        outputWriter.writeTokenArray(tokenArrayBuffer);
-        outputWriter.writeToponymRegion(toponymToRegionIDsMap);
-        outputWriter.writeToponymCoordinate(toponymToCoordinateMap);
-        outputWriter.writeLexicon(lexicon);
-        outputWriter.writeRegions(regionArray);
-    }
+    protected abstract void addToTopoStructs(int _wordid, Coordinate _coord);
+
+    protected abstract void initializeRegionArray();
 }
