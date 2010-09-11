@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -99,10 +100,10 @@ public class ExperimentParameterManipulator {
                     String s = (String) field.get(_experimentParameters);
                     fieldValue = s;
                     fieldTypeName = "string";
-                } else if (fieldTypeName.endsWith("INPUT_FORMAT")) {
+                } else if (fieldTypeName.endsWith("java.lang.Enum")) {
                     String s = field.get(_experimentParameters).toString();
                     fieldValue = s;
-                    fieldTypeName = "INPUT_FORMAT";
+                    fieldTypeName = "enum";
                 } else {
                     continue;
                 }
@@ -148,6 +149,15 @@ public class ExperimentParameterManipulator {
                 _class.getDeclaredField(_fieldName).setDouble(_experimentParameters, value);
             } else if (_fieldTypeName.equals("string")) {
                 _class.getDeclaredField(_fieldName).set(_experimentParameters, _fieldValue);
+            } else if (_fieldTypeName.equals("enum")) {
+                Enum classDefaultVal = (Enum) _class.getDeclaredField(_fieldName).get(_experimentParameters);
+                Enum[] enumValues = classDefaultVal.getClass().getEnumConstants();
+                for (Enum e : enumValues) {
+                    if (e.toString().equalsIgnoreCase(_fieldValue)) {
+                        _class.getDeclaredField(_fieldName).set(_experimentParameters, e);
+                        break;
+                    }
+                }
             } else {
                 return;
             }
@@ -158,5 +168,19 @@ public class ExperimentParameterManipulator {
                 throw new NoSuchFieldException(ex.getMessage());
             }
         }
+    }
+
+    /**
+     * Function serving no use. Just keeping it around as a reminder of how
+     * to construct generic functions
+     *
+     * @param <T>
+     * @param _inputE
+     * @param _inputS
+     * @return
+     */
+    protected static <T extends Enum<T>> T goThroughEnum(Enum<T> _inputE, String _inputS) {
+        T x = (T) _inputE;
+        return x;
     }
 }

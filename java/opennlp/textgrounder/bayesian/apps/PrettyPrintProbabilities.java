@@ -29,6 +29,9 @@ public class PrettyPrintProbabilities extends BaseApp {
         ConverterExperimentParameters experimentParameters = new ConverterExperimentParameters();
         processRawCommandline(args, experimentParameters);
 
+        switch(experimentParameters.getModelType()) {
+        }
+
         ProbabilityPrettyPrinterRLDA probabilityPrettyPrinter = new ProbabilityPrettyPrinterRLDA(experimentParameters);
         probabilityPrettyPrinter.readFiles();
         probabilityPrettyPrinter.normalizeAndPrintRegionByWord();

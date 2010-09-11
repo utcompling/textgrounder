@@ -29,11 +29,24 @@ public class TrainSphericalModel extends BaseApp {
         ExperimentParameters experimentParameters = new ExperimentParameters();
         processRawCommandline(args, experimentParameters);
 
-        SphericalModelBase rm = new SphericalModelV2(experimentParameters);
+        SphericalModelBase smb = null;
 
-        rm.initialize();
-        rm.train();
-        rm.decode();
-        rm.write();
+        switch (experimentParameters.getModelType()) {
+            case V1:
+            case V1_INDEPENDENT_REGIONS:
+                smb = new SphericalModelV1(experimentParameters);
+                break;
+            case V2:
+            case V2_DEPENDENT_REGIONS:
+                smb = new SphericalModelV2(experimentParameters);
+                break;
+            default:
+                break;
+        }
+
+        smb.initialize();
+        smb.train();
+        smb.decode();
+        smb.write();
     }
 }
