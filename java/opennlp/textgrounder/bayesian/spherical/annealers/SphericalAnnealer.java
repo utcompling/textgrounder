@@ -262,4 +262,12 @@ public abstract class SphericalAnnealer extends Annealer {
     public void setRegionMeans(double[][] _regionMeans) {
         regionMeans = _regionMeans;
     }
+
+    public double[] getTopicByDocumentCounts() {
+        return topicByDocumentCounts;
+    }
+
+    public void setTopicByDocumentCounts(double[] topicByDocumentCounts) {
+        this.topicByDocumentCounts = topicByDocumentCounts;
+    }
 }

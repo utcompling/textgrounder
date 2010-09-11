@@ -44,6 +44,7 @@ import org.jdom.input.SAXBuilder;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
+import opennlp.textgrounder.bayesian.spherical.io.SphericalBinaryInputReader;
 
 /**
  *
@@ -106,6 +107,8 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
 
     @Override
     public void readFiles() {
+        sphericalInputReader = new SphericalBinaryInputReader(experimentParameters);
+        
         AveragedSphericalCountWrapper averagedCountWrapper = sphericalInputReader.readProbabilities();
 
         alpha = averagedCountWrapper.getAlpha();
@@ -474,5 +477,15 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
             Logger.getLogger(ProbabilityPrettyPrinterSphericalV2.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
+    }
+
+    public void normalizeAndPrintWordByTopic() {
+        return;
+    }
+
+    @Override
+    public void normalizeAndPrintAll() {
+        super.normalizeAndPrintAll();
+        normalizeAndPrintWordByTopic();
     }
 }

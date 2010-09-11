@@ -39,7 +39,7 @@ public abstract class SphericalOutputWriter extends SphericalIOBase {
     public SphericalOutputWriter(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         tokenArrayFile = new File(experimentParameters.getTokenArrayOutputPath());
-        probabilitiesFile = new File(experimentParameters.getSampledProbabilitiesPath());
+        averagedCountsFile = new File(experimentParameters.getAveragedCountsPath());
     }
 
     /**
@@ -62,7 +62,7 @@ public abstract class SphericalOutputWriter extends SphericalIOBase {
           AveragedSphericalCountWrapper _averagedSphericalCountWrapper) {
         ObjectOutputStream probOut = null;
         try {
-            probOut = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(probabilitiesFile.getCanonicalPath())));
+            probOut = new ObjectOutputStream(new GZIPOutputStream(new FileOutputStream(averagedCountsFile.getCanonicalPath())));
             probOut.writeObject(_averagedSphericalCountWrapper);
             probOut.close();
         } catch (IOException ex) {

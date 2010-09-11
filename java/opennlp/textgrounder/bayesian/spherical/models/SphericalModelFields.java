@@ -16,13 +16,14 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.spherical.models;
 
+import java.io.Serializable;
 import java.util.HashSet;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class SphericalModelFields {
+public class SphericalModelFields implements Serializable{
 
     /**
      * Hyperparameter for CRP

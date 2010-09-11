@@ -38,7 +38,7 @@ public abstract class InputReader extends IOBase {
     public InputReader(ConverterExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         tokenArrayFile = new File(experimentParameters.getTokenArrayOutputPath());
-        probabilityFile = new File(experimentParameters.getSampledProbabilitiesPath());
+        probabilityFile = new File(experimentParameters.getAveragedCountsPath());
     }
 
     public Lexicon readLexicon() {

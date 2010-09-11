@@ -39,7 +39,7 @@ public abstract class RLDAOutputWriter extends RLDAIOBase {
     public RLDAOutputWriter(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         tokenArrayFile = new File(experimentParameters.getTokenArrayOutputPath());
-        probabilitiesFile = new File(experimentParameters.getSampledProbabilitiesPath());
+        probabilitiesFile = new File(experimentParameters.getAveragedCountsPath());
     }
 
     /**

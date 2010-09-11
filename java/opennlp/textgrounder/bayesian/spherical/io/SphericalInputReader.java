@@ -41,6 +41,7 @@ public abstract class SphericalInputReader extends SphericalIOBase {
     public SphericalInputReader(ExperimentParameters _experimentParameters) {
         super(_experimentParameters);
         tokenArrayFile = new File(experimentParameters.getTokenArrayInputPath());
+        averagedCountsFile = new File(experimentParameters.getAveragedCountsPath());
     }
 
     /**
@@ -94,7 +95,7 @@ public abstract class SphericalInputReader extends SphericalIOBase {
 
         ObjectInputStream probIn = null;
         try {
-            probIn = new ObjectInputStream(new GZIPInputStream(new FileInputStream(probabilitiesFile.getCanonicalPath())));
+            probIn = new ObjectInputStream(new GZIPInputStream(new FileInputStream(averagedCountsFile.getCanonicalPath())));
             normalizedProbabilityWrapper = (AveragedSphericalCountWrapper) probIn.readObject();
         } catch (IOException ex) {
             Logger.getLogger(SphericalInputReader.class.getName()).log(Level.SEVERE, null, ex);

@@ -36,7 +36,7 @@ public abstract class SphericalIOBase {
     /**
      * 
      */
-    protected File probabilitiesFile;
+    protected File averagedCountsFile;
     /**
      *
      */
@@ -44,6 +44,6 @@ public abstract class SphericalIOBase {
 
     public SphericalIOBase(ExperimentParameters _experimentParameters) {
         experimentParameters = _experimentParameters;
-        toponymCoordinateFile = new File(experimentParameters.getToponymRegionPath());
+        toponymCoordinateFile = new File(experimentParameters.getToponymCoordinatePath());
     }
 }

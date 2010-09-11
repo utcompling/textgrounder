@@ -74,11 +74,10 @@ public class SphericalBinaryInputReader extends SphericalInputReader {
         toprecord.add(new Integer(topid));
 
         int fieldsize = toponymCoordinateInputStream.readInt();
-        double[] record = new double[fieldsize * 2];
-        record[0] = topid;
-        for (int i = 0; i < fieldsize; i += 2) {
-            record[i] = toponymCoordinateInputStream.readDouble();
-            record[i + 1] = toponymCoordinateInputStream.readDouble();
+        double[] record = new double[fieldsize];
+        for (int i = 0; i < fieldsize; i++) {
+            record[i] = (double) toponymCoordinateInputStream.readDouble();
+//            record[i + 1] = (double) toponymCoordinateInputStream.readDouble();
         }
         toprecord.add(record);
 

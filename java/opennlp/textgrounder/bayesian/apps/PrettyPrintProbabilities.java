@@ -16,7 +16,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.apps;
 
-import opennlp.textgrounder.bayesian.converters.ProbabilityPrettyPrinterRLDA;
+import opennlp.textgrounder.bayesian.converters.*;
 
 /**
  *
@@ -29,13 +29,21 @@ public class PrettyPrintProbabilities extends BaseApp {
         ConverterExperimentParameters experimentParameters = new ConverterExperimentParameters();
         processRawCommandline(args, experimentParameters);
 
-        switch(experimentParameters.getModelType()) {
+        ProbabilityPrettyPrinter probabilityPrettyPrinter = null;
+        switch (experimentParameters.getModelType()) {
+            case RLDA:
+                probabilityPrettyPrinter = new ProbabilityPrettyPrinterRLDA(experimentParameters);
+                break;
+            case V1:
+            case V1_INDEPENDENT_REGIONS:
+                probabilityPrettyPrinter = new ProbabilityPrettyPrinterSphericalV1(experimentParameters);
+                break;
+            case V2:
+            case V2_DEPENDENT_REGIONS:
+                probabilityPrettyPrinter = new ProbabilityPrettyPrinterSphericalV2(experimentParameters);
         }
 
-        ProbabilityPrettyPrinterRLDA probabilityPrettyPrinter = new ProbabilityPrettyPrinterRLDA(experimentParameters);
         probabilityPrettyPrinter.readFiles();
-        probabilityPrettyPrinter.normalizeAndPrintRegionByWord();
-        probabilityPrettyPrinter.normalizeAndPrintWordByRegion();
-        probabilityPrettyPrinter.normalizeAndPrintRegionByDocument();
+        probabilityPrettyPrinter.normalizeAndPrintAll();
     }
 }

@@ -175,7 +175,7 @@ public class ExperimentParameters {
     /**
      * 
      */
-    protected String sampledProbabilitiesFilename = "probabilities.dat.gz";
+    protected String averagedCountsFilename = "averaged-counts.dat.gz";
     /**
      *
      */
@@ -211,7 +211,7 @@ public class ExperimentParameters {
     /**
      *
      */
-    protected Enum<MODEL_TYPE> modelType = MODEL_TYPE.V1_INDEPENDENT_REGIONS;
+    protected Enum<MODEL_TYPE> modelType = MODEL_TYPE.RLDA;
 
     public double getCrpalpha() {
         return crpalpha;
@@ -325,8 +325,8 @@ public class ExperimentParameters {
         return joinPath(projectRoot, tokenArrayInputFilename);
     }
 
-    public String getSampledProbabilitiesPath() {
-        return joinPath(projectRoot, sampledProbabilitiesFilename);
+    public String getAveragedCountsPath() {
+        return joinPath(projectRoot, averagedCountsFilename);
     }
 
     public int getOutputPerClass() {

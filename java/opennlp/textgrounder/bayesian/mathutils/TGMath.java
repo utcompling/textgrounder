@@ -16,6 +16,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.mathutils;
 
+import java.util.Arrays;
 import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
 
 /**
@@ -45,9 +46,8 @@ public class TGMath {
     public static double unnormalizedProportionalSphericalDensity(double[] _x,
           double[] _mu, double _kappa) {
         double[] nrmmean = new double[3];
-        for (int i = 0; i < 3; ++i) {
-            nrmmean[i] = 0;
-        }
+        Arrays.fill(nrmmean, 0);
+
         TGBLAS.daxpy(0, 1 / TGBLAS.dnrm2(0, _mu, 1), _mu, 1, nrmmean, 1);
         return Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, nrmmean, 1));
     }

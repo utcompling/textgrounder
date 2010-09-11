@@ -162,7 +162,7 @@ public class BinaryOutputWriter extends OutputWriter {
                 HashSet<Coordinate> coords = _toponymToCoordinateMap.get(topid);
                 int fieldsize = coords.size();
                 toponymCoordinateOutputStream.writeInt(topid);
-                toponymCoordinateOutputStream.writeInt(fieldsize);
+                toponymCoordinateOutputStream.writeInt(fieldsize * 2);
                 for (Coordinate coord : coords) {
                     toponymCoordinateOutputStream.writeDouble(coord.latitude);
                     toponymCoordinateOutputStream.writeDouble(coord.longitude);

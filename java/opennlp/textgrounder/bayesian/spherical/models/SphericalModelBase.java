@@ -146,7 +146,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * </p>
      */
     protected void initializeCountArrays() {
-        expectedR = (int) Math.ceil(crpalpha * Math.log(1 + N / crpalpha)) * 2;
+        expectedR = (int) Math.ceil(crpalpha * Math.log(1 + N / crpalpha)) * 3;
 
         toponymRegionCounts = new int[expectedR];
         Arrays.fill(toponymRegionCounts, 0);
@@ -246,11 +246,10 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         copyToArray(stopwordVector, stopwordArray);
 
         regionVector = new int[N];
+        Arrays.fill(regionVector, -1);
+
         coordinateVector = new int[N];
-        for (int i = 0; i < N; ++i) {
-            regionVector[i] = -1;
-            coordinateVector[i] = -1;
-        }
+        Arrays.fill(coordinateVector, -1);
     }
 
     /**
@@ -427,7 +426,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         outputWriter.writeTokenArray(wordVector, documentVector, toponymVector, stopwordVector, regionVector, coordinateVector);
 
         AveragedSphericalCountWrapper averagedSphericalCountWrapper = new AveragedSphericalCountWrapper(this);
-        averagedSphericalCountWrapper.addHyperparameters();
+//        averagedSphericalCountWrapper.addHyperparameters();
 
         outputWriter.writeProbabilities(averagedSphericalCountWrapper);
     }
