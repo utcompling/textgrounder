@@ -26,6 +26,7 @@ import opennlp.textgrounder.bayesian.wrapper.io.*;
  */
 public abstract class ProbabilityPrettyPrinter {
 
+    protected final static double EPSILON = 1e-10;
     /**
      * Hyperparameter for region*doc priors
      */
@@ -81,6 +82,13 @@ public abstract class ProbabilityPrettyPrinter {
     public abstract void normalizeAndPrintRegionByWord();
 
     public abstract void normalizeAndPrintRegionByDocument();
+
+    protected boolean isInvalidProb(double _val) {
+        if (_val > EPSILON && !Double.isNaN(_val)) {
+            return false;
+        }
+        return true;
+    }
 
     public void normalizeAndPrintAll() {
         normalizeAndPrintRegionByDocument();

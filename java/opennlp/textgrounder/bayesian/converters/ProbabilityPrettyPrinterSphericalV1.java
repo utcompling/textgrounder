@@ -113,12 +113,11 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
 
     public ProbabilityPrettyPrinterSphericalV1(ConverterExperimentParameters _parameters) {
         super(_parameters);
+        sphericalInputReader = new SphericalInternalToInternalBinaryInputReader(experimentParameters);
     }
 
     @Override
     public void readFiles() {
-        sphericalInputReader = new SphericalInternalToInternalBinaryInputReader(experimentParameters);
-
         AveragedSphericalCountWrapper averagedCountWrapper = sphericalInputReader.readProbabilities();
 
         alpha = averagedCountWrapper.getAlpha();
@@ -199,6 +198,9 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
                         w.writeStartElement("word");
 
                         IntDoublePair pair = topWords.get(j);
+                        if (isInvalidProb(pair.count / averagedRegionCounts[i])) {
+                            break;
+                        }
                         w.writeAttribute("term", lexicon.getWordForInt(pair.index));
                         w.writeAttribute("prob", String.format("%.8e", pair.count / averagedRegionCounts[i]));
                         w.writeEndElement();
@@ -237,6 +239,9 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
                         w.writeStartElement("region");
 
                         IntDoublePair pair = topRegions.get(j);
+                        if (isInvalidProb(pair.count / wordCounts[i])) {
+                            break;
+                        }
                         Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(TGMath.normalizeVector(averagedRegionMeans[pair.index])));
                         w.writeAttribute("id", String.format("%04d", pair.index));
                         w.writeAttribute("lat", String.format("%.6f", coord.latitude));
@@ -304,6 +309,9 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
                         w.writeStartElement("region");
 
                         IntDoublePair pair = topRegions.get(j);
+                        if (isInvalidProb(pair.count / docWordCounts[i])) {
+                            break;
+                        }
                         Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(TGMath.normalizeVector(averagedRegionMeans[pair.index])));
                         w.writeAttribute("id", String.format("%04d", pair.index));
                         w.writeAttribute("lat", String.format("%.6f", coord.latitude));
@@ -358,6 +366,9 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
                 toponymByRegionWriter.write(String.format("Region%04d\t%.6f\t%.6f\t%.2f\t%.8e", i, coord.longitude, coord.latitude, kappa, averagedRegionCounts[i] / sum));
                 toponymByRegionWriter.newLine();
                 for (IntDoublePair pair : topWords) {
+                    if (isInvalidProb(pair.count / averagedRegionCounts[i])) {
+                        break;
+                    }
                     toponymByRegionWriter.write(String.format("%s\t%.8e", lexicon.getWordForInt(pair.index), pair.count / averagedRegionCounts[i]));
                     toponymByRegionWriter.newLine();
                 }
@@ -404,6 +415,9 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
                 regionByToponymWriter.write(String.format("%s", lexicon.getWordForInt(i)));
                 regionByToponymWriter.newLine();
                 for (IntDoublePair pair : topRegions) {
+                    if (isInvalidProb(pair.count / wordCounts[i])) {
+                        break;
+                    }
                     Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(TGMath.normalizeVector(averagedRegionMeans[pair.index])));
                     regionByToponymWriter.write(String.format("%.6f\t%.6f\t%.2f\t%.8e", coord.longitude, coord.latitude, kappa, pair.count / wordCounts[i]));
                     regionByToponymWriter.newLine();
@@ -472,6 +486,9 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
                 regionByDocumentWriter.write(String.format("%s", docidToName.get(i)));
                 regionByDocumentWriter.newLine();
                 for (IntDoublePair pair : topRegions) {
+                    if (isInvalidProb(pair.count / docWordCounts[i])) {
+                        break;
+                    }
                     Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(TGMath.normalizeVector(averagedRegionMeans[pair.index])));
                     regionByDocumentWriter.write(String.format("%.6f\t%.6f\t%.2f\t%.8e", coord.longitude, coord.latitude, kappa, pair.count / docWordCounts[i]));
                     regionByDocumentWriter.newLine();

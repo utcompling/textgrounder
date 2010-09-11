@@ -39,7 +39,7 @@ public class InternalSphericalV2ToXMLConverter extends InternalSphericalV1ToXMLC
     @Override
     protected void setTokenAttribute(Element _token, int _wordid, int _regid, int _coordid) {
         Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(TGMath.normalizeVector(regionMeans[_regid])));
-        _token.setAttribute("long", String.format("%.2f", coord.longitude));
-        _token.setAttribute("lat", String.format("%.2f", coord.latitude));
+        _token.setAttribute("long", String.format("%.6f", coord.longitude));
+        _token.setAttribute("lat", String.format("%.6f", coord.latitude));
     }
 }
