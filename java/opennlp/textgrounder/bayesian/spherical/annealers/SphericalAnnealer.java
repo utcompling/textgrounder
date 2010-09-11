@@ -74,6 +74,8 @@ public abstract class SphericalAnnealer extends Annealer {
 
     public abstract double annealProbs(int _starti, int _endi, double[] _classes);
 
+    public abstract double annealProbs(int _R, int _subC, int _C, double[] _classes);
+
     /**
      *
      * @param _wordByRegionCounts

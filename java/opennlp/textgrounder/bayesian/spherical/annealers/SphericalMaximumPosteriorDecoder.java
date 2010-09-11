@@ -82,4 +82,29 @@ public class SphericalMaximumPosteriorDecoder extends SphericalAnnealer {
             return false;
         }
     }
+
+    @Override
+    public double annealProbs(int _R, int _subC, int _C, double[] _classes) {
+        double max = 0;
+        int maxid = 0;
+        for (int i = 0; i < _R; ++i) {
+            int off = i * _C;
+            for (int j = 0; j < _subC; ++j) {
+                if (_classes[off + j] > max) {
+                    max = _classes[off + j];
+                    maxid = off + j;
+                }
+            }
+        }
+
+        for (int i = 0; i < _R; ++i) {
+            int off = i * _C;
+            for (int j = 0; j < _subC; ++j) {
+                _classes[off + j] = 0;
+            }
+        }
+
+        _classes[maxid] = 1;
+        return 1;
+    }
 }

@@ -52,16 +52,10 @@ public class SphericalSimulatedAnnealer extends SphericalAnnealer {
         } else {
             sumw = sum;
         }
-        try {
-            for (int i = starti;; ++i) {
-                classes[i] /= sumw;
-            }
-        } catch (ArrayIndexOutOfBoundsException e) {
-        }
         /**
          * For now, we set everything so that it sums to one.
          */
-        return 1;
+        return sumw;
     }
 
     @Override
@@ -78,12 +72,30 @@ public class SphericalSimulatedAnnealer extends SphericalAnnealer {
         } else {
             sumw = sum;
         }
-        for (int i = _starti; i < _endi; ++i) {
-            _classes[i] /= sumw;
+        return sumw;
+    }
+
+    @Override
+    public double annealProbs(int _R, int _subC, int _C, double[] _classes) {
+        double sum = 0, sumw = 0;
+        for (int i = 0; i < _R; ++i) {
+            int off = i * _C;
+            for (int j = 0; j < _subC; ++j) {
+                sum += _classes[off + j];
+            }
         }
-        /**
-         * For now, we set everything so that it sums to one.
-         */
-        return 1;
+        if (temperatureReciprocal != 1) {
+            for (int i = 0; i < _R; ++i) {
+                int off = i * _C;
+                for (int j = 0; j < _subC; ++j) {
+                    _classes[off + j] /= sum;
+                    sumw += _classes[off + j] = Math.pow(_classes[off + j], temperatureReciprocal);
+                }
+            }
+        } else {
+            sumw = sum;
+        }
+
+        return sumw;
     }
 }
