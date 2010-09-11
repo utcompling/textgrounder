@@ -25,13 +25,13 @@ import org.jdom.Element;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class InternalSphericalV2ToXMLConverter extends InternalSphericalV1ToXMLConverter {
+public class InternalToXMLConverterSphericalV2 extends InternalToXMLConverterSphericalV1 {
 
     /**
      *
      * @param _converterExperimentParameters
      */
-    public InternalSphericalV2ToXMLConverter(
+    public InternalToXMLConverterSphericalV2(
           ConverterExperimentParameters _converterExperimentParameters) {
         super(_converterExperimentParameters);
     }

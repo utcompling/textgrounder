@@ -33,7 +33,7 @@ import org.jdom.Element;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class InternalSphericalV1ToXMLConverter extends InternalToXMLConverter {
+public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
 
     /**
      * 
@@ -56,7 +56,7 @@ public class InternalSphericalV1ToXMLConverter extends InternalToXMLConverter {
      *
      * @param _converterExperimentParameters
      */
-    public InternalSphericalV1ToXMLConverter(
+    public InternalToXMLConverterSphericalV1(
           ConverterExperimentParameters _converterExperimentParameters) {
         super(_converterExperimentParameters);
         InputReader reader = new BinaryInputReader(_converterExperimentParameters);
@@ -106,7 +106,7 @@ public class InternalSphericalV1ToXMLConverter extends InternalToXMLConverter {
             }
         } catch (EOFException ex) {
         } catch (IOException ex) {
-            Logger.getLogger(InternalSphericalV1ToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(InternalToXMLConverterSphericalV1.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 

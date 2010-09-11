@@ -31,7 +31,7 @@ import org.jdom.Element;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class InternalRLDAToXMLConverter extends InternalToXMLConverter {
+public class InternalToXMLConverterRLDA extends InternalToXMLConverter {
 
     /**
      *
@@ -58,7 +58,7 @@ public class InternalRLDAToXMLConverter extends InternalToXMLConverter {
      *
      * @param _converterExperimentParameters
      */
-    public InternalRLDAToXMLConverter(
+    public InternalToXMLConverterRLDA(
           ConverterExperimentParameters _converterExperimentParameters) {
         super(_converterExperimentParameters);
     }
@@ -113,7 +113,7 @@ public class InternalRLDAToXMLConverter extends InternalToXMLConverter {
             }
         } catch (EOFException ex) {
         } catch (IOException ex) {
-            Logger.getLogger(InternalRLDAToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(InternalToXMLConverterRLDA.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 

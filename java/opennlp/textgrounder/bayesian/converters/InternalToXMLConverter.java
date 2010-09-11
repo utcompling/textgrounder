@@ -101,10 +101,10 @@ public abstract class InternalToXMLConverter {
         try {
             indoc = builder.build(TRXMLPathFile);
         } catch (JDOMException ex) {
-            Logger.getLogger(InternalRLDAToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         } catch (IOException ex) {
-            Logger.getLogger(InternalRLDAToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
 
@@ -175,7 +175,7 @@ public abstract class InternalToXMLConverter {
             XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
             xout.output(outdoc, new FileOutputStream(new File(pathToOutput)));
         } catch (IOException ex) {
-            Logger.getLogger(InternalRLDAToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
             System.exit(1);
         }
     }

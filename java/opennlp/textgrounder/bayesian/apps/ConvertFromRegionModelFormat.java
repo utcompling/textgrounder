@@ -33,17 +33,18 @@ public class ConvertFromRegionModelFormat extends BaseApp {
 
         switch (experimentParameters.getModelType()) {
             case RLDA:
-                converter = new InternalRLDAToXMLConverter(experimentParameters);
+            case RLDAC:
+                converter = new InternalToXMLConverterRLDA(experimentParameters);
                 break;
             case V1:
             case V1_INDEPENDENT_REGIONS:
-                converter = new InternalSphericalV1ToXMLConverter(experimentParameters);
+                converter = new InternalToXMLConverterSphericalV1(experimentParameters);
                 break;
             case V2:
             case V2_DEPENDENT_REGIONS:
             case V3:
             case V3_DEPENDENT_REGIONS:
-                converter = new InternalSphericalV2ToXMLConverter(experimentParameters);
+                converter = new InternalToXMLConverterSphericalV2(experimentParameters);
                 break;
         }
 
