@@ -33,6 +33,14 @@ public class ExperimentParameters {
         TEXT,
         XML
     }
+
+    public static enum SPHERICAL_MOD_TYPE {
+
+        V1,
+        V1_INDEPENDENT_REGIONS,
+        V2,
+        V2_DEPENDENT_REGIONS
+    }
     /**
      * Switch for whether hyperparameters should be reestimated or not.
      * 0 is no, 1 is yes.
@@ -198,7 +206,11 @@ public class ExperimentParameters {
     /**
      *
      */
-    protected INPUT_FORMAT inputFormat = INPUT_FORMAT.BINARY;
+    protected Enum<INPUT_FORMAT> inputFormat = INPUT_FORMAT.BINARY;
+    /**
+     *
+     */
+    protected Enum<SPHERICAL_MOD_TYPE> sphericalModelType = SPHERICAL_MOD_TYPE.V1_INDEPENDENT_REGIONS;
 
     public double getCrpalpha() {
         return crpalpha;
@@ -360,7 +372,11 @@ public class ExperimentParameters {
     }
 
     public INPUT_FORMAT getInputFormat() {
-        return inputFormat;
+        return (INPUT_FORMAT) inputFormat;
+    }
+
+    public SPHERICAL_MOD_TYPE getSphericalModelType() {
+        return (SPHERICAL_MOD_TYPE) sphericalModelType;
     }
 
     /**
