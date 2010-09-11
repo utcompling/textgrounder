@@ -49,7 +49,6 @@ public class SphericalModelV1 extends SphericalModelBase {
 
     public SphericalModelV1(ExperimentParameters _parameters) {
         super(_parameters);
-        emptyRSet = new HashSet<Integer>();
     }
 
     protected void baseSpecificInitialize() {
@@ -257,8 +256,10 @@ public class SphericalModelV1 extends SphericalModelBase {
                             }
                         }
 
-                        for (int j = 0; j < curCoordCount; ++j) {
-                            regionProbs[emptyid * maxCoord + j] = crpalpha_mod / curCoordCount;
+                        if (emptyid == currentR) {
+                            totalprob = annealer.annealProbs(0, (currentR + 1) * maxCoord, regionProbs);
+                        } else {
+                            totalprob = annealer.annealProbs(0, currentR * maxCoord, regionProbs);
                         }
 
                         totalprob = annealer.annealProbs(0, currentR * maxCoord, regionProbs);

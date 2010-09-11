@@ -16,6 +16,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.spherical.models;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 import opennlp.textgrounder.bayesian.mathutils.*;
@@ -123,8 +124,6 @@ public class SphericalModelV2 extends SphericalModelBase {
             }
         }
 
-        emptyRSet.add(currentR);
-
         for (int i = 0; i < currentR; ++i) {
             int[][] toponymCoordinateCounts = regionToponymCoordinateCounts[i];
             double[] mean = new double[3];
@@ -145,6 +144,12 @@ public class SphericalModelV2 extends SphericalModelBase {
 
             regionMeans[i] = mean;
         }
+
+        for (int i = currentR; i < expectedR; ++i) {
+            double[] mean = new double[3];
+            Arrays.fill(mean, 0);
+            regionMeans[i] = mean;
+        }
     }
 
     /**
@@ -154,19 +159,21 @@ public class SphericalModelV2 extends SphericalModelBase {
      */
     @Override
     public void train(SphericalAnnealer _annealer) {
-        int wordid, docid, regionid, coordid;
-        int wordoff, docoff;
+        int wordid, docid, regionid, coordid, emptyid = 0;
+        int wordoff, docoff, regoff;
         int istoponym, isstopword;
         int curCoordCount;
         double[][] curCoords;
         double[] probs = new double[expectedR * maxCoord];
         double[] regionmean;
         double totalprob = 0, max, r;
+        boolean addedEmptyR = false;
 
         while (_annealer.nextIter()) {
             for (int i = 0; i < N; ++i) {
                 isstopword = stopwordVector[i];
                 istoponym = toponymVector[i];
+                addedEmptyR = false;
                 if (isstopword == 0) {
                     if (istoponym == 1) {
                         wordid = wordVector[i];
@@ -188,28 +195,51 @@ public class SphericalModelV2 extends SphericalModelBase {
 
                         if (regionCountsOfToponyms[regionid] == 0) {
                             emptyRSet.add(regionid);
+                            addedEmptyR = true;
+                            emptyid = regionid;
+
+                            regionmean = new double[3];
+                            Arrays.fill(regionmean, 0);
+                            regionMeans[regionid] = regionmean;
                             resetRegionID(annealer, regionid, docid);
+                        } else {
+                            if (emptyRSet.isEmpty()) {
+                                emptyid = currentR;
+                            } else {
+                                Iterator<Integer> it = emptyRSet.iterator();
+                                emptyid = it.next();
+                            }
                         }
 
                         for (int j = 0; j < currentR; ++j) {
-                            regionmean = regionMeans[j];
-                            int doccount = regionByDocumentCounts[docoff + j];
-                            for (int k = 0; k < curCoordCount; ++k) {
-                                probs[j * maxCoord + k] =
-                                      doccount
-                                      * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
+                            regoff = j * maxCoord;
+                            if (emptyRSet.contains(j)) {
+                                for (int k = 0; k < maxCoord; ++k) {
+                                    probs[regoff + k] = 0;
+                                }
+                            } else {
+                                regionmean = regionMeans[j];
+                                int doccount = regionByDocumentCounts[docoff + j];
+                                for (int k = 0; k < curCoordCount; ++k) {
+                                    probs[regoff + k] =
+                                          doccount
+                                          * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
+                                }
+                                for (int k = curCoordCount; k < maxCoord; ++k) {
+                                    probs[regoff + k] = 0;
+                                }
                             }
                         }
 
-                        Iterator<Integer> it = emptyRSet.iterator();
-                        if (it.hasNext()) {
-                            int emptyR = it.next();
-                            for (int j = 0; j < curCoordCount; ++j) {
-                                probs[emptyR * maxCoord + j] = crpalpha_mod / curCoordCount;
-                            }
+                        for (int j = 0; j < curCoordCount; ++j) {
+                            probs[emptyid * maxCoord + j] = crpalpha_mod / curCoordCount;
                         }
 
-                        totalprob = annealer.annealProbs(0, expectedR * maxCoord, probs);
+                        if (emptyid == currentR) {
+                            totalprob = annealer.annealProbs(0, (currentR + 1) * maxCoord, probs);
+                        } else {
+                            totalprob = annealer.annealProbs(0, currentR * maxCoord, probs);
+                        }
 
                         r = rand.nextDouble() * totalprob;
 
@@ -237,11 +267,12 @@ public class SphericalModelV2 extends SphericalModelBase {
 
                         if (emptyRSet.contains(regionid)) {
                             emptyRSet.remove(regionid);
-
-                            if (emptyRSet.isEmpty()) {
-                                currentR += 1;
-                                emptyRSet.add(currentR);
-                            }
+                        } else if (regionid == currentR) {
+                            currentR += 1;
+                        }
+                        while (emptyRSet.contains(currentR - 1)) {
+                            currentR -= 1;
+                            emptyRSet.remove(currentR);
                         }
                     } else {
                         wordid = wordVector[i];
@@ -368,7 +399,7 @@ public class SphericalModelV2 extends SphericalModelBase {
     public void decode() {
         SphericalAnnealer decoder = new SphericalMaximumPosteriorDecoder();
         int wordid, docid, regionid, coordid;
-        int wordoff, docoff;
+        int wordoff, docoff, regoff;
         int istoponym, isstopword;
         int curCoordCount;
         double[][] curCoords;
@@ -393,16 +424,23 @@ public class SphericalModelV2 extends SphericalModelBase {
                     curCoords = toponymCoordinateLexicon[wordid];
 
                     for (int j = 0; j < currentR; ++j) {
-                        regionmean = averagedRegionMeans[j];
-                        double doccount = averagedRegionByDocumentCounts[docoff + j];
-                        for (int k = 0; k < curCoordCount; ++k) {
-                            probs[j * maxCoord + k] =
-                                  doccount
-                                  * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
+                        regoff = j * maxCoord;
+                        if (emptyRSet.contains(j)) {
+                            for (int k = 0; k < maxCoord; ++k) {
+                                probs[regoff + k] = 0;
+                            }
+                        } else {
+                            regionmean = averagedRegionMeans[j];
+                            double doccount = averagedRegionByDocumentCounts[docoff + j];
+                            for (int k = 0; k < curCoordCount; ++k) {
+                                probs[regoff + k] =
+                                      doccount
+                                      * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
+                            }
                         }
                     }
 
-                    totalprob = decoder.annealProbs(0, expectedR * maxCoord, probs);
+                    totalprob = decoder.annealProbs(0, currentR * maxCoord, probs);
 
                     r = rand.nextDouble() * totalprob;
 

@@ -20,6 +20,7 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -264,6 +265,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * @param _file
      */
     public void readRegionCoordinateList() {
+
+        emptyRSet = new HashSet<Integer>();
 
         HashMap<Integer, double[]> toprecords = new HashMap<Integer, double[]>();
         T = 0;
