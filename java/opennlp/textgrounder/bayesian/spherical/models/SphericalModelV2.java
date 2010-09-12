@@ -327,6 +327,7 @@ public class SphericalModelV2 extends SphericalModelBase {
     @Override
     protected void expandExpectedR() {
         int newExpectedR = (int) Math.ceil(expectedR * (1 + EXPANSION_FACTOR));
+        System.err.print(String.format("(R:%d->%d,%d)", expectedR, newExpectedR, currentR));
 
         regionCountsOfToponyms = TGArrays.expandSingleTierC(regionCountsOfToponyms, newExpectedR, expectedR);
         regionCountsOfAllWords = TGArrays.expandSingleTierC(regionCountsOfAllWords, newExpectedR, expectedR);
@@ -441,6 +442,9 @@ public class SphericalModelV2 extends SphericalModelBase {
                                 probs[regoff + k] =
                                       doccount
                                       * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
+                            }
+                            for (int k = curCoordCount; k < maxCoord; ++k) {
+                                probs[regoff + k] = 0;
                             }
                         }
                     }

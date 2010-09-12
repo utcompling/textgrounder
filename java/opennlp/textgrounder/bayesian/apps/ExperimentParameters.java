@@ -38,12 +38,12 @@ public class ExperimentParameters {
 
         RLDA,
         RLDAC,
-        V1,
-        V1_INDEPENDENT_REGIONS,
-        V2,
-        V2_DEPENDENT_REGIONS,
-        V3,
-        V3_DEPENDENT_REGIONS
+        SV1,
+        SPHERICAL_V1_INDEPENDENT_REGIONS,
+        SV2,
+        SPHERICAL_V2_DEPENDENT_REGIONS,
+        SV3,
+        SPHERICAL_V3_DEPENDENT_REGIONS
     }
     /**
      * Switch for whether hyperparameters should be reestimated or not.
@@ -98,7 +98,7 @@ public class ExperimentParameters {
     /**
      * Number of training iterations
      */
-    protected int trainIterations = 100;
+    protected int burnInIterations = 100;
     /**
      * Number to seed random number generator. If 0 is passed from the commandline,
      * it means that a true random seed will be used (i.e. one based on the current time).
@@ -288,8 +288,8 @@ public class ExperimentParameters {
         return kappa;
     }
 
-    public int getIterations() {
-        return trainIterations;
+    public int getBurnInIterations() {
+        return burnInIterations;
     }
 
     public int getRandomSeed() {
@@ -369,10 +369,6 @@ public class ExperimentParameters {
 
     public String getToponymCoordinatePath() {
         return joinPath(projectRoot, toponymCoordinateFilename);
-    }
-
-    public int getTrainIterations() {
-        return trainIterations;
     }
 
     public INPUT_FORMAT getInputFormat() {

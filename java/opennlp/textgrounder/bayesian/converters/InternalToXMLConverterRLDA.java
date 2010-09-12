@@ -40,10 +40,6 @@ public class InternalToXMLConverterRLDA extends InternalToXMLConverter {
     /**
      *
      */
-    protected ConverterExperimentParameters converterExperimentParameters;
-    /**
-     *
-     */
     protected Region[][] regionMatrix;
     /**
      * 

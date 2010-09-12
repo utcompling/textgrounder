@@ -206,6 +206,7 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
                         w.writeAttribute("id", String.format("%04d", pair.index));
                         w.writeAttribute("lat", String.format("%.6f", coord.latitude));
                         w.writeAttribute("lon", String.format("%.6f", coord.longitude));
+                        w.writeAttribute("kappa", String.format("%.2f", kappa));
                         w.writeAttribute("prob", String.format("%.8e", pair.count / wordCounts[i]));
                         w.writeEndElement();
                     }
@@ -276,6 +277,7 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
                         w.writeAttribute("id", String.format("%04d", pair.index));
                         w.writeAttribute("lat", String.format("%.6f", coord.latitude));
                         w.writeAttribute("lon", String.format("%.6f", coord.longitude));
+                        w.writeAttribute("kappa", String.format("%.2f", kappa));
                         w.writeAttribute("prob", String.format("%.8e", pair.count / docWordCounts[i]));
                         w.writeEndElement();
                     }
@@ -398,7 +400,7 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
                         break;
                     }
                     Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(TGMath.normalizeVector(averagedRegionMeans[pair.index])));
-                    regionByWordWriter.write(String.format("%.6f\t%.6f\t%.2f\t%.8e", coord.longitude, coord.latitude, kappa, pair.count / wordCounts[i]));
+                    regionByWordWriter.write(String.format("%04d\t%.6f\t%.6f\t%.2f\t%.8e", pair.index, coord.longitude, coord.latitude, kappa, pair.count / wordCounts[i]));
                     regionByWordWriter.newLine();
                 }
                 regionByWordWriter.newLine();
@@ -469,7 +471,7 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
                         break;
                     }
                     Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(TGMath.normalizeVector(averagedRegionMeans[pair.index])));
-                    regionByDocumentWriter.write(String.format("%.6f\t%.6f\t%.2f\t%.8e", coord.longitude, coord.latitude, kappa, pair.count / docWordCounts[i]));
+                    regionByDocumentWriter.write(String.format("%04d\t%.6f\t%.6f\t%.2f\t%.8e", pair.index, coord.longitude, coord.latitude, kappa, pair.count / docWordCounts[i]));
                     regionByDocumentWriter.newLine();
                 }
                 regionByDocumentWriter.newLine();

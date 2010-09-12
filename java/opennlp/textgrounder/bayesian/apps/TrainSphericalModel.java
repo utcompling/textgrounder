@@ -32,16 +32,16 @@ public class TrainSphericalModel extends BaseApp {
         SphericalModelBase smb = null;
 
         switch (experimentParameters.getModelType()) {
-            case V1:
-            case V1_INDEPENDENT_REGIONS:
+            case SV1:
+            case SPHERICAL_V1_INDEPENDENT_REGIONS:
                 smb = new SphericalModelV1(experimentParameters);
                 break;
-            case V2:
-            case V2_DEPENDENT_REGIONS:
+            case SV2:
+            case SPHERICAL_V2_DEPENDENT_REGIONS:
                 smb = new SphericalModelV2(experimentParameters);
                 break;
-            case V3:
-            case V3_DEPENDENT_REGIONS:
+            case SV3:
+            case SPHERICAL_V3_DEPENDENT_REGIONS:
                 smb = new SphericalModelV3(experimentParameters);
                 break;
             default:

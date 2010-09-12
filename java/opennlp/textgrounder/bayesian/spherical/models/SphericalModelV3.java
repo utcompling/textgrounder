@@ -255,23 +255,53 @@ public class SphericalModelV3 extends SphericalModelV2 {
                                       * (wordByRegionCounts[wordoff + j] + beta)
                                       / (regionCountsOfAllWords[j] + betaW);
                             }
+                            for (int k = curCoordCount; k < maxCoord; ++k) {
+                                probs[regoff + k] = 0;
+                            }
                         }
                     }
 
                     totalprob = decoder.annealProbs(0, currentR * maxCoord, probs);
+
+                    if (i == 16701 || i == 16723 || i == 134061) {
+                        double m = 0;
+                        int maxid = 0;
+                        for (int k = 0; k < currentR * maxCoord; ++k) {
+                            if (probs[k] > m) {
+                                m = probs[k];
+                                maxid = k;
+                            }
+                        }
+                        System.err.println("maxid:" + maxid);
+                        System.err.println("max:" + m);
+                        System.err.println("mod:" + maxid % maxCoord);
+                        System.err.println("curC:" + curCoordCount);
+                    }
 
                     r = rand.nextDouble() * totalprob;
 
                     max = probs[0];
                     regionid = 0;
                     coordid = 0;
-                    while (r > max) {
-                        coordid++;
-                        if (coordid == curCoordCount) {
-                            regionid++;
-                            coordid = 0;
+                    try {
+                        while (r > max) {
+                            coordid++;
+                            if (coordid == curCoordCount) {
+                                regionid++;
+                                coordid = 0;
+                            }
+                            max += probs[regionid * maxCoord + coordid];
                         }
-                        max += probs[regionid * maxCoord + coordid];
+                    } catch (ArrayIndexOutOfBoundsException e) {
+                        System.err.println(i);
+                        System.err.println(totalprob);
+                        System.err.println(regionid);
+                        System.err.println(coordid);
+                        System.err.println(regionid * maxCoord + coordid);
+                        System.err.println(currentR);
+                        System.err.println(expectedR);
+                        System.err.println(maxCoord);
+//                        System.exit(1);
                     }
 
                     regionVector[i] = regionid;

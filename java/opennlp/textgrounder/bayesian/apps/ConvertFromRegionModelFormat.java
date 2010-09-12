@@ -36,14 +36,14 @@ public class ConvertFromRegionModelFormat extends BaseApp {
             case RLDAC:
                 converter = new InternalToXMLConverterRLDA(experimentParameters);
                 break;
-            case V1:
-            case V1_INDEPENDENT_REGIONS:
+            case SV1:
+            case SPHERICAL_V1_INDEPENDENT_REGIONS:
                 converter = new InternalToXMLConverterSphericalV1(experimentParameters);
                 break;
-            case V2:
-            case V2_DEPENDENT_REGIONS:
-            case V3:
-            case V3_DEPENDENT_REGIONS:
+            case SV2:
+            case SPHERICAL_V2_DEPENDENT_REGIONS:
+            case SV3:
+            case SPHERICAL_V3_DEPENDENT_REGIONS:
                 converter = new InternalToXMLConverterSphericalV2(experimentParameters);
                 break;
         }
