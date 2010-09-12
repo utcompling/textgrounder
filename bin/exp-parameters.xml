@@ -13,7 +13,7 @@
     <beta_b type="double">0.100000</beta_b>
     <estimateKappa type="int">0</estimateKappa>
     <kappa type="double">20.000000</kappa>
-    <trainIterations type="int">100</trainIterations>
+    <burnInIterations type="int">100</burnInIterations>
     <randomSeed type="int">1</randomSeed>
     <initialTemperature type="double">1.000000</initialTemperature>
     <temperatureDecrement type="double">0.100000</temperatureDecrement>
