@@ -52,7 +52,11 @@ public class TrainSphericalModel extends BaseApp {
 
         smb.initialize();
         smb.train();
+        System.err.println("Beginning maximum posterior decoding");
         smb.decode();
+        System.err.println("Decoding complete");
+        System.err.println("Writing output");
         smb.write();
+        System.err.println("Done!");
     }
 }

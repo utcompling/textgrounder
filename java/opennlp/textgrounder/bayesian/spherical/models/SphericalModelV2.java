@@ -214,7 +214,7 @@ public class SphericalModelV2 extends SphericalModelBase {
                         for (int j = 0; j < currentR; ++j) {
                             regoff = j * maxCoord;
                             if (emptyRSet.contains(j)) {
-                                for (int k = 0; k < maxCoord; ++k) {
+                                for (int k = 0; k < curCoordCount; ++k) {
                                     probs[regoff + k] = 0;
                                 }
                             } else {
@@ -225,23 +225,23 @@ public class SphericalModelV2 extends SphericalModelBase {
                                           doccount
                                           * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
                                 }
-                                for (int k = curCoordCount; k < maxCoord; ++k) {
-                                    probs[regoff + k] = 0;
-                                }
+//                                for (int k = curCoordCount; k < maxCoord; ++k) {
+//                                    probs[regoff + k] = 0;
+//                                }
                             }
                         }
 
                         for (int j = 0; j < curCoordCount; ++j) {
                             probs[emptyid * maxCoord + j] = crpalpha_mod / curCoordCount;
                         }
-                        for (int j = curCoordCount; j < maxCoord; ++j) {
-                            probs[emptyid * maxCoord + j] = 0;
-                        }
+//                        for (int j = curCoordCount; j < maxCoord; ++j) {
+//                            probs[emptyid * maxCoord + j] = 0;
+//                        }
 
                         if (emptyid == currentR) {
-                            totalprob = annealer.annealProbs(0, (currentR + 1) * maxCoord, probs);
+                            totalprob = annealer.annealProbs((currentR + 1), curCoordCount, maxCoord, probs);
                         } else {
-                            totalprob = annealer.annealProbs(0, currentR * maxCoord, probs);
+                            totalprob = annealer.annealProbs(currentR, curCoordCount, maxCoord, probs);
                         }
 
                         r = rand.nextDouble() * totalprob;
@@ -327,7 +327,7 @@ public class SphericalModelV2 extends SphericalModelBase {
     @Override
     protected void expandExpectedR() {
         int newExpectedR = (int) Math.ceil(expectedR * (1 + EXPANSION_FACTOR));
-        System.err.print(String.format("(R:%d->%d,%d)", expectedR, newExpectedR, currentR));
+        System.err.print(String.format("(Expand Reg#:%d->%d,Current Reg#:%d)", expectedR, newExpectedR, currentR));
 
         regionCountsOfToponyms = TGArrays.expandSingleTierC(regionCountsOfToponyms, newExpectedR, expectedR);
         regionCountsOfAllWords = TGArrays.expandSingleTierC(regionCountsOfAllWords, newExpectedR, expectedR);
@@ -449,7 +449,7 @@ public class SphericalModelV2 extends SphericalModelBase {
                         }
                     }
 
-                    totalprob = decoder.annealProbs(0, currentR * maxCoord, probs);
+                    totalprob = decoder.annealProbs(currentR, curCoordCount, maxCoord, probs);
 
                     r = rand.nextDouble() * totalprob;
 
