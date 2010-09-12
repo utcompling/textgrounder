@@ -55,7 +55,7 @@ public class RegionTopicXMLtoKML {
       while (in.isStartElement() && in.getLocalName().equals("region")) {
         double regionLat = Double.parseDouble(in.getAttributeValue(null, "lat"));
         double regionLon = Double.parseDouble(in.getAttributeValue(null, "lon"));
-        Coordinate center = new Coordinate(regionLat, regionLon);
+        Coordinate center = new Coordinate(regionLon, regionLat);
 
         in.nextTag();
 

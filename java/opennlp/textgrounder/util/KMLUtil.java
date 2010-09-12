@@ -108,7 +108,7 @@ public class KMLUtil {
     for (double currentRadian = startRadian; currentRadian <= 2 * Math.PI + startRadian; currentRadian += radianUnit) {
       double lat = coord.latitude + radius * Math.cos(currentRadian);
       double lon = coord.longitude + radius * Math.sin(currentRadian);
-      w.writeCharacters(String.format("%f,%f,%f\n", lat, lon, height));
+      w.writeCharacters(String.format("%f,%f,%f\n", lon, lat, height));
     }
 
     w.writeEndElement(); // coordinates
@@ -150,7 +150,7 @@ public class KMLUtil {
     KMLUtil.writeRegion(w, coord, radius);
     KMLUtil.writeWithCharacters(w, "styleUrl", "#bar");
     w.writeStartElement("Point");
-    KMLUtil.writeWithCharacters(w, "coordinates", coord.toString());
+    KMLUtil.writeWithCharacters(w, "coordinates", String.format("%f,%f", coord.longitude, coord.latitude));
     w.writeEndElement(); // Point
     w.writeEndElement(); // Placemark
     w.writeStartElement("Placemark");
@@ -183,7 +183,7 @@ public class KMLUtil {
     KMLUtil.writeRegion(w, coord, radius);
     KMLUtil.writeWithCharacters(w, "styleUrl", "#context");
     w.writeStartElement("Point");
-    KMLUtil.writeWithCharacters(w, "coordinates", coord.toString());
+    KMLUtil.writeWithCharacters(w, "coordinates", String.format("%f,%f", coord.longitude, coord.latitude));
     w.writeEndElement(); // Point
     w.writeEndElement(); // Placemark
   }
@@ -205,7 +205,7 @@ public class KMLUtil {
     KMLUtil.writeWithCharacters(w, "styleUrl", styleUrl);
     w.writeStartElement("Point");
     KMLUtil.writeWithCharacters(w, "altitudeMode", "relativeToGround");
-    KMLUtil.writeWithCharacters(w, "coordinates", String.format("%s,%f", coord, height));
+    KMLUtil.writeWithCharacters(w, "coordinates", String.format("%f,%f,%f", coord.longitude, coord.latitude, height));
     w.writeEndElement(); // Point
     w.writeEndElement(); // Placemark
   }
