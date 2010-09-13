@@ -20,7 +20,7 @@
     <property name="deprecation" value="on"/>
 
     <property name="top.dir" value="."/>
-    <property name="src.dir" value="./java"/>
+    <property name="src.dir" value="./src/main/java"/>
     <property name="bin.dir" value="./bin"/>
     <property name="lib.dir" value="./lib"/>
     <property name="docs.dir" value="./docs"/>

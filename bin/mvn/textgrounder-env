@@ -1,0 +1,26 @@
+#!/bin/sh
+
+###### sets TEXTGROUNDER environment variables
+
+# TextGrounder-related
+TG_DIR="$TEXTGROUNDER_DIR"
+TG_LIB="$TG_DIR/lib"
+TG_CP="$TG_DIR/target/textgrounder-0.1.0-jar-with-dependencies.jar:$TG_LIB/trove.jar"
+
+# Stanford-NER-related
+STANFORD_NER_CP="$TG_LIB/stanford-ner.jar"
+
+#### FIXME! trove.jar and stanford-ner.jar duplicated.
+
+# Create the combined CLASSPATH
+CP="$TG_CP:$STANFORD_NER_CP"
+JAVA="$JAVA_HOME/bin/java"
+
+# Determine the heap-size flag
+if [ -z "$JAVA_MEM_FLAG" ] 
+then
+    JAVA_MEM_FLAG=-Xmx2500m
+fi
+
+# Now prepares the Java command with the right settings
+JAVA_CMD="$JAVA $JAVA_MEM_FLAG -classpath $CP"
