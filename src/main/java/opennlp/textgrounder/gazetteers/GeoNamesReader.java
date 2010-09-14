@@ -97,6 +97,7 @@ public class GeoNamesReader extends GazetteerReader implements Closeable {
     Coordinate coordinate = new Coordinate(lng, lat);
 
     Location location = new Location(this.currentId++, this.current[1], this.current[6], coordinate, population);
+    if (this.currentId % 50000 == 0) { System.out.println("At location id: " + this.currentId); }
 
     this.current = this.nextFields();
     return location;

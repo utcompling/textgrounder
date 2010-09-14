@@ -33,9 +33,11 @@ public abstract class Gazetteer {
       this.add(location.getName(), location);
     }
     reader.close();
+    this.finishLoading();
     return count;
   }
 
+  public void finishLoading() {}
   public void close() {}
 }
 

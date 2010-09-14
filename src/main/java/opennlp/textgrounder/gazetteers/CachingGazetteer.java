@@ -53,6 +53,11 @@ public class CachingGazetteer extends Gazetteer {
     this.source.add(name, location);
   }
 
+  @Override
+  public void finishLoading() {
+    this.source.finishLoading();
+  }
+
   public List<Location> lookup(String query) {
     List<Location> result = this.cache.get(query);
     if (result == null) {

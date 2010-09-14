@@ -73,12 +73,31 @@ public class DbGazetteer extends Gazetteer {
         this.inBatch = 0;
         statement.executeBatch();
         statement.close();
+        /* Ideally we'd just close the statement, but the SQLite driver has a
+           problem with isClosed(), so we're setting it to null. */
+        this.insertStatement = null;
       }
 
     } catch (SQLException e) {
       System.err.format("Error while adding location to database: %s\n", e);
       e.printStackTrace();
       System.exit(1); 
+    }
+  }
+
+  @Override
+  public void finishLoading() {
+    if (this.inBatch > 0) {
+      this.inBatch = 0;
+      try {
+        this.insertStatement.executeBatch();
+        this.insertStatement.close();
+        this.insertStatement = null;
+      } catch (SQLException e) {
+        System.err.format("Error while adding location to database: %s\n", e);
+        e.printStackTrace();
+        System.exit(1); 
+      }
     }
   }
 
@@ -113,11 +132,6 @@ public class DbGazetteer extends Gazetteer {
   @Override
   public void close() {
     try {
-      if (this.inBatch > 0) {
-        this.inBatch = 0;
-        this.insertStatement.executeBatch();
-        this.insertStatement.close();
-      }
       this.connection.close();
     } catch (SQLException e) {
       System.err.format("Could not close database connection: %s\n", e);
@@ -143,7 +157,7 @@ public class DbGazetteer extends Gazetteer {
   }
 
   protected PreparedStatement getInsertStatement() throws SQLException {
-    if (this.insertStatement == null || this.insertStatement.isClosed()) {
+    if (this.insertStatement == null) {
       String query = "INSERT INTO places VALUES (?, ?, ?, ?, ?, ?, ?)";
       this.insertStatement = this.connection.prepareStatement(query);
     }
@@ -151,7 +165,7 @@ public class DbGazetteer extends Gazetteer {
   }
 
   protected PreparedStatement getLookupStatement() throws SQLException {
-    if (this.lookupStatement == null || this.lookupStatement.isClosed()) {
+    if (this.lookupStatement == null) {
       String query = "SELECT * FROM places WHERE name = ?";
       this.lookupStatement = this.connection.prepareStatement(query);
     }

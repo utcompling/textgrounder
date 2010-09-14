@@ -22,6 +22,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
+import org.sqlite.JDBC;
+import org.sqlite.*;
+
 import opennlp.textgrounder.topostructs.Coordinate;
 import opennlp.textgrounder.topostructs.Location;
 
@@ -51,7 +54,12 @@ public class TempDbGazetteer extends DbGazetteer {
   }
 
   public static TempDbGazetteer createSQLite() {
-    return TempDbGazetteer.createTemporary("jdbc:sqlite:/%s");
+    try {
+      Class.forName("org.sqlite.JDBC");
+      return TempDbGazetteer.createTemporary("jdbc:sqlite:/%s");
+    } catch (ClassNotFoundException e) {
+      return null;
+    }
   }
 
   public String getPath() {
