@@ -295,7 +295,7 @@ public class WGGazetteer extends Gazetteer {
         int willBeDecimalIndex = raw.length() - 2;
         return Double.parseDouble(raw.substring(0, willBeDecimalIndex) + "." + raw.substring(willBeDecimalIndex));
     }
-
+/*
     public Coordinate baselineGet(String placename) throws Exception {
         ResultSet rs = stat.executeQuery("select pop from places where type != \"locality\" and name = \""
               + placename + "\" order by pop desc;");
@@ -307,7 +307,7 @@ public class WGGazetteer extends Gazetteer {
 
         rs = stat.executeQuery("select * from places where type = \"locality\" and name = \""
               + placename + "\" order by pop desc;");
-        /*while*/ if (rs.next()) {
+        while if (rs.next()) {
             //System.out.println(rs.getString("id") + ": " + rs.getString("name") + ": " + rs.getString("type") + ": " + rs.getString("lat") + ": " + rs.getString("lon") + ": " + rs.getString("pop"));
             if (rs.getInt("pop") > nonLocalityPop || rs.getString("container").equals(rs.getString("name"))) {
                 Coordinate returnCoord = new Coordinate(rs.getDouble("lon"), rs.getDouble("lat"));
@@ -318,7 +318,8 @@ public class WGGazetteer extends Gazetteer {
         rs.close();
         return new Coordinate(9999.99, 9999.99);
     }
-
+*/
+/*
     public boolean hasPlace(String placename) throws Exception {
         ResultSet rs = stat.executeQuery("select * from places where type = \"locality\" and name = \"" + placename + "\";");
         if (rs.next()) {
@@ -329,6 +330,7 @@ public class WGGazetteer extends Gazetteer {
             return false;
         }
     }
+ */
 
     protected void finalize() throws Throwable {
         try {

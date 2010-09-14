@@ -82,6 +82,7 @@ public class BasicMinDistanceModelXML extends ModelXML {
                         if(candidates.getLength() < 3)
                             continue;
 
+                        //System.out.println("Selecting min total distance for " + tokenNode.getAttributes().getNamedItem("term").getNodeValue());
                         int selectedIndex = disambiguateFromCandidateSet(candidates, corpusDocs.item(d));
                         
 
@@ -96,6 +97,10 @@ public class BasicMinDistanceModelXML extends ModelXML {
                         System.out.println(candidateNode.getNodeName());
                         System.out.println(candidateNode.getAttributes().getLength());
                         System.out.println(candidateNode.getAttributes().getNamedItem("lat"));*/
+
+                        if(candidateNode.getAttributes() == null || candidateNode.getAttributes().getNamedItem("lat") == null
+                                || candidateNode.getAttributes().getNamedItem("long") == null)
+                            continue;
 
                         locationE.setAttribute("lat", candidateNode.getAttributes().getNamedItem("lat").getNodeValue());
                         locationE.setAttribute("long", candidateNode.getAttributes().getNamedItem("long").getNodeValue());
@@ -117,8 +122,10 @@ public class BasicMinDistanceModelXML extends ModelXML {
     private int disambiguateFromCandidateSet(NodeList candidates, Node curDocNode) {
 
         // singleton case: "3" actually means 1 here, due to the extra #text nodes in-between each cand node
-        if(candidates.getLength() == 3)
+        if(candidates.getLength() == 3) {
+            //System.out.println("Singleton");
             return 1;
+        }
 
         TObjectDoubleHashMap<String> totalDistances = new TObjectDoubleHashMap<String>();
         TObjectIntHashMap<String> idsToIndeces = new TObjectIntHashMap<String>();
@@ -181,20 +188,26 @@ public class BasicMinDistanceModelXML extends ModelXML {
 
         String idToReturn = null;
         
-        for(int outerCandIndex = 0; outerCandIndex < candidates.getLength(); outerCandIndex++) {
+        /*for(int outerCandIndex = 0; outerCandIndex < candidates.getLength(); outerCandIndex++) {
             Node outerCandNode = candidates.item(outerCandIndex);
             if(!outerCandNode.getNodeName().equals("cand"))
-                continue;
+                continue;*/
 
-            double minTotalDistance = Double.MAX_VALUE;
-            for(String outerCandId : totalDistances.keys(new String[0])) {
-                double curTotalDistance = totalDistances.get(outerCandId);
-                if(curTotalDistance < minTotalDistance) {
-                    curTotalDistance = minTotalDistance;
-                    idToReturn = outerCandId;
-                }
+        double minTotalDistance = Double.MAX_VALUE;
+        for(String outerCandId : totalDistances.keys(new String[0])) {
+            double curTotalDistance = totalDistances.get(outerCandId);
+            if(curTotalDistance < minTotalDistance) {
+                minTotalDistance = curTotalDistance;
+                idToReturn = outerCandId;
+                //System.out.println("  " + curTotalDistance + " was a new low");
+            }
+            else {
+                //System.out.println("  " + curTotalDistance + " was not a new low");
             }
         }
+        //}
+
+        //System.out.println(idsToIndeces.get(idToReturn));
 
         return idsToIndeces.get(idToReturn);
     }

@@ -162,6 +162,9 @@ public class EvalBasedOnXML {
         System.out.println("Precision: " + precision);
         System.out.println("Recall: " + recall);
         System.out.println("F-score: " + f1);
+        System.out.println();
+        System.out.println("P\tR\tF");
+        System.out.println(precision + "\t" + recall + "\t" + f1);
 
         //System.out.println("t_n = " + t_n);
         //System.out.println("matchCount = " + matchCount);
