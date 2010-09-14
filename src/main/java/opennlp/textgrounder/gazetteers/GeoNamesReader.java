@@ -40,7 +40,7 @@ public class GeoNamesReader extends GazetteerReader implements Closeable {
     try {
       this.reader = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(file))));
       this.current = this.nextFields();
-      this.currentId = 0;
+      this.currentId = 1;
     } catch (IOException e) {      
       System.err.format("Error opening gazetteer file: %s\n", e);
       e.printStackTrace();
@@ -97,8 +97,6 @@ public class GeoNamesReader extends GazetteerReader implements Closeable {
     Coordinate coordinate = new Coordinate(lng, lat);
 
     Location location = new Location(this.currentId++, this.current[1], this.current[6], coordinate, population);
-
-    if (this.currentId % 50000 == 0) System.out.format("At %d\n", this.currentId);
 
     this.current = this.nextFields();
     return location;
