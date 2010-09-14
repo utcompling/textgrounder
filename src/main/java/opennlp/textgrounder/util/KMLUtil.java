@@ -268,7 +268,7 @@ public class KMLUtil {
               + "\t\t\t\t<styleUrl>#bar</styleUrl>\n"
               + "\t\t\t\t<Point>\n"
               + "\t\t\t\t\t<coordinates>\n"
-              + "\t\t\t\t\t\t" + coord + "\n"
+              + "\t\t\t\t\t\t" + String.format("%f,%f", coord.longitude, coord.latitude) + "\n"
               + "\t\t\t\t\t</coordinates>\n"
               + "\t\t\t\t</Point>\n"
               + "\t\t\t</Placemark>\n"
@@ -307,7 +307,7 @@ public class KMLUtil {
               + "\t\t\t\t</Region>\n"
               + "\t\t\t\t<styleUrl>#context</styleUrl>\n"
               + "\t\t\t\t<Point>\n"
-              + "\t\t\t\t\t<coordinates>" + spiralPoint + "</coordinates>\n"
+              + "\t\t\t\t\t<coordinates>" + String.format("%f,%f", spiralPoint.longitude, spiralPoint.latitude) + "</coordinates>\n"
               + "\t\t\t\t</Point>\n"
               + "\t\t\t</Placemark>\n";
     }
@@ -329,7 +329,7 @@ public class KMLUtil {
               + "<styleUrl>#downArrowIcon</styleUrl>\n"
               + "<Point>\n"
               + "<altitudeMode>relativeToGround</altitudeMode>\n"
-              + "<coordinates>" + coord + "," + height + "</coordinates>\n"
+              + "<coordinates>" + String.format("%f,%f", coord.longitude, coord.latitude) + "," + height + "</coordinates>\n"
               + "</Point>\n"
               + "</Placemark>\n";
     }

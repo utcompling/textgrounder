@@ -79,7 +79,7 @@ public class Coordinate implements Serializable {
 	StringBuilder sb = new StringBuilder("<coordinates>\n\t\t\t\t\t\t\t\t");
 	
 	while (currentRadian <= twoPI+startRadian) {
-	    sb.append(latitude+radius*Math.cos(currentRadian)).append(",").append(longitude+radius*Math.sin(currentRadian)).append(",").append(height).append("\n\t\t\t\t\t\t\t\t");
+	    sb.append(longitude+radius*Math.cos(currentRadian)).append(",").append(latitude+radius*Math.sin(currentRadian)).append(",").append(height).append("\n\t\t\t\t\t\t\t\t");
 	    currentRadian += radianUnit;
 	}
 	sb.append("</coordinates>");
