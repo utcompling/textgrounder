@@ -34,7 +34,7 @@ import java.util.*;
  * @author Taesun Moon
  * 
  */
-public class Location implements Serializable {
+public class Location implements Serializable, Comparable<Location> {
 
     protected String name;
     protected String type;
@@ -217,4 +217,9 @@ public class Location implements Serializable {
         }
         return true;
     }
+
+    public int compareTo(Location other) {
+      return this.id - other.id;
+    }
 }
+

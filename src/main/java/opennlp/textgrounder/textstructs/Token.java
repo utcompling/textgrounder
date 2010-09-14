@@ -17,7 +17,10 @@ package opennlp.textgrounder.textstructs;
 
 import gnu.trove.TIntIterator;
 
+import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
+
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
@@ -25,7 +28,6 @@ import org.jdom.Attribute;
 import org.jdom.Element;
 
 import opennlp.textgrounder.topostructs.*;
-import opennlp.textgrounder.gazetteers.old.Gazetteer;
 
 /**
  * Class that stores data about a single token in a sequence of tokens. Tokens
@@ -78,27 +80,29 @@ public class Token extends DocumentComponent {
         w.writeAttribute("term", word);
         w.writeStartElement("candidates");
 
-        Gazetteer gazetteer = document.corpus.gazetteer;
-        /* This totally sucks.  Why can't I iterate in the obvious way? */
-        // System.out.println("Toponym is " + word);
-        for (TIntIterator it = gazetteer.get(word).iterator(); it.hasNext();) {
-          int locid = it.next();
-          Location loc = gazetteer.getLocation(locid);
-          w.writeStartElement("cand");
-          w.writeAttribute("id", "c" + locid);
+        int[] locIds = document.corpus.gazetteer.get(word).toArray();
+        Arrays.sort(locIds);
+        List<Location> locations = new ArrayList<Location>(locIds.length);
+        for (int locId : locIds) {
+          locations.add(document.corpus.gazetteer.getLocation(locId));
+        }
 
-          Coordinate coord = loc.getCoord();
+        for (Location location : locations) {
+          w.writeStartElement("cand");
+          w.writeAttribute("id", "c" + location.getId());
+
+          Coordinate coord = location.getCoord();
           /* Java sucks.  Why can't I just call toString() on a double? */
           w.writeAttribute("lat", "" + coord.latitude);
           w.writeAttribute("long", "" + coord.longitude);
-          if (loc.getType() != null) {
-            w.writeAttribute("type", loc.getType());
+          if (location.getType() != null) {
+            w.writeAttribute("type", location.getType());
           }
-          if (loc.getContainer() != null) {
-            w.writeAttribute("container", loc.getContainer());
+          if (location.getContainer() != null) {
+            w.writeAttribute("container", location.getContainer());
           }
-          if (loc.getPop() > 0) {
-            w.writeAttribute("population", "" + loc.getPop());
+          if (location.getPop() > 0) {
+            w.writeAttribute("population", "" + location.getPop());
           }
           w.writeEndElement();
         }
@@ -125,25 +129,28 @@ public class Token extends DocumentComponent {
             e.setAttribute("term", word);
             Element cands = new Element("candidates");
             e.addContent(cands);
-            Gazetteer gazetteer = document.corpus.gazetteer;
-            /* This totally sucks.  Why can't I iterate in the obvious way? */
-            // System.out.println("Toponym is " + word);
-            for (TIntIterator it = gazetteer.get(word).iterator(); it.hasNext();) {
-                int locid = it.next();
-                Location loc = gazetteer.getLocation(locid);
+
+            int[] locIds = document.corpus.gazetteer.get(word).toArray();
+            Arrays.sort(locIds);
+            List<Location> locations = new ArrayList<Location>(locIds.length);
+            for (int locId : locIds) {
+              locations.add(document.corpus.gazetteer.getLocation(locId));
+            }
+
+            for (Location location : locations) {
                 Element cand = new Element("cand");
                 cands.addContent(cand);
-                cand.setAttribute("id", "c" + locid);
-                Coordinate coord = loc.getCoord();
+                cand.setAttribute("id", "c" + location.getId());
+                Coordinate coord = location.getCoord();
                 /* Java sucks.  Why can't I just call toString() on a double? */
                 cand.setAttribute("lat", "" + coord.latitude);
                 cand.setAttribute("long", "" + coord.longitude);
-                if (loc.getType() != null)
-                    cand.setAttribute("type", loc.getType());
-                if (loc.getContainer() != null)
-                    cand.setAttribute("container", loc.getContainer());
-                if (loc.getPop() > 0)
-                    cand.setAttribute("population", "" + loc.getPop());
+                if (location.getType() != null)
+                    cand.setAttribute("type", location.getType());
+                if (location.getContainer() != null)
+                    cand.setAttribute("container", location.getContainer());
+                if (location.getPop() > 0)
+                    cand.setAttribute("population", "" + location.getPop());
             }
         } else {
             assert (word != null);
@@ -158,3 +165,4 @@ public class Token extends DocumentComponent {
         return e;
     }
 }
+
