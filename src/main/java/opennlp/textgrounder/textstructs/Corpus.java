@@ -40,15 +40,20 @@ import javax.xml.stream.XMLStreamWriter;
 public class Corpus extends ArrayList<CorpusDocument> {
     static private final long serialVersionUID = 1L;
     
-    public Gazetteer gazetteer;
-    /**
-     * Table of words and indexes.
-     */
-    public Lexicon lexicon;
+    private final Gazetteer gazetteer;
+    private final Lexicon lexicon;
     
-    public Corpus(Gazetteer g, Lexicon l) {
-        gazetteer = g;
-        lexicon = l;
+    public Corpus(Gazetteer gazetteer, Lexicon lexicon) {
+      this.gazetteer = gazetteer;
+      this.lexicon = lexicon;
+    }
+
+    public Gazetteer getGazetteer() {
+      return this.gazetteer;
+    }
+
+    public Lexicon getLexicon() {
+      return this.lexicon;
     }
 
     /**

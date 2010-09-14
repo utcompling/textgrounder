@@ -62,7 +62,7 @@ public class Token extends DocumentComponent {
             String value = att.getValue();
             // System.out.println("name=" + name + ", value=" + value);
             if ((!istop && name.equals("tok")) || (istop && name.equals("term")))
-                id = document.corpus.lexicon.addWord(value);
+                id = document.corpus.getLexicon().addWord(value);
             else
                 props.put(name, value);
         }
@@ -75,16 +75,16 @@ public class Token extends DocumentComponent {
       for (String name : props.keySet()) {
         w.writeAttribute(name, props.get(name));
       }
-      String word = this.document.corpus.lexicon.getWordForInt(id);
+      String word = this.document.corpus.getLexicon().getWordForInt(id);
       if (this.istop) {
         w.writeAttribute("term", word);
         w.writeStartElement("candidates");
 
-        int[] locIds = document.corpus.gazetteer.get(word).toArray();
+        int[] locIds = document.corpus.getGazetteer().get(word).toArray();
         Arrays.sort(locIds);
         List<Location> locations = new ArrayList<Location>(locIds.length);
         for (int locId : locIds) {
-          locations.add(document.corpus.gazetteer.getLocation(locId));
+          locations.add(document.corpus.getGazetteer().getLocation(locId));
         }
 
         for (Location location : locations) {
@@ -124,17 +124,17 @@ public class Token extends DocumentComponent {
      */
     protected Element outputElement() {
         Element e = new Element(istop ? "toponym" : "w");
-        String word = document.corpus.lexicon.getWordForInt(id);
+        String word = document.corpus.getLexicon().getWordForInt(id);
         if (istop) {
             e.setAttribute("term", word);
             Element cands = new Element("candidates");
             e.addContent(cands);
 
-            int[] locIds = document.corpus.gazetteer.get(word).toArray();
+            int[] locIds = document.corpus.getGazetteer().get(word).toArray();
             Arrays.sort(locIds);
             List<Location> locations = new ArrayList<Location>(locIds.length);
             for (int locId : locIds) {
-              locations.add(document.corpus.gazetteer.getLocation(locId));
+              locations.add(document.corpus.getGazetteer().getLocation(locId));
             }
 
             for (Location location : locations) {

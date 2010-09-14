@@ -111,7 +111,7 @@ public class StanfordNER extends NamedEntityRecognizer {
      */
     public void processText(CorpusDocument doc, String text) {
 
-        Lexicon lexicon = doc.corpus.lexicon;
+        Lexicon lexicon = doc.corpus.getLexicon();
         
         createClassifier();
         
