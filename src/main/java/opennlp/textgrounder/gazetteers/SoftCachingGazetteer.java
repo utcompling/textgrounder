@@ -27,7 +27,7 @@ import opennlp.textgrounder.topostructs.Location;
 
 public class SoftCachingGazetteer extends CachingGazetteer {
   public SoftCachingGazetteer(Gazetteer source) {
-    this(source, false);
+    this(source, true);
   }
 
   public SoftCachingGazetteer(Gazetteer source, boolean cacheIncoming) {
