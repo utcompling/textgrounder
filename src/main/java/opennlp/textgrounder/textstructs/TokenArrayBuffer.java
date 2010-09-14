@@ -138,6 +138,7 @@ public class TokenArrayBuffer implements Serializable {
      *            the TokenArrayBuffer to be concatenated with this
      * @return the concatenated TokenArrayBuffer
      */
+    @Deprecated
     public TokenArrayBuffer concatenate(TokenArrayBuffer otherTokenArrayBuffer) {
         TokenArrayBuffer toReturn = new TokenArrayBuffer(this.lexicon.concatenate(otherTokenArrayBuffer.lexicon));
 
