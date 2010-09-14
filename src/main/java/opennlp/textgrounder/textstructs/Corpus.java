@@ -15,7 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.textstructs;
 
-import opennlp.textgrounder.textstructs.old.Lexicon;
+//import opennlp.textgrounder.textstructs.old.Lexicon;
 import opennlp.textgrounder.gazetteers.old.Gazetteer;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -32,6 +32,8 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
+import com.google.inject.Inject;
+
 /**
  * Class that stores data about a corpus (sequence of documents).
  * 
@@ -41,9 +43,10 @@ public class Corpus extends ArrayList<CorpusDocument> {
     static private final long serialVersionUID = 1L;
     
     private final Gazetteer gazetteer;
-    private final Lexicon lexicon;
-    
-    public Corpus(Gazetteer gazetteer, Lexicon lexicon) {
+    private final Lexicon<String> lexicon;
+
+    @Inject
+    public Corpus(Gazetteer gazetteer, Lexicon<String> lexicon) {
       this.gazetteer = gazetteer;
       this.lexicon = lexicon;
     }
@@ -52,7 +55,7 @@ public class Corpus extends ArrayList<CorpusDocument> {
       return this.gazetteer;
     }
 
-    public Lexicon getLexicon() {
+    public Lexicon<String> getLexicon() {
       return this.lexicon;
     }
 
@@ -101,3 +104,4 @@ public class Corpus extends ArrayList<CorpusDocument> {
         }
     }
 }
+

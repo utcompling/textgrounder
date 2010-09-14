@@ -26,7 +26,7 @@ import edu.stanford.nlp.ie.crf.CRFClassifier;
 
 import opennlp.textgrounder.textstructs.CorpusDocument;
 import opennlp.textgrounder.textstructs.Token;
-import opennlp.textgrounder.textstructs.old.Lexicon;
+import opennlp.textgrounder.textstructs.Lexicon;
 import opennlp.textgrounder.util.Constants;
 import opennlp.textgrounder.util.StringUtil;
 
@@ -111,7 +111,7 @@ public class StanfordNER extends NamedEntityRecognizer {
      */
     public void processText(CorpusDocument doc, String text) {
 
-        Lexicon lexicon = doc.corpus.getLexicon();
+        Lexicon<String> lexicon = doc.corpus.getLexicon();
         
         createClassifier();
         
@@ -151,7 +151,7 @@ public class StanfordNER extends NamedEntityRecognizer {
                     String cur = StringUtil.join(tokens, " ",
                             toponymStartIndex, toponymEndIndex, "/")
                             .toLowerCase();
-                    wordidx = lexicon.addWord(cur);
+                    wordidx = lexicon.getOrAdd(cur);
                     doc.add(new Token(doc, wordidx, true));
 
                     toponymStartIndex = -1;
@@ -170,7 +170,7 @@ public class StanfordNER extends NamedEntityRecognizer {
                  */
                 String cur = StringUtil.join(tokens, " ", toponymStartIndex,
                         toponymEndIndex, "/").toLowerCase();
-                wordidx = lexicon.addWord(cur);
+                wordidx = lexicon.getOrAdd(cur);
                 doc.add(new Token(doc, wordidx, true));
 
                 /**
@@ -185,7 +185,7 @@ public class StanfordNER extends NamedEntityRecognizer {
                 for (String subtoke : subtokes) {
                     if (!subtoke.isEmpty()) {
                         subtoke = subtoke.trim().toLowerCase();
-                        wordidx = lexicon.addWord(subtoke);
+                        wordidx = lexicon.getOrAdd(subtoke);
                         doc.add(new Token(doc, wordidx, false));
                     }
                 }
@@ -203,7 +203,7 @@ public class StanfordNER extends NamedEntityRecognizer {
                 for (String subtoke : subtokes) {
                     if (!subtoke.isEmpty()) {
                         subtoke = subtoke.trim().toLowerCase();
-                        wordidx = lexicon.addWord(subtoke);
+                        wordidx = lexicon.getOrAdd(subtoke);
                         doc.add(new Token(doc, wordidx, false));
                     }
                 }
@@ -212,7 +212,7 @@ public class StanfordNER extends NamedEntityRecognizer {
 
         // case where toponym ended at very end of document:
         if (toponymStartIndex != -1) {
-            int wordidx = lexicon.addWord(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
+            int wordidx = lexicon.getOrAdd(StringUtil.join(tokens, " ", toponymStartIndex, toponymEndIndex, "/"));
             doc.add(new Token(doc, wordidx, true));
         }
     }
@@ -271,3 +271,4 @@ public class StanfordNER extends NamedEntityRecognizer {
         }
     }
 }
+

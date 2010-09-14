@@ -23,8 +23,9 @@ import org.apache.commons.cli.*;
 import opennlp.textgrounder.gazetteers.old.Gazetteer;
 import opennlp.textgrounder.gazetteers.old.GazetteerGenerator;
 import opennlp.textgrounder.textstructs.Corpus;
+import opennlp.textgrounder.textstructs.Lexicon;
+import opennlp.textgrounder.textstructs.SimpleLexicon;
 import opennlp.textgrounder.textstructs.TextProcessor;
-import opennlp.textgrounder.textstructs.old.Lexicon;
 import opennlp.textgrounder.ners.*;
 
 /**
@@ -207,7 +208,7 @@ public class GeoPreprocess {
         }
 
         GeoPreprocess gp = new GeoPreprocess(cline);
-        Lexicon lexicon = new Lexicon();
+        Lexicon<String> lexicon = new SimpleLexicon<String>();
         Gazetteer gazetteer = new GazetteerGenerator(gp.gazetteType,
                 gp.gazetteerPath, gp.gazetteerRefresh).generateGazetteer();
         Corpus corpus = new Corpus(gazetteer, lexicon);

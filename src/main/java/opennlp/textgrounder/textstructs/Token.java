@@ -62,7 +62,7 @@ public class Token extends DocumentComponent {
             String value = att.getValue();
             // System.out.println("name=" + name + ", value=" + value);
             if ((!istop && name.equals("tok")) || (istop && name.equals("term")))
-                id = document.corpus.getLexicon().addWord(value);
+                id = document.corpus.getLexicon().getOrAdd(value);
             else
                 props.put(name, value);
         }
@@ -75,7 +75,7 @@ public class Token extends DocumentComponent {
       for (String name : props.keySet()) {
         w.writeAttribute(name, props.get(name));
       }
-      String word = this.document.corpus.getLexicon().getWordForInt(id);
+      String word = this.document.corpus.getLexicon().atIndex(id);
       if (this.istop) {
         w.writeAttribute("term", word);
         w.writeStartElement("candidates");
@@ -124,7 +124,7 @@ public class Token extends DocumentComponent {
      */
     protected Element outputElement() {
         Element e = new Element(istop ? "toponym" : "w");
-        String word = document.corpus.getLexicon().getWordForInt(id);
+        String word = document.corpus.getLexicon().atIndex(id);
         if (istop) {
             e.setAttribute("term", word);
             Element cands = new Element("candidates");

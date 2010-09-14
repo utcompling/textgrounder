@@ -262,7 +262,7 @@ public abstract class TextProcessor {
 
                 cur = tokens[0].toLowerCase();
 
-                wordidx = corpus.getLexicon().addWord(cur);
+                wordidx = corpus.getLexicon().getOrAdd(cur);
                 if (!tokens[1].equals("LOC")) {
                     doc.add(new Token(doc, wordidx, false));
                 } else {
