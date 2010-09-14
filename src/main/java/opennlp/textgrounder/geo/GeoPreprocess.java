@@ -16,6 +16,7 @@
 package opennlp.textgrounder.geo;
 
 import java.io.*;
+import java.util.Arrays;
 
 import org.apache.commons.cli.*;
 
@@ -213,10 +214,11 @@ public class GeoPreprocess {
             System.out.println("Processing: " + filename);
             File file = new File(filename);
             if (file.isDirectory()) {
-                for (String pathname : file.list()) {
-                    System.out.println("Processing: " + pathname);
-                    gp.processFile(file.getCanonicalPath() + File.separator + pathname,
-                            corpus);
+                File[] contents = file.listFiles();
+                Arrays.sort(contents);
+                for (File dirFile : contents) {
+                    System.out.format("Processing: %s\n", dirFile);
+                    gp.processFile(dirFile.getPath(), corpus);
                 }
             } else
                 gp.processFile(filename, corpus);
