@@ -39,8 +39,6 @@ import opennlp.textgrounder.topostructs.*;
  * @author benwing
  */
 public class Token extends DocumentComponent {
-    static private final long serialVersionUID = 1L;
-
     private int id; // Identifier in a lexicon
     private boolean istop;
     private Location goldLocation; // Gold-standard location, if known 

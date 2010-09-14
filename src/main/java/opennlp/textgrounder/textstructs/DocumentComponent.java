@@ -35,17 +35,15 @@ import javax.xml.stream.XMLStreamWriter;
  * @author benwing
  */
 public abstract class DocumentComponent extends ArrayList<DocumentComponent> {
-    static private final long serialVersionUID = 1L;
-
     /**
      * Type of component. Corresponds to name of corresponding XML element.
      */
-    protected String type; 
+    protected final String type; 
     /**
      * Properties of component. Corresponds to attributes and corresponding
      * values of the corresponding XML element.
      */
-    protected Map<String, String> props = new HashMap<String, String>();
+    protected final Map<String, String> props = new HashMap<String, String>();
     /**
      * Back pointer to document this component is part of.
      */

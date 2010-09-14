@@ -24,10 +24,6 @@ import gnu.trove.*;
  * @version $Revision: 1.1 $, $Date: 2005/04/14 04:22:57 $
  */
 public final class IntStringPair extends TLinkableAdapter implements Comparable<IntStringPair> {
-    /**
-     * 
-     */
-    private static final long serialVersionUID = 1L;
     public int intValue;
     public String stringValue;
 

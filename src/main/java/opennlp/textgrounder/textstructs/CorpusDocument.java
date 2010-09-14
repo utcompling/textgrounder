@@ -48,8 +48,6 @@ import org.jdom.input.SAXBuilder;
  * @author benwing
  */
 public class CorpusDocument extends DocumentComponent {
-    static private final long serialVersionUID = 1L;
-
     protected String name; // Name of document
     protected Corpus corpus; // Corpus that we're in
     protected List<Token> tokens;

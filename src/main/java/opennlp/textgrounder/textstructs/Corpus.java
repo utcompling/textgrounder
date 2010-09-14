@@ -39,9 +39,7 @@ import com.google.inject.Inject;
  * 
  * @author benwing
  */
-public class Corpus extends ArrayList<CorpusDocument> {
-    static private final long serialVersionUID = 1L;
-    
+public class Corpus extends ArrayList<CorpusDocument> { 
     private final Gazetteer gazetteer;
     private final Lexicon<String> lexicon;
 

@@ -23,8 +23,6 @@ package opennlp.textgrounder.textstructs;
  * @author benwing
  */
 public class Division extends DocumentComponent {
-    static private final long serialVersionUID = 1L;
-
     public Division(CorpusDocument doc, String type) {
         super(doc, type);
     }
