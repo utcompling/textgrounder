@@ -57,37 +57,6 @@ public class Coordinate implements Serializable {
     }
 
     /**
-     * Create a KML expression corresponding to a polygonal cylinder (i.e. a
-     * cylinder with a polygon as its base instead of a circle) located around
-     * the given coordinate.
-     * 
-     * @param sides
-     *            Number of sides of the polygon
-     * @param radius
-     *            Radius of the circle that circumscribes the polygon
-     * @param height
-     *            Height of the cylinder
-     * @return A string representing a KML expression describing the coordinates
-     *         of the cylinder
-     */
-    @Deprecated
-    public String toKMLPolygon(int sides, double radius, double height) {
-	final double radianUnit = twoPI/sides;
-	final double startRadian = radianUnit/2;
-	double currentRadian = startRadian;
-
-	StringBuilder sb = new StringBuilder("<coordinates>\n\t\t\t\t\t\t\t\t");
-	
-	while (currentRadian <= twoPI+startRadian) {
-	    sb.append(longitude+radius*Math.cos(currentRadian)).append(",").append(latitude+radius*Math.sin(currentRadian)).append(",").append(height).append("\n\t\t\t\t\t\t\t\t");
-	    currentRadian += radianUnit;
-	}
-	sb.append("</coordinates>");
-
-	return sb.toString();
-    }
-
-    /**
      * Generate a new Coordinate that is the `n'th point along a spiral
      * radiating outward from the given coordinate. `initRadius' controls where
      * on the spiral the zeroth point is located. The constant local variable

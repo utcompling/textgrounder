@@ -25,6 +25,10 @@ import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
+
 import opennlp.textgrounder.gazetteers.old.Gazetteer;
 import opennlp.textgrounder.gazetteers.old.GazetteerGenerator;
 import opennlp.textgrounder.geo.*;
@@ -394,26 +398,24 @@ public abstract class Model {
     public void writeXMLFile(String inputFilename, String outputFilename,
           TIntObjectHashMap<Location> idxToLocationMap, TIntHashSet locations,
           TokenArrayBuffer tokenArrayBuffer) throws
-          IOException {
+          IOException, XMLStreamException {
 
-        BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));
+        XMLOutputFactory factory = XMLOutputFactory.newInstance();
+        XMLStreamWriter out = factory.createXMLStreamWriter(new BufferedWriter(new FileWriter(outputFilename)));
+
         int dotKmlIndex = outputFilename.lastIndexOf(".kml");
         String contextFilename = outputFilename.substring(0, dotKmlIndex) + "-context.kml";
-        BufferedWriter contextOut = new BufferedWriter(new FileWriter(contextFilename));
+        XMLStreamWriter contextOut = factory.createXMLStreamWriter(new BufferedWriter(new FileWriter(contextFilename)));
 
-        out.write(KMLUtil.genKMLHeader(inputFilename));
-
-        contextOut.write(KMLUtil.genKMLHeader(inputFilename));
+        KMLUtil.writeHeader(out, inputFilename);
+        KMLUtil.writeHeader(contextOut, inputFilename);
 
         for (TIntIterator it = locations.iterator(); it.hasNext();) {
             int locid = it.next();
             Location loc = idxToLocationMap.get(locid);
 
             double height = Math.log(loc.getCount()) * barScale;
-
             double radius = .15;
-            //String kmlPolygon = coord.toKMLPolygon(4,radius,height);  // a square
-            String kmlPolygon = loc.getCoord().toKMLPolygon(10, radius, height);
 
             String placename = null;
             try {
@@ -422,19 +424,18 @@ public abstract class Model {
                 placename = lexicon.getWordForInt(loc.getNameid());
             }
             Coordinate coord = loc.getCoord();
-            out.write(KMLUtil.genPolygon(placename, coord, radius, kmlPolygon));
+            KMLUtil.writePolygon(out, placename, coord, 10, radius, height);
 
             for (int j = 0; j < loc.getBackPointers().size(); j++) {
                 int index = loc.getBackPointers().get(j);
                 String context = tokenArrayBuffer.getContextAround(index, windowSize, true);
                 Coordinate spiralPoint = coord.getNthSpiralPoint(j, 0.13);
-
-                contextOut.write(KMLUtil.genSpiralpoint(placename, context, spiralPoint, j, radius));
+                KMLUtil.writeSpiralPoint(contextOut, placename, j, context, spiralPoint, radius);
             }
         }
 
-        out.write(KMLUtil.genKMLFooter());
-        contextOut.write(KMLUtil.genKMLFooter());
+        KMLUtil.writeFooter(out);
+        KMLUtil.writeFooter(contextOut);
 
         out.close();
         contextOut.close();

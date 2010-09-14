@@ -4,17 +4,17 @@
 
 package opennlp.textgrounder.eval;
 
-import java.io.*;
+/*import java.io.*;
 import java.util.*;
 import javax.xml.parsers.*;
 import javax.xml.xpath.*;
 import org.w3c.dom.*;
 
 import opennlp.textgrounder.util.*;
-import opennlp.textgrounder.topostructs.*;
+import opennlp.textgrounder.topostructs.*;*/
 
 public class GenerateKML {
-
+/*
     private static DocumentBuilderFactory dbf;
     private static DocumentBuilder db;
 
@@ -63,8 +63,8 @@ public class GenerateKML {
 
             Node modelLocationN = ModelTopN.getChildNodes().item(1);
 
-            String modelLat = /*Double.parseDouble(*/modelLocationN.getAttributes().getNamedItem("lat").getNodeValue()/*)*/;
-            String modelLon = /*Double.parseDouble(*/modelLocationN.getAttributes().getNamedItem("long").getNodeValue()/*)*/;
+            String modelLat = modelLocationN.getAttributes().getNamedItem("lat").getNodeValue();
+            String modelLon = modelLocationN.getAttributes().getNamedItem("long").getNodeValue();
             String modelContext = ModelTopN.getChildNodes().item(3).getTextContent();
 
             ArrayList<String> curContextsList = locationsToContexts.get(modelLat + ";" + modelLon);
@@ -113,5 +113,5 @@ public class GenerateKML {
 
         kmlOut.close();
         contextOut.close();
-    }
+    }*/
 }
