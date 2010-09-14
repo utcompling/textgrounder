@@ -80,28 +80,6 @@ public class Corpus extends ArrayList<CorpusDocument> {
 
       out.writeEndElement();
       out.close();
-    } 
-
-    /**
-     * Output the corpus in XML to the given file.
-     * 
-     * @param file
-     * @throws IOException
-     */
-    public void outputXML(File file) {
-        Document doc = new Document();
-        Element root = new Element("corpus");
-        doc.addContent(root);
-        for (CorpusDocument cdoc : this) {
-            System.out.println("Outputting XML for " + cdoc);
-            root.addContent(cdoc.outputElement());
-        }
-        try {
-            XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
-            xout.output(doc, new FileOutputStream(file));
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
-        }
     }
 }
 

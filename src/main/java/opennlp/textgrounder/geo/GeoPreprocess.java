@@ -228,8 +228,7 @@ public class GeoPreprocess {
         }
 
         System.out.println("Writing output file " + gp.outputPath);
-        corpus.outputXML(new File(gp.outputPath));
+        corpus.writeXML(new File(gp.outputPath));
     }
-        
 }
 

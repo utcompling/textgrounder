@@ -71,7 +71,6 @@ public class Token extends DocumentComponent {
 
     protected void writeElement(XMLStreamWriter w) throws XMLStreamException {
       w.writeStartElement(this.istop ? "toponym" : "w");
-      // copy properties
       for (String name : props.keySet()) {
         w.writeAttribute(name, props.get(name));
       }
@@ -92,9 +91,8 @@ public class Token extends DocumentComponent {
           w.writeAttribute("id", "c" + location.getId());
 
           Coordinate coord = location.getCoord();
-          /* Java sucks.  Why can't I just call toString() on a double? */
-          w.writeAttribute("lat", "" + coord.latitude);
-          w.writeAttribute("long", "" + coord.longitude);
+          w.writeAttribute("lat", Double.toString(coord.latitude));
+          w.writeAttribute("long", Double.toString(coord.longitude));
           if (location.getType() != null) {
             w.writeAttribute("type", location.getType());
           }
@@ -112,57 +110,7 @@ public class Token extends DocumentComponent {
         w.writeAttribute("tok", word);
       }
       w.writeEndElement();
-      // there should be no children
-      for (DocumentComponent child : this) {
-        assert (false);
-      }
-    }
-
-    /**
-     * Create a new XML Element corresponding to the current component
-     * (including its children).
-     */
-    protected Element outputElement() {
-        Element e = new Element(istop ? "toponym" : "w");
-        String word = document.corpus.getLexicon().atIndex(id);
-        if (istop) {
-            e.setAttribute("term", word);
-            Element cands = new Element("candidates");
-            e.addContent(cands);
-
-            int[] locIds = document.corpus.getGazetteer().get(word).toArray();
-            Arrays.sort(locIds);
-            List<Location> locations = new ArrayList<Location>(locIds.length);
-            for (int locId : locIds) {
-              locations.add(document.corpus.getGazetteer().getLocation(locId));
-            }
-
-            for (Location location : locations) {
-                Element cand = new Element("cand");
-                cands.addContent(cand);
-                cand.setAttribute("id", "c" + location.getId());
-                Coordinate coord = location.getCoord();
-                /* Java sucks.  Why can't I just call toString() on a double? */
-                cand.setAttribute("lat", "" + coord.latitude);
-                cand.setAttribute("long", "" + coord.longitude);
-                if (location.getType() != null)
-                    cand.setAttribute("type", location.getType());
-                if (location.getContainer() != null)
-                    cand.setAttribute("container", location.getContainer());
-                if (location.getPop() > 0)
-                    cand.setAttribute("population", "" + location.getPop());
-            }
-        } else {
-            assert (word != null);
-            e.setAttribute("tok", word);
-        }
-        // copy properties
-        for (String name : props.keySet())
-            e.setAttribute(name, props.get(name));
-        // there should be no children
-        for (DocumentComponent child : this)
-            assert (false);
-        return e;
+      assert this.size() == 0 : "There should be no children.";
     }
 }
 

@@ -81,21 +81,6 @@ public abstract class DocumentComponent extends ArrayList<DocumentComponent> {
     }
 
     /**
-     * Create a new XML Element corresponding to the current component
-     * (including its children).
-     */
-    protected Element outputElement() {
-        Element e = new Element(type);
-        // copy properties
-        for (String name : props.keySet())
-            e.setAttribute(name, props.get(name));
-        // process children
-        for (DocumentComponent child : this)
-            e.addContent(child.outputElement());
-        return e;
-    }
-    
-    /**
      * Process an XML Element corresponding to the current component and
      * populate properties and children.
      * 
