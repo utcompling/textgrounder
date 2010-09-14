@@ -69,10 +69,10 @@ public class DbGazetteer extends Gazetteer {
       statement.setString(7, location.getContainer());
       statement.addBatch();
 
-      if (this.inBatch == this.batchSize) {        
+      if (++this.inBatch == this.batchSize) {        
         this.inBatch = 0;
-        this.insertStatement.executeBatch();
-        this.insertStatement.close();
+        statement.executeBatch();
+        statement.close();
       }
 
     } catch (SQLException e) {
@@ -113,6 +113,11 @@ public class DbGazetteer extends Gazetteer {
   @Override
   public void close() {
     try {
+      if (this.inBatch > 0) {
+        this.inBatch = 0;
+        this.insertStatement.executeBatch();
+        this.insertStatement.close();
+      }
       this.connection.close();
     } catch (SQLException e) {
       System.err.format("Could not close database connection: %s\n", e);

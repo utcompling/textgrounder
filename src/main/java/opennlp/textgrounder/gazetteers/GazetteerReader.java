@@ -15,11 +15,14 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.gazetteers;
 
+import java.io.Closeable;
 import java.util.Iterator;
 import opennlp.textgrounder.topostructs.Location;
 
 public abstract class GazetteerReader implements Iterable<Location>,
                                                  Iterator<Location> {
+  public abstract void close();
+
   public Iterator<Location> iterator() {
     return this;
   }

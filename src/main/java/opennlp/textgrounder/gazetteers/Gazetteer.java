@@ -15,7 +15,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.gazetteers;
 
-import java.io.Closeable;
 import java.util.List;
 import opennlp.textgrounder.topostructs.Location;
 
@@ -33,6 +32,7 @@ public abstract class Gazetteer {
       count++;
       this.add(location.getName(), location);
     }
+    reader.close();
     return count;
   }
 
