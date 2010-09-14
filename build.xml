@@ -91,6 +91,7 @@
           depends="prepare"
           description="compiles the source code">
   	<javac srcdir="${src.dir}"
+           includeantruntime="false"
            destdir="${build.dest}"
            debug="${debug}"
            deprecation="${deprecation}"
