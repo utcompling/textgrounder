@@ -41,20 +41,28 @@ import opennlp.textgrounder.topostructs.*;
 public class Token extends DocumentComponent {
     static private final long serialVersionUID = 1L;
 
-    public int id; // Identifier in a lexicon
-    public boolean istop;
-    public Location goldLocation; // Gold-standard location, if known 
-    
+    private int id; // Identifier in a lexicon
+    private boolean istop;
+    private Location goldLocation; // Gold-standard location, if known 
+
     public Token(CorpusDocument doc, boolean istop) {
         super(doc, "SHOULD_NOT_BE_SEEN");
         this.istop = istop;
     }
-    
+
     public Token(CorpusDocument doc, int id, boolean istop) {
         this(doc, istop);
         this.id = id;
     }
-    
+
+    public void setGoldLocation(Location goldLocation) {
+      this.goldLocation = goldLocation;
+    }
+
+    public Location getGoldLocation() {
+      return this.goldLocation;
+    }
+
     protected void copyElementProperties(Element e) {
         istop = e.getName().equals("toponym");
         for (Attribute att : (List<Attribute>) e.getAttributes()) {

@@ -104,7 +104,7 @@ public class OpenNLPNER extends NamedEntityRecognizer {
                     String toktype = token[1];
                     String netype = null;
                     boolean istok = false;
-                    int tokid = doc.corpus.getLexicon().getOrAdd(tokstr);
+                    int tokid = doc.getCorpus().getLexicon().getOrAdd(tokstr);
 
                     if (toktype == null) netype = "O";
                     else if (toktype.equals("person")) netype = "I-PER";
@@ -115,7 +115,7 @@ public class OpenNLPNER extends NamedEntityRecognizer {
 
                     Token tok = new Token(doc, tokid, istok);
                     if (netype != null)
-                        tok.props.put("ne", netype);
+                        tok.addProperty("ne", netype);
                     
                     sentdiv.add(tok);
                 }

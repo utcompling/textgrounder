@@ -240,7 +240,7 @@ public abstract class TextProcessor {
 
                 if (lookingForGoldLoc && curLine.startsWith("\t>")) {
                     Token tok = new Token(doc, wordidx, true);
-                    tok.goldLocation = parseTRLocation(cur, curLine, wordidx);
+                    tok.setGoldLocation(parseTRLocation(cur, curLine, wordidx));
                     doc.add(tok);
                     lookingForGoldLoc = false;
                     continue;

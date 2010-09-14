@@ -50,19 +50,23 @@ import org.jdom.input.SAXBuilder;
 public class CorpusDocument extends DocumentComponent {
     static private final long serialVersionUID = 1L;
 
-    public String name; // Name of document
-    public Corpus corpus; // Corpus that we're in
-    public List<Token> tokens;
-    
+    protected String name; // Name of document
+    protected Corpus corpus; // Corpus that we're in
+    protected List<Token> tokens;
+
     public CorpusDocument(Corpus corpus, String name) {
-        /* FUCKME. For some reason you can't say `super(this, "doc");'. */
+        /* For some reason you can't say `super(this, "doc");'. */
         super(null, "doc");
         this.document = this;
         this.corpus = corpus;
         this.name = name;
         tokens = new ArrayList<Token>();
     }
-    
+
+    public Corpus getCorpus() {
+      return this.corpus;
+    }
+
     protected void writeElement(XMLStreamWriter w) throws XMLStreamException {
       w.writeStartElement(this.type);
       /* This is a hack. */

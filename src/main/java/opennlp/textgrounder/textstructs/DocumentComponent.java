@@ -16,15 +16,15 @@
 package opennlp.textgrounder.textstructs;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.jdom.Attribute;
 import org.jdom.Element;
 
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
-
-import gnu.trove.*;
 
 /**
  * Class that stores data about some component of a document, including possibly
@@ -40,16 +40,16 @@ public abstract class DocumentComponent extends ArrayList<DocumentComponent> {
     /**
      * Type of component. Corresponds to name of corresponding XML element.
      */
-    public String type; 
+    protected String type; 
     /**
      * Properties of component. Corresponds to attributes and corresponding
      * values of the corresponding XML element.
      */
-    public THashMap<String,String> props = new THashMap<String,String>();
+    protected Map<String, String> props = new HashMap<String, String>();
     /**
      * Back pointer to document this component is part of.
      */
-    public CorpusDocument document;
+    protected CorpusDocument document;
     
     /**
      * Create a component of the given type.
@@ -67,6 +67,10 @@ public abstract class DocumentComponent extends ArrayList<DocumentComponent> {
             document.tokens.add((Token) o); 
         }
         return super.add(o);
+    }
+
+    public void addProperty(String name, String value) {
+      this.props.put(name, value);
     }
 
     protected void writeElement(XMLStreamWriter w) throws XMLStreamException {
