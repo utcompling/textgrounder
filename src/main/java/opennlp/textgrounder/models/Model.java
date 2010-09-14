@@ -28,7 +28,10 @@ import java.util.logging.Logger;
 import opennlp.textgrounder.gazetteers.old.Gazetteer;
 import opennlp.textgrounder.gazetteers.old.GazetteerGenerator;
 import opennlp.textgrounder.geo.*;
-import opennlp.textgrounder.textstructs.*;
+import opennlp.textgrounder.textstructs.EvalTokenArrayBuffer;
+import opennlp.textgrounder.textstructs.TokenArrayBuffer;
+import opennlp.textgrounder.textstructs.TextProcessor;
+import opennlp.textgrounder.textstructs.old.Lexicon;
 import opennlp.textgrounder.topostructs.*;
 import opennlp.textgrounder.util.KMLUtil;
 

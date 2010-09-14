@@ -24,7 +24,9 @@ import java.lang.ClassNotFoundException;
 
 import edu.stanford.nlp.ie.crf.CRFClassifier;
 
-import opennlp.textgrounder.textstructs.*;
+import opennlp.textgrounder.textstructs.CorpusDocument;
+import opennlp.textgrounder.textstructs.Token;
+import opennlp.textgrounder.textstructs.old.Lexicon;
 import opennlp.textgrounder.util.Constants;
 import opennlp.textgrounder.util.StringUtil;
 

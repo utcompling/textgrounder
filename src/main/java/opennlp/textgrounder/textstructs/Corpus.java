@@ -15,6 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.textstructs;
 
+import opennlp.textgrounder.textstructs.old.Lexicon;
 import opennlp.textgrounder.gazetteers.old.Gazetteer;
 import java.io.BufferedWriter;
 import java.io.File;

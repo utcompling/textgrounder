@@ -27,7 +27,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.*;
 
-import opennlp.textgrounder.textstructs.Lexicon;
+import opennlp.textgrounder.textstructs.old.Lexicon;
 import opennlp.textgrounder.topostructs.*;
 
 /**

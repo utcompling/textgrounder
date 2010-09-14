@@ -15,11 +15,13 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.models;
 
+import java.util.logging.*;
+
 import gnu.trove.TIntHashSet;
+
 import opennlp.textgrounder.gazetteers.old.Gazetteer;
 import opennlp.textgrounder.geo.CommandLineOptions;
-import opennlp.textgrounder.textstructs.*;
-import java.util.logging.*;
+import opennlp.textgrounder.textstructs.old.Lexicon;
 import opennlp.textgrounder.topostructs.Location;
 
 /**

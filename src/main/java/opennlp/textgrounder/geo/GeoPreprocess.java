@@ -22,7 +22,9 @@ import org.apache.commons.cli.*;
 
 import opennlp.textgrounder.gazetteers.old.Gazetteer;
 import opennlp.textgrounder.gazetteers.old.GazetteerGenerator;
-import opennlp.textgrounder.textstructs.*;
+import opennlp.textgrounder.textstructs.Corpus;
+import opennlp.textgrounder.textstructs.TextProcessor;
+import opennlp.textgrounder.textstructs.old.Lexicon;
 import opennlp.textgrounder.ners.*;
 
 /**
@@ -229,3 +231,4 @@ public class GeoPreprocess {
     }
         
 }
+

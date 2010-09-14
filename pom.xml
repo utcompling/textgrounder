@@ -1,4 +1,4 @@
-<project  xmlns="http://maven.apache.org/POM/4.0.0">
+<project xmlns="http://maven.apache.org/POM/4.0.0">
   <modelVersion>4.0.0</modelVersion>
   <groupId>opennlp</groupId>
   <artifactId>textgrounder</artifactId>

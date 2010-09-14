@@ -16,9 +16,10 @@
 package opennlp.textgrounder.textstructs;
 
 import java.io.*;
-
 import java.util.ArrayList;
 import java.util.List;
+
+import opennlp.textgrounder.textstructs.old.Lexicon;
 import opennlp.textgrounder.topostructs.*;
 
 /**
