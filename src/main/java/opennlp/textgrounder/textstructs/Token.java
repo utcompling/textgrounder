@@ -25,7 +25,7 @@ import org.jdom.Attribute;
 import org.jdom.Element;
 
 import opennlp.textgrounder.topostructs.*;
-import opennlp.textgrounder.gazetteers.*;
+import opennlp.textgrounder.gazetteers.old.Gazetteer;
 
 /**
  * Class that stores data about a single token in a sequence of tokens. Tokens

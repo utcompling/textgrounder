@@ -31,7 +31,8 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import opennlp.textgrounder.gazetteers.*;
+import opennlp.textgrounder.gazetteers.old.Gazetteer;
+import opennlp.textgrounder.gazetteers.old.WGGazetteer;
 import opennlp.textgrounder.geo.*;
 import opennlp.textgrounder.textstructs.*;
 import opennlp.textgrounder.ners.*;

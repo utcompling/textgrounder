@@ -19,7 +19,8 @@ import java.io.*;
 
 import org.apache.commons.cli.*;
 
-import opennlp.textgrounder.gazetteers.*;
+import opennlp.textgrounder.gazetteers.old.Gazetteer;
+import opennlp.textgrounder.gazetteers.old.GazetteerGenerator;
 import opennlp.textgrounder.textstructs.*;
 import opennlp.textgrounder.ners.*;
 

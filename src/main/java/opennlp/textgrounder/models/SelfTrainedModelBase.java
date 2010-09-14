@@ -16,7 +16,7 @@
 package opennlp.textgrounder.models;
 
 import gnu.trove.TIntHashSet;
-import opennlp.textgrounder.gazetteers.*;
+import opennlp.textgrounder.gazetteers.old.Gazetteer;
 import opennlp.textgrounder.geo.CommandLineOptions;
 import opennlp.textgrounder.textstructs.*;
 import java.util.logging.*;

@@ -2,7 +2,7 @@
  * GeoNames Gazetteer; works much like WGGazetteer (World Gazetteer).
  */
 
-package opennlp.textgrounder.gazetteers;
+package opennlp.textgrounder.gazetteers.old;
 
 import java.io.*;
 import java.util.*;

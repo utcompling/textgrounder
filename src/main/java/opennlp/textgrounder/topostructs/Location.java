@@ -56,6 +56,15 @@ public class Location implements Serializable {
     public Location() {
     }
 
+    public Location(int id, String name, String type, Coordinate coord, int pop) {
+      this(id, name, type, coord, pop, "");
+    }
+
+    public Location(int id, String name, String type, Coordinate coord, int pop,
+          String container) {
+      this(id, name, type, coord, pop, container, 0);
+    }
+
     public Location(int id, String name, String type, Coordinate coord, int pop,
           String container, int count) {
         this.id = id;

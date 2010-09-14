@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  Copyright (C) 2010 Taesun Moon, The University of Texas at Austin
+//  Copyright (C) 2010 Travis Brown, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -13,25 +13,18 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-
 package opennlp.textgrounder.gazetteers;
 
-/**
- * Class holding gazetteer-related enumerations.
- * @author tsmoon
- */
-public class GazetteerEnum {
+import java.util.Iterator;
+import opennlp.textgrounder.topostructs.Location;
 
-    /**
-     * 
-     */
-    public static enum GazetteerTypes {
+public abstract class GazetteerReader implements Iterable<Location>,
+                                                 Iterator<Location> {
+  public Iterator<Location> iterator() {
+    return this;
+  }
 
-        CG, //census gazetteer
-        NGAG, // ? national geographic?
-        TRG, // TR-CoNLL Gazetteer
-        USGSG, // ? us geological survey?
-        WG, // World gazetteer
-        GN // GeoNames
-    };
+  public void remove() {
+    throw new UnsupportedOperationException("Cannot remove location from gazetteer.");
+  }
 }

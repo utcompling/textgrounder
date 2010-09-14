@@ -13,7 +13,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.gazetteers;
+package opennlp.textgrounder.gazetteers.old;
 
 import java.io.*;
 import java.util.*;
