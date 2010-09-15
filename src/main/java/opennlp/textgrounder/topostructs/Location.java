@@ -57,7 +57,7 @@ public class Location implements Serializable, Comparable<Location> {
     }
 
     public Location(int id, String name, String type, Coordinate coord, int pop) {
-      this(id, name, type, coord, pop, "");
+      this(id, name, type, coord, pop, null);
     }
 
     public Location(int id, String name, String type, Coordinate coord, int pop,
