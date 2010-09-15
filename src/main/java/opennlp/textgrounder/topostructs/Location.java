@@ -57,7 +57,7 @@ public class Location implements Serializable, Comparable<Location> {
     }
 
     public Location(int id, String name, String type, Coordinate coord, int pop) {
-      this(id, name, type, coord, pop, "");
+      this(id, name, type, coord, pop, null);
     }
 
     public Location(int id, String name, String type, Coordinate coord, int pop,
@@ -192,30 +192,22 @@ public class Location implements Serializable, Comparable<Location> {
 
     @Override
     public String toString() {
-        return id + ", " + name + ", " + type + ", (" + coord + "), " + pop + ", " + container;
+      return String.format("%d, %s, %s, (%s), %d, %s", id, name, type, coord, pop, container);
     }
 
     @Override
     public int hashCode() {
-        return id;
+      return id;
     }
 
     /**
      * Two Locations are the same if they have the same class and same ID.
      */
     @Override
-    public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final Location other = (Location) obj;
-        if (this.id != other.id) {
-            return false;
-        }
-        return true;
+    public boolean equals(Object other) {
+      return other != null &&
+             other.getClass() == this.getClass() &&
+             ((Location) other).id == this.id;
     }
 
     public int compareTo(Location other) {

@@ -72,21 +72,11 @@ public class Region implements Serializable {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final Region other = (Region) obj;
-        if (this.centLon != other.centLon) {
-            return false;
-        }
-        if (this.centLat != other.centLat) {
-            return false;
-        }
-        return true;
+    public boolean equals(Object other) {
+      return other != null &&
+             other.getClass() == this.getClass() &&
+             ((Region) other).centLat == this.centLat &&
+             ((Region) other).centLon == this.centLon;
     }
 
     @Override
@@ -97,3 +87,4 @@ public class Region implements Serializable {
         return hash;
     }
 }
+
