@@ -18,6 +18,9 @@ public class EvalBasedOnXML {
     private static final int CONTEXT_WINDOW_SIZE = 20;
     private static final int CONTEXT_SIGNATURE_WINDOW_SIZE = 20;
 
+    private static final String ERROR_DUMP_FILENAME = "error-dump.txt";
+    private static final String RECALL_OUTPUT_FILENAME = "sorted-recall-output.txt";
+
     private static DocumentBuilderFactory dbf;
     private static DocumentBuilder db;
 
@@ -68,10 +71,13 @@ public class EvalBasedOnXML {
         HashSet<Integer> trUnmatched = getToponymSet(TRXMLPath);
         HashSet<Integer> modelUnmatched = getToponymSet(modelXMLPath);
 
+        HashMap<String, Integer> trCounts = new HashMap<String, Integer>(); // used for recall output
+        HashMap<String, Integer> modelCorrectCounts = new HashMap<String, Integer>();
+
         int numTopsInTR = trUnmatched.size();
         int numTopsInModel = modelUnmatched.size();
 
-        BufferedWriter errorDump = new BufferedWriter(new FileWriter("error-dump.txt"));
+        BufferedWriter errorDump = new BufferedWriter(new FileWriter(ERROR_DUMP_FILENAME));
 
         int prevDocId = -1;
 
@@ -91,6 +97,16 @@ public class EvalBasedOnXML {
                                                 Double.parseDouble(trLocationN.getAttributes().getNamedItem("lat").getNodeValue())));
             int trDocId = Integer.parseInt(TRTopN.getAttributes().getNamedItem("did").getNodeValue());
             //System.out.println(trDocId + "  " + prevDocId);
+
+            String curKey = trLocation.getName().toLowerCase() + "|" + trLocation.getCoord().toString();
+            Integer curTrCount = trCounts.get(curKey);
+            if(curTrCount == null) {
+                trCounts.put(curKey, 1);
+                //modelCorrectCounts.put(curKey, 0);
+            }
+            else {
+                trCounts.put(curKey, curTrCount + 1);
+            }
 
             if(trDocId != prevDocId)
                 errorDump.write("###################### d" + trDocId + " #######################\n");
@@ -138,6 +154,12 @@ public class EvalBasedOnXML {
 
                     errorDump.write("cor | Gold: " + trLocation.getName() + " (" + trLocation.getCoord() + ") | Model: "
                                             + modelLocation.getName() + " (" + modelLocation.getCoord() + ") "/*p = " + modelLocation.getPop()*/ + "\n");
+                    
+                    //curKey = trLocation.getName() + "|" + trLocation.getCoord().toString();
+                    Integer prevCount = modelCorrectCounts.get(curKey);
+                    if(prevCount == null) prevCount = 0;
+                    modelCorrectCounts.put(curKey, prevCount + 1);
+
                 }
                 else {
                     t_i++;
@@ -165,11 +187,73 @@ public class EvalBasedOnXML {
         System.out.println();
         System.out.println("P\tR\tF");
         System.out.println(precision + "\t" + recall + "\t" + f1);
+        System.out.println();
+        System.out.println("Itemized error dump written to " + ERROR_DUMP_FILENAME);
+        System.out.println("Sorted recall output written to " + RECALL_OUTPUT_FILENAME);
 
         //System.out.println("t_n = " + t_n);
         //System.out.println("matchCount = " + matchCount);
 
+        printSortedRecallOutput(sortByValue(trCounts), modelCorrectCounts, -1, RECALL_OUTPUT_FILENAME);
         errorDump.close();
+    }
+
+    private void printSortedRecallOutput(List<LocationCountPair> sortedTrCounts,
+            HashMap<String, Integer> modelCorrectCounts, int topN, String outputFilename) throws Exception {
+
+        BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename));
+
+        if(topN != -1)
+            topN = Math.min(topN, sortedTrCounts.size());
+        else
+            topN = sortedTrCounts.size();
+
+        for(int i = 0; i < topN; i++) {
+            String curLocation = sortedTrCounts.get(i).key;
+            Integer modelCorrect = modelCorrectCounts.get(curLocation);
+            if(modelCorrect == null) modelCorrect = 0;
+            int denom = sortedTrCounts.get(i).value;
+
+            //System.out.println(curLocation + ": " + modelCorrect + "/" + denom + " (" + (double)modelCorrect/denom + ")");
+            out.write(curLocation + ":  " + modelCorrect + "/" + denom + "  (" + (double)modelCorrect/denom + ")\n");
+        }
+
+        out.close();
+    }
+
+    private class LocationCountPair implements Comparable {
+        public String key;
+        public int value;
+
+        public LocationCountPair(String key, int value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        public int compareTo(Object o) {
+            if(!(o instanceof LocationCountPair)) {
+                return -1;
+            }
+            LocationCountPair other = (LocationCountPair) o;
+            if(this.value != other.value)
+                return other.value - this.value; // descending
+            else
+                return this.key.compareToIgnoreCase(other.key);
+        }
+
+        @Override
+        public String toString() {
+            return key + "=" + value;
+        }
+    }
+
+    private List<LocationCountPair> sortByValue(HashMap<String, Integer> unsorted) {
+        ArrayList<LocationCountPair> toReturn = new ArrayList<LocationCountPair>();
+        for(String key : unsorted.keySet()) {
+            toReturn.add(new LocationCountPair(key, unsorted.get(key)));
+        }
+        Collections.sort(toReturn);
+        return toReturn;
     }
 
     private HashSet<Integer> getToponymSet(String xmlPath) throws Exception {
