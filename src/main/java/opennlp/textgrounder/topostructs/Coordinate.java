@@ -110,21 +110,11 @@ public class Coordinate implements Serializable {
      * latitude and longitude.
      */
     @Override
-    public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final Coordinate other = (Coordinate) obj;
-        if (this.longitude != other.longitude) {
-            return false;
-        }
-        if (this.latitude != other.latitude) {
-            return false;
-        }
-        return true;
+    public boolean equals(Object other) {
+      return other != null &&
+             other.getClass() == this.getClass() &&
+             ((Coordinate) other).latitude == this.latitude &&
+             ((Coordinate) other).longitude == this.longitude;
     }
 
     @Override
@@ -135,3 +125,4 @@ public class Coordinate implements Serializable {
         return hash;
     }
 }
+
