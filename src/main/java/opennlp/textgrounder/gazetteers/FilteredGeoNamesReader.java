@@ -15,7 +15,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.gazetteers;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
