@@ -28,37 +28,50 @@ import opennlp.textgrounder.util.Constants;
 import opennlp.textgrounder.topostructs.Coordinate;
 import opennlp.textgrounder.topostructs.Location;
 
-public class GeoNamesReader extends GazetteerLineReader {
-  public GeoNamesReader() throws FileNotFoundException, IOException {
-    this(new File(Constants.TEXTGROUNDER_DATA + "/gazetteer/allCountries.txt.gz"));
+public class WorldReader extends GazetteerLineReader {
+  public WorldReader() throws FileNotFoundException, IOException {
+    this(new File(Constants.TEXTGROUNDER_DATA + "/gazetteer/dataen-fixed.txt.gz"));
   }
 
-  public GeoNamesReader(File file) throws FileNotFoundException, IOException {
+  public WorldReader(File file) throws FileNotFoundException, IOException {
     this(new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(file)))));
   }
 
-  public GeoNamesReader(BufferedReader reader)
+  public WorldReader(BufferedReader reader)
     throws FileNotFoundException, IOException {
     super(reader);
+  }
+
+  private double convertNumber(String number) {
+    boolean negative = number.charAt(0) == '-';
+    number = "00" + (negative ? number.substring(1) : number);
+    int split = number.length() - 2;
+    number = number.substring(0, split) + "." + number.substring(split);
+    return Double.parseDouble(number) * (negative ? -1 : 1);
   }
 
   protected Location parseLine(String line, int currentId) {
     Location location = null;
     String[] fields = line.split("\t");
-    if (fields.length > 14) {
+    if (fields.length > 7 && fields[6].length() > 0 && fields[7].length() > 0 &&
+        !(fields[6].equals("0") && fields[7].equals("9999"))) {
       String name = fields[1].toLowerCase();
-      String type = fields[6].toLowerCase();
-      double lat = Double.parseDouble(fields[4]);
-      double lng = Double.parseDouble(fields[5]);
-      try {
-        int population = fields[14].length() == 0 ? 0 : Integer.parseInt(fields[14]);
-        Coordinate coordinate = new Coordinate(lng, lat);
-        location = new Location(currentId, name, type, coordinate, population);
-      } catch (NumberFormatException e) {
-        System.err.format("Invalid population: %s\n", fields[14]);
+      String type = fields[4].toLowerCase();
+
+      double lat = this.convertNumber(fields[6].trim());
+      double lng = this.convertNumber(fields[7].trim());
+      Coordinate coordinate = new Coordinate(lng, lat);
+
+      int population = fields[5].trim().length() > 0 ? Integer.parseInt(fields[5]) : 0;
+      
+      String container = null;
+      if (fields.length > 10 && fields[10].trim().length() > 0) {
+        container = fields[10].trim().toLowerCase();
       }
+
+      location = new Location(currentId, name, type, coordinate, population);
     }
-    return location;
+    return location;  
   }
 }
 

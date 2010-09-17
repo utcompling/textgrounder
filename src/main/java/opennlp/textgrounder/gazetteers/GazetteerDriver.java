@@ -15,19 +15,16 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.gazetteers;
 
-import java.util.Iterator;
 import opennlp.textgrounder.topostructs.Location;
 
-public abstract class GazetteerReader implements Iterable<Location>,
-                                                 Iterator<Location> {
-  public abstract void close();
-
-  public Iterator<Location> iterator() {
-    return this;
-  }
-
-  public void remove() {
-    throw new UnsupportedOperationException("Cannot remove location from gazetteer.");
+public class GazetteerDriver {
+  public static void main(String args[]) throws Exception {
+    Gazetteer gazetteer = new InMemoryGazetteer();
+    gazetteer.load(new WorldReader());
+    System.out.format("Results for %s:\n", args[0]);
+    for (Location location : gazetteer.lookup(args[0])) {
+      System.out.format("  %s\n", location);
+    }
   }
 }
 

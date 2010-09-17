@@ -28,37 +28,29 @@ import opennlp.textgrounder.util.Constants;
 import opennlp.textgrounder.topostructs.Coordinate;
 import opennlp.textgrounder.topostructs.Location;
 
-public class GeoNamesReader extends GazetteerLineReader {
-  public GeoNamesReader() throws FileNotFoundException, IOException {
+public class FilteredGeoNamesReader extends GeoNamesReader {
+  public FilteredGeoNamesReader() throws FileNotFoundException, IOException {
     this(new File(Constants.TEXTGROUNDER_DATA + "/gazetteer/allCountries.txt.gz"));
   }
 
-  public GeoNamesReader(File file) throws FileNotFoundException, IOException {
+  public FilteredGeoNamesReader(File file) throws FileNotFoundException, IOException {
     this(new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(file)))));
   }
 
-  public GeoNamesReader(BufferedReader reader)
+  public FilteredGeoNamesReader(BufferedReader reader)
     throws FileNotFoundException, IOException {
     super(reader);
   }
 
   protected Location parseLine(String line, int currentId) {
-    Location location = null;
-    String[] fields = line.split("\t");
-    if (fields.length > 14) {
-      String name = fields[1].toLowerCase();
-      String type = fields[6].toLowerCase();
-      double lat = Double.parseDouble(fields[4]);
-      double lng = Double.parseDouble(fields[5]);
-      try {
-        int population = fields[14].length() == 0 ? 0 : Integer.parseInt(fields[14]);
-        Coordinate coordinate = new Coordinate(lng, lat);
-        location = new Location(currentId, name, type, coordinate, population);
-      } catch (NumberFormatException e) {
-        System.err.format("Invalid population: %s\n", fields[14]);
+    Location location = super.parseLine(line, currentId);
+    if (location != null) {
+      String type = location.getType();
+      if (!type.equals("a") && !type.equals("p")) {
+        location = null;
       }
     }
-    return location;
+    return location;  
   }
 }
 

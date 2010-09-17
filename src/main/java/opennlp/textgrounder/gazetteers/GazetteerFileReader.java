@@ -15,19 +15,43 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.gazetteers;
 
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStreamReader;
+import java.io.IOException;
 import java.util.Iterator;
+import java.util.zip.GZIPInputStream;
+
 import opennlp.textgrounder.topostructs.Location;
 
-public abstract class GazetteerReader implements Iterable<Location>,
-                                                 Iterator<Location> {
-  public abstract void close();
+public abstract class GazetteerFileReader extends GazetteerReader {
+  private final BufferedReader reader;
 
-  public Iterator<Location> iterator() {
-    return this;
+  protected GazetteerFileReader(BufferedReader reader)
+    throws FileNotFoundException, IOException {
+    this.reader = reader;
   }
 
-  public void remove() {
-    throw new UnsupportedOperationException("Cannot remove location from gazetteer.");
+  protected String readLine() {
+    String line = null;
+    try {
+      line = this.reader.readLine();
+    } catch (IOException e) {   
+      System.err.format("Error while reading gazetteer file: %s\n", e);
+      e.printStackTrace();
+    }
+    return line;
+  }
+
+  public void close() {
+    try {
+      this.reader.close();
+    } catch (IOException e) {      
+      System.err.format("Error closing gazetteer file: %s\n", e);
+      e.printStackTrace();
+      System.exit(1); 
+    }
   }
 }
 
