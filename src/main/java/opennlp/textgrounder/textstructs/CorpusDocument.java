@@ -68,14 +68,14 @@ public class CorpusDocument extends DocumentComponent {
     protected void writeElement(XMLStreamWriter w) throws XMLStreamException {
       w.writeStartElement(this.type);
       /* This is a hack. */
-      w.writeStartElement("s");
+      //w.writeStartElement("s");
       for (String name : this.props.keySet()) {
         w.writeAttribute(name, props.get(name));
       }
       for (DocumentComponent child : this) {
         child.writeElement(w);
       }
-      w.writeEndElement();
+      //w.writeEndElement();
       w.writeEndElement();
     }
 
