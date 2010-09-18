@@ -19,6 +19,7 @@ package opennlp.textgrounder.models;
 import java.io.*;
 import java.util.*;
 import javax.xml.parsers.*;
+import javax.xml.xpath.*;
 import org.w3c.dom.*;
 
 import opennlp.textgrounder.util.*;
@@ -26,6 +27,15 @@ import opennlp.textgrounder.util.*;
 public class RandomModelXML extends ModelXML {
 
     private static Random myRandom = new Random();
+
+    private static XPathFactory xpf;
+    private static XPath xpath;
+
+    private static XPathExpression docExpr;
+    private static XPathExpression sExpr;
+    private static XPathExpression candidatesExpr;
+    //private static XPathExpression latExpr;
+    //private static XPathExpression longExpr;
 
     public static void main(String[] args) throws Exception {
         RandomModelXML randomModelXML = new RandomModelXML(args[0], args[1]);
@@ -44,6 +54,14 @@ public class RandomModelXML extends ModelXML {
     protected void disambiguateToponyms(String inputXMLPath, String outputXMLPath) throws Exception {
         Document outputDoc = db.newDocument();
         File inputXMLFile = new File(inputXMLPath);
+        xpf = XPathFactory.newInstance();
+        xpath = xpf.newXPath();
+
+        docExpr = xpath.compile("//doc");
+        sExpr = xpath.compile("s");
+        candidatesExpr = xpath.compile("candidates");
+        //latExpr = xpath.compile("@lat");
+        //longExpr = xpath.compile("@long");
 
         Element toponymsE = outputDoc.createElement("toponyms");
 
@@ -71,13 +89,20 @@ public class RandomModelXML extends ModelXML {
         int tokenIndex = -1;
 
         //NodeList sentences = inputDoc.getChildNodes().item(1).getChildNodes();
-        NodeList corpusDocs = inputDoc.getChildNodes().item(0).getChildNodes();
+        //NodeList corpusDocs = inputDoc.getChildNodes().item(0).getChildNodes();
+
+        Object docResult = docExpr.evaluate(inputDoc, XPathConstants.NODESET);
+        NodeList corpusDocs = (NodeList) docResult;
 
         for(int d = 0; d < corpusDocs.getLength(); d++) {
-            if(!corpusDocs.item(d).getNodeName().equals("doc"))
+            Node curDocNode = corpusDocs.item(d);
+            if(!curDocNode.getNodeName().equals("doc"))
                 continue;
 
-            NodeList sentences = corpusDocs.item(d).getChildNodes();
+            NodeList sentences = curDocNode.getChildNodes();
+
+            //Object sResult = sExpr.evaluate(curDocNode, XPathConstants.NODESET);
+            //NodeList sentences = (NodeList) sResult;
 
             for(int i = 0; i < sentences.getLength(); i++) {
                 if(!sentences.item(i).getNodeName().equals("s"))
@@ -93,6 +118,12 @@ public class RandomModelXML extends ModelXML {
                             continue;
 
                         Node candidatesNode = tokenNode.getChildNodes().item(1);
+                        //System.out.println(tokenNode.getChildNodes().item(0).getNodeName());
+                        //System.out.println(tokenNode.getChildNodes().item(1).getNodeName());
+
+                        //Object candidatesResult = candidatesExpr.evaluate(tokenNode, XPathConstants.NODE);
+                        //Node candidatesNode = (Node) candidatesResult;
+
                         NodeList candidates = candidatesNode.getChildNodes();
                         if(candidates.getLength() < 3)
                             continue;
