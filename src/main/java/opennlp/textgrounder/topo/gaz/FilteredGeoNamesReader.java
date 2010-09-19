@@ -23,14 +23,9 @@ import java.io.IOException;
 import java.io.BufferedReader;
 import java.util.zip.GZIPInputStream;
 
-import opennlp.textgrounder.util.Constants;
 import opennlp.textgrounder.topo.Location;
 
 public class FilteredGeoNamesReader extends GeoNamesReader {
-  public FilteredGeoNamesReader() throws FileNotFoundException, IOException {
-    this(new File(Constants.TEXTGROUNDER_DATA + "/gazetteer/allCountries.txt.gz"));
-  }
-
   public FilteredGeoNamesReader(File file) throws FileNotFoundException, IOException {
     this(new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(file)))));
   }

@@ -15,14 +15,16 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.topo.gaz;
 
+import java.util.File;
+
 import opennlp.textgrounder.topo.Location;
 
 public class GazetteerDriver {
   public static void main(String args[]) throws Exception {
     Gazetteer gazetteer = new InMemoryGazetteer();
-    gazetteer.load(new FilteredGeoNamesReader());
-    System.out.format("Results for %s:\n", args[0]);
-    for (Location location : gazetteer.lookup(args[0])) {
+    gazetteer.load(new FilteredGeoNamesReader(new File(args[0])));
+    System.out.format("Results for %s:\n", args[1]);
+    for (Location location : gazetteer.lookup(args[1])) {
       System.out.format("  %s\n", location);
     }
   }

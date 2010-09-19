@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.BufferedReader;
 import java.util.zip.GZIPInputStream;
 
-import opennlp.textgrounder.util.Constants;
 import opennlp.textgrounder.topo.Coordinate;
 import opennlp.textgrounder.topo.DegreeCoordinate;
 import opennlp.textgrounder.topo.Location;
@@ -31,10 +30,6 @@ import opennlp.textgrounder.topo.PointRegion;
 import opennlp.textgrounder.topo.Region;
 
 public class WorldReader extends GazetteerLineReader {
-  public WorldReader() throws FileNotFoundException, IOException {
-    this(new File(Constants.TEXTGROUNDER_DATA + "/gazetteer/dataen-fixed.txt.gz"));
-  }
-
   public WorldReader(File file) throws FileNotFoundException, IOException {
     this(new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(file)))));
   }

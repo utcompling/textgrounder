@@ -28,13 +28,8 @@ import opennlp.textgrounder.topo.DegreeCoordinate;
 import opennlp.textgrounder.topo.Location;
 import opennlp.textgrounder.topo.PointRegion;
 import opennlp.textgrounder.topo.Region;
-import opennlp.textgrounder.util.Constants;
 
 public class GeoNamesReader extends GazetteerLineReader {
-  public GeoNamesReader() throws FileNotFoundException, IOException {
-    this(new File(Constants.TEXTGROUNDER_DATA + "/gazetteer/allCountries.txt.gz"));
-  }
-
   public GeoNamesReader(File file) throws FileNotFoundException, IOException {
     this(new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(file)))));
   }

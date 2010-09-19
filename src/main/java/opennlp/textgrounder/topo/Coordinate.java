@@ -79,7 +79,7 @@ public class Coordinate {
     }
 
     public String toString() {
-      return String.format("%0.08f,%0.08f", this.getLatDegrees(), this.getLngDegrees());
+      return String.format("%.08f,%.08f", this.getLatDegrees(), this.getLngDegrees());
     }
 
     public double distance(Coordinate other) {
