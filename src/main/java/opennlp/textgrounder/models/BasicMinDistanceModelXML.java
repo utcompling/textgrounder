@@ -8,7 +8,7 @@ import java.io.*;
 import java.util.*;
 import javax.xml.parsers.*;
 import org.w3c.dom.*;
-import gnu.trove.*;
+//import gnu.trove.*;
 
 import opennlp.textgrounder.util.*;
 import opennlp.textgrounder.topostructs.*;
@@ -127,8 +127,10 @@ public class BasicMinDistanceModelXML extends ModelXML {
             return 1;
         }
 
-        TObjectDoubleHashMap<String> totalDistances = new TObjectDoubleHashMap<String>();
-        TObjectIntHashMap<String> idsToIndeces = new TObjectIntHashMap<String>();
+        //TObjectDoubleHashMap<String> totalDistances = new TObjectDoubleHashMap<String>();
+        HashMap<String, Double> totalDistances = new HashMap<String, Double>();
+        //TObjectIntHashMap<String> idsToIndeces = new TObjectIntHashMap<String>();
+        HashMap<String, Integer> idsToIndeces = new HashMap<String, Integer>();
 
         NodeList sentences = curDocNode.getChildNodes();
 
@@ -180,7 +182,9 @@ public class BasicMinDistanceModelXML extends ModelXML {
                                 minDistance = curDistance;
                             }                            
                         }
-                        totalDistances.put(outerCandId, totalDistances.get(outerCandId) + minDistance);
+                        Double prevDist = totalDistances.get(outerCandId);
+                        if(prevDist == null) prevDist = 0.0;
+                        totalDistances.put(outerCandId, prevDist + minDistance);
                     }
                 }
             }
@@ -194,7 +198,8 @@ public class BasicMinDistanceModelXML extends ModelXML {
                 continue;*/
 
         double minTotalDistance = Double.MAX_VALUE;
-        for(String outerCandId : totalDistances.keys(new String[0])) {
+        //for(String outerCandId : totalDistances.keys(new String[0])) {
+        for(String outerCandId : totalDistances.keySet()) {
             double curTotalDistance = totalDistances.get(outerCandId);
             if(curTotalDistance < minTotalDistance) {
                 minTotalDistance = curTotalDistance;
