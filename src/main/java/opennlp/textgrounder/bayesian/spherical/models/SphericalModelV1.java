@@ -269,7 +269,7 @@ public class SphericalModelV1 extends SphericalModelBase {
                             totalprob = annealer.annealProbs(currentR, curCoordCount, maxCoord, regionProbs);
                         }
 
-                        totalprob = annealer.annealProbs(0, currentR * maxCoord, regionProbs);
+//                        totalprob = annealer.annealProbs(0, currentR * maxCoord, regionProbs);
 
                         r = rand.nextDouble() * totalprob;
 

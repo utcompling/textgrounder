@@ -297,7 +297,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             double[] sphericalrecord = entry.getValue();
             double[][] cartesianrecords = new double[sphericalrecord.length / 2][];
             for (int i = 0; i < sphericalrecord.length / 2; i++) {
-                double[] crec = TGMath.sphericalToCartesian(sphericalrecord[2 * i], sphericalrecord[2 * i + 1]);
+                double[] crec = TGMath.sphericalToCartesian(TGMath.geographicToSpherical(sphericalrecord[2 * i], sphericalrecord[2 * i + 1]));
                 cartesianrecords[i] = crec;
             }
             toponymCoordinateLexicon[topid] = cartesianrecords;

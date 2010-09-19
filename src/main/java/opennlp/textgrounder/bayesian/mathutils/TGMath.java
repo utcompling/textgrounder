@@ -70,14 +70,25 @@ public class TGMath {
               + Math.sin(_alpha) * Math.sin(_theta) * Math.cos(_phi - _beta)));
     }
 
-    public static double[] sphericalToCartesian(double _lat, double _long) {
+    public static double[] sphericalToCartesian(double _theta, double _phi) {
         double[] cart = new double[3];
+        cart[0] = Math.sin(_theta) * Math.cos(_phi);
+        cart[1] = Math.sin(_theta) * Math.sin(_phi);
+        cart[2] = Math.cos(_theta);
+        return cart;
+    }
+
+    public static double[] sphericalToCartesian(double[] _coord) {
+        return sphericalToCartesian(_coord[0], _coord[1]);
+    }
+
+    public static double[] geographicToSpherical(double _lat, double _long) {
+        double[] geo = new double[2];
         double theta = latToRadians(_lat);
         double phi = longToRadians(_long);
-        cart[0] = Math.sin(theta) * Math.cos(phi);
-        cart[1] = Math.sin(theta) * Math.sin(phi);
-        cart[2] = Math.cos(theta);
-        return cart;
+        geo[0] = theta;
+        geo[1] = phi;
+        return geo;
     }
 
     public static double[] cartesianToSpherical(double[] _x) {
@@ -103,7 +114,7 @@ public class TGMath {
     }
 
     public static double longToRadians(double _long) {
-        return (_long / 180 + 1) * Math.PI;
+        return (_long / 180) * Math.PI;
     }
 
     public static double[] sampleFromFisher(MersenneTwisterFast _mtf, int _N) {
