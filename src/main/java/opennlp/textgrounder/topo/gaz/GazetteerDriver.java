@@ -15,7 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.topo.gaz;
 
-import java.util.File;
+import java.io.File;
 
 import opennlp.textgrounder.topo.Location;
 
