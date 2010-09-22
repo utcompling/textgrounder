@@ -20,6 +20,7 @@ public class EvalBasedOnXML {
 
     private static final String ERROR_DUMP_FILENAME = "error-dump.txt";
     private static final String RECALL_OUTPUT_FILENAME = "sorted-recall-output.txt";
+    private static final String RESULTS_OUT_FILENAME = "results.txt";
 
     private static DocumentBuilderFactory dbf;
     private static DocumentBuilder db;
@@ -78,6 +79,7 @@ public class EvalBasedOnXML {
         int numTopsInModel = modelUnmatched.size();
 
         BufferedWriter errorDump = new BufferedWriter(new FileWriter(ERROR_DUMP_FILENAME));
+        BufferedWriter resultsOut = new BufferedWriter(new FileWriter(RESULTS_OUT_FILENAME));
 
         int prevDocId = -1;
 
@@ -181,14 +183,15 @@ public class EvalBasedOnXML {
 
         double f1 = 2 * ((precision * recall) / (precision + recall));
 
+        resultsOut.write("P\tR\tF\n");
+        resultsOut.write(precision + "\t" + recall + "\t" + f1 + "\n");
+
         System.out.println("Precision: " + precision);
         System.out.println("Recall: " + recall);
         System.out.println("F-score: " + f1);
         System.out.println();
-        System.out.println("P\tR\tF");
-        System.out.println(precision + "\t" + recall + "\t" + f1);
-        System.out.println();
         System.out.println("Itemized error dump written to " + ERROR_DUMP_FILENAME);
+        System.out.println("Tab-delineated results written to " + RESULTS_OUT_FILENAME);
         System.out.println("Sorted recall output written to " + RECALL_OUTPUT_FILENAME);
 
         //System.out.println("t_n = " + t_n);
@@ -196,6 +199,7 @@ public class EvalBasedOnXML {
 
         printSortedRecallOutput(sortByValue(trCounts), modelCorrectCounts, -1, RECALL_OUTPUT_FILENAME);
         errorDump.close();
+        resultsOut.close();
     }
 
     private void printSortedRecallOutput(List<LocationCountPair> sortedTrCounts,

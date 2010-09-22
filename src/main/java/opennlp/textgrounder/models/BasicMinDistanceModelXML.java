@@ -8,7 +8,7 @@ import java.io.*;
 import java.util.*;
 import javax.xml.parsers.*;
 import org.w3c.dom.*;
-import gnu.trove.*;
+//import gnu.trove.*;
 
 import opennlp.textgrounder.util.*;
 import opennlp.textgrounder.topostructs.*;
@@ -84,6 +84,8 @@ public class BasicMinDistanceModelXML extends ModelXML {
 
                         //System.out.println("Selecting min total distance for " + tokenNode.getAttributes().getNamedItem("term").getNodeValue());
                         int selectedIndex = disambiguateFromCandidateSet(candidates, corpusDocs.item(d));
+                        if(selectedIndex == -1)
+                            continue;
                         
 
                         Node toponymNode = outputDoc.importNode(tokenNode, false);
@@ -127,8 +129,10 @@ public class BasicMinDistanceModelXML extends ModelXML {
             return 1;
         }
 
-        TObjectDoubleHashMap<String> totalDistances = new TObjectDoubleHashMap<String>();
-        TObjectIntHashMap<String> idsToIndeces = new TObjectIntHashMap<String>();
+        //TObjectDoubleHashMap<String> totalDistances = new TObjectDoubleHashMap<String>();
+        HashMap<String, Double> totalDistances = new HashMap<String, Double>();
+        //TObjectIntHashMap<String> idsToIndeces = new TObjectIntHashMap<String>();
+        HashMap<String, Integer> idsToIndeces = new HashMap<String, Integer>();
 
         NodeList sentences = curDocNode.getChildNodes();
 
@@ -180,7 +184,9 @@ public class BasicMinDistanceModelXML extends ModelXML {
                                 minDistance = curDistance;
                             }                            
                         }
-                        totalDistances.put(outerCandId, totalDistances.get(outerCandId) + minDistance);
+                        Double prevDist = totalDistances.get(outerCandId);
+                        if(prevDist == null) prevDist = 0.0;
+                        totalDistances.put(outerCandId, prevDist + minDistance);
                     }
                 }
             }
@@ -194,7 +200,8 @@ public class BasicMinDistanceModelXML extends ModelXML {
                 continue;*/
 
         double minTotalDistance = Double.MAX_VALUE;
-        for(String outerCandId : totalDistances.keys(new String[0])) {
+        //for(String outerCandId : totalDistances.keys(new String[0])) {
+        for(String outerCandId : totalDistances.keySet()) {
             double curTotalDistance = totalDistances.get(outerCandId);
             if(curTotalDistance < minTotalDistance) {
                 minTotalDistance = curTotalDistance;
@@ -208,7 +215,10 @@ public class BasicMinDistanceModelXML extends ModelXML {
         //}
 
         //System.out.println(idsToIndeces.get(idToReturn));
-
-        return idsToIndeces.get(idToReturn);
+        Integer toReturn = idsToIndeces.get(idToReturn);
+        if(toReturn == null)
+            return -1;
+        else
+            return toReturn;
     }
 }
