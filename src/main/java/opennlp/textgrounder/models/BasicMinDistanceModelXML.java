@@ -84,6 +84,8 @@ public class BasicMinDistanceModelXML extends ModelXML {
 
                         //System.out.println("Selecting min total distance for " + tokenNode.getAttributes().getNamedItem("term").getNodeValue());
                         int selectedIndex = disambiguateFromCandidateSet(candidates, corpusDocs.item(d));
+                        if(selectedIndex == -1)
+                            continue;
                         
 
                         Node toponymNode = outputDoc.importNode(tokenNode, false);
@@ -213,7 +215,10 @@ public class BasicMinDistanceModelXML extends ModelXML {
         //}
 
         //System.out.println(idsToIndeces.get(idToReturn));
-
-        return idsToIndeces.get(idToReturn);
+        Integer toReturn = idsToIndeces.get(idToReturn);
+        if(toReturn == null)
+            return -1;
+        else
+            return toReturn;
     }
 }
