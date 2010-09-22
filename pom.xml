@@ -40,6 +40,42 @@
         </configuration>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-install-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>validate</phase>
+            <id>install-trove</id>
+            <configuration>
+              <file>${basedir}/lib/trove.jar</file>
+              <groupId>trove</groupId>
+              <artifactId>trove</artifactId>
+              <version>2.1.1</version>
+              <packaging>jar</packaging>
+              <generatePom>true</generatePom>
+            </configuration>
+            <goals>
+              <goal>install-file</goal>
+            </goals>
+          </execution>
+          <execution>
+            <phase>validate</phase>
+            <id>install-stanford-ner</id>
+            <configuration>
+              <file>${basedir}/lib/stanford-ner.jar</file>
+              <groupId>edu.stanford.nlp</groupId>
+              <artifactId>ner</artifactId>
+              <version>1.1.1</version>
+              <packaging>jar</packaging>
+              <generatePom>true</generatePom>
+            </configuration>
+            <goals>
+              <goal>install-file</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <artifactId>maven-assembly-plugin</artifactId>
         <configuration>
           <descriptorRefs>
@@ -121,15 +157,15 @@
       <groupId>edu.stanford.nlp</groupId>
       <artifactId>ner</artifactId>
       <version>1.1.1</version>
-      <scope>system</scope>
-      <systemPath>${basedir}/lib/stanford-ner.jar</systemPath>
+      <!--<scope>system</scope>
+      <systemPath>${basedir}/lib/stanford-ner.jar</systemPath>-->
     </dependency>
     <dependency>
       <groupId>trove</groupId>
       <artifactId>trove</artifactId>
       <version>2.1.1</version>
-      <scope>system</scope>
-      <systemPath>${basedir}/lib/trove.jar</systemPath>
+      <!--<scope>system</scope>
+      <systemPath>${basedir}/lib/trove.jar</systemPath>-->
     </dependency>
   </dependencies>
 </project>
