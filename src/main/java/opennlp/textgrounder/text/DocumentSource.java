@@ -19,7 +19,6 @@ import java.util.Iterator;
 
 public abstract class DocumentSource implements Iterable<Document>,
                                                 Iterator<Document> {
-
   public Iterator<Document> iterator() {
     return this;
   }

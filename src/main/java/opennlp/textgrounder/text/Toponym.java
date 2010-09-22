@@ -22,17 +22,26 @@ import opennlp.textgrounder.topo.Location;
 
 public class Toponym extends Token implements Iterable<Location> {
   private final List<Location> candidates;
-  private final Integer selected;
+  private final Integer gold;
+  private Integer selected;
 
   public Toponym(String form, List<Location> candidates) {
     this(form, candidates, null);
   }
 
-  public Toponym(String form, List<Location> candidates, Integer selected) {
+  public Toponym(String form, List<Location> candidates, Integer gold) {
     super(form);
     this.candidates = candidates;
-    this.selected = selected;
+    this.gold = gold;
     assert this.selected < this.candidates.size() : "Invalid candidate index.";
+  }
+
+  public Location getGold() {
+    Location location = null;
+    if (this.gold != null) {
+      location = this.candidates.get(this.gold);
+    }
+    return location; 
   }
 
   public boolean hasSelected() {
@@ -45,6 +54,10 @@ public class Toponym extends Token implements Iterable<Location> {
       location = this.candidates.get(this.selected);
     }
     return location;
+  }
+
+  public void setSelected(Integer index) {
+    this.selected = index;
   }
 
   public Iterator<Location> iterator() {
