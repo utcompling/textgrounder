@@ -25,5 +25,9 @@ public class Token {
   public String getForm() {
     return this.form;
   }
+
+  public boolean isToponym() {
+      return false;
+  }
 }
 

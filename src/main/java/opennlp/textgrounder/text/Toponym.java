@@ -63,5 +63,14 @@ public class Toponym extends Token implements Iterable<Location> {
   public Iterator<Location> iterator() {
     return this.candidates.iterator();
   }
+
+  @Override
+  public boolean isToponym() {
+      return true;
+  }
+
+  public int getAmbiguity() {
+      return candidates.size();
+  }
 }
 
