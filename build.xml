@@ -40,8 +40,8 @@
       <pathelement location="${lib.dir}/guava-r06.jar"/>
       <!-- OpenNLP libraries -->
       <pathelement location="${lib.dir}/jwnl-1.3.3.jar"/>
-      <pathelement location="${lib.dir}/maxent-2.5.2.jar"/>
-      <pathelement location="${lib.dir}/opennlp-tools-1.4.3.jar"/>
+      <pathelement location="${lib.dir}/maxent-3.0.0.jar"/>
+      <pathelement location="${lib.dir}/opennlp-tools-1.5.0.jar"/>
     </path>
 
     <filter token="year" value="${year}"/>

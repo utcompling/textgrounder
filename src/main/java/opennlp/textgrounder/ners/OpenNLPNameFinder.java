@@ -22,14 +22,16 @@ package opennlp.textgrounder.ners;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.*;
 
-import opennlp.maxent.MaxentModel;
+import opennlp.model.MaxentModel;
 import opennlp.maxent.io.PooledGISModelReader;
 import opennlp.tools.namefind.NameFinderEventStream;
 import opennlp.tools.namefind.NameFinderME;
+import opennlp.tools.namefind.TokenNameFinderModel;
 // import opennlp.tools.parser.Parse;
 import opennlp.tools.tokenize.SimpleTokenizer;
 import opennlp.tools.util.Span;
@@ -65,7 +67,7 @@ public class OpenNLPNameFinder {
      * @param mod
      *            The model used for finding names.
      */
-    public OpenNLPNameFinder(MaxentModel mod) {
+    public OpenNLPNameFinder(TokenNameFinderModel mod) {
         nameFinder = new NameFinderME(mod);
     }
 
@@ -214,10 +216,11 @@ public class OpenNLPNameFinder {
         String[] names = new String[models.size()];
         for (int i = 0; i < models.size(); i++) {
             String modelName = models.get(i);
-            finders[i] = new OpenNLPNameFinder(new PooledGISModelReader(
-                    new File(modelName)).getModel());
+            finders[i] = new OpenNLPNameFinder(new TokenNameFinderModel(new FileInputStream(new File(modelName))));
+            // The additional 7 is to pass the language and "-ner-" in the new
+            // naming scheme.
             int nameStart = modelName.lastIndexOf(System
-                    .getProperty("file.separator")) + 1;
+                    .getProperty("file.separator")) + 1 + 7; 
             int nameEnd = modelName.indexOf('.', nameStart);
             if (nameEnd == -1) {
                 nameEnd = modelName.length();

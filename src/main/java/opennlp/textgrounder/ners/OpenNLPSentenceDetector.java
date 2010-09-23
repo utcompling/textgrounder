@@ -22,11 +22,13 @@ package opennlp.textgrounder.ners;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringReader;
 
 import opennlp.maxent.io.SuffixSensitiveGISModelReader;
 import opennlp.tools.sentdetect.SentenceDetectorME;
+import opennlp.tools.sentdetect.SentenceModel;
 
 /**
  * A sentence detector which uses a model trained on English data. The code in
@@ -49,8 +51,9 @@ public class OpenNLPSentenceDetector extends SentenceDetectorME {
      *             If the model specified can not be read.
      */
     public OpenNLPSentenceDetector(String modelName) throws IOException {
-        super((new SuffixSensitiveGISModelReader(new File(modelName)))
-                .getModel());
+        //super((new SuffixSensitiveGISModelReader(new File(modelName)))
+        //        .getModel());
+        super(new SentenceModel(new FileInputStream(new File(modelName))));
         this.useTokenEnd = true;
     }
 
