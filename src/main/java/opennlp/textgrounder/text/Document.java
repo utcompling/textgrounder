@@ -15,23 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-import java.util.Iterator;
-
-public class Document implements Iterable<Sentence> {
-  private final String id;
-  private final Iterable<Sentence> sentences;
-
-  public Document(String id, Iterable<Sentence> sentences) {
-    this.id = id;
-    this.sentences = sentences;
-  }
-
-  public String getId() {
-    return this.id;
-  }
-
-  public Iterator<Sentence> iterator() {
-    return this.sentences.iterator();
-  }
+public interface Document extends Iterable<Sentence> {
+  public String getId();
 }
 

@@ -15,26 +15,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
-import com.google.common.collect.Iterators;
-import com.google.inject.Inject;
-
-public class Corpus implements Iterable<Document> {
-  private final List<DocumentSource> sources;
-
-  public Corpus() {
-    this.sources = new ArrayList<DocumentSource>();
-  }
-
-  public Iterator<Document> iterator() {
-    return Iterators.concat(this.sources.iterator());
-  }
-
-  public void addSource(DocumentSource source) {
-    this.sources.add(source);
-  }
+public interface Corpus extends Iterable<Document> {
 }
 

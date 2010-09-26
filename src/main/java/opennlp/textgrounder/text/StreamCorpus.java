@@ -15,25 +15,26 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
-public interface Sentence extends Iterable<Token> {
-  public String getId();
+import com.google.common.collect.Iterators;
+//import com.google.inject.Inject;
+
+public class StreamCorpus implements Corpus {
+  private final List<DocumentSource> sources;
+
+  public StreamCorpus() {
+    this.sources = new ArrayList<DocumentSource>();
+  }
+
+  public Iterator<Document> iterator() {
+    return Iterators.concat(this.sources.iterator());
+  }
+
+  public void addSource(DocumentSource source) {
+    this.sources.add(source);
+  }
 }
-/*  private final String id;
-  private final Iterable<Token> tokens;
-
-  public Sentence(String id, Iterable<Token> tokens) {
-    this.id = id;
-    this.tokens = tokens;
-  }
-
-  public String getId() {
-    return this.id;
-  }
-
-  public Iterator<Token> iterator() {
-    return this.tokens.iterator();
-  }
-}*/
 
