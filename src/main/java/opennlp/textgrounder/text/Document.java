@@ -15,7 +15,15 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-public interface Document extends Iterable<Sentence> {
-  public String getId();
+public abstract class Document<A extends Token> implements Iterable<Sentence<A>> {
+  private final String id;
+
+  protected Document(String id) {
+    this.id = id;
+  }
+
+  public String getId() {
+    return this.id;
+  }
 }
 

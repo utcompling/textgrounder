@@ -15,7 +15,77 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-public interface Sentence extends Iterable<Token> {
-  public String getId();
+import java.util.Iterator;
+import java.util.List;
+
+public abstract class Sentence<A extends Token> implements Iterable<A> {
+  private final String id;
+
+  protected Sentence(String id) {
+    this.id = id;
+  }
+
+  public abstract Iterator<A> tokens();
+  public abstract Iterator<Span<A>> toponymSpans();
+
+  public String getId() {
+    return this.id;
+  }
+
+  public Iterator<A> iterator() {
+    return new Iterator<A>() {
+      private final Iterator<A> tokens = Sentence.this.tokens();
+      private final Iterator<Span<A>> spans = Sentence.this.toponymSpans();
+      private int current = 0;
+      private Span<A> span = this.spans.hasNext() ? this.spans.next() : null;
+
+      public boolean hasNext() {
+        return this.tokens.hasNext();
+      }
+
+      public A next() {
+        if (this.span != null && this.span.getStart() == this.current) {
+          A toponym = span.getItem();
+          for (int i = 0; i < this.span.getEnd() - this.span.getStart(); i++) {
+            this.tokens.next();
+          }
+          this.current = this.span.getEnd();
+          this.span = this.spans.hasNext() ? this.spans.next() : null;
+          return toponym;
+        } else {
+          this.current++;
+          return this.tokens.next();
+        }
+      }
+
+      public void remove() {
+        throw new UnsupportedOperationException();
+      }
+    };
+  }
+
+  public class Span<B> {
+    private final int start;
+    private final int end;
+    private final B item;
+
+    protected Span(int start, int end, B item) {
+      this.start = start;
+      this.end = end;
+      this.item = item;
+    }
+
+    public int getStart() {
+      return this.start;
+    }
+
+    public int getEnd() {
+      return this.end;
+    }
+
+    public B getItem() {
+      return this.item;
+    }
+  }
 }
 

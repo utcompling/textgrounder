@@ -20,14 +20,14 @@ import java.io.IOException;
 import java.io.Reader;
 import java.util.Iterator;
 
-public abstract class DocumentSource implements Iterator<Document>, Iterable<Document>, Closeable {
+public abstract class DocumentSource implements Iterator<Document<Token>>, Iterable<Document<Token>>, Closeable {
   protected final Reader reader;
 
   public DocumentSource(Reader reader) throws IOException {
     this.reader = reader;
   }
 
-  public Iterator<Document> iterator() {
+  public Iterator<Document<Token>> iterator() {
     return this;
   }
 

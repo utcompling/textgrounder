@@ -21,14 +21,14 @@ import java.util.List;
 
 import com.google.common.collect.Iterators;
 
-public class StreamCorpus implements Corpus {
+public class StreamCorpus implements Corpus<Token> {
   private final List<DocumentSource> sources;
 
   public StreamCorpus() {
     this.sources = new ArrayList<DocumentSource>();
   }
 
-  public Iterator<Document> iterator() {
+  public Iterator<Document<Token>> iterator() {
     return Iterators.concat(this.sources.iterator());
   }
 

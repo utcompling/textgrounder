@@ -22,10 +22,51 @@ import java.util.List;
 import java.util.Map;
 
 import opennlp.textgrounder.topo.Location;
-import opennlp.textgrounder.util.Lexicon;
-import opennlp.textgrounder.util.SimpleLexicon;
+import opennlp.textgrounder.util.CountingLexicon;
+import opennlp.textgrounder.util.SimpleCountingLexicon;
 
-public class StoredCorpus extends StoredItem<Corpus, Document> implements Corpus {
+public class StoredCorpus implements Corpus<StoredToken> {
+  private final CountingLexicon<String> tokenLexicon;
+  private final CountingLexicon<String> toponymLexicon;
+  private final CountingLexicon<String> combinedLexicon;
+  private final ArrayList<Document<StoredToken>> documents;
+  
+  public StoredCorpus(Corpus wrapped) {
+    this.tokenLexicon = new SimpleCountingLexicon<String>();
+    this.toponymLexicon = new SimpleCountingLexicon<String>();
+    this.combinedLexicon = new SimpleCountingLexicon<String>();
+    this.documents = new ArrayList<Document<StoredToken>>();
+  }
+
+  public Iterator<Document<StoredToken>> iterator() {
+    return this.documents.iterator();
+  }
+
+  private class StoredDocument extends Document<StoredToken> {
+    private final List<Sentence<StoredToken>> sentences;
+
+    private StoredDocument(String id, List<Sentence<StoredToken>> sentences) {
+      super(id);
+      this.sentences = sentences;
+    }
+
+    public Iterator<Sentence<StoredToken>> iterator() {
+      return this.sentences.iterator();
+    }
+  }
+
+  private class StoredSentence extends Sentence<StoredToken> {
+    private StoredSentence(String id) {
+      super(id);
+    }
+
+    public Iterator<StoredToken> tokens() { throw new UnsupportedOperationException(); }
+    public Iterator<Span<StoredToken>> toponymSpans() { throw new UnsupportedOperationException(); }
+  }
+}
+
+
+/*
   private final Lexicon<String> tokenLexicon;
   private final Lexicon<String> toponymLexicon;
   private final List<List<Location>> candidateLists;
@@ -135,4 +176,5 @@ public class StoredCorpus extends StoredItem<Corpus, Document> implements Corpus
     }
   }
 }
+*/
 

@@ -15,12 +15,28 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-import java.util.Iterator;
 import java.util.List;
 
 import opennlp.textgrounder.topo.Location;
 
-public class Toponym extends Token implements Iterable<Location> {
+public interface Toponym extends Token {
+  public boolean hasGold();
+  public Location getGold();
+  public int getGoldIdx();
+
+  public boolean hasSelected();
+  public Location getSelected();
+  public int getSelectedIdx();
+
+  public void setSelectedIdx(int idx);
+
+  public int getAmbiguity();
+  public List<Location> getCandidates();
+
+  public List<Token> getTokens();
+}
+
+/*public class Toponym extends Token implements Iterable<Location> {
   private final int toponymIdx;
   private final List<Location> candidates;
   private final Integer gold;
@@ -116,5 +132,5 @@ public class Toponym extends Token implements Iterable<Location> {
   public int getAmbiguity() {
     return this.candidates.size();
   }
-}
+}*/
 

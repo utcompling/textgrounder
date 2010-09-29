@@ -17,6 +17,6 @@ package opennlp.textgrounder.text;
 
 import opennlp.textgrounder.util.Lexicon;
 
-public interface Corpus extends Iterable<Document> {
+public interface Corpus<A extends Token> extends Iterable<Document<A>> {
 }
 

@@ -27,9 +27,9 @@ import java.util.List;
 import java.util.Map;
 
 public class SimpleLexicon<A extends Serializable> implements Lexicon<A> {
-  private Map<A, Integer> map;
-  private ArrayList<A> entries;
-  private boolean growing;
+  protected Map<A, Integer> map;
+  protected ArrayList<A> entries;
+  protected boolean growing;
 
   public SimpleLexicon(int capacity) {
     this.map = new HashMap<A, Integer>(capacity, 0.5F);

@@ -15,7 +15,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-public class Token {
+public interface Token {
+  public String getForm();
+  public boolean isToponym();
+}
+
+/*public class Token {
   private final int idx;
   private final String form;
 
@@ -43,5 +48,5 @@ public class Token {
   public boolean isToponym() {
       return false;
   }
-}
+}*/
 
