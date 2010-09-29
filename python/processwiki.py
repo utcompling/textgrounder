@@ -81,17 +81,20 @@
 #    
 #
 # The basic functioning of this code is controlled by an article handler class.
-# The default handler class is DefaultArticleHandler.  Usually it is
+# The default handler class is ArticleHandler.  Usually it is
 # sufficient to subclass this handler class, as it provides hooks to do
-# interesting things, which by default do nothing.
+# interesting things, which by default do nothing.  You can also subclass
+# ArticleHandlerForUsefulText if you want the source text processed for
+# "useful text" (what the Wikipedia user sees, plus similar-quality
+# hidden text).
 #
 # SAX is used to process the XML of the raw Wikipedia dump file.
 # Simple SAX handler functions are what invokes the article handler
 # functions in the article handler class.
 #
-# For each article, the article handler function process_text() is called
-# to process the text of the article, and is passed the article title and
-# full text, with entity expressions such as &nbsp; replaced appropriately.
+# For each article, the article handler function process_article_text() is
+# called to process the text of the article, and is passed the article title
+# and full text, with entity expressions such as &nbsp; replaced appropriately.
 # This function operates in two passes.  The first pass, performed by
 # the article handler process_text_for_data(), extracts useful data, e.g.
 # coordinates or links.  It returns True or False, indicating whether the
@@ -102,14 +105,14 @@
 #
 # 1. Process the text, filtering out some junk
 #    (see format_text_second_pass()).
-# 2. Use process_top_level_text_chunks() to extract chunks of "actual
+# 2. Use process_source_text() to extract chunks of "actual
 #    text" (as opposed to directives of various sorts), i.e. text that
 #    is useful for constructing a language model that can be used
 #    for classifying a document to find the most similar article.
 #    Join together and then split into words.  Pass the generator
 #    of words to the article handler process_text_for_words().
 #  
-# process_top_level_text_chunks() is is a generator that yields processed
+# process_source_text() is is a generator that yields processed
 # textual chunks containing only "actual text".  This function works by
 # calling parse_simple_balanced_text() to parse the text into balanced chunks
 # (text delimited by balanced braces or brackets, i.e. {...} or [...],
@@ -386,6 +389,79 @@ not worry about crashing on these syntactic errors.'''
   return macroargs
 
 #######################################################################
+#                         Process source text                         #
+#######################################################################
+
+# Handle the text of a given article.  Yield chunks of processed text.
+
+class SourceTextHandler(object):
+  def process_internal_link(self, text):
+    yield text
+    
+  def process_template(self, text):
+    yield text
+    
+  def process_table(self, text):
+    yield text
+    
+  def process_external_link(self, text):
+    yield text
+    
+  def process_text_chunk(self, text):
+    yield text
+
+  def process_source_text(self, text):
+    # Look for all template and link expressions in the text and do something
+    # sensible with them.  Yield the resulting text chunks.  The idea is that
+    # when the chunks are joined back together, we will get raw text that can
+    # be directly separated into words, without any remaining macros (templates,
+    # internal or external links, tables, etc.) and with as much extraneous
+    # junk (directives of various sorts, instead of relevant text) as possible
+    # filtered out.  Note that when we process macros and extract the relevant
+    # text from them, we need to recursively process that text.
+  
+    if debug > 1: uniprint("Entering process_source_text: [%s]" % text)
+  
+    for foo in parse_simple_balanced_text(text):
+      if debug > 1: uniprint("parse_simple_balanced_text yields: [%s]" % foo)
+  
+      if foo.startswith('[['):
+        gen = self.process_internal_link(foo)
+  
+      elif foo.startswith('{{'):
+        gen = self.process_template(foo)
+  
+      elif foo.startswith('{|'):
+        gen = self.process_table(foo)
+  
+      elif foo.startswith('['):
+        gen = self.process_external_link(foo)
+  
+      else:
+        gen = self.process_text_chunk(foo)
+  
+      for chunk in gen:
+        if debug > 1: uniprint("process_source_text yields: [%s]" % chunk)
+        yield chunk
+  
+# An article source-text handler that recursively processes text inside of
+# macros.  Doesn't split templates, links or tables according to arguments
+# or fields.
+
+class RecursiveSourceTextHandler(SourceTextHandler):
+  def process_internal_link(self, text):
+    return self.process_source_text(text[2:-2])
+    
+  def process_template(self, text):
+    return self.process_source_text(text[2:-2])
+    
+  def process_table(self, text):
+    return self.process_source_text(text[2:-2])
+    
+  def process_external_link(self, text):
+    return self.process_source_text(text[1:-1])
+    
+#######################################################################
 #                     Process text for coordinates                    #
 #######################################################################
 
@@ -501,28 +577,27 @@ globe: which planet or satellite the coordinate is on (esp. if not the Earth)
   (_, long) = get_coord_1(args[i:], ('E','W'), convert_ew)
   return (lat, long)
 
-def process_text_for_coordinates(title, text):
-  '''Given the article text TEXT of an article with title TITLE, with some
-basic formatting applied to the text, extract coordinates out of templates
-that have coordinates in them (Infobox, Coord, etc.).  Yield each coordinate
-seen as (lat,long).  Similar code could be used to do other things, such as
-processing links.
+class ExtractCoordinatesFromSource(SourceTextHandler):
+  '''Given the article text TEXT of an article (in general, after first-
+stage processing), extract coordinates out of templates that have coordinates
+in them (Infobox, Coord, etc.).  Record each coordinate into COORD.
 
-See process_text() for a description of the formatting that is applied to the
-text before being sent to this function.'''
+We don't recursively process text inside of templates or links.  If we want
+to do that, change this class to inherit from RecursiveSourceTextHandler.
 
-  # Loop over templates at top level (note, since we don't recursively
-  # parse the arguments inside of templates, we won't see templates inside
-  # of those arguments; currently not an issue).
-  for template in (foo for foo in parse_simple_balanced_text(text)
-                   if foo.startswith('{{')):
+See process_article_text() for a description of the formatting that is
+applied to the text before being sent here.'''
+
+  coords = []
+
+  def process_template(self, text):
+    # Look for a Coord, Infobox, etc. template that may have coordinates in it
     lat = long = None
-    if debug > 0: uniprint("Saw template %s" % template)
-    tempargs = get_macro_args(template)
+    if debug > 0: uniprint("Enter process_template: [%s]" % text)
+    tempargs = get_macro_args(text)
     temptype = tempargs[0].strip()
     if debug > 0: uniprint("Template type: %s" % temptype)
     lowertemp = temptype.lower()
-    all_templates[lowertemp] = all_templates.get(lowertemp, 0) + 1
     # Look for a coordinate template
     if lowertemp in ('coord', 'coor d', 'coor dm', 'coor dms',
                      'coor dec', 'coorheader') \
@@ -541,7 +616,8 @@ text before being sent to this function.'''
     if lat or long:
       if debug > 0: uniprint("Saw coordinate %s,%s in template type %s" %
                 (lat, long, temptype))
-      yield (lat,long)
+      self.coords.append((lat,long))
+    yield text
 
 #######################################################################
 #                         Process text for words                      #
@@ -569,10 +645,6 @@ text before being sent to this function.'''
 #    The latent variable subnodes are ...
 #
 # But that's a major hassle, and such occurrences should be rare.)
-
-def process_and_join_arguments(args_of_macro):
-  return ' '.join(''.join(process_text_chunks(chunk))
-                  for chunk in args_of_macro)
 
 # Process an internal link into separate chunks for each interesting
 # argument.  Yield the chunks.  They will be recursively processed, and
@@ -618,12 +690,6 @@ def yield_internal_link_args(text):
     # For textual internal link, use all arguments
     for chunk in tempargs: yield chunk
 
-def process_internal_link(foo):
-  '''Process an internal link into chunks of raw text and yield them.'''
-  # Find the interesting arguments of an internal link and join
-  # with spaces.
-  yield process_and_join_arguments(yield_internal_link_args(foo))
-
 # Process a template into separate chunks for each interesting
 # argument.  Yield the chunks.  They will be recursively processed, and
 # joined by spaces.
@@ -649,6 +715,9 @@ def yield_template_args(text):
   tempargs = get_macro_args(text)
   if debug > 1: uniprint("template args: %s" % tempargs)
   temptype = tempargs[0].strip().lower()
+
+  if debug > 0:
+    all_templates[temptype] = all_templates.get(temptype, 0) + 1
 
   # Extract the parameter and non-parameter arguments.
   (paramhash, nonparam) = find_template_params(tempargs[1:], False)
@@ -685,11 +754,6 @@ def yield_template_args(text):
   for arg in nonparam:
     yield arg
 
-def process_template(foo):
-  '''Process a template into chunks of raw text and yield them.'''
-  # Find the interesting arguments of a template and join with spaces.
-  yield process_and_join_arguments(yield_template_args(foo))
-
 # Process a table into separate chunks.  Unlike code for processing
 # internal links, the chunks should have whitespace added where necessary.
 def yield_table_chunks(text):
@@ -705,7 +769,7 @@ def yield_table_chunks(text):
       if atstart:
         m = re.match('(?s)[^|]*\|(.*)', arg)
         if m:
-          yield m.group(1)
+          yield m.group(1) + ' '
           continue
       yield arg
       atstart = True
@@ -751,24 +815,6 @@ def yield_table_chunks(text):
     # Add whitespace between fields, as above.
     yield ' '.join(process_table_chunk(arg, False))
 
-class 
-
-def process_table(foo):
-  '''Process a table into chunks of raw text and yield them.'''
-  for bar in yield_table_chunks(foo):
-    if debug > 1: uniprint("process_table yields: [%s]" % bar)
-    for baz in process_text_chunks(bar):
-      yield baz
-
-def process_external_link(foo):
-  '''Process an external link into chunks of raw text and yield them.'''
-  # For an external link, use the anchor text of the link, if any
-  splitlink = re.split(r'\s+', foo[1:-1], 1)
-  if len(splitlink) == 2:
-    (link, linktext) = splitlink
-    for chunk in process_text_chunks(linktext):
-      yield chunk
-
 # Given raw text, split it into words, filtering out punctuation, and
 # yield the words.  Also ignore words with a colon in the middle, indicating
 # likely URL's and similar directives.
@@ -784,50 +830,46 @@ def split_text_into_words(text):
       # filtering for : so URL's don't get split up.
       for word2 in re.split('[#_]', word):
         yield word2
-    
-def process_text_chunks_1(text):
-  # Look for all template and link expressions in the text and do something
-  # sensible with them.  Yield the resulting text chunks.  The idea is that
-  # when the chunks are joined back together, we will get raw text that can
-  # be directly separated into words, without any remaining macros (templates,
-  # internal or external links, tables, etc.) and with as much extraneous
-  # junk (directives of various sorts, instead of relevant text) as possible
-  # filtered out.  Note that when we process macros and extract the relevant
-  # text from them, we need to recursively process that text.
 
-  for foo in parse_simple_balanced_text(text):
-    if debug > 1: uniprint("parse_simple_balanced_text yields: [%s]" % foo)
+# Extract "useful" text (generally, text that will be seen by the user,
+# or hidden text of similar quality) and yield up chunks.
 
-    if foo.startswith('[['):
-      for bar in process_internal_link(foo): yield bar
+class ExtractUsefulText(SourceTextHandler):
+  def process_and_join_arguments(self, args_of_macro):
+    return ' '.join(''.join(self.process_source_text(chunk))
+                    for chunk in args_of_macro)
 
-    elif foo.startswith('{{'):
-      for bar in process_template(foo): yield bar
+  def process_internal_link(self, text):
+    '''Process an internal link into chunks of raw text and yield them.'''
+    # Find the interesting arguments of an internal link and join
+    # with spaces.
+    yield self.process_and_join_arguments(yield_internal_link_args(text))
+  
+  def process_template(self, text):
+    '''Process a template into chunks of raw text and yield them.'''
+    # Find the interesting arguments of a template and join with spaces.
+    yield self.process_and_join_arguments(yield_template_args(text))
+  
+  def process_table(self, text):
+    '''Process a table into chunks of raw text and yield them.'''
+    for bar in yield_table_chunks(text):
+      if debug > 1: uniprint("process_table yields: [%s]" % bar)
+      for baz in self.process_source_text(bar):
+        yield baz
+  
+  def process_external_link(self, text):
+    '''Process an external link into chunks of raw text and yield them.'''
+    # For an external link, use the anchor text of the link, if any
+    splitlink = re.split(r'\s+', text[1:-1], 1)
+    if len(splitlink) == 2:
+      (link, linktext) = splitlink
+      for chunk in self.process_source_text(linktext):
+        yield chunk
+  
 
-    elif foo.startswith('{|'):
-      for bar in process_table(foo): yield bar
-
-    elif foo.startswith('['):
-      for bar in process_external_link(foo): yield bar
-
-    else:
-      yield foo
-
-# Just a wrapper around process_text_chunks_1(), for logging purposes.
-def process_text_chunks(text):
-  if debug > 1: uniprint("Entering process_text_chunks: [%s]" % text)
-  for chunk in process_text_chunks_1(text):
-    if debug > 1: uniprint("process_text_chunks yields: [%s]" % chunk)
-    yield chunk
-
-def process_top_level_text_chunks(text):
-  # A wrapper around process_text_chunks to log the chunks seen.
-  # We only log the chunks we see directly (at "top-level");
-  # process_text_chunks() is also called recursively.
-  for chunk in process_text_chunks(text):
-    if debug > 0:
-      uniprint("Top-level process_text_chunks yields: [%s]" % chunk)
-    yield chunk
+#######################################################################
+#               Formatting text to make processing easier             #
+#######################################################################
 
 # Process the text in various ways in preparation for extracting data
 # from the text.
@@ -865,6 +907,27 @@ def format_text_second_pass(text):
   # words outside and inside a reference together
   (text, _) = re.subn(r'(?s)<ref.*?>', ' ', text)
 
+  # Another hack: Inside of <gallery>...</gallery>, there are raw filenames.
+  # Get rid of.
+
+  def process_gallery(text):
+    # Split on gallery blocks (FIXME, recursion not handled).  Putting a
+    # group around the split text ensures we get it returned along with the
+    # other text.
+    chunks = re.split(r'(?s)(<gallery.*?>.*?</gallery>)', text)
+    for chunk in chunks:
+      # If a gallery, extract the stuff inside ...
+      m = re.match(r'^(?s)<gallery.*?>(.*?)</gallery>$', chunk)
+      if m:
+        chunk = m.group(1)
+        # ... then remove files and images, but keep any text after |
+        (chunk, _) = re.subn(r'(?m)^(?:File|Image):[^|\n]*$', '', chunk)
+        (chunk, _) = re.subn(r'(?m)^(?:File|Image):[^|\n]*\|(.*)$',
+                             r'\1', chunk)
+      yield chunk
+  
+  text = ''.join(process_gallery(text))
+  
   # Remove remaining HTML codes from the text
   (text, _) = re.subn(r'(?s)<.*?>', '', text)
 
@@ -909,7 +972,7 @@ it to be dynamically manipulated).  Given the size of the XML dump file
 
   def characters(self, text):
     '''Handler for chunks of text.  Accumulate all adjacent chunks.  When
-the end element </text> is seen, process_text() will be called on the
+the end element </text> is seen, process_article_text() will be called on the
 combined chunks.'''
     if debug > 1: uniprint("characters() saw %s" % text)
     if self.intitle:
@@ -924,9 +987,10 @@ combined chunks.'''
       self.intitle = False
     elif name == 'text':
       # If we saw the end of the article text, join all the text chunks
-      # together and call process_text() on it.
+      # together and call process_article_text() on it.
       self.intext = False
-      self.output_handler.process_text(self.curtitle, ''.join(self.curtext))
+      self.output_handler.process_article_text(self.curtitle,
+                                               ''.join(self.curtext))
       self.curtext = None
  
 #######################################################################
@@ -935,7 +999,7 @@ combined chunks.'''
 
 ### Default handler class for processing article text.  Subclass this to
 ### implement your own handlers.
-class DefaultArticleHandler(object):
+class ArticleHandler(object):
   # Process the text of article TITLE, with text TEXT.  The default
   # implementation does the following:
   #
@@ -945,7 +1009,7 @@ class DefaultArticleHandler(object):
   # 4. If that handler returned True, call self.process_text_for_text()
   #    to do processing of the text itself (e.g. for words).
 
-  def process_text(self, title, text):
+  def process_article_text(self, title, text):
   
     if debug > 0:
       uniprint("Article title: %s" % title)
@@ -973,35 +1037,15 @@ class DefaultArticleHandler(object):
     if self.process_text_for_data(title, text):
       self.process_text_for_text(title, text)
 
-  # Process the text itself, e.g. for words.  Input it text that has been
-  # preprocessed as described above (remove comments, etc.).  Default
-  # handler does two things:
-  #
-  # 1. Further process the text (see format_text_second_pass())
-  # 2. Use process_top_level_text_chunks() to extract chunks of useful
-  #    text.  Join together and then split into words.  Pass the generator
-  #    of words to self.process_text_for_words().
-
-  def process_text_for_text(self, title, text):  
-    # Now process the text in various ways in preparation for extracting
-    # the words from the text
-    text = format_text_second_pass(text)
-    # Now process the resulting text into chunks.  Join them back together
-    # again (to handle cases like "the [[latent variable]]s are ..."), and
-    # split to find words.
-    self.process_text_for_words(title, split_text_into_words(
-                                ''.join(process_top_level_text_chunks(text))))
+  # Process the text itself, e.g. for words.  Default implementation does
+  # nothing.
+  def process_text_for_text(self, title, text):
+    pass
 
   # Process an article that is a redirect.  Default implementation does
   # nothing.
 
   def process_redirect(self, title, redirtitle):
-    pass
-
-  # Process the real words of the text of an article.  Default implementation
-  # does nothing.
-
-  def process_text_for_words(self, title, word_generator):
     pass
 
   # Process the text and extract data.  Return True if further processing of
@@ -1014,13 +1058,42 @@ class DefaultArticleHandler(object):
   def process_text_for_data(self, title, text):
     return True
 
-# "Stage 1 Handler": Does what process-wiki.py used to do.  Basically just
-# prints out the info passed in for redirects and article words; as for the
-# implementation of process_text_for_data(), calls
-# process_text_for_coordinates() to extract coordinates, and outputs all
-# the coordinates seen.  Always returns True.
+### Default handler class for processing article text, including returning
+### "useful" text (what the Wikipedia user sees, plus similar-quality
+### hidden text).
+class ArticleHandlerForUsefulText(ArticleHandler):
+  # Process the text itself, e.g. for words.  Input it text that has been
+  # preprocessed as described above (remove comments, etc.).  Default
+  # handler does two things:
+  #
+  # 1. Further process the text (see format_text_second_pass())
+  # 2. Use process_source_text() to extract chunks of useful
+  #    text.  Join together and then split into words.  Pass the generator
+  #    of words to self.process_text_for_words().
 
-class Stage1Handler(DefaultArticleHandler):
+  def process_text_for_text(self, title, text):  
+    # Now process the text in various ways in preparation for extracting
+    # the words from the text
+    text = format_text_second_pass(text)
+    # Now process the resulting text into chunks.  Join them back together
+    # again (to handle cases like "the [[latent variable]]s are ..."), and
+    # split to find words.
+    self.process_text_for_words(
+      title, split_text_into_words(
+               ''.join(ExtractUsefulText().process_source_text(text))))
+
+  # Process the real words of the text of an article.  Default implementation
+  # does nothing.
+
+  def process_text_for_words(self, title, word_generator):
+    pass
+
+# Does what processwiki.py used to do.  Basically just prints out the info
+# passed in for redirects and article words; as for the implementation of
+# process_text_for_data(), uses ExtractCoordinatesFromSource() to extract
+# coordinates, and outputs all the coordinates seen.  Always returns True.
+
+class PrintWordsAndCoords(ArticleHandlerForUsefulText):
   def process_text_for_words(self, title, word_generator):
     uniprint("Article title: %s" % title)
     for word in word_generator:
@@ -1032,7 +1105,9 @@ class Stage1Handler(DefaultArticleHandler):
     uniprint("Redirect to: %s" % redirtitle)
 
   def process_text_for_data(self, title, text):
-    for (lat,long) in process_text_for_coordinates(title, text):
+    handler = ExtractCoordinatesFromSource()
+    for foo in handler.process_source_text(text): pass
+    for (lat,long) in handler.coords:
       uniprint("Article coordinates: %s,%s" % (lat, long))
     return True
 
@@ -1042,7 +1117,7 @@ class Stage1Handler(DefaultArticleHandler):
 # each word in the article text, after filtering text for "actual text"
 # (as opposed to directives etc.), and outputs the counts.
 
-class GetCoordsAndCounts(DefaultArticleHandler):
+class GetCoordsAndCounts(ArticleHandlerForUsefulText):
   def process_text_for_words(self, title, word_generator):
     wordhash = {}
     for word in word_generator:
@@ -1050,9 +1125,10 @@ class GetCoordsAndCounts(DefaultArticleHandler):
     output_reverse_sorted_table(wordhash)
 
   def process_text_for_data(self, title, text):
-    coords = [coord for coord in process_text_for_coordinates(title, text)]
-    if len(coords) > 0:
-      (lat, long) = coords[0]
+    handler = ExtractCoordinatesFromSource()
+    for foo in handler.process_source_text(text): pass
+    if len(handler.coords) > 0:
+      (lat, long) = handler.coords[0]
       uniprint("Article title: %s" % title)
       uniprint("Article coordinates: %s,%s" % (lat, long))
       return True
@@ -1065,7 +1141,7 @@ class GetCoordsAndCounts(DefaultArticleHandler):
 # each word in the article text, after filtering text for "actual text"
 # (as opposed to directives etc.), and outputs the counts.
 
-class FindCoordsAndLinks(DefaultArticleHandler):
+class FindCoordsAndLinks(ArticleHandlerForUsefulText):
   def process_text_for_words(self, title, word_generator):
     wordhash = {}
     for word in word_generator:
@@ -1107,8 +1183,8 @@ def main_process_input(wiki_handler):
     print "Notice: ending processing"
 
 def main():
-  #main_process_input(Stage1Handler())
-  main_process_input(GetCoordsAndCounts())
+  main_process_input(PrintWordsAndCoords())
+  #main_process_input(GetCoordsAndCounts())
 
 #import cProfile
 #cProfile.run('main()', 'process-wiki.prof')
