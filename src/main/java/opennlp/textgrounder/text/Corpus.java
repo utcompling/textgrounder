@@ -15,6 +15,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
+import opennlp.textgrounder.util.Lexicon;
+
 public interface Corpus extends Iterable<Document> {
 }
 

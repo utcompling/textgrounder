@@ -21,25 +21,47 @@ import java.util.List;
 import opennlp.textgrounder.topo.Location;
 
 public class Toponym extends Token implements Iterable<Location> {
+  private final int toponymIdx;
   private final List<Location> candidates;
   private final Integer gold;
   private Integer selected;
 
-  public Toponym(String form, List<Location> candidates) {
-    this(form, candidates, null);
+  Toponym(String form, List<Location> candidates) {
+    this(-1, -1, form, candidates, null);
   }
 
-  public Toponym(String form, List<Location> candidates, Integer gold) {
-    this(form, candidates, gold, null);
+  Toponym(String form, List<Location> candidates, Integer gold) {
+    this(-1, -1, form, candidates, gold, null);
   }
 
-  public Toponym(String form, List<Location> candidates, Integer gold, Integer selected) {
-    super(form);
+  Toponym(String form, List<Location> candidates, Integer gold, Integer selected) {
+    this(-1, -1, form, candidates, gold, selected);
+  }
+
+  Toponym(int idx, int toponymIdx, String form, List<Location> candidates) {
+    this(idx, toponymIdx, form, candidates, null);
+  }
+
+  Toponym(int idx, int toponymIdx, String form, List<Location> candidates, Integer gold) {
+    this(idx, toponymIdx, form, candidates, gold, null);
+  }
+
+  Toponym(int idx, int toponymIdx, String form, List<Location> candidates, Integer gold, Integer selected) {
+    super(idx, form);
+    this.toponymIdx = toponymIdx;
     this.candidates = candidates;
     this.gold = gold;
     this.selected = selected;
     assert this.gold == null || this.gold < this.candidates.size() : "Invalid candidate index.";
     assert this.selected == null || this.selected < this.candidates.size() : "Invalid candidate index.";
+  }
+
+  public int getToponymIdx() {
+    if (this.toponymIdx == -1) {
+      throw new UnsupportedOperationException("This toponym has no index.");
+    } else {
+      return this.toponymIdx;
+    }
   }
 
   public boolean hasGold() {

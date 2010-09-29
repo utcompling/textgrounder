@@ -16,10 +16,24 @@
 package opennlp.textgrounder.text;
 
 public class Token {
+  private final int idx;
   private final String form;
 
-  public Token(String form) {
+  Token(String form) {
+    this(-1, form);
+  }
+
+  Token(int idx, String form) {
+    this.idx = idx;
     this.form = form;
+  }
+
+  public int getIdx() {
+    if (this.idx == -1) {
+      throw new UnsupportedOperationException("This token has no index.");
+    } else {
+      return this.idx;
+    }
   }
 
   public String getForm() {

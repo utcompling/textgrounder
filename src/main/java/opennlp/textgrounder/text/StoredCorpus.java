@@ -57,7 +57,7 @@ public class StoredCorpus extends StoredItem<Corpus, Document> implements Corpus
 
   private class StoredSentence implements Sentence {
     private final String id;
-    private final int[] tokens;
+    private final long[] tokens;
 
     public StoredSentence(Sentence wrapped) {
       this.id = wrapped.getId();
@@ -67,17 +67,22 @@ public class StoredCorpus extends StoredItem<Corpus, Document> implements Corpus
         tokenList.add(token);
       }
 
-      this.tokens = new int[tokenList.size()];
+      this.tokens = new long[tokenList.size()];
+
       for (int i = 0; i < this.tokens.length; i++) {
         Token token = tokenList.get(i);
+        int idx = StoredCorpus.this.tokenLexicon.getOrAdd(token.getForm());
 
         if (token.isToponym()) {
           Toponym toponym = (Toponym) token;
-          int formId = StoredCorpus.this.toponymLexicon.getOrAdd(token.getForm());         
-          StoredCorpus.this.candidateLists.set(formId, toponym.getCandidates());
-          this.tokens[i] = 1 & ((1 + toponym.getGoldIdx()) << 1) & ((1 + toponym.getSelectedIdx()) << 4) & (formId << 7);
+          int toponymIdx = StoredCorpus.this.toponymLexicon.getOrAdd(token.getForm());
+          StoredCorpus.this.candidateLists.set(toponymIdx, toponym.getCandidates());
+
+          this.tokens[i] = 1 | ((1 + toponym.getGoldIdx()) << 4)
+                             | ((1 + toponym.getSelectedIdx()) << 8)
+                             | (toponymIdx << 12) | (idx << 32);
         } else {
-          this.tokens[i] = StoredCorpus.this.tokenLexicon.getOrAdd(token.getForm()) << 1;
+          this.tokens[i] = idx << 1;
         }
       }
     }
@@ -95,27 +100,29 @@ public class StoredCorpus extends StoredItem<Corpus, Document> implements Corpus
         }
 
         public Token next() {
-          int code = StoredSentence.this.tokens[this.current++];
+          long code = StoredSentence.this.tokens[this.current++];
           Token token;
 
           if ((code & 1) == 1) {
-            int formId = code >> 7;
-            int goldIdx = (code >> 1) - 1;
-            int selectedIdx = (code >> 4) - 1;
+            int idx = (int) code >> 32;
+            int toponymIdx  = (int) (code & 0xFFFFF000) >> 12;
+            int selectedIdx = (int) (code & 0x00000F00) >> 8;
+            int goldIdx     = (int) (code & 0x000000F0) >> 4;
 
-            String form = StoredCorpus.this.toponymLexicon.atIndex(formId);
-            List<Location> candidates = StoredCorpus.this.candidateLists.get(formId);
+            String form = StoredCorpus.this.toponymLexicon.atIndex(toponymIdx);
+            List<Location> candidates = StoredCorpus.this.candidateLists.get(toponymIdx);
             if (goldIdx >= 0) {
               if (selectedIdx >= 0) {
-                token = new Toponym(form, candidates, goldIdx, selectedIdx);
+                token = new Toponym(idx, toponymIdx, form, candidates, goldIdx, selectedIdx);
               } else {
-                token = new Toponym(form, candidates, goldIdx);
+                token = new Toponym(idx, toponymIdx, form, candidates, goldIdx);
               }
             } else {
-              token = new Toponym(form, candidates);
+              token = new Toponym(idx, toponymIdx, form, candidates);
             }
           } else {
-            token = new Token(StoredCorpus.this.tokenLexicon.atIndex(code >> 1));
+            int idx = (int) code >> 1;
+            token = new Token(idx, StoredCorpus.this.tokenLexicon.atIndex(idx));
           }
 
           return token;
