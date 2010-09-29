@@ -13,30 +13,21 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.text;
+package opennlp.textgrounder.util;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.io.Reader;
-import java.util.Iterator;
+import java.io.Serializable;
+import java.util.List;
 
-public abstract class DocumentSource implements Iterator<Document>, Iterable<Document>, Closeable {
-  protected final Reader reader;
-
-  public DocumentSource(Reader reader) throws IOException {
-    this.reader = reader;
-  }
-
-  public Iterator<Document> iterator() {
-    return this;
-  }
-
-  public void close() throws IOException {
-    this.reader.close();
-  }
-
-  public void remove() {
-    throw new UnsupportedOperationException("Cannot remove item from corpus source.");
-  }
+public interface Lexicon<A extends Serializable>
+  extends Serializable, Iterable<A> {
+  public boolean contains(A entry);
+  public int get(A entry);
+  public int getOrAdd(A entry);
+  public A atIndex(int index);
+  public int size();
+  public boolean isGrowing();
+  public void stopGrowing();
+  public void startGrowing();
+  public List<Integer> concatenate(Lexicon<A> other);
 }
 

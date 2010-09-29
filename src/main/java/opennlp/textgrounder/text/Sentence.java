@@ -15,25 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-import java.util.Iterator;
-
 public interface Sentence extends Iterable<Token> {
   public String getId();
 }
-/*  private final String id;
-  private final Iterable<Token> tokens;
-
-  public Sentence(String id, Iterable<Token> tokens) {
-    this.id = id;
-    this.tokens = tokens;
-  }
-
-  public String getId() {
-    return this.id;
-  }
-
-  public Iterator<Token> iterator() {
-    return this.tokens.iterator();
-  }
-}*/
 

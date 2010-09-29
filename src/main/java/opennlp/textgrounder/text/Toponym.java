@@ -30,10 +30,20 @@ public class Toponym extends Token implements Iterable<Location> {
   }
 
   public Toponym(String form, List<Location> candidates, Integer gold) {
+    this(form, candidates, gold, null);
+  }
+
+  public Toponym(String form, List<Location> candidates, Integer gold, Integer selected) {
     super(form);
     this.candidates = candidates;
     this.gold = gold;
-    assert this.selected < this.candidates.size() : "Invalid candidate index.";
+    this.selected = selected;
+    assert this.gold == null || this.gold < this.candidates.size() : "Invalid candidate index.";
+    assert this.selected == null || this.selected < this.candidates.size() : "Invalid candidate index.";
+  }
+
+  public boolean hasGold() {
+    return this.gold != null;
   }
 
   public Location getGold() {
@@ -42,6 +52,10 @@ public class Toponym extends Token implements Iterable<Location> {
       location = this.candidates.get(this.gold);
     }
     return location; 
+  }
+
+  public int getGoldIdx() {
+    return this.gold == null ? -1 : this.gold;
   }
 
   public boolean hasSelected() {
@@ -56,6 +70,10 @@ public class Toponym extends Token implements Iterable<Location> {
     return location;
   }
 
+  public int getSelectedIdx() {
+    return this.selected == null ? -1 : this.selected;
+  }
+
   public void setSelected(Integer index) {
     this.selected = index;
   }
@@ -66,11 +84,15 @@ public class Toponym extends Token implements Iterable<Location> {
 
   @Override
   public boolean isToponym() {
-      return true;
+    return true;
+  }
+
+  public List<Location> getCandidates() {
+    return this.candidates;
   }
 
   public int getAmbiguity() {
-      return candidates.size();
+    return this.candidates.size();
   }
 }
 

@@ -20,7 +20,6 @@ import java.util.Iterator;
 import java.util.List;
 
 import com.google.common.collect.Iterators;
-//import com.google.inject.Inject;
 
 public class StreamCorpus implements Corpus {
   private final List<DocumentSource> sources;

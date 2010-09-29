@@ -15,28 +15,34 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.Iterator;
 
-public abstract class DocumentSource implements Iterator<Document>, Iterable<Document>, Closeable {
-  protected final Reader reader;
+import opennlp.textgrounder.text.ner.NamedEntityRecognizer;
+import opennlp.textgrounder.text.prep.Tokenizer;
+import opennlp.textgrounder.text.prep.SentenceDivider;
 
-  public DocumentSource(Reader reader) throws IOException {
-    this.reader = reader;
+public abstract class PlainTextDocumentSource extends DocumentSource {
+  private final Tokenizer tokenizer;
+  private final SentenceDivider divider;
+  private final NamedEntityRecognizer recognizer;
+
+  public PlainTextDocumentSource(Reader reader, Tokenizer tokenizer,
+                                 SentenceDivider divider, NamedEntityRecognizer recognizer)
+    throws IOException {
+    super(reader);
+    this.tokenizer = tokenizer;
+    this.divider = divider;
+    this.recognizer = recognizer;
   }
 
-  public Iterator<Document> iterator() {
-    return this;
+  public boolean hasNext() {
+    return false;
   }
 
-  public void close() throws IOException {
-    this.reader.close();
-  }
-
-  public void remove() {
-    throw new UnsupportedOperationException("Cannot remove item from corpus source.");
+  public Document next() {
+    return null;
   }
 }
 

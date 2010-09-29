@@ -17,11 +17,24 @@ package opennlp.textgrounder.text;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import opennlp.textgrounder.topo.Location;
+import opennlp.textgrounder.util.Lexicon;
+import opennlp.textgrounder.util.SimpleLexicon;
 
 public class StoredCorpus extends StoredItem<Corpus, Document> implements Corpus {
+  private final Lexicon<String> tokenLexicon;
+  private final Lexicon<String> toponymLexicon;
+  private final List<List<Location>> candidateLists;
+
   public StoredCorpus(Corpus wrapped) {
     super(wrapped);
+    this.tokenLexicon = new SimpleLexicon<String>();
+    this.toponymLexicon = new SimpleLexicon<String>();
+    this.candidateLists = new ArrayList<List<Location>>();
   }
 
   protected Document wrap(Document document) {
@@ -42,127 +55,77 @@ public class StoredCorpus extends StoredItem<Corpus, Document> implements Corpus
     }
   }
 
-  private class StoredSentence extends StoredItem<Sentence, Token> implements Sentence {
+  private class StoredSentence implements Sentence {
+    private final String id;
+    private final int[] tokens;
+
     public StoredSentence(Sentence wrapped) {
-      super(wrapped);
+      this.id = wrapped.getId();
+
+      List<Token> tokenList = new ArrayList<Token>();
+      for (Token token : wrapped) {
+        tokenList.add(token);
+      }
+
+      this.tokens = new int[tokenList.size()];
+      for (int i = 0; i < this.tokens.length; i++) {
+        Token token = tokenList.get(i);
+
+        if (token.isToponym()) {
+          Toponym toponym = (Toponym) token;
+          int formId = StoredCorpus.this.toponymLexicon.getOrAdd(token.getForm());         
+          StoredCorpus.this.candidateLists.set(formId, toponym.getCandidates());
+          this.tokens[i] = 1 & ((1 + toponym.getGoldIdx()) << 1) & ((1 + toponym.getSelectedIdx()) << 4) & (formId << 7);
+        } else {
+          this.tokens[i] = StoredCorpus.this.tokenLexicon.getOrAdd(token.getForm()) << 1;
+        }
+      }
     }
 
     public String getId() {
-      return this.getWrapped().getId();
+      return this.id;
     }
-  }
-}
 
-/*  private final Corpus wrapped;
-  private final List<Document> documents;
-  private boolean first;
+    public Iterator<Token> iterator() {
+      return new Iterator<Token>() {
+        private int current = 0;
 
-  public StoredCorpus(Corpus wrapped) {
-    this.wrapped = wrapped;
-    this.documents = new ArrayList<Document>();
-    this.first = true;
-  }
-
-  public Iterator<Document> iterator() {
-    if (this.first) {
-      this.first = false;
-      final Iterator<Document> documents = this.wrapped.iterator();
-      return new Iterator<Document>() {
         public boolean hasNext() {
-          return documents.hasNext();
+          return this.current < StoredSentence.this.tokens.length;
         }
 
-        public Document next() {
-          Document document = new StoredDocument(documents.next());
-          StoredCorpus.this.documents.add(document);
-          return document;
+        public Token next() {
+          int code = StoredSentence.this.tokens[this.current++];
+          Token token;
+
+          if ((code & 1) == 1) {
+            int formId = code >> 7;
+            int goldIdx = (code >> 1) - 1;
+            int selectedIdx = (code >> 4) - 1;
+
+            String form = StoredCorpus.this.toponymLexicon.atIndex(formId);
+            List<Location> candidates = StoredCorpus.this.candidateLists.get(formId);
+            if (goldIdx >= 0) {
+              if (selectedIdx >= 0) {
+                token = new Toponym(form, candidates, goldIdx, selectedIdx);
+              } else {
+                token = new Toponym(form, candidates, goldIdx);
+              }
+            } else {
+              token = new Toponym(form, candidates);
+            }
+          } else {
+            token = new Token(StoredCorpus.this.tokenLexicon.atIndex(code >> 1));
+          }
+
+          return token;
         }
 
         public void remove() {
           throw new UnsupportedOperationException();
         }
       };
-    } else {
-      return this.documents.iterator();
     }
   }
-
-  private class StoredDocument extends Document {
-    private final Document wrapped;
-    private final List<Sentence> sentences;
-    private boolean first;
-
-    private StoredDocument(Document wrapped) {
-      super(wrapped.getId());
-      this.wrapped = wrapped;
-      this.sentences = new ArrayList<Sentence>();
-      this.first = true;
-    }
-
-    public Iterator<Sentence> iterator() {
-      if (this.first) {
-        this.first = false;
-        final Iterator<Sentence> sentences = this.wrapped.iterator();
-        return new Iterator<Sentence>() {
-          public boolean hasNext() {
-            return sentences.hasNext();
-          }
-
-          public Sentence next() {
-            Sentence sentence = new StoredSentence(sentences.next());
-            StoredDocument.this.sentences.add(sentence);
-            return sentence;
-          }
-
-          public void remove() {
-            throw new UnsupportedOperationException();
-          }
-        };
-      } else {
-        return this.sentences.iterator();
-      }
-    }
-  }
-
-  private class StoredSentence extends Sentence {
-    private final Sentence wrapped;
-    private final List<Token> tokens;
-    private boolean first;
-
-    private StoredSentence(Sentence wrapped) {
-      super(wrapped.getId());
-      this.wrapped = wrapped;
-      this.sentences = new ArrayList<Token>();
-      this.first = true;
-    }
-
-    public Iterator<Sentence> iterator() {
-      if (this.first) {
-        this.first = false;
-        final Iterator<Tokens> sentences = this.wrapped.iterator();
-        return new Iterator<Sentence>() {
-          public boolean hasNext() {
-            return sentences.hasNext();
-          }
-
-          public Sentence next() {
-            Sentence sentence = new StoredSentence(sentences.next());
-            StoredDocument.this.sentences.add(sentence);
-            return sentence;
-          }
-
-          public void remove() {
-            throw new UnsupportedOperationException();
-          }
-        };
-      } else {
-        return this.sentences.iterator();
-      }
-    }
-  }
-  @Override
-  public void addSource(DocumentSource source) {
-    this.wrapped.addSource(source);
-  }
-}*/
+}
 
