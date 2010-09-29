@@ -1171,6 +1171,20 @@ incoming_link_count = {}
 # Map surface names to a hash that maps articles to counts
 surface_map = {}
 
+# Set listing articles containing coordinates
+coordinate_articles = set()
+
+# Parse the result of a previous run of --coords-counts for articles with
+# coordinates
+def get_coordinates(filename):
+  for line in open(filename):
+    line = line.strip()
+    m = re.match('Article title: (.*)', line)
+    if m:
+      title = m.group(1)
+    elif re.match('Article coordinates: ', line):
+      coordinate_articles.add(title)
+    
 class ProcessSourceForLinks(RecursiveSourceTextHandler):
   useful_text_handler = ExtractUsefulText()
   def process_internal_link(self, text):
@@ -1183,21 +1197,23 @@ class ProcessSourceForLinks(RecursiveSourceTextHandler):
       pass
     else:
       article = tempargs[0]
-      surface = ''.join(self.useful_text_handler.
-                        process_source_text(tempargs[-1]))
-      incoming_link_count[article] = incoming_link_count.get(article, 0) + 1
-      if surface not in surface_map:
-        nested_surface_map = {}
-        surface_map[surface] = nested_surface_map
+      # Skip links to articles without coordinates
+      if coordinate_articles and article not in coordinate_articles:
+        pass
       else:
-        nested_surface_map = surface_map[surface]
-      nested_surface_map[article] = nested_surface_map.get(article, 0) + 1
+        surface = ''.join(self.useful_text_handler.
+                          process_source_text(tempargs[-1]))
+        incoming_link_count[article] = incoming_link_count.get(article, 0) + 1
+        if surface not in surface_map:
+          nested_surface_map = {}
+          surface_map[surface] = nested_surface_map
+        else:
+          nested_surface_map = surface_map[surface]
+        nested_surface_map[article] = nested_surface_map.get(article, 0) + 1
  
     # Also recursively process all the arguments for links, etc.
     return self.process_source_text(text[2:-2])
 
-
-    
 class FindLinks(ArticleHandler):
   def process_text_for_data(self, title, text):
     handler = ProcessSourceForLinks()
@@ -1247,6 +1263,10 @@ all articles it maps to.""",
   op.add_option("-c", "--coords-counts",
                 help="Print info about counts of words for all articles with coodinates.",
                 action="store_true")
+  op.add_option("-f", "--coords-file",
+                help="""File containing output from a prior run of
+--coords-counts, listing all the articles with associated coordinates.""",
+                metavar="FILE")
   op.add_option("-d", "--debug", metavar="LEVEL",
                 help="Output debug info at given level")
   opts, args = op.parse_args()
@@ -1254,7 +1274,9 @@ all articles it maps to.""",
   global debug
   if opts.debug:
     debug = int(opts.debug)
-  
+ 
+  if opts.coords_file:
+    get_coordinates(opts.coords_file)    
   if opts.words_coords:
     main_process_input(PrintWordsAndCoords())
   elif opts.find_links:
