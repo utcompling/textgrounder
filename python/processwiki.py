@@ -232,6 +232,7 @@
 ############################################################################
 
 import sys, re
+from optparse import OptionParser
 
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
@@ -997,6 +998,8 @@ combined chunks.'''
 #                           Article handlers                          #
 #######################################################################
 
+
+
 ### Default handler class for processing article text.  Subclass this to
 ### implement your own handlers.
 class ArticleHandler(object):
@@ -1058,6 +1061,11 @@ class ArticleHandler(object):
   def process_text_for_data(self, title, text):
     return True
 
+  def finish_processing(self):
+    pass
+
+
+
 ### Default handler class for processing article text, including returning
 ### "useful" text (what the Wikipedia user sees, plus similar-quality
 ### hidden text).
@@ -1088,6 +1096,8 @@ class ArticleHandlerForUsefulText(ArticleHandler):
   def process_text_for_words(self, title, word_generator):
     pass
 
+
+
 # Does what processwiki.py used to do.  Basically just prints out the info
 # passed in for redirects and article words; as for the implementation of
 # process_text_for_data(), uses ExtractCoordinatesFromSource() to extract
@@ -1110,6 +1120,20 @@ class PrintWordsAndCoords(ArticleHandlerForUsefulText):
     for (lat,long) in handler.coords:
       uniprint("Article coordinates: %s,%s" % (lat, long))
     return True
+
+  def finish_processing(self):
+    ### Output all of the templates that were seen with coordinates in them,
+    ### along with counts of how many times each template was seen.
+    if debug > 0:
+      print("Templates with coordinates:")
+      output_reverse_sorted_table(templates_with_coords)
+      
+      print("All templates:")
+      output_reverse_sorted_table(all_templates)
+  
+      print "Notice: ending processing"
+
+
 
 # Handler to output count information on words.  Only processes articles
 # with coordinates in them, and only selects the first coordinate seen.
@@ -1135,27 +1159,64 @@ class GetCoordsAndCounts(ArticleHandlerForUsefulText):
     else: return False
 
 # Handler to output link information as well as coordinate information.
-# count information on words.  Only processes articles
-# with coordinates in them, and only selects the first coordinate seen.
-# Outputs the article title and coordinates.  Then computes the count of
-# each word in the article text, after filtering text for "actual text"
-# (as opposed to directives etc.), and outputs the counts.
+# Note that a link consists of two parts: The surface text and the article
+# name.  For all links, we keep track of all the possible articles for a
+# given surface text and their counts.  We also count all of the incoming
+# links to an article (can be used for computing prior probabilities of
+# an article).
 
-class FindCoordsAndLinks(ArticleHandlerForUsefulText):
-  def process_text_for_words(self, title, word_generator):
-    wordhash = {}
-    for word in word_generator:
-      if word: wordhash[word] = wordhash.get(word, 0) + 1
-    output_reverse_sorted_table(wordhash)
+# Count number of incoming links for articles
+incoming_link_count = {}
 
+# Map surface names to a hash that maps articles to counts
+surface_map = {}
+
+class ProcessSourceForLinks(RecursiveSourceTextHandler):
+  useful_text_handler = ExtractUsefulText()
+  def process_internal_link(self, text):
+    tempargs = get_macro_args(text)
+    m = re.match(r'(?s)\s*([a-zA-Z0-9_]+)\s*:(.*)', tempargs[0])
+    if m:
+      # Something like [[Image:...]] or [[wikt:...]] or [[fr:...]]
+      # For now, just skip them all; eventually, might want to do something
+      # useful with some, e.g. categories
+      pass
+    else:
+      article = tempargs[0]
+      surface = ''.join(self.useful_text_handler.
+                        process_source_text(tempargs[-1]))
+      incoming_link_count[article] = incoming_link_count.get(article, 0) + 1
+      if surface not in surface_map:
+        nested_surface_map = {}
+        surface_map[surface] = nested_surface_map
+      else:
+        nested_surface_map = surface_map[surface]
+      nested_surface_map[article] = nested_surface_map.get(article, 0) + 1
+ 
+    # Also recursively process all the arguments for links, etc.
+    return self.process_source_text(text[2:-2])
+
+
+    
+class FindLinks(ArticleHandler):
   def process_text_for_data(self, title, text):
-    coords = [coord for coord in process_text_for_coordinates(title, text)]
-    if len(coords) > 0:
-      (lat, long) = coords[0]
-      uniprint("Article title: %s" % title)
-      uniprint("Article coordinates: %s,%s" % (lat, long))
-      return True
-    else: return False
+    handler = ProcessSourceForLinks()
+    for foo in handler.process_source_text(text): pass
+    return False
+
+  def finish_processing(self):
+    print "------------------ Count of incoming links: ---------------"
+    output_reverse_sorted_table(incoming_link_count)
+  
+    print "==========================================================="
+    print "==========================================================="
+    print "==========================================================="
+    print ""
+    for (surface,map) in surface_map.items():
+      uniprint("-------- Surface->article for %s: " % surface)
+      output_reverse_sorted_table(map)
+
+
 
 #######################################################################
 #                                Main code                            #
@@ -1170,21 +1231,36 @@ def main_process_input(wiki_handler):
   sax_handler = WikipediaSaxHandler(wiki_handler)
   sax_parser.setContentHandler(sax_handler)
   sax_parser.parse(sys.stdin)
+  wiki_handler.finish_processing()
   
-  ### Output all of the templates that were seen with coordinates in them,
-  ### along with counts of how many times each template was seen.
-  if debug > 0:
-    print("Templates with coordinates:")
-    output_reverse_sorted_table(templates_with_coords)
-    
-    print("All templates:")
-    output_reverse_sorted_table(all_templates)
-
-    print "Notice: ending processing"
-
 def main():
-  main_process_input(PrintWordsAndCoords())
-  #main_process_input(GetCoordsAndCounts())
+
+  op = OptionParser(usage="%prog [options] input_dir")
+  op.add_option("-p", "--words-coords",
+                help="Print all words and coordinates",
+                action="store_true")
+  op.add_option("-l", "--find-links",
+                help="""Find all links and print info about them.
+Includes count of incoming links, and, for each surface form, counts of
+all articles it maps to.""",
+                action="store_true")
+  op.add_option("-c", "--coords-counts",
+                help="Print info about counts of words for all articles with coodinates.",
+                action="store_true")
+  op.add_option("-d", "--debug", metavar="LEVEL",
+                help="Output debug info at given level")
+  opts, args = op.parse_args()
+
+  global debug
+  if opts.debug:
+    debug = int(opts.debug)
+  
+  if opts.words_coords:
+    main_process_input(PrintWordsAndCoords())
+  elif opts.find_links:
+    main_process_input(FindLinks())
+  elif opts.coords_counts:
+    main_process_input(GetCoordsAndCounts())
 
 #import cProfile
 #cProfile.run('main()', 'process-wiki.prof')
