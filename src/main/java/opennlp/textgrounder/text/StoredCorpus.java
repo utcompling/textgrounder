@@ -106,13 +106,13 @@ public class StoredCorpus extends StoredItem<Corpus, Document> implements Corpus
           if ((code & 1) == 1) {
             int idx = (int) code >> 32;
             int toponymIdx  = (int) (code & 0xFFFFF000) >> 12;
-            int selectedIdx = (int) (code & 0x00000F00) >> 8;
-            int goldIdx     = (int) (code & 0x000000F0) >> 4;
+            int selectedIdx = ((int) (code & 0x00000F00) >> 8) - 1;
+            int goldIdx     = ((int) (code & 0x000000F0) >> 4) - 1;
 
             String form = StoredCorpus.this.toponymLexicon.atIndex(toponymIdx);
             List<Location> candidates = StoredCorpus.this.candidateLists.get(toponymIdx);
-            if (goldIdx >= 0) {
-              if (selectedIdx >= 0) {
+            if (goldIdx > -1) {
+              if (selectedIdx > -1) {
                 token = new Toponym(idx, toponymIdx, form, candidates, goldIdx, selectedIdx);
               } else {
                 token = new Toponym(idx, toponymIdx, form, candidates, goldIdx);
