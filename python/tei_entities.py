@@ -1,5 +1,11 @@
 import re, sys
 
+# Class which replaces XML entities in raw text with the corresponding
+# Unicode character.
+#
+# Comments from Ben: This is garbage!  SAX and similar packages that are
+# built into Python surely have functions to automatically do this.
+
 from codecs import latin_1_decode
 
 class pcl_tei_entities:
