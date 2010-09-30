@@ -18,6 +18,8 @@ package opennlp.textgrounder.text;
 import java.util.Iterator;
 import java.util.List;
 
+import opennlp.textgrounder.util.Span;
+
 public abstract class Sentence<A extends Token> implements Iterable<A> {
   private final String id;
 
@@ -62,30 +64,6 @@ public abstract class Sentence<A extends Token> implements Iterable<A> {
         throw new UnsupportedOperationException();
       }
     };
-  }
-
-  public class Span<B> {
-    private final int start;
-    private final int end;
-    private final B item;
-
-    protected Span(int start, int end, B item) {
-      this.start = start;
-      this.end = end;
-      this.item = item;
-    }
-
-    public int getStart() {
-      return this.start;
-    }
-
-    public int getEnd() {
-      return this.end;
-    }
-
-    public B getItem() {
-      return this.item;
-    }
   }
 }
 

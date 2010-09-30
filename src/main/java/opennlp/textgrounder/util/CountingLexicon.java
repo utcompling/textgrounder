@@ -13,22 +13,13 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.text;
+package opennlp.textgrounder.util;
 
-import java.io.Closeable;
+import java.io.Serializable;
+import java.util.List;
 
-import opennlp.textgrounder.text.io.DocumentSource;
-import opennlp.textgrounder.util.Lexicon;
-
-public abstract class Corpus<A extends Token> implements Iterable<Document<A>>, Closeable {
-  public abstract void addSource(DocumentSource source);
-
-  public static Corpus<Token> createStreamCorpus() {
-    return new StreamCorpus();
-  }
-
-  public static Corpus<StoredToken> createStoredCorpus() {
-    return new StoredCorpus(new StreamCorpus());
-  }
+public interface CountingLexicon<A extends Serializable> extends Lexicon<A> {
+  public int count(A entry);
+  public int countAtIndex(int index);
 }
 

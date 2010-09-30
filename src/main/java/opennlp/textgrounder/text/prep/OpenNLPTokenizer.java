@@ -13,22 +13,26 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.text;
+package opennlp.textgrounder.text.prep;
 
-import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.List;
 
-import opennlp.textgrounder.text.io.DocumentSource;
-import opennlp.textgrounder.util.Lexicon;
+import opennlp.tools.tokenize.TokenizerME;
+import opennlp.tools.tokenize.TokenizerModel;
+import opennlp.tools.util.InvalidFormatException;
 
-public abstract class Corpus<A extends Token> implements Iterable<Document<A>>, Closeable {
-  public abstract void addSource(DocumentSource source);
+public class OpenNLPTokenizer implements Tokenizer {
+  private final opennlp.tools.tokenize.Tokenizer tokenizer;
 
-  public static Corpus<Token> createStreamCorpus() {
-    return new StreamCorpus();
+  public OpenNLPTokenizer(InputStream in) throws IOException, InvalidFormatException {
+    this.tokenizer = new TokenizerME(new TokenizerModel(in));
   }
 
-  public static Corpus<StoredToken> createStoredCorpus() {
-    return new StoredCorpus(new StreamCorpus());
+  public List<String> tokenize(String text) {
+    return Arrays.asList(this.tokenizer.tokenize(text));
   }
 }
 

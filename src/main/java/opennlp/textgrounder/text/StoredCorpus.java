@@ -15,30 +15,97 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import opennlp.textgrounder.text.io.DocumentSource;
 import opennlp.textgrounder.topo.Location;
 import opennlp.textgrounder.util.CountingLexicon;
 import opennlp.textgrounder.util.SimpleCountingLexicon;
+import opennlp.textgrounder.util.Span;
 
-public class StoredCorpus implements Corpus<StoredToken> {
+public class StoredCorpus extends Corpus<StoredToken> {
+  private Corpus<Token> wrapped;
   private final CountingLexicon<String> tokenLexicon;
   private final CountingLexicon<String> toponymLexicon;
-  private final CountingLexicon<String> combinedLexicon;
   private final ArrayList<Document<StoredToken>> documents;
+  private final ArrayList<List<Location>> candidateLists;
   
-  public StoredCorpus(Corpus wrapped) {
+  StoredCorpus(Corpus<Token> wrapped) {
+    this.wrapped = wrapped;
     this.tokenLexicon = new SimpleCountingLexicon<String>();
     this.toponymLexicon = new SimpleCountingLexicon<String>();
-    this.combinedLexicon = new SimpleCountingLexicon<String>();
     this.documents = new ArrayList<Document<StoredToken>>();
+    this.candidateLists = new ArrayList<List<Location>>();
+  }
+
+  private void load() throws IOException {
+    for (Document<Token> document : wrapped) {
+      ArrayList<Sentence<StoredToken>> sentences = new ArrayList<Sentence<StoredToken>>();
+
+      for (Sentence<Token> sentence : document) {
+        List<String> tokenStrings = new ArrayList<String>();
+
+        for (Iterator<Token> it = sentence.tokens(); it.hasNext(); ) {
+          tokenStrings.add(it.next().getForm());
+        }
+
+        int[] tokens = new int[tokenStrings.size()];
+        for (int i = 0; i < tokens.length; i++) {
+          tokens[i] = this.tokenLexicon.getOrAdd(tokenStrings.get(i));
+        }
+
+        StoredSentence stored = new StoredSentence(sentence.getId(), tokens);
+
+        for (Iterator<Span<Token>> it = sentence.toponymSpans(); it.hasNext(); ) {
+          Span<Token> span = it.next();
+          Toponym toponym = (Toponym) span.getItem();
+          int idx = this.toponymLexicon.getOrAdd(toponym.getForm());
+          if (toponym.hasGold()) {
+            int goldIdx = toponym.getGoldIdx();
+            if (toponym.hasSelected()) {
+              int selectedIdx = toponym.getSelectedIdx();
+              stored.addToponym(span.getStart(), span.getEnd(), idx, goldIdx, selectedIdx);
+            } else {
+              stored.addToponym(span.getStart(), span.getEnd(), idx, goldIdx);
+            }
+          } else {
+            stored.addToponym(span.getStart(), span.getEnd(), idx);
+          }
+        }
+
+        stored.compact();
+        sentences.add(stored);
+      }
+
+      sentences.trimToSize();
+      this.documents.add(new StoredDocument(document.getId(), sentences));
+    }
+  }
+
+  public void addSource(DocumentSource source) {
+    if (this.wrapped == null) {
+      throw new UnsupportedOperationException("Cannot add a source to a stored corpus after it has been loaded.");
+    } else {
+      this.wrapped.addSource(source);
+    }
   }
 
   public Iterator<Document<StoredToken>> iterator() {
+    if (this.wrapped != null) {
+      try {
+        this.load();
+        this.wrapped.close();
+      } catch (IOException e) {
+        System.err.println("Error loading the wrapped corpus.");
+      }
+      this.wrapped = null;
+    }
+
     return this.documents.iterator();
   }
 
@@ -56,117 +123,110 @@ public class StoredCorpus implements Corpus<StoredToken> {
   }
 
   private class StoredSentence extends Sentence<StoredToken> {
-    private StoredSentence(String id) {
+    private final int[] tokens;
+    private final ArrayList<Span<StoredToken>> toponymSpans;
+
+    private StoredSentence(String id, int[] tokens) {
       super(id);
+      this.tokens = tokens;
+      this.toponymSpans = new ArrayList<Span<StoredToken>>();
     }
 
-    public Iterator<StoredToken> tokens() { throw new UnsupportedOperationException(); }
-    public Iterator<Span<StoredToken>> toponymSpans() { throw new UnsupportedOperationException(); }
-  }
-}
-
-
-/*
-  private final Lexicon<String> tokenLexicon;
-  private final Lexicon<String> toponymLexicon;
-  private final List<List<Location>> candidateLists;
-
-  public StoredCorpus(Corpus wrapped) {
-    super(wrapped);
-    this.tokenLexicon = new SimpleLexicon<String>();
-    this.toponymLexicon = new SimpleLexicon<String>();
-    this.candidateLists = new ArrayList<List<Location>>();
-  }
-
-  protected Document wrap(Document document) {
-    return new StoredDocument(document);
-  }
-
-  private class StoredDocument extends StoredItem<Document, Sentence> implements Document {
-    public StoredDocument(Document wrapped) {
-      super(wrapped);
+    private void addToponym(int start, int end, int toponymIdx) {
+      this.toponymSpans.add(new Span<StoredToken>(start, end, new CompactToponym(toponymIdx)));
     }
 
-    protected Sentence wrap(Sentence sentence) {
-      return new StoredSentence(sentence);
+    private void addToponym(int start, int end, int toponymIdx, int goldIdx) {
+      this.toponymSpans.add(new Span<StoredToken>(start, end, new CompactToponym(toponymIdx, goldIdx)));
     }
 
-    public String getId() {
-      return this.getWrapped().getId();
+    private void addToponym(int start, int end, int toponymIdx, int goldIdx, int selectedIdx) {
+      this.toponymSpans.add(new Span<StoredToken>(start, end, new CompactToponym(toponymIdx, goldIdx, selectedIdx)));
     }
-  }
 
-  private class StoredSentence implements Sentence {
-    private final String id;
-    private final long[] tokens;
+    private void compact() {
+      this.toponymSpans.trimToSize();
+    }
 
-    public StoredSentence(Sentence wrapped) {
-      this.id = wrapped.getId();
+    private class CompactToponym implements StoredToponym {
+      private final int idx;
+      private final int goldIdx;
+      private int selectedIdx;
 
-      List<Token> tokenList = new ArrayList<Token>();
-      for (Token token : wrapped) {
-        tokenList.add(token);
+      private CompactToponym(int idx) {
+        this(idx, -1);
       }
 
-      this.tokens = new long[tokenList.size()];
+      private CompactToponym(int idx, int goldIdx) {
+        this(idx, goldIdx, -1);
+      }
 
-      for (int i = 0; i < this.tokens.length; i++) {
-        Token token = tokenList.get(i);
-        int idx = StoredCorpus.this.tokenLexicon.getOrAdd(token.getForm());
+      private CompactToponym(int idx, int goldIdx, int selectedIdx) {
+        this.idx = idx;
+        this.goldIdx = goldIdx;
+        this.selectedIdx = selectedIdx;
+      }
 
-        if (token.isToponym()) {
-          Toponym toponym = (Toponym) token;
-          int toponymIdx = StoredCorpus.this.toponymLexicon.getOrAdd(token.getForm());
-          StoredCorpus.this.candidateLists.set(toponymIdx, toponym.getCandidates());
+      public String getForm() {
+        return StoredCorpus.this.toponymLexicon.atIndex(this.idx);
+      }
 
-          this.tokens[i] = 1 | ((1 + toponym.getGoldIdx()) << 4)
-                             | ((1 + toponym.getSelectedIdx()) << 8)
-                             | (toponymIdx << 12) | (idx << 32);
-        } else {
-          this.tokens[i] = idx << 1;
-        }
+      public boolean isToponym() {
+        return true;
+      }
+
+      public boolean hasGold() { return this.goldIdx > -1; }
+      public Location getGold() { return StoredCorpus.this.candidateLists.get(this.idx).get(this.goldIdx); }
+      public int getGoldIdx() { return this.goldIdx; }
+
+      public boolean hasSelected() { return this.selectedIdx > -1; }
+      public Location getSelected() { return StoredCorpus.this.candidateLists.get(this.idx).get(this.selectedIdx); }
+      public int getSelectedIdx() { return this.selectedIdx; }
+      public void setSelectedIdx(int idx) { this.selectedIdx = idx; }
+
+      public int getAmbiguity() { return StoredCorpus.this.candidateLists.get(this.idx).size(); }
+      public List<Location> getCandidates() { return StoredCorpus.this.candidateLists.get(this.idx); }
+      public Iterator<Location> iterator() { return StoredCorpus.this.candidateLists.get(this.idx).iterator(); }
+
+      public List<Token> getTokens() { throw new UnsupportedOperationException(); }
+
+      public int getIdx() {
+        return this.idx;
+      }
+
+      public int getTypeCount() {
+        return StoredCorpus.this.toponymLexicon.countAtIndex(this.idx);
       }
     }
 
-    public String getId() {
-      return this.id;
-    }
-
-    public Iterator<Token> iterator() {
-      return new Iterator<Token>() {
+    public Iterator<StoredToken> tokens() {
+      return new Iterator<StoredToken>() {
         private int current = 0;
 
         public boolean hasNext() {
           return this.current < StoredSentence.this.tokens.length;
         }
 
-        public Token next() {
-          long code = StoredSentence.this.tokens[this.current++];
-          Token token;
-
-          if ((code & 1) == 1) {
-            int idx = (int) code >> 32;
-            int toponymIdx  = (int) (code & 0xFFFFF000) >> 12;
-            int selectedIdx = ((int) (code & 0x00000F00) >> 8) - 1;
-            int goldIdx     = ((int) (code & 0x000000F0) >> 4) - 1;
-
-            String form = StoredCorpus.this.toponymLexicon.atIndex(toponymIdx);
-            List<Location> candidates = StoredCorpus.this.candidateLists.get(toponymIdx);
-            if (goldIdx > -1) {
-              if (selectedIdx > -1) {
-                token = new Toponym(idx, toponymIdx, form, candidates, goldIdx, selectedIdx);
-              } else {
-                token = new Toponym(idx, toponymIdx, form, candidates, goldIdx);
-              }
-            } else {
-              token = new Toponym(idx, toponymIdx, form, candidates);
+        public StoredToken next() {
+          final int current = this.current++;
+          final int idx = StoredSentence.this.tokens[current];
+          return new StoredToken() {
+            public String getForm() {
+              return StoredCorpus.this.tokenLexicon.atIndex(idx);
             }
-          } else {
-            int idx = (int) code >> 1;
-            token = new Token(idx, StoredCorpus.this.tokenLexicon.atIndex(idx));
-          }
 
-          return token;
+            public boolean isToponym() {
+              return false;
+            }
+
+            public int getIdx() {
+              return idx;
+            }
+
+            public int getTypeCount() {
+              return StoredCorpus.this.tokenLexicon.countAtIndex(idx);
+            }
+          };
         }
 
         public void remove() {
@@ -174,7 +234,13 @@ public class StoredCorpus implements Corpus<StoredToken> {
         }
       };
     }
+
+    public Iterator<Span<StoredToken>> toponymSpans() {
+      return this.toponymSpans.iterator();
+    }
+  }
+
+  public void close() throws IOException {
   }
 }
-*/
 

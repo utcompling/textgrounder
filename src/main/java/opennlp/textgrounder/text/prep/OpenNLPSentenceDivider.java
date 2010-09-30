@@ -13,22 +13,27 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.text;
+package opennlp.textgrounder.text.prep;
 
-import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.List;
 
-import opennlp.textgrounder.text.io.DocumentSource;
-import opennlp.textgrounder.util.Lexicon;
+import opennlp.tools.sentdetect.SentenceDetector;
+import opennlp.tools.sentdetect.SentenceDetectorME;
+import opennlp.tools.sentdetect.SentenceModel;
+import opennlp.tools.util.InvalidFormatException;
 
-public abstract class Corpus<A extends Token> implements Iterable<Document<A>>, Closeable {
-  public abstract void addSource(DocumentSource source);
+public class OpenNLPSentenceDivider implements SentenceDivider {
+  private final SentenceDetector detector;
 
-  public static Corpus<Token> createStreamCorpus() {
-    return new StreamCorpus();
+  public OpenNLPSentenceDivider(InputStream in) throws IOException, InvalidFormatException {
+    this.detector = new SentenceDetectorME(new SentenceModel(in));
   }
 
-  public static Corpus<StoredToken> createStoredCorpus() {
-    return new StoredCorpus(new StreamCorpus());
+  public List<String> divide(String text) {
+    return Arrays.asList(this.detector.sentDetect(text));
   }
 }
 

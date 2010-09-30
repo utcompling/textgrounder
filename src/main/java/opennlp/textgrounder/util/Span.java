@@ -13,22 +13,29 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.text;
+package opennlp.textgrounder.util;
 
-import java.io.Closeable;
+public class Span<A> {
+  private final int start;
+  private final int end;
+  private final A item;
 
-import opennlp.textgrounder.text.io.DocumentSource;
-import opennlp.textgrounder.util.Lexicon;
-
-public abstract class Corpus<A extends Token> implements Iterable<Document<A>>, Closeable {
-  public abstract void addSource(DocumentSource source);
-
-  public static Corpus<Token> createStreamCorpus() {
-    return new StreamCorpus();
+  public Span(int start, int end, A item) {
+    this.start = start;
+    this.end = end;
+    this.item = item;
   }
 
-  public static Corpus<StoredToken> createStoredCorpus() {
-    return new StoredCorpus(new StreamCorpus());
+  public int getStart() {
+    return this.start;
+  }
+
+  public int getEnd() {
+    return this.end;
+  }
+
+  public A getItem() {
+    return this.item;
   }
 }
 

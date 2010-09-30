@@ -15,20 +15,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-import java.io.Closeable;
-
-import opennlp.textgrounder.text.io.DocumentSource;
-import opennlp.textgrounder.util.Lexicon;
-
-public abstract class Corpus<A extends Token> implements Iterable<Document<A>>, Closeable {
-  public abstract void addSource(DocumentSource source);
-
-  public static Corpus<Token> createStreamCorpus() {
-    return new StreamCorpus();
-  }
-
-  public static Corpus<StoredToken> createStoredCorpus() {
-    return new StoredCorpus(new StreamCorpus());
-  }
+public interface StoredToponym extends StoredToken, Toponym {
 }
 

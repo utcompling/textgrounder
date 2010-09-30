@@ -12,15 +12,15 @@ public class RandomModel extends Model {
     private Random rand = new Random();
 
     @Override
-    public Corpus disambiguate(Corpus corpus) {
+    public Corpus<Token> disambiguate(Corpus<Token> corpus) {
 
-        for(Document doc : corpus) {
-            for(Sentence sent : doc) {
+        for(Document<Token> doc : corpus) {
+            for(Sentence<Token> sent : doc) {
                 for(Token token : sent) {
                     if(token.isToponym()) {
                         Toponym toponym = (Toponym) token;
                         
-                        toponym.setSelected(rand.nextInt(toponym.getAmbiguity()));
+                        toponym.setSelectedIdx(rand.nextInt(toponym.getAmbiguity()));
                     }
                 }
             }

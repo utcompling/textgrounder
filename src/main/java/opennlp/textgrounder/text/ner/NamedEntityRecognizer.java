@@ -17,7 +17,9 @@ package opennlp.textgrounder.text.ner;
 
 import java.util.List;
 
+import opennlp.textgrounder.util.Span;
+
 public interface NamedEntityRecognizer {
-  public List<NamedEntitySpan> entities(List<String> tokens);
+  public List<Span<NamedEntityType>> recognize(List<String> tokens);
 }
 

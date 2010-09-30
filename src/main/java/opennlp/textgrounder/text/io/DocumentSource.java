@@ -13,22 +13,33 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.text;
+package opennlp.textgrounder.text.io;
 
 import java.io.Closeable;
+import java.io.IOException;
+import java.io.Reader;
+import java.util.Iterator;
 
-import opennlp.textgrounder.text.io.DocumentSource;
-import opennlp.textgrounder.util.Lexicon;
+import opennlp.textgrounder.text.Document;
+import opennlp.textgrounder.text.Token;
 
-public abstract class Corpus<A extends Token> implements Iterable<Document<A>>, Closeable {
-  public abstract void addSource(DocumentSource source);
+public abstract class DocumentSource implements Iterator<Document<Token>>, Iterable<Document<Token>>, Closeable {
+  protected final Reader reader;
 
-  public static Corpus<Token> createStreamCorpus() {
-    return new StreamCorpus();
+  public DocumentSource(Reader reader) throws IOException {
+    this.reader = reader;
   }
 
-  public static Corpus<StoredToken> createStoredCorpus() {
-    return new StoredCorpus(new StreamCorpus());
+  public Iterator<Document<Token>> iterator() {
+    return this;
+  }
+
+  public void close() throws IOException {
+    this.reader.close();
+  }
+
+  public void remove() {
+    throw new UnsupportedOperationException("Cannot remove item from corpus source.");
   }
 }
 

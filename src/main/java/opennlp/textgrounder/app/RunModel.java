@@ -15,7 +15,7 @@ public class RunModel extends BaseApp {
 
         initializeOptionsFromCommandLine(args);
 
-        Corpus corpus = new StreamCorpus();
+        Corpus corpus = Corpus.createStreamCorpus();
         //corpus.addSource(new TrXMLDocumentSource(getInputPath()));
 
         Model model;

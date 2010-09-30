@@ -5,6 +5,7 @@
 package opennlp.textgrounder.model;
 
 import opennlp.textgrounder.text.Corpus;
+import opennlp.textgrounder.text.Token;
 
 /**
  * @param corpus
@@ -14,6 +15,6 @@ import opennlp.textgrounder.text.Corpus;
  */
 public abstract class Model {
 
-    public abstract Corpus disambiguate(Corpus corpus);
+    public abstract Corpus<Token> disambiguate(Corpus<Token> corpus);
     
 }

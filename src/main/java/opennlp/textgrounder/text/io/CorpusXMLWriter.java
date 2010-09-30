@@ -41,10 +41,10 @@ import opennlp.textgrounder.text.Toponym;
 import opennlp.textgrounder.topo.Location;
 
 public class CorpusXMLWriter {
-  private final Corpus corpus;
+  private final Corpus<Token> corpus;
   private final XMLOutputFactory factory;
 
-  public CorpusXMLWriter(Corpus corpus) {
+  public CorpusXMLWriter(Corpus<Token> corpus) {
     this.corpus = corpus;
     this.factory = XMLOutputFactory.newInstance();
   }
@@ -70,20 +70,20 @@ public class CorpusXMLWriter {
     return this.factory.createXMLStreamWriter(writer);
   }
 
-  protected void writeDocument(XMLStreamWriter out, Document document) throws XMLStreamException {
+  protected void writeDocument(XMLStreamWriter out, Document<Token> document) throws XMLStreamException {
     out.writeStartElement("doc");
     out.writeAttribute("id", document.getId());
-    for (Sentence sentence : document) {
+    for (Sentence<Token> sentence : document) {
       this.writeSentence(out, sentence);
     }
     out.writeEndElement();
   }
 
-  protected void writeSentence(XMLStreamWriter out, Sentence sentence) throws XMLStreamException {
+  protected void writeSentence(XMLStreamWriter out, Sentence<Token> sentence) throws XMLStreamException {
     out.writeStartElement("s");
     out.writeAttribute("id", sentence.getId());
     for (Token token : sentence) {
-      if (token.getClass() == Toponym.class) {
+      if (token.isToponym()) {
         this.writeToponym(out, (Toponym) token);
       } else {
         this.writeToken(out, token);

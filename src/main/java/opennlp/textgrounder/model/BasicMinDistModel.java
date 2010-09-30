@@ -12,8 +12,8 @@ import java.util.*;
 public class BasicMinDistModel extends Model {
 
     @Override
-    public Corpus disambiguate(Corpus corpus) {
-        for(Document doc : corpus) {
+    public Corpus<Token> disambiguate(Corpus<Token> corpus) {
+    /*    for(Document doc : corpus) {
             for(Sentence sent : doc) {
                 for(Token token : sent) {
                     if(token.isToponym()) {
@@ -23,7 +23,7 @@ public class BasicMinDistModel extends Model {
                     }
                 }
             }
-        }
+        }*/
         return corpus;
     }
 
@@ -36,7 +36,7 @@ public class BasicMinDistModel extends Model {
 
         // Compute the total minimum distances from each candidate Location of toponymToDisambiguate to some disambiguation
         // of all the Toponyms in doc; store these in totalDistances
-        for(Location curLoc : toponymToDisambiguate) {
+        /*for(Location curLoc : toponymToDisambiguate) {
             for(Sentence sent : doc) {
                 for(Token token : sent) {
                     if(token.isToponym()) {
@@ -56,7 +56,7 @@ public class BasicMinDistModel extends Model {
                     }
                 }
             }
-        }
+        }*/
 
         // Find the overall minimum of all the total minimum distances computed above
         double minTotalDist = Double.MAX_VALUE;
@@ -74,7 +74,7 @@ public class BasicMinDistModel extends Model {
         // Set toponymToDisambiguate's index to the index of the Location with the overall minimum distance
         // from above, if one was found
         if(indexOfMin >= 0) {
-            toponymToDisambiguate.setSelected(indexOfMin);
+            toponymToDisambiguate.setSelectedIdx(indexOfMin);
         }
     }
 }

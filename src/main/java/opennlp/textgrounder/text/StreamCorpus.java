@@ -15,25 +15,41 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
 import com.google.common.collect.Iterators;
 
-public class StreamCorpus implements Corpus<Token> {
-  private final List<DocumentSource> sources;
+import opennlp.textgrounder.text.io.DocumentSource;
 
-  public StreamCorpus() {
+public class StreamCorpus extends Corpus<Token> {
+  private final List<DocumentSource> sources;
+  private boolean read;
+
+  StreamCorpus() {
     this.sources = new ArrayList<DocumentSource>();
+    this.read = false;
   }
 
   public Iterator<Document<Token>> iterator() {
-    return Iterators.concat(this.sources.iterator());
+    if (this.read) {
+      throw new UnsupportedOperationException("Cannot read a stream corpus more than once.");
+    } else {
+      this.read = true;
+      return Iterators.concat(this.sources.iterator());
+    }
   }
 
   public void addSource(DocumentSource source) {
     this.sources.add(source);
+  }
+
+  public void close() throws IOException {
+    for (DocumentSource source : this.sources) {
+      source.close();
+    }
   }
 }
 

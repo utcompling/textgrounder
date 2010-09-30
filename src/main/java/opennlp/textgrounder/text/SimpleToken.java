@@ -15,20 +15,19 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-import java.io.Closeable;
+public class SimpleToken implements Token {
+  private final String form;
 
-import opennlp.textgrounder.text.io.DocumentSource;
-import opennlp.textgrounder.util.Lexicon;
-
-public abstract class Corpus<A extends Token> implements Iterable<Document<A>>, Closeable {
-  public abstract void addSource(DocumentSource source);
-
-  public static Corpus<Token> createStreamCorpus() {
-    return new StreamCorpus();
+  SimpleToken(String form) {
+    this.form = form;
   }
 
-  public static Corpus<StoredToken> createStoredCorpus() {
-    return new StoredCorpus(new StreamCorpus());
+  public String getForm() {
+    return this.form;
+  }
+
+  public boolean isToponym() {
+    return false;
   }
 }
 
