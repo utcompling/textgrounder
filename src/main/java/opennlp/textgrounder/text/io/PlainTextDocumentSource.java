@@ -30,7 +30,7 @@ import opennlp.textgrounder.text.prep.Tokenizer;
 import opennlp.textgrounder.text.prep.SentenceDivider;
 //import opennlp.textgrounder.topo.gaz.Gazetteer;
 
-public abstract class PlainTextDocumentSource extends DocumentSource {
+public class PlainTextDocumentSource extends DocumentSource {
   private final SentenceDivider divider;
   private final Tokenizer tokenizer;
   //private final NamedEntityRecognizer recognizer;
