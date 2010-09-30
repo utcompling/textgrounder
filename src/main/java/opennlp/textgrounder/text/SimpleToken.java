@@ -18,7 +18,7 @@ package opennlp.textgrounder.text;
 public class SimpleToken implements Token {
   private final String form;
 
-  SimpleToken(String form) {
+  public SimpleToken(String form) {
     this.form = form;
   }
 

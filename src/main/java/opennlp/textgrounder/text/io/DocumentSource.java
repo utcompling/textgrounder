@@ -15,23 +15,33 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text.io;
 
+import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.Reader;
 import java.util.Iterator;
 
 import opennlp.textgrounder.text.Document;
 import opennlp.textgrounder.text.Token;
 
 public abstract class DocumentSource implements Iterator<Document<Token>>, Iterable<Document<Token>>, Closeable {
-  protected final Reader reader;
+  protected final BufferedReader reader;
 
-  public DocumentSource(Reader reader) throws IOException {
+  public DocumentSource(BufferedReader reader) throws IOException {
     this.reader = reader;
   }
 
   public Iterator<Document<Token>> iterator() {
     return this;
+  }
+
+  protected String readLine() {
+    String line = null;
+    try {
+      line = this.reader.readLine();
+    } catch (IOException e) {
+      System.err.println("Error reading document source.");
+    }
+    return line;
   }
 
   public void close() throws IOException {
