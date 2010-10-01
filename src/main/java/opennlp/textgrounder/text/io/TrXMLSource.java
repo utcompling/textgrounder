@@ -19,7 +19,6 @@ import java.io.Reader;
 import java.io.IOException;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
@@ -61,9 +60,17 @@ public class TrXMLSource extends DocumentSource {
 
   private void nextTag() {
     try {
-      TrXMLSource.this.in.nextTag();
+      this.in.nextTag();
     } catch (XMLStreamException e) {
       System.err.println("Error while reading TR-XML file.");
+    }
+  }
+
+  public void close() {
+    try {
+      this.in.close();
+    } catch (XMLStreamException e) {
+      System.err.println("Error while closing TR-XML file.");
     }
   }
 
