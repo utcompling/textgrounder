@@ -29,15 +29,27 @@ import opennlp.textgrounder.util.Span;
 
 public class StoredCorpus extends Corpus<StoredToken> {
   private Corpus<Token> wrapped;
+
   private final CountingLexicon<String> tokenLexicon;
   private final CountingLexicon<String> toponymLexicon;
+
+  private final CountingLexicon<String> tokenOrigLexicon;
+  private final CountingLexicon<String> toponymOrigLexicon;
+
+  private int[] tokenOrigMap;
+  private int[] toponymOrigMap;
+
   private final ArrayList<Document<StoredToken>> documents;
   private final ArrayList<List<Location>> candidateLists;
   
   StoredCorpus(Corpus<Token> wrapped) {
     this.wrapped = wrapped;
+
     this.tokenLexicon = new SimpleCountingLexicon<String>();
     this.toponymLexicon = new SimpleCountingLexicon<String>();
+    this.tokenOrigLexicon = new SimpleCountingLexicon<String>();
+    this.toponymOrigLexicon = new SimpleCountingLexicon<String>();
+
     this.documents = new ArrayList<Document<StoredToken>>();
     this.candidateLists = new ArrayList<List<Location>>();
   }
@@ -47,23 +59,24 @@ public class StoredCorpus extends Corpus<StoredToken> {
       ArrayList<Sentence<StoredToken>> sentences = new ArrayList<Sentence<StoredToken>>();
 
       for (Sentence<Token> sentence : document) {
-        List<String> tokenStrings = new ArrayList<String>();
+        List<Token> tokens = sentence.getTokenList();
+        int[] tokenIdxs = new int[tokens.size()];
 
-        for (Iterator<Token> it = sentence.tokens(); it.hasNext(); ) {
-          tokenStrings.add(it.next().getForm());
+        for (int i = 0; i < tokenIdxs.length; i++) {
+          Token token = tokens.get(i);
+          tokenIdxs[i] = this.tokenOrigLexicon.getOrAdd(token.getOrigForm());
+          this.tokenLexicon.getOrAdd(token.getForm());
         }
 
-        int[] tokens = new int[tokenStrings.size()];
-        for (int i = 0; i < tokens.length; i++) {
-          tokens[i] = this.tokenLexicon.getOrAdd(tokenStrings.get(i));
-        }
-
-        StoredSentence stored = new StoredSentence(sentence.getId(), tokens);
+        StoredSentence stored = new StoredSentence(sentence.getId(), tokenIdxs);
 
         for (Iterator<Span<Token>> it = sentence.toponymSpans(); it.hasNext(); ) {
           Span<Token> span = it.next();
           Toponym toponym = (Toponym) span.getItem();
-          int idx = this.toponymLexicon.getOrAdd(toponym.getForm());
+
+          int idx = this.toponymOrigLexicon.getOrAdd(toponym.getOrigForm());
+          this.toponymLexicon.getOrAdd(toponym.getForm());
+
           if (toponym.hasGold()) {
             int goldIdx = toponym.getGoldIdx();
             if (toponym.hasSelected()) {
@@ -83,6 +96,21 @@ public class StoredCorpus extends Corpus<StoredToken> {
 
       sentences.trimToSize();
       this.documents.add(new StoredDocument(document.getId(), sentences));
+    }
+
+    this.tokenOrigMap = new int[this.tokenOrigLexicon.size()];
+    this.toponymOrigMap = new int[this.toponymOrigLexicon.size()];
+
+    int i = 0;
+    for (String entry : this.tokenOrigLexicon) {
+      this.tokenOrigMap[i] = this.tokenLexicon.get(entry.toLowerCase());
+      i++;
+    }
+
+    i = 0;
+    for (String entry : this.toponymOrigLexicon) {
+      this.toponymOrigMap[i] = this.toponymLexicon.get(entry.toLowerCase());
+      i++;
     }
   }
 
@@ -167,7 +195,11 @@ public class StoredCorpus extends Corpus<StoredToken> {
       }
 
       public String getForm() {
-        return StoredCorpus.this.toponymLexicon.atIndex(this.idx);
+        return StoredCorpus.this.toponymLexicon.atIndex(StoredCorpus.this.toponymOrigMap[this.idx]);
+      }
+
+      public String getOrigForm() {
+        return StoredCorpus.this.toponymOrigLexicon.atIndex(this.idx);
       }
 
       public boolean isToponym() {
@@ -190,11 +222,19 @@ public class StoredCorpus extends Corpus<StoredToken> {
       public List<Token> getTokens() { throw new UnsupportedOperationException(); }
 
       public int getIdx() {
+        return StoredCorpus.this.toponymOrigMap[this.idx];
+      }
+
+      public int getOrigIdx() {
         return this.idx;
       }
 
       public int getTypeCount() {
-        return StoredCorpus.this.toponymLexicon.countAtIndex(this.idx);
+        return StoredCorpus.this.toponymLexicon.countAtIndex(StoredCorpus.this.toponymOrigMap[this.idx]);
+      }
+
+      public int getOrigTypeCount() {
+        return StoredCorpus.this.toponymOrigLexicon.countAtIndex(idx);
       }
     }
 
@@ -211,7 +251,11 @@ public class StoredCorpus extends Corpus<StoredToken> {
           final int idx = StoredSentence.this.tokens[current];
           return new StoredToken() {
             public String getForm() {
-              return StoredCorpus.this.tokenLexicon.atIndex(idx);
+              return StoredCorpus.this.tokenLexicon.atIndex(StoredCorpus.this.tokenOrigMap[idx]);
+            }
+
+            public String getOrigForm() {
+              return StoredCorpus.this.tokenOrigLexicon.atIndex(idx);
             }
 
             public boolean isToponym() {
@@ -219,11 +263,19 @@ public class StoredCorpus extends Corpus<StoredToken> {
             }
 
             public int getIdx() {
+              return StoredCorpus.this.tokenOrigMap[idx];
+            }
+
+            public int getOrigIdx() {
               return idx;
             }
 
             public int getTypeCount() {
-              return StoredCorpus.this.tokenLexicon.countAtIndex(idx);
+              return StoredCorpus.this.tokenLexicon.countAtIndex(StoredCorpus.this.tokenOrigMap[idx]);
+            }
+
+            public int getOrigTypeCount() {
+              return StoredCorpus.this.tokenOrigLexicon.countAtIndex(idx);
             }
           };
         }

@@ -23,6 +23,10 @@ public class SimpleToken implements Token {
   }
 
   public String getForm() {
+    return this.form.toLowerCase();
+  }
+
+  public String getOrigForm() {
     return this.form;
   }
 

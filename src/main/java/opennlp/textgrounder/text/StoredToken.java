@@ -17,6 +17,8 @@ package opennlp.textgrounder.text;
 
 public interface StoredToken extends Token {
   public int getIdx();
+  public int getOrigIdx();
   public int getTypeCount();
+  public int getOrigTypeCount();
 }
 

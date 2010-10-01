@@ -66,7 +66,7 @@ public class ToponymAnnotator extends DocumentSource {
             List<Token> tokens = sentence.getTokenList();
 
             for (Token token : tokens) {
-              forms.add(token.getForm());
+              forms.add(token.getOrigForm());
             }
 
             List<Span<NamedEntityType>> spans = ToponymAnnotator.this.recognizer.recognize(forms);

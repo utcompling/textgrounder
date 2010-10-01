@@ -17,6 +17,7 @@ package opennlp.textgrounder.text;
 
 public interface Token {
   public String getForm();
+  public String getOrigForm();
   public boolean isToponym();
 }
 
