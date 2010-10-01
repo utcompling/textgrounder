@@ -21,17 +21,14 @@ import java.io.IOException;
 import java.util.Iterator;
 
 import opennlp.textgrounder.text.Document;
+import opennlp.textgrounder.text.DocumentSource;
 import opennlp.textgrounder.text.Token;
 
-public abstract class DocumentSource implements Iterator<Document<Token>>, Iterable<Document<Token>>, Closeable {
+public abstract class TextSource extends DocumentSource {
   protected final BufferedReader reader;
 
-  public DocumentSource(BufferedReader reader) throws IOException {
+  public TextSource(BufferedReader reader) throws IOException {
     this.reader = reader;
-  }
-
-  public Iterator<Document<Token>> iterator() {
-    return this;
   }
 
   protected String readLine() {
@@ -39,17 +36,17 @@ public abstract class DocumentSource implements Iterator<Document<Token>>, Itera
     try {
       line = this.reader.readLine();
     } catch (IOException e) {
-      System.err.println("Error reading document source.");
+      System.err.println("Error while reading document source.");
     }
     return line;
   }
 
-  public void close() throws IOException {
-    this.reader.close();
-  }
-
-  public void remove() {
-    throw new UnsupportedOperationException("Cannot remove item from corpus source.");
+  public void close() {
+    try {
+      this.reader.close();
+    } catch (IOException e) {
+      System.err.println("Error while closing document source.");
+    }
   }
 }
 

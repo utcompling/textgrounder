@@ -30,7 +30,7 @@ import opennlp.textgrounder.text.prep.Tokenizer;
 import opennlp.textgrounder.text.prep.SentenceDivider;
 //import opennlp.textgrounder.topo.gaz.Gazetteer;
 
-public class PlainTextDocumentSource extends DocumentSource {
+public class PlainTextSource extends TextSource {
   private final SentenceDivider divider;
   private final Tokenizer tokenizer;
   //private final NamedEntityRecognizer recognizer;
@@ -41,7 +41,7 @@ public class PlainTextDocumentSource extends DocumentSource {
   private int currentIdx;
   private int parasPerDocument;
 
-  public PlainTextDocumentSource(BufferedReader reader, SentenceDivider divider, Tokenizer tokenizer)
+  public PlainTextSource(BufferedReader reader, SentenceDivider divider, Tokenizer tokenizer)
     throws IOException {
     super(reader);
     this.divider = divider;
@@ -62,26 +62,26 @@ public class PlainTextDocumentSource extends DocumentSource {
     return new Document<Token>(null) {
       public Iterator<Sentence<Token>> iterator() {
         final List<List<Token>> sentences = new ArrayList<List<Token>>();
-        while (PlainTextDocumentSource.this.current != null &&
-               PlainTextDocumentSource.this.current.length() > 0 &&
-               PlainTextDocumentSource.this.number < PlainTextDocumentSource.this.parasPerDocument) {
-          for (String sentence : PlainTextDocumentSource.this.divider.divide(PlainTextDocumentSource.this.current)) {
+        while (PlainTextSource.this.current != null &&
+               PlainTextSource.this.current.length() > 0 &&
+               PlainTextSource.this.number < PlainTextSource.this.parasPerDocument) {
+          for (String sentence : PlainTextSource.this.divider.divide(PlainTextSource.this.current)) {
             List<Token> tokens = new ArrayList<Token>();
-            for (String token : PlainTextDocumentSource.this.tokenizer.tokenize(sentence)) {
+            for (String token : PlainTextSource.this.tokenizer.tokenize(sentence)) {
               tokens.add(new SimpleToken(token));
             }
             sentences.add(tokens);
           }
-          PlainTextDocumentSource.this.number++;
-          PlainTextDocumentSource.this.current = PlainTextDocumentSource.this.readLine();
+          PlainTextSource.this.number++;
+          PlainTextSource.this.current = PlainTextSource.this.readLine();
         }
-        PlainTextDocumentSource.this.number = 0;
-        if (PlainTextDocumentSource.this.current != null &&
-            PlainTextDocumentSource.this.current.length() == 0) {
-          PlainTextDocumentSource.this.current = PlainTextDocumentSource.this.readLine();
+        PlainTextSource.this.number = 0;
+        if (PlainTextSource.this.current != null &&
+            PlainTextSource.this.current.length() == 0) {
+          PlainTextSource.this.current = PlainTextSource.this.readLine();
         }
 
-        return new Iterator<Sentence<Token>>() {
+        return new SentenceIterator() {
           private int idx = 0;
 
           public boolean hasNext() {
@@ -95,10 +95,6 @@ public class PlainTextDocumentSource extends DocumentSource {
                 return sentences.get(idx).iterator();
               }
             };
-          }
-          
-          public void remove() {
-            throw new UnsupportedOperationException("Cannot remove item from corpus source.");
           }
         };
       }

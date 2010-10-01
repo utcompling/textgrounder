@@ -13,33 +13,31 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.text.ner;
+package opennlp.textgrounder.text;
 
-public class NamedEntitySpan {
-  private final NamedEntityType type;
-  private final int start;
-  private final int end;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
 
-  public NamedEntitySpan(NamedEntityType type, int start, int end) {
-    this.type = type;
-    this.start = start;
-    this.end = end;
+import opennlp.textgrounder.util.Span;
+
+public class SimpleSentence<A extends Token> extends Sentence {
+  private final List<A> tokens;
+  private final List<Span<A>> toponymSpans;
+
+  public SimpleSentence(String id, List<A> tokens, List<Span<A>> toponymSpans) {
+    super(id);
+    this.tokens = tokens;
+    this.toponymSpans = toponymSpans;
   }
 
-  public NamedEntityType getType() {
-    return this.type;
+  public Iterator<A> tokens() {
+    return this.tokens.iterator();
   }
 
-  public int getStart() {
-    return this.start;
-  }
-
-  public int getEnd() {
-    return this.end;
-  }
-
-  public int length() {
-    return this.end - this.start;
+  public Iterator<Span<A>> toponymSpans() {
+    return this.toponymSpans.iterator();
   }
 }
 

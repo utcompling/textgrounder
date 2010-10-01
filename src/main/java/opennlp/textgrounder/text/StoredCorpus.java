@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import opennlp.textgrounder.text.io.DocumentSource;
 import opennlp.textgrounder.topo.Location;
 import opennlp.textgrounder.util.CountingLexicon;
 import opennlp.textgrounder.util.SimpleCountingLexicon;

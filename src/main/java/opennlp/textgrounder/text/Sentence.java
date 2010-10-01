@@ -15,6 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -29,6 +30,14 @@ public abstract class Sentence<A extends Token> implements Iterable<A> {
   }
 
   public abstract Iterator<A> tokens();
+
+  public List<A> getTokenList() {
+    List<A> tokens = new ArrayList<A>();
+    for (Iterator<A> it = this.tokens(); it.hasNext(); ) {
+      tokens.add(it.next());
+    }
+    return tokens;
+  }
 
   public Iterator<Span<A>> toponymSpans() {
     return new Iterator<Span<A>>() {      

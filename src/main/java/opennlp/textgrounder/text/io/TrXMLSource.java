@@ -13,41 +13,32 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.text;
+package opennlp.textgrounder.text.io;
 
+import java.io.Writer;
 import java.io.IOException;
+
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
-import com.google.common.collect.Iterators;
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
 
-public class StreamCorpus extends Corpus<Token> {
-  private final List<DocumentSource> sources;
-  private boolean read;
+import opennlp.textgrounder.text.Corpus;
+import opennlp.textgrounder.text.Document;
+import opennlp.textgrounder.text.DocumentSource;
+import opennlp.textgrounder.text.Sentence;
+import opennlp.textgrounder.text.Token;
+import opennlp.textgrounder.text.Toponym;
 
-  StreamCorpus() {
-    this.sources = new ArrayList<DocumentSource>();
-    this.read = false;
-  }
+import opennlp.textgrounder.topo.Location;
 
-  public Iterator<Document<Token>> iterator() {
-    if (this.read) {
-      throw new UnsupportedOperationException("Cannot read a stream corpus more than once.");
-    } else {
-      this.read = true;
-      return Iterators.concat(this.sources.iterator());
-    }
-  }
-
-  public void addSource(DocumentSource source) {
-    this.sources.add(source);
-  }
-
-  public void close() throws IOException {
-    for (DocumentSource source : this.sources) {
-      source.close();
-    }
-  }
+public abstract class TrXMLSource extends DocumentSource {
+  //private final boolean keepSentences;
+  //private final boolean keepTokens;
+  //private final boolean 
 }
 

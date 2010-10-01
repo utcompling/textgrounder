@@ -13,13 +13,26 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.text.ner;
+package opennlp.textgrounder.text;
 
-import java.util.List;
+import java.util.Iterator;
 
-import opennlp.textgrounder.util.Span;
+import opennlp.textgrounder.text.Document;
+import opennlp.textgrounder.text.Sentence;
+import opennlp.textgrounder.text.Token;
 
-public interface NamedEntityRecognizer {
-  public List<Span<NamedEntityType>> recognize(List<String> tokens);
+public abstract class DocumentSource implements Iterator<Document<Token>> {
+  public void close() {
+  }
+
+  public void remove() {
+    throw new UnsupportedOperationException("Cannot remove a document from a source.");
+  }
+
+  protected abstract class SentenceIterator implements Iterator<Sentence<Token>> {
+    public void remove() {
+      throw new UnsupportedOperationException("Cannot remove a sentence from a source.");
+    }    
+  }
 }
 

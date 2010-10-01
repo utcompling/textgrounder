@@ -25,15 +25,15 @@ public class SimpleToponym extends SimpleToken implements Toponym {
   private final int goldIdx;
   private int selectedIdx;
 
-  SimpleToponym(String form, List<Location> candidates) {
+  public SimpleToponym(String form, List<Location> candidates) {
     this(form, candidates, -1);
   }
 
-  SimpleToponym(String form, List<Location> candidates, int goldIdx) {
+  public SimpleToponym(String form, List<Location> candidates, int goldIdx) {
     this(form, candidates, goldIdx, -1);
   }
 
-  SimpleToponym(String form, List<Location> candidates, int goldIdx, int selectedIdx) {
+  public SimpleToponym(String form, List<Location> candidates, int goldIdx, int selectedIdx) {
     super(form);
     this.candidates = candidates;
     this.goldIdx = goldIdx;

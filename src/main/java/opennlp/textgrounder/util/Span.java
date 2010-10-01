@@ -15,6 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.util;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Span<A> {
   private final int start;
   private final int end;
