@@ -12,7 +12,7 @@ import java.util.*;
 public class BasicMinDistModel extends Model {
 
     @Override
-    public Corpus<Token> disambiguate(Corpus<Token> corpus) {
+    public StoredCorpus disambiguate(StoredCorpus corpus) {
     /*    for(Document doc : corpus) {
             for(Sentence sent : doc) {
                 for(Token token : sent) {
@@ -31,7 +31,7 @@ public class BasicMinDistModel extends Model {
      * Sets the selected index of toponymToDisambiguate according to the Location with the minimum total
      * distance to some disambiguation of all the Locations of the Toponyms in doc.
      */
-    private void basicMinDistDisambiguate(Toponym toponymToDisambiguate, Document doc) {
+    private void basicMinDistDisambiguate(Toponym toponymToDisambiguate, Document<StoredToken> doc) {
         HashMap<Location, Double> totalDistances = new HashMap<Location, Double>();
 
         // Compute the total minimum distances from each candidate Location of toponymToDisambiguate to some disambiguation

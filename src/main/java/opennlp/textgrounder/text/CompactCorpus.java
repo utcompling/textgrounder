@@ -107,6 +107,12 @@ public class CompactCorpus extends StoredCorpus {
           } else {
             stored.addToponym(span.getStart(), span.getEnd(), idx);
           }
+
+          if (this.candidateLists.size() <= idx) {
+            this.candidateLists.add(toponym.getCandidates());
+          } else {
+            this.candidateLists.set(idx, toponym.getCandidates());
+          }
         }
 
         stored.compact();
@@ -222,11 +228,24 @@ public class CompactCorpus extends StoredCorpus {
       }
 
       public boolean hasGold() { return this.goldIdx > -1; }
-      public Location getGold() { return CompactCorpus.this.candidateLists.get(this.idx).get(this.goldIdx); }
+      public Location getGold() {
+        if (this.goldIdx == -1) {
+          return null;
+        } else {
+          return CompactCorpus.this.candidateLists.get(this.idx).get(this.goldIdx);
+        }
+      }
       public int getGoldIdx() { return this.goldIdx; }
 
       public boolean hasSelected() { return this.selectedIdx > -1; }
-      public Location getSelected() { return CompactCorpus.this.candidateLists.get(this.idx).get(this.selectedIdx); }
+      public Location getSelected() {
+        if (this.selectedIdx == -1) {
+          return null;
+        } else {
+          return CompactCorpus.this.candidateLists.get(this.idx).get(this.selectedIdx);
+        }
+      }
+
       public int getSelectedIdx() { return this.selectedIdx; }
       public void setSelectedIdx(int idx) { this.selectedIdx = idx; }
 

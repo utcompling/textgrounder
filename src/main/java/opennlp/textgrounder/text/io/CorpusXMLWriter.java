@@ -41,10 +41,10 @@ import opennlp.textgrounder.text.Toponym;
 import opennlp.textgrounder.topo.Location;
 
 public class CorpusXMLWriter {
-  private final Corpus<Token> corpus;
+  private final Corpus<? extends Token> corpus;
   private final XMLOutputFactory factory;
 
-  public CorpusXMLWriter(Corpus<Token> corpus) {
+  public CorpusXMLWriter(Corpus<? extends Token> corpus) {
     this.corpus = corpus;
     this.factory = XMLOutputFactory.newInstance();
   }
@@ -103,13 +103,13 @@ public class CorpusXMLWriter {
     out.writeAttribute("term", toponym.getForm());
     out.writeStartElement("candidates");
     for (Location location : toponym) {
-      this.writeLocation(out, location, toponym.getSelected());
+      this.writeLocation(out, location, toponym.getGold(), toponym.getSelected());
     }
     out.writeEndElement();
     out.writeEndElement();
   }
 
-  protected void writeLocation(XMLStreamWriter out, Location location, Location selected) throws XMLStreamException {
+  protected void writeLocation(XMLStreamWriter out, Location location, Location gold, Location selected) throws XMLStreamException {
     out.writeStartElement("cand");
     out.writeAttribute("id", String.format("c%d", location.getId()));
     out.writeAttribute("lat", String.format("%f", location.getRegion().getCenter().getLatDegrees()));
@@ -118,6 +118,9 @@ public class CorpusXMLWriter {
     int population = location.getPopulation();
     if (population > 0) {
       out.writeAttribute("population", String.format("%d", population));
+    }
+    if (location == gold) {
+      out.writeAttribute("gold", "true");
     }
     if (location == selected) {
       out.writeAttribute("selected", "true");

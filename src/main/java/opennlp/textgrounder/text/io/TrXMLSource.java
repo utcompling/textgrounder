@@ -62,7 +62,7 @@ public class TrXMLSource extends DocumentSource {
     try {
       this.in.nextTag();
     } catch (XMLStreamException e) {
-      System.err.println("Error while reading TR-XML file.");
+      System.err.println("Error while advancing TR-XML file.");
     }
   }
 
@@ -91,7 +91,6 @@ public class TrXMLSource extends DocumentSource {
                 TrXMLSource.this.in.getLocalName().equals("s")) {
               return true;
             } else {
-              TrXMLSource.this.nextTag();
               return false;
             }
           }
