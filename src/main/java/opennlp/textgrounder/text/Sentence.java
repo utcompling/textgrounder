@@ -31,14 +31,6 @@ public abstract class Sentence<A extends Token> implements Iterable<A> {
 
   public abstract Iterator<A> tokens();
 
-  public List<A> getTokenList() {
-    List<A> tokens = new ArrayList<A>();
-    for (Iterator<A> it = this.tokens(); it.hasNext(); ) {
-      tokens.add(it.next());
-    }
-    return tokens;
-  }
-
   public Iterator<Span<A>> toponymSpans() {
     return new Iterator<Span<A>>() {      
       public boolean hasNext() {
@@ -53,6 +45,22 @@ public abstract class Sentence<A extends Token> implements Iterable<A> {
         throw new UnsupportedOperationException();
       }
     };
+  }
+
+  public List<A> getTokenList() {
+    List<A> tokens = new ArrayList<A>();
+    for (Iterator<A> it = this.tokens(); it.hasNext(); ) {
+      tokens.add(it.next());
+    }
+    return tokens;
+  }
+
+  public List<A> getToponyms() {
+    List<A> toponyms = new ArrayList<A>();
+    for (Iterator<Span<A>> it = this.toponymSpans(); it.hasNext(); ) {
+      toponyms.add(it.next().getItem());
+    }
+    return toponyms;
   }
 
   public String getId() {

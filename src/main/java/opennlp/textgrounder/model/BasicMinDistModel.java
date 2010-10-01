@@ -15,12 +15,12 @@ public class BasicMinDistModel extends Model {
     public StoredCorpus disambiguate(StoredCorpus corpus) {
         for(Document<StoredToken> doc : corpus) {
             for(Sentence<StoredToken> sent : doc) {
-                for(Token token : sent) {
-                    if(token.isToponym()) {
+                for(Token token : sent.getToponyms()) {
+                    //if(token.isToponym()) {
                         Toponym toponym = (Toponym) token;
 
                         basicMinDistDisambiguate(toponym, doc);
-                    }
+                    //}
                 }
             }
         }
@@ -31,15 +31,17 @@ public class BasicMinDistModel extends Model {
      * Sets the selected index of toponymToDisambiguate according to the Location with the minimum total
      * distance to some disambiguation of all the Locations of the Toponyms in doc.
      */
-    private void basicMinDistDisambiguate(Toponym toponymToDisambiguate, Document<StoredToken> doc) {
-        HashMap<Location, Double> totalDistances = new HashMap<Location, Double>();
+    private void basicMinDistDisambiguate(Toponym toponymToDisambiguate, Document<StoredToken> doc) {        
+        //HashMap<Location, Double> totalDistances = new HashMap<Location, Double>();
+        List<Double> totalDistances = new ArrayList<Double>();
 
         // Compute the total minimum distances from each candidate Location of toponymToDisambiguate to some disambiguation
         // of all the Toponyms in doc; store these in totalDistances
         for(Location curLoc : toponymToDisambiguate) {
+            Double totalDistSoFar = 0.0;
             for(Sentence<StoredToken> sent : doc) {
-                for(Token token : sent) {
-                    if(token.isToponym()) {
+                for(Token token : sent.getToponyms()) {
+                    //if(token.isToponym()) {
                         Toponym otherToponym = (Toponym) token;
 
                         double minDist = Double.MAX_VALUE;
@@ -49,22 +51,18 @@ public class BasicMinDistModel extends Model {
                                 minDist = curDist;
                             }
                         }
-                        Double totalDistSoFar = totalDistances.get(curLoc);
-                        if(totalDistSoFar == null)
-                            totalDistSoFar = 0.0;
-                        totalDistances.put(curLoc, totalDistSoFar + minDist);
-                    }
+                        totalDistSoFar += minDist;
+                    //}
                 }
             }
+            totalDistances.add(totalDistSoFar);
         }
 
         // Find the overall minimum of all the total minimum distances computed above
         double minTotalDist = Double.MAX_VALUE;
         int indexOfMin = -1;
-        int curLocIndex = -1;
-        for(Location curLoc : toponymToDisambiguate) {
-            curLocIndex++;
-            double totalDist = totalDistances.get(curLoc);
+        for(int curLocIndex = 0; curLocIndex < totalDistances.size(); curLocIndex++) {
+            double totalDist = totalDistances.get(curLocIndex);
             if(totalDist < minTotalDist) {
                 minTotalDist = totalDist;
                 indexOfMin = curLocIndex;

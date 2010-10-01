@@ -73,7 +73,7 @@ public class CompactCorpus extends StoredCorpus {
     return this.toponymOrigLexicon.size();
   }
 
-  private void load() {
+  public void load() {
     for (Document<Token> document : wrapped) {
       ArrayList<Sentence<StoredToken>> sentences = new ArrayList<Sentence<StoredToken>>();
 
@@ -137,6 +137,9 @@ public class CompactCorpus extends StoredCorpus {
       this.toponymOrigMap[i] = this.toponymLexicon.get(entry.toLowerCase());
       i++;
     }
+    
+    this.wrapped.close();
+    this.wrapped = null;
   }
 
   public void addSource(DocumentSource source) {

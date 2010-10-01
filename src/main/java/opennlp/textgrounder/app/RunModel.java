@@ -19,6 +19,7 @@ public class RunModel extends BaseApp {
         Tokenizer tokenizer = new OpenNLPTokenizer();
         StoredCorpus corpus = Corpus.createStoredCorpus();
         corpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
+        corpus.load();
 
         Model model;
         if(getModelType() == MODEL_TYPE.RANDOM)
@@ -32,6 +33,8 @@ public class RunModel extends BaseApp {
 
         CorpusXMLWriter w = new CorpusXMLWriter(disambiguated);
         w.write(out);
+        out.close();
     }
 
 }
+
