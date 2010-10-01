@@ -617,7 +617,7 @@ applied to the text before being sent here.'''
     if lat or long:
       if debug > 0: uniprint("Saw coordinate %s,%s in template type %s" %
                 (lat, long, temptype))
-      self.coords.append((lat,long))
+      self.coords.append((lowertemp,lat,long))
     yield text
 
 #######################################################################
@@ -1117,7 +1117,7 @@ class PrintWordsAndCoords(ArticleHandlerForUsefulText):
   def process_text_for_data(self, title, text):
     handler = ExtractCoordinatesFromSource()
     for foo in handler.process_source_text(text): pass
-    for (lat,long) in handler.coords:
+    for (temptype,lat,long) in handler.coords:
       uniprint("Article coordinates: %s,%s" % (lat, long))
     return True
 
@@ -1152,7 +1152,15 @@ class GetCoordsAndCounts(ArticleHandlerForUsefulText):
     handler = ExtractCoordinatesFromSource()
     for foo in handler.process_source_text(text): pass
     if len(handler.coords) > 0:
-      (lat, long) = handler.coords[0]
+      # Prefer a coordinate specified using {{Coord|...}} or similar to
+      # a coordinate in an Infobox, because the latter tend to be less
+      # accurate.
+      for (temptype, lat, long) in handler.coords:
+        if temptype.startswith('coor'):
+        uniprint("Article title: %s" % title)
+        uniprint("Article coordinates: %s,%s" % (lat, long))
+        return True
+      (temptype, lat, long) = handler.coords[0]
       uniprint("Article title: %s" % title)
       uniprint("Article coordinates: %s,%s" % (lat, long))
       return True
@@ -1265,7 +1273,14 @@ all articles it maps to.""",
                 action="store_true")
   op.add_option("-f", "--coords-file",
                 help="""File containing output from a prior run of
---coords-counts, listing all the articles with associated coordinates.""",
+--coords-counts, listing all the articles with associated coordinates.
+This is used to limit the operation of --find-links to only consider links
+to articles with coordinates.  Currently, if this is not done, then using
+--coords-file requires at least 10GB, perhaps more, of memory in order to
+store the entire table of surface->article mappings in memory. (If this
+entire table is needed, it may be necessary to implement a MapReduce-style
+process where smaller chunks are processed separately and then the results
+combined.)""",
                 metavar="FILE")
   op.add_option("-d", "--debug", metavar="LEVEL",
                 help="Output debug info at given level")
