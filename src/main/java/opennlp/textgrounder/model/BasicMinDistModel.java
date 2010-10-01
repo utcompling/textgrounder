@@ -13,8 +13,8 @@ public class BasicMinDistModel extends Model {
 
     @Override
     public StoredCorpus disambiguate(StoredCorpus corpus) {
-    /*    for(Document doc : corpus) {
-            for(Sentence sent : doc) {
+        for(Document<StoredToken> doc : corpus) {
+            for(Sentence<StoredToken> sent : doc) {
                 for(Token token : sent) {
                     if(token.isToponym()) {
                         Toponym toponym = (Toponym) token;
@@ -23,7 +23,7 @@ public class BasicMinDistModel extends Model {
                     }
                 }
             }
-        }*/
+        }
         return corpus;
     }
 
@@ -36,8 +36,8 @@ public class BasicMinDistModel extends Model {
 
         // Compute the total minimum distances from each candidate Location of toponymToDisambiguate to some disambiguation
         // of all the Toponyms in doc; store these in totalDistances
-        /*for(Location curLoc : toponymToDisambiguate) {
-            for(Sentence sent : doc) {
+        for(Location curLoc : toponymToDisambiguate) {
+            for(Sentence<StoredToken> sent : doc) {
                 for(Token token : sent) {
                     if(token.isToponym()) {
                         Toponym otherToponym = (Toponym) token;
@@ -56,7 +56,7 @@ public class BasicMinDistModel extends Model {
                     }
                 }
             }
-        }*/
+        }
 
         // Find the overall minimum of all the total minimum distances computed above
         double minTotalDist = Double.MAX_VALUE;
