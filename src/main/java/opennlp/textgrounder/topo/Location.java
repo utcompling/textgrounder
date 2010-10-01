@@ -41,9 +41,20 @@ public class Location {
     this(id, name, region, type, 0);
   }
 
-  
   public Location(int id, String name, Region region) {
     this(id, name, region, Location.Type.UNKNOWN);
+  }
+
+  public Location(String name, Region region) {
+    this(-1, name, region);
+  }
+
+  public Location(String name, Region region, Location.Type type) {
+    this(-1, name, region, type);
+  }
+
+  public Location(String name, Region region, Location.Type type, int population) {
+    this(-1, name, region, type, population);
   }
 
   public int getId() {

@@ -15,7 +15,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.HashMap;
@@ -27,7 +26,7 @@ import opennlp.textgrounder.util.CountingLexicon;
 import opennlp.textgrounder.util.SimpleCountingLexicon;
 import opennlp.textgrounder.util.Span;
 
-public class StoredCorpus extends Corpus<StoredToken> {
+public class CompactCorpus extends StoredCorpus {
   private Corpus<Token> wrapped;
 
   private final CountingLexicon<String> tokenLexicon;
@@ -42,7 +41,7 @@ public class StoredCorpus extends Corpus<StoredToken> {
   private final ArrayList<Document<StoredToken>> documents;
   private final ArrayList<List<Location>> candidateLists;
   
-  StoredCorpus(Corpus<Token> wrapped) {
+  CompactCorpus(Corpus<Token> wrapped) {
     this.wrapped = wrapped;
 
     this.tokenLexicon = new SimpleCountingLexicon<String>();
@@ -54,7 +53,27 @@ public class StoredCorpus extends Corpus<StoredToken> {
     this.candidateLists = new ArrayList<List<Location>>();
   }
 
-  private void load() throws IOException {
+  public int getDocumentCount() {
+    return this.documents.size();
+  }
+
+  public int getTokenTypeCount() {
+    return this.tokenLexicon.size();
+  }
+
+  public int getTokenOrigTypeCount() {
+    return this.tokenOrigLexicon.size();
+  }
+
+  public int getToponymTypeCount() {
+    return this.toponymLexicon.size();
+  }
+
+  public int getToponymOrigTypeCount() {
+    return this.toponymOrigLexicon.size();
+  }
+
+  private void load() {
     for (Document<Token> document : wrapped) {
       ArrayList<Sentence<StoredToken>> sentences = new ArrayList<Sentence<StoredToken>>();
 
@@ -124,12 +143,8 @@ public class StoredCorpus extends Corpus<StoredToken> {
 
   public Iterator<Document<StoredToken>> iterator() {
     if (this.wrapped != null) {
-      try {
-        this.load();
-        this.wrapped.close();
-      } catch (IOException e) {
-        System.err.println("Error loading the wrapped corpus.");
-      }
+      this.load();
+      this.wrapped.close();
       this.wrapped = null;
     }
 
@@ -195,11 +210,11 @@ public class StoredCorpus extends Corpus<StoredToken> {
       }
 
       public String getForm() {
-        return StoredCorpus.this.toponymLexicon.atIndex(StoredCorpus.this.toponymOrigMap[this.idx]);
+        return CompactCorpus.this.toponymLexicon.atIndex(CompactCorpus.this.toponymOrigMap[this.idx]);
       }
 
       public String getOrigForm() {
-        return StoredCorpus.this.toponymOrigLexicon.atIndex(this.idx);
+        return CompactCorpus.this.toponymOrigLexicon.atIndex(this.idx);
       }
 
       public boolean isToponym() {
@@ -207,22 +222,22 @@ public class StoredCorpus extends Corpus<StoredToken> {
       }
 
       public boolean hasGold() { return this.goldIdx > -1; }
-      public Location getGold() { return StoredCorpus.this.candidateLists.get(this.idx).get(this.goldIdx); }
+      public Location getGold() { return CompactCorpus.this.candidateLists.get(this.idx).get(this.goldIdx); }
       public int getGoldIdx() { return this.goldIdx; }
 
       public boolean hasSelected() { return this.selectedIdx > -1; }
-      public Location getSelected() { return StoredCorpus.this.candidateLists.get(this.idx).get(this.selectedIdx); }
+      public Location getSelected() { return CompactCorpus.this.candidateLists.get(this.idx).get(this.selectedIdx); }
       public int getSelectedIdx() { return this.selectedIdx; }
       public void setSelectedIdx(int idx) { this.selectedIdx = idx; }
 
-      public int getAmbiguity() { return StoredCorpus.this.candidateLists.get(this.idx).size(); }
-      public List<Location> getCandidates() { return StoredCorpus.this.candidateLists.get(this.idx); }
-      public Iterator<Location> iterator() { return StoredCorpus.this.candidateLists.get(this.idx).iterator(); }
+      public int getAmbiguity() { return CompactCorpus.this.candidateLists.get(this.idx).size(); }
+      public List<Location> getCandidates() { return CompactCorpus.this.candidateLists.get(this.idx); }
+      public Iterator<Location> iterator() { return CompactCorpus.this.candidateLists.get(this.idx).iterator(); }
 
       public List<Token> getTokens() { throw new UnsupportedOperationException(); }
 
       public int getIdx() {
-        return StoredCorpus.this.toponymOrigMap[this.idx];
+        return CompactCorpus.this.toponymOrigMap[this.idx];
       }
 
       public int getOrigIdx() {
@@ -230,11 +245,11 @@ public class StoredCorpus extends Corpus<StoredToken> {
       }
 
       public int getTypeCount() {
-        return StoredCorpus.this.toponymLexicon.countAtIndex(StoredCorpus.this.toponymOrigMap[this.idx]);
+        return CompactCorpus.this.toponymLexicon.countAtIndex(CompactCorpus.this.toponymOrigMap[this.idx]);
       }
 
       public int getOrigTypeCount() {
-        return StoredCorpus.this.toponymOrigLexicon.countAtIndex(idx);
+        return CompactCorpus.this.toponymOrigLexicon.countAtIndex(idx);
       }
     }
 
@@ -251,11 +266,11 @@ public class StoredCorpus extends Corpus<StoredToken> {
           final int idx = StoredSentence.this.tokens[current];
           return new StoredToken() {
             public String getForm() {
-              return StoredCorpus.this.tokenLexicon.atIndex(StoredCorpus.this.tokenOrigMap[idx]);
+              return CompactCorpus.this.tokenLexicon.atIndex(CompactCorpus.this.tokenOrigMap[idx]);
             }
 
             public String getOrigForm() {
-              return StoredCorpus.this.tokenOrigLexicon.atIndex(idx);
+              return CompactCorpus.this.tokenOrigLexicon.atIndex(idx);
             }
 
             public boolean isToponym() {
@@ -263,7 +278,7 @@ public class StoredCorpus extends Corpus<StoredToken> {
             }
 
             public int getIdx() {
-              return StoredCorpus.this.tokenOrigMap[idx];
+              return CompactCorpus.this.tokenOrigMap[idx];
             }
 
             public int getOrigIdx() {
@@ -271,11 +286,11 @@ public class StoredCorpus extends Corpus<StoredToken> {
             }
 
             public int getTypeCount() {
-              return StoredCorpus.this.tokenLexicon.countAtIndex(StoredCorpus.this.tokenOrigMap[idx]);
+              return CompactCorpus.this.tokenLexicon.countAtIndex(CompactCorpus.this.tokenOrigMap[idx]);
             }
 
             public int getOrigTypeCount() {
-              return StoredCorpus.this.tokenOrigLexicon.countAtIndex(idx);
+              return CompactCorpus.this.tokenOrigLexicon.countAtIndex(idx);
             }
           };
         }
@@ -291,7 +306,10 @@ public class StoredCorpus extends Corpus<StoredToken> {
     }
   }
 
-  public void close() throws IOException {
+  public void close() {
+    if (this.wrapped != null) {
+      this.wrapped.close();
+    }
   }
 }
 

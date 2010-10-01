@@ -19,9 +19,17 @@ public class Coordinate {
     private final double lng;
     private final double lat;
     
-    public Coordinate(double lat, double lng) {
+    Coordinate(double lat, double lng) {
       this.lng = lng;
       this.lat = lat;
+    }
+
+    public static Coordinate fromRadians(double lat, double lng) {
+      return new Coordinate(lat, lng);
+    }
+
+    public static Coordinate fromDegrees(double lat, double lng) {
+      return new Coordinate(lat * Math.PI / 180.0, lng * Math.PI / 180.0);
     }
 
     public double getLat() {

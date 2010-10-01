@@ -15,19 +15,34 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-import java.io.Closeable;
+import java.util.Iterator;
 
 import opennlp.textgrounder.util.Lexicon;
 
-public abstract class Corpus<A extends Token> implements Iterable<Document<A>>, Closeable {
+public abstract class Corpus<A extends Token> implements Iterable<Document<A>> {
   public abstract void addSource(DocumentSource source);
+  public abstract void close();
 
   public static Corpus<Token> createStreamCorpus() {
     return new StreamCorpus();
   }
 
-  public static Corpus<StoredToken> createStoredCorpus() {
-    return new StoredCorpus(new StreamCorpus());
+  public static StoredCorpus createStoredCorpus() {
+    return new CompactCorpus(Corpus.createStreamCorpus());
+  }
+
+  public DocumentSource asSource() {
+    final Iterator<Document<A>> iterator = this.iterator();
+
+    return new DocumentSource() {
+      public boolean hasNext() {
+        return iterator.hasNext();
+      }
+
+      public Document<Token> next() {
+        return (Document<Token>) iterator.next();
+      }
+    };
   }
 }
 

@@ -44,7 +44,7 @@ public class StreamCorpus extends Corpus<Token> {
     this.sources.add(source);
   }
 
-  public void close() throws IOException {
+  public void close() {
     for (DocumentSource source : this.sources) {
       source.close();
     }

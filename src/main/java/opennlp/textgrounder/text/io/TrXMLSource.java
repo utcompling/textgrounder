@@ -15,7 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text.io;
 
-import java.io.Writer;
+import java.io.Reader;
 import java.io.IOException;
 
 import java.util.ArrayList;
@@ -31,14 +31,123 @@ import opennlp.textgrounder.text.Corpus;
 import opennlp.textgrounder.text.Document;
 import opennlp.textgrounder.text.DocumentSource;
 import opennlp.textgrounder.text.Sentence;
+import opennlp.textgrounder.text.SimpleSentence;
+import opennlp.textgrounder.text.SimpleToken;
+import opennlp.textgrounder.text.SimpleToponym;
 import opennlp.textgrounder.text.Token;
 import opennlp.textgrounder.text.Toponym;
-
+import opennlp.textgrounder.text.prep.Tokenizer;
+import opennlp.textgrounder.topo.Coordinate;
 import opennlp.textgrounder.topo.Location;
+import opennlp.textgrounder.topo.PointRegion;
+import opennlp.textgrounder.topo.Region;
+import opennlp.textgrounder.util.Span;
 
-public abstract class TrXMLSource extends DocumentSource {
-  //private final boolean keepSentences;
-  //private final boolean keepTokens;
-  //private final boolean 
+public class TrXMLSource extends DocumentSource {
+  private final XMLStreamReader in;
+  private final Tokenizer tokenizer;
+
+  public TrXMLSource(Reader reader, Tokenizer tokenizer) throws XMLStreamException {
+    this.tokenizer = tokenizer;
+
+    XMLInputFactory factory = XMLInputFactory.newInstance();
+    this.in = factory.createXMLStreamReader(reader);
+
+    while (this.in.hasNext() && this.in.next() != XMLStreamReader.START_ELEMENT) {}
+    if (this.in.getLocalName().equals("corpus")) {
+      this.in.nextTag();
+    }
+  }
+
+  private void nextTag() {
+    try {
+      TrXMLSource.this.in.nextTag();
+    } catch (XMLStreamException e) {
+      System.err.println("Error while reading TR-XML file.");
+    }
+  }
+
+  public boolean hasNext() {
+    return this.in.isStartElement() && this.in.getLocalName().equals("doc");
+  }
+
+  public Document<Token> next() {
+    assert this.in.isStartElement() && this.in.getLocalName().equals("doc");
+    String id = TrXMLSource.this.in.getAttributeValue(null, "id");
+    TrXMLSource.this.nextTag();
+
+    return new Document(id) {
+      public Iterator<Sentence<Token>> iterator() {
+        return new SentenceIterator() {
+          public boolean hasNext() {
+            if (TrXMLSource.this.in.isStartElement() &&
+                TrXMLSource.this.in.getLocalName().equals("s")) {
+              return true;
+            } else {
+              TrXMLSource.this.nextTag();
+              return false;
+            }
+          }
+
+          public Sentence<Token> next() {
+            String id = TrXMLSource.this.in.getAttributeValue(null, "id");
+            List<Token> tokens = new ArrayList<Token>();
+            List<Span<Toponym>> toponymSpans = new ArrayList<Span<Toponym>>();
+
+            try {
+              while (TrXMLSource.this.in.nextTag() == XMLStreamReader.START_ELEMENT &&
+                    (TrXMLSource.this.in.getLocalName().equals("w") ||
+                     TrXMLSource.this.in.getLocalName().equals("toponym"))) {
+                String name = TrXMLSource.this.in.getLocalName();
+ 
+                if (name.equals("w")) {
+                  tokens.add(new SimpleToken(TrXMLSource.this.in.getAttributeValue(null, "tok")));
+                } else {
+                  int spanStart = tokens.size();
+                  String form = TrXMLSource.this.in.getAttributeValue(null, "term");
+                  List<String> formTokens = TrXMLSource.this.tokenizer.tokenize(form);
+
+                  for (String formToken : TrXMLSource.this.tokenizer.tokenize(form)) {
+                    tokens.add(new SimpleToken(formToken));
+                  }
+
+                  ArrayList<Location> locations = new ArrayList<Location>();
+                  int goldIdx = -1;
+
+                  if (TrXMLSource.this.in.nextTag() == XMLStreamReader.START_ELEMENT &&
+                      TrXMLSource.this.in.getLocalName().equals("candidates")) {
+                    while (TrXMLSource.this.in.nextTag() == XMLStreamReader.START_ELEMENT &&
+                           TrXMLSource.this.in.getLocalName().equals("cand")) {
+                      String selected = TrXMLSource.this.in.getAttributeValue(null, "selected");
+                      if (selected != null && selected.equals("yes")) {
+                        goldIdx = locations.size();
+                      }
+
+                      double lat = Double.parseDouble(TrXMLSource.this.in.getAttributeValue(null, "lat"));
+                      double lng = Double.parseDouble(TrXMLSource.this.in.getAttributeValue(null, "long"));
+                      Region region = new PointRegion(Coordinate.fromDegrees(lat, lng));
+                      locations.add(new Location(form, region));
+                      TrXMLSource.this.nextTag();
+                      assert TrXMLSource.this.in.isEndElement() &&
+                             TrXMLSource.this.in.getLocalName().equals("cand");
+                    }
+                  }
+
+                  Toponym toponym = new SimpleToponym(form, locations, goldIdx);
+                  toponymSpans.add(new Span<Toponym>(spanStart, tokens.size(), toponym));
+                }
+                TrXMLSource.this.nextTag();
+              }
+            } catch (XMLStreamException e) {
+              System.err.println("Error while reading TR-XML file.");
+            }
+
+            TrXMLSource.this.nextTag();
+            return new SimpleSentence(id, tokens, toponymSpans);           
+          }
+        };
+      }
+    };
+  }
 }
 
