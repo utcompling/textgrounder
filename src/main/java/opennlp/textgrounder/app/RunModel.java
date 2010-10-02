@@ -25,7 +25,7 @@ public class RunModel extends BaseApp {
         if(getModelType() == MODEL_TYPE.RANDOM)
             model = new RandomModel();
         else// if(getModelType() == MODEL_TYPE.BASIC_MIN_DIST)
-            model = new BasicMinDistModel();
+            model = new AltBasicMinDistModel();
 
         StoredCorpus disambiguated = model.disambiguate(corpus);
 
