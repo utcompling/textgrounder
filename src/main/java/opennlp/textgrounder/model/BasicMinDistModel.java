@@ -75,4 +75,63 @@ public class BasicMinDistModel extends Model {
             toponymToDisambiguate.setSelectedIdx(indexOfMin);
         }
     }
+
+  /* This is an alternative implementation of disambiguate that immediately
+   * stops computing distance totals for candidates when it becomes clear
+   * that they aren't optimal. */
+  public StoredCorpus disambiguateAlt(StoredCorpus corpus) {
+    for (Document<StoredToken> doc : corpus) {
+      for (Sentence<StoredToken> sent : doc) {
+        for (Token token : sent.getToponyms()) {
+          Toponym toponym = (Toponym) token;
+          double min = Double.MAX_VALUE;
+          int minIdx = -1;
+
+          int idx = 0;
+          for (Location candidate : toponym) {
+            Double candidateMin = this.checkCandidate(candidate, doc, min);
+            if (candidateMin != null) {
+              min = candidateMin;
+              minIdx = idx;
+            }
+            idx++;
+          }
+
+          if (minIdx > -1) {
+            toponym.setSelectedIdx(minIdx);
+          }
+        }
+      }
+    }
+
+    return corpus;
+  }
+
+  /* Returns the minimum total distance to all other locations in the document
+   * for the candidate, or null if it's greater than the current minimum. */
+  public Double checkCandidate(Location candidate, Document<StoredToken> doc, double currentMinTotal) {
+    Double total = 0.0;
+
+    for (Sentence<StoredToken> sent : doc) {
+      for (Token token : sent.getToponyms()) {
+        Toponym toponym = (Toponym) token;
+        double min = Double.MAX_VALUE;
+
+        for (Location other : toponym) {
+          double dist = candidate.distance(other);
+          if (dist < min) {
+            min = dist;
+          }
+        }
+
+        total += min;
+        if (total > currentMinTotal) {
+          return null;
+        }
+      }
+    }
+
+    return total;
+  }
 }
+
