@@ -39,11 +39,11 @@ import opennlp.textgrounder.text.Toponym;
 public class CorpusDocumentXMLWriter extends CorpusXMLWriter {
   private final String prefix;
 
-  public CorpusDocumentXMLWriter(Corpus corpus) {
+  public CorpusDocumentXMLWriter(Corpus<? extends Token> corpus) {
     this(corpus, "doc-");
   }
 
-  public CorpusDocumentXMLWriter(Corpus corpus, String prefix) {
+  public CorpusDocumentXMLWriter(Corpus<? extends Token> corpus, String prefix) {
     super(corpus);
     this.prefix = prefix;
   }
