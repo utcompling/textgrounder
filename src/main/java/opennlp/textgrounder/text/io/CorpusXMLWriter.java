@@ -137,10 +137,30 @@ public class CorpusXMLWriter {
   }
 
   public void write(File file) {
+    this.write(file, "doc-");
+  }
+
+  public void write(File file, String prefix) {
     try {
-      OutputStream stream = new BufferedOutputStream(new FileOutputStream(file));
-      this.write(this.factory.createXMLStreamWriter(stream));     
-      stream.close();
+      if (file.isDirectory()) {
+        int idx = 0;
+        for (Document document : this.corpus) {
+          File docFile = new File(file, String.format("%s%06d.xml", prefix, idx));
+          OutputStream stream = new BufferedOutputStream(new FileOutputStream(docFile));
+          XMLStreamWriter out = this.createXMLStreamWriter(stream);
+          out.writeStartDocument();
+          out.writeStartElement("corpus");
+          out.writeAttribute("created", this.getCalendar().toString());
+          this.writeDocument(out, document);
+          out.writeEndElement();
+          stream.close();
+          idx++;
+        }
+      } else {
+        OutputStream stream = new BufferedOutputStream(new FileOutputStream(file));
+        this.write(this.factory.createXMLStreamWriter(stream));
+        stream.close();
+      }
     } catch (XMLStreamException e) {
       System.err.println(e);
       System.exit(1);

@@ -29,11 +29,8 @@ public class RunModel extends BaseApp {
 
         StoredCorpus disambiguated = model.disambiguate(corpus);
 
-        File output = new File(getOutputPath());
-        CorpusXMLWriter w = output.isDirectory() ?
-          new CorpusDocumentXMLWriter(disambiguated) :
-          new CorpusXMLWriter(disambiguated);
-        w.write(output);
+        CorpusXMLWriter w = new CorpusXMLWriter(disambiguated);
+        w.write(new File(getOutputPath()));
     }
 
 }
