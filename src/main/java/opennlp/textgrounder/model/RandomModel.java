@@ -16,13 +16,10 @@ public class RandomModel extends Model {
 
         for(Document<StoredToken> doc : corpus) {
             for(Sentence<StoredToken> sent : doc) {
-                for(Token token : sent) {
-                    if(token.isToponym()) {
-                        Toponym toponym = (Toponym) token;
-                        int ambiguity = toponym.getAmbiguity();
-                        if (ambiguity > 0) {
-                          toponym.setSelectedIdx(rand.nextInt(ambiguity));
-                        }
+                for(Toponym toponym : sent.getToponyms()) {
+                    int ambiguity = toponym.getAmbiguity();
+                    if (ambiguity > 0) {
+                        toponym.setSelectedIdx(rand.nextInt(ambiguity));
                     }
                 }
             }
