@@ -15,8 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text.io;
 
-import java.io.Writer;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.Writer;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -68,6 +69,10 @@ public class CorpusXMLWriter {
 
   protected XMLStreamWriter createXMLStreamWriter(Writer writer) throws XMLStreamException {
     return this.factory.createXMLStreamWriter(writer);
+  }
+
+  protected XMLStreamWriter createXMLStreamWriter(OutputStream stream) throws XMLStreamException {
+    return this.factory.createXMLStreamWriter(stream, "UTF-8");
   }
 
   protected void writeDocument(XMLStreamWriter out, Document<Token> document) throws XMLStreamException {
@@ -128,9 +133,27 @@ public class CorpusXMLWriter {
     out.writeEndElement();
   }
 
+  public void write(OutputStream stream) {
+    try {
+      this.write(this.factory.createXMLStreamWriter(stream));
+    } catch (XMLStreamException e) {
+      System.err.println(e);
+      System.exit(1);
+    }
+  }
+
   public void write(Writer writer) {
     try {
-      XMLStreamWriter out = this.factory.createXMLStreamWriter(writer);
+      this.write(this.factory.createXMLStreamWriter(writer));
+    } catch (XMLStreamException e) {
+      System.err.println(e);
+      System.exit(1);
+    }
+  }
+
+  protected void write(XMLStreamWriter out) {
+    try {
+      out.writeStartDocument();
       out.writeStartElement("corpus");
       out.writeAttribute("created", this.getCalendar().toString());
       for (Document document : this.corpus) {
