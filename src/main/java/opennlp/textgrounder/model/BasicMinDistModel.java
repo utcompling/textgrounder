@@ -11,8 +11,8 @@ import java.util.*;
 
 public class BasicMinDistModel extends Model {
 
-    @Override
-    public StoredCorpus disambiguate(StoredCorpus corpus) {
+    //@Override
+    public StoredCorpus disambiguate2(StoredCorpus corpus) {
         for(Document<StoredToken> doc : corpus) {
             for(Sentence<StoredToken> sent : doc) {
                 for(Token token : sent.getToponyms()) {
@@ -39,23 +39,32 @@ public class BasicMinDistModel extends Model {
         // of all the Toponyms in doc; store these in totalDistances
         for(Location curLoc : toponymToDisambiguate) {
             Double totalDistSoFar = 0.0;
+            int seen = 0;
+
             for(Sentence<StoredToken> sent : doc) {
                 for(Token token : sent.getToponyms()) {
                     //if(token.isToponym()) {
                         Toponym otherToponym = (Toponym) token;
 
-                        double minDist = Double.MAX_VALUE;
-                        for(Location otherLoc : otherToponym) {
-                            double curDist = curLoc.distance(otherLoc);
-                            if(curDist < minDist) {
-                                minDist = curDist;
-                            }
+                        /* We don't want to compute distances if this other toponym is the
+                         * same as the current one, or if it has no candidates. */  
+                        if (!otherToponym.equals(toponymToDisambiguate) && otherToponym.getAmbiguity() > 0) {
+                          double minDist = Double.MAX_VALUE;
+                          for(Location otherLoc : otherToponym) {
+                              double curDist = curLoc.distance(otherLoc);
+                              if(curDist < minDist) {
+                                  minDist = curDist;
+                              }
+                          }
+                          totalDistSoFar += minDist;
+                          seen++;
                         }
-                        totalDistSoFar += minDist;
                     //}
                 }
             }
-            totalDistances.add(totalDistSoFar);
+
+            /* Abstain if we haven't seen any other toponyms. */
+            totalDistances.add(seen > 0 ? totalDistSoFar : Double.MAX_VALUE);
         }
 
         // Find the overall minimum of all the total minimum distances computed above
@@ -78,8 +87,8 @@ public class BasicMinDistModel extends Model {
 
   /* This is an alternative implementation of disambiguate that immediately
    * stops computing distance totals for candidates when it becomes clear
-   * that they aren't optimal. */
-  public StoredCorpus disambiguateAlt(StoredCorpus corpus) {
+   * that they aren't minimal. */
+  public StoredCorpus disambiguate(StoredCorpus corpus) {
     for (Document<StoredToken> doc : corpus) {
       for (Sentence<StoredToken> sent : doc) {
         for (Token token : sent.getToponyms()) {
@@ -89,7 +98,7 @@ public class BasicMinDistModel extends Model {
 
           int idx = 0;
           for (Location candidate : toponym) {
-            Double candidateMin = this.checkCandidate(candidate, doc, min);
+            Double candidateMin = this.checkCandidate(toponym, candidate, doc, min);
             if (candidateMin != null) {
               min = candidateMin;
               minIdx = idx;
@@ -109,29 +118,40 @@ public class BasicMinDistModel extends Model {
 
   /* Returns the minimum total distance to all other locations in the document
    * for the candidate, or null if it's greater than the current minimum. */
-  public Double checkCandidate(Location candidate, Document<StoredToken> doc, double currentMinTotal) {
+  public Double checkCandidate(Toponym toponym, Location candidate, Document<StoredToken> doc, double currentMinTotal) {
     Double total = 0.0;
+    int seen = 0;
 
-    for (Sentence<StoredToken> sent : doc) {
-      for (Token token : sent.getToponyms()) {
-        Toponym toponym = (Toponym) token;
-        double min = Double.MAX_VALUE;
+    for (Sentence<StoredToken> otherSent : doc) {
+      for (Token otherToken : otherSent.getToponyms()) {
+        Toponym otherToponym = (Toponym) otherToken;
 
-        for (Location other : toponym) {
-          double dist = candidate.distance(other);
-          if (dist < min) {
-            min = dist;
+        /* We don't want to compute distances if this other toponym is the
+         * same as the current one, or if it has no candidates. */  
+        if (!otherToponym.equals(toponym) && otherToponym.getAmbiguity() > 0) {
+          double min = Double.MAX_VALUE;
+
+          for (Location otherLoc : otherToponym) {
+            double dist = candidate.distance(otherLoc);
+            if (dist < min) {
+              min = dist;
+            }
           }
-        }
 
-        total += min;
-        if (total > currentMinTotal) {
-          return null;
+          seen++;
+          total += min;
+
+          /* If the running total is greater than the current minimum, we can
+           * stop. */
+          if (total >= currentMinTotal) {
+            return null;
+          }
         }
       }
     }
 
-    return total;
+    /* Abstain if we haven't seen any other toponyms. */
+    return seen > 0 ? total : null;
   }
 }
 

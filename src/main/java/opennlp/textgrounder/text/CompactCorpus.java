@@ -273,6 +273,13 @@ public class CompactCorpus extends StoredCorpus {
       public int getOrigTypeCount() {
         return CompactCorpus.this.toponymOrigLexicon.countAtIndex(idx);
       }
+
+      @Override
+      public boolean equals(Object other) {
+        return other != null && 
+               other.getClass() == this.getClass() &&
+               ((StoredToponym) other).getIdx() == this.getIdx();
+      }
     }
 
     public Iterator<StoredToken> tokens() {
