@@ -78,7 +78,7 @@ public class CompactCorpus extends StoredCorpus {
       ArrayList<Sentence<StoredToken>> sentences = new ArrayList<Sentence<StoredToken>>();
 
       for (Sentence<Token> sentence : document) {
-        List<Token> tokens = sentence.getTokenList();
+        List<Token> tokens = sentence.getTokens();
         int[] tokenIdxs = new int[tokens.size()];
 
         for (int i = 0; i < tokenIdxs.length; i++) {

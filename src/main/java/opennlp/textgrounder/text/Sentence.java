@@ -47,7 +47,7 @@ public abstract class Sentence<A extends Token> implements Iterable<A> {
     };
   }
 
-  public List<A> getTokenList() {
+  public List<A> getTokens() {
     List<A> tokens = new ArrayList<A>();
     for (Iterator<A> it = this.tokens(); it.hasNext(); ) {
       tokens.add(it.next());

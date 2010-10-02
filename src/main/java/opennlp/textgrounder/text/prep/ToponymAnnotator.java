@@ -63,7 +63,7 @@ public class ToponymAnnotator extends DocumentSource {
           public Sentence<Token> next() {
             Sentence<Token> sentence = sentences.next();
             List<String> forms = new ArrayList<String>();
-            List<Token> tokens = sentence.getTokenList();
+            List<Token> tokens = sentence.getTokens();
 
             for (Token token : tokens) {
               forms.add(token.getOrigForm());
