@@ -11,8 +11,8 @@ import java.util.*;
 
 public class BasicMinDistModel extends Model {
 
-    //@Override
-    public StoredCorpus disambiguate2(StoredCorpus corpus) {
+    @Override
+    public StoredCorpus disambiguate(StoredCorpus corpus) {
         for(Document<StoredToken> doc : corpus) {
             for(Sentence<StoredToken> sent : doc) {
                 for(Token token : sent.getToponyms()) {
@@ -88,7 +88,7 @@ public class BasicMinDistModel extends Model {
   /* This is an alternative implementation of disambiguate that immediately
    * stops computing distance totals for candidates when it becomes clear
    * that they aren't minimal. */
-  public StoredCorpus disambiguate(StoredCorpus corpus) {
+  public StoredCorpus disambiguateAlt(StoredCorpus corpus) {
     for (Document<StoredToken> doc : corpus) {
       for (Sentence<StoredToken> sent : doc) {
         for (Token token : sent.getToponyms()) {
