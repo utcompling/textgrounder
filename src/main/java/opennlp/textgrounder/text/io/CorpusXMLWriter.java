@@ -15,6 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text.io;
 
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Writer;
@@ -42,7 +45,7 @@ import opennlp.textgrounder.text.Toponym;
 import opennlp.textgrounder.topo.Location;
 
 public class CorpusXMLWriter {
-  private final Corpus<? extends Token> corpus;
+  protected final Corpus<? extends Token> corpus;
   private final XMLOutputFactory factory;
 
   public CorpusXMLWriter(Corpus<? extends Token> corpus) {
@@ -131,6 +134,20 @@ public class CorpusXMLWriter {
       out.writeAttribute("selected", "true");
     }
     out.writeEndElement();
+  }
+
+  public void write(File file) {
+    try {
+      OutputStream stream = new BufferedOutputStream(new FileOutputStream(file));
+      this.write(this.factory.createXMLStreamWriter(stream));     
+      stream.close();
+    } catch (XMLStreamException e) {
+      System.err.println(e);
+      System.exit(1);
+    } catch (IOException e) {
+      System.err.println(e);
+      System.exit(1);
+    }
   }
 
   public void write(OutputStream stream) {

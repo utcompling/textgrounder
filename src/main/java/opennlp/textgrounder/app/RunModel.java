@@ -29,11 +29,11 @@ public class RunModel extends BaseApp {
 
         StoredCorpus disambiguated = model.disambiguate(corpus);
 
-        OutputStream out = new BufferedOutputStream(new FileOutputStream(getOutputPath()));
-
-        CorpusXMLWriter w = new CorpusXMLWriter(disambiguated);
-        w.write(out);
-        out.close();
+        File output = new File(getOutputPath());
+        CorpusXMLWriter w = output.isDirectory() ?
+          new CorpusDocumentXMLWriter(disambiguated) :
+          new CorpusXMLWriter(disambiguated);
+        w.write(output);
     }
 
 }

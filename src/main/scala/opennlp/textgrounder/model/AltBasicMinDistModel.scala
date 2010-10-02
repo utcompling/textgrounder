@@ -25,7 +25,7 @@ class AltBasicMinDistModel extends Model {
     corpus.foreach { document =>
 
       /* Collect a list of toponyms with candidates for each document. */
-      val toponyms = document.flatMap(_.getToponyms).filter(_.getAmbiguity > 0)
+      val toponyms = document.flatMap(_.getToponyms).filter(_.getAmbiguity > 0).toList
 
       /* For each toponym, pick the best candidate. */
       toponyms.foreach { toponym =>

@@ -15,8 +15,13 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text.io;
 
-import java.io.Writer;
+import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.io.Writer;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -32,8 +37,51 @@ import opennlp.textgrounder.text.Token;
 import opennlp.textgrounder.text.Toponym;
 
 public class CorpusDocumentXMLWriter extends CorpusXMLWriter {
+  private final String prefix;
+
   public CorpusDocumentXMLWriter(Corpus corpus) {
+    this(corpus, "doc-");
+  }
+
+  public CorpusDocumentXMLWriter(Corpus corpus, String prefix) {
     super(corpus);
+    this.prefix = prefix;
+  }
+
+  public void write(File file) {
+    if (!file.isDirectory()) {
+      throw new UnsupportedOperationException("The document writer can only write to a directory.");
+    } else {
+      int idx = 0;
+      for (Document document : this.corpus) {
+        try {
+          File docFile = new File(file, String.format("%s%06d.xml", this.prefix, idx));
+          OutputStream stream = new BufferedOutputStream(new FileOutputStream(docFile));
+          XMLStreamWriter out = this.createXMLStreamWriter(stream);
+          out.writeStartDocument();
+          out.writeStartElement("corpus");
+          out.writeAttribute("created", this.getCalendar().toString());
+          this.writeDocument(out, document);
+          out.writeEndElement();
+          stream.close();
+        } catch (XMLStreamException e) {
+          System.err.println(e);
+          System.exit(1);
+        } catch (IOException e) {
+          System.err.println(e);
+          System.exit(1);
+        }
+        idx++;
+      }
+    }    
+  }
+
+  public void write(OutputStream stream) {
+    throw new UnsupportedOperationException("The document writer can only write to a directory.");
+  }
+
+  public void write(Writer writer) {
+    throw new UnsupportedOperationException("The document writer can only write to a directory.");
   }
 }
 
