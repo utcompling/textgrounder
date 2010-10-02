@@ -55,10 +55,10 @@ public abstract class Sentence<A extends Token> implements Iterable<A> {
     return tokens;
   }
 
-  public List<A> getToponyms() {
-    List<A> toponyms = new ArrayList<A>();
+  public List<Toponym> getToponyms() {
+    List<Toponym> toponyms = new ArrayList<Toponym>();
     for (Iterator<Span<A>> it = this.toponymSpans(); it.hasNext(); ) {
-      toponyms.add(it.next().getItem());
+      toponyms.add((Toponym) it.next().getItem());
     }
     return toponyms;
   }
