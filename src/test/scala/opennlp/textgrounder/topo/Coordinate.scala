@@ -21,14 +21,29 @@ import org.specs.runner._
 class CoordinateTest extends JUnit4(CoordinateSpec)
 object CoordinateSpec extends Specification {
 
-  "Coordinate.fromDegrees(45.0, -45.0)" should {
-    val coordinate = Coordinate.fromDegrees(45.0, -45.0)
-    "have the correct value for latitude" in {
+  "A degree-constructed coordinate" should {
+    val coordinate = Coordinate.fromDegrees(45, -45)
+    "have the correct radian value for latitude" in {
       coordinate.getLat must_== math.Pi / 4
     }
 
-    "have the correct value for longitude" in {
+    "have the correct radian value for longitude" in {
       coordinate.getLng must_== -math.Pi / 4
+    }
+
+    "be equal to its radian-constructed equivalent" in {
+      coordinate must_== Coordinate.fromRadians(math.Pi / 4, -math.Pi / 4)
+    }
+  }
+
+  "A coordinate at the origin" should {
+    val coordinate = Coordinate.fromDegrees(0, 0)
+    "have the correct angular distance from a coordinate 1 radian away horizontally" in {
+      coordinate.distance(Coordinate.fromRadians(0, 1)) must_== 1
+    }
+
+    "have the correct distance from a coordinate 1 radian away vertically" in {
+      coordinate.distance(Coordinate.fromRadians(1, 0)) must_== 1
     }
   }
 }
