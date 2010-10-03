@@ -24,7 +24,6 @@ import java.io.BufferedReader;
 import java.util.zip.GZIPInputStream;
 
 import opennlp.textgrounder.topo.Coordinate;
-import opennlp.textgrounder.topo.DegreeCoordinate;
 import opennlp.textgrounder.topo.Location;
 import opennlp.textgrounder.topo.PointRegion;
 import opennlp.textgrounder.topo.Region;
@@ -76,7 +75,7 @@ public class GeoNamesReader extends GazetteerLineReader {
 
         double lat = Double.parseDouble(fields[4]);
         double lng = Double.parseDouble(fields[5]);
-        Coordinate coordinate = new DegreeCoordinate(lat, lng);
+        Coordinate coordinate = Coordinate.fromDegrees(lat, lng);
         Region region = new PointRegion(coordinate);
 
         int population = fields[14].length() == 0 ? 0 : Integer.parseInt(fields[14]);

@@ -13,11 +13,23 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.topo;
+package opennlp.textgrounder.topo
 
-public class DegreeCoordinate extends Coordinate {
-  public DegreeCoordinate(double latitude, double longitude) {
-    super(latitude * Math.PI / 180.0, longitude * Math.PI / 180.0);
+import org.specs._
+import org.specs.runner._
+
+class CoordinateTest extends JUnit4(CoordinateSpec)
+object CoordinateSpec extends Specification {
+
+  "Coordinate.fromDegrees(45.0, -45.0)" should {
+    val coordinate = Coordinate.fromDegrees(45.0, -45.0)
+    "have the correct value for latitude" in {
+      coordinate.getLat must_== math.Pi / 4
+    }
+
+    "have the correct value for longitude" in {
+      coordinate.getLng must_== -math.Pi / 4
+    }
   }
 }
 
