@@ -9,7 +9,7 @@ import opennlp.textgrounder.text.*;
 
 public class AccuracyEvaluator extends Evaluator {
 
-    public AccuracyEvaluator(Corpus<Token> corpus) {
+    public AccuracyEvaluator(Corpus corpus) {
         super(corpus);
     }
 
