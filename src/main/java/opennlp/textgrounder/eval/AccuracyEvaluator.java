@@ -22,9 +22,9 @@ public class AccuracyEvaluator extends Evaluator {
                 for(Toponym toponym : sent.getToponyms()) {
                     if(toponym.hasGold()) {
                         if(toponym.getGoldIdx() == toponym.getSelectedIdx()) {
-                            // add true positive to report
+                            report.incrementTP();
                         }
-                        // increment instance-count of report
+                        report.incrementInstanceCount();
                     }
                 }
             }

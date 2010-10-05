@@ -37,7 +37,7 @@ public class RunModel extends BaseApp {
 
         Report report = evaluator.evaluate();
 
-        //System.out.println("Accuracy: " + report.getAccuracy());
+        System.out.println("Accuracy: " + report.computeAccuracy());
     }
 
 }
