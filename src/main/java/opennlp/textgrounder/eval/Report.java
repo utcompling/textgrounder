@@ -15,5 +15,64 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.eval;
 
-public class Report {}
+public class Report {
+
+    private int tp;
+    private int fp;
+    private int fn;
+    private int totalInstances;
+
+    public int getFN() {
+        return fn;
+    }
+
+    public int getFP() {
+        return fp;
+    }
+
+    public int getTP() {
+        return tp;
+    }
+
+    public int getInstanceCount() {
+        return totalInstances;
+    }
+
+    public void incrementTP() {
+        tp++;
+        totalInstances++;
+    }
+
+    public void incrementFP() {
+        fp++;
+        totalInstances++;
+    }
+
+    public void incrementFN() {
+        fn++;
+        totalInstances++;
+    }
+
+    public void incrementInstanceCount() {
+        totalInstances++;
+    }
+
+    public double computeAccuracy() {
+        return (double) tp / totalInstances;
+    }
+
+    public double computePrecision() {
+        return (double) tp / (tp + fp);
+    }
+
+    public double computeRecall() {
+        return (double) tp / (tp + fn);
+    }
+
+    public double computeFScore() {
+        double p = computePrecision();
+        double r = computeRecall();
+        return (2 * p * r) / (p + r);
+    }
+}
 
