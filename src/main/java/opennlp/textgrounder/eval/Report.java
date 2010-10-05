@@ -57,21 +57,21 @@ public class Report {
         totalInstances++;
     }
 
-    public double computeAccuracy() {
+    public double getAccuracy() {
         return (double) tp / totalInstances;
     }
 
-    public double computePrecision() {
+    public double getPrecision() {
         return (double) tp / (tp + fp);
     }
 
-    public double computeRecall() {
+    public double getRecall() {
         return (double) tp / (tp + fn);
     }
 
-    public double computeFScore() {
-        double p = computePrecision();
-        double r = computeRecall();
+    public double getFScore() {
+        double p = getPrecision();
+        double r = getRecall();
         return (2 * p * r) / (p + r);
     }
 }
