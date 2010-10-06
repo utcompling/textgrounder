@@ -21,14 +21,49 @@ public class SignatureEvaluator extends Evaluator {
         return null;
     }
 
+    private Map<String, Integer> populateSigsAndIndices(Corpus<Token> corpus, boolean getGoldIndices) {
+        Map<String, Integer> locs = new HashMap<String, Integer>();
+
+        for(Document<Token> doc : corpus) {
+            for(Sentence<Token> sent : doc) {
+                StringBuffer sb = new StringBuffer();
+                List<Integer> toponymStarts = new ArrayList<Integer>();
+                List<Integer> idxs = new ArrayList<Integer>();
+                for(Token token : sent) {
+                    if(token.isToponym()) {
+                        Toponym toponym = (Toponym) token;
+                        if((getGoldIndices && toponym.hasGold()) || (!getGoldIndices && toponym.hasSelected())) {
+                            toponymStarts.add(sb.length());
+                            if(getGoldIndices)
+                                idxs.add(toponym.getGoldIdx());
+                            else
+                                idxs.add(toponym.getSelectedIdx());
+                        }
+                    }
+                    sb.append(token.getForm().replaceAll("[^a-z0-9]", ""));
+                }
+                for(int i = 0; i < toponymStarts.size(); i++) {
+                    int toponymStart = toponymStarts.get(i);
+                    int idx = idxs.get(i);
+                    locs.put(getSignature(sb, toponymStart, CONTEXT_WINDOW_SIZE), idx);
+                }
+            }
+        }
+
+        return locs;
+    }
+
     @Override
     public Report evaluate(Corpus<Token> pred, boolean useSelected) {
         
         Report report = new Report();
 
-        Map<String, Integer> goldLocs = new HashMap<String, Integer>();
+        //Map<String, Integer> goldLocs = new HashMap<String, Integer>();
 
-        for(Document<Token> doc : corpus) {
+        Map<String, Integer> goldLocs = populateSigsAndIndices(corpus, true);
+        Map<String, Integer> predLocs = populateSigsAndIndices(pred, false);
+
+        /*for(Document<Token> doc : corpus) {
             for(Sentence<Token> sent : doc) {
                 StringBuffer sb = new StringBuffer();
                 List<Integer> toponymStarts = new ArrayList<Integer>();
@@ -77,6 +112,8 @@ public class SignatureEvaluator extends Evaluator {
             }
         }
 
+        */
+
         for(String context : goldLocs.keySet()) {
             if(predLocs.containsKey(context)) {
                 if(goldLocs.get(context) == predLocs.get(context)) {
@@ -96,11 +133,9 @@ public class SignatureEvaluator extends Evaluator {
             }
         }
         for(String context : predLocs.keySet()) {
-            if(goldLocs.containsKey(context)) {
-                if(predLocs.get(context) != goldLocs.get(context)) {
-                    //System.out.println("FP: " + context + "| not found in gold");
-                    report.incrementFP();
-                }
+            if(!goldLocs.containsKey(context)) {
+                //System.out.println("FP: " + context + "| not found in gold");
+                report.incrementFP();
             }
         }
 

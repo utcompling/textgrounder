@@ -44,6 +44,7 @@ public class RunResolver extends BaseApp {
         System.out.println("P: " + report.getPrecision());
         System.out.println("R: " + report.getRecall());
         System.out.println("F: " + report.getFScore());
+        System.out.println("A: " + report.getAccuracy());
     }
 
 }
