@@ -1,5 +1,5 @@
 /*
- * Base app for running models and/or other functionality such as evaluation and visualization generation.
+ * Base app for running resolvers and/or other functionality such as evaluation and visualization generation.
  */
 
 package opennlp.textgrounder.app;
@@ -17,16 +17,16 @@ public class BaseApp {
     private static String inputPath = "";
     private static String outputPath = "output.xml";
 
-    public static enum MODEL_TYPE {
+    public static enum RESOLVER_TYPE {
         RANDOM,
         BASIC_MIN_DIST
     }
-    private static Enum<MODEL_TYPE> modelType = MODEL_TYPE.BASIC_MIN_DIST;
+    private static Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
 
     protected static void initializeOptionsFromCommandLine(String[] args) throws Exception {
 
         options.addOption("i", "input", true, "input path");
-        options.addOption("m", "model", true, "model (RandomModel, BasicMinDistModel) [default = BasicMinDistModel]");
+        options.addOption("r", "resolver", true, "resolver (RandomResolver, BasicMinDistResolver) [default = BasicMinDistResolver]");
         options.addOption("o", "output", true, "output path [default = 'output.xml']");
 
         options.addOption("h", "help", false, "print help");
@@ -51,11 +51,11 @@ public class BaseApp {
                 case 'o':
                     outputPath = value;
                     break;
-                case 'm':
+                case 'r':
                     if(value.toLowerCase().startsWith("r"))
-                        modelType = MODEL_TYPE.RANDOM;
+                        resolverType = RESOLVER_TYPE.RANDOM;
                     else
-                        modelType = MODEL_TYPE.BASIC_MIN_DIST;
+                        resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
                     break;
             }
         }
@@ -65,8 +65,8 @@ public class BaseApp {
         return inputPath;
     }
 
-    public static Enum<MODEL_TYPE> getModelType() {
-        return modelType;
+    public static Enum<RESOLVER_TYPE> getResolverType() {
+        return resolverType;
     }
 
     public static String getOutputPath() {

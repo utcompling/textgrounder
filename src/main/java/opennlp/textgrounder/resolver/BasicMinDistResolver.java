@@ -1,15 +1,15 @@
 /*
- * Basic Minimum Distance model. For each toponym, the location is selected that minimizes the total distance to some disambiguation
+ * Basic Minimum Distance resolver. For each toponym, the location is selected that minimizes the total distance to some disambiguation
  * of the other toponyms in the same document.
  */
 
-package opennlp.textgrounder.model;
+package opennlp.textgrounder.resolver;
 
 import opennlp.textgrounder.text.*;
 import opennlp.textgrounder.topo.*;
 import java.util.*;
 
-public class BasicMinDistModel extends Model {
+public class BasicMinDistResolver extends Resolver {
 
   /* This implementation of disambiguate immediately stops computing distance
    * totals for candidates when it becomes clear that they aren't minimal. */

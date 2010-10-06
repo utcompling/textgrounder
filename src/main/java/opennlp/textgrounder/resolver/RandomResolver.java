@@ -1,13 +1,13 @@
 /*
- * Random baseline model. Selects a random location for each toponym.
+ * Random baseline resolver. Selects a random location for each toponym.
  */
 
-package opennlp.textgrounder.model;
+package opennlp.textgrounder.resolver;
 
 import opennlp.textgrounder.text.*;
 import java.util.*;
 
-public class RandomModel extends Model {
+public class RandomResolver extends Resolver {
 
     private Random rand = new Random();
 

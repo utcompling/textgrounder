@@ -1,8 +1,8 @@
 /*
- * This version of Model (started 9/22/10) is just an abstract class with the disambiguate(Corpus) method.
+ * This version of Resolver (started 9/22/10) is just an abstract class with the disambiguate(Corpus) method.
  */
 
-package opennlp.textgrounder.model;
+package opennlp.textgrounder.resolver;
 
 import opennlp.textgrounder.text.StoredCorpus;
 
@@ -12,7 +12,7 @@ import opennlp.textgrounder.text.StoredCorpus;
  * @return
  *        a corpus with selected candidates, ready for evaluation
  */
-public abstract class Model {
+public abstract class Resolver {
 
     public abstract StoredCorpus disambiguate(StoredCorpus corpus);
     
