@@ -139,8 +139,10 @@ public class TrXMLSource extends DocumentSource {
                     }
                   }
 
-                  Toponym toponym = new SimpleToponym(form, locations, goldIdx);
-                  toponymSpans.add(new Span<Toponym>(spanStart, tokens.size(), toponym));
+                  if (locations.size() > 0 && goldIdx > -1) {
+                    Toponym toponym = new SimpleToponym(form, locations, goldIdx);
+                    toponymSpans.add(new Span<Toponym>(spanStart, tokens.size(), toponym));
+                  }
                 }
                 TrXMLSource.this.nextTag();
               }
