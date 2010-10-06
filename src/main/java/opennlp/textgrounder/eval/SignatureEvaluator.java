@@ -58,61 +58,8 @@ public class SignatureEvaluator extends Evaluator {
         
         Report report = new Report();
 
-        //Map<String, Integer> goldLocs = new HashMap<String, Integer>();
-
         Map<String, Integer> goldLocs = populateSigsAndIndices(corpus, true);
         Map<String, Integer> predLocs = populateSigsAndIndices(pred, false);
-
-        /*for(Document<Token> doc : corpus) {
-            for(Sentence<Token> sent : doc) {
-                StringBuffer sb = new StringBuffer();
-                List<Integer> toponymStarts = new ArrayList<Integer>();
-                List<Integer> goldIdxs = new ArrayList<Integer>();
-                for(Token token : sent) {
-                    if(token.isToponym()) {
-                        Toponym toponym = (Toponym) token;
-                        if(toponym.hasGold()) {
-                            toponymStarts.add(sb.length());
-                            goldIdxs.add(toponym.getGoldIdx());
-                        }
-                    }
-                    sb.append(token.getForm().replaceAll("[^a-z0-9]", ""));
-                }
-                for(int i = 0; i < toponymStarts.size(); i++) {
-                    int toponymStart = toponymStarts.get(i);
-                    int goldIdx = goldIdxs.get(i);
-                    goldLocs.put(getSignature(sb, toponymStart, CONTEXT_WINDOW_SIZE), goldIdx);
-                }
-            }
-        }
-
-        
-        Map<String, Integer> predLocs = new HashMap<String, Integer>();
-
-        for(Document<Token> doc : pred) {
-            for(Sentence<Token> sent : doc) {
-                StringBuffer sb = new StringBuffer();
-                List<Integer> toponymStarts = new ArrayList<Integer>();
-                List<Integer> predIdxs = new ArrayList<Integer>();
-                for(Token token : sent) {
-                    if(token.isToponym()) {
-                        Toponym toponym = (Toponym) token;
-                        if(toponym.hasSelected()) {
-                            toponymStarts.add(sb.length());
-                            predIdxs.add(toponym.getSelectedIdx());
-                        }
-                    }
-                    sb.append(token.getForm().replaceAll("[^a-z0-9]", ""));
-                }
-                for(int i = 0; i < toponymStarts.size(); i++) {
-                    int toponymStart = toponymStarts.get(i);
-                    int predIdx = predIdxs.get(i);
-                    predLocs.put(getSignature(sb, toponymStart, CONTEXT_WINDOW_SIZE), predIdx);
-                }
-            }
-        }
-
-        */
 
         for(String context : goldLocs.keySet()) {
             if(predLocs.containsKey(context)) {
