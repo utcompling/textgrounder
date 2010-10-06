@@ -13,6 +13,7 @@ public class AccuracyEvaluator extends Evaluator {
         super(corpus);
     }
 
+    @Override
     public Report evaluate() {
 
         Report report = new Report();
@@ -34,7 +35,8 @@ public class AccuracyEvaluator extends Evaluator {
 
         return report;
     }
-    
+
+    @Override
     public Report evaluate(Corpus<Token> pred, boolean useSelected) {
         return null;
     }

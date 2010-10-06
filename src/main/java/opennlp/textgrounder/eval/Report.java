@@ -53,6 +53,12 @@ public class Report {
         totalInstances++;
     }
 
+    public void incrementFPandFN() {
+        fp++;
+        fn++;
+        totalInstances++;
+    }
+
     public void incrementInstanceCount() {
         totalInstances++;
     }

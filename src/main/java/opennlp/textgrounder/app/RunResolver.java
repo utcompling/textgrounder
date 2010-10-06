@@ -24,22 +24,26 @@ public class RunResolver extends BaseApp {
 
         Resolver resolver;
         if(getResolverType() == RESOLVER_TYPE.RANDOM) {
+            System.out.println("Running RANDOM resolver...");
             resolver = new RandomResolver();
         }
         else {// if(getResolverType() == RESOLVER_TYPE.BASIC_MIN_DIST)
+            System.out.println("Running BASICMINDIST resolver...");
             resolver = new BasicMinDistResolver();
         }
 
-        StoredCorpus disambiguated = resolver.disambiguate(corpus);
+        Corpus disambiguated = resolver.disambiguate(corpus);
 
         CorpusXMLWriter w = new CorpusXMLWriter(disambiguated);
         w.write(new File(getOutputPath()));
 
-        Evaluator evaluator = new AccuracyEvaluator(disambiguated);
+        Evaluator evaluator = new SignatureEvaluator(corpus);
 
-        Report report = evaluator.evaluate();
+        Report report = evaluator.evaluate(disambiguated, false);
 
-        System.out.println("Accuracy: " + report.getAccuracy());
+        System.out.println("P: " + report.getPrecision());
+        System.out.println("R: " + report.getRecall());
+        System.out.println("F: " + report.getFScore());
     }
 
 }
