@@ -12,46 +12,7 @@ import math
 import collections
 import traceback
 from optparse import OptionParser
-from perlwrap import *
-
-# Count number of incoming links for articles
-incoming_link_count = {}
-
-# Coordinates for articles
-article_coordinates = {}
-
-# Map from short to full form of articles.  Each a value is a list of all
-# the full forms.
-short_to_full_name = {}
-
-# Map from tuple (CITY, DIV) for articles of the form "Springfield, Ohio".
-# Maps to the full article name.
-tuple_to_full_name = {}
-
-# List of stopwords
-stopwords = set()
-
-# For each Wikipedia article, value is a hash table of word->probability
-# items.  In addition, an item with key None lists the probability of an
-# unknown word.
-article_probs = {}
-
-# For each toponym, value is a list of Location items, listing gazetteer
-# locations and corresponding matching Wikipedia articles.
-toponym_to_location = {}
-
-correct_toponyms_disambiguated = 0
-total_toponyms_disambiguated = 0
-
-# Debug level; if non-zero, output lots of extra information about how
-# things are progressing.  If > 1, even more info.
-debug = 1
-
-# If true, print out warnings about strangely formatted input
-show_warnings = True
-
-# After ignoring stopwords, do we renormalize the probabilities or not?
-renormalize_non_stopword_probs = True
+from textutil import *
 
 ############################################################################
 #                              Documentation                               #
@@ -62,11 +23,229 @@ renormalize_non_stopword_probs = True
 # This program does disambiguation of geographic names on the TR-CONLL corpus.
 # It uses data from Wikipedia to do this.  It is "unsupervised" in the sense
 # that it does not do any supervised learning using the correct matches
-# provided in the corpus; instead, it uses them only for testing purposes.
+# provided in the corpus; instead, it uses them only for evaluation purposes.
+
+############################################################################
+#                                  Globals                                 #
+############################################################################
+
+# Count number of incoming links for Wikipedia articles.
+incoming_link_count = {}
+
+# Coordinates for articles
+article_coordinates = {}
+
+# Map from short to full form of Wikipedia articles.  Each a value is a list
+# of all the full forms.  The "short form" of an article's name is the
+# form before any comma, e.g. the short form of "Springfield, Ohio" is
+# "Springfield".
+short_to_full_name = listdict()
+
+# Map from tuple (CITY, DIV) for Wikipedia articles of the form
+# "Springfield, Ohio".  Maps to the full article name.
+tuple_to_full_name = {}
+
+# List of stopwords
+stopwords = set()
+
+# For each Wikipedia article, value is a hash table of word->probability
+# items.  In addition, an item with key None lists the probability of an
+# unknown word.
+article_probs = {}
+
+# For each toponym (name of location), value is a list of Locality items,
+# listing gazetteer locations and corresponding matching Wikipedia articles.
+toponym_to_location = listdict()
+
+# For each toponym corresponding to a division higher than a locality,
+# list of divisions with this name.
+toponym_to_division = listdict()
+
+# For each division, map from division's path to Division object.
+path_to_division = {}
+
+correct_toponyms_disambiguated = 0
+total_toponyms_disambiguated = 0
+
+# Debug level; if non-zero, output lots of extra information about how
+# things are progressing.  If > 1, even more info.
+debug = 2
+
+# If true, print out warnings about strangely formatted input
+show_warnings = True
+
+# After ignoring stopwords, do we renormalize the probabilities or not?
+renormalize_non_stopword_probs = True
+
+# Maximum number of miles allowed when looking for a close match
+max_dist_for_close_match = 20
+
+# Maximum number of miles allowed between a point and any others in a
+# division.  Points farther away than this are ignored as "outliers"
+# (possible errors, etc.).
+max_dist_for_outliers = 200
+
+# Number of words on either side used for context
+naive_bayes_context_len = 10
 
 ############################################################################
 #                                   Code                                   #
 ############################################################################
+
+# A general location (either locality or division).  The following
+# fields are defined:
+#
+#   name: Name of location.
+#   altnames: List of alternative names of location.
+#   type: Type of location (locality, agglomeration, country, state,
+#                           territory, province, etc.)
+#   match: Wikipedia article corresponding to this location.
+#   div: Next higher-level division this location is within, or None.
+
+class Location(object):
+  pass
+
+# A location corresponding to an entry in a gazetteer, with a single
+# coordinate.
+#
+# The following fields are defined, in addition to those for Location:
+#
+#   coord: Coordinates of the location, as a Coord object.
+
+class Locality(Location):
+  def __init__(self, name, coord):
+    self.name = name
+    self.coord = coord
+    self.altnames = []
+    self.match = None
+
+# A class holding the boundary of a geographic object.  Currently this is
+# just a bounding box, but eventually may be expanded to including a
+# convex hull or more complex model.
+
+class Boundary(object):
+  def __init__(self, botleft, topright):
+    self.botleft = botleft
+    self.topright = topright
+
+  def __str__(self):
+    return '%s-%s' % (self.botleft, self.topright)
+
+  def __contains__(self, coord):
+    return (coord.lat >= self.botleft.lat and
+            coord.lat <= self.topright.lat and
+            coord.long >= self.botleft.long and
+            coord.long <= self.topright.long)
+
+# A division higher than a single locality.  According to the World
+# gazetteer, there are three levels of divisions.  For the U.S., this
+# corresponds to country, state, county.
+#
+# The following fields are defined:
+#
+#   level: 1, 2, or 3 for first, second, or third-level division
+#   path: Tuple of same size as the level #, listing the path of divisions
+#         from highest to lowest, leading to this division.  The last
+#         element is the same as the "name" of the division.
+#   points: Set of Coord objects listing all points inside of the division.
+#   goodpoints: Set of Coord objects listing all points inside of the division
+#               other than those rejected as outliers (too far from all other
+#               points).
+#   boundary: A Boundary object specifying the boundary of the area of the
+#             division.  Currently in the form of a rectangular bounding box.
+#             Eventually may contain a convex hull or even more complex
+#             region (e.g. set of convex regions).
+
+class Division(object):
+  def __init__(self, path):
+    self.name = path[-1]
+    self.altnames = []
+    self.path = path
+    self.level = len(path)
+    self.points = []
+    self.match = None
+
+  def __str__(self):
+    return '%s (%s), boundary %s' % \
+      (self.name, '/'.join(self.path), self.boundary)
+
+  # Compute the boundary of the geographic region of this division, based
+  # on the points in the region.
+  def compute_boundary(self):
+    # Yield up all points that are not "outliers", where outliers are defined
+    # as points that are more than max_dist_for_outliers away from all other
+    # points.
+    def yield_non_outliers():
+      # If not enough points, just return them; otherwise too much possibility
+      # that all of them, or some good ones, will be considered outliers.
+      if len(self.points) <= 5:
+        for p in self.points: yield p
+        return
+      for p in self.points: yield p
+      #for p in self.points:
+      #  # Find minimum distance to all other points and check it.
+      #  mindist = min(spheredist(p, x) for x in self.points if x is not p)
+      #  if mindist <= max_dist_for_outliers: yield p
+
+    if debug > 1:
+      uniprint("Computing boundary for %s, path %s, num points %s" %
+               (self.name, self.path, len(self.points)))
+               
+    self.goodpoints = list(yield_non_outliers())
+    # If we've somehow discarded all points, just use the original list
+    if not len(self.goodpoints):
+      if debug > 0:
+        warning("All points considered outliers?  Division %s, path %s" %
+                (self.name, self.path))
+      self.goodpoints = self.points
+    topleft = Coord(min(x.lat for x in self.goodpoints),
+                    min(x.long for x in self.goodpoints))
+    botright = Coord(max(x.lat for x in self.goodpoints),
+                     max(x.long for x in self.goodpoints))
+    self.boundary = Boundary(topleft, botright)
+
+  def __contains__(self, coord):
+    return coord in self.boundary
+
+  # Note that a location was seen with the given coordinate and path to
+  # the location.  Return the corresponding Division.
+  @staticmethod
+  def note_point_seen_in_division(coord, path):
+    higherdiv = None
+    if len(path) > 1:
+      # Also note location in next-higher division.
+      higherdiv = Division.note_point_seen_in_division(coord, path[0:-1])
+    # Skip divisions where last element in path is empty; this is a
+    # reference to a higher-level division with no corresponding lower-level
+    # division.
+    if not path[-1]: return higherdiv
+    if path in path_to_division:
+      division = path_to_division[path]
+    else:
+      # If we haven't seen this path, create a new Division object.
+      # Record the mapping from path to division, and also from the
+      # division's "name" (name of lowest-level division in path) to
+      # the division.
+      division = Division(path)
+      division.div = higherdiv
+      path_to_division[path] = division
+      toponym_to_division[path[-1].lower()] += [division]
+    division.points += [coord]
+    return division
+
+# A 2-dimensional coordinate.
+#
+# The following fields are defined:
+#
+#   lat, long: Latitude and longitude of coordinate.
+
+class Coord(object):
+  def __init__(self, lat, long):
+    self.lat = lat
+    self.long = long
+
+  def __str__(self):
+    return '(%s,%s)' % (self.lat, self.long)
 
 #######################################################################
 ###                        Utility functions                        ###
@@ -96,24 +275,30 @@ instead, output a warning.'''
     return 0.
 
 # Compute spherical distance in miles (along a great circle) between two
-# latitude/longitude points.
+# coordinates.
 
-def spherical_distance(lat1, long1, lat2, long2):
-  thisRadLat = (lat1 / 180.) * math.pi
-  thisRadLong = (long1 / 180.) * math.pi
-  otherRadLat = (lat2 / 180.) * math.pi
-  otherRadLong = (long2 / 180.) * math.pi
+def spheredist(p1, p2):
+  thisRadLat = (p1.lat / 180.) * math.pi
+  thisRadLong = (p1.long / 180.) * math.pi
+  otherRadLat = (p2.lat / 180.) * math.pi
+  otherRadLong = (p2.long / 180.) * math.pi
         
   # 3963.191 = Earth radius in miles
-  try:
-    return 3963.191 * \
-      math.acos(math.sin(thisRadLat)*math.sin(otherRadLat)
-                + math.cos(thisRadLat)*math.cos(otherRadLat)*
-                  math.cos(otherRadLong-thisRadLong))
-  except Exception, exc:
-    warning("Exception %s computing spherical distance (%s,%s) to (%s,%s)" %
-            (exc, lat1, long1, lat2, long2))
-    return 1000000.
+
+  anglecos = (math.sin(thisRadLat)*math.sin(otherRadLat)
+              + math.cos(thisRadLat)*math.cos(otherRadLat)*
+                math.cos(otherRadLong-thisRadLong))
+  # If the values are extremely close to each other, the resulting cosine
+  # value will be extremely close to 1.  In reality, however, if the values
+  # are too close (e.g. the same), the computed cosine will be slightly
+  # above 1, and acos() will complain.  So special-case this.
+  if abs(anglecos) > 1.0:
+    if abs(anglecos) > 1.000001:
+      warning("Something wrong in computation of spherical distance, out-of-range cosine value %f" % anglecos)
+      return 1000000.
+    else:
+      return 0.
+  return 3963.191 * math.acos(anglecos)
 
 #######################################################################
 #                            Process files                            #
@@ -121,7 +306,7 @@ def spherical_distance(lat1, long1, lat2, long2):
 
 # Read in the list of stopwords from the given filename.
 def read_stopwords(filename):
-  for line in chompopen(filename):
+  for line in uchompopen(filename):
     stopwords.add(line)
 
 # Parse the result of a previous run of --coords-counts and generate
@@ -132,7 +317,7 @@ def read_stopwords(filename):
 
 def construct_naive_bayes_dist(filename):
   articles_seen = 0
-  for line in chompopen(filename):
+  for line in uchompopen(filename):
     if rematch('Article title: (.*)$', line):
       title = m_[1]
       wordprob = {}
@@ -163,121 +348,255 @@ def construct_naive_bayes_dist(filename):
       if word in stopwords: continue
       wordhash[word] = count
 
-class Location(object):
-  pass
-
 # Parse the result of a previous run of --coords-counts for articles with
 # coordinates
 def get_coordinates(filename):
-  for line in open(filename):
-    line = line.strip()
+  for line in uchompopen(filename):
     if rematch('Article title: (.*)$', line):
       title = m_[1]
     elif rematch('Article coordinates: (.*),(.*)$', line):
-      article_coordinates[title] = (safe_float(m_[1]), safe_float(m_[2]))
+      article_coordinates[title] = Coord(safe_float(m_[1]), safe_float(m_[2]))
       short = title
       if rematch('(.*?), (.*)$', title):
         short = m_[1]
         tuple = (m_[1], m_[2])
         tuple_to_full_name[tuple] = title
-      if short not in short_to_full_name:
-        short_to_full_name[short] = []
-      short_to_full_name[short].append(title)
+      short_to_full_name[short] += [title]
 
-# Maximum number of miles allowed when looking for a close match
-maxdist = 20
+# Find Wikipedia article matching name NAME for location LOC.  NAME
+# will generally be one of the names of LOC (either its canonical
+# name or one of the alternate name).  CHECK_MATCH is a function that
+# is passed two aruments, the location and the Wikipedia artile name,
+# and should return True if the location matches the article.
+# PREFER_MATCH is used when two or more articles match.  It is passed
+# three argument, the location and two Wikipedia article names.  It
+# should return TRUE if the first is to be preferred to the second.
+# Return the name of the article matched, or None.
 
-def read_world_gazetteer_and_match(filename):
-  def record_match(loc, match, lat, long, dist):
-    lowername = loc.name.lower()
-    if lowername not in toponym_to_location:
-      toponym_to_location[lowername] = []
-    toponym_to_location[lowername].append(loc)
-    loc.match = match
-    if debug > 1:
-      uniprint("Matched location %s with coordinates (%s,%s), dist=%s" %
-               (match, lat, long, dist))
+def find_one_wikipedia_match(loc, name, check_match, prefer_match):
 
-  class GetOut: pass
+  # See if there is an article with the same name as the location
+  if name in article_coordinates:
+    if check_match(loc, name): return name
 
-  def output_non_match(match, lat, long, dist):
-    if debug > 1:
-      uniprint("Found location %s with coordinates (%s,%s) but dist %s > %s" %
-               (match, lat, long, dist, maxdist))
+  # Check whether there is a match for an article whose name is
+  # a combination of the location's name and one of the divisions that
+  # the location is in (e.g. "Augusta, Georgia" for a location named
+  # "Augusta" in a second-level division "Georgia").
+  if loc.div:
+    for div in loc.div.path:
+      artname = tuple_to_full_name.get((name, div), None)
+      if artname:
+        if check_match(loc, artname): return artname
 
-  for line in chompopen(filename):
-    fields = re.split(r'\t', line.strip())
-    # Skip places without coordinates
-    if len(fields) < 8 or not fields[6] or not fields[7]: continue
-    loc = Location()
-    loc.lat  = int(fields[6]) / 100.
-    loc.long = int(fields[7]) / 100.
-    loc.name = fields[1].strip()
-    loc.type = fields[4].strip()
-    loc.country = ''
-    loc.div1 = ''
-    loc.div2 = ''
-    if len(fields) >= 9: loc.country = fields[8].strip()
-    if len(fields) >= 10: loc.div1 = fields[9].strip()
-    if len(fields) >= 11: loc.div2 = fields[10].strip()
-
-    if debug > 1:
-      uniprint("Saw location %s (div %s/%s/%s) with coordinates (%s,%s)" %
-               (loc.name, loc.country, loc.div1, loc.div2, loc.lat, loc.long))
-
-    def check_match(artname):
-      (artlat, artlong) = article_coordinates[artname]
-      dist = spherical_distance(loc.lat, loc.long, artlat, artlong)
-      if dist <= maxdist:
-        record_match(loc, artname, artlat, artlong, dist)
-        return True
-      else:
-        output_non_match(artname, artlat, artlong, dist)
-        return False
-
-    try:
-      if loc.name in article_coordinates:
-        if check_match(loc.name): raise GetOut
-      for div in (loc.country, loc.div1, loc.div2):
-        artname = tuple_to_full_name.get((loc.name, div), None)
-        if artname:
-          if check_match(artname): raise GetOut
-      artnames = short_to_full_name.get(loc.name, None)
-      if artnames:
-        if len(artnames) == 1:
-          if check_match(artnames[0]): raise GetOut
-        else:
-          dists_names = []
-          for artname in artnames:
-            (artlat, artlong) = article_coordinates[artname]
-            dists_names.append((artname, spherical_distance(loc.lat, loc.long,
-                                                            artlat, artlong)))
-          dists_names.sort(key = lambda x:x[1])
-          if debug > 1:
-            print("Warning: Saw %s short-name matches" % len(artnames))
-          if debug > 1:
-            for i in xrange(len(dists_names)):
-              match = dists_names[i]
-              artlat, artlong = article_coordinates[match[0]]
-              uniprint("Match #%d: %s, dist=%s, coords (%s,%s)" %
-                       (i+1, match[0], match[1], artlat, artlong))
-          matchname = dists_names[0][0]
-          matchdist = dists_names[0][1]
-          (artlat, artlong) = article_coordinates[matchname]
-          record_match(loc, matchname, artlat, artlong, matchdist)
-          raise GetOut
+  # See if there is a match with any of the articles whose short
+  # name is the same as the location's name
+  artnames = short_to_full_name.get(name, None)
+  if artnames:
+    goodarts = [artname for artname in artnames if check_match(loc, artname)]
+    if len(goodarts) == 1:
+      return goodarts[0] # One match
+    elif len(goodarts) > 1:
+      # Multiple matches: Sort by preference, return most preferred one
       if debug > 1:
-        uniprint("Unmatched name %s" % loc.name)
-    except GetOut: pass
+        print("Warning: Saw %s short-name matches: %s" %
+              (len(goodarts), goodarts))
+      sortedarts = \
+        sorted(goodarts, cmp=(lambda x,y:1 if prefer_match(loc, x,y) else -1),
+               reverse=True)
+      return sortedarts[0]
+
+  # No match.
+  return None
+
+# Find Wikipedia article matching location LOC.  CHECK_MATCH and
+# PREFER_MATCH are as above.  Return the name of the article matched, or None.
+
+def find_wikipedia_match(loc, check_match, prefer_match):
+  # Try to find a match for the canonical name of the location
+  match = find_one_wikipedia_match(loc, loc.name, check_match, prefer_match)
+  if match: return match
+
+  # No match; try each of the alternate names in turn.
+  for altname in loc.altnames:
+    match = find_one_wikipedia_match(loc, altname, check_match, prefer_match)
+    if match: return match
+
+  # No match.
+  return None
+
+def find_match_for_locality(loc, maxdist):
+  # Check whether the given location matches the specified Wikipedia
+  # article by seeing if the distance away is at most MAXDIST.
+
+  def check_match(loc, artname):
+    artcoord = article_coordinates[artname]
+    dist = spheredist(loc.coord, artcoord)
+    if dist <= maxdist:
+      return True
+    else:
+      if debug > 1:
+        uniprint("Found location %s with coordinates %s but dist %s > %s" %
+                 (artname, artcoord, dist, maxdist))
+      return False
+
+  def prefer_match(loc, art1, art2):
+    return spheredist(loc.coord, article_coordinates[art1]) < \
+      spheredist(loc.coord, article_coordinates[art2])
+
+  return find_wikipedia_match(loc, check_match, prefer_match)
+
+def find_match_for_division(loc):
+  # Check whether the given location matches the specified Wikipedia
+  # article by seeing if the distance away is at most MAXDIST.
+
+  def check_match(loc, artname):
+    artcoord = article_coordinates[artname]
+    if artcoord in loc:
+      return True
+    else:
+      if debug > 1:
+        uniprint("Found article %s with coordinates %s but not in location named %s, path %s" %
+                 (artname, artcoord, loc.name, loc.path))
+      return False
+
+  def prefer_match(loc, art1, art2):
+    # Prefer according to incoming link counts, if that info is available
+    if art1 in incoming_link_count and art2 in incoming_link_count:
+      return incoming_link_count[art1] > incoming_link_count[art2]
+    else:
+      # FIXME: Do something smart here -- maybe check that location is farther
+      # in the middle of the bounding box (does this even make sense???)
+      return True
+
+  return find_wikipedia_match(loc, check_match, prefer_match)
+
+# Find the Wikipedia article matching an entry in the gazetteer.
+# The format of an entry is
+#
+# ID  NAME  ALTNAMES  ORIG-SCRIPT-NAME  TYPE  POPULATION  LAT  LONG  DIV1  DIV2  DIV3
+#
+# where there is a tab character separating each field.  Fields may be empty;
+# but there will still be a tab character separating the field from others.
+#
+# The ALTNAMES specify any alternative names of the location, often including
+# the equivalent of the original name without any accent characters.  If
+# there is more than one alternative name, the possibilities are separated
+# by a comma and a space, e.g. "Dongshi, Dongshih, Tungshih".  The
+# ORIG-SCRIPT-NAME is the name in its original script, if that script is not
+# Latin characters (e.g. names in Russia will be in Cyrillic). (For some
+# reason, names in Chinese characters are listed in the ALTNAMES rather than
+# the ORIG-SCRIPT-NAME.)
+#
+# LAT and LONG specify the latitude and longitude, respectively.  These are
+# given as integer values, where the actual value is found by dividing this
+# integer value by 100.
+#
+# DIV1, DIV2 and DIV3 specify different-level divisions that a location is
+# within, from largest to smallest.  Typically the largest is a country.
+# For locations in the U.S., the next two levels will be state and county,
+# respectively.  Note that such divisions also have corresponding entries
+# in the gazetteer.  However, these entries are somewhat lacking in that
+# (1) no coordinates are given, and (2) only the top-level division (the
+# country) is given, even for third-level divisions (e.g. counties in the
+# U.S.).
+
+def match_world_gazetteer_entry(line):
+  # Split on tabs, make sure at least 11 fields present and strip off
+  # extra whitespace
+  fields = re.split(r'\t', line.strip()) + ['']*11
+  fields = [x.strip() for x in fields[0:11]]
+  (id, name, altnames, orig_script_name, typ, population, lat, long,
+   div1, div2, div3) = fields
+
+  # Skip places without coordinates
+  if not lat or not long:
+    if debug > 1:
+      uniprint("Skipping location %s (div %s/%s/%s) without coordinates" %
+               (name, div1, div2, div3))
+    return
+
+  # Create and populate a Locality object
+  loc = Locality(name, Coord(int(lat) / 100., int(long) / 100.))
+  loc.type = typ
+  if altnames:
+    loc.altnames = re.split(', ', altnames)
+  # Add the given location to the division the location is in
+  loc.div = Division.note_point_seen_in_division(loc.coord, (div1, div2, div3))
+  if debug > 1:
+    uniprint("Saw location %s (div %s/%s/%s) with coordinates %s" %
+             (loc.name, div1, div2, div3, loc.coord))
+
+  # Record the location.  For each name for the location (its
+  # canonical name and all alternates), add the location to the list of
+  # locations associated with the name.  Record the name in lowercase
+  # for ease in matching.
+  for name in [loc.name] + loc.altnames:
+    lowername = name.lower()
+    if debug > 1:
+      uniprint("Noting toponym_to_location for toponym %s, canonical name %s"
+               % (name, loc.name))
+    toponym_to_location[lowername] += [loc]
+
+  # We start out looking for articles whose distance is no more
+  # than max_dist_for_close_match, preferring articles whose name
+  # is as close as possible to the name of the toponym.  Then we
+  # steadily widen the match radius until we have considered the
+  # entire earth.
+  maxdist = max_dist_for_close_match
+  # For points on the earth, we should never see a great-circle
+  # distance greater than 12,500 miles or so, but set it much higher
+  # just in case.
+  while maxdist < 30000:
+    match = find_match_for_locality(loc, maxdist)
+    if match: break
+    maxdist *= 2
+
+  if not match: 
+    if debug > 1:
+      uniprint("Unmatched name %s" % loc.name)
+    return
+  
+  # Record the match.
+  loc.match = match
+  if debug > 1:
+    uniprint("Matched location %s (coord %s) with article %s (coord %s), dist=%s"
+             % (loc.name, loc.coord, match, article_coordinates[match],
+                spheredist(loc.coord, article_coordinates[match])))
+
+# Read in the data from the World gazetteer and find the Wikipedia article
+# matching each entry in the gazetteer.  The format of an entry is
+def read_world_gazetteer_and_match(filename):
+
+  # Match each entry in the gazetteer
+  for line in uchompopen(filename):
+    if debug > 1:
+      uniprint("Processing line: %s" % line)
+    match_world_gazetteer_entry(line)
+
+  for division in path_to_division.itervalues():
+    if debug > 1:
+      uniprint("Processing division named %s, path %s"
+               % (division.name, division.path))
+    division.compute_boundary()
+    match = find_match_for_division(division)
+    if match:
+      if debug > 1:
+        uniprint("Matched article %s (coord %s) for division %s, path %s" %
+                 (match, article_coordinates[match],
+                  division.name, division.path))
+      division.match = match
+    else:
+      if debug > 1:
+        uniprint("Couldn't find match for division %s, path %s" %
+                 (division.name, division.path))
 
 def read_incoming_link_info(filename):
-  fi = open(filename)
   articles_seen = 0
-  for line in fi:
+  for line in uchompopen(filename):
     if rematch('------------------ Count of incoming links: ------------',
                line): continue
     elif rematch('==========================================', line):
-      fi.close()
       return
     else:
       assert rematch('(.*) = ([0-9]+)$', line)
@@ -286,35 +605,64 @@ def read_incoming_link_info(filename):
       if (articles_seen % 10000) == 0:
         print "Processed %d articles" % articles_seen
 
+# Class of word in a CONLL file.  Fields:
+#
+#   word: The identity of the word.
+#   isstop: True if it is a stopword.
+#   coord: For a location with specified ground-truth coordinate, the
+#          coordinate.  Else, none.
+#   context: Vector including the word and 10 words on other side.
+#
+class ConllWord(object):
+  def __init__(self, word):
+    self.word = word
+    self.isstop = word in stopwords
+    self.coord = None
+    self.context = None
+
 def read_trconll_file(filename):
   results = []
-  words = collections.deque()
   in_loc = False
-  for line in chompopen(filename):
-    try:
-      (word, ty) = re.split('\t', line, 1)
-      if word and word not in stopwords:
-        pass # FIXME
-      if in_loc and word:
-        in_loc = False
-      elif ty.startswith('LOC'):
-        in_loc = True
-        loc_word = word
-      elif in_loc and ty[0] == '>':
-        (off, gaz, lat, long, fulltop) = re.split('\t', ty, 4)
-        lat = float(lat)
-        long = float(long)
-        results.append((loc_word, lat, long))
-        if debug > 0:
-          uniprint("Saw loc %s with true coordinates %s,%s" %
-                   (loc_word, lat, long))
-    except Exception as exc:
-      print "Bad line %s" % line
-      print "Exception is %s" % exc
-      if type(exc) is not ValueError:
-        traceback.print_exc()
-      return results
+  try:
+    for line in uchompopen(filename):
+      try:
+        (word, ty) = re.split('\t', line, 1)
+        if word:
+          wordstruct = ConllWord(word)
+          results.append(wordstruct)
+        if in_loc and word:
+          in_loc = False
+        elif ty.startswith('LOC'):
+          in_loc = True
+          loc_word = wordstruct
+        elif in_loc and ty[0] == '>':
+          (off, gaz, lat, long, fulltop) = re.split('\t', ty, 4)
+          lat = float(lat)
+          long = float(long)
+          loc_word.coord = Coord(lat, long)
+          if debug > 0:
+            uniprint("Saw loc %s with true coordinates %s" %
+                     (loc_word.word, loc_word.coord))
+      except Exception as exc:
+        print "Bad line %s" % line
+        print "Exception is %s" % exc
+        if type(exc) is not ValueError:
+          traceback.print_exc()
+        return None
+  except Exception as exc:
+    print "Exception %s reading from file %s" % (exc, filename)
+    traceback.print_exc()
+    return None
+
+  # Now compute context for words
+  nbcl = naive_bayes_context_len
+  for i in xrange(len(results)):
+    pass
+    # Select up to naive_bayes_context_len words on either side
+    #results.context = [x.word for x in
+    #                   results[max(0,i-nbcl) : min(len(results),i+nbcl+1)]]
   return results
+  
 
 # Process all files in DIR, calling FUN on each one (with the directory name
 # joined to the name of each file in the directory).
@@ -323,39 +671,67 @@ def process_dir_files(dir, fun):
     fullname = os.path.join(dir, fname)
     fun(fullname)
   
+# Given a TR-CONLL file, find each toponym explicitly mentioned as such
+# and disambiguate it (find the correct geographic location) using the
+# "link baseline", i.e. use the location with the highest number of
+# incoming links.
 def disambiguate_link_baseline(fname):
   print "Processing TR-CONLL file %s..." % fname
   results = read_trconll_file(fname)
-  for (toponym, lat, long) in results:
+  # Return value will be None if error occurred
+  if not results: return
+  for conllword in results:
+    toponym = conllword.word
+    coord = conllword.coord
+    if not coord: continue
     lowertop = toponym.lower()
     maxlinks = 0
     bestloc = None
-    if lowertop not in toponym_to_location:
+    locs = toponym_to_location.get(lowertop, []) + \
+           toponym_to_division.get(lowertop, [])
+    if not locs:
       if debug > 0:
         uniprint("Unable to find any possibilities for %s" % toponym)
       correct = False
     else:
-      locs = toponym_to_location[lowertop]
       if debug > 0:
-        uniprint("Considering toponym %s, coordinates %s,%s" %
-                 (toponym, lat, long))
+        uniprint("Considering toponym %s, coordinates %s" %
+                 (toponym, coord))
         uniprint("For toponym %s, %d possible locations" %
                  (toponym, len(locs)))
       for loc in locs:
+        artname = loc.match
         if debug > 0:
-          artname = loc.match
-          uniprint("Considering article %s" % artname)
+          if type(loc) is Locality:
+            uniprint("Considering location %s (Locality), coord %s, article %s"
+                     % (loc.name, loc.coord, artname))
+          else:
+            uniprint("Considering location %s (Division), article %s"
+                     % (loc.name, artname))
+        if not artname:
+          thislinks = 0
+          if debug > 0:
+            uniprint("--> Location without matching article")
+        else:
           if artname not in incoming_link_count:
-            warning("Strange, article %s has no link count" % artname)
             thislinks = 0
+            if debug > 0:
+              warning("Strange, article (coord %s) has no link count" %
+                      (article_coordinates[artname]))
           else:
             thislinks = incoming_link_count[artname]
-          if thislinks > maxlinks:
-            maxlinks = thislinks
-            bestloc = loc
+            if debug > 0:
+              uniprint("--> Coord %s, link count is %s" %
+                       (article_coordinates[artname], thislinks))
+        if thislinks > maxlinks:
+          maxlinks = thislinks
+          bestloc = loc
       if bestloc:
-        dist = spherical_distance(lat, long, bestloc.lat, bestloc.long)
-        correct = dist <= maxdist
+        if type(bestloc) is Locality:
+          dist = spheredist(coord, bestloc.coord)
+          correct = dist <= max_dist_for_close_match
+        else:
+          correct = coord in bestloc
       else:
         # If we couldn't find link counts, this can happen
         correct = False
@@ -365,8 +741,86 @@ def disambiguate_link_baseline(fname):
     global total_toponyms_disambiguated
     total_toponyms_disambiguated += 1
     if debug > 0 and bestloc:
-      uniprint("Best match = %s, coordinates %s,%s, dist %s, correct %s"
-               % (bestloc.match, bestloc.lat, bestloc.long, dist, correct))
+      if type(bestloc) is Locality:
+        uniprint("Best match = %s, link count = %s, coordinates %s, dist %s, correct %s"
+                 % (bestloc.match, maxlinks, bestloc.coord, dist, correct))
+      else:
+        uniprint("Best match = %s, link count = %s, correct %s" %
+                 (bestloc.match, maxlinks, correct))
+
+# Given a TR-CONLL file, find each toponym explicitly mentioned as such
+# and disambiguate it (find the correct geographic location) using
+# Naive Bayes.
+#def disambiguate_naive_bayes(fname):
+#  print "Processing TR-CONLL file %s..." % fname
+#  results = read_trconll_file(fname)
+#  for conllword in results:
+#    toponym = conllword.word
+#    coord = conllword.coord
+#    if not coord: continue
+#    lowertop = toponym.lower()
+#    maxlinks = 0
+#    bestloc = None
+#    locs = toponym_to_location.get(lowertop, []) + \
+#           toponym_to_division.get(lowertop, [])
+#    if not locs:
+#      if debug > 0:
+#        uniprint("Unable to find any possibilities for %s" % toponym)
+#      correct = False
+#    else:
+#      if debug > 0:
+#        uniprint("Considering toponym %s, coordinates %s" %
+#                 (toponym, coord))
+#        uniprint("For toponym %s, %d possible locations" %
+#                 (toponym, len(locs)))
+#      for loc in locs:
+#        artname = loc.match
+#        if debug > 0:
+#          if type(loc) is Locality:
+#            uniprint("Considering location %s (Locality), coord %s, article %s"
+#                     % (loc.name, loc.coord, artname))
+#          else:
+#            uniprint("Considering location %s (Division), article %s"
+#                     % (loc.name, artname))
+#        if not artname:
+#          thislinks = 0
+#          if debug > 0:
+#            uniprint("--> Location without matching article")
+#        else:
+#          if artname not in incoming_link_count:
+#            thislinks = 0
+#            if debug > 0:
+#              warning("Strange, article (coord %s) has no link count" %
+#                      (article_coordinates[artname]))
+#          else:
+#            thislinks = incoming_link_count[artname]
+#            if debug > 0:
+#              uniprint("--> Coord %s, link count is %s" %
+#                       (article_coordinates[artname], thislinks))
+#        if thislinks > maxlinks:
+#          maxlinks = thislinks
+#          bestloc = loc
+#      if bestloc:
+#        if type(bestloc) is Locality:
+#          dist = spheredist(coord, bestloc.coord)
+#          correct = dist <= max_dist_for_close_match
+#        else:
+#          correct = coord in bestloc
+#      else:
+#        # If we couldn't find link counts, this can happen
+#        correct = False
+#    if correct:
+#      global correct_toponyms_disambiguated
+#      correct_toponyms_disambiguated += 1
+#    global total_toponyms_disambiguated
+#    total_toponyms_disambiguated += 1
+#    if debug > 0 and bestloc:
+#      if type(bestloc) is Locality:
+#        uniprint("Best match = %s, link count = %s, coordinates %s, dist %s, correct %s"
+#                 % (bestloc.match, maxlinks, bestloc.coord, dist, correct))
+#      else:
+#        uniprint("Best match = %s, link count = %s, correct %s" %
+#                 (bestloc.match, maxlinks, correct))
 
 #######################################################################
 #                                Main code                            #
