@@ -6,6 +6,43 @@
 ####### Copyright (c) 2010 Ben Wing.
 #######
 
+### FIXME:
+###
+### Cases to fix involving coordinates:
+
+# 1. Nested coordinates:
+
+#{{Infobox Australian Place
+#| name     = Lauderdale
+#| image    = Lauderdale Canal.JPG
+#| caption  = 
+#| loc-x    = 
+#| loc-y    = 
+#| coordinates = {{coord|42|54|40|S|147|29|34|E|display=inline,title}}
+#| state    = tas
+#...
+#}}
+
+# 2. Mapit and Geolinks templates:
+
+# {{Geolinks-AUS-suburbscale|long=138.601|lat=-34.929}}
+# {{Geolinks-US-streetscale|34.1996350|-118.1746540}}
+# {{Mapit-AUS-suburbscale|lat=-43.164721|long=146.926947}}
+
+import sys, re
+from optparse import OptionParser
+from textutil import *
+
+from xml.sax import make_parser
+from xml.sax.handler import ContentHandler
+
+# Debug level; if non-zero, output lots of extra information about how
+# things are progressing.  If > 1, even more info.
+debug = 0
+
+# If true, print out warnings about strangely formatted input
+show_warnings = False
+
 ############################################################################
 #                              Documentation                               #
 ############################################################################
@@ -226,23 +263,6 @@
 #    Note that "return generator2()" *will* work inside of a function that is
 #    not a generator, i.e. has no "yield" statement in it.
 
-
-############################################################################
-#                                    Code                                  #
-############################################################################
-
-import sys, re
-from optparse import OptionParser
-
-from xml.sax import make_parser
-from xml.sax.handler import ContentHandler
-
-# Debug level; if non-zero, output lots of extra information about how
-# things are progressing.  If > 1, even more info.
-debug = 0
-
-# If true, print out warnings about strangely formatted input
-show_warnings = False
 
 #######################################################################
 #                 Chunk text into balanced sections                   #
@@ -468,10 +488,10 @@ class RecursiveSourceTextHandler(SourceTextHandler):
 
 # Accumulate a table of all the templates with coordinates in them, along
 # with counts.
-templates_with_coords = {}
+templates_with_coords = intdict()
 
 # Accumulate a table of all templates, with counts.
-all_templates = {}
+all_templates = intdict()
 
 def safe_float(x):
   '''Convert a string to floating point, but don't crash on errors;
@@ -535,7 +555,7 @@ def get_coord_1(args, nsew, convert_nsew):
     d = args[0]; m = args[1]; s = 0; i = 2
   elif args[3] in nsew:
     d = args[0]; m = args[1]; s = args[2]; i = 3
-  else: return (0, args[0])
+  else: return (1, args[0])
   return (i+1, convert_dms(convert_nsew[args[i]], d, m, s))
 
 def get_coord(temptype, args):
@@ -589,7 +609,8 @@ to do that, change this class to inherit from RecursiveSourceTextHandler.
 See process_article_text() for a description of the formatting that is
 applied to the text before being sent here.'''
 
-  coords = []
+  def __init__(self):
+    self.coords = []
 
   def process_template(self, text):
     # Look for a Coord, Infobox, etc. template that may have coordinates in it
@@ -611,8 +632,7 @@ applied to the text before being sent here.'''
       # look at templates whose lowercased name begins with "infobox".
       (paramshash, _) = find_template_params(tempargs[1:], True)
       if 'latd' in paramshash:
-        templates_with_coords[lowertemp] = \
-          templates_with_coords.get(lowertemp, 0) + 1
+        templates_with_coords[lowertemp] += 1
         (lat, long) = get_lat_long(temptype, paramshash)
     if lat or long:
       if debug > 0: uniprint("Saw coordinate %s,%s in template type %s" %
@@ -718,7 +738,7 @@ def yield_template_args(text):
   temptype = tempargs[0].strip().lower()
 
   if debug > 0:
-    all_templates[temptype] = all_templates.get(temptype, 0) + 1
+    all_templates[temptype] += 1
 
   # Extract the parameter and non-parameter arguments.
   (paramhash, nonparam) = find_template_params(tempargs[1:], False)
@@ -1135,6 +1155,13 @@ class PrintWordsAndCoords(ArticleHandlerForUsefulText):
 
 
 
+# Just find redirects.
+
+class FindRedirects(ArticleHandler):
+  def process_redirect(self, title, redirtitle):
+    uniprint("Article title: %s" % title)
+    uniprint("Redirect to: %s" % redirtitle)
+
 # Handler to output count information on words.  Only processes articles
 # with coordinates in them, and only selects the first coordinate seen.
 # Outputs the article title and coordinates.  Then computes the count of
@@ -1143,9 +1170,9 @@ class PrintWordsAndCoords(ArticleHandlerForUsefulText):
 
 class GetCoordsAndCounts(ArticleHandlerForUsefulText):
   def process_text_for_words(self, title, word_generator):
-    wordhash = {}
+    wordhash = intdict()
     for word in word_generator:
-      if word: wordhash[word] = wordhash.get(word, 0) + 1
+      if word: wordhash[word] += 1
     output_reverse_sorted_table(wordhash)
 
   def process_text_for_data(self, title, text):
@@ -1157,9 +1184,9 @@ class GetCoordsAndCounts(ArticleHandlerForUsefulText):
       # accurate.
       for (temptype, lat, long) in handler.coords:
         if temptype.startswith('coor'):
-        uniprint("Article title: %s" % title)
-        uniprint("Article coordinates: %s,%s" % (lat, long))
-        return True
+          uniprint("Article title: %s" % title)
+          uniprint("Article coordinates: %s,%s" % (lat, long))
+          return True
       (temptype, lat, long) = handler.coords[0]
       uniprint("Article title: %s" % title)
       uniprint("Article coordinates: %s,%s" % (lat, long))
@@ -1174,7 +1201,7 @@ class GetCoordsAndCounts(ArticleHandlerForUsefulText):
 # an article).
 
 # Count number of incoming links for articles
-incoming_link_count = {}
+incoming_link_count = intdict()
 
 # Map surface names to a hash that maps articles to counts
 surface_map = {}
@@ -1185,8 +1212,7 @@ coordinate_articles = set()
 # Parse the result of a previous run of --coords-counts for articles with
 # coordinates
 def get_coordinates(filename):
-  for line in open(filename):
-    line = line.strip()
+  for line in uchompopen(filename):
     m = re.match('Article title: (.*)', line)
     if m:
       title = m.group(1)
@@ -1211,13 +1237,13 @@ class ProcessSourceForLinks(RecursiveSourceTextHandler):
       else:
         surface = ''.join(self.useful_text_handler.
                           process_source_text(tempargs[-1]))
-        incoming_link_count[article] = incoming_link_count.get(article, 0) + 1
+        incoming_link_count[article] += 1
         if surface not in surface_map:
-          nested_surface_map = {}
+          nested_surface_map = intdict()
           surface_map[surface] = nested_surface_map
         else:
           nested_surface_map = surface_map[surface]
-        nested_surface_map[article] = nested_surface_map.get(article, 0) + 1
+        nested_surface_map[article] += 1
  
     # Also recursively process all the arguments for links, etc.
     return self.process_source_text(text[2:-2])
@@ -1271,6 +1297,9 @@ all articles it maps to.""",
   op.add_option("-c", "--coords-counts",
                 help="Print info about counts of words for all articles with coodinates.",
                 action="store_true")
+  op.add_option("-r", "--find-redirects",
+                help="Output all redirects.",
+                action="store_true")
   op.add_option("-f", "--coords-file",
                 help="""File containing output from a prior run of
 --coords-counts, listing all the articles with associated coordinates.
@@ -1296,6 +1325,8 @@ combined.)""",
     main_process_input(PrintWordsAndCoords())
   elif opts.find_links:
     main_process_input(FindLinks())
+  elif opts.find_redirects:
+    main_process_input(FindRedirects())
   elif opts.coords_counts:
     main_process_input(GetCoordsAndCounts())
 
