@@ -1,5 +1,12 @@
-import re
-import codecs
+from __future__ import with_statement # For chompopen(), uchompopen()
+import re # For regexp wrappers
+import codecs # For uchompopen()
+import bisect # For sorted lists
+
+#############################################################################
+#                        Regular expression functions                       #
+#############################################################################
+
 
 #### Some simple wrappers around basic text-processing Python functions to
 #### make them easier to use.
@@ -13,17 +20,6 @@ import codecs
 #### global variable m_.  Groups can be accessed from this variable using
 #### m_.group() or m_.groups(), but they can also be accessed through direct
 #### subscripting, i.e. m_[###] = m_.group(###).
-####
-#### 2. chompopen():
-####
-#### A generator that yields lines from a file, with any terminating newline
-#### removed (but no other whitespace removed).  Ensures that the file
-#### will be automatically closed under all circumstances.
-####
-#### 3. uchompopen():
-####
-#### Same as chompopen() but specifically open the file as 'utf-8' and
-#### return Unicode strings.
 
 class WreMatch(object):
   def setmatch(self, match):
@@ -55,6 +51,24 @@ def research(pattern, string, flags=0):
     return True
   return False
 
+#############################################################################
+#                            File reading functions                         #
+#############################################################################
+
+### NOTE NOTE NOTE: Only works on Python 2.5 and above, due to using the
+### "with" statement.
+
+#### 1. chompopen():
+####
+#### A generator that yields lines from a file, with any terminating newline
+#### removed (but no other whitespace removed).  Ensures that the file
+#### will be automatically closed under all circumstances.
+####
+#### 2. uchompopen():
+####
+#### Same as chompopen() but specifically open the file as 'utf-8' and
+#### return Unicode strings.
+
 # Open a filename with UTF-8-encoded input and yield lines converted to
 # Unicode strings, but with any terminating newline removed (similar to
 # "chomp" in Perl).
@@ -71,6 +85,29 @@ def chompopen(filename):
     for line in f:
       if line and line[-1] == '\n': line = line[:-1]
       yield line
+
+#############################################################################
+#                         Other Unicode utility functions                   #
+#############################################################################
+
+def internasc(text):
+  '''Intern a string (for more efficient memory use, potentially faster lookup.
+If string is Unicode, automatically convert to UTF-8.'''
+  if type(text) is unicode: text = text.encode("utf-8")
+  return intern(text)
+
+def uniprint(text):
+  '''Print text string using 'print', converting Unicode as necessary.
+If string is Unicode, automatically convert to UTF-8, so it can be output
+without errors.'''
+  if type(text) is unicode:
+    print text.encode("utf-8")
+  else:
+    print text
+
+#############################################################################
+#                             Default dictionaries                          #
+#############################################################################
 
 # A dictionary where missing keys automatically spring into existence
 # with a value of 0.  Useful for dictionaries that track counts of items.
@@ -118,3 +155,33 @@ class tupledict(dict):
 class setdict(dict):
   def __missing__(self, key):
     return set()
+
+#############################################################################
+#                                 Sorted lists                              #
+#############################################################################
+
+# Return a tuple (keys, values) of lists of items corresponding to a hash
+# table.  Stored in sorted order according to the keys.  Use
+# lookup_sorted_list(key) to find the corresponding value.  The purpose of
+# doing this, rather than just directly using a hash table, is to save
+# memory.
+
+def make_sorted_list(table):
+  items = sorted(table.items(), key=lambda x:x[0])
+  keys = ['']*len(items)
+  values = ['']*len(items)
+  for i in xrange(len(items)):
+    item = items[i]
+    keys[i] = item[0]
+    values[i] = item[1]
+  return (keys, values)
+
+# Given a sorted list in the tuple form (KEYS, VALUES), look up the item KEY.
+# If found, return the corresponding value; else return None.
+
+def lookup_sorted_list(sorted_list, key):
+  (keys, values) = sorted_list
+  i = bisect.bisect_left(keys, key)
+  if i != len(keys) and keys[i] == key:
+    return values[i]
+  return None

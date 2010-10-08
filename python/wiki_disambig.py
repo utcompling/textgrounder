@@ -11,6 +11,9 @@ import os, os.path
 import math
 import collections
 import traceback
+import cPickle
+import itertools
+import gc
 from optparse import OptionParser
 from textutil import *
 
@@ -48,10 +51,73 @@ tuple_to_full_name = {}
 # List of stopwords
 stopwords = set()
 
-# For each Wikipedia article, value is a hash table of word->probability
-# items.  In addition, an item with key None lists the probability of an
-# unknown word.
+# Map of word to index
+word_to_index = {}
+
+# Inverse map: Index to word
+index_to_word = {}
+
+# Total number of word types seen (size of vocabulary)
+num_word_types = 0
+
+# Total number of word tokens seen
+num_word_tokens = 0
+
+# Total number of types seen once
+num_types_seen_once = 0
+
+# Estimate of number of unseen word types for all articles
+num_unseen_word_types = 0
+
+# Overall probabilities over all articles of seeing a word in an article,
+# for all words seen at least once in any article, computed using the
+# empirical frequency of a word among all articles, adjusted by the mass
+# to be assigned to unknown words (words never seen at all), i.e. the
+# value in 'overall_unknown_word_prob'.
+overall_word_probs = intdict()
+
+# The total probability mass to be assigned to words not seen at all in
+# any article, estimated using Good-Turing smoothing as the unadjusted
+# empirical probability of having seen a word once.
+overall_unknown_word_prob = 0.0
+
+# For each Wikipedia article, value is a list [PROBS, UNKNOWN_PROB,
+# OVERALL_UNSEEN_WORD_PROB] where:
+#
+# -- PROBS is a "sorted list" (tuple of sorted keys and values) of
+#    (word, probability) items, specifying the estimated probability of
+#    each word that has been seen at least once in the article (the
+#    empirical frequency of the word in the article, adjusted by
+#    UNKNOWN_PROB, see following).
+# -- UNKNOWN_PROB is the total probability mass to be assigned to all
+#    words not seen in the article, estimated using Good-Turing smoothing
+#    as the unadjusted empirical probability of having seen a word once.
+# -- OVERALL_UNSEEN_WORD_PROB is the probability mass assigned in
+#    'overall_word_probs' to all words not seen at least once in the article.
+#    This is 1 - (sum over W in A of overall_word_probs[W]).  The idea is
+#    that we compute the probability of seeing a word W in article A as
+#
+#    -- if W has been seen before in A, use PROBS[W]
+#    -- else, if W seen in any articles (W in 'overall_word_probs'),
+#       use UNKNOWN_PROB * (overall_word_probs[W] / OVERALL_UNSEEN_WORD_PROB).
+#       The idea is that overall_word_probs[W] / OVERALL_UNSEEN_WORD_PROB is
+#       an estimate of p(W | W not in A).  We have to divide by
+#       OVERALL_UNSEEN_WORD_PROB to make these probabilities be normalized
+#       properly.  We scale p(W | W not in A) by the total probability mass
+#       we have available for all words not seen in A.
+#    -- else, use UNKNOWN_PROB * overall_unknown_word_prob / NUM_UNKNOWN_WORDS,
+#       where NUM_UNKNOWN_WORDS is an estimate of the total number of words
+#       "exist" but haven't been seen in any articles.  One simple idea is
+#       to use the number of words seen once in any article.  This certainly
+#       underestimates this number of not too many articles have been seen
+#       but might be OK if many articles seen.
+
 article_probs = {}
+
+# For articles not listed in article_probs, use an empty list to look up in.
+unseen_article_probs = ([], [])
+
+max_articles_to_count = 0
 
 # For each toponym (name of location), value is a list of Locality items,
 # listing gazetteer locations and corresponding matching Wikipedia articles.
@@ -69,13 +135,13 @@ total_toponyms_disambiguated = 0
 
 # Debug level; if non-zero, output lots of extra information about how
 # things are progressing.  If > 1, even more info.
-debug = 2
+debug = 3
 
 # If true, print out warnings about strangely formatted input
 show_warnings = True
 
-# After ignoring stopwords, do we renormalize the probabilities or not?
-renormalize_non_stopword_probs = True
+# Do we ignore stopwords when computing word distributions?
+ignore_stopwords_in_article_dists = False
 
 # Maximum number of miles allowed when looking for a close match
 max_dist_for_close_match = 20
@@ -251,13 +317,6 @@ class Coord(object):
 ###                        Utility functions                        ###
 #######################################################################
 
-def uniprint(text):
-  '''Print Unicode text in UTF-8, so it can be output without errors'''
-  if type(text) is unicode:
-    print text.encode("utf-8")
-  else:
-    print text
-
 def warning(text):
   '''Output a warning, formatting into UTF-8 as necessary'''
   if show_warnings:
@@ -316,37 +375,96 @@ def read_stopwords(filename):
 # the remaining probabilities accordingly.
 
 def construct_naive_bayes_dist(filename):
+
   articles_seen = 0
+  totalcount = 0
+
+  def one_article_probs():
+    if totalcount == 0: return
+    wordprob = {}
+    # Compute probabilities.  Use a very simple version of Good-Turing
+    # smoothing where we assign to unknown words the probability mass of
+    # words seen once, and adjust all other probs accordingly.
+    unknown_mass = float(oncecount)/totalcount
+    for (word,count) in wordhash.iteritems():
+      # Get index of word; if not seen, create new index.
+      if word in word_to_index:
+        ind = word_to_index[word]
+      else:
+        global num_word_types
+        num_word_types += 1
+        ind = num_word_types
+        word_to_index[word] = ind
+        index_to_word[ind] = word
+      # Record in overall_word_probs; note more tokens seen.
+      overall_word_probs[ind] += count
+      global num_word_tokens
+      num_word_tokens += count
+      # Record in current article's word->probability map.
+      wordprob[ind] = float(count)/totalcount*(1 - unknown_mass)
+    article_probs[title] = [make_sorted_list(wordprob), unknown_mass, 0.0]
+    if debug > 3:
+      uniprint("Title = %s, numtypes = %s, numtokens = %s, unknown_mass = %s" % (
+        title, len(article_probs[title][0][0]), totalcount, unknown_mass))
+    if (articles_seen % 100) == 0:
+      print "Processed %d articles" % articles_seen
+
   for line in uchompopen(filename):
-    if rematch('Article title: (.*)$', line):
-      title = m_[1]
-      wordprob = {}
+    if line.startswith('Article title: '):
+      m = re.match('Article title: (.*)$', line)
+      articles_seen += 1
+      one_article_probs()
+      # Stop if we've reached the maximum
+      if max_articles_to_count and articles_seen >= max_articles_to_count:
+        break
+      title = m.group(1)
       wordhash = {}
       totalcount = 0
       oncecount = 0
-    elif rematch('Article coordinates: (.*),(.*)$', line):
-      # Compute probabilities.  Use a very simple version of Good-Turing
-      # smoothing where we assign to unknown words the probability mass of
-      # words seen once, and adjust all other probs accordingly.
-      unknown_mass = float(oncecount)/totalcount
-      # I would just reuse wordhash, but I'm not sure whether it's allowed
-      # to modify an item you're iterating over
-      for (word,count) in wordhash.iteritems():
-        wordprob[word] = float(count)/totalcount*unknown_mass
-      wordprob[None] = unknown_mass
-      article_probs[title] = wordprob
-      articles_seen += 1
-      if (articles_seen % 10000) == 0:
-        print "Processed %d articles" % articles_seen
+    elif line.startswith('Article coordinates: '):
+      pass
     else:
-      assert rematch('(.*) = ([0-9]+)$', line)
-      word = m_[1]
-      count = int(m_[2])
-      if word in stopwords and not renormalize_non_stopword_probs: continue
+      m = re.match('(.*) = ([0-9]+)$', line)
+      if not m:
+        warning("Strange line, can't parse: title=%s: line=%s" % (title, line))
+        continue
+      word = m.group(1)
+      count = int(m.group(2))
+      if word in stopwords and ignore_stopwords_in_article_dists: continue
       totalcount += count
       if count == 1: oncecount += 1
-      if word in stopwords: continue
       wordhash[word] = count
+  else:
+    articles_seen += 1
+    one_article_probs()
+
+  # Now, adjust overall_word_probs accordingly.
+  global num_types_seen_once
+  num_types_seen_once = 0
+  for count in overall_word_probs.itervalues():
+    if count == 1:
+      num_types_seen_once += 1
+  global overall_unknown_word_prob
+  overall_unknown_word_prob = float(num_types_seen_once)/num_word_tokens
+  for (wordind,count) in overall_word_probs.iteritems():
+    overall_word_probs[wordind] = (
+      float(count)/num_word_tokens*(1 - overall_unknown_word_prob))
+  # A very rough estimate, perhaps totally wrong
+  global num_unseen_word_types
+  num_unseen_word_types = num_types_seen_once
+
+  #if debug > 2:
+  #  uniprint("Num types = %s, num tokens = %s, num_seen_once = %s, unknown_word_prob = %s, total mass = %s" % (num_word_types, num_word_tokens, num_types_seen_once, overall_unknown_word_prob, overall_unknown_word_prob + sum(overall_word_probs.itervalues())))
+
+  # Figure out the value of OVERALL_UNSEEN_WORD_PROB for each article.
+  for (artname, probval) in article_probs.iteritems():
+    wordproblist = probval[0]
+    overall_seen_prob = 0.0
+    for ind in wordproblist[0]:
+      overall_seen_prob += overall_word_probs[ind]
+    probval[2] = 1.0 - overall_seen_prob
+    if debug > 3:
+      uniprint("Article %s: unknown mass = %s, total mass = %s, overall unseen prob = %s" % (artname, probval[1], probval[1] + sum(probval[0][1]), probval[2]))
 
 # Parse the result of a previous run of --coords-counts for articles with
 # coordinates
@@ -616,11 +734,11 @@ def read_incoming_link_info(filename):
 class ConllWord(object):
   def __init__(self, word):
     self.word = word
-    self.isstop = word in stopwords
+    self.isstop = False
     self.coord = None
     self.context = None
 
-def read_trconll_file(filename):
+def read_trconll_file(filename, compute_context):
   results = []
   in_loc = False
   try:
@@ -643,24 +761,33 @@ def read_trconll_file(filename):
           if debug > 0:
             uniprint("Saw loc %s with true coordinates %s" %
                      (loc_word.word, loc_word.coord))
-      except Exception as exc:
+      except Exception, exc:
         print "Bad line %s" % line
         print "Exception is %s" % exc
         if type(exc) is not ValueError:
           traceback.print_exc()
         return None
-  except Exception as exc:
+  except Exception, exc:
     print "Exception %s reading from file %s" % (exc, filename)
     traceback.print_exc()
     return None
 
   # Now compute context for words
   nbcl = naive_bayes_context_len
-  for i in xrange(len(results)):
-    pass
-    # Select up to naive_bayes_context_len words on either side
-    #results.context = [x.word for x in
-    #                   results[max(0,i-nbcl) : min(len(results),i+nbcl+1)]]
+  if compute_context:
+    # First determine whether each word is a stopword
+    for i in xrange(len(results)):
+      # If a word tagged as a toponym is homonymous with a stopword, it
+      # still isn't a stopword.
+      results[i].isstop = not results[i].coord and results[i].word in stopwords
+    # Now generate context for toponyms
+    for i in xrange(len(results)):
+      if results[i].coord:
+        # Select up to naive_bayes_context_len words on either side; skip
+        # stopwords.
+        results[i].context = \
+          [x.word for x in results[max(0,i-nbcl):min(len(results),i+nbcl+1)]
+                  if x.word not in stopwords]
   return results
   
 
@@ -677,7 +804,7 @@ def process_dir_files(dir, fun):
 # incoming links.
 def disambiguate_link_baseline(fname):
   print "Processing TR-CONLL file %s..." % fname
-  results = read_trconll_file(fname)
+  results = read_trconll_file(fname, False)
   # Return value will be None if error occurred
   if not results: return
   for conllword in results:
@@ -751,76 +878,121 @@ def disambiguate_link_baseline(fname):
 # Given a TR-CONLL file, find each toponym explicitly mentioned as such
 # and disambiguate it (find the correct geographic location) using
 # Naive Bayes.
-#def disambiguate_naive_bayes(fname):
-#  print "Processing TR-CONLL file %s..." % fname
-#  results = read_trconll_file(fname)
-#  for conllword in results:
-#    toponym = conllword.word
-#    coord = conllword.coord
-#    if not coord: continue
-#    lowertop = toponym.lower()
-#    maxlinks = 0
-#    bestloc = None
-#    locs = toponym_to_location.get(lowertop, []) + \
-#           toponym_to_division.get(lowertop, [])
-#    if not locs:
-#      if debug > 0:
-#        uniprint("Unable to find any possibilities for %s" % toponym)
-#      correct = False
-#    else:
-#      if debug > 0:
-#        uniprint("Considering toponym %s, coordinates %s" %
-#                 (toponym, coord))
-#        uniprint("For toponym %s, %d possible locations" %
-#                 (toponym, len(locs)))
-#      for loc in locs:
-#        artname = loc.match
-#        if debug > 0:
-#          if type(loc) is Locality:
-#            uniprint("Considering location %s (Locality), coord %s, article %s"
-#                     % (loc.name, loc.coord, artname))
-#          else:
-#            uniprint("Considering location %s (Division), article %s"
-#                     % (loc.name, artname))
-#        if not artname:
-#          thislinks = 0
-#          if debug > 0:
-#            uniprint("--> Location without matching article")
-#        else:
-#          if artname not in incoming_link_count:
-#            thislinks = 0
-#            if debug > 0:
-#              warning("Strange, article (coord %s) has no link count" %
-#                      (article_coordinates[artname]))
-#          else:
-#            thislinks = incoming_link_count[artname]
-#            if debug > 0:
-#              uniprint("--> Coord %s, link count is %s" %
-#                       (article_coordinates[artname], thislinks))
-#        if thislinks > maxlinks:
-#          maxlinks = thislinks
-#          bestloc = loc
-#      if bestloc:
-#        if type(bestloc) is Locality:
-#          dist = spheredist(coord, bestloc.coord)
-#          correct = dist <= max_dist_for_close_match
-#        else:
-#          correct = coord in bestloc
-#      else:
-#        # If we couldn't find link counts, this can happen
-#        correct = False
-#    if correct:
-#      global correct_toponyms_disambiguated
-#      correct_toponyms_disambiguated += 1
-#    global total_toponyms_disambiguated
-#    total_toponyms_disambiguated += 1
-#    if debug > 0 and bestloc:
-#      if type(bestloc) is Locality:
-#        uniprint("Best match = %s, link count = %s, coordinates %s, dist %s, correct %s"
-#                 % (bestloc.match, maxlinks, bestloc.coord, dist, correct))
-#      else:
-#        uniprint("Best match = %s, link count = %s, correct %s" %
-#                 (bestloc.match, maxlinks, correct))
+def disambiguate_naive_bayes(fname):
+  print "Processing TR-CONLL file %s..." % fname
+  results = read_trconll_file(fname, True)
+  # Return value will be None if error occurred
+  if not results: return
+  for conllword in results:
+    toponym = conllword.word
+    coord = conllword.coord
+    if not coord: continue
+    lowertop = toponym.lower()
+    bestloc = None
+    bestprob = -1e308
+    locs = toponym_to_location.get(lowertop, []) + \
+           toponym_to_division.get(lowertop, [])
+    if not locs:
+      if debug > 0:
+        uniprint("Unable to find any possibilities for %s" % toponym)
+      correct = False
+    else:
+      if debug > 0:
+        uniprint("Considering toponym %s, coordinates %s" %
+                 (toponym, coord))
+        uniprint("For toponym %s, %d possible locations" %
+                 (toponym, len(locs)))
+      for loc in locs:
+        artname = loc.match
+        if debug > 0:
+          if type(loc) is Locality:
+            uniprint("Considering location %s (Locality), coord %s, article %s"
+                     % (loc.name, loc.coord, artname))
+          else:
+            uniprint("Considering location %s (Division), article %s"
+                     % (loc.name, artname))
+        if not artname:
+          thislinks = 0
+          if debug > 0:
+            uniprint("--> Location without matching article")
+        else:
+          if artname not in incoming_link_count:
+            thislinks = 0
+            if debug > 0:
+              warning("Strange, article (coord %s) has no link count" %
+                      (article_coordinates[artname]))
+          else:
+            thislinks = incoming_link_count[artname]
+            if debug > 0:
+              uniprint("--> Coord %s, link count is %s" %
+                       (article_coordinates[artname], thislinks))
+          if not artname in article_probs:
+            wordprobs = unseen_article_probs
+            unknown_prob = 1.0
+            overall_unseen_prob = 1.0
+            if debug > 1:
+              uniprint("Counts for article %s (coord %s) not tabulated" %
+                       (artname, article_coordinates[artname]))
+          else:
+            (wordprobs, unknown_prob, overall_unseen_prob) = \
+              article_probs[artname]
+            if debug > 1:
+              uniprint("Found counts for article %s (coord %s), num word types = %s"
+                       % (artname, article_coordinates[artname],
+                          len(wordprobs[0])))
+              uniprint("Unknown prob = %s, overall_unseen_prob = %s" %
+                       (unknown_prob, overall_unseen_prob))
+          totalprob = 0.0
+          for word in conllword.context:
+            ind = word_to_index.get(word, None)
+            if ind == None:
+              wordprob = (unknown_prob*overall_unknown_word_prob
+                          / num_unseen_word_types)
+              if debug > 2:
+                uniprint("Word %s, never seen at all, wordprob = %s" %
+                         (word, wordprob))
+            else:
+              wordprob = lookup_sorted_list(wordprobs, ind)
+              if wordprob == None:
+                wordprob = (unknown_prob *
+                            (overall_word_probs[ind] / overall_unseen_prob))
+                if debug > 2:
+                  uniprint("Word %s, seen but not in article, wordprob = %s" %
+                           (word, wordprob))
+              else:
+                if debug > 2:
+                  uniprint("Word %s, seen in article, wordprob = %s" %
+                           (word, wordprob))
+            totalprob += math.log(wordprob)
+          if debug > 1:
+            uniprint("Computed total log-likelihood as %s" % totalprob)
+          totalprob += math.log(thislinks + 1)
+          if debug > 1:
+            uniprint("Computed thislinks-prob + total log-likelihood as %s" % totalprob)
+          if totalprob > bestprob:
+            bestprob = totalprob
+            bestloc = loc
+      if bestloc:
+        if type(bestloc) is Locality:
+          dist = spheredist(coord, bestloc.coord)
+          correct = dist <= max_dist_for_close_match
+        else:
+          correct = coord in bestloc
+      else:
+        # If we couldn't find link counts, this can happen
+        correct = False
+    if correct:
+      global correct_toponyms_disambiguated
+      correct_toponyms_disambiguated += 1
+    global total_toponyms_disambiguated
+    total_toponyms_disambiguated += 1
+    if debug > 0 and bestloc:
+      if type(bestloc) is Locality:
+        uniprint("Best match = %s, best prob = %s, coordinates %s, dist %s, correct %s"
+                 % (bestloc.match, bestprob, bestloc.coord, dist, correct))
+      else:
+        uniprint("Best match = %s, best prob = %s, correct %s" %
+                 (bestloc.match, bestprob, correct))
 
 #######################################################################
 #                                Main code                            #
@@ -846,22 +1018,28 @@ Output by processwiki.py --find-links.""",
 --coords-counts, listing all the articles with associated coordinates.
 May be filtered only for articles and coordinates.""",
                 metavar="FILE")
-  op.add_option("-w", "--word-coords-file",
+  op.add_option("-w", "--words-coords-file",
                 help="""File containing output from a prior run of
 --coords-counts, listing all the articles with associated coordinates.
 Should not be filtered, as the counts of words are needed.""",
+                metavar="FILE")
+  op.add_option("-p", "--pickle-file",
+                help="""Serialize the result of processing the word-coords file to the given file.""",
+                metavar="FILE")
+  op.add_option("-u", "--unpickle-file",
+                help="""Read the result of serializing the word-coords file to the given file.""",
                 metavar="FILE")
   op.add_option("-f", "--trconll-dir",
                 help="""Directory containing TR-CONLL files in the text format.
 Each file is read in and then disambiguation is performed.""",
                 metavar="DIR")
-  op.add_option("-b", "--link-baseline", action="store_true",
-                help="""Output the baseline determined by using the matching
-toponym with the highest incoming link count in Wikipedia.""")
-  op.add_option("-m", "--only-match", action="store_true",
-                help="""If specified, only do the "match" stage, where locations
-in the gazetteer are matched with the corresponding Wikipedia articles to find
-the best match.  Most useful when debug > 0.""")
+  op.add_option("-m", "--mode", default="match-only",
+                choices=['disambig-link-baseline', 'disambig-naive-bayes',
+                         'match-only', 'pickle-only'],
+                help="""Disambiguate using the given procedure (link-baseline
+for simply using the matching location with the highest number of incoming
+links; naive-bayes for also using the words around the toponym to be
+disambiguated, in a Naive-Bayes scheme; ); default %d.""")
   op.add_option("-d", "--debug", metavar="LEVEL",
                 help="Output debug info at given level")
   opts, args = op.parse_args()
@@ -873,37 +1051,99 @@ the best match.  Most useful when debug > 0.""")
   # FIXME! Can only currently handle World-type gazetteers.
   assert opts.gazetteer_type == 'world'
 
-  if not opts.coords_file:
-    op.error("Must specify coordinate file using -c or --coords-file")
+  # Files needed for different options:
+  #
+  # 1. match-only:
+  #
+  #    coords-file
+  #    gazetteer-file
+  #    links-file
+  #
+  # 2. pickle-only:
+  #
+  #    words-coords-file
+  #    stopwords-file
+  #    pickle-file
+  #
+  # 3. disambig-link-baseline:
+  #
+  #    coords-file
+  #    gazetteer-file
+  #    links-file
+  #    trconll-dir
+  #
+  # 4. disambig-naive-bayes:
+  #
+  #    stopwords-file
+  #    words-coords-file or unpickle-file
+  #    pickle-file if given
+  #    coords-file
+  #    gazetteer-file
+  #    links-file
+  #    trconll-dir
 
-  if not opts.only_match:
-    if not opts.gazetteer_file:
-      op.error("Must specify coordinate file using -g or --gazetteer-file")
+  if opts.mode == 'pickle-only' or opts.mode == 'disambig-naive-bayes':
     if not opts.stopwords_file:
       op.error("Must specify stopwords file using -s or --stopwords-file")
+    print "Reading stopwords file %s..." % opts.stopwords_file
+    read_stopwords(opts.stopwords_file)
+    if not opts.unpickle_file and not opts.words_coords_file:
+      op.error("Must specify either unpickle file or words-coords file")
+
+  if opts.mode != 'pickle-only':
+    if not opts.coords_file:
+      op.error("Must specify coordinate file using -c or --coords-file")
+    if not opts.gazetteer_file:
+      op.error("Must specify gazetteer file using -g or --gazetteer-file")
+    if not opts.links_file:
+      op.error("Must specify links file using -l or --links-file")
+
+  if opts.mode == 'disambig-link-baseline' or \
+     opts.mode == 'disambig-naive-bayes':
     if not opts.trconll_dir:
       op.error("Must specify TR-CONLL directory using -f or --trconll-dir")
 
-    print "Reading stopwords file %s..." % opts.stopwords_file
-    read_stopwords(opts.stopwords_file)
+  if opts.mode == 'pickle-only':
+    if not opts.pickle_file:
+      op.error("For pickle-only mode, must specify pickle file using -p or --pick-file")
+
+  # Read in (or unpickle) and maybe pickle the words-counts file
+  if opts.mode == 'pickle-only' or opts.mode == 'disambig-naive-bayes':
+    if opts.unpickle_file:
+      global article_probs
+      infile = open(opts.unpickle_file)
+      article_probs = cPickle.load(infile)
+      infile.close()
+    else:
+      print "Reading words and coordinates file %s..." % opts.words_coords_file
+      construct_naive_bayes_dist(opts.words_coords_file)
+    if opts.pickle_file:
+      outfile = open(opts.pickle_file, "w")
+      cPickle.dump(article_probs, outfile)
+      outfile.close()
+
+  if opts.mode == 'pickle-only': return
 
   print "Reading coordinates file %s..." % opts.coords_file
   get_coordinates(opts.coords_file)
+  print "Reading incoming links file %s..." % opts.links_file
+  read_incoming_link_info(opts.links_file)
   print "Reading and matching World gazetteer file %s..." % opts.gazetteer_file
   read_world_gazetteer_and_match(opts.gazetteer_file)
 
-  if not opts.only_match:
-    print "Reading incoming links file %s..." % opts.links_file
-    read_incoming_link_info(opts.links_file)
-    if opts.link_baseline:
-      print "Processing TR-CONLL directory %s..." % opts.trconll_dir
-      process_dir_files(opts.trconll_dir, disambiguate_link_baseline)
-      print("Percent correct = %s/%s = %5.2f" %
-            (correct_toponyms_disambiguated, total_toponyms_disambiguated,
-             100*float(correct_toponyms_disambiguated)/
-                 total_toponyms_disambiguated))
-    else:
-      construct_naive_bayes_dist(opts.word_coords_file)
-      process_dir_files(opts.trconll_dir, disambiguate_naive_bayes)
+  if opts.mode == 'match-only': return
+
+  if opts.mode == 'disambig-link-baseline':
+    disambig_fun = disambiguate_link_baseline
+  else:
+    assert opts.mode == 'disambig-naive-bayes'
+    disambig_fun = disambiguate_naive_bayes
+
+  print "Processing TR-CONLL directory %s..." % opts.trconll_dir
+  process_dir_files(opts.trconll_dir, disambig_fun)
+  print("Percent correct = %s/%s = %5.2f" %
+        (correct_toponyms_disambiguated, total_toponyms_disambiguated,
+         100*float(correct_toponyms_disambiguated)/
+             total_toponyms_disambiguated))
 
 main()
