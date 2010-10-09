@@ -15,24 +15,34 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text.prep;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import opennlp.textgrounder.util.Span;
-
 import opennlp.tools.namefind.NameFinderME;
 import opennlp.tools.namefind.TokenNameFinder;
 import opennlp.tools.namefind.TokenNameFinderModel;
 import opennlp.tools.util.InvalidFormatException;
 
+import opennlp.textgrounder.util.Constants;
+import opennlp.textgrounder.util.Span;
+
 public class OpenNLPRecognizer implements NamedEntityRecognizer {
   private final TokenNameFinder finder;
   private final NamedEntityType type;
 
-  public OpenNLPRecognizer(InputStream in, NamedEntityType type) throws IOException, InvalidFormatException {
+  public OpenNLPRecognizer() throws IOException, InvalidFormatException {
+    this(new FileInputStream(
+      Constants.getOpenNLPModelsDir() + File.separator + "en-ner-location.bin"),
+      NamedEntityType.LOCATION);
+  }
+
+  public OpenNLPRecognizer(InputStream in, NamedEntityType type)
+    throws IOException, InvalidFormatException {
     this.finder = new NameFinderME(new TokenNameFinderModel(in));
     this.type = type;
   }
