@@ -17,6 +17,11 @@ import gc
 from optparse import OptionParser
 from textutil import *
 
+# FIXME:
+#
+# -- If coords and 0,9999, they are inaccurate, ignore them
+# -- Add flags for lower-case-words, etc.
+
 ############################################################################
 #                              Documentation                               #
 ############################################################################
@@ -142,6 +147,9 @@ show_warnings = True
 
 # Do we ignore stopwords when computing word distributions?
 ignore_stopwords_in_article_dists = False
+
+# If true, ignore case when creating distributions and looking up words
+ignore_case_words = True
 
 # Maximum number of miles allowed when looking for a close match
 max_dist_for_close_match = 20
@@ -407,7 +415,7 @@ def construct_naive_bayes_dist(filename):
       uniprint("Title = %s, numtypes = %s, numtokens = %s, unknown_mass = %s" % (
         title, len(article_probs[title][0][0]), totalcount, unknown_mass))
     if (articles_seen % 100) == 0:
-      print "Processed %d articles" % articles_seen
+      print >>sys.stderr, "Processed %d articles" % articles_seen
 
   for line in uchompopen(filename):
     if line.startswith('Article title: '):
@@ -418,7 +426,7 @@ def construct_naive_bayes_dist(filename):
       if max_articles_to_count and articles_seen >= max_articles_to_count:
         break
       title = m.group(1)
-      wordhash = {}
+      wordhash = intdict()
       totalcount = 0
       oncecount = 0
     elif line.startswith('Article coordinates: '):
@@ -429,11 +437,12 @@ def construct_naive_bayes_dist(filename):
         warning("Strange line, can't parse: title=%s: line=%s" % (title, line))
         continue
       word = m.group(1)
+      if ignore_case_words: word = word.lower()
       count = int(m.group(2))
       if word in stopwords and ignore_stopwords_in_article_dists: continue
       totalcount += count
       if count == 1: oncecount += 1
-      wordhash[word] = count
+      wordhash[word] += count
   else:
     articles_seen += 1
     one_article_probs()
@@ -721,7 +730,7 @@ def read_incoming_link_info(filename):
       incoming_link_count[m_[1]] = int(m_[2])
       articles_seen += 1
       if (articles_seen % 10000) == 0:
-        print "Processed %d articles" % articles_seen
+        print >>sys.stderr, "Processed %d articles" % articles_seen
 
 # Class of word in a CONLL file.  Fields:
 #
@@ -930,13 +939,13 @@ def disambiguate_naive_bayes(fname):
             wordprobs = unseen_article_probs
             unknown_prob = 1.0
             overall_unseen_prob = 1.0
-            if debug > 1:
+            if debug > 0:
               uniprint("Counts for article %s (coord %s) not tabulated" %
                        (artname, article_coordinates[artname]))
           else:
             (wordprobs, unknown_prob, overall_unseen_prob) = \
               article_probs[artname]
-            if debug > 1:
+            if debug > 0:
               uniprint("Found counts for article %s (coord %s), num word types = %s"
                        % (artname, article_coordinates[artname],
                           len(wordprobs[0])))
@@ -944,11 +953,12 @@ def disambiguate_naive_bayes(fname):
                        (unknown_prob, overall_unseen_prob))
           totalprob = 0.0
           for word in conllword.context:
+            if ignore_case_words: word = word.lower()
             ind = word_to_index.get(word, None)
             if ind == None:
               wordprob = (unknown_prob*overall_unknown_word_prob
                           / num_unseen_word_types)
-              if debug > 2:
+              if debug > 0:
                 uniprint("Word %s, never seen at all, wordprob = %s" %
                          (word, wordprob))
             else:
@@ -956,18 +966,18 @@ def disambiguate_naive_bayes(fname):
               if wordprob == None:
                 wordprob = (unknown_prob *
                             (overall_word_probs[ind] / overall_unseen_prob))
-                if debug > 2:
+                if debug > 0:
                   uniprint("Word %s, seen but not in article, wordprob = %s" %
                            (word, wordprob))
               else:
-                if debug > 2:
+                if debug > 0:
                   uniprint("Word %s, seen in article, wordprob = %s" %
                            (word, wordprob))
             totalprob += math.log(wordprob)
-          if debug > 1:
+          if debug > 0:
             uniprint("Computed total log-likelihood as %s" % totalprob)
           totalprob += math.log(thislinks + 1)
-          if debug > 1:
+          if debug > 0:
             uniprint("Computed thislinks-prob + total log-likelihood as %s" % totalprob)
           if totalprob > bestprob:
             bestprob = totalprob
@@ -1042,6 +1052,9 @@ links; naive-bayes for also using the words around the toponym to be
 disambiguated, in a Naive-Bayes scheme; ); default %d.""")
   op.add_option("-d", "--debug", metavar="LEVEL",
                 help="Output debug info at given level")
+
+  uniprint("Arguments: %s" % ' '.join(sys.argv))
+  
   opts, args = op.parse_args()
 
   global debug
