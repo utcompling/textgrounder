@@ -80,7 +80,9 @@ public class CorpusXMLWriter {
 
   protected void writeDocument(XMLStreamWriter out, Document<Token> document) throws XMLStreamException {
     out.writeStartElement("doc");
-    out.writeAttribute("id", document.getId());
+    if (document.getId() != null) {
+      out.writeAttribute("id", document.getId());
+    }
     for (Sentence<Token> sentence : document) {
       this.writeSentence(out, sentence);
     }
@@ -89,7 +91,9 @@ public class CorpusXMLWriter {
 
   protected void writeSentence(XMLStreamWriter out, Sentence<Token> sentence) throws XMLStreamException {
     out.writeStartElement("s");
-    out.writeAttribute("id", sentence.getId());
+    if (sentence.getId() != null) {
+      out.writeAttribute("id", sentence.getId());
+    }
     for (Token token : sentence) {
       if (token.isToponym()) {
         this.writeToponym(out, (Toponym) token);
@@ -110,8 +114,11 @@ public class CorpusXMLWriter {
     out.writeStartElement("toponym");
     out.writeAttribute("term", toponym.getForm());
     out.writeStartElement("candidates");
+    Location gold = toponym.hasGold() ? toponym.getGold() : null;
+    Location selected = toponym.hasSelected() ? toponym.getSelected() : null;
+
     for (Location location : toponym) {
-      this.writeLocation(out, location, toponym.getGold(), toponym.getSelected());
+      this.writeLocation(out, location, gold, selected);
     }
     out.writeEndElement();
     out.writeEndElement();
