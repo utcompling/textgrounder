@@ -18,6 +18,6 @@ package opennlp.textgrounder.text.prep;
 import java.util.List;
 
 public interface SentenceDivider {
-  public List<List<String>> divide(List<String> tokens);
+  public List<String> divide(String text);
 }
 

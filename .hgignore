@@ -12,3 +12,4 @@ data/xml-trdev
 data/raw-trdev
 api
 target
+tmp

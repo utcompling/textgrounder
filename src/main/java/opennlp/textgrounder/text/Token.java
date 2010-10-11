@@ -15,19 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-public class Token {
-  private final String form;
-
-  public Token(String form) {
-    this.form = form;
-  }
-
-  public String getForm() {
-    return this.form;
-  }
-
-  public boolean isToponym() {
-      return false;
-  }
+public interface Token {
+  public String getForm();
+  public String getOrigForm();
+  public boolean isToponym();
 }
 

@@ -15,23 +15,88 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
 
-public class Sentence implements Iterable<Token> {
+import opennlp.textgrounder.util.Span;
+
+public abstract class Sentence<A extends Token> implements Iterable<A> {
   private final String id;
-  private final Iterable<Token> tokens;
 
-  public Sentence(String id, Iterable<Token> tokens) {
+  protected Sentence(String id) {
     this.id = id;
-    this.tokens = tokens;
+  }
+
+  public abstract Iterator<A> tokens();
+
+  public Iterator<Span<A>> toponymSpans() {
+    return new Iterator<Span<A>>() {      
+      public boolean hasNext() {
+        return false;
+      }
+
+      public Span<A> next() {
+        throw new NoSuchElementException();
+      }
+
+      public void remove() {
+        throw new UnsupportedOperationException();
+      }
+    };
+  }
+
+  public List<A> getTokens() {
+    List<A> tokens = new ArrayList<A>();
+    for (Iterator<A> it = this.tokens(); it.hasNext(); ) {
+      tokens.add(it.next());
+    }
+    return tokens;
+  }
+
+  public List<Toponym> getToponyms() {
+    List<Toponym> toponyms = new ArrayList<Toponym>();
+    for (Iterator<Span<A>> it = this.toponymSpans(); it.hasNext(); ) {
+      toponyms.add((Toponym) it.next().getItem());
+    }
+    return toponyms;
   }
 
   public String getId() {
     return this.id;
   }
 
-  public Iterator<Token> iterator() {
-    return this.tokens.iterator();
+  public Iterator<A> iterator() {
+    return new Iterator<A>() {
+      private final Iterator<A> tokens = Sentence.this.tokens();
+      private final Iterator<Span<A>> spans = Sentence.this.toponymSpans();
+      private int current = 0;
+      private Span<A> span = this.spans.hasNext() ? this.spans.next() : null;
+
+      public boolean hasNext() {
+        return this.tokens.hasNext();
+      }
+
+      public A next() {
+        if (this.span != null && this.span.getStart() == this.current) {
+          A toponym = span.getItem();
+          for (int i = 0; i < this.span.getEnd() - this.span.getStart(); i++) {
+            this.tokens.next();
+          }
+          this.current = this.span.getEnd();
+          this.span = this.spans.hasNext() ? this.spans.next() : null;
+          return toponym;
+        } else {
+          this.current++;
+          return this.tokens.next();
+        }
+      }
+
+      public void remove() {
+        throw new UnsupportedOperationException();
+      }
+    };
   }
 }
 

@@ -116,7 +116,7 @@ public class DbGazetteer extends Gazetteer {
         Location.Type type = Location.Type.values()[result.getInt(3)];
         double lat = result.getDouble(4);
         double lng = result.getDouble(5);
-        Coordinate coordinate = new Coordinate(lat, lng);
+        Coordinate coordinate = Coordinate.fromRadians(lat, lng);
         Region region = new PointRegion(coordinate);
         int population = result.getInt(6);
         locations.add(new Location(id, name, region, type, population));

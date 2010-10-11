@@ -15,62 +15,24 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-import java.util.Iterator;
 import java.util.List;
 
 import opennlp.textgrounder.topo.Location;
 
-public class Toponym extends Token implements Iterable<Location> {
-  private final List<Location> candidates;
-  private final Integer gold;
-  private Integer selected;
+public interface Toponym extends Token, Iterable<Location> {
+  public boolean hasGold();
+  public Location getGold();
+  public int getGoldIdx();
 
-  public Toponym(String form, List<Location> candidates) {
-    this(form, candidates, null);
-  }
+  public boolean hasSelected();
+  public Location getSelected();
+  public int getSelectedIdx();
 
-  public Toponym(String form, List<Location> candidates, Integer gold) {
-    super(form);
-    this.candidates = candidates;
-    this.gold = gold;
-    assert this.selected < this.candidates.size() : "Invalid candidate index.";
-  }
+  public void setSelectedIdx(int idx);
 
-  public Location getGold() {
-    Location location = null;
-    if (this.gold != null) {
-      location = this.candidates.get(this.gold);
-    }
-    return location; 
-  }
+  public int getAmbiguity();
+  public List<Location> getCandidates();
 
-  public boolean hasSelected() {
-    return this.selected != null;
-  }
-
-  public Location getSelected() {
-    Location location = null;
-    if (this.selected != null) {
-      location = this.candidates.get(this.selected);
-    }
-    return location;
-  }
-
-  public void setSelected(Integer index) {
-    this.selected = index;
-  }
-
-  public Iterator<Location> iterator() {
-    return this.candidates.iterator();
-  }
-
-  @Override
-  public boolean isToponym() {
-      return true;
-  }
-
-  public int getAmbiguity() {
-      return candidates.size();
-  }
+  public List<Token> getTokens();
 }
 

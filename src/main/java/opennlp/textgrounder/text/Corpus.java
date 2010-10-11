@@ -15,26 +15,34 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 
-import com.google.common.collect.Iterators;
-import com.google.inject.Inject;
+import opennlp.textgrounder.util.Lexicon;
 
-public class Corpus implements Iterable<Document> {
-  private final List<DocumentSource> sources;
+public abstract class Corpus<A extends Token> implements Iterable<Document<A>> {
+  public abstract void addSource(DocumentSource source);
+  public abstract void close();
 
-  public Corpus() {
-    this.sources = new ArrayList<DocumentSource>();
+  public static Corpus<Token> createStreamCorpus() {
+    return new StreamCorpus();
   }
 
-  public Iterator<Document> iterator() {
-    return Iterators.concat(this.sources.iterator());
+  public static StoredCorpus createStoredCorpus() {
+    return new CompactCorpus(Corpus.createStreamCorpus());
   }
 
-  public void addSource(DocumentSource source) {
-    this.sources.add(source);
+  public DocumentSource asSource() {
+    final Iterator<Document<A>> iterator = this.iterator();
+
+    return new DocumentSource() {
+      public boolean hasNext() {
+        return iterator.hasNext();
+      }
+
+      public Document<Token> next() {
+        return (Document<Token>) iterator.next();
+      }
+    };
   }
 }
 

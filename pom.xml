@@ -6,6 +6,9 @@
   <artifactId>textgrounder</artifactId>
   <name>TextGrounder</name>
   <version>0.1.0</version>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
   <repositories>
     <repository>
       <id>MavenCentral</id>
@@ -84,6 +87,13 @@
             <descriptorRef>jar-with-dependencies</descriptorRef>
           </descriptorRefs>
         </configuration>
+        <executions>
+          <execution>
+            <id>make-assembly</id>
+            <phase>package</phase>
+            <goals><goal>single</goal></goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.scala-tools</groupId>
@@ -96,6 +106,11 @@
           <execution>
             <phase>process-resources</phase>
             <goals><goal>compile</goal></goals>
+          </execution>									
+          <execution>
+            <id>scala-test-compile</id>
+            <phase>process-test-resources</phase>
+            <goals><goal>testCompile</goal></goals>
           </execution>
         </executions>
         <configuration>
@@ -164,6 +179,18 @@
       <groupId>trove</groupId>
       <artifactId>trove</artifactId>
       <version>2.1.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.scala-tools.testing</groupId>
+      <artifactId>specs_2.8.0.Beta1</artifactId>
+      <version>1.6.4</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+       <groupId>junit</groupId>
+       <artifactId>junit</artifactId>
+       <version>4.4</version>
+       <scope>test</scope>
     </dependency>
   </dependencies>
 </project>

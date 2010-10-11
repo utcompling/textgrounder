@@ -21,15 +21,26 @@ public class RectRegion extends Region {
   private final double minLng;
   private final double maxLng;
 
-  public RectRegion(double minLat, double maxLat, double minLng, double maxLng) {
+  private RectRegion(double minLat, double maxLat, double minLng, double maxLng) {
     this.minLat = minLat;
     this.maxLat = maxLat;
     this.minLng = minLng;
     this.maxLng = maxLng;
   }
 
+  public static RectRegion fromRadians(double minLat, double maxLat, double minLng, double maxLng) {
+    return new RectRegion(minLat, maxLat, minLng, maxLng);
+  }
+
+  public static RectRegion fromDegrees(double minLat, double maxLat, double minLng, double maxLng) {
+    return new RectRegion(minLat * Math.PI / 180.0,
+                          maxLat * Math.PI / 180.0,
+                          minLng * Math.PI / 180.0,
+                          maxLng * Math.PI / 180.0);
+  }
+
   public Coordinate getCenter() {
-    return new Coordinate(this.maxLat - this.minLat, this.maxLng - this.minLng);
+    return Coordinate.fromRadians(this.maxLat - this.minLat, this.maxLng - this.minLng);
   }
 
   public boolean contains(double lat, double lng) {

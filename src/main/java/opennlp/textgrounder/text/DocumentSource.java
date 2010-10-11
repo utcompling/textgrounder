@@ -17,14 +17,22 @@ package opennlp.textgrounder.text;
 
 import java.util.Iterator;
 
-public abstract class DocumentSource implements Iterable<Document>,
-                                                Iterator<Document> {
-  public Iterator<Document> iterator() {
-    return this;
+import opennlp.textgrounder.text.Document;
+import opennlp.textgrounder.text.Sentence;
+import opennlp.textgrounder.text.Token;
+
+public abstract class DocumentSource implements Iterator<Document<Token>> {
+  public void close() {
   }
 
   public void remove() {
-    throw new UnsupportedOperationException("Cannot remove item from corpus source.");
+    throw new UnsupportedOperationException("Cannot remove a document from a source.");
+  }
+
+  protected abstract class SentenceIterator implements Iterator<Sentence<Token>> {
+    public void remove() {
+      throw new UnsupportedOperationException("Cannot remove a sentence from a source.");
+    }    
   }
 }
 

@@ -15,8 +15,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text.io;
 
-import java.io.Writer;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.Writer;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -41,10 +45,10 @@ import opennlp.textgrounder.text.Toponym;
 import opennlp.textgrounder.topo.Location;
 
 public class CorpusXMLWriter {
-  private final Corpus corpus;
+  protected final Corpus<? extends Token> corpus;
   private final XMLOutputFactory factory;
 
-  public CorpusXMLWriter(Corpus corpus) {
+  public CorpusXMLWriter(Corpus<? extends Token> corpus) {
     this.corpus = corpus;
     this.factory = XMLOutputFactory.newInstance();
   }
@@ -70,20 +74,24 @@ public class CorpusXMLWriter {
     return this.factory.createXMLStreamWriter(writer);
   }
 
-  protected void writeDocument(XMLStreamWriter out, Document document) throws XMLStreamException {
+  protected XMLStreamWriter createXMLStreamWriter(OutputStream stream) throws XMLStreamException {
+    return this.factory.createXMLStreamWriter(stream, "UTF-8");
+  }
+
+  protected void writeDocument(XMLStreamWriter out, Document<Token> document) throws XMLStreamException {
     out.writeStartElement("doc");
     out.writeAttribute("id", document.getId());
-    for (Sentence sentence : document) {
+    for (Sentence<Token> sentence : document) {
       this.writeSentence(out, sentence);
     }
     out.writeEndElement();
   }
 
-  protected void writeSentence(XMLStreamWriter out, Sentence sentence) throws XMLStreamException {
+  protected void writeSentence(XMLStreamWriter out, Sentence<Token> sentence) throws XMLStreamException {
     out.writeStartElement("s");
     out.writeAttribute("id", sentence.getId());
     for (Token token : sentence) {
-      if (token.getClass() == Toponym.class) {
+      if (token.isToponym()) {
         this.writeToponym(out, (Toponym) token);
       } else {
         this.writeToken(out, token);
@@ -103,13 +111,13 @@ public class CorpusXMLWriter {
     out.writeAttribute("term", toponym.getForm());
     out.writeStartElement("candidates");
     for (Location location : toponym) {
-      this.writeLocation(out, location, toponym.getSelected());
+      this.writeLocation(out, location, toponym.getGold(), toponym.getSelected());
     }
     out.writeEndElement();
     out.writeEndElement();
   }
 
-  protected void writeLocation(XMLStreamWriter out, Location location, Location selected) throws XMLStreamException {
+  protected void writeLocation(XMLStreamWriter out, Location location, Location gold, Location selected) throws XMLStreamException {
     out.writeStartElement("cand");
     out.writeAttribute("id", String.format("c%d", location.getId()));
     out.writeAttribute("lat", String.format("%f", location.getRegion().getCenter().getLatDegrees()));
@@ -119,15 +127,71 @@ public class CorpusXMLWriter {
     if (population > 0) {
       out.writeAttribute("population", String.format("%d", population));
     }
+    if (location == gold) {
+      out.writeAttribute("gold", "true");
+    }
     if (location == selected) {
       out.writeAttribute("selected", "true");
     }
     out.writeEndElement();
   }
 
+  public void write(File file) {
+    this.write(file, "doc-");
+  }
+
+  public void write(File file, String prefix) {
+    try {
+      if (file.isDirectory()) {
+        int idx = 0;
+        for (Document document : this.corpus) {
+          File docFile = new File(file, String.format("%s%06d.xml", prefix, idx));
+          OutputStream stream = new BufferedOutputStream(new FileOutputStream(docFile));
+          XMLStreamWriter out = this.createXMLStreamWriter(stream);
+          out.writeStartDocument("UTF-8", "1.0");
+          out.writeStartElement("corpus");
+          out.writeAttribute("created", this.getCalendar().toString());
+          this.writeDocument(out, document);
+          out.writeEndElement();
+          out.close();
+          stream.close();
+          idx++;
+        }
+      } else {
+        OutputStream stream = new BufferedOutputStream(new FileOutputStream(file));
+        this.write(this.createXMLStreamWriter(stream));
+        stream.close();
+      }
+    } catch (XMLStreamException e) {
+      System.err.println(e);
+      System.exit(1);
+    } catch (IOException e) {
+      System.err.println(e);
+      System.exit(1);
+    }
+  }
+
+  public void write(OutputStream stream) {
+    try {
+      this.write(this.createXMLStreamWriter(stream));
+    } catch (XMLStreamException e) {
+      System.err.println(e);
+      System.exit(1);
+    }
+  }
+
   public void write(Writer writer) {
     try {
-      XMLStreamWriter out = this.factory.createXMLStreamWriter(writer);
+      this.write(this.createXMLStreamWriter(writer));
+    } catch (XMLStreamException e) {
+      System.err.println(e);
+      System.exit(1);
+    }
+  }
+
+  protected void write(XMLStreamWriter out) {
+    try {
+      out.writeStartDocument("UTF-8", "1.0");
       out.writeStartElement("corpus");
       out.writeAttribute("created", this.getCalendar().toString());
       for (Document document : this.corpus) {
