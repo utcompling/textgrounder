@@ -19,8 +19,13 @@ public class RunResolver extends BaseApp {
 
         Tokenizer tokenizer = new OpenNLPTokenizer();
         StoredCorpus corpus = Corpus.createStoredCorpus();
+        System.out.print("Reading corpus from " + getInputPath() + " ...");
         corpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
         corpus.load();
+        System.out.println("done.");
+        System.out.println("Number of documents: " + corpus.getDocumentCount());
+        System.out.println("Number of toponym types: " + corpus.getToponymTypeCount());
+        System.out.println("Maximum ambiguity (locations per toponym): " + corpus.getMaxToponymAmbiguity());
 
         Resolver resolver;
         if(getResolverType() == RESOLVER_TYPE.RANDOM) {
