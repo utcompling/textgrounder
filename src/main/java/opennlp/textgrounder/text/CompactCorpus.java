@@ -38,6 +38,8 @@ public class CompactCorpus extends StoredCorpus {
   private int[] tokenOrigMap;
   private int[] toponymOrigMap;
 
+  private int maxToponymAmbiguity;
+
   private final ArrayList<Document<StoredToken>> documents;
   private final ArrayList<List<Location>> candidateLists;
   
@@ -48,6 +50,7 @@ public class CompactCorpus extends StoredCorpus {
     this.toponymLexicon = new SimpleCountingLexicon<String>();
     this.tokenOrigLexicon = new SimpleCountingLexicon<String>();
     this.toponymOrigLexicon = new SimpleCountingLexicon<String>();
+    this.maxToponymAmbiguity = 0;
 
     this.documents = new ArrayList<Document<StoredToken>>();
     this.candidateLists = new ArrayList<List<Location>>();
@@ -73,6 +76,10 @@ public class CompactCorpus extends StoredCorpus {
     return this.toponymOrigLexicon.size();
   }
 
+  public int getMaxToponymAmbiguity() {
+    return this.maxToponymAmbiguity;
+  }
+
   public void load() {
     for (Document<Token> document : wrapped) {
       ArrayList<Sentence<StoredToken>> sentences = new ArrayList<Sentence<StoredToken>>();
@@ -92,6 +99,10 @@ public class CompactCorpus extends StoredCorpus {
         for (Iterator<Span<Token>> it = sentence.toponymSpans(); it.hasNext(); ) {
           Span<Token> span = it.next();
           Toponym toponym = (Toponym) span.getItem();
+
+          if (toponym.getAmbiguity() > this.maxToponymAmbiguity) {
+            this.maxToponymAmbiguity = toponym.getAmbiguity();
+          }
 
           int idx = this.toponymOrigLexicon.getOrAdd(toponym.getOrigForm());
           this.toponymLexicon.getOrAdd(toponym.getForm());
