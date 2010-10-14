@@ -1,6 +1,6 @@
 from __future__ import with_statement # For chompopen(), uchompopen()
 import re # For regexp wrappers
-import codecs # For uchompopen()
+import sys, codecs # For uchompopen()
 import bisect # For sorted lists
 
 #############################################################################
@@ -72,8 +72,8 @@ def research(pattern, string, flags=0):
 # Open a filename with UTF-8-encoded input and yield lines converted to
 # Unicode strings, but with any terminating newline removed (similar to
 # "chomp" in Perl).
-def uchompopen(filename):
-  with codecs.open(filename, encoding='utf-8') as f:
+def uchompopen(filename, errors='strict'):
+  with codecs.open(filename, encoding='utf-8', errors=errors) as f:
     for line in f:
       if line and line[-1] == '\n': line = line[:-1]
       yield line
@@ -96,14 +96,15 @@ If string is Unicode, automatically convert to UTF-8.'''
   if type(text) is unicode: text = text.encode("utf-8")
   return intern(text)
 
-def uniprint(text):
+def uniprint(text, outfile=sys.stdout):
   '''Print text string using 'print', converting Unicode as necessary.
 If string is Unicode, automatically convert to UTF-8, so it can be output
-without errors.'''
+without errors.  Send output to the file given in OUTFILE (default is
+stdout).'''
   if type(text) is unicode:
-    print text.encode("utf-8")
+    print >>outfile, text.encode("utf-8")
   else:
-    print text
+    print >>outfile, text
 
 #############################################################################
 #                             Default dictionaries                          #
@@ -185,3 +186,14 @@ def lookup_sorted_list(sorted_list, key):
   if i != len(keys) and keys[i] == key:
     return values[i]
   return None
+
+#############################################################################
+#                                     Misc                                  #
+#############################################################################
+
+# Given a table with values that are numbers, output the table, sorted
+# on the numbers from bigger to smaller.
+def output_reverse_sorted_table(table):
+  for x in sorted(table.items(), key=lambda x:x[1], reverse=True):
+    uniprint("%s = %s" % (x[0], x[1]))
+

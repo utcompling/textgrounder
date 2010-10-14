@@ -362,12 +362,6 @@ def warning(text):
   if show_warnings:
     uniprint("Warning: %s" % text)
 
-# Given a table with values that are numbers, output the table, sorted
-# on the numbers from bigger to smaller.
-def output_reverse_sorted_table(table):
-  for x in sorted(table.items(), key=lambda x:x[1], reverse=True):
-    uniprint("%s = %s" % (x[0], x[1]))
-  
 def find_template_params(args, strip_values):
   '''Find the parameters specified in template arguments, i.e. the arguments
 to a template that are of the form KEY=VAL.  Given the arguments ARGS of a
