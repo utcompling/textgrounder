@@ -15,8 +15,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.util;
 
+import java.io.File;
 import java.text.DecimalFormat;
-
 
 /**
  * Class for keeping constant values.
@@ -39,8 +39,30 @@ public class Constants {
     public final static String STANFORD_NER_HOME = System.getenv("STANFORD_NER_HOME");
 
     // the location of the OpenNLP models
-    public final static String OPENNLP_MODELS = System.getenv("OPENNLP_MODELS");
-    
+    public final static String OPENNLP_MODELS = Constants.getOpenNLPModelsDir();
+
+    public static String getOpenNLPModelsDir() {
+      String dir = System.getenv("OPENNLP_MODELS");
+      if (dir == null) {
+        dir = System.getProperty("opennlp.models");
+        if (dir == null) {
+          dir = System.getProperty("user.dir") + File.separator + "data/models";
+        }
+      }
+      return dir;
+    }
+
+    public static String getGazetteersDir() {
+      String dir = System.getenv("TEXTGROUNDER_DATA") + File.separator + "gazetteers";
+      if (dir == null) {
+        dir = System.getProperty("gazetteers");
+        if (dir == null) {
+          dir = System.getProperty("user.dir") + File.separator + "data/gazetteers";
+        }
+      }
+      return dir;
+    }
+
     // the location of the World Gazetteer database file
 //    public final static String WGDB_PATH = System.getenv("WGDB_PATH");
 

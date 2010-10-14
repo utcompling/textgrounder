@@ -22,17 +22,17 @@ import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 
-import opennlp.textgrounder.util.Constants;
-
 import opennlp.tools.tokenize.TokenizerME;
 import opennlp.tools.tokenize.TokenizerModel;
 import opennlp.tools.util.InvalidFormatException;
+
+import opennlp.textgrounder.util.Constants;
 
 public class OpenNLPTokenizer implements Tokenizer {
   private final opennlp.tools.tokenize.Tokenizer tokenizer;
 
   public OpenNLPTokenizer() throws IOException, InvalidFormatException {
-    this(new FileInputStream(Constants.OPENNLP_MODELS + File.separator + "en-token.bin"));
+    this(new FileInputStream(Constants.getOpenNLPModelsDir() + File.separator + "en-token.bin"));
   }
 
   public OpenNLPTokenizer(InputStream in) throws IOException, InvalidFormatException {

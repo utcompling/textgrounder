@@ -26,6 +26,7 @@ public abstract class StoredCorpus extends Corpus<StoredToken> {
   public abstract int getTokenOrigTypeCount();
   public abstract int getToponymTypeCount();
   public abstract int getToponymOrigTypeCount();
+  public abstract int getMaxToponymAmbiguity();
   public abstract void load();
 }
 
