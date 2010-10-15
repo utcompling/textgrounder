@@ -321,9 +321,7 @@ class NBDist(object):
     total_tokens = 0
     incoming_links = 0
     if debug > 0:
-      uniprint("Naive Bayes dist, number of articles = %s" %
-               (latind*degrees_per_region, longind*degrees_per_region,
-                numarts))
+      uniprint("Naive Bayes dist, number of articles = %s" % num_arts)
     counts = self.counts
     for loc in locs:
       art = loc.match
@@ -331,7 +329,8 @@ class NBDist(object):
       for (word,count) in itertools.izip(art.counts[0], art.counts[1]):
         counts[word] += count
       total_tokens += art.total_tokens
-      incoming_links += art.incoming_links
+      if art.incoming_links: # Might be None, for unknown link count
+        incoming_links += art.incoming_links
     self.num_arts += num_arts
     self.total_tokens += total_tokens
     self.incoming_links += incoming_links
@@ -392,7 +391,7 @@ class NBRegion(object):
 
     if debug > 0:
       uniprint("Generating distribution for Naive Bayes region centered at %s"
-               % region_indicies_to_coord(nblat, nblong))
+               % region_indices_to_coord(nblat, nblong))
 
     # Accumulate counts for the given region
     def process_one_region(latind, longind):
@@ -791,6 +790,9 @@ def construct_naive_bayes_dist(filename):
 
   def one_article_probs():
     if total_tokens == 0: return
+    art = Article.find_article_create(title)
+    if art.counts:
+      warning("Article %s already has counts for it!" % art)
     wordcounts = {}
     # Compute probabilities.  Use a very simple version of Good-Turing
     # smoothing where we assign to unseen words the probability mass of
@@ -828,9 +830,6 @@ def construct_naive_bayes_dist(filename):
       if max_articles_to_count and articles_seen >= max_articles_to_count:
         break
       title = m.group(1)
-      art = Article.find_article_create(title)
-      if art.counts:
-        warning("Article %s already has counts for it!" % art)
       wordhash = intdict()
       total_tokens = 0
     elif line.startswith('Article coordinates: '):
@@ -871,6 +870,8 @@ def construct_naive_bayes_dist(filename):
 
   # Figure out the value of OVERALL_UNSEEN_MASS for each article.
   for art in name_to_article.itervalues():
+    # make sure counts not None (eg article in coords file but not counts file)
+    if not art.counts: continue
     overall_seen_mass = 0.0
     for ind in art.counts[0]:
       overall_seen_mass += overall_word_probs[ind]
@@ -1241,11 +1242,24 @@ def disambiguate_toponym(geogword, compute_score):
   total_toponyms_disambiguated += 1
   if debug > 0 and bestloc:
     if type(bestloc) is Locality:
-      uniprint("Best match = %s, link count = %s, coordinates %s, dist %s, correct %s"
-               % (bestloc.match, maxlinks, bestloc.coord, dist, correct))
+      uniprint("Best match = %s, score = %s, coordinates %s, dist %s, correct %s"
+               % (bestloc.match, bestscore, bestloc.coord, dist, correct))
     else:
-      uniprint("Best match = %s, link count = %s, correct %s" %
-               (bestloc.match, maxlinks, correct))
+      uniprint("Best match = %s, score = %s, correct %s" %
+               (bestloc.match, bestscore, correct))
+
+def get_adjusted_incoming_links(art):
+  thislinks = art.incoming_links
+  if thislinks == None:
+    thislinks = 0
+    if debug > 0:
+      warning("Strange, %s has no link count" % art)
+  else:
+    if debug > 0:
+      uniprint("--> Link count is %s" % thislinks)
+  if thislinks == 0: # Whether from unknown count or count is actually zero
+    thislinks = 0.01 # So we don't get errors from log(0)
+  return thislinks
 
 # Given a TR-CONLL file, find each toponym explicitly mentioned as such
 # and disambiguate it (find the correct geographic location) using the
@@ -1254,15 +1268,7 @@ def disambiguate_toponym(geogword, compute_score):
 def disambiguate_link_baseline(fname):
   def compute_score(geogword, loc):
     art = loc.match
-    thislinks = art.incoming_links
-    if thislinks == None:
-      thislinks = 0.01 # So we don't get errors from log(0)
-      if debug > 0:
-        warning("Strange, %s has no link count" % art)
-    else:
-      if debug > 0:
-        uniprint("--> Link count is %s" % thislinks)
-    return thislinks
+    return get_adjusted_incoming_links(art)
 
   disambiguate_trconll_file(fname, compute_score, compute_context=False)
 
@@ -1272,14 +1278,7 @@ def disambiguate_link_baseline(fname):
 def disambiguate_naive_bayes(fname):
   def compute_score(geogword, loc):
     art = loc.match
-    thislinks = art.incoming_links
-    if thislinks == None:
-      thislinks = 0.01 # So we don't get errors from log(0)
-      if debug > 0:
-        warning("Strange, %s has no link count" % art)
-    else:
-      if debug > 0:
-        uniprint("--> Link count is %s" % thislinks)
+    thislinks = get_adjusted_incoming_links(art)
 
     if naive_bayes_type == 'article':
       distobj = art
