@@ -52,11 +52,8 @@ name_div_to_article = {}
 # List of stopwords
 stopwords = set()
 
-# Map of word to index
-word_to_index = {}
-
-# Inverse map: Index to word
-index_to_word = {}
+# Map of redirects
+redirect_map = {}
 
 # Total number of word types seen (size of vocabulary)
 num_word_types = 0
@@ -86,7 +83,7 @@ globally_unseen_word_prob = 0.0
 # look up in.
 unknown_article_counts = ([], [])
 
-max_articles_to_count = 0
+max_articles_to_count = None
 
 # For each toponym (name of location), value is a list of Locality items,
 # listing gazetteer locations and corresponding matching Wikipedia articles.
@@ -98,9 +95,6 @@ toponym_to_division = listdict()
 
 # For each division, map from division's path to Division object.
 path_to_division = {}
-
-correct_toponyms_disambiguated = 0
-total_toponyms_disambiguated = 0
 
 # Debug level; if non-zero, output lots of extra information about how
 # things are progressing.  If > 1, even more info.
@@ -130,12 +124,15 @@ naive_bayes_context_len = 10
 # (however, that option is expressed in miles).
 degrees_per_region = 0.0
 
+# Number of tiling regions on a side of a Naive Bayes region
+width_of_nbregion = None
+
 # Minimum, maximum latitude/longitude, directly and in indices
 # (integers used to index the set of regions that tile the earth)
-minimum_latitude = -180.0
-maximum_latitude = 179.99999
-minimum_longitude = -90.0
-maximum_longitude = 90.0
+minimum_latitude = -90.0
+maximum_latitude = 90.0
+minimum_longitude = -180.0
+maximum_longitude = 179.99999
 minimum_latind = None
 maximum_latind = None
 minimum_longind = None
@@ -170,7 +167,7 @@ region_to_locations = listdict()
 
 # Mapping from center of Naive Bayes region to corresponding region object.
 # A "Naive Bayes region" is a square of four tiling regions.
-center_to_nbregion = {}
+corner_to_nbregion = {}
 
 # Table of all toponyms seen in evaluation files, along with how many times
 # seen.  Used to determine when caching of certain toponym-specific values
@@ -196,6 +193,59 @@ instead, output a warning.'''
     if x:
       warning("Expected number, saw %s" % x)
     return 0.
+
+############################################################################
+#                                Evaluation                                #
+############################################################################
+
+class Eval(object):
+  # Statistics on the types of toponyms processed
+  # Total number of toponyms
+  total_toponyms = 0
+  correct_toponyms = 0
+  incorrect_toponyms = 0
+
+  # Toponyms by number of candidates available
+  total_toponyms_by_num_candidates = intdict()
+  correct_toponyms_by_num_candidates = intdict()
+  incorrect_toponyms_by_num_candidates = intdict()
+  # Toponyms by number of candidates with associated Wikipedia articles
+  total_toponyms_by_num_article_candidates = intdict()
+  correct_toponyms_by_num_article_candidates = intdict()
+  incorrect_toponyms_by_num_article_candidates = intdict()
+
+  incorrect_values = [
+    ('incorrect_with_no_candidates',
+     'Incorrect, with no candidates'),
+    ('incorrect_with_no_article_candidates',
+     'Incorrect, with candidates but none with matching articles'),
+    ('incorrect_with_no_correct_candidates',
+     'Incorrect, with article candidates but no correct candidates'),
+    ('incorrect_with_correct_candidates_but_no_correct_article_candidates',
+     'Incorrect, with article candidates, correct candidates but none with articles'),
+    ('incorrect_with_multiple_correct_article_candidates',
+     'Incorrect, with article candidates, with multiple correct article candidates'),
+    ('incorrect_one_correct_article_candidate_but_article_coord_doesnt_match_location',
+     "Incorrect, with article candidates, one correct but article coordinates don't match location"),
+    ('incorrect_one_good_correct_article_candidate',
+     'Incorrect, with article candidates, one good correct article candidate'),
+  ]
+
+  for (val, descr) in incorrect_values:
+    exec "%s = 0" % val
+
+  @staticmethod
+  def output():
+    tot = Eval.total_toponyms
+    print ("Percent correct = %s/%s = %5.2f" %
+           (Eval.correct_toponyms, tot, 100*float(Eval.correct_toponyms)/tot))
+    print ("Percent incorrect = %s/%s = %5.2f" %
+           (Eval.incorrect_toponyms, tot,
+            100*float(Eval.incorrect_toponyms)/tot))
+    for (val, descr) in Eval.incorrect_values:
+      print ("  %s = %s/%s = %5.2f" %
+        (descr, getattr(Eval, val), tot, 100*float(getattr(Eval, val))/tot))
+
 
 ############################################################################
 #                                Coordinates                               #
@@ -241,6 +291,7 @@ class Coord(object):
 # coordinates.
 
 def spheredist(p1, p2):
+  if not p1 or not p2: return 1000000.
   thisRadLat = (p1.lat / 180.) * math.pi
   thisRadLong = (p1.long / 180.) * math.pi
   otherRadLat = (p2.lat / 180.) * math.pi
@@ -321,9 +372,7 @@ class NBDist(object):
     total_tokens = 0
     incoming_links = 0
     if debug > 0:
-      uniprint("Naive Bayes dist, number of articles = %s" %
-               (latind*degrees_per_region, longind*degrees_per_region,
-                numarts))
+      uniprint("Naive Bayes dist, number of articles = %s" % num_arts)
     counts = self.counts
     for loc in locs:
       art = loc.match
@@ -331,7 +380,8 @@ class NBDist(object):
       for (word,count) in itertools.izip(art.counts[0], art.counts[1]):
         counts[word] += count
       total_tokens += art.total_tokens
-      incoming_links += art.incoming_links
+      if art.incoming_links: # Might be None, for unknown link count
+        incoming_links += art.incoming_links
     self.num_arts += num_arts
     self.total_tokens += total_tokens
     self.incoming_links += incoming_links
@@ -373,7 +423,8 @@ class NBDist(object):
 # region surrounding the locality in question.  The region is currently a
 # square of 4 tiling regions.  The following fields are defined: 
 #
-#   latind, longind: Integer indices of coordinates of center of region.
+#   latind, longind: Region indices of southwest-most tiling region in
+#                    Naive Bayes region.
 #   nbdist: Distribution corresponding to region.
 
 class NBRegion(object):
@@ -392,7 +443,7 @@ class NBRegion(object):
 
     if debug > 0:
       uniprint("Generating distribution for Naive Bayes region centered at %s"
-               % region_indicies_to_coord(nblat, nblong))
+               % region_indices_to_coord(nblat, nblong))
 
     # Accumulate counts for the given region
     def process_one_region(latind, longind):
@@ -404,17 +455,13 @@ class NBRegion(object):
                  region_indices_to_coord(latind, longind))
       self.nbdist.add_locations(locs)
 
-    # Process the four regions around the given central point (remember that
-    # points always refer to the SW corner of a region); but be careful around
-    # the edges
-    if nblat == minimum_latind: nblat1 = maximum_latind
-    else: nblat1 = nblat - 1
-    process_one_region(nblat, nblong)
-    process_one_region(nblat1, nblong)
-    if nblong > minimum_longind:
-      nblong -= 1
-      process_one_region(nblat, nblong)
-      process_one_region(nblat1, nblong)
+    # Process the tiling regions making up the Naive Bayes region;
+    # but be careful around the edges.
+    for i in range(nblat, nblat + width_of_nbregion):
+      for j in range(nblong, nblong + width_of_nbregion):
+        jj = j
+        if jj > maximum_longind: jj = minimum_longind
+        process_one_region(i, jj)
 
     self.nbdist.finish_dist()
 
@@ -427,15 +474,26 @@ def find_nbdist(loc):
     return loc.nbdist
   nbreg = loc.nbregion
   if nbreg: return nbreg.nbdist
-  # Compute the indices of the closest grid point
-  lat = min(maximum_latitude, loc.coord.lat + degrees_per_region/2.0)
-  long = min(maximum_longitude, loc.coord.long + degrees_per_region/2.0)
+
+  # When width_of_nbregion = 1, don't subtract anything.
+  # When width_of_nbregion = 2, subtract 0.5*degrees_per_region.
+  # When width_of_nbregion = 3, subtract degrees_per_region.
+  # When width_of_nbregion = 4, subtract 1.5*degrees_per_region.
+  # In general, subtract (width_of_nbregion-1)/2.0*degrees_per_region.
+
+  # Compute the indices of the southwest region
+  subval = (width_of_nbregion-1)/2.0*degrees_per_region
+  lat = loc.coord.lat - subval
+  long = loc.coord.long - subval
+  if lat < minimum_latitude: lat = minimum_latitude
+  if long < minimum_longitude: long += 360.
+  
   latind, longind = coord_to_region_indices(Coord(lat, long))
-  nbreg = center_to_nbregion.get((latind, longind), None)
+  nbreg = corner_to_nbregion.get((latind, longind), None)
   if not nbreg:
     nbreg = NBRegion(latind, longind)
     nbreg.generate_dist()
-    center_to_nbregion[(latind, longind)] = nbreg
+    corner_to_nbregion[(latind, longind)] = nbreg
   loc.nbregion = nbreg
   return nbreg.nbdist
 
@@ -478,6 +536,17 @@ class Locality(Location):
     self.match = None
     self.nbregion = None
 
+  def __str__(self):
+    return 'Locality %s (%s) at %s, match=%s' % \
+      (self.name, self.div and '/'.join(self.div.path), self.coord, self.match)
+
+  def distance_to_coord(self, coord):
+    return spheredist(self.coord, coord)
+
+  def matches_coord(self, coord):
+    return self.distance_to_coord(coord) <= max_dist_for_close_match
+
+
 # A division higher than a single locality.  According to the World
 # gazetteer, there are three levels of divisions.  For the U.S., this
 # corresponds to country, state, county.
@@ -512,8 +581,14 @@ class Division(object):
     self.nbdist = None
 
   def __str__(self):
-    return '%s (%s), boundary %s' % \
-      (self.name, '/'.join(self.path), self.boundary)
+    return 'Division %s (%s), match=%s, boundary=%s' % \
+      (self.name, '/'.join(self.path), self.match, self.boundary)
+
+  def distance_to_coord(self, coord):
+    return "Unknown"
+
+  def matches_coord(self, coord):
+    return coord in self
 
   # Compute the boundary of the geographic region of this division, based
   # on the points in the region.
@@ -643,6 +718,25 @@ class Article(object):
     self.overall_unseen_mass = None
     self.total_tokens = None
     self.words_seen_once = None
+    short = name
+    if rematch('(.*?), (.*)$', name):
+      short = m_[1]
+      tuple = (m_[1], m_[2])
+      name_div_to_article[tuple] = self
+    elif rematch('(.*) \(.*\)$', name):
+      short = m_[1]
+    short_name_to_articles[short] += [self]
+
+  # Copy properties (but not name) from another article
+  def copy_from(self, art):
+    self.coord = art.coord
+    self.incoming_links = art.incoming_links
+    self.counts = art.counts
+    self.finished = art.finished
+    self.unseen_mass = art.unseen_mass
+    self.overall_unseen_mass = art.overall_unseen_mass
+    self.total_tokens = art.total_tokens
+    self.words_seen_once = art.words_seen_once
 
   # Return the article with the given name; if none exists, create a new
   # article with that name.
@@ -791,6 +885,9 @@ def construct_naive_bayes_dist(filename):
 
   def one_article_probs():
     if total_tokens == 0: return
+    art = Article.find_article_create(title)
+    if art.counts:
+      warning("Article %s already has counts for it!" % art)
     wordcounts = {}
     # Compute probabilities.  Use a very simple version of Good-Turing
     # smoothing where we assign to unseen words the probability mass of
@@ -828,9 +925,6 @@ def construct_naive_bayes_dist(filename):
       if max_articles_to_count and articles_seen >= max_articles_to_count:
         break
       title = m.group(1)
-      art = Article.find_article_create(title)
-      if art.counts:
-        warning("Article %s already has counts for it!" % art)
       wordhash = intdict()
       total_tokens = 0
     elif line.startswith('Article coordinates: '):
@@ -871,6 +965,8 @@ def construct_naive_bayes_dist(filename):
 
   # Figure out the value of OVERALL_UNSEEN_MASS for each article.
   for art in name_to_article.itervalues():
+    # make sure counts not None (eg article in coords file but not counts file)
+    if not art.counts: continue
     overall_seen_mass = 0.0
     for ind in art.counts[0]:
       overall_seen_mass += overall_word_probs[ind]
@@ -884,14 +980,10 @@ def get_coordinates(filename):
     if rematch('Article title: (.*)$', line):
       title = m_[1]
     elif rematch('Article coordinates: (.*),(.*)$', line):
+      # The context may be modified by find_article_create()
+      c = Coord(safe_float(m_[1]), safe_float(m_[2]))
       art = Article.find_article_create(title)
-      art.coord = Coord(safe_float(m_[1]), safe_float(m_[2]))
-      short = title
-      if rematch('(.*?), (.*)$', title):
-        short = m_[1]
-        tuple = (m_[1], m_[2])
-        name_div_to_article[tuple] = art
-      short_name_to_articles[short] += [art]
+      art.coord = c
 
 # Add the given locality to the region map, which covers the earth in regions
 # of a particular size to aid in computing the regions used in region-based
@@ -1041,6 +1133,19 @@ def read_incoming_link_info(filename):
       articles_seen += 1
       if (articles_seen % 10000) == 0:
         print >>sys.stderr, "Processed %d articles" % articles_seen
+
+def read_redirect_file(filename):
+  for line in uchompopen(filename):
+    if rematch('Article title: (.*)$', line):
+      title = m_[1]
+    elif rematch('Redirect to: (.*)$', line):
+      redirect = m_[1]
+      redart = name_to_article.get(redirect, None)
+      if redart:
+        art = Article.find_article_create(title)
+        art.copy_from(redart)
+    else:
+      warning("Strange line in redirect file: %s" % line)
 
 # Class of word in a file containing toponyms.  Fields:
 #
@@ -1211,12 +1316,7 @@ def disambiguate_toponym(geogword, compute_score):
     for loc in locs:
       art = loc.match
       if debug > 0:
-        if type(loc) is Locality:
-          uniprint("Considering location %s (Locality), coord %s, article %s"
-                   % (loc.name, loc.coord, art))
-        else:
-          uniprint("Considering location %s (Division), article %s"
-                   % (loc.name, art))
+          uniprint("Considering %s, article %s" % (loc, art))
       if not art:
         if debug > 0:
           uniprint("--> Location without matching article")
@@ -1227,25 +1327,85 @@ def disambiguate_toponym(geogword, compute_score):
         bestscore = thisscore
         bestloc = loc
     if bestloc:
-      if type(bestloc) is Locality:
-        dist = spheredist(coord, bestloc.coord)
-        correct = dist <= max_dist_for_close_match
-      else:
-        correct = coord in bestloc
+      correct = bestloc.matches_coord(coord)
     else:
       correct = False
+
+  # Toponyms by number of candidates available
+  total_toponyms_by_number_of_candidates = intdict()
+  correct_toponyms_by_number_of_candidates = intdict()
+  incorrect_toponyms_by_number_of_candidates = intdict()
+  # Toponyms by number of candidates available with associated Wikipedia articles
+  total_toponyms_by_number_of_article_candidates = intdict()
+  correct_toponyms_by_number_of_article_candidates = intdict()
+  incorrect_toponyms_by_number_of_article_candidates = intdict()
+  # Toponyms where the correct answer is one of the candidates
+  total_toponyms_with_correct_in_candidates = 0
+  correct_toponyms_with_correct_in_candidates = 0
+  incorrect_toponyms_with_correct_in_candidates = 0
+  # Toponyms where the correct answer is one of the candidates with associated
+  # Wikipedia article
+  total_toponyms_with_correct_in_article_candidates = 0
+  correct_toponyms_with_correct_in_article_candidates = 0
+  incorrect_toponyms_with_correct_in_article_candidates = 0
+
+  num_locs = len(locs)
+  num_article_locs = sum(1 for loc in locs if loc.match)
+
+  Eval.total_toponyms_by_num_candidates[num_locs] += 1
+  Eval.total_toponyms_by_num_article_candidates[num_article_locs] += 1
+  Eval.total_toponyms += 1
+
   if correct:
-    global correct_toponyms_disambiguated
-    correct_toponyms_disambiguated += 1
-  global total_toponyms_disambiguated
-  total_toponyms_disambiguated += 1
-  if debug > 0 and bestloc:
-    if type(bestloc) is Locality:
-      uniprint("Best match = %s, link count = %s, coordinates %s, dist %s, correct %s"
-               % (bestloc.match, maxlinks, bestloc.coord, dist, correct))
+    Eval.correct_toponyms += 1
+    Eval.correct_toponyms_by_num_candidates[num_locs] += 1
+    Eval.correct_toponyms_by_num_article_candidates[num_article_locs] += 1
+  else:
+    Eval.incorrect_toponyms += 1
+    Eval.incorrect_toponyms_by_num_candidates[num_locs] += 1
+    Eval.incorrect_toponyms_by_num_article_candidates[num_article_locs] += 1
+    if num_locs == 0:
+      reason = 'incorrect_with_no_candidates'
+    elif num_article_locs == 0:
+      reason = 'incorrect_with_no_article_candidates'
     else:
-      uniprint("Best match = %s, link count = %s, correct %s" %
-               (bestloc.match, maxlinks, correct))
+      good_locs = [loc for loc in locs if loc.matches_coord(coord)]
+      good_article_locs = [loc for loc in good_locs if loc.match]
+      if not good_locs:
+        reason = 'incorrect_with_no_correct_candidates'
+      elif not good_article_locs:
+        reason = 'incorrect_with_correct_candidates_but_no_correct_article_candidates'
+      elif len(good_article_locs) > 1:
+        reason = 'incorrect_with_multiple_correct_article_candidates'
+      else:
+        goodloc = good_article_locs[0]
+        if type(goodloc) is Locality and \
+           not goodloc.matches_coord(goodloc.match.coord):
+          reason = 'incorrect_one_correct_article_candidate_but_article_coord_doesnt_match_location'
+        else:
+          reason = 'incorrect_one_good_correct_article_candidate'
+  if correct:
+    uniprint("Eval: Toponym %s, correct" % toponym)
+  else:
+    uniprint("Eval: Toponym %s, incorrect, reason = %s" % (toponym, reason))
+    setattr(Eval, reason, getattr(Eval, reason) + 1)
+
+  if debug > 0 and bestloc:
+    uniprint("Best location = %s, score = %s, dist = %s, correct %s"
+             % (bestloc, bestscore, bestloc.distance_to_coord(coord), correct))
+
+def get_adjusted_incoming_links(art):
+  thislinks = art.incoming_links
+  if thislinks == None:
+    thislinks = 0
+    if debug > 0:
+      warning("Strange, %s has no link count" % art)
+  else:
+    if debug > 0:
+      uniprint("--> Link count is %s" % thislinks)
+  if thislinks == 0: # Whether from unknown count or count is actually zero
+    thislinks = 0.01 # So we don't get errors from log(0)
+  return thislinks
 
 # Given a TR-CONLL file, find each toponym explicitly mentioned as such
 # and disambiguate it (find the correct geographic location) using the
@@ -1254,15 +1414,7 @@ def disambiguate_toponym(geogword, compute_score):
 def disambiguate_link_baseline(fname):
   def compute_score(geogword, loc):
     art = loc.match
-    thislinks = art.incoming_links
-    if thislinks == None:
-      thislinks = 0.01 # So we don't get errors from log(0)
-      if debug > 0:
-        warning("Strange, %s has no link count" % art)
-    else:
-      if debug > 0:
-        uniprint("--> Link count is %s" % thislinks)
-    return thislinks
+    return get_adjusted_incoming_links(art)
 
   disambiguate_trconll_file(fname, compute_score, compute_context=False)
 
@@ -1272,14 +1424,7 @@ def disambiguate_link_baseline(fname):
 def disambiguate_naive_bayes(fname):
   def compute_score(geogword, loc):
     art = loc.match
-    thislinks = art.incoming_links
-    if thislinks == None:
-      thislinks = 0.01 # So we don't get errors from log(0)
-      if debug > 0:
-        warning("Strange, %s has no link count" % art)
-    else:
-      if debug > 0:
-        uniprint("--> Link count is %s" % thislinks)
+    thislinks = get_adjusted_incoming_links(art)
 
     if naive_bayes_type == 'article':
       distobj = art
@@ -1365,6 +1510,9 @@ Wikipedia articles. Output by processwiki.py --find-links.""",
   op.add_option("-s", "--stopwords-file",
                 help="""File containing list of stopwords.""",
                 metavar="FILE")
+  op.add_option("--redirect-file",
+                help="""File containing redirects from Wikipedia.""",
+                metavar="FILE")
   op.add_option("-g", "--gazetteer-file",
                 help="""File containing gazetteer information to match.""",
                 metavar="FILE")
@@ -1390,6 +1538,12 @@ to the given file.""",
                 help="""Directory containing TR-CONLL files in the text format.
 Each file is read in and then disambiguation is performed.""",
                 metavar="DIR")
+  op.add_option("--width-of-nbregion", type='int', default=2,
+                help="""Width of the Naive Bayes region used for region-based
+Naive Bayes disambiguation, in tiling regions.  Default %default.""")
+  op.add_option("--max-articles-to-count", type='int', default=0,
+                help="""Maximum number of articles to load word counts from, for testing.
+If 0, load all articles.  Default %default.""")
   op.add_option("-r", "--region-size", type='float', default=50.0,
                 help="""Size of the region (in miles) to use when doing
 region-based Naive Bayes disambiguation.  Default %default.""")
@@ -1426,7 +1580,9 @@ disambiguated, in a Naive-Bayes scheme. Default '%default'.""")
   op.add_option("-d", "--debug", type='int', metavar="LEVEL",
                 help="Output debug info at given level")
 
-  uniprint("Arguments: %s" % ' '.join(sys.argv))
+  uniprint("Arguments: %s" % ' '.join(sys.argv), flush=True)
+
+  ### Process the command-line options and set other values from them ###
   
   opts, args = op.parse_args()
 
@@ -1448,8 +1604,18 @@ disambiguated, in a Naive-Bayes scheme. Default '%default'.""")
   minimum_latind, minimum_longind = \
      coord_to_region_indices(Coord(minimum_latitude, minimum_longitude))
 
+  if opts.width_of_nbregion <= 0:
+    op.error("Width of Naive Bayes region must be positive")
+  global width_of_nbregion
+  width_of_nbregion = opts.width_of_nbregion
+
   global naive_bayes_type
   naive_bayes_type = opts.naive_bayes_type
+
+  global max_articles_to_count
+  max_articles_to_count = opts.max_articles_to_count
+
+  ### Start reading in the files and operating on them ###
 
   # Files needed for different options:
   #
@@ -1507,13 +1673,13 @@ disambiguated, in a Naive-Bayes scheme. Default '%default'.""")
     if not opts.pickle_file:
       op.error("For pickle-only mode, must specify pickle file using -p or --pick-file")
 
-  print "Processing TR-CONLL directory %s for toponym counts..." % opts.trconll_dir
-  process_dir_files(opts.trconll_dir, count_toponyms_in_file)
-  print "Number of toponyms seen: %s" % len(toponyms_seen_in_eval_files)
-  print "Number of toponyms seen more than once: %s" % \
-    len([foo for (foo,count) in toponyms_seen_in_eval_files.iteritems() if
-         count > 1])
-  output_reverse_sorted_table(toponyms_seen_in_eval_files)
+  #print "Processing TR-CONLL directory %s for toponym counts..." % opts.trconll_dir
+  #process_dir_files(opts.trconll_dir, count_toponyms_in_file)
+  #print "Number of toponyms seen: %s" % len(toponyms_seen_in_eval_files)
+  #print "Number of toponyms seen more than once: %s" % \
+  #  len([foo for (foo,count) in toponyms_seen_in_eval_files.iteritems() if
+  #       count > 1])
+  #output_reverse_sorted_table(toponyms_seen_in_eval_files)
 
   # Read in (or unpickle) and maybe pickle the words-counts file
   if opts.mode == 'pickle-only' or opts.mode == 'disambig-naive-bayes':
@@ -1536,6 +1702,9 @@ disambiguated, in a Naive-Bayes scheme. Default '%default'.""")
   get_coordinates(opts.coords_file)
   print "Reading incoming links file %s..." % opts.links_file
   read_incoming_link_info(opts.links_file)
+  if opts.redirect_file:
+    print "Reading redirect file %s..." % opts.redirect_file
+    read_redirect_file(opts.redirect_file)
   print "Reading and matching World gazetteer file %s..." % opts.gazetteer_file
   read_world_gazetteer_and_match(opts.gazetteer_file,
                                  opts.naive_bayes_type != "article")
@@ -1550,9 +1719,6 @@ disambiguated, in a Naive-Bayes scheme. Default '%default'.""")
 
   print "Processing TR-CONLL directory %s..." % opts.trconll_dir
   process_dir_files(opts.trconll_dir, disambig_fun)
-  print("Percent correct = %s/%s = %5.2f" %
-        (correct_toponyms_disambiguated, total_toponyms_disambiguated,
-         100*float(correct_toponyms_disambiguated)/
-             total_toponyms_disambiguated))
+  Eval.output()
 
 main()
