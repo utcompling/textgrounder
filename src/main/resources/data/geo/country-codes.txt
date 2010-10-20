@@ -10,7 +10,7 @@ Antigua and Barbuda 	AC 	AG 	ATG 	028	ATG 	.ag
 Argentina 	AR 	AR 	ARG 	032	ARG 	.ar 	 
 Armenia 	AM 	AM 	ARM 	051	ARM 	.am 	 
 Aruba 	AA 	AW 	ABW 	533	ABW 	.aw 	 
-Ashmore and Cartier Islands 	AT - 	- 	-	AUS 	- 	ISO includes with Australia
+Ashmore and Cartier Islands 	AT	-	- 	-	AUS 	- 	ISO includes with Australia
 Australia 	AS 	AU 	AUS 	036	AUS 	.au 	ISO includes Ashmore and Cartier Islands, Coral Sea Islands
 Austria 	AU 	AT 	AUT 	040	AUT 	.at 	 
 Azerbaijan 	AJ 	AZ 	AZE 	031	AZE 	.az 	
@@ -31,7 +31,7 @@ Bosnia and Herzegovina 	BK 	BA 	BIH 	070	BIH 	.ba
 Botswana 	BC 	BW 	BWA 	072	BWA 	.bw 	 
 Bouvet Island 	BV 	BV 	BVT 	074	BVT 	.bv 	 
 Brazil 	BR 	BR 	BRA 	076	BRA 	.br 	 
-British Indian Ocean Territory 	IO IO 	IOT 	086	IOT 	.io 	 
+British Indian Ocean Territory 	IO	IO 	IOT 	086	IOT 	.io 	 
 British Virgin Islands 	VI 	VG 	VGB 	092	VGB 	.vg 	 
 Brunei 	BX 	BN 	BRN 	096	BRN 	.bn 	 
 Bulgaria 	BU 	BG 	BGR 	100	BGR 	.bg 	 
