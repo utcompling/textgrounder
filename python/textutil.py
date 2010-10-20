@@ -96,15 +96,22 @@ If string is Unicode, automatically convert to UTF-8.'''
   if type(text) is unicode: text = text.encode("utf-8")
   return intern(text)
 
-def uniprint(text, outfile=sys.stdout):
+def uniprint(text, outfile=sys.stdout, nonl=False, flush=False):
   '''Print text string using 'print', converting Unicode as necessary.
 If string is Unicode, automatically convert to UTF-8, so it can be output
 without errors.  Send output to the file given in OUTFILE (default is
-stdout).'''
+stdout).  Uses the 'print' command, and normally outputs a newline; but
+this can be suppressed using NONL.  Output is not normally flushed (unless
+the stream does this automatically); but this can be forced using FLUSH.'''
+  
   if type(text) is unicode:
-    print >>outfile, text.encode("utf-8")
+    text = text.encode("utf-8")
+  if nonl:
+    print >>outfile, text,
   else:
     print >>outfile, text
+  if flush:
+    outfile.flush()
 
 #############################################################################
 #                             Default dictionaries                          #
