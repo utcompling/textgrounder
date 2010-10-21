@@ -39,7 +39,7 @@ class CodeConverter(in: InputStream) {
   while (line != null) {
     val fs = line.split("\t")
     val country = Country(
-      fields(0),
+      fs(0),
       if (fs(1) == "-") None else Some(fs(1)),
       if (fs(2) == "-") None else Some(fs(2), fs(3), fs(4).toInt),
       if (fs(5) == "-") None else Some(fs(5)),
