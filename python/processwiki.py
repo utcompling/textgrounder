@@ -26,6 +26,7 @@
 import sys, re
 from optparse import OptionParser
 from textutil import *
+import itertools
 
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
@@ -916,7 +917,6 @@ class ExtractUsefulText(SourceTextHandler):
       for chunk in self.process_source_text(linktext):
         yield chunk
   
-
 #######################################################################
 #               Formatting text to make processing easier             #
 #######################################################################
@@ -1249,12 +1249,16 @@ coordinate_articles = set()
 # Parse the result of a previous run of --coords-counts for articles with
 # coordinates
 def get_coordinates(filename):
+  articles_seen = 0
   for line in uchompopen(filename):
     m = re.match('Article title: (.*)', line)
     if m:
       title = m.group(1)
     elif re.match('Article coordinates: ', line):
       coordinate_articles.add(title)
+      articles_seen += 1
+      if (articles_seen % 10000) == 0:
+        print >>sys.stderr, "Processed %d articles" % articles_seen
     
 class ProcessSourceForLinks(RecursiveSourceTextHandler):
   useful_text_handler = ExtractUsefulText()
@@ -1285,6 +1289,103 @@ class ProcessSourceForLinks(RecursiveSourceTextHandler):
     # Also recursively process all the arguments for links, etc.
     return self.process_source_text(text[2:-2])
 
+class ToponymEvalDataHandler(ExtractUsefulText):
+  def join_arguments_as_generator(self, args_of_macro):
+    first = True
+    for chunk in args_of_macro:
+      if not first: yield ' '
+      first = False
+      for chu in self.process_source_text(chunk):
+        yield chu
+
+  # OK, this is a bit tricky.  The definitions of process_template() and
+  # process_internal_link() in ExtractUsefulText() use yield_template_args()
+  # and yield_internal_link_args(), respectively, to yield arguments, and
+  # then call process_source_text() to recursively process the arguments and
+  # then join everything together into a string, with spaces between the
+  # chunks corresponding to separate arguments.  The joining together
+  # happens inside of process_and_join_arguments().  This runs into problems
+  # if we have an internal link inside of another internal link, which often
+  # happens with images, which are internal links that have an extra caption
+  # argument, which frequently contains (nested) internal links.  The
+  # reason is that we've overridden process_internal_link() to sometimes
+  # return a tuple (which signals the outer handler that we found a link
+  # of the appropriate sort), and the joining together chokes on non-string
+  # arguments.  So instead, we "join" arguments by just yielding everything
+  # in sequence, with spaces inserted as needed between arguments; this
+  # happens in join_arguments_as_generator().  We specifically need to
+  # override process_template() (and already override process_internal_link()),
+  # because it's exactly those two that currently call
+  # process_and_join_arguments().
+  #
+  # The idea is that we never join arguments together at any level of
+  # recursion, but just yield chunks.  At the topmost level, we will join
+  # as necessary and resplit for word boundaries.
+
+  def process_template(self, text):
+    for chunk in self.join_arguments_as_generator(yield_template_args(text)):
+      yield chunk
+  
+  def process_internal_link(self, text):
+    tempargs = get_macro_args(text)
+    m = re.match(r'(?s)\s*([a-zA-Z0-9_]+)\s*:(.*)', tempargs[0])
+    if m:
+      # Something like [[Image:...]] or [[wikt:...]] or [[fr:...]]
+      # For now, just skip them all; eventually, might want to do something
+      # useful with some, e.g. categories
+      pass
+    else:
+      article = tempargs[0]
+      # Skip links to articles without coordinates
+      if coordinate_articles and article not in coordinate_articles:
+        pass
+      else:
+        yield ('link', tempargs)
+        return
+
+    for chunk in self.join_arguments_as_generator(yield_internal_link_args(text)):
+      yield chunk
+
+### Default handler class for processing article text, including returning
+### "useful" text (what the Wikipedia user sees, plus similar-quality
+### hidden text).
+class GenerateToponymEvalData(ArticleHandler):
+  # Process the text itself, e.g. for words.  Input it text that has been
+  # preprocessed as described above (remove comments, etc.).  Default
+  # handler does two things:
+  #
+  # 1. Further process the text (see format_text_second_pass())
+  # 2. Use process_source_text() to extract chunks of useful
+  #    text.  Join together and then split into words.  Pass the generator
+  #    of words to self.process_text_for_words().
+
+  def process_text_for_text(self, title, text):
+    # Now process the text in various ways in preparation for extracting
+    # the words from the text
+    text = format_text_second_pass(text)
+
+    uniprint("Article title: %s" % title)
+    chunkgen = ToponymEvalDataHandler().process_source_text(text)
+    #for chunk in chunkgen:
+    #  uniprint("Saw chunk: %s" % (chunk,))
+    # groupby() allows us to group all the non-link chunks (which are raw
+    # strings) together efficiently
+    for k, g in itertools.groupby(chunkgen,
+                                  lambda chunk: type(chunk) is tuple):
+      #args = [arg for arg in g]
+      #uniprint("Saw k=%s, g=%s" % (k,args))
+      if k:
+         for (linktext, linkargs) in g:
+           uniprint("Link: %s" % '|'.join(linkargs))
+      else:
+        # Now process the resulting text into chunks.  Join them back together
+        # again (to handle cases like "the [[latent variable]]s are ..."), and
+        # split to find words.
+        for word in split_text_into_words(''.join(g)):
+          if word:
+            uniprint("%s" % word)
+
+
 class FindLinks(ArticleHandler):
   def process_text_for_data(self, title, text):
     handler = ProcessSourceForLinks()
@@ -1302,8 +1403,6 @@ class FindLinks(ArticleHandler):
     for (surface,map) in surface_map.items():
       uniprint("-------- Surface->article for %s: " % surface)
       output_reverse_sorted_table(map)
-
-
 
 #######################################################################
 #                                Main code                            #
@@ -1340,6 +1439,9 @@ all articles it maps to.""",
   op.add_option("-r", "--find-redirects",
                 help="Output all redirects.",
                 action="store_true")
+  op.add_option("-t", "--generate-toponym-eval",
+                help="Generate data files for use in toponym evaluation.",
+                action="store_true")
   op.add_option("-f", "--coords-file",
                 help="""File containing output from a prior run of
 --coords-counts, listing all the articles with associated coordinates.
@@ -1371,6 +1473,8 @@ combined.)""",
     main_process_input(GetCoords())
   elif opts.coords_counts:
     main_process_input(GetCoordsAndCounts())
+  elif opts.generate_toponym_eval:
+    main_process_input(GenerateToponymEvalData())
 
 #import cProfile
 #cProfile.run('main()', 'process-wiki.prof')
