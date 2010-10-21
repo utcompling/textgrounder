@@ -23,6 +23,7 @@ import java.io.FileReader;
 import java.io.IOException;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
@@ -52,6 +53,7 @@ public class TrXMLDirSource extends DocumentSource {
     });
 
     this.files = files == null ? new File[0] : files;
+    Arrays.sort(this.files);
 
     this.currentIdx = 0;
     this.nextFile();

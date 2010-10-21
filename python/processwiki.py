@@ -23,15 +23,10 @@
 #...
 #}}
 
-# 2. Mapit and Geolinks templates:
-
-# {{Geolinks-AUS-suburbscale|long=138.601|lat=-34.929}}
-# {{Geolinks-US-streetscale|34.1996350|-118.1746540}}
-# {{Mapit-AUS-suburbscale|lat=-43.164721|long=146.926947}}
-
 import sys, re
 from optparse import OptionParser
 from textutil import *
+import itertools
 
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
@@ -506,36 +501,59 @@ values into a decimal +/- latitude or longitude.'''
 convert_ns = {'N':1, 'S':-1}
 convert_ew = {'E':1, 'W':-1}
 
-# Utility function for get_lat_long().  Extract out either latitude or
+# Utility function for get_latd_coord().  Extract out either latitude or
 # longitude from a template of type TEMPTYPE with arguments ARGS.
-# LAT is a string, either 'lat' or 'long'.  NS is a string, either 'ns'
-# (for latitude) or 'ew' (for longitude).  CONVERT is a table mapping
-# NSEW directions into a multiplier +1 or -1, coming from either of the
-# global variables convert_ns (for latitude) or convert_ew (for longitude).
-def get_lat_long_1(temptype, args, lat, ns, convert):
-  if '%sd' % lat not in args:
-    warning("No %sd seen for template type %s" % (lat, temptype))
-  d = args.get('%sd' % lat, 0)
-  m = args.get('%sm' % lat, 0)
-  s = args.get('%ss' % lat, 0)
-  latns = '%s%s' % (lat, ns)
-  latNS = '%s%s' % (lat, ns.upper())
-  if latns not in args:
-    warning("No %s seen for template type %s" % (latNS, temptype))
+# LAT is a string, e.g. 'lat' or 'long'.  DMS_SUFF is a three-argument
+# list, e.g. ['d', 'm', 's'] if arguments like 'latd' or 'longm' are
+# expected.  OFFPARAM is the parameter indicating the offset to the N, S,
+# E or W.  # ['lat_dir', 'lon_dir'].  CONVERT is a table mapping NSEW directions into a
+# multiplier +1 or -1, coming from either of the global variables
+# convert_ns (for latitude) or convert_ew (for longitude).
+def get_lat_long_1(temptype, args, lat, dms_suff, offparam, convert):
+  dsuff = dms_suff[0]
+  msuff = dms_suff[1]
+  ssuff = dms_suff[2]
+  if '%s%s' % (lat, dsuff) not in args:
+    warning("No %s%s seen for template type %s" % (lat, dsuff, temptype))
+  d = args.get('%s%s' % (lat, dsuff), 0)
+  m = args.get('%s%s' % (lat, msuff), 0)
+  s = args.get('%s%s' % (lat, ssuff), 0)
+  if offparam not in args:
+    warning("No %s seen for template type %s" % (offparam, temptype))
     latmult = 1
   else:
-    latmult = convert.get(args[latns], 0)
+    latmult = convert.get(args[offparam], 0)
     if latmult == 0:
       warning("%s for template type %s has bad value %s" %
-               (latNS, temptype, args[latns]))
+               (offparam, temptype, args[offparam]))
   return convert_dms(latmult, d, m, s)
 
-def get_lat_long(temptype, args):
+def get_latd_coord(temptype, args):
   '''Given a template of type TEMPTYPE with arguments ARGS, assumed to have
-a latitude/longitude specification in it, extract out and return a tuple
-of decimal (latitude, longitude) values.'''
-  lat = get_lat_long_1(temptype, args, 'lat', 'ns', convert_ns)
-  long = get_lat_long_1(temptype, args, 'long', 'ew', convert_ew)
+a latitude/longitude specification in it using latd and longd, extract out
+and return a tuple of decimal (latitude, longitude) values.'''
+  lat = get_lat_long_1(temptype, args, 'lat', ['d', 'm', 's'],
+                       'latns', convert_ns)
+  long = get_lat_long_1(temptype, args, 'long', ['d', 'm', 's'],
+                        'longew', convert_ew)
+  return (lat, long)
+
+def get_lat_deg_coord(temptype, args):
+  '''Given a template of type TEMPTYPE with arguments ARGS, assumed to have
+a latitude/longitude specification in it using lat_deg and lon_deg, extract out
+and return a tuple of decimal (latitude, longitude) values.'''
+  lat = get_lat_long_1(temptype, args, 'lat', ['_deg', '_min', '_sec'],
+                       'lat_dir', convert_ns)
+  long = get_lat_long_1(temptype, args, 'lon', ['_deg', '_min', '_sec'],
+                        'lon_dir', convert_ew)
+  return (lat, long)
+
+def get_latitude_coord(temptype, args):
+  '''Given a template of type TEMPTYPE with arguments ARGS, assumed to have
+a latitude/longitude specification in it using latitude/longitude, extract out
+and return a tuple of decimal (latitude, longitude) values.'''
+  lat = safe_float(args.get('latitude', '0'))
+  long = safe_float(args.get('longitude', '0'))
   return (lat, long)
 
 # Utility function for get_coord().  Extract out the latitude or longitude
@@ -587,10 +605,22 @@ globe: which planet or satellite the coordinate is on (esp. if not the Earth)
   # Filter out optional "template arguments", add a bunch of blank arguments
   # at the end to make sure we don't get out-of-bounds errors in
   # get_coord_1()
-  args = [x for x in args if '=' not in x] + ['','','','','','']
-  (i, lat) = get_coord_1(args, ('N','S'), convert_ns)
-  (_, long) = get_coord_1(args[i:], ('E','W'), convert_ew)
-  return (lat, long)
+  filtargs = [x for x in args if '=' not in x]
+  if filtargs:
+    filtargs += ['','','','','','']
+    (i, lat) = get_coord_1(filtargs, ('N','S'), convert_ns)
+    (_, long) = get_coord_1(filtargs[i:], ('E','W'), convert_ew)
+    return (lat, long)
+  else:
+    (paramshash, _) = find_template_params(args, True)
+    lat = paramshash.get('lat', None) or paramshash.get('latitude', None)
+    long = paramshash.get('long', None) or paramshash.get('longitude', None)
+    if not lat or not long:
+      warning("Can't find latitude/longitude in {{%s|%s}}" %
+              (temptype, '|'.join(args)))
+    lat = safe_float(lat) if lat else 0.
+    long = safe_float(long) if long else 0.
+    return (lat, long)
 
 class ExtractCoordinatesFromSource(SourceTextHandler):
   '''Given the article text TEXT of an article (in general, after first-
@@ -621,13 +651,19 @@ applied to the text before being sent here.'''
         or lowertemp.startswith('mapit'):
       (lat, long) = get_coord(temptype, tempargs[1:])
     else:
-      # Look for any other template with a 'latd' parameter.  Usually
-      # these will be Infobox-type templates.  Possibly we should only
+      # Look for any other template with a 'latd' or 'latitude' parameter.
+      # Usually these will be Infobox-type templates.  Possibly we should only
       # look at templates whose lowercased name begins with "infobox".
       (paramshash, _) = find_template_params(tempargs[1:], True)
       if 'latd' in paramshash:
         templates_with_coords[lowertemp] += 1
-        (lat, long) = get_lat_long(temptype, paramshash)
+        (lat, long) = get_latd_coord(temptype, paramshash)
+      elif 'lat_deg' in paramshash:
+        templates_with_coords[lowertemp] += 1
+        (lat, long) = get_lat_deg_coord(temptype, paramshash)
+      elif 'latitude' in paramshash:
+        templates_with_coords[lowertemp] += 1
+        (lat, long) = get_latitude_coord(temptype, paramshash)
     if lat or long:
       if debug > 0: uniprint("Saw coordinate %s,%s in template type %s" %
                 (lat, long, temptype))
@@ -881,7 +917,6 @@ class ExtractUsefulText(SourceTextHandler):
       for chunk in self.process_source_text(linktext):
         yield chunk
   
-
 #######################################################################
 #               Formatting text to make processing easier             #
 #######################################################################
@@ -1156,6 +1191,24 @@ class FindRedirects(ArticleHandler):
     uniprint("Article title: %s" % title)
     uniprint("Redirect to: %s" % redirtitle)
 
+def extract_coordinates_from_article(title, text):
+  handler = ExtractCoordinatesFromSource()
+  for foo in handler.process_source_text(text): pass
+  if len(handler.coords) > 0:
+    # Prefer a coordinate specified using {{Coord|...}} or similar to
+    # a coordinate in an Infobox, because the latter tend to be less
+    # accurate.
+    for (temptype, lat, long) in handler.coords:
+      if temptype.startswith('coor'):
+        uniprint("Article title: %s" % title)
+        uniprint("Article coordinates: %s,%s" % (lat, long))
+        return True
+    (temptype, lat, long) = handler.coords[0]
+    uniprint("Article title: %s" % title)
+    uniprint("Article coordinates: %s,%s" % (lat, long))
+    return True
+  else: return False
+
 # Handler to output count information on words.  Only processes articles
 # with coordinates in them, and only selects the first coordinate seen.
 # Outputs the article title and coordinates.  Then computes the count of
@@ -1170,22 +1223,12 @@ class GetCoordsAndCounts(ArticleHandlerForUsefulText):
     output_reverse_sorted_table(wordhash)
 
   def process_text_for_data(self, title, text):
-    handler = ExtractCoordinatesFromSource()
-    for foo in handler.process_source_text(text): pass
-    if len(handler.coords) > 0:
-      # Prefer a coordinate specified using {{Coord|...}} or similar to
-      # a coordinate in an Infobox, because the latter tend to be less
-      # accurate.
-      for (temptype, lat, long) in handler.coords:
-        if temptype.startswith('coor'):
-          uniprint("Article title: %s" % title)
-          uniprint("Article coordinates: %s,%s" % (lat, long))
-          return True
-      (temptype, lat, long) = handler.coords[0]
-      uniprint("Article title: %s" % title)
-      uniprint("Article coordinates: %s,%s" % (lat, long))
-      return True
-    else: return False
+    return extract_coordinates_from_article(title, text)
+
+# Handler to output just coordinate information.
+class GetCoords(ArticleHandler):
+  def process_text_for_data(self, title, text):
+    return extract_coordinates_from_article(title, text)
 
 # Handler to output link information as well as coordinate information.
 # Note that a link consists of two parts: The surface text and the article
@@ -1206,12 +1249,16 @@ coordinate_articles = set()
 # Parse the result of a previous run of --coords-counts for articles with
 # coordinates
 def get_coordinates(filename):
+  articles_seen = 0
   for line in uchompopen(filename):
     m = re.match('Article title: (.*)', line)
     if m:
       title = m.group(1)
     elif re.match('Article coordinates: ', line):
       coordinate_articles.add(title)
+      articles_seen += 1
+      if (articles_seen % 10000) == 0:
+        print >>sys.stderr, "Processed %d articles" % articles_seen
     
 class ProcessSourceForLinks(RecursiveSourceTextHandler):
   useful_text_handler = ExtractUsefulText()
@@ -1242,6 +1289,103 @@ class ProcessSourceForLinks(RecursiveSourceTextHandler):
     # Also recursively process all the arguments for links, etc.
     return self.process_source_text(text[2:-2])
 
+class ToponymEvalDataHandler(ExtractUsefulText):
+  def join_arguments_as_generator(self, args_of_macro):
+    first = True
+    for chunk in args_of_macro:
+      if not first: yield ' '
+      first = False
+      for chu in self.process_source_text(chunk):
+        yield chu
+
+  # OK, this is a bit tricky.  The definitions of process_template() and
+  # process_internal_link() in ExtractUsefulText() use yield_template_args()
+  # and yield_internal_link_args(), respectively, to yield arguments, and
+  # then call process_source_text() to recursively process the arguments and
+  # then join everything together into a string, with spaces between the
+  # chunks corresponding to separate arguments.  The joining together
+  # happens inside of process_and_join_arguments().  This runs into problems
+  # if we have an internal link inside of another internal link, which often
+  # happens with images, which are internal links that have an extra caption
+  # argument, which frequently contains (nested) internal links.  The
+  # reason is that we've overridden process_internal_link() to sometimes
+  # return a tuple (which signals the outer handler that we found a link
+  # of the appropriate sort), and the joining together chokes on non-string
+  # arguments.  So instead, we "join" arguments by just yielding everything
+  # in sequence, with spaces inserted as needed between arguments; this
+  # happens in join_arguments_as_generator().  We specifically need to
+  # override process_template() (and already override process_internal_link()),
+  # because it's exactly those two that currently call
+  # process_and_join_arguments().
+  #
+  # The idea is that we never join arguments together at any level of
+  # recursion, but just yield chunks.  At the topmost level, we will join
+  # as necessary and resplit for word boundaries.
+
+  def process_template(self, text):
+    for chunk in self.join_arguments_as_generator(yield_template_args(text)):
+      yield chunk
+  
+  def process_internal_link(self, text):
+    tempargs = get_macro_args(text)
+    m = re.match(r'(?s)\s*([a-zA-Z0-9_]+)\s*:(.*)', tempargs[0])
+    if m:
+      # Something like [[Image:...]] or [[wikt:...]] or [[fr:...]]
+      # For now, just skip them all; eventually, might want to do something
+      # useful with some, e.g. categories
+      pass
+    else:
+      article = tempargs[0]
+      # Skip links to articles without coordinates
+      if coordinate_articles and article not in coordinate_articles:
+        pass
+      else:
+        yield ('link', tempargs)
+        return
+
+    for chunk in self.join_arguments_as_generator(yield_internal_link_args(text)):
+      yield chunk
+
+### Default handler class for processing article text, including returning
+### "useful" text (what the Wikipedia user sees, plus similar-quality
+### hidden text).
+class GenerateToponymEvalData(ArticleHandler):
+  # Process the text itself, e.g. for words.  Input it text that has been
+  # preprocessed as described above (remove comments, etc.).  Default
+  # handler does two things:
+  #
+  # 1. Further process the text (see format_text_second_pass())
+  # 2. Use process_source_text() to extract chunks of useful
+  #    text.  Join together and then split into words.  Pass the generator
+  #    of words to self.process_text_for_words().
+
+  def process_text_for_text(self, title, text):
+    # Now process the text in various ways in preparation for extracting
+    # the words from the text
+    text = format_text_second_pass(text)
+
+    uniprint("Article title: %s" % title)
+    chunkgen = ToponymEvalDataHandler().process_source_text(text)
+    #for chunk in chunkgen:
+    #  uniprint("Saw chunk: %s" % (chunk,))
+    # groupby() allows us to group all the non-link chunks (which are raw
+    # strings) together efficiently
+    for k, g in itertools.groupby(chunkgen,
+                                  lambda chunk: type(chunk) is tuple):
+      #args = [arg for arg in g]
+      #uniprint("Saw k=%s, g=%s" % (k,args))
+      if k:
+         for (linktext, linkargs) in g:
+           uniprint("Link: %s" % '|'.join(linkargs))
+      else:
+        # Now process the resulting text into chunks.  Join them back together
+        # again (to handle cases like "the [[latent variable]]s are ..."), and
+        # split to find words.
+        for word in split_text_into_words(''.join(g)):
+          if word:
+            uniprint("%s" % word)
+
+
 class FindLinks(ArticleHandler):
   def process_text_for_data(self, title, text):
     handler = ProcessSourceForLinks()
@@ -1259,8 +1403,6 @@ class FindLinks(ArticleHandler):
     for (surface,map) in surface_map.items():
       uniprint("-------- Surface->article for %s: " % surface)
       output_reverse_sorted_table(map)
-
-
 
 #######################################################################
 #                                Main code                            #
@@ -1291,8 +1433,14 @@ all articles it maps to.""",
   op.add_option("-c", "--coords-counts",
                 help="Print info about counts of words for all articles with coodinates.",
                 action="store_true")
+  op.add_option("-o", "--only-coords",
+                help="Print info about coordinates of articles with coordinates.",
+                action="store_true")
   op.add_option("-r", "--find-redirects",
                 help="Output all redirects.",
+                action="store_true")
+  op.add_option("-t", "--generate-toponym-eval",
+                help="Generate data files for use in toponym evaluation.",
                 action="store_true")
   op.add_option("-f", "--coords-file",
                 help="""File containing output from a prior run of
@@ -1321,8 +1469,12 @@ combined.)""",
     main_process_input(FindLinks())
   elif opts.find_redirects:
     main_process_input(FindRedirects())
+  elif opts.only_coords:
+    main_process_input(GetCoords())
   elif opts.coords_counts:
     main_process_input(GetCoordsAndCounts())
+  elif opts.generate_toponym_eval:
+    main_process_input(GenerateToponymEvalData())
 
 #import cProfile
 #cProfile.run('main()', 'process-wiki.prof')
