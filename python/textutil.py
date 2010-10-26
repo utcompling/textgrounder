@@ -2,6 +2,7 @@ from __future__ import with_statement # For chompopen(), uchompopen()
 import re # For regexp wrappers
 import sys, codecs # For uchompopen()
 import bisect # For sorted lists
+import time # For status messages
 
 #############################################################################
 #                        Regular expression functions                       #
@@ -113,6 +114,13 @@ the stream does this automatically); but this can be forced using FLUSH.'''
   if flush:
     outfile.flush()
 
+def errprint(text, nonl=False):
+  '''Print text to stderr using 'print', converting Unicode as necessary.
+If string is Unicode, automatically convert to UTF-8, so it can be output
+without errors.  Uses the 'print' command, and normally outputs a newline; but
+this can be suppressed using NONL.'''
+  uniprint(text, outfile=sys.stderr, nonl=nonl)
+
 #############################################################################
 #                             Default dictionaries                          #
 #############################################################################
@@ -195,12 +203,124 @@ def lookup_sorted_list(sorted_list, key):
   return None
 
 #############################################################################
-#                                     Misc                                  #
+#                                Table Output                               #
 #############################################################################
 
 # Given a table with values that are numbers, output the table, sorted
 # on the numbers from bigger to smaller.
-def output_reverse_sorted_table(table):
+def output_reverse_sorted_table(table, outfile=sys.stdout):
   for x in sorted(table.items(), key=lambda x:x[1], reverse=True):
-    uniprint("%s = %s" % (x[0], x[1]))
+    uniprint("%s = %s" % (x[0], x[1]), outfile=outfile)
 
+#############################################################################
+#                             Status Messages                               #
+#############################################################################
+
+# Simple algorithm for pluralizing a word
+def pluralize(word):
+  if word[-1] >= 'A' and word[-1] <= 'Z': upper = True
+  else: upper = False
+  lowerword = word.lower()
+  if re.match(r'.*[b-df-hj-np-tv-z]y$', lowerword):
+    if upper: return word[:-1] + 'IES'
+    else: return word[:-1] + 'ies'
+  elif re.match(r'.*([cs]h|[sx])$', lowerword):
+    if upper: return word + 'ES'
+    else: return word + 'es'
+  else:
+    if upper: return word + 'S'
+    else: return word + 's'
+
+# Output status messages periodically, at some multiple of
+# 'secs_between_output', measured in real time. 'item_name' is the name
+# of the items being processed.  Every time an item is processed, call
+# item_processed()
+class StatusMessage(object):
+  def __init__(self, item_name, secs_between_output=15):
+    self.item_name = item_name
+    self.plural_item_name = pluralize(item_name)
+    self.secs_between_output = secs_between_output
+    self.items_processed = 0
+    self.first_time = time.time()
+    self.last_time = self.first_time
+
+  def item_processed(self):
+    curtime = time.time()
+    self.items_processed += 1
+    total_elapsed_secs = int(curtime - self.first_time)
+    last_elapsed_secs = int(curtime - self.last_time)
+    if last_elapsed_secs >= self.secs_between_output:
+      # Rather than directly recording the time, round it down to the nearest
+      # multiple of secs_between_output; else we will eventually see something
+      # like 0, 15, 45, 60, 76, 91, 107, 122, ...
+      # rather than
+      # like 0, 15, 45, 60, 76, 90, 106, 120, ...
+      rounded_elapsed = (int(total_elapsed_secs / self.secs_between_output) *
+                         self.secs_between_output)
+      self.last_time = self.first_time + rounded_elapsed
+      uniprint ("Elapsed time: %s minutes %s seconds, %s %s processed"
+                % (int(total_elapsed_secs / 60), total_elapsed_secs % 60,
+                   self.items_processed,
+                   self.item_name if self.items_processed == 1
+                     else self.plural_item_name), outfile=sys.stderr)
+    return total_elapsed_secs
+ 
+def output_option_parameters(opts):
+  errprint("Parameter values:")
+  for opt in dir(opts):
+    if not opt.startswith('_') and opt not in \
+       ['ensure_value', 'read_file', 'read_module']:
+      errprint("%30s: %s" % (opt, getattr(opts, opt)))
+  errprint("")
+
+#############################################################################
+#                               File Splitting                              #
+#############################################################################
+
+# Return the next file to output to, when the instances being output to the
+# files are meant to be split according to SPLIT_FRACTIONS.  The absolute
+# quantities in SPLIT_FRACTIONS don't matter, only the values relative to
+# the other values, i.e. [20, 60, 10] is the same as [4, 12, 2].  This
+# function implements an algorithm that is deterministic (same results
+# each time it is run), and spreads out the instances as much as possible.
+# For example, if all values are equal, it will cycle successively through
+# the different split files; if the values are [1, 1.5, 1], the output
+# will be [1, 2, 3, 2, 1, 2, 3, ...]; etc.
+
+def next_split_set(split_fractions):
+
+  num_splits = len(split_fractions)
+  cumulative_articles = [0]*num_splits
+
+  # Normalize so that the smallest value is 1.
+
+  minval = min(split_fractions)
+  split_fractions = [float(val)/minval for val in split_fractions]
+
+  # The algorithm used is as follows.  We cycle through the output sets in
+  # order; each time we return a set, we increment the corresponding
+  # cumulative count, but before returning a set, we check to see if the
+  # count has reached the corresponding fraction and skip this set if so.
+  # If we have run through an entire cycle without returning any sets,
+  # then for each set we subtract the fraction value from the cumulative
+  # value.  This way, if the fraction value is not a whole number, then
+  # any fractional quantity (e.g. 0.6 for a value of 7.6) is left over,
+  # any will ensure that the total ratios still work out appropriately.
+
+  while True:
+    this_output = False
+    for j in xrange(num_splits):
+      #print "j=%s, this_output=%s" % (j, this_output)
+      if cumulative_articles[j] < split_fractions[j]:
+        yield j
+        cumulative_articles[j] += 1
+        this_output = True
+    if not this_output:
+      for j in xrange(num_splits):
+        while cumulative_articles[j] >= split_fractions[j]:
+          cumulative_articles[j] -= split_fractions[j]
+
+def capfirst(st):
+  '''Capitalize the first letter of string, leaving the remainder alone.'''
+  if not st: return st
+  return st[0].capitalize() + st[1:]

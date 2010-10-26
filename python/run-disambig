@@ -1,25 +1,29 @@
 #!/bin/sh
 
 PICKLE_FILE="enwiki-20100905-coords-counts.pickled"
-
-#MODE="--mode disambig-link-baseline"
-MODE="--mode disambig-naive-bayes-with-baseline"
-#MODE="--mode disambig-naive-bayes-no-baseline"
-#MODE="--mode pickle-only"
-#MODE="--mode match-only"
-#NBTYPE="--naive-bayes-weighting distance-weighted"
 #UNPICKLE="--unpickle-file $PICKLE_FILE"
 #PICKLE="--pickle-file $PICKLE_FILE"
 PICKLE=
 UNPICKLE=
+
 DEBUG="--debug 1"
-#MAXARTS="--max-articles-to-count 200"
+#MAXTIME="--max-time-per-stage 5"
+#MAXTIME="--max-time-per-stage 10"
+
+#MODE="--mode pickle-only"
+#MODE="--mode match-only"
+MODE="--mode geotag-toponyms"
+#MODE="--mode geotag-articles"
+STRATEGY="--strategy link-baseline"
+#STRATEGY="--strategy naive-bayes-with-baseline"
+#STRATEGY="--strategy naive-bayes-no-baseline"
+#NBTYPE="--naive-bayes-weighting distance-weighted"
 #REDIRECT="--redirect-file enwiki-20100905-redirects.txt"
 #OUTREDIRECT="--output-filtered-redirects enwiki-20100905-filtered-redirects.txt"
 REDIRECT="--redirect-file enwiki-20100905-filtered-redirects.txt"
 EVALFILE="--eval-file /groups/projects/pcl_travel/data/trconlldevtest/dev"
+EVALTYPE="--eval-format tr-conll"
 #EVALFILE="--eval-file enwiki-20100905-toponym-eval.txt"
-#EVALTYPE="--eval-format wiki"
 
 $HOME/devel/textgrounder/python/wiki_disambig.py \
   --stopwords-file stopwords.english \
@@ -29,4 +33,4 @@ $HOME/devel/textgrounder/python/wiki_disambig.py \
   --links-file enwiki-20100905-links-only-coord-articles.txt \
   --width-of-nbregion 1 --region-size 100 \
   $REDIRECT $OUTREDIRECT $EVALFILE $EVALTYPE \
-  $PICKLE $UNPICKLE $MAXARTS $MODE $NBTYPE $DEBUG ${1+"$@"}
+  $PICKLE $UNPICKLE $MAXTIME $MODE $STRATEGY $NBTYPE $DEBUG ${1+"$@"}

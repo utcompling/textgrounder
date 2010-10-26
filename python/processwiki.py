@@ -27,6 +27,7 @@ import sys, re
 from optparse import OptionParser
 from textutil import *
 import itertools
+import time
 
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
@@ -36,7 +37,89 @@ from xml.sax.handler import ContentHandler
 debug = 0
 
 # If true, print out warnings about strangely formatted input
-show_warnings = False
+show_warnings = True
+
+# Program options
+progopts = None
+
+article_title_to_id = {}
+article_id_to_title = {}
+disambig_pages_by_id = set()
+
+article_namespaces = ['User', 'Wikipedia', 'File', 'MediaWiki', 'Template',
+                      'Help', 'Category', 'Thread', 'Summary', 'Portal',
+                      'Book']
+
+article_namespace_aliases = {
+  'P':'Portal', 'H':'Help', 'T':'Template',
+  'CAT':'Category', 'Cat':'Category', 'C':'Category',
+  'MOS':'Wikipedia', 'MoS':'Wikipedia', 'Mos':'Wikipedia'}
+
+next_unseen_article_id = 1000000000
+
+max_time_per_stage = 2**31
+
+# Count number of incoming links for articles
+incoming_link_count = intdict()
+
+# Map anchor text to a hash that maps articles to counts
+anchor_text_map = {}
+
+# Set listing articles containing coordinates
+coordinate_articles = set()
+
+# Parse the result of a previous run of --coords-counts for articles with
+# coordinates
+def read_coordinates_file(filename):
+  errprint("Reading coordinates file %s..." % filename)
+  status = StatusMessage("article")
+  for line in uchompopen(filename):
+    m = re.match('Article title: (.*)', line)
+    if m:
+      title = capfirst(m.group(1))
+    elif re.match('Article coordinates: ', line):
+      coordinate_articles.add(title)
+      if status.item_processed() >= max_time_per_stage:
+        break
+    
+# Read in redirects.  Record redirects as additional articles with coordinates
+# if the article pointed to has coordinates. NOTE: Must be done *AFTER*
+# reading coordinates.
+def read_redirect_file(filename):
+  assert coordinate_articles
+  errprint("Reading redirect info from %s..." % filename)
+  status = StatusMessage('article')
+  for line in uchompopen(filename):
+    if rematch('Article title: (.*)$', line):
+      title = capfirst(m_[1])
+    elif rematch('Redirect to: (.*)$', line):
+      redirect = capfirst(m_[1])
+      if redirect in coordinate_articles:
+        coordinate_articles.add(title)
+      if status.item_processed() >= max_time_per_stage:
+        break
+    else:
+      warning("Strange line in redirect file: %s" % line)
+
+# Read the list of disambiguation article ID's.
+def read_disambig_id_file(filename):
+  errprint("Reading disambig ID file %s..." % filename)
+  status = StatusMessage("article")
+  for line in uchompopen(filename):
+    disambig_pages_by_id.add(line)
+    if status.item_processed() >= max_time_per_stage:
+      break
+    
+# Read the mapping between article titles and ID's.
+def read_article_id_file(filename):
+  errprint("Reading article ID file %s..." % filename)
+  status = StatusMessage("article")
+  for line in uchompopen(filename):
+    title, id = line.split('\t')
+    article_title_to_id[title] = id
+    article_id_to_title[id] = title
+    if status.item_processed() >= max_time_per_stage:
+      break
 
 ############################################################################
 #                              Documentation                               #
@@ -260,7 +343,48 @@ show_warnings = False
 
 
 #######################################################################
-#                 Chunk text into balanced sections                   #
+#                         Splitting the output                        #
+#######################################################################
+
+# Files to output to, when splitting output
+split_output_files = None
+
+# List of split suffixes
+split_suffixes = None
+
+# Current file to output to
+cur_output_file = sys.stdout
+
+# Name of current split (training, dev, test)
+cur_split_name = ''
+
+# Generator of files to output to
+split_file_gen = None
+
+# Initialize the split output files, using PREFIX as the prefix
+def init_output_files(prefix, split_fractions, the_split_suffixes):
+  assert len(split_fractions) == len(the_split_suffixes)
+  global split_output_files
+  split_output_files = [None]*len(the_split_suffixes)
+  global split_suffixes
+  split_suffixes = the_split_suffixes
+  for i in range(len(the_split_suffixes)):
+    split_output_files[i] = open("%s.%s" % (prefix, the_split_suffixes[i]), "w")
+  global split_file_gen
+  split_file_gen = next_split_set(split_fractions)
+
+# Find the next split file to output to and set CUR_OUTPUT_FILE appropriately;
+# don't do anything if the user hasn't called for splitting.
+def set_next_split_file():
+  global cur_output_file
+  global cur_split_name
+  if split_file_gen:
+    nextid = split_file_gen.next()
+    cur_output_file = split_output_files[nextid]
+    cur_split_name = split_suffixes[nextid]
+  
+#######################################################################
+#                  Chunk text into balanced sections                  #
 #######################################################################
 
 ### Return chunks of balanced text, for use in handling template chunks
@@ -348,14 +472,16 @@ unmatched single or double right braces or brackets.'''
 ###                        Utility functions                        ###
 #######################################################################
 
-def uniprint(text):
-  '''Print Unicode text in UTF-8, so it can be output without errors'''
-  print text.encode("utf-8")
-
 def warning(text):
   '''Output a warning, formatting into UTF-8 as necessary'''
   if show_warnings:
     uniprint("Warning: %s" % text)
+    #uniprint("Warning: %s" % text, sys.stderr)
+
+def splitprint(text):
+  '''Print text (possibly Unicode) to the appropriate output, either stdout
+or one of the split output files.'''
+  uniprint(text, outfile=cur_output_file)
 
 def find_template_params(args, strip_values):
   '''Find the parameters specified in template arguments, i.e. the arguments
@@ -501,15 +627,23 @@ values into a decimal +/- latitude or longitude.'''
 convert_ns = {'N':1, 'S':-1}
 convert_ew = {'E':1, 'W':-1}
 
-# Utility function for get_latd_coord().  Extract out either latitude or
-# longitude from a template of type TEMPTYPE with arguments ARGS.
-# LAT is a string, e.g. 'lat' or 'long'.  DMS_SUFF is a three-argument
-# list, e.g. ['d', 'm', 's'] if arguments like 'latd' or 'longm' are
-# expected.  OFFPARAM is the parameter indicating the offset to the N, S,
-# E or W.  # ['lat_dir', 'lon_dir'].  CONVERT is a table mapping NSEW directions into a
-# multiplier +1 or -1, coming from either of the global variables
-# convert_ns (for latitude) or convert_ew (for longitude).
-def get_lat_long_1(temptype, args, lat, dms_suff, offparam, convert):
+# Get the default value for the hemisphere, as a multiplier +1 or -1.
+# We need to handle Australian places specially, as S latitude, E longitude.
+# Otherwise assume +1.
+def get_hemisphere(temptype, is_lat):
+  if temptype.lower().startswith('infobox australia'):
+    if is_lat: return -1
+    else: return 1
+  else: return 1
+
+# Utility function for get_latd_coord() and get_lat_deg_coord().
+# Extract out either latitude or longitude from a template of type
+# TEMPTYPE with arguments ARGS.  LAT is a string, e.g. 'lat' or 'long'.
+# DMS_SUFF is a three-argument list, e.g. ['d', 'm', 's'] if arguments
+# like 'latd' or 'longm' are expected.  OFFPARAM is the parameter
+# indicating the offset to the N, S, E or W.  IS_LAT is True if a latitude
+# is being extracted, False for longitude.
+def get_lat_long_1(temptype, args, lat, dms_suff, offparam, is_lat):
   dsuff = dms_suff[0]
   msuff = dms_suff[1]
   ssuff = dms_suff[2]
@@ -520,22 +654,26 @@ def get_lat_long_1(temptype, args, lat, dms_suff, offparam, convert):
   s = args.get('%s%s' % (lat, ssuff), 0)
   if offparam not in args:
     warning("No %s seen for template type %s" % (offparam, temptype))
-    latmult = 1
+    hemismult = get_hemisphere(temptype, is_lat)
   else:
-    latmult = convert.get(args[offparam], 0)
-    if latmult == 0:
+    if is_lat:
+      convert = convert_ns
+    else:
+      convert = convert_ew
+    hemismult = convert.get(args[offparam], 0)
+    if hemismult == 0:
       warning("%s for template type %s has bad value %s" %
                (offparam, temptype, args[offparam]))
-  return convert_dms(latmult, d, m, s)
+  return convert_dms(hemismult, d, m, s)
 
 def get_latd_coord(temptype, args):
   '''Given a template of type TEMPTYPE with arguments ARGS, assumed to have
 a latitude/longitude specification in it using latd and longd, extract out
 and return a tuple of decimal (latitude, longitude) values.'''
   lat = get_lat_long_1(temptype, args, 'lat', ['d', 'm', 's'],
-                       'latns', convert_ns)
+                       'latns', is_lat=True)
   long = get_lat_long_1(temptype, args, 'long', ['d', 'm', 's'],
-                        'longew', convert_ew)
+                        'longew', is_lat=False)
   return (lat, long)
 
 def get_lat_deg_coord(temptype, args):
@@ -543,9 +681,9 @@ def get_lat_deg_coord(temptype, args):
 a latitude/longitude specification in it using lat_deg and lon_deg, extract out
 and return a tuple of decimal (latitude, longitude) values.'''
   lat = get_lat_long_1(temptype, args, 'lat', ['_deg', '_min', '_sec'],
-                       'lat_dir', convert_ns)
+                       'lat_dir', is_lat=True)
   long = get_lat_long_1(temptype, args, 'lon', ['_deg', '_min', '_sec'],
-                        'lon_dir', convert_ew)
+                        'lon_dir', is_lat=False)
   return (lat, long)
 
 def get_latitude_coord(temptype, args):
@@ -880,7 +1018,7 @@ def split_text_into_words(text):
       # Handle things like "Two-port_network#ABCD-parameters".  Do this after
       # filtering for : so URL's don't get split up.
       for word2 in re.split('[#_]', word):
-        yield word2
+        if word2: yield word2
 
 # Extract "useful" text (generally, text that will be seen by the user,
 # or hidden text of similar quality) and yield up chunks.
@@ -1004,11 +1142,13 @@ DOM-type interface, which reads the entire XML file into memory and allows
 it to be dynamically manipulated).  Given the size of the XML dump file
 (around 50 or 100 GB uncompressed), we can't read it all into memory.'''
   def __init__(self, output_handler):
+    print >>sys.stderr, "Beginning processing..."
     self.intext = False
     self.intitle = False
     self.curtitle = None
     self.curtext = None
     self.output_handler = output_handler
+    self.status = StatusMessage('article')
     
   def startElement(self, name, attrs):
     '''Handler for beginning of XML element.'''
@@ -1039,9 +1179,11 @@ combined chunks.'''
       # If we saw the end of the article text, join all the text chunks
       # together and call process_article_text() on it.
       self.intext = False
+      set_next_split_file()
       self.output_handler.process_article_text(self.curtitle,
                                                ''.join(self.curtext))
       self.curtext = None
+      self.status.item_processed()
  
 #######################################################################
 #                           Article handlers                          #
@@ -1074,7 +1216,7 @@ class ArticleHandler(object):
   
     ### Look to see if the article is a redirect
   
-    m = re.match('#REDIRECT \[\[(.*?)\]\]', text)
+    m = re.match(r'(?i)#REDIRECT\s*\[\[(.*?)\]\]', text)
     if m:
       self.process_redirect(title, m.group(1))
       # NOTE: There may be additional templates specified along with a
@@ -1154,20 +1296,20 @@ class ArticleHandlerForUsefulText(ArticleHandler):
 
 class PrintWordsAndCoords(ArticleHandlerForUsefulText):
   def process_text_for_words(self, title, word_generator):
-    uniprint("Article title: %s" % title)
+    splitprint("Article title: %s" % title)
     for word in word_generator:
       if debug > 0: uniprint("Saw word: %s" % word)
-      else: uniprint("%s" % word)
+      else: splitprint("%s" % word)
 
   def process_redirect(self, title, redirtitle):
-    uniprint("Article title: %s" % title)
-    uniprint("Redirect to: %s" % redirtitle)
+    splitprint("Article title: %s" % title)
+    splitprint("Redirect to: %s" % redirtitle)
 
   def process_text_for_data(self, title, text):
     handler = ExtractCoordinatesFromSource()
     for foo in handler.process_source_text(text): pass
     for (temptype,lat,long) in handler.coords:
-      uniprint("Article coordinates: %s,%s" % (lat, long))
+      splitprint("Article coordinates: %s,%s" % (lat, long))
     return True
 
   def finish_processing(self):
@@ -1175,10 +1317,11 @@ class PrintWordsAndCoords(ArticleHandlerForUsefulText):
     ### along with counts of how many times each template was seen.
     if debug > 0:
       print("Templates with coordinates:")
-      output_reverse_sorted_table(templates_with_coords)
+      output_reverse_sorted_table(templates_with_coords,
+                                  outfile=cur_output_file)
       
       print("All templates:")
-      output_reverse_sorted_table(all_templates)
+      output_reverse_sorted_table(all_templates, outfile=cur_output_file)
   
       print "Notice: ending processing"
 
@@ -1188,8 +1331,8 @@ class PrintWordsAndCoords(ArticleHandlerForUsefulText):
 
 class FindRedirects(ArticleHandler):
   def process_redirect(self, title, redirtitle):
-    uniprint("Article title: %s" % title)
-    uniprint("Redirect to: %s" % redirtitle)
+    splitprint("Article title: %s" % title)
+    splitprint("Redirect to: %s" % redirtitle)
 
 def extract_coordinates_from_article(title, text):
   handler = ExtractCoordinatesFromSource()
@@ -1200,12 +1343,12 @@ def extract_coordinates_from_article(title, text):
     # accurate.
     for (temptype, lat, long) in handler.coords:
       if temptype.startswith('coor'):
-        uniprint("Article title: %s" % title)
-        uniprint("Article coordinates: %s,%s" % (lat, long))
+        splitprint("Article title: %s" % title)
+        splitprint("Article coordinates: %s,%s" % (lat, long))
         return True
     (temptype, lat, long) = handler.coords[0]
-    uniprint("Article title: %s" % title)
-    uniprint("Article coordinates: %s,%s" % (lat, long))
+    splitprint("Article title: %s" % title)
+    splitprint("Article coordinates: %s,%s" % (lat, long))
     return True
   else: return False
 
@@ -1220,7 +1363,7 @@ class GetCoordsAndCounts(ArticleHandlerForUsefulText):
     wordhash = intdict()
     for word in word_generator:
       if word: wordhash[word] += 1
-    output_reverse_sorted_table(wordhash)
+    output_reverse_sorted_table(wordhash, outfile=cur_output_file)
 
   def process_text_for_data(self, title, text):
     return extract_coordinates_from_article(title, text)
@@ -1230,64 +1373,6 @@ class GetCoords(ArticleHandler):
   def process_text_for_data(self, title, text):
     return extract_coordinates_from_article(title, text)
 
-# Handler to output link information as well as coordinate information.
-# Note that a link consists of two parts: The surface text and the article
-# name.  For all links, we keep track of all the possible articles for a
-# given surface text and their counts.  We also count all of the incoming
-# links to an article (can be used for computing prior probabilities of
-# an article).
-
-# Count number of incoming links for articles
-incoming_link_count = intdict()
-
-# Map surface names to a hash that maps articles to counts
-surface_map = {}
-
-# Set listing articles containing coordinates
-coordinate_articles = set()
-
-# Parse the result of a previous run of --coords-counts for articles with
-# coordinates
-def get_coordinates(filename):
-  articles_seen = 0
-  for line in uchompopen(filename):
-    m = re.match('Article title: (.*)', line)
-    if m:
-      title = m.group(1)
-    elif re.match('Article coordinates: ', line):
-      coordinate_articles.add(title)
-      articles_seen += 1
-      if (articles_seen % 10000) == 0:
-        print >>sys.stderr, "Processed %d articles" % articles_seen
-    
-class ProcessSourceForLinks(RecursiveSourceTextHandler):
-  useful_text_handler = ExtractUsefulText()
-  def process_internal_link(self, text):
-    tempargs = get_macro_args(text)
-    m = re.match(r'(?s)\s*([a-zA-Z0-9_]+)\s*:(.*)', tempargs[0])
-    if m:
-      # Something like [[Image:...]] or [[wikt:...]] or [[fr:...]]
-      # For now, just skip them all; eventually, might want to do something
-      # useful with some, e.g. categories
-      pass
-    else:
-      article = tempargs[0]
-      # Skip links to articles without coordinates
-      if coordinate_articles and article not in coordinate_articles:
-        pass
-      else:
-        surface = ''.join(self.useful_text_handler.
-                          process_source_text(tempargs[-1]))
-        incoming_link_count[article] += 1
-        if surface not in surface_map:
-          nested_surface_map = intdict()
-          surface_map[surface] = nested_surface_map
-        else:
-          nested_surface_map = surface_map[surface]
-        nested_surface_map[article] += 1
- 
-    # Also recursively process all the arguments for links, etc.
-    return self.process_source_text(text[2:-2])
 
 class ToponymEvalDataHandler(ExtractUsefulText):
   def join_arguments_as_generator(self, args_of_macro):
@@ -1335,7 +1420,7 @@ class ToponymEvalDataHandler(ExtractUsefulText):
       # useful with some, e.g. categories
       pass
     else:
-      article = tempargs[0]
+      article = capfirst(tempargs[0])
       # Skip links to articles without coordinates
       if coordinate_articles and article not in coordinate_articles:
         pass
@@ -1346,9 +1431,7 @@ class ToponymEvalDataHandler(ExtractUsefulText):
     for chunk in self.join_arguments_as_generator(yield_internal_link_args(text)):
       yield chunk
 
-### Default handler class for processing article text, including returning
-### "useful" text (what the Wikipedia user sees, plus similar-quality
-### hidden text).
+
 class GenerateToponymEvalData(ArticleHandler):
   # Process the text itself, e.g. for words.  Input it text that has been
   # preprocessed as described above (remove comments, etc.).  Default
@@ -1364,7 +1447,7 @@ class GenerateToponymEvalData(ArticleHandler):
     # the words from the text
     text = format_text_second_pass(text)
 
-    uniprint("Article title: %s" % title)
+    splitprint("Article title: %s" % title)
     chunkgen = ToponymEvalDataHandler().process_source_text(text)
     #for chunk in chunkgen:
     #  uniprint("Saw chunk: %s" % (chunk,))
@@ -1376,15 +1459,84 @@ class GenerateToponymEvalData(ArticleHandler):
       #uniprint("Saw k=%s, g=%s" % (k,args))
       if k:
          for (linktext, linkargs) in g:
-           uniprint("Link: %s" % '|'.join(linkargs))
+           splitprint("Link: %s" % '|'.join(linkargs))
       else:
         # Now process the resulting text into chunks.  Join them back together
         # again (to handle cases like "the [[latent variable]]s are ..."), and
         # split to find words.
         for word in split_text_into_words(''.join(g)):
           if word:
-            uniprint("%s" % word)
+            splitprint("%s" % word)
 
+# Generate article data of various sorts
+class GenerateArticleData(ArticleHandler):
+  def process_article(self, title, redirtitle):
+    id = article_title_to_id.get(title, None)
+    if not id:
+      warning("Found article %s without ID" % title)
+      global next_unseen_article_id
+      id = "%s" % next_unseen_article_id
+      next_unseen_article_id += 1
+      article_title_to_id[title] = id
+      article_id_to_title[id] = title
+    if rematch('(.*?):', title):
+      namespace = m_[1]
+      if namespace in article_namespace_aliases:
+        namespace = article_namespace_aliases[namespace]
+      elif namespace not in article_namespaces:
+        namespace = 'Main'
+    else:
+      namespace = 'Main'
+    yesno = {True:'yes', False:'no'}
+    listof = title.startswith('List of ')
+    disambig = id in disambig_pages_by_id
+    list = listof or disambig or namespace in ('Category', 'Book')
+    uniprint("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" %
+             (id, title, cur_split_name, redirtitle, namespace,
+              yesno[listof], yesno[disambig], yesno[list]))
+
+  def process_redirect(self, title, redirtitle):
+    self.process_article(title, redirtitle)
+
+  def process_text_for_data(self, title, text):
+    self.process_article(title, '')
+    return False
+
+# Handler to output link information as well as coordinate information.
+# Note that a link consists of two parts: The anchor text and the article
+# name.  For all links, we keep track of all the possible articles for a
+# given anchor text and their counts.  We also count all of the incoming
+# links to an article (can be used for computing prior probabilities of
+# an article).
+
+class ProcessSourceForLinks(RecursiveSourceTextHandler):
+  useful_text_handler = ExtractUsefulText()
+  def process_internal_link(self, text):
+    tempargs = get_macro_args(text)
+    m = re.match(r'(?s)\s*([a-zA-Z0-9_]+)\s*:(.*)', tempargs[0])
+    if m:
+      # Something like [[Image:...]] or [[wikt:...]] or [[fr:...]]
+      # For now, just skip them all; eventually, might want to do something
+      # useful with some, e.g. categories
+      pass
+    else:
+      article = capfirst(tempargs[0])
+      # Skip links to articles without coordinates
+      if coordinate_articles and article not in coordinate_articles:
+        pass
+      else:
+        anchor = ''.join(self.useful_text_handler.
+                         process_source_text(tempargs[-1]))
+        incoming_link_count[article] += 1
+        if anchor not in anchor_text_map:
+          nested_anchor_text_map = intdict()
+          anchor_text_map[anchor] = nested_anchor_text_map
+        else:
+          nested_anchor_text_map = anchor_text_map[anchor]
+        nested_anchor_text_map[article] += 1
+ 
+    # Also recursively process all the arguments for links, etc.
+    return self.process_source_text(text[2:-2])
 
 class FindLinks(ArticleHandler):
   def process_text_for_data(self, title, text):
@@ -1394,15 +1546,15 @@ class FindLinks(ArticleHandler):
 
   def finish_processing(self):
     print "------------------ Count of incoming links: ---------------"
-    output_reverse_sorted_table(incoming_link_count)
+    output_reverse_sorted_table(incoming_link_count, outfile=cur_output_file)
   
     print "==========================================================="
     print "==========================================================="
     print "==========================================================="
     print ""
-    for (surface,map) in surface_map.items():
-      uniprint("-------- Surface->article for %s: " % surface)
-      output_reverse_sorted_table(map)
+    for (anchor,map) in anchor_text_map.items():
+      splitprint("-------- Anchor text->article for %s: " % anchor)
+      output_reverse_sorted_table(map, outfile=cur_output_file)
 
 #######################################################################
 #                                Main code                            #
@@ -1421,13 +1573,13 @@ def main_process_input(wiki_handler):
   
 def main():
 
-  op = OptionParser(usage="%prog [options] input_dir")
+  op = OptionParser(usage="%prog [options] < file")
   op.add_option("-p", "--words-coords",
                 help="Print all words and coordinates",
                 action="store_true")
   op.add_option("-l", "--find-links",
                 help="""Find all links and print info about them.
-Includes count of incoming links, and, for each surface form, counts of
+Includes count of incoming links, and, for each anchor-text form, counts of
 all articles it maps to.""",
                 action="store_true")
   op.add_option("-c", "--coords-counts",
@@ -1442,27 +1594,128 @@ all articles it maps to.""",
   op.add_option("-t", "--generate-toponym-eval",
                 help="Generate data files for use in toponym evaluation.",
                 action="store_true")
+  op.add_option("--generate-article-data",
+                help="""Generate file listing all articles and info about them.
+If using this option, the --disambig-id-file and title-id-file options
+should also be used.  If you want training/dev/test splits output, you need
+to also use the --split-training-dev-test option.
+
+The format is
+
+ID TITLE SPLIT REDIR NAMESPACE LIST-OF DISAMBIG LIST
+
+where each field is separated by a tab character.
+
+The fields are
+
+ID = Numeric ID of article, given by wikiprep
+TITLE = Title of article
+SPLIT = Split to assign the article to; one of 'training', 'dev', or 'test'.
+REDIR = If the article is a redirect, lists the article it redirects to;
+        else, blank.
+NAMESPACE = Namespace of the article, one of 'Main', 'User', 'Wikipedia',
+            'File', 'MediaWiki', 'Template', 'Help', 'Category', 'Thread',
+            'Summary', 'Portal', 'Book'.  These are the basic namespaces
+            defined in [[Wikipedia:Namespace]].  Articles of the appropriate
+            namespace begin with the namespace prefix, e.g. 'File:*', except
+            for articles in the main namespace, which includes everything
+            else.  Note that some of these namespaces don't actually appear
+            in the article dump; likewise, talk pages don't appear in the
+            dump.  In addition, we automatically include the common namespace
+            abbreviations in the appropriate space, i.e.
+
+            P               Portal
+            H               Help
+            T               Template
+            CAT, Cat, C     Category
+            MOS, MoS, Mos   Wikipedia (used for "Manual of Style" pages)
+LIST-OF = 'yes' if article title is of the form 'List of *', typically
+          containing a list; else 'no'.
+DISAMBIG = 'yes' if article is a disambiguation page (used to disambiguate
+           multiple concepts with the same name); else 'no'.
+LIST = 'yes' if article is a list of some sort, else no.  This includes
+       'List of' articles, disambiguation pages, and articles in the 'Category'
+       and 'Book' namespaces.""",
+                action="store_true")
+  op.add_option("-s", "--split-training-dev-test",
+                help="""Split output into training, dev and test files.
+Use the specified value as the file prefix, suffixed with '.train', '.dev'
+and '.test' respectively.""",
+                metavar="FILE")
+  op.add_option("--training-fraction", type='float', default=80,
+                help="""Fraction of total articles to use for training.
+The absolute amount doesn't matter, only the value relative to the test
+and dev fractions, as the values are normalized.  Default %default.""",
+                metavar="FRACTION")
+  op.add_option("--dev-fraction", type='float', default=10,
+                help="""Fraction of total articles to use for dev set.
+The absolute amount doesn't matter, only the value relative to the training
+and test fractions, as the values are normalized.  Default %default.""",
+                metavar="FRACTION")
+  op.add_option("--test-fraction", type='float', default=10,
+                help="""Fraction of total articles to use for test set.
+The absolute amount doesn't matter, only the value relative to the training
+and dev fractions, as the values are normalized.  Default %default.""",
+                metavar="FRACTION")
   op.add_option("-f", "--coords-file",
                 help="""File containing output from a prior run of
 --coords-counts, listing all the articles with associated coordinates.
 This is used to limit the operation of --find-links to only consider links
 to articles with coordinates.  Currently, if this is not done, then using
 --coords-file requires at least 10GB, perhaps more, of memory in order to
-store the entire table of surface->article mappings in memory. (If this
+store the entire table of anchor->article mappings in memory. (If this
 entire table is needed, it may be necessary to implement a MapReduce-style
 process where smaller chunks are processed separately and then the results
 combined.)""",
                 metavar="FILE")
+  op.add_option("--redirect-file",
+                help="""File containing lists of redirects.  Redirects to
+articles with coordinates are treated as additional articles with
+coordinates.""",
+                metavar="FILE")
+  op.add_option("--disambig-id-file",
+                help="""File containing list of article ID's that are
+disambiguation pages.""",
+                metavar="FILE")
+  op.add_option("--article-id-file",
+                help="""File containing mapping between article titles and
+article ID's.""",
+                metavar="FILE")
+  op.add_option("--max-time-per-stage", type='int', default=0,
+                help="""Maximum time per stage in seconds.  If 0, no limit.
+Used for testing purposes.  Default %default.""")
   op.add_option("-d", "--debug", metavar="LEVEL",
                 help="Output debug info at given level")
+
+  uniprint("Arguments: %s" % ' '.join(sys.argv), flush=True)
   opts, args = op.parse_args()
+  output_option_parameters(opts)
+
+  global progopts
+  progopts = opts
 
   global debug
   if opts.debug:
     debug = int(opts.debug)
- 
+
+  global max_time_per_stage
+  if opts.max_time_per_stage:
+    max_time_per_stage = opts.max_time_per_stage
+
+  if opts.split_training_dev_test:
+    init_output_files(opts.split_training_dev_test,
+                      [opts.training_fraction, opts.dev_fraction,
+                       opts.test_fraction],
+                      ['training', 'dev', 'test'])
+
   if opts.coords_file:
-    get_coordinates(opts.coords_file)    
+    read_coordinates_file(opts.coords_file)    
+  if opts.redirect_file:
+    read_redirect_file(opts.redirect_file)
+  if opts.disambig_id_file:
+    read_disambig_id_file(opts.disambig_id_file)
+  if opts.article_id_file:
+    read_article_id_file(opts.article_id_file)
   if opts.words_coords:
     main_process_input(PrintWordsAndCoords())
   elif opts.find_links:
@@ -1475,6 +1728,8 @@ combined.)""",
     main_process_input(GetCoordsAndCounts())
   elif opts.generate_toponym_eval:
     main_process_input(GenerateToponymEvalData())
+  elif opts.generate_article_data:
+    main_process_input(GenerateArticleData())
 
 #import cProfile
 #cProfile.run('main()', 'process-wiki.prof')
