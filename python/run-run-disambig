@@ -1,0 +1,4 @@
+#!/bin/sh
+
+nohup run-disambig > run-disambig.out
+cp run-disambig.out run-disambig.out.`date '+%F.%H%M%P'`

@@ -1,0 +1,38 @@
+#!/bin/sh
+
+#DEBUG="--debug 1"
+DEBUG="--debug 0"
+MAXTIME="--max-time-per-stage 5"
+PREFIX="foobar"
+#MAXTIME="--max-time-per-stage 10"
+
+#COORDS_FILE="--coords-file enwiki-20100905-just-titles-coords.txt"
+
+#MODE="--generate-toponym-eval"
+#PREFIX="enwiki-20100905-toponym-eval.txt"
+#MISCOPTS="--redirect-file enwiki-20100905-filtered-redirects.txt"
+
+#MODE="--find-redirects"
+#PREFIX="enwiki-20100905-redirects.txt"
+
+#MODE="--only-coords"
+#PREFIX="enwiki-20100905-just-titles-coords.txt"
+
+#MODE="--coords-counts"
+#PREFIX="enwiki-20100905-coords-counts.txt"
+
+#MODE="--find-links"
+#PREFIX="enwiki-20100905-links-only-coord-articles.txt"
+
+SPLIT="--split-training-dev-test $PREFIX"
+#OUTFILE="> $PREFIX"
+
+MODE="--generate-article-data"
+PREFIX="enwiki-20100905-article-data.txt"
+DISAMBIG_ID="--disambig-id-file enwiki-20100905-pages-articles.disambig.id.txt"
+ARTICLE_ID="--article-id-file enwiki-20100905-pages-articles.title2id.txt"
+MISCOPTS="$DISAMBIG_ID $ARTICLE_ID"
+
+bzcat enwiki-20100905-pages-articles.xml.bz2 | \
+  $HOME/devel/textgrounder/python/processwiki.py \
+  $COORDS_FILE $MAXTIME $SPLIT $MISCOPTS $DEBUG $MODE ${1+"$@"} $OUTFILE 
