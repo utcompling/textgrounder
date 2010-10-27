@@ -42,8 +42,6 @@ show_warnings = True
 # Program options
 progopts = None
 
-article_title_to_id = {}
-article_id_to_title = {}
 disambig_pages_by_id = set()
 
 article_namespaces = ['User', 'Wikipedia', 'File', 'MediaWiki', 'Template',
@@ -54,8 +52,6 @@ article_namespace_aliases = {
   'P':'Portal', 'H':'Help', 'T':'Template',
   'CAT':'Category', 'Cat':'Category', 'C':'Category',
   'MOS':'Wikipedia', 'MoS':'Wikipedia', 'Mos':'Wikipedia'}
-
-next_unseen_article_id = 1000000000
 
 max_time_per_stage = 2**31
 
@@ -98,6 +94,8 @@ def read_redirect_file(filename):
         coordinate_articles.add(title)
       if status.item_processed() >= max_time_per_stage:
         break
+    elif rematch('Article ID: (.*)$', line):
+      pass
     else:
       warning("Strange line in redirect file: %s" % line)
 
@@ -110,17 +108,6 @@ def read_disambig_id_file(filename):
     if status.item_processed() >= max_time_per_stage:
       break
     
-# Read the mapping between article titles and ID's.
-def read_article_id_file(filename):
-  errprint("Reading article ID file %s..." % filename)
-  status = StatusMessage("article")
-  for line in uchompopen(filename):
-    title, id = line.split('\t')
-    article_title_to_id[title] = id
-    article_id_to_title[id] = title
-    if status.item_processed() >= max_time_per_stage:
-      break
-
 ############################################################################
 #                              Documentation                               #
 ############################################################################
@@ -556,10 +543,10 @@ class SourceTextHandler(object):
     # filtered out.  Note that when we process macros and extract the relevant
     # text from them, we need to recursively process that text.
   
-    if debug > 1: uniprint("Entering process_source_text: [%s]" % text)
+    if debug >= 2: uniprint("Entering process_source_text: [%s]" % text)
   
     for foo in parse_simple_balanced_text(text):
-      if debug > 1: uniprint("parse_simple_balanced_text yields: [%s]" % foo)
+      if debug >= 2: uniprint("parse_simple_balanced_text yields: [%s]" % foo)
   
       if foo.startswith('[['):
         gen = self.process_internal_link(foo)
@@ -577,7 +564,7 @@ class SourceTextHandler(object):
         gen = self.process_text_chunk(foo)
   
       for chunk in gen:
-        if debug > 1: uniprint("process_source_text yields: [%s]" % chunk)
+        if debug >= 2: uniprint("process_source_text yields: [%s]" % chunk)
         yield chunk
   
 # An article source-text handler that recursively processes text inside of
@@ -739,7 +726,7 @@ region: the "political region for terrestrial coordinates", i.e. the country
         country plus next-level subdivision (state, province, etc.)
 globe: which planet or satellite the coordinate is on (esp. if not the Earth)
 '''
-  if debug > 0: uniprint("Passed in args %s" % args)
+  if debug >= 1: uniprint("Passed in args %s" % args)
   # Filter out optional "template arguments", add a bunch of blank arguments
   # at the end to make sure we don't get out-of-bounds errors in
   # get_coord_1()
@@ -777,10 +764,10 @@ applied to the text before being sent here.'''
   def process_template(self, text):
     # Look for a Coord, Infobox, etc. template that may have coordinates in it
     lat = long = None
-    if debug > 0: uniprint("Enter process_template: [%s]" % text)
+    if debug >= 1: uniprint("Enter process_template: [%s]" % text)
     tempargs = get_macro_args(text)
     temptype = tempargs[0].strip()
-    if debug > 0: uniprint("Template type: %s" % temptype)
+    if debug >= 1: uniprint("Template type: %s" % temptype)
     lowertemp = temptype.lower()
     # Look for a coordinate template
     if lowertemp in ('coord', 'coor d', 'coor dm', 'coor dms',
@@ -803,7 +790,7 @@ applied to the text before being sent here.'''
         templates_with_coords[lowertemp] += 1
         (lat, long) = get_latitude_coord(temptype, paramshash)
     if lat or long:
-      if debug > 0: uniprint("Saw coordinate %s,%s in template type %s" %
+      if debug >= 1: uniprint("Saw coordinate %s,%s in template type %s" %
                 (lat, long, temptype))
       self.coords.append((lowertemp,lat,long))
     yield text
@@ -884,7 +871,7 @@ def yield_internal_link_args(text):
 # joined by spaces.
 def yield_template_args(text):
   # For a template, do something smart depending on the template.
-  if debug > 1: uniprint("yield_template_args called with: %s" % text)
+  if debug >= 2: uniprint("yield_template_args called with: %s" % text)
 
   # OK, this is a hack, but a useful one.  There are lots of templates that
   # look like {{Emancipation Proclamation draft}} or
@@ -902,10 +889,10 @@ def yield_template_args(text):
     return
 
   tempargs = get_macro_args(text)
-  if debug > 1: uniprint("template args: %s" % tempargs)
+  if debug >= 2: uniprint("template args: %s" % tempargs)
   temptype = tempargs[0].strip().lower()
 
-  if debug > 0:
+  if debug >= 1:
     all_templates[temptype] += 1
 
   # Extract the parameter and non-parameter arguments.
@@ -946,7 +933,7 @@ def yield_template_args(text):
 # Process a table into separate chunks.  Unlike code for processing
 # internal links, the chunks should have whitespace added where necessary.
 def yield_table_chunks(text):
-  if debug > 1: uniprint("Entering yield_table_chunks: [%s]" % text)
+  if debug >= 2: uniprint("Entering yield_table_chunks: [%s]" % text)
 
   # Given a single line or part of a line, and an indication (ATSTART) of
   # whether we just saw a beginning-of-line separator, split on within-line
@@ -966,9 +953,9 @@ def yield_table_chunks(text):
   # Just a wrapper function around process_table_chunk_1() for logging
   # purposes.
   def process_table_chunk(text, atstart):
-    if debug > 1: uniprint("Entering process_table_chunk: [%s], %s" % (text, atstart))
+    if debug >= 2: uniprint("Entering process_table_chunk: [%s], %s" % (text, atstart))
     for chunk in process_table_chunk_1(text, atstart):
-      if debug > 1: uniprint("process_table_chunk yields: [%s]" % chunk)
+      if debug >= 2: uniprint("process_table_chunk yields: [%s]" % chunk)
       yield chunk
 
   # Strip off {| and |}
@@ -982,7 +969,7 @@ def yield_table_chunks(text):
   # process_table_chunk(), which will split a line on within-line separators
   # (e.g. || or !!) and strip out directives.
   for arg in parse_balanced_text(balanced_table_re, text):
-    if debug > 1: uniprint("parse_balanced_text(balanced_table_re) yields: [%s]" % arg)
+    if debug >= 2: uniprint("parse_balanced_text(balanced_table_re) yields: [%s]" % arg)
     # If we see a newline, reset the flags and yield the newline.  This way,
     # a whitespace will always be inserted.
     if arg == '\n':
@@ -1042,7 +1029,7 @@ class ExtractUsefulText(SourceTextHandler):
   def process_table(self, text):
     '''Process a table into chunks of raw text and yield them.'''
     for bar in yield_table_chunks(text):
-      if debug > 1: uniprint("process_table yields: [%s]" % bar)
+      if debug >= 2: uniprint("process_table yields: [%s]" % bar)
       for baz in self.process_source_text(bar):
         yield baz
   
@@ -1132,60 +1119,6 @@ def format_text_second_pass(text):
   return text
 
 #######################################################################
-#                SAX handler for processing raw dump files            #
-#######################################################################
-
-class WikipediaSaxHandler(ContentHandler):
-  '''SAX handler for processing Wikipedia documents.  Note that SAX is a
-simple interface for handling XML in a serial fashion (as opposed to a
-DOM-type interface, which reads the entire XML file into memory and allows
-it to be dynamically manipulated).  Given the size of the XML dump file
-(around 50 or 100 GB uncompressed), we can't read it all into memory.'''
-  def __init__(self, output_handler):
-    print >>sys.stderr, "Beginning processing..."
-    self.intext = False
-    self.intitle = False
-    self.curtitle = None
-    self.curtext = None
-    self.output_handler = output_handler
-    self.status = StatusMessage('article')
-    
-  def startElement(self, name, attrs):
-    '''Handler for beginning of XML element.'''
-    if debug > 1: uniprint("startElement() saw %s/%s" % (name, attrs))
-    if name == 'title':
-      self.intitle = True
-      self.curtitle = ""
-    elif name == 'text':
-      self.intext = True
-      self.curtext = []
-
-  def characters(self, text):
-    '''Handler for chunks of text.  Accumulate all adjacent chunks.  When
-the end element </text> is seen, process_article_text() will be called on the
-combined chunks.'''
-    if debug > 1: uniprint("characters() saw %s" % text)
-    if self.intitle:
-      self.curtitle += text
-    elif self.intext:
-      self.curtext.append(text)
- 
-  def endElement(self, name):
-    '''Handler for end of XML element.'''
-    if name == 'title':
-      # If we saw a title, note it
-      self.intitle = False
-    elif name == 'text':
-      # If we saw the end of the article text, join all the text chunks
-      # together and call process_article_text() on it.
-      self.intext = False
-      set_next_split_file()
-      self.output_handler.process_article_text(self.curtitle,
-                                               ''.join(self.curtext))
-      self.curtext = None
-      self.status.item_processed()
- 
-#######################################################################
 #                           Article handlers                          #
 #######################################################################
 
@@ -1194,6 +1127,10 @@ combined chunks.'''
 ### Default handler class for processing article text.  Subclass this to
 ### implement your own handlers.
 class ArticleHandler(object):
+  def __init__(self):
+    self.title = None
+    self.id = None
+
   # Process the text of article TITLE, with text TEXT.  The default
   # implementation does the following:
   #
@@ -1203,11 +1140,15 @@ class ArticleHandler(object):
   # 4. If that handler returned True, call self.process_text_for_text()
   #    to do processing of the text itself (e.g. for words).
 
-  def process_article_text(self, title, text):
+  def process_article_text(self, text, title, id, redirect):
+    self.title = title
+    self.id = id
   
-    if debug > 0:
-      uniprint("Article title: %s" % title)
-      uniprint("Original article text:\n%s" % text)
+    if debug >= 1:
+      errprint("Article title: %s" % title)
+      errprint("Article ID: %s" % id)
+      errprint("Article is redirect: %s" % redirect)
+      errprint("Original article text:\n%s" % text)
   
     ### Preliminary processing of text, removing stuff unuseful even for
     ### extracting data.
@@ -1216,30 +1157,35 @@ class ArticleHandler(object):
   
     ### Look to see if the article is a redirect
   
-    m = re.match(r'(?i)#REDIRECT\s*\[\[(.*?)\]\]', text)
-    if m:
-      self.process_redirect(title, m.group(1))
-      # NOTE: There may be additional templates specified along with a
-      # redirection page, typically something like {{R from misspelling}}
-      # that gives the reason for the redirection.  Currently, we ignore
-      # such templates.
-      return
+    if redirect:
+      m = re.match(r'(?i)#REDIRECT:?\s*\[\[(.*?)\]\]', text)
+      if m:
+        self.process_redirect(m.group(1))
+        # NOTE: There may be additional templates specified along with a
+        # redirection page, typically something like {{R from misspelling}}
+        # that gives the reason for the redirection.  Currently, we ignore
+        # such templates.
+        return
+      else:
+        warning(
+          "Article %s (ID %s) is a redirect but can't parse redirect spec %s"
+          % (title, id, text))
   
     ### Extract the data out of templates; if it returns True, also process
     ### text for words
   
-    if self.process_text_for_data(title, text):
-      self.process_text_for_text(title, text)
+    if self.process_text_for_data(text):
+      self.process_text_for_text(text)
 
   # Process the text itself, e.g. for words.  Default implementation does
   # nothing.
-  def process_text_for_text(self, title, text):
+  def process_text_for_text(self, text):
     pass
 
   # Process an article that is a redirect.  Default implementation does
   # nothing.
 
-  def process_redirect(self, title, redirtitle):
+  def process_redirect(self, redirtitle):
     pass
 
   # Process the text and extract data.  Return True if further processing of
@@ -1249,7 +1195,7 @@ class ArticleHandler(object):
   #
   # Default implementation just returns True.
 
-  def process_text_for_data(self, title, text):
+  def process_text_for_data(self, text):
     return True
 
   def finish_processing(self):
@@ -1270,7 +1216,7 @@ class ArticleHandlerForUsefulText(ArticleHandler):
   #    text.  Join together and then split into words.  Pass the generator
   #    of words to self.process_text_for_words().
 
-  def process_text_for_text(self, title, text):  
+  def process_text_for_text(self, text):  
     # Now process the text in various ways in preparation for extracting
     # the words from the text
     text = format_text_second_pass(text)
@@ -1278,34 +1224,30 @@ class ArticleHandlerForUsefulText(ArticleHandler):
     # again (to handle cases like "the [[latent variable]]s are ..."), and
     # split to find words.
     self.process_text_for_words(
-      title, split_text_into_words(
-               ''.join(ExtractUsefulText().process_source_text(text))))
+      split_text_into_words(
+        ''.join(ExtractUsefulText().process_source_text(text))))
 
   # Process the real words of the text of an article.  Default implementation
   # does nothing.
 
-  def process_text_for_words(self, title, word_generator):
+  def process_text_for_words(self, word_generator):
     pass
 
 
 
-# Does what processwiki.py used to do.  Basically just prints out the info
-# passed in for redirects and article words; as for the implementation of
+# Print out the info passed in for article words; as for the implementation of
 # process_text_for_data(), uses ExtractCoordinatesFromSource() to extract
 # coordinates, and outputs all the coordinates seen.  Always returns True.
 
 class PrintWordsAndCoords(ArticleHandlerForUsefulText):
-  def process_text_for_words(self, title, word_generator):
-    splitprint("Article title: %s" % title)
+  def process_text_for_words(self, word_generator):
+    splitprint("Article title: %s" % self.title)
+    splitprint("Article ID: %s" % self.id)
     for word in word_generator:
-      if debug > 0: uniprint("Saw word: %s" % word)
+      if debug >= 1: uniprint("Saw word: %s" % word)
       else: splitprint("%s" % word)
 
-  def process_redirect(self, title, redirtitle):
-    splitprint("Article title: %s" % title)
-    splitprint("Redirect to: %s" % redirtitle)
-
-  def process_text_for_data(self, title, text):
+  def process_text_for_data(self, text):
     handler = ExtractCoordinatesFromSource()
     for foo in handler.process_source_text(text): pass
     for (temptype,lat,long) in handler.coords:
@@ -1315,7 +1257,7 @@ class PrintWordsAndCoords(ArticleHandlerForUsefulText):
   def finish_processing(self):
     ### Output all of the templates that were seen with coordinates in them,
     ### along with counts of how many times each template was seen.
-    if debug > 0:
+    if debug >= 1:
       print("Templates with coordinates:")
       output_reverse_sorted_table(templates_with_coords,
                                   outfile=cur_output_file)
@@ -1330,11 +1272,17 @@ class PrintWordsAndCoords(ArticleHandlerForUsefulText):
 # Just find redirects.
 
 class FindRedirects(ArticleHandler):
-  def process_redirect(self, title, redirtitle):
-    splitprint("Article title: %s" % title)
+  def process_redirect(self, redirtitle):
+    splitprint("Article title: %s" % self.title)
+    splitprint("Article ID: %s" % self.id)
     splitprint("Redirect to: %s" % redirtitle)
 
-def extract_coordinates_from_article(title, text):
+def output_title_and_coordinates(title, id, lat, long):
+  splitprint("Article title: %s" % title)
+  splitprint("Article ID: %s" % id)
+  splitprint("Article coordinates: %s,%s" % (lat, long))
+
+def extract_coordinates_from_article(title, id, text):
   handler = ExtractCoordinatesFromSource()
   for foo in handler.process_source_text(text): pass
   if len(handler.coords) > 0:
@@ -1343,12 +1291,10 @@ def extract_coordinates_from_article(title, text):
     # accurate.
     for (temptype, lat, long) in handler.coords:
       if temptype.startswith('coor'):
-        splitprint("Article title: %s" % title)
-        splitprint("Article coordinates: %s,%s" % (lat, long))
+        output_title_and_coordinates(title, id, lat, long)
         return True
     (temptype, lat, long) = handler.coords[0]
-    splitprint("Article title: %s" % title)
-    splitprint("Article coordinates: %s,%s" % (lat, long))
+    output_title_and_coordinates(title, id, lat, long)
     return True
   else: return False
 
@@ -1359,19 +1305,20 @@ def extract_coordinates_from_article(title, text):
 # (as opposed to directives etc.), and outputs the counts.
 
 class GetCoordsAndCounts(ArticleHandlerForUsefulText):
-  def process_text_for_words(self, title, word_generator):
+  def process_text_for_words(self, word_generator):
     wordhash = intdict()
     for word in word_generator:
       if word: wordhash[word] += 1
     output_reverse_sorted_table(wordhash, outfile=cur_output_file)
 
-  def process_text_for_data(self, title, text):
-    return extract_coordinates_from_article(title, text)
+  def process_text_for_data(self, text):
+    return extract_coordinates_from_article(self.title, self.id, text)
+
 
 # Handler to output just coordinate information.
 class GetCoords(ArticleHandler):
-  def process_text_for_data(self, title, text):
-    return extract_coordinates_from_article(title, text)
+  def process_text_for_data(self, text):
+    return extract_coordinates_from_article(self.title, self.id, text)
 
 
 class ToponymEvalDataHandler(ExtractUsefulText):
@@ -1442,12 +1389,12 @@ class GenerateToponymEvalData(ArticleHandler):
   #    text.  Join together and then split into words.  Pass the generator
   #    of words to self.process_text_for_words().
 
-  def process_text_for_text(self, title, text):
+  def process_text_for_text(self, text):
     # Now process the text in various ways in preparation for extracting
     # the words from the text
     text = format_text_second_pass(text)
 
-    splitprint("Article title: %s" % title)
+    splitprint("Article title: %s" % self.title)
     chunkgen = ToponymEvalDataHandler().process_source_text(text)
     #for chunk in chunkgen:
     #  uniprint("Saw chunk: %s" % (chunk,))
@@ -1470,16 +1417,8 @@ class GenerateToponymEvalData(ArticleHandler):
 
 # Generate article data of various sorts
 class GenerateArticleData(ArticleHandler):
-  def process_article(self, title, redirtitle):
-    id = article_title_to_id.get(title, None)
-    if not id:
-      warning("Found article %s without ID" % title)
-      global next_unseen_article_id
-      id = "%s" % next_unseen_article_id
-      next_unseen_article_id += 1
-      article_title_to_id[title] = id
-      article_id_to_title[id] = title
-    if rematch('(.*?):', title):
+  def process_article(self, redirtitle):
+    if rematch('(.*?):', self.title):
       namespace = m_[1]
       if namespace in article_namespace_aliases:
         namespace = article_namespace_aliases[namespace]
@@ -1488,18 +1427,18 @@ class GenerateArticleData(ArticleHandler):
     else:
       namespace = 'Main'
     yesno = {True:'yes', False:'no'}
-    listof = title.startswith('List of ')
-    disambig = id in disambig_pages_by_id
+    listof = self.title.startswith('List of ')
+    disambig = self.id in disambig_pages_by_id
     list = listof or disambig or namespace in ('Category', 'Book')
     uniprint("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" %
-             (id, title, cur_split_name, redirtitle, namespace,
+             (self.id, self.title, cur_split_name, redirtitle, namespace,
               yesno[listof], yesno[disambig], yesno[list]))
 
-  def process_redirect(self, title, redirtitle):
-    self.process_article(title, redirtitle)
+  def process_redirect(self, redirtitle):
+    self.process_article(redirtitle)
 
-  def process_text_for_data(self, title, text):
-    self.process_article(title, '')
+  def process_text_for_data(self, text):
+    self.process_article('')
     return False
 
 # Handler to output link information as well as coordinate information.
@@ -1539,7 +1478,7 @@ class ProcessSourceForLinks(RecursiveSourceTextHandler):
     return self.process_source_text(text[2:-2])
 
 class FindLinks(ArticleHandler):
-  def process_text_for_data(self, title, text):
+  def process_text_for_data(self, text):
     handler = ProcessSourceForLinks()
     for foo in handler.process_source_text(text): pass
     return False
@@ -1557,16 +1496,94 @@ class FindLinks(ArticleHandler):
       output_reverse_sorted_table(map, outfile=cur_output_file)
 
 #######################################################################
+#                SAX handler for processing raw dump files            #
+#######################################################################
+
+# We do a very simple-minded way of handling the XML.  We maintain the
+# path of nested elements that we're within, and we track the text since the
+# last time we saw the beginning of an element.  We reset the text we're
+# tracking every time we see an element begin tag, and we don't record
+# text at all after an end tag, until we see a begin tag again.  Basically,
+# this means we don't handle cases where tags are nested inside of text.
+# This isn't a problem since cases like this don't occur in the Wikipedia
+# dump.
+
+class WikipediaDumpSaxHandler(ContentHandler):
+  '''SAX handler for processing Wikipedia dumps.  Note that SAX is a
+simple interface for handling XML in a serial fashion (as opposed to a
+DOM-type interface, which reads the entire XML file into memory and allows
+it to be dynamically manipulated).  Given the size of the XML dump file
+(around 25 GB uncompressed), we can't read it all into memory.'''
+  def __init__(self, output_handler):
+    errprint("Beginning processing of Wikipedia dump...")
+    self.curpath = []
+    self.curtext = None
+    self.output_handler = output_handler
+    self.status = StatusMessage('article')
+    
+  def startElement(self, name, attrs):
+    '''Handler for beginning of XML element.'''
+    if debug >= 2: errprint("startElement() saw %s/%s" % (name, attrs))
+    # We should never see an element inside of the Wikipedia text.
+    if self.curpath:
+      assert self.curpath[-1] != 'text'
+    self.curpath.append(name)
+    self.curtext = []
+    # We care about the title, ID, and redirect status.  Reset them for
+    # every page; this is especially important for redirect status.
+    if name == 'page':
+      self.title = None
+      self.id = None
+      self.redirect = False
+
+  def characters(self, text):
+    '''Handler for chunks of text.  Accumulate all adjacent chunks.  When
+the end element </text> is seen, process_article_text() will be called on the
+combined chunks.'''
+    if debug >= 2: errprint("characters() saw %s" % text)
+    # None means the last directive we saw was an end tag; we don't track
+    # text any more until the next begin tag.
+    if self.curtext != None:
+      self.curtext.append(text)
+ 
+  def endElement(self, name):
+    '''Handler for end of XML element.'''
+    eltext = ''.join(self.curtext) if self.curtext else ''
+    self.curtext = None # Stop tracking text
+    self.curpath.pop()
+    if name == 'title':
+      self.title = eltext
+    # ID's occur in three places: the page ID, revision ID and contributor ID.
+    # We only want the page ID, so check to make sure we've got the right one.
+    elif name == 'id' and self.curpath[-1] == 'page':
+      self.id = eltext
+    elif name == 'redirect':
+      self.redirect = True
+    elif name == 'text':
+      # If we saw the end of the article text, join all the text chunks
+      # together and call process_article_text() on it.
+      set_next_split_file()
+      if debug >= 2:
+        max_text_len = 150
+        endslice = min(max_text_len, len(eltext))
+        truncated = len(eltext) > max_text_len
+        errprint(
+        """Calling process_article_text with title=%s, id=%s, redirect=%s;
+  text=[%s%s]""" % (self.title, self.id, self.redirect, eltext[0:endslice],
+                    "..." if truncated else ""))
+      self.output_handler.process_article_text(text=eltext, title=self.title,
+        id=self.id, redirect=self.redirect)
+      self.status.item_processed()
+ 
+#######################################################################
 #                                Main code                            #
 #######################################################################
 
 
 def main_process_input(wiki_handler):
-  if debug > 0: print "Notice: beginning Wikipedia parsing"
-
   ### Create the SAX parser and run it on stdin.
   sax_parser = make_parser()
-  sax_handler = WikipediaSaxHandler(wiki_handler)
+  sax_handler = WikipediaDumpSaxHandler(wiki_handler)
   sax_parser.setContentHandler(sax_handler)
   sax_parser.parse(sys.stdin)
   wiki_handler.finish_processing()
@@ -1596,9 +1613,8 @@ all articles it maps to.""",
                 action="store_true")
   op.add_option("--generate-article-data",
                 help="""Generate file listing all articles and info about them.
-If using this option, the --disambig-id-file and title-id-file options
-should also be used.  If you want training/dev/test splits output, you need
-to also use the --split-training-dev-test option.
+If using this option, the --disambig-id-file and --split-training-dev-test
+options should also be used.
 
 The format is
 
@@ -1677,17 +1693,13 @@ coordinates.""",
                 help="""File containing list of article ID's that are
 disambiguation pages.""",
                 metavar="FILE")
-  op.add_option("--article-id-file",
-                help="""File containing mapping between article titles and
-article ID's.""",
-                metavar="FILE")
   op.add_option("--max-time-per-stage", type='int', default=0,
                 help="""Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default %default.""")
   op.add_option("-d", "--debug", metavar="LEVEL",
                 help="Output debug info at given level")
 
-  uniprint("Arguments: %s" % ' '.join(sys.argv), flush=True)
+  errprint("Arguments: %s" % ' '.join(sys.argv))
   opts, args = op.parse_args()
   output_option_parameters(opts)
 
@@ -1714,8 +1726,6 @@ Used for testing purposes.  Default %default.""")
     read_redirect_file(opts.redirect_file)
   if opts.disambig_id_file:
     read_disambig_id_file(opts.disambig_id_file)
-  if opts.article_id_file:
-    read_article_id_file(opts.article_id_file)
   if opts.words_coords:
     main_process_input(PrintWordsAndCoords())
   elif opts.find_links:
