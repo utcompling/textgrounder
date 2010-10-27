@@ -43,6 +43,11 @@ public class PlainTextSource extends TextSource {
 
   public PlainTextSource(BufferedReader reader, SentenceDivider divider, Tokenizer tokenizer)
     throws IOException {
+    this(reader, divider, tokenizer, 5);
+  }
+
+  public PlainTextSource(BufferedReader reader, SentenceDivider divider, Tokenizer tokenizer, int parasPerDocument)
+    throws IOException {
     super(reader);
     this.divider = divider;
     this.tokenizer = tokenizer;
@@ -51,7 +56,7 @@ public class PlainTextSource extends TextSource {
     this.current = this.readLine();
     this.number = 0;
     this.currentIdx = 0;
-    this.parasPerDocument = 5;
+    this.parasPerDocument = parasPerDocument;
   }
 
   public boolean hasNext() {
