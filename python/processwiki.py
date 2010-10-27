@@ -462,7 +462,7 @@ unmatched single or double right braces or brackets.'''
 def warning(text):
   '''Output a warning, formatting into UTF-8 as necessary'''
   if show_warnings:
-    uniprint("Warning: %s" % text)
+    errprint("Warning: %s" % text)
     #uniprint("Warning: %s" % text, sys.stderr)
 
 def splitprint(text):
@@ -1158,7 +1158,7 @@ class ArticleHandler(object):
     ### Look to see if the article is a redirect
   
     if redirect:
-      m = re.match(r'(?i)#REDIRECT:?\s*\[\[(.*?)\]\]', text)
+      m = re.match(r'(?i)#REDIRECT:?\s*\[\[(.*?)\]\]', text.strip())
       if m:
         self.process_redirect(m.group(1))
         # NOTE: There may be additional templates specified along with a
