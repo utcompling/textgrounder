@@ -1,0 +1,12 @@
+#!/bin/sh
+
+DEBUG="--debug 1"
+#MAXTIME="--max-time-per-stage 5"
+#MAXTIME="--max-time-per-stage 10"
+
+ARTICLEDATA='--article-data-file enwiki-20100905-article-data.txt'
+LINKS='--links-file enwiki-20100905-links-only-coord-articles.txt'
+COORDS='--coords-file enwiki-20100905-just-titles-coords.txt'
+
+$HOME/devel/textgrounder/python/generate_combined.py \
+  $DEBUG $MAXTIME $ARTICLEDATA $LINKS $COORDS ${1+"$@"}
