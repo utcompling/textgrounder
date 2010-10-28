@@ -18,14 +18,25 @@ public class RunResolver extends BaseApp {
         initializeOptionsFromCommandLine(args);
 
         Tokenizer tokenizer = new OpenNLPTokenizer();
-        StoredCorpus corpus = Corpus.createStoredCorpus();
+
+        StoredCorpus testCorpus = Corpus.createStoredCorpus();
         System.out.print("Reading corpus from " + getInputPath() + " ...");
-        corpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
-        corpus.load();
+        testCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
+        testCorpus.load();
         System.out.println("done.");
-        System.out.println("Number of documents: " + corpus.getDocumentCount());
-        System.out.println("Number of toponym types: " + corpus.getToponymTypeCount());
-        System.out.println("Maximum ambiguity (locations per toponym): " + corpus.getMaxToponymAmbiguity());
+
+        StoredCorpus trainCorpus = Corpus.createStoredCorpus();
+        if(getAdditionalInputPath() != null) {
+            System.out.print("Reading additional training corpus from " + getAdditionalInputPath() + " ...");
+            trainCorpus.addSource(new PlainTextSource(new BufferedReader(new FileReader(getAdditionalInputPath())), new OpenNLPSentenceDivider(), tokenizer));
+            trainCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
+            trainCorpus.load();
+        }
+        System.out.println("done.");
+
+        System.out.println("Number of documents: " + testCorpus.getDocumentCount());
+        System.out.println("Number of toponym types: " + testCorpus.getToponymTypeCount());
+        System.out.println("Maximum ambiguity (locations per toponym): " + testCorpus.getMaxToponymAmbiguity());
 
         Resolver resolver;
         if(getResolverType() == RESOLVER_TYPE.RANDOM) {
@@ -33,7 +44,7 @@ public class RunResolver extends BaseApp {
             resolver = new RandomResolver();
         }
         else if(getResolverType() == RESOLVER_TYPE.WEIGHTED_MIN_DIST) {
-            System.out.println("Running WEIGHTED MINIMUM DISTANCE resolver with " + getNumIterations() + " iterations...");
+            System.out.println("Running WEIGHTED MINIMUM DISTANCE resolver with " + getNumIterations() + " iteration(s)...");
             resolver = new WeightedMinDistResolver(getNumIterations());
         }
         else {//if(getResolverType() == RESOLVER_TYPE.BASIC_MIN_DIST) {
@@ -41,12 +52,14 @@ public class RunResolver extends BaseApp {
             resolver = new BasicMinDistResolver();
         }
 
-        Corpus disambiguated = resolver.disambiguate(corpus);
+        if(getAdditionalInputPath() != null)
+            resolver.train(trainCorpus);
+        Corpus disambiguated = resolver.disambiguate(testCorpus);
 
         CorpusXMLWriter w = new CorpusXMLWriter(disambiguated);
         w.write(new File(getOutputPath()));
 
-        Evaluator evaluator = new SignatureEvaluator(corpus);
+        Evaluator evaluator = new SignatureEvaluator(testCorpus);
 
         Report report = evaluator.evaluate(disambiguated, false);
 

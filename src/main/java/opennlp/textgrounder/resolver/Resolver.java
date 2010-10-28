@@ -14,6 +14,10 @@ import opennlp.textgrounder.text.StoredCorpus;
  */
 public abstract class Resolver {
 
+    public void train(StoredCorpus corpus) {
+        throw new UnsupportedOperationException("This type of resolver cannot be trained.");
+    }
+
     public abstract StoredCorpus disambiguate(StoredCorpus corpus);
     
 }
