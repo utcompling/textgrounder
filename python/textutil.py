@@ -1,4 +1,5 @@
 from __future__ import with_statement # For chompopen(), uchompopen()
+from optparse import OptionParser
 import re # For regexp wrappers
 import sys, codecs # For uchompopen()
 import bisect # For sorted lists
@@ -121,6 +122,21 @@ without errors.  Uses the 'print' command, and normally outputs a newline; but
 this can be suppressed using NONL.'''
   uniprint(text, outfile=sys.stderr, nonl=nonl)
 
+def warning(text):
+  '''Output a warning, formatting into UTF-8 as necessary'''
+  errprint("Warning: %s" % text)
+
+def safe_float(x):
+  '''Convert a string to floating point, but don't crash on errors;
+instead, output a warning.'''
+  try:
+    return float(x)
+  except:
+    x = x.strip()
+    if x:
+      warning("Expected number, saw %s" % x)
+    return 0.
+
 #############################################################################
 #                             Default dictionaries                          #
 #############################################################################
@@ -208,9 +224,9 @@ def lookup_sorted_list(sorted_list, key):
 
 # Given a table with values that are numbers, output the table, sorted
 # on the numbers from bigger to smaller.
-def output_reverse_sorted_table(table, outfile=sys.stdout):
+def output_reverse_sorted_table(table, outfile=sys.stdout, indent=""):
   for x in sorted(table.items(), key=lambda x:x[1], reverse=True):
-    uniprint("%s = %s" % (x[0], x[1]), outfile=outfile)
+    uniprint("%s%s = %s" % (indent, x[0], x[1]), outfile=outfile)
 
 #############################################################################
 #                             Status Messages                               #
@@ -243,6 +259,12 @@ class StatusMessage(object):
     self.items_processed = 0
     self.first_time = time.time()
     self.last_time = self.first_time
+
+  def num_processed(self):
+    return self.items_processed
+
+  def elapsed_time(self):
+    return time.time() - self.first_time
 
   def item_processed(self):
     curtime = time.time()
@@ -324,3 +346,56 @@ def capfirst(st):
   '''Capitalize the first letter of string, leaving the remainder alone.'''
   if not st: return st
   return st[0].capitalize() + st[1:]
+
+class NLPProgram(object):
+  def __init__(self):
+    if self.run_main_on_init():
+      self.main()
+
+  def implement_main(self, op, args):
+    pass
+
+  def populate_options(self, op):
+    pass
+
+  def argument_usage(self):
+    return ""
+
+  def get_usage(self):
+    argusage = self.argument_usage()
+    if argusage:
+      argusage = ' ' + argusage
+    return "%%prog [options]%s" % argusage
+
+  def run_main_on_init(self):
+    return True
+
+  def populate_shared_options(self, op):
+    op.add_option("--max-time-per-stage", type='int', default=2**31,
+                  help="""Maximum time per stage in seconds.  If 0, no limit.
+Used for testing purposes.  Default %default.""")
+    op.add_option("-d", "--debug", type='int', metavar="LEVEL",
+                  help="Output debug info at given level")
+
+  def need(self, arg, arg_english=None):
+    if not arg_english:
+      arg_english=arg.replace('_', ' ')
+    if not getattr(self.opts, arg):
+      self.op.error("Must specify %s using --%s" %
+                    (arg_english, arg.replace('_', '-')))
+
+  def main(self):
+    self.op = OptionParser(usage="%prog [options]")
+    self.populate_shared_options(self.op)
+    self.populate_options(self.op)
+
+    errprint("Arguments: %s" % ' '.join(sys.argv))
+
+    ### Process the command-line options and set other values from them ###
+    
+    self.opts, self.args = self.op.parse_args()
+
+    output_option_parameters(self.opts)
+
+    return self.implement_main(self.opts, self.op, self.args)
+
