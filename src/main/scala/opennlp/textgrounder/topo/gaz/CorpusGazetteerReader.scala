@@ -22,7 +22,7 @@ import opennlp.textgrounder.text.Corpus
 import opennlp.textgrounder.text.Token
 import opennlp.textgrounder.topo.Location
 
-class CorpusGazetteerReader(private val corpus: Corpus[Token])
+class CorpusGazetteerReader(private val corpus: Corpus[_ <: Token])
   extends GazetteerReader {
 
   private val it = corpus.flatMap(_.flatMap {
