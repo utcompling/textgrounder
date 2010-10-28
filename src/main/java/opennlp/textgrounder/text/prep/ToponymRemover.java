@@ -38,8 +38,8 @@ import opennlp.textgrounder.util.Span;
  * @author Travis Brown <travis.brown@mail.utexas.edu>
  * @version 0.1.0
  */
-public class ToponymStripper extends DocumentSourceWrapper {
-  public ToponymStripper(DocumentSource source) {
+public class ToponymRemover extends DocumentSourceWrapper {
+  public ToponymRemover(DocumentSource source) {
     super(source);
   }
 

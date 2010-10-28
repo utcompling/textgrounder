@@ -37,7 +37,7 @@ object ReprocessTrApp {
 
     val corpus = Corpus.createStreamCorpus
     val source = new TrXMLDirSource(new File(args(0)), tokenizer)
-    val stripped = new ToponymStripper(source)
+    val stripped = new ToponymRemover(source)
     corpus.addSource(new ToponymAnnotator(stripped, recognizer, gazetteer))
 
     val writer = new CorpusXMLWriter(corpus)
