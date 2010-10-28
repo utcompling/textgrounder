@@ -10,13 +10,13 @@ Antigua and Barbuda	AC	AG	ATG	028	ATG	.ag
 Argentina	AR	AR	ARG	032	ARG	.ar	
 Armenia	AM	AM	ARM	051	ARM	.am	
 Aruba	AA	AW	ABW	533	ABW	.aw	
-Ashmore and Cartier Islands	AT	-	-	-	AUS	-	ISO includes with Australia
+Ashmore and Cartier Islands	AT	AU	AUS	036	AUS	-	ISO includes with Australia
 Australia	AS	AU	AUS	036	AUS	.au	ISO includes Ashmore and Cartier Islands, Coral Sea Islands
 Austria	AU	AT	AUT	040	AUT	.at	
 Azerbaijan	AJ	AZ	AZE	031	AZE	.az	
 Bahamas, The	BF	BS	BHS	044	BHS	.bs	
 Bahrain	BA	BH	BHR	048	BHR	.bh	
-Baker Island	FQ	-	-	-	UMI	-	ISO includes with the US Minor Outlying Islands
+Baker Island	FQ	UM	UMI	581	UMI	-	ISO includes with the US Minor Outlying Islands
 Bangladesh	BG	BD	BGD	050	BGD	.bd	
 Barbados	BB	BB	BRB	052	BRB	.bb	
 Bassas da India	BS	-	-	-	-	-	administered as part of French Southern and Antarctic Lands; no ISO codes assigned
@@ -48,14 +48,14 @@ Chad	CD	TD	TCD	148	TCD	.td
 Chile	CI	CL	CHL	152	CHL	.cl	
 China	CH	CN	CHN	156	CHN	.cn	see also Taiwan
 Christmas Island	KT	CX	CXR	162	CXR	.cx	
-Clipperton Island	IP	-	-	-	FYP	-	ISO includes with French Polynesia
+Clipperton Island	IP	PF	PYF	258	FYP	-	ISO includes with French Polynesia
 Cocos (Keeling) Islands	CK	CC	CCK	166	AUS	.cc	
 Colombia	CO	CO	COL	170	COL	.co	
 Comoros	CN	KM	COM	174	COM	.km	
 Congo, Democratic Republic of the	CG	CD	COD	180	COD	.cd	formerly Zaire
 Congo, Republic of the	CF	CG	COG	178	COG	.cg	
 Cook Islands	CW	CK	COK	184	COK	.ck	
-Coral Sea Islands	CR	-	-	-	AUS	-	ISO includes with Australia
+Coral Sea Islands	CR	AU	AUS	036	AUS	-	ISO includes with Australia
 Costa Rica	CS	CR	CRI	188	CRI	.cr	
 Cote d'Ivoire	IV	CI	CIV	384	CIV	.ci	
 Croatia	HR	HR	HRV	191	HRV	.hr	
@@ -106,7 +106,7 @@ Heard Island and McDonald Islands	HM	HM	HMD	334	HMD	.hm
 Holy See (Vatican City)	VT	VA	VAT	336	VAT	.va	
 Honduras	HO	HN	HND	340	HND	.hn	
 Hong Kong	HK	HK	HKG	344	HKG	.hk	
-Howland Island	HQ	-	-	-	UMI	-	ISO includes with the US Minor Outlying Islands
+Howland Island	HQ	UM	UMI	581	UMI	-	ISO includes with the US Minor Outlying Islands
 Hungary	HU	HU	HUN	348	HUN	.hu	
 Iceland	IC	IS	ISL	352	ISL	.is	
 India	IN	IN	IND	356	IND	.in	
@@ -118,16 +118,16 @@ Isle of Man	IM	IM	IMN	833	UK	.im
 Israel	IS	IL	ISR	376	ISR	.il	
 Italy	IT	IT	ITA	380	ITA	.it	
 Jamaica	JM	JM	JAM	388	JAM	.jm	
-Jan Mayen	JN	-	-	-	SJM	-	ISO includes with Svalbard
+Jan Mayen	JN	SJ	SJM	744	SJM	-	ISO includes with Svalbard
 Japan	JA	JP	JPN	392	JPN	.jp	
-Jarvis Island	DQ	-	-	-	UMI	-	ISO includes with the US Minor Outlying Islands
+Jarvis Island	DQ	UM	UMI	581	UMI	-	ISO includes with the US Minor Outlying Islands
 Jersey	JE	JE	JEY	832	UK	.je	
-Johnston Atoll	JQ	-	-	-	UMI	-	ISO includes with the US Minor Outlying Islands
+Johnston Atoll	JQ	UM	UMI	581	UMI	-	ISO includes with the US Minor Outlying Islands
 Jordan	JO	JO	JOR	400	JOR	.jo	
 Juan de Nova Island	JU	-	-	-	-	-	administered as part of French Southern and Antarctic Lands; no ISO codes assigned
 Kazakhstan	KZ	KZ	KAZ	398	KAZ	.kz	
 Kenya	KE	KE	KEN	404	KEN	.ke	
-Kingman Reef	KQ	-	-	-	UMI	-	ISO includes with the US Minor Outlying Islands
+Kingman Reef	KQ	UM	UMI	581	UMI	-	ISO includes with the US Minor Outlying Islands
 Kiribati	KR	KI	KIR	296	KIR	.ki	
 Korea, North	KN	KP	PRK	408	PRK	.kp	
 Korea, South	KS	KR	KOR	410	KOR	.kr	
@@ -158,7 +158,7 @@ Mauritius	MP	MU	MUS	480	MUS	.mu
 Mayotte	MF	YT	MYT	175	FRA	.yt	
 Mexico	MX	MX	MEX	484	MEX	.mx	
 Micronesia, Federated States of	FM	FM	FSM	583	FSM	.fm	
-Midway Islands	MQ	-	-	-	UMI	-	ISO includes with the US Minor Outlying Islands
+Midway Islands	MQ	UM	UMI	581	UMI	-	ISO includes with the US Minor Outlying Islands
 Moldova	MD	MD	MDA	498	MDA	.md	
 Monaco	MN	MC	MCO	492	MCO	.mc	
 Mongolia	MG	MN	MNG	496	MNG	.mn	
@@ -169,7 +169,7 @@ Mozambique	MZ	MZ	MOZ	508	MOZ	.mz
 Myanmar	-	-	-	-	-	-	see Burma
 Namibia	WA	NA	NAM	516	NAM	.na	
 Nauru	NR	NR	NRU	520	NRU	.nr	
-Navassa Island	BQ	-	-	-	US	-	ISO includes with the US Minor Outlying Islands
+Navassa Island	BQ	UM	UMI	581	US	-	ISO includes with the US Minor Outlying Islands
 Nepal	NP	NP	NPL	524	NPL	.np	
 Netherlands	NL	NL	NLD	528	NLD	.nl	
 Netherlands Antilles	NT	AN	ANT	530	ANT	.an	
@@ -185,7 +185,7 @@ Norway	NO	NO	NOR	578	NOR	.no
 Oman	MU	OM	OMN	512	OMN	.om	
 Pakistan	PK	PK	PAK	586	PAK	.pk	
 Palau	PS	PW	PLW	585	PLW	.pw	
-Palmyra Atoll	LQ	-	-	-	UMI	-	ISO includes with the US Minor Outlying Islands
+Palmyra Atoll	LQ	UM	UMI	581	UMI	-	ISO includes with the US Minor Outlying Islands
 Panama	PM	PA	PAN	591	PAN	.pa	
 Papua New Guinea	PP	PG	PNG	598	PNG	.pg	
 Paracel Islands	PF	-	-	-	-	-	
@@ -262,7 +262,7 @@ Vietnam	VM	VN	VNM	704	VNM	.vn
 Virgin Islands	VQ	VI	VIR	850	VIR	.vi	
 Virgin Islands (UK)	-	-	-	-	-	.vg	see British Virgin Islands
 Virgin Islands (US)	-	-	-	-	-	.vi	see Virgin Islands
-Wake Island	WQ	-	-	-	UMI	-	ISO includes with the US Minor Outlying Islands
+Wake Island	WQ	UM	UMI	581	UMI	-	ISO includes with the US Minor Outlying Islands
 Wallis and Futuna	WF	WF	WLF	876	WLF	.wf	
 West Bank	WE	PS	PSE	275	PSE	.ps	ISO identifies as Occupied Palestinian Territory
 Western Sahara	WI	EH	ESH	732	ESH	.eh	
