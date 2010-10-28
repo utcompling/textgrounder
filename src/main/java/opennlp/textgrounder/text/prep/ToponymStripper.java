@@ -28,27 +28,19 @@ import opennlp.textgrounder.text.SimpleSentence;
 import opennlp.textgrounder.text.SimpleToponym;
 import opennlp.textgrounder.text.Token;
 import opennlp.textgrounder.text.Toponym;
-import opennlp.textgrounder.topo.Location;
 import opennlp.textgrounder.topo.gaz.Gazetteer;
 import opennlp.textgrounder.util.Span;
 
 /**
- * Wraps a document source, removes any toponym spans, and identifies toponyms
- * using a named entity recognizer and a gazetteer.
+ * Wraps a document source and removes any toponyms spans that it contains,
+ * returning only the tokens.
  *
  * @author Travis Brown <travis.brown@mail.utexas.edu>
  * @version 0.1.0
  */
-public class ToponymAnnotator extends DocumentSourceWrapper {
-  private final NamedEntityRecognizer recognizer;
-  private final Gazetteer gazetteer;
-
-  public ToponymAnnotator(DocumentSource source,
-                          NamedEntityRecognizer recognizer,
-                          Gazetteer gazetteer) {
+public class ToponymStripper extends DocumentSourceWrapper {
+  public ToponymStripper(DocumentSource source) {
     super(source);
-    this.recognizer = recognizer;
-    this.gazetteer = gazetteer;
   }
 
   public Document<Token> next() {
@@ -64,36 +56,7 @@ public class ToponymAnnotator extends DocumentSourceWrapper {
 
           public Sentence<Token> next() {
             Sentence<Token> sentence = sentences.next();
-            List<String> forms = new ArrayList<String>();
-            List<Token> tokens = sentence.getTokens();
-
-            for (Token token : tokens) {
-              forms.add(token.getOrigForm());
-            }
-
-            List<Span<NamedEntityType>> spans = ToponymAnnotator.this.recognizer.recognize(forms);
-            List<Span<Toponym>> toponymSpans = new ArrayList<Span<Toponym>>();
-
-            for (Span<NamedEntityType> span : spans) {
-              if (span.getItem() == NamedEntityType.LOCATION) {
-                StringBuilder builder = new StringBuilder();
-                for (int i = span.getStart(); i < span.getEnd(); i++) {
-                  builder.append(forms.get(i));
-                  if (i < span.getEnd() - 1) {
-                    builder.append(" ");
-                  }
-                }
-
-                String form = builder.toString();
-                List<Location> candidates = ToponymAnnotator.this.gazetteer.lookup(form.toLowerCase());
-                if (!candidates.isEmpty()) {
-                  Toponym toponym = new SimpleToponym(form, candidates);
-                  toponymSpans.add(new Span<Toponym>(span.getStart(), span.getEnd(), toponym));
-                }
-              }
-            }
-
-            return new SimpleSentence(sentence.getId(), tokens, toponymSpans);
+            return new SimpleSentence(sentence.getId(), sentence.getTokens());
           }
         };
       }

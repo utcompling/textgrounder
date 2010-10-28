@@ -164,8 +164,6 @@ public class CompactCorpus extends StoredCorpus {
   public Iterator<Document<StoredToken>> iterator() {
     if (this.wrapped != null) {
       this.load();
-      this.wrapped.close();
-      this.wrapped = null;
     }
 
     return this.documents.iterator();
