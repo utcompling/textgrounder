@@ -1586,6 +1586,33 @@ class WikipediaGeotagToponymEvaluator(GeotagToponymEvaluator):
         yield word
 
 class WikipediaGeotagArticleEvaluator(TestFileEvaluator):
+  def yield_documents(self, filename):
+    title = None
+    words = []
+    for line in uchompopen(filename, errors='replace'):
+      if rematch('Article title: (.*)$', line):
+        if title:
+          yield (title, words)
+        title = m_[1]
+        words = []
+      elif rematch('Link: (.*)$', line):
+        args = m_[1].split('|')
+        trueart = args[0]
+        linkword = trueart
+        if len(args) > 1:
+          linkword = args[1]
+        words.append(linkword)
+      else:
+        words.append(line)
+    if title:
+      yield (title, words)
+
+  def evaluate_document(self, doc):
+    pass
+
+  def output_results(self):
+    output_all_results()
+
   pass
 
 # If given a directory, yield all the files in the directory; else just
