@@ -14,7 +14,8 @@ public class BaseApp {
 
     private static Options options = new Options();
 
-    private static String inputPath = "";
+    private static String inputPath = null;
+    private static String additionalInputPath = null;
     private static String outputPath = "output.xml";
 
     private static int numIterations = 1;
@@ -29,6 +30,7 @@ public class BaseApp {
     protected static void initializeOptionsFromCommandLine(String[] args) throws Exception {
 
         options.addOption("i", "input", true, "input path");
+        options.addOption("ia", "input-additional", true, "path to additional input data to be used in training but not evaluation");
         options.addOption("r", "resolver", true, "resolver (RandomResolver, BasicMinDistResolver, WeightedMinDistResolver) [default = BasicMinDistResolver]");
         options.addOption("it", "iterations", true, "number of iterations for iterative models [default = 1]");
         options.addOption("o", "output", true, "output path [default = 'output.xml']");
@@ -52,6 +54,8 @@ public class BaseApp {
                         inputPath = value;
                     else if(option.getOpt() == "it")
                         numIterations = Integer.parseInt(value);
+                    else if(option.getOpt() == "ia")
+                        additionalInputPath = value;
                     break;
                 case 'o':
                     outputPath = value;
@@ -70,6 +74,10 @@ public class BaseApp {
 
     public static String getInputPath() {
         return inputPath;
+    }
+
+    public static String getAdditionalInputPath() {
+        return additionalInputPath;
     }
 
     public static Enum<RESOLVER_TYPE> getResolverType() {

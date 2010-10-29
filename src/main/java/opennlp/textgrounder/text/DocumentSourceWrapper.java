@@ -15,33 +15,44 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
 
-import opennlp.textgrounder.util.Span;
+import opennlp.textgrounder.text.Document;
+import opennlp.textgrounder.text.Sentence;
+import opennlp.textgrounder.text.Token;
 
-public class SimpleSentence<A extends Token> extends Sentence {
-  private final List<A> tokens;
-  private final List<Span<A>> toponymSpans;
+/**
+ * Wraps a document source in order to perform some operation on it.
+ *
+ * @author Travis Brown <travis.brown@mail.utexas.edu>
+ * @version 0.1.0
+ */
+public abstract class DocumentSourceWrapper extends DocumentSource {
+  private final DocumentSource source;
 
-  public SimpleSentence(String id, List<A> tokens) {
-    this(id, tokens, new ArrayList<Span<A>>());
+  public DocumentSourceWrapper(DocumentSource source) {
+    this.source = source;
   }
 
-  public SimpleSentence(String id, List<A> tokens, List<Span<A>> toponymSpans) {
-    super(id);
-    this.tokens = tokens;
-    this.toponymSpans = toponymSpans;
+  /**
+   * Closes the underlying source.
+   */
+  public void close() {
+    this.source.close();
   }
 
-  public Iterator<A> tokens() {
-    return this.tokens.iterator();
+  /**
+   * Indicates whether the underlying source has more documents.
+   */
+  public boolean hasNext() {
+    return this.source.hasNext();
   }
 
-  public Iterator<Span<A>> toponymSpans() {
-    return this.toponymSpans.iterator();
+  /**
+   * Returns the underlying source (for use in subclasses).
+   */
+  protected DocumentSource getSource() {
+    return this.source;
   }
 }
 

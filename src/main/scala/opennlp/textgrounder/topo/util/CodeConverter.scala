@@ -55,6 +55,7 @@ class CodeConverter(in: InputStream) {
     }
     line = reader.readLine
   }
+  reader.close()
 
   def convertFipsToIso2(code: String): Option[String] =
     countriesF.get(code).flatMap(_.iso.map(_._1))

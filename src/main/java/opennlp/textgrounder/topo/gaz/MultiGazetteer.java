@@ -13,35 +13,31 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.text;
+package opennlp.textgrounder.topo.gaz;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
+import opennlp.textgrounder.topo.Location;
 
-import opennlp.textgrounder.util.Span;
+public class MultiGazetteer {
+  private final List<Gazetteer> gazetteers;
 
-public class SimpleSentence<A extends Token> extends Sentence {
-  private final List<A> tokens;
-  private final List<Span<A>> toponymSpans;
-
-  public SimpleSentence(String id, List<A> tokens) {
-    this(id, tokens, new ArrayList<Span<A>>());
+  public MultiGazetteer(List<Gazetteer> gazetteers) {
+    this.gazetteers = gazetteers;
   }
 
-  public SimpleSentence(String id, List<A> tokens, List<Span<A>> toponymSpans) {
-    super(id);
-    this.tokens = tokens;
-    this.toponymSpans = toponymSpans;
+  public void add(String name, Location location) {
+    this.gazetteers.get(0).add(name, location);
   }
 
-  public Iterator<A> tokens() {
-    return this.tokens.iterator();
-  }
-
-  public Iterator<Span<A>> toponymSpans() {
-    return this.toponymSpans.iterator();
+  public List<Location> lookup(String query) {
+    for (Gazetteer gazetteer : this.gazetteers) {
+      List<Location> candidates = gazetteer.lookup(query);
+      if (!candidates.isEmpty()) {
+        return candidates;
+      }
+    }
+    return new ArrayList<Location>(0);
   }
 }
 

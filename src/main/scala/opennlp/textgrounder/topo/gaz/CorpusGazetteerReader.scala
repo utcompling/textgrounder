@@ -13,35 +13,27 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.text;
+package opennlp.textgrounder.topo.gaz
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.Iterator
+import scala.collection.JavaConversions._
 
-import opennlp.textgrounder.util.Span;
+import opennlp.textgrounder.text.Corpus
+import opennlp.textgrounder.text.Token
+import opennlp.textgrounder.topo.Location
 
-public class SimpleSentence<A extends Token> extends Sentence {
-  private final List<A> tokens;
-  private final List<Span<A>> toponymSpans;
+class CorpusGazetteerReader(private val corpus: Corpus[_ <: Token])
+  extends GazetteerReader {
 
-  public SimpleSentence(String id, List<A> tokens) {
-    this(id, tokens, new ArrayList<Span<A>>());
-  }
+  private val it = corpus.flatMap(_.flatMap {
+    _.getToponyms.flatMap(_.getCandidates)
+  }).toIterator
 
-  public SimpleSentence(String id, List<A> tokens, List<Span<A>> toponymSpans) {
-    super(id);
-    this.tokens = tokens;
-    this.toponymSpans = toponymSpans;
-  }
+  def hasNext: Boolean = it.hasNext
+  def next: Location = it.next
 
-  public Iterator<A> tokens() {
-    return this.tokens.iterator();
-  }
-
-  public Iterator<Span<A>> toponymSpans() {
-    return this.toponymSpans.iterator();
+  def close() {
+    corpus.close()
   }
 }
 

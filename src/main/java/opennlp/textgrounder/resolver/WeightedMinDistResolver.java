@@ -12,6 +12,11 @@ import java.util.*;
 
 public class WeightedMinDistResolver extends Resolver {
 
+    // weights and toponym lexicon (for indexing into weights) are stored so that a different
+    //   corpus/corpora can be used for training than for disambiguating
+    private List<List<Double> > weights = null;
+    Lexicon<String> toponymLexicon = null;
+
     private int numIterations;
     //private Map<Long, Double> distanceCache = new HashMap<Long, Double>();
     //private int maxCoeff = Integer.MAX_VALUE;
@@ -24,14 +29,14 @@ public class WeightedMinDistResolver extends Resolver {
     }
 
     @Override
-    public StoredCorpus disambiguate(StoredCorpus corpus) {
+    public void train(StoredCorpus corpus) {
 
         distanceTable = new DistanceTable(corpus.getToponymTypeCount());
 
-        Lexicon<String> toponymLexicon = buildLexicon(corpus);
+        toponymLexicon = buildLexicon(corpus);
         List<List<Integer> > counts = new ArrayList<List<Integer> >(toponymLexicon.size());
         for(int i = 0; i < toponymLexicon.size(); i++) counts.add(null);
-        List<List<Double> > weights = new ArrayList<List<Double> >(toponymLexicon.size());
+        weights = new ArrayList<List<Double> >(toponymLexicon.size());
         for(int i = 0; i < toponymLexicon.size(); i++) weights.add(null);
 
         initializeCountsAndWeights(counts, weights, corpus, toponymLexicon, PHANTOM_COUNT);
@@ -39,8 +44,35 @@ public class WeightedMinDistResolver extends Resolver {
         for(int i = 0; i < numIterations; i++) {
             updateWeights(corpus, counts, PHANTOM_COUNT, weights, toponymLexicon);
         }
+    }
+
+    @Override
+    public StoredCorpus disambiguate(StoredCorpus corpus) {
+
+        if(weights == null)
+            train(corpus);
+
+        addToponymsToLexicon(toponymLexicon, corpus);
+        weights = expandWeightsArray(toponymLexicon, corpus, weights);
         
         return finalDisambiguationStep(corpus, weights, toponymLexicon);
+    }
+
+    // adds a weight of 1.0 to candidate locations of toponyms found in lexicon but not in oldWeights
+    private List<List<Double> > expandWeightsArray(Lexicon<String> lexicon, StoredCorpus corpus, List<List<Double> > oldWeights) {
+        if(oldWeights.size() >= lexicon.size())
+            return oldWeights;
+        
+        List<List<Double> > newWeights = new ArrayList<List<Double> >(lexicon.size());
+        for(int i = 0; i < lexicon.size(); i++) newWeights.add(null);
+
+        for(int i = 0; i < oldWeights.size(); i++) {
+            newWeights.set(i, oldWeights.get(i));
+        }
+
+        initializeWeights(newWeights, corpus, lexicon);
+
+        return newWeights;
     }
 
     private void initializeCountsAndWeights(List<List<Integer> > counts, List<List<Double> > weights,
@@ -65,9 +97,33 @@ public class WeightedMinDistResolver extends Resolver {
         }
     }
 
+    private void initializeWeights(List<List<Double> > weights, StoredCorpus corpus, Lexicon<String> lexicon) {
+        for(Document<StoredToken> doc : corpus) {
+            for(Sentence<StoredToken> sent : doc) {
+                for(Toponym toponym : sent.getToponyms()) {
+                    if(toponym.getAmbiguity() > 0) {
+                        int index = lexicon.get(toponym.getForm());
+                        if(weights.get(index) == null) {
+                            weights.set(index, new ArrayList<Double>(toponym.getAmbiguity()));
+                            for(int i = 0; i < toponym.getAmbiguity(); i++) {
+                                weights.get(index).add(1.0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private Lexicon<String> buildLexicon(StoredCorpus corpus) {
         Lexicon<String> lexicon = new SimpleLexicon<String>();
 
+        addToponymsToLexicon(lexicon, corpus);
+
+        return lexicon;
+    }
+
+    private void addToponymsToLexicon(Lexicon<String> lexicon, StoredCorpus corpus) {
         for(Document<StoredToken> doc : corpus) {
             for(Sentence<StoredToken> sent : doc) {
                 for(Toponym toponym : sent.getToponyms()) {
@@ -77,8 +133,6 @@ public class WeightedMinDistResolver extends Resolver {
                 }
             }
         }
-
-        return lexicon;
     }
 
     private void updateWeights(StoredCorpus corpus, List<List<Integer> > counts, int initialCount, List<List<Double> > weights, Lexicon<String> lexicon) {
