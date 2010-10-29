@@ -18,19 +18,16 @@ STRATEGY="--strategy link-baseline"
 #STRATEGY="--strategy naive-bayes-with-baseline"
 #STRATEGY="--strategy naive-bayes-no-baseline"
 #NBTYPE="--naive-bayes-weighting distance-weighted"
-#REDIRECT="--redirect-file enwiki-20100905-redirects.txt"
-#OUTREDIRECT="--output-filtered-redirects enwiki-20100905-filtered-redirects.txt"
-REDIRECT="--redirect-file enwiki-20100905-filtered-redirects.txt"
 EVALFILE="--eval-file /groups/projects/pcl_travel/data/trconlldevtest/dev"
 EVALTYPE="--eval-format tr-conll"
 #EVALFILE="--eval-file enwiki-20100905-toponym-eval.txt"
 
+
 $HOME/devel/textgrounder/python/wiki_disambig.py \
   --stopwords-file stopwords.english \
-  --coords-file enwiki-20100905-just-titles-coords.txt \
+  --article-data-file enwiki-20100905-combined-article-data.txt \
   --words-coords-file enwiki-20100905-coords-counts.txt \
   --gazetteer-file world-dataen-fixed.txt \
-  --links-file enwiki-20100905-links-only-coord-articles.txt \
   --width-of-nbregion 1 --region-size 100 \
-  $REDIRECT $OUTREDIRECT $EVALFILE $EVALTYPE \
+  $EVALFILE $EVALTYPE \
   $PICKLE $UNPICKLE $MAXTIME $MODE $STRATEGY $NBTYPE $DEBUG ${1+"$@"}

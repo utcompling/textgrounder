@@ -14,8 +14,8 @@ import traceback
 import cPickle
 import itertools
 import gc
-from optparse import OptionParser
 from textutil import *
+from process_article_data import *
 
 # FIXME:
 #
@@ -36,9 +36,12 @@ from textutil import *
 #                                  Globals                                 #
 ############################################################################
 
-# Class maintaining the full list of articles and various ways to refer
-# to the articles or find them by name.
-class ArticleList(object):
+# Static class maintaining tables listing all articles and mapping between
+# names, ID's and articles.  Objects corresponding to redirect articles
+# should not be present anywhere in this table; instead, the name of the
+# redirect article should point to the article object for the article
+# pointed to by the redirect.
+class ArticleTable(object):
   # Map from short name (lowercased) to list of Wikipedia articles.  The short
   # name for an article is computed from the article's name.  If the article
   # name has a comma, the short name is the part before the comma, e.g. the
@@ -59,13 +62,37 @@ class ArticleList(object):
   # Mapping from lowercased article names to Article objects
   lowername_to_articles = listdict()
 
+  articles_by_split = {}
+
   # Look up an article named NAME and return the associated article.
   # Note that article names are case-sensitive but the first letter needs to
   # be capitalized.
   @staticmethod
   def lookup_article(name):
     assert name
-    return ArticleList.name_to_article.get(capfirst(name), None)
+    return ArticleTable.name_to_article.get(capfirst(name), None)
+
+  # Record the article as having NAME as one of its names (there may be
+  # multiple names, due to redirects).  Also add to related lists mapping
+  # lowercased form, short form, etc.
+  @staticmethod
+  def record_article(name, art):
+    # Must pass in properly cased name
+    assert name == capfirst(name)
+    ArticleTable.name_to_article[name] = art
+    loname = name.lower()
+    ArticleTable.lowername_to_articles[loname] += [art]
+    (short, div) = compute_short_form(loname)
+    if div:
+      ArticleTable.lowername_div_to_articles[(short, div)] += [art]
+    ArticleTable.short_lowername_to_articles[short] += [art]
+    if art not in lower_toponym_to_article[loname]:
+      lower_toponym_to_article[loname] += [art]
+    if short != loname and art not in lower_toponym_to_article[short]:
+      lower_toponym_to_article[short] += [art]
+    if art.split not in ArticleTable.articles_by_split:
+      ArticleTable.articles_by_split[art.split] = set()
+    ArticleTable.articles_by_split[art.split].add(art)
 
 # List of stopwords
 stopwords = set()
@@ -98,8 +125,6 @@ globally_unseen_word_prob = 0.0
 # look up in.
 unknown_article_counts = ([], [])
 
-max_time_per_stage = 2**31
-
 # For each toponym (name of location), value is a list of Locality items,
 # listing gazetteer locations and corresponding matching Wikipedia articles.
 lower_toponym_to_location = listdict()
@@ -118,9 +143,6 @@ path_to_division = {}
 # things are progressing.  If > 1, even more info.
 debug = 0
 
-# If true, print out warnings about strangely formatted input
-show_warnings = True
-
 # Do we ignore stopwords when computing word distributions?
 ignore_stopwords_in_article_dists = False
 
@@ -128,23 +150,9 @@ ignore_stopwords_in_article_dists = False
 # FIXME: This is hardcoded to true in various places
 ignore_case_words = True
 
-# Maximum number of miles allowed when looking for a close match
-max_dist_for_close_match = None
-
-# Maximum number of miles allowed between a point and any others in a
-# division.  Points farther away than this are ignored as "outliers"
-# (possible errors, etc.).
-max_dist_for_outliers = None
-
-# Number of words on either side used for context
-naive_bayes_context_len = 10
-
 # Size of each region in degrees.  Determined by the --region-size option
 # (however, that option is expressed in miles).
 degrees_per_region = 0.0
-
-# Number of tiling regions on a side of a Naive Bayes region
-width_of_nbregion = None
 
 # Minimum, maximum latitude/longitude, directly and in indices
 # (integers used to index the set of regions that tile the earth)
@@ -182,7 +190,7 @@ region_to_locations = listdict()
 
 # Mapping from center of Naive Bayes region to corresponding region object.
 # A "Naive Bayes region" is made up of a square of tiling regions, with
-# the number of regions on a side determined by `width_of_nbregion'.  A
+# the number of regions on a side determined by `Opts.width_of_nbregion'.  A
 # word distribution is associated with each Naive Bayes region.
 corner_to_nbregion = {}
 
@@ -193,27 +201,6 @@ toponyms_seen_in_eval_files = intdict()
 
 # Count of total documents processed so far
 documents_processed = 0
-
-############################################################################
-#                             Utility functions                            #
-############################################################################
-
-def warning(text):
-  '''Output a warning, formatting into UTF-8 as necessary'''
-  if show_warnings:
-    uniprint("Warning: %s" % text)
-    #uniprint("Warning: %s" % text, sys.stderr)
-
-def safe_float(x):
-  '''Convert a string to floating point, but don't crash on errors;
-instead, output a warning.'''
-  try:
-    return float(x)
-  except:
-    x = x.strip()
-    if x:
-      warning("Expected number, saw %s" % x)
-    return 0.
 
 ############################################################################
 #                                Evaluation                                #
@@ -332,22 +319,6 @@ class Boundary(object):
             coord.lat <= self.topright.lat and
             coord.long >= self.botleft.long and
             coord.long <= self.topright.long)
-
-# A 2-dimensional coordinate.
-#
-# The following fields are defined:
-#
-#   lat, long: Latitude and longitude of coordinate.
-
-class Coord(object):
-  __slots__ = ['lat', 'long']
-
-  def __init__(self, lat, long):
-    self.lat = lat
-    self.long = long
-
-  def __str__(self):
-    return '(%s,%s)' % (self.lat, self.long)
 
 # Compute spherical distance in miles (along a great circle) between two
 # coordinates.
@@ -519,8 +490,8 @@ class NBRegion(object):
 
     # Process the tiling regions making up the Naive Bayes region;
     # but be careful around the edges.
-    for i in range(nblat, nblat + width_of_nbregion):
-      for j in range(nblong, nblong + width_of_nbregion):
+    for i in range(nblat, nblat + Opts.width_of_nbregion):
+      for j in range(nblong, nblong + Opts.width_of_nbregion):
         jj = j
         if jj > maximum_longind: jj = minimum_longind
         process_one_region(i, jj)
@@ -574,7 +545,7 @@ class Locality(Location):
     return spheredist(self.coord, coord)
 
   def matches_coord(self, coord):
-    return self.distance_to_coord(coord) <= max_dist_for_close_match
+    return self.distance_to_coord(coord) <= Opts.max_dist_for_close_match
 
 
 # A division higher than a single locality.  According to the World
@@ -624,8 +595,8 @@ class Division(object):
   # on the points in the region.
   def compute_boundary(self):
     # Yield up all points that are not "outliers", where outliers are defined
-    # as points that are more than max_dist_for_outliers away from all other
-    # points.
+    # as points that are more than Opts.max_dist_for_outliers away from all
+    # other points.
     def yield_non_outliers():
       # If not enough points, just return them; otherwise too much possibility
       # that all of them, or some good ones, will be considered outliers.
@@ -636,7 +607,7 @@ class Division(object):
       #for p in self.locs:
       #  # Find minimum distance to all other points and check it.
       #  mindist = min(spheredist(p, x) for x in self.locs if x is not p)
-      #  if mindist <= max_dist_for_outliers: yield p
+      #  if mindist <= Opts.max_dist_for_outliers: yield p
 
     if debug > 1:
       uniprint("Computing boundary for %s, path %s, num points %s" %
@@ -694,6 +665,8 @@ class Division(object):
 #                             Wikipedia articles                           #
 ############################################################################
 
+######################## Articles
+
 # Compute the short form of an article name.  If short form includes a
 # division (e.g. "Tucson, Arizona"), return a tuple (SHORTFORM, DIVISION);
 # else return a tuple (SHORTFORM, None).
@@ -706,12 +679,10 @@ def compute_short_form(name):
   else:
     return (name, None)
 
-# A Wikipedia article.  Defined fields:
+# A Wikipedia article for geotagging.  Defined fields, in addition to those
+# of the base class:
 #
-#   name: Name of article.
-#   coord: Coordinates of article.
 #   location: Corresponding location for this article.
-#   incoming_links: Number of incoming links, or None if unknown.
 #   counts: A "sorted list" (tuple of sorted keys and values) of
 #           (word, count) items, specifying the counts of all words seen
 #           at least once.
@@ -746,16 +717,14 @@ def compute_short_form(name):
 #   words_seen_once: List of words seen once, for computing the value of
 #     unseen_mass for a combination of multiple articles.
 
-class Article(object):
-  __slots__ = ['name', 'coord', 'location', 'incoming_links', 'counts',
-               'finished', 'unseen_mass', 'overall_unseen_mass',
-               'total_tokens', 'words_seen_once', 'nbregion']
+class NBArticle(Article):
+  __slots__ = Article.__slots__ + [
+    'location', 'counts', 'finished', 'unseen_mass',
+    'overall_unseen_mass', 'total_tokens', 'words_seen_once', 'nbregion']
 
-  def __init__(self, name):
-    self.name = name
-    self.coord = None
+  def __init__(self, **args):
+    super(NBArticle, self).__init__(**args)
     self.location = None
-    self.incoming_links = None
     self.counts = None
     self.finished = False
     self.unseen_mass = None
@@ -764,43 +733,15 @@ class Article(object):
     self.words_seen_once = None
     self.nbregion = None
 
-  # Copy properties (but not name) from another article
-  def copy_from(self, art):
-    self.coord = art.coord
-    self.incoming_links = art.incoming_links
-    self.counts = art.counts
-    self.finished = art.finished
-    self.unseen_mass = art.unseen_mass
-    self.overall_unseen_mass = art.overall_unseen_mass
-    self.total_tokens = art.total_tokens
-    self.words_seen_once = art.words_seen_once
-
   def distance_to_coord(self, coord):
     return spheredist(self.coord, coord)
 
   def matches_coord(self, coord):
-    if self.distance_to_coord(coord) <= max_dist_for_close_match: return True
+    if self.distance_to_coord(coord) <= Opts.max_dist_for_close_match:
+      return True
     if self.location and type(self.location) is Division and \
         self.location.matches_coord(coord): return True
     return False
-
-  # Record the article as having NAME as one of its names (there may be
-  # multiple names, due to redirects).  Also add to related lists mapping
-  # lowercased form, short form, etc.
-  def record_candidate_for(self, name):
-    # Must pass in properly cased name
-    assert name == capfirst(name)
-    ArticleList.name_to_article[name] = self
-    loname = name.lower()
-    ArticleList.lowername_to_articles[loname] += [self]
-    (short, div) = compute_short_form(loname)
-    if div:
-      ArticleList.lowername_div_to_articles[(short, div)] += [self]
-    ArticleList.short_lowername_to_articles[short] += [self]
-    if self not in lower_toponym_to_article[loname]:
-      lower_toponym_to_article[loname] += [self]
-    if short != loname and self not in lower_toponym_to_article[short]:
-      lower_toponym_to_article[short] += [self]
 
   # Determine the Naive Bayes distribution object for a given article:
   # Create and populate one if necessary.
@@ -813,14 +754,14 @@ class Article(object):
     nbreg = self.nbregion
     if nbreg: return nbreg.nbdist
   
-    # When width_of_nbregion = 1, don't subtract anything.
-    # When width_of_nbregion = 2, subtract 0.5*degrees_per_region.
-    # When width_of_nbregion = 3, subtract degrees_per_region.
-    # When width_of_nbregion = 4, subtract 1.5*degrees_per_region.
-    # In general, subtract (width_of_nbregion-1)/2.0*degrees_per_region.
+    # When Opts.width_of_nbregion = 1, don't subtract anything.
+    # When Opts.width_of_nbregion = 2, subtract 0.5*degrees_per_region.
+    # When Opts.width_of_nbregion = 3, subtract degrees_per_region.
+    # When Opts.width_of_nbregion = 4, subtract 1.5*degrees_per_region.
+    # In general, subtract (Opts.width_of_nbregion-1)/2.0*degrees_per_region.
   
     # Compute the indices of the southwest region
-    subval = (width_of_nbregion-1)/2.0*degrees_per_region
+    subval = (Opts.width_of_nbregion-1)/2.0*degrees_per_region
     lat = self.coord.lat - subval
     long = self.coord.long - subval
     if lat < minimum_latitude: lat = minimum_latitude
@@ -834,24 +775,6 @@ class Article(object):
       corner_to_nbregion[(latind, longind)] = nbreg
     self.nbregion = nbreg
     return nbreg.nbdist
-
-  # Return the article with the given name; if none exists, create a new
-  # article with that name.  Record article in candidate lists for the name
-  # and also the short form of the name, if different.
-  @staticmethod
-  def find_article_create(name):
-    name = capfirst(name)
-    art = ArticleList.lookup_article(name)
-    if not art:
-      art = Article(name)
-      art.record_candidate_for(name)
-    return art
-
-  def __str__(self):
-    if self.coord:
-      return '%s%s' % (self.name, self.coord)
-    else:
-      return '%s(no coord)' % (self.name)
 
 # Find Wikipedia article matching name NAME for location LOC.  NAME
 # will generally be one of the names of LOC (either its canonical
@@ -869,7 +792,7 @@ def find_one_wikipedia_match(loc, name, check_match, prefer_match):
 
   # Look for any articles with same name (case-insensitive) as the location,
   # check for matches
-  for art in ArticleList.lowername_to_articles[loname]:
+  for art in ArticleTable.lowername_to_articles[loname]:
     if check_match(loc, art): return art
 
   # Check whether there is a match for an article whose name is
@@ -878,12 +801,12 @@ def find_one_wikipedia_match(loc, name, check_match, prefer_match):
   # "Augusta" in a second-level division "Georgia").
   if loc.div:
     for div in loc.div.path:
-      for art in ArticleList.lowername_div_to_articles[(loname, div.lower())]:
+      for art in ArticleTable.lowername_div_to_articles[(loname, div.lower())]:
         if check_match(loc, art): return art
 
   # See if there is a match with any of the articles whose short name
   # is the same as the location's name
-  arts = ArticleList.short_lowername_to_articles[loname]
+  arts = ArticleTable.short_lowername_to_articles[loname]
   if arts:
     goodarts = [art for art in arts if check_match(loc, art)]
     if len(goodarts) == 1:
@@ -977,6 +900,30 @@ def read_stopwords(filename):
   for line in uchompopen(filename):
     stopwords.add(line)
 
+
+def read_article_data(filename):
+  errprint("Reading article data file %s..." % filename)
+  status = StatusMessage('article')
+
+  redirects = []
+
+  def process(art):
+    if art.namespace != 'Main':
+      return
+    if art.redir:
+      redirects.append(art)
+    elif art.coord:
+      ArticleTable.record_article(art.title, art)
+
+  read_article_data_file(filename, process, article_type=NBArticle,
+                         max_time_per_stage=Opts.max_time_per_stage)
+
+  for x in redirects:
+    redart = ArticleTable.lookup_article(x.redir)
+    if redart:
+      ArticleTable.record_article(x.title, redart)
+
+
 # Parse the result of a previous run of --coords-counts and generate
 # a unigram distribution for Naive Bayes matching.  We do a simple version
 # of Good-Turing smoothing where we assign probability mass to unseen
@@ -991,7 +938,10 @@ def read_word_counts(filename):
 
   def one_article_probs():
     if total_tokens == 0: return
-    art = Article.find_article_create(title)
+    art = ArticleTable.lookup_article(title)
+    if not art:
+      warning("Skipping article %s" % title)
+      return
     if art.counts:
       warning("Article %s already has counts for it!" % art)
     wordcounts = {}
@@ -1025,7 +975,7 @@ def read_word_counts(filename):
       m = re.match('Article title: (.*)$', line)
       one_article_probs()
       # Stop if we've reached the maximum
-      if status.item_processed() >= max_time_per_stage:
+      if status.item_processed() >= Opts.max_time_per_stage:
         break
       title = m.group(1)
       wordhash = intdict()
@@ -1066,7 +1016,7 @@ def read_word_counts(filename):
   #  uniprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s" % (num_word_types, num_word_tokens, num_types_seen_once, globally_unseen_word_prob, globally_unseen_word_prob + sum(overall_word_probs.itervalues())))
 
   # Figure out the value of OVERALL_UNSEEN_MASS for each article.
-  for art in ArticleList.name_to_article.itervalues():
+  for art in ArticleTable.name_to_article.itervalues():
     # make sure counts not None (eg article in coords file but not counts file)
     if not art.counts: continue
     overall_seen_mass = 0.0
@@ -1074,22 +1024,6 @@ def read_word_counts(filename):
       overall_seen_mass += overall_word_probs[ind]
     art.overall_unseen_mass = 1.0 - overall_seen_mass
     art.finished = True
-
-# Parse the result of a previous run of --only-coords or coords-counts for
-# articles with coordinates.
-def read_coordinates_file(filename):
-  errprint("Reading article coordinates from %s..." % filename)
-  status = StatusMessage('article')
-  for line in uchompopen(filename):
-    if rematch('Article title: (.*)$', line):
-      title = m_[1]
-    elif rematch('Article coordinates: (.*),(.*)$', line):
-      # The context may be modified by find_article_create()
-      c = Coord(safe_float(m_[1]), safe_float(m_[2]))
-      art = Article.find_article_create(title)
-      art.coord = c
-      if status.item_processed() >= max_time_per_stage:
-        break
 
 # Add the given locality to the region map, which covers the earth in regions
 # of a particular size to aid in computing the regions used in region-based
@@ -1169,9 +1103,9 @@ def match_world_gazetteer_entry(line, add_to_region_map):
     lower_toponym_to_location[loname] += [loc]
 
   # We start out looking for articles whose distance is very close,
-  # then widen until we reach max_dist_for_close_match.
+  # then widen until we reach Opts.max_dist_for_close_match.
   maxdist = 5
-  while maxdist <= max_dist_for_close_match:
+  while maxdist <= Opts.max_dist_for_close_match:
     match = find_match_for_locality(loc, maxdist)
     if match: break
     maxdist *= 2
@@ -1205,7 +1139,7 @@ def read_world_gazetteer_and_match(filename, add_to_region_map):
     if debug > 1:
       uniprint("Processing line: %s" % line)
     match_world_gazetteer_entry(line, add_to_region_map)
-    if status.item_processed() >= max_time_per_stage:
+    if status.item_processed() >= Opts.max_time_per_stage:
       break
 
   for division in path_to_division.itervalues():
@@ -1224,53 +1158,6 @@ def read_world_gazetteer_and_match(filename, add_to_region_map):
       if debug > 1:
         uniprint("Couldn't find match for division %s, path %s" %
                  (division.name, division.path))
-
-def read_incoming_link_info(filename):
-  errprint("Reading incoming link info from %s..." % filename)
-  status = StatusMessage('article')
-
-  for line in uchompopen(filename):
-    if rematch('------------------ Count of incoming links: ------------',
-               line): continue
-    elif rematch('==========================================', line):
-      return
-    else:
-      assert rematch('(.*) = ([0-9]+)$', line)
-      title = m_[1]
-      links = int(m_[2])
-      art = Article.find_article_create(title)
-      art.incoming_links = int(links)
- 
-    if status.item_processed() >= max_time_per_stage:
-      break
-
-# Read in redirects.  Record redirects as additional names for the articles.
-# NOTE: Currently only records additional names for already-existing articles,
-# meaning that this must be run in a separate pass after the non-redirect
-# articles have been loaded.
-def read_redirect_file(filename, filtered_out=None):
-  errprint("Reading redirect info from %s..." % filename)
-  status = StatusMessage('article')
-
-  outfile = None
-  if filtered_out:
-    outfile = open(filtered_out, "w")
-  for line in uchompopen(filename):
-    if rematch('Article title: (.*)$', line):
-      title = m_[1]
-    elif rematch('Redirect to: (.*)$', line):
-      redirect = m_[1]
-      # Only include if what we're linking to has coordinates
-      redart = ArticleList.lookup_article(redirect)
-      if redart:
-        redart.record_candidate_for(title)
-        if outfile:
-          uniprint("Article title: %s" % title, outfile=outfile)
-          uniprint("Redirect to: %s" % redirect, outfile=outfile)
-      if status.item_processed() >= max_time_per_stage:
-        break
-    else:
-      warning("Strange line in redirect file: %s" % line)
 
 # Class of word in a file containing toponyms.  Fields:
 #
@@ -1471,7 +1358,7 @@ class GeotagToponymEvaluator(TestFileEvaluator):
       results = [return_word(word) for word in g]
 
       # Now compute context for words
-      nbcl = naive_bayes_context_len
+      nbcl = Opts.naive_bayes_context_len
       if self.strategy.need_context():
         # First determine whether each word is a stopword
         for i in xrange(len(results)):
@@ -1482,9 +1369,9 @@ class GeotagToponymEvaluator(TestFileEvaluator):
         # Now generate context for toponyms
         for i in xrange(len(results)):
           if results[i].coord:
-            # Select up to naive_bayes_context_len words on either side; skip
-            # stopwords.  Associate each word with the distance away from the
-            # toponym.
+            # Select up to Opts.naive_bayes_context_len words on either side;
+            # skip stopwords.  Associate each word with the distance away from
+            # the toponym.
             minind = max(0,i-nbcl)
             maxind = min(len(results),i+nbcl+1)
             results[i].context = \
@@ -1689,7 +1576,7 @@ class WikipediaGeotagToponymEvaluator(GeotagToponymEvaluator):
         word.is_toponym = True
         word.location = trueart
         word.document = title
-        art = ArticleList.lookup_article(trueart)
+        art = ArticleTable.lookup_article(trueart)
         if art:
           word.coord = art.coord
         yield word
@@ -1723,114 +1610,116 @@ def count_toponyms_in_file(fname):
 #                                  Main code                               #
 ############################################################################
 
-def main():
-  op = OptionParser(usage="%prog [options] input_dir")
-  op.add_option("-t", "--gazetteer-type", type='choice', default="world",
-                choices=['world', 'db'],
-                help="""Type of gazetteer file specified using --gazetteer;
+class WikiDisambigProgram(NLPProgram):
+
+  def populate_options(self, op):
+    op.add_option("-t", "--gazetteer-type", type='choice', default="world",
+                  choices=['world', 'db'],
+                  help="""Type of gazetteer file specified using --gazetteer;
 default '%default'.""")
-  op.add_option("-l", "--links-file",
-                help="""File containing incoming link information for
+    op.add_option("-l", "--links-file",
+                  help="""File containing incoming link information for
 Wikipedia articles. Output by processwiki.py --find-links.""",
-                metavar="FILE")
-  op.add_option("-s", "--stopwords-file",
-                help="""File containing list of stopwords.""",
-                metavar="FILE")
-  op.add_option("--redirect-file",
-                help="""File containing redirects from Wikipedia.""",
-                metavar="FILE")
-  op.add_option("--output-filtered-redirects", default=None,
-                help="""If specified, file to output only redirects pointing to a geotagged article.""",
-                metavar="FILE")
-  op.add_option("-g", "--gazetteer-file",
-                help="""File containing gazetteer information to match.""",
-                metavar="FILE")
-  op.add_option("-c", "--coords-file",
-                help="""File containing output from a prior run of
+                  metavar="FILE")
+    op.add_option("-s", "--stopwords-file",
+                  help="""File containing list of stopwords.""",
+                  metavar="FILE")
+    op.add_option("--article-data-file",
+                  help="""File containing info about Wikipedia articles.""",
+                  metavar="FILE")
+    op.add_option("--redirect-file",
+                  help="""File containing redirects from Wikipedia.""",
+                  metavar="FILE")
+    op.add_option("-g", "--gazetteer-file",
+                  help="""File containing gazetteer information to match.""",
+                  metavar="FILE")
+    op.add_option("-c", "--coords-file",
+                  help="""File containing output from a prior run of
 --coords-counts, listing all the articles with associated coordinates.
 May be filtered only for articles and coordinates.""",
-                metavar="FILE")
-  op.add_option("-w", "--words-coords-file",
-                help="""File containing output from a prior run of
+                  metavar="FILE")
+    op.add_option("-w", "--words-coords-file",
+                  help="""File containing output from a prior run of
 --coords-counts, listing all the articles with associated coordinates.
 Should not be filtered, as the counts of words are needed.""",
-                metavar="FILE")
-  op.add_option("-p", "--pickle-file",
-                help="""Serialize the result of processing the word-coords
+                  metavar="FILE")
+    op.add_option("-p", "--pickle-file",
+                  help="""Serialize the result of processing the word-coords
 file to the given file.""",
-                metavar="FILE")
-  op.add_option("-u", "--unpickle-file",
-                help="""Read the result of serializing the word-coords file
+                  metavar="FILE")
+    op.add_option("-u", "--unpickle-file",
+                  help="""Read the result of serializing the word-coords file
 to the given file.""",
-                metavar="FILE")
-  op.add_option("-e", "--eval-file",
-                help="""File or directory containing files to evaluate on.
-Directory containing TR-CONLL files in the text format.
+                  metavar="FILE")
+    op.add_option("-e", "--eval-file",
+                  help="""File or directory containing files to evaluate on.
 Each file is read in and then disambiguation is performed.""",
-                metavar="FILE")
-  op.add_option("-f", "--eval-format", type='choice',
-                default="wiki", choices=['tr-conll', 'wiki'],
-                help="""Format of evaluation file(s).  Default '%default'.""")
-  op.add_option("--max-time-per-stage", type='int', default=0,
-                help="""Maximum time per stage in seconds.  If 0, no limit.
-Used for testing purposes.  Default %default.""")
-  op.add_option("--max-dist-for-close-match", type='float', default=80,
-                help="""Maximum number of miles allowed when looking for a close match.  Default %default.""")
-  op.add_option("--max-dist-for-outliers", type='float', default=200,
-                help="""Maximum number of miles allowed between a point and
+                  metavar="FILE")
+    op.add_option("-f", "--eval-format", type='choice',
+                  default="wiki", choices=['tr-conll', 'wiki'],
+                  help="""Format of evaluation file(s).  Default '%default'.""")
+    op.add_option("--max-dist-for-close-match", type='float', default=80,
+                  help="""Maximum number of miles allowed when looking for a
+close match.  Default %default.""")
+    op.add_option("--max-dist-for-outliers", type='float', default=200,
+                  help="""Maximum number of miles allowed between a point and
 any others in a division.  Points farther away than this are ignored as
 "outliers" (possible errors, etc.).  Default %default.""")
-  op.add_option("--naive-bayes-context-len", type='int', default=10,
-                help="""Number of words on either side of a toponym to use
+    op.add_option("--naive-bayes-context-len", type='int', default=10,
+                  help="""Number of words on either side of a toponym to use
 in Naive Bayes matching.  Default %default.""")
-  op.add_option("-m", "--mode", type='choice', default='match-only',
-                choices=['geotag-toponyms',
-                         'geotag-articles',
-                         'match-only', 'pickle-only'],
-                help="""Action to perform.  'match-only' means to only do the
-stage that involves finding matches between gazetteer locations and Wikipedia
-articles (mostly useful when debugging output is enabled). 'pickle-only' means
-only to generate the pickled version of the --words-coords file.  The modes
-of the form 'disambig-*' find the proper location for each toponym in each
-document in the test set.  'geotag-articles' finds the proper location for
-each article in the test set.  'geotag-toponyms' finds the proper location for
-each toponym in the test set.  The test set is specified by --eval-file.
-Default '%default'.""")
-  op.add_option("--strategy", type='choice', default='link-baseline',
-                choices=['link-baseline',
-                         'naive-bayes-with-baseline',
-                         'naive-bayes-no-baseline'],
-                help="""Strategy to use for Geotagging.
+    op.add_option("-m", "--mode", type='choice', default='match-only',
+                  choices=['geotag-toponyms',
+                           'geotag-articles',
+                           'match-only', 'pickle-only'],
+                  help="""Action to perform.
+
+'match-only' means to only do the stage that involves finding matches between
+gazetteer locations and Wikipedia articles (mostly useful when debugging
+output is enabled).
+
+'pickle-only' means only to generate the pickled version of the data, for
+reading in by a separate process (e.g. the Java code).
+
+'geotag-articles' finds the proper location for each article in the test set.
+
+'geotag-toponyms' finds the proper location for each toponym in the test set.
+The test set is specified by --eval-file.  Default '%default'.""")
+    op.add_option("--strategy", type='choice', default='link-baseline',
+                  choices=['link-baseline',
+                           'naive-bayes-with-baseline',
+                           'naive-bayes-no-baseline'],
+                  help="""Strategy to use for Geotagging.
 'link-baseline' means simply use the matching location with the
 highest number of incoming links; 'naive-bayes-with-baseline' means
 also use the words around the toponym to be disambiguated, in a Naive-Bayes
 scheme, using the link baseline as the prior probability;
 'naive-bayes-no-baseline' means use uniform prior probability.
 Default '%default'.""")
-  op.add_option("--baseline-weight", type='float', metavar="WEIGHT",
-                default=0.5,
-                help="""Relative weight to assign to the baseline (prior
+    op.add_option("--baseline-weight", type='float', metavar="WEIGHT",
+                  default=0.5,
+                  help="""Relative weight to assign to the baseline (prior
 probability) when doing weighted Naive Bayes.  Default %default.""")
-  op.add_option("--naive-bayes-weighting", type='choice',
-                default="equal",
-                choices=['equal', 'equal-words', 'distance-weighted'],
-                help="""Strategy for weighting the different probabilities
+    op.add_option("--naive-bayes-weighting", type='choice',
+                  default="equal",
+                  choices=['equal', 'equal-words', 'distance-weighted'],
+                  help="""Strategy for weighting the different probabilities
 that go into Naive Bayes.  If 'equal', do pure Naive Bayes, weighting the
 prior probability (baseline) and all word probabilities the same.  If
 'equal-words', weight all the words the same but weight the baseline
 according to --baseline-weight, assigning the remainder to the words.  If
 'distance-weighted', use the --baseline-weight for the prior probability
 and weight the words according to distance from the toponym.""")
-  op.add_option("--width-of-nbregion", type='int', default=2,
-                help="""Width of the Naive Bayes region used for region-based
+    op.add_option("--width-of-nbregion", type='int', default=2,
+                  help="""Width of the Naive Bayes region used for region-based
 Naive Bayes disambiguation, in tiling regions.  Default %default.""")
-  op.add_option("-r", "--region-size", type='float', default=50.0,
-                help="""Size of the region (in miles) to use when doing
+    op.add_option("-r", "--region-size", type='float', default=50.0,
+                  help="""Size of the region (in miles) to use when doing
 region-based Naive Bayes disambiguation.  Default %default.""")
-  op.add_option("-b", "--naive-bayes-type", type='choice',
-                default="round-region",
-                choices=['article', 'round-region', 'square-region'],
-                help="""Type of context used when doing Naive Bayes
+    op.add_option("-b", "--naive-bayes-type", type='choice',
+                  default="round-region",
+                  choices=['article', 'round-region', 'square-region'],
+                  help="""Type of context used when doing Naive Bayes
 disambiguation. 'article' means use only the words in the article itself.
 'round-region' means to use a region of constant radius centered on the
 article's location. 'square-region' means to use a "square" region
@@ -1844,166 +1733,139 @@ addition, when the article itself refers to a region rather than a
 locality, both region-based methods use the articles which are
 specified in the gazetteer to belong to the region, rather than any
 particular-sized region.  Default '%default'.""")
-  op.add_option("-d", "--debug", type='int', metavar="LEVEL",
-                help="Output debug info at given level")
 
-  uniprint("Arguments: %s" % ' '.join(sys.argv), flush=True)
+  def implement_main(self, opts, op, args):
+    global Opts
+    Opts = opts
+    global debug
+    if opts.debug:
+      debug = int(opts.debug)
+   
+    # FIXME! Can only currently handle World-type gazetteers.
+    if opts.gazetteer_type != 'world':
+      op.error("Currently can only handle world-type gazetteers")
 
-  ### Process the command-line options and set other values from them ###
-  
-  opts, args = op.parse_args()
+    if opts.region_size <= 0:
+      op.error("Region size must be positive")
+    global degrees_per_region
+    degrees_per_region = opts.region_size / miles_per_degree
+    global maximum_latind, minimum_latind, maximum_longind, minimum_longind
+    maximum_latind, maximum_longind = \
+       coord_to_region_indices(Coord(maximum_latitude, maximum_longitude))
+    minimum_latind, minimum_longind = \
+       coord_to_region_indices(Coord(minimum_latitude, minimum_longitude))
 
-  output_option_parameters(opts)
+    if opts.width_of_nbregion <= 0:
+      op.error("Width of Naive Bayes region must be positive")
 
-  global debug
-  if opts.debug:
-    debug = int(opts.debug)
- 
-  # FIXME! Can only currently handle World-type gazetteers.
-  if opts.gazetteer_type != 'world':
-    op.error("Currently can only handle world-type gazetteers")
+    ### Start reading in the files and operating on them ###
 
-  if opts.region_size <= 0:
-    op.error("Region size must be positive")
-  global degrees_per_region
-  degrees_per_region = opts.region_size / miles_per_degree
-  global maximum_latind, minimum_latind, maximum_longind, minimum_longind
-  maximum_latind, maximum_longind = \
-     coord_to_region_indices(Coord(maximum_latitude, maximum_longitude))
-  minimum_latind, minimum_longind = \
-     coord_to_region_indices(Coord(minimum_latitude, minimum_longitude))
+    # Files needed for different options:
+    #
+    # 1. match-only:
+    #
+    #    coords-file
+    #    gazetteer-file
+    #    links-file
+    #
+    # 2. pickle-only:
+    #
+    #    words-coords-file
+    #    stopwords-file
+    #    pickle-file
+    #
+    # 3. disambig-link-baseline:
+    #
+    #    coords-file
+    #    gazetteer-file
+    #    links-file
+    #    eval-file
+    #
+    # 4. disambig-naive-bayes-*:
+    #
+    #    stopwords-file
+    #    words-coords-file or unpickle-file
+    #    pickle-file if given
+    #    coords-file
+    #    gazetteer-file
+    #    links-file
+    #    eval-file
 
-  if opts.width_of_nbregion <= 0:
-    op.error("Width of Naive Bayes region must be positive")
-  global width_of_nbregion
-  width_of_nbregion = opts.width_of_nbregion
+    if opts.mode == 'pickle-only' or \
+       opts.mode.startswith('geotag'):
+      self.need('stopwords_file')
+      read_stopwords(opts.stopwords_file)
+      if not opts.unpickle_file and not opts.words_coords_file:
+        op.error("Must specify either unpickle file or words-coords file")
 
-  global max_time_per_stage
-  if opts.max_time_per_stage:
-    max_time_per_stage = opts.max_time_per_stage
-  global max_dist_for_close_match
-  max_dist_for_close_match = opts.max_dist_for_close_match
-  global max_dist_for_outliers
-  max_dist_for_outliers = opts.max_dist_for_outliers
-  global naive_bayes_context_len
-  naive_bayes_context_len = opts.naive_bayes_context_len
+    if opts.mode != 'pickle-only':
+      self.need('gazetteer_file')
 
-  ### Start reading in the files and operating on them ###
+    if opts.mode.startswith('geotag'):
+      self.need('eval_file', 'evaluation file(s)')
 
-  # Files needed for different options:
-  #
-  # 1. match-only:
-  #
-  #    coords-file
-  #    gazetteer-file
-  #    links-file
-  #
-  # 2. pickle-only:
-  #
-  #    words-coords-file
-  #    stopwords-file
-  #    pickle-file
-  #
-  # 3. disambig-link-baseline:
-  #
-  #    coords-file
-  #    gazetteer-file
-  #    links-file
-  #    eval-file
-  #
-  # 4. disambig-naive-bayes-*:
-  #
-  #    stopwords-file
-  #    words-coords-file or unpickle-file
-  #    pickle-file if given
-  #    coords-file
-  #    gazetteer-file
-  #    links-file
-  #    eval-file
+    if opts.mode == 'pickle-only':
+      if not opts.pickle_file:
+        self.need('pickle_file')
 
-  if opts.mode == 'pickle-only' or \
-     opts.mode.startswith('geotag'):
-    if not opts.stopwords_file:
-      op.error("Must specify stopwords file using -s or --stopwords-file")
-    read_stopwords(opts.stopwords_file)
-    if not opts.unpickle_file and not opts.words_coords_file:
-      op.error("Must specify either unpickle file or words-coords file")
+    if opts.mode == 'geotag-articles' and opts.eval_format != 'wiki':
+      op.error("Can only geotag articles in Wikipedia format")
 
-  if opts.mode != 'pickle-only':
-    if not opts.coords_file:
-      op.error("Must specify coordinate file using -c or --coords-file")
-    if not opts.gazetteer_file:
-      op.error("Must specify gazetteer file using -g or --gazetteer-file")
-    if not opts.links_file:
-      op.error("Must specify links file using -l or --links-file")
+    self.need('article_data_file')
+    read_article_data(opts.article_data_file)
 
-  if opts.mode.startswith('geotag'):
-    if not opts.eval_file:
-      op.error("Must specify evaluation file(s) using -e or --eval-file")
+    #print "Processing evaluation file(s) %s for toponym counts..." % opts.eval_file
+    #process_dir_files(opts.eval_file, count_toponyms_in_file)
+    #print "Number of toponyms seen: %s" % len(toponyms_seen_in_eval_files)
+    #print "Number of toponyms seen more than once: %s" % \
+    #  len([foo for (foo,count) in toponyms_seen_in_eval_files.iteritems() if
+    #       count > 1])
+    #output_reverse_sorted_table(toponyms_seen_in_eval_files)
 
-  if opts.mode == 'pickle-only':
-    if not opts.pickle_file:
-      op.error("For pickle-only mode, must specify pickle file using -p or --pick-file")
+    # Read in (or unpickle) and maybe pickle the words-counts file
+    if opts.mode == 'pickle-only' or opts.mode.startswith('geotag'):
+      if opts.unpickle_file:
+        global article_probs
+        infile = open(opts.unpickle_file)
+        #FIXME: article_probs = cPickle.load(infile)
+        infile.close()
+      else:
+        read_word_counts(opts.words_coords_file)
+      if opts.pickle_file:
+        outfile = open(opts.pickle_file, "w")
+        #FIXME: cPickle.dump(article_probs, outfile)
+        outfile.close()
 
-  if opts.mode == 'geotag-articles' and opts.eval_format != 'wiki':
-    op.error("Can only geotag articles in Wikipedia format")
+    if opts.mode == 'pickle-only': return
 
-  #print "Processing evaluation file(s) %s for toponym counts..." % opts.eval_file
-  #process_dir_files(opts.eval_file, count_toponyms_in_file)
-  #print "Number of toponyms seen: %s" % len(toponyms_seen_in_eval_files)
-  #print "Number of toponyms seen more than once: %s" % \
-  #  len([foo for (foo,count) in toponyms_seen_in_eval_files.iteritems() if
-  #       count > 1])
-  #output_reverse_sorted_table(toponyms_seen_in_eval_files)
+    read_world_gazetteer_and_match(opts.gazetteer_file,
+                                   opts.naive_bayes_type != "article")
 
-  # Read in (or unpickle) and maybe pickle the words-counts file
-  if opts.mode == 'pickle-only' or opts.mode.startswith('geotag'):
-    if opts.unpickle_file:
-      global article_probs
-      infile = open(opts.unpickle_file)
-      #FIXME: article_probs = cPickle.load(infile)
-      infile.close()
+    if opts.mode == 'match-only': return
+
+    if opts.mode == 'geotag-toponyms':
+      # Generate strategy object
+      if opts.strategy == 'link-baseline':
+        strategy = LinkBaselineStrategy()
+      elif opts.strategy == 'naive-bayes-no-baseline':
+        strategy = NaiveBayesStrategy(use_baseline=False)
+      else:
+        strategy = NaiveBayesStrategy(use_baseline=True)
+
+      # Generate reader object
+      if opts.eval_format == 'tr-conll':
+        evalobj = TRCoNLLGeotagToponymEvaluator(opts, strategy)
+      else:
+        evalobj = WikipediaGeotagToponymEvaluator(opts, strategy)
     else:
-      read_word_counts(opts.words_coords_file)
-    if opts.pickle_file:
-      outfile = open(opts.pickle_file, "w")
-      #FIXME: cPickle.dump(article_probs, outfile)
-      outfile.close()
+      evalobj = WikipediaGeotagArticleEvaluator(opts)
 
-  if opts.mode == 'pickle-only': return
+    print "Processing evaluation file/dir %s..." % opts.eval_file
+    for filename in yield_directory_files(opts.eval_file):
+      print "Processing evaluation file %s..." % filename
+      for doc in evalobj.yield_documents(filename):
+        evalobj.evaluate_document(doc)
 
-  read_coordinates_file(opts.coords_file)
-  read_incoming_link_info(opts.links_file)
-  if opts.redirect_file:
-    read_redirect_file(opts.redirect_file, opts.output_filtered_redirects)
-  read_world_gazetteer_and_match(opts.gazetteer_file,
-                                 opts.naive_bayes_type != "article")
+    evalobj.output_results()
 
-  if opts.mode == 'match-only': return
-
-  if opts.mode == 'geotag-toponyms':
-    # Generate strategy object
-    if opts.strategy == 'link-baseline':
-      strategy = LinkBaselineStrategy()
-    elif opts.strategy == 'naive-bayes-no-baseline':
-      strategy = NaiveBayesStrategy(use_baseline=False)
-    else:
-      strategy = NaiveBayesStrategy(use_baseline=True)
-
-    # Generate reader object
-    if opts.eval_format == 'tr-conll':
-      evalobj = TRCoNLLGeotagToponymEvaluator(opts, strategy)
-    else:
-      evalobj = WikipediaGeotagToponymEvaluator(opts, strategy)
-  else:
-    evalobj = WikipediaGeotagArticleEvaluator(opts)
-
-  print "Processing evaluation file/dir %s..." % opts.eval_file
-  for filename in yield_directory_files(opts.eval_file):
-    print "Processing evaluation file %s..." % filename
-    for doc in evalobj.yield_documents(filename):
-      evalobj.evaluate_document(doc)
-
-  evalobj.output_results()
-
-main()
+WikiDisambigProgram()

@@ -28,6 +28,7 @@ from optparse import OptionParser
 from textutil import *
 import itertools
 import time
+from process_article_data import *
 
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
@@ -35,9 +36,6 @@ from xml.sax.handler import ContentHandler
 # Debug level; if non-zero, output lots of extra information about how
 # things are progressing.  If > 1, even more info.
 debug = 0
-
-# If true, print out warnings about strangely formatted input
-show_warnings = True
 
 # Program options
 progopts = None
@@ -53,8 +51,6 @@ article_namespace_aliases = {
   'CAT':'Category', 'Cat':'Category', 'C':'Category',
   'MOS':'Wikipedia', 'MoS':'Wikipedia', 'Mos':'Wikipedia'}
 
-max_time_per_stage = 2**31
-
 # Count number of incoming links for articles
 incoming_link_count = intdict()
 
@@ -64,40 +60,37 @@ anchor_text_map = {}
 # Set listing articles containing coordinates
 coordinate_articles = set()
 
+debug_cur_title = None
+
 # Parse the result of a previous run of --coords-counts for articles with
 # coordinates
 def read_coordinates_file(filename):
   errprint("Reading coordinates file %s..." % filename)
-  status = StatusMessage("article")
+  status = StatusMessage('article')
   for line in uchompopen(filename):
     m = re.match('Article title: (.*)', line)
     if m:
       title = capfirst(m.group(1))
     elif re.match('Article coordinates: ', line):
       coordinate_articles.add(title)
-      if status.item_processed() >= max_time_per_stage:
+      if status.item_processed() >= Opts.max_time_per_stage:
         break
     
 # Read in redirects.  Record redirects as additional articles with coordinates
 # if the article pointed to has coordinates. NOTE: Must be done *AFTER*
 # reading coordinates.
-def read_redirect_file(filename):
+def read_redirects_from_article_data(filename):
   assert coordinate_articles
-  errprint("Reading redirect info from %s..." % filename)
-  status = StatusMessage('article')
-  for line in uchompopen(filename):
-    if rematch('Article title: (.*)$', line):
-      title = capfirst(m_[1])
-    elif rematch('Redirect to: (.*)$', line):
-      redirect = capfirst(m_[1])
-      if redirect in coordinate_articles:
-        coordinate_articles.add(title)
-      if status.item_processed() >= max_time_per_stage:
-        break
-    elif rematch('Article ID: (.*)$', line):
-      pass
-    else:
-      warning("Strange line in redirect file: %s" % line)
+  errprint("Reading redirects from article data file %s..." % filename)
+
+  def process(art):
+    if art.namespace != 'Main':
+      return
+    if art.redir and capfirst(art.redir) in coordinate_articles:
+      coordinate_articles.add(art.title)
+
+  read_article_data_file(filename, process,
+                         max_time_per_stage=Opts.max_time_per_stage)
 
 # Read the list of disambiguation article ID's.
 def read_disambig_id_file(filename):
@@ -105,7 +98,7 @@ def read_disambig_id_file(filename):
   status = StatusMessage("article")
   for line in uchompopen(filename):
     disambig_pages_by_id.add(line)
-    if status.item_processed() >= max_time_per_stage:
+    if status.item_processed() >= Opts.max_time_per_stage:
       break
     
 ############################################################################
@@ -329,6 +322,9 @@ def read_disambig_id_file(filename):
 #    not a generator, i.e. has no "yield" statement in it.
 
 
+def wikiwarning(foo):
+  warning("Article %s: %s" % (debug_cur_title, foo))
+
 #######################################################################
 #                         Splitting the output                        #
 #######################################################################
@@ -423,7 +419,7 @@ top-level separators, such as vertical bar.'''
   for string in textre.findall(text):
     if string in right_match_chars:
       if parenlevel == 0:
-        warning("Nesting level would drop below 0; string = %s, prevstring = %s" % (string, prevstring.replace('\n','\\n')))
+        wikiwarning("Nesting level would drop below 0; string = %s, prevstring = %s" % (string, prevstring.replace('\n','\\n')))
         yield string
       else:
         strbuf.append(string)
@@ -431,7 +427,7 @@ top-level separators, such as vertical bar.'''
         should_left = right_match_chars[string]
         the_left = leftmatches[-1]
         if should_left != the_left:
-          warning("Non-matching brackets: Saw %s, expected %s; prevstring = %s" % (string, left_match_chars[the_left], prevstring.replace('\n','\\n')))
+          wikiwarning("Non-matching brackets: Saw %s, expected %s; prevstring = %s" % (string, left_match_chars[the_left], prevstring.replace('\n','\\n')))
         parenlevel -= 1
         leftmatches = leftmatches[:-1]
         if parenlevel == 0:
@@ -458,12 +454,6 @@ unmatched single or double right braces or brackets.'''
 #######################################################################
 ###                        Utility functions                        ###
 #######################################################################
-
-def warning(text):
-  '''Output a warning, formatting into UTF-8 as necessary'''
-  if show_warnings:
-    errprint("Warning: %s" % text)
-    #uniprint("Warning: %s" % text, sys.stderr)
 
 def splitprint(text):
   '''Print text (possibly Unicode) to the appropriate output, either stdout
@@ -507,7 +497,7 @@ not worry about crashing on these syntactic errors.'''
               parse_balanced_text(balanced_pipe_re, macro[2:-2])
               if foo != '|']
   if not macroargs:
-    warning("Strange macro with no arguments: %s" % macroargs)
+    wikiwarning("Strange macro with no arguments: %s" % macroargs)
     return ['empty macro']
   return macroargs
 
@@ -603,7 +593,7 @@ instead, output a warning.'''
   except:
     x = x.strip()
     if x:
-      warning("Expected number, saw %s" % x)
+      wikiwarning("Expected number, saw %s" % x)
     return 0.
 
 def convert_dms(nsew, d, m, s):
@@ -616,11 +606,15 @@ convert_ew = {'E':1, 'W':-1}
 
 # Get the default value for the hemisphere, as a multiplier +1 or -1.
 # We need to handle Australian places specially, as S latitude, E longitude.
+# We need to handle Pittsburgh neighborhoods specially, as N latitude, W longitude.
 # Otherwise assume +1.
 def get_hemisphere(temptype, is_lat):
   if temptype.lower().startswith('infobox australia'):
     if is_lat: return -1
     else: return 1
+  elif temptype.lower().startswith('infobox pittsburgh neighborhood'):
+    if is_lat: return 1
+    else: return -1
   else: return 1
 
 # Utility function for get_latd_coord() and get_lat_deg_coord().
@@ -635,12 +629,12 @@ def get_lat_long_1(temptype, args, lat, dms_suff, offparam, is_lat):
   msuff = dms_suff[1]
   ssuff = dms_suff[2]
   if '%s%s' % (lat, dsuff) not in args:
-    warning("No %s%s seen for template type %s" % (lat, dsuff, temptype))
+    wikiwarning("No %s%s seen for template type %s" % (lat, dsuff, temptype))
   d = args.get('%s%s' % (lat, dsuff), 0)
   m = args.get('%s%s' % (lat, msuff), 0)
   s = args.get('%s%s' % (lat, ssuff), 0)
   if offparam not in args:
-    warning("No %s seen for template type %s" % (offparam, temptype))
+    wikiwarning("No %s seen for template type %s" % (offparam, temptype))
     hemismult = get_hemisphere(temptype, is_lat)
   else:
     if is_lat:
@@ -649,7 +643,7 @@ def get_lat_long_1(temptype, args, lat, dms_suff, offparam, is_lat):
       convert = convert_ew
     hemismult = convert.get(args[offparam], 0)
     if hemismult == 0:
-      warning("%s for template type %s has bad value %s" %
+      wikiwarning("%s for template type %s has bad value %s" %
                (offparam, temptype, args[offparam]))
   return convert_dms(hemismult, d, m, s)
 
@@ -741,7 +735,7 @@ globe: which planet or satellite the coordinate is on (esp. if not the Earth)
     lat = paramshash.get('lat', None) or paramshash.get('latitude', None)
     long = paramshash.get('long', None) or paramshash.get('longitude', None)
     if not lat or not long:
-      warning("Can't find latitude/longitude in {{%s|%s}}" %
+      wikiwarning("Can't find latitude/longitude in {{%s|%s}}" %
               (temptype, '|'.join(args)))
     lat = safe_float(lat) if lat else 0.
     long = safe_float(long) if long else 0.
@@ -1143,6 +1137,8 @@ class ArticleHandler(object):
   def process_article_text(self, text, title, id, redirect):
     self.title = title
     self.id = id
+    global debug_cur_title
+    debug_cur_title = title
   
     if debug >= 1:
       errprint("Article title: %s" % title)
@@ -1167,7 +1163,7 @@ class ArticleHandler(object):
         # such templates.
         return
       else:
-        warning(
+        wikiwarning(
           "Article %s (ID %s) is a redirect but can't parse redirect spec %s"
           % (title, id, text))
   
@@ -1435,7 +1431,7 @@ class GenerateArticleData(ArticleHandler):
               yesno[listof], yesno[disambig], yesno[list]))
 
   def process_redirect(self, redirtitle):
-    self.process_article(redirtitle)
+    self.process_article(capfirst(redirtitle))
 
   def process_text_for_data(self, text):
     self.process_article('')
@@ -1498,6 +1494,9 @@ class FindLinks(ArticleHandler):
 #######################################################################
 #                SAX handler for processing raw dump files            #
 #######################################################################
+
+class FinishParsing:
+  pass
 
 # We do a very simple-minded way of handling the XML.  We maintain the
 # path of nested elements that we're within, and we track the text since the
@@ -1573,7 +1572,8 @@ combined chunks.'''
                     "..." if truncated else ""))
       self.output_handler.process_article_text(text=eltext, title=self.title,
         id=self.id, redirect=self.redirect)
-      self.status.item_processed()
+      if self.status.item_processed() >= Opts.max_time_per_stage:
+        raise FinishParsing()
  
 #######################################################################
 #                                Main code                            #
@@ -1585,7 +1585,10 @@ def main_process_input(wiki_handler):
   sax_parser = make_parser()
   sax_handler = WikipediaDumpSaxHandler(wiki_handler)
   sax_parser.setContentHandler(sax_handler)
-  sax_parser.parse(sys.stdin)
+  try:
+    sax_parser.parse(sys.stdin)
+  except FinishParsing:
+    pass
   wiki_handler.finish_processing()
   
 def main():
@@ -1684,17 +1687,16 @@ entire table is needed, it may be necessary to implement a MapReduce-style
 process where smaller chunks are processed separately and then the results
 combined.)""",
                 metavar="FILE")
-  op.add_option("--redirect-file",
-                help="""File containing lists of redirects.  Redirects to
-articles with coordinates are treated as additional articles with
-coordinates.""",
+  op.add_option("--article-data-file",
+                help="""File containing article data.  Used by --find-links
+to find the redirects pointing to articles with coordinates.""",
                 metavar="FILE")
   op.add_option("--disambig-id-file",
                 help="""File containing list of article ID's that are
 disambiguation pages.""",
                 metavar="FILE")
-  op.add_option("--max-time-per-stage", type='int', default=0,
-                help="""Maximum time per stage in seconds.  If 0, no limit.
+  op.add_option("--max-time-per-stage", type='int', default=2**31,
+                help="""Maximum time per stage in seconds.
 Used for testing purposes.  Default %default.""")
   op.add_option("-d", "--debug", metavar="LEVEL",
                 help="Output debug info at given level")
@@ -1703,16 +1705,12 @@ Used for testing purposes.  Default %default.""")
   opts, args = op.parse_args()
   output_option_parameters(opts)
 
-  global progopts
-  progopts = opts
+  global Opts
+  Opts = opts
 
   global debug
   if opts.debug:
     debug = int(opts.debug)
-
-  global max_time_per_stage
-  if opts.max_time_per_stage:
-    max_time_per_stage = opts.max_time_per_stage
 
   if opts.split_training_dev_test:
     init_output_files(opts.split_training_dev_test,
@@ -1722,8 +1720,8 @@ Used for testing purposes.  Default %default.""")
 
   if opts.coords_file:
     read_coordinates_file(opts.coords_file)    
-  if opts.redirect_file:
-    read_redirect_file(opts.redirect_file)
+  if opts.article_data_file:
+    read_redirects_from_article_data(opts.article_data_file)
   if opts.disambig_id_file:
     read_disambig_id_file(opts.disambig_id_file)
   if opts.words_coords:
@@ -1739,6 +1737,7 @@ Used for testing purposes.  Default %default.""")
   elif opts.generate_toponym_eval:
     main_process_input(GenerateToponymEvalData())
   elif opts.generate_article_data:
+    uniprint('id\ttitle\tsplit\tredir\tnamespace\tis_list_of\tis_disambig\tis_list')
     main_process_input(GenerateArticleData())
 
 #import cProfile

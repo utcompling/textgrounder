@@ -1,37 +1,47 @@
 #!/bin/sh
 
+PREFIX="enwiki-20100905"
+PROCESSWIKI="$HOME/devel/textgrounder/python/processwiki.py"
+
 #DEBUG="--debug 2"
 DEBUG="--debug 0"
-PREFIX="foobar"
 #MAXTIME="--max-time-per-stage 5"
 #MAXTIME="--max-time-per-stage 10"
 
-#COORDS_FILE="--coords-file enwiki-20100905-just-titles-coords.txt"
+COORDS_FILE="--coords-file $PREFIX-just-titles-coords.txt"
 
 #MODE="--generate-toponym-eval"
-#PREFIX="enwiki-20100905-toponym-eval.txt"
-#MISCOPTS="--redirect-file enwiki-20100905-filtered-redirects.txt"
+#OUTFILE="$PREFIX-toponym-eval.txt"
+#MISCOPTS="--redirect-file $PREFIX-filtered-redirects.txt"
 
 #MODE="--find-redirects"
-#PREFIX="enwiki-20100905-redirects.txt"
+#OUTFILE="$PREFIX-redirects.txt"
 
 #MODE="--only-coords"
-#PREFIX="enwiki-20100905-just-titles-coords.txt"
+#OUTFILE="$PREFIX-just-titles-coords.txt"
 
 #MODE="--coords-counts"
-#PREFIX="enwiki-20100905-coords-counts.txt"
+#OUTFILE="$PREFIX-coords-counts.txt"
 
-#MODE="--find-links"
-#PREFIX="enwiki-20100905-links-only-coord-articles.txt"
+MODE="--find-links"
+OUTFILE="$PREFIX-links-only-coord-articles.txt"
 
-MODE="--generate-article-data"
-PREFIX="enwiki-20100905-article-data.txt"
-MISCOPTS="--disambig-id-file enwiki-20100905-pages-articles.disambig.id.txt"
+#MODE="--generate-article-data"
+#OUTFILE="$PREFIX-article-data.txt"
+#MISCOPTS="--disambig-id-file $PREFIX-pages-articles.disambig.id.txt"
 
-SPLIT="--split-training-dev-test $PREFIX"
+SPLITPREFIX="$OUTFILE"
+SPLITPREFIX="foobar"
+#SPLIT="--split-training-dev-test $SPLITPREFIX"
 
-#OUTFILE="> $PREFIX"
 
-bzcat enwiki-20100905-pages-articles.xml.bz2 | \
-  $HOME/devel/textgrounder/python/processwiki.py \
-  $COORDS_FILE $MAXTIME $SPLIT $MISCOPTS $DEBUG $MODE ${1+"$@"} $OUTFILE 
+INFILE="$PREFIX-pages-articles.xml.bz2"
+
+OPTIONS="$COORDS_FILE $MAXTIME $SPLIT $MISCOPTS $DEBUG $MODE"
+if [ -n "$OUTFILE" ]; then
+  echo $INFILE '|' $PROCESSWIKI $OPTIONS ${1+"$@"} '>' $OUTFILE
+  bzcat $INFILE | $PROCESSWIKI $OPTIONS ${1+"$@"} > $OUTFILE
+else
+  echo $INFILE '|' $PROCESSWIKI $OPTIONS ${1+"$@"}
+  bzcat $INFILE | $PROCESSWIKI $OPTIONS ${1+"$@"}
+fi
