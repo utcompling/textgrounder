@@ -62,10 +62,9 @@ class Article(object):
     self.is_list = is_list
 
   def __str__(self):
-    if coord:
-      return '%s(%s) at %s' % (self.title, self.id, self.coord)
-    else:
-      return '%s(%s)' % (self.title, self.id)
+    coordstr = " at %s" % self.coord if self.coord else ""
+    redirstr = ", redirect to %s" % self.redir if self.redir else ""
+    return '%s(%s)%s%s' % (self.title, self.id, coordstr, redirstr)
 
 def yesno_to_boolean(foo):
   if foo == 'yes': return True
@@ -148,6 +147,7 @@ def read_article_data_file(filename, process, article_type=Article,
     process(art)
     if status.item_processed() >= max_time_per_stage:
       break
+  return fields
 
 def write_article_data_file(outfile, outfields, articles):
   field_types = get_field_types(known_fields_output, outfields)
