@@ -6,6 +6,10 @@
 ####### Copyright (c) 2010 Ben Wing.
 #######
 
+# Essentially does an SQL JOIN on the --article-data-file, --coords-file
+# and --links-file, keeping only the article records with a coordinate and
+# attaching the coordinate.
+
 import sys
 from textutil import *
 from process_article_data import *

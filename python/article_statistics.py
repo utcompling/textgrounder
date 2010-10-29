@@ -6,6 +6,9 @@
 ####### Copyright (c) 2010 Ben Wing.
 #######
 
+# Counts and outputs various statistics about the articles in the
+# article-data file.
+
 from textutil import *
 import process_article_data as pad
 
