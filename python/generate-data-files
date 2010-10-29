@@ -1,0 +1,82 @@
+#!/bin/sh
+
+# Generate the various necessary data files.  To generate everything, use
+#
+#  generate-data-files all
+#
+# Else, do one of the steps:
+#
+# article-data = Basic article data file
+# coords = Article coordinates
+# links = Article incoming links, only for articles with coordinates or
+#         redirects to such articles
+# combined = Combined article data file, only for articles with coordinates or
+#            redirects to such articles
+
+# Options you're most likely to change.
+#DEBUG="--debug 2"
+DEBUG="--debug 0"
+MAXTIME="--max-time-per-stage 5"
+#MAXTIME="--max-time-per-stage 10"
+
+TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+DUMP_PREFIX="enwiki-20100905"
+PAGES_ARTICLES_PREFIX="$DUMP_PREFIX-pages-articles"
+
+PROCESSWIKI="$TEXTGROUNDER_PYTHON/processwiki.py"
+GENERATE_COMBINED="$TEXTGROUNDER_PYTHON/generate_combined.py"
+
+DUMPFILE="$PAGES_ARTICLES_PREFIX.xml.bz2"
+COORDS_FILE="$DUMP_PREFIX-just-titles-coords.txt"
+LINKS_FILE="$DUMP_PREFIX-links-only-coord-articles.txt"
+ARTICLE_DATA_FILE="$DUMP_PREFIX-article-data.txt"
+DISAMBIG_ID_FILE="$PAGES_ARTICLES_PREFIX.disambig.id.txt"
+COMBINED_ARTICLE_DATA_FILE="$DUMP_PREFIX-combined-article-data.txt"
+LOGFILE="generate-all-data.log"
+
+COORDS_ARG="--coords-file $COORDS_FILE"
+LINKS_ARG="--links-file $LINKS_FILE"
+ARTICLE_DATA_ARG="--article-data-file $ARTICLE_DATA_FILE"
+DISAMBIG_ID_ARG="--disambig-id-file $DISAMBIG_ID_FILE"
+
+OTHEROPTS="$MAXTIME $DEBUG"
+
+if [ -z "$*" -o "$*" = "all" ]; then
+  steps="article-data coords links combine"
+else
+  steps="$*"
+fi
+
+echo $steps
+
+for step in $steps; do
+
+if [ "$step" = article-data ]; then
+echo "Generating article data ..."
+bzcat $DUMPFILE | $PROCESSWIKI \
+  $DISAMBIG_ID_ARG \
+  --split-training-dev-test foobar \
+  --generate-article-data \
+  $OTHEROPTS > $ARTICLE_DATA_FILE
+
+elif [ "$step" = coords ]; then
+echo "Generating coordinate data ..."
+bzcat $DUMPFILE | $PROCESSWIKI \
+  --only-coords \
+  $OTHEROPTS > $COORDS_FILE
+
+elif [ "$step" = links ]; then
+echo "Generating link data ..."
+bzcat $DUMPFILE | $PROCESSWIKI \
+  $COORDS_ARG $ARTICLE_DATA_ARG \
+  --find-links \
+  $OTHEROPTS > $LINKS_FILE
+
+elif [ "$step" = combine ]; then
+echo "Combining data ..."
+$GENERATE_COMBINED $LINKS_ARG $COORDS_ARG \
+  $ARTICLE_DATA_ARG > $COMBINED_ARTICLE_DATA_FILE
+
+fi
+
+done
