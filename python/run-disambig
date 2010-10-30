@@ -26,7 +26,7 @@ EVALTYPE="--eval-format tr-conll"
 $HOME/devel/textgrounder/python/wiki_disambig.py \
   --stopwords-file stopwords.english \
   --article-data-file enwiki-20100905-combined-article-data.txt \
-  --words-coords-file enwiki-20100905-coords-counts.txt \
+  --counts-file enwiki-20100905-counts-only-coord-articles.txt \
   --gazetteer-file world-dataen-fixed.txt \
   --width-of-nbregion 1 --region-size 100 \
   $EVALFILE $EVALTYPE \

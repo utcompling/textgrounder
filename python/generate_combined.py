@@ -55,16 +55,17 @@ def output_combined_article_data(filename, coords_file, links_file):
   articles_seen = []
 
   def process(art):
-    keep = False
+    if art.namespace != 'Main':
+      return
     coord = coords_hash.get(art.title, None)
     if coord:
       art.coord = coord
-      keep = True
     elif art.redir and capfirst(art.redir) in coords_hash:
-      keep = True
-    if keep:
-      articles_hash[art.title] = art
-      articles_seen.append(art)
+      pass
+    else:
+      return
+    articles_hash[art.title] = art
+    articles_seen.append(art)
   read_article_data_file(filename, process,
                          max_time_per_stage=Opts.max_time_per_stage)
 

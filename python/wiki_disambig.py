@@ -924,7 +924,7 @@ def read_article_data(filename):
       ArticleTable.record_article(x.title, redart)
 
 
-# Parse the result of a previous run of --coords-counts and generate
+# Parse the result of a previous run of --output-counts and generate
 # a unigram distribution for Naive Bayes matching.  We do a simple version
 # of Good-Turing smoothing where we assign probability mass to unseen
 # words equal to the probability mass of all words seen once, and rescale
@@ -1644,31 +1644,19 @@ class WikiDisambigProgram(NLPProgram):
                   choices=['world', 'db'],
                   help="""Type of gazetteer file specified using --gazetteer;
 default '%default'.""")
-    op.add_option("-l", "--links-file",
-                  help="""File containing incoming link information for
-Wikipedia articles. Output by processwiki.py --find-links.""",
-                  metavar="FILE")
     op.add_option("-s", "--stopwords-file",
                   help="""File containing list of stopwords.""",
                   metavar="FILE")
     op.add_option("--article-data-file",
                   help="""File containing info about Wikipedia articles.""",
                   metavar="FILE")
-    op.add_option("--redirect-file",
-                  help="""File containing redirects from Wikipedia.""",
-                  metavar="FILE")
     op.add_option("-g", "--gazetteer-file",
                   help="""File containing gazetteer information to match.""",
                   metavar="FILE")
-    op.add_option("-c", "--coords-file",
+    op.add_option("-w", "--counts-file",
                   help="""File containing output from a prior run of
---coords-counts, listing all the articles with associated coordinates.
-May be filtered only for articles and coordinates.""",
-                  metavar="FILE")
-    op.add_option("-w", "--words-coords-file",
-                  help="""File containing output from a prior run of
---coords-counts, listing all the articles with associated coordinates.
-Should not be filtered, as the counts of words are needed.""",
+--output-counts, listing for each article the words in the article and
+associated counts.""",
                   metavar="FILE")
     op.add_option("-p", "--pickle-file",
                   help="""Serialize the result of processing the word-coords
@@ -1857,7 +1845,7 @@ particular-sized region.  Default '%default'.""")
         #FIXME: article_probs = cPickle.load(infile)
         infile.close()
       else:
-        read_word_counts(opts.words_coords_file)
+        read_word_counts(opts.counts_file)
       if opts.pickle_file:
         outfile = open(opts.pickle_file, "w")
         #FIXME: cPickle.dump(article_probs, outfile)

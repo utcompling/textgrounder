@@ -164,16 +164,6 @@ def read_disambig_id_file(filename):
 # allow for different sorts of processing of the Wikipedia dump.  See the
 # following description, which indicates where to change in order to
 # implement different behavior.
-
-# 5. If an article is a redirect to another article, instead of the words,
-#    a single line will be output like this:
-#
-#    Redirect to: Computer accessibility
-#
-# 6. Finally, the last line output looks like this:
-#
-#    Notice: ending processing
-#    
 #
 # The basic functioning of this code is controlled by an article handler class.
 # The default handler class is ArticleHandler.  Usually it is
@@ -1273,12 +1263,15 @@ class FindRedirects(ArticleHandler):
     splitprint("Article ID: %s" % self.id)
     splitprint("Redirect to: %s" % redirtitle)
 
-def output_title_and_coordinates(title, id, lat, long):
+def output_title(title, id):
   splitprint("Article title: %s" % title)
   splitprint("Article ID: %s" % id)
+
+def output_title_and_coordinates(title, id, lat, long):
+  output_title(title, id)
   splitprint("Article coordinates: %s,%s" % (lat, long))
 
-def extract_coordinates_from_article(title, id, text):
+def extract_coordinates_from_article(text):
   handler = ExtractCoordinatesFromSource()
   for foo in handler.process_source_text(text): pass
   if len(handler.coords) > 0:
@@ -1287,20 +1280,24 @@ def extract_coordinates_from_article(title, id, text):
     # accurate.
     for (temptype, lat, long) in handler.coords:
       if temptype.startswith('coor'):
-        output_title_and_coordinates(title, id, lat, long)
-        return True
+        return (lat, long)
     (temptype, lat, long) = handler.coords[0]
-    output_title_and_coordinates(title, id, lat, long)
-    return True
-  else: return False
+    return (lat, long)
+  else: return None
+
+def extract_and_output_coordinates_from_article(title, id, text):
+  retval = extract_coordinates_from_article(text)
+  if retval == None: return False
+  (lat, long) = retval
+  output_title_and_coordinates(title, id, lat, long)
+  return True
 
 # Handler to output count information on words.  Only processes articles
-# with coordinates in them, and only selects the first coordinate seen.
-# Outputs the article title and coordinates.  Then computes the count of
-# each word in the article text, after filtering text for "actual text"
-# (as opposed to directives etc.), and outputs the counts.
+# with coordinates in them.  Computes the count of each word in the article
+# text, after filtering text for "actual text" (as opposed to directives
+# etc.), and outputs the counts.
 
-class GetCoordsAndCounts(ArticleHandlerForUsefulText):
+class OutputCounts(ArticleHandlerForUsefulText):
   def process_text_for_words(self, word_generator):
     wordhash = intdict()
     for word in word_generator:
@@ -1308,13 +1305,17 @@ class GetCoordsAndCounts(ArticleHandlerForUsefulText):
     output_reverse_sorted_table(wordhash, outfile=cur_output_file)
 
   def process_text_for_data(self, text):
-    return extract_coordinates_from_article(self.title, self.id, text)
+    if extract_coordinates_from_article(text):
+      output_title(self.title, self.id)
+      return True
+    return False
 
 
 # Handler to output just coordinate information.
-class GetCoords(ArticleHandler):
+class OutputCoords(ArticleHandler):
   def process_text_for_data(self, text):
-    return extract_coordinates_from_article(self.title, self.id, text)
+    return extract_and_output_coordinates_from_article(self.title, self.id,
+                                                       text)
 
 
 class ToponymEvalDataHandler(ExtractUsefulText):
@@ -1602,10 +1603,10 @@ def main():
 Includes count of incoming links, and, for each anchor-text form, counts of
 all articles it maps to.""",
                 action="store_true")
-  op.add_option("-c", "--coords-counts",
+  op.add_option("-c", "--output-counts",
                 help="Print info about counts of words for all articles with coodinates.",
                 action="store_true")
-  op.add_option("-o", "--only-coords",
+  op.add_option("-o", "--output-coords",
                 help="Print info about coordinates of articles with coordinates.",
                 action="store_true")
   op.add_option("-r", "--find-redirects",
@@ -1730,10 +1731,10 @@ Used for testing purposes.  Default %default.""")
     main_process_input(FindLinks())
   elif opts.find_redirects:
     main_process_input(FindRedirects())
-  elif opts.only_coords:
-    main_process_input(GetCoords())
-  elif opts.coords_counts:
-    main_process_input(GetCoordsAndCounts())
+  elif opts.output_coords:
+    main_process_input(OutputCoords())
+  elif opts.output_counts:
+    main_process_input(OutputCounts())
   elif opts.generate_toponym_eval:
     main_process_input(GenerateToponymEvalData())
   elif opts.generate_article_data:

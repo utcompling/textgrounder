@@ -16,7 +16,7 @@
 # Options you're most likely to change.
 #DEBUG="--debug 2"
 DEBUG="--debug 0"
-MAXTIME="--max-time-per-stage 5"
+#MAXTIME="--max-time-per-stage 5"
 #MAXTIME="--max-time-per-stage 10"
 
 TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
@@ -27,11 +27,13 @@ PROCESSWIKI="$TEXTGROUNDER_PYTHON/processwiki.py"
 GENERATE_COMBINED="$TEXTGROUNDER_PYTHON/generate_combined.py"
 
 DUMPFILE="$PAGES_ARTICLES_PREFIX.xml.bz2"
-COORDS_FILE="$DUMP_PREFIX-just-titles-coords.txt"
+COORDS_FILE="$DUMP_PREFIX-coords.txt"
 LINKS_FILE="$DUMP_PREFIX-links-only-coord-articles.txt"
+COUNTS_FILE="$DUMP_PREFIX-counts-only-coord-articles.txt"
 ARTICLE_DATA_FILE="$DUMP_PREFIX-article-data.txt"
 DISAMBIG_ID_FILE="$PAGES_ARTICLES_PREFIX.disambig.id.txt"
 COMBINED_ARTICLE_DATA_FILE="$DUMP_PREFIX-combined-article-data.txt"
+TOPONYM_EVAL_DATA_FILE="$DUMP_PREFIX-toponym-eval.txt"
 LOGFILE="generate-all-data.log"
 
 COORDS_ARG="--coords-file $COORDS_FILE"
@@ -62,7 +64,7 @@ bzcat $DUMPFILE | $PROCESSWIKI \
 elif [ "$step" = coords ]; then
 echo "Generating coordinate data ..."
 bzcat $DUMPFILE | $PROCESSWIKI \
-  --only-coords \
+  --output-coords \
   $OTHEROPTS > $COORDS_FILE
 
 elif [ "$step" = links ]; then
@@ -76,6 +78,19 @@ elif [ "$step" = combine ]; then
 echo "Combining data ..."
 $GENERATE_COMBINED $LINKS_ARG $COORDS_ARG \
   $ARTICLE_DATA_ARG > $COMBINED_ARTICLE_DATA_FILE
+
+elif [ "$step" = counts ]; then
+echo "Generating word count data ..."
+bzcat $DUMPFILE | $PROCESSWIKI \
+  --output-counts \
+  $OTHEROPTS > $COUNTS_FILE
+
+elif [ "$step" = toponym-eval-data ]; then
+echo "Generating toponym eval data ..."
+bzcat $DUMPFILE | $PROCESSWIKI \
+  $COORDS_ARG $ARTICLE_DATA_ARG \
+  --generate-toponym-eval \
+  $OTHEROPTS > $TOPONYM_EVAL_DATA_FILE
 
 fi
 

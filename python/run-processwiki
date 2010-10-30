@@ -8,7 +8,7 @@ DEBUG="--debug 0"
 #MAXTIME="--max-time-per-stage 5"
 #MAXTIME="--max-time-per-stage 10"
 
-COORDS_FILE="--coords-file $PREFIX-just-titles-coords.txt"
+COORDS_FILE="--coords-file $PREFIX-coords.txt"
 
 #MODE="--generate-toponym-eval"
 #OUTFILE="$PREFIX-toponym-eval.txt"
@@ -17,11 +17,11 @@ COORDS_FILE="--coords-file $PREFIX-just-titles-coords.txt"
 #MODE="--find-redirects"
 #OUTFILE="$PREFIX-redirects.txt"
 
-#MODE="--only-coords"
-#OUTFILE="$PREFIX-just-titles-coords.txt"
+#MODE="--output-coords"
+#OUTFILE="$PREFIX-coords.txt"
 
-#MODE="--coords-counts"
-#OUTFILE="$PREFIX-coords-counts.txt"
+#MODE="--output-counts"
+#OUTFILE="$PREFIX-counts-only-coord-articles.txt"
 
 MODE="--find-links"
 OUTFILE="$PREFIX-links-only-coord-articles.txt"
