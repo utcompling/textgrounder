@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import opennlp.textgrounder.topo.Location;
 
-public class MultiGazetteer {
+public class MultiGazetteer extends Gazetteer {
   private final List<Gazetteer> gazetteers;
 
   public MultiGazetteer(List<Gazetteer> gazetteers) {

@@ -42,7 +42,7 @@ public abstract class GazetteerLineReader extends GazetteerFileReader {
       if (location != null) break;
     }
     this.currentId++;
-    if (this.currentId % 50000 == 0) { System.out.format("At location id: %d.\n", this.currentId); }
+    //if (this.currentId % 50000 == 0) { System.out.format("At location id: %d.\n", this.currentId); }
     return location;
   }
 
