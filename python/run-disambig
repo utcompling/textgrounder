@@ -1,33 +1,53 @@
 #!/bin/sh
 
-PICKLE_FILE="enwiki-20100905-coords-counts.pickled"
+PREFIX="enwiki-20100905"
+WIKI_DISAMBIG="$HOME/devel/textgrounder/python/wiki_disambig.py"
+
+#DEBUG="--debug 2"
+#DEBUG="--debug 0"
+DEBUG="--debug 1"
+#MAXTIME="--max-time-per-stage 5"
+#MAXTIME="--max-time-per-stage 10"
+
+PICKLE_FILE="$PREFIX-coords-counts.pickled"
 #UNPICKLE="--unpickle-file $PICKLE_FILE"
 #PICKLE="--pickle-file $PICKLE_FILE"
 PICKLE=
 UNPICKLE=
 
-DEBUG="--debug 1"
-#MAXTIME="--max-time-per-stage 5"
-#MAXTIME="--max-time-per-stage 10"
+STOPWORDS_FILE="--stopwords-file stopwords.english"
+ARTICLE_DATA_FILE="--article-data-file $PREFIX-combined-article-data.txt"
+#COUNTS_FILE="--counts-file $PREFIX-training-counts-only-coord-articles.txt"
+COUNTS_FILE="--counts-file $PREFIX-counts-only-coord-articles.txt"
+GAZETTEER_FILE="--gazetteer-file world-dataen-fixed.txt"
 
-#MODE="--mode pickle-only"
-#MODE="--mode match-only"
-MODE="--mode geotag-toponyms"
-#MODE="--mode geotag-articles"
-STRATEGY="--strategy link-baseline"
-#STRATEGY="--strategy naive-bayes-with-baseline"
-#STRATEGY="--strategy naive-bayes-no-baseline"
-#NBTYPE="--naive-bayes-weighting distance-weighted"
-EVALFILE="--eval-file /groups/projects/pcl_travel/data/trconlldevtest/dev"
-EVALTYPE="--eval-format tr-conll"
-#EVALFILE="--eval-file enwiki-20100905-toponym-eval.txt"
+#MODE="pickle-only"
+#MODE="match-only"
+MODE="geotag-toponyms"
+#MODE="geotag-documents"
 
 
-$HOME/devel/textgrounder/python/wiki_disambig.py \
-  --stopwords-file stopwords.english \
-  --article-data-file enwiki-20100905-combined-article-data.txt \
-  --counts-file enwiki-20100905-counts-only-coord-articles.txt \
-  --gazetteer-file world-dataen-fixed.txt \
-  --width-of-nbregion 1 --region-size 100 \
+MISCOPTS="--width-of-nbregion 1 --region-size 100"
+if [ "$MODE" = "geotag-toponyms" -o "$MODE" = "match-only" ]; then
+  STRATEGY="--strategy baseline"
+  # Don't need counts file with baseline-only strategy
+  COUNTS_FILE=""
+  #STRATEGY="--strategy naive-bayes-with-baseline"
+  #STRATEGY="--strategy naive-bayes-no-baseline"
+  #NBTYPE="--naive-bayes-weighting distance-weighted"
+  EVALFILE="--eval-file /groups/projects/pcl_travel/data/trconlldevtest/dev"
+  EVALTYPE="--eval-format tr-conll"
+  #EVALFILE="--eval-file $PREFIX-toponym-eval.txt"
+elif [ "$MODE" = "geotag-documents" ]; then
+  EVALTYPE="--eval-format wiki"
+fi
+
+$WIKI_DISAMBIG \
+  $STOPWORDS_FILE \
+  $ARTICLE_DATA_FILE \
+  $COUNTS_FILE \
+  $GAZETTEER_FILE \
+  --mode "$MODE" \
+  $MISCOPTS \
   $EVALFILE $EVALTYPE \
-  $PICKLE $UNPICKLE $MAXTIME $MODE $STRATEGY $NBTYPE $DEBUG ${1+"$@"}
+  $PICKLE $UNPICKLE $MAXTIME $STRATEGY $NBTYPE $DEBUG ${1+"$@"}

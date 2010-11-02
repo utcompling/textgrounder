@@ -36,94 +36,8 @@ from process_article_data import *
 #                                  Globals                                 #
 ############################################################################
 
-# Static class maintaining tables listing all articles and mapping between
-# names, ID's and articles.  Objects corresponding to redirect articles
-# should not be present anywhere in this table; instead, the name of the
-# redirect article should point to the article object for the article
-# pointed to by the redirect.
-class ArticleTable(object):
-  # Map from short name (lowercased) to list of Wikipedia articles.  The short
-  # name for an article is computed from the article's name.  If the article
-  # name has a comma, the short name is the part before the comma, e.g. the
-  # short name of "Springfield, Ohio" is "Springfield".  If the name has no
-  # comma, the short name is the same as the article name.  The idea is that
-  # the short name should be the same as one of the toponyms used to refer to
-  # the article.
-  short_lowername_to_articles = listdict()
-
-  # Map from tuple (NAME, DIV) for Wikipedia articles of the form
-  # "Springfield, Ohio", lowercased.
-  lowername_div_to_articles = listdict()
-
-  # Mapping from article names to Article objects, using the actual case of
-  # the article.
-  name_to_article = {}
-
-  # Mapping from lowercased article names to Article objects
-  lowername_to_articles = listdict()
-
-  articles_by_split = {}
-
-  # Look up an article named NAME and return the associated article.
-  # Note that article names are case-sensitive but the first letter needs to
-  # be capitalized.
-  @staticmethod
-  def lookup_article(name):
-    assert name
-    return ArticleTable.name_to_article.get(capfirst(name), None)
-
-  # Record the article as having NAME as one of its names (there may be
-  # multiple names, due to redirects).  Also add to related lists mapping
-  # lowercased form, short form, etc.
-  @staticmethod
-  def record_article(name, art):
-    # Must pass in properly cased name
-    assert name == capfirst(name)
-    ArticleTable.name_to_article[name] = art
-    loname = name.lower()
-    ArticleTable.lowername_to_articles[loname] += [art]
-    (short, div) = compute_short_form(loname)
-    if div:
-      ArticleTable.lowername_div_to_articles[(short, div)] += [art]
-    ArticleTable.short_lowername_to_articles[short] += [art]
-    if art not in lower_toponym_to_article[loname]:
-      lower_toponym_to_article[loname] += [art]
-    if short != loname and art not in lower_toponym_to_article[short]:
-      lower_toponym_to_article[short] += [art]
-    if art.split not in ArticleTable.articles_by_split:
-      ArticleTable.articles_by_split[art.split] = set()
-    ArticleTable.articles_by_split[art.split].add(art)
-
 # List of stopwords
 stopwords = set()
-
-# Total number of word types seen (size of vocabulary)
-num_word_types = 0
-
-# Total number of word tokens seen
-num_word_tokens = 0
-
-# Total number of types seen once
-num_types_seen_once = 0
-
-# Estimate of number of unseen word types for all articles
-num_unseen_word_types = 0
-
-# Overall probabilities over all articles of seeing a word in an article,
-# for all words seen at least once in any article, computed using the
-# empirical frequency of a word among all articles, adjusted by the mass
-# to be assigned to globally unseen words (words never seen at all), i.e. the
-# value in 'globally_unseen_word_prob'.
-overall_word_probs = intdict()
-
-# The total probability mass to be assigned to words not seen at all in
-# any article, estimated using Good-Turing smoothing as the unadjusted
-# empirical probability of having seen a word once.
-globally_unseen_word_prob = 0.0
-
-# For articles whose word counts are not known, use an empty list to
-# look up in.
-unknown_article_counts = ([], [])
 
 # For each toponym (name of location), value is a list of Locality items,
 # listing gazetteer locations and corresponding matching Wikipedia articles.
@@ -142,13 +56,6 @@ path_to_division = {}
 # Debug level; if non-zero, output lots of extra information about how
 # things are progressing.  If > 1, even more info.
 debug = 0
-
-# Do we ignore stopwords when computing word distributions?
-ignore_stopwords_in_article_dists = False
-
-# If true, ignore case when creating distributions and looking up words
-# FIXME: This is hardcoded to true in various places
-ignore_case_words = True
 
 # Size of each region in degrees.  Determined by the --region-size option
 # (however, that option is expressed in miles).
@@ -174,42 +81,276 @@ earth_radius_in_miles = 3963.191
 # from the equator.
 miles_per_degree = math.pi * 2 * earth_radius_in_miles / 360.
 
-# Mapping of region->locations in region, for region-based Naive Bayes
-# disambiguation.  The key is a tuple expressing the integer indices of the
-# latitude and longitude of the southwest corner of the region. (Basically,
-# given an index, the latitude or longitude of the southwest corner is
-# index*degrees_per_region, and the region includes all locations whose
-# latitude or longitude is in the half-open interval
-# [index*degrees_per_region, (index+1)*degrees_per_region).
-#
-# We don't just create an array because we expect many regions to have no
-# locations in them, esp. as we decrease the region size.  The idea is that
-# the regions provide a first approximation to the regions used to create the
-# article distributions.
-region_to_locations = listdict()
-
-# Mapping from center of Naive Bayes region to corresponding region object.
-# A "Naive Bayes region" is made up of a square of tiling regions, with
-# the number of regions on a side determined by `Opts.width_of_nbregion'.  A
-# word distribution is associated with each Naive Bayes region.
-corner_to_nbregion = {}
-
 # Table of all toponyms seen in evaluation files, along with how many times
 # seen.  Used to determine when caching of certain toponym-specific values
 # should be done.
-toponyms_seen_in_eval_files = intdict()
+#toponyms_seen_in_eval_files = intdict()
 
 # Count of total documents processed so far
 documents_processed = 0
 
 ############################################################################
+#                          The global word distribution                    #
+############################################################################
+
+class GlobalDist(object):
+  # Total number of word types seen (size of vocabulary)
+  num_word_types = 0
+
+  # Total number of word tokens seen
+  num_word_tokens = 0
+
+  # Total number of types seen once
+  num_types_seen_once = 0
+
+  # Estimate of number of unseen word types for all articles
+  num_unseen_word_types = 0
+
+  # Overall probabilities over all articles of seeing a word in an article,
+  # for all words seen at least once in any article, computed using the
+  # empirical frequency of a word among all articles, adjusted by the mass
+  # to be assigned to globally unseen words (words never seen at all), i.e. the
+  # value in 'globally_unseen_word_prob'.
+  overall_word_probs = intdict()
+
+  # The total probability mass to be assigned to words not seen at all in
+  # any article, estimated using Good-Turing smoothing as the unadjusted
+  # empirical probability of having seen a word once.
+  globally_unseen_word_prob = 0.0
+
+  # For articles whose word counts are not known, use an empty list to
+  # look up in.
+  # unknown_article_counts = ([], [])
+
+  @staticmethod
+  def finish_article_distributions():
+    # Now, adjust overall_word_probs accordingly.
+    GlobalDist.num_types_seen_once = 0
+    ### FIXME: A simple calculation reveals that in the scheme where we use
+    ### globally_unseen_word_prob, num_types_seen_once cancels out and
+    ### we never actually have to compute it.
+    for count in GlobalDist.overall_word_probs.itervalues():
+      if count == 1:
+        GlobalDist.num_types_seen_once += 1
+    GlobalDist.globally_unseen_word_prob = (
+      float(GlobalDist.num_types_seen_once)/GlobalDist.num_word_tokens)
+    for (wordind,count) in GlobalDist.overall_word_probs.iteritems():
+      GlobalDist.overall_word_probs[wordind] = (
+        float(count)/GlobalDist.num_word_tokens*
+          (1 - GlobalDist.globally_unseen_word_prob))
+    # A very rough estimate, perhaps totally wrong
+    GlobalDist.num_unseen_word_types = GlobalDist.num_types_seen_once
+
+    #if debug > 2:
+    #  uniprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s" % (GlobalDist.num_word_types, GlobalDist.num_word_tokens, GlobalDist.num_types_seen_once, GlobalDist.globally_unseen_word_prob, GlobalDist.globally_unseen_word_prob + sum(GlobalDist.overall_word_probs.itervalues())))
+
+    # Figure out the value of OVERALL_UNSEEN_MASS for each article.
+    for art in ArticleTable.name_to_article.itervalues():
+      # make sure counts not None (eg article in coords file but not counts file)
+      if not art.counts: continue
+      overall_seen_mass = 0.0
+      for ind in art.counts[0]:
+        overall_seen_mass += GlobalDist.overall_word_probs[ind]
+      art.overall_unseen_mass = 1.0 - overall_seen_mass
+      art.finished = True
+
+
+############################################################################
+#                                Article table                             #
+############################################################################
+
+# Static class maintaining tables listing all articles and mapping between
+# names, ID's and articles.  Objects corresponding to redirect articles
+# should not be present anywhere in this table; instead, the name of the
+# redirect article should point to the article object for the article
+# pointed to by the redirect.
+class ArticleTable(object):
+  # Map from short name (lowercased) to list of Wikipedia articles.  The short
+  # name for an article is computed from the article's name.  If the article
+  # name has a comma, the short name is the part before the comma, e.g. the
+  # short name of "Springfield, Ohio" is "Springfield".  If the name has no
+  # comma, the short name is the same as the article name.  The idea is that
+  # the short name should be the same as one of the toponyms used to refer to
+  # the article.
+  short_lower_name_to_articles = listdict()
+
+  # Map from tuple (NAME, DIV) for Wikipedia articles of the form
+  # "Springfield, Ohio", lowercased.
+  lower_name_div_to_articles = listdict()
+
+  # Mapping from article names to Article objects, using the actual case of
+  # the article.
+  name_to_article = {}
+
+  # Mapping from lowercased article names to Article objects
+  lower_name_to_articles = listdict()
+
+  articles_by_split = {}
+
+  # Look up an article named NAME and return the associated article.
+  # Note that article names are case-sensitive but the first letter needs to
+  # be capitalized.
+  @staticmethod
+  def lookup_article(name):
+    assert name
+    return ArticleTable.name_to_article.get(capfirst(name), None)
+
+  # Record the article as having NAME as one of its names (there may be
+  # multiple names, due to redirects).  Also add to related lists mapping
+  # lowercased form, short form, etc.
+  @staticmethod
+  def record_article(name, art):
+    # Must pass in properly cased name
+    assert name == capfirst(name)
+    ArticleTable.name_to_article[name] = art
+    loname = name.lower()
+    ArticleTable.lower_name_to_articles[loname] += [art]
+    (short, div) = compute_short_form(loname)
+    if div:
+      ArticleTable.lower_name_div_to_articles[(short, div)] += [art]
+    ArticleTable.short_lower_name_to_articles[short] += [art]
+    if art not in lower_toponym_to_article[loname]:
+      lower_toponym_to_article[loname] += [art]
+    if short != loname and art not in lower_toponym_to_article[short]:
+      lower_toponym_to_article[short] += [art]
+    if art.split not in ArticleTable.articles_by_split:
+      ArticleTable.articles_by_split[art.split] = set()
+    ArticleTable.articles_by_split[art.split].add(art)
+
+
+############################################################################
 #                                Evaluation                                #
 ############################################################################
 
-max_individual_candidates = 5
-
 class Eval(object):
-  incorrect_values = [
+  def __init__(self, incorrect_reasons):
+    # Statistics on the types of instances processed
+    # Total number of instances
+    self.total_instances = 0
+    self.correct_instances = 0
+    self.incorrect_instances = 0
+    self.incorrect_reasons = incorrect_reasons
+    for (attrname, engname) in self.incorrect_reasons:
+      setattr(self, attrname, 0)
+  
+  def record_result(self, correct, reason=None):
+    self.total_instances += 1
+    if correct:
+      self.correct_instances += 1
+    else:
+      self.incorrect_instances += 1
+      if reason != None:
+        setattr(self, reason, getattr(self, reason) + 1)
+
+  def output_fraction(self, header, amount, total):
+    if amount > total:
+      warning("Something wrong: Fractional quantity %s greater than total %s"
+              % (amount, total))
+    if total == 0:
+      percent = "indeterminate percent"
+    else:
+      percent = "%5.2f%%" % (100*float(amount)/total)
+    print ("%s = %s/%s = %s" % (header, amount, total, percent))
+
+  def output_correct_results(self):
+    self.output_fraction("Percent correct", self.correct_instances,
+                         self.total_instances)
+
+  def output_incorrect_results(self):
+    self.output_fraction("Percent incorrect", self.incorrect_instances,
+                         self.total_instances)
+    for (reason, descr) in self.incorrect_reasons:
+      self.output_fraction("  %s" % descr, getattr(self, reason),
+                           self.total_instances)
+
+  def output_results(self):
+    if not self.total_instances:
+      warning("Strange, no instances found at all; perhaps --eval-format is incorrect?")
+      return
+    self.output_correct_results()
+    self.output_incorrect_results()
+
+class EvalWithCandidateList(Eval):
+  def __init__(self, incorrect_reasons, max_individual_candidates=5):
+    super(EvalWithCandidateList, self).__init__(incorrect_reasons)
+    self.max_individual_candidates = max_individual_candidates
+    # Toponyms by number of candidates available
+    self.total_instances_by_num_candidates = intdict()
+    self.correct_instances_by_num_candidates = intdict()
+    self.incorrect_instances_by_num_candidates = intdict()
+
+  def record_result(self, correct, reason, num_arts):
+    super(EvalWithCandidateList, self).record_result(correct, reason)
+    self.total_instances_by_num_candidates[num_arts] += 1
+    if correct:
+      self.correct_instances_by_num_candidates[num_arts] += 1
+    else:
+      self.incorrect_instances_by_num_candidates[num_arts] += 1
+
+  def output_table_by_num_candidates(self, table, total):
+    for i in range(0, 1+self.max_individual_candidates):
+      self.output_fraction("  With %d  candidates" % i, table[i], total)
+    items = sum(val for key, val in table.iteritems()
+                if key > self.max_individual_candidates)
+    self.output_fraction("  With %d+ candidates" %
+                           (1+self.max_individual_candidates),
+                         items, total)
+
+  def output_correct_results(self):
+    super(EvalWithCandidateList, self).output_correct_results()
+    self.output_table_by_num_candidates(
+      self.correct_instances_by_num_candidates, self.correct_instances)
+
+  def output_incorrect_results(self):
+    super(EvalWithCandidateList, self).output_incorrect_results()
+    self.output_table_by_num_candidates(
+      self.incorrect_instances_by_num_candidates, self.incorrect_instances)
+
+class EvalWithRank(Eval):
+  def __init__(self, max_rank_for_credit=10):
+    super(EvalWithRank, self).__init__(incorrect_reasons=[])
+    self.max_rank_for_credit = max_rank_for_credit
+    self.incorrect_by_exact_rank = intdict()
+    self.correct_by_up_to_rank = intdict()
+    self.incorrect_past_max_rank = 0
+    self.total_credit = 0
+  
+  def record_result(self, rank):
+    assert rank >= 1
+    correct = rank == 1
+    super(EvalWithRank, self).record_result(correct, reason=None)
+    self.total_credit = self.max_rank_for_credit + 1 - rank
+    if rank <= self.max_rank_for_credit:
+      self.incorrect_by_exact_rank[rank] += 1
+      for i in xrange(i, max_rank_for_credit + 1):
+        self.correct_by_up_to_rank[i] += 1
+    else:
+      self.incorrect_past_max_rank += 1
+
+  def output_correct_results(self):
+    super(EvalWithRank, self).output_correct_results()
+    possible_credit = self.max_rank_for_credit*self.total_instances
+    self.output_fraction("Percent correct with partial credit",
+                         self.total_credit, possible_credit)
+    for i in xrange(2, self.max_rank_for_credit + 1):
+      self.output_fraction("  Correct is at or below rank %s" % i,
+                           self.correct_by_up_to_rank[i], self.total_instances)
+
+  def output_incorrect_results(self):
+    super(EvalWithRank, self).output_incorrect_results()
+    for i in xrange(2, self.max_rank_for_credit + 1):
+      self.output_fraction("  Incorrect, with correct at rank %s" % i,
+                           self.incorrect_by_exact_rank[i],
+                           self.total_instances)
+    self.output_fraction("  Incorrect, with correct not in top %s" %
+                           self.max_rank_for_credit,
+                           self.incorrect_past_max_rank, self.total_instances)
+
+
+class Results(object):
+  ####### Results for geotagging toponyms
+
+  incorrect_geotag_toponym_reasons = [
     ('incorrect_with_no_candidates',
      'Incorrect, with no candidates'),
     ('incorrect_with_no_correct_candidates',
@@ -222,79 +363,50 @@ class Eval(object):
      'Incorrect, with one correct candidate'),
   ]
 
-  for (val, descr) in incorrect_values:
-    exec "%s = 0" % val
+  # Overall statistics
+  all_toponym = EvalWithCandidateList(incorrect_geotag_toponym_reasons) 
 
-  def __init__(self):
-    # Statistics on the types of toponyms processed
-    # Total number of toponyms
-    self.total_toponyms = 0
-    self.correct_toponyms = 0
-    self.incorrect_toponyms = 0
-  
-    # Toponyms by number of candidates available
-    self.total_toponyms_by_num_candidates = intdict()
-    self.correct_toponyms_by_num_candidates = intdict()
-    self.incorrect_toponyms_by_num_candidates = intdict()
+  # Statistics when toponym not same as true name of location
+  diff_surface = EvalWithCandidateList(incorrect_geotag_toponym_reasons)
 
-  def record_result(self, correct, reason, num_arts):
-    self.total_toponyms += 1
-    self.total_toponyms_by_num_candidates[num_arts] += 1
-    if correct:
-      self.correct_toponyms += 1
-      self.correct_toponyms_by_num_candidates[num_arts] += 1
-    else:
-      self.incorrect_toponyms += 1
-      self.incorrect_toponyms_by_num_candidates[num_arts] += 1
-      setattr(self, reason, getattr(self, reason) + 1)
+  # Statistics when toponym not same as true name or short form of location
+  diff_short = EvalWithCandidateList(incorrect_geotag_toponym_reasons)
 
-  def output_results(self):
-    def output_table_by_num_candidates(table, total):
-      for i in range(0, 1+max_individual_candidates):
-        print ("  With %d  candidates = %6d (%5.2f%%)" %
-               (i, table[i], 100*float(table[i])/total))
-      items = sum(val for key, val in table.iteritems()
-                  if key > max_individual_candidates)
-      print ("  With %d+ candidates = %6d (%5.2f%%)" %
-             (1+max_individual_candidates, items, 100*float(items)/total))
-      
-    tot = self.total_toponyms
-    if not tot:
-      warning("Strange, no toponyms found at all; perhaps --eval-format is incorrect?")
-      return
-    print ("Percent correct = %s/%s = %5.2f%%" %
-           (self.correct_toponyms, tot, 100*float(self.correct_toponyms)/tot))
-    output_table_by_num_candidates(self.correct_toponyms_by_num_candidates,
-                                   self.correct_toponyms)
-    print ("Percent incorrect = %s/%s = %5.2f%%" %
-           (self.incorrect_toponyms, tot,
-            100*float(self.incorrect_toponyms)/tot))
-    for (val, descr) in self.incorrect_values:
-      print ("  %s = %s/%s = %5.2f%%" %
-        (descr, getattr(self, val), tot, 100*float(getattr(self, val))/tot))
-    output_table_by_num_candidates(self.incorrect_toponyms_by_num_candidates,
-                                   self.incorrect_toponyms)
+  @staticmethod
+  def record_geotag_toponym_result(correct, toponym, trueloc, reason,
+                                   num_arts):
+    Results.all_toponym.record_result(correct, reason, num_arts)
+    if toponym != trueloc:
+      Results.diff_surface.record_result(correct, reason, num_arts)
+      (short, div) = compute_short_form(trueloc)
+      if toponym != short:
+        Results.diff_short.record_result(correct, reason, num_arts)
+
+  @staticmethod
+  def output_geotag_toponym_results():
+    print "Results for all toponyms:"
+    Results.all_toponym.output_results()
+    print ""
+    print "Results for toponyms when different from true location name:"
+    Results.diff_surface.output_results()
+    print ""
+    print "Results for toponyms when different from either true location name"
+    print "  or its short form:"
+    Results.diff_short.output_results()
 
 
-# Overall statistics
-all_eval = Eval()
+  ####### Results for geotagging documents/articles
 
-# Statistics when toponym not same as true name of location
-diff_surface_eval = Eval()
+  all_document = EvalWithRank()
 
-# Statistics when toponym not same as true name or short form of location
-diff_short_eval = Eval()
+  def record_geotag_document_result(rank):
+    Results.all_document.record_result(rank)
 
-def output_all_results():
-  print "Results for all toponyms:"
-  all_eval.output_results()
-  print ""
-  print "Results for toponyms when different from true location name:"
-  diff_surface_eval.output_results()
-  print ""
-  print "Results for toponyms when different from either true location name"
-  print "  or its short form:"
-  diff_short_eval.output_results()
+  @staticmethod
+  def output_geotag_document_results():
+    print "Results for all documents/articles:"
+    Results.all_document.output_results()
+
 
 ############################################################################
 #                                Coordinates                               #
@@ -345,9 +457,26 @@ def spheredist(p1, p2):
       return 0.
   return earth_radius_in_miles * math.acos(anglecos)
 
-def coord_to_region_indices(coord):
+def coord_to_tiling_region_indices(coord):
   latind = int(math.floor(coord.lat / degrees_per_region))
   longind = int(math.floor(coord.long / degrees_per_region))
+  return (latind, longind)
+
+def coord_to_nbregion_indices(coord):
+  # When Opts.width_of_nbregion = 1, don't subtract anything.
+  # When Opts.width_of_nbregion = 2, subtract 0.5*degrees_per_region.
+  # When Opts.width_of_nbregion = 3, subtract degrees_per_region.
+  # When Opts.width_of_nbregion = 4, subtract 1.5*degrees_per_region.
+  # In general, subtract (Opts.width_of_nbregion-1)/2.0*degrees_per_region.
+
+  # Compute the indices of the southwest region
+  subval = (Opts.width_of_nbregion-1)/2.0*degrees_per_region
+  lat = coord.lat - subval
+  long = coord.long - subval
+  if lat < minimum_latitude: lat = minimum_latitude
+  if long < minimum_longitude: long += 360.
+
+  latind, longind = coord_to_tiling_region_indices(Coord(lat, long))
   return (latind, longind)
 
 def region_indices_to_coord(latind, longind):
@@ -356,6 +485,117 @@ def region_indices_to_coord(latind, longind):
 ############################################################################
 #                           Geographic locations                           #
 ############################################################################
+
+class WordDistribution(object):
+  __slots__ = ['finished', 'counts', 'unseen_mass', 'total_tokens',
+               'overall_unseen_mass']
+
+  # Compute the KL divergence between this distribution and another
+  # distribution.  This is a bit tricky.  We have to take into account:
+  # 1. Words in this distribution (may or may not be in the other).
+  # 2. Words in the other distribution that are not in this one.
+  # 3. Words in neither distribution but seen globally.
+  # 4. Words never seen at all.  These have the 
+  def kl_divergence(self, otherdist):
+    assert self.finished
+    assert otherdist.finished
+    kldiv = 0.0
+    overall_probs_diff_words = 0.0
+    # 1.
+    for word in self.counts[0]:
+      p = self.lookup_word(word)
+      q = otherdist.lookup_word(word)
+      kldiv += p*(math.log(p) - math.log(q))
+    # 2.
+    for word in otherdist.counts[0]:
+      if lookup_sorted_list(self.counts, ind) == None:
+        p = self.lookup_word(word)
+        q = otherdist.lookup_word(word)
+        kldiv += p*(math.log(p) - math.log(q))
+        overall_probs_diff_words += GlobalDist.overall_word_probs[word]
+    # 3. For words seen in neither dist but seen globally:
+    # You can show that this is
+    #
+    # factor1 = (log(self.unseen_mass) - log(self.overall_unseen_mass)) -
+    #           (log(other.unseen_mass) - log(other.overall_unseen_mass))
+    # factor2 = self.unseen_mass / self.overall_unseen_mass * factor1
+    # kldiv = factor2 * (sum(words seen globally but not in either dist)
+    #                    of overall_word_probs[word]) 
+    #
+    # The final sum
+    #   = 1 - sum(words in self) overall_word_probs[word]
+    #       - sum(words in other, not self) overall_word_probs[word]
+    #   = self.overall_unseen_mass
+    #       - sum(words in other, not self) overall_word_probs[word]
+    #
+    # So we just need the sum over the words in other, not self.
+
+    factor1 = ((log(self.unseen_mass) - log(self.overall_unseen_mass)) -
+               (log(other.unseen_mass) - log(other.overall_unseen_mass)))
+    factor2 = self.unseen_mass / self.overall_unseen_mass * factor1
+    the_sum = self.overall_unseen_mass - overall_probs_diff_words
+    kldiv += factor2 * the_sum
+
+    # 4. For words never seen at all:
+    p = (self.unseen_mass*GlobalDist.globally_unseen_word_prob /
+          GlobalDist.num_unseen_word_types)
+    q = (otherdist.unseen_mass*GlobalDist.globally_unseen_word_prob /
+          GlobalDist.num_unseen_word_types)
+    kldiv += GlobalDist.num_unseen_word_types*(p*(math.log(p) - math.log(q)))
+
+    return kldiv
+
+  def symmetric_kldiv(self, otherdist):
+    return (0.5*self.kl_divergence(otherdist) + 
+            0.5*otherdist.kl_divergence(self))
+
+  def lookup_word(self, word):
+    assert self.finished
+    #if debug > 0:
+    #  uniprint("Found counts for article %s, num word types = %s"
+    #           % (art, len(wordcounts[0])))
+    #  uniprint("Unknown prob = %s, overall_unseen_mass = %s" %
+    #           (unseen_mass, overall_unseen_mass))
+    if word in GlobalDist.overall_word_probs:
+      ind = internasc(word)
+    else:
+      ind = None
+    if ind == None:
+      wordprob = (self.unseen_mass*GlobalDist.globally_unseen_word_prob
+                  / GlobalDist.num_unseen_word_types)
+      if debug > 0:
+        uniprint("Word %s, never seen at all, wordprob = %s" %
+                 (word, wordprob))
+    else:
+      wordprob = lookup_sorted_list(self.counts, ind)
+      if wordprob == None:
+        wordprob = (self.unseen_mass *
+                    (GlobalDist.overall_word_probs[ind] /
+                     self.overall_unseen_mass))
+        #if wordprob <= 0:
+        #  warning("Bad values; unseen_mass = %s, overall_word_probs[ind] = %s, overall_unseen_mass = %s" % (unseen_mass, GlobalDist.overall_word_probs[ind], GlobalDist.overall_unseen_mass))
+        if debug > 0:
+          uniprint("Word %s, seen but not in article, wordprob = %s" %
+                   (word, wordprob))
+      else:
+        #if wordprob <= 0 or total_tokens <= 0 or unseen_mass >= 1.0:
+        #  warning("Bad values; wordprob = %s, unseen_mass = %s" %
+        #          (wordprob, unseen_mass))
+        #  for (word,count) in itertools.izip(wordcounts[0], wordcounts[1]):
+        #    uniprint("%s: %s" % (word, count))
+        wordprob = float(wordprob)/self.total_tokens*(1 - self.unseen_mass)
+        if debug > 0:
+          uniprint("Word %s, seen in article, wordprob = %s" %
+                   (word, wordprob))
+    return wordprob
+
+  def __init__(self):
+    self.finished = False
+    self.counts = intdict()
+    self.unseen_mass = 1.0
+    self.total_tokens = 0
+    self.num_types_seen_once = 0
+    self.overall_unseen_mass = 1.0
 
 # Distribution used for Naive Bayes disambiguation.  The following
 # fields are defined: 
@@ -409,7 +649,7 @@ class NBDist(object):
     counts = self.counts
     for loc in locs:
       art = loc.match
-      if not art or not art.finished: continue
+      if not art or not art.finished or art.split != 'training': continue
       for (word,count) in itertools.izip(art.counts[0], art.counts[1]):
         counts[word] += count
       total_tokens += art.total_tokens
@@ -429,7 +669,7 @@ class NBDist(object):
       sum(1 for word in self.counts if self.counts[word] == 1)
     overall_seen_mass = 0.0
     for word in self.counts:
-      overall_seen_mass += overall_word_probs[word]
+      overall_seen_mass += GlobalDist.overall_word_probs[word]
     self.overall_unseen_mass = 1.0 - overall_seen_mass
     if self.total_tokens > 0:
       # If no words seen only once, we will have a problem if we assign 0
@@ -454,7 +694,8 @@ class NBDist(object):
 # Info used in region-based Naive Bayes disambiguation.  This class contains
 # values used in computing the distribution over all locations in the
 # region surrounding the locality in question.  The region is currently a
-# square of 4 tiling regions.  The following fields are defined: 
+# square of NxN tiling regions, for N = Opts.width_of_nbregion.
+# The following fields are defined: 
 #
 #   latind, longind: Region indices of southwest-most tiling region in
 #                    Naive Bayes region.
@@ -462,6 +703,29 @@ class NBDist(object):
 
 class NBRegion(object):
   __slots__ = ['latind', 'longind', 'nbdist']
+  
+  # Mapping of region->locations in region, for region-based Naive Bayes
+  # disambiguation.  The key is a tuple expressing the integer indices of the
+  # latitude and longitude of the southwest corner of the region. (Basically,
+  # given an index, the latitude or longitude of the southwest corner is
+  # index*degrees_per_region, and the region includes all locations whose
+  # latitude or longitude is in the half-open interval
+  # [index*degrees_per_region, (index+1)*degrees_per_region).
+  #
+  # We don't just create an array because we expect many regions to have no
+  # locations in them, esp. as we decrease the region size.  The idea is that
+  # the regions provide a first approximation to the regions used to create the
+  # article distributions.
+  tiling_region_to_locations = listdict()
+
+  # Mapping from center of Naive Bayes region to corresponding region object.
+  # A "Naive Bayes region" is made up of a square of tiling regions, with
+  # the number of regions on a side determined by `Opts.width_of_nbregion'.  A
+  # word distribution is associated with each Naive Bayes region.
+  corner_to_nbregion = {}
+
+  empty_nbregion = None # Can't compute this until class is initialized
+  all_regions_computed = False
 
   def __init__(self, latind, longind):
     self.latind = latind
@@ -480,7 +744,7 @@ class NBRegion(object):
 
     # Accumulate counts for the given region
     def process_one_region(latind, longind):
-      locs = region_to_locations.get((latind, longind), None)
+      locs = NBRegion.tiling_region_to_locations.get((latind, longind), None)
       if not locs:
         return
       if debug > 0:
@@ -497,6 +761,54 @@ class NBRegion(object):
         process_one_region(i, jj)
 
     self.nbdist.finish_dist()
+
+  # Find the correct NBRegion for the given coordinates.
+  # If none, create the region.
+  @staticmethod
+  def find_region_for_coord(coord):
+    latind, longind = coord_to_nbregion_indices(coord)
+    return NBRegion.find_nbregion_for_region_indices(latind, longind)
+
+  # Find the NBRegion with the given indices at the southwest point.
+  # If none, create the region.
+  @staticmethod
+  def find_region_for_region_indices(latind, longind, no_create_empty=False):
+    nbreg = NBRegion.corner_to_nbregion.get((latind, longind), None)
+    if not nbreg:
+      if NBRegion.all_regions_computed:
+        if not NBRegion.empty_nbregion:
+          NBRegion.empty_nbregion = NBRegion(None, None)
+          NBRegion.empty_nbregion.nbdist.finish_dist()
+        return NBRegion.empty_nbregion
+      nbreg = NBRegion(latind, longind)
+      nbreg.generate_dist()
+      if not nbreg.nbdist.is_empty() or not no_create_empty:
+        NBRegion.corner_to_nbregion[(latind, longind)] = nbreg
+    return nbreg
+
+  # Generate all NBRegions that are non-empty.
+  @staticmethod
+  def generate_all_nonempty_regions():
+    status = StatusMessage('Naive Bayes region')
+
+    for i in xrange(minimum_latind, maximum_latind + 1):
+      for j in xrange(minimum_longind, maximum_longind + 1):
+        find_region_for_region_indices(i, j, no_create_empty=True)
+        status.item_processed()
+
+    NBRegion.all_regions_computed = True
+    
+  # Add the given locality to the region map, which covers the earth in regions
+  # of a particular size to aid in computing the regions used in region-based
+  # Naive Bayes.
+  @staticmethod
+  def add_locality_to_region_map(loc):
+    latind, longind = coord_to_tiling_region_indices(loc.coord)
+    NBRegion.tiling_region_to_locations[(latind, longind)] += [loc]
+
+  @staticmethod
+  def yield_all_nonempty_regions():
+    return NBRegion.corner_to_nbregion.iteritems()
 
 ############ Locations ############
 
@@ -751,30 +1063,38 @@ class NBArticle(Article):
       if not loc.nbdist:
         loc.generate_nbdist()
       return loc.nbdist
-    nbreg = self.nbregion
-    if nbreg: return nbreg.nbdist
-  
-    # When Opts.width_of_nbregion = 1, don't subtract anything.
-    # When Opts.width_of_nbregion = 2, subtract 0.5*degrees_per_region.
-    # When Opts.width_of_nbregion = 3, subtract degrees_per_region.
-    # When Opts.width_of_nbregion = 4, subtract 1.5*degrees_per_region.
-    # In general, subtract (Opts.width_of_nbregion-1)/2.0*degrees_per_region.
-  
-    # Compute the indices of the southwest region
-    subval = (Opts.width_of_nbregion-1)/2.0*degrees_per_region
-    lat = self.coord.lat - subval
-    long = self.coord.long - subval
-    if lat < minimum_latitude: lat = minimum_latitude
-    if long < minimum_longitude: long += 360.
-    
-    latind, longind = coord_to_region_indices(Coord(lat, long))
-    nbreg = corner_to_nbregion.get((latind, longind), None)
-    if not nbreg:
-      nbreg = NBRegion(latind, longind)
-      nbreg.generate_dist()
-      corner_to_nbregion[(latind, longind)] = nbreg
-    self.nbregion = nbreg
-    return nbreg.nbdist
+    if not self.nbregion:
+      self.nbregion = NBRegion.find_region_for_coord(self.coord)
+    return self.nbregion.nbdist
+
+  def compute_distribution(self, wordhash, total_tokens):
+    if total_tokens == 0: return
+    if self.counts:
+      warning("Article %s already has counts for it!" % art)
+    wordcounts = {}
+    # Compute probabilities.  Use a very simple version of Good-Turing
+    # smoothing where we assign to unseen words the probability mass of
+    # words seen once, and adjust all other probs accordingly.
+    self.words_seen_once = [word for word in wordhash if wordhash[word] == 1]
+    oncecount = len(self.words_seen_once)
+    unseen_mass = float(oncecount)/total_tokens
+    for (word,count) in wordhash.iteritems():
+      ind = internasc(word)
+      if ind not in GlobalDist.overall_word_probs:
+        GlobalDist.num_word_types += 1
+      # Record in overall_word_probs; note more tokens seen.
+      GlobalDist.overall_word_probs[ind] += count
+      GlobalDist.num_word_tokens += count
+      # Record in current article's word->probability map.
+      # wordcounts[ind] = float(count)/total_tokens*(1 - unseen_mass)
+      wordcounts[ind] = count
+    self.counts = make_sorted_list(wordcounts)
+    self.unseen_mass = unseen_mass
+    self.total_tokens = total_tokens
+    if debug > 3:
+      uniprint("Title = %s, numtypes = %s, numtokens = %s, unseen_mass = %s"
+               % (title, len(self.counts[0]), total_tokens, unseen_mass))
+
 
 # Find Wikipedia article matching name NAME for location LOC.  NAME
 # will generally be one of the names of LOC (either its canonical
@@ -792,7 +1112,7 @@ def find_one_wikipedia_match(loc, name, check_match, prefer_match):
 
   # Look for any articles with same name (case-insensitive) as the location,
   # check for matches
-  for art in ArticleTable.lowername_to_articles[loname]:
+  for art in ArticleTable.lower_name_to_articles[loname]:
     if check_match(loc, art): return art
 
   # Check whether there is a match for an article whose name is
@@ -801,12 +1121,12 @@ def find_one_wikipedia_match(loc, name, check_match, prefer_match):
   # "Augusta" in a second-level division "Georgia").
   if loc.div:
     for div in loc.div.path:
-      for art in ArticleTable.lowername_div_to_articles[(loname, div.lower())]:
+      for art in ArticleTable.lower_name_div_to_articles[(loname, div.lower())]:
         if check_match(loc, art): return art
 
   # See if there is a match with any of the articles whose short name
   # is the same as the location's name
-  arts = ArticleTable.short_lowername_to_articles[loname]
+  arts = ArticleTable.short_lower_name_to_articles[loname]
   if arts:
     goodarts = [art for art in arts if check_match(loc, art)]
     if len(goodarts) == 1:
@@ -902,9 +1222,6 @@ def read_stopwords(filename):
 
 
 def read_article_data(filename):
-  errprint("Reading article data file %s..." % filename)
-  status = StatusMessage('article')
-
   redirects = []
 
   def process(art):
@@ -932,48 +1249,28 @@ def read_article_data(filename):
 
 def read_word_counts(filename):
 
+  def one_article_probs(title, wordhash, total_tokens):
+    if total_tokens == 0: return
+    art = ArticleTable.lookup_article(title)
+    if not art:
+      warning("Skipping article %s, not in table" % title)
+      return
+    if art.split != 'training':
+      errprint("Skipping article %s, in split '%s', not training" %
+               (art, art.split))
+      return
+    art.compute_distribution(wordhash, total_tokens)
+
   errprint("Reading word counts from %s..." % filename)
   status = StatusMessage('article')
   total_tokens = 0
 
-  def one_article_probs():
-    if total_tokens == 0: return
-    art = ArticleTable.lookup_article(title)
-    if not art:
-      warning("Skipping article %s" % title)
-      return
-    if art.counts:
-      warning("Article %s already has counts for it!" % art)
-    wordcounts = {}
-    # Compute probabilities.  Use a very simple version of Good-Turing
-    # smoothing where we assign to unseen words the probability mass of
-    # words seen once, and adjust all other probs accordingly.
-    art.words_seen_once = [word for word in wordhash if wordhash[word] == 1]
-    oncecount = len(art.words_seen_once)
-    unseen_mass = float(oncecount)/total_tokens
-    for (word,count) in wordhash.iteritems():
-      global num_word_types
-      ind = internasc(word)
-      if ind not in overall_word_probs:
-        num_word_types += 1
-      # Record in overall_word_probs; note more tokens seen.
-      overall_word_probs[ind] += count
-      global num_word_tokens
-      num_word_tokens += count
-      # Record in current article's word->probability map.
-      # wordcounts[ind] = float(count)/total_tokens*(1 - unseen_mass)
-      wordcounts[ind] = count
-    art.counts = make_sorted_list(wordcounts)
-    art.unseen_mass = unseen_mass
-    art.total_tokens = total_tokens
-    if debug > 3:
-      uniprint("Title = %s, numtypes = %s, numtokens = %s, unseen_mass = %s"
-               % (title, len(art.counts[0]), total_tokens, unseen_mass))
-
+  title = None
   for line in uchompopen(filename):
     if line.startswith('Article title: '):
       m = re.match('Article title: (.*)$', line)
-      one_article_probs()
+      if title:
+        one_article_probs(title, wordhash, total_tokens)
       # Stop if we've reached the maximum
       if status.item_processed() >= Opts.max_time_per_stage:
         break
@@ -988,49 +1285,17 @@ def read_word_counts(filename):
         warning("Strange line, can't parse: title=%s: line=%s" % (title, line))
         continue
       word = m.group(1)
-      if ignore_case_words: word = word.lower()
+      if not Opts.preserve_case_words: word = word.lower()
       count = int(m.group(2))
-      if word in stopwords and ignore_stopwords_in_article_dists: continue
+      if word in stopwords and Opts.ignore_stopwords_in_article_dists: continue
       word = internasc(word)
       total_tokens += count
       wordhash[word] += count
   else:
     one_article_probs()
 
-  # Now, adjust overall_word_probs accordingly.
-  global num_types_seen_once
-  num_types_seen_once = 0
-  for count in overall_word_probs.itervalues():
-    if count == 1:
-      num_types_seen_once += 1
-  global globally_unseen_word_prob
-  globally_unseen_word_prob = float(num_types_seen_once)/num_word_tokens
-  for (wordind,count) in overall_word_probs.iteritems():
-    overall_word_probs[wordind] = (
-      float(count)/num_word_tokens*(1 - globally_unseen_word_prob))
-  # A very rough estimate, perhaps totally wrong
-  global num_unseen_word_types
-  num_unseen_word_types = num_types_seen_once
+  GlobalDist.finish_article_distributions()
 
-  #if debug > 2:
-  #  uniprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s" % (num_word_types, num_word_tokens, num_types_seen_once, globally_unseen_word_prob, globally_unseen_word_prob + sum(overall_word_probs.itervalues())))
-
-  # Figure out the value of OVERALL_UNSEEN_MASS for each article.
-  for art in ArticleTable.name_to_article.itervalues():
-    # make sure counts not None (eg article in coords file but not counts file)
-    if not art.counts: continue
-    overall_seen_mass = 0.0
-    for ind in art.counts[0]:
-      overall_seen_mass += overall_word_probs[ind]
-    art.overall_unseen_mass = 1.0 - overall_seen_mass
-    art.finished = True
-
-# Add the given locality to the region map, which covers the earth in regions
-# of a particular size to aid in computing the regions used in region-based
-# Naive Bayes.
-def add_locality_to_region_map(loc):
-  (latind, longind) = coord_to_region_indices(loc.coord)
-  region_to_locations[(latind, longind)] += [loc]
 
 # Find the Wikipedia article matching an entry in the gazetteer.
 # The format of an entry is
@@ -1116,7 +1381,7 @@ def match_world_gazetteer_entry(line, add_to_region_map):
     return
   
   if add_to_region_map:
-    add_locality_to_region_map(loc)
+    NBRegion.add_locality_to_region_map(loc)
 
   # Record the match.
   loc.match = match
@@ -1203,7 +1468,7 @@ class LinkBaselineStrategy(GeotagToponymStrategy):
 
 # Find each toponym explicitly mentioned as such and disambiguate it
 # (find the correct geographic location) using Naive Bayes, possibly
-# in conjunction with the link baseline.
+# in conjunction with the baseline.
 class NaiveBayesStrategy(GeotagToponymStrategy):
   def __init__(self, use_baseline):
     self.use_baseline = use_baseline
@@ -1212,29 +1477,14 @@ class NaiveBayesStrategy(GeotagToponymStrategy):
     return True
 
   def compute_score(self, geogword, art):
+    # FIXME FIXME!!! We are assuming that the baseline is 'internal-link',
+    # regardless of its actual settings.
     thislinks = get_adjusted_incoming_links(art)
 
     if self.opts.naive_bayes_type == 'article':
       distobj = art
     else:
       distobj = art.find_nbdist()
-    if not distobj.finished:
-      wordcounts = unknown_article_counts
-      total_tokens = 0
-      unseen_mass = 1.0
-      overall_unseen_mass = 1.0
-      if debug > 0:
-        uniprint("Counts for article %s not tabulated" % art)
-    else:
-      wordcounts = distobj.counts
-      unseen_mass = distobj.unseen_mass
-      total_tokens = distobj.total_tokens
-      overall_unseen_mass = distobj.overall_unseen_mass
-      if debug > 0:
-        uniprint("Found counts for article %s, num word types = %s"
-                 % (art, len(wordcounts[0])))
-        uniprint("Unknown prob = %s, overall_unseen_mass = %s" %
-                 (unseen_mass, overall_unseen_mass))
     totalprob = 0.0
     total_word_weight = 0.0
     if not self.strategy.use_baseline:
@@ -1247,37 +1497,8 @@ class NaiveBayesStrategy(GeotagToponymStrategy):
       baseline_weight = self.opts.baseline_weight
       word_weight = 1 - baseline_weight
     for (dist, word) in geogword.context:
-      if ignore_case_words: word = word.lower()
-      if word in overall_word_probs:
-        ind = internasc(word)
-      else:
-        ind = None
-      if ind == None:
-        wordprob = (unseen_mass*globally_unseen_word_prob
-                    / num_unseen_word_types)
-        if debug > 0:
-          uniprint("Word %s, never seen at all, wordprob = %s" %
-                   (word, wordprob))
-      else:
-        wordprob = lookup_sorted_list(wordcounts, ind)
-        if wordprob == None:
-          wordprob = (unseen_mass *
-                      (overall_word_probs[ind] / overall_unseen_mass))
-          #if wordprob <= 0:
-          #  warning("Bad values; unseen_mass = %s, overall_word_probs[ind] = %s, overall_unseen_mass = %s" % (unseen_mass, overall_word_probs[ind], overall_unseen_mass))
-          if debug > 0:
-            uniprint("Word %s, seen but not in article, wordprob = %s" %
-                     (word, wordprob))
-        else:
-          #if wordprob <= 0 or total_tokens <= 0 or unseen_mass >= 1.0:
-          #  warning("Bad values; wordprob = %s, unseen_mass = %s" %
-          #          (wordprob, unseen_mass))
-          #  for (word,count) in itertools.izip(wordcounts[0], wordcounts[1]):
-          #    uniprint("%s: %s" % (word, count))
-          wordprob = float(wordprob)/total_tokens*(1 - unseen_mass)
-          if debug > 0:
-            uniprint("Word %s, seen in article, wordprob = %s" %
-                     (word, wordprob))
+      if not Opts.preserve_case_words: word = word.lower()
+      wordprob = distobj.lookup_word(word)
 
       # Compute weight for each word, based on distance from toponym
       if self.opts.naive_bayes_weighting == 'equal' or \
@@ -1321,7 +1542,7 @@ class TestFileEvaluator(object):
     pass
 
   def output_results(self):
-    output_all_results()
+    pass
 
 
 class GeotagToponymEvaluator(TestFileEvaluator):
@@ -1460,12 +1681,8 @@ class GeotagToponymEvaluator(TestFileEvaluator):
     else:
       uniprint("incorrect, reason = %s" % reason)
 
-    all_eval.record_result(correct, reason, num_arts)
-    if toponym != geogword.location:
-      diff_surface_eval.record_result(correct, reason, num_arts)
-      (short, div) = compute_short_form(geogword.location)
-      if toponym != short:
-        diff_short_eval.record_result(correct, reason, num_arts)
+    Results.record_geotag_toponym_result(correct, toponym, geogword.location,
+                                         reason, num_arts)
 
     if debug > 0 and bestart:
       uniprint("Best article = %s, score = %s, dist = %s, correct %s"
@@ -1480,6 +1697,10 @@ class GeotagToponymEvaluator(TestFileEvaluator):
     if (self.documents_processed % 100) == 0:
       print "Results after %d documents:" % self.documents_processed
       self.output_results()
+
+  def output_results(self):
+    Results.output_geotag_toponym_results()
+
 
 def get_adjusted_incoming_links(art):
   thislinks = art.incoming_links
@@ -1585,35 +1806,56 @@ class WikipediaGeotagToponymEvaluator(GeotagToponymEvaluator):
         word.document = title
         yield word
 
-class WikipediaGeotagArticleEvaluator(TestFileEvaluator):
-  def yield_documents(self, filename):
-    title = None
-    words = []
-    for line in uchompopen(filename, errors='replace'):
-      if rematch('Article title: (.*)$', line):
-        if title:
-          yield (title, words)
-        title = m_[1]
-        words = []
-      elif rematch('Link: (.*)$', line):
-        args = m_[1].split('|')
-        trueart = args[0]
-        linkword = trueart
-        if len(args) > 1:
-          linkword = args[1]
-        words.append(linkword)
-      else:
-        words.append(line)
-    if title:
-      yield (title, words)
 
-  def evaluate_document(self, doc):
-    pass
-
+class GeotagDocumentEvaluator(TestFileEvaluator):
   def output_results(self):
-    output_all_results()
+    Results.output_geotag_document_results()
 
-  pass
+
+class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
+  def yield_documents(self, filename):
+    for art in ArticleTable.articles_by_split['dev']:
+      yield art
+
+    #title = None
+    #words = []
+    #for line in uchompopen(filename, errors='replace'):
+    #  if rematch('Article title: (.*)$', line):
+    #    if title:
+    #      yield (title, words)
+    #    title = m_[1]
+    #    words = []
+    #  elif rematch('Link: (.*)$', line):
+    #    args = m_[1].split('|')
+    #    trueart = args[0]
+    #    linkword = trueart
+    #    if len(args) > 1:
+    #      linkword = args[1]
+    #    words.append(linkword)
+    #  else:
+    #    words.append(line)
+    #if title:
+    #  yield (title, words)
+
+  def evaluate_document(self, article):
+    article_pq = PriorityQueue()
+    for (inds, nbregion) in NBRegion.yield_all_nonempty_regions():
+      article_pq.add_task(article.kl_divergence(nbregion.nbdist),
+                          (inds, nbregion))
+    rank = 1
+    truelat, truelong = coord_to_nbregion_indices(article.coord)
+    while True:
+      try:
+        latind, longind = article_pq.get_top_priority()
+        if latind == truelat and longind == truelong:
+          Results.record_geotag_toponym_result(rank)
+          break
+        rank += 1
+      except IndexError:
+        warning("For article %s, no training articles in article's region" %
+                article)
+        Results.record_geotag_toponym_result(rank)
+
 
 # If given a directory, yield all the files in the directory; else just
 # yield the file.
@@ -1647,13 +1889,13 @@ default '%default'.""")
     op.add_option("-s", "--stopwords-file",
                   help="""File containing list of stopwords.""",
                   metavar="FILE")
-    op.add_option("--article-data-file",
+    op.add_option("-a", "--article-data-file",
                   help="""File containing info about Wikipedia articles.""",
                   metavar="FILE")
     op.add_option("-g", "--gazetteer-file",
                   help="""File containing gazetteer information to match.""",
                   metavar="FILE")
-    op.add_option("-w", "--counts-file",
+    op.add_option("-c", "--counts-file",
                   help="""File containing output from a prior run of
 --output-counts, listing for each article the words in the article and
 associated counts.""",
@@ -1671,8 +1913,17 @@ to the given file.""",
 Each file is read in and then disambiguation is performed.""",
                   metavar="FILE")
     op.add_option("-f", "--eval-format", type='choice',
-                  default="wiki", choices=['tr-conll', 'wiki'],
+                  default="wiki", choices=['tr-conll', 'wiki', 'raw-text'],
                   help="""Format of evaluation file(s).  Default '%default'.""")
+    op.add_option("--preserve-case-words", action='store_true',
+                  default=False,
+                  help="""Don't fold the case of words used to compute and
+match against article distributions.  Note that this does not apply to
+toponyms; currently, toponyms are always matched case-insensitively.""")
+    op.add_option("--ignore-stopwords-in-article-dists", action='store_true',
+                  default=False,
+                  help="""Ignore stopwords when computing word
+distributions.""")
     op.add_option("--max-dist-for-close-match", type='float', default=80,
                   help="""Maximum number of miles allowed when looking for a
 close match.  Default %default.""")
@@ -1685,7 +1936,7 @@ any others in a division.  Points farther away than this are ignored as
 in Naive Bayes matching.  Default %default.""")
     op.add_option("-m", "--mode", type='choice', default='match-only',
                   choices=['geotag-toponyms',
-                           'geotag-articles',
+                           'geotag-documents',
                            'match-only', 'pickle-only'],
                   help="""Action to perform.
 
@@ -1696,20 +1947,35 @@ output is enabled).
 'pickle-only' means only to generate the pickled version of the data, for
 reading in by a separate process (e.g. the Java code).
 
-'geotag-articles' finds the proper location for each article in the test set.
+'geotag-documnts' finds the proper location for each document (or article)
+in the test set.
 
 'geotag-toponyms' finds the proper location for each toponym in the test set.
 The test set is specified by --eval-file.  Default '%default'.""")
-    op.add_option("--strategy", type='choice', default='link-baseline',
-                  choices=['link-baseline',
+    op.add_option("--strategy", type='choice', default='baseline',
+                  choices=['baseline',
+                           'symmetric-kl-divergence',
                            'naive-bayes-with-baseline',
                            'naive-bayes-no-baseline'],
                   help="""Strategy to use for Geotagging.
-'link-baseline' means simply use the matching location with the
-highest number of incoming links; 'naive-bayes-with-baseline' means
-also use the words around the toponym to be disambiguated, in a Naive-Bayes
-scheme, using the link baseline as the prior probability;
-'naive-bayes-no-baseline' means use uniform prior probability.
+'baseline' means just use the baseline strategy (see --baseline-type);
+'naive-bayes-with-baseline' means also use the words around the toponym to
+be disambiguated, in a Naive-Bayes scheme, using the baseline as the prior
+probability; 'naive-bayes-no-baseline' means use uniform prior probability.
+Default '%default'.""")
+    op.add_option("--baseline-type", type='choice',
+                  default="internal-link",
+                  choices=['internal-link', 'random', 'num-articles'],
+                  help="""Strategy to use to compute the baseline.
+
+'internal-link' means use number of internal links pointing to the article or
+region.
+
+'random' means choose randomly.
+
+'num-articles' (only in region-type matching) means use number of articles
+in region.
+
 Default '%default'.""")
     op.add_option("--baseline-weight", type='float', metavar="WEIGHT",
                   default=0.5,
@@ -1725,10 +1991,10 @@ prior probability (baseline) and all word probabilities the same.  If
 according to --baseline-weight, assigning the remainder to the words.  If
 'distance-weighted', use the --baseline-weight for the prior probability
 and weight the words according to distance from the toponym.""")
-    op.add_option("--width-of-nbregion", type='int', default=2,
+    op.add_option("--width-of-nbregion", type='int', default=1,
                   help="""Width of the Naive Bayes region used for region-based
 Naive Bayes disambiguation, in tiling regions.  Default %default.""")
-    op.add_option("-r", "--region-size", type='float', default=50.0,
+    op.add_option("-r", "--region-size", type='float', default=100.0,
                   help="""Size of the region (in miles) to use when doing
 region-based Naive Bayes disambiguation.  Default %default.""")
     op.add_option("-b", "--naive-bayes-type", type='choice',
@@ -1766,65 +2032,43 @@ particular-sized region.  Default '%default'.""")
     degrees_per_region = opts.region_size / miles_per_degree
     global maximum_latind, minimum_latind, maximum_longind, minimum_longind
     maximum_latind, maximum_longind = \
-       coord_to_region_indices(Coord(maximum_latitude, maximum_longitude))
+      coord_to_tiling_region_indices(Coord(maximum_latitude,
+                                           maximum_longitude))
     minimum_latind, minimum_longind = \
-       coord_to_region_indices(Coord(minimum_latitude, minimum_longitude))
+      coord_to_tiling_region_indices(Coord(minimum_latitude,
+                                           minimum_longitude))
 
     if opts.width_of_nbregion <= 0:
       op.error("Width of Naive Bayes region must be positive")
 
     ### Start reading in the files and operating on them ###
 
-    # Files needed for different options:
-    #
-    # 1. match-only:
-    #
-    #    coords-file
-    #    gazetteer-file
-    #    links-file
-    #
-    # 2. pickle-only:
-    #
-    #    words-coords-file
-    #    stopwords-file
-    #    pickle-file
-    #
-    # 3. disambig-link-baseline:
-    #
-    #    coords-file
-    #    gazetteer-file
-    #    links-file
-    #    eval-file
-    #
-    # 4. disambig-naive-bayes-*:
-    #
-    #    stopwords-file
-    #    words-coords-file or unpickle-file
-    #    pickle-file if given
-    #    coords-file
-    #    gazetteer-file
-    #    links-file
-    #    eval-file
-
-    if opts.mode == 'pickle-only' or \
-       opts.mode.startswith('geotag'):
+    if opts.mode == 'pickle-only' or opts.mode.startswith('geotag'):
       self.need('stopwords_file')
       read_stopwords(opts.stopwords_file)
-      if not opts.unpickle_file and not opts.words_coords_file:
-        op.error("Must specify either unpickle file or words-coords file")
+      if opts.mode == 'geotag-toponyms' and opts.strategy == 'baseline':
+        pass
+      elif not opts.unpickle_file and not opts.counts_file:
+        op.error("Must specify either unpickle file or counts file")
 
     if opts.mode != 'pickle-only':
       self.need('gazetteer_file')
 
-    if opts.mode.startswith('geotag'):
+    if opts.eval_format == 'raw-text':
+      # FIXME!!!!
+      op.error("Raw-text reading not implemented yet")
+
+    if opts.mode == 'geotag-documents' and opts.eval_format == 'wiki':
+      pass # No need for evaluation file, uses the counts file
+    # FIXME!! Fix this limitation.  Should allow raw text files.
+    elif opts.mode == 'geotag-documents' and opts.eval_format != 'wiki':
+      op.error("Can only geotag articles in Wikipedia format")
+    elif opts.mode.startswith('geotag'):
       self.need('eval_file', 'evaluation file(s)')
 
     if opts.mode == 'pickle-only':
       if not opts.pickle_file:
         self.need('pickle_file')
-
-    if opts.mode == 'geotag-articles' and opts.eval_format != 'wiki':
-      op.error("Can only geotag articles in Wikipedia format")
 
     self.need('article_data_file')
     read_article_data(opts.article_data_file)
@@ -1844,7 +2088,7 @@ particular-sized region.  Default '%default'.""")
         infile = open(opts.unpickle_file)
         #FIXME: article_probs = cPickle.load(infile)
         infile.close()
-      else:
+      elif opts.counts_file:
         read_word_counts(opts.counts_file)
       if opts.pickle_file:
         outfile = open(opts.pickle_file, "w")
@@ -1860,8 +2104,12 @@ particular-sized region.  Default '%default'.""")
 
     if opts.mode == 'geotag-toponyms':
       # Generate strategy object
-      if opts.strategy == 'link-baseline':
-        strategy = LinkBaselineStrategy()
+      if opts.strategy == 'baseline':
+        if opts.baseline_type == 'internal-link':
+          strategy = LinkBaselineStrategy()
+        else:
+          # FIXME!!!!!
+          op.error("Non-internal-link baseline strategies not implemented")
       elif opts.strategy == 'naive-bayes-no-baseline':
         strategy = NaiveBayesStrategy(use_baseline=False)
       else:
@@ -1873,7 +2121,7 @@ particular-sized region.  Default '%default'.""")
       else:
         evalobj = WikipediaGeotagToponymEvaluator(opts, strategy)
     else:
-      evalobj = WikipediaGeotagArticleEvaluator(opts)
+      evalobj = WikipediaGeotagDocumentEvaluator(opts)
 
     print "Processing evaluation file/dir %s..." % opts.eval_file
     for filename in yield_directory_files(opts.eval_file):
