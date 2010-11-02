@@ -1,4 +1,5 @@
 #!/bin/sh
 
-nohup run-disambig > run-disambig.out
+TGP_DIR=$HOME/devel/textgrounder/python
+nohup $TGP_DIR/run-disambig > run-disambig.out
 cp run-disambig.out run-disambig.out.`date '+%F.%H%M%P'`
