@@ -4,6 +4,7 @@ import re # For regexp wrappers
 import sys, codecs # For uchompopen()
 import bisect # For sorted lists
 import time # For status messages
+from heapq import * # For priority queue
 
 #############################################################################
 #                        Regular expression functions                       #
@@ -399,3 +400,36 @@ Used for testing purposes.  Default %default.""")
 
     return self.implement_main(self.opts, self.op, self.args)
 
+# Priority queue implementation, based on Python heapq documentation.
+# Note that in Python 2.6 and on, there is a priority queue implementation
+# in the Queue module.
+class PriorityQueue(object):
+  INVALID = 0                     # mark an entry as deleted
+
+  def __init__(self):
+    self.pq = []                         # the priority queue list
+    self.counter = itertools.count(1)    # unique sequence count
+    self.task_finder = {}                # mapping of tasks to entries
+
+  def add_task(self, priority, task, count=None):
+    if count is None:
+      count = self.counter.next()
+    entry = [priority, count, task]
+    self.task_finder[task] = entry
+    heappush(self.pq, entry)
+
+  def get_top_priority(self):
+    while True:
+      priority, count, task = heappop(self.pq)
+      del self.task_finder[task]
+      if count is not PriorityQueue.INVALID:
+        return task
+
+  def delete_task(self, task):
+    entry = self.task_finder[task]
+    entry[1] = PriorityQueue.INVALID
+
+  def reprioritize(self, priority, task):
+    entry = self.task_finder[task]
+    self.add_task(priority, task, entry[1])
+    entry[1] = PriorityQueue.INVALID
