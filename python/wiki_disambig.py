@@ -91,347 +91,6 @@ miles_per_degree = math.pi * 2 * earth_radius_in_miles / 360.
 documents_processed = 0
 
 ############################################################################
-#                          The global word distribution                    #
-############################################################################
-
-class GlobalDist(object):
-  # Total number of word types seen (size of vocabulary)
-  num_word_types = 0
-
-  # Total number of word tokens seen
-  num_word_tokens = 0
-
-  # Total number of types seen once
-  num_types_seen_once = 0
-
-  # Estimate of number of unseen word types for all articles
-  num_unseen_word_types = 0
-
-  # Overall probabilities over all articles of seeing a word in an article,
-  # for all words seen at least once in any article, computed using the
-  # empirical frequency of a word among all articles, adjusted by the mass
-  # to be assigned to globally unseen words (words never seen at all), i.e. the
-  # value in 'globally_unseen_word_prob'.
-  overall_word_probs = intdict()
-
-  # The total probability mass to be assigned to words not seen at all in
-  # any article, estimated using Good-Turing smoothing as the unadjusted
-  # empirical probability of having seen a word once.
-  globally_unseen_word_prob = 0.0
-
-  # For articles whose word counts are not known, use an empty list to
-  # look up in.
-  # unknown_article_counts = ([], [])
-
-  @staticmethod
-  def finish_article_distributions():
-    # Now, adjust overall_word_probs accordingly.
-    GlobalDist.num_types_seen_once = 0
-    ### FIXME: A simple calculation reveals that in the scheme where we use
-    ### globally_unseen_word_prob, num_types_seen_once cancels out and
-    ### we never actually have to compute it.
-    for count in GlobalDist.overall_word_probs.itervalues():
-      if count == 1:
-        GlobalDist.num_types_seen_once += 1
-    GlobalDist.globally_unseen_word_prob = (
-      float(GlobalDist.num_types_seen_once)/GlobalDist.num_word_tokens)
-    for (wordind,count) in GlobalDist.overall_word_probs.iteritems():
-      GlobalDist.overall_word_probs[wordind] = (
-        float(count)/GlobalDist.num_word_tokens*
-          (1 - GlobalDist.globally_unseen_word_prob))
-    # A very rough estimate, perhaps totally wrong
-    GlobalDist.num_unseen_word_types = GlobalDist.num_types_seen_once
-
-    #if debug > 2:
-    #  errprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s" % (GlobalDist.num_word_types, GlobalDist.num_word_tokens, GlobalDist.num_types_seen_once, GlobalDist.globally_unseen_word_prob, GlobalDist.globally_unseen_word_prob + sum(GlobalDist.overall_word_probs.itervalues())))
-
-    # Figure out the value of OVERALL_UNSEEN_MASS for each article.
-    for art in ArticleTable.name_to_article.itervalues():
-      # make sure counts not None (eg article in coords file but not counts file)
-      if not art.counts: continue
-      overall_seen_mass = 0.0
-      for ind in art.counts[0]:
-        overall_seen_mass += GlobalDist.overall_word_probs[ind]
-      art.overall_unseen_mass = 1.0 - overall_seen_mass
-      art.finished = True
-
-
-############################################################################
-#                                Article table                             #
-############################################################################
-
-# Static class maintaining tables listing all articles and mapping between
-# names, ID's and articles.  Objects corresponding to redirect articles
-# should not be present anywhere in this table; instead, the name of the
-# redirect article should point to the article object for the article
-# pointed to by the redirect.
-class ArticleTable(object):
-  # Map from short name (lowercased) to list of Wikipedia articles.  The short
-  # name for an article is computed from the article's name.  If the article
-  # name has a comma, the short name is the part before the comma, e.g. the
-  # short name of "Springfield, Ohio" is "Springfield".  If the name has no
-  # comma, the short name is the same as the article name.  The idea is that
-  # the short name should be the same as one of the toponyms used to refer to
-  # the article.
-  short_lower_name_to_articles = listdict()
-
-  # Map from tuple (NAME, DIV) for Wikipedia articles of the form
-  # "Springfield, Ohio", lowercased.
-  lower_name_div_to_articles = listdict()
-
-  # Mapping from article names to Article objects, using the actual case of
-  # the article.
-  name_to_article = {}
-
-  # Mapping from lowercased article names to Article objects
-  lower_name_to_articles = listdict()
-
-  articles_by_split = {}
-
-  # Look up an article named NAME and return the associated article.
-  # Note that article names are case-sensitive but the first letter needs to
-  # be capitalized.
-  @staticmethod
-  def lookup_article(name):
-    assert name
-    return ArticleTable.name_to_article.get(capfirst(name), None)
-
-  # Record the article as having NAME as one of its names (there may be
-  # multiple names, due to redirects).  Also add to related lists mapping
-  # lowercased form, short form, etc.  If IS_REDIRECT, this is a redirect to
-  # an article, so don't record it again.
-  @staticmethod
-  def record_article(name, art, is_redirect=False):
-    # Must pass in properly cased name
-    assert name == capfirst(name)
-    ArticleTable.name_to_article[name] = art
-    loname = name.lower()
-    ArticleTable.lower_name_to_articles[loname] += [art]
-    (short, div) = compute_short_form(loname)
-    if div:
-      ArticleTable.lower_name_div_to_articles[(short, div)] += [art]
-    ArticleTable.short_lower_name_to_articles[short] += [art]
-    if art not in lower_toponym_to_article[loname]:
-      lower_toponym_to_article[loname] += [art]
-    if short != loname and art not in lower_toponym_to_article[short]:
-      lower_toponym_to_article[short] += [art]
-    if not is_redirect:
-      splithash = ArticleTable.articles_by_split
-      if art.split not in splithash:
-        #splithash[art.split] = set()
-        splithash[art.split] = []
-      splitcoll = splithash[art.split]
-      if isinstance(splitcoll, set):
-        splitcoll.add(art)
-      else:
-        splitcoll.append(art)
-
-
-############################################################################
-#                                Evaluation                                #
-############################################################################
-
-class Eval(object):
-  def __init__(self, incorrect_reasons):
-    # Statistics on the types of instances processed
-    # Total number of instances
-    self.total_instances = 0
-    self.correct_instances = 0
-    self.incorrect_instances = 0
-    self.incorrect_reasons = incorrect_reasons
-    for (attrname, engname) in self.incorrect_reasons:
-      setattr(self, attrname, 0)
-    self.other_stats = intdict()
-  
-  def record_result(self, correct, reason=None):
-    self.total_instances += 1
-    if correct:
-      self.correct_instances += 1
-    else:
-      self.incorrect_instances += 1
-      if reason != None:
-        setattr(self, reason, getattr(self, reason) + 1)
-
-  def record_other_stat(self, othertype):
-    self.other_stats[othertype] += 1
-
-  def output_fraction(self, header, amount, total):
-    if amount > total:
-      warning("Something wrong: Fractional quantity %s greater than total %s"
-              % (amount, total))
-    if total == 0:
-      percent = "indeterminate percent"
-    else:
-      percent = "%5.2f%%" % (100*float(amount)/total)
-    errprint("%s = %s/%s = %s" % (header, amount, total, percent))
-
-  def output_correct_results(self):
-    self.output_fraction("Percent correct", self.correct_instances,
-                         self.total_instances)
-
-  def output_incorrect_results(self):
-    self.output_fraction("Percent incorrect", self.incorrect_instances,
-                         self.total_instances)
-    for (reason, descr) in self.incorrect_reasons:
-      self.output_fraction("  %s" % descr, getattr(self, reason),
-                           self.total_instances)
-
-  def output_other_stats(self):
-    for (ty, count) in self.other_stats.iteritems():
-      errprint("%s = %s" % (ty, count))
-
-  def output_results(self):
-    if not self.total_instances:
-      warning("Strange, no instances found at all; perhaps --eval-format is incorrect?")
-      return
-    self.output_correct_results()
-    self.output_incorrect_results()
-    self.output_other_stats()
-
-class EvalWithCandidateList(Eval):
-  def __init__(self, incorrect_reasons, max_individual_candidates=5):
-    super(EvalWithCandidateList, self).__init__(incorrect_reasons)
-    self.max_individual_candidates = max_individual_candidates
-    # Toponyms by number of candidates available
-    self.total_instances_by_num_candidates = intdict()
-    self.correct_instances_by_num_candidates = intdict()
-    self.incorrect_instances_by_num_candidates = intdict()
-
-  def record_result(self, correct, reason, num_arts):
-    super(EvalWithCandidateList, self).record_result(correct, reason)
-    self.total_instances_by_num_candidates[num_arts] += 1
-    if correct:
-      self.correct_instances_by_num_candidates[num_arts] += 1
-    else:
-      self.incorrect_instances_by_num_candidates[num_arts] += 1
-
-  def output_table_by_num_candidates(self, table, total):
-    for i in range(0, 1+self.max_individual_candidates):
-      self.output_fraction("  With %d  candidates" % i, table[i], total)
-    items = sum(val for key, val in table.iteritems()
-                if key > self.max_individual_candidates)
-    self.output_fraction("  With %d+ candidates" %
-                           (1+self.max_individual_candidates),
-                         items, total)
-
-  def output_correct_results(self):
-    super(EvalWithCandidateList, self).output_correct_results()
-    self.output_table_by_num_candidates(
-      self.correct_instances_by_num_candidates, self.correct_instances)
-
-  def output_incorrect_results(self):
-    super(EvalWithCandidateList, self).output_incorrect_results()
-    self.output_table_by_num_candidates(
-      self.incorrect_instances_by_num_candidates, self.incorrect_instances)
-
-class EvalWithRank(Eval):
-  def __init__(self, max_rank_for_credit=10):
-    super(EvalWithRank, self).__init__(incorrect_reasons=[])
-    self.max_rank_for_credit = max_rank_for_credit
-    self.incorrect_by_exact_rank = intdict()
-    self.correct_by_up_to_rank = intdict()
-    self.incorrect_past_max_rank = 0
-    self.total_credit = 0
-  
-  def record_result(self, rank):
-    assert rank >= 1
-    correct = rank == 1
-    super(EvalWithRank, self).record_result(correct, reason=None)
-    if rank <= self.max_rank_for_credit:
-      self.total_credit += self.max_rank_for_credit + 1 - rank
-      self.incorrect_by_exact_rank[rank] += 1
-      for i in xrange(rank, self.max_rank_for_credit + 1):
-        self.correct_by_up_to_rank[i] += 1
-    else:
-      self.incorrect_past_max_rank += 1
-
-  def output_correct_results(self):
-    super(EvalWithRank, self).output_correct_results()
-    possible_credit = self.max_rank_for_credit*self.total_instances
-    self.output_fraction("Percent correct with partial credit",
-                         self.total_credit, possible_credit)
-    for i in xrange(2, self.max_rank_for_credit + 1):
-      self.output_fraction("  Correct is at or above rank %s" % i,
-                           self.correct_by_up_to_rank[i], self.total_instances)
-
-  def output_incorrect_results(self):
-    super(EvalWithRank, self).output_incorrect_results()
-    for i in xrange(2, self.max_rank_for_credit + 1):
-      self.output_fraction("  Incorrect, with correct at rank %s" % i,
-                           self.incorrect_by_exact_rank[i],
-                           self.total_instances)
-    self.output_fraction("  Incorrect, with correct not in top %s" %
-                           self.max_rank_for_credit,
-                           self.incorrect_past_max_rank, self.total_instances)
-
-
-class Results(object):
-  ####### Results for geotagging toponyms
-
-  incorrect_geotag_toponym_reasons = [
-    ('incorrect_with_no_candidates',
-     'Incorrect, with no candidates'),
-    ('incorrect_with_no_correct_candidates',
-     'Incorrect, with candidates but no correct candidates'),
-    ('incorrect_with_multiple_correct_candidates',
-     'Incorrect, with multiple correct candidates'),
-    ('incorrect_one_correct_candidate_missing_link_info',
-     'Incorrect, with one correct candidate, but link info missing'),
-    ('incorrect_one_correct_candidate',
-     'Incorrect, with one correct candidate'),
-  ]
-
-  # Overall statistics
-  all_toponym = EvalWithCandidateList(incorrect_geotag_toponym_reasons) 
-
-  # Statistics when toponym not same as true name of location
-  diff_surface = EvalWithCandidateList(incorrect_geotag_toponym_reasons)
-
-  # Statistics when toponym not same as true name or short form of location
-  diff_short = EvalWithCandidateList(incorrect_geotag_toponym_reasons)
-
-  @staticmethod
-  def record_geotag_toponym_result(correct, toponym, trueloc, reason,
-                                   num_arts):
-    Results.all_toponym.record_result(correct, reason, num_arts)
-    if toponym != trueloc:
-      Results.diff_surface.record_result(correct, reason, num_arts)
-      (short, div) = compute_short_form(trueloc)
-      if toponym != short:
-        Results.diff_short.record_result(correct, reason, num_arts)
-
-  @staticmethod
-  def output_geotag_toponym_results():
-    errprint("Results for all toponyms:")
-    Results.all_toponym.output_results()
-    errprint("")
-    errprint("Results for toponyms when different from true location name:")
-    Results.diff_surface.output_results()
-    errprint("")
-    errprint("Results for toponyms when different from either true location name")
-    errprint("  or its short form:")
-    Results.diff_short.output_results()
-
-
-  ####### Results for geotagging documents/articles
-
-  all_document = EvalWithRank()
-
-  @staticmethod
-  def record_geotag_document_result(rank):
-    Results.all_document.record_result(rank)
-
-  @staticmethod
-  def record_geotag_document_other_stat(othertype):
-    Results.all_document.record_other_stat(othertype)
-
-  @staticmethod
-  def output_geotag_document_results():
-    errprint("Results for all documents/articles:")
-    Results.all_document.output_results()
-
-
-############################################################################
 #                                Coordinates                               #
 ############################################################################
 
@@ -506,8 +165,70 @@ def region_indices_to_coord(latind, longind):
   return Coord(latind * degrees_per_region, longind * degrees_per_region)
 
 ############################################################################
-#                           Geographic locations                           #
+#                             Word distributions                           #
 ############################################################################
+
+class GlobalDist(object):
+  # Total number of word types seen (size of vocabulary)
+  num_word_types = 0
+
+  # Total number of word tokens seen
+  num_word_tokens = 0
+
+  # Total number of types seen once
+  num_types_seen_once = 0
+
+  # Estimate of number of unseen word types for all articles
+  num_unseen_word_types = 0
+
+  # Overall probabilities over all articles of seeing a word in an article,
+  # for all words seen at least once in any article, computed using the
+  # empirical frequency of a word among all articles, adjusted by the mass
+  # to be assigned to globally unseen words (words never seen at all), i.e. the
+  # value in 'globally_unseen_word_prob'.
+  overall_word_probs = intdict()
+
+  # The total probability mass to be assigned to words not seen at all in
+  # any article, estimated using Good-Turing smoothing as the unadjusted
+  # empirical probability of having seen a word once.
+  globally_unseen_word_prob = 0.0
+
+  # For articles whose word counts are not known, use an empty list to
+  # look up in.
+  # unknown_article_counts = ([], [])
+
+  @staticmethod
+  def finish_article_distributions():
+    # Now, adjust overall_word_probs accordingly.
+    GlobalDist.num_types_seen_once = 0
+    ### FIXME: A simple calculation reveals that in the scheme where we use
+    ### globally_unseen_word_prob, num_types_seen_once cancels out and
+    ### we never actually have to compute it.
+    for count in GlobalDist.overall_word_probs.itervalues():
+      if count == 1:
+        GlobalDist.num_types_seen_once += 1
+    GlobalDist.globally_unseen_word_prob = (
+      float(GlobalDist.num_types_seen_once)/GlobalDist.num_word_tokens)
+    for (wordind,count) in GlobalDist.overall_word_probs.iteritems():
+      GlobalDist.overall_word_probs[wordind] = (
+        float(count)/GlobalDist.num_word_tokens*
+          (1 - GlobalDist.globally_unseen_word_prob))
+    # A very rough estimate, perhaps totally wrong
+    GlobalDist.num_unseen_word_types = GlobalDist.num_types_seen_once
+
+    #if debug > 2:
+    #  errprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s" % (GlobalDist.num_word_types, GlobalDist.num_word_tokens, GlobalDist.num_types_seen_once, GlobalDist.globally_unseen_word_prob, GlobalDist.globally_unseen_word_prob + sum(GlobalDist.overall_word_probs.itervalues())))
+
+    # Figure out the value of OVERALL_UNSEEN_MASS for each article.
+    for art in ArticleTable.name_to_article.itervalues():
+      # make sure counts not None (eg article in coords file but not counts file)
+      if not art.counts: continue
+      overall_seen_mass = 0.0
+      for ind in art.counts[0]:
+        overall_seen_mass += GlobalDist.overall_word_probs[ind]
+      art.overall_unseen_mass = 1.0 - overall_seen_mass
+      art.finished = True
+
 
 # Fields defined:
 #
@@ -742,6 +463,10 @@ class NBDist(WordDistribution):
                (self.num_arts, self.total_tokens, self.unseen_mass,
                 num_types_seen_once, self.incoming_links,
                 self.overall_unseen_mass))
+
+############################################################################
+#                           Geographic locations                           #
+############################################################################
 
 ############ Naive Bayes regions ############
 
@@ -1039,6 +764,75 @@ class Division(object):
 #                             Wikipedia articles                           #
 ############################################################################
 
+#####################  Article table
+
+# Static class maintaining tables listing all articles and mapping between
+# names, ID's and articles.  Objects corresponding to redirect articles
+# should not be present anywhere in this table; instead, the name of the
+# redirect article should point to the article object for the article
+# pointed to by the redirect.
+class ArticleTable(object):
+  # Map from short name (lowercased) to list of Wikipedia articles.  The short
+  # name for an article is computed from the article's name.  If the article
+  # name has a comma, the short name is the part before the comma, e.g. the
+  # short name of "Springfield, Ohio" is "Springfield".  If the name has no
+  # comma, the short name is the same as the article name.  The idea is that
+  # the short name should be the same as one of the toponyms used to refer to
+  # the article.
+  short_lower_name_to_articles = listdict()
+
+  # Map from tuple (NAME, DIV) for Wikipedia articles of the form
+  # "Springfield, Ohio", lowercased.
+  lower_name_div_to_articles = listdict()
+
+  # Mapping from article names to Article objects, using the actual case of
+  # the article.
+  name_to_article = {}
+
+  # Mapping from lowercased article names to Article objects
+  lower_name_to_articles = listdict()
+
+  articles_by_split = {}
+
+  # Look up an article named NAME and return the associated article.
+  # Note that article names are case-sensitive but the first letter needs to
+  # be capitalized.
+  @staticmethod
+  def lookup_article(name):
+    assert name
+    return ArticleTable.name_to_article.get(capfirst(name), None)
+
+  # Record the article as having NAME as one of its names (there may be
+  # multiple names, due to redirects).  Also add to related lists mapping
+  # lowercased form, short form, etc.  If IS_REDIRECT, this is a redirect to
+  # an article, so don't record it again.
+  @staticmethod
+  def record_article(name, art, is_redirect=False):
+    # Must pass in properly cased name
+    assert name == capfirst(name)
+    ArticleTable.name_to_article[name] = art
+    loname = name.lower()
+    ArticleTable.lower_name_to_articles[loname] += [art]
+    (short, div) = compute_short_form(loname)
+    if div:
+      ArticleTable.lower_name_div_to_articles[(short, div)] += [art]
+    ArticleTable.short_lower_name_to_articles[short] += [art]
+    if art not in lower_toponym_to_article[loname]:
+      lower_toponym_to_article[loname] += [art]
+    if short != loname and art not in lower_toponym_to_article[short]:
+      lower_toponym_to_article[short] += [art]
+    if not is_redirect:
+      splithash = ArticleTable.articles_by_split
+      if art.split not in splithash:
+        #splithash[art.split] = set()
+        splithash[art.split] = []
+      splitcoll = splithash[art.split]
+      if isinstance(splitcoll, set):
+        splitcoll.add(art)
+      else:
+        splitcoll.append(art)
+
+
 ######################## Articles
 
 # Compute the short form of an article name.  If short form includes a
@@ -1234,213 +1028,212 @@ def find_match_for_division(loc):
   return find_wikipedia_match(loc, check_match, prefer_match)
 
 ############################################################################
-#                               Process files                              #
+#                             Accumulate results                           #
 ############################################################################
 
-# Read in the list of stopwords from the given filename.
-def read_stopwords(filename):
-  errprint("Reading stopwords from %s..." % filename)
-  for line in uchompopen(filename):
-    stopwords.add(line)
-
-
-def read_article_data(filename):
-  redirects = []
-
-  def process(art):
-    if art.namespace != 'Main':
-      return
-    if art.redir:
-      redirects.append(art)
-    elif art.coord:
-      ArticleTable.record_article(art.title, art)
-      if art.split == 'training':
-        NBRegion.add_article_to_region(art)
-
-  read_article_data_file(filename, process, article_type=NBArticle,
-                         max_time_per_stage=Opts.max_time_per_stage)
-
-  for x in redirects:
-    redart = ArticleTable.lookup_article(x.redir)
-    if redart:
-      ArticleTable.record_article(x.title, redart, is_redirect=True)
-
-
-# Parse the result of a previous run of --output-counts and generate
-# a unigram distribution for Naive Bayes matching.  We do a simple version
-# of Good-Turing smoothing where we assign probability mass to unseen
-# words equal to the probability mass of all words seen once, and rescale
-# the remaining probabilities accordingly.
-
-def read_word_counts(filename):
-
-  def one_article_probs():
-    if total_tokens == 0: return
-    art = ArticleTable.lookup_article(title)
-    if not art:
-      warning("Skipping article %s, not in table" % title)
-      return
-    art.compute_distribution(wordhash, total_tokens)
-
-  errprint("Reading word counts from %s..." % filename)
-  status = StatusMessage('article')
-  total_tokens = 0
-
-  title = None
-  for line in uchompopen(filename):
-    if line.startswith('Article title: '):
-      m = re.match('Article title: (.*)$', line)
-      if title:
-        one_article_probs()
-      # Stop if we've reached the maximum
-      if status.item_processed() >= Opts.max_time_per_stage:
-        break
-      title = m.group(1)
-      wordhash = intdict()
-      total_tokens = 0
-    elif line.startswith('Article coordinates: '):
-      pass
-    else:
-      m = re.match('(.*) = ([0-9]+)$', line)
-      if not m:
-        warning("Strange line, can't parse: title=%s: line=%s" % (title, line))
-        continue
-      word = m.group(1)
-      if not Opts.preserve_case_words: word = word.lower()
-      count = int(m.group(2))
-      if word in stopwords and Opts.ignore_stopwords_in_article_dists: continue
-      word = internasc(word)
-      total_tokens += count
-      wordhash[word] += count
-  else:
-    one_article_probs()
-
-  GlobalDist.finish_article_distributions()
-
-
-# Find the Wikipedia article matching an entry in the gazetteer.
-# The format of an entry is
-#
-# ID  NAME  ALTNAMES  ORIG-SCRIPT-NAME  TYPE  POPULATION  LAT  LONG  DIV1  DIV2  DIV3
-#
-# where there is a tab character separating each field.  Fields may be empty;
-# but there will still be a tab character separating the field from others.
-#
-# The ALTNAMES specify any alternative names of the location, often including
-# the equivalent of the original name without any accent characters.  If
-# there is more than one alternative name, the possibilities are separated
-# by a comma and a space, e.g. "Dongshi, Dongshih, Tungshih".  The
-# ORIG-SCRIPT-NAME is the name in its original script, if that script is not
-# Latin characters (e.g. names in Russia will be in Cyrillic). (For some
-# reason, names in Chinese characters are listed in the ALTNAMES rather than
-# the ORIG-SCRIPT-NAME.)
-#
-# LAT and LONG specify the latitude and longitude, respectively.  These are
-# given as integer values, where the actual value is found by dividing this
-# integer value by 100.
-#
-# DIV1, DIV2 and DIV3 specify different-level divisions that a location is
-# within, from largest to smallest.  Typically the largest is a country.
-# For locations in the U.S., the next two levels will be state and county,
-# respectively.  Note that such divisions also have corresponding entries
-# in the gazetteer.  However, these entries are somewhat lacking in that
-# (1) no coordinates are given, and (2) only the top-level division (the
-# country) is given, even for third-level divisions (e.g. counties in the
-# U.S.).
-#
-# For localities, add them to the region-map that covers the earth if
-# ADD_TO_REGION_MAP is true.
-
-def match_world_gazetteer_entry(line):
-  # Split on tabs, make sure at least 11 fields present and strip off
-  # extra whitespace
-  fields = re.split(r'\t', line.strip()) + ['']*11
-  fields = [x.strip() for x in fields[0:11]]
-  (id, name, altnames, orig_script_name, typ, population, lat, long,
-   div1, div2, div3) = fields
-
-  # Skip places without coordinates
-  if not lat or not long:
-    if debug > 1:
-      errprint("Skipping location %s (div %s/%s/%s) without coordinates" %
-               (name, div1, div2, div3))
-    return
-
-  # Create and populate a Locality object
-  loc = Locality(name, Coord(int(lat) / 100., int(long) / 100.))
-  loc.type = typ
-  if altnames:
-    loc.altnames = re.split(', ', altnames)
-  # Add the given location to the division the location is in
-  loc.div = Division.note_point_seen_in_division(loc, (div1, div2, div3))
-  if debug > 1:
-    errprint("Saw location %s (div %s/%s/%s) with coordinates %s" %
-             (loc.name, div1, div2, div3, loc.coord))
-
-  # Record the location.  For each name for the location (its
-  # canonical name and all alternates), add the location to the list of
-  # locations associated with the name.  Record the name in lowercase
-  # for ease in matching.
-  for name in [loc.name] + loc.altnames:
-    loname = name.lower()
-    if debug > 1:
-      errprint("Noting lower_toponym_to_location for toponym %s, canonical name %s"
-               % (name, loc.name))
-    lower_toponym_to_location[loname] += [loc]
-
-  # We start out looking for articles whose distance is very close,
-  # then widen until we reach Opts.max_dist_for_close_match.
-  maxdist = 5
-  while maxdist <= Opts.max_dist_for_close_match:
-    match = find_match_for_locality(loc, maxdist)
-    if match: break
-    maxdist *= 2
-
-  if not match: 
-    if debug > 1:
-      errprint("Unmatched name %s" % loc.name)
-    return
+class Eval(object):
+  def __init__(self, incorrect_reasons):
+    # Statistics on the types of instances processed
+    # Total number of instances
+    self.total_instances = 0
+    self.correct_instances = 0
+    self.incorrect_instances = 0
+    self.incorrect_reasons = incorrect_reasons
+    for (attrname, engname) in self.incorrect_reasons:
+      setattr(self, attrname, 0)
+    self.other_stats = intdict()
   
-  # Record the match.
-  loc.match = match
-  match.location = loc
-  if debug > 1:
-    errprint("Matched location %s (coord %s) with article %s, dist=%s"
-             % (loc.name, loc.coord, match,
-                spheredist(loc.coord, match.coord)))
-
-# Read in the data from the World gazetteer in FILENAME and find the
-# Wikipedia article matching each entry in the gazetteer.  For localities,
-# add them to the region-map that covers the earth if ADD_TO_REGION_MAP is
-# true.
-def read_world_gazetteer_and_match(filename):
-  errprint("Matching gazetteer entries in %s..." % filename)
-  status = StatusMessage('gazetteer entry')
-
-  # Match each entry in the gazetteer
-  for line in uchompopen(filename):
-    if debug > 1:
-      errprint("Processing line: %s" % line)
-    match_world_gazetteer_entry(line)
-    if status.item_processed() >= Opts.max_time_per_stage:
-      break
-
-  for division in path_to_division.itervalues():
-    if debug > 1:
-      errprint("Processing division named %s, path %s"
-               % (division.name, division.path))
-    division.compute_boundary()
-    match = find_match_for_division(division)
-    if match:
-      if debug > 1:
-        errprint("Matched article %s for division %s, path %s" %
-                 (match, division.name, division.path))
-      division.match = match
-      match.location = division
+  def record_result(self, correct, reason=None):
+    self.total_instances += 1
+    if correct:
+      self.correct_instances += 1
     else:
-      if debug > 1:
-        errprint("Couldn't find match for division %s, path %s" %
-                 (division.name, division.path))
+      self.incorrect_instances += 1
+      if reason != None:
+        setattr(self, reason, getattr(self, reason) + 1)
+
+  def record_other_stat(self, othertype):
+    self.other_stats[othertype] += 1
+
+  def output_fraction(self, header, amount, total):
+    if amount > total:
+      warning("Something wrong: Fractional quantity %s greater than total %s"
+              % (amount, total))
+    if total == 0:
+      percent = "indeterminate percent"
+    else:
+      percent = "%5.2f%%" % (100*float(amount)/total)
+    errprint("%s = %s/%s = %s" % (header, amount, total, percent))
+
+  def output_correct_results(self):
+    self.output_fraction("Percent correct", self.correct_instances,
+                         self.total_instances)
+
+  def output_incorrect_results(self):
+    self.output_fraction("Percent incorrect", self.incorrect_instances,
+                         self.total_instances)
+    for (reason, descr) in self.incorrect_reasons:
+      self.output_fraction("  %s" % descr, getattr(self, reason),
+                           self.total_instances)
+
+  def output_other_stats(self):
+    for (ty, count) in self.other_stats.iteritems():
+      errprint("%s = %s" % (ty, count))
+
+  def output_results(self):
+    if not self.total_instances:
+      warning("Strange, no instances found at all; perhaps --eval-format is incorrect?")
+      return
+    self.output_correct_results()
+    self.output_incorrect_results()
+    self.output_other_stats()
+
+class EvalWithCandidateList(Eval):
+  def __init__(self, incorrect_reasons, max_individual_candidates=5):
+    super(EvalWithCandidateList, self).__init__(incorrect_reasons)
+    self.max_individual_candidates = max_individual_candidates
+    # Toponyms by number of candidates available
+    self.total_instances_by_num_candidates = intdict()
+    self.correct_instances_by_num_candidates = intdict()
+    self.incorrect_instances_by_num_candidates = intdict()
+
+  def record_result(self, correct, reason, num_arts):
+    super(EvalWithCandidateList, self).record_result(correct, reason)
+    self.total_instances_by_num_candidates[num_arts] += 1
+    if correct:
+      self.correct_instances_by_num_candidates[num_arts] += 1
+    else:
+      self.incorrect_instances_by_num_candidates[num_arts] += 1
+
+  def output_table_by_num_candidates(self, table, total):
+    for i in range(0, 1+self.max_individual_candidates):
+      self.output_fraction("  With %d  candidates" % i, table[i], total)
+    items = sum(val for key, val in table.iteritems()
+                if key > self.max_individual_candidates)
+    self.output_fraction("  With %d+ candidates" %
+                           (1+self.max_individual_candidates),
+                         items, total)
+
+  def output_correct_results(self):
+    super(EvalWithCandidateList, self).output_correct_results()
+    self.output_table_by_num_candidates(
+      self.correct_instances_by_num_candidates, self.correct_instances)
+
+  def output_incorrect_results(self):
+    super(EvalWithCandidateList, self).output_incorrect_results()
+    self.output_table_by_num_candidates(
+      self.incorrect_instances_by_num_candidates, self.incorrect_instances)
+
+class EvalWithRank(Eval):
+  def __init__(self, max_rank_for_credit=10):
+    super(EvalWithRank, self).__init__(incorrect_reasons=[])
+    self.max_rank_for_credit = max_rank_for_credit
+    self.incorrect_by_exact_rank = intdict()
+    self.correct_by_up_to_rank = intdict()
+    self.incorrect_past_max_rank = 0
+    self.total_credit = 0
+  
+  def record_result(self, rank):
+    assert rank >= 1
+    correct = rank == 1
+    super(EvalWithRank, self).record_result(correct, reason=None)
+    if rank <= self.max_rank_for_credit:
+      self.total_credit += self.max_rank_for_credit + 1 - rank
+      self.incorrect_by_exact_rank[rank] += 1
+      for i in xrange(rank, self.max_rank_for_credit + 1):
+        self.correct_by_up_to_rank[i] += 1
+    else:
+      self.incorrect_past_max_rank += 1
+
+  def output_correct_results(self):
+    super(EvalWithRank, self).output_correct_results()
+    possible_credit = self.max_rank_for_credit*self.total_instances
+    self.output_fraction("Percent correct with partial credit",
+                         self.total_credit, possible_credit)
+    for i in xrange(2, self.max_rank_for_credit + 1):
+      self.output_fraction("  Correct is at or above rank %s" % i,
+                           self.correct_by_up_to_rank[i], self.total_instances)
+
+  def output_incorrect_results(self):
+    super(EvalWithRank, self).output_incorrect_results()
+    for i in xrange(2, self.max_rank_for_credit + 1):
+      self.output_fraction("  Incorrect, with correct at rank %s" % i,
+                           self.incorrect_by_exact_rank[i],
+                           self.total_instances)
+    self.output_fraction("  Incorrect, with correct not in top %s" %
+                           self.max_rank_for_credit,
+                           self.incorrect_past_max_rank, self.total_instances)
+
+
+class Results(object):
+  ####### Results for geotagging toponyms
+
+  incorrect_geotag_toponym_reasons = [
+    ('incorrect_with_no_candidates',
+     'Incorrect, with no candidates'),
+    ('incorrect_with_no_correct_candidates',
+     'Incorrect, with candidates but no correct candidates'),
+    ('incorrect_with_multiple_correct_candidates',
+     'Incorrect, with multiple correct candidates'),
+    ('incorrect_one_correct_candidate_missing_link_info',
+     'Incorrect, with one correct candidate, but link info missing'),
+    ('incorrect_one_correct_candidate',
+     'Incorrect, with one correct candidate'),
+  ]
+
+  # Overall statistics
+  all_toponym = EvalWithCandidateList(incorrect_geotag_toponym_reasons) 
+
+  # Statistics when toponym not same as true name of location
+  diff_surface = EvalWithCandidateList(incorrect_geotag_toponym_reasons)
+
+  # Statistics when toponym not same as true name or short form of location
+  diff_short = EvalWithCandidateList(incorrect_geotag_toponym_reasons)
+
+  @staticmethod
+  def record_geotag_toponym_result(correct, toponym, trueloc, reason,
+                                   num_arts):
+    Results.all_toponym.record_result(correct, reason, num_arts)
+    if toponym != trueloc:
+      Results.diff_surface.record_result(correct, reason, num_arts)
+      (short, div) = compute_short_form(trueloc)
+      if toponym != short:
+        Results.diff_short.record_result(correct, reason, num_arts)
+
+  @staticmethod
+  def output_geotag_toponym_results():
+    errprint("Results for all toponyms:")
+    Results.all_toponym.output_results()
+    errprint("")
+    errprint("Results for toponyms when different from true location name:")
+    Results.diff_surface.output_results()
+    errprint("")
+    errprint("Results for toponyms when different from either true location name")
+    errprint("  or its short form:")
+    Results.diff_short.output_results()
+
+
+  ####### Results for geotagging documents/articles
+
+  all_document = EvalWithRank()
+
+  @staticmethod
+  def record_geotag_document_result(rank):
+    Results.all_document.record_result(rank)
+
+  @staticmethod
+  def record_geotag_document_other_stat(othertype):
+    Results.all_document.record_other_stat(othertype)
+
+  @staticmethod
+  def output_geotag_document_results():
+    errprint("Results for all documents/articles:")
+    Results.all_document.output_results()
+
+
+############################################################################
+#                             Main geotagging code                         #
+############################################################################
 
 # Class of word in a file containing toponyms.  Fields:
 #
@@ -1926,6 +1719,215 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     assert raised == (true_nbreg.nbdist.num_arts == 0)
     return True
 
+
+############################################################################
+#                               Process files                              #
+############################################################################
+
+# Read in the list of stopwords from the given filename.
+def read_stopwords(filename):
+  errprint("Reading stopwords from %s..." % filename)
+  for line in uchompopen(filename):
+    stopwords.add(line)
+
+
+def read_article_data(filename):
+  redirects = []
+
+  def process(art):
+    if art.namespace != 'Main':
+      return
+    if art.redir:
+      redirects.append(art)
+    elif art.coord:
+      ArticleTable.record_article(art.title, art)
+      if art.split == 'training':
+        NBRegion.add_article_to_region(art)
+
+  read_article_data_file(filename, process, article_type=NBArticle,
+                         max_time_per_stage=Opts.max_time_per_stage)
+
+  for x in redirects:
+    redart = ArticleTable.lookup_article(x.redir)
+    if redart:
+      ArticleTable.record_article(x.title, redart, is_redirect=True)
+
+
+# Parse the result of a previous run of --output-counts and generate
+# a unigram distribution for Naive Bayes matching.  We do a simple version
+# of Good-Turing smoothing where we assign probability mass to unseen
+# words equal to the probability mass of all words seen once, and rescale
+# the remaining probabilities accordingly.
+
+def read_word_counts(filename):
+
+  def one_article_probs():
+    if total_tokens == 0: return
+    art = ArticleTable.lookup_article(title)
+    if not art:
+      warning("Skipping article %s, not in table" % title)
+      return
+    art.compute_distribution(wordhash, total_tokens)
+
+  errprint("Reading word counts from %s..." % filename)
+  status = StatusMessage('article')
+  total_tokens = 0
+
+  title = None
+  for line in uchompopen(filename):
+    if line.startswith('Article title: '):
+      m = re.match('Article title: (.*)$', line)
+      if title:
+        one_article_probs()
+      # Stop if we've reached the maximum
+      if status.item_processed() >= Opts.max_time_per_stage:
+        break
+      title = m.group(1)
+      wordhash = intdict()
+      total_tokens = 0
+    elif line.startswith('Article coordinates: '):
+      pass
+    else:
+      m = re.match('(.*) = ([0-9]+)$', line)
+      if not m:
+        warning("Strange line, can't parse: title=%s: line=%s" % (title, line))
+        continue
+      word = m.group(1)
+      if not Opts.preserve_case_words: word = word.lower()
+      count = int(m.group(2))
+      if word in stopwords and Opts.ignore_stopwords_in_article_dists: continue
+      word = internasc(word)
+      total_tokens += count
+      wordhash[word] += count
+  else:
+    one_article_probs()
+
+  GlobalDist.finish_article_distributions()
+
+
+# Find the Wikipedia article matching an entry in the gazetteer.
+# The format of an entry is
+#
+# ID  NAME  ALTNAMES  ORIG-SCRIPT-NAME  TYPE  POPULATION  LAT  LONG  DIV1  DIV2  DIV3
+#
+# where there is a tab character separating each field.  Fields may be empty;
+# but there will still be a tab character separating the field from others.
+#
+# The ALTNAMES specify any alternative names of the location, often including
+# the equivalent of the original name without any accent characters.  If
+# there is more than one alternative name, the possibilities are separated
+# by a comma and a space, e.g. "Dongshi, Dongshih, Tungshih".  The
+# ORIG-SCRIPT-NAME is the name in its original script, if that script is not
+# Latin characters (e.g. names in Russia will be in Cyrillic). (For some
+# reason, names in Chinese characters are listed in the ALTNAMES rather than
+# the ORIG-SCRIPT-NAME.)
+#
+# LAT and LONG specify the latitude and longitude, respectively.  These are
+# given as integer values, where the actual value is found by dividing this
+# integer value by 100.
+#
+# DIV1, DIV2 and DIV3 specify different-level divisions that a location is
+# within, from largest to smallest.  Typically the largest is a country.
+# For locations in the U.S., the next two levels will be state and county,
+# respectively.  Note that such divisions also have corresponding entries
+# in the gazetteer.  However, these entries are somewhat lacking in that
+# (1) no coordinates are given, and (2) only the top-level division (the
+# country) is given, even for third-level divisions (e.g. counties in the
+# U.S.).
+#
+# For localities, add them to the region-map that covers the earth if
+# ADD_TO_REGION_MAP is true.
+
+def match_world_gazetteer_entry(line):
+  # Split on tabs, make sure at least 11 fields present and strip off
+  # extra whitespace
+  fields = re.split(r'\t', line.strip()) + ['']*11
+  fields = [x.strip() for x in fields[0:11]]
+  (id, name, altnames, orig_script_name, typ, population, lat, long,
+   div1, div2, div3) = fields
+
+  # Skip places without coordinates
+  if not lat or not long:
+    if debug > 1:
+      errprint("Skipping location %s (div %s/%s/%s) without coordinates" %
+               (name, div1, div2, div3))
+    return
+
+  # Create and populate a Locality object
+  loc = Locality(name, Coord(int(lat) / 100., int(long) / 100.))
+  loc.type = typ
+  if altnames:
+    loc.altnames = re.split(', ', altnames)
+  # Add the given location to the division the location is in
+  loc.div = Division.note_point_seen_in_division(loc, (div1, div2, div3))
+  if debug > 1:
+    errprint("Saw location %s (div %s/%s/%s) with coordinates %s" %
+             (loc.name, div1, div2, div3, loc.coord))
+
+  # Record the location.  For each name for the location (its
+  # canonical name and all alternates), add the location to the list of
+  # locations associated with the name.  Record the name in lowercase
+  # for ease in matching.
+  for name in [loc.name] + loc.altnames:
+    loname = name.lower()
+    if debug > 1:
+      errprint("Noting lower_toponym_to_location for toponym %s, canonical name %s"
+               % (name, loc.name))
+    lower_toponym_to_location[loname] += [loc]
+
+  # We start out looking for articles whose distance is very close,
+  # then widen until we reach Opts.max_dist_for_close_match.
+  maxdist = 5
+  while maxdist <= Opts.max_dist_for_close_match:
+    match = find_match_for_locality(loc, maxdist)
+    if match: break
+    maxdist *= 2
+
+  if not match: 
+    if debug > 1:
+      errprint("Unmatched name %s" % loc.name)
+    return
+  
+  # Record the match.
+  loc.match = match
+  match.location = loc
+  if debug > 1:
+    errprint("Matched location %s (coord %s) with article %s, dist=%s"
+             % (loc.name, loc.coord, match,
+                spheredist(loc.coord, match.coord)))
+
+# Read in the data from the World gazetteer in FILENAME and find the
+# Wikipedia article matching each entry in the gazetteer.  For localities,
+# add them to the region-map that covers the earth if ADD_TO_REGION_MAP is
+# true.
+def read_world_gazetteer_and_match(filename):
+  errprint("Matching gazetteer entries in %s..." % filename)
+  status = StatusMessage('gazetteer entry')
+
+  # Match each entry in the gazetteer
+  for line in uchompopen(filename):
+    if debug > 1:
+      errprint("Processing line: %s" % line)
+    match_world_gazetteer_entry(line)
+    if status.item_processed() >= Opts.max_time_per_stage:
+      break
+
+  for division in path_to_division.itervalues():
+    if debug > 1:
+      errprint("Processing division named %s, path %s"
+               % (division.name, division.path))
+    division.compute_boundary()
+    match = find_match_for_division(division)
+    if match:
+      if debug > 1:
+        errprint("Matched article %s for division %s, path %s" %
+                 (match, division.name, division.path))
+      division.match = match
+      match.location = division
+    else:
+      if debug > 1:
+        errprint("Couldn't find match for division %s, path %s" %
+                 (division.name, division.path))
 
 # If given a directory, yield all the files in the directory; else just
 # yield the file.
