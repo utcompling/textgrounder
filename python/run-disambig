@@ -11,7 +11,7 @@ WIKI_DISAMBIG="$HOME/devel/textgrounder/python/wiki_disambig.py"
 #DEBUG="--debug 0"
 DEBUG="--debug 1"
 #MAXTIME="--max-time-per-stage 5"
-MAXTIME="--max-time-per-stage 300"
+#MAXTIME="--max-time-per-stage 300"
 #MAXTIME="--max-time-per-stage 10"
 
 PICKLE_FILE="$PREFIX-coords-counts.pickled"

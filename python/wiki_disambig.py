@@ -143,7 +143,7 @@ class GlobalDist(object):
     GlobalDist.num_unseen_word_types = GlobalDist.num_types_seen_once
 
     #if debug > 2:
-    #  uniprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s" % (GlobalDist.num_word_types, GlobalDist.num_word_tokens, GlobalDist.num_types_seen_once, GlobalDist.globally_unseen_word_prob, GlobalDist.globally_unseen_word_prob + sum(GlobalDist.overall_word_probs.itervalues())))
+    #  errprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s" % (GlobalDist.num_word_types, GlobalDist.num_word_tokens, GlobalDist.num_types_seen_once, GlobalDist.globally_unseen_word_prob, GlobalDist.globally_unseen_word_prob + sum(GlobalDist.overall_word_probs.itervalues())))
 
     # Figure out the value of OVERALL_UNSEEN_MASS for each article.
     for art in ArticleTable.name_to_article.itervalues():
@@ -198,9 +198,10 @@ class ArticleTable(object):
 
   # Record the article as having NAME as one of its names (there may be
   # multiple names, due to redirects).  Also add to related lists mapping
-  # lowercased form, short form, etc.
+  # lowercased form, short form, etc.  If IS_REDIRECT, this is a redirect to
+  # an article, so don't record it again.
   @staticmethod
-  def record_article(name, art):
+  def record_article(name, art, is_redirect=False):
     # Must pass in properly cased name
     assert name == capfirst(name)
     ArticleTable.name_to_article[name] = art
@@ -214,9 +215,16 @@ class ArticleTable(object):
       lower_toponym_to_article[loname] += [art]
     if short != loname and art not in lower_toponym_to_article[short]:
       lower_toponym_to_article[short] += [art]
-    if art.split not in ArticleTable.articles_by_split:
-      ArticleTable.articles_by_split[art.split] = set()
-    ArticleTable.articles_by_split[art.split].add(art)
+    if not is_redirect:
+      splithash = ArticleTable.articles_by_split
+      if art.split not in splithash:
+        #splithash[art.split] = set()
+        splithash[art.split] = []
+      splitcoll = splithash[art.split]
+      if isinstance(splitcoll, set):
+        splitcoll.add(art)
+      else:
+        splitcoll.append(art)
 
 
 ############################################################################
@@ -255,7 +263,7 @@ class Eval(object):
       percent = "indeterminate percent"
     else:
       percent = "%5.2f%%" % (100*float(amount)/total)
-    print ("%s = %s/%s = %s" % (header, amount, total, percent))
+    errprint("%s = %s/%s = %s" % (header, amount, total, percent))
 
   def output_correct_results(self):
     self.output_fraction("Percent correct", self.correct_instances,
@@ -270,7 +278,7 @@ class Eval(object):
 
   def output_other_stats(self):
     for (ty, count) in self.other_stats.iteritems():
-      print ("%s = %s" % (ty, count))
+      errprint("%s = %s" % (ty, count))
 
   def output_results(self):
     if not self.total_instances:
@@ -329,8 +337,8 @@ class EvalWithRank(Eval):
     assert rank >= 1
     correct = rank == 1
     super(EvalWithRank, self).record_result(correct, reason=None)
-    self.total_credit += self.max_rank_for_credit + 1 - rank
     if rank <= self.max_rank_for_credit:
+      self.total_credit += self.max_rank_for_credit + 1 - rank
       self.incorrect_by_exact_rank[rank] += 1
       for i in xrange(rank, self.max_rank_for_credit + 1):
         self.correct_by_up_to_rank[i] += 1
@@ -394,14 +402,14 @@ class Results(object):
 
   @staticmethod
   def output_geotag_toponym_results():
-    print "Results for all toponyms:"
+    errprint("Results for all toponyms:")
     Results.all_toponym.output_results()
-    print ""
-    print "Results for toponyms when different from true location name:"
+    errprint("")
+    errprint("Results for toponyms when different from true location name:")
     Results.diff_surface.output_results()
-    print ""
-    print "Results for toponyms when different from either true location name"
-    print "  or its short form:"
+    errprint("")
+    errprint("Results for toponyms when different from either true location name")
+    errprint("  or its short form:")
     Results.diff_short.output_results()
 
 
@@ -419,7 +427,7 @@ class Results(object):
 
   @staticmethod
   def output_geotag_document_results():
-    print "Results for all documents/articles:"
+    errprint("Results for all documents/articles:")
     Results.all_document.output_results()
 
 
@@ -555,7 +563,7 @@ class WordDistribution(object):
   # 2. Words in the other distribution that are not in this one.
   # 3. Words in neither distribution but seen globally.
   # 4. Words never seen at all.  These have the 
-  def kl_divergence(self, other):
+  def kl_divergence(self, other, partial=False):
     assert self.finished
     assert other.finished
     kldiv = 0.0
@@ -565,6 +573,10 @@ class WordDistribution(object):
       p = self.lookup_word(word)
       q = other.lookup_word(word)
       kldiv += p*(log(p) - log(q))
+
+    if partial:
+      return kldiv
+
     # 2.
     for word in other.counts[0]:
       if lookup_sorted_list(self.counts, word) == None:
@@ -611,9 +623,9 @@ class WordDistribution(object):
   def lookup_word(self, word):
     assert self.finished
     #if debug > 0:
-    #  uniprint("Found counts for article %s, num word types = %s"
+    #  errprint("Found counts for article %s, num word types = %s"
     #           % (art, len(wordcounts[0])))
-    #  uniprint("Unknown prob = %s, overall_unseen_mass = %s" %
+    #  errprint("Unknown prob = %s, overall_unseen_mass = %s" %
     #           (unseen_mass, overall_unseen_mass))
     if word in GlobalDist.overall_word_probs:
       ind = internasc(word)
@@ -623,7 +635,7 @@ class WordDistribution(object):
       wordprob = (self.unseen_mass*GlobalDist.globally_unseen_word_prob
                   / GlobalDist.num_unseen_word_types)
       if debug > 1:
-        uniprint("Word %s, never seen at all, wordprob = %s" %
+        errprint("Word %s, never seen at all, wordprob = %s" %
                  (word, wordprob))
     else:
       wordprob = lookup_sorted_list(self.counts, ind)
@@ -634,17 +646,17 @@ class WordDistribution(object):
         #if wordprob <= 0:
         #  warning("Bad values; unseen_mass = %s, overall_word_probs[ind] = %s, overall_unseen_mass = %s" % (unseen_mass, GlobalDist.overall_word_probs[ind], GlobalDist.overall_unseen_mass))
         if debug > 1:
-          uniprint("Word %s, seen but not in article, wordprob = %s" %
+          errprint("Word %s, seen but not in article, wordprob = %s" %
                    (word, wordprob))
       else:
         #if wordprob <= 0 or total_tokens <= 0 or unseen_mass >= 1.0:
         #  warning("Bad values; wordprob = %s, unseen_mass = %s" %
         #          (wordprob, unseen_mass))
         #  for (word,count) in itertools.izip(wordcounts[0], wordcounts[1]):
-        #    uniprint("%s: %s" % (word, count))
+        #    errprint("%s: %s" % (word, count))
         wordprob = float(wordprob)/self.total_tokens*(1 - self.unseen_mass)
         if debug > 1:
-          uniprint("Word %s, seen in article, wordprob = %s" %
+          errprint("Word %s, seen in article, wordprob = %s" %
                    (word, wordprob))
     return wordprob
 
@@ -673,7 +685,7 @@ class NBDist(WordDistribution):
     total_tokens = 0
     incoming_links = 0
     if debug > 1:
-      uniprint("Naive Bayes dist, number of articles = %s" % num_arts)
+      errprint("Naive Bayes dist, number of articles = %s" % num_arts)
     counts = self.counts
     total_arts = 0
     num_arts = 0
@@ -686,6 +698,7 @@ class NBDist(WordDistribution):
       elif art.split != 'training':
         continue
       num_arts += 1
+      self.articles += [art]
       for (word,count) in itertools.izip(art.counts[0], art.counts[1]):
         counts[word] += count
       total_tokens += art.total_tokens
@@ -695,7 +708,7 @@ class NBDist(WordDistribution):
     self.total_tokens += total_tokens
     self.incoming_links += incoming_links
     if num_arts and debug > 0:
-      uniprint("""--> Finished processing, number articles handled = %s/%s,
+      errprint("""--> Finished processing, number articles handled = %s/%s,
     skipped articles = %s, total tokens = %s/%s, incoming links = %s/%s""" %
                (num_arts, self.num_arts, total_arts - num_arts,
                 total_tokens, self.total_tokens, incoming_links,
@@ -723,7 +736,7 @@ class NBDist(WordDistribution):
     self.finished = True
 
     if debug > 1:
-      uniprint("""For Naive Bayes dist, num articles = %s, total tokens = %s,
+      errprint("""For Naive Bayes dist, num articles = %s, total tokens = %s,
     unseen_mass = %s, types seen once = %s, incoming links = %s,
     overall unseen mass = %s""" %
                (self.num_arts, self.total_tokens, self.unseen_mass,
@@ -767,6 +780,8 @@ class NBRegion(object):
 
   empty_nbregion = None # Can't compute this until class is initialized
   all_regions_computed = False
+  num_empty_regions = 0
+  num_non_empty_regions = 0
 
   def __init__(self, latind, longind):
     self.latind = latind
@@ -780,7 +795,7 @@ class NBRegion(object):
     nblong = self.longind
 
     if debug > 1:
-      uniprint("Generating distribution for Naive Bayes region centered at %s"
+      errprint("Generating distribution for Naive Bayes region centered at %s"
                % region_indices_to_coord(nblat, nblong))
 
     # Accumulate counts for the given region
@@ -789,7 +804,7 @@ class NBRegion(object):
       if not arts:
         return
       if debug > 1:
-        uniprint("--> Processing tiling region %s" %
+        errprint("--> Processing tiling region %s" %
                  region_indices_to_coord(latind, longind))
       self.nbdist.add_articles(arts)
 
@@ -823,7 +838,12 @@ class NBRegion(object):
         return NBRegion.empty_nbregion
       nbreg = NBRegion(latind, longind)
       nbreg.generate_dist()
-      if not nbreg.nbdist.is_empty() or not no_create_empty:
+      empty = nbreg.nbdist.is_empty()
+      if empty:
+        NBRegion.num_empty_regions += 1
+      else:
+        NBRegion.num_non_empty_regions += 1
+      if not empty or not no_create_empty:
         NBRegion.corner_to_nbregion[(latind, longind)] = nbreg
     return nbreg
 
@@ -964,7 +984,7 @@ class Division(object):
       #  if mindist <= Opts.max_dist_for_outliers: yield p
 
     if debug > 1:
-      uniprint("Computing boundary for %s, path %s, num points %s" %
+      errprint("Computing boundary for %s, path %s, num points %s" %
                (self.name, self.path, len(self.locs)))
                
     self.goodlocs = list(yield_non_outliers())
@@ -1095,7 +1115,7 @@ class NBArticle(Article, WordDistribution):
     self.unseen_mass = unseen_mass
     self.total_tokens = total_tokens
     if debug > 3:
-      uniprint("Title = %s, numtypes = %s, numtokens = %s, unseen_mass = %s"
+      errprint("Title = %s, numtypes = %s, numtokens = %s, unseen_mass = %s"
                % (title, len(self.counts[0]), total_tokens, unseen_mass))
 
 
@@ -1137,7 +1157,7 @@ def find_one_wikipedia_match(loc, name, check_match, prefer_match):
     elif len(goodarts) > 1:
       # Multiple matches: Sort by preference, return most preferred one
       if debug > 1:
-        uniprint("Warning: Saw %s toponym matches: %s" %
+        errprint("Warning: Saw %s toponym matches: %s" %
                  (len(goodarts), goodarts))
       sortedarts = \
         sorted(goodarts, cmp=(lambda x,y:1 if prefer_match(loc, x,y) else -1),
@@ -1173,7 +1193,7 @@ def find_match_for_locality(loc, maxdist):
       return True
     else:
       if debug > 1:
-        uniprint("Found article %s but dist %s > %s" %
+        errprint("Found article %s but dist %s > %s" %
                  (art, dist, maxdist))
       return False
 
@@ -1193,10 +1213,10 @@ def find_match_for_division(loc):
     else:
       if debug > 1:
         if not art.coord:
-          uniprint("Found article %s but no coordinate, so not in location named %s, path %s" %
+          errprint("Found article %s but no coordinate, so not in location named %s, path %s" %
                    (art, loc.name, loc.path))
         else:
-          uniprint("Found article %s but not in location named %s, path %s" %
+          errprint("Found article %s but not in location named %s, path %s" %
                    (art, loc.name, loc.path))
       return False
 
@@ -1243,7 +1263,7 @@ def read_article_data(filename):
   for x in redirects:
     redart = ArticleTable.lookup_article(x.redir)
     if redart:
-      ArticleTable.record_article(x.title, redart)
+      ArticleTable.record_article(x.title, redart, is_redirect=True)
 
 
 # Parse the result of a previous run of --output-counts and generate
@@ -1342,7 +1362,7 @@ def match_world_gazetteer_entry(line):
   # Skip places without coordinates
   if not lat or not long:
     if debug > 1:
-      uniprint("Skipping location %s (div %s/%s/%s) without coordinates" %
+      errprint("Skipping location %s (div %s/%s/%s) without coordinates" %
                (name, div1, div2, div3))
     return
 
@@ -1354,7 +1374,7 @@ def match_world_gazetteer_entry(line):
   # Add the given location to the division the location is in
   loc.div = Division.note_point_seen_in_division(loc, (div1, div2, div3))
   if debug > 1:
-    uniprint("Saw location %s (div %s/%s/%s) with coordinates %s" %
+    errprint("Saw location %s (div %s/%s/%s) with coordinates %s" %
              (loc.name, div1, div2, div3, loc.coord))
 
   # Record the location.  For each name for the location (its
@@ -1364,7 +1384,7 @@ def match_world_gazetteer_entry(line):
   for name in [loc.name] + loc.altnames:
     loname = name.lower()
     if debug > 1:
-      uniprint("Noting lower_toponym_to_location for toponym %s, canonical name %s"
+      errprint("Noting lower_toponym_to_location for toponym %s, canonical name %s"
                % (name, loc.name))
     lower_toponym_to_location[loname] += [loc]
 
@@ -1378,14 +1398,14 @@ def match_world_gazetteer_entry(line):
 
   if not match: 
     if debug > 1:
-      uniprint("Unmatched name %s" % loc.name)
+      errprint("Unmatched name %s" % loc.name)
     return
   
   # Record the match.
   loc.match = match
   match.location = loc
   if debug > 1:
-    uniprint("Matched location %s (coord %s) with article %s, dist=%s"
+    errprint("Matched location %s (coord %s) with article %s, dist=%s"
              % (loc.name, loc.coord, match,
                 spheredist(loc.coord, match.coord)))
 
@@ -1400,26 +1420,26 @@ def read_world_gazetteer_and_match(filename):
   # Match each entry in the gazetteer
   for line in uchompopen(filename):
     if debug > 1:
-      uniprint("Processing line: %s" % line)
+      errprint("Processing line: %s" % line)
     match_world_gazetteer_entry(line)
     if status.item_processed() >= Opts.max_time_per_stage:
       break
 
   for division in path_to_division.itervalues():
     if debug > 1:
-      uniprint("Processing division named %s, path %s"
+      errprint("Processing division named %s, path %s"
                % (division.name, division.path))
     division.compute_boundary()
     match = find_match_for_division(division)
     if match:
       if debug > 1:
-        uniprint("Matched article %s for division %s, path %s" %
+        errprint("Matched article %s for division %s, path %s" %
                  (match, division.name, division.path))
       division.match = match
       match.location = division
     else:
       if debug > 1:
-        uniprint("Couldn't find match for division %s, path %s" %
+        errprint("Couldn't find match for division %s, path %s" %
                  (division.name, division.path))
 
 # Class of word in a file containing toponyms.  Fields:
@@ -1508,7 +1528,7 @@ class NaiveBayesStrategy(GeotagToponymStrategy):
       total_word_weight += thisweight
       totalprob += thisweight*log(wordprob)
     if debug > 0:
-      uniprint("Computed total word log-likelihood as %s" % totalprob)
+      errprint("Computed total word log-likelihood as %s" % totalprob)
     # Normalize probability according to the total word weight
     if total_word_weight > 0:
       totalprob /= total_word_weight
@@ -1517,7 +1537,7 @@ class NaiveBayesStrategy(GeotagToponymStrategy):
     totalprob *= word_weight
     totalprob += baseline_weight*log(thislinks)
     if debug > 0:
-      uniprint("Computed total log-likelihood as %s" % totalprob)
+      errprint("Computed total log-likelihood as %s" % totalprob)
     return totalprob
 
   def need_context(self):
@@ -1537,10 +1557,35 @@ class TestFileEvaluator(object):
     pass
 
   def evaluate_document(self, doc):
-    pass
+    # Return True if document was actually processed and evaluated; False
+    # is skipped.
+    return True
 
   def output_results(self):
     pass
+
+  def evaluate_and_output_results(self, files):
+    status = StatusMessage('document')
+    last_elapsed = 0
+    last_processed = 0
+    for filename in files:
+      errprint("Processing evaluation file %s..." % filename)
+      for doc in self.yield_documents(filename):
+        errprint("Processing document: %s" % doc)
+        if self.evaluate_document(doc):
+          new_elapsed = status.item_processed()
+          new_processed = status.num_processed()
+          # If five minutes and ten documents have gone by, print out results
+          if (new_elapsed - last_elapsed >= 300 and
+              new_processed - last_processed >= 10):
+            errprint("Results after %d documents:" % status.num_processed())
+            self.output_results()
+            last_elapsed = new_elapsed
+            last_processed = new_processed
+  
+    errprint("Final results: All %d documents processed:" %
+             status.num_processed())
+    self.output_results()
 
 
 class GeotagToponymEvaluator(TestFileEvaluator):
@@ -1563,11 +1608,11 @@ class GeotagToponymEvaluator(TestFileEvaluator):
     def return_word(word):
       if word.is_toponym:
         if debug > 1:
-          uniprint("Saw loc %s with true coordinates %s, true location %s" %
+          errprint("Saw loc %s with true coordinates %s, true location %s" %
                    (word.word, word.coord, word.location))
       else:
         if debug > 2:
-          uniprint("Non-toponym %s" % word.word)
+          errprint("Non-toponym %s" % word.word)
       return word
 
     for k, g in itertools.groupby(self.yield_geogwords(filename),
@@ -1627,20 +1672,20 @@ class GeotagToponymEvaluator(TestFileEvaluator):
         articles += [loc.match]
     if not articles:
       if debug > 0:
-        uniprint("Unable to find any possibilities for %s" % toponym)
+        errprint("Unable to find any possibilities for %s" % toponym)
       correct = False
     else:
       if debug > 0:
-        uniprint("Considering toponym %s, coordinates %s" %
+        errprint("Considering toponym %s, coordinates %s" %
                  (toponym, coord))
-        uniprint("For toponym %s, %d possible articles" %
+        errprint("For toponym %s, %d possible articles" %
                  (toponym, len(articles)))
       for art in articles:
         if debug > 0:
-            uniprint("Considering article %s" % art)
+            errprint("Considering article %s" % art)
         if not art:
           if debug > 0:
-            uniprint("--> Location without matching article")
+            errprint("--> Location without matching article")
           continue
         else:
           thisscore = self.strategy.compute_score(geogword, art)
@@ -1672,29 +1717,25 @@ class GeotagToponymEvaluator(TestFileEvaluator):
           else:
             reason = 'incorrect_one_correct_candidate'
 
-    uniprint("Eval: Toponym %s (true: %s at %s),"
+    errprint("Eval: Toponym %s (true: %s at %s),"
              % (toponym, geogword.location, coord), nonl=True)
     if correct:
-      uniprint("correct")
+      errprint("correct")
     else:
-      uniprint("incorrect, reason = %s" % reason)
+      errprint("incorrect, reason = %s" % reason)
 
     Results.record_geotag_toponym_result(correct, toponym, geogword.location,
                                          reason, num_arts)
 
     if debug > 0 and bestart:
-      uniprint("Best article = %s, score = %s, dist = %s, correct %s"
+      errprint("Best article = %s, score = %s, dist = %s, correct %s"
                % (bestart, bestscore, bestart.distance_to_coord(coord),
                   correct))
 
   def evaluate_document(self, doc):
-    print "Document: %s" % doc
     for geogword in doc:
        self.disambiguate_toponym(geogword)
-    self.documents_processed += 1
-    if (self.documents_processed % 100) == 0:
-      print "Results after %d documents:" % self.documents_processed
-      self.output_results()
+    return True
 
   def output_results(self):
     Results.output_geotag_toponym_results()
@@ -1708,7 +1749,7 @@ def get_adjusted_incoming_links(art):
       warning("Strange, %s has no link count" % art)
   else:
     if debug > 0:
-      uniprint("--> Link count is %s" % thislinks)
+      errprint("--> Link count is %s" % thislinks)
   if thislinks == 0: # Whether from unknown count or count is actually zero
     thislinks = 0.01 # So we don't get errors from log(0)
   return thislinks
@@ -1772,8 +1813,8 @@ class TRCoNLLGeotagToponymEvaluator(GeotagToponymEvaluator):
           wordstruct.coord = Coord(lat, long)
           wordstruct.location = fulltop
       except Exception, exc:
-        print "Bad line %s" % line
-        print "Exception is %s" % exc
+        errprint("Bad line %s" % line)
+        errprint("Exception is %s" % exc)
         if type(exc) is not ValueError:
           traceback.print_exc()
     if in_loc:
@@ -1814,9 +1855,12 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
   def __init__(self, opts):
     super(WikipediaGeotagDocumentEvaluator, self).__init__(opts)
     NBRegion.generate_all_nonempty_regions()
+    errprint("Number of non-empty regions: %s" % NBRegion.num_non_empty_regions)
+    errprint("Number of empty regions: %s" % NBRegion.num_empty_regions)
 
   def yield_documents(self, filename):
     for art in ArticleTable.articles_by_split['dev']:
+      assert art.split == 'dev'
       yield art
 
     #title = None
@@ -1846,7 +1890,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       if not Opts.max_time_per_stage:
         warning("Can't evaluate unfinished article %s" % article)
       Results.record_geotag_document_other_stat('Skipped articles')
-      return
+      return False
     truelat, truelong = coord_to_nbregion_indices(article.coord)
     true_nbreg = NBRegion.find_region_for_coord(article.coord)
     if debug > 0:
@@ -1859,7 +1903,8 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
         coord = region_indices_to_coord(latind, longind)
         errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s"
                  % (latind, longind, coord, nbregion.nbdist.num_arts))
-      kldiv = article.kl_divergence(nbregion.nbdist)
+      kldiv = article.kl_divergence(nbregion.nbdist,
+                                    Opts.strategy == 'partial-kl-divergence')
       #errprint("For region %s, KL divergence = %s" % (inds, kldiv))
       article_pq.add_task(kldiv, inds)
     rank = 1
@@ -1879,6 +1924,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     errprint("For article %s, true region at rank %s" %
              (article, rank))
     assert raised == (true_nbreg.nbdist.num_arts == 0)
+    return True
 
 
 # If given a directory, yield all the files in the directory; else just
@@ -1978,7 +2024,8 @@ in the test set.
 The test set is specified by --eval-file.  Default '%default'.""")
     op.add_option("--strategy", type='choice', default='baseline',
                   choices=['baseline',
-                           'symmetric-kl-divergence',
+                           'kl-divergence',
+                           'partial-kl-divergence',
                            'naive-bayes-with-baseline',
                            'naive-bayes-no-baseline'],
                   help="""Strategy to use for Geotagging.
@@ -2097,13 +2144,14 @@ particular-sized region.  Default '%default'.""")
     self.need('article_data_file')
     read_article_data(opts.article_data_file)
 
-    #print "Processing evaluation file(s) %s for toponym counts..." % opts.eval_file
+    #errprint("Processing evaluation file(s) %s for toponym counts..." % opts.eval_file)
     #process_dir_files(opts.eval_file, count_toponyms_in_file)
-    #print "Number of toponyms seen: %s" % len(toponyms_seen_in_eval_files)
-    #print "Number of toponyms seen more than once: %s" % \
+    #errprint("Number of toponyms seen: %s" % len(toponyms_seen_in_eval_files))
+    #errprint("Number of toponyms seen more than once: %s" % \
     #  len([foo for (foo,count) in toponyms_seen_in_eval_files.iteritems() if
-    #       count > 1])
-    #output_reverse_sorted_table(toponyms_seen_in_eval_files)
+    #       count > 1]))
+    #output_reverse_sorted_table(toponyms_seen_in_eval_files,
+    #                            outfile=sys.stderr)
 
     # Read in (or unpickle) and maybe pickle the words-counts file
     if opts.mode == 'pickle-only' or opts.mode.startswith('geotag'):
@@ -2152,12 +2200,7 @@ particular-sized region.  Default '%default'.""")
       if not opts.eval_file:
         opts.eval_file = opts.article_data_file
 
-    print "Processing evaluation file/dir %s..." % opts.eval_file
-    for filename in yield_directory_files(opts.eval_file):
-      print "Processing evaluation file %s..." % filename
-      for doc in evalobj.yield_documents(filename):
-        evalobj.evaluate_document(doc)
-
-    evalobj.output_results()
+    errprint("Processing evaluation file/dir %s..." % opts.eval_file)
+    evalobj.evaluate_and_output_results(yield_directory_files(opts.eval_file))
 
 WikiDisambigProgram()
