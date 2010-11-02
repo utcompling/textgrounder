@@ -1,13 +1,17 @@
 #!/bin/sh
 
-PREFIX="enwiki-20100905"
+if [ -z "$WIKIPEDIA_DATA_DIR" ]; then
+  WIKIPEDIA_DATA_DIR='.'
+fi
+
+PREFIX="$WIKIPEDIA_DATA_DIR/enwiki-20100905"
 WIKI_DISAMBIG="$HOME/devel/textgrounder/python/wiki_disambig.py"
 
 #DEBUG="--debug 2"
 #DEBUG="--debug 0"
 DEBUG="--debug 1"
 #MAXTIME="--max-time-per-stage 5"
-#MAXTIME="--max-time-per-stage 30"
+MAXTIME="--max-time-per-stage 300"
 #MAXTIME="--max-time-per-stage 10"
 
 PICKLE_FILE="$PREFIX-coords-counts.pickled"
