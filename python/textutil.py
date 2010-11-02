@@ -5,6 +5,7 @@ import sys, codecs # For uchompopen()
 import bisect # For sorted lists
 import time # For status messages
 from heapq import * # For priority queue
+import itertools # For priority queue
 
 #############################################################################
 #                        Regular expression functions                       #

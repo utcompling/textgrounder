@@ -9,6 +9,7 @@
 import sys, re
 import os, os.path
 import math
+from math import log
 import collections
 import traceback
 import cPickle
@@ -232,6 +233,7 @@ class Eval(object):
     self.incorrect_reasons = incorrect_reasons
     for (attrname, engname) in self.incorrect_reasons:
       setattr(self, attrname, 0)
+    self.other_stats = intdict()
   
   def record_result(self, correct, reason=None):
     self.total_instances += 1
@@ -241,6 +243,9 @@ class Eval(object):
       self.incorrect_instances += 1
       if reason != None:
         setattr(self, reason, getattr(self, reason) + 1)
+
+  def record_other_stat(self, othertype):
+    self.other_stats[othertype] += 1
 
   def output_fraction(self, header, amount, total):
     if amount > total:
@@ -263,12 +268,17 @@ class Eval(object):
       self.output_fraction("  %s" % descr, getattr(self, reason),
                            self.total_instances)
 
+  def output_other_stats(self):
+    for (ty, count) in self.other_stats.iteritems():
+      print ("%s = %s" % (ty, count))
+
   def output_results(self):
     if not self.total_instances:
       warning("Strange, no instances found at all; perhaps --eval-format is incorrect?")
       return
     self.output_correct_results()
     self.output_incorrect_results()
+    self.output_other_stats()
 
 class EvalWithCandidateList(Eval):
   def __init__(self, incorrect_reasons, max_individual_candidates=5):
@@ -319,10 +329,10 @@ class EvalWithRank(Eval):
     assert rank >= 1
     correct = rank == 1
     super(EvalWithRank, self).record_result(correct, reason=None)
-    self.total_credit = self.max_rank_for_credit + 1 - rank
+    self.total_credit += self.max_rank_for_credit + 1 - rank
     if rank <= self.max_rank_for_credit:
       self.incorrect_by_exact_rank[rank] += 1
-      for i in xrange(i, max_rank_for_credit + 1):
+      for i in xrange(rank, self.max_rank_for_credit + 1):
         self.correct_by_up_to_rank[i] += 1
     else:
       self.incorrect_past_max_rank += 1
@@ -333,7 +343,7 @@ class EvalWithRank(Eval):
     self.output_fraction("Percent correct with partial credit",
                          self.total_credit, possible_credit)
     for i in xrange(2, self.max_rank_for_credit + 1):
-      self.output_fraction("  Correct is at or below rank %s" % i,
+      self.output_fraction("  Correct is at or above rank %s" % i,
                            self.correct_by_up_to_rank[i], self.total_instances)
 
   def output_incorrect_results(self):
@@ -399,8 +409,13 @@ class Results(object):
 
   all_document = EvalWithRank()
 
+  @staticmethod
   def record_geotag_document_result(rank):
     Results.all_document.record_result(rank)
+
+  @staticmethod
+  def record_geotag_document_other_stat(othertype):
+    Results.all_document.record_other_stat(othertype)
 
   @staticmethod
   def output_geotag_document_results():
@@ -486,9 +501,53 @@ def region_indices_to_coord(latind, longind):
 #                           Geographic locations                           #
 ############################################################################
 
+# Fields defined:
+#
+#   counts: A "sorted list" (tuple of sorted keys and values) of
+#           (word, count) items, specifying the counts of all words seen
+#           at least once.
+#   finished: Whether we have finished computing the distribution in
+#             'counts'.
+#   unseen_mass: Total probability mass to be assigned to all words not
+#                seen in the article, estimated using Good-Turing smoothing
+#                as the unadjusted empirical probability of having seen a
+#                word once.
+#   overall_unseen_mass:
+#     Probability mass assigned in 'overall_word_probs' to all words not seen
+#     in the article.  This is 1 - (sum over W in A of overall_word_probs[W]).
+#     The idea is that we compute the probability of seeing a word W in
+#     article A as
+#
+#     -- if W has been seen before in A, use the following:
+#          COUNTS[W]/TOTAL_TOKENS*(1 - UNSEEN_MASS)
+#     -- else, if W seen in any articles (W in 'overall_word_probs'),
+#        use UNSEEN_MASS * (overall_word_probs[W] / OVERALL_UNSEEN_MASS).
+#        The idea is that overall_word_probs[W] / OVERALL_UNSEEN_MASS is
+#        an estimate of p(W | W not in A).  We have to divide by
+#        OVERALL_UNSEEN_MASS to make these probabilities be normalized
+#        properly.  We scale p(W | W not in A) by the total probability mass
+#        we have available for all words not seen in A.
+#     -- else, use UNSEEN_MASS * globally_unseen_word_prob / NUM_UNSEEN_WORDS,
+#        where NUM_UNSEEN_WORDS is an estimate of the total number of words
+#        "exist" but haven't been seen in any articles.  One simple idea is
+#        to use the number of words seen once in any article.  This certainly
+#        underestimates this number of not too many articles have been seen
+#        but might be OK if many articles seen.
+#   total_tokens: Total number of word tokens seen
+
 class WordDistribution(object):
-  __slots__ = ['finished', 'counts', 'unseen_mass', 'total_tokens',
-               'overall_unseen_mass']
+  # Can't use __slots__, or you get this following for NBArticle:
+  #TypeError: Error when calling the metaclass bases
+  #    multiple bases have instance lay-out conflict
+  myslots = ['finished', 'counts', 'unseen_mass', 'total_tokens',
+             'overall_unseen_mass']
+
+  def init_word_distribution(self):
+    self.finished = False
+    self.counts = intdict()
+    self.unseen_mass = 1.0
+    self.total_tokens = 0
+    self.overall_unseen_mass = 1.0
 
   # Compute the KL divergence between this distribution and another
   # distribution.  This is a bit tricky.  We have to take into account:
@@ -496,22 +555,22 @@ class WordDistribution(object):
   # 2. Words in the other distribution that are not in this one.
   # 3. Words in neither distribution but seen globally.
   # 4. Words never seen at all.  These have the 
-  def kl_divergence(self, otherdist):
+  def kl_divergence(self, other):
     assert self.finished
-    assert otherdist.finished
+    assert other.finished
     kldiv = 0.0
     overall_probs_diff_words = 0.0
     # 1.
     for word in self.counts[0]:
       p = self.lookup_word(word)
-      q = otherdist.lookup_word(word)
-      kldiv += p*(math.log(p) - math.log(q))
+      q = other.lookup_word(word)
+      kldiv += p*(log(p) - log(q))
     # 2.
-    for word in otherdist.counts[0]:
-      if lookup_sorted_list(self.counts, ind) == None:
+    for word in other.counts[0]:
+      if lookup_sorted_list(self.counts, word) == None:
         p = self.lookup_word(word)
-        q = otherdist.lookup_word(word)
-        kldiv += p*(math.log(p) - math.log(q))
+        q = other.lookup_word(word)
+        kldiv += p*(log(p) - log(q))
         overall_probs_diff_words += GlobalDist.overall_word_probs[word]
     # 3. For words seen in neither dist but seen globally:
     # You can show that this is
@@ -539,15 +598,15 @@ class WordDistribution(object):
     # 4. For words never seen at all:
     p = (self.unseen_mass*GlobalDist.globally_unseen_word_prob /
           GlobalDist.num_unseen_word_types)
-    q = (otherdist.unseen_mass*GlobalDist.globally_unseen_word_prob /
+    q = (other.unseen_mass*GlobalDist.globally_unseen_word_prob /
           GlobalDist.num_unseen_word_types)
-    kldiv += GlobalDist.num_unseen_word_types*(p*(math.log(p) - math.log(q)))
+    kldiv += GlobalDist.num_unseen_word_types*(p*(log(p) - log(q)))
 
     return kldiv
 
-  def symmetric_kldiv(self, otherdist):
-    return (0.5*self.kl_divergence(otherdist) + 
-            0.5*otherdist.kl_divergence(self))
+  def symmetric_kldiv(self, other):
+    return (0.5*self.kl_divergence(other) + 
+            0.5*other.kl_divergence(self))
 
   def lookup_word(self, word):
     assert self.finished
@@ -563,7 +622,7 @@ class WordDistribution(object):
     if ind == None:
       wordprob = (self.unseen_mass*GlobalDist.globally_unseen_word_prob
                   / GlobalDist.num_unseen_word_types)
-      if debug > 0:
+      if debug > 1:
         uniprint("Word %s, never seen at all, wordprob = %s" %
                  (word, wordprob))
     else:
@@ -574,7 +633,7 @@ class WordDistribution(object):
                      self.overall_unseen_mass))
         #if wordprob <= 0:
         #  warning("Bad values; unseen_mass = %s, overall_word_probs[ind] = %s, overall_unseen_mass = %s" % (unseen_mass, GlobalDist.overall_word_probs[ind], GlobalDist.overall_unseen_mass))
-        if debug > 0:
+        if debug > 1:
           uniprint("Word %s, seen but not in article, wordprob = %s" %
                    (word, wordprob))
       else:
@@ -584,72 +643,49 @@ class WordDistribution(object):
         #  for (word,count) in itertools.izip(wordcounts[0], wordcounts[1]):
         #    uniprint("%s: %s" % (word, count))
         wordprob = float(wordprob)/self.total_tokens*(1 - self.unseen_mass)
-        if debug > 0:
+        if debug > 1:
           uniprint("Word %s, seen in article, wordprob = %s" %
                    (word, wordprob))
     return wordprob
 
-  def __init__(self):
-    self.finished = False
-    self.counts = intdict()
-    self.unseen_mass = 1.0
-    self.total_tokens = 0
-    self.num_types_seen_once = 0
-    self.overall_unseen_mass = 1.0
-
 # Distribution used for Naive Bayes disambiguation.  The following
-# fields are defined: 
+# fields are defined in addition to base class fields:
 #
-#   finished: Whether we have finished computing the distribution over all
-#             articles to be added.
-#   locs: List of locations whose articles are used in computing the
-#         distribution.
+#   articles: Articles used in computing the distribution.
 #   num_arts: Total number of articles included.
 #   incoming_links: Total number of incoming links, or None if unknown.
-#   counts: During accumulation, a hash table of (word, count) items,
-#           specifying the count of each word that has been seen at least
-#           once in any article making up the distribution.  After
-#           all articles have been added, converted to a "sorted list"
-#           (tuple of sorted keys and values) of words and counts.
-#   unseen_mass: Total probability mass to be assigned to all words not
-#                seen in any articles, estimated using Good-Turing smoothing
-#                as the unadjusted empirical probability of having seen a
-#                word once.
-#   total_tokens: Total number of tokens in all articles
-#   num_types_seen_once: Number of word types seen only once across
-#                        all articles.
-#   overall_unseen_mass:
-#     Probability mass assigned in 'overall_word_probs' to all words not seen
-#     in any article.  This is 1 - (sum over seen W of overall_word_probs[W]).
 
-class NBDist(object):
-  __slots__ = ['finished', 'locs', 'num_arts', 'incoming_links', 'counts',
-               'unseen_mass', 'total_tokens', 'num_types_seen_once',
-               'overall_unseen_mass']
+class NBDist(WordDistribution):
+  __slots__ = WordDistribution.myslots + \
+      ['articles', 'num_arts', 'incoming_links']
 
   def __init__(self):
-    self.finished = False
-    self.locs = []
+    self.init_word_distribution()
+    self.articles = []
     self.num_arts = 0
     self.incoming_links = 0
-    self.counts = intdict()
-    self.unseen_mass = 1.0
-    self.total_tokens = 0
-    self.num_types_seen_once = 0
-    self.overall_unseen_mass = 1.0
 
-  # Add the given locations to the total distribution seen so far
-  def add_locations(self, locs):
-    self.locs += locs
-    num_arts = sum(1 for loc in locs if loc.match)
+  def is_empty(self):
+    return self.num_arts == 0
+
+  # Add the given articles to the total distribution seen so far
+  def add_articles(self, articles):
     total_tokens = 0
     incoming_links = 0
-    if debug > 0:
+    if debug > 1:
       uniprint("Naive Bayes dist, number of articles = %s" % num_arts)
     counts = self.counts
-    for loc in locs:
-      art = loc.match
-      if not art or not art.finished or art.split != 'training': continue
+    total_arts = 0
+    num_arts = 0
+    for art in articles:
+      total_arts += 1
+      if not art.finished:
+        if not Opts.max_time_per_stage:
+          warning("Saw unfinished article %s" % art)
+        continue
+      elif art.split != 'training':
+        continue
+      num_arts += 1
       for (word,count) in itertools.izip(art.counts[0], art.counts[1]):
         counts[word] += count
       total_tokens += art.total_tokens
@@ -658,14 +694,19 @@ class NBDist(object):
     self.num_arts += num_arts
     self.total_tokens += total_tokens
     self.incoming_links += incoming_links
-    if debug > 0:
-      uniprint("""--> Finished processing, number articles seen = %s/%s,
-    total tokens = %s/%s, incoming links = %s/%s""" %
-               (num_arts, self.num_arts, total_tokens, self.total_tokens,
-                incoming_links, self.incoming_links))
+    if num_arts and debug > 0:
+      uniprint("""--> Finished processing, number articles handled = %s/%s,
+    skipped articles = %s, total tokens = %s/%s, incoming links = %s/%s""" %
+               (num_arts, self.num_arts, total_arts - num_arts,
+                total_tokens, self.total_tokens, incoming_links,
+                self.incoming_links))
+
+  def add_locations(self, locs):
+    arts = [loc.match for loc in locs if loc.match]
+    self.add_articles(arts)
 
   def finish_dist(self):
-    self.num_types_seen_once = \
+    num_types_seen_once = \
       sum(1 for word in self.counts if self.counts[word] == 1)
     overall_seen_mass = 0.0
     for word in self.counts:
@@ -675,18 +716,18 @@ class NBDist(object):
       # If no words seen only once, we will have a problem if we assign 0
       # to the unseen mass, as unseen words will end up with 0 probability.
       self.unseen_mass = \
-        float(max(1, self.num_types_seen_once))/self.total_tokens
+        float(max(1, num_types_seen_once))/self.total_tokens
     else:
       self.unseen_mass = 1.0
     self.counts = make_sorted_list(self.counts)
     self.finished = True
 
-    if debug > 0:
+    if debug > 1:
       uniprint("""For Naive Bayes dist, num articles = %s, total tokens = %s,
     unseen_mass = %s, types seen once = %s, incoming links = %s,
     overall unseen mass = %s""" %
                (self.num_arts, self.total_tokens, self.unseen_mass,
-                self.num_types_seen_once, self.incoming_links,
+                num_types_seen_once, self.incoming_links,
                 self.overall_unseen_mass))
 
 ############ Naive Bayes regions ############
@@ -713,10 +754,10 @@ class NBRegion(object):
   # [index*degrees_per_region, (index+1)*degrees_per_region).
   #
   # We don't just create an array because we expect many regions to have no
-  # locations in them, esp. as we decrease the region size.  The idea is that
+  # articles in them, esp. as we decrease the region size.  The idea is that
   # the regions provide a first approximation to the regions used to create the
   # article distributions.
-  tiling_region_to_locations = listdict()
+  tiling_region_to_articles = listdict()
 
   # Mapping from center of Naive Bayes region to corresponding region object.
   # A "Naive Bayes region" is made up of a square of tiling regions, with
@@ -738,19 +779,19 @@ class NBRegion(object):
     nblat = self.latind
     nblong = self.longind
 
-    if debug > 0:
+    if debug > 1:
       uniprint("Generating distribution for Naive Bayes region centered at %s"
                % region_indices_to_coord(nblat, nblong))
 
     # Accumulate counts for the given region
     def process_one_region(latind, longind):
-      locs = NBRegion.tiling_region_to_locations.get((latind, longind), None)
-      if not locs:
+      arts = NBRegion.tiling_region_to_articles.get((latind, longind), None)
+      if not arts:
         return
-      if debug > 0:
+      if debug > 1:
         uniprint("--> Processing tiling region %s" %
                  region_indices_to_coord(latind, longind))
-      self.nbdist.add_locations(locs)
+      self.nbdist.add_articles(arts)
 
     # Process the tiling regions making up the Naive Bayes region;
     # but be careful around the edges.
@@ -767,7 +808,7 @@ class NBRegion(object):
   @staticmethod
   def find_region_for_coord(coord):
     latind, longind = coord_to_nbregion_indices(coord)
-    return NBRegion.find_nbregion_for_region_indices(latind, longind)
+    return NBRegion.find_region_for_region_indices(latind, longind)
 
   # Find the NBRegion with the given indices at the southwest point.
   # If none, create the region.
@@ -789,22 +830,23 @@ class NBRegion(object):
   # Generate all NBRegions that are non-empty.
   @staticmethod
   def generate_all_nonempty_regions():
+    errprint("Generating all non-empty Naive Bayes regions...")
     status = StatusMessage('Naive Bayes region')
 
     for i in xrange(minimum_latind, maximum_latind + 1):
       for j in xrange(minimum_longind, maximum_longind + 1):
-        find_region_for_region_indices(i, j, no_create_empty=True)
+        NBRegion.find_region_for_region_indices(i, j, no_create_empty=True)
         status.item_processed()
 
     NBRegion.all_regions_computed = True
     
-  # Add the given locality to the region map, which covers the earth in regions
+  # Add the given article to the region map, which covers the earth in regions
   # of a particular size to aid in computing the regions used in region-based
   # Naive Bayes.
   @staticmethod
-  def add_locality_to_region_map(loc):
-    latind, longind = coord_to_tiling_region_indices(loc.coord)
-    NBRegion.tiling_region_to_locations[(latind, longind)] += [loc]
+  def add_article_to_region(article):
+    latind, longind = coord_to_tiling_region_indices(article.coord)
+    NBRegion.tiling_region_to_articles[(latind, longind)] += [article]
 
   @staticmethod
   def yield_all_nonempty_regions():
@@ -992,57 +1034,19 @@ def compute_short_form(name):
     return (name, None)
 
 # A Wikipedia article for geotagging.  Defined fields, in addition to those
-# of the base class:
+# of the base classes:
 #
 #   location: Corresponding location for this article.
-#   counts: A "sorted list" (tuple of sorted keys and values) of
-#           (word, count) items, specifying the counts of all words seen
-#           at least once.
-#   finished: Whether we have finished computing the distribution in
-#             'counts'.
-#   unseen_mass: Total probability mass to be assigned to all words not
-#                seen in the article, estimated using Good-Turing smoothing
-#                as the unadjusted empirical probability of having seen a
-#                word once.
-#   overall_unseen_mass:
-#     Probability mass assigned in 'overall_word_probs' to all words not seen
-#     in the article.  This is 1 - (sum over W in A of overall_word_probs[W]).
-#     The idea is that we compute the probability of seeing a word W in
-#     article A as
-#
-#     -- if W has been seen before in A, use the following:
-#          COUNTS[W]/TOTAL_TOKENS*(1 - UNSEEN_MASS)
-#     -- else, if W seen in any articles (W in 'overall_word_probs'),
-#        use UNSEEN_MASS * (overall_word_probs[W] / OVERALL_UNSEEN_MASS).
-#        The idea is that overall_word_probs[W] / OVERALL_UNSEEN_MASS is
-#        an estimate of p(W | W not in A).  We have to divide by
-#        OVERALL_UNSEEN_MASS to make these probabilities be normalized
-#        properly.  We scale p(W | W not in A) by the total probability mass
-#        we have available for all words not seen in A.
-#     -- else, use UNSEEN_MASS * globally_unseen_word_prob / NUM_UNSEEN_WORDS,
-#        where NUM_UNSEEN_WORDS is an estimate of the total number of words
-#        "exist" but haven't been seen in any articles.  One simple idea is
-#        to use the number of words seen once in any article.  This certainly
-#        underestimates this number of not too many articles have been seen
-#        but might be OK if many articles seen.
-#   total_tokens: Total number of word tokens seen
-#   words_seen_once: List of words seen once, for computing the value of
-#     unseen_mass for a combination of multiple articles.
+#   nbregion: NBRegion object corresponding to this article.
 
-class NBArticle(Article):
-  __slots__ = Article.__slots__ + [
-    'location', 'counts', 'finished', 'unseen_mass',
-    'overall_unseen_mass', 'total_tokens', 'words_seen_once', 'nbregion']
+class NBArticle(Article, WordDistribution):
+  __slots__ = Article.__slots__ + WordDistribution.myslots + [
+    'location', 'nbregion']
 
   def __init__(self, **args):
     super(NBArticle, self).__init__(**args)
+    self.init_word_distribution()
     self.location = None
-    self.counts = None
-    self.finished = False
-    self.unseen_mass = None
-    self.overall_unseen_mass = None
-    self.total_tokens = None
-    self.words_seen_once = None
     self.nbregion = None
 
   def distance_to_coord(self, coord):
@@ -1075,8 +1079,7 @@ class NBArticle(Article):
     # Compute probabilities.  Use a very simple version of Good-Turing
     # smoothing where we assign to unseen words the probability mass of
     # words seen once, and adjust all other probs accordingly.
-    self.words_seen_once = [word for word in wordhash if wordhash[word] == 1]
-    oncecount = len(self.words_seen_once)
+    oncecount = sum(1 for word in wordhash if wordhash[word] == 1)
     unseen_mass = float(oncecount)/total_tokens
     for (word,count) in wordhash.iteritems():
       ind = internasc(word)
@@ -1231,6 +1234,8 @@ def read_article_data(filename):
       redirects.append(art)
     elif art.coord:
       ArticleTable.record_article(art.title, art)
+      if art.split == 'training':
+        NBRegion.add_article_to_region(art)
 
   read_article_data_file(filename, process, article_type=NBArticle,
                          max_time_per_stage=Opts.max_time_per_stage)
@@ -1249,15 +1254,11 @@ def read_article_data(filename):
 
 def read_word_counts(filename):
 
-  def one_article_probs(title, wordhash, total_tokens):
+  def one_article_probs():
     if total_tokens == 0: return
     art = ArticleTable.lookup_article(title)
     if not art:
       warning("Skipping article %s, not in table" % title)
-      return
-    if art.split != 'training':
-      errprint("Skipping article %s, in split '%s', not training" %
-               (art, art.split))
       return
     art.compute_distribution(wordhash, total_tokens)
 
@@ -1270,7 +1271,7 @@ def read_word_counts(filename):
     if line.startswith('Article title: '):
       m = re.match('Article title: (.*)$', line)
       if title:
-        one_article_probs(title, wordhash, total_tokens)
+        one_article_probs()
       # Stop if we've reached the maximum
       if status.item_processed() >= Opts.max_time_per_stage:
         break
@@ -1330,7 +1331,7 @@ def read_word_counts(filename):
 # For localities, add them to the region-map that covers the earth if
 # ADD_TO_REGION_MAP is true.
 
-def match_world_gazetteer_entry(line, add_to_region_map):
+def match_world_gazetteer_entry(line):
   # Split on tabs, make sure at least 11 fields present and strip off
   # extra whitespace
   fields = re.split(r'\t', line.strip()) + ['']*11
@@ -1380,9 +1381,6 @@ def match_world_gazetteer_entry(line, add_to_region_map):
       uniprint("Unmatched name %s" % loc.name)
     return
   
-  if add_to_region_map:
-    NBRegion.add_locality_to_region_map(loc)
-
   # Record the match.
   loc.match = match
   match.location = loc
@@ -1395,7 +1393,7 @@ def match_world_gazetteer_entry(line, add_to_region_map):
 # Wikipedia article matching each entry in the gazetteer.  For localities,
 # add them to the region-map that covers the earth if ADD_TO_REGION_MAP is
 # true.
-def read_world_gazetteer_and_match(filename, add_to_region_map):
+def read_world_gazetteer_and_match(filename):
   errprint("Matching gazetteer entries in %s..." % filename)
   status = StatusMessage('gazetteer entry')
 
@@ -1403,7 +1401,7 @@ def read_world_gazetteer_and_match(filename, add_to_region_map):
   for line in uchompopen(filename):
     if debug > 1:
       uniprint("Processing line: %s" % line)
-    match_world_gazetteer_entry(line, add_to_region_map)
+    match_world_gazetteer_entry(line)
     if status.item_processed() >= Opts.max_time_per_stage:
       break
 
@@ -1508,7 +1506,7 @@ class NaiveBayesStrategy(GeotagToponymStrategy):
         thisweight = 1.0/(1+dist)
 
       total_word_weight += thisweight
-      totalprob += thisweight*math.log(wordprob)
+      totalprob += thisweight*log(wordprob)
     if debug > 0:
       uniprint("Computed total word log-likelihood as %s" % totalprob)
     # Normalize probability according to the total word weight
@@ -1517,7 +1515,7 @@ class NaiveBayesStrategy(GeotagToponymStrategy):
     # Combine word and prior (baseline) probability acccording to their
     # relative weights
     totalprob *= word_weight
-    totalprob += baseline_weight*math.log(thislinks)
+    totalprob += baseline_weight*log(thislinks)
     if debug > 0:
       uniprint("Computed total log-likelihood as %s" % totalprob)
     return totalprob
@@ -1813,6 +1811,10 @@ class GeotagDocumentEvaluator(TestFileEvaluator):
 
 
 class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
+  def __init__(self, opts):
+    super(WikipediaGeotagDocumentEvaluator, self).__init__(opts)
+    NBRegion.generate_all_nonempty_regions()
+
   def yield_documents(self, filename):
     for art in ArticleTable.articles_by_split['dev']:
       yield art
@@ -1838,23 +1840,45 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     #  yield (title, words)
 
   def evaluate_document(self, article):
+    if not article.finished:
+      # This can (and does) happen when --max-time-per-stage is set,
+      # so that the counts for many articles don't get read in.
+      if not Opts.max_time_per_stage:
+        warning("Can't evaluate unfinished article %s" % article)
+      Results.record_geotag_document_other_stat('Skipped articles')
+      return
+    truelat, truelong = coord_to_nbregion_indices(article.coord)
+    true_nbreg = NBRegion.find_region_for_coord(article.coord)
+    if debug > 0:
+      errprint("Evaluating article %s with %s articles in region" %
+               (article, true_nbreg.nbdist.num_arts))
     article_pq = PriorityQueue()
     for (inds, nbregion) in NBRegion.yield_all_nonempty_regions():
-      article_pq.add_task(article.kl_divergence(nbregion.nbdist),
-                          (inds, nbregion))
+      if debug > 1:
+        (latind, longind) = inds
+        coord = region_indices_to_coord(latind, longind)
+        errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s"
+                 % (latind, longind, coord, nbregion.nbdist.num_arts))
+      kldiv = article.kl_divergence(nbregion.nbdist)
+      #errprint("For region %s, KL divergence = %s" % (inds, kldiv))
+      article_pq.add_task(kldiv, inds)
     rank = 1
-    truelat, truelong = coord_to_nbregion_indices(article.coord)
+    raised = False
     while True:
       try:
         latind, longind = article_pq.get_top_priority()
         if latind == truelat and longind == truelong:
-          Results.record_geotag_toponym_result(rank)
+          Results.record_geotag_document_result(rank)
           break
         rank += 1
       except IndexError:
-        warning("For article %s, no training articles in article's region" %
-                article)
-        Results.record_geotag_toponym_result(rank)
+        raised = True
+        Results.record_geotag_document_result(rank)
+        Results.record_geotag_document_other_stat('No training articles in region')
+        break
+    errprint("For article %s, true region at rank %s" %
+             (article, rank))
+    assert raised == (true_nbreg.nbdist.num_arts == 0)
 
 
 # If given a directory, yield all the files in the directory; else just
@@ -2097,8 +2121,7 @@ particular-sized region.  Default '%default'.""")
 
     if opts.mode == 'pickle-only': return
 
-    read_world_gazetteer_and_match(opts.gazetteer_file,
-                                   opts.naive_bayes_type != "article")
+    read_world_gazetteer_and_match(opts.gazetteer_file)
 
     if opts.mode == 'match-only': return
 
@@ -2122,6 +2145,12 @@ particular-sized region.  Default '%default'.""")
         evalobj = WikipediaGeotagToponymEvaluator(opts, strategy)
     else:
       evalobj = WikipediaGeotagDocumentEvaluator(opts)
+      # Hack: When running in --mode=geotag-documents and --eval-format=wiki,
+      # we don't need an eval file because we use the article counts we've
+      # already loaded.  But we will get an error if we don't set this to
+      # a file.
+      if not opts.eval_file:
+        opts.eval_file = opts.article_data_file
 
     print "Processing evaluation file/dir %s..." % opts.eval_file
     for filename in yield_directory_files(opts.eval_file):

@@ -7,6 +7,7 @@ WIKI_DISAMBIG="$HOME/devel/textgrounder/python/wiki_disambig.py"
 #DEBUG="--debug 0"
 DEBUG="--debug 1"
 #MAXTIME="--max-time-per-stage 5"
+#MAXTIME="--max-time-per-stage 30"
 #MAXTIME="--max-time-per-stage 10"
 
 PICKLE_FILE="$PREFIX-coords-counts.pickled"
@@ -17,14 +18,13 @@ UNPICKLE=
 
 STOPWORDS_FILE="--stopwords-file stopwords.english"
 ARTICLE_DATA_FILE="--article-data-file $PREFIX-combined-article-data.txt"
-#COUNTS_FILE="--counts-file $PREFIX-training-counts-only-coord-articles.txt"
 COUNTS_FILE="--counts-file $PREFIX-counts-only-coord-articles.txt"
 GAZETTEER_FILE="--gazetteer-file world-dataen-fixed.txt"
 
 #MODE="pickle-only"
 #MODE="match-only"
-MODE="geotag-toponyms"
-#MODE="geotag-documents"
+#MODE="geotag-toponyms"
+MODE="geotag-documents"
 
 
 MISCOPTS="--width-of-nbregion 1 --region-size 100"
