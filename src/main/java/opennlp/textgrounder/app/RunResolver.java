@@ -8,8 +8,11 @@ import opennlp.textgrounder.resolver.*;
 import opennlp.textgrounder.text.*;
 import opennlp.textgrounder.text.io.*;
 import opennlp.textgrounder.text.prep.*;
+import opennlp.textgrounder.topo.gaz.*;
 import opennlp.textgrounder.eval.*;
+import opennlp.textgrounder.util.*;
 import java.io.*;
+import java.util.*;
 
 public class RunResolver extends BaseApp {
 
@@ -28,7 +31,22 @@ public class RunResolver extends BaseApp {
         StoredCorpus trainCorpus = Corpus.createStoredCorpus();
         if(getAdditionalInputPath() != null) {
             System.out.print("Reading additional training corpus from " + getAdditionalInputPath() + " ...");
-            trainCorpus.addSource(new PlainTextSource(new BufferedReader(new FileReader(getAdditionalInputPath())), new OpenNLPSentenceDivider(), tokenizer));
+            List<Gazetteer> gazList = new ArrayList<Gazetteer>();
+            Gazetteer trGaz = new InMemoryGazetteer();
+            trGaz.load(new CorpusGazetteerReader(testCorpus));
+            Gazetteer otherGaz = new InMemoryGazetteer();
+            otherGaz.load(new WorldReader(new File(Constants.getGazetteersDir() + File.separator + "dataen-fixed.txt.gz")));
+            gazList.add(trGaz);
+            gazList.add(otherGaz);
+            Gazetteer multiGaz = new MultiGazetteer(gazList);
+            /*trainCorpus.addSource(new ToponymAnnotator(new PlainTextSource(
+                    new BufferedReader(new FileReader(getAdditionalInputPath())), new OpenNLPSentenceDivider(), tokenizer),
+                    new OpenNLPRecognizer(),
+                    multiGaz));*/
+            trainCorpus.addSource(new ToponymAnnotator(new GigawordSource(
+                    new BufferedReader(new FileReader(getAdditionalInputPath())), 50, 1000),
+                    new OpenNLPRecognizer(),
+                    multiGaz));
             trainCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
             trainCorpus.load();
         }

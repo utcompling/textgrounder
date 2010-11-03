@@ -18,8 +18,8 @@ package opennlp.textgrounder.util;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
-import opennlp.textgrounder.models.Model;
-import opennlp.textgrounder.topostructs.Coordinate;
+import opennlp.textgrounder.old.models.Model;
+import opennlp.textgrounder.old.topostructs.Coordinate;
 
 /**
  * Class of static methods for generating KML headers, footers and other stuff.

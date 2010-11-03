@@ -1,12 +1,9 @@
 package opennlp.textgrounder.resolver;
 
-import opennlp.textgrounder.resolver.*;
 import opennlp.textgrounder.text.*;
 import opennlp.textgrounder.text.io.*;
 import opennlp.textgrounder.text.prep.*;
-import opennlp.textgrounder.topo.gaz.*;
 import opennlp.textgrounder.topo.*;
-import opennlp.textgrounder.eval.*;
 import opennlp.textgrounder.util.*;
 import java.io.*;
 import java.util.*;
