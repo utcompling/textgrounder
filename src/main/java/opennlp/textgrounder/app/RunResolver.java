@@ -13,6 +13,7 @@ import opennlp.textgrounder.eval.*;
 import opennlp.textgrounder.util.*;
 import java.io.*;
 import java.util.*;
+import java.util.zip.*;
 
 public class RunResolver extends BaseApp {
 
@@ -44,7 +45,8 @@ public class RunResolver extends BaseApp {
                     new OpenNLPRecognizer(),
                     multiGaz));*/
             trainCorpus.addSource(new ToponymAnnotator(new GigawordSource(
-                    new BufferedReader(new FileReader(getAdditionalInputPath())), 50, 1000),
+                    new BufferedReader(new InputStreamReader(
+                    new GZIPInputStream(new FileInputStream(getAdditionalInputPath())))), 50, 100),
                     new OpenNLPRecognizer(),
                     multiGaz));
             trainCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
