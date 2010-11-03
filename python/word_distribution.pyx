@@ -66,8 +66,8 @@ class WordDist(object):
   # Can't use __slots__, or you get this following for NBArticle:
   #TypeError: Error when calling the metaclass bases
   #    multiple bases have instance lay-out conflict
-  myslots = ['finished', 'counts', 'unseen_mass', 'total_tokens',
-             'overall_unseen_mass']
+  __slots__ = ['finished', 'counts', 'unseen_mass', 'total_tokens',
+               'overall_unseen_mass']
 
   # Total number of word types seen (size of vocabulary)
   num_word_types = 0
@@ -103,7 +103,7 @@ class WordDist(object):
     global debug
     debug = val
 
-  def init_word_distribution(self):
+  def __init__(self):
     self.finished = False
     self.counts = intdict()
     self.unseen_mass = 1.0
@@ -138,6 +138,7 @@ add the word counts to the global word count statistics.'''
     '''Finish computation of the word distribution.'''
     # make sure counts not None (eg article in coords file but not counts file)
     if not self.counts: return
+    if self.finished: return
     # Compute probabilities.  Use a very simple version of Good-Turing
     # smoothing where we assign to unseen words the probability mass of
     # words seen once, and adjust all other probs accordingly.

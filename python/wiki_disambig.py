@@ -174,11 +174,10 @@ def region_indices_to_coord(latind, longind):
 #   incoming_links: Total number of incoming links, or None if unknown.
 
 class NBDist(WordDist):
-  __slots__ = WordDist.myslots + \
-      ['articles', 'num_arts', 'incoming_links']
+  __slots__ = WordDist.__slots__ + ['articles', 'num_arts', 'incoming_links']
 
   def __init__(self):
-    self.init_word_distribution()
+    super(NBDist, self).__init__()
     self.articles = []
     self.num_arts = 0
     self.incoming_links = 0
@@ -196,15 +195,16 @@ class NBDist(WordDist):
     old_total_tokens = self.total_tokens
     for art in articles:
       total_arts += 1
-      if not art.finished:
+      if not art.dist:
         if not Opts.max_time_per_stage:
-          warning("Saw unfinished article %s" % art)
+          warning("Saw article %s without distribution" % art)
         continue
-      elif art.split != 'training':
+      assert art.dist.finished
+      if art.split != 'training':
         continue
       num_arts += 1
       self.articles += [art]
-      self.add_word_distribution(art)
+      self.add_word_distribution(art.dist)
       if art.incoming_links: # Might be None, for unknown link count
         incoming_links += art.incoming_links
     self.num_arts += num_arts
@@ -213,8 +213,8 @@ class NBDist(WordDist):
       errprint("""--> Finished processing, number articles handled = %s/%s,
     skipped articles = %s, total tokens = %s/%s, incoming links = %s/%s""" %
                (num_arts, self.num_arts, total_arts - num_arts,
-                self.total_tokens - old_total_tokens, self.total_tokens,
-                incoming_links, self.incoming_links))
+                self.total_tokens - old_total_tokens,
+                self.total_tokens, incoming_links, self.incoming_links))
 
   def add_locations(self, locs):
     arts = [loc.match for loc in locs if loc.match]
@@ -225,11 +225,9 @@ class NBDist(WordDist):
 
     if debug > 1:
       errprint("""For Naive Bayes dist, num articles = %s, total tokens = %s,
-    unseen_mass = %s, types seen once = %s, incoming links = %s,
-    overall unseen mass = %s""" %
+    unseen_mass = %s, incoming links = %s, overall unseen mass = %s""" %
                (self.num_arts, self.total_tokens, self.unseen_mass,
-                num_types_seen_once, self.incoming_links,
-                self.overall_unseen_mass))
+                self.incoming_links, self.overall_unseen_mass))
 
 ############################################################################
 #                           Geographic locations                           #
@@ -600,11 +598,13 @@ class ArticleTable(object):
       else:
         splitcoll.append(art)
 
-  @staticmethod
-  def finish_article_distributions():
+  @classmethod
+  def finish_article_distributions(cls):
     # Figure out the value of OVERALL_UNSEEN_MASS for each article.
-    for art in ArticleTable.name_to_article.itervalues():
-      art.finish_word_distribution()
+    for table in cls.articles_by_split.itervalues():
+      for art in table:
+        if art.dist:
+          art.dist.finish_word_distribution()
 
 
 ######################## Articles
@@ -627,15 +627,14 @@ def compute_short_form(name):
 #   location: Corresponding location for this article.
 #   nbregion: NBRegion object corresponding to this article.
 
-class NBArticle(Article, WordDist):
-  __slots__ = Article.__slots__ + WordDist.myslots + [
-    'location', 'nbregion']
+class NBArticle(Article):
+  __slots__ = Article.__slots__ + ['dist', 'location', 'nbregion']
 
   def __init__(self, **args):
     super(NBArticle, self).__init__(**args)
-    self.init_word_distribution()
     self.location = None
     self.nbregion = None
+    self.dist = None
 
   def distance_to_coord(self, coord):
     return spheredist(self.coord, coord)
@@ -1076,7 +1075,7 @@ class NaiveBayesStrategy(GeotagToponymStrategy):
     thislinks = get_adjusted_incoming_links(art)
 
     if self.opts.naive_bayes_type == 'article':
-      distobj = art
+      distobj = art.dist
     else:
       distobj = art.find_nbdist()
     totalprob = 0.0
@@ -1461,13 +1460,14 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     #  yield (title, words)
 
   def evaluate_document(self, article):
-    if not article.finished:
+    if not article.dist:
       # This can (and does) happen when --max-time-per-stage is set,
       # so that the counts for many articles don't get read in.
       if not Opts.max_time_per_stage:
-        warning("Can't evaluate unfinished article %s" % article)
+        warning("Can't evaluate article %s without distribution" % article)
       Results.record_geotag_document_other_stat('Skipped articles')
       return False
+    assert article.dist.finished
     truelat, truelong = coord_to_nbregion_indices(article.coord)
     true_nbreg = NBRegion.find_region_for_coord(article.coord)
     naitr = true_nbreg.nbdist.num_arts
@@ -1481,8 +1481,8 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
         coord = region_indices_to_coord(latind, longind)
         errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s"
                  % (latind, longind, coord, nbregion.nbdist.num_arts))
-      kldiv = article.fast_kl_divergence(nbregion.nbdist,
-                                    Opts.strategy == 'partial-kl-divergence')
+      kldiv = article.dist.fast_kl_divergence(nbregion.nbdist,
+                  Opts.strategy == 'partial-kl-divergence')
       #errprint("For region %s, KL divergence = %s" % (inds, kldiv))
       article_pq.add_task(kldiv, inds)
     rank = 1
@@ -1550,7 +1550,8 @@ def read_word_counts(filename):
     if not art:
       warning("Skipping article %s, not in table" % title)
       return
-    art.set_word_distribution(total_tokens, wordhash, note_globally=True)
+    art.dist = WordDist()
+    art.dist.set_word_distribution(total_tokens, wordhash, note_globally=True)
 
   errprint("Reading word counts from %s..." % filename)
   status = StatusMessage('article')
