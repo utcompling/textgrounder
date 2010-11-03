@@ -87,8 +87,7 @@ miles_per_degree = math.pi * 2 * earth_radius_in_miles / 360.
 # should be done.
 #toponyms_seen_in_eval_files = intdict()
 
-# Count of total documents processed so far
-documents_processed = 0
+use_sorted_list = False
 
 ############################################################################
 #                                Coordinates                               #
@@ -168,67 +167,6 @@ def region_indices_to_coord(latind, longind):
 #                             Word distributions                           #
 ############################################################################
 
-class GlobalDist(object):
-  # Total number of word types seen (size of vocabulary)
-  num_word_types = 0
-
-  # Total number of word tokens seen
-  num_word_tokens = 0
-
-  # Total number of types seen once
-  num_types_seen_once = 0
-
-  # Estimate of number of unseen word types for all articles
-  num_unseen_word_types = 0
-
-  # Overall probabilities over all articles of seeing a word in an article,
-  # for all words seen at least once in any article, computed using the
-  # empirical frequency of a word among all articles, adjusted by the mass
-  # to be assigned to globally unseen words (words never seen at all), i.e. the
-  # value in 'globally_unseen_word_prob'.
-  overall_word_probs = intdict()
-
-  # The total probability mass to be assigned to words not seen at all in
-  # any article, estimated using Good-Turing smoothing as the unadjusted
-  # empirical probability of having seen a word once.
-  globally_unseen_word_prob = 0.0
-
-  # For articles whose word counts are not known, use an empty list to
-  # look up in.
-  # unknown_article_counts = ([], [])
-
-  @staticmethod
-  def finish_article_distributions():
-    # Now, adjust overall_word_probs accordingly.
-    GlobalDist.num_types_seen_once = 0
-    ### FIXME: A simple calculation reveals that in the scheme where we use
-    ### globally_unseen_word_prob, num_types_seen_once cancels out and
-    ### we never actually have to compute it.
-    for count in GlobalDist.overall_word_probs.itervalues():
-      if count == 1:
-        GlobalDist.num_types_seen_once += 1
-    GlobalDist.globally_unseen_word_prob = (
-      float(GlobalDist.num_types_seen_once)/GlobalDist.num_word_tokens)
-    for (wordind,count) in GlobalDist.overall_word_probs.iteritems():
-      GlobalDist.overall_word_probs[wordind] = (
-        float(count)/GlobalDist.num_word_tokens*
-          (1 - GlobalDist.globally_unseen_word_prob))
-    # A very rough estimate, perhaps totally wrong
-    GlobalDist.num_unseen_word_types = GlobalDist.num_types_seen_once
-
-    #if debug > 2:
-    #  errprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s" % (GlobalDist.num_word_types, GlobalDist.num_word_tokens, GlobalDist.num_types_seen_once, GlobalDist.globally_unseen_word_prob, GlobalDist.globally_unseen_word_prob + sum(GlobalDist.overall_word_probs.itervalues())))
-
-    # Figure out the value of OVERALL_UNSEEN_MASS for each article.
-    for art in ArticleTable.name_to_article.itervalues():
-      # make sure counts not None (eg article in coords file but not counts file)
-      if not art.counts: continue
-      overall_seen_mass = 0.0
-      for ind in art.counts[0]:
-        overall_seen_mass += GlobalDist.overall_word_probs[ind]
-      art.overall_unseen_mass = 1.0 - overall_seen_mass
-      art.finished = True
-
 
 # Fields defined:
 #
@@ -264,12 +202,72 @@ class GlobalDist(object):
 #        but might be OK if many articles seen.
 #   total_tokens: Total number of word tokens seen
 
-class WordDistribution(object):
+class WordDist(object):
   # Can't use __slots__, or you get this following for NBArticle:
   #TypeError: Error when calling the metaclass bases
   #    multiple bases have instance lay-out conflict
   myslots = ['finished', 'counts', 'unseen_mass', 'total_tokens',
              'overall_unseen_mass']
+
+  # Total number of word types seen (size of vocabulary)
+  num_word_types = 0
+
+  # Total number of word tokens seen
+  num_word_tokens = 0
+
+  # Total number of types seen once
+  num_types_seen_once = 0
+
+  # Estimate of number of unseen word types for all articles
+  num_unseen_word_types = 0
+
+  # Overall probabilities over all articles of seeing a word in an article,
+  # for all words seen at least once in any article, computed using the
+  # empirical frequency of a word among all articles, adjusted by the mass
+  # to be assigned to globally unseen words (words never seen at all), i.e. the
+  # value in 'globally_unseen_word_prob'.
+  overall_word_probs = intdict()
+
+  # The total probability mass to be assigned to words not seen at all in
+  # any article, estimated using Good-Turing smoothing as the unadjusted
+  # empirical probability of having seen a word once.
+  globally_unseen_word_prob = 0.0
+
+  # For articles whose word counts are not known, use an empty list to
+  # look up in.
+  # unknown_article_counts = ([], [])
+
+  @staticmethod
+  def finish_article_distributions():
+    # Now, adjust overall_word_probs accordingly.
+    WordDist.num_types_seen_once = 0
+    ### FIXME: A simple calculation reveals that in the scheme where we use
+    ### globally_unseen_word_prob, num_types_seen_once cancels out and
+    ### we never actually have to compute it.
+    for count in WordDist.overall_word_probs.itervalues():
+      if count == 1:
+        WordDist.num_types_seen_once += 1
+    WordDist.globally_unseen_word_prob = (
+      float(WordDist.num_types_seen_once)/WordDist.num_word_tokens)
+    for (wordind,count) in WordDist.overall_word_probs.iteritems():
+      WordDist.overall_word_probs[wordind] = (
+        float(count)/WordDist.num_word_tokens*
+          (1 - WordDist.globally_unseen_word_prob))
+    # A very rough estimate, perhaps totally wrong
+    WordDist.num_unseen_word_types = WordDist.num_types_seen_once
+
+    #if debug > 2:
+    #  errprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s" % (WordDist.num_word_types, WordDist.num_word_tokens, WordDist.num_types_seen_once, WordDist.globally_unseen_word_prob, WordDist.globally_unseen_word_prob + sum(WordDist.overall_word_probs.itervalues())))
+
+    # Figure out the value of OVERALL_UNSEEN_MASS for each article.
+    for art in ArticleTable.name_to_article.itervalues():
+      # make sure counts not None (eg article in coords file but not counts file)
+      if not art.counts: continue
+      overall_seen_mass = 0.0
+      for ind in art.counts:
+        overall_seen_mass += WordDist.overall_word_probs[ind]
+      art.overall_unseen_mass = 1.0 - overall_seen_mass
+      art.finished = True
 
   def init_word_distribution(self):
     self.finished = False
@@ -290,7 +288,7 @@ class WordDistribution(object):
     kldiv = 0.0
     overall_probs_diff_words = 0.0
     # 1.
-    for word in self.counts[0]:
+    for word in self.counts:
       p = self.lookup_word(word)
       q = other.lookup_word(word)
       kldiv += p*(log(p) - log(q))
@@ -299,12 +297,12 @@ class WordDistribution(object):
       return kldiv
 
     # 2.
-    for word in other.counts[0]:
-      if lookup_sorted_list(self.counts, word) == None:
+    for word in other.counts:
+      if word not in self.counts:
         p = self.lookup_word(word)
         q = other.lookup_word(word)
         kldiv += p*(log(p) - log(q))
-        overall_probs_diff_words += GlobalDist.overall_word_probs[word]
+        overall_probs_diff_words += WordDist.overall_word_probs[word]
     # 3. For words seen in neither dist but seen globally:
     # You can show that this is
     #
@@ -329,11 +327,11 @@ class WordDistribution(object):
     kldiv += factor2 * the_sum
 
     # 4. For words never seen at all:
-    p = (self.unseen_mass*GlobalDist.globally_unseen_word_prob /
-          GlobalDist.num_unseen_word_types)
-    q = (other.unseen_mass*GlobalDist.globally_unseen_word_prob /
-          GlobalDist.num_unseen_word_types)
-    kldiv += GlobalDist.num_unseen_word_types*(p*(log(p) - log(q)))
+    p = (self.unseen_mass*WordDist.globally_unseen_word_prob /
+          WordDist.num_unseen_word_types)
+    q = (other.unseen_mass*WordDist.globally_unseen_word_prob /
+          WordDist.num_unseen_word_types)
+    kldiv += WordDist.num_unseen_word_types*(p*(log(p) - log(q)))
 
     return kldiv
 
@@ -348,24 +346,24 @@ class WordDistribution(object):
     #           % (art, len(wordcounts[0])))
     #  errprint("Unknown prob = %s, overall_unseen_mass = %s" %
     #           (unseen_mass, overall_unseen_mass))
-    if word in GlobalDist.overall_word_probs:
+    if word in WordDist.overall_word_probs:
       ind = internasc(word)
     else:
       ind = None
-    if ind == None:
-      wordprob = (self.unseen_mass*GlobalDist.globally_unseen_word_prob
-                  / GlobalDist.num_unseen_word_types)
+    if ind is None:
+      wordprob = (self.unseen_mass*WordDist.globally_unseen_word_prob
+                  / WordDist.num_unseen_word_types)
       if debug > 1:
         errprint("Word %s, never seen at all, wordprob = %s" %
                  (word, wordprob))
     else:
-      wordprob = lookup_sorted_list(self.counts, ind)
-      if wordprob == None:
+      wordprob = self.counts.get(ind, None)
+      if wordprob is None:
         wordprob = (self.unseen_mass *
-                    (GlobalDist.overall_word_probs[ind] /
+                    (WordDist.overall_word_probs[ind] /
                      self.overall_unseen_mass))
         #if wordprob <= 0:
-        #  warning("Bad values; unseen_mass = %s, overall_word_probs[ind] = %s, overall_unseen_mass = %s" % (unseen_mass, GlobalDist.overall_word_probs[ind], GlobalDist.overall_unseen_mass))
+        #  warning("Bad values; unseen_mass = %s, overall_word_probs[ind] = %s, overall_unseen_mass = %s" % (unseen_mass, WordDist.overall_word_probs[ind], WordDist.overall_unseen_mass))
         if debug > 1:
           errprint("Word %s, seen but not in article, wordprob = %s" %
                    (word, wordprob))
@@ -388,8 +386,8 @@ class WordDistribution(object):
 #   num_arts: Total number of articles included.
 #   incoming_links: Total number of incoming links, or None if unknown.
 
-class NBDist(WordDistribution):
-  __slots__ = WordDistribution.myslots + \
+class NBDist(WordDist):
+  __slots__ = WordDist.myslots + \
       ['articles', 'num_arts', 'incoming_links']
 
   def __init__(self):
@@ -420,7 +418,7 @@ class NBDist(WordDistribution):
         continue
       num_arts += 1
       self.articles += [art]
-      for (word,count) in itertools.izip(art.counts[0], art.counts[1]):
+      for (word, count) in art.counts.iteritems():
         counts[word] += count
       total_tokens += art.total_tokens
       if art.incoming_links: # Might be None, for unknown link count
@@ -444,7 +442,7 @@ class NBDist(WordDistribution):
       sum(1 for word in self.counts if self.counts[word] == 1)
     overall_seen_mass = 0.0
     for word in self.counts:
-      overall_seen_mass += GlobalDist.overall_word_probs[word]
+      overall_seen_mass += WordDist.overall_word_probs[word]
     self.overall_unseen_mass = 1.0 - overall_seen_mass
     if self.total_tokens > 0:
       # If no words seen only once, we will have a problem if we assign 0
@@ -453,7 +451,8 @@ class NBDist(WordDistribution):
         float(max(1, num_types_seen_once))/self.total_tokens
     else:
       self.unseen_mass = 1.0
-    self.counts = make_sorted_list(self.counts)
+    if use_sorted_list:
+      self.counts = SortedList(self.counts)
     self.finished = True
 
     if debug > 1:
@@ -853,8 +852,8 @@ def compute_short_form(name):
 #   location: Corresponding location for this article.
 #   nbregion: NBRegion object corresponding to this article.
 
-class NBArticle(Article, WordDistribution):
-  __slots__ = Article.__slots__ + WordDistribution.myslots + [
+class NBArticle(Article, WordDist):
+  __slots__ = Article.__slots__ + WordDist.myslots + [
     'location', 'nbregion']
 
   def __init__(self, **args):
@@ -897,20 +896,22 @@ class NBArticle(Article, WordDistribution):
     unseen_mass = float(oncecount)/total_tokens
     for (word,count) in wordhash.iteritems():
       ind = internasc(word)
-      if ind not in GlobalDist.overall_word_probs:
-        GlobalDist.num_word_types += 1
+      if ind not in WordDist.overall_word_probs:
+        WordDist.num_word_types += 1
       # Record in overall_word_probs; note more tokens seen.
-      GlobalDist.overall_word_probs[ind] += count
-      GlobalDist.num_word_tokens += count
+      WordDist.overall_word_probs[ind] += count
+      WordDist.num_word_tokens += count
       # Record in current article's word->probability map.
       # wordcounts[ind] = float(count)/total_tokens*(1 - unseen_mass)
       wordcounts[ind] = count
-    self.counts = make_sorted_list(wordcounts)
+    self.counts = wordcounts
+    if use_sorted_list:
+      self.counts = SortedList(self.counts)
     self.unseen_mass = unseen_mass
     self.total_tokens = total_tokens
     if debug > 3:
       errprint("Title = %s, numtypes = %s, numtokens = %s, unseen_mass = %s"
-               % (title, len(self.counts[0]), total_tokens, unseen_mass))
+               % (title, len(self.counts), total_tokens, unseen_mass))
 
 
 # Find Wikipedia article matching name NAME for location LOC.  NAME
@@ -1018,7 +1019,7 @@ def find_match_for_division(loc):
     l1 = art1.incoming_links
     l2 = art2.incoming_links
     # Prefer according to incoming link counts, if that info is available
-    if l1 != None and l2 != None:
+    if l1 is not None and l2 is not None:
       return l1 > l2
     else:
       # FIXME: Do something smart here -- maybe check that location is farther
@@ -1049,7 +1050,7 @@ class Eval(object):
       self.correct_instances += 1
     else:
       self.incorrect_instances += 1
-      if reason != None:
+      if reason is not None:
         setattr(self, reason, getattr(self, reason) + 1)
 
   def record_other_stat(self, othertype):
@@ -1211,7 +1212,12 @@ class Results(object):
     errprint("Results for toponyms when different from either true location name")
     errprint("  or its short form:")
     Results.diff_short.output_results()
+    Results.output_resource_usage()
 
+  @staticmethod
+  def output_resource_usage():
+    errprint("Total elapsed time: %.2f" % get_program_time_usage())
+    errprint("Memory usage: %s" % get_program_memory_usage())
 
   ####### Results for geotagging documents/articles
 
@@ -1229,6 +1235,7 @@ class Results(object):
   def output_geotag_document_results():
     errprint("Results for all documents/articles:")
     Results.all_document.output_results()
+    Results.output_resource_usage()
 
 
 ############################################################################
@@ -1505,7 +1512,7 @@ class GeotagToponymEvaluator(TestFileEvaluator):
           reason = 'incorrect_with_multiple_correct_candidates'
         else:
           goodart = good_arts[0]
-          if goodart.incoming_links == None:
+          if goodart.incoming_links is None:
             reason = 'incorrect_one_correct_candidate_missing_link_info'
           else:
             reason = 'incorrect_one_correct_candidate'
@@ -1536,7 +1543,7 @@ class GeotagToponymEvaluator(TestFileEvaluator):
 
 def get_adjusted_incoming_links(art):
   thislinks = art.incoming_links
-  if thislinks == None:
+  if thislinks is None:
     thislinks = 0
     if debug > 0:
       warning("Strange, %s has no link count" % art)
@@ -1802,7 +1809,7 @@ def read_word_counts(filename):
   else:
     one_article_probs()
 
-  GlobalDist.finish_article_distributions()
+  WordDist.finish_article_distributions()
 
 
 # Find the Wikipedia article matching an entry in the gazetteer.

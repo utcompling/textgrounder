@@ -4,8 +4,15 @@ if [ -z "$WIKIPEDIA_DATA_DIR" ]; then
   WIKIPEDIA_DATA_DIR='.'
 fi
 
+if [ -z "$WIKIPEDIA_AUX_DATA_DIR" ]; then
+  WIKIPEDIA_AUX_DATA_DIR='.'
+fi
+
 PREFIX="$WIKIPEDIA_DATA_DIR/enwiki-20100905"
-WIKI_DISAMBIG="$HOME/devel/textgrounder/python/wiki_disambig.py"
+AUXPREFIX="$WIKIPEDIA_AUX_DATA_DIR"
+TG_PYTHON_DIR="$HOME/devel/textgrounder/python"
+TRCONLL_DEV_DIR="/groups/projects/pcl_travel/data/trconlldevtest/dev"
+WIKI_DISAMBIG="$TG_PYTHON_DIR/wiki_disambig.py"
 
 #DEBUG="--debug 2"
 #DEBUG="--debug 0"
@@ -20,10 +27,10 @@ PICKLE_FILE="$PREFIX-coords-counts.pickled"
 PICKLE=
 UNPICKLE=
 
-STOPWORDS_FILE="--stopwords-file stopwords.english"
+STOPWORDS_FILE="--stopwords-file $AUXPREFIX/stopwords.english"
 ARTICLE_DATA_FILE="--article-data-file $PREFIX-combined-article-data.txt"
 COUNTS_FILE="--counts-file $PREFIX-counts-only-coord-articles.txt"
-GAZETTEER_FILE="--gazetteer-file world-dataen-fixed.txt"
+GAZETTEER_FILE="--gazetteer-file $AUXPREFIX/world-dataen-fixed.txt"
 
 #MODE="pickle-only"
 #MODE="match-only"
@@ -39,7 +46,7 @@ if [ "$MODE" = "geotag-toponyms" -o "$MODE" = "match-only" ]; then
   #STRATEGY="--strategy naive-bayes-with-baseline"
   #STRATEGY="--strategy naive-bayes-no-baseline"
   #NBTYPE="--naive-bayes-weighting distance-weighted"
-  EVALFILE="--eval-file /groups/projects/pcl_travel/data/trconlldevtest/dev"
+  EVALFILE="--eval-file $TRCONLL_DEV_DIR"
   EVALTYPE="--eval-format tr-conll"
   #EVALFILE="--eval-file $PREFIX-toponym-eval.txt"
 elif [ "$MODE" = "geotag-documents" ]; then

@@ -28,7 +28,7 @@ class Coord(object):
     self.long = long
 
   def __str__(self):
-    return '(%s,%s)' % (self.lat, self.long)
+    return '(%.2f,%.2f)' % (self.lat, self.long)
 
 # A Wikipedia article.  Defined fields:
 #

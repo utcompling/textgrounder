@@ -3,9 +3,10 @@ from optparse import OptionParser
 import re # For regexp wrappers
 import sys, codecs # For uchompopen()
 import bisect # For sorted lists
-import time # For status messages
+import time # For status messages, resource usage
 from heapq import * # For priority queue
 import itertools # For priority queue
+import resource # For resource usage
 
 #############################################################################
 #                        Regular expression functions                       #
@@ -91,7 +92,7 @@ def chompopen(filename):
       yield line
 
 #############################################################################
-#                         Other Unicode utility functions                   #
+#                         Other basic utility functions                     #
 #############################################################################
 
 def internasc(text):
@@ -138,6 +139,26 @@ instead, output a warning.'''
     if x:
       warning("Expected number, saw %s" % x)
     return 0.
+
+def pluralize(word):
+  '''Pluralize an English word, using a basic but effective algorithm.'''
+  if word[-1] >= 'A' and word[-1] <= 'Z': upper = True
+  else: upper = False
+  lowerword = word.lower()
+  if re.match(r'.*[b-df-hj-np-tv-z]y$', lowerword):
+    if upper: return word[:-1] + 'IES'
+    else: return word[:-1] + 'ies'
+  elif re.match(r'.*([cs]h|[sx])$', lowerword):
+    if upper: return word + 'ES'
+    else: return word + 'es'
+  else:
+    if upper: return word + 'S'
+    else: return word + 's'
+
+def capfirst(st):
+  '''Capitalize the first letter of string, leaving the remainder alone.'''
+  if not st: return st
+  return st[0].capitalize() + st[1:]
 
 #############################################################################
 #                             Default dictionaries                          #
@@ -213,12 +234,51 @@ def make_sorted_list(table):
 # Given a sorted list in the tuple form (KEYS, VALUES), look up the item KEY.
 # If found, return the corresponding value; else return None.
 
-def lookup_sorted_list(sorted_list, key):
+def lookup_sorted_list(sorted_list, key, default=None):
   (keys, values) = sorted_list
   i = bisect.bisect_left(keys, key)
   if i != len(keys) and keys[i] == key:
     return values[i]
-  return None
+  return default
+
+# A class that provides a dictionary-compatible interface to a sorted list
+
+class SortedList(object):
+  def __init__(self, table):
+    self.sorted_list = make_sorted_list(table)
+
+  def __len__(self):
+    return len(self.sorted_list[0])
+
+  def __getitem__(self, key):
+    retval = lookup_sorted_list(self.sorted_list, key)
+    if retval is None:
+      raise KeyError(key)
+    return retval
+
+  def get(self, key, default=None):
+    return lookup_sorted_list(self.sorted_list, key, default)
+
+  def __contains__(self, key):
+    return lookup_sorted_list(self.sorted_list, key) is not None
+
+  def __iter__(self):
+    (keys, values) = self.sorted_list
+    for x in keys:
+      yield x
+
+  def iterkeys(self):
+    return self.__iter__()
+
+  def itervalues(self):
+    (keys, values) = self.sorted_list
+    for x in values:
+      yield x
+
+  def iteritems(self):
+    (keys, values) = self.sorted_list
+    for (key, value) in itertools.izip(keys, values):
+      yield (key, value)
 
 #############################################################################
 #                                Table Output                               #
@@ -233,21 +293,6 @@ def output_reverse_sorted_table(table, outfile=sys.stdout, indent=""):
 #############################################################################
 #                             Status Messages                               #
 #############################################################################
-
-# Simple algorithm for pluralizing a word
-def pluralize(word):
-  if word[-1] >= 'A' and word[-1] <= 'Z': upper = True
-  else: upper = False
-  lowerword = word.lower()
-  if re.match(r'.*[b-df-hj-np-tv-z]y$', lowerword):
-    if upper: return word[:-1] + 'IES'
-    else: return word[:-1] + 'ies'
-  elif re.match(r'.*([cs]h|[sx])$', lowerword):
-    if upper: return word + 'ES'
-    else: return word + 'es'
-  else:
-    if upper: return word + 'S'
-    else: return word + 's'
 
 # Output status messages periodically, at some multiple of
 # 'secs_between_output', measured in real time. 'item_name' is the name
@@ -289,14 +334,6 @@ class StatusMessage(object):
                      else self.plural_item_name), outfile=sys.stderr)
     return total_elapsed_secs
  
-def output_option_parameters(opts):
-  errprint("Parameter values:")
-  for opt in dir(opts):
-    if not opt.startswith('_') and opt not in \
-       ['ensure_value', 'read_file', 'read_module']:
-      errprint("%30s: %s" % (opt, getattr(opts, opt)))
-  errprint("")
-
 #############################################################################
 #                               File Splitting                              #
 #############################################################################
@@ -344,10 +381,17 @@ def next_split_set(split_fractions):
         while cumulative_articles[j] >= split_fractions[j]:
           cumulative_articles[j] -= split_fractions[j]
 
-def capfirst(st):
-  '''Capitalize the first letter of string, leaving the remainder alone.'''
-  if not st: return st
-  return st[0].capitalize() + st[1:]
+#############################################################################
+#                               NLP Programs                                #
+#############################################################################
+
+def output_option_parameters(opts):
+  errprint("Parameter values:")
+  for opt in dir(opts):
+    if not opt.startswith('_') and opt not in \
+       ['ensure_value', 'read_file', 'read_module']:
+      errprint("%30s: %s" % (opt, getattr(opts, opt)))
+  errprint("")
 
 class NLPProgram(object):
   def __init__(self):
@@ -401,6 +445,10 @@ Used for testing purposes.  Default %default.""")
 
     return self.implement_main(self.opts, self.op, self.args)
 
+#############################################################################
+#                               Priority Queues                             #
+#############################################################################
+
 # Priority queue implementation, based on Python heapq documentation.
 # Note that in Python 2.6 and on, there is a priority queue implementation
 # in the Queue module.
@@ -434,3 +482,18 @@ class PriorityQueue(object):
     entry = self.task_finder[task]
     self.add_task(priority, task, entry[1])
     entry[1] = PriorityQueue.INVALID
+
+#############################################################################
+#                               Resource Usage                              #
+#############################################################################
+
+beginning_prog_time = time.time()
+
+def get_program_time_usage():
+  return time.time() - beginning_prog_time
+
+def get_program_memory_usage():
+  res = resource.getrusage(resource.RUSAGE_SELF)
+  # FIXME!  This is "maximum resident set size".  There are other more useful
+  # values, but on the Mac at least they show up as 0 in this structure.
+  return res.ru_maxrss
