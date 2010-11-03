@@ -244,7 +244,32 @@ class WordDist(object):
     self.total_tokens = 0
     self.overall_unseen_mass = 1.0
 
+  def set_word_distribution(self, total_tokens, wordhash, note_globally=True):
+    '''Set the word distribution from the given table of words and counts.
+'total_tokens' is the total number of word tokens.  If 'note_globally',
+add the word counts to the global word count statistics.'''
+    if self.counts:
+      warning("Article %s already has counts for it!" % art)
+    self.total_tokens = total_tokens
+    if note_globally:
+      for (ind, count) in wordhash.iteritems():
+        if ind not in WordDist.overall_word_probs:
+          WordDist.num_word_types += 1
+        # Record in overall_word_probs; note more tokens seen.
+        WordDist.overall_word_probs[ind] += count
+        WordDist.num_word_tokens += count
+    self.counts = wordhash
+
+  def add_word_distribution(self, worddist):
+    '''Incorporate counts from the given distribution into our distribution.'''
+    assert not self.finished
+    counts = self.counts
+    for (word, count) in worddist.counts.iteritems():
+      counts[word] += count
+    self.total_tokens += worddist.total_tokens
+
   def finish_word_distribution(self):
+    '''Finish computation of the word distribution.'''
     # make sure counts not None (eg article in coords file but not counts file)
     if not self.counts: return
     # Compute probabilities.  Use a very simple version of Good-Turing
@@ -413,13 +438,12 @@ class NBDist(WordDist):
 
   # Add the given articles to the total distribution seen so far
   def add_articles(self, articles):
-    total_tokens = 0
     incoming_links = 0
     if debug > 1:
       errprint("Naive Bayes dist, number of articles = %s" % num_arts)
-    counts = self.counts
     total_arts = 0
     num_arts = 0
+    old_total_tokens = self.total_tokens
     for art in articles:
       total_arts += 1
       if not art.finished:
@@ -430,20 +454,17 @@ class NBDist(WordDist):
         continue
       num_arts += 1
       self.articles += [art]
-      for (word, count) in art.counts.iteritems():
-        counts[word] += count
-      total_tokens += art.total_tokens
+      self.add_word_distribution(art)
       if art.incoming_links: # Might be None, for unknown link count
         incoming_links += art.incoming_links
     self.num_arts += num_arts
-    self.total_tokens += total_tokens
     self.incoming_links += incoming_links
     if num_arts and debug > 0:
       errprint("""--> Finished processing, number articles handled = %s/%s,
     skipped articles = %s, total tokens = %s/%s, incoming links = %s/%s""" %
                (num_arts, self.num_arts, total_arts - num_arts,
-                total_tokens, self.total_tokens, incoming_links,
-                self.incoming_links))
+                self.total_tokens - old_total_tokens, self.total_tokens,
+                incoming_links, self.incoming_links))
 
   def add_locations(self, locs):
     arts = [loc.match for loc in locs if loc.match]
@@ -1191,7 +1212,7 @@ class Results(object):
 
   @staticmethod
   def output_resource_usage():
-    errprint("Total elapsed time: %.2f" %
+    errprint("Total elapsed time: %s" %
              float_with_commas(get_program_time_usage()))
     errprint("Memory usage: %s" % int_with_commas(get_program_memory_usage()))
 
@@ -1779,16 +1800,7 @@ def read_word_counts(filename):
     if not art:
       warning("Skipping article %s, not in table" % title)
       return
-    art.total_tokens = total_tokens
-    if art.counts:
-      warning("Article %s already has counts for it!" % art)
-    for (ind, count) in wordhash.iteritems():
-      if ind not in WordDist.overall_word_probs:
-        WordDist.num_word_types += 1
-      # Record in overall_word_probs; note more tokens seen.
-      WordDist.overall_word_probs[ind] += count
-      WordDist.num_word_tokens += count
-    art.counts = wordhash
+    art.set_word_distribution(total_tokens, wordhash, note_globally=True)
 
   errprint("Reading word counts from %s..." % filename)
   status = StatusMessage('article')
