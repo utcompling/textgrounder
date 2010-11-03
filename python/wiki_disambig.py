@@ -1481,7 +1481,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
         coord = region_indices_to_coord(latind, longind)
         errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s"
                  % (latind, longind, coord, nbregion.nbdist.num_arts))
-      kldiv = article.kl_divergence(nbregion.nbdist,
+      kldiv = article.fast_kl_divergence(nbregion.nbdist,
                                     Opts.strategy == 'partial-kl-divergence')
       #errprint("For region %s, KL divergence = %s" % (inds, kldiv))
       article_pq.add_task(kldiv, inds)

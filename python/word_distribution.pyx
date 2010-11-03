@@ -1,10 +1,28 @@
 import math
-from math import log
 from textutil import *
 
 debug = 0
 
 use_sorted_list = False
+
+# This is a Cython file -- basically a pure Python file but with annotations
+# to make it possible to compile it into a C module that runs a lot faster
+# than normal Python.
+#
+# You need Cython installed in order for this to work, of course.
+# See www.cython.org.
+#
+# For Mac OS X, you can install Cython using something like
+#
+# sudo port install py26-cython
+
+
+# For pure Python code, use this instead:
+#
+# from math import log
+
+cdef extern from "math.h":
+  double log(double)
 
 ############################################################################
 #                             Word distributions                           #
@@ -80,8 +98,8 @@ class WordDist(object):
   # unknown_article_counts = ([], [])
 
   # Yuck.
-  @staticmethod
-  def set_debug_level(val):
+  @classmethod
+  def set_debug_level(cls, val):
     global debug
     debug = val
 
@@ -161,17 +179,71 @@ add the word counts to the global word count statistics.'''
     #if debug > 2:
     #  errprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s" % (cls.num_word_types, cls.num_word_tokens, cls.num_types_seen_once, cls.globally_unseen_word_prob, cls.globally_unseen_word_prob + sum(cls.overall_word_probs.itervalues())))
 
+  def test_kl_divergence(self, other, partial=False):
+    '''Check fast and slow versions against each other.'''
+    assert self.finished
+    assert other.finished
+    fast_kldiv = self.fast_kl_divergence(other, partial)
+    slow_kldiv = self.slow_kl_divergence(other, partial)
+    if abs(fast_kldiv - slow_kldiv) > 1e-8:
+      errprint("Fast KL-div=%s but slow KL-div=%s" % (fast_kldiv, slow_kldiv))
+      assert fast_kldiv == slow_kldiv
+    return fast_kldiv
+
+  def fast_kl_divergence(self, other, partial=False):
+    '''A fast implementation of KL-divergence that uses Cython declarations and
+inlines lookups as much as possible.'''
+    cdef double kldiv, p, q
+    cdef double pfact, qfact, pfact_unseen, qfact_unseen
+    kldiv = 0.0
+    pfact = (1 - self.unseen_mass)/self.total_tokens
+    qfact = (1 - other.unseen_mass)/other.total_tokens
+    pfact_unseen = self.unseen_mass / self.overall_unseen_mass
+    qfact_unseen = other.unseen_mass / other.overall_unseen_mass
+    # 1.
+    pcounts = self.counts
+    qcounts = other.counts
+    for word in pcounts:
+      p = pcounts[word] * pfact
+      qcount = qcounts.get(word, None)
+      if qcount is None:
+        q = WordDist.overall_word_probs[word] * qfact_unseen
+      else:
+        q = qcount*qfact
+      kldiv += p * (log(p) - log(q))
+
+    if partial:
+      return kldiv
+
+    # 2.
+    cdef double overall_probs_diff_words
+    cdef double word_overall_prob
+    overall_probs_diff_words = 0.0
+    for word in qcounts:
+      if word not in pcounts:
+        word_overall_prob = WordDist.overall_word_probs[word]
+        p = word_overall_prob * pfact_unseen
+        q = qcounts[word] * qfact
+        kldiv += p * (log(p) - log(q))
+        overall_probs_diff_words += word_overall_prob
+
+    kldiv += self.kl_divergence_34(other, overall_probs_diff_words)
+
+    return kldiv
+
+
   # Compute the KL divergence between this distribution and another
   # distribution.  This is a bit tricky.  We have to take into account:
   # 1. Words in this distribution (may or may not be in the other).
   # 2. Words in the other distribution that are not in this one.
   # 3. Words in neither distribution but seen globally.
   # 4. Words never seen at all.  These have the 
-  def kl_divergence(self, other, partial=False):
+  def slow_kl_divergence(self, other, partial=False):
+    '''The basic implementation of KL-divergence.  Useful for checking against
+other implementations.'''
     assert self.finished
     assert other.finished
     kldiv = 0.0
-    overall_probs_diff_words = 0.0
     # 1.
     for word in self.counts:
       p = self.lookup_word(word)
@@ -182,12 +254,21 @@ add the word counts to the global word count statistics.'''
       return kldiv
 
     # 2.
+    overall_probs_diff_words = 0.0
     for word in other.counts:
       if word not in self.counts:
         p = self.lookup_word(word)
         q = other.lookup_word(word)
         kldiv += p*(log(p) - log(q))
         overall_probs_diff_words += WordDist.overall_word_probs[word]
+
+    return kldiv + self.kl_divergence_34(other, overall_probs_diff_words)
+
+
+  def kl_divergence_34(self, other, overall_probs_diff_words):
+    '''Steps 3 and 4 of KL-divergence computation.'''
+    kldiv = 0.0
+
     # 3. For words seen in neither dist but seen globally:
     # You can show that this is
     #
