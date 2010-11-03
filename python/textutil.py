@@ -2,6 +2,7 @@ from __future__ import with_statement # For chompopen(), uchompopen()
 from optparse import OptionParser
 import re # For regexp wrappers
 import sys, codecs # For uchompopen()
+import math # For float_with_commas()
 import bisect # For sorted lists
 import time # For status messages, resource usage
 from heapq import * # For priority queue
@@ -159,6 +160,24 @@ def capfirst(st):
   '''Capitalize the first letter of string, leaving the remainder alone.'''
   if not st: return st
   return st[0].capitalize() + st[1:]
+
+# From: http://stackoverflow.com/questions/1823058/how-to-print-number-with-commas-as-thousands-separators-in-python-2-x
+def int_with_commas(x):
+  if type(x) not in [type(0), type(0L)]:
+    raise TypeError("Parameter must be an integer.")
+  if x < 0:
+    return '-' + int_with_commas(-x)
+  result = ''
+  while x >= 1000:
+    x, r = divmod(x, 1000)
+    result = ",%03d%s" % (r, result)
+  return "%d%s" % (x, result)
+
+# My own version
+def float_with_commas(x):
+  intpart = int(math.floor(x))
+  fracpart = x - intpart
+  return int_with_commas(intpart) + ("%.2f" % fracpart)[1:]
 
 #############################################################################
 #                             Default dictionaries                          #
