@@ -38,7 +38,7 @@ GAZETTEER_FILE="--gazetteer-file $AUXPREFIX/world-dataen-fixed.txt"
 MODE="geotag-documents"
 
 
-MISCOPTS="--width-of-stat-region 1 --region-size 100"
+MISCOPTS="--width-of-stat-region 1 --miles-per-region 100"
 if [ "$MODE" = "geotag-toponyms" -o "$MODE" = "match-only" ]; then
   STRATEGY="--strategy baseline"
   # Don't need counts file with baseline-only strategy

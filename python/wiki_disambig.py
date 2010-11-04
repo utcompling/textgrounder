@@ -1027,26 +1027,50 @@ class Results(object):
   documents_by_naitr = {}
   upper_range_by_naitr = {}
 
-  @classmethod
-  def locate_naitr_object(cls, rank):
-    lower_range = 0
-    upper_range = 'infinity'
-    for i in cls.ranges_for_naitr:
-      if i <= rank:
-        lower_range = i
-      else:
-        upper_range = i - 1
-        break
-    if lower_range not in cls.documents_by_naitr:
-      cls.documents_by_naitr[lower_range] = EvalWithRank()
-      cls.upper_range_by_naitr[lower_range] = upper_range
-    return cls.documents_by_naitr[lower_range]
+  # Results for documents where the location is at a certain distance
+  # from the center of the statistical region.  The key is measured in
+  # fractions of a tiling region (determined by 'dist_fraction_increment',
+  # e.g. if dist_fraction_increment = 0.25 then values in the range of
+  # [0.25, 0.5) go in one bin, [0.5, 0.75) go in another, etc.).  We measure
+  # distance is two ways: True distance (in miles or whatever) and "degree
+  # distance", as if degrees were a constant length both latitudinally
+  # and longitudinally.
+  dist_fraction_increment = 0.25
+  documents_by_degree_dist_to_center = collections.defaultdict(EvalWithRank)
+  documents_by_true_dist_to_center = collections.defaultdict(EvalWithRank)
 
   @classmethod
-  def record_geotag_document_result(cls, rank, num_arts_in_true_region):
+  def record_geotag_document_result(cls, rank, coord, num_arts_in_true_region):
+    def locate_naitr_object(rank):
+      lower_range = 0
+      upper_range = 'infinity'
+      for i in cls.ranges_for_naitr:
+        if i <= rank:
+          lower_range = i
+        else:
+          upper_range = i - 1
+          break
+      if lower_range not in cls.documents_by_naitr:
+        cls.documents_by_naitr[lower_range] = EvalWithRank()
+        cls.upper_range_by_naitr[lower_range] = upper_range
+      return cls.documents_by_naitr[lower_range]
+
+    def degree_dist(c1, c2):
+      return math.sqrt((c1.lat - c2.lat)**2 + (c1.long - c2.long)**2)
+
+    true_latind, true_longind = coord_to_stat_region_indices(coord)
+    regcenter = stat_region_indices_to_center_coord(true_latind, true_longind)
+    truedist = spheredist(coord, regcenter) / Opts.miles_per_region
+    degdist = degree_dist(coord, regcenter) / degrees_per_region
+    fracinc = cls.dist_fraction_increment
+    truedist = fracinc * (truedist // fracinc)
+    degdist = fracinc * (degdist // fracinc)
+
     cls.all_document.record_result(rank)
-    naitr = cls.locate_naitr_object(num_arts_in_true_region)
+    naitr = locate_naitr_object(num_arts_in_true_region)
     naitr.record_result(rank)
+    cls.documents_by_degree_dist_to_center[degdist].record_result(rank)
+    cls.documents_by_true_dist_to_center[truedist].record_result(rank)
 
   @classmethod
   def record_geotag_document_other_stat(cls, othertype):
@@ -1057,11 +1081,32 @@ class Results(object):
     errprint("")
     errprint("Results for all documents/articles:")
     cls.all_document.output_results()
+    errprint("")
     for (lower_range, obj) in cls.documents_by_naitr.iteritems():
       errprint("")
       errprint("Results for documents/articles where number of articles")
       errprint("  in true region is in the range [%s,%s]:" %
                (lower_range, cls.upper_range_by_naitr[lower_range]))
+      obj.output_results()
+    errprint("")
+    for (truedist, obj) in cls.documents_by_true_dist_to_center.iteritems():
+      lowrange = truedist * Opts.miles_per_region
+      highrange = ((truedist + cls.dist_fraction_increment) *
+                   Opts.miles_per_region)
+      errprint("")
+      errprint("Results for documents/articles where distance to center")
+      errprint("  of true region in miles is in the range [%.2f,%.2f):" %
+               (lowrange, highrange))
+      obj.output_results()
+    errprint("")
+    for (degdist, obj) in cls.documents_by_degree_dist_to_center.iteritems():
+      lowrange = degdist * degrees_per_region
+      highrange = ((degdist + cls.dist_fraction_increment) *
+                   degrees_per_region)
+      errprint("")
+      errprint("Results for documents/articles where distance to center")
+      errprint("  of true region in degrees is in the range [%.2f,%.2f):" %
+               (lowrange, highrange))
       obj.output_results()
     errprint("")
     cls.output_resource_usage()
@@ -1522,7 +1567,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       Results.record_geotag_document_other_stat('Skipped articles')
       return False
     assert article.dist.finished
-    truelat, truelong = coord_to_stat_region_indices(article.coord)
+    true_latind, true_longind = coord_to_stat_region_indices(article.coord)
     true_statreg = StatRegion.find_region_for_coord(article.coord)
     naitr = true_statreg.regdist.num_arts
     if debug > 0:
@@ -1544,14 +1589,15 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     while True:
       try:
         latind, longind = article_pq.get_top_priority()
-        if latind == truelat and longind == truelong:
+        if latind == true_latind and longind == true_longind:
           break
         rank += 1
       except IndexError:
         raised = True
         Results.record_geotag_document_other_stat('Articles with no training articles in region')
         break
-    Results.record_geotag_document_result(rank, num_arts_in_true_region=naitr)
+    Results.record_geotag_document_result(rank, article.coord,
+                                          num_arts_in_true_region=naitr)
     errprint("For article %s, true region at rank %s" % (article, rank))
     assert raised == (true_statreg.regdist.num_arts == 0)
     return True
@@ -1908,7 +1954,7 @@ and weight the words according to distance from the toponym.""")
                   help="""Width of the region used to compute a statistical
 distribution for geotagging purposes, in terms of number of tiling regions.
 Default %default.""")
-    op.add_option("-r", "--region-size", type='float', default=100.0,
+    op.add_option("-r", "--miles-per-region", type='float', default=100.0,
                   help="""Size (in miles) of the tiling regions that cover
 the earth.  Some number of tiling regions are put together to form the region
 used to construct a statistical distribution.  Default %default.""")
@@ -1942,10 +1988,10 @@ particular-sized region.  Default '%default'.""")
     if opts.gazetteer_type != 'world':
       op.error("Currently can only handle world-type gazetteers")
 
-    if opts.region_size <= 0:
-      op.error("Region size must be positive")
+    if opts.miles_per_region <= 0:
+      op.error("Miles per region must be positive")
     global degrees_per_region
-    degrees_per_region = opts.region_size / miles_per_degree
+    degrees_per_region = opts.miles_per_region / miles_per_degree
     global maximum_latind, minimum_latind, maximum_longind, minimum_longind
     maximum_latind, maximum_longind = \
       coord_to_tiling_region_indices(Coord(maximum_latitude,
