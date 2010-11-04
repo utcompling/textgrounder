@@ -19,14 +19,18 @@ DEBUG="--debug 0"
 #MAXTIME="--max-time-per-stage 5"
 #MAXTIME="--max-time-per-stage 10"
 
-TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+if [ -z "$WIKIPEDIA_DATA_DIR" ]; then
+  WIKIPEDIA_DATA_DIR='.'
+fi
+
 DUMP_PREFIX="enwiki-20100905"
+TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
 PAGES_ARTICLES_PREFIX="$DUMP_PREFIX-pages-articles"
 
 PROCESSWIKI="$TEXTGROUNDER_PYTHON/processwiki.py"
 GENERATE_COMBINED="$TEXTGROUNDER_PYTHON/generate_combined.py"
 
-DUMPFILE="$PAGES_ARTICLES_PREFIX.xml.bz2"
+IN_DUMPFILE="$WIKIPEDIA_DATA_DIR/$PAGES_ARTICLES_PREFIX.xml.bz2"
 COORDS_FILE="$DUMP_PREFIX-coords.txt"
 LINKS_FILE="$DUMP_PREFIX-links-only-coord-articles.txt"
 COUNTS_FILE="$DUMP_PREFIX-counts-only-coord-articles.txt"
@@ -36,10 +40,10 @@ COMBINED_ARTICLE_DATA_FILE="$DUMP_PREFIX-combined-article-data.txt"
 TOPONYM_EVAL_DATA_FILE="$DUMP_PREFIX-toponym-eval.txt"
 LOGFILE="generate-all-data.log"
 
-COORDS_ARG="--coords-file $COORDS_FILE"
-LINKS_ARG="--links-file $LINKS_FILE"
-ARTICLE_DATA_ARG="--article-data-file $ARTICLE_DATA_FILE"
-DISAMBIG_ID_ARG="--disambig-id-file $DISAMBIG_ID_FILE"
+COORDS_ARG="--coords-file $WIKIPEDIA_DATA_DIR/$COORDS_FILE"
+LINKS_ARG="--links-file $WIKIPEDIA_DATA_DIR/$LINKS_FILE"
+ARTICLE_DATA_ARG="--article-data-file $WIKIPEDIA_DATA_DIR/$ARTICLE_DATA_FILE"
+DISAMBIG_ID_ARG="--disambig-id-file $WIKIPEDIA_DATA_DIR/$DISAMBIG_ID_FILE"
 
 OTHEROPTS="$MAXTIME $DEBUG"
 
