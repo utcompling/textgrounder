@@ -676,14 +676,15 @@ def compute_short_form(name):
 # A Wikipedia article for geotagging.  Defined fields, in addition to those
 # of the base classes:
 #
+#   dist: Object containing word distribution of this article.
 #   location: Corresponding location for this article.
 #   stat_region: StatRegion object corresponding to this article.
 
-class NBArticle(Article):
+class StatArticle(Article):
   __slots__ = Article.__slots__ + ['dist', 'location', 'stat_region']
 
   def __init__(self, **args):
-    super(NBArticle, self).__init__(**args)
+    super(StatArticle, self).__init__(**args)
     self.location = None
     self.stat_region = None
     self.dist = None
@@ -1580,7 +1581,7 @@ def read_article_data(filename):
       if art.split == 'training':
         StatRegion.add_article_to_region(art)
 
-  read_article_data_file(filename, process, article_type=NBArticle,
+  read_article_data_file(filename, process, article_type=StatArticle,
                          max_time_per_stage=Opts.max_time_per_stage)
 
   for x in redirects:
