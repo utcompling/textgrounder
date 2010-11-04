@@ -1,5 +1,28 @@
 #!/bin/sh
 
+# Run an experiment using run-disambig, sending its output to a unique file
+# and using 'nohup' so that exiting the session won't kill a background script.
+
 TGP_DIR=$HOME/devel/textgrounder/python
-nohup $TGP_DIR/run-disambig ${1+"$@"} > run-disambig.out 2>&1
-cp run-disambig.out run-disambig.out.`date '+%F.%H%M%P'`
+
+if [ "`uname`" = "Darwin" ]; then
+  # Darwin (BSD) is missing all sorts of stuff, naturally, including %P,
+  # which gets you lowercase am or pm (%p gets you upperacse AM or PM) --
+  # real logical, huh?
+  OUTFILE="run-disambig.out.`date '+%F.%H%M%p'`"
+else
+  OUTFILE="run-disambig.out.`date '+%F.%H%M%P'`"
+fi
+if [ -e "$OUTFILE" ]; then
+  echo "Output file $OUTFILE already exists!  Won't overwrite."
+  exit 1
+fi
+
+echo "Outputting to $OUTFILE"
+if [ -n "$1" ]; then
+  echo "Arguments are" ${1+"$@"}
+else
+  echo "Run without arguments"
+fi
+
+nohup $TGP_DIR/run-disambig ${1+"$@"} > $OUTFILE 2>&1

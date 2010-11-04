@@ -450,6 +450,8 @@ Used for testing purposes.  Default %default.""")
                     (arg_english, arg.replace('_', '-')))
 
   def main(self):
+    errprint("Beginning operation at %s" % (time.ctime()))
+
     self.op = OptionParser(usage="%prog [options]")
     self.populate_shared_options(self.op)
     self.populate_options(self.op)
@@ -462,7 +464,9 @@ Used for testing purposes.  Default %default.""")
 
     output_option_parameters(self.opts)
 
-    return self.implement_main(self.opts, self.op, self.args)
+    retval = self.implement_main(self.opts, self.op, self.args)
+    errprint("Ending operation at %s" % (time.ctime()))
+    return retval
 
 #############################################################################
 #                               Priority Queues                             #
