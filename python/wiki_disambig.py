@@ -18,6 +18,7 @@ import gc
 from textutil import *
 from process_article_data import *
 from word_distribution import WordDist
+from kl_divergence import *
 
 # FIXME:
 #
@@ -1585,8 +1586,10 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
         coord = region_indices_to_coord(latind, longind)
         errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s"
                  % (latind, longind, coord, stat_region.regdist.num_arts))
-      kldiv = article.dist.fast_kl_divergence(stat_region.regdist,
+      kldiv = fast_kl_divergence(article.dist, stat_region.regdist,
                   Opts.strategy == 'partial-kl-divergence')
+      #kldiv = article.dist.test_kl_divergence(stat_region.regdist,
+      #            Opts.strategy == 'partial-kl-divergence')
       #errprint("For region %s, KL divergence = %s" % (inds, kldiv))
       article_pq.add_task(kldiv, inds)
     rank = 1
