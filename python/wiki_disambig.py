@@ -59,6 +59,49 @@ path_to_division = {}
 # things are progressing.  If > 1, even more info.
 debug = 0
 
+# Table of all toponyms seen in evaluation files, along with how many times
+# seen.  Used to determine when caching of certain toponym-specific values
+# should be done.
+#toponyms_seen_in_eval_files = intdict()
+
+############################################################################
+#                       Coordinates and regions                            #
+############################################################################
+
+# The coordinates of a point are spherical coordinates, indicating a
+# latitude and longitude.  Latitude ranges from -90 degrees (south) to
+# +90 degrees (north), with the Equator at 0 degrees.  Longitude ranges
+# from -180 degrees (west) to +179.9999999.... degrees (east). -180 and +180
+# degrees correspond to the same north-south parallel, and we arbitrarily
+# choose -180 degrees over +180 degrees.  0 degrees longitude has been
+# arbitrarily chosen as the north-south parallel that passes through
+# Greenwich, England (near London).  Note that longitude wraps around, but
+# latitude does not.  Furthermore, the distance between latitude lines is
+# always the same (about 69 miles per degree), but the distance between
+# longitude lines varies according to the latitude, ranging from about
+# 69 miles per degree at the Equator to 0 miles at the North and South Pole.
+#
+# We divide the earth's surface into "tiling regions", using the value
+# of --region-size, which is specified in miles; we convert it to degrees
+# using 'miles_per_degree', which is derived from the value for the
+# Earth's radius in miles.  In addition, we form a square of tiling regions
+# in order to create a "statistical region", which is used to compute a
+# distribution over words.  The numbe of tiling regions on a side is
+# determined by --width-of-stat-region.  Note that if this is greater than
+# 1, different statistical regions will overlap.
+#
+# To specify a region, we use region indices, which are derived from
+# coordinates by dividing by degrees_per_region.  Hence, if for example
+# degrees_per_region is 2, then region indices are in the range [-45,+45]
+# for latitude and [-90,+90) for longitude.  In general, an arbitrary
+# coordinate will have fractional region indices; however, the region
+# indices of the corners of a region (tiling or statistical) will be
+# integers.  Normally, we use the southwest corner to specify a region.
+#
+# Near the edges, tiling regions may be truncated.  Statistical regions
+# will wrap around longitudinally, and will still have the same number
+# of tiling regions, but may be smaller.
+
 # Size of each region in degrees.  Determined by the --region-size option
 # (however, that option is expressed in miles).
 degrees_per_region = 0.0
@@ -68,7 +111,7 @@ degrees_per_region = 0.0
 minimum_latitude = -90.0
 maximum_latitude = 90.0
 minimum_longitude = -180.0
-maximum_longitude = 179.99999
+maximum_longitude = 179.999999
 minimum_latind = None
 maximum_latind = None
 minimum_longind = None
@@ -82,15 +125,6 @@ earth_radius_in_miles = 3963.191
 # same everywhere, but for latitude it is proportional to the degrees away
 # from the equator.
 miles_per_degree = math.pi * 2 * earth_radius_in_miles / 360.
-
-# Table of all toponyms seen in evaluation files, along with how many times
-# seen.  Used to determine when caching of certain toponym-specific values
-# should be done.
-#toponyms_seen_in_eval_files = intdict()
-
-############################################################################
-#                                Coordinates                               #
-############################################################################
 
 # A class holding the boundary of a geographic object.  Currently this is
 # just a bounding box, but eventually may be expanded to including a
@@ -137,20 +171,24 @@ def spheredist(p1, p2):
       return 0.
   return earth_radius_in_miles * math.acos(anglecos)
 
+# Convert a coordinate to the indices of the southwest corner of the
+# corresponding tiling region.
 def coord_to_tiling_region_indices(coord):
   latind = int(math.floor(coord.lat / degrees_per_region))
   longind = int(math.floor(coord.long / degrees_per_region))
   return (latind, longind)
 
-def coord_to_nbregion_indices(coord):
-  # When Opts.width_of_nbregion = 1, don't subtract anything.
-  # When Opts.width_of_nbregion = 2, subtract 0.5*degrees_per_region.
-  # When Opts.width_of_nbregion = 3, subtract degrees_per_region.
-  # When Opts.width_of_nbregion = 4, subtract 1.5*degrees_per_region.
-  # In general, subtract (Opts.width_of_nbregion-1)/2.0*degrees_per_region.
+# Convert a coordinate to the indices of the southwest corner of the
+# corresponding statistical region.
+def coord_to_stat_region_indices(coord):
+  # When Opts.width_of_stat_region = 1, don't subtract anything.
+  # When Opts.width_of_stat_region = 2, subtract 0.5*degrees_per_region.
+  # When Opts.width_of_stat_region = 3, subtract degrees_per_region.
+  # When Opts.width_of_stat_region = 4, subtract 1.5*degrees_per_region.
+  # In general, subtract (Opts.width_of_stat_region-1)/2.0*degrees_per_region.
 
   # Compute the indices of the southwest region
-  subval = (Opts.width_of_nbregion-1)/2.0*degrees_per_region
+  subval = (Opts.width_of_stat_region-1)/2.0*degrees_per_region
   lat = coord.lat - subval
   long = coord.long - subval
   if lat < minimum_latitude: lat = minimum_latitude
@@ -159,25 +197,39 @@ def coord_to_nbregion_indices(coord):
   latind, longind = coord_to_tiling_region_indices(Coord(lat, long))
   return (latind, longind)
 
+# Convert region indices to the corresponding coordinate.
 def region_indices_to_coord(latind, longind):
   return Coord(latind * degrees_per_region, longind * degrees_per_region)
+
+# Convert region indices of a statistical region to the coordinate of the
+# center of the region.
+def stat_region_indices_to_center_coord(latind, longind):
+  addval = Opts.width_of_stat_region/2.0
+  latind += addval
+  longind += addval
+
+  coord = region_indices_to_coord(latind, longind)
+  lat, long = coord.lat, coord.long
+  if lat > maximum_latitude: lat = maximum_latitude
+  if long > maximum_longitude: long -= 360.
+  return Coord(lat, long)
 
 ############################################################################
 #                             Word distributions                           #
 ############################################################################
 
-# Distribution used for Naive Bayes disambiguation.  The following
+# Distribution corresponding to a statistical region.  The following
 # fields are defined in addition to base class fields:
 #
 #   articles: Articles used in computing the distribution.
 #   num_arts: Total number of articles included.
 #   incoming_links: Total number of incoming links, or None if unknown.
 
-class NBDist(WordDist):
+class RegionDist(WordDist):
   __slots__ = WordDist.__slots__ + ['articles', 'num_arts', 'incoming_links']
 
   def __init__(self):
-    super(NBDist, self).__init__()
+    super(RegionDist, self).__init__()
     self.articles = []
     self.num_arts = 0
     self.incoming_links = 0
@@ -189,7 +241,7 @@ class NBDist(WordDist):
   def add_articles(self, articles):
     incoming_links = 0
     if debug > 1:
-      errprint("Naive Bayes dist, number of articles = %s" % num_arts)
+      errprint("Region dist, number of articles = %s" % num_arts)
     total_arts = 0
     num_arts = 0
     old_total_tokens = self.total_tokens
@@ -224,7 +276,7 @@ class NBDist(WordDist):
     self.finish_word_distribution()
 
     if debug > 1:
-      errprint("""For Naive Bayes dist, num articles = %s, total tokens = %s,
+      errprint("""For region dist, num articles = %s, total tokens = %s,
     unseen_mass = %s, incoming links = %s, overall unseen mass = %s""" %
                (self.num_arts, self.total_tokens, self.unseen_mass,
                 self.incoming_links, self.overall_unseen_mass))
@@ -233,20 +285,20 @@ class NBDist(WordDist):
 #                           Geographic locations                           #
 ############################################################################
 
-############ Naive Bayes regions ############
+############ statistical regions ############
 
-# Info used in region-based Naive Bayes disambiguation.  This class contains
-# values used in computing the distribution over all locations in the
-# region surrounding the locality in question.  The region is currently a
-# square of NxN tiling regions, for N = Opts.width_of_nbregion.
+# This class contains values used in computing the distribution over all
+# locations in the statistical region surrounding the locality in question.
+# The statistical region is currently defined as a square of NxN tiling
+# regions, for N = Opts.width_of_stat_region.
 # The following fields are defined: 
 #
 #   latind, longind: Region indices of southwest-most tiling region in
-#                    Naive Bayes region.
-#   nbdist: Distribution corresponding to region.
+#                    statistical region.
+#   regdist: Distribution corresponding to region.
 
-class NBRegion(object):
-  __slots__ = ['latind', 'longind', 'nbdist']
+class StatRegion(object):
+  __slots__ = ['latind', 'longind', 'regdist']
   
   # Mapping of region->locations in region, for region-based Naive Bayes
   # disambiguation.  The key is a tuple expressing the integer indices of the
@@ -262,13 +314,13 @@ class NBRegion(object):
   # article distributions.
   tiling_region_to_articles = listdict()
 
-  # Mapping from center of Naive Bayes region to corresponding region object.
-  # A "Naive Bayes region" is made up of a square of tiling regions, with
-  # the number of regions on a side determined by `Opts.width_of_nbregion'.  A
-  # word distribution is associated with each Naive Bayes region.
-  corner_to_nbregion = {}
+  # Mapping from center of statistical region to corresponding region object.
+  # A "statistical region" is made up of a square of tiling regions, with
+  # the number of regions on a side determined by `Opts.width_of_stat_region'.  A
+  # word distribution is associated with each statistical region.
+  corner_to_stat_region = {}
 
-  empty_nbregion = None # Can't compute this until class is initialized
+  empty_stat_region = None # Can't compute this until class is initialized
   all_regions_computed = False
   num_empty_regions = 0
   num_non_empty_regions = 0
@@ -276,80 +328,80 @@ class NBRegion(object):
   def __init__(self, latind, longind):
     self.latind = latind
     self.longind = longind
-    self.nbdist = NBDist()
+    self.regdist = RegionDist()
 
-  # Generate the distribution for a Naive Bayes region from the tiling regions.
+  # Generate the distribution for a statistical region from the tiling regions.
   def generate_dist(self):
 
-    nblat = self.latind
-    nblong = self.longind
+    reglat = self.latind
+    reglong = self.longind
 
     if debug > 1:
-      errprint("Generating distribution for Naive Bayes region centered at %s"
-               % region_indices_to_coord(nblat, nblong))
+      errprint("Generating distribution for statistical region centered at %s"
+               % region_indices_to_coord(reglat, reglong))
 
     # Accumulate counts for the given region
     def process_one_region(latind, longind):
-      arts = NBRegion.tiling_region_to_articles.get((latind, longind), None)
+      arts = StatRegion.tiling_region_to_articles.get((latind, longind), None)
       if not arts:
         return
       if debug > 1:
         errprint("--> Processing tiling region %s" %
                  region_indices_to_coord(latind, longind))
-      self.nbdist.add_articles(arts)
+      self.regdist.add_articles(arts)
 
-    # Process the tiling regions making up the Naive Bayes region;
+    # Process the tiling regions making up the statistical region;
     # but be careful around the edges.
-    for i in range(nblat, nblat + Opts.width_of_nbregion):
-      for j in range(nblong, nblong + Opts.width_of_nbregion):
+    for i in range(reglat, reglat + Opts.width_of_stat_region):
+      for j in range(reglong, reglong + Opts.width_of_stat_region):
         jj = j
         if jj > maximum_longind: jj = minimum_longind
         process_one_region(i, jj)
 
-    self.nbdist.finish_distribution()
+    self.regdist.finish_distribution()
 
-  # Find the correct NBRegion for the given coordinates.
+  # Find the correct StatRegion for the given coordinates.
   # If none, create the region.
   @staticmethod
   def find_region_for_coord(coord):
-    latind, longind = coord_to_nbregion_indices(coord)
-    return NBRegion.find_region_for_region_indices(latind, longind)
+    latind, longind = coord_to_stat_region_indices(coord)
+    return StatRegion.find_region_for_region_indices(latind, longind)
 
-  # Find the NBRegion with the given indices at the southwest point.
+  # Find the StatRegion with the given indices at the southwest point.
   # If none, create the region.
   @classmethod
   def find_region_for_region_indices(cls, latind, longind,
                                      no_create_empty=False):
-    nbreg = cls.corner_to_nbregion.get((latind, longind), None)
-    if not nbreg:
+    statreg = cls.corner_to_stat_region.get((latind, longind), None)
+    if not statreg:
       if cls.all_regions_computed:
-        if not cls.empty_nbregion:
-          cls.empty_nbregion = cls(None, None)
-          cls.empty_nbregion.nbdist.finish_distribution()
-        return cls.empty_nbregion
-      nbreg = cls(latind, longind)
-      nbreg.generate_dist()
-      empty = nbreg.nbdist.is_empty()
+        if not cls.empty_stat_region:
+          cls.empty_stat_region = cls(None, None)
+          cls.empty_stat_region.regdist.finish_distribution()
+        return cls.empty_stat_region
+      statreg = cls(latind, longind)
+      statreg.generate_dist()
+      empty = statreg.regdist.is_empty()
       if empty:
         cls.num_empty_regions += 1
       else:
         cls.num_non_empty_regions += 1
       if not empty or not no_create_empty:
-        cls.corner_to_nbregion[(latind, longind)] = nbreg
-    return nbreg
+        cls.corner_to_stat_region[(latind, longind)] = statreg
+    return statreg
 
   # Generate all clss that are non-empty.
   @staticmethod
   def generate_all_nonempty_regions():
-    errprint("Generating all non-empty Naive Bayes regions...")
-    status = StatusMessage('Naive Bayes region')
+    errprint("Generating all non-empty statistical regions...")
+    status = StatusMessage('statistical region')
 
     for i in xrange(minimum_latind, maximum_latind + 1):
       for j in xrange(minimum_longind, maximum_longind + 1):
-        NBRegion.find_region_for_region_indices(i, j, no_create_empty=True)
+        StatRegion.find_region_for_region_indices(i, j, no_create_empty=True)
         status.item_processed()
 
-    NBRegion.all_regions_computed = True
+    StatRegion.all_regions_computed = True
     
   # Add the given article to the region map, which covers the earth in regions
   # of a particular size to aid in computing the regions used in region-based
@@ -357,11 +409,11 @@ class NBRegion(object):
   @staticmethod
   def add_article_to_region(article):
     latind, longind = coord_to_tiling_region_indices(article.coord)
-    NBRegion.tiling_region_to_articles[(latind, longind)] += [article]
+    StatRegion.tiling_region_to_articles[(latind, longind)] += [article]
 
   @staticmethod
   def yield_all_nonempty_regions():
-    return NBRegion.corner_to_nbregion.iteritems()
+    return StatRegion.corner_to_stat_region.iteritems()
 
 ############ Locations ############
 
@@ -385,7 +437,7 @@ class Location(object):
 # The following fields are defined, in addition to those for Location:
 #
 #   coord: Coordinates of the location, as a Coord object.
-#   nbregion: The Naive Bayes region surrounding this location, including
+#   stat_region: The statistical region surrounding this location, including
 #             all necessary information to determine the region-based
 #             distribution.
 
@@ -393,14 +445,14 @@ class Locality(Location):
   # This is an optimization that causes space to be allocated in the most
   # efficient possible way for exactly these attributes, and no others.
 
-  __slots__ = Location.__slots__ + ['coord', 'nbregion']
+  __slots__ = Location.__slots__ + ['coord', 'stat_region']
 
   def __init__(self, name, coord):
     self.name = name
     self.coord = coord
     self.altnames = []
     self.match = None
-    self.nbregion = None
+    self.stat_region = None
 
   def __str__(self):
     return 'Locality %s (%s) at %s, match=%s' % \
@@ -430,12 +482,12 @@ class Locality(Location):
 #             division.  Currently in the form of a rectangular bounding box.
 #             Eventually may contain a convex hull or even more complex
 #             region (e.g. set of convex regions).
-#   nbdist: For region-based Naive Bayes disambiguation, a distribution
+#   regdist: For region-based Naive Bayes disambiguation, a distribution
 #           over the division's article and all locations within the region.
 
 class Division(object):
   __slots__ = Location.__slots__ + \
-    ['level', 'path', 'locs', 'goodlocs', 'boundary', 'nbdist']
+    ['level', 'path', 'locs', 'goodlocs', 'boundary', 'regdist']
 
   def __init__(self, path):
     self.name = path[-1]
@@ -444,7 +496,7 @@ class Division(object):
     self.level = len(path)
     self.locs = []
     self.match = None
-    self.nbdist = None
+    self.regdist = None
 
   def __str__(self):
     return 'Division %s (%s), match=%s, boundary=%s' % \
@@ -491,11 +543,11 @@ class Division(object):
                      max(x.coord.long for x in self.goodlocs))
     self.boundary = Boundary(topleft, botright)
 
-  def generate_nbdist(self):
-    self.nbdist = NBDist()
-    self.nbdist.add_locations([self])
-    self.nbdist.add_locations(self.goodlocs)
-    self.nbdist.finish_distribution()
+  def generate_regdist(self):
+    self.regdist = RegionDist()
+    self.regdist.add_locations([self])
+    self.regdist.add_locations(self.goodlocs)
+    self.regdist.finish_distribution()
 
   def __contains__(self, coord):
     return coord in self.boundary
@@ -625,15 +677,15 @@ def compute_short_form(name):
 # of the base classes:
 #
 #   location: Corresponding location for this article.
-#   nbregion: NBRegion object corresponding to this article.
+#   stat_region: StatRegion object corresponding to this article.
 
 class NBArticle(Article):
-  __slots__ = Article.__slots__ + ['dist', 'location', 'nbregion']
+  __slots__ = Article.__slots__ + ['dist', 'location', 'stat_region']
 
   def __init__(self, **args):
     super(NBArticle, self).__init__(**args)
     self.location = None
-    self.nbregion = None
+    self.stat_region = None
     self.dist = None
 
   def distance_to_coord(self, coord):
@@ -646,17 +698,17 @@ class NBArticle(Article):
         self.location.matches_coord(coord): return True
     return False
 
-  # Determine the Naive Bayes distribution object for a given article:
+  # Determine the region distribution object for a given article:
   # Create and populate one if necessary.
-  def find_nbdist(self):
+  def find_regdist(self):
     loc = self.location
     if loc and type(loc) is Division:
-      if not loc.nbdist:
-        loc.generate_nbdist()
-      return loc.nbdist
-    if not self.nbregion:
-      self.nbregion = NBRegion.find_region_for_coord(self.coord)
-    return self.nbregion.nbdist
+      if not loc.regdist:
+        loc.generate_regdist()
+      return loc.regdist
+    if not self.stat_region:
+      self.stat_region = StatRegion.find_region_for_coord(self.coord)
+    return self.stat_region.regdist
 
 # Find Wikipedia article matching name NAME for location LOC.  NAME
 # will generally be one of the names of LOC (either its canonical
@@ -968,6 +1020,7 @@ class Results(object):
   ####### Results for geotagging documents/articles
 
   all_document = EvalWithRank()
+
   # naitr = "num articles in true region"
   ranges_for_naitr = [1, 10, 25, 100]
   documents_by_naitr = {}
@@ -1077,7 +1130,7 @@ class NaiveBayesStrategy(GeotagToponymStrategy):
     if self.opts.naive_bayes_type == 'article':
       distobj = art.dist
     else:
-      distobj = art.find_nbdist()
+      distobj = art.find_regdist()
     totalprob = 0.0
     total_word_weight = 0.0
     if not self.strategy.use_baseline:
@@ -1430,9 +1483,9 @@ class GeotagDocumentEvaluator(TestFileEvaluator):
 class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
   def __init__(self, opts):
     super(WikipediaGeotagDocumentEvaluator, self).__init__(opts)
-    NBRegion.generate_all_nonempty_regions()
-    errprint("Number of non-empty regions: %s" % NBRegion.num_non_empty_regions)
-    errprint("Number of empty regions: %s" % NBRegion.num_empty_regions)
+    StatRegion.generate_all_nonempty_regions()
+    errprint("Number of non-empty regions: %s" % StatRegion.num_non_empty_regions)
+    errprint("Number of empty regions: %s" % StatRegion.num_empty_regions)
 
   def yield_documents(self, filename):
     for art in ArticleTable.articles_by_split['dev']:
@@ -1468,20 +1521,20 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       Results.record_geotag_document_other_stat('Skipped articles')
       return False
     assert article.dist.finished
-    truelat, truelong = coord_to_nbregion_indices(article.coord)
-    true_nbreg = NBRegion.find_region_for_coord(article.coord)
-    naitr = true_nbreg.nbdist.num_arts
+    truelat, truelong = coord_to_stat_region_indices(article.coord)
+    true_statreg = StatRegion.find_region_for_coord(article.coord)
+    naitr = true_statreg.regdist.num_arts
     if debug > 0:
       errprint("Evaluating article %s with %s articles in true region" %
                (article, naitr))
     article_pq = PriorityQueue()
-    for (inds, nbregion) in NBRegion.yield_all_nonempty_regions():
+    for (inds, stat_region) in StatRegion.yield_all_nonempty_regions():
       if debug > 1:
         (latind, longind) = inds
         coord = region_indices_to_coord(latind, longind)
         errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s"
-                 % (latind, longind, coord, nbregion.nbdist.num_arts))
-      kldiv = article.dist.fast_kl_divergence(nbregion.nbdist,
+                 % (latind, longind, coord, stat_region.regdist.num_arts))
+      kldiv = article.dist.fast_kl_divergence(stat_region.regdist,
                   Opts.strategy == 'partial-kl-divergence')
       #errprint("For region %s, KL divergence = %s" % (inds, kldiv))
       article_pq.add_task(kldiv, inds)
@@ -1499,7 +1552,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
         break
     Results.record_geotag_document_result(rank, num_arts_in_true_region=naitr)
     errprint("For article %s, true region at rank %s" % (article, rank))
-    assert raised == (true_nbreg.nbdist.num_arts == 0)
+    assert raised == (true_statreg.regdist.num_arts == 0)
     return True
 
 
@@ -1525,7 +1578,7 @@ def read_article_data(filename):
     elif art.coord:
       ArticleTable.record_article(art.title, art)
       if art.split == 'training':
-        NBRegion.add_article_to_region(art)
+        StatRegion.add_article_to_region(art)
 
   read_article_data_file(filename, process, article_type=NBArticle,
                          max_time_per_stage=Opts.max_time_per_stage)
@@ -1850,12 +1903,14 @@ prior probability (baseline) and all word probabilities the same.  If
 according to --baseline-weight, assigning the remainder to the words.  If
 'distance-weighted', use the --baseline-weight for the prior probability
 and weight the words according to distance from the toponym.""")
-    op.add_option("--width-of-nbregion", type='int', default=1,
-                  help="""Width of the Naive Bayes region used for region-based
-Naive Bayes disambiguation, in tiling regions.  Default %default.""")
+    op.add_option("--width-of-stat-region", type='int', default=1,
+                  help="""Width of the region used to compute a statistical
+distribution for geotagging purposes, in terms of number of tiling regions.
+Default %default.""")
     op.add_option("-r", "--region-size", type='float', default=100.0,
-                  help="""Size of the region (in miles) to use when doing
-region-based Naive Bayes disambiguation.  Default %default.""")
+                  help="""Size (in miles) of the tiling regions that cover
+the earth.  Some number of tiling regions are put together to form the region
+used to construct a statistical distribution.  Default %default.""")
     op.add_option("-b", "--naive-bayes-type", type='choice',
                   default="round-region",
                   choices=['article', 'round-region', 'square-region'],
@@ -1898,8 +1953,8 @@ particular-sized region.  Default '%default'.""")
       coord_to_tiling_region_indices(Coord(minimum_latitude,
                                            minimum_longitude))
 
-    if opts.width_of_nbregion <= 0:
-      op.error("Width of Naive Bayes region must be positive")
+    if opts.width_of_stat_region <= 0:
+      op.error("Width of statistical region must be positive")
 
     ### Start reading in the files and operating on them ###
 
