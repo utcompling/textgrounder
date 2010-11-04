@@ -42,28 +42,9 @@ from kl_divergence import *
 # List of stopwords
 stopwords = set()
 
-# For each toponym (name of location), value is a list of Locality items,
-# listing gazetteer locations and corresponding matching Wikipedia articles.
-lower_toponym_to_location = listdict()
-
-# For each toponym, list of Wikipedia articles matching the name.
-lower_toponym_to_article = listdict()
-
-# For each toponym corresponding to a division higher than a locality,
-# list of divisions with this name.
-lower_toponym_to_division = listdict()
-
-# For each division, map from division's path to Division object.
-path_to_division = {}
-
 # Debug level; if non-zero, output lots of extra information about how
 # things are progressing.  If > 1, even more info.
 debug = 0
-
-# Table of all toponyms seen in evaluation files, along with how many times
-# seen.  Used to determine when caching of certain toponym-specific values
-# should be done.
-#toponyms_seen_in_eval_files = intdict()
 
 ############################################################################
 #                       Coordinates and regions                            #
@@ -363,10 +344,10 @@ class StatRegion(object):
 
   # Find the correct StatRegion for the given coordinates.
   # If none, create the region.
-  @staticmethod
-  def find_region_for_coord(coord):
+  @classmethod
+  def find_region_for_coord(cls, coord):
     latind, longind = coord_to_stat_region_indices(coord)
-    return StatRegion.find_region_for_region_indices(latind, longind)
+    return cls.find_region_for_region_indices(latind, longind)
 
   # Find the StatRegion with the given indices at the southwest point.
   # If none, create the region.
@@ -392,29 +373,29 @@ class StatRegion(object):
     return statreg
 
   # Generate all clss that are non-empty.
-  @staticmethod
-  def generate_all_nonempty_regions():
+  @classmethod
+  def generate_all_nonempty_regions(cls):
     errprint("Generating all non-empty statistical regions...")
     status = StatusMessage('statistical region')
 
     for i in xrange(minimum_latind, maximum_latind + 1):
       for j in xrange(minimum_longind, maximum_longind + 1):
-        StatRegion.find_region_for_region_indices(i, j, no_create_empty=True)
+        cls.find_region_for_region_indices(i, j, no_create_empty=True)
         status.item_processed()
 
-    StatRegion.all_regions_computed = True
+    cls.all_regions_computed = True
     
   # Add the given article to the region map, which covers the earth in regions
   # of a particular size to aid in computing the regions used in region-based
   # Naive Bayes.
-  @staticmethod
-  def add_article_to_region(article):
+  @classmethod
+  def add_article_to_region(cls, article):
     latind, longind = coord_to_tiling_region_indices(article.coord)
-    StatRegion.tiling_region_to_articles[(latind, longind)] += [article]
+    cls.tiling_region_to_articles[(latind, longind)] += [article]
 
-  @staticmethod
-  def yield_all_nonempty_regions():
-    return StatRegion.corner_to_stat_region.iteritems()
+  @classmethod
+  def yield_all_nonempty_regions(cls):
+    return cls.corner_to_stat_region.iteritems()
 
 ############ Locations ############
 
@@ -490,6 +471,9 @@ class Division(object):
   __slots__ = Location.__slots__ + \
     ['level', 'path', 'locs', 'goodlocs', 'boundary', 'regdist']
 
+  # For each division, map from division's path to Division object.
+  path_to_division = {}
+
   def __init__(self, path):
     self.name = path[-1]
     self.altnames = []
@@ -555,27 +539,27 @@ class Division(object):
 
   # Note that a location was seen with the given path to the location.
   # Return the corresponding Division.
-  @staticmethod
-  def note_point_seen_in_division(loc, path):
+  @classmethod
+  def note_point_seen_in_division(cls, loc, path):
     higherdiv = None
     if len(path) > 1:
       # Also note location in next-higher division.
-      higherdiv = Division.note_point_seen_in_division(loc, path[0:-1])
+      higherdiv = cls.note_point_seen_in_division(loc, path[0:-1])
     # Skip divisions where last element in path is empty; this is a
     # reference to a higher-level division with no corresponding lower-level
     # division.
     if not path[-1]: return higherdiv
-    if path in path_to_division:
-      division = path_to_division[path]
+    if path in cls.path_to_division:
+      division = cls.path_to_division[path]
     else:
       # If we haven't seen this path, create a new Division object.
       # Record the mapping from path to division, and also from the
       # division's "name" (name of lowest-level division in path) to
       # the division.
-      division = Division(path)
+      division = cls(path)
       division.div = higherdiv
-      path_to_division[path] = division
-      lower_toponym_to_division[path[-1].lower()] += [division]
+      cls.path_to_division[path] = division
+      Gazetteer.lower_toponym_to_division[path[-1].lower()] += [division]
     division.locs += [loc]
     return division
 
@@ -608,6 +592,9 @@ class ArticleTable(object):
   # the article.
   name_to_article = {}
 
+  # For each toponym, list of Wikipedia articles matching the name.
+  lower_toponym_to_article = listdict()
+
   # Mapping from lowercased article names to Article objects
   lower_name_to_articles = listdict()
 
@@ -616,32 +603,32 @@ class ArticleTable(object):
   # Look up an article named NAME and return the associated article.
   # Note that article names are case-sensitive but the first letter needs to
   # be capitalized.
-  @staticmethod
-  def lookup_article(name):
+  @classmethod
+  def lookup_article(cls, name):
     assert name
-    return ArticleTable.name_to_article.get(capfirst(name), None)
+    return cls.name_to_article.get(capfirst(name), None)
 
   # Record the article as having NAME as one of its names (there may be
   # multiple names, due to redirects).  Also add to related lists mapping
   # lowercased form, short form, etc.  If IS_REDIRECT, this is a redirect to
   # an article, so don't record it again.
-  @staticmethod
-  def record_article(name, art, is_redirect=False):
+  @classmethod
+  def record_article(cls, name, art, is_redirect=False):
     # Must pass in properly cased name
     assert name == capfirst(name)
-    ArticleTable.name_to_article[name] = art
+    cls.name_to_article[name] = art
     loname = name.lower()
-    ArticleTable.lower_name_to_articles[loname] += [art]
+    cls.lower_name_to_articles[loname] += [art]
     (short, div) = compute_short_form(loname)
     if div:
-      ArticleTable.lower_name_div_to_articles[(short, div)] += [art]
-    ArticleTable.short_lower_name_to_articles[short] += [art]
-    if art not in lower_toponym_to_article[loname]:
-      lower_toponym_to_article[loname] += [art]
-    if short != loname and art not in lower_toponym_to_article[short]:
-      lower_toponym_to_article[short] += [art]
+      cls.lower_name_div_to_articles[(short, div)] += [art]
+    cls.short_lower_name_to_articles[short] += [art]
+    if art not in cls.lower_toponym_to_article[loname]:
+      cls.lower_toponym_to_article[loname] += [art]
+    if short != loname and art not in cls.lower_toponym_to_article[short]:
+      cls.lower_toponym_to_article[short] += [art]
     if not is_redirect:
-      splithash = ArticleTable.articles_by_split
+      splithash = cls.articles_by_split
       if art.split not in splithash:
         #splithash[art.split] = set()
         splithash[art.split] = []
@@ -658,6 +645,128 @@ class ArticleTable(object):
       for art in table:
         if art.dist:
           art.dist.finish_word_distribution()
+
+  # Find Wikipedia article matching name NAME for location LOC.  NAME
+  # will generally be one of the names of LOC (either its canonical
+  # name or one of the alternate name).  CHECK_MATCH is a function that
+  # is passed two aruments, the location and the Wikipedia artile name,
+  # and should return True if the location matches the article.
+  # PREFER_MATCH is used when two or more articles match.  It is passed
+  # three argument, the location and two Wikipedia article names.  It
+  # should return TRUE if the first is to be preferred to the second.
+  # Return the name of the article matched, or None.
+
+  @classmethod
+  def find_one_wikipedia_match(cls, loc, name, check_match, prefer_match):
+
+    loname = name.lower()
+
+    # Look for any articles with same name (case-insensitive) as the location,
+    # check for matches
+    for art in cls.lower_name_to_articles[loname]:
+      if check_match(loc, art): return art
+
+    # Check whether there is a match for an article whose name is
+    # a combination of the location's name and one of the divisions that
+    # the location is in (e.g. "Augusta, Georgia" for a location named
+    # "Augusta" in a second-level division "Georgia").
+    if loc.div:
+      for div in loc.div.path:
+        for art in cls.lower_name_div_to_articles[(loname, div.lower())]:
+          if check_match(loc, art): return art
+
+    # See if there is a match with any of the articles whose short name
+    # is the same as the location's name
+    arts = cls.short_lower_name_to_articles[loname]
+    if arts:
+      goodarts = [art for art in arts if check_match(loc, art)]
+      if len(goodarts) == 1:
+        return goodarts[0] # One match
+      elif len(goodarts) > 1:
+        # Multiple matches: Sort by preference, return most preferred one
+        if debug > 1:
+          errprint("Warning: Saw %s toponym matches: %s" %
+                   (len(goodarts), goodarts))
+        sortedarts = \
+          sorted(goodarts, cmp=(lambda x,y:1 if prefer_match(loc, x,y) else -1),
+                 reverse=True)
+        return sortedarts[0]
+
+    # No match.
+    return None
+
+  # Find Wikipedia article matching location LOC.  CHECK_MATCH and
+  # PREFER_MATCH are as above.  Return the name of the article matched, or None.
+
+  @classmethod
+  def find_wikipedia_match(cls, loc, check_match, prefer_match):
+    # Try to find a match for the canonical name of the location
+    match = cls.find_one_wikipedia_match(loc, loc.name, check_match,
+                                         prefer_match)
+    if match: return match
+
+    # No match; try each of the alternate names in turn.
+    for altname in loc.altnames:
+      match = cls.find_one_wikipedia_match(loc, altname, check_match,
+                                           prefer_match)
+      if match: return match
+
+    # No match.
+    return None
+
+  # Find Wikipedia article matching locality LOC; the two coordinates must
+  # be at most MAXDIST away from each other.
+
+  @classmethod
+  def find_match_for_locality(cls, loc, maxdist):
+
+    def check_match(loc, art):
+      dist = spheredist(loc.coord, art.coord)
+      if dist <= maxdist:
+        return True
+      else:
+        if debug > 1:
+          errprint("Found article %s but dist %s > %s" %
+                   (art, dist, maxdist))
+        return False
+
+    def prefer_match(loc, art1, art2):
+      return spheredist(loc.coord, art1.coord) < \
+        spheredist(loc.coord, art2.coord)
+
+    return cls.find_wikipedia_match(loc, check_match, prefer_match)
+
+  # Find Wikipedia article matching division LOC; the article coordinate
+  # must be inside of the division's boundaries.
+
+  @classmethod
+  def find_match_for_division(cls, loc):
+
+    def check_match(loc, art):
+      if art.coord and art.coord in loc:
+        return True
+      else:
+        if debug > 1:
+          if not art.coord:
+            errprint("Found article %s but no coordinate, so not in location named %s, path %s" %
+                     (art, loc.name, loc.path))
+          else:
+            errprint("Found article %s but not in location named %s, path %s" %
+                     (art, loc.name, loc.path))
+        return False
+
+    def prefer_match(loc, art1, art2):
+      l1 = art1.incoming_links
+      l2 = art2.incoming_links
+      # Prefer according to incoming link counts, if that info is available
+      if l1 is not None and l2 is not None:
+        return l1 > l2
+      else:
+        # FIXME: Do something smart here -- maybe check that location is farther
+        # in the middle of the bounding box (does this even make sense???)
+        return True
+
+    return cls.find_wikipedia_match(loc, check_match, prefer_match)
 
 
 ######################## Articles
@@ -711,120 +820,6 @@ class StatArticle(Article):
     if not self.stat_region:
       self.stat_region = StatRegion.find_region_for_coord(self.coord)
     return self.stat_region.regdist
-
-# Find Wikipedia article matching name NAME for location LOC.  NAME
-# will generally be one of the names of LOC (either its canonical
-# name or one of the alternate name).  CHECK_MATCH is a function that
-# is passed two aruments, the location and the Wikipedia artile name,
-# and should return True if the location matches the article.
-# PREFER_MATCH is used when two or more articles match.  It is passed
-# three argument, the location and two Wikipedia article names.  It
-# should return TRUE if the first is to be preferred to the second.
-# Return the name of the article matched, or None.
-
-def find_one_wikipedia_match(loc, name, check_match, prefer_match):
-
-  loname = name.lower()
-
-  # Look for any articles with same name (case-insensitive) as the location,
-  # check for matches
-  for art in ArticleTable.lower_name_to_articles[loname]:
-    if check_match(loc, art): return art
-
-  # Check whether there is a match for an article whose name is
-  # a combination of the location's name and one of the divisions that
-  # the location is in (e.g. "Augusta, Georgia" for a location named
-  # "Augusta" in a second-level division "Georgia").
-  if loc.div:
-    for div in loc.div.path:
-      for art in ArticleTable.lower_name_div_to_articles[(loname, div.lower())]:
-        if check_match(loc, art): return art
-
-  # See if there is a match with any of the articles whose short name
-  # is the same as the location's name
-  arts = ArticleTable.short_lower_name_to_articles[loname]
-  if arts:
-    goodarts = [art for art in arts if check_match(loc, art)]
-    if len(goodarts) == 1:
-      return goodarts[0] # One match
-    elif len(goodarts) > 1:
-      # Multiple matches: Sort by preference, return most preferred one
-      if debug > 1:
-        errprint("Warning: Saw %s toponym matches: %s" %
-                 (len(goodarts), goodarts))
-      sortedarts = \
-        sorted(goodarts, cmp=(lambda x,y:1 if prefer_match(loc, x,y) else -1),
-               reverse=True)
-      return sortedarts[0]
-
-  # No match.
-  return None
-
-# Find Wikipedia article matching location LOC.  CHECK_MATCH and
-# PREFER_MATCH are as above.  Return the name of the article matched, or None.
-
-def find_wikipedia_match(loc, check_match, prefer_match):
-  # Try to find a match for the canonical name of the location
-  match = find_one_wikipedia_match(loc, loc.name, check_match, prefer_match)
-  if match: return match
-
-  # No match; try each of the alternate names in turn.
-  for altname in loc.altnames:
-    match = find_one_wikipedia_match(loc, altname, check_match, prefer_match)
-    if match: return match
-
-  # No match.
-  return None
-
-def find_match_for_locality(loc, maxdist):
-  # Check whether the given location matches the specified Wikipedia
-  # article by seeing if the distance away is at most MAXDIST.
-
-  def check_match(loc, art):
-    dist = spheredist(loc.coord, art.coord)
-    if dist <= maxdist:
-      return True
-    else:
-      if debug > 1:
-        errprint("Found article %s but dist %s > %s" %
-                 (art, dist, maxdist))
-      return False
-
-  def prefer_match(loc, art1, art2):
-    return spheredist(loc.coord, art1.coord) < \
-      spheredist(loc.coord, art2.coord)
-
-  return find_wikipedia_match(loc, check_match, prefer_match)
-
-def find_match_for_division(loc):
-  # Check whether the given location matches the specified Wikipedia
-  # article by seeing if the distance away is at most MAXDIST.
-
-  def check_match(loc, art):
-    if art.coord and art.coord in loc:
-      return True
-    else:
-      if debug > 1:
-        if not art.coord:
-          errprint("Found article %s but no coordinate, so not in location named %s, path %s" %
-                   (art, loc.name, loc.path))
-        else:
-          errprint("Found article %s but not in location named %s, path %s" %
-                   (art, loc.name, loc.path))
-      return False
-
-  def prefer_match(loc, art1, art2):
-    l1 = art1.incoming_links
-    l2 = art2.incoming_links
-    # Prefer according to incoming link counts, if that info is available
-    if l1 is not None and l2 is not None:
-      return l1 > l2
-    else:
-      # FIXME: Do something smart here -- maybe check that location is farther
-      # in the middle of the bounding box (does this even make sense???)
-      return True
-
-  return find_wikipedia_match(loc, check_match, prefer_match)
 
 ############################################################################
 #                             Accumulate results                           #
@@ -990,31 +985,31 @@ class Results(object):
   # Statistics when toponym not same as true name or short form of location
   diff_short = EvalWithCandidateList(incorrect_geotag_toponym_reasons)
 
-  @staticmethod
-  def record_geotag_toponym_result(correct, toponym, trueloc, reason,
+  @classmethod
+  def record_geotag_toponym_result(cls, correct, toponym, trueloc, reason,
                                    num_arts):
-    Results.all_toponym.record_result(correct, reason, num_arts)
+    cls.all_toponym.record_result(correct, reason, num_arts)
     if toponym != trueloc:
-      Results.diff_surface.record_result(correct, reason, num_arts)
+      cls.diff_surface.record_result(correct, reason, num_arts)
       (short, div) = compute_short_form(trueloc)
       if toponym != short:
-        Results.diff_short.record_result(correct, reason, num_arts)
+        cls.diff_short.record_result(correct, reason, num_arts)
 
-  @staticmethod
-  def output_geotag_toponym_results():
+  @classmethod
+  def output_geotag_toponym_results(cls):
     errprint("Results for all toponyms:")
-    Results.all_toponym.output_results()
+    cls.all_toponym.output_results()
     errprint("")
     errprint("Results for toponyms when different from true location name:")
-    Results.diff_surface.output_results()
+    cls.diff_surface.output_results()
     errprint("")
     errprint("Results for toponyms when different from either true location name")
     errprint("  or its short form:")
-    Results.diff_short.output_results()
-    Results.output_resource_usage()
+    cls.diff_short.output_results()
+    cls.output_resource_usage()
 
-  @staticmethod
-  def output_resource_usage():
+  @classmethod
+  def output_resource_usage(cls):
     errprint("Total elapsed time: %s" %
              float_with_commas(get_program_time_usage()))
     errprint("Memory usage: %s" % int_with_commas(get_program_memory_usage()))
@@ -1345,9 +1340,9 @@ class GeotagToponymEvaluator(TestFileEvaluator):
     lotop = toponym.lower()
     bestscore = -1e308
     bestart = None
-    articles = lower_toponym_to_article[lotop]
-    locs = (lower_toponym_to_location[lotop] +
-            lower_toponym_to_division[lotop])
+    articles = ArticleTable.lower_toponym_to_article[lotop]
+    locs = (Gazetteer.lower_toponym_to_location[lotop] +
+            Gazetteer.lower_toponym_to_division[lotop])
     for loc in locs:
       if loc.match and loc.match not in articles:
         articles += [loc.match]
@@ -1698,130 +1693,148 @@ def read_word_counts(filename):
   WordDist.finish_global_distribution()
   ArticleTable.finish_article_distributions()
 
+class Gazetteer(object):
+  # For each toponym (name of location), value is a list of Locality items,
+  # listing gazetteer locations and corresponding matching Wikipedia articles.
+  lower_toponym_to_location = listdict()
 
-# Find the Wikipedia article matching an entry in the gazetteer.
-# The format of an entry is
-#
-# ID  NAME  ALTNAMES  ORIG-SCRIPT-NAME  TYPE  POPULATION  LAT  LONG  DIV1  DIV2  DIV3
-#
-# where there is a tab character separating each field.  Fields may be empty;
-# but there will still be a tab character separating the field from others.
-#
-# The ALTNAMES specify any alternative names of the location, often including
-# the equivalent of the original name without any accent characters.  If
-# there is more than one alternative name, the possibilities are separated
-# by a comma and a space, e.g. "Dongshi, Dongshih, Tungshih".  The
-# ORIG-SCRIPT-NAME is the name in its original script, if that script is not
-# Latin characters (e.g. names in Russia will be in Cyrillic). (For some
-# reason, names in Chinese characters are listed in the ALTNAMES rather than
-# the ORIG-SCRIPT-NAME.)
-#
-# LAT and LONG specify the latitude and longitude, respectively.  These are
-# given as integer values, where the actual value is found by dividing this
-# integer value by 100.
-#
-# DIV1, DIV2 and DIV3 specify different-level divisions that a location is
-# within, from largest to smallest.  Typically the largest is a country.
-# For locations in the U.S., the next two levels will be state and county,
-# respectively.  Note that such divisions also have corresponding entries
-# in the gazetteer.  However, these entries are somewhat lacking in that
-# (1) no coordinates are given, and (2) only the top-level division (the
-# country) is given, even for third-level divisions (e.g. counties in the
-# U.S.).
-#
-# For localities, add them to the region-map that covers the earth if
-# ADD_TO_REGION_MAP is true.
+  # For each toponym corresponding to a division higher than a locality,
+  # list of divisions with this name.
+  lower_toponym_to_division = listdict()
 
-def match_world_gazetteer_entry(line):
-  # Split on tabs, make sure at least 11 fields present and strip off
-  # extra whitespace
-  fields = re.split(r'\t', line.strip()) + ['']*11
-  fields = [x.strip() for x in fields[0:11]]
-  (id, name, altnames, orig_script_name, typ, population, lat, long,
-   div1, div2, div3) = fields
+  # Table of all toponyms seen in evaluation files, along with how many times
+  # seen.  Used to determine when caching of certain toponym-specific values
+  # should be done.
+  #toponyms_seen_in_eval_files = intdict()
 
-  # Skip places without coordinates
-  if not lat or not long:
-    if debug > 1:
-      errprint("Skipping location %s (div %s/%s/%s) without coordinates" %
-               (name, div1, div2, div3))
-    return
 
-  # Create and populate a Locality object
-  loc = Locality(name, Coord(int(lat) / 100., int(long) / 100.))
-  loc.type = typ
-  if altnames:
-    loc.altnames = re.split(', ', altnames)
-  # Add the given location to the division the location is in
-  loc.div = Division.note_point_seen_in_division(loc, (div1, div2, div3))
-  if debug > 1:
-    errprint("Saw location %s (div %s/%s/%s) with coordinates %s" %
-             (loc.name, div1, div2, div3, loc.coord))
+class WorldGazetteer(Gazetteer):
 
-  # Record the location.  For each name for the location (its
-  # canonical name and all alternates), add the location to the list of
-  # locations associated with the name.  Record the name in lowercase
-  # for ease in matching.
-  for name in [loc.name] + loc.altnames:
-    loname = name.lower()
-    if debug > 1:
-      errprint("Noting lower_toponym_to_location for toponym %s, canonical name %s"
-               % (name, loc.name))
-    lower_toponym_to_location[loname] += [loc]
+  # Find the Wikipedia article matching an entry in the gazetteer.
+  # The format of an entry is
+  #
+  # ID  NAME  ALTNAMES  ORIG-SCRIPT-NAME  TYPE  POPULATION  LAT  LONG  DIV1  DIV2  DIV3
+  #
+  # where there is a tab character separating each field.  Fields may be empty;
+  # but there will still be a tab character separating the field from others.
+  #
+  # The ALTNAMES specify any alternative names of the location, often including
+  # the equivalent of the original name without any accent characters.  If
+  # there is more than one alternative name, the possibilities are separated
+  # by a comma and a space, e.g. "Dongshi, Dongshih, Tungshih".  The
+  # ORIG-SCRIPT-NAME is the name in its original script, if that script is not
+  # Latin characters (e.g. names in Russia will be in Cyrillic). (For some
+  # reason, names in Chinese characters are listed in the ALTNAMES rather than
+  # the ORIG-SCRIPT-NAME.)
+  #
+  # LAT and LONG specify the latitude and longitude, respectively.  These are
+  # given as integer values, where the actual value is found by dividing this
+  # integer value by 100.
+  #
+  # DIV1, DIV2 and DIV3 specify different-level divisions that a location is
+  # within, from largest to smallest.  Typically the largest is a country.
+  # For locations in the U.S., the next two levels will be state and county,
+  # respectively.  Note that such divisions also have corresponding entries
+  # in the gazetteer.  However, these entries are somewhat lacking in that
+  # (1) no coordinates are given, and (2) only the top-level division (the
+  # country) is given, even for third-level divisions (e.g. counties in the
+  # U.S.).
+  #
+  # For localities, add them to the region-map that covers the earth if
+  # ADD_TO_REGION_MAP is true.
 
-  # We start out looking for articles whose distance is very close,
-  # then widen until we reach Opts.max_dist_for_close_match.
-  maxdist = 5
-  while maxdist <= Opts.max_dist_for_close_match:
-    match = find_match_for_locality(loc, maxdist)
-    if match: break
-    maxdist *= 2
+  @classmethod
+  def match_world_gazetteer_entry(cls, line):
+    # Split on tabs, make sure at least 11 fields present and strip off
+    # extra whitespace
+    fields = re.split(r'\t', line.strip()) + ['']*11
+    fields = [x.strip() for x in fields[0:11]]
+    (id, name, altnames, orig_script_name, typ, population, lat, long,
+     div1, div2, div3) = fields
 
-  if not match: 
-    if debug > 1:
-      errprint("Unmatched name %s" % loc.name)
-    return
-  
-  # Record the match.
-  loc.match = match
-  match.location = loc
-  if debug > 1:
-    errprint("Matched location %s (coord %s) with article %s, dist=%s"
-             % (loc.name, loc.coord, match,
-                spheredist(loc.coord, match.coord)))
-
-# Read in the data from the World gazetteer in FILENAME and find the
-# Wikipedia article matching each entry in the gazetteer.  For localities,
-# add them to the region-map that covers the earth if ADD_TO_REGION_MAP is
-# true.
-def read_world_gazetteer_and_match(filename):
-  errprint("Matching gazetteer entries in %s..." % filename)
-  status = StatusMessage('gazetteer entry')
-
-  # Match each entry in the gazetteer
-  for line in uchompopen(filename):
-    if debug > 1:
-      errprint("Processing line: %s" % line)
-    match_world_gazetteer_entry(line)
-    if status.item_processed() >= Opts.max_time_per_stage:
-      break
-
-  for division in path_to_division.itervalues():
-    if debug > 1:
-      errprint("Processing division named %s, path %s"
-               % (division.name, division.path))
-    division.compute_boundary()
-    match = find_match_for_division(division)
-    if match:
+    # Skip places without coordinates
+    if not lat or not long:
       if debug > 1:
-        errprint("Matched article %s for division %s, path %s" %
-                 (match, division.name, division.path))
-      division.match = match
-      match.location = division
-    else:
+        errprint("Skipping location %s (div %s/%s/%s) without coordinates" %
+                 (name, div1, div2, div3))
+      return
+
+    # Create and populate a Locality object
+    loc = Locality(name, Coord(int(lat) / 100., int(long) / 100.))
+    loc.type = typ
+    if altnames:
+      loc.altnames = re.split(', ', altnames)
+    # Add the given location to the division the location is in
+    loc.div = Division.note_point_seen_in_division(loc, (div1, div2, div3))
+    if debug > 1:
+      errprint("Saw location %s (div %s/%s/%s) with coordinates %s" %
+               (loc.name, div1, div2, div3, loc.coord))
+
+    # Record the location.  For each name for the location (its
+    # canonical name and all alternates), add the location to the list of
+    # locations associated with the name.  Record the name in lowercase
+    # for ease in matching.
+    for name in [loc.name] + loc.altnames:
+      loname = name.lower()
       if debug > 1:
-        errprint("Couldn't find match for division %s, path %s" %
-                 (division.name, division.path))
+        errprint("Noting lower_toponym_to_location for toponym %s, canonical name %s"
+                 % (name, loc.name))
+      cls.lower_toponym_to_location[loname] += [loc]
+
+    # We start out looking for articles whose distance is very close,
+    # then widen until we reach Opts.max_dist_for_close_match.
+    maxdist = 5
+    while maxdist <= Opts.max_dist_for_close_match:
+      match = ArticleTable.find_match_for_locality(loc, maxdist)
+      if match: break
+      maxdist *= 2
+
+    if not match: 
+      if debug > 1:
+        errprint("Unmatched name %s" % loc.name)
+      return
+    
+    # Record the match.
+    loc.match = match
+    match.location = loc
+    if debug > 1:
+      errprint("Matched location %s (coord %s) with article %s, dist=%s"
+               % (loc.name, loc.coord, match,
+                  spheredist(loc.coord, match.coord)))
+
+  # Read in the data from the World gazetteer in FILENAME and find the
+  # Wikipedia article matching each entry in the gazetteer.  For localities,
+  # add them to the region-map that covers the earth if ADD_TO_REGION_MAP is
+  # true.
+  @classmethod
+  def read_world_gazetteer_and_match(cls, filename):
+    errprint("Matching gazetteer entries in %s..." % filename)
+    status = StatusMessage('gazetteer entry')
+
+    # Match each entry in the gazetteer
+    for line in uchompopen(filename):
+      if debug > 1:
+        errprint("Processing line: %s" % line)
+      cls.match_world_gazetteer_entry(line)
+      if status.item_processed() >= Opts.max_time_per_stage:
+        break
+
+    for division in Division.path_to_division.itervalues():
+      if debug > 1:
+        errprint("Processing division named %s, path %s"
+                 % (division.name, division.path))
+      division.compute_boundary()
+      match = ArticleTable.find_match_for_division(division)
+      if match:
+        if debug > 1:
+          errprint("Matched article %s for division %s, path %s" %
+                   (match, division.name, division.path))
+        division.match = match
+        match.location = division
+      else:
+        if debug > 1:
+          errprint("Couldn't find match for division %s, path %s" %
+                   (division.name, division.path))
 
 # If given a directory, yield all the files in the directory; else just
 # yield the file.
@@ -2068,7 +2081,7 @@ particular-sized region.  Default '%default'.""")
 
     if opts.mode == 'pickle-only': return
 
-    read_world_gazetteer_and_match(opts.gazetteer_file)
+    WorldGazetteer.read_world_gazetteer_and_match(opts.gazetteer_file)
 
     if opts.mode == 'match-only': return
 
