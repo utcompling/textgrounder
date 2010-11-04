@@ -1082,14 +1082,17 @@ class Results(object):
     errprint("Results for all documents/articles:")
     cls.all_document.output_results()
     errprint("")
-    for (lower_range, obj) in cls.documents_by_naitr.iteritems():
+    for (lower_range, obj) in sorted(cls.documents_by_naitr.iteritems(),
+                                     key=lambda x:x[0]):
       errprint("")
       errprint("Results for documents/articles where number of articles")
       errprint("  in true region is in the range [%s,%s]:" %
                (lower_range, cls.upper_range_by_naitr[lower_range]))
       obj.output_results()
     errprint("")
-    for (truedist, obj) in cls.documents_by_true_dist_to_center.iteritems():
+    for (truedist, obj) in \
+        sorted(cls.documents_by_true_dist_to_center.iteritems(),
+               key=lambda x:x[0]):
       lowrange = truedist * Opts.miles_per_region
       highrange = ((truedist + cls.dist_fraction_increment) *
                    Opts.miles_per_region)
@@ -1099,7 +1102,9 @@ class Results(object):
                (lowrange, highrange))
       obj.output_results()
     errprint("")
-    for (degdist, obj) in cls.documents_by_degree_dist_to_center.iteritems():
+    for (degdist, obj) in \
+        sorted(cls.documents_by_degree_dist_to_center.iteritems(),
+               key=lambda x:x[0]):
       lowrange = degdist * degrees_per_region
       highrange = ((degdist + cls.dist_fraction_increment) *
                    degrees_per_region)
