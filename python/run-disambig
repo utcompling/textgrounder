@@ -1,5 +1,12 @@
 #!/bin/sh
 
+# Run wiki_disambig.py, passing it various useful arguments.  Extra arguments
+# can be specified on the command line, which will override any existing
+# arguments.
+#
+# See also 'run-run-disambig', which will run this script using 'nohup'
+# while saving the output to a file.
+
 if [ -z "$WIKIPEDIA_DATA_DIR" ]; then
   WIKIPEDIA_DATA_DIR='.'
 fi
@@ -36,7 +43,6 @@ GAZETTEER_FILE="--gazetteer-file $AUXPREFIX/world-dataen-fixed.txt"
 #MODE="match-only"
 #MODE="geotag-toponyms"
 MODE="geotag-documents"
-
 
 MISCOPTS="--width-of-stat-region 1 --miles-per-region 100"
 if [ "$MODE" = "geotag-toponyms" -o "$MODE" = "match-only" ]; then
