@@ -201,16 +201,21 @@ inlines lookups as much as possible.'''
     qfact = (1 - other.unseen_mass)/other.total_tokens
     pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     qfact_unseen = other.unseen_mass / other.overall_unseen_mass
+    owprobs = WordDist.overall_word_probs
     # 1.
     pcounts = self.counts
     qcounts = other.counts
-    for word in pcounts:
-      p = pcounts[word] * pfact
+    cdef int pcount
+    # FIXME!! p * log(p) is the same for all calls of fast_kl_divergence
+    # on this item, so we could cache it.  Not clear it would save much
+    # time, though.
+    for (word, pcount) in pcounts.iteritems():
+      p = pcount * pfact
       qcount = qcounts.get(word, None)
       if qcount is None:
-        q = WordDist.overall_word_probs[word] * qfact_unseen
+        q = owprobs[word] * qfact_unseen
       else:
-        q = qcount*qfact
+        q = qcount * qfact
       kldiv += p * (log(p) - log(q))
 
     if partial:
@@ -222,7 +227,7 @@ inlines lookups as much as possible.'''
     overall_probs_diff_words = 0.0
     for word in qcounts:
       if word not in pcounts:
-        word_overall_prob = WordDist.overall_word_probs[word]
+        word_overall_prob = owprobs[word]
         p = word_overall_prob * pfact_unseen
         q = qcounts[word] * qfact
         kldiv += p * (log(p) - log(q))

@@ -1,6 +1,10 @@
 #!/bin/sh
 
-PREFIX="enwiki-20100905"
+if [ -z "$WIKIPEDIA_DATA_DIR" ]; then
+  WIKIPEDIA_DATA_DIR='.'
+fi
+
+PREFIX="$WIKIPEDIA_DATA_DIR/enwiki-20100905"
 PROCESSWIKI="$HOME/devel/textgrounder/python/processwiki.py"
 
 #DEBUG="--debug 2"
