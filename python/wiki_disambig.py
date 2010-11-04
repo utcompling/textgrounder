@@ -1569,7 +1569,8 @@ def read_word_counts(filename):
       title = m.group(1)
       wordhash = intdict()
       total_tokens = 0
-    elif line.startswith('Article coordinates: '):
+    elif line.startswith('Article coordinates: ') or \
+        line.startswith('Article ID: '):
       pass
     else:
       m = re.match('(.*) = ([0-9]+)$', line)
