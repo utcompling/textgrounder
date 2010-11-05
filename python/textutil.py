@@ -6,6 +6,7 @@ import math # For float_with_commas()
 import bisect # For sorted lists
 import time # For status messages, resource usage
 from heapq import * # For priority queue
+import UserDict # For SortedList, LRUCache
 import itertools # For priority queue
 import resource # For resource usage
 
@@ -179,6 +180,19 @@ def float_with_commas(x):
   fracpart = x - intpart
   return int_with_commas(intpart) + ("%.2f" % fracpart)[1:]
 
+def median(list):
+  "Return the median value of a sorted list."
+  l = len(list)
+  if l % 2 == 1:
+    return list[l // 2]
+  else:
+    l = l // 2
+    return 0.5*(list[l-1] + list[l])
+
+def mean(list):
+  "Return the mean of a list."
+  return sum(list) / float(len(list))
+
 #############################################################################
 #                             Default dictionaries                          #
 #############################################################################
@@ -188,6 +202,12 @@ def float_with_commas(x):
 class intdict(dict):
   def __missing__(self, key):
     return 0
+
+# A dictionary where missing keys automatically spring into existence
+# with a value of 0.0.  Useful for dictionaries that track counts of items.
+class floatdict(dict):
+  def __missing__(self, key):
+    return 0.0
 
 # A dictionary where missing keys automatically spring into existence
 # with a value of [].  Useful for dictionaries that track lists of items.
@@ -262,7 +282,7 @@ def lookup_sorted_list(sorted_list, key, default=None):
 
 # A class that provides a dictionary-compatible interface to a sorted list
 
-class SortedList(object):
+class SortedList(object, UserDict.DictMixin):
   def __init__(self, table):
     self.sorted_list = make_sorted_list(table)
 
@@ -275,9 +295,6 @@ class SortedList(object):
       raise KeyError(key)
     return retval
 
-  def get(self, key, default=None):
-    return lookup_sorted_list(self.sorted_list, key, default)
-
   def __contains__(self, key):
     return lookup_sorted_list(self.sorted_list, key) is not None
 
@@ -286,8 +303,8 @@ class SortedList(object):
     for x in keys:
       yield x
 
-  def iterkeys(self):
-    return self.__iter__()
+  def keys(self):
+    return self.sorted_list[0]
 
   def itervalues(self):
     (keys, values) = self.sorted_list
@@ -507,6 +524,55 @@ class PriorityQueue(object):
     entry[1] = PriorityQueue.INVALID
 
 #############################################################################
+#                      Least-recently-used (LRU) Caches                     #
+#############################################################################
+
+class LRUCache(object, UserDict.DictMixin):
+  def __init__(self, maxsize=1000):
+    self.cache = {}
+    self.pq = PriorityQueue()
+    self.maxsize = maxsize
+    self.time = 0
+
+  def __len__(self):
+    return len(self.cache)
+
+  def __getitem__(self, key):
+    if key in self.cache:
+      time = self.time
+      self.time += 1
+      self.pq.reprioritize(time, key)
+    return self.cache[key]
+
+  def __delitem__(self, key):
+    del self.cache[key]
+    self.pq.delete_task(key)
+
+  def __setitem__(self, key, value):
+    time = self.time
+    self.time += 1
+    if key in self.cache:
+      self.pq.reprioritize(time, key)
+    elif len(self.cache) < self.maxsize:
+      self.pq.add_task(time, key)
+    else:
+      delkey = self.pq.get_top_priority()
+      del self.cache[delkey]
+    self.cache[key] = value
+
+  def keys(self):
+    return self.cache.keys()
+
+  def __contains__(self, key):
+    return key in self.cache
+
+  def __iter__(self):
+    return self.cache.iterkeys()
+
+  def iteritems(self):
+    return self.cache.iteritems()
+
+#############################################################################
 #                               Resource Usage                              #
 #############################################################################
 
@@ -520,3 +586,82 @@ def get_program_memory_usage():
   # FIXME!  This is "maximum resident set size".  There are other more useful
   # values, but on the Mac at least they show up as 0 in this structure.
   return res.ru_maxrss
+
+#############################################################################
+#                             Hash tables by range                          #
+#############################################################################
+
+# A table that groups all keys in a specific range together.  Instead of
+# directly storing the values for a group of keys, we store an object (termed a
+# "collector") that the user can use to keep track of the keys and values.
+# This way, the user can choose to use a list of values, a set of values, a
+# table of keys and values, etc.
+
+class TableByRange(object):
+  # Create a new object. 'ranges' is a sorted list of numbers, indicating the
+  # boundaries of the ranges.  One range includes all keys that are
+  # numerically below the first number, one range includes all keys that are
+  # at or above the last number, and there is a range going from each number
+  # up to, but not including, the next number.  'collector' is used to create
+  # the collectors used to keep track of keys and values within each range;
+  # it is either a type or a no-argument factory function.  We only create
+  # ranges and collectors as needed. 'lowest_bound' is the value of the
+  # lower bound of the lowest range; default is 0.  This is used only
+  # it iter_ranges() when returning the lower bound of the lowest range,
+  # and can be an item of any type, e.g. the number 0, the string "-infinity",
+  # etc.
+  def __init__(self, ranges, collector, lowest_bound=0):
+    self.ranges = ranges
+    self.collector = collector
+    self.lowest_bound = lowest_bound
+    self.items_by_range = {}
+
+  def get_collector(self, key):
+    lower_range = self.lowest_bound
+    # upper_range = 'infinity'
+    for i in self.ranges:
+      if i <= key:
+        lower_range = i
+      else:
+        # upper_range = i
+        break
+    if lower_range not in self.items_by_range:
+      self.items_by_range[lower_range] = self.collector()
+    return self.items_by_range[lower_range]
+
+  def iter_ranges(self, unseen_between=True, unseen_all=False):
+    """Return an iterator over ranges in the table.  Each returned value is
+a tuple (LOWER, UPPER, COLLECTOR), giving the lower and upper bounds
+(inclusive and exclusive, respectively), and the collector item for this
+range.  The lower bound of the lowest range comes from the value of
+'lowest_bound' specified during creation, and the upper bound of the range
+that is higher than any numbers specified during creation in the 'ranges'
+list will be the string "infinity" is such a range is returned.
+
+The optional arguments 'unseen_between' and 'unseen_all' control the
+behavior of this iterator with respect to ranges that have never been seen
+(i.e. no keys in this range have been passed to 'get_collector').  If
+'unseen_all' is true, all such ranges will be returned; else if
+'unseen_between' is true, only ranges between the lowest and highest
+actually-seen ranges will be returned."""
+    highest_seen = None
+    for (lower, upper) in (
+        itertools.izip(itertools.chain([self.lowest_bound], self.ranges),
+                       itertools.chain(self.ranges, ['infinity']))):
+      if lower in self.items_by_range:
+        highest_seen = upper
+
+    seen_any = False
+    for (lower, upper) in (
+        itertools.izip(itertools.chain([self.lowest_bound], self.ranges),
+                       itertools.chain(self.ranges, ['infinity']))):
+      collector = self.items_by_range.get(lower, None)
+      if collector is None:
+        if not unseen_all:
+          if not unseen_between: continue
+          if not seen_any: continue
+          if upper == 'infinity' or upper > highest_seen: continue
+        collector = self.collector()
+      else:
+        seen_any = True
+      yield (lower, upper, collector)
