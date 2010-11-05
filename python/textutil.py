@@ -510,8 +510,8 @@ class PriorityQueue(object):
   def get_top_priority(self):
     while True:
       priority, count, task = heappop(self.pq)
-      del self.task_finder[task]
       if count is not PriorityQueue.INVALID:
+        del self.task_finder[task]
         return task
 
   def delete_task(self, task):
@@ -553,11 +553,11 @@ class LRUCache(object, UserDict.DictMixin):
     self.time += 1
     if key in self.cache:
       self.pq.reprioritize(time, key)
-    elif len(self.cache) < self.maxsize:
-      self.pq.add_task(time, key)
     else:
-      delkey = self.pq.get_top_priority()
-      del self.cache[delkey]
+      while len(self.cache) >= self.maxsize:
+        delkey = self.pq.get_top_priority()
+        del self.cache[delkey]
+      self.pq.add_task(time, key)
     self.cache[key] = value
 
   def keys(self):
