@@ -1252,6 +1252,48 @@ class GeogWord(object):
     self.context = None
     self.document = None
 
+# Abstract class for reading documents from a test file and evaluating on
+# them.
+class TestFileEvaluator(object):
+  def __init__(self, opts):
+    self.opts = opts
+    self.documents_processed = 0
+
+  def yield_documents(self, filename):
+    pass
+
+  def evaluate_document(self, doc):
+    # Return True if document was actually processed and evaluated; False
+    # is skipped.
+    return True
+
+  def output_results(self, final=False):
+    pass
+
+  def evaluate_and_output_results(self, files):
+    status = StatusMessage('document')
+    last_elapsed = 0
+    last_processed = 0
+    for filename in files:
+      errprint("Processing evaluation file %s..." % filename)
+      for doc in self.yield_documents(filename):
+        errprint("Processing document: %s" % doc)
+        if self.evaluate_document(doc):
+          new_elapsed = status.item_processed()
+          new_processed = status.num_processed()
+          # If five minutes and ten documents have gone by, print out results
+          if (new_elapsed - last_elapsed >= 300 and
+              new_processed - last_processed >= 10):
+            errprint("Results after %d documents:" % status.num_processed())
+            self.output_results(final=False)
+            last_elapsed = new_elapsed
+            last_processed = new_processed
+  
+    errprint("")
+    errprint("Final results: All %d documents processed:" %
+             status.num_processed())
+    self.output_results(final=True)
+
 class GeotagToponymStrategy(object):
   def need_context(self):
     pass
@@ -1330,49 +1372,6 @@ class NaiveBayesStrategy(GeotagToponymStrategy):
 
   def compute_score(self, geogword, art):
     return get_adjusted_incoming_links(art)
-
-# Abstract class for reading documents from a test file and evaluating on
-# them.
-class TestFileEvaluator(object):
-  def __init__(self, opts):
-    self.opts = opts
-    self.documents_processed = 0
-
-  def yield_documents(self, filename):
-    pass
-
-  def evaluate_document(self, doc):
-    # Return True if document was actually processed and evaluated; False
-    # is skipped.
-    return True
-
-  def output_results(self, final=False):
-    pass
-
-  def evaluate_and_output_results(self, files):
-    status = StatusMessage('document')
-    last_elapsed = 0
-    last_processed = 0
-    for filename in files:
-      errprint("Processing evaluation file %s..." % filename)
-      for doc in self.yield_documents(filename):
-        errprint("Processing document: %s" % doc)
-        if self.evaluate_document(doc):
-          new_elapsed = status.item_processed()
-          new_processed = status.num_processed()
-          # If five minutes and ten documents have gone by, print out results
-          if (new_elapsed - last_elapsed >= 300 and
-              new_processed - last_processed >= 10):
-            errprint("Results after %d documents:" % status.num_processed())
-            self.output_results(final=False)
-            last_elapsed = new_elapsed
-            last_processed = new_processed
-  
-    errprint("")
-    errprint("Final results: All %d documents processed:" %
-             status.num_processed())
-    self.output_results(final=True)
-
 
 class GeotagToponymEvaluator(TestFileEvaluator):
   def __init__(self, opts, strategy):
