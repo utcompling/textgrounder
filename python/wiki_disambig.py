@@ -91,7 +91,11 @@ degrees_per_region = 0.0
 # Minimum, maximum latitude/longitude, directly and in indices
 # (integers used to index the set of regions that tile the earth)
 minimum_latitude = -90.0
-maximum_latitude = 90.0
+# The actual maximum latitude is exactly 90 (the North Pole).  But if we
+# set degrees per region to be a number that exactly divides 180, and we
+# set maximum_latitude = 90, then we would end up with the North Pole
+# in a region by itself, something we probably don't want.
+maximum_latitude = 89.999999
 minimum_longitude = -180.0
 maximum_longitude = 179.999999
 minimum_latind = None
@@ -200,18 +204,18 @@ def stat_region_indices_to_center_coord(latind, longind):
 #                             Word distributions                           #
 ############################################################################
 
-# Distribution corresponding to a statistical region.  The following
+# Distribution over words corresponding to a statistical region.  The following
 # fields are defined in addition to base class fields:
 #
 #   articles: Articles used in computing the distribution.
 #   num_arts: Total number of articles included.
 #   incoming_links: Total number of incoming links, or None if unknown.
 
-class RegionDist(WordDist):
+class RegionWordDist(WordDist):
   __slots__ = WordDist.__slots__ + ['articles', 'num_arts', 'incoming_links']
 
   def __init__(self):
-    super(RegionDist, self).__init__()
+    super(RegionWordDist, self).__init__()
     self.articles = []
     self.num_arts = 0
     self.incoming_links = 0
@@ -264,6 +268,72 @@ class RegionDist(WordDist):
                 self.incoming_links, self.overall_unseen_mass))
 
 ############################################################################
+#                             Region distributions                         #
+############################################################################
+
+# Distribution over regions, as might be attached to a word.  If we have a
+# set of regions, each with a word distribution, then we can imagine
+# conceptually inverting the process to generate a region distribution over
+# words.  Basically, for a given word, look to see what its probability is
+# in all regions; normalize, and we have a word distribution.
+
+# Fields defined:
+#
+#   word: Word for which the region is computed
+#   regionprobs: Hash table listing probabilities associated with regions
+
+class RegionDist(object):
+  __slots__ = ['word', 'regionprobs']
+
+  # It's expensive to compute the value for a given word so we cache word
+  # distributions.
+  cached_dists = LRUCache(maxsize=10000)
+
+  def __init__(self, word=None, regionprobs=None):
+    if regionprobs:
+      self.regionprobs = regionprobs
+    else:
+      self.regionprobs = {}
+    if not word:
+      return
+    self.word = word
+    totalprob = 0.0
+    # Compute and store un-normalized probabilities for all regions
+    for reg in StatRegion.yield_all_nonempty_regions():
+      prob = reg.worddist.lookup_word(word)
+      self.regionprobs[reg] = prob
+      totalprob += prob
+    # Normalize the probabilities
+    for (reg, prob) in self.regionprobs.iteritems():
+      self.regionprobs[reg] /= totalprob
+
+  # Return a region distribution over a given word, using a least-recently-used
+  # cache to optimize access.
+  @classmethod
+  def get_region_dist(cls, word):
+    dist = cls.cached_dists.get(word, None)
+    if not dist:
+      dist = RegionDist(word)
+      cls.cached_dists[word] = dist
+    return dist
+
+  # Return a region distribution over a distribution over words.  This works
+  # by adding up the distributions of the individual words, weighting by
+  # the count of the each word.
+  @classmethod
+  def get_region_dist_for_word_dist(cls, worddist):
+    regprobs = floatdict()
+    for (word, count) in worddist.counts.iteritems():
+      dist = cls.get_region_dist(word)
+      for (reg, prob) in dist.regionprobs.iteritems():
+        regprobs[reg] += count*prob
+    totalprob = sum(regprobs.itervalues())
+    for (reg, prob) in regprobs.iteritems():
+      regprobs[reg] /= totalprob
+    return RegionDist(regionprobs=regprobs)
+
+
+############################################################################
 #                           Geographic locations                           #
 ############################################################################
 
@@ -277,10 +347,10 @@ class RegionDist(WordDist):
 #
 #   latind, longind: Region indices of southwest-most tiling region in
 #                    statistical region.
-#   regdist: Distribution corresponding to region.
+#   worddist: Distribution corresponding to region.
 
 class StatRegion(object):
-  __slots__ = ['latind', 'longind', 'regdist']
+  __slots__ = ['latind', 'longind', 'worddist']
   
   # Mapping of region->locations in region, for region-based Naive Bayes
   # disambiguation.  The key is a tuple expressing the integer indices of the
@@ -310,7 +380,7 @@ class StatRegion(object):
   def __init__(self, latind, longind):
     self.latind = latind
     self.longind = longind
-    self.regdist = RegionDist()
+    self.worddist = RegionWordDist()
 
   # Generate the distribution for a statistical region from the tiling regions.
   def generate_dist(self):
@@ -330,7 +400,7 @@ class StatRegion(object):
       if debug > 1:
         errprint("--> Processing tiling region %s" %
                  region_indices_to_coord(latind, longind))
-      self.regdist.add_articles(arts)
+      self.worddist.add_articles(arts)
 
     # Process the tiling regions making up the statistical region;
     # but be careful around the edges.
@@ -340,7 +410,7 @@ class StatRegion(object):
         if jj > maximum_longind: jj = minimum_longind
         process_one_region(i, jj)
 
-    self.regdist.finish_distribution()
+    self.worddist.finish_distribution()
 
   # Find the correct StatRegion for the given coordinates.
   # If none, create the region.
@@ -359,11 +429,11 @@ class StatRegion(object):
       if cls.all_regions_computed:
         if not cls.empty_stat_region:
           cls.empty_stat_region = cls(None, None)
-          cls.empty_stat_region.regdist.finish_distribution()
+          cls.empty_stat_region.worddist.finish_distribution()
         return cls.empty_stat_region
       statreg = cls(latind, longind)
       statreg.generate_dist()
-      empty = statreg.regdist.is_empty()
+      empty = statreg.worddist.is_empty()
       if empty:
         cls.num_empty_regions += 1
       else:
@@ -395,7 +465,8 @@ class StatRegion(object):
 
   @classmethod
   def yield_all_nonempty_regions(cls):
-    return cls.corner_to_stat_region.iteritems()
+    assert cls.all_regions_computed
+    return cls.corner_to_stat_region.itervalues()
 
 ############ Locations ############
 
@@ -464,12 +535,12 @@ class Locality(Location):
 #             division.  Currently in the form of a rectangular bounding box.
 #             Eventually may contain a convex hull or even more complex
 #             region (e.g. set of convex regions).
-#   regdist: For region-based Naive Bayes disambiguation, a distribution
+#   worddist: For region-based Naive Bayes disambiguation, a distribution
 #           over the division's article and all locations within the region.
 
 class Division(object):
   __slots__ = Location.__slots__ + \
-    ['level', 'path', 'locs', 'goodlocs', 'boundary', 'regdist']
+    ['level', 'path', 'locs', 'goodlocs', 'boundary', 'worddist']
 
   # For each division, map from division's path to Division object.
   path_to_division = {}
@@ -481,7 +552,7 @@ class Division(object):
     self.level = len(path)
     self.locs = []
     self.match = None
-    self.regdist = None
+    self.worddist = None
 
   def __str__(self):
     return 'Division %s (%s), match=%s, boundary=%s' % \
@@ -528,11 +599,11 @@ class Division(object):
                      max(x.coord.long for x in self.goodlocs))
     self.boundary = Boundary(topleft, botright)
 
-  def generate_regdist(self):
-    self.regdist = RegionDist()
-    self.regdist.add_locations([self])
-    self.regdist.add_locations(self.goodlocs)
-    self.regdist.finish_distribution()
+  def generate_worddist(self):
+    self.worddist = RegionWordDist()
+    self.worddist.add_locations([self])
+    self.worddist.add_locations(self.goodlocs)
+    self.worddist.finish_distribution()
 
   def __contains__(self, coord):
     return coord in self.boundary
@@ -809,17 +880,17 @@ class StatArticle(Article):
         self.location.matches_coord(coord): return True
     return False
 
-  # Determine the region distribution object for a given article:
+  # Determine the region word-distribution object for a given article:
   # Create and populate one if necessary.
-  def find_regdist(self):
+  def find_regworddist(self):
     loc = self.location
     if loc and type(loc) is Division:
-      if not loc.regdist:
-        loc.generate_regdist()
-      return loc.regdist
+      if not loc.worddist:
+        loc.generate_worddist()
+      return loc.worddist
     if not self.stat_region:
       self.stat_region = StatRegion.find_region_for_coord(self.coord)
-    return self.stat_region.regdist
+    return self.stat_region.worddist
 
 ############################################################################
 #                             Accumulate results                           #
@@ -959,6 +1030,30 @@ class EvalWithRank(Eval):
                            self.max_rank_for_credit,
                            self.incorrect_past_max_rank, self.total_instances)
 
+class GeotagDocumentEval(EvalWithRank):
+  def __init__(self, max_rank_for_credit=10):
+    super(GeotagDocumentEval, self).__init__(max_rank_for_credit)
+    self.true_dists = []
+    self.degree_dists = []
+
+  def record_result(self, rank, true_dist, degree_dist):
+    super(GeotagDocumentEval, self).record_result(rank)
+    self.true_dists += [true_dist]
+    self.degree_dists += [degree_dist]
+
+  def output_incorrect_results(self):
+    super(GeotagDocumentEval, self).output_incorrect_results()
+    self.true_dists.sort()
+    self.degree_dists.sort()
+    errprint("  Mean true distance to true center = %.2f" %
+             mean(self.true_dists))
+    errprint("  Median true distance to true center = %.2f" %
+             median(self.true_dists))
+    errprint("  Mean degree distance to degree center = %.2f" %
+             mean(self.degree_dists))
+    errprint("  Median degree distance to degree center = %.2f" %
+             median(self.degree_dists))
+
 
 class Results(object):
   ####### Results for geotagging toponyms
@@ -1016,15 +1111,13 @@ class Results(object):
 
   ####### Results for geotagging documents/articles
 
-  all_document = EvalWithRank()
+  all_document = GeotagDocumentEval()
 
   # naitr = "num articles in true region"
-  ranges_for_naitr = [1, 10, 25, 100]
-  documents_by_naitr = {}
-  upper_range_by_naitr = {}
+  docs_by_naitr = TableByRange([1, 10, 25, 100], GeotagDocumentEval)
 
   # Results for documents where the location is at a certain distance
-  # from the center of the statistical region.  The key is measured in
+  # from the center of the true statistical region.  The key is measured in
   # fractions of a tiling region (determined by 'dist_fraction_increment',
   # e.g. if dist_fraction_increment = 0.25 then values in the range of
   # [0.25, 0.5) go in one bin, [0.5, 0.75) go in another, etc.).  We measure
@@ -1032,83 +1125,100 @@ class Results(object):
   # distance", as if degrees were a constant length both latitudinally
   # and longitudinally.
   dist_fraction_increment = 0.25
-  documents_by_degree_dist_to_center = collections.defaultdict(EvalWithRank)
-  documents_by_true_dist_to_center = collections.defaultdict(EvalWithRank)
+  docs_by_degree_dist_to_true_center = \
+      collections.defaultdict(GeotagDocumentEval)
+  docs_by_true_dist_to_true_center = \
+      collections.defaultdict(GeotagDocumentEval)
+
+  # Similar, but distance between location and center of top predicted region.
+  dist_fractions_for_error_dist = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8,
+                                   12, 16, 24, 32, 48, 64, 96, 128, 192, 256,
+                                   # We're never going to see these
+                                   384, 512, 768, 1024, 1536, 2048]
+  docs_by_degree_dist_to_pred_center = \
+      TableByRange(dist_fractions_for_error_dist, GeotagDocumentEval)
+  docs_by_true_dist_to_pred_center = \
+      TableByRange(dist_fractions_for_error_dist, GeotagDocumentEval)
+
+  true_error_dists = []
+  deg_error_dists = []
 
   @classmethod
-  def record_geotag_document_result(cls, rank, coord, num_arts_in_true_region):
-    def locate_naitr_object(rank):
-      lower_range = 0
-      upper_range = 'infinity'
-      for i in cls.ranges_for_naitr:
-        if i <= rank:
-          lower_range = i
-        else:
-          upper_range = i - 1
-          break
-      if lower_range not in cls.documents_by_naitr:
-        cls.documents_by_naitr[lower_range] = EvalWithRank()
-        cls.upper_range_by_naitr[lower_range] = upper_range
-      return cls.documents_by_naitr[lower_range]
-
+  def record_geotag_document_result(cls, rank, coord, pred_latind,
+                                    pred_longind, num_arts_in_true_region):
     def degree_dist(c1, c2):
       return math.sqrt((c1.lat - c2.lat)**2 + (c1.long - c2.long)**2)
 
+    predcenter = stat_region_indices_to_center_coord(pred_latind, pred_longind)
+    pred_truedist = spheredist(coord, predcenter) / Opts.miles_per_region
+    pred_degdist = degree_dist(coord, predcenter) / degrees_per_region
+
+    cls.all_document.record_result(rank, pred_truedist, pred_degdist)
+    naitr = cls.docs_by_naitr.get_collector(rank)
+    naitr.record_result(rank, pred_truedist, pred_degdist)
+
     true_latind, true_longind = coord_to_stat_region_indices(coord)
     regcenter = stat_region_indices_to_center_coord(true_latind, true_longind)
-    truedist = spheredist(coord, regcenter) / Opts.miles_per_region
-    degdist = degree_dist(coord, regcenter) / degrees_per_region
+    true_truedist = spheredist(coord, regcenter) / Opts.miles_per_region
+    true_degdist = degree_dist(coord, regcenter) / degrees_per_region
     fracinc = cls.dist_fraction_increment
-    truedist = fracinc * (truedist // fracinc)
-    degdist = fracinc * (degdist // fracinc)
+    true_truedist = fracinc * (true_truedist // fracinc)
+    true_degdist = fracinc * (true_degdist // fracinc)
 
-    cls.all_document.record_result(rank)
-    naitr = locate_naitr_object(num_arts_in_true_region)
-    naitr.record_result(rank)
-    cls.documents_by_degree_dist_to_center[degdist].record_result(rank)
-    cls.documents_by_true_dist_to_center[truedist].record_result(rank)
+    cls.docs_by_true_dist_to_true_center[true_truedist]. \
+        record_result(rank, pred_truedist, pred_degdist)
+    cls.docs_by_degree_dist_to_true_center[true_degdist]. \
+        record_result(rank, pred_truedist, pred_degdist)
+
+    cls.docs_by_true_dist_to_pred_center.get_collector(pred_truedist). \
+        record_result(rank, pred_truedist, pred_degdist)
+    cls.docs_by_degree_dist_to_pred_center.get_collector(pred_degdist). \
+        record_result(rank, pred_truedist, pred_degdist)
 
   @classmethod
   def record_geotag_document_other_stat(cls, othertype):
     cls.all_document.record_other_stat(othertype)
 
   @classmethod
-  def output_geotag_document_results(cls):
+  def output_geotag_document_results(cls, all_results=False):
     errprint("")
     errprint("Results for all documents/articles:")
     cls.all_document.output_results()
-    errprint("")
-    for (lower_range, obj) in sorted(cls.documents_by_naitr.iteritems(),
-                                     key=lambda x:x[0]):
+    if all_results:
       errprint("")
-      errprint("Results for documents/articles where number of articles")
-      errprint("  in true region is in the range [%s,%s]:" %
-               (lower_range, cls.upper_range_by_naitr[lower_range]))
-      obj.output_results()
-    errprint("")
-    for (truedist, obj) in \
-        sorted(cls.documents_by_true_dist_to_center.iteritems(),
-               key=lambda x:x[0]):
-      lowrange = truedist * Opts.miles_per_region
-      highrange = ((truedist + cls.dist_fraction_increment) *
-                   Opts.miles_per_region)
+      for (lower, upper, obj) in cls.docs_by_naitr.iter_ranges():
+        errprint("")
+        errprint("Results for documents/articles where number of articles")
+        errprint("  in true region is in the range [%s,%s]:" %
+                 (lower, upper - 1 if type(upper) is int else upper))
+        obj.output_results()
       errprint("")
-      errprint("Results for documents/articles where distance to center")
-      errprint("  of true region in miles is in the range [%.2f,%.2f):" %
-               (lowrange, highrange))
-      obj.output_results()
-    errprint("")
-    for (degdist, obj) in \
-        sorted(cls.documents_by_degree_dist_to_center.iteritems(),
-               key=lambda x:x[0]):
-      lowrange = degdist * degrees_per_region
-      highrange = ((degdist + cls.dist_fraction_increment) *
-                   degrees_per_region)
+      for (truedist, obj) in \
+          sorted(cls.docs_by_true_dist_to_true_center.iteritems(),
+                 key=lambda x:x[0]):
+        lowrange = truedist * Opts.miles_per_region
+        highrange = ((truedist + cls.dist_fraction_increment) *
+                     Opts.miles_per_region)
+        errprint("")
+        errprint("Results for documents/articles where distance to center")
+        errprint("  of true region in miles is in the range [%.2f,%.2f):" %
+                 (lowrange, highrange))
+        obj.output_results()
       errprint("")
-      errprint("Results for documents/articles where distance to center")
-      errprint("  of true region in degrees is in the range [%.2f,%.2f):" %
-               (lowrange, highrange))
-      obj.output_results()
+      for (degdist, obj) in \
+          sorted(cls.docs_by_degree_dist_to_true_center.iteritems(),
+                 key=lambda x:x[0]):
+        lowrange = degdist * degrees_per_region
+        highrange = ((degdist + cls.dist_fraction_increment) *
+                     degrees_per_region)
+        errprint("")
+        errprint("Results for documents/articles where distance to center")
+        errprint("  of true region in degrees is in the range [%.2f,%.2f):" %
+                 (lowrange, highrange))
+        obj.output_results()
+    # FIXME: Output median and mean of true and degree error dists; also
+    # maybe move this info info EvalByRank so that we can output the values
+    # for each category
     errprint("")
     cls.output_resource_usage()
 
@@ -1177,7 +1287,7 @@ class NaiveBayesStrategy(GeotagToponymStrategy):
     if self.opts.naive_bayes_type == 'article':
       distobj = art.dist
     else:
-      distobj = art.find_regdist()
+      distobj = art.find_regworddist()
     totalprob = 0.0
     total_word_weight = 0.0
     if not self.strategy.use_baseline:
@@ -1236,7 +1346,7 @@ class TestFileEvaluator(object):
     # is skipped.
     return True
 
-  def output_results(self):
+  def output_results(self, final=False):
     pass
 
   def evaluate_and_output_results(self, files):
@@ -1254,14 +1364,14 @@ class TestFileEvaluator(object):
           if (new_elapsed - last_elapsed >= 300 and
               new_processed - last_processed >= 10):
             errprint("Results after %d documents:" % status.num_processed())
-            self.output_results()
+            self.output_results(final=False)
             last_elapsed = new_elapsed
             last_processed = new_processed
   
     errprint("")
     errprint("Final results: All %d documents processed:" %
              status.num_processed())
-    self.output_results()
+    self.output_results(final=True)
 
 
 class GeotagToponymEvaluator(TestFileEvaluator):
@@ -1413,7 +1523,7 @@ class GeotagToponymEvaluator(TestFileEvaluator):
        self.disambiguate_toponym(geogword)
     return True
 
-  def output_results(self):
+  def output_results(self, final=False):
     Results.output_geotag_toponym_results()
 
 
@@ -1522,18 +1632,59 @@ class WikipediaGeotagToponymEvaluator(GeotagToponymEvaluator):
         yield word
 
 
+class GeotagDocumentStrategy(object):
+  def return_ranked_regions(self, worddist):
+    pass
+
+class KLDivergenceStrategy(object):
+  def __init__(self, partial=True):
+    self.partial = partial
+
+  def return_ranked_regions(self, worddist):
+    article_pq = PriorityQueue()
+    for stat_region in StatRegion.yield_all_nonempty_regions():
+      inds = (stat_region.latind, stat_region.longind)
+      if debug > 1:
+        (latind, longind) = inds
+        coord = region_indices_to_coord(latind, longind)
+        errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s"
+                 % (latind, longind, coord, stat_region.worddist.num_arts))
+      kldiv = fast_kl_divergence(worddist, stat_region.worddist,
+                                 partial=self.partial)
+      #kldiv = article.dist.test_kl_divergence(stat_region.worddist,
+      #                           partial=self.partial)
+      #errprint("For region %s, KL divergence = %s" % (inds, kldiv))
+      article_pq.add_task(kldiv, stat_region)
+
+    regions = []
+    while True:
+      try:
+        regions.append(article_pq.get_top_priority())
+      except IndexError:
+        break
+    return regions
+
+
+class PerWordRegionDistributionsStrategy(object):
+  def return_ranked_regions(self, worddist):
+    regdist = RegionDist.get_region_dist_for_word_dist(worddist)
+    return [reg for (reg, prob) in sorted(regdist.regionprobs.iteritems(),
+                                          key=lambda x:x[1], reverse=True)]
+
+
 class GeotagDocumentEvaluator(TestFileEvaluator):
-  def output_results(self):
-    Results.output_geotag_document_results()
-
-
-class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
-  def __init__(self, opts):
-    super(WikipediaGeotagDocumentEvaluator, self).__init__(opts)
+  def __init__(self, opts, strategy):
+    super(GeotagDocumentEvaluator, self).__init__(opts)
+    self.strategy = strategy
     StatRegion.generate_all_nonempty_regions()
     errprint("Number of non-empty regions: %s" % StatRegion.num_non_empty_regions)
     errprint("Number of empty regions: %s" % StatRegion.num_empty_regions)
 
+  def output_results(self, final=False):
+    Results.output_geotag_document_results(all_results=final)
+
+
+class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
   def yield_documents(self, filename):
     for art in ArticleTable.articles_by_split['dev']:
       assert art.split == 'dev'
@@ -1570,39 +1721,22 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     assert article.dist.finished
     true_latind, true_longind = coord_to_stat_region_indices(article.coord)
     true_statreg = StatRegion.find_region_for_coord(article.coord)
-    naitr = true_statreg.regdist.num_arts
+    naitr = true_statreg.worddist.num_arts
     if debug > 0:
       errprint("Evaluating article %s with %s articles in true region" %
                (article, naitr))
-    article_pq = PriorityQueue()
-    for (inds, stat_region) in StatRegion.yield_all_nonempty_regions():
-      if debug > 1:
-        (latind, longind) = inds
-        coord = region_indices_to_coord(latind, longind)
-        errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s"
-                 % (latind, longind, coord, stat_region.regdist.num_arts))
-      kldiv = fast_kl_divergence(article.dist, stat_region.regdist,
-                  Opts.strategy == 'partial-kl-divergence')
-      #kldiv = article.dist.test_kl_divergence(stat_region.regdist,
-      #            Opts.strategy == 'partial-kl-divergence')
-      #errprint("For region %s, KL divergence = %s" % (inds, kldiv))
-      article_pq.add_task(kldiv, inds)
+    regs = self.strategy.return_ranked_regions(article.dist)
     rank = 1
-    raised = False
-    while True:
-      try:
-        latind, longind = article_pq.get_top_priority()
-        if latind == true_latind and longind == true_longind:
-          break
-        rank += 1
-      except IndexError:
-        raised = True
-        Results.record_geotag_document_other_stat('Articles with no training articles in region')
+    for reg in regs:
+      if reg.latind == true_latind and reg.longind == true_longind:
         break
+      rank += 1
     Results.record_geotag_document_result(rank, article.coord,
+                                          regs[0].latind, regs[0].longind,
                                           num_arts_in_true_region=naitr)
+    if naitr == 0:
+      Results.record_geotag_document_other_stat('Articles with no training articles in region')
     errprint("For article %s, true region at rank %s" % (article, rank))
-    assert raised == (true_statreg.regdist.num_arts == 0)
     return True
 
 
@@ -1931,19 +2065,31 @@ in the test set.
 
 'geotag-toponyms' finds the proper location for each toponym in the test set.
 The test set is specified by --eval-file.  Default '%default'.""")
-    op.add_option("--strategy", type='choice', default='baseline',
+    op.add_option("--geotag-toponym-strategy", type='choice',
+                  default='baseline',
                   choices=['baseline',
-                           'kl-divergence',
-                           'partial-kl-divergence',
                            'naive-bayes-with-baseline',
                            'naive-bayes-no-baseline'],
-                  help="""Strategy to use for Geotagging.
-'baseline' means just use the baseline strategy (see --baseline-type);
+                  help="""Strategy to use for geotagging toponyms.
+'baseline' means just use the baseline strategy (see --baseline-strategy);
 'naive-bayes-with-baseline' means also use the words around the toponym to
 be disambiguated, in a Naive-Bayes scheme, using the baseline as the prior
 probability; 'naive-bayes-no-baseline' means use uniform prior probability.
 Default '%default'.""")
-    op.add_option("--baseline-type", type='choice',
+    op.add_option("--geotag-document-strategy", type='choice',
+                  default='kl-divergence',
+                  choices=['baseline',
+                           'kl-divergence',
+                           'partial-kl-divergence',
+                           'per-word-region-distributions'],
+                  help="""Strategy to use for geotagging documents.
+'baseline' means just use the baseline strategy (see --baseline-strategy);
+'
+'naive-bayes-with-baseline' means also use the words around the toponym to
+be disambiguated, in a Naive-Bayes scheme, using the baseline as the prior
+probability; 'naive-bayes-no-baseline' means use uniform prior probability.
+Default '%default'.""")
+    op.add_option("--baseline-strategy", type='choice',
                   default="internal-link",
                   choices=['internal-link', 'random', 'num-articles'],
                   help="""Strategy to use to compute the baseline.
@@ -1975,6 +2121,11 @@ and weight the words according to distance from the toponym.""")
                   help="""Width of the region used to compute a statistical
 distribution for geotagging purposes, in terms of number of tiling regions.
 Default %default.""")
+    op.add_option("--degrees-per-region", type='float', default=None,
+                  help="""Size (in degrees) of the tiling regions that cover
+the earth.  Some number of tiling regions are put together to form the region
+used to construct a statistical distribution.  No default; the default of
+'--miles-per-region' is used instead.""")
     op.add_option("-r", "--miles-per-region", type='float', default=100.0,
                   help="""Size (in miles) of the tiling regions that cover
 the earth.  Some number of tiling regions are put together to form the region
@@ -2012,7 +2163,10 @@ particular-sized region.  Default '%default'.""")
     if opts.miles_per_region <= 0:
       op.error("Miles per region must be positive")
     global degrees_per_region
-    degrees_per_region = opts.miles_per_region / miles_per_degree
+    if opts.degrees_per_region:
+      degrees_per_region = opts.degrees_per_region
+    else:
+      degrees_per_region = opts.miles_per_region / miles_per_degree
     global maximum_latind, minimum_latind, maximum_longind, minimum_longind
     maximum_latind, maximum_longind = \
       coord_to_tiling_region_indices(Coord(maximum_latitude,
@@ -2029,7 +2183,8 @@ particular-sized region.  Default '%default'.""")
     if opts.mode == 'pickle-only' or opts.mode.startswith('geotag'):
       self.need('stopwords_file')
       read_stopwords(opts.stopwords_file)
-      if opts.mode == 'geotag-toponyms' and opts.strategy == 'baseline':
+      if (opts.mode == 'geotag-toponyms' and
+          opts.geotag_toponym_strategy == 'baseline'):
         pass
       elif not opts.unpickle_file and not opts.counts_file:
         op.error("Must specify either unpickle file or counts file")
@@ -2087,13 +2242,13 @@ particular-sized region.  Default '%default'.""")
 
     if opts.mode == 'geotag-toponyms':
       # Generate strategy object
-      if opts.strategy == 'baseline':
-        if opts.baseline_type == 'internal-link':
+      if opts.geotag_toponym_strategy == 'baseline':
+        if opts.baseline_strategy == 'internal-link':
           strategy = LinkBaselineStrategy()
         else:
           # FIXME!!!!!
           op.error("Non-internal-link baseline strategies not implemented")
-      elif opts.strategy == 'naive-bayes-no-baseline':
+      elif opts.geotag_toponym_strategy == 'naive-bayes-no-baseline':
         strategy = NaiveBayesStrategy(use_baseline=False)
       else:
         strategy = NaiveBayesStrategy(use_baseline=True)
@@ -2104,7 +2259,14 @@ particular-sized region.  Default '%default'.""")
       else:
         evalobj = WikipediaGeotagToponymEvaluator(opts, strategy)
     else:
-      evalobj = WikipediaGeotagDocumentEvaluator(opts)
+      if opts.geotag_document_strategy == 'baseline':
+        assert False # FIXME
+      elif opts.geotag_document_strategy == 'per-word-region-distributions':
+        strategy = PerWordRegionDistributionsStrategy()
+      else:
+        partial = opts.geotag_document_strategy == 'partial-kl-divergence'
+        strategy = KLDivergenceStrategy(partial=partial)
+      evalobj = WikipediaGeotagDocumentEvaluator(opts, strategy)
       # Hack: When running in --mode=geotag-documents and --eval-format=wiki,
       # we don't need an eval file because we use the article counts we've
       # already loaded.  But we will get an error if we don't set this to
