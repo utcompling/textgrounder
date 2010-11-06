@@ -421,6 +421,8 @@ def next_split_set(split_fractions):
 #                               NLP Programs                                #
 #############################################################################
 
+max_time_unlimited = 2**31
+
 def output_option_parameters(opts):
   errprint("Parameter values:")
   for opt in dir(opts):
@@ -453,7 +455,8 @@ class NLPProgram(object):
     return True
 
   def populate_shared_options(self, op):
-    op.add_option("--max-time-per-stage", type='int', default=2**31,
+    op.add_option("--max-time-per-stage", type='int',
+                  default=max_time_unlimited,
                   help="""Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default %default.""")
     op.add_option("-d", "--debug", type='int', metavar="LEVEL",
