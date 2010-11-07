@@ -41,16 +41,16 @@ GAZETTEER_FILE="--gazetteer-file $AUXPREFIX/world-dataen-fixed.txt"
 
 #MODE="pickle-only"
 #MODE="match-only"
-#MODE="geotag-toponyms"
-MODE="geotag-documents"
+MODE="geotag-toponyms"
+#MODE="geotag-documents"
 
 MISCOPTS="--width-of-stat-region 1 --miles-per-region 100"
 if [ "$MODE" = "geotag-toponyms" -o "$MODE" = "match-only" ]; then
-  STRATEGY="--geotag-toponym-strategy baseline"
+  STRATEGY="--strategy baseline"
   # Don't need counts file with baseline-only strategy
   COUNTS_FILE=""
-  #STRATEGY="--geotag-toponym-strategy naive-bayes-with-baseline"
-  #STRATEGY="--geotag-toponym-strategy naive-bayes-no-baseline"
+  #STRATEGY="--strategy naive-bayes-with-baseline"
+  #STRATEGY="--strategy naive-bayes-no-baseline"
   #NBTYPE="--naive-bayes-weighting distance-weighted"
   EVALFILE="--eval-file $TRCONLL_DEV_DIR"
   EVALTYPE="--eval-format tr-conll"

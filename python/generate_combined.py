@@ -97,12 +97,14 @@ Wikipedia articles. Output by processwiki.py --find-links.""",
 coordinates.  May be filtered only for articles and coordinates.""",
                   metavar="FILE")
 
-  def implement_main(self, opts, op, args):
+  def handle_arguments(self, opts, op, args):
     global Opts
     Opts = opts
     self.need('article_data_file')
     self.need('coords_file')
     self.need('links_file')
+
+  def implement_main(self, opts, params, args):
     output_combined_article_data(opts.article_data_file, opts.coords_file,
                                  opts.links_file)
     

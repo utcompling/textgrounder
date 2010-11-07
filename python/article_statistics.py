@@ -136,12 +136,13 @@ class ArticleStatisticsProgram(NLPProgram):
   def argument_usage(self):
     return "article-data-file"
 
-  def implement_main(self, opts, op, args):
+  def handle_arguments(self, opts, op, args):
     global Opts
     Opts = opts
     if len(args) != 1:
       op.error("Must specify exactly one article-data file as an argument")
 
+  def implement_main(self, opts, params, args):
     generate_article_stats(args[0])
     
 ArticleStatisticsProgram()

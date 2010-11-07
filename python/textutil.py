@@ -423,12 +423,16 @@ def next_split_set(split_fractions):
 
 max_time_unlimited = 2**31
 
-def output_option_parameters(opts):
+def output_option_parameters(opts, params):
   errprint("Parameter values:")
   for opt in dir(opts):
     if not opt.startswith('_') and opt not in \
        ['ensure_value', 'read_file', 'read_module']:
       errprint("%30s: %s" % (opt, getattr(opts, opt)))
+  if params:
+    for opt in dir(params):
+      if not opt.startswith('_'):
+        errprint("%30s: %s" % (opt, getattr(params, opt)))
   errprint("")
 
 class NLPProgram(object):
@@ -436,10 +440,13 @@ class NLPProgram(object):
     if self.run_main_on_init():
       self.main()
 
-  def implement_main(self, op, args):
+  def implement_main(self, opts, params, args):
     pass
 
   def populate_options(self, op):
+    pass
+
+  def handle_arguments(self, opts, op, args):
     pass
 
   def argument_usage(self):
@@ -482,9 +489,11 @@ Used for testing purposes.  Default %default.""")
     
     self.opts, self.args = self.op.parse_args()
 
-    output_option_parameters(self.opts)
+    params = self.handle_arguments(self.opts, self.op, self.args)
 
-    retval = self.implement_main(self.opts, self.op, self.args)
+    output_option_parameters(self.opts, params)
+
+    retval = self.implement_main(self.opts, params, self.args)
     errprint("Ending operation at %s" % (time.ctime()))
     return retval
 
