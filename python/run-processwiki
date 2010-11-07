@@ -1,51 +1,87 @@
 #!/bin/sh
 
-if [ -z "$WIKIPEDIA_DATA_DIR" ]; then
-  WIKIPEDIA_DATA_DIR='.'
-fi
+# Generate the various necessary data files.  To generate everything, use
+#
+#  generate-data-files all
+#
+# Else, do one of the steps:
+#
+# article-data = Basic article data file
+# coords = Article coordinates
+# links = Article incoming links, only for articles with coordinates or
+#         redirects to such articles
+# combined = Combined article data file, only for articles with coordinates or
+#            redirects to such articles
 
-PREFIX="$WIKIPEDIA_DATA_DIR/enwiki-20100905"
-PROCESSWIKI="$HOME/devel/textgrounder/python/processwiki.py"
+TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+. $TEXTGROUNDER_PYTHON/config-wikigrounder
 
+PROCESSWIKI="$TEXTGROUNDER_PYTHON/processwiki.py"
+GENERATE_COMBINED="$TEXTGROUNDER_PYTHON/generate_combined.py"
+
+# Options you're most likely to change.
 #DEBUG="--debug 2"
 DEBUG="--debug 0"
-#MAXTIME="--max-time-per-stage 5"
+MAXTIME="--max-time-per-stage 5"
 #MAXTIME="--max-time-per-stage 10"
 
-COORDS_FILE="--coords-file $PREFIX-coords.txt"
+LOGFILE="generate-all-data.log"
 
-#MODE="--generate-toponym-eval"
-#OUTFILE="$PREFIX-toponym-eval.txt"
-#MISCOPTS="--redirect-file $PREFIX-filtered-redirects.txt"
+OTHEROPTS="$MAXTIME $DEBUG"
 
-#MODE="--find-redirects"
-#OUTFILE="$PREFIX-redirects.txt"
-
-#MODE="--output-coords"
-#OUTFILE="$PREFIX-coords.txt"
-
-#MODE="--output-counts"
-#OUTFILE="$PREFIX-counts-only-coord-articles.txt"
-
-MODE="--find-links"
-OUTFILE="$PREFIX-links-only-coord-articles.txt"
-
-#MODE="--generate-article-data"
-#OUTFILE="$PREFIX-article-data.txt"
-#MISCOPTS="--disambig-id-file $PREFIX-pages-articles.disambig.id.txt"
-
-SPLITPREFIX="$OUTFILE"
-SPLITPREFIX="foobar"
-#SPLIT="--split-training-dev-test $SPLITPREFIX"
-
-
-INFILE="$PREFIX-pages-articles.xml.bz2"
-
-OPTIONS="$COORDS_FILE $MAXTIME $SPLIT $MISCOPTS $DEBUG $MODE"
-if [ -n "$OUTFILE" ]; then
-  echo $INFILE '|' $PROCESSWIKI $OPTIONS ${1+"$@"} '>' $OUTFILE
-  bzcat $INFILE | $PROCESSWIKI $OPTIONS ${1+"$@"} > $OUTFILE
+if [ -z "$*" -o "$*" = "all" ]; then
+  steps="article-data coords links combine"
 else
-  echo $INFILE '|' $PROCESSWIKI $OPTIONS ${1+"$@"}
-  bzcat $INFILE | $PROCESSWIKI $OPTIONS ${1+"$@"}
+  steps="$*"
 fi
+
+echo "Steps are $steps"
+
+for step in $steps; do
+echo "Executing step '$step' ..."
+
+if [ "$step" = article-data ]; then
+echo "Generating article data ..."
+bzcat $IN_DUMP_FILE | $PROCESSWIKI \
+  $DISAMBIG_ID_ARG \
+  --split-training-dev-test foobar \
+  --generate-article-data \
+  $OTHEROPTS > $OUT_ORIG_ARTICLE_DATA_FILE
+
+elif [ "$step" = coords ]; then
+echo "Generating coordinate data ..."
+bzcat $IN_DUMP_FILE | $PROCESSWIKI \
+  --output-coords \
+  $OTHEROPTS > $OUT_COORDS_FILE
+
+elif [ "$step" = links ]; then
+echo "Generating link data ..."
+bzcat $IN_DUMP_FILE | $PROCESSWIKI \
+  $COORDS_ARG $ORIG_ARTICLE_DATA_ARG \
+  --find-links \
+  $OTHEROPTS > $OUT_LINKS_FILE
+
+elif [ "$step" = combine ]; then
+echo "Combining data ..."
+$GENERATE_COMBINED $LINKS_ARG $COORDS_ARG \
+  $ORIG_ARTICLE_DATA_ARG > $OUT_COMBINED_ARTICLE_DATA_FILE
+
+elif [ "$step" = counts ]; then
+echo "Generating word count data ..."
+bzcat $IN_DUMP_FILE | $PROCESSWIKI \
+  --output-counts \
+  $OTHEROPTS > $OUT_COUNTS_FILE
+
+elif [ "$step" = toponym-eval ]; then
+echo "Generating toponym eval data ..."
+bzcat $IN_DUMP_FILE | $PROCESSWIKI \
+  $COORDS_ARG $ORIG_ARTICLE_DATA_ARG \
+  --generate-toponym-eval \
+  $OTHEROPTS > $OUT_TOPONYM_EVAL_FILE
+
+else
+echo "Unrecognized step $step"
+
+fi
+
+done
