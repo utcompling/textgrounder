@@ -12,13 +12,6 @@ TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
 
 WIKI_DISAMBIG="$TEXTGROUNDER_PYTHON/wiki_disambig.py"
 
-#DEBUG="--debug 2"
-#DEBUG="--debug 0"
-DEBUG="--debug 1"
-#MAXTIME="--max-time-per-stage 5"
-#MAXTIME="--max-time-per-stage 300"
-#MAXTIME="--max-time-per-stage 10"
-
 #MODE="match-only"
 MODE="geotag-toponyms"
 #MODE="geotag-documents"

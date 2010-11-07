@@ -66,3 +66,10 @@ LINKS_ARG="--links-file $IN_LINKS_FILE"
 #No TOPONYM_EVAL_ARG; used in --evalfile
 DISAMBIG_ID_ARG="--disambig-id-file $IN_DISAMBIG_ID_FILE"
 TITLE2ID_ARG="--title2id-file $IN_TITLE2ID_FILE"
+
+# Include local configuration if it exists
+
+if [ -e "$TEXTGROUNDER_PYTHON/local-config" ]; then
+  . "$TEXTGROUNDER_PYTHON/local-config"
+fi
+

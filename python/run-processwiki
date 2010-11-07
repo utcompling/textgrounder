@@ -19,12 +19,6 @@ TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
 PROCESSWIKI="$TEXTGROUNDER_PYTHON/processwiki.py"
 GENERATE_COMBINED="$TEXTGROUNDER_PYTHON/generate_combined.py"
 
-# Options you're most likely to change.
-#DEBUG="--debug 2"
-DEBUG="--debug 0"
-MAXTIME="--max-time-per-stage 5"
-#MAXTIME="--max-time-per-stage 10"
-
 LOGFILE="generate-all-data.log"
 
 OTHEROPTS="$MAXTIME $DEBUG"
