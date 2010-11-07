@@ -7,19 +7,10 @@
 # See also 'run-run-disambig', which will run this script using 'nohup'
 # while saving the output to a file.
 
-if [ -z "$WIKIPEDIA_DATA_DIR" ]; then
-  WIKIPEDIA_DATA_DIR='.'
-fi
+TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+. $TEXTGROUNDER_PYTHON/config-wikigrounder
 
-if [ -z "$WIKIPEDIA_AUX_DATA_DIR" ]; then
-  WIKIPEDIA_AUX_DATA_DIR='.'
-fi
-
-PREFIX="$WIKIPEDIA_DATA_DIR/enwiki-20100905"
-AUXPREFIX="$WIKIPEDIA_AUX_DATA_DIR"
-TG_PYTHON_DIR="$HOME/devel/textgrounder/python"
-TRCONLL_DEV_DIR="/groups/projects/pcl_travel/data/trconlldevtest/dev"
-WIKI_DISAMBIG="$TG_PYTHON_DIR/wiki_disambig.py"
+WIKI_DISAMBIG="$TEXTGROUNDER_PYTHON/wiki_disambig.py"
 
 #DEBUG="--debug 2"
 #DEBUG="--debug 0"
@@ -28,18 +19,6 @@ DEBUG="--debug 1"
 #MAXTIME="--max-time-per-stage 300"
 #MAXTIME="--max-time-per-stage 10"
 
-PICKLE_FILE="$PREFIX-coords-counts.pickled"
-#UNPICKLE="--unpickle-file $PICKLE_FILE"
-#PICKLE="--pickle-file $PICKLE_FILE"
-PICKLE=
-UNPICKLE=
-
-STOPWORDS_FILE="--stopwords-file $AUXPREFIX/stopwords.english"
-ARTICLE_DATA_FILE="--article-data-file $PREFIX-combined-article-data.txt"
-COUNTS_FILE="--counts-file $PREFIX-counts-only-coord-articles.txt"
-GAZETTEER_FILE="--gazetteer-file $AUXPREFIX/world-dataen-fixed.txt"
-
-#MODE="pickle-only"
 #MODE="match-only"
 MODE="geotag-toponyms"
 #MODE="geotag-documents"
@@ -51,7 +30,7 @@ if [ "$MODE" = "geotag-toponyms" -o "$MODE" = "match-only" ]; then
   COUNTS_FILE=""
   #STRATEGY="--strategy naive-bayes-with-baseline"
   #STRATEGY="--strategy naive-bayes-no-baseline"
-  #NBTYPE="--naive-bayes-weighting distance-weighted"
+  #MISCOPTS="$MISCOPTS --naive-bayes-weighting distance-weighted"
   EVALFILE="--eval-file $TRCONLL_DEV_DIR"
   EVALTYPE="--eval-format tr-conll"
   #EVALFILE="--eval-file $PREFIX-toponym-eval.txt"
@@ -60,11 +39,6 @@ elif [ "$MODE" = "geotag-documents" ]; then
 fi
 
 $WIKI_DISAMBIG \
-  $STOPWORDS_FILE \
-  $ARTICLE_DATA_FILE \
-  $COUNTS_FILE \
-  $GAZETTEER_FILE \
-  --mode "$MODE" \
-  $MISCOPTS \
-  $EVALFILE $EVALTYPE \
-  $PICKLE $UNPICKLE $MAXTIME $STRATEGY $NBTYPE $DEBUG ${1+"$@"}
+  $STOPWORDS_ARG $COMBINED_ARTICLE_DATA_ARG $COUNTS_ARG $GAZETTEER_ARG \
+  --mode "$MODE" $STRATEGY $EVALFILE $EVALTYPE \
+  $MISCOPTS $MAXTIME $DEBUG ${1+"$@"}
