@@ -24,7 +24,7 @@ public class LabelPropPreproc {
 
         Map<Integer, Set<Integer> > toponymRegionEdges = new HashMap<Integer, Set<Integer> >();
 
-        Lexicon<String> toponymLexicon = buildLexicon(corpus);
+        Lexicon<String> toponymLexicon = TopoUtil.buildLexicon(corpus);
 
         for(Document<StoredToken> doc : corpus) {
             for(Sentence<StoredToken> sent : doc) {
@@ -87,25 +87,5 @@ public class LabelPropPreproc {
         int y = (int) ((location.getRegion().getCenter().getLat() + 90.0) / DEGREES_PER_REGION);
 
         return x * 1000 + y;
-    }
-
-    private static Lexicon<String> buildLexicon(StoredCorpus corpus) {
-        Lexicon<String> lexicon = new SimpleLexicon<String>();
-
-        addToponymsToLexicon(lexicon, corpus);
-
-        return lexicon;
-    }
-
-    private static void addToponymsToLexicon(Lexicon<String> lexicon, StoredCorpus corpus) {
-        for(Document<StoredToken> doc : corpus) {
-            for(Sentence<StoredToken> sent : doc) {
-                for(Toponym toponym : sent.getToponyms()) {
-                    if(toponym.getAmbiguity() > 0) {
-                        lexicon.getOrAdd(toponym.getForm());
-                    }
-                }
-            }
-        }
     }
 }

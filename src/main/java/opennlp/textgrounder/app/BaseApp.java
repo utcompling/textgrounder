@@ -12,6 +12,7 @@ public class BaseApp {
 
     private static String inputPath = null;
     private static String additionalInputPath = null;
+    private static String graphInputPath = null;
     private static String outputPath = "output.xml";
 
     private static int numIterations = 1;
@@ -19,7 +20,8 @@ public class BaseApp {
     public static enum RESOLVER_TYPE {
         RANDOM,
         BASIC_MIN_DIST,
-        WEIGHTED_MIN_DIST
+        WEIGHTED_MIN_DIST,
+        LABEL_PROP_DEFAULT_RULE
     }
     private static Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
 
@@ -27,7 +29,8 @@ public class BaseApp {
 
         options.addOption("i", "input", true, "input path");
         options.addOption("ia", "input-additional", true, "path to additional input data to be used in training but not evaluation");
-        options.addOption("r", "resolver", true, "resolver (RandomResolver, BasicMinDistResolver, WeightedMinDistResolver) [default = BasicMinDistResolver]");
+        options.addOption("ig", "input-graph", true, "path to graph for label propagation resolvers");
+        options.addOption("r", "resolver", true, "resolver (RandomResolver, BasicMinDistResolver, WeightedMinDistResolver, LabelPropDefaultRuleResolver) [default = BasicMinDistResolver]");
         options.addOption("it", "iterations", true, "number of iterations for iterative models [default = 1]");
         options.addOption("o", "output", true, "output path [default = 'output.xml']");
 
@@ -46,12 +49,14 @@ public class BaseApp {
             String value = option.getValue();
             switch (option.getOpt().charAt(0)) {
                 case 'i':
-                    if(option.getOpt() == "i")
+                    if(option.getOpt().equals("i"))
                         inputPath = value;
-                    else if(option.getOpt() == "it")
+                    else if(option.getOpt().equals("it"))
                         numIterations = Integer.parseInt(value);
-                    else if(option.getOpt() == "ia")
+                    else if(option.getOpt().equals("ia"))
                         additionalInputPath = value;
+                    else if(option.getOpt().equals("ig"))
+                        graphInputPath = value;
                     break;
                 case 'o':
                     outputPath = value;
@@ -61,6 +66,8 @@ public class BaseApp {
                         resolverType = RESOLVER_TYPE.RANDOM;
                     else if(value.toLowerCase().startsWith("w"))
                         resolverType = RESOLVER_TYPE.WEIGHTED_MIN_DIST;
+                    else if(value.toLowerCase().startsWith("labelpropd"))
+                        resolverType = RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE;
                     else
                         resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
                     break;
@@ -74,6 +81,10 @@ public class BaseApp {
 
     public static String getAdditionalInputPath() {
         return additionalInputPath;
+    }
+
+    public static String getGraphInputPath() {
+        return graphInputPath;
     }
 
     public static Enum<RESOLVER_TYPE> getResolverType() {

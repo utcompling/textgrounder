@@ -33,7 +33,7 @@ public class WeightedMinDistResolver extends Resolver {
 
         distanceTable = new DistanceTable(corpus.getToponymTypeCount());
 
-        toponymLexicon = buildLexicon(corpus);
+        toponymLexicon = TopoUtil.buildLexicon(corpus);
         List<List<Integer> > counts = new ArrayList<List<Integer> >(toponymLexicon.size());
         for(int i = 0; i < toponymLexicon.size(); i++) counts.add(null);
         weights = new ArrayList<List<Double> >(toponymLexicon.size());
@@ -53,7 +53,7 @@ public class WeightedMinDistResolver extends Resolver {
         if(weights == null)
             train(corpus);
 
-        addToponymsToLexicon(toponymLexicon, corpus);
+        TopoUtil.addToponymsToLexicon(toponymLexicon, corpus);
         weights = expandWeightsArray(toponymLexicon, corpus, weights);
         
         return finalDisambiguationStep(corpus, weights, toponymLexicon);
@@ -114,26 +114,6 @@ public class WeightedMinDistResolver extends Resolver {
                                 weights.get(index).add(1.0);
                             }
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    private Lexicon<String> buildLexicon(StoredCorpus corpus) {
-        Lexicon<String> lexicon = new SimpleLexicon<String>();
-
-        addToponymsToLexicon(lexicon, corpus);
-
-        return lexicon;
-    }
-
-    private void addToponymsToLexicon(Lexicon<String> lexicon, StoredCorpus corpus) {
-        for(Document<StoredToken> doc : corpus) {
-            for(Sentence<StoredToken> sent : doc) {
-                for(Toponym toponym : sent.getToponyms()) {
-                    if(toponym.getAmbiguity() > 0) {
-                        lexicon.getOrAdd(toponym.getForm());
                     }
                 }
             }
