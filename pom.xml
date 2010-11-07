@@ -79,6 +79,21 @@
               <goal>install-file</goal>
             </goals>
           </execution>
+          <execution>
+            <phase>validate</phase>
+            <id>install-jython</id>
+            <configuration>
+              <file>${basedir}/lib/jython.jar</file>
+              <groupId>org.python</groupId>
+              <artifactId>jython</artifactId>
+              <version>2.5.1</version>
+              <packaging>jar</packaging>
+              <generatePom>true</generatePom>
+            </configuration>
+            <goals>
+              <goal>install-file</goal>
+            </goals>
+          </execution>
         </executions>
       </plugin>
       <plugin>
@@ -137,6 +152,11 @@
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
       <version>2.8.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.python</groupId>
+      <artifactId>jython</artifactId>
+      <version>2.5.1</version>
     </dependency>
     <dependency>
       <groupId>com.google.inject</groupId>
