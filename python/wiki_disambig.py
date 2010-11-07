@@ -2091,14 +2091,6 @@ default '%default'.""")
 --output-counts, listing for each article the words in the article and
 associated counts.""",
                   metavar="FILE")
-    op.add_option("-p", "--pickle-file",
-                  help="""Serialize the result of processing the word-coords
-file to the given file.""",
-                  metavar="FILE")
-    op.add_option("-u", "--unpickle-file",
-                  help="""Read the result of serializing the word-coords file
-to the given file.""",
-                  metavar="FILE")
     op.add_option("-e", "--eval-file",
                   help="""File or directory containing files to evaluate on.
 Each file is read in and then disambiguation is performed.""",
@@ -2128,15 +2120,12 @@ in Naive Bayes matching.  Default %default.""")
     op.add_option("-m", "--mode", type='choice', default='match-only',
                   choices=['geotag-toponyms',
                            'geotag-documents',
-                           'match-only', 'pickle-only'],
+                           'match-only'],
                   help="""Action to perform.
 
 'match-only' means to only do the stage that involves finding matches between
 gazetteer locations and Wikipedia articles (mostly useful when debugging
 output is enabled).
-
-'pickle-only' means only to generate the pickled version of the data, for
-reading in by a separate process (e.g. the Java code).
 
 'geotag-documnts' finds the proper location for each document (or article)
 in the test set.
@@ -2272,15 +2261,14 @@ considered.  Default '%default'.""")
 
     ### Start reading in the files and operating on them ###
 
-    if opts.mode == 'pickle-only' or opts.mode.startswith('geotag'):
+    if opts.mode.startswith('geotag'):
       params.need_to_read_stopwords = True
       if (opts.mode == 'geotag-toponyms' and opts.strategy == 'baseline'):
         pass
-      elif not opts.unpickle_file and not opts.counts_file:
-        op.error("Must specify either unpickle file or counts file")
+      elif not opts.counts_file:
+        op.error("Must specify counts file")
 
-    if opts.mode != 'pickle-only':
-      self.need('gazetteer_file')
+    self.need('gazetteer_file')
 
     if opts.eval_format == 'raw-text':
       # FIXME!!!!
@@ -2310,10 +2298,6 @@ considered.  Default '%default'.""")
     elif opts.mode.startswith('geotag'):
       self.need('eval_file', 'evaluation file(s)')
 
-    if opts.mode == 'pickle-only':
-      if not opts.pickle_file:
-        self.need('pickle_file')
-
     self.need('article_data_file')
 
     return params
@@ -2332,21 +2316,10 @@ considered.  Default '%default'.""")
     #output_reverse_sorted_table(toponyms_seen_in_eval_files,
     #                            outfile=sys.stderr)
 
-    # Read in (or unpickle) and maybe pickle the words-counts file
-    if opts.mode == 'pickle-only' or opts.mode.startswith('geotag'):
-      if opts.unpickle_file:
-        global article_probs
-        infile = open(opts.unpickle_file)
-        #FIXME: article_probs = cPickle.load(infile)
-        infile.close()
-      elif opts.counts_file:
+    # Read in the words-counts file
+    if opts.mode.startswith('geotag'):
+      if opts.counts_file:
         read_word_counts(opts.counts_file)
-      if opts.pickle_file:
-        outfile = open(opts.pickle_file, "w")
-        #FIXME: cPickle.dump(article_probs, outfile)
-        outfile.close()
-
-    if opts.mode == 'pickle-only': return
 
     WorldGazetteer.read_world_gazetteer_and_match(opts.gazetteer_file)
 
