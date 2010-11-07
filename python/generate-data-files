@@ -13,18 +13,15 @@
 # combined = Combined article data file, only for articles with coordinates or
 #            redirects to such articles
 
+TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+. $TEXTGROUNDER_PYTHON/config-wikigrounder
+
 # Options you're most likely to change.
 #DEBUG="--debug 2"
 DEBUG="--debug 0"
 #MAXTIME="--max-time-per-stage 5"
 #MAXTIME="--max-time-per-stage 10"
 
-if [ -z "$WIKIPEDIA_DATA_DIR" ]; then
-  WIKIPEDIA_DATA_DIR='.'
-fi
-
-DUMP_PREFIX="enwiki-20100905"
-TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
 PAGES_ARTICLES_PREFIX="$DUMP_PREFIX-pages-articles"
 
 PROCESSWIKI="$TEXTGROUNDER_PYTHON/processwiki.py"
@@ -59,7 +56,7 @@ for step in $steps; do
 
 if [ "$step" = article-data ]; then
 echo "Generating article data ..."
-bzcat $DUMPFILE | $PROCESSWIKI \
+bzcat $IN_DUMPFILE | $PROCESSWIKI \
   $DISAMBIG_ID_ARG \
   --split-training-dev-test foobar \
   --generate-article-data \
@@ -67,13 +64,13 @@ bzcat $DUMPFILE | $PROCESSWIKI \
 
 elif [ "$step" = coords ]; then
 echo "Generating coordinate data ..."
-bzcat $DUMPFILE | $PROCESSWIKI \
+bzcat $IN_DUMPFILE | $PROCESSWIKI \
   --output-coords \
   $OTHEROPTS > $COORDS_FILE
 
 elif [ "$step" = links ]; then
 echo "Generating link data ..."
-bzcat $DUMPFILE | $PROCESSWIKI \
+bzcat $IN_DUMPFILE | $PROCESSWIKI \
   $COORDS_ARG $ARTICLE_DATA_ARG \
   --find-links \
   $OTHEROPTS > $LINKS_FILE
@@ -85,13 +82,13 @@ $GENERATE_COMBINED $LINKS_ARG $COORDS_ARG \
 
 elif [ "$step" = counts ]; then
 echo "Generating word count data ..."
-bzcat $DUMPFILE | $PROCESSWIKI \
+bzcat $IN_DUMPFILE | $PROCESSWIKI \
   --output-counts \
   $OTHEROPTS > $COUNTS_FILE
 
 elif [ "$step" = toponym-eval-data ]; then
 echo "Generating toponym eval data ..."
-bzcat $DUMPFILE | $PROCESSWIKI \
+bzcat $IN_DUMPFILE | $PROCESSWIKI \
   $COORDS_ARG $ARTICLE_DATA_ARG \
   --generate-toponym-eval \
   $OTHEROPTS > $TOPONYM_EVAL_DATA_FILE
