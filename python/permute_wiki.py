@@ -186,16 +186,19 @@ class PermuteWikipediaDumpProgram(NLPProgram):
                   default=None, choices=['permute', 'split', 'sort'],
                   help="""Format of evaluation file(s).  Default '%default'.""")
 
-  def implement_main(self, opts, op, args):
+  def handle_arguments(self, opts, op, args):
     global Opts
     Opts = opts
     self.need('mode')
     self.need('article_data_file')
+    if opts.mode == 'split':
+      self.need('split_prefix')
+
+  def implement_main(self, opts, params, args):
     infields = read_article_data(opts.article_data_file)
     if opts.mode == 'permute':
       write_permutation(infields)
     elif opts.mode == 'split':
-      self.need('split_prefix')
       split_files(infields, opts.split_prefix, opts.number_of_splits)
     elif opts.mode == 'sort':
       sort_file()
