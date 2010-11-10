@@ -1349,10 +1349,17 @@ class BaselineGeotagToponymStrategy(GeotagToponymStrategy):
         return get_adjusted_incoming_links(art.find_regworddist())
       else:
         return get_adjusted_incoming_links(art)
+    elif self.opts.baseline_strategy == 'num-articles':
+      if self.opts.context_type == 'region':
+        return art.find_regworddist().num_arts_for_links
+      else:
+        location = art.location
+        if type(location) is Division:
+          return len(location.locs)
+        else:
+          return 1
     else:
-      # FIXME!
-      assert False
-      return 0
+      return random.random()
 
 # Find each toponym explicitly mentioned as such and disambiguate it
 # (find the correct geographic location) using Naive Bayes, possibly
@@ -2283,6 +2290,9 @@ considered.  Default '%default'.""")
         op.error("Strategy '%s' invalid for --mode=geotag-documents" %
                  opts.strategy)
     elif opts.mode == 'geotag-toponyms':
+      if opts.baseline_strategy == \
+          'region-distribution-most-common-proper-noun':
+        op.error("--baseline-strategy=region-distribution-most-common-proper-noun only compatible with --mode=geotag-documents")
       if not opts.strategy:
         opts.strategy = 'baseline'
       elif opts.strategy not in [
