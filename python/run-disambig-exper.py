@@ -18,7 +18,7 @@ baseline_strategy=['internal-link', 'random', 'num-articles',
 def runit(id, args):
   command='%s documents --id %s %s %s' % (runcmd, id, common_args, args)
   errprint("Executing: %s" % command)
-  #os.system("%s" % command)
+  os.system("%s" % command)
 
 def iter_strategy(fun, id, args):
   for strat in strategy:
