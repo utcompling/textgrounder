@@ -1,5 +1,5 @@
 import math
-from textutil import *
+from nlputil import *
 from math import log
 
 debug = 0

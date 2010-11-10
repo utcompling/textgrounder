@@ -11,7 +11,7 @@
 # Wikipedia.
 
 import sys
-from textutil import *
+from nlputil import *
 from process_article_data import *
 
 def fix_redirects(filename):

@@ -6,7 +6,7 @@
 ####### Copyright (c) 2010 Ben Wing.
 #######
 
-from textutil import *
+from nlputil import *
 
 #!/usr/bin/python
 

@@ -25,7 +25,7 @@
 
 import sys, re
 from optparse import OptionParser
-from textutil import *
+from nlputil import *
 import itertools
 import time
 from process_article_data import *

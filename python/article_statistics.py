@@ -9,7 +9,7 @@
 # Counts and outputs various statistics about the articles in the
 # article-data file.
 
-from textutil import *
+from nlputil import *
 import process_article_data as pad
 
 ######################## Statistics about articles

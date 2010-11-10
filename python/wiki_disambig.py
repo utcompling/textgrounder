@@ -18,7 +18,7 @@ import cPickle
 import itertools
 import random
 import gc
-from textutil import *
+from nlputil import *
 from process_article_data import *
 from word_distribution import WordDist
 from kl_divergence import *

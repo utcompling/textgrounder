@@ -11,7 +11,7 @@
 # attaching the coordinate.
 
 import sys
-from textutil import *
+from nlputil import *
 from process_article_data import *
 
 def read_incoming_link_info(filename, articles_hash):

@@ -11,7 +11,7 @@ from __future__ import with_statement
 import random
 import re
 import sys
-from textutil import *
+from nlputil import *
 from process_article_data import *
 
 """
