@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# Run a series of disambiguation experiments.
+
+RUNIT="$TEXTGROUNDER_DIR/python/run-run-disambig"
+# COMMON="--max-time-per-stage 5"
+COMMON="--max-time-per-stage 300"
+DEGREES_PER_REGION="90 30 10 5 3 2 1 0.5"
+STRATEGY="partial-kl-divergence per-word-region-distribution baseline"
+BASELINE_STRATEGY="internal-link random num-articles region-distribution-most-common-proper-noun"
+
+for dpr in $DEGREES_PER_REGION; do
+  arg="--degrees-per-region $dpr"
+  id="$dpr"
+  for strat in $STRATEGY; do
+    arg2="$arg --strategy $strat"
+    id2="$id.$strat"
+    if [ "$strat" = "baseline" ]; then
+      for basestrat in $BASELINE_STRATEGY; do
+        arg3="$arg2 --baseline-strategy $basestrat"
+        id3="$id2.$basestrat"
+        echo $RUNIT --id $id3 geotag-documents $arg3 $COMMON
+        $RUNIT --id $id3 geotag-documents $arg3 $COMMON
+      done
+    else
+      echo $RUNIT --id $id2 geotag-documents $arg2 $COMMON
+      $RUNIT --id $id2 geotag-documents $arg2 $COMMON
+    fi
+  done
+done
