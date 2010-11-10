@@ -14,6 +14,11 @@ from textutil import *
 #                                  Main code                               #
 ############################################################################
 
+minimum_latitude = -90.0
+maximum_latitude = 90.0
+minimum_longitude = -180.0
+maximum_longitude = 180.0 - 1e-10
+
 # A 2-dimensional coordinate.
 #
 # The following fields are defined:
@@ -23,7 +28,14 @@ from textutil import *
 class Coord(object):
   __slots__ = ['lat', 'long']
 
-  def __init__(self, lat, long):
+  ### If coerce_within_bounds=True, then force the values to be within
+  ### the allowed range, by wrapping longitude and bounding latitude.
+  def __init__(self, lat, long, coerce_within_bounds=False):
+    if coerce_within_bounds:
+      if lat > maximum_latitude: lat = maximum_latitude
+      while long > maximum_longitude: long -= 360.
+      if lat < minimum_latitude: lat = minimum_latitude
+      while long < minimum_longitude: long += 360.
     self.lat = lat
     self.long = long
 

@@ -423,7 +423,7 @@ def next_split_set(split_fractions):
 
 max_time_unlimited = 2**31
 
-def output_option_parameters(opts, params):
+def output_option_parameters(opts, params=None):
   errprint("Parameter values:")
   for opt in dir(opts):
     if not opt.startswith('_') and opt not in \
@@ -462,7 +462,7 @@ class NLPProgram(object):
     return True
 
   def populate_shared_options(self, op):
-    op.add_option("--max-time-per-stage", type='int',
+    op.add_option("--max-time-per-stage", "--mts", type='int',
                   default=max_time_unlimited,
                   help="""Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default %default.""")
@@ -481,13 +481,19 @@ Used for testing purposes.  Default %default.""")
 
     self.op = OptionParser(usage="%prog [options]")
     self.populate_shared_options(self.op)
-    self.populate_options(self.op)
+    self.canon_options = self.populate_options(self.op)
 
     errprint("Arguments: %s" % ' '.join(sys.argv))
 
     ### Process the command-line options and set other values from them ###
     
     self.opts, self.args = self.op.parse_args()
+    # If a mapper for canonicalizing options is given, apply the mappings
+    if self.canon_options:
+      for (opt, mapper) in self.canon_options.iteritems():
+        val = getattr(self.opts, opt)
+        if val in mapper:
+          setattr(self.opts, opt, mapper[val])
 
     params = self.handle_arguments(self.opts, self.op, self.args)
 
