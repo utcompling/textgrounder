@@ -16,7 +16,7 @@ baseline_strategy=['internal-link', 'random', 'num-articles',
     'region-distribution-most-common-proper-noun']
 
 def runit(id, args):
-  command='%s documents --id %s %s %s' % (runcmd, id, common_args, args)
+  command='%s --id %s documents %s %s' % (runcmd, id, common_args, args)
   errprint("Executing: %s" % command)
   os.system("%s" % command)
 
