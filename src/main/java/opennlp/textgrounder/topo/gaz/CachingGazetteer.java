@@ -42,6 +42,7 @@ public class CachingGazetteer extends Gazetteer {
   }
 
   public void add(String name, Location location) {
+    name = name.toLowerCase();
     if (this.cacheIncoming) {
       List<Location> result = this.lookup(name);
       if (result == null) {
@@ -59,6 +60,7 @@ public class CachingGazetteer extends Gazetteer {
   }
 
   public List<Location> lookup(String query) {
+    query = query.toLowerCase();
     List<Location> result = this.cache.get(query);
     if (result == null) {
       result = this.source.lookup(query);
