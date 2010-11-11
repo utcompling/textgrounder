@@ -1,6 +1,3 @@
-from word_distribution import WordDist
-
-
 # This is a Cython file -- basically a pure Python file but with annotations
 # to make it possible to compile it into a C module that runs a lot faster
 # than normal Python.
@@ -30,7 +27,9 @@ inlines lookups as much as possible.'''
   qfact = (1 - other.unseen_mass)/other.total_tokens
   pfact_unseen = self.unseen_mass / self.overall_unseen_mass
   qfact_unseen = other.unseen_mass / other.overall_unseen_mass
-  owprobs = WordDist.overall_word_probs
+  qfact_globally_unseen_prob = (other.unseen_mass*
+      other.globally_unseen_word_prob / other.num_unseen_word_types)
+  owprobs = self.overall_word_probs
   # 1.
   pcounts = self.counts
   qcounts = other.counts
@@ -42,9 +41,14 @@ inlines lookups as much as possible.'''
     p = pcount * pfact
     qcount = qcounts.get(word, None)
     if qcount is None:
-      q = owprobs[word] * qfact_unseen
+      q = (owprobs[word] * qfact_unseen) or qfact_globally_unseen_prob
     else:
       q = qcount * qfact
+    #if q == 0.0:
+    #  print "Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s" % (word, qfact_globally_unseen_prob, qcount, qfact)
+    #if p == 0.0 or q == 0.0:
+    #  print "Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s" % (
+    #      p, q, word, pcount, qcount, qfact, qfact_unseen, owprobs[word])
     kldiv += p * (log(p) - log(q))
 
   if partial:
