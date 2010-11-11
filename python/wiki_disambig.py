@@ -1960,8 +1960,8 @@ class PCLTravelGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     dist.add_words(split_text_into_words(doc.title))
     dist.add_words(split_text_into_words(doc.text))
     dist.finish_word_distribution()
-    errprint("Distribution: %s" % dist)
     regs = self.strategy.return_ranked_regions(dist)
+    errprint("")
     errprint("Article with title: %s" % doc.title)
     num_regs_to_show = 5
     for (rank, reg) in izip(xrange(1, 1 + num_regs_to_show), regs):
