@@ -1,5 +1,7 @@
 from __future__ import with_statement # For chompopen(), uchompopen()
 from optparse import OptionParser
+import itertools
+from itertools import izip, chain, cycle
 import re # For regexp wrappers
 import sys, codecs # For uchompopen()
 import math # For float_with_commas()
@@ -7,8 +9,8 @@ import bisect # For sorted lists
 import time # For status messages, resource usage
 from heapq import * # For priority queue
 import UserDict # For SortedList, LRUCache
-import itertools # For priority queue
 import resource # For resource usage
+from collections import deque # For breadth-first search
 
 #############################################################################
 #                        Regular expression functions                       #
@@ -193,6 +195,33 @@ def mean(list):
   "Return the mean of a list."
   return sum(list) / float(len(list))
 
+def split_text_into_words(text, ignore_punc=False, include_nl=False):
+  # This regexp splits on whitespace, but also handles the following cases:
+  # 1. Any of , ; . etc. at the end of a word
+  # 2. Parens or quotes in words like (foo) or "bar"
+  # These punctuation characters are returned as separate words, unless
+  # 'ignore_punc' is given.  Also, if 'include_nl' is given, newlines are
+  # returned as their own words; otherwise, they are treated like all other
+  # whitespace (i.e. ignored).
+  if include_nl:
+    split_punc_re = r'[ \t]+'
+  else:
+    split_punc_re = r'\s+'
+  # The use of izip and cycle will pair True with return values that come
+  # from the grouping in the split re, and False with regular words.
+  for (ispunc, word) in izip(cycle([False, True]),
+                  re.split('([,;."):]*\s+[("]*)', text)):
+    if not word: continue
+    if ispunc:
+      # Divide the punctuation up 
+      for punc in word:
+        if punc == '\n':
+          if include_nl: yield punc
+        elif punc in ' \t\r\f\v': continue
+        elif not ignore_punc: yield punc
+    else:
+      yield word
+
 #############################################################################
 #                             Default dictionaries                          #
 #############################################################################
@@ -313,7 +342,7 @@ class SortedList(object, UserDict.DictMixin):
 
   def iteritems(self):
     (keys, values) = self.sorted_list
-    for (key, value) in itertools.izip(keys, values):
+    for (key, value) in izip(keys, values):
       yield (key, value)
 
 #############################################################################
@@ -664,15 +693,15 @@ behavior of this iterator with respect to ranges that have never been seen
 actually-seen ranges will be returned."""
     highest_seen = None
     for (lower, upper) in (
-        itertools.izip(itertools.chain([self.lowest_bound], self.ranges),
-                       itertools.chain(self.ranges, ['infinity']))):
+        izip(chain([self.lowest_bound], self.ranges),
+             chain(self.ranges, ['infinity']))):
       if lower in self.items_by_range:
         highest_seen = upper
 
     seen_any = False
     for (lower, upper) in (
-        itertools.izip(itertools.chain([self.lowest_bound], self.ranges),
-                       itertools.chain(self.ranges, ['infinity']))):
+        izip(chain([self.lowest_bound], self.ranges),
+             chain(self.ranges, ['infinity']))):
       collector = self.items_by_range.get(lower, None)
       if collector is None:
         if not unseen_all:
@@ -683,3 +712,31 @@ actually-seen ranges will be returned."""
       else:
         seen_any = True
       yield (lower, upper, collector)
+
+
+#############################################################################
+#                          Depth-, breadth-first search                     #
+#############################################################################
+
+# General depth-first search.  'node' is the node to search, the top of a
+# tree.  'matches' indicates whether a given node matches.  'children'
+# returns a list of child nodes.
+def depth_first_search(node, matches, children):
+  nodelist = [node]
+  while len(nodelist) > 0:
+    node = nodelist.pop()
+    if matches(node):
+      yield node
+    nodelist.extend(reversed(children(node)))
+
+# General breadth-first search.  'node' is the node to search, the top of a
+# tree.  'matches' indicates whether a given node matches.  'children'
+# returns a list of child nodes.
+def breadth_first_search(node, matches, children):
+  nodelist = deque([node])
+  while len(nodelist) > 0:
+    node = nodelist.popLeft()
+    if matches(node):
+      yield node
+    nodelist.extend(children(node))
+
