@@ -1957,8 +1957,16 @@ class PCLTravelGeotagDocumentEvaluator(GeotagDocumentEvaluator):
 
   def evaluate_document(self, doc):
     dist = WordDist()
-    dist.add_words(split_text_into_words(doc.title))
-    dist.add_words(split_text_into_words(doc.text))
+    if Opts.include_stopwords_in_article_dists:
+      the_stopwords = {}
+    else:
+      the_stopwords = stopwords
+    dist.add_words(split_text_into_words(doc.title),
+                   ignore_case=not Opts.preserve_case_words,
+                   stopwords=the_stopwords)
+    dist.add_words(split_text_into_words(doc.text),
+                   ignore_case=not Opts.preserve_case_words,
+                   stopwords=the_stopwords)
     dist.finish_word_distribution()
     regs = self.strategy.return_ranked_regions(dist)
     errprint("")
