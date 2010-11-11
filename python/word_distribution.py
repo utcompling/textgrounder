@@ -1,6 +1,8 @@
 import math
 from nlputil import *
 from math import log
+from itertools import *
+from kl_divergence import *
 
 debug = 0
 
@@ -88,9 +90,21 @@ class WordDist(object):
   def __init__(self):
     self.finished = False
     self.counts = intdict()
-    self.unseen_mass = 1.0
+    self.unseen_mass = 0.5
     self.total_tokens = 0
     self.overall_unseen_mass = 1.0
+
+  def __str__(self):
+    finished = ""
+    if not self.finished: finished = ", unfinished"
+    num_words_to_print = 15
+    items = list('%s=%s' % (word, count) for (word, count) in
+        islice(self.counts.iteritems(), num_words_to_print + 1))
+    if len(items) > num_words_to_print:
+      items[-1] = '...'
+    words = ' '.join(items)
+    return "WordDist(%d tokens, %.2f unseen mass%s, %s)" % (
+        self.total_tokens, self.unseen_mass, finished, words)
 
   def set_word_distribution(self, total_tokens, wordhash, note_globally=True):
     '''Set the word distribution from the given table of words and counts.
@@ -107,6 +121,20 @@ add the word counts to the global word count statistics.'''
         WordDist.overall_word_probs[ind] += count
         WordDist.num_word_tokens += count
     self.counts = wordhash
+
+  def add_words(self, words, ignore_case=True, stopwords={}):
+    '''Incorporate a list of words into the distribution. 'words' is an iterable.'''
+    assert not self.finished
+    counts = self.counts
+    toks = 0
+    for word in words:
+      if ignore_case: word = word.lower()
+      if word in stopwords:
+        continue
+      word = internasc(word)
+      counts[word] += 1
+      toks += 1
+    self.total_tokens += toks
 
   def add_word_distribution(self, worddist):
     '''Incorporate counts from the given distribution into our distribution.'''
@@ -129,10 +157,15 @@ add the word counts to the global word count statistics.'''
     if self.total_tokens > 0:
       # If no words seen only once, we will have a problem if we assign 0
       # to the unseen mass, as unseen words will end up with 0 probability.
+      # However, if we assign a value of 1.0 to unseen_mass (which could
+      # happen in case all words seen exactly once), then we will end
+      # up assigning 0 probability to seen words.  So we arbitrarily
+      # limit it to 0.5, which is pretty damn much mass going to unseen
+      # words.
       self.unseen_mass = \
-        float(max(1, num_types_seen_once))/self.total_tokens
+        min(0.5, float(max(1, num_types_seen_once))/self.total_tokens)
     else:
-      self.unseen_mass = 1.0
+      self.unseen_mass = 0.5
     overall_seen_mass = 0.0
     for ind in self.counts:
       overall_seen_mass += WordDist.overall_word_probs[ind]
@@ -190,7 +223,10 @@ other implementations.'''
     for word in self.counts:
       p = self.lookup_word(word)
       q = other.lookup_word(word)
-      kldiv += p*(log(p) - log(q))
+      if p <= 0.0 or q <= 0.0:
+        errprint("Warning: problematic values: p=%s, q=%s, word=%s" % (p, q, word))
+      else:
+        kldiv += p*(log(p) - log(q))
 
     if partial:
       return kldiv
@@ -254,37 +290,34 @@ other implementations.'''
     #           % (art, len(wordcounts[0])))
     #  errprint("Unknown prob = %s, overall_unseen_mass = %s" %
     #           (unseen_mass, overall_unseen_mass))
-    if word in WordDist.overall_word_probs:
-      ind = internasc(word)
-    else:
-      ind = None
-    if ind is None:
-      wordprob = (self.unseen_mass*WordDist.globally_unseen_word_prob
-                  / WordDist.num_unseen_word_types)
-      if debug > 1:
-        errprint("Word %s, never seen at all, wordprob = %s" %
-                 (word, wordprob))
-    else:
-      wordprob = self.counts.get(ind, None)
-      if wordprob is None:
+    wordprob = self.counts.get(word, None)
+    if wordprob is None:
+      owprob = WordDist.overall_word_probs.get(word, None)
+      if owprob is None:
+        wordprob = (self.unseen_mass*WordDist.globally_unseen_word_prob
+                    / WordDist.num_unseen_word_types)
+        if debug > 1:
+          errprint("Word %s, never seen at all, wordprob = %s" %
+                   (word, wordprob))
+      else:
         wordprob = (self.unseen_mass *
-                    (WordDist.overall_word_probs[ind] /
+                    (WordDist.overall_word_probs[word] /
                      self.overall_unseen_mass))
         #if wordprob <= 0:
-        #  warning("Bad values; unseen_mass = %s, overall_word_probs[ind] = %s, overall_unseen_mass = %s" % (unseen_mass, WordDist.overall_word_probs[ind], WordDist.overall_unseen_mass))
+        #  warning("Bad values; unseen_mass = %s, overall_word_probs[word] = %s, overall_unseen_mass = %s" % (unseen_mass, WordDist.overall_word_probs[word], WordDist.overall_unseen_mass))
         if debug > 1:
           errprint("Word %s, seen but not in article, wordprob = %s" %
                    (word, wordprob))
-      else:
-        #if wordprob <= 0 or total_tokens <= 0 or unseen_mass >= 1.0:
-        #  warning("Bad values; wordprob = %s, unseen_mass = %s" %
-        #          (wordprob, unseen_mass))
-        #  for (word, count) in self.counts.iteritems():
-        #    errprint("%s: %s" % (word, count))
-        wordprob = float(wordprob)/self.total_tokens*(1 - self.unseen_mass)
-        if debug > 1:
-          errprint("Word %s, seen in article, wordprob = %s" %
-                   (word, wordprob))
+    else:
+      #if wordprob <= 0 or total_tokens <= 0 or unseen_mass >= 1.0:
+      #  warning("Bad values; wordprob = %s, unseen_mass = %s" %
+      #          (wordprob, unseen_mass))
+      #  for (word, count) in self.counts.iteritems():
+      #    errprint("%s: %s" % (word, count))
+      wordprob = float(wordprob)/self.total_tokens*(1 - self.unseen_mass)
+      if debug > 1:
+        errprint("Word %s, seen in article, wordprob = %s" %
+                 (word, wordprob))
     return wordprob
 
 

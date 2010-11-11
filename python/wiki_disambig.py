@@ -15,13 +15,14 @@ from math import log
 import collections
 import traceback
 import cPickle
-import itertools
+from itertools import *
 import random
 import gc
 from nlputil import *
 from process_article_data import *
-from word_distribution import WordDist
 from kl_divergence import *
+from word_distribution import *
+import xml.dom.minidom as md
 
 ############################################################################
 #                              Documentation                               #
@@ -286,8 +287,8 @@ class RegionWordDist(WordDist):
     arts = [loc.match for loc in locs if loc.match]
     self.add_articles(arts)
 
-  def finish_distribution(self):
-    self.finish_word_distribution()
+  def finish_word_distribution(self):
+    super(RegionWordDist, self).finish_word_distribution()
 
     if debug >= 2:
       errprint("""For region dist, num articles = %s, total tokens = %s,
@@ -382,7 +383,8 @@ class RegionDist(object):
 #   worddist: Distribution corresponding to region.
 
 class StatRegion(object):
-  __slots__ = ['latind', 'longind', 'worddist']
+  __slots__ = ['latind', 'longind', 'worddist', 'most_popular_article',
+               'mostpopart_links']
   
   # Mapping of region->locations in region, for region-based Naive Bayes
   # disambiguation.  The key is a tuple expressing the integer indices of the
@@ -413,6 +415,8 @@ class StatRegion(object):
     self.latind = latind
     self.longind = longind
     self.worddist = RegionWordDist()
+    self.most_popular_article = None
+    self.mostpopart_links = 0
 
   def __str__(self):
     if self.latind is not None:
@@ -422,9 +426,13 @@ class StatRegion(object):
     else:
       bounds = "nowhere"
     unfinished = "" if self.worddist.finished else ", unfinished"
+    contains = ""
+    if self.most_popular_article:
+      contains = ", most-pop-art %s(%d links)" % (
+          self.most_popular_article, self.mostpopart_links)
 
-    return "StatRegion(%s%s, %d articles(dist), %d articles(links), %d links)" % (
-        bounds, unfinished,
+    return "StatRegion(%s%s%s, %d articles(dist), %d articles(links), %d links)" % (
+        bounds, unfinished, contains,
         self.worddist.num_arts_for_word_dist, self.worddist.num_arts_for_links,
         self.worddist.incoming_links)
 
@@ -447,6 +455,10 @@ class StatRegion(object):
         errprint("--> Processing tiling region %s" %
                  region_indices_to_coord(latind, longind))
       self.worddist.add_articles(arts)
+      for art in arts:
+        if art.incoming_links > self.mostpopart_links:
+          self.mostpopart_links = art.incoming_links
+          self.most_popular_article = art
 
     # Process the tiling regions making up the statistical region;
     # but be careful around the edges.  Truncate the latitude, wrap the
@@ -458,7 +470,7 @@ class StatRegion(object):
         if jj > maximum_longind: jj -= 360.
         process_one_region(i, jj)
 
-    self.worddist.finish_distribution()
+    self.worddist.finish_word_distribution()
 
   # Find the correct StatRegion for the given coordinates.
   # If none, create the region.
@@ -477,7 +489,7 @@ class StatRegion(object):
       if cls.all_regions_computed:
         if not cls.empty_stat_region:
           cls.empty_stat_region = cls(None, None)
-          cls.empty_stat_region.worddist.finish_distribution()
+          cls.empty_stat_region.worddist.finish_word_distribution()
         return cls.empty_stat_region
       statreg = cls(latind, longind)
       statreg.generate_dist()
@@ -667,7 +679,7 @@ class Division(object):
     self.worddist = RegionWordDist()
     self.worddist.add_locations([self])
     self.worddist.add_locations(self.goodlocs)
-    self.worddist.finish_distribution()
+    self.worddist.finish_word_distribution()
 
   def __contains__(self, coord):
     return coord in self.boundary
@@ -1502,8 +1514,8 @@ class GeotagToponymEvaluator(TestFileEvaluator):
           errprint("Non-toponym %s" % word.word)
       return word
 
-    for k, g in itertools.groupby(self.yield_geogwords(filename),
-                                  lambda word: word.document or 'foo'):
+    for k, g in groupby(self.yield_geogwords(filename),
+                        lambda word: word.document or 'foo'):
       if k:
         errprint("Processing document %s..." % k)
       results = [return_word(word) for word in g]
@@ -1757,19 +1769,18 @@ class BaselineGeotagDocumentStrategy(GeotagDocumentStrategy):
       # if we come back with the max count being negative, we know we had
       # an empty sequence, so retry just using all words.
       maxword, maxcount = \
-        max(itertools.chain([(None, -1)],
-                            ((word, count) for word, count in
-                             worddist.counts.iteritems()
-                             if word_is_toponym(word))),
+        max(chain([(None, -1)],
+                  ((word, count) for word, count in worddist.counts.iteritems()
+                   if word_is_toponym(word))),
             key = lambda x:x[1])
       # Look for a proper noun.  But there may not be any proper nouns --
       # esp. if we have lowercased everything, as is the case by default!
       if maxcount == -1:
         maxword, maxcount = \
-          max(itertools.chain([(None, -1)],
-                              ((word, count) for word, count in
-                               worddist.counts.iteritems()
-                               if word and word[0] >= 'A' and word[0] <= 'Z')),
+          max(chain([(None, -1)],
+                    ((word, count) for word, count in
+                      worddist.counts.iteritems()
+                      if word and word[0] >= 'A' and word[0] <= 'Z')),
               key = lambda x:x[1])
       if maxcount == -1:
         maxword, maxcount = \
@@ -1808,9 +1819,9 @@ class KLDivergenceStrategy(GeotagDocumentStrategy):
                     stat_region.worddist.num_arts_for_word_dist))
       kldiv = fast_kl_divergence(worddist, stat_region.worddist,
                                  partial=self.partial)
-      #kldiv = article.dist.test_kl_divergence(stat_region.worddist,
+      #kldiv = worddist.test_kl_divergence(stat_region.worddist,
       #                           partial=self.partial)
-      #errprint("For region %s, KL divergence = %s" % (inds, kldiv))
+      #errprint("For region %s, KL divergence %.3f" % (stat_region, kldiv))
       article_pq.add_task(kldiv, stat_region)
 
     regions = []
@@ -1904,6 +1915,59 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     return True
 
 
+class TitledDocument(object):
+  def __init__(self, title, text):
+    self.title = title
+    self.text = text
+
+class PCLTravelGeotagDocumentEvaluator(GeotagDocumentEvaluator):
+  def yield_documents(self, filename):
+    # Find XML nodes using depth-first search.  'match' is either a
+    # string (match localName on that string) or a predicate.
+    def find_node_dfs(node, match):
+      if not callable(match):
+        def matchpred(node):
+          return node.localName == match
+      else:
+        matchpred = match
+      def children(node):
+        return node.childNodes
+      return depth_first_search(node, matchpred, children)
+
+    # Return the text within a given node subtree.
+    def get_node_text(node):
+      return ''.join(t.data for t in
+          find_node_dfs(node, lambda x:x.nodeType == md.Attr.TEXT_NODE))
+
+    dom = md.parse(filename)
+    for chapter in find_node_dfs(dom, (lambda x:
+        x.localName == 'div' and x.getAttribute('type') == 'chapter')):
+      heads = []
+      nonheads = []
+      for child in chapter.childNodes:
+        if child.localName == 'head':
+          heads.append(child)
+        else:
+          nonheads.append(child)
+      headtext = ''.join(get_node_text(x) for x in heads)
+      text = ''.join(get_node_text(x) for x in nonheads)
+      #errprint("Head text: %s" % headtext)
+      #errprint("Non-head text: %s" % text)
+      yield TitledDocument(headtext, text)
+
+  def evaluate_document(self, doc):
+    dist = WordDist()
+    dist.add_words(split_text_into_words(doc.title))
+    dist.add_words(split_text_into_words(doc.text))
+    dist.finish_word_distribution()
+    errprint("Distribution: %s" % dist)
+    regs = self.strategy.return_ranked_regions(dist)
+    errprint("Article with title: %s" % doc.title)
+    num_regs_to_show = 5
+    for (rank, reg) in izip(xrange(1, 1 + num_regs_to_show), regs):
+      errprint("  Rank %d: %s" % (rank, reg))
+    return True
+
 ############################################################################
 #                               Process files                              #
 ############################################################################
@@ -1981,7 +2045,8 @@ def read_word_counts(filename):
       word = m.group(1)
       if not Opts.preserve_case_words: word = word.lower()
       count = int(m.group(2))
-      if word in stopwords and Opts.ignore_stopwords_in_article_dists: continue
+      if word in stopwords and not Opts.include_stopwords_in_article_dists:
+        continue
       word = internasc(word)
       total_tokens += count
       wordhash[word] += count
@@ -2191,7 +2256,8 @@ associated counts.""",
 Each file is read in and then disambiguation is performed.""",
                   metavar="FILE")
     op.add_option("-f", "--eval-format", "--f", type='choice',
-                  default="wiki", choices=['tr-conll', 'wiki', 'raw-text'],
+                  default="wiki", choices=['tr-conll', 'wiki', 'raw-text',
+                                           'pcl-travel'],
                   help="""Format of evaluation file(s).  Default '%default'.""")
 
     ########## Misc options for handling distributions
@@ -2200,9 +2266,9 @@ Each file is read in and then disambiguation is performed.""",
                   help="""Don't fold the case of words used to compute and
 match against article distributions.  Note that this does not apply to
 toponyms; currently, toponyms are always matched case-insensitively.""")
-    op.add_option("--ignore-stopwords-in-article-dists", action='store_true',
+    op.add_option("--include-stopwords-in-article-dists", action='store_true',
                   default=False,
-                  help="""Ignore stopwords when computing word
+                  help="""Include stopwords when computing word
 distributions.""")
     op.add_option("--naive-bayes-context-len", "--nbcl", type='int', default=10,
                   help="""Number of words on either side of a toponym to use
@@ -2413,6 +2479,8 @@ considered.  Default '%default'.""")
           'per-word-region-distribution']:
         op.error("Strategy '%s' invalid for --mode=geotag-documents" %
                  opts.strategy)
+      if opts.eval_format not in ['pcl-travel', 'wiki']:
+        op.error("For --mode=geotag-documents, eval-format must be 'pcl-travel' or 'wiki'")
     elif opts.mode == 'geotag-toponyms':
       if opts.baseline_strategy == 'regdist-most-common-noun':
         op.error("--baseline-strategy=regdist-most-common-noun only compatible with --mode=geotag-documents")
@@ -2420,12 +2488,11 @@ considered.  Default '%default'.""")
           'baseline', 'naive-bayes-with-baseline', 'naive-bayes-no-baseline']:
         op.error("Strategy '%s' invalid for --mode=geotag-toponyms" %
                  opts.strategy)
+      if opts.eval_format not in ['tr-conll', 'wiki']:
+        op.error("For --mode=geotag-toponyms, eval-format must be 'tr-conll' or 'wiki'")
 
     if opts.mode == 'geotag-documents' and opts.eval_format == 'wiki':
       pass # No need for evaluation file, uses the counts file
-    # FIXME!! Fix this limitation.  Should allow raw text files.
-    elif opts.mode == 'geotag-documents' and opts.eval_format != 'wiki':
-      op.error("Can only geotag articles in Wikipedia format")
     elif opts.mode.startswith('geotag'):
       self.need('eval_file', 'evaluation file(s)')
 
@@ -2478,7 +2545,10 @@ considered.  Default '%default'.""")
       else:
         partial = opts.strategy == 'partial-kl-divergence'
         strategy = KLDivergenceStrategy(partial=partial)
-      evalobj = WikipediaGeotagDocumentEvaluator(opts, strategy)
+      if opts.eval_format == 'pcl-travel':
+        evalobj = PCLTravelGeotagDocumentEvaluator(opts, strategy)
+      else:
+        evalobj = WikipediaGeotagDocumentEvaluator(opts, strategy)
       # Hack: When running in --mode=geotag-documents and --eval-format=wiki,
       # we don't need an eval file because we use the article counts we've
       # already loaded.  But we will get an error if we don't set this to
@@ -2489,4 +2559,5 @@ considered.  Default '%default'.""")
     errprint("Processing evaluation file/dir %s..." % opts.eval_file)
     evalobj.evaluate_and_output_results(yield_directory_files(opts.eval_file))
 
-WikiDisambigProgram()
+if __name__ == "__main__":
+  WikiDisambigProgram()
