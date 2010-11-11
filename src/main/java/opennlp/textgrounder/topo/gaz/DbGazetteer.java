@@ -59,6 +59,7 @@ public class DbGazetteer extends Gazetteer {
   }
 
   public void add(String name, Location location) {
+    name = name.toLowerCase();
     Coordinate coordinate = location.getRegion().getCenter();
     try {
       PreparedStatement statement = this.getInsertStatement();
@@ -104,6 +105,7 @@ public class DbGazetteer extends Gazetteer {
   }
 
   public List<Location> lookup(String query) {
+    query = query.toLowerCase();
     ArrayList<Location> locations = new ArrayList<Location>();
 
     try {

@@ -30,6 +30,7 @@ public class InMemoryGazetteer extends Gazetteer {
   }
 
   public void add(String name, Location location) {
+    name = name.toLowerCase();
     List<Location> locations = this.map.get(name);
     if (locations == null) {
       locations = new ArrayList<Location>();
@@ -39,6 +40,7 @@ public class InMemoryGazetteer extends Gazetteer {
   }
 
   public List<Location> lookup(String query) {
+    query = query.toLowerCase();
     List<Location> locations = this.map.get(query);
     if (locations == null) {
       locations = new ArrayList<Location>(0);

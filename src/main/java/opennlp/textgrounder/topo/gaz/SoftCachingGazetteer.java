@@ -47,6 +47,7 @@ public class SoftCachingGazetteer extends CachingGazetteer {
 
   @Override
   public List<Location> lookup(String query) {
+    query = query.toLowerCase();
     return this.cache.get(query);
   }
 }
