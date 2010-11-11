@@ -11,6 +11,8 @@ runcmd = '%s/python/run-run-disambig' % tgdir
 common_args='--max-time-per-stage 300'
 
 degrees_per_region=[90, 30, 10, 5, 3, 2, 1, 0.5]
+degrees_per_region2=[90, 75, 60, 50, 40, 30, 25, 20, 15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2.5, 2, 1.75, 1.5, 1.25, 1, 0.87, 0.75, 0.63, 0.5, 0.4, 0.3, 0.25, 0.2, 0.15, 0.1]
+ 
 strategy=['partial-kl-divergence', 'per-word-region-distribution', 'baseline']
 baseline_strategy=['internal-link', 'random', 'num-articles',
     'region-distribution-most-common-proper-noun']
