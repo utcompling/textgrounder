@@ -1939,7 +1939,13 @@ class PCLTravelGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       return ''.join(t.data for t in
           find_node_dfs(node, lambda x:x.nodeType == md.Attr.TEXT_NODE))
 
-    dom = md.parse(filename)
+    # On error, just return, so that we don't have problems when called
+    # on the whole PCL corpus dir (which includes non-XML files).
+    try:
+      dom = md.parse(filename)
+    except:
+      warning("Unable to parse XML filename: %s" % filename)
+      return
     for chapter in find_node_dfs(dom, (lambda x:
         x.localName == 'div' and x.getAttribute('type') == 'chapter')):
       heads = []
