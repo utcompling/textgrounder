@@ -28,6 +28,11 @@ def iterate(paramname, vals):
       fun('%s.%s' % (id, val), '%s %s %s' % (args, paramname, val))
   return do_iterate
 
+def add_param(param):
+  def do_add_param(fun, id, args):
+    fun(id, '%s %s' % (args, param))
+  return do_add_param
+
 def recurse(funs, *args):
   if not funs:
     return
@@ -75,7 +80,7 @@ CoarseDisambig = nest(MTS300, AllStrategies, CoarseDPR)
 
 # PCL experiments
 PCLDPR = iterate('--degrees-per-region', [1.5, 0.5, 1, 2, 3, 5])
-PCLEvalFile = iterate('-f pcl-travel -e', ['/groups/corpora/pcl_travel/books'])
+PCLEvalFile = add_param('-f pcl-travel -e /groups/corpora/pcl_travel/books')
 PCLDisambig = nest(MTS300, PCLEvalFile, NonBaselineStrategies, PCLDPR)
 
 main()
