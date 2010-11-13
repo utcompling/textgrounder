@@ -42,9 +42,8 @@ import xml.dom.minidom as md
 # List of stopwords
 stopwords = set()
 
-# Debug level; if non-zero, output lots of extra information about how
-# things are progressing.  If > 1, even more info.
-debug = 0
+# Debug flags.  Different flags indicate different info to output.
+debug = booldict()
 
 ############################################################################
 #                       Coordinates and regions                            #
@@ -252,7 +251,7 @@ class RegionWordDist(WordDist):
   # Add the given articles to the total distribution seen so far
   def add_articles(self, articles):
     incoming_links = 0
-    if debug >= 2:
+    if debug['lots']:
       errprint("Region dist, number of articles = %s" % num_arts_for_word_dist)
     old_total_tokens = self.total_tokens
     num_arts_for_links = 0
@@ -274,7 +273,7 @@ class RegionWordDist(WordDist):
     self.num_arts_for_links += num_arts_for_links
     self.num_arts_for_word_dist = num_arts_for_word_dist
     self.incoming_links += incoming_links
-    if num_arts_for_word_dist and debug >= 2:
+    if num_arts_for_word_dist and debug['lots']:
       errprint("""--> Finished processing, number articles handled = %s/%s,
     skipped articles = %s, total tokens = %s/%s, incoming links = %s/%s""" %
                (num_arts_for_word_dist,
@@ -290,7 +289,7 @@ class RegionWordDist(WordDist):
   def finish_word_distribution(self):
     super(RegionWordDist, self).finish_word_distribution()
 
-    if debug >= 2:
+    if debug['lots']:
       errprint("""For region dist, num articles = %s, total tokens = %s,
     unseen_mass = %s, incoming links = %s, overall unseen mass = %s""" %
                (self.num_arts_for_word_dist, self.total_tokens,
@@ -442,7 +441,7 @@ class StatRegion(object):
     reglat = self.latind
     reglong = self.longind
 
-    if debug >= 2:
+    if debug['lots']:
       errprint("Generating distribution for statistical region centered at %s"
                % region_indices_to_coord(reglat, reglong))
 
@@ -451,7 +450,7 @@ class StatRegion(object):
       arts = StatRegion.tiling_region_to_articles.get((latind, longind), None)
       if not arts:
         return
-      if debug >= 2:
+      if debug['lots']:
         errprint("--> Processing tiling region %s" %
                  region_indices_to_coord(latind, longind))
       self.worddist.add_articles(arts)
@@ -511,7 +510,7 @@ class StatRegion(object):
     for i in xrange(minimum_latind, maximum_latind + 1):
       for j in xrange(minimum_longind, maximum_longind + 1):
         reg = cls.find_region_for_region_indices(i, j, no_create_empty=True)
-        if debug >= 1 and not reg.worddist.is_empty():
+        if debug['some'] and not reg.worddist.is_empty():
           errprint("--> (%d,%d): %s" % (i, j, reg))
         status.item_processed()
 
@@ -658,14 +657,14 @@ class Division(object):
       #  mindist = min(spheredist(p, x) for x in self.locs if x is not p)
       #  if mindist <= Opts.max_dist_for_outliers: yield p
 
-    if debug >= 2:
+    if debug['lots']:
       errprint("Computing boundary for %s, path %s, num points %s" %
                (self.name, self.path, len(self.locs)))
                
     self.goodlocs = list(yield_non_outliers())
     # If we've somehow discarded all points, just use the original list
     if not len(self.goodlocs):
-      if debug >= 1:
+      if debug['some']:
         warning("All points considered outliers?  Division %s, path %s" %
                 (self.name, self.path))
       self.goodlocs = self.locs
@@ -831,7 +830,7 @@ class ArticleTable(object):
         return goodarts[0] # One match
       elif len(goodarts) > 1:
         # Multiple matches: Sort by preference, return most preferred one
-        if debug >= 2:
+        if debug['lots']:
           errprint("Warning: Saw %s toponym matches: %s" %
                    (len(goodarts), goodarts))
         sortedarts = \
@@ -872,7 +871,7 @@ class ArticleTable(object):
       if dist <= maxdist:
         return True
       else:
-        if debug >= 2:
+        if debug['lots']:
           errprint("Found article %s but dist %s > %s" %
                    (art, dist, maxdist))
         return False
@@ -893,7 +892,7 @@ class ArticleTable(object):
       if art.coord and art.coord in loc:
         return True
       else:
-        if debug >= 2:
+        if debug['lots']:
           if not art.coord:
             errprint("Found article %s but no coordinate, so not in location named %s, path %s" %
                      (art, loc.name, loc.path))
@@ -1191,7 +1190,8 @@ class Results(object):
   def output_resource_usage(cls):
     errprint("Total elapsed time: %s" %
              float_with_commas(get_program_time_usage()))
-    errprint("Memory usage: %s" % int_with_commas(get_program_memory_usage()))
+    errprint("Memory usage: %s" %
+        int_with_commas(get_program_memory_usage_ps()))
 
   ####### Results for geotagging documents/articles
 
@@ -1468,7 +1468,7 @@ class NaiveBayesStrategy(GeotagToponymStrategy):
 
       total_word_weight += thisweight
       totalprob += thisweight*log(wordprob)
-    if debug >= 1:
+    if debug['some']:
       errprint("Computed total word log-likelihood as %s" % totalprob)
     # Normalize probability according to the total word weight
     if total_word_weight > 0:
@@ -1477,7 +1477,7 @@ class NaiveBayesStrategy(GeotagToponymStrategy):
     # relative weights
     totalprob *= word_weight
     totalprob += baseline_weight*log(thislinks)
-    if debug >= 1:
+    if debug['some']:
       errprint("Computed total log-likelihood as %s" % totalprob)
     return totalprob
 
@@ -1506,11 +1506,11 @@ class GeotagToponymEvaluator(TestFileEvaluator):
   def yield_documents(self, filename):
     def return_word(word):
       if word.is_toponym:
-        if debug >= 2:
+        if debug['lots']:
           errprint("Saw loc %s with true coordinates %s, true location %s" %
                    (word.word, word.coord, word.location))
       else:
-        if debug >= 3:
+        if debug['tons']:
           errprint("Non-toponym %s" % word.word)
       return word
 
@@ -1570,20 +1570,20 @@ class GeotagToponymEvaluator(TestFileEvaluator):
       if loc.match and loc.match not in articles:
         articles += [loc.match]
     if not articles:
-      if debug >= 1:
+      if debug['some']:
         errprint("Unable to find any possibilities for %s" % toponym)
       correct = False
     else:
-      if debug >= 1:
+      if debug['some']:
         errprint("Considering toponym %s, coordinates %s" %
                  (toponym, coord))
         errprint("For toponym %s, %d possible articles" %
                  (toponym, len(articles)))
       for art in articles:
-        if debug >= 1:
+        if debug['some']:
             errprint("Considering article %s" % art)
         if not art:
-          if debug >= 1:
+          if debug['some']:
             errprint("--> Location without matching article")
           continue
         else:
@@ -1626,7 +1626,7 @@ class GeotagToponymEvaluator(TestFileEvaluator):
     Results.record_geotag_toponym_result(correct, toponym, geogword.location,
                                          reason, num_candidates)
 
-    if debug >= 1 and bestart:
+    if debug['some'] and bestart:
       errprint("Best article = %s, score = %s, dist = %s, correct %s"
                % (bestart, bestscore, bestart.distance_to_coord(coord),
                   correct))
@@ -1644,10 +1644,10 @@ def get_adjusted_incoming_links(obj):
   incoming_links = obj.incoming_links
   if incoming_links is None:
     incoming_links = 0
-    if debug >= 1:
+    if debug['some']:
       warning("Strange, %s has no link count" % obj)
   else:
-    if debug >= 1:
+    if debug['some']:
       errprint("--> Link count is %s" % incoming_links)
   if incoming_links == 0: # Whether from unknown count or count is actually zero
     incoming_links = 0.01 # So we don't get errors from log(0)
@@ -1811,7 +1811,7 @@ class KLDivergenceStrategy(GeotagDocumentStrategy):
     article_pq = PriorityQueue()
     for stat_region in StatRegion.yield_all_nonempty_for_word_dist_regions():
       inds = (stat_region.latind, stat_region.longind)
-      if debug >= 2:
+      if debug['lots']:
         (latind, longind) = inds
         coord = region_indices_to_coord(latind, longind)
         errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s"
@@ -1830,6 +1830,26 @@ class KLDivergenceStrategy(GeotagDocumentStrategy):
         regions.append(article_pq.get_top_priority())
       except IndexError:
         break
+    if debug['kldiv']:
+      # Print out the words that contribute most to the KL divergence, for
+      # the top-ranked regions
+      num_contrib_regions = 5
+      num_contrib_words = 25
+      errprint("")
+      errprint("KL-divergence debugging info:")
+      for i in xrange(min(len(regions), num_contrib_regions)):
+        region = regions[i]
+        (kldiv, contribs) = worddist.slow_kl_divergence(region.worddist,
+            partial=self.partial, return_contributing_words=True)
+        errprint("  At rank #%s, region %s:" % (i + 1, region))
+        errprint("    %30s  %s" % ('Word', 'KL-div contribution'))
+        errprint("    %s" % ('-'*50))
+        items = sorted(contribs.iteritems(), key=lambda x:x[1], reverse=True)
+        items = items[0:num_contrib_words]
+        for (word, contribval) in items:
+          errprint("    %30s  %s" % (word, contribval))
+        errprint("")
+
     return regions
 
 
@@ -1889,7 +1909,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     true_latind, true_longind = coord_to_stat_region_indices(article.coord)
     true_statreg = StatRegion.find_region_for_coord(article.coord)
     naitr = true_statreg.worddist.num_arts_for_word_dist
-    if debug >= 2:
+    if debug['lots']:
       errprint("Evaluating article %s with %s word-dist articles in true region" %
                (article, naitr))
     regs = self.strategy.return_ranked_regions(article.dist)
@@ -1900,10 +1920,10 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       rank += 1
     stats = Results.record_geotag_document_result(rank, article.coord,
         regs[0].latind, regs[0].longind, num_arts_in_true_region=naitr,
-        return_stats=(debug >= 1))
+        return_stats=(debug['some']))
     if naitr == 0:
       Results.record_geotag_document_other_stat('Articles with no training articles in region')
-    if debug >= 1:
+    if debug['some']:
       errprint("Article %s:" % article)
       errprint("  True region at rank: %s" % rank)
       errprint("  True region: %s" % true_statreg)
@@ -1967,12 +1987,10 @@ class PCLTravelGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       the_stopwords = {}
     else:
       the_stopwords = stopwords
-    dist.add_words(split_text_into_words(doc.title),
-                   ignore_case=not Opts.preserve_case_words,
-                   stopwords=the_stopwords)
-    dist.add_words(split_text_into_words(doc.text),
-                   ignore_case=not Opts.preserve_case_words,
-                   stopwords=the_stopwords)
+    for text in (doc.title, doc.text):
+      dist.add_words(split_text_into_words(text, ignore_punc=True),
+                     ignore_case=not Opts.preserve_case_words,
+                     stopwords=the_stopwords)
     dist.finish_word_distribution()
     regs = self.strategy.return_ranked_regions(dist)
     errprint("")
@@ -2131,13 +2149,13 @@ class WorldGazetteer(Gazetteer):
 
     # Skip places without coordinates
     if not lat or not long:
-      if debug >= 2:
+      if debug['lots']:
         errprint("Skipping location %s (div %s/%s/%s) without coordinates" %
                  (name, div1, div2, div3))
       return
 
     if lat == '0' and long == '9999':
-      if debug >= 2:
+      if debug['lots']:
         errprint("Skipping location %s (div %s/%s/%s) with bad coordinates" %
                  (name, div1, div2, div3))
       return
@@ -2149,7 +2167,7 @@ class WorldGazetteer(Gazetteer):
       loc.altnames = re.split(', ', altnames)
     # Add the given location to the division the location is in
     loc.div = Division.note_point_seen_in_division(loc, (div1, div2, div3))
-    if debug >= 2:
+    if debug['lots']:
       errprint("Saw location %s (div %s/%s/%s) with coordinates %s" %
                (loc.name, div1, div2, div3, loc.coord))
 
@@ -2159,7 +2177,7 @@ class WorldGazetteer(Gazetteer):
     # for ease in matching.
     for name in [loc.name] + loc.altnames:
       loname = name.lower()
-      if debug >= 2:
+      if debug['lots']:
         errprint("Noting lower_toponym_to_location for toponym %s, canonical name %s"
                  % (name, loc.name))
       cls.lower_toponym_to_location[loname] += [loc]
@@ -2173,14 +2191,14 @@ class WorldGazetteer(Gazetteer):
       maxdist *= 2
 
     if not match: 
-      if debug >= 2:
+      if debug['lots']:
         errprint("Unmatched name %s" % loc.name)
       return
     
     # Record the match.
     loc.match = match
     match.location = loc
-    if debug >= 2:
+    if debug['lots']:
       errprint("Matched location %s (coord %s) with article %s, dist=%s"
                % (loc.name, loc.coord, match,
                   spheredist(loc.coord, match.coord)))
@@ -2196,26 +2214,26 @@ class WorldGazetteer(Gazetteer):
 
     # Match each entry in the gazetteer
     for line in uchompopen(filename):
-      if debug >= 2:
+      if debug['lots']:
         errprint("Processing line: %s" % line)
       cls.match_world_gazetteer_entry(line)
       if status.item_processed() >= Opts.max_time_per_stage:
         break
 
     for division in Division.path_to_division.itervalues():
-      if debug >= 2:
+      if debug['lots']:
         errprint("Processing division named %s, path %s"
                  % (division.name, division.path))
       division.compute_boundary()
       match = ArticleTable.find_match_for_division(division)
       if match:
-        if debug >= 2:
+        if debug['lots']:
           errprint("Matched article %s for division %s, path %s" %
                    (match, division.name, division.path))
         division.match = match
         match.location = division
       else:
-        if debug >= 2:
+        if debug['lots']:
           errprint("Couldn't find match for division %s, path %s" %
                    (division.name, division.path))
 
@@ -2429,8 +2447,10 @@ considered.  Default '%default'.""")
     Opts = opts
     global debug
     if opts.debug:
-      debug = int(opts.debug)
-      WordDist.set_debug_level(debug)
+      flags = re.split(r'[,\s]+', opts.debug)
+      for f in flags:
+        debug[f] = True
+      WordDist.set_debug(debug)
 
     class Params(object):
       pass

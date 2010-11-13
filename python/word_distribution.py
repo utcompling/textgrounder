@@ -4,7 +4,7 @@ from math import log
 from itertools import *
 from kl_divergence import *
 
-debug = 0
+debug = {}
 
 use_sorted_list = False
 
@@ -83,7 +83,7 @@ class WordDist(object):
 
   # Yuck.
   @classmethod
-  def set_debug_level(cls, val):
+  def set_debug(cls, val):
     global debug
     debug = val
 
@@ -192,7 +192,7 @@ add the word counts to the global word count statistics.'''
           (1 - cls.globally_unseen_word_prob))
     # A very rough estimate, perhaps totally wrong
     cls.num_unseen_word_types = cls.num_types_seen_once
-    #if debug > 2:
+    #if debug['tons']:
     #  errprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s" % (cls.num_word_types, cls.num_word_tokens, cls.num_types_seen_once, cls.globally_unseen_word_prob, cls.globally_unseen_word_prob + sum(cls.overall_word_probs.itervalues())))
 
   def test_kl_divergence(self, other, partial=False):
@@ -212,13 +212,19 @@ add the word counts to the global word count statistics.'''
   # 1. Words in this distribution (may or may not be in the other).
   # 2. Words in the other distribution that are not in this one.
   # 3. Words in neither distribution but seen globally.
-  # 4. Words never seen at all.  These have the 
-  def slow_kl_divergence(self, other, partial=False):
+  # 4. Words never seen at all.
+  # If 'return_contributing_words', return a tuple of (val, word_contribs)
+  #   where word_contribs is a table of words and the amount each word
+  #   contributes to the KL divergence.
+  def slow_kl_divergence(self, other, partial=False,
+      return_contributing_words=False):
     '''The basic implementation of KL-divergence.  Useful for checking against
 other implementations.'''
     assert self.finished
     assert other.finished
     kldiv = 0.0
+    if return_contributing_words:
+      contribs = {}
     # 1.
     for word in self.counts:
       p = self.lookup_word(word)
@@ -227,8 +233,12 @@ other implementations.'''
         errprint("Warning: problematic values: p=%s, q=%s, word=%s" % (p, q, word))
       else:
         kldiv += p*(log(p) - log(q))
+        if return_contributing_words:
+          contribs[word] = p*(log(p) - log(q))
 
     if partial:
+      if return_contributing_words:
+        return (kldiv, contribs)
       return kldiv
 
     # 2.
@@ -238,9 +248,14 @@ other implementations.'''
         p = self.lookup_word(word)
         q = other.lookup_word(word)
         kldiv += p*(log(p) - log(q))
+        if return_contributing_words:
+          contribs[word] = p*(log(p) - log(q))
         overall_probs_diff_words += WordDist.overall_word_probs[word]
 
-    return kldiv + self.kl_divergence_34(other, overall_probs_diff_words)
+    retval = kldiv + self.kl_divergence_34(other, overall_probs_diff_words)
+    if return_contributing_words:
+      return (retval, contribs)
+    return retval
 
 
   def kl_divergence_34(self, other, overall_probs_diff_words):
@@ -285,7 +300,7 @@ other implementations.'''
 
   def lookup_word(self, word):
     assert self.finished
-    #if debug > 0:
+    #if debug['some']:
     #  errprint("Found counts for article %s, num word types = %s"
     #           % (art, len(wordcounts[0])))
     #  errprint("Unknown prob = %s, overall_unseen_mass = %s" %
@@ -296,7 +311,7 @@ other implementations.'''
       if owprob is None:
         wordprob = (self.unseen_mass*WordDist.globally_unseen_word_prob
                     / WordDist.num_unseen_word_types)
-        if debug > 1:
+        if debug['lots']:
           errprint("Word %s, never seen at all, wordprob = %s" %
                    (word, wordprob))
       else:
@@ -305,7 +320,7 @@ other implementations.'''
                      self.overall_unseen_mass))
         #if wordprob <= 0:
         #  warning("Bad values; unseen_mass = %s, overall_word_probs[word] = %s, overall_unseen_mass = %s" % (unseen_mass, WordDist.overall_word_probs[word], WordDist.overall_unseen_mass))
-        if debug > 1:
+        if debug['lots']:
           errprint("Word %s, seen but not in article, wordprob = %s" %
                    (word, wordprob))
     else:
@@ -315,7 +330,7 @@ other implementations.'''
       #  for (word, count) in self.counts.iteritems():
       #    errprint("%s: %s" % (word, count))
       wordprob = float(wordprob)/self.total_tokens*(1 - self.unseen_mass)
-      if debug > 1:
+      if debug['lots']:
         errprint("Word %s, seen in article, wordprob = %s" %
                  (word, wordprob))
     return wordprob

@@ -11,6 +11,9 @@ from heapq import * # For priority queue
 import UserDict # For SortedList, LRUCache
 import resource # For resource usage
 from collections import deque # For breadth-first search
+from subprocess import * # For backquote
+from errno import * # For backquote
+import os # For get_program_memory_usage_ps()
 
 #############################################################################
 #                        Regular expression functions                       #
@@ -237,6 +240,12 @@ class intdict(dict):
 class floatdict(dict):
   def __missing__(self, key):
     return 0.0
+
+# A dictionary where missing keys automatically spring into existence
+# with a value of False.
+class booldict(dict):
+  def __missing__(self, key):
+    return False
 
 # A dictionary where missing keys automatically spring into existence
 # with a value of [].  Useful for dictionaries that track lists of items.
@@ -495,8 +504,8 @@ class NLPProgram(object):
                   default=max_time_unlimited,
                   help="""Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default %default.""")
-    op.add_option("-d", "--debug", type='int', metavar="LEVEL",
-                  help="Output debug info at given level")
+    op.add_option("-d", "--debug", metavar="FLAGS",
+                  help="Output debug info of the given types (separated by spaces or commas)")
 
   def need(self, arg, arg_english=None):
     if not arg_english:
@@ -632,7 +641,18 @@ def get_program_memory_usage():
   res = resource.getrusage(resource.RUSAGE_SELF)
   # FIXME!  This is "maximum resident set size".  There are other more useful
   # values, but on the Mac at least they show up as 0 in this structure.
+  # On Linux, alas, all values show up as 0 or garbage (e.g. negative).
   return res.ru_maxrss
+
+# Get memory usage by running 'ps'; getrusage() doesn't seem to work very
+# well.  The following seems to work on both Mac OS X and Linux, at least.
+def get_program_memory_usage_ps():
+  pid = os.getpid()
+  input = backquote("ps -p %s -o rss" % pid)
+  lines = re.split(r'\n', input)
+  for line in lines:
+    if line.strip() == 'RSS': continue
+    return 1024*int(line.strip())
 
 #############################################################################
 #                             Hash tables by range                          #
@@ -740,3 +760,52 @@ def breadth_first_search(node, matches, children):
       yield node
     nodelist.extend(children(node))
 
+#############################################################################
+#                                Subprocesses                               #
+#############################################################################
+
+# Run the specified command; return its combined output and stderr as a string.
+# 'command' can either be a string or a list of individual arguments.  Optional
+# argument 'shell' indicates whether to pass the command to the shell to run.
+# If unspecified, it defaults to True if 'command' is a string, False if a
+# list.  If optional arg 'input' is given, pass this string as the stdin to the
+# command.  If 'include_stderr' is True, stderr will be included along with
+# the output.  If return code is non-zero, throw CommandError if 'throw' is
+# specified; else, return tuple of (output, return-code).
+def backquote(command, input=None, shell=None, include_stderr=True, throw=True):
+  #logdebug("backquote called: %s" % command)
+  if shell is None:
+    if isinstance(command, basestring):
+      shell = True
+    else:
+      shell = False
+  stderrval = STDOUT if include_stderr else PIPE
+  if input is not None:
+    popen = Popen(command, stdin=PIPE, stdout=PIPE, stderr=stderrval,
+                  shell=shell, close_fds=True)
+    output = popen.communicate(input)
+  else:
+    popen = Popen(command, stdout=PIPE, stderr=stderrval,
+                  shell=shell, close_fds=True)
+    output = popen.communicate()
+  if popen.returncode != 0:
+    if throw:
+      if output[0]:
+        outputstr = "Command's output:\n%s" % output[0]
+        if outputstr[-1] != '\n':
+          outputstr += '\n'
+      errstr = output[1]
+      if errstr and errstr[-1] != '\n':
+        errstr += '\n'
+      errmess = ("Error running command: %s\n\n%s\n%s" %
+          (command, output[0], output[1]))
+      #log.error(errmess)
+      oserror(errmess, EINVAL)
+    else:
+      return (output[0], popen.returncode)
+  return output[0]
+
+def oserror(mess, err):
+    e = OSError(mess)
+    e.errno = err
+    raise e
