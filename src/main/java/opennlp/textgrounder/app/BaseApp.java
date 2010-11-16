@@ -21,7 +21,8 @@ public class BaseApp {
         RANDOM,
         BASIC_MIN_DIST,
         WEIGHTED_MIN_DIST,
-        LABEL_PROP_DEFAULT_RULE
+        LABEL_PROP_DEFAULT_RULE,
+        LABEL_PROP_CONTEXT_SENSITIVE
     }
     private static Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
 
@@ -30,7 +31,7 @@ public class BaseApp {
         options.addOption("i", "input", true, "input path");
         options.addOption("ia", "input-additional", true, "path to additional input data to be used in training but not evaluation");
         options.addOption("ig", "input-graph", true, "path to graph for label propagation resolvers");
-        options.addOption("r", "resolver", true, "resolver (RandomResolver, BasicMinDistResolver, WeightedMinDistResolver, LabelPropDefaultRuleResolver) [default = BasicMinDistResolver]");
+        options.addOption("r", "resolver", true, "resolver (RandomResolver, BasicMinDistResolver, WeightedMinDistResolver, LabelPropDefaultRuleResolver, LabelPropContextSensitiveResolver) [default = BasicMinDistResolver]");
         options.addOption("it", "iterations", true, "number of iterations for iterative models [default = 1]");
         options.addOption("o", "output", true, "output path [default = 'output.xml']");
 
@@ -68,6 +69,8 @@ public class BaseApp {
                         resolverType = RESOLVER_TYPE.WEIGHTED_MIN_DIST;
                     else if(value.toLowerCase().startsWith("labelpropd"))
                         resolverType = RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE;
+                    else if(value.toLowerCase().startsWith("labelpropc"))
+                        resolverType = RESOLVER_TYPE.LABEL_PROP_CONTEXT_SENSITIVE;
                     else
                         resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
                     break;

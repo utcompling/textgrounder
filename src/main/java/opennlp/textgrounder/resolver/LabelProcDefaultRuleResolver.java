@@ -21,8 +21,8 @@ public class LabelProcDefaultRuleResolver extends Resolver {
     }
 
     @Override
-    public void train(StoredCorpus corpus){
-        buildLexicons(corpus, lexicon, reverseLexicon);
+    public void train(StoredCorpus corpus) {
+        TopoUtil.buildLexicons(corpus, lexicon, reverseLexicon);
 
         defaultRegions = new HashMap<Integer, Integer>();
 
@@ -84,7 +84,7 @@ public class LabelProcDefaultRuleResolver extends Resolver {
                         Integer indexToSelect = indexCache.get(idx);
                         if(indexToSelect == null) {
                             int regionNumber = defaultRegions.get(idx);
-                            indexToSelect = getCorrectCandidateIndex(toponym, regionNumber);
+                            indexToSelect = TopoUtil.getCorrectCandidateIndex(toponym, regionNumber, DEGREES_PER_REGION);
                             indexCache.put(idx, indexToSelect);
                         }
                         //System.out.println("index selected for " + toponym.getForm() + ": " + indexToSelect);
@@ -97,40 +97,4 @@ public class LabelProcDefaultRuleResolver extends Resolver {
 
         return corpus;
     }
-
-    private int getCorrectCandidateIndex(Toponym toponym, int regionNumber) {
-
-        //System.out.println(toponym.getForm() + " (" + lexicon.get(toponym.getForm()) + ")");
-
-        int index = 0;
-        for(Location location : toponym.getCandidates()) {
-            //System.out.println(getRegionNumber(location) + " vs. " + regionNumber);
-            if(getRegionNumber(location) == regionNumber)
-                return index;
-            index++;
-        }
-
-        return -1;
-    }
-
-    private int getRegionNumber(Location location) {
-        int x = (int) ((location.getRegion().getCenter().getLng() + 180.0) / DEGREES_PER_REGION);
-        int y = (int) ((location.getRegion().getCenter().getLat() + 90.0) / DEGREES_PER_REGION);
-
-        return x * 1000 + y;
-    }
-
-    private void buildLexicons(StoredCorpus corpus, Lexicon<String> lexicon, HashMap<Integer, String> reverseLexicon) {
-        for(Document<StoredToken> doc : corpus) {
-            for(Sentence<StoredToken> sent : doc) {
-                for(Toponym toponym : sent.getToponyms()) {
-                    if(toponym.getAmbiguity() > 0) {
-                        int idx = lexicon.getOrAdd(toponym.getForm());
-                        reverseLexicon.put(idx, toponym.getForm());
-                    }
-                }
-            }
-        }
-    }
-
 }

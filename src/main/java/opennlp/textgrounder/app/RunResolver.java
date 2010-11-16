@@ -46,7 +46,7 @@ public class RunResolver extends BaseApp {
                     multiGaz));*/
             trainCorpus.addSource(new ToponymAnnotator(new GigawordSource(
                     new BufferedReader(new InputStreamReader(
-                    new GZIPInputStream(new FileInputStream(getAdditionalInputPath())))), 50, 100),
+                    new GZIPInputStream(new FileInputStream(getAdditionalInputPath())))), 10, 40000),
                     new OpenNLPRecognizer(),
                     multiGaz));
             trainCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
@@ -70,6 +70,10 @@ public class RunResolver extends BaseApp {
         else if(getResolverType() == RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE) {
             System.out.println("Running LABEL PROP DEFAULT RULE resolver, using graph at " + getGraphInputPath() + " ...");
             resolver = new LabelProcDefaultRuleResolver(getGraphInputPath());
+        }
+        else if(getResolverType() == RESOLVER_TYPE.LABEL_PROP_CONTEXT_SENSITIVE) {
+            System.out.println("Running LABEL PROP CONTEXT SENSITIVE resolver, using graph at " + getGraphInputPath() + " ...");
+            resolver = new LabelPropContextSensitiveResolver(getGraphInputPath());
         }
         else {//if(getResolverType() == RESOLVER_TYPE.BASIC_MIN_DIST) {
             System.out.println("Running BASIC MINIMUM DISTANCE resolver...");

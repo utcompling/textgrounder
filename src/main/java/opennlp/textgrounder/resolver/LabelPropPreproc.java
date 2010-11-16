@@ -35,7 +35,7 @@ public class LabelPropPreproc {
                         if(regionSet == null) {
                             regionSet = new HashSet<Integer>();
                             for(Location location : toponym.getCandidates()) {
-                                int regionNumber = getRegionNumber(location);
+                                int regionNumber = TopoUtil.getRegionNumber(location, DEGREES_PER_REGION);
                                 regionSet.add(regionNumber);
                             }
                             toponymRegionEdges.put(idx, regionSet);
@@ -80,12 +80,5 @@ public class LabelPropPreproc {
         }
 
         out.close();
-    }
-
-    private static int getRegionNumber(Location location) {
-        int x = (int) ((location.getRegion().getCenter().getLng() + 180.0) / DEGREES_PER_REGION);
-        int y = (int) ((location.getRegion().getCenter().getLat() + 90.0) / DEGREES_PER_REGION);
-
-        return x * 1000 + y;
     }
 }

@@ -42,7 +42,7 @@ public class WeightedMinDistResolver extends Resolver {
         initializeCountsAndWeights(counts, weights, corpus, toponymLexicon, PHANTOM_COUNT);
 
         for(int i = 0; i < numIterations; i++) {
-            System.out.println("Iteration: " + i);
+            System.out.println("Iteration: " + (i+1));
             updateWeights(corpus, counts, PHANTOM_COUNT, weights, toponymLexicon);
         }
     }
@@ -83,10 +83,6 @@ public class WeightedMinDistResolver extends Resolver {
             for(Sentence<StoredToken> sent : doc) {
                 for(Toponym toponym : sent.getToponyms()) {
                     if(toponym.getAmbiguity() > 0) {
-                        if(toponym.getForm().equals("york")) {
-                            System.out.println(toponym.getOrigForm());
-                            System.out.println(toponym.getAmbiguity());
-                        }
                         int index = lexicon.get(toponym.getForm());
                         if(counts.get(index) == null) {
                             counts.set(index, new ArrayList<Integer>(toponym.getAmbiguity()));
@@ -147,11 +143,11 @@ public class WeightedMinDistResolver extends Resolver {
 
               if (minIdx > -1) {
                 int countIndex = lexicon.get(toponym.getForm());
-                System.out.println(toponym.getForm());
+                /*System.out.println(toponym.getForm());
                 System.out.println(countIndex);
                 System.out.println(minIdx);
                 System.out.println(counts.get(countIndex).size());
-                System.out.println(toponym.getAmbiguity());
+                System.out.println(toponym.getAmbiguity());*/
                 int prevCount = counts.get(countIndex)
                         .get(minIdx);
                 counts.get(countIndex).set(minIdx, prevCount + 1);
