@@ -144,7 +144,7 @@ add the word counts to the global word count statistics.'''
       counts[word] += count
     self.total_tokens += worddist.total_tokens
 
-  def finish_word_distribution(self):
+  def finish(self):
     '''Finish computation of the word distribution.'''
     # make sure counts not None (eg article in coords file but not counts file)
     if not self.counts: return
