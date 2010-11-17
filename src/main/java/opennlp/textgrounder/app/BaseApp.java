@@ -14,6 +14,7 @@ public class BaseApp {
     private static String additionalInputPath = null;
     private static String graphInputPath = null;
     private static String outputPath = "output.xml";
+    private static String kmlOutputPath = "output.kml";
 
     private static int numIterations = 1;
 
@@ -34,6 +35,7 @@ public class BaseApp {
         options.addOption("r", "resolver", true, "resolver (RandomResolver, BasicMinDistResolver, WeightedMinDistResolver, LabelPropDefaultRuleResolver, LabelPropContextSensitiveResolver) [default = BasicMinDistResolver]");
         options.addOption("it", "iterations", true, "number of iterations for iterative models [default = 1]");
         options.addOption("o", "output", true, "output path [default = 'output.xml']");
+        options.addOption("ok", "output-kml", true, "kml output path");
 
         options.addOption("h", "help", false, "print help");
         
@@ -60,7 +62,10 @@ public class BaseApp {
                         graphInputPath = value;
                     break;
                 case 'o':
-                    outputPath = value;
+                    if(option.getOpt().equals("o"))
+                        outputPath = value;
+                    else if(option.getOpt().equals("ok"))
+                        kmlOutputPath = value;
                     break;
                 case 'r':
                     if(value.toLowerCase().startsWith("r"))
@@ -100,5 +105,9 @@ public class BaseApp {
 
     public static String getOutputPath() {
         return outputPath;
+    }
+
+    public static String getKMLOutputPath() {
+        return kmlOutputPath;
     }
 }

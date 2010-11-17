@@ -87,6 +87,9 @@ public class RunResolver extends BaseApp {
         CorpusXMLWriter w = new CorpusXMLWriter(disambiguated);
         w.write(new File(getOutputPath()));
 
+        CorpusKMLWriter kw = new CorpusKMLWriter(disambiguated);
+        kw.write(new File(getKMLOutputPath()));
+
         Evaluator evaluator = new SignatureEvaluator(testCorpus);
 
         Report report = evaluator.evaluate(disambiguated, false);
