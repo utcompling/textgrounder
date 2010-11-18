@@ -10,10 +10,10 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import javax.xml.stream.XMLStreamWriter;
-import javax.xml.stream.events.*;
 
 import opennlp.textgrounder.util.KMLUtil;
-import opennlp.textgrounder.old.topostructs.*;
+//import opennlp.textgrounder.old.topostructs.*;
+import opennlp.textgrounder.topo.*;
 
 public class RegionTopicXMLtoKML {
 

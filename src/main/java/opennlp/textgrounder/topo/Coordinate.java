@@ -19,7 +19,7 @@ public class Coordinate {
     private final double lng;
     private final double lat;
     
-    private Coordinate(double lat, double lng) {
+    public Coordinate(double lat, double lng) {
       this.lng = lng;
       this.lat = lat;
     }

@@ -36,6 +36,7 @@ import opennlp.textgrounder.old.textstructs.EvalTokenArrayBuffer;
 import opennlp.textgrounder.old.textstructs.TokenArrayBuffer;
 import opennlp.textgrounder.old.textstructs.TextProcessor;
 import opennlp.textgrounder.old.textstructs.older.Lexicon;
+import opennlp.textgrounder.topo.Coordinate;
 import opennlp.textgrounder.old.topostructs.*;
 import opennlp.textgrounder.util.KMLUtil;
 
@@ -423,7 +424,7 @@ public abstract class Model {
             } catch (UnsupportedOperationException e) {
                 placename = lexicon.getWordForInt(loc.getNameid());
             }
-            Coordinate coord = loc.getCoord();
+            Coordinate coord = new Coordinate(loc.getCoord().latitude, loc.getCoord().longitude);
             KMLUtil.writePolygon(out, placename, coord, 10, radius, height);
 
             for (int j = 0; j < loc.getBackPointers().size(); j++) {

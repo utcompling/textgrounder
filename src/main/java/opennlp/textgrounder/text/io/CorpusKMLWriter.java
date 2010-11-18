@@ -1,18 +1,20 @@
 package opennlp.textgrounder.text.io;
 
 import java.io.*;
-
 import java.util.*;
-
 import javax.xml.datatype.*;
-
 import javax.xml.stream.*;
 
 import opennlp.textgrounder.text.*;
-
 import opennlp.textgrounder.topo.*;
+import opennlp.textgrounder.util.*;
 
 public class CorpusKMLWriter {
+    
+      private static double RADIUS = .2;
+      private static int SIDES = 10;
+      private static int BARSCALE = 50000;
+
       protected final Corpus<? extends Token> corpus;
       private final XMLOutputFactory factory;
 
@@ -82,68 +84,23 @@ public class CorpusKMLWriter {
       }
 
       protected void write(XMLStreamWriter out) throws Exception {
-          out.writeStartDocument("UTF-8", "1.0");
-          out.writeStartElement("kml");
-          out.writeAttribute("created", this.getCalendar().toString());
-          out.writeAttribute("xmlns", "http://www.opengis.net/kml/2.2");
-          out.writeAttribute("xmlns:gx", "http://www.google.com/kml/ext/2.2");
-          out.writeAttribute("xmlns:kml", "http://www.opengis.net/kml/2.2");
-          out.writeAttribute("xmlns:atom", "http://www.w3.org/2005/Atom");
 
-          out.writeStartElement("Document");
-
-          this.writeStyleNode(out);
-
-          out.writeStartElement("Folder");
-          this.writeFolderHeading(out);
+          KMLUtil.writeHeader(out, "corpus");
           
           for (opennlp.textgrounder.topo.Location loc : locationCounts.keySet()) {
-              this.writePlacemarkNode(out, loc);
+              this.writePlacemarkAndPolygon(out, loc);
           }
-          
-          out.writeEndDocument();
+
+          KMLUtil.writeFooter(out);
+
           out.close();
       }
 
-      protected void writePlacemarkNode(XMLStreamWriter out, opennlp.textgrounder.topo.Location loc) throws Exception {
+      protected void writePlacemarkAndPolygon(XMLStreamWriter out, opennlp.textgrounder.topo.Location loc) throws Exception {
           String name = loc.getName();
           Coordinate coord = loc.getRegion().getCenter();
-          //int count = locationCounts.get(loc);
+          int count = locationCounts.get(loc);
 
-          out.writeStartElement("Placemark");
-            out.writeStartElement("name"); out.writeCharacters(name); out.writeEndElement();
-            //Region goes here
-            //out.writeStartElement("styleUrl"); out.writeCharacters("#bar"); out.writeEndElement();
-            out.writeStartElement("Point");
-              out.writeStartElement("coordinates");
-                out.writeCharacters(coord.getLngDegrees() + "," + coord.getLatDegrees()); // KML wants (lon,lat)
-              out.writeEndElement();
-            out.writeEndElement();
-          out.writeEndElement();
-      }
-
-      protected void writeStyleNode(XMLStreamWriter out) throws Exception {
-          out.writeStartElement("Style"); out.writeAttribute("id", "bar");
-            out.writeStartElement("PolyStyle");
-              out.writeStartElement("outline"); out.writeCharacters("0"); out.writeEndElement();
-            out.writeEndElement();
-            out.writeStartElement("IconStyle");
-              out.writeStartElement("Icon"); out.writeEndElement();
-            out.writeEndElement();
-          out.writeEndElement();
-      }
-
-      protected void writeFolderHeading(XMLStreamWriter out) throws Exception {
-          out.writeStartElement("name"); out.writeCharacters("Locations"); out.writeEndElement();
-          out.writeStartElement("open"); out.writeCharacters("1"); out.writeEndElement();
-          out.writeStartElement("description"); out.writeCharacters("Location distribution"); out.writeEndElement();
-          out.writeStartElement("LookAt");
-            out.writeStartElement("latitude"); out.writeCharacters("42"); out.writeEndElement();
-            out.writeStartElement("longitude"); out.writeCharacters("-102"); out.writeEndElement();
-            out.writeStartElement("altitude"); out.writeCharacters("0"); out.writeEndElement();
-            out.writeStartElement("range"); out.writeCharacters("5000000"); out.writeEndElement();
-            out.writeStartElement("tilt"); out.writeCharacters("53.454348562403"); out.writeEndElement();
-            out.writeStartElement("heading"); out.writeCharacters("0"); out.writeEndElement();
-          out.writeEndElement();
+          KMLUtil.writePolygon(out, name, coord, SIDES, RADIUS, Math.log(count) * BARSCALE);
       }
 }
