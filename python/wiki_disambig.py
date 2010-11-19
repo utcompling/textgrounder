@@ -328,7 +328,7 @@ class RegionWordDist(WordDist):
         incoming_links += art.incoming_links
       num_arts_for_links += 1
       if not art.dist:
-        if Opts.max_time_per_stage == max_time_unlimited:
+        if Opts.max_time_per_stage == 0:
           warning("Saw article %s without distribution" % art)
         continue
       assert art.dist.finished
@@ -352,8 +352,8 @@ class RegionWordDist(WordDist):
     arts = [loc.match for loc in locs if loc.match]
     self.add_articles(arts)
 
-  def finish(self):
-    super(RegionWordDist, self).finish()
+  def finish(self, minimum_word_count=0):
+    super(RegionWordDist, self).finish(minimum_word_count=minimum_word_count)
 
     if debug['lots']:
       errprint("""For region dist, num articles = %s, total tokens = %s,
@@ -361,6 +361,18 @@ class RegionWordDist(WordDist):
                (self.num_arts_for_word_dist, self.total_tokens,
                 self.unseen_mass, self.incoming_links,
                 self.overall_unseen_mass))
+
+  # For a document described by its distribution 'worddist', return the
+  # log probability log p(worddist|reg) using a Naive Bayes algorithm.  Use 
+  # options from 'opts' to determine specifics of how the algorithm works
+  # (how to compute a prior probability and how to weight it).
+  def get_nbayes_logprob(self, worddist, opts):
+    logprob = 0.0
+    for (word, count) in worddist.counts.iteritems():
+      logprob += log(self.lookup_word(word))
+    # FIXME: Also use baseline (prior probability)
+    return logprob
+
 
 ############################################################################
 #                             Region distributions                         #
@@ -558,7 +570,7 @@ class StatRegion(object):
         if jj > maximum_longind: jj -= 360.
         process_one_region(i, jj)
 
-    self.worddist.finish()
+    self.worddist.finish(minimum_word_count=Opts.minimum_word_count)
 
   # Find the correct StatRegion for the given coordinates.
   # If none, create the region.
@@ -813,7 +825,7 @@ class Division(Location):
     self.worddist = RegionWordDist()
     self.worddist.add_locations([self])
     self.worddist.add_locations(self.goodlocs)
-    self.worddist.finish()
+    self.worddist.finish(minimum_word_count=Opts.minimum_word_count)
 
   def __contains__(self, coord):
     return coord in self.boundary
@@ -908,7 +920,11 @@ class ArticleTable(object):
   # Mapping from lowercased article names to Article objects
   lower_name_to_articles = listdict()
 
-  articles_by_split = {}
+  # List of articles in each split.
+  articles_by_split = listdict()
+
+  # Total # of incoming links for all articles in each split.
+  incoming_links_by_split = intdict()
 
   # Look up an article named NAME and return the associated article.
   # Note that article names are case-sensitive but the first letter needs to
@@ -920,10 +936,9 @@ class ArticleTable(object):
 
   # Record the article as having NAME as one of its names (there may be
   # multiple names, due to redirects).  Also add to related lists mapping
-  # lowercased form, short form, etc.  If IS_REDIRECT, this is a redirect to
-  # an article, so don't record it again.
+  # lowercased form, short form, etc.
   @classmethod
-  def record_article(cls, name, art, is_redirect=False):
+  def record_article_name(cls, name, art):
     # Must pass in properly cased name
     assert name == capfirst(name)
     cls.name_to_article[name] = art
@@ -937,16 +952,34 @@ class ArticleTable(object):
       cls.lower_toponym_to_article[loname] += [art]
     if short != loname and art not in cls.lower_toponym_to_article[short]:
       cls.lower_toponym_to_article[short] += [art]
-    if not is_redirect:
-      splithash = cls.articles_by_split
-      if art.split not in splithash:
-        #splithash[art.split] = set()
-        splithash[art.split] = []
-      splitcoll = splithash[art.split]
-      if isinstance(splitcoll, set):
-        splitcoll.add(art)
+
+  # Record either a normal article ('artfrom' same as 'artto') or a
+  # redirect ('artfrom' redirects to 'artto').
+  @classmethod
+  def record_article(cls, artfrom, artto):
+
+    def none_to_zero(val):
+      if val is None:
+        return 0
       else:
-        splitcoll.append(art)
+        return val
+
+    cls.record_article_name(artfrom.title, artto)
+    redir = artfrom is not artto
+    split = artto.split
+    fromlinks = none_to_zero(artfrom.incoming_links)
+    cls.incoming_links_by_split[split] += fromlinks
+    if not redir:
+      splitcoll = cls.articles_by_split[split]
+      if isinstance(splitcoll, set):
+        splitcoll.add(artto)
+      else:
+        splitcoll.append(artto)
+    elif fromlinks:
+      # Add count of links pointing to a redirect to count of links
+      # pointing to the article redirected to, so that the total incoming
+      # link count of an article includes any redirects to that article.
+      artto.incoming_links = none_to_zero(artto.incoming_links) + fromlinks
 
   @classmethod
   def finish_article_distributions(cls):
@@ -954,7 +987,7 @@ class ArticleTable(object):
     for table in cls.articles_by_split.itervalues():
       for art in table:
         if art.dist:
-          art.dist.finish()
+          art.dist.finish(minimum_word_count=Opts.minimum_word_count)
 
   # Find Wikipedia article matching name NAME for location LOC.  NAME
   # will generally be one of the names of LOC (either its canonical
@@ -1578,7 +1611,8 @@ class TestFileEvaluator(object):
       for doc in self.iter_documents(filename):
         # errprint("Processing document: %s" % doc)
         if self.evaluate_document(doc):
-          new_elapsed = status.item_processed()
+          status.item_processed()
+          new_elapsed = status.elapsed_time()
           new_processed = status.num_processed()
           # If five minutes and ten documents have gone by, print out results
           if (new_elapsed - last_elapsed >= 300 and
@@ -2059,10 +2093,16 @@ class KLDivergenceStrategy(GeotagDocumentStrategy):
     return regions
 
 
+# Return the probability of seeing the given document 
 class NaiveBayesDocumentStrategy(GeotagDocumentStrategy):
   def return_ranked_regions(self, worddist):
-    # FIXME
-    assert False
+    regprobs = {}
+    for reg in \
+        StatRegion.iter_nonempty_regions(nonempty_word_dist=True):
+      logprob = reg.worddist.get_nbayes_logprob(worddist, self.opts)
+      regprobs[reg] = logprob
+    return [reg for (reg, prob) in sorted(regprobs.iteritems(),
+                                          key=lambda x:x[1], reverse=True)]
 
 
 class PerWordRegionDistributionsStrategy(GeotagDocumentStrategy):
@@ -2087,8 +2127,7 @@ class GeotagDocumentEvaluator(TestFileEvaluator):
 
 class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
   def iter_documents(self, filename):
-    for art in ArticleTable.articles_by_split['dev']:
-      assert art.split == 'dev'
+    for art in ArticleTable.articles_by_split[self.opts.eval_set]:
       yield art
 
     #title = None
@@ -2115,7 +2154,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     if not article.dist:
       # This can (and does) happen when --max-time-per-stage is set,
       # so that the counts for many articles don't get read in.
-      if Opts.max_time_per_stage == 'max_time_unlimited':
+      if Opts.max_time_per_stage == 0:
         warning("Can't evaluate article %s without distribution" % article)
       Results.record_geotag_document_other_stat('Skipped articles')
       return False
@@ -2205,7 +2244,7 @@ class PCLTravelGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       dist.add_words(split_text_into_words(text, ignore_punc=True),
                      ignore_case=not Opts.preserve_case_words,
                      stopwords=the_stopwords)
-    dist.finish()
+    dist.finish(minimum_word_count=Opts.minimum_word_count)
     regs = self.strategy.return_ranked_regions(dist)
     errprint("")
     errprint("Article with title: %s" % doc.title)
@@ -2239,17 +2278,17 @@ def read_article_data(filename):
     if art.redir:
       redirects.append(art)
     elif art.coord:
-      ArticleTable.record_article(art.title, art)
+      ArticleTable.record_article(art, art)
       if art.split == 'training':
         StatRegion.add_article_to_region(art)
 
   read_article_data_file(filename, process, article_type=StatArticle,
-                         max_time_per_stage=Opts.max_time_per_stage)
+                         maxtime=Opts.max_time_per_stage)
 
   for x in redirects:
     redart = ArticleTable.lookup_article(x.redir)
     if redart:
-      ArticleTable.record_article(x.title, redart, is_redirect=True)
+      ArticleTable.record_article(x, redart)
 
 
 # Parse the result of a previous run of --output-counts and generate
@@ -2266,8 +2305,14 @@ def read_word_counts(filename):
     if not art:
       warning("Skipping article %s, not in table" % title)
       return
+    # If we are evaluating on the dev set, skip the test set and vice
+    # versa, to save memory and avoid contaminating the results.
+    if art.split != 'training' and art.split != Opts.eval_set:
+      return
     art.dist = WordDist()
-    art.dist.set_word_distribution(total_tokens, wordhash, note_globally=True)
+    # Don't train on test set
+    art.dist.set_word_distribution(total_tokens, wordhash,
+        note_globally=(art.split == 'training'))
 
   errprint("Reading word counts from %s..." % filename)
   status = StatusMessage('article')
@@ -2280,7 +2325,7 @@ def read_word_counts(filename):
       if title:
         one_article_probs()
       # Stop if we've reached the maximum
-      if status.item_processed() >= Opts.max_time_per_stage:
+      if status.item_processed(maxtime=Opts.max_time_per_stage):
         break
       title = m.group(1)
       wordhash = intdict()
@@ -2436,7 +2481,7 @@ class WorldGazetteer(Gazetteer):
       if debug['lots']:
         errprint("Processing line: %s" % line)
       cls.match_world_gazetteer_entry(line)
-      if status.item_processed() >= Opts.max_time_per_stage:
+      if status.item_processed(maxtime=Opts.max_time_per_stage):
         break
 
     Division.finish_all()
@@ -2495,6 +2540,12 @@ Each file is read in and then disambiguation is performed.""",
                   default="wiki", choices=['tr-conll', 'wiki', 'raw-text',
                                            'pcl-travel'],
                   help="""Format of evaluation file(s).  Default '%default'.""")
+    op.add_option("--eval-set", "--es", type='choice',
+                  default="dev", choices=['dev', 'devel', 'test'],
+                  help="""Set to use for evaluation when --eval-format=wiki
+and --mode=geotag-documents ('dev' or 'devel' for the development set,
+'test' for the test set).  Default '%default'.""")
+    canon_options['eval_set'] = {'devel':'dev'}
 
     ########## Misc options for handling distributions
     op.add_option("--preserve-case-words", "--pcw", action='store_true',
@@ -2509,6 +2560,9 @@ distributions.""")
     op.add_option("--naive-bayes-context-len", "--nbcl", type='int', default=10,
                   help="""Number of words on either side of a toponym to use
 in Naive Bayes matching.  Default %default.""")
+    op.add_option("--minimum-word-count", "--mwc", type='int', default=1,
+                  help="""Minimum count of words to consider in word
+distributions.  Words whose count is less than this value are ignored.""")
 
     ########## Misc options for controlling matching
     op.add_option("--max-dist-for-close-match", "--mdcm", type='float',
@@ -2714,7 +2768,8 @@ considered.  Default '%default'.""")
     if opts.mode == 'geotag-documents':
       if opts.strategy not in [
           'baseline', 'kl-divergence', 'partial-kl-divergence',
-          'per-word-region-distribution']:
+          'per-word-region-distribution',
+          'naive-bayes-with-baseline', 'naive-bayes-no-baseline']:
         op.error("Strategy '%s' invalid for --mode=geotag-documents" %
                  opts.strategy)
       if opts.eval_format not in ['pcl-travel', 'wiki']:
@@ -2765,8 +2820,6 @@ considered.  Default '%default'.""")
       # Generate strategy object
       if opts.strategy == 'baseline':
         strategy = BaselineGeotagToponymStrategy(opts)
-      elif opts.strategy == 'naive-bayes-no-baseline':
-        strategy = NaiveBayesToponymStrategy(opts)
       else:
         strategy = NaiveBayesToponymStrategy(opts)
 
@@ -2778,6 +2831,8 @@ considered.  Default '%default'.""")
     else:
       if opts.strategy == 'baseline':
         strategy = BaselineGeotagDocumentStrategy(opts.baseline_strategy)
+      elif opts.strategy.startswith('naive-bayes-'):
+        strategy = NaiveBayesDocumentStrategy(opts)
       elif opts.strategy == 'per-word-region-distribution':
         strategy = PerWordRegionDistributionsStrategy()
       else:

@@ -144,8 +144,16 @@ add the word counts to the global word count statistics.'''
       counts[word] += count
     self.total_tokens += worddist.total_tokens
 
-  def finish(self):
+  def finish(self, minimum_word_count=0):
     '''Finish computation of the word distribution.'''
+
+    # If 'minimum_word_count' was given, then eliminate words whose count
+    # is too small.
+    if minimum_word_count > 1:
+      for (word, count) in self.counts.iteritems():
+        if count < minimum_word_count:
+          del self.counts[word]
+
     # make sure counts not None (eg article in coords file but not counts file)
     if not self.counts: return
     if self.finished: return
