@@ -13,8 +13,8 @@ public class BaseApp {
     private static String inputPath = null;
     private static String additionalInputPath = null;
     private static String graphInputPath = null;
-    private static String outputPath = "output.xml";
-    private static String kmlOutputPath = "output.kml";
+    private static String outputPath = null;
+    private static String kmlOutputPath = null;
 
     private static int numIterations = 1;
 

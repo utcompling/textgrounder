@@ -20,6 +20,7 @@ import javax.xml.stream.XMLStreamWriter;
 
 //import opennlp.textgrounder.old.topostructs.Coordinate;
 import opennlp.textgrounder.topo.*;
+import java.text.*;
 
 /**
  * Class of static methods for generating KML headers, footers and other stuff.
@@ -28,7 +29,14 @@ import opennlp.textgrounder.topo.*;
  */
 public class KMLUtil {
   // Minimum number of pixels the (small) square region (NOT our Region) represented by each city must occupy on the screen for its label to appear:
-  public final static int MIN_LOD_PIXELS = 16;
+  private final static int MIN_LOD_PIXELS = 16;
+
+  public static double RADIUS = .15;
+  public static double SPIRAL_RADIUS = .2;
+  public static int SIDES = 10;
+  public static int BARSCALE = 50000;
+
+  private final static DecimalFormat df = new DecimalFormat("#.####");
 
   public static void writeWithCharacters(XMLStreamWriter w, String localName, String text)
     throws XMLStreamException {
@@ -83,11 +91,18 @@ public class KMLUtil {
     w.writeEndElement(); // IconStyle
     w.writeEndElement(); // Style
 
+    w.writeStartElement("Style");
+    w.writeAttribute("id", "context");
+    w.writeStartElement("LabelStyle");
+    KMLUtil.writeWithCharacters(w, "scale", "0");
+    w.writeEndElement(); // LabelStyle
+    w.writeEndElement(); // Style
+
     w.writeStartElement("Folder");
     KMLUtil.writeWithCharacters(w, "name", name);
     KMLUtil.writeWithCharacters(w, "open", "1");
     KMLUtil.writeWithCharacters(w, "description", "Distribution of place names found in " + name);
-    KMLUtil.writeLookAt(w, 42, -102, 0, 5000000, 53.454348562403, 0);
+    KMLUtil.writeLookAt(w, 42, -102, 0, 5000000, 53.45434856, 0);
   }
 
   public static void writeFooter(XMLStreamWriter w)
@@ -109,7 +124,7 @@ public class KMLUtil {
     for (double currentRadian = startRadian; currentRadian >= startRadian - 2 * Math.PI; currentRadian -= radianUnit) {
       double lat = coord.getLatDegrees() + radius * Math.cos(currentRadian);
       double lon = coord.getLngDegrees() + radius * Math.sin(currentRadian);
-      w.writeCharacters(String.format("%f,%f,%f\n", lon, lat, height));
+      w.writeCharacters(df.format(lon) + "," + df.format(lat) + "," + df.format(height) + "\n");
     }
 
     w.writeEndElement(); // coordinates
@@ -119,10 +134,10 @@ public class KMLUtil {
     throws XMLStreamException {
     w.writeStartElement("Region");
     w.writeStartElement("LatLonAltBox");
-    KMLUtil.writeWithCharacters(w, "north", String.format("%f", coord.getLatDegrees() + radius));
-    KMLUtil.writeWithCharacters(w, "south", String.format("%f", coord.getLatDegrees() - radius));
-    KMLUtil.writeWithCharacters(w, "east", String.format("%f", coord.getLngDegrees() + radius));
-    KMLUtil.writeWithCharacters(w, "west", String.format("%f", coord.getLngDegrees() - radius));
+    KMLUtil.writeWithCharacters(w, "north", df.format(coord.getLatDegrees() + radius));
+    KMLUtil.writeWithCharacters(w, "south", df.format(coord.getLatDegrees() - radius));
+    KMLUtil.writeWithCharacters(w, "east", df.format(coord.getLngDegrees() + radius));
+    KMLUtil.writeWithCharacters(w, "west", df.format(coord.getLngDegrees() - radius));
     w.writeEndElement(); // LatLonAltBox
     w.writeStartElement("Lod");
     KMLUtil.writeWithCharacters(w, "minLodPixels", Integer.toString(KMLUtil.MIN_LOD_PIXELS));
@@ -134,12 +149,12 @@ public class KMLUtil {
                                  double alt, double range, double tilt, double heading)
     throws XMLStreamException {
     w.writeStartElement("LookAt");
-    KMLUtil.writeWithCharacters(w, "latitude", String.format("%f", lat));
-    KMLUtil.writeWithCharacters(w, "longitude", String.format("%f", lon));
-    KMLUtil.writeWithCharacters(w, "altitude", String.format("%f", alt));
-    KMLUtil.writeWithCharacters(w, "range", String.format("%f", range));
-    KMLUtil.writeWithCharacters(w, "tilt", String.format("%f", tilt));
-    KMLUtil.writeWithCharacters(w, "heading", String.format("%f", heading));
+    KMLUtil.writeWithCharacters(w, "latitude", "" + lat);
+    KMLUtil.writeWithCharacters(w, "longitude", "" + lon);
+    KMLUtil.writeWithCharacters(w, "altitude", "" + alt);
+    KMLUtil.writeWithCharacters(w, "range", "" + range);
+    KMLUtil.writeWithCharacters(w, "tilt", "" + tilt);
+    KMLUtil.writeWithCharacters(w, "heading", "" + heading);
     w.writeEndElement(); // LookAt
   }
 
@@ -151,7 +166,7 @@ public class KMLUtil {
     KMLUtil.writeRegion(w, coord, radius);
     KMLUtil.writeWithCharacters(w, "styleUrl", "#bar");
     w.writeStartElement("Point");
-    KMLUtil.writeWithCharacters(w, "coordinates", String.format("%f,%f", coord.getLngDegrees(), coord.getLatDegrees()));
+    KMLUtil.writeWithCharacters(w, "coordinates", df.format(coord.getLngDegrees()) + "," + df.format(coord.getLatDegrees()));
     w.writeEndElement(); // Point
     w.writeEndElement(); // Placemark
     w.writeStartElement("Placemark");
@@ -184,7 +199,7 @@ public class KMLUtil {
     KMLUtil.writeRegion(w, coord, radius);
     KMLUtil.writeWithCharacters(w, "styleUrl", "#context");
     w.writeStartElement("Point");
-    KMLUtil.writeWithCharacters(w, "coordinates", String.format("%f,%f", coord.getLngDegrees(), coord.getLatDegrees()));
+    KMLUtil.writeWithCharacters(w, "coordinates", df.format(coord.getLngDegrees()) + "," + df.format(coord.getLatDegrees()));
     w.writeEndElement(); // Point
     w.writeEndElement(); // Placemark
   }
@@ -202,13 +217,13 @@ public class KMLUtil {
     w.writeStartElement("Placemark");
     KMLUtil.writeWithCharacters(w, "name", name);
     KMLUtil.writeWithCharacters(w, "visibility", "1");
-    KMLUtil.writeLookAt(w, coord.getLatDegrees(), coord.getLngDegrees(), height, 500.6566641072245, 40.5575073395506, -148.4122922628044);
+    KMLUtil.writeLookAt(w, coord.getLatDegrees(), coord.getLngDegrees(), height, 500.656, 40.557, -148.412);
     KMLUtil.writeWithCharacters(w, "styleUrl", styleUrl);
     w.writeStartElement("Point");
     KMLUtil.writeWithCharacters(w, "altitudeMode", "relativeToGround");
-    KMLUtil.writeWithCharacters(w, "coordinates", String.format("%f,%f,%f", coord.getLngDegrees(), coord.getLatDegrees(), height));
+    KMLUtil.writeWithCharacters(w, "coordinates",
+            df.format(coord.getLngDegrees()) + "," + df.format(coord.getLatDegrees()) + "," + df.format(height));
     w.writeEndElement(); // Point
     w.writeEndElement(); // Placemark
   }
 }
-

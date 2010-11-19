@@ -51,32 +51,32 @@ public class RunResolver extends BaseApp {
                     multiGaz));
             trainCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
             trainCorpus.load();
+            System.out.println("done.");
         }
-        System.out.println("done.\n");
 
-        System.out.println("Number of documents: " + testCorpus.getDocumentCount());
+        System.out.println("\nNumber of documents: " + testCorpus.getDocumentCount());
         System.out.println("Number of toponym types: " + testCorpus.getToponymTypeCount());
         System.out.println("Maximum ambiguity (locations per toponym): " + testCorpus.getMaxToponymAmbiguity() + "\n");
 
         Resolver resolver;
         if(getResolverType() == RESOLVER_TYPE.RANDOM) {
-            System.out.println("Running RANDOM resolver...");
+            System.out.print("Running RANDOM resolver...");
             resolver = new RandomResolver();
         }
         else if(getResolverType() == RESOLVER_TYPE.WEIGHTED_MIN_DIST) {
-            System.out.println("Running WEIGHTED MINIMUM DISTANCE resolver with " + getNumIterations() + " iteration(s)...");
+            System.out.print("Running WEIGHTED MINIMUM DISTANCE resolver with " + getNumIterations() + " iteration(s)...");
             resolver = new WeightedMinDistResolver(getNumIterations());
         }
         else if(getResolverType() == RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE) {
-            System.out.println("Running LABEL PROP DEFAULT RULE resolver, using graph at " + getGraphInputPath() + " ...");
+            System.out.print("Running LABEL PROP DEFAULT RULE resolver, using graph at " + getGraphInputPath() + " ...");
             resolver = new LabelProcDefaultRuleResolver(getGraphInputPath());
         }
         else if(getResolverType() == RESOLVER_TYPE.LABEL_PROP_CONTEXT_SENSITIVE) {
-            System.out.println("Running LABEL PROP CONTEXT SENSITIVE resolver, using graph at " + getGraphInputPath() + " ...");
+            System.out.print("Running LABEL PROP CONTEXT SENSITIVE resolver, using graph at " + getGraphInputPath() + " ...");
             resolver = new LabelPropContextSensitiveResolver(getGraphInputPath());
         }
         else {//if(getResolverType() == RESOLVER_TYPE.BASIC_MIN_DIST) {
-            System.out.println("Running BASIC MINIMUM DISTANCE resolver...");
+            System.out.print("Running BASIC MINIMUM DISTANCE resolver...");
             resolver = new BasicMinDistResolver();
         }
 
@@ -84,21 +84,31 @@ public class RunResolver extends BaseApp {
             resolver.train(trainCorpus);
         Corpus disambiguated = resolver.disambiguate(testCorpus);
 
-        CorpusXMLWriter w = new CorpusXMLWriter(disambiguated);
-        w.write(new File(getOutputPath()));
+        System.out.println("done.");
 
-        CorpusKMLWriter kw = new CorpusKMLWriter(disambiguated);
-        kw.write(new File(getKMLOutputPath()));
-
+        System.out.print("\nEvaluating...");
         Evaluator evaluator = new SignatureEvaluator(testCorpus);
-
         Report report = evaluator.evaluate(disambiguated, false);
+        System.out.println("done.");
 
-        System.out.println("\nP: " + report.getPrecision());
+        System.out.println("\nResults:");
+        System.out.println("P: " + report.getPrecision());
         System.out.println("R: " + report.getRecall());
         System.out.println("F: " + report.getFScore());
-        System.out.println("A: " + report.getAccuracy());
+        System.out.println("A: " + report.getAccuracy() + "\n");
+
+        if(getOutputPath() != null) {
+            System.out.print("Writing resolved corpus in XML format to " + getOutputPath() + " ...");
+            CorpusXMLWriter w = new CorpusXMLWriter(disambiguated);
+            w.write(new File(getOutputPath()));
+            System.out.println("done.");
+        }
+
+        if(getKMLOutputPath() != null) {
+            System.out.print("Writing visualizable resolved corpus in KML format to " + getKMLOutputPath() + " ...");
+            CorpusKMLWriter kw = new CorpusKMLWriter(disambiguated);
+            kw.write(new File(getKMLOutputPath()));
+            System.out.println("done.");
+        }
     }
-
 }
-

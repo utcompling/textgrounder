@@ -83,7 +83,10 @@ public class Coordinate {
       double radius = initRadius + (initRadius * 0.1) * n;
       double angle = radianUnit / 2.0 + 1.1 * radianUnit * n;
 
-      return new Coordinate(this.lat + radius * Math.cos(angle), this.lng + radius * Math.sin(angle));
+      double newLatDegrees = this.getLatDegrees() + radius * Math.cos(angle);
+      double newLngDegrees = this.getLngDegrees() + radius * Math.sin(angle);
+
+      return new Coordinate(newLatDegrees * Math.PI / 180.0, newLngDegrees * Math.PI / 180.0);
     }
 
     public String toString() {

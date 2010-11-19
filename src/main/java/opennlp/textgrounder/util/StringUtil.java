@@ -23,6 +23,14 @@ package opennlp.textgrounder.util;
  */
 public class StringUtil {
 
+    public static boolean containsAlphanumeric(String s) {
+        for(int i = 0; i < s.length(); i++) {
+            if(Character.isLetterOrDigit(s.charAt(i)))
+                return true;
+        }
+        return false;
+    }
+
     public static String[] splitAtLast(char sep, String s) {
         int lastIndex = s.lastIndexOf(sep);
         String[] wordtag = {s.substring(0, lastIndex),
