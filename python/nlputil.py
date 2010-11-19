@@ -229,64 +229,77 @@ def split_text_into_words(text, ignore_punc=False, include_nl=False):
 #                             Default dictionaries                          #
 #############################################################################
 
-# A dictionary where missing keys automatically spring into existence
-# with a value of 0.  Useful for dictionaries that track counts of items.
-class intdict(dict):
-  def __missing__(self, key):
-    return 0
-
-# A dictionary where missing keys automatically spring into existence
-# with a value of 0.0.  Useful for dictionaries that track counts of items.
-class floatdict(dict):
-  def __missing__(self, key):
-    return 0.0
-
-# A dictionary where missing keys automatically spring into existence
-# with a value of False.
-class booldict(dict):
-  def __missing__(self, key):
-    return False
-
-# A dictionary where missing keys automatically spring into existence
-# with a value of [].  Useful for dictionaries that track lists of items.
-# NOTE NOTE NOTE: It DOES NOT work to add to a non-existent key using
-# append(); use += instead.  It "appears" to work but the new value gets
-# swallowed.  The reason is that although asking for the value of a
-# non-existent key automatically returns [], the key itself doesn't
-# spring into existence until you assign assign a value to it, as for
-# normal dictionaries.  NOTE: This behavior is NOT the same as when you
-# use collections.defaultdict(list), where asking for the value of a
-# non-existent key DOES cause the key to get added to the dictionary with
-# the default value.
+# Our own version similar to collections.defaultdict().  The difference is
+# that we can specify whether or not simply referencing an unseen key
+# automatically causes the key to permanently spring into existence with
+# the "missing" value.  collections.defaultdict() always behaves as if
+# 'add_upon_ref'=True, same as our default.  Basically:
 #
-# Hence:
+# foo = defdict(list, add_upon_ref=False)
+# foo['bar']          -> []
+# 'bar' in foo        -> False
 #
-# foo = listdict()
-# foo['bar'] -> []
-# 'bar' in foo -> False
+# foo = defdict(list, add_upon_ref=True)
+# foo['bar']          -> []
+# 'bar' in foo        -> True
 #
-# import collections
-# foo2 = collections.defaultdict(list)
-# foo2['bar'] -> []
-# 'bar' in foo2 -> True
+# The former may be useful where you may make many queries involving
+# non-existent keys, and you don't want all these keys added to the dict.
+# The latter is useful with mutable objects like lists.  If I create
 #
-class listdict(dict):
-  def __missing__(self, key):
-    return list()
+#   foo = defdict(list, add_upon_ref=False)
+#
+# and then call
+#
+#   foo['glorplebargle'].append('shazbat')
+#
+# where 'glorplebargle' is a previously non-existent key, the call to
+# 'append' will "appear" to work but in fact nothing will happen, because
+# the reference foo['glorplebargle'] will create a new list and return
+# it, but not store it in the dict, and 'append' will add to this
+# temporary list, which will soon disappear.  Note that using += will
+# actually work, but this is fragile behavior, not something to depend on.
+#
+class defdict(dict):
+  def __init__(self, factory, add_upon_ref=True):
+    super(defdict, self).__init__()
+    self.factory = factory
+    self.add_upon_ref = add_upon_ref
 
-# A dictionary where missing keys automatically spring into existence
-# with a value of (), i.e. the empty tuple.
-class tupledict(dict):
   def __missing__(self, key):
-    return ()
+    val = self.factory()
+    if self.add_upon_ref:
+      self[key] = val
+    return val
 
-# A dictionary where missing keys automatically spring into existence
-# with a value of set(), i.e. the empty set.  Useful for dictionaries that
-# track sets of items.  See above: you need to add items to the set
-# using +=, not using append().
-class setdict(dict):
-  def __missing__(self, key):
-    return set()
+
+# A dictionary where asking for the value of a missing key causes 0 (or 0.0,
+# etc.) to be returned.  Useful for dictionaries that track counts of items.
+
+def intdict():
+  return defdict(int, add_upon_ref=False)
+
+def floatdict():
+  return defdict(float, add_upon_ref=False)
+
+def booldict():
+  return defdict(float, add_upon_ref=False)
+
+# Similar but the default value is an empty collection.  We set
+# 'add_upon_ref' to True whenever the collection is mutable; see comments
+# above.
+
+def listdict():
+  return defdict(list, add_upon_ref=True)
+
+def strdict():
+  return defdict(str, add_upon_ref=False)
+
+def tupledict():
+  return defdict(tuple, add_upon_ref=False)
+
+def setdict():
+  return defdict(set, add_upon_ref=True)
 
 #############################################################################
 #                                 Sorted lists                              #
@@ -387,7 +400,13 @@ class StatusMessage(object):
   def elapsed_time(self):
     return time.time() - self.first_time
 
-  def item_processed(self):
+  def item_unit(self):
+    if self.items_processed == 1:
+      return self.item_name
+    else:
+      return self.plural_item_name
+
+  def item_processed(self, maxtime=0):
     curtime = time.time()
     self.items_processed += 1
     total_elapsed_secs = int(curtime - self.first_time)
@@ -401,12 +420,14 @@ class StatusMessage(object):
       rounded_elapsed = (int(total_elapsed_secs / self.secs_between_output) *
                          self.secs_between_output)
       self.last_time = self.first_time + rounded_elapsed
-      uniprint ("Elapsed time: %s minutes %s seconds, %s %s processed"
-                % (int(total_elapsed_secs / 60), total_elapsed_secs % 60,
-                   self.items_processed,
-                   self.item_name if self.items_processed == 1
-                     else self.plural_item_name), outfile=sys.stderr)
-    return total_elapsed_secs
+      errprint("Elapsed time: %s minutes %s seconds, %s %s processed"
+               % (int(total_elapsed_secs / 60), total_elapsed_secs % 60,
+                  self.items_processed, self.item_unit()))
+    if maxtime and total_elapsed_secs >= maxtime:
+      errprint("Maximum time reached, interrupting processing after %s %s"
+               % (self.items_processed, self.item_unit()))
+      return True
+    return False
  
 #############################################################################
 #                               File Splitting                              #
@@ -459,8 +480,6 @@ def next_split_set(split_fractions):
 #                               NLP Programs                                #
 #############################################################################
 
-max_time_unlimited = 2**31
-
 def output_option_parameters(opts, params=None):
   errprint("Parameter values:")
   for opt in dir(opts):
@@ -500,8 +519,7 @@ class NLPProgram(object):
     return True
 
   def populate_shared_options(self, op):
-    op.add_option("--max-time-per-stage", "--mts", type='int',
-                  default=max_time_unlimited,
+    op.add_option("--max-time-per-stage", "--mts", type='int', default=0,
                   help="""Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default %default.""")
     op.add_option("-d", "--debug", metavar="FLAGS",

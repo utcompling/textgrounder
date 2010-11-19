@@ -136,11 +136,11 @@ def get_field_types(field_table, field_list):
 
 # Read in the article data file.  Call PROCESS on each article.
 # The type of the article created is given by ARTICLE_TYPE, which defaults
-# to Article.  MAX_TIME_PER_STAGE is a value in seconds, which limits the
-# total processing time (real time, not CPU time) used for reading in the
+# to Article.  MAXTIME is a value in seconds, which limits the total
+# processing time (real time, not CPU time) used for reading in the
 # file, for testing purposes.
 def read_article_data_file(filename, process, article_type=Article,
-                           max_time_per_stage=2**31):
+                           maxtime=0):
   errprint("Reading article data from %s..." % filename)
   status = StatusMessage('article')
 
@@ -157,7 +157,7 @@ def read_article_data_file(filename, process, article_type=Article,
     record = dict([(str(f),t(v)) for f,v,t in zip(fields, fieldvals, field_types)])
     art = article_type(**record)
     process(art)
-    if status.item_processed() >= max_time_per_stage:
+    if status.item_processed(maxtime=maxtime):
       break
   return fields
 

@@ -46,6 +46,33 @@ stopwords = set()
 debug = booldict()
 
 ############################################################################
+#                               Structures                                 #
+############################################################################
+
+def print_structure(struct, indent=0):
+  indstr = ' '*indent
+  if not struct or not isinstance(struct, list):
+    errprint("%s%s" % (indstr, struct))
+  else:
+    if isinstance(struct[0], basestring):
+      errprint("%s%s:" % (indstr, struct[0]))
+      indstr += '  '
+      indent += 2
+      struct = struct[1:]
+    for s in struct:
+      if isinstance(s, list):
+        print_structure(s, indent + 2)
+      elif isinstance(s, tuple):
+        (key, val) = s
+        if isinstance(val, list):
+          errprint("%s%s:" % (indstr, key))
+          print_structure(val, indent + 2)
+        else:
+          errprint("%s%s: %s" % (indstr, key, val))
+      else:
+        errprint("%s%s" % (indstr, s))
+
+############################################################################
 #                       Coordinates and regions                            #
 ############################################################################
 
@@ -117,11 +144,50 @@ class Boundary(object):
   def __str__(self):
     return '%s-%s' % (self.botleft, self.topright)
 
+  def struct(self):
+    return ["Boundary", ('boundary', '%s-%s' % (self.botleft, self.topright))]
+
   def __contains__(self, coord):
-    return (coord.lat >= self.botleft.lat and
-            coord.lat <= self.topright.lat and
-            coord.long >= self.botleft.long and
-            coord.long <= self.topright.long)
+    if not (coord.lat >= self.botleft.lat and
+            coord.lat <= self.topright.lat):
+      return False
+    if self.botleft.long <= self.topright.long:
+      return (coord.long >= self.botleft.long and
+              coord.long <= self.topright.long)
+    else:
+      # Handle case where boundary overlaps the date line.
+      return ((coord.long >= self.botleft.long and
+               coord.long <= self.topright.long + 360.) or
+              (coord.long >= self.botleft.long - 360. and
+               coord.long <= self.topright.long))
+
+  def square_area(self):
+    (lat1, lon1) = (self.botleft.lat, self.botleft.long)
+    (lat2, lon2) = (self.topright.lat, self.topright.long)
+    lat1 = (lat1 / 180.) * math.pi
+    lat2 = (lat2 / 180.) * math.pi
+    lon1 = (lon1 / 180.) * math.pi
+    lon2 = (lon2 / 180.) * math.pi
+
+    return ((earth_radius_in_miles ** 2) *
+            abs(math.sin(lat1) - math.sin(lat2)) *
+            abs(lon1 - lon2))
+
+  # Iterate over the regions that overlap the boundary.  If
+  # 'nonempty_word_dist' is True, only yield regions with a non-empty
+  # word distribution; else, yield all non-empty regions.
+  def iter_nonempty_tiling_regions(self):
+    (latind1, longind1) = coord_to_tiling_region_indices(self.botleft)
+    (latind2, longind2) = coord_to_tiling_region_indices(self.topright)
+    for i in xrange(latind1, latind2 + 1):
+      if longind1 <= longind2:
+        it = xrange(longind1, longind2 + 1)
+      else:
+        it = chain(xrange(longind1, maximum_longind + 1),
+                   xrange(minimum_longind, longind2 + 1))
+      for j in it:
+        if (i, j) in StatRegion.tiling_region_to_articles:
+          yield (i, j)
 
 # Compute spherical distance in miles (along a great circle) between two
 # coordinates.
@@ -262,7 +328,7 @@ class RegionWordDist(WordDist):
         incoming_links += art.incoming_links
       num_arts_for_links += 1
       if not art.dist:
-        if Opts.max_time_per_stage == max_time_unlimited:
+        if Opts.max_time_per_stage == 0:
           warning("Saw article %s without distribution" % art)
         continue
       assert art.dist.finished
@@ -286,8 +352,8 @@ class RegionWordDist(WordDist):
     arts = [loc.match for loc in locs if loc.match]
     self.add_articles(arts)
 
-  def finish_word_distribution(self):
-    super(RegionWordDist, self).finish_word_distribution()
+  def finish(self, minimum_word_count=0):
+    super(RegionWordDist, self).finish(minimum_word_count=minimum_word_count)
 
     if debug['lots']:
       errprint("""For region dist, num articles = %s, total tokens = %s,
@@ -295,6 +361,18 @@ class RegionWordDist(WordDist):
                (self.num_arts_for_word_dist, self.total_tokens,
                 self.unseen_mass, self.incoming_links,
                 self.overall_unseen_mass))
+
+  # For a document described by its distribution 'worddist', return the
+  # log probability log p(worddist|reg) using a Naive Bayes algorithm.  Use 
+  # options from 'opts' to determine specifics of how the algorithm works
+  # (how to compute a prior probability and how to weight it).
+  def get_nbayes_logprob(self, worddist, opts):
+    logprob = 0.0
+    for (word, count) in worddist.counts.iteritems():
+      logprob += log(self.lookup_word(word))
+    # FIXME: Also use baseline (prior probability)
+    return logprob
+
 
 ############################################################################
 #                             Region distributions                         #
@@ -328,7 +406,8 @@ class RegionDist(object):
     self.word = word
     totalprob = 0.0
     # Compute and store un-normalized probabilities for all regions
-    for reg in StatRegion.yield_all_nonempty_for_word_dist_regions():
+    for reg in \
+        StatRegion.iter_nonempty_regions(nonempty_word_dist=True):
       prob = reg.worddist.lookup_word(word)
       self.regionprobs[reg] = prob
       totalprob += prob
@@ -417,13 +496,15 @@ class StatRegion(object):
     self.most_popular_article = None
     self.mostpopart_links = 0
 
-  def __str__(self):
+  def boundstr(self):
     if self.latind is not None:
       near = stat_region_indices_to_near_corner_coord(self.latind, self.longind)
       far = stat_region_indices_to_far_corner_coord(self.latind, self.longind)
-      bounds = "%s-%s" % (near, far)
+      return "%s-%s" % (near, far)
     else:
-      bounds = "nowhere"
+      return "nowhere"
+
+  def __str__(self):
     unfinished = "" if self.worddist.finished else ", unfinished"
     contains = ""
     if self.most_popular_article:
@@ -431,9 +512,29 @@ class StatRegion(object):
           self.most_popular_article, self.mostpopart_links)
 
     return "StatRegion(%s%s%s, %d articles(dist), %d articles(links), %d links)" % (
-        bounds, unfinished, contains,
+        self.boundstr(), unfinished, contains,
         self.worddist.num_arts_for_word_dist, self.worddist.num_arts_for_links,
         self.worddist.incoming_links)
+
+  def shortstr(self):
+    str = "Region %s" % self.boundstr()
+    mostpop = self.most_popular_article
+    if mostpop:
+      str += ", most-popular %s" % mostpop.shortstr()
+    return str
+
+  def struct(self):
+    foo = ["StatRegion"]
+    foo += [('bounds', self.boundstr())]
+    if not self.worddist.finished:
+      foo += [('finished', True)]
+    if self.most_popular_article:
+      foo += [('most-popular-article', self.most_popular_article.struct())]
+      foo += [('most-popular-article-links', self.mostpopart_links)]
+    foo += [('num-articles-dist', self.worddist.num_arts_for_word_dist)]
+    foo += [('num-articles-link', self.worddist.num_arts_for_links)]
+    foo += [('incoming-links', self.worddist.incoming_links)]
+    return foo
 
   # Generate the distribution for a statistical region from the tiling regions.
   def generate_dist(self):
@@ -469,7 +570,7 @@ class StatRegion(object):
         if jj > maximum_longind: jj -= 360.
         process_one_region(i, jj)
 
-    self.worddist.finish_word_distribution()
+    self.worddist.finish(minimum_word_count=Opts.minimum_word_count)
 
   # Find the correct StatRegion for the given coordinates.
   # If none, create the region.
@@ -479,16 +580,20 @@ class StatRegion(object):
     return cls.find_region_for_region_indices(latind, longind)
 
   # Find the StatRegion with the given indices at the southwest point.
-  # If none, create the region.
+  # If none, create the region unless 'no_create' is True.  Otherwise, if
+  # 'no_create_empty' is True and the region is empty, a default empty
+  # region is returned.
   @classmethod
-  def find_region_for_region_indices(cls, latind, longind,
+  def find_region_for_region_indices(cls, latind, longind, no_create=False,
                                      no_create_empty=False):
     statreg = cls.corner_to_stat_region.get((latind, longind), None)
     if not statreg:
+      if no_create:
+        return None
       if cls.all_regions_computed:
         if not cls.empty_stat_region:
           cls.empty_stat_region = cls(None, None)
-          cls.empty_stat_region.worddist.finish_word_distribution()
+          cls.empty_stat_region.worddist.finish()
         return cls.empty_stat_region
       statreg = cls(latind, longind)
       statreg.generate_dist()
@@ -510,7 +615,7 @@ class StatRegion(object):
     for i in xrange(minimum_latind, maximum_latind + 1):
       for j in xrange(minimum_longind, maximum_longind + 1):
         reg = cls.find_region_for_region_indices(i, j, no_create_empty=True)
-        if debug['some'] and not reg.worddist.is_empty():
+        if debug['region'] and not reg.worddist.is_empty():
           errprint("--> (%d,%d): %s" % (i, j, reg))
         status.item_processed()
 
@@ -524,16 +629,18 @@ class StatRegion(object):
     latind, longind = coord_to_tiling_region_indices(article.coord)
     cls.tiling_region_to_articles[(latind, longind)] += [article]
 
+  # Iterate over all non-empty regions.  If 'nonempty_word_dist' is given,
+  # distributions must also have a non-empty word distribution; otherwise,
+  # they just need to have at least one point in them. (Not all points
+  # have word distributions, esp. when --max-time-per-stage is set so
+  # that we only load the word distributions for a fraction of the whole
+  # set of articles with distributions.)
   @classmethod
-  def yield_all_nonempty_regions(cls):
-    assert cls.all_regions_computed
-    return cls.corner_to_stat_region.itervalues()
-
-  @classmethod
-  def yield_all_nonempty_for_word_dist_regions(cls):
+  def iter_nonempty_regions(cls, nonempty_word_dist=False):
     assert cls.all_regions_computed
     for val in cls.corner_to_stat_region.itervalues():
-      if val.worddist.is_empty_for_word_dist():
+      if (val.worddist.is_empty_for_word_dist() if nonempty_word_dist
+          else val.worddist.is_empty()):
         continue
       yield val
 
@@ -583,6 +690,22 @@ class Locality(Location):
     return 'Locality %s (%s) at %s%s' % \
       (self.name, self.div and '/'.join(self.div.path), self.coord, match)
 
+  def shortstr(self):
+    return "Locality %s (%s)" % (
+        self.name, self.div and '/'.join(self.div.path))
+
+  def struct(self, no_article=False): 
+    foo = ["Locality"]
+    foo += [('name', self.name)]
+    foo += [('in division', self.div and '/'.join(self.div.path))]
+    foo += [('at coordinate', self.coord)]
+    if not no_article:
+      if self.match:
+        foo += [('matching', self.match.struct())]
+      else:
+        foo += [('matching', 'none')]
+    return foo
+
   def distance_to_coord(self, coord):
     return spheredist(self.coord, coord)
 
@@ -610,12 +733,15 @@ class Locality(Location):
 #   worddist: For region-based Naive Bayes disambiguation, a distribution
 #           over the division's article and all locations within the region.
 
-class Division(object):
+class Division(Location):
   __slots__ = Location.__slots__ + \
     ['level', 'path', 'locs', 'goodlocs', 'boundary', 'worddist']
 
   # For each division, map from division's path to Division object.
   path_to_division = {}
+
+  # For each tiling region, list of divisions that have territory in it
+  tiling_region_to_divisions = listdict()
 
   def __init__(self, path):
     self.name = path[-1]
@@ -633,6 +759,24 @@ class Division(object):
     return 'Division %s (%s)%s, boundary=%s' % \
       (self.name, '/'.join(self.path), match, self.boundary)
 
+  def shortstr(self):
+    str = "Division %s" % self.name
+    if self.level > 1:
+      str += " (%s)" % ('/'.join(self.path))
+    return str
+
+  def struct(self, no_article=False): 
+    foo = ["Division"]
+    foo += [('name', self.name)]
+    foo += [('path', '/'.join(self.path))]
+    if not no_article:
+      if self.match:
+        foo += [('matching', self.match.struct())]
+      else:
+        foo += [('matching', 'none')]
+    foo += [('boundary', self.boundary.struct())]
+    return foo
+
   def distance_to_coord(self, coord):
     return "Unknown"
 
@@ -645,12 +789,13 @@ class Division(object):
     # Yield up all points that are not "outliers", where outliers are defined
     # as points that are more than Opts.max_dist_for_outliers away from all
     # other points.
-    def yield_non_outliers():
+    def iter_non_outliers():
       # If not enough points, just return them; otherwise too much possibility
       # that all of them, or some good ones, will be considered outliers.
       if len(self.locs) <= 5:
         for p in self.locs: yield p
         return
+      # FIXME: Actually look for outliers.
       for p in self.locs: yield p
       #for p in self.locs:
       #  # Find minimum distance to all other points and check it.
@@ -661,13 +806,15 @@ class Division(object):
       errprint("Computing boundary for %s, path %s, num points %s" %
                (self.name, self.path, len(self.locs)))
                
-    self.goodlocs = list(yield_non_outliers())
+    self.goodlocs = list(iter_non_outliers())
     # If we've somehow discarded all points, just use the original list
     if not len(self.goodlocs):
       if debug['some']:
         warning("All points considered outliers?  Division %s, path %s" %
                 (self.name, self.path))
       self.goodlocs = self.locs
+    # FIXME! This will fail for a division that crosses the International
+    # Date Line.
     topleft = Coord(min(x.coord.lat for x in self.goodlocs),
                     min(x.coord.long for x in self.goodlocs))
     botright = Coord(max(x.coord.lat for x in self.goodlocs),
@@ -678,19 +825,20 @@ class Division(object):
     self.worddist = RegionWordDist()
     self.worddist.add_locations([self])
     self.worddist.add_locations(self.goodlocs)
-    self.worddist.finish_word_distribution()
+    self.worddist.finish(minimum_word_count=Opts.minimum_word_count)
 
   def __contains__(self, coord):
     return coord in self.boundary
 
-  # Note that a location was seen with the given path to the location.
+  # Find the division for a point in the division with a given path,
+  # add the point to the division.  Create the division if necessary.
   # Return the corresponding Division.
   @classmethod
-  def note_point_seen_in_division(cls, loc, path):
+  def find_division_note_point(cls, loc, path):
     higherdiv = None
     if len(path) > 1:
       # Also note location in next-higher division.
-      higherdiv = cls.note_point_seen_in_division(loc, path[0:-1])
+      higherdiv = cls.find_division_note_point(loc, path[0:-1])
     # Skip divisions where last element in path is empty; this is a
     # reference to a higher-level division with no corresponding lower-level
     # division.
@@ -708,6 +856,36 @@ class Division(object):
       Gazetteer.lower_toponym_to_division[path[-1].lower()] += [division]
     division.locs += [loc]
     return division
+
+  # Finish all computations related to Divisions, after we've processed
+  # all points (and hence all points have been added to the appropriate
+  # Divisions).
+  @classmethod
+  def finish_all(cls):
+    divs_by_area = []
+    for division in cls.path_to_division.itervalues():
+      if debug['lots']:
+        errprint("Processing division named %s, path %s"
+                 % (division.name, division.path))
+      division.compute_boundary()
+      match = ArticleTable.find_match_for_division(division)
+      if match:
+        if debug['lots']:
+          errprint("Matched article %s for division %s, path %s" %
+                   (match, division.name, division.path))
+        division.match = match
+        match.location = division
+      else:
+        if debug['lots']:
+          errprint("Couldn't find match for division %s, path %s" %
+                   (division.name, division.path))
+      for inds in division.boundary.iter_nonempty_tiling_regions():
+        cls.tiling_region_to_divisions[inds] += [division]
+      if debug['region']:
+        divs_by_area += [(division, division.boundary.square_area())]
+    if debug['region']:
+      for (div, area) in sorted(divs_by_area, key=lambda x:x[1], reverse=True):
+        errprint("%.2f square miles: %s" % (area, div))
 
 ############################################################################
 #                             Wikipedia articles                           #
@@ -744,7 +922,11 @@ class ArticleTable(object):
   # Mapping from lowercased article names to Article objects
   lower_name_to_articles = listdict()
 
-  articles_by_split = {}
+  # List of articles in each split.
+  articles_by_split = listdict()
+
+  # Total # of incoming links for all articles in each split.
+  incoming_links_by_split = intdict()
 
   # Look up an article named NAME and return the associated article.
   # Note that article names are case-sensitive but the first letter needs to
@@ -756,10 +938,9 @@ class ArticleTable(object):
 
   # Record the article as having NAME as one of its names (there may be
   # multiple names, due to redirects).  Also add to related lists mapping
-  # lowercased form, short form, etc.  If IS_REDIRECT, this is a redirect to
-  # an article, so don't record it again.
+  # lowercased form, short form, etc.
   @classmethod
-  def record_article(cls, name, art, is_redirect=False):
+  def record_article_name(cls, name, art):
     # Must pass in properly cased name
     assert name == capfirst(name)
     cls.name_to_article[name] = art
@@ -773,16 +954,34 @@ class ArticleTable(object):
       cls.lower_toponym_to_article[loname] += [art]
     if short != loname and art not in cls.lower_toponym_to_article[short]:
       cls.lower_toponym_to_article[short] += [art]
-    if not is_redirect:
-      splithash = cls.articles_by_split
-      if art.split not in splithash:
-        #splithash[art.split] = set()
-        splithash[art.split] = []
-      splitcoll = splithash[art.split]
-      if isinstance(splitcoll, set):
-        splitcoll.add(art)
+
+  # Record either a normal article ('artfrom' same as 'artto') or a
+  # redirect ('artfrom' redirects to 'artto').
+  @classmethod
+  def record_article(cls, artfrom, artto):
+
+    def none_to_zero(val):
+      if val is None:
+        return 0
       else:
-        splitcoll.append(art)
+        return val
+
+    cls.record_article_name(artfrom.title, artto)
+    redir = artfrom is not artto
+    split = artto.split
+    fromlinks = none_to_zero(artfrom.incoming_links)
+    cls.incoming_links_by_split[split] += fromlinks
+    if not redir:
+      splitcoll = cls.articles_by_split[split]
+      if isinstance(splitcoll, set):
+        splitcoll.add(artto)
+      else:
+        splitcoll.append(artto)
+    elif fromlinks:
+      # Add count of links pointing to a redirect to count of links
+      # pointing to the article redirected to, so that the total incoming
+      # link count of an article includes any redirects to that article.
+      artto.incoming_links = none_to_zero(artto.incoming_links) + fromlinks
 
   @classmethod
   def finish_article_distributions(cls):
@@ -790,7 +989,7 @@ class ArticleTable(object):
     for table in cls.articles_by_split.itervalues():
       for art in table:
         if art.dist:
-          art.dist.finish_word_distribution()
+          art.dist.finish(minimum_word_count=Opts.minimum_word_count)
 
   # Find Wikipedia article matching name NAME for location LOC.  NAME
   # will generally be one of the names of LOC (either its canonical
@@ -951,7 +1150,41 @@ class StatArticle(Article):
       coordstr += (", matching location %s" %
                    self.location.__str__(no_article=True))
     redirstr = ", redirect to %s" % self.redir if self.redir else ""
-    return '%s(%s)%s%s' % (self.title, self.id, coordstr, redirstr)
+    divs = self.find_covering_divisions()
+    top_divs = [div.__str__(no_article=True) for div in divs if div.level == 1]
+    if top_divs:
+      topdivstr = ", in top-level divisions %s" % (', '.join(top_divs))
+    else:
+      topdivstr = ", not in any top-level divisions"
+    return '%s(%s)%s%s%s' % (self.title, self.id, coordstr, redirstr, topdivstr)
+
+  def shortstr(self):
+    str = "%s" % self.title
+    if self.location:
+      str += ", matching %s" % self.location.shortstr()
+    divs = self.find_covering_divisions()
+    top_divs = [div.name for div in divs if div.level == 1]
+    if top_divs:
+      str += ", in top-level divisions %s" % (', '.join(top_divs))
+    return str
+
+  def struct(self): 
+    foo = ["StatArticle"]
+    foo += [('title', self.title)]
+    foo += [('id', self.id)]
+    if self.coord:
+      foo += [('location', self.coord)]
+    if self.location:
+      foo += [('matching', self.location.struct(no_article=True))]
+    if self.redir:
+      foo += [('redirect to', self.redir.struct())]
+    divs = self.find_covering_divisions()
+    top_divs = [div.struct(no_article=True) for div in divs if div.level == 1]
+    if top_divs:
+      foo += [('top level divisions', top_divs)]
+    else:
+      foo += [('top level divisions', "none")]
+    return foo
 
   def distance_to_coord(self, coord):
     return spheredist(self.coord, coord)
@@ -974,6 +1207,13 @@ class StatArticle(Article):
     if not self.stat_region:
       self.stat_region = StatRegion.find_region_for_coord(self.coord)
     return self.stat_region.worddist
+
+  # Find the divisions that cover the given article.
+  def find_covering_divisions(self):
+    inds = coord_to_tiling_region_indices(self.coord)
+    divs = Division.tiling_region_to_divisions[inds]
+    return [div for div in divs if self.coord in div]
+
 
 ############################################################################
 #                             Accumulate results                           #
@@ -1353,7 +1593,7 @@ class TestFileEvaluator(object):
     self.opts = opts
     self.documents_processed = 0
 
-  def yield_documents(self, filename):
+  def iter_documents(self, filename):
     pass
 
   def evaluate_document(self, doc):
@@ -1370,10 +1610,11 @@ class TestFileEvaluator(object):
     last_processed = 0
     for filename in files:
       errprint("Processing evaluation file %s..." % filename)
-      for doc in self.yield_documents(filename):
+      for doc in self.iter_documents(filename):
         # errprint("Processing document: %s" % doc)
         if self.evaluate_document(doc):
-          new_elapsed = status.item_processed()
+          status.item_processed()
+          new_elapsed = status.elapsed_time()
           new_processed = status.num_processed()
           # If five minutes and ten documents have gone by, print out results
           if (new_elapsed - last_elapsed >= 300 and
@@ -1428,7 +1669,7 @@ class BaselineGeotagToponymStrategy(GeotagToponymStrategy):
 # Find each toponym explicitly mentioned as such and disambiguate it
 # (find the correct geographic location) using Naive Bayes, possibly
 # in conjunction with the baseline.
-class NaiveBayesStrategy(GeotagToponymStrategy):
+class NaiveBayesToponymStrategy(GeotagToponymStrategy):
   def __init__(self, opts):
     self.opts = opts
 
@@ -1495,15 +1736,15 @@ class GeotagToponymEvaluator(TestFileEvaluator):
   # Given an evaluation file, read in the words specified, including the
   # toponyms.  Mark each word with the "document" (e.g. article) that it's
   # within.
-  def yield_geogwords(self, filename):
+  def iter_geogwords(self, filename):
     pass
 
-  # Retrieve the words yielded by yield_geowords() and separate by "document"
+  # Retrieve the words yielded by iter_geowords() and separate by "document"
   # (e.g. article); yield each "document" as a list of such Geogword objects.
   # If self.compute_context, also generate the set of "context" words used for
   # disambiguation (some window, e.g. size 20, of words around each
   # toponym).
-  def yield_documents(self, filename):
+  def iter_documents(self, filename):
     def return_word(word):
       if word.is_toponym:
         if debug['lots']:
@@ -1514,7 +1755,7 @@ class GeotagToponymEvaluator(TestFileEvaluator):
           errprint("Non-toponym %s" % word.word)
       return word
 
-    for k, g in groupby(self.yield_geogwords(filename),
+    for k, g in groupby(self.iter_geogwords(filename),
                         lambda word: word.document or 'foo'):
       if k:
         errprint("Processing document %s..." % k)
@@ -1689,7 +1930,7 @@ class TRCoNLLGeotagToponymEvaluator(GeotagToponymEvaluator):
   #...
   #
   # Yield GeogWord objects, one per word.
-  def yield_geogwords(self, filename):
+  def iter_geogwords(self, filename):
     in_loc = False
     for line in uchompopen(filename, errors='replace'):
       try:
@@ -1720,7 +1961,7 @@ class TRCoNLLGeotagToponymEvaluator(GeotagToponymEvaluator):
       yield wordstruct
 
 class WikipediaGeotagToponymEvaluator(GeotagToponymEvaluator):
-  def yield_geogwords(self, filename):
+  def iter_geogwords(self, filename):
     title = None
     for line in uchompopen(filename, errors='replace'):
       if rematch('Article title: (.*)$', line):
@@ -1789,14 +2030,14 @@ class BaselineGeotagDocumentStrategy(GeotagDocumentStrategy):
 
       return RegionDist.get_region_dist(maxword).get_ranked_regions()
     elif self.baseline_strategy == 'random':
-      return random.sample(list(StatRegion.yield_all_nonempty_regions()), 1)
+      return random.sample(list(StatRegion.iter_nonempty_regions()), 1)
     else:
       if self.most_popular_region is None:
         return [reg for reg, popularity
                 in sorted(((reg, (reg.worddist.incoming_links
                                   if self.baseline_strategy == 'internal_link'
                                   else reg.worddist.num_arts_for_links))
-                          for reg in StatRegion.yield_all_nonempty_regions()),
+                          for reg in StatRegion.iter_nonempty_regions()),
                          key=lambda x:x[1],
                          reverse=True)]
         self.most_popular_region = maxreg
@@ -1809,7 +2050,8 @@ class KLDivergenceStrategy(GeotagDocumentStrategy):
 
   def return_ranked_regions(self, worddist):
     article_pq = PriorityQueue()
-    for stat_region in StatRegion.yield_all_nonempty_for_word_dist_regions():
+    for stat_region in \
+        StatRegion.iter_nonempty_regions(nonempty_word_dist=True):
       inds = (stat_region.latind, stat_region.longind)
       if debug['lots']:
         (latind, longind) = inds
@@ -1853,6 +2095,18 @@ class KLDivergenceStrategy(GeotagDocumentStrategy):
     return regions
 
 
+# Return the probability of seeing the given document 
+class NaiveBayesDocumentStrategy(GeotagDocumentStrategy):
+  def return_ranked_regions(self, worddist):
+    regprobs = {}
+    for reg in \
+        StatRegion.iter_nonempty_regions(nonempty_word_dist=True):
+      logprob = reg.worddist.get_nbayes_logprob(worddist, self.opts)
+      regprobs[reg] = logprob
+    return [reg for (reg, prob) in sorted(regprobs.iteritems(),
+                                          key=lambda x:x[1], reverse=True)]
+
+
 class PerWordRegionDistributionsStrategy(GeotagDocumentStrategy):
   def return_ranked_regions(self, worddist):
     regdist = RegionDist.get_region_dist_for_word_dist(worddist)
@@ -1866,15 +2120,16 @@ class GeotagDocumentEvaluator(TestFileEvaluator):
     StatRegion.generate_all_nonempty_regions()
     errprint("Number of non-empty regions: %s" % StatRegion.num_non_empty_regions)
     errprint("Number of empty regions: %s" % StatRegion.num_empty_regions)
+    # Save some memory by clearing this after it's not needed
+    StatRegion.tiling_region_to_articles = None
 
   def output_results(self, final=False):
     Results.output_geotag_document_results(all_results=final)
 
 
 class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
-  def yield_documents(self, filename):
-    for art in ArticleTable.articles_by_split['dev']:
-      assert art.split == 'dev'
+  def iter_documents(self, filename):
+    for art in ArticleTable.articles_by_split[self.opts.eval_set]:
       yield art
 
     #title = None
@@ -1901,7 +2156,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     if not article.dist:
       # This can (and does) happen when --max-time-per-stage is set,
       # so that the counts for many articles don't get read in.
-      if Opts.max_time_per_stage == 'max_time_unlimited':
+      if Opts.max_time_per_stage == 0:
         warning("Can't evaluate article %s without distribution" % article)
       Results.record_geotag_document_other_stat('Skipped articles')
       return False
@@ -1941,7 +2196,7 @@ class TitledDocument(object):
     self.text = text
 
 class PCLTravelGeotagDocumentEvaluator(GeotagDocumentEvaluator):
-  def yield_documents(self, filename):
+  def iter_documents(self, filename):
     # Find XML nodes using depth-first search.  'match' is either a
     # string (match localName on that string) or a predicate.
     def find_node_dfs(node, match):
@@ -1991,14 +2246,40 @@ class PCLTravelGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       dist.add_words(split_text_into_words(text, ignore_punc=True),
                      ignore_case=not Opts.preserve_case_words,
                      stopwords=the_stopwords)
-    dist.finish_word_distribution()
+    dist.finish(minimum_word_count=Opts.minimum_word_count)
     regs = self.strategy.return_ranked_regions(dist)
     errprint("")
     errprint("Article with title: %s" % doc.title)
     num_regs_to_show = 5
     for (rank, reg) in izip(xrange(1, 1 + num_regs_to_show), regs):
-      errprint("  Rank %d: %s" % (rank, reg))
+      if debug['struct']:
+        errprint("  Rank %d:" % rank)
+        print_structure(reg.struct(), indent=4)
+      else:
+        errprint("  Rank %d: %s" % (rank, reg.shortstr()))
+    
     return True
+
+############################################################################
+#                                Segmentation                              #
+############################################################################
+
+# General idea: Keep track of best possible segmentations up to a maximum
+# number of segments.  Either do it using a maximum number of segmentations
+# (e.g. 100 or 1000) or all within a given factor of the best score (the
+# "beam width", e.g. 10^-4).  Then given the existing best segmentations,
+# we search for new segmentations with more segments by looking at all
+# possible ways of segmenting each of the existing best segments, and
+# finding the best score for each of these.  This is a slow process -- for
+# each segmentation, we have to iterate over all segments, and for each
+# segment we have to look at all possible ways of splitting it, and for
+# each split we have to look at all assignments of regions to the two
+# new segments.  It also seems that we're likely to consider the same
+# segmentation multiple times.
+#
+# In the case of per-word region dists, we can maybe speed things up by
+# computing the non-normalized distributions over each paragraph and then
+# summing them up as necessary.
 
 ############################################################################
 #                               Process files                              #
@@ -2020,17 +2301,17 @@ def read_article_data(filename):
     if art.redir:
       redirects.append(art)
     elif art.coord:
-      ArticleTable.record_article(art.title, art)
+      ArticleTable.record_article(art, art)
       if art.split == 'training':
         StatRegion.add_article_to_region(art)
 
   read_article_data_file(filename, process, article_type=StatArticle,
-                         max_time_per_stage=Opts.max_time_per_stage)
+                         maxtime=Opts.max_time_per_stage)
 
   for x in redirects:
     redart = ArticleTable.lookup_article(x.redir)
     if redart:
-      ArticleTable.record_article(x.title, redart, is_redirect=True)
+      ArticleTable.record_article(x, redart)
 
 
 # Parse the result of a previous run of --output-counts and generate
@@ -2047,8 +2328,14 @@ def read_word_counts(filename):
     if not art:
       warning("Skipping article %s, not in table" % title)
       return
+    # If we are evaluating on the dev set, skip the test set and vice
+    # versa, to save memory and avoid contaminating the results.
+    if art.split != 'training' and art.split != Opts.eval_set:
+      return
     art.dist = WordDist()
-    art.dist.set_word_distribution(total_tokens, wordhash, note_globally=True)
+    # Don't train on test set
+    art.dist.set_word_distribution(total_tokens, wordhash,
+        note_globally=(art.split == 'training'))
 
   errprint("Reading word counts from %s..." % filename)
   status = StatusMessage('article')
@@ -2061,7 +2348,7 @@ def read_word_counts(filename):
       if title:
         one_article_probs()
       # Stop if we've reached the maximum
-      if status.item_processed() >= Opts.max_time_per_stage:
+      if status.item_processed(maxtime=Opts.max_time_per_stage):
         break
       title = m.group(1)
       wordhash = intdict()
@@ -2166,7 +2453,7 @@ class WorldGazetteer(Gazetteer):
     if altnames:
       loc.altnames = re.split(', ', altnames)
     # Add the given location to the division the location is in
-    loc.div = Division.note_point_seen_in_division(loc, (div1, div2, div3))
+    loc.div = Division.find_division_note_point(loc, (div1, div2, div3))
     if debug['lots']:
       errprint("Saw location %s (div %s/%s/%s) with coordinates %s" %
                (loc.name, div1, div2, div3, loc.coord))
@@ -2217,29 +2504,14 @@ class WorldGazetteer(Gazetteer):
       if debug['lots']:
         errprint("Processing line: %s" % line)
       cls.match_world_gazetteer_entry(line)
-      if status.item_processed() >= Opts.max_time_per_stage:
+      if status.item_processed(maxtime=Opts.max_time_per_stage):
         break
 
-    for division in Division.path_to_division.itervalues():
-      if debug['lots']:
-        errprint("Processing division named %s, path %s"
-                 % (division.name, division.path))
-      division.compute_boundary()
-      match = ArticleTable.find_match_for_division(division)
-      if match:
-        if debug['lots']:
-          errprint("Matched article %s for division %s, path %s" %
-                   (match, division.name, division.path))
-        division.match = match
-        match.location = division
-      else:
-        if debug['lots']:
-          errprint("Couldn't find match for division %s, path %s" %
-                   (division.name, division.path))
+    Division.finish_all()
 
 # If given a directory, yield all the files in the directory; else just
 # yield the file.
-def yield_directory_files(dir):
+def iter_directory_files(dir):
   if os.path.isdir(dir): 
     for fname in os.listdir(dir):
       fullname = os.path.join(dir, fname)
@@ -2291,6 +2563,12 @@ Each file is read in and then disambiguation is performed.""",
                   default="wiki", choices=['tr-conll', 'wiki', 'raw-text',
                                            'pcl-travel'],
                   help="""Format of evaluation file(s).  Default '%default'.""")
+    op.add_option("--eval-set", "--es", type='choice',
+                  default="dev", choices=['dev', 'devel', 'test'],
+                  help="""Set to use for evaluation when --eval-format=wiki
+and --mode=geotag-documents ('dev' or 'devel' for the development set,
+'test' for the test set).  Default '%default'.""")
+    canon_options['eval_set'] = {'devel':'dev'}
 
     ########## Misc options for handling distributions
     op.add_option("--preserve-case-words", "--pcw", action='store_true',
@@ -2305,6 +2583,9 @@ distributions.""")
     op.add_option("--naive-bayes-context-len", "--nbcl", type='int', default=10,
                   help="""Number of words on either side of a toponym to use
 in Naive Bayes matching.  Default %default.""")
+    op.add_option("--minimum-word-count", "--mwc", type='int', default=1,
+                  help="""Minimum count of words to consider in word
+distributions.  Words whose count is less than this value are ignored.""")
 
     ########## Misc options for controlling matching
     op.add_option("--max-dist-for-close-match", "--mdcm", type='float',
@@ -2320,6 +2601,7 @@ any others in a division.  Points farther away than this are ignored as
     op.add_option("-m", "--mode", "--m", type='choice', default='match-only',
                   choices=['geotag-toponyms',
                            'geotag-documents',
+                           'segment-geotag-documents',
                            'match-only'],
                   help="""Action to perform.
 
@@ -2329,6 +2611,9 @@ output is enabled).
 
 'geotag-documents' finds the proper location for each document (or article)
 in the test set.
+
+'segment-geotag-documents' simultaneously segments a document into sections
+covering a specific location and determines that location.
 
 'geotag-toponyms' finds the proper location for each toponym in the test set.
 The test set is specified by --eval-file.  Default '%default'.""")
@@ -2510,7 +2795,8 @@ considered.  Default '%default'.""")
     if opts.mode == 'geotag-documents':
       if opts.strategy not in [
           'baseline', 'kl-divergence', 'partial-kl-divergence',
-          'per-word-region-distribution']:
+          'per-word-region-distribution',
+          'naive-bayes-with-baseline', 'naive-bayes-no-baseline']:
         op.error("Strategy '%s' invalid for --mode=geotag-documents" %
                  opts.strategy)
       if opts.eval_format not in ['pcl-travel', 'wiki']:
@@ -2561,10 +2847,8 @@ considered.  Default '%default'.""")
       # Generate strategy object
       if opts.strategy == 'baseline':
         strategy = BaselineGeotagToponymStrategy(opts)
-      elif opts.strategy == 'naive-bayes-no-baseline':
-        strategy = NaiveBayesStrategy(opts)
       else:
-        strategy = NaiveBayesStrategy(opts)
+        strategy = NaiveBayesToponymStrategy(opts)
 
       # Generate reader object
       if opts.eval_format == 'tr-conll':
@@ -2574,6 +2858,8 @@ considered.  Default '%default'.""")
     else:
       if opts.strategy == 'baseline':
         strategy = BaselineGeotagDocumentStrategy(opts.baseline_strategy)
+      elif opts.strategy.startswith('naive-bayes-'):
+        strategy = NaiveBayesDocumentStrategy(opts)
       elif opts.strategy == 'per-word-region-distribution':
         strategy = PerWordRegionDistributionsStrategy()
       else:
@@ -2591,7 +2877,7 @@ considered.  Default '%default'.""")
         opts.eval_file = opts.article_data_file
 
     errprint("Processing evaluation file/dir %s..." % opts.eval_file)
-    evalobj.evaluate_and_output_results(yield_directory_files(opts.eval_file))
+    evalobj.evaluate_and_output_results(iter_directory_files(opts.eval_file))
 
 if __name__ == "__main__":
   WikiDisambigProgram()
