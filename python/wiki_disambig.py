@@ -615,7 +615,7 @@ class StatRegion(object):
     for i in xrange(minimum_latind, maximum_latind + 1):
       for j in xrange(minimum_longind, maximum_longind + 1):
         reg = cls.find_region_for_region_indices(i, j, no_create_empty=True)
-        if debug['some'] and not reg.worddist.is_empty():
+        if debug['region'] and not reg.worddist.is_empty():
           errprint("--> (%d,%d): %s" % (i, j, reg))
         status.item_processed()
 
@@ -881,9 +881,11 @@ class Division(Location):
                    (division.name, division.path))
       for inds in division.boundary.iter_nonempty_tiling_regions():
         cls.tiling_region_to_divisions[inds] += [division]
-      divs_by_area += [(division, division.boundary.square_area())]
-    for (div, area) in sorted(divs_by_area, key=lambda x:x[1], reverse=True):
-      errprint("%.2f square miles: %s" % (area, div))
+      if debug['region']:
+        divs_by_area += [(division, division.boundary.square_area())]
+    if debug['region']:
+      for (div, area) in sorted(divs_by_area, key=lambda x:x[1], reverse=True):
+        errprint("%.2f square miles: %s" % (area, div))
 
 ############################################################################
 #                             Wikipedia articles                           #
