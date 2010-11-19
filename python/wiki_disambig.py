@@ -2261,6 +2261,27 @@ class PCLTravelGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     return True
 
 ############################################################################
+#                                Segmentation                              #
+############################################################################
+
+# General idea: Keep track of best possible segmentations up to a maximum
+# number of segments.  Either do it using a maximum number of segmentations
+# (e.g. 100 or 1000) or all within a given factor of the best score (the
+# "beam width", e.g. 10^-4).  Then given the existing best segmentations,
+# we search for new segmentations with more segments by looking at all
+# possible ways of segmenting each of the existing best segments, and
+# finding the best score for each of these.  This is a slow process -- for
+# each segmentation, we have to iterate over all segments, and for each
+# segment we have to look at all possible ways of splitting it, and for
+# each split we have to look at all assignments of regions to the two
+# new segments.  It also seems that we're likely to consider the same
+# segmentation multiple times.
+#
+# In the case of per-word region dists, we can maybe speed things up by
+# computing the non-normalized distributions over each paragraph and then
+# summing them up as necessary.
+
+############################################################################
 #                               Process files                              #
 ############################################################################
 
@@ -2580,6 +2601,7 @@ any others in a division.  Points farther away than this are ignored as
     op.add_option("-m", "--mode", "--m", type='choice', default='match-only',
                   choices=['geotag-toponyms',
                            'geotag-documents',
+                           'segment-geotag-documents',
                            'match-only'],
                   help="""Action to perform.
 
@@ -2589,6 +2611,9 @@ output is enabled).
 
 'geotag-documents' finds the proper location for each document (or article)
 in the test set.
+
+'segment-geotag-documents' simultaneously segments a document into sections
+covering a specific location and determines that location.
 
 'geotag-toponyms' finds the proper location for each toponym in the test set.
 The test set is specified by --eval-file.  Default '%default'.""")
