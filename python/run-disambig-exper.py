@@ -63,7 +63,7 @@ def main():
 
 MTS300 = iterate('--max-time-per-stage', [300])
 NonBaselineStrategies = iterate('--strategy',
-    ['partial-kl-divergence', 'per-word-region-distribution'])
+    ['partial-kl-divergence', 'per-word-region-distribution', 'naive-bayes-no-baseline'])
 BaselineStrategies = iterate('--strategy baseline --baseline-strategy',
     ['internal-link', 'random', 'num-articles',
     'region-distribution-most-common-proper-noun'])
@@ -76,11 +76,19 @@ FineDPR = iterate('--degrees-per-region',
      1.75, 1.5, 1.25, 1, 0.87, 0.75, 0.63, 0.5, 0.4, 0.3, 0.25, 0.2, 0.15, 0.1]
     )
 
+DPR1 = iterate('--degrees-per-region', [0.5, 1, 3])
+
+MinWordCount = iterate('--minimum-word-count', [1, 2, 3, 4, 5])
+
 CoarseDisambig = nest(MTS300, AllStrategies, CoarseDPR)
 
 # PCL experiments
 PCLDPR = iterate('--degrees-per-region', [1.5, 0.5, 1, 2, 3, 5])
 PCLEvalFile = add_param('-f pcl-travel -e /groups/corpora/pcl_travel/books')
 PCLDisambig = nest(MTS300, PCLEvalFile, NonBaselineStrategies, PCLDPR)
+
+# Param experiments
+
+ParamExper = nest(MTS300, DPR1, MinWordCount, NonBaselineStrategies)
 
 main()
