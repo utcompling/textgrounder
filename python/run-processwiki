@@ -48,6 +48,12 @@ bzcat $IN_DUMP_FILE | $PROCESSWIKI \
   --output-coords \
   $OTHEROPTS > $OUT_COORDS_FILE
 
+elif [ "$step" = location-type ]; then
+echo "Generating location-type data ..."
+bzcat $IN_DUMP_FILE | $PROCESSWIKI \
+  --output-location-type \
+  $OTHEROPTS
+
 elif [ "$step" = links ]; then
 echo "Generating link data ..."
 bzcat $IN_DUMP_FILE | $PROCESSWIKI \

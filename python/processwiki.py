@@ -33,9 +33,8 @@ from process_article_data import *
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 
-# Debug level; if non-zero, output lots of extra information about how
-# things are progressing.  If > 1, even more info.
-debug = 0
+# Debug flags.  Different flags indicate different info to output.
+debug = booldict()
 
 # Program options
 progopts = None
@@ -523,10 +522,10 @@ class SourceTextHandler(object):
     # filtered out.  Note that when we process macros and extract the relevant
     # text from them, we need to recursively process that text.
   
-    if debug >= 2: uniprint("Entering process_source_text: [%s]" % text)
+    if debug['lots']: uniprint("Entering process_source_text: [%s]" % text)
   
     for foo in parse_simple_balanced_text(text):
-      if debug >= 2: uniprint("parse_simple_balanced_text yields: [%s]" % foo)
+      if debug['lots']: uniprint("parse_simple_balanced_text yields: [%s]" % foo)
   
       if foo.startswith('[['):
         gen = self.process_internal_link(foo)
@@ -544,7 +543,7 @@ class SourceTextHandler(object):
         gen = self.process_text_chunk(foo)
   
       for chunk in gen:
-        if debug >= 2: uniprint("process_source_text yields: [%s]" % chunk)
+        if debug['lots']: uniprint("process_source_text yields: [%s]" % chunk)
         yield chunk
   
 # An article source-text handler that recursively processes text inside of
@@ -710,7 +709,7 @@ region: the "political region for terrestrial coordinates", i.e. the country
         country plus next-level subdivision (state, province, etc.)
 globe: which planet or satellite the coordinate is on (esp. if not the Earth)
 '''
-  if debug >= 1: uniprint("Passed in args %s" % args)
+  if debug['some']: uniprint("Passed in args %s" % args)
   # Filter out optional "template arguments", add a bunch of blank arguments
   # at the end to make sure we don't get out-of-bounds errors in
   # get_coord_1()
@@ -731,7 +730,19 @@ globe: which planet or satellite the coordinate is on (esp. if not the Earth)
     long = safe_float(long) if long else 0.
     return (lat, long)
 
-class ExtractCoordinatesFromSource(SourceTextHandler):
+def get_coord_params(temptype, args):
+  '''Parse a Coord template and return a list of tuples of coordinate
+parameters (see comment under get_coord).'''
+  if debug['some']: uniprint("Passed in args %s" % args)
+  # Filter out optional "template arguments"
+  filtargs = [x for x in args if '=' not in x]
+  if filtargs and ':' in filtargs[-1]:
+    coord_params = [tuple(x.split(':')) for x in filtargs[-1].split('_')]
+    return coord_params
+  else:
+    return []
+
+class ExtractCoordinatesFromSource(RecursiveSourceTextHandler):
   '''Given the article text TEXT of an article (in general, after first-
 stage processing), extract coordinates out of templates that have coordinates
 in them (Infobox, Coord, etc.).  Record each coordinate into COORD.
@@ -748,10 +759,10 @@ applied to the text before being sent here.'''
   def process_template(self, text):
     # Look for a Coord, Infobox, etc. template that may have coordinates in it
     lat = long = None
-    if debug >= 1: uniprint("Enter process_template: [%s]" % text)
+    if debug['some']: uniprint("Enter process_template: [%s]" % text)
     tempargs = get_macro_args(text)
     temptype = tempargs[0].strip()
-    if debug >= 1: uniprint("Template type: %s" % temptype)
+    if debug['some']: uniprint("Template type: %s" % temptype)
     lowertemp = temptype.lower()
     # Look for a coordinate template
     if lowertemp in ('coord', 'coor d', 'coor dm', 'coor dms',
@@ -774,9 +785,48 @@ applied to the text before being sent here.'''
         templates_with_coords[lowertemp] += 1
         (lat, long) = get_latitude_coord(temptype, paramshash)
     if lat or long:
-      if debug >= 1: uniprint("Saw coordinate %s,%s in template type %s" %
+      if debug['some']: uniprint("Saw coordinate %s,%s in template type %s" %
                 (lat, long, temptype))
       self.coords.append((lowertemp,lat,long))
+    # Recursively process the text inside the template in case there are
+    # coordinates in it.
+    return self.process_source_text(text[2:-2])
+
+class ExtractLocationTypeFromSource(SourceTextHandler):
+  '''Given the article text TEXT of an article (in general, after first-
+stage processing), extract info about the type of location (if any).
+Record info found in 'loctype'.'''
+
+  def __init__(self):
+    self.loctype = []
+
+  def process_template(self, text):
+    # Look for a Coord, Infobox, etc. template that may have coordinates in it
+    lat = long = None
+    tempargs = get_macro_args(text)
+    temptype = tempargs[0].strip()
+    lowertemp = temptype.lower()
+    # Look for a coordinate template
+    if lowertemp in ('coord', 'coor d', 'coor dm', 'coor dms',
+                     'coor dec', 'coorheader') \
+        or lowertemp.startswith('geolinks') \
+        or lowertemp.startswith('mapit'):
+      params = get_coord_params(temptype, tempargs[1:])
+      if params:
+        self.loctype += [['coord-params', params]]
+    else:
+      (paramshash, _) = find_template_params(tempargs[1:], True)
+      if lowertemp == 'infobox settlement':
+        params = []
+        for x in ['settlement_type', 'subdivision_type', 'subdivision_name']:
+          val = paramshash.get(x, None)
+          if val:
+            params += [(x, val)]
+        self.loctype += [['infobox-settlement', params]]
+      elif ('latd' in paramshash or 'lat_deg' in paramshash or
+          'latitude' in paramshash):
+        self.loctype += \
+            [['other-template-with-coord', [('template', temptype)]]]
     yield text
 
 #######################################################################
@@ -855,7 +905,7 @@ def yield_internal_link_args(text):
 # joined by spaces.
 def yield_template_args(text):
   # For a template, do something smart depending on the template.
-  if debug >= 2: uniprint("yield_template_args called with: %s" % text)
+  if debug['lots']: uniprint("yield_template_args called with: %s" % text)
 
   # OK, this is a hack, but a useful one.  There are lots of templates that
   # look like {{Emancipation Proclamation draft}} or
@@ -873,10 +923,10 @@ def yield_template_args(text):
     return
 
   tempargs = get_macro_args(text)
-  if debug >= 2: uniprint("template args: %s" % tempargs)
+  if debug['lots']: uniprint("template args: %s" % tempargs)
   temptype = tempargs[0].strip().lower()
 
-  if debug >= 1:
+  if debug['some']:
     all_templates[temptype] += 1
 
   # Extract the parameter and non-parameter arguments.
@@ -917,7 +967,7 @@ def yield_template_args(text):
 # Process a table into separate chunks.  Unlike code for processing
 # internal links, the chunks should have whitespace added where necessary.
 def yield_table_chunks(text):
-  if debug >= 2: uniprint("Entering yield_table_chunks: [%s]" % text)
+  if debug['lots']: uniprint("Entering yield_table_chunks: [%s]" % text)
 
   # Given a single line or part of a line, and an indication (ATSTART) of
   # whether we just saw a beginning-of-line separator, split on within-line
@@ -937,9 +987,9 @@ def yield_table_chunks(text):
   # Just a wrapper function around process_table_chunk_1() for logging
   # purposes.
   def process_table_chunk(text, atstart):
-    if debug >= 2: uniprint("Entering process_table_chunk: [%s], %s" % (text, atstart))
+    if debug['lots']: uniprint("Entering process_table_chunk: [%s], %s" % (text, atstart))
     for chunk in process_table_chunk_1(text, atstart):
-      if debug >= 2: uniprint("process_table_chunk yields: [%s]" % chunk)
+      if debug['lots']: uniprint("process_table_chunk yields: [%s]" % chunk)
       yield chunk
 
   # Strip off {| and |}
@@ -953,7 +1003,7 @@ def yield_table_chunks(text):
   # process_table_chunk(), which will split a line on within-line separators
   # (e.g. || or !!) and strip out directives.
   for arg in parse_balanced_text(balanced_table_re, text):
-    if debug >= 2: uniprint("parse_balanced_text(balanced_table_re) yields: [%s]" % arg)
+    if debug['lots']: uniprint("parse_balanced_text(balanced_table_re) yields: [%s]" % arg)
     # If we see a newline, reset the flags and yield the newline.  This way,
     # a whitespace will always be inserted.
     if arg == '\n':
@@ -1013,7 +1063,7 @@ class ExtractUsefulText(SourceTextHandler):
   def process_table(self, text):
     '''Process a table into chunks of raw text and yield them.'''
     for bar in yield_table_chunks(text):
-      if debug >= 2: uniprint("process_table yields: [%s]" % bar)
+      if debug['lots']: uniprint("process_table yields: [%s]" % bar)
       for baz in self.process_source_text(bar):
         yield baz
   
@@ -1130,7 +1180,7 @@ class ArticleHandler(object):
     global debug_cur_title
     debug_cur_title = title
   
-    if debug >= 1:
+    if debug['some']:
       errprint("Article title: %s" % title)
       errprint("Article ID: %s" % id)
       errprint("Article is redirect: %s" % redirect)
@@ -1230,7 +1280,7 @@ class PrintWordsAndCoords(ArticleHandlerForUsefulText):
     splitprint("Article title: %s" % self.title)
     splitprint("Article ID: %s" % self.id)
     for word in word_generator:
-      if debug >= 1: uniprint("Saw word: %s" % word)
+      if debug['some']: uniprint("Saw word: %s" % word)
       else: splitprint("%s" % word)
 
   def process_text_for_data(self, text):
@@ -1243,7 +1293,7 @@ class PrintWordsAndCoords(ArticleHandlerForUsefulText):
   def finish_processing(self):
     ### Output all of the templates that were seen with coordinates in them,
     ### along with counts of how many times each template was seen.
-    if debug >= 1:
+    if debug['some']:
       print("Templates with coordinates:")
       output_reverse_sorted_table(templates_with_coords,
                                   outfile=cur_output_file)
@@ -1292,6 +1342,12 @@ def extract_and_output_coordinates_from_article(title, id, text):
   output_title_and_coordinates(title, id, lat, long)
   return True
 
+def extract_location_type(text):
+  handler = ExtractLocationTypeFromSource()
+  for foo in handler.process_source_text(text): pass
+  for (ty, vals) in handler.loctype:
+    splitprint("  %s: %s" % (ty, vals))
+
 # Handler to output count information on words.  Only processes articles
 # with coordinates in them.  Computes the count of each word in the article
 # text, after filtering text for "actual text" (as opposed to directives
@@ -1316,6 +1372,15 @@ class OutputCoords(ArticleHandler):
   def process_text_for_data(self, text):
     return extract_and_output_coordinates_from_article(self.title, self.id,
                                                        text)
+
+# Handler to try to determine the type of an article with coordinates.
+class OutputLocationType(ArticleHandler):
+  def process_text_for_data(self, text):
+    iscoord = extract_and_output_coordinates_from_article(self.title, self.id,
+                                                          text)
+    if iscoord:
+      extract_location_type(text)
+    return iscoord
 
 
 class ToponymEvalDataHandler(ExtractUsefulText):
@@ -1523,7 +1588,7 @@ it to be dynamically manipulated).  Given the size of the XML dump file
     
   def startElement(self, name, attrs):
     '''Handler for beginning of XML element.'''
-    if debug >= 2: errprint("startElement() saw %s/%s" % (name, attrs))
+    if debug['lots']: errprint("startElement() saw %s/%s" % (name, attrs))
     # We should never see an element inside of the Wikipedia text.
     if self.curpath:
       assert self.curpath[-1] != 'text'
@@ -1540,7 +1605,7 @@ it to be dynamically manipulated).  Given the size of the XML dump file
     '''Handler for chunks of text.  Accumulate all adjacent chunks.  When
 the end element </text> is seen, process_article_text() will be called on the
 combined chunks.'''
-    if debug >= 2: errprint("characters() saw %s" % text)
+    if debug['lots']: errprint("characters() saw %s" % text)
     # None means the last directive we saw was an end tag; we don't track
     # text any more until the next begin tag.
     if self.curtext != None:
@@ -1563,7 +1628,7 @@ combined chunks.'''
       # If we saw the end of the article text, join all the text chunks
       # together and call process_article_text() on it.
       set_next_split_file()
-      if debug >= 2:
+      if debug['lots']:
         max_text_len = 150
         endslice = min(max_text_len, len(eltext))
         truncated = len(eltext) > max_text_len
@@ -1608,6 +1673,9 @@ all articles it maps to.""",
                 action="store_true")
   op.add_option("-o", "--output-coords",
                 help="Print info about coordinates of articles with coordinates.",
+                action="store_true")
+  op.add_option("--output-location-type",
+                help="Print info about type of articles with coordinates.",
                 action="store_true")
   op.add_option("-r", "--find-redirects",
                 help="Output all redirects.",
@@ -1711,7 +1779,9 @@ Used for testing purposes.  Default %default.""")
 
   global debug
   if opts.debug:
-    debug = int(opts.debug)
+    flags = re.split(r'[,\s]+', opts.debug)
+    for f in flags:
+      debug[f] = True
 
   if opts.split_training_dev_test:
     init_output_files(opts.split_training_dev_test,
@@ -1735,6 +1805,8 @@ Used for testing purposes.  Default %default.""")
     main_process_input(OutputCoords())
   elif opts.output_counts:
     main_process_input(OutputCounts())
+  elif opts.output_location_type:
+    main_process_input(OutputLocationType())
   elif opts.generate_toponym_eval:
     main_process_input(GenerateToponymEvalData())
   elif opts.generate_article_data:
