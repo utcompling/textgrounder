@@ -144,6 +144,9 @@ class Boundary(object):
   def __str__(self):
     return '%s-%s' % (self.botleft, self.topright)
 
+  def __repr__(self):
+    return "Boundary(%s)" % self.__str__()
+
   def struct(self):
     return ["Boundary", ('boundary', '%s-%s' % (self.botleft, self.topright))]
 
@@ -516,6 +519,9 @@ class StatRegion(object):
         self.worddist.num_arts_for_word_dist, self.worddist.num_arts_for_links,
         self.worddist.incoming_links)
 
+  def __repr__(self):
+    return self.__str__().encode("utf-8")
+
   def shortstr(self):
     str = "Region %s" % self.boundstr()
     mostpop = self.most_popular_article
@@ -690,6 +696,9 @@ class Locality(Location):
     return 'Locality %s (%s) at %s%s' % \
       (self.name, self.div and '/'.join(self.div.path), self.coord, match)
 
+  def __repr__(self):
+    return self.__str__().encode("utf-8")
+
   def shortstr(self):
     return "Locality %s (%s)" % (
         self.name, self.div and '/'.join(self.div.path))
@@ -758,6 +767,9 @@ class Division(Location):
       match = ", match=%s" % self.match
     return 'Division %s (%s)%s, boundary=%s' % \
       (self.name, '/'.join(self.path), match, self.boundary)
+
+  def __repr__(self):
+    return self.__str__().encode("utf-8")
 
   def shortstr(self):
     str = "Division %s" % self.name
@@ -960,16 +972,10 @@ class ArticleTable(object):
   @classmethod
   def record_article(cls, artfrom, artto):
 
-    def none_to_zero(val):
-      if val is None:
-        return 0
-      else:
-        return val
-
     cls.record_article_name(artfrom.title, artto)
     redir = artfrom is not artto
     split = artto.split
-    fromlinks = none_to_zero(artfrom.incoming_links)
+    fromlinks = get_adjusted_incoming_links(artfrom)
     cls.incoming_links_by_split[split] += fromlinks
     if not redir:
       splitcoll = cls.articles_by_split[split]
@@ -981,7 +987,7 @@ class ArticleTable(object):
       # Add count of links pointing to a redirect to count of links
       # pointing to the article redirected to, so that the total incoming
       # link count of an article includes any redirects to that article.
-      artto.incoming_links = none_to_zero(artto.incoming_links) + fromlinks
+      artto.incoming_links = get_adjusted_incoming_links(artto) + fromlinks
 
   @classmethod
   def finish_article_distributions(cls):
@@ -1157,6 +1163,9 @@ class StatArticle(Article):
     else:
       topdivstr = ", not in any top-level divisions"
     return '%s(%s)%s%s%s' % (self.title, self.id, coordstr, redirstr, topdivstr)
+
+  def __repr__(self):
+    return "Article(%s)" % self.__str__().encode("utf-8")
 
   def shortstr(self):
     str = "%s" % self.title
@@ -1561,6 +1570,25 @@ class Results(object):
 #                             Main geotagging code                         #
 ############################################################################
 
+
+# Construct the list of possible candidate articles for a given toponym
+def construct_candidates(toponym):
+  lotop = toponym.lower()
+  articles = ArticleTable.lower_toponym_to_article[lotop]
+  locs = (Gazetteer.lower_toponym_to_location[lotop] +
+          Gazetteer.lower_toponym_to_division[lotop])
+  for loc in locs:
+    if loc.match and loc.match not in articles:
+      articles += [loc.match]
+  return articles
+
+def word_is_toponym(word):
+  word = word.lower()
+  return (word in ArticleTable.lower_toponym_to_article or
+          word in Gazetteer.lower_toponym_to_location or
+          word in Gazetteer.lower_toponym_to_division)
+
+
 # Class of word in a file containing toponyms.  Fields:
 #
 #   word: The identity of the word.
@@ -1801,15 +1829,9 @@ class GeotagToponymEvaluator(TestFileEvaluator):
     toponym = geogword.word
     coord = geogword.coord
     if not coord: return # If no ground-truth, skip it
-    lotop = toponym.lower()
+    articles = construct_candidates(toponym)
     bestscore = -1e308
     bestart = None
-    articles = ArticleTable.lower_toponym_to_article[lotop]
-    locs = (Gazetteer.lower_toponym_to_location[lotop] +
-            Gazetteer.lower_toponym_to_division[lotop])
-    for loc in locs:
-      if loc.match and loc.match not in articles:
-        articles += [loc.match]
     if not articles:
       if debug['some']:
         errprint("Unable to find any possibilities for %s" % toponym)
@@ -1823,12 +1845,7 @@ class GeotagToponymEvaluator(TestFileEvaluator):
       for art in articles:
         if debug['some']:
             errprint("Considering article %s" % art)
-        if not art:
-          if debug['some']:
-            errprint("--> Location without matching article")
-          continue
-        else:
-          thisscore = self.strategy.compute_score(geogword, art)
+        thisscore = self.strategy.compute_score(geogword, art)
         if thisscore > bestscore:
           bestscore = thisscore
           bestart = art 
@@ -1990,58 +2007,88 @@ class GeotagDocumentStrategy(object):
   def return_ranked_regions(self, worddist):
     pass
 
+def find_most_common_word(worddist, pred):
+  # Look for the most common word matching a given predicate.
+  # But there may not be any.  max() will raise an error if given an
+  # empty sequence, so insert a bogus value into the sequence with a
+  # negative count.
+  maxword, maxcount = \
+    max(chain([(None, -1)],
+              ((word, count) for word, count in worddist.counts.iteritems()
+               if pred(word))),
+        key = lambda x:x[1])
+  return maxword
 
 class BaselineGeotagDocumentStrategy(GeotagDocumentStrategy):
   def __init__(self, baseline_strategy):
     self.baseline_strategy = baseline_strategy
-    self.most_popular_region = None
+    self.cached_ranked_mps = None
+
+  def ranked_regions_random(self, worddist):
+    regions = list(StatRegion.iter_nonempty_regions())
+    random.shuffle(regions)
+    return regions
+
+  def ranked_most_popular_regions(self, worddist):
+    if self.cached_ranked_mps is None:
+      self.cached_ranked_mps = \
+          [reg for reg, popularity
+              in sorted(((reg, (get_adjusted_incoming_links(reg.worddist)
+                                if self.baseline_strategy == 'internal_link'
+                                else reg.worddist.num_arts_for_links))
+                        for reg in StatRegion.iter_nonempty_regions()),
+                       key=lambda x:x[1],
+                       reverse=True)]
+    return self.cached_ranked_mps
+
+  def ranked_regions_regdist_most_common_toponym(self, worddist):
+    # Look for a toponym, then a proper noun, then any word.
+    maxword = find_most_common_word(worddist,
+        lambda word: word and word[0].isupper() and word_is_toponym(word))
+    if maxword is None:
+      maxword = find_most_common_word(worddist,
+          lambda word: word and word[0].isupper())
+    if maxword is None:
+      maxword = find_most_common_word(worddist, lambda x: True)
+    return RegionDist.get_region_dist(maxword).get_ranked_regions()
+
+  def ranked_regions_link_most_common_toponym(self, worddist):
+    maxword = find_most_common_word(worddist,
+        lambda word: word and word[0].isupper() and word_is_toponym(word))
+    if not maxword:
+      maxword = find_most_common_word(worddist,
+          lambda word: word_is_toponym(word))
+    if debug['commontop']:
+      errprint("  maxword = %s" % maxword)
+    if maxword:
+      cands = construct_candidates(maxword)
+      if debug['commontop']:
+        errprint("  candidates = %s" % cands)
+      # Sort candidate list by number of incoming links
+      cands = [cand for cand, links in
+          sorted(((cand, (get_adjusted_incoming_links(cand)))
+            for cand in cands),
+            key=lambda x:x[1], reverse=True)]
+      if debug['commontop']:
+        errprint("  sorted candidates = %s" % cands)
+      # Convert to regions
+      cands = [StatRegion.find_region_for_coord(cand.coord) for cand in cands]
+      errprint("  region candidates = %s" % cands)
+    else:
+      cands = []
+    # Append random regions and remove duplicates
+    return list(merge_sequences_uniquely(cands,
+        self.ranked_regions_random(worddist)))
 
   def return_ranked_regions(self, worddist):
-    def word_is_toponym(word):
-      word = word.lower()
-      return (word in ArticleTable.lower_toponym_to_article or
-              word in Gazetteer.lower_toponym_to_location or
-              word in Gazetteer.lower_toponym_to_division)
-
-    if self.baseline_strategy == 'regdist-most-common-noun':
-      # Look for a word that's a known toponym.  But there may not be
-      # any.  max() will raise an error if given an empty sequence, so
-      # insert a bogus value into the sequence with a negative count --
-      # if we come back with the max count being negative, we know we had
-      # an empty sequence, so retry just using all words.
-      maxword, maxcount = \
-        max(chain([(None, -1)],
-                  ((word, count) for word, count in worddist.counts.iteritems()
-                   if word_is_toponym(word))),
-            key = lambda x:x[1])
-      # Look for a proper noun.  But there may not be any proper nouns --
-      # esp. if we have lowercased everything, as is the case by default!
-      if maxcount == -1:
-        maxword, maxcount = \
-          max(chain([(None, -1)],
-                    ((word, count) for word, count in
-                      worddist.counts.iteritems()
-                      if word and word[0] >= 'A' and word[0] <= 'Z')),
-              key = lambda x:x[1])
-      if maxcount == -1:
-        maxword, maxcount = \
-          max(((word, count) for word, count in worddist.counts.iteritems()),
-              key = lambda x:x[1])
-
-      return RegionDist.get_region_dist(maxword).get_ranked_regions()
+    if self.baseline_strategy == 'link-most-common-toponym':
+      return self.ranked_regions_link_most_common_toponym(worddist)
+    elif self.baseline_strategy == 'regdist-most-common-toponym':
+      return self.ranked_regions_regdist_most_common_toponym(worddist)
     elif self.baseline_strategy == 'random':
-      return random.sample(list(StatRegion.iter_nonempty_regions()), 1)
+      return self.ranked_regions_random(worddist)
     else:
-      if self.most_popular_region is None:
-        return [reg for reg, popularity
-                in sorted(((reg, (reg.worddist.incoming_links
-                                  if self.baseline_strategy == 'internal_link'
-                                  else reg.worddist.num_arts_for_links))
-                          for reg in StatRegion.iter_nonempty_regions()),
-                         key=lambda x:x[1],
-                         reverse=True)]
-        self.most_popular_region = maxreg
-      return self.most_popular_region
+      return self.ranked_most_popular_regions(worddist)
 
 
 class KLDivergenceStrategy(GeotagDocumentStrategy):
@@ -2164,7 +2211,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     true_latind, true_longind = coord_to_stat_region_indices(article.coord)
     true_statreg = StatRegion.find_region_for_coord(article.coord)
     naitr = true_statreg.worddist.num_arts_for_word_dist
-    if debug['lots']:
+    if debug['lots'] or debug['commontop']:
       errprint("Evaluating article %s with %s word-dist articles in true region" %
                (article, naitr))
     regs = self.strategy.return_ranked_regions(article.dist)
@@ -2173,6 +2220,8 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       if reg.latind == true_latind and reg.longind == true_longind:
         break
       rank += 1
+    else:
+      rank = 1000000000
     stats = Results.record_geotag_document_result(rank, article.coord,
         regs[0].latind, regs[0].longind, num_arts_in_true_region=naitr,
         return_stats=(debug['some']))
@@ -2302,8 +2351,7 @@ def read_article_data(filename):
       redirects.append(art)
     elif art.coord:
       ArticleTable.record_article(art, art)
-      if art.split == 'training':
-        StatRegion.add_article_to_region(art)
+      StatRegion.add_article_to_region(art)
 
   read_article_data_file(filename, process, article_type=StatArticle,
                          maxtime=Opts.max_time_per_stage)
@@ -2660,9 +2708,10 @@ the article.  Default is 'partial-kl-divergence'.""")
                   default="internal-link",
                   choices=['internal-link', 'link',
                            'random',
-                           'num-articles', 'num-arts', 'numarts', 
-                           'region-distribution-most-common-proper-noun',
-                           'regdist-most-common-noun'],
+                           'num-articles', 'num-arts', 'numarts',
+                           'link-most-common-toponym',
+                           'region-distribution-most-common-toponym',
+                           'regdist-most-common-toponym'],
                   help="""Strategy to use to compute the baseline.
 
 'internal-link' (or 'link') means use number of internal links pointing to the
@@ -2673,17 +2722,20 @@ article or region.
 'num-articles' (or 'num-arts' or 'numarts'; only in region-type matching) means
 use number of articles in region.
 
-'region-distribution-most-common-proper-noun' (or 'regdist-most-common-noun';
-only in --mode=geotag-documents) picks the most common proper noun and uses the
-region distribution of that word.
+'link-most-common-toponym' (only in --mode=geotag-documents) means to look
+for the toponym that occurs the most number of times in the article, and
+then use the internal-link baseline to match it to a location.
+
+'regdist-most-common-toponym' (only in --mode=geotag-documents) is similar,
+but uses the region distribution of the most common toponym.
 
 Default '%default'.""")
     canon_options['baseline_strategy'] = (
         {'link':'internal-link',
          'num-arts':'num-articles',
          'numarts':'num-articles',
-         'region-distribution-most-common-proper-noun':
-           'regdist-most-common-noun'}
+         'region-distribution-most-common-toponym':
+           'regdist-most-common-toponym'}
         )
 
     op.add_option("--baseline-weight", "--bw", type='float', metavar="WEIGHT",
@@ -2750,6 +2802,10 @@ considered.  Default '%default'.""")
       elif opts.mode == 'geotag-toponyms':
         opts.strategy = 'baseline'
 
+    if (opts.strategy == 'baseline' and
+        opts.baseline_strategy.endswith('most-common-toponym')):
+      opts.preserve_case_words = True
+
     # FIXME! Can only currently handle World-type gazetteers.
     if opts.gazetteer_type != 'world':
       op.error("Currently can only handle world-type gazetteers")
@@ -2802,8 +2858,9 @@ considered.  Default '%default'.""")
       if opts.eval_format not in ['pcl-travel', 'wiki']:
         op.error("For --mode=geotag-documents, eval-format must be 'pcl-travel' or 'wiki'")
     elif opts.mode == 'geotag-toponyms':
-      if opts.baseline_strategy == 'regdist-most-common-noun':
-        op.error("--baseline-strategy=regdist-most-common-noun only compatible with --mode=geotag-documents")
+      if opts.baseline_strategy.endswith('most-common-toponym'):
+        op.error("--baseline-strategy=%s only compatible with --mode=geotag-documents"
+            % opts.baseline_strategy)
       if opts.strategy not in [
           'baseline', 'naive-bayes-with-baseline', 'naive-bayes-no-baseline']:
         op.error("Strategy '%s' invalid for --mode=geotag-toponyms" %

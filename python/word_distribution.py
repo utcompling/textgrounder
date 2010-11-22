@@ -4,7 +4,7 @@ from math import log
 from itertools import *
 from kl_divergence import *
 
-debug = {}
+debug = booldict()
 
 use_sorted_list = False
 
