@@ -779,6 +779,21 @@ def breadth_first_search(node, matches, children):
     nodelist.extend(children(node))
 
 #############################################################################
+#                               Merge sequences                             #
+#############################################################################
+
+# Return an iterator over all elements in all the given sequences, omitting
+# elements seen more than once and keeping the order.
+def merge_sequences_uniquely(*seqs):
+  table = {}
+  for seq in seqs:
+    for s in seq:
+      if s not in table:
+        table[s] = True
+        yield s
+
+
+#############################################################################
 #                                Subprocesses                               #
 #############################################################################
 
