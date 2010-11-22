@@ -72,7 +72,7 @@ def read_coordinates_file(filename):
       title = capfirst(m.group(1))
     elif re.match('Article coordinates: ', line):
       coordinate_articles.add(title)
-      if status.item_processed() >= Opts.max_time_per_stage:
+      if status.item_processed(maxtime=Opts.max_time_per_stage):
         break
     
 # Read in redirects.  Record redirects as additional articles with coordinates
@@ -88,8 +88,7 @@ def read_redirects_from_article_data(filename):
     if art.redir and capfirst(art.redir) in coordinate_articles:
       coordinate_articles.add(art.title)
 
-  read_article_data_file(filename, process,
-                         max_time_per_stage=Opts.max_time_per_stage)
+  read_article_data_file(filename, process, maxtime=Opts.max_time_per_stage)
 
 # Read the list of disambiguation article ID's.
 def read_disambig_id_file(filename):
@@ -97,7 +96,7 @@ def read_disambig_id_file(filename):
   status = StatusMessage("article")
   for line in uchompopen(filename):
     disambig_pages_by_id.add(line)
-    if status.item_processed() >= Opts.max_time_per_stage:
+    if status.item_processed(maxtime=Opts.max_time_per_stage):
       break
     
 ############################################################################
@@ -1638,7 +1637,7 @@ combined chunks.'''
                     "..." if truncated else ""))
       self.output_handler.process_article_text(text=eltext, title=self.title,
         id=self.id, redirect=self.redirect)
-      if self.status.item_processed() >= Opts.max_time_per_stage:
+      if self.status.item_processed(maxtime=Opts.max_time_per_stage):
         raise FinishParsing()
  
 #######################################################################
@@ -1764,11 +1763,11 @@ to find the redirects pointing to articles with coordinates.""",
                 help="""File containing list of article ID's that are
 disambiguation pages.""",
                 metavar="FILE")
-  op.add_option("--max-time-per-stage", type='int', default=2**31,
-                help="""Maximum time per stage in seconds.
+  op.add_option("--max-time-per-stage", "--mts", type='int', default=0,
+                help="""Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default %default.""")
-  op.add_option("-d", "--debug", metavar="LEVEL",
-                help="Output debug info at given level")
+  op.add_option("-d", "--debug", metavar="FLAGS",
+                help="Output debug info of the given types (separated by spaces or commas)")
 
   errprint("Arguments: %s" % ' '.join(sys.argv))
   opts, args = op.parse_args()
