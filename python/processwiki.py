@@ -792,13 +792,72 @@ applied to the text before being sent here.'''
     # coordinates in it.
     return self.process_source_text(text[2:-2])
 
-class ExtractLocationTypeFromSource(SourceTextHandler):
+#category_types = [
+#    ['neighbourhoods', 'neighborhood'],
+#    ['neighborhoods', 'neighborhood'],
+#    ['mountains', 'mountain'],
+#    ['stations', ('landmark', 'railwaystation')],
+#    ['rivers', 'river'],
+#    ['islands', 'isle'],
+#    ['counties', 'adm2nd'],
+#    ['parishes', 'adm2nd'],
+#    ['municipalities', 'city'],
+#    ['communities', 'city'],
+#    ['towns', 'city'],
+#    ['villages', 'city'],
+#    ['hamlets', 'city'],
+#    ['communes', 'city'],
+#    ['suburbs', 'city'],
+#    ['universities', 'edu'],
+#    ['colleges', 'edu'],
+#    ['schools', 'edu'],
+#    ['educational institutions', 'edu'],
+#    ['reserves', '?'],
+#    ['buildings', '?'],
+#    ['structures', '?'],
+#    ['landfills' '?'],
+#    ['streets', '?'],
+#    ['museums', '?'],
+#    ['galleries', '?']
+#    ['organizations', '?'],
+#    ['groups', '?'],
+#    ['lighthouses', '?'],
+#    ['attractions', '?'],
+#    ['border crossings', '?'],
+#    ['forts', '?'],
+#    ['parks', '?'],
+#    ['townships', '?'],
+#    ['cathedrals', '?'],
+#    ['skyscrapers', '?'],
+#    ['waterfalls', '?'],
+#    ['caves', '?'],
+#    ['beaches', '?'],
+#    ['cemeteries'],
+#    ['prisons'],
+#    ['territories'],
+#    ['states'],
+#    ['countries'],
+#    ['dominions'],
+#    ['airports', 'airport'],
+#    ['bridges'],
+#    ]
+
+
+class ExtractLocationTypeFromSource(RecursiveSourceTextHandler):
   '''Given the article text TEXT of an article (in general, after first-
 stage processing), extract info about the type of location (if any).
 Record info found in 'loctype'.'''
 
   def __init__(self):
     self.loctype = []
+    self.categories = []
+
+  def process_internal_link(self, text):
+    tempargs = get_macro_args(text)
+    arg0 = tempargs[0].strip()
+    if arg0.startswith('Category:'):
+      self.categories += [arg0[9:].strip()]
+    return self.process_source_text(text[2:-2])
 
   def process_template(self, text):
     # Look for a Coord, Infobox, etc. template that may have coordinates in it
@@ -818,7 +877,10 @@ Record info found in 'loctype'.'''
       (paramshash, _) = find_template_params(tempargs[1:], True)
       if lowertemp == 'infobox settlement':
         params = []
-        for x in ['settlement_type', 'subdivision_type', 'subdivision_name']:
+        for x in ['settlement_type',
+                  'subdivision_type', 'subdivision_type1', 'subdivision_type2',
+                  'subdivision_name', 'subdivision_name1', 'subdivision_name2',
+                  'coordinates_type', 'coordinates_region']:
           val = paramshash.get(x, None)
           if val:
             params += [(x, val)]
@@ -827,7 +889,9 @@ Record info found in 'loctype'.'''
           'latitude' in paramshash):
         self.loctype += \
             [['other-template-with-coord', [('template', temptype)]]]
-    yield text
+    # Recursively process the text inside the template in case there are
+    # coordinates in it.
+    return self.process_source_text(text[2:-2])
 
 #######################################################################
 #                         Process text for words                      #
@@ -1347,6 +1411,8 @@ def extract_location_type(text):
   for foo in handler.process_source_text(text): pass
   for (ty, vals) in handler.loctype:
     splitprint("  %s: %s" % (ty, vals))
+  for cat in handler.categories:
+    splitprint("  category: %s" % cat)
 
 # Handler to output count information on words.  Only processes articles
 # with coordinates in them.  Computes the count of each word in the article
