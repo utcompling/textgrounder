@@ -22,11 +22,11 @@ import scala.collection.JavaConversions._
 import scala.util.Random
 
 trait Geometry[A] {
-  def dist(x: A)(y: A): Double
-  def move(s: A)(t: A)(d: Double): A
-  def cent(ps: Seq[A]): A
+  def distance(x: A)(y: A): Double
+  def centroid(ps: Seq[A]): A
 
-  def nearest(cs: Seq[A], p: A): Int = cs.map(dist(p)(_)).zipWithIndex.min._2
+  def nearest(cs: Seq[A], p: A): Int =
+    cs.map(distance(p)(_)).zipWithIndex.min._2
 }
 
 trait Clusterer {
@@ -44,7 +44,7 @@ class KMeans extends Clusterer {
         clusters(i) += ps(j)
       }
 
-      cs = clusters.map(g.cent(_))
+      cs = clusters.map(g.centroid(_))
 
       val bs = ps.map(g.nearest(cs, _))
       done = as == bs
@@ -57,28 +57,25 @@ class KMeans extends Clusterer {
 }
 
 /* A simple instance for Euclidean geometry. */
-object Geometry {
+object EuclideanGeometry {
   type Point = (Double, Double)
 
-  implicit def euclideanGeometry = new Geometry[Point] {
-    def dist(x: Point)(y: Point): Double =
+  implicit def g = new Geometry[Point] {
+    def distance(x: Point)(y: Point): Double =
       Math.sqrt(Math.pow(x._1 - y._1, 2) + Math.pow(x._2 - y._2, 2))
 
-    def move(s: Point)(t: Point)(d: Double): Point = {
-      val r = d / dist(s)(t)
-      (s._1 + r * (t._1 - s._1), s._2 + r * (t._2 - s._2))
-    }
-
-    def cent(ps: Seq[Point]): Point = {
+    def centroid(ps: Seq[Point]): Point = {
       def pointPlus(x: Point, y: Point) = (x._1 + y._1, x._2 + y._2)
-      ps.reduceLeft(pointPlus) match { case (a, b) => (a / 2, b / 2) }
+      ps.reduceLeft(pointPlus) match {
+        case (a, b) => (a / ps.size, b / ps.size)
+      }
     }
   }
 }
 
 object KMeans {
   def main(args: Array[String]) {
-    import Geometry.euclideanGeometry
+    import EuclideanGeometry._
 
     val km = new KMeans()
     val ps: List[(Double, Double)] = List((0.01, 1), (0.25, 0.25), (1.3, 0), (1, 1.2), (0.1, 0))
