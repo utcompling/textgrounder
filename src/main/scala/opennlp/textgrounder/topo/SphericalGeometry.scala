@@ -38,7 +38,7 @@ object SphericalGeometry {
     }.toList
     println("Loaded...")
 
-    val xs = scala.util.Random.shuffle(cs).take(max)
+    val xs = scala.util.Random.shuffle(cs).take(max).toIndexedSeq
 
     println(Coordinate.centroid(xs))
 

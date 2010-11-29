@@ -15,8 +15,10 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.util.cluster
 
+
 import java.io._
 import scala.Math
+import scala.collection.immutable.Vector
 import scala.collection.mutable.Buffer
 import scala.collection.JavaConversions._
 import scala.util.Random
@@ -30,16 +32,18 @@ trait Geometry[A] {
 }
 
 trait Clusterer {
-  def cluster[A](ps: List[A], n: Int)(implicit g: Geometry[A]): List[A]
+  def cluster[A](ps: IndexedSeq[A], k: Int)(implicit g: Geometry[A]): Seq[A]
 }
 
 class KMeans extends Clusterer {
-  def cluster[A](ps: List[A], n: Int)(implicit g: Geometry[A]): List[A] = {
-    var cs = init(ps, n)
+  def cluster[A](ps: IndexedSeq[A], k: Int)(implicit g: Geometry[A]): Seq[A] = {
+    var cs = init(ps, k)
     var as = ps.map(g.nearest(cs, _))
     var done = false
+    val clusters = IndexedSeq.fill(k)(Buffer[A]())
     while (!done) {
-      val clusters = List.fill(n)(Buffer[A]())
+      clusters.foreach(_.clear)
+
       as.zipWithIndex.foreach { case (i, j) =>
         clusters(i) += ps(j)
       }
@@ -53,10 +57,11 @@ class KMeans extends Clusterer {
     cs
   }
 
-  def init[A](ps: List[A], n: Int): List[A] = Random.shuffle(ps).take(n)
+  def init[A](ps: Seq[A], k: Int): IndexedSeq[A] = {
+    (1 to k).map(_ => ps(Random.nextInt(ps.size)))
+  }
 }
 
-/* A simple instance for Euclidean geometry. */
 object EuclideanGeometry {
   type Point = (Double, Double)
 
@@ -70,16 +75,6 @@ object EuclideanGeometry {
         case (a, b) => (a / ps.size, b / ps.size)
       }
     }
-  }
-}
-
-object KMeans {
-  def main(args: Array[String]) {
-    import EuclideanGeometry._
-
-    val km = new KMeans()
-    val ps: List[(Double, Double)] = List((0.01, 1), (0.25, 0.25), (1.3, 0), (1, 1.2), (0.1, 0))
-    km.cluster(ps, 3).foreach { case (x, y) => println(x + " " + y) }
   }
 }
 
