@@ -15,6 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.topo;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class RectRegion extends Region {
   private final double minLat;
   private final double maxLat;
@@ -64,6 +67,15 @@ public class RectRegion extends Region {
 
   public double getMaxLng() {
     return this.maxLng;
+  }
+
+  public List<Coordinate> getRepresentatives() {
+    List<Coordinate> representatives = new ArrayList<Coordinate>(4);
+    representatives.add(Coordinate.fromRadians(this.minLat, this.minLng));
+    representatives.add(Coordinate.fromRadians(this.maxLat, this.minLng));
+    representatives.add(Coordinate.fromRadians(this.maxLat, this.maxLng));
+    representatives.add(Coordinate.fromRadians(this.minLat, this.maxLng));
+    return representatives;
   }
 }
 

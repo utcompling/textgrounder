@@ -15,35 +15,81 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.topo;
 
-public class PointSetRegion extends Region {
-  private final Coordinate coordinate;
+import java.util.List;
 
-  public PointSetRegion(Coordinate coordinate) {
-    this.coordinate = coordinate;
+public class PointSetRegion extends Region {
+  private final List<Coordinate> coordinates;
+  private final Coordinate center;
+  private final double minLat;
+  private final double maxLat;
+  private final double minLng;
+  private final double maxLng;
+
+  public PointSetRegion(List<Coordinate> coordinates) {
+    this.coordinates = coordinates;
+    this.center = Coordinate.centroid(this.coordinates);
+
+    double minLat = Double.POSITIVE_INFINITY;
+    double maxLat = Double.NEGATIVE_INFINITY;
+    double minLng = Double.POSITIVE_INFINITY;
+    double maxLng = Double.NEGATIVE_INFINITY;
+
+    for (Coordinate coordinate : this.coordinates) {
+      double lat = coordinate.getLat();
+      double lng = coordinate.getLng();
+
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+    }
+
+    this.minLat = minLat;
+    this.maxLat = maxLat;
+    this.minLng = minLng;
+    this.maxLng = maxLng;
   }
 
   public Coordinate getCenter() {
-    return this.coordinate;
+    return this.center;
   }
 
   public boolean contains(double lat, double lng) {
-    return lat == this.coordinate.getLat() && lng == this.coordinate.getLng();
+    return lat == this.center.getLat() && lng == this.center.getLng();
   }
 
   public double getMinLat() {
-    return this.coordinate.getLat();
+    return this.minLat;
   }
 
   public double getMaxLat() {
-    return this.coordinate.getLat();
+    return this.maxLat;
   }
 
   public double getMinLng() {
-    return this.coordinate.getLng();
+    return this.minLng;
   }
 
   public double getMaxLng() {
-    return this.coordinate.getLng();
+    return this.maxLng;
+  }
+
+  public List<Coordinate> getRepresentatives() {
+    return this.coordinates;
+  }
+
+  @Override
+  public double distance(Coordinate coordinate) {
+    double minDistance = Double.POSITIVE_INFINITY;
+
+    for (Coordinate representative : this.coordinates) {
+      double distance = representative.distance(coordinate);
+      if (distance < minDistance) {
+        minDistance = distance;
+      }
+    }
+
+    return minDistance;
   }
 }
 

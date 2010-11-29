@@ -15,6 +15,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.topo;
 
+import java.util.List;
+
 public abstract class Region {
   public abstract Coordinate getCenter();
   public abstract boolean contains(double lat, double lng);
@@ -23,29 +25,34 @@ public abstract class Region {
   public abstract double getMaxLat();
   public abstract double getMinLng();
   public abstract double getMaxLng();
+  public abstract List<Coordinate> getRepresentatives();
 
   public boolean contains(Coordinate coordinate) {
     return this.contains(coordinate.getLat(), coordinate.getLng());
   }
 
   public double getMinLatDegrees() {
-     return this.getMinLat() * Math.PI / 180.0;
+    return this.getMinLat() * Math.PI / 180.0;
   }
 
   public double getMaxLatDegrees() {
-     return this.getMaxLat() * Math.PI / 180.0;
+    return this.getMaxLat() * Math.PI / 180.0;
   }
 
   public double getMinLngDegrees() {
-     return this.getMinLng() * Math.PI / 180.0;
+    return this.getMinLng() * Math.PI / 180.0;
   }
 
   public double getMaxLngDegrees() {
-     return this.getMaxLng() * Math.PI / 180.0;
+    return this.getMaxLng() * Math.PI / 180.0;
   }
 
   public double distance(Region other) {
-     return this.getCenter().distance(other.getCenter());
+    return this.distance(other.getCenter());
+  }
+
+  public double distance(Coordinate coordinate) {
+    return this.getCenter().distance(coordinate);
   }
 }
 

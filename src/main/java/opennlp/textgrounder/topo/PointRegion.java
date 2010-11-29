@@ -15,6 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.topo;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class PointRegion extends Region {
   private final Coordinate coordinate;
 
@@ -44,6 +47,12 @@ public class PointRegion extends Region {
 
   public double getMaxLng() {
     return this.coordinate.getLng();
+  }
+
+  public List<Coordinate> getRepresentatives() {
+    List<Coordinate> representatives = new ArrayList<Coordinate>(1);
+    representatives.add(this.coordinate);
+    return representatives;
   }
 }
 

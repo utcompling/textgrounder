@@ -35,10 +35,10 @@ object SphericalGeometry {
     val cs = Source.fromFile(args(0)).getLines.map { line =>
       val Array(lat, lng) = line.split("\t").map(_.toDouble)
       Coordinate.fromDegrees(lat, lng)
-    }.toList
+    }.toIndexedSeq
     println("Loaded...")
 
-    val xs = scala.util.Random.shuffle(cs).take(max).toIndexedSeq
+    val xs = scala.util.Random.shuffle(cs).take(max)
 
     println(Coordinate.centroid(xs))
 
