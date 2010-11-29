@@ -15,6 +15,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.topo
 
+import scala.io._
+
 import scala.collection.JavaConversions._
 
 import opennlp.textgrounder.util.cluster._
@@ -23,5 +25,30 @@ object SphericalGeometry {
   implicit def g = new Geometry[Coordinate] {
     def distance(x: Coordinate)(y: Coordinate): Double = x.distance(y)
     def centroid(ps: Seq[Coordinate]): Coordinate = Coordinate.centroid(ps)
+  }
+
+  def main(args: Array[String]) {
+    val max = args(1).toInt
+    val n = args(2).toInt
+    val style = args(3)
+
+    val cs = Source.fromFile(args(0)).getLines.map { line =>
+      val Array(lat, lng) = line.split("\t").map(_.toDouble)
+      Coordinate.fromDegrees(lat, lng)
+    }.toList
+    println("Loaded...")
+
+    val xs = scala.util.Random.shuffle(cs).take(max)
+
+    println(Coordinate.centroid(xs))
+
+    val clusterer = new KMeans
+    val clusters = clusterer.cluster(xs, n)
+    clusters.foreach {
+      case c => println("<Placemark><styleUrl>" +
+                style + "</styleUrl><Point><coordinates>" +
+                c.getLngDegrees + "," + c.getLatDegrees +
+                "</coordinates></Point></Placemark>")
+    }
   }
 }
