@@ -15,40 +15,24 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.topo.gaz;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentMap;
-
-import com.google.common.base.Function;
-import com.google.common.collect.MapMaker;
-
 import opennlp.textgrounder.topo.Location;
 
-public class SoftCachingGazetteer extends CachingGazetteer {
-  public SoftCachingGazetteer(Gazetteer source) {
-    this(source, true);
+public abstract class LoadableGazetteer implements Gazetteer {
+  public abstract void add(String name, Location location);
+
+  public int load(GazetteerReader reader) {
+    int count = 0;
+    for (Location location : reader) {
+      count++;
+      this.add(location.getName(), location);
+    }
+    reader.close();
+    this.finishLoading();
+    return count;
   }
 
-  public SoftCachingGazetteer(Gazetteer source, boolean cacheIncoming) {
-    super(source, cacheIncoming);
-  }
-
-  @Override
-  protected Map<String, List<Location>> initialize() {
-    return new MapMaker().softValues().makeComputingMap(
-      new Function<String, List<Location>>() {
-        public List<Location> apply(String query) {
-          return SoftCachingGazetteer.this.lookup(query);
-        }
-      }
-    );
-  }
-
-  @Override
-  public List<Location> lookup(String query) {
-    query = query.toLowerCase();
-    return this.cache.get(query);
-  }
+  public void finishLoading() {}
+  public void close() {}
 }
 

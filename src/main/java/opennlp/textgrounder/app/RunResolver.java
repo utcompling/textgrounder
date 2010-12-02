@@ -33,9 +33,9 @@ public class RunResolver extends BaseApp {
         if(getAdditionalInputPath() != null) {
             System.out.print("Reading additional training corpus from " + getAdditionalInputPath() + " ...");
             List<Gazetteer> gazList = new ArrayList<Gazetteer>();
-            Gazetteer trGaz = new InMemoryGazetteer();
+            LoadableGazetteer trGaz = new InMemoryGazetteer();
             trGaz.load(new CorpusGazetteerReader(testCorpus));
-            Gazetteer otherGaz = new InMemoryGazetteer();
+            LoadableGazetteer otherGaz = new InMemoryGazetteer();
             otherGaz.load(new WorldReader(new File(Constants.getGazetteersDir() + File.separator + "dataen-fixed.txt.gz")));
             gazList.add(trGaz);
             gazList.add(otherGaz);

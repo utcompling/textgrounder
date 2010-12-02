@@ -86,7 +86,7 @@ public class ToponymAnnotator extends DocumentSourceWrapper {
 
                 String form = builder.toString();
                 List<Location> candidates = ToponymAnnotator.this.gazetteer.lookup(form.toLowerCase());
-                if (!candidates.isEmpty()) {
+                if (candidates != null) {
                   Toponym toponym = new SimpleToponym(form, candidates);
                   toponymSpans.add(new Span<Toponym>(span.getStart(), span.getEnd(), toponym));
                 }

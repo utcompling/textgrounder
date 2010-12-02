@@ -16,28 +16,19 @@
 package opennlp.textgrounder.topo.gaz;
 
 import java.util.List;
+
 import opennlp.textgrounder.topo.Location;
 
-public abstract class Gazetteer {
-  public abstract void add(String name, Location location);
-  public abstract List<Location> lookup(String query);
-
-  public boolean contains(String query) {
-    return !this.lookup(query).isEmpty();
-  }
-
-  public int load(GazetteerReader reader) {
-    int count = 0;
-    for (Location location : reader) {
-      count++;
-      this.add(location.getName(), location);
-    }
-    reader.close();
-    this.finishLoading();
-    return count;
-  }
-
-  public void finishLoading() {}
-  public void close() {}
+/**
+ * Represents a mapping from toponym strings to lists of location candidates.
+ *
+ * @author Travis Brown <travis.brown@mail.utexas.edu>
+ */
+public interface Gazetteer {
+  /**
+   * Lookup a toponym in the gazetteer, returning null if no candidate list is
+   * found.
+   */
+  public List<Location> lookup(String query);
 }
 

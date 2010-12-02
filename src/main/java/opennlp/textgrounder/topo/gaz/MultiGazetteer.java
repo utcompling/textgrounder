@@ -19,25 +19,21 @@ import java.util.ArrayList;
 import java.util.List;
 import opennlp.textgrounder.topo.Location;
 
-public class MultiGazetteer extends Gazetteer {
+public class MultiGazetteer implements Gazetteer {
   private final List<Gazetteer> gazetteers;
 
   public MultiGazetteer(List<Gazetteer> gazetteers) {
     this.gazetteers = gazetteers;
   }
 
-  public void add(String name, Location location) {
-    this.gazetteers.get(0).add(name, location);
-  }
-
   public List<Location> lookup(String query) {
     for (Gazetteer gazetteer : this.gazetteers) {
       List<Location> candidates = gazetteer.lookup(query);
-      if (!candidates.isEmpty()) {
+      if (candidates != null) {
         return candidates;
       }
     }
-    return new ArrayList<Location>(0);
+    return null;
   }
 }
 

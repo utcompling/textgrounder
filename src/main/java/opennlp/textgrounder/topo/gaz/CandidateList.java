@@ -47,7 +47,7 @@ public abstract class CandidateList implements Iterable<Location> {
    * possible.
    */
   public Iterator<SortedItem> getNearest(Coordinate point) {
-    List items = new ArrayList<SortedItem>(this.size());
+    List<SortedItem> items = new ArrayList<SortedItem>(this.size());
     for (int i = 0; i < this.size(); i++) {
       items.add(new SortedItem(i, this.get(i).getRegion().distance(point)));
     }
