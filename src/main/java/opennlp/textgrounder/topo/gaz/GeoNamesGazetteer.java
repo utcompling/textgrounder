@@ -52,12 +52,17 @@ public class GeoNamesGazetteer implements Gazetteer {
   private final Map<String, List<Coordinate>> admPoints;
 
   public GeoNamesGazetteer(BufferedReader reader) throws IOException {
-    this(reader, 0.01);
+    this(reader, 0.005);
+  }
+
+  public GeoNamesGazetteer(BufferedReader reader, int kPoints)
+    throws IOException {
+    this(reader, 1.0, kPoints, kPoints);
   }
 
   public GeoNamesGazetteer(BufferedReader reader, double pointRatio)
     throws IOException {
-    this(reader, pointRatio, 5, 50);
+    this(reader, pointRatio, 5, 30);
   }
 
   public GeoNamesGazetteer(BufferedReader reader, double pointRatio, int minPoints, int maxPoints)
@@ -80,20 +85,21 @@ public class GeoNamesGazetteer implements Gazetteer {
     this.admPoints = new HashMap<String, List<Coordinate>>();
 
     this.load(reader);
-    this.expandRegions();
+    this.expandIPE();
   }
 
   private boolean ignore(String cat, String type) {
-    return (cat == "L" || cat == "S" || cat == "U" || cat == "V");
+    return (cat.equals("H") || cat.equals("L") || cat.equals("S") || cat.equals("U") || cat.equals("V"));
   }
 
   private boolean store(String cat, String type) {
     return true;
   }
 
-  private void expandRegions() {
+  private void expandIPE() {
     Clusterer clusterer = new KMeans();
 
+    System.err.println("Selecting points for " + this.ipes.size() + " independent political entities.");
     for (String ipe : this.ipes.keySet()) {
       Location location = this.locations.get(this.ipes.get(ipe));
       List<Coordinate> contained = this.ipePoints.get(ipe);
@@ -106,6 +112,8 @@ public class GeoNamesGazetteer implements Gazetteer {
         k = this.maxPoints;
       }
 
+      System.err.format("Clustering: %d points for %s.\n", k, location.getName());
+
       if (contained.size() > this.maxConsidered) {
         Collections.shuffle(contained);
         contained = contained.subList(0, this.maxConsidered);
@@ -116,6 +124,38 @@ public class GeoNamesGazetteer implements Gazetteer {
     }
   }
 
+  private void expandADM() {
+    Clusterer clusterer = new KMeans();
+
+    System.err.println("Selecting points for " + this.adms.size() + " administrative regions.");
+    for (String adm : this.adms.keySet()) {
+      Location location = this.locations.get(this.adms.get(adm));
+      List<Coordinate> contained = this.admPoints.get(adm);
+
+      int k = (int) Math.floor(contained.size() * this.pointRatio);
+      if (k < this.minPoints) {
+        k = this.minPoints;
+      }
+      if (k > this.maxPoints) {
+        k = this.maxPoints;
+      }
+
+      System.err.format("Clustering: %d points for %s.\n", k, location.getName());
+
+      if (contained.size() > this.maxConsidered) {
+        Collections.shuffle(contained);
+        contained = contained.subList(0, this.maxConsidered);
+      }
+
+      List<Coordinate> representatives = clusterer.clusterList(contained, k, SphericalGeometry.g());
+      location.setRegion(new PointSetRegion(representatives));
+    }
+  }
+
+  private String standardize(String name) {
+    return name.toLowerCase().replace("’", "'");
+  }
+
   private int load(BufferedReader reader) {
     int index = 0;
     try {
@@ -123,20 +163,20 @@ public class GeoNamesGazetteer implements Gazetteer {
            line != null; line = reader.readLine()) {   
         String[] fields = line.split("\t");
         if (fields.length > 14) {
-          String primaryName = fields[1].toLowerCase();
+          String primaryName = fields[1];
           Set<String> nameSet = new HashSet<String>();
-          nameSet.add(primaryName);
+          nameSet.add(this.standardize(primaryName));
 
           String[] names = fields[3].split(",");
           for (int i = 0; i < names.length; i++) {
-            nameSet.add(names[i].toLowerCase());
+            nameSet.add(this.standardize(names[i]));
           }
 
           String cat = fields[6];
           String type = fields[7];
 
           if (this.ignore(cat, type)) {
-            break;
+            continue;
           }
 
           String ipe = fields[8];
@@ -171,9 +211,9 @@ public class GeoNamesGazetteer implements Gazetteer {
           }
           this.ipePoints.get(ipe).add(coordinate);
 
-          if (type == "PCLI") {
+          if (type.equals("PCLI")) {
             this.ipes.put(ipe, index);
-          } else if (type == "ADM1") {
+          } else if (type.equals("ADM1")) {
             this.adms.put(adm, index);
           }
 

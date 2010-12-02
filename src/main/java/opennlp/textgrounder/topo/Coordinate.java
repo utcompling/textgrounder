@@ -17,6 +17,8 @@ package opennlp.textgrounder.topo;
 
 import java.util.List;
 
+import opennlp.textgrounder.util.FastTrig;
+
 public class Coordinate {
     private final double lng;
     private final double lat;
