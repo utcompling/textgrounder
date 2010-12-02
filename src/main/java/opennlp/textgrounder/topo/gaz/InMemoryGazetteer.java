@@ -40,12 +40,7 @@ public class InMemoryGazetteer extends LoadableGazetteer {
   }
 
   public List<Location> lookup(String query) {
-    query = query.toLowerCase();
-    List<Location> locations = this.map.get(query);
-    if (locations == null) {
-      locations = new ArrayList<Location>(0);
-    }
-    return locations;
+    return this.map.get(query.toLowerCase());
   }
 }
 

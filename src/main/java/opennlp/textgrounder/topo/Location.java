@@ -25,7 +25,7 @@ public class Location {
 
   private final int id;
   private final String name;
-  private final Region region;
+  private Region region;
   private final Location.Type type;
   private final int population;
 
@@ -67,6 +67,10 @@ public class Location {
 
   public Region getRegion() {
     return this.region;
+  }
+
+  public void setRegion(Region region) {
+    this.region = region;
   }
 
   public Location.Type getType() {

@@ -22,14 +22,14 @@ import scala.collection.JavaConversions._
 import opennlp.textgrounder.util.cluster._
 
 object SphericalGeometry {
-  implicit def g = new Geometry[Coordinate] {
+  implicit def g: Geometry[Coordinate] = new Geometry[Coordinate] {
     def distance(x: Coordinate)(y: Coordinate): Double = x.distance(y)
     def centroid(ps: Seq[Coordinate]): Coordinate = Coordinate.centroid(ps)
   }
 
   def main(args: Array[String]) {
     val max = args(1).toInt
-    val n = args(2).toInt
+    val k = args(2).toInt
     val style = args(3)
 
     val cs = Source.fromFile(args(0)).getLines.map { line =>
@@ -43,7 +43,7 @@ object SphericalGeometry {
     println(Coordinate.centroid(xs))
 
     val clusterer = new KMeans
-    val clusters = clusterer.cluster(xs, n)
+    val clusters = clusterer.cluster(xs, k)
     clusters.foreach {
       case c => println("<Placemark><styleUrl>" +
                 style + "</styleUrl><Point><coordinates>" +

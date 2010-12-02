@@ -32,12 +32,18 @@ trait Geometry[A] {
 }
 
 trait Clusterer {
-  def cluster[A](ps: IndexedSeq[A], k: Int)(implicit g: Geometry[A]): Seq[A]
+  def clusterList[A](ps: java.util.List[A], k: Int)(implicit g: Geometry[A]): java.util.List[A]
+  def cluster[A](ps: Seq[A], k: Int)(implicit g: Geometry[A]): Seq[A]
 }
 
 class KMeans extends Clusterer {
-  def cluster[A](ps: IndexedSeq[A], k: Int)(implicit g: Geometry[A]): Seq[A] = {
-    var cs = init(ps, k)
+  def clusterList[A](ps: java.util.List[A], k: Int)(implicit g: Geometry[A]): java.util.List[A] = {
+    cluster(ps.toIndexedSeq, k)(g)
+  }
+
+  def cluster[A](ps: Seq[A], k: Int)(implicit g: Geometry[A]): Seq[A] = {
+    var ips = ps.toIndexedSeq
+    var cs = init(ips, k)
     var as = ps.map(g.nearest(cs, _))
     var done = false
     val clusters = IndexedSeq.fill(k)(Buffer[A]())
@@ -45,12 +51,12 @@ class KMeans extends Clusterer {
       clusters.foreach(_.clear)
 
       as.zipWithIndex.foreach { case (i, j) =>
-        clusters(i) += ps(j)
+        clusters(i) += ips(j)
       }
 
       cs = clusters.map(g.centroid(_))
 
-      val bs = ps.map(g.nearest(cs, _))
+      val bs = ips.map(g.nearest(cs, _))
       done = as == bs
       as = bs
     }
