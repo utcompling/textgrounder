@@ -15,47 +15,47 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.topo;
 
-import java.util.ArrayList;
 import java.util.List;
 
-public class RectRegion extends Region {
+public class PointSetRegion extends Region {
+  private final List<Coordinate> coordinates;
+  private final Coordinate center;
   private final double minLat;
   private final double maxLat;
   private final double minLng;
   private final double maxLng;
 
-  private RectRegion(double minLat, double maxLat, double minLng, double maxLng) {
+  public PointSetRegion(List<Coordinate> coordinates) {
+    this.coordinates = coordinates;
+    this.center = Coordinate.centroid(this.coordinates);
+
+    double minLat = Double.POSITIVE_INFINITY;
+    double maxLat = Double.NEGATIVE_INFINITY;
+    double minLng = Double.POSITIVE_INFINITY;
+    double maxLng = Double.NEGATIVE_INFINITY;
+
+    for (Coordinate coordinate : this.coordinates) {
+      double lat = coordinate.getLat();
+      double lng = coordinate.getLng();
+
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+    }
+
     this.minLat = minLat;
     this.maxLat = maxLat;
     this.minLng = minLng;
     this.maxLng = maxLng;
   }
 
-  public static RectRegion fromRadians(double minLat, double maxLat, double minLng, double maxLng) {
-    return new RectRegion(minLat, maxLat, minLng, maxLng);
-  }
-
-  public static RectRegion fromDegrees(double minLat, double maxLat, double minLng, double maxLng) {
-    return new RectRegion(minLat * Math.PI / 180.0,
-                          maxLat * Math.PI / 180.0,
-                          minLng * Math.PI / 180.0,
-                          maxLng * Math.PI / 180.0);
-  }
-
-  /**
-   * Returns the average of the minimum and maximum values for latitude and
-   * longitude. Should be changed to avoid problems around zero degrees.
-   */
   public Coordinate getCenter() {
-    return Coordinate.fromRadians((this.maxLat - this.minLat) / 2.0,
-                                  (this.maxLng - this.minLng) / 2.0);
+    return this.center;
   }
 
   public boolean contains(double lat, double lng) {
-    return lat >= this.minLat &&
-           lat <= this.maxLat &&
-           lng >= this.minLng &&
-           lng <= this.maxLng;
+    return lat == this.center.getLat() && lng == this.center.getLng();
   }
 
   public double getMinLat() {
@@ -75,12 +75,21 @@ public class RectRegion extends Region {
   }
 
   public List<Coordinate> getRepresentatives() {
-    List<Coordinate> representatives = new ArrayList<Coordinate>(4);
-    representatives.add(Coordinate.fromRadians(this.minLat, this.minLng));
-    representatives.add(Coordinate.fromRadians(this.maxLat, this.minLng));
-    representatives.add(Coordinate.fromRadians(this.maxLat, this.maxLng));
-    representatives.add(Coordinate.fromRadians(this.minLat, this.maxLng));
-    return representatives;
+    return this.coordinates;
+  }
+
+  @Override
+  public double distance(Coordinate coordinate) {
+    double minDistance = Double.POSITIVE_INFINITY;
+
+    for (Coordinate representative : this.coordinates) {
+      double distance = representative.distance(coordinate);
+      if (distance < minDistance) {
+        minDistance = distance;
+      }
+    }
+
+    return minDistance;
   }
 }
 

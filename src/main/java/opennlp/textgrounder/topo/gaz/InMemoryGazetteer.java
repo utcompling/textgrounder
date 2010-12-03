@@ -22,7 +22,7 @@ import java.util.Map;
 
 import opennlp.textgrounder.topo.Location;
 
-public class InMemoryGazetteer extends Gazetteer {
+public class InMemoryGazetteer extends LoadableGazetteer {
   private final Map<String, List<Location>> map;
 
   public InMemoryGazetteer() {
@@ -40,12 +40,7 @@ public class InMemoryGazetteer extends Gazetteer {
   }
 
   public List<Location> lookup(String query) {
-    query = query.toLowerCase();
-    List<Location> locations = this.map.get(query);
-    if (locations == null) {
-      locations = new ArrayList<Location>(0);
-    }
-    return locations;
+    return this.map.get(query.toLowerCase());
   }
 }
 

@@ -39,15 +39,12 @@ import opennlp.textgrounder.util.Span;
  * @author Travis Brown <travis.brown@mail.utexas.edu>
  * @version 0.1.0
  */
-public class ToponymAnnotator extends DocumentSourceWrapper {
-  private final NamedEntityRecognizer recognizer;
+public class CandidateAnnotator extends DocumentSourceWrapper {
   private final Gazetteer gazetteer;
 
-  public ToponymAnnotator(DocumentSource source,
-                          NamedEntityRecognizer recognizer,
+  public CandidateAnnotator(DocumentSource source,
                           Gazetteer gazetteer) {
     super(source);
-    this.recognizer = recognizer;
     this.gazetteer = gazetteer;
   }
 
@@ -64,32 +61,22 @@ public class ToponymAnnotator extends DocumentSourceWrapper {
 
           public Sentence<Token> next() {
             Sentence<Token> sentence = sentences.next();
-            List<String> forms = new ArrayList<String>();
             List<Token> tokens = sentence.getTokens();
 
-            for (Token token : tokens) {
-              forms.add(token.getOrigForm());
-            }
-
-            List<Span<NamedEntityType>> spans = ToponymAnnotator.this.recognizer.recognize(forms);
             List<Span<Toponym>> toponymSpans = new ArrayList<Span<Toponym>>();
 
-            for (Span<NamedEntityType> span : spans) {
-              if (span.getItem() == NamedEntityType.LOCATION) {
-                StringBuilder builder = new StringBuilder();
-                for (int i = span.getStart(); i < span.getEnd(); i++) {
-                  builder.append(forms.get(i));
-                  if (i < span.getEnd() - 1) {
-                    builder.append(" ");
-                  }
-                }
+            Iterator<Span<Token>> spans = sentence.toponymSpans();
+            while (spans.hasNext()) {
+              Span<Token> span = (Span<Token>) spans.next();
+              Toponym toponym = (Toponym) span.getItem();
+              String form = toponym.getOrigForm();
 
-                String form = builder.toString();
-                List<Location> candidates = ToponymAnnotator.this.gazetteer.lookup(form.toLowerCase());
-                if (candidates != null) {
-                  Toponym toponym = new SimpleToponym(form, candidates);
-                  toponymSpans.add(new Span<Toponym>(span.getStart(), span.getEnd(), toponym));
-                }
+              List<Location> candidates = CandidateAnnotator.this.gazetteer.lookup(form.toLowerCase());
+              if (candidates != null) {
+                Toponym newToponym = new SimpleToponym(form, candidates);
+                toponymSpans.add(new Span<Toponym>(span.getStart(), span.getEnd(), newToponym));
+              } else {
+                toponymSpans.add(new Span<Toponym>(span.getStart(), span.getEnd(), toponym));
               }
             }
 

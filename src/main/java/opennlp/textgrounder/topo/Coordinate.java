@@ -15,6 +15,10 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.topo;
 
+import java.util.List;
+
+import opennlp.textgrounder.util.FastTrig;
+
 public class Coordinate {
     private final double lng;
     private final double lat;
@@ -96,6 +100,34 @@ public class Coordinate {
     public double distance(Coordinate other) {
       return Math.acos(Math.sin(this.lat) * Math.sin(other.lat)
            + Math.cos(this.lat) * Math.cos(other.lat) * Math.cos(other.lng - this.lng));
+    }
+
+    /**
+     * Compute the approximate centroid by taking the average of the latitudes
+     * and longitudes.
+     */
+    public static Coordinate centroid(List<Coordinate> coordinates) {
+      double latSins = 0.0;
+      double latCoss = 0.0;
+      double lngSins = 0.0;
+      double lngCoss = 0.0;
+
+      for (int i = 0; i < coordinates.size(); i++) {
+        latSins += Math.sin(coordinates.get(i).getLat());
+        latCoss += Math.cos(coordinates.get(i).getLat());
+        lngSins += Math.sin(coordinates.get(i).getLng());
+        lngCoss += Math.cos(coordinates.get(i).getLng());
+      }
+
+      latSins /= coordinates.size();
+      latCoss /= coordinates.size();
+      lngSins /= coordinates.size();
+      lngCoss /= coordinates.size();
+
+      double lat = Math.atan2(latSins, latCoss);
+      double lng = Math.atan2(lngSins, lngCoss);
+
+      return Coordinate.fromRadians(lat, lng);
     }
 
     @Override

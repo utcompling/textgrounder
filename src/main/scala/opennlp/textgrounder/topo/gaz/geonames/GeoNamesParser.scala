@@ -13,20 +13,22 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.topo.gaz;
+package opennlp.textgrounder.topo.gaz.geonames
 
-import java.io.File;
+import java.io._
+import scala.collection.JavaConversions._
+import scala.io._
 
-import opennlp.textgrounder.topo.Location;
+import opennlp.textgrounder.text.Corpus
+import opennlp.textgrounder.text.Token
+import opennlp.textgrounder.topo.Location
 
-public class GazetteerDriver {
-  public static void main(String args[]) throws Exception {
-    Gazetteer gazetteer = new InMemoryGazetteer();
-    gazetteer.load(new FilteredGeoNamesReader(new File(args[0])));
-    System.out.format("Results for %s:\n", args[1]);
-    for (Location location : gazetteer.lookup(args[1])) {
-      System.out.format("  %s\n", location);
-    }
+class GeoNamesParser(private val file: File) {
+  val locs = scala.collection.mutable.Map[String, List[(Double, Double)]]()
+
+  Source.fromFile(file).getLines.foreach { line =>
+    val Array(lat, lng) = line.split("\t").map(_.toDouble)
+    
   }
 }
 
