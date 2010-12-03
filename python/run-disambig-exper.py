@@ -54,6 +54,8 @@ def main():
   global dry_run
   if opts.dry_run:
     dry_run = True
+  if not args:
+    op.print_help()
   for exper in args:
     run_exper(eval(exper), exper)
 
