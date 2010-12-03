@@ -22,7 +22,7 @@ def fix_redirects(filename):
     articles_seen.append(art)
   errprint("Reading from %s..." % filename)
   fields = read_article_data_file(filename, process,
-                                  max_time_per_stage=Opts.max_time_per_stage)
+                                  maxtime=Opts.max_time_per_stage)
   errprint("Writing to stdout...")
   write_article_data_file(sys.stdout, outfields=fields,
                           articles=articles_seen)

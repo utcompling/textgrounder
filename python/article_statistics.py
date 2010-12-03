@@ -125,7 +125,7 @@ def generate_article_stats(filename):
   def process(art):
     note_article_for_global_stats(art)
   pad.read_article_data_file(filename, process=process,
-                             max_time_per_stage=Opts.max_time_per_stage)
+                             maxtime=Opts.max_time_per_stage)
   output_global_stats()
 
 ############################################################################
