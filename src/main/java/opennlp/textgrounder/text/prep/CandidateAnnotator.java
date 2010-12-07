@@ -43,7 +43,7 @@ public class CandidateAnnotator extends DocumentSourceWrapper {
   private final Gazetteer gazetteer;
 
   public CandidateAnnotator(DocumentSource source,
-                          Gazetteer gazetteer) {
+                            Gazetteer gazetteer) {
     super(source);
     this.gazetteer = gazetteer;
   }
@@ -72,12 +72,11 @@ public class CandidateAnnotator extends DocumentSourceWrapper {
               String form = toponym.getOrigForm();
 
               List<Location> candidates = CandidateAnnotator.this.gazetteer.lookup(form.toLowerCase());
+              Toponym newToponym = toponym;
               if (candidates != null) {
-                Toponym newToponym = new SimpleToponym(form, candidates);
-                toponymSpans.add(new Span<Toponym>(span.getStart(), span.getEnd(), newToponym));
-              } else {
-                toponymSpans.add(new Span<Toponym>(span.getStart(), span.getEnd(), toponym));
+                newToponym = new SimpleToponym(form, candidates);
               }
+              toponymSpans.add(new Span<Toponym>(span.getStart(), span.getEnd(), newToponym));
             }
 
             return new SimpleSentence(sentence.getId(), tokens, toponymSpans);
