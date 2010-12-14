@@ -397,7 +397,7 @@ class RegionDist(object):
 
   # It's expensive to compute the value for a given word so we cache word
   # distributions.
-  cached_dists = LRUCache(maxsize=10000)
+  cached_dists = LRUCache(maxsize=1000)
 
   def __init__(self, word=None, regionprobs=None):
     if regionprobs:
@@ -2142,8 +2142,46 @@ class KLDivergenceStrategy(GeotagDocumentStrategy):
     return regions
 
 
+# FIXME: Duplicates code from KLDivergenceStrategy
+
+class CosineSimilarityStrategy(GeotagDocumentStrategy):
+  def __init__(self, partial=True):
+    self.partial = partial
+
+  def return_ranked_regions(self, worddist):
+    article_pq = PriorityQueue()
+    for stat_region in \
+        StatRegion.iter_nonempty_regions(nonempty_word_dist=True):
+      inds = (stat_region.latind, stat_region.longind)
+      if debug['lots']:
+        (latind, longind) = inds
+        coord = region_indices_to_coord(latind, longind)
+        errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s"
+                 % (latind, longind, coord,
+                    stat_region.worddist.num_arts_for_word_dist))
+      cossim = fast_cosine_similarity(worddist, stat_region.worddist,
+                                 partial=self.partial)
+      assert cossim >= 0.0
+      # Just in case of round-off problems
+      assert cossim <= 1.002
+      cossim = 1.002 - cossim
+      article_pq.add_task(cossim, stat_region)
+
+    regions = []
+    while True:
+      try:
+        regions.append(article_pq.get_top_priority())
+      except IndexError:
+        break
+
+    return regions
+
+
 # Return the probability of seeing the given document 
 class NaiveBayesDocumentStrategy(GeotagDocumentStrategy):
+  def __init__(self, opts):
+    self.opts = opts
+
   def return_ranked_regions(self, worddist):
     regprobs = {}
     for reg in \
@@ -2222,16 +2260,18 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       rank += 1
     else:
       rank = 1000000000
+    want_indiv_results = debug['some'] or debug['indivresults']
     stats = Results.record_geotag_document_result(rank, article.coord,
         regs[0].latind, regs[0].longind, num_arts_in_true_region=naitr,
-        return_stats=(debug['some']))
+        return_stats=want_indiv_results)
     if naitr == 0:
       Results.record_geotag_document_other_stat('Articles with no training articles in region')
-    if debug['some']:
+    if want_indiv_results:
       errprint("Article %s:" % article)
       errprint("  True region at rank: %s" % rank)
       errprint("  True region: %s" % true_statreg)
-      errprint("  Predicted region (at rank 1): %s" % regs[0])
+      for i in xrange(5):
+        errprint("  Predicted region (at rank %s): %s" % (i+1, regs[i]))
       errprint("  Distance %.2f miles to true region center at %s" %
                (stats['true_truedist'], stats['true_center']))
       errprint("  Distance %.2f miles to predicted region center at %s" %
@@ -2671,6 +2711,8 @@ The test set is specified by --eval-file.  Default '%default'.""")
                   choices=['baseline',
                            'kl-divergence', 'kldiv',
                            'partial-kl-divergence', 'partial-kldiv',
+                           'cosine-similarity', 'cossim',
+                           'partial-cosine-similarity', 'partial-cossim',
                            'per-word-region-distribution', 'regdist',
                            'naive-bayes-with-baseline', 'nb-base',
                            'naive-bayes-no-baseline', 'nb-nobase'],
@@ -2700,6 +2742,8 @@ distributions over all words in an article, weighted by the count the word in
 the article.  Default is 'partial-kl-divergence'.""")
     canon_options['strategy'] = {'kldiv':'kl-divergence',
                                  'partial-kldiv':'partial-kl-divergence',
+                                 'cossim':'cosine-similarity',
+                                 'partial-cossim':'partial-cosine-similarity',
                                  'regdist':'per-word-region-distribution',
                                  'nb-base':'naive-bayes-with-baseline',
                                  'nb-nobase':'naive-bayes-no-baseline'}
@@ -2849,12 +2893,6 @@ considered.  Default '%default'.""")
       op.error("Raw-text reading not implemented yet")
 
     if opts.mode == 'geotag-documents':
-      if opts.strategy not in [
-          'baseline', 'kl-divergence', 'partial-kl-divergence',
-          'per-word-region-distribution',
-          'naive-bayes-with-baseline', 'naive-bayes-no-baseline']:
-        op.error("Strategy '%s' invalid for --mode=geotag-documents" %
-                 opts.strategy)
       if opts.eval_format not in ['pcl-travel', 'wiki']:
         op.error("For --mode=geotag-documents, eval-format must be 'pcl-travel' or 'wiki'")
     elif opts.mode == 'geotag-toponyms':
@@ -2919,6 +2957,10 @@ considered.  Default '%default'.""")
         strategy = NaiveBayesDocumentStrategy(opts)
       elif opts.strategy == 'per-word-region-distribution':
         strategy = PerWordRegionDistributionsStrategy()
+      elif opts.strategy == 'cosine-similarity':
+        strategy = CosineSimilarityStrategy(partial=False)
+      elif opts.strategy == 'partial-cosine-similarity':
+        strategy = CosineSimilarityStrategy(partial=True)
       else:
         partial = opts.strategy == 'partial-kl-divergence'
         strategy = KLDivergenceStrategy(partial=partial)
