@@ -130,6 +130,13 @@ earth_radius_in_miles = 3963.191
 # from the equator.
 miles_per_degree = math.pi * 2 * earth_radius_in_miles / 360.
 
+# Height of highest bar in meters
+kml_max_height = 2000000
+
+# Minimum and maximum colors
+kml_mincolor = (255, 255, 0)    # yellow
+kml_maxcolor = (255, 0, 0)      # red
+
 # A class holding the boundary of a geographic object.  Currently this is
 # just a bounding box, but eventually may be expanded to including a
 # convex hull or more complex model.
@@ -385,7 +392,7 @@ class RegionWordDist(WordDist):
 # set of regions, each with a word distribution, then we can imagine
 # conceptually inverting the process to generate a region distribution over
 # words.  Basically, for a given word, look to see what its probability is
-# in all regions; normalize, and we have a word distribution.
+# in all regions; normalize, and we have a region distribution.
 
 # Fields defined:
 #
@@ -446,6 +453,120 @@ class RegionDist(object):
     for (reg, prob) in regprobs.iteritems():
       regprobs[reg] /= totalprob
     return RegionDist(regionprobs=regprobs)
+
+  # Convert region to a KML file showing the distribution
+  def generate_kml_file(self, filename):
+
+    if Opts.kml_transform == 'log':
+      def xform(x): return log(x)
+    elif Opts.kml_transform == 'logsquared':
+      def xform(x): return -log(x)*log(x)
+    else:
+      def xform(x): return x
+
+    minxformprob = xform(min(prob for prob in self.regionprobs.itervalues()))
+    maxxformprob = xform(max(prob for prob in self.regionprobs.itervalues()))
+
+    # Generate KML for a single region
+    def one_reg_kml(reg, prob):
+      latind, longind = reg.latind, reg.longind
+      offprob = xform(prob) - minxformprob
+      fracprob = offprob / (maxxformprob - minxformprob)
+      swcoord = stat_region_indices_to_near_corner_coord(latind, longind)
+      necoord = stat_region_indices_to_far_corner_coord(latind, longind)
+      nwcoord = Coord(necoord.lat, swcoord.long)
+      secoord = Coord(swcoord.lat, necoord.long)
+      center = stat_region_indices_to_center_coord(latind, longind)
+      coordtext = '\n'
+      for coord in (swcoord, nwcoord, necoord, secoord, swcoord):
+        lat = (center.lat + coord.lat) / 2
+        long = (center.long + coord.long) / 2
+        coordtext += '%s,%s,%s\n' % (long, lat, fracprob*kml_max_height)
+      if reg.most_popular_article:
+        name = reg.most_popular_article.title
+      else:
+        name = ''
+
+      # Placemark indicating name
+      yield ['Placemark', [],
+          ['name', [], name],
+          ['Region', [],
+            ['LatLonAltBox', [],
+              ['north', [], '%s' % ((center.lat + necoord.lat) / 2)],
+              ['south', [], '%s' % ((center.lat + swcoord.lat) / 2)],
+              ['east', [], '%s' % ((center.long + necoord.long) / 2)],
+              ['west', [], '%s' % ((center.long + swcoord.long) / 2)]],
+            ['Lod', [],
+              ['minLodPixels', [], '16']]],
+          ['styleURL', [], '#bar'],
+          ['Point', [],
+            ['coordinates', [], '%s,%s' % (center.long, center.lat)]]
+          ]
+
+      # Interpolate colors
+      color = [0, 0, 0]
+      for i in range(3):
+        color[i] = (kml_mincolor[i] +
+            fracprob*(kml_maxcolor[i] - kml_mincolor[i]))
+      # Original color dc0155ff
+      #rgbcolor = 'dc0155ff'
+      rgbcolor = 'ff%02x%02x%02x' % tuple(reversed(color))
+
+      # Yield cylinder indicating probability by height and color
+      yield ['Placemark', [],
+          ['name', [], '%s POLYGON' % name],
+          ['styleUrl', [], '#bar'],
+          ['Style', [],
+            ['PolyStyle', [],
+              ['color', [], rgbcolor],
+              ['colorMode', [], 'normal']]],
+          ['Polygon', [],
+            ['extrude', [], '1'],
+            ['tessellate', [], '1'],
+            ['altitudeMode', [], 'relativeToGround'],
+            ['outerBoundaryIs', [],
+              ['LinearRing', [],
+                ['coordinates', [], coordtext]]]
+            ]
+          ]
+
+    def yield_reg_kml():
+      for reg, prob in self.regionprobs.iteritems():
+        for kml in one_reg_kml(reg, prob):
+          yield kml
+
+    allregkml = [x for x in yield_reg_kml()]
+
+    kml = ['kml',
+        [('xmlns', 'http://www.opengis.net/kml/2.2'),
+         ('xmlns:gx', 'http://www.google.com/kml/ext/2.2'),
+         ('xmlns:kml', 'http://www.opengis.net/kml/2.2'),
+         ('xmlns:atom', 'http://www.w3.org/2005/Atom')],
+        ['Document', [],
+          ['Style', [('id', 'bar')],
+            ['PolyStyle', [],
+              ['outline', [], '0']],
+            ['IconStyle', [], ['Icon', []]]],
+          ['Style', [('id', 'downArrowIcon')],
+            ['IconStyle', [],
+              ['Icon', [],
+                ['href', [],
+                  'http://maps.google.com/mapfiles/kml/pal4/icon28.png']]]],
+          ['Folder', [],
+            ['name', [], self.word],
+            ['open', [], '1'],
+            ['description', [],
+              "Region distribution for word '%s'" % self.word],
+            ['LookAt', [],
+              ['latitude', [], '42'],
+              ['longitude', [], '-102'],
+              ['altitude', [], '0'],
+              ['range', [], '5000000'],
+              ['tilt', [], '53.454348562403'],
+              ['heading', [], '0']]] + allregkml]]
+
+    output_xml_file(filename, kml)
+
 
 ############################################################################
 #                           Geographic locations                           #
@@ -627,6 +748,14 @@ class StatRegion(object):
 
     cls.all_regions_computed = True
     
+  @classmethod
+  def initialize_regions(cls):
+    cls.generate_all_nonempty_regions()
+    errprint("Number of non-empty regions: %s" % cls.num_non_empty_regions)
+    errprint("Number of empty regions: %s" % cls.num_empty_regions)
+    # Save some memory by clearing this after it's not needed
+    cls.tiling_region_to_articles = None
+
   # Add the given article to the region map, which covers the earth in regions
   # of a particular size to aid in computing the regions used in region-based
   # Naive Bayes.
@@ -2159,16 +2288,11 @@ class PerWordRegionDistributionsStrategy(GeotagDocumentStrategy):
     regdist = RegionDist.get_region_dist_for_word_dist(worddist)
     return regdist.get_ranked_regions()
 
-
 class GeotagDocumentEvaluator(TestFileEvaluator):
   def __init__(self, opts, strategy):
     super(GeotagDocumentEvaluator, self).__init__(opts)
     self.strategy = strategy
-    StatRegion.generate_all_nonempty_regions()
-    errprint("Number of non-empty regions: %s" % StatRegion.num_non_empty_regions)
-    errprint("Number of empty regions: %s" % StatRegion.num_empty_regions)
-    # Save some memory by clearing this after it's not needed
-    StatRegion.tiling_region_to_articles = None
+    StatRegion.initialize_regions()
 
   def output_results(self, final=False):
     Results.output_geotag_document_results(all_results=final)
@@ -2649,6 +2773,7 @@ any others in a division.  Points farther away than this are ignored as
     op.add_option("-m", "--mode", "--m", type='choice', default='match-only',
                   choices=['geotag-toponyms',
                            'geotag-documents',
+                           'generate-kml',
                            'segment-geotag-documents',
                            'match-only'],
                   help="""Action to perform.
@@ -2659,6 +2784,10 @@ output is enabled).
 
 'geotag-documents' finds the proper location for each document (or article)
 in the test set.
+
+'generate-kml' generates KML files for some set of words, showing the
+distribution over regions that the word determines.  Use '--kml-words' to
+specify the words whose distributions should be outputted.
 
 'segment-geotag-documents' simultaneously segments a document into sections
 covering a specific location and determines that location.
@@ -2777,6 +2906,23 @@ computing a word distribution, but the article for counting the number of
 incoming internal links.  Note that this only applies when
 --mode='geotag-toponyms'; in --mode='geotag-documents', only regions are
 considered.  Default '%default'.""")
+
+    op.add_option("-k", "--kml-words", "--kw",
+                  help="""Words to generate KML distributions for, when
+--mode='generate-kml'.  Each word should be separated by a comma.  A separate
+file is generated for each word, using '--kml-prefix' and adding '.kml'.""")
+    op.add_option("--kml-prefix", "--kp",
+                  default='kml-dist.',
+                  help="""Prefix to use for KML files outputted.
+Default '%default',""")
+    op.add_option("--kml-transform", "--kt", "--kx", type='choice',
+                  default="none",
+                  choices=['none', 'log', 'logsquared'],
+                  help="""Type of transformation to apply to the probabilities
+when generating KML, possibly to try and make the low values more visible.
+Possibilities are 'none' (no transformation), 'log' (take the log), and
+'logsquared' (negative of squared log).  Default '%default'.""")
+
     return canon_options
 
   def handle_arguments(self, opts, op, args):
@@ -2873,6 +3019,11 @@ considered.  Default '%default'.""")
     elif opts.mode.startswith('geotag'):
       self.need('eval_file', 'evaluation file(s)')
 
+    if opts.mode == 'generate-kml':
+      self.need('kml_words')
+    elif opts.kml_words:
+      op.error('--kml-words only compatible with --mode=generate-kml')
+
     self.need('article_data_file')
 
     return params
@@ -2892,13 +3043,21 @@ considered.  Default '%default'.""")
     #                            outfile=sys.stderr)
 
     # Read in the words-counts file
-    if opts.mode.startswith('geotag'):
+    if not opts.mode == 'match-only':
       if opts.counts_file:
         read_word_counts(opts.counts_file)
 
     WorldGazetteer.read_world_gazetteer_and_match(opts.gazetteer_file)
 
     if opts.mode == 'match-only': return
+
+    if opts.mode == 'generate-kml':
+      StatRegion.initialize_regions()
+      words = opts.kml_words.split(',')
+      for word in words:
+        regdist = RegionDist.get_region_dist(word)
+        regdist.generate_kml_file('%s%s.kml' % (opts.kml_prefix, word))
+      return
 
     if opts.mode == 'geotag-toponyms':
       # Generate strategy object
@@ -2912,7 +3071,7 @@ considered.  Default '%default'.""")
         evalobj = TRCoNLLGeotagToponymEvaluator(opts, strategy)
       else:
         evalobj = WikipediaGeotagToponymEvaluator(opts, strategy)
-    else:
+    elif opts.mode == 'geotag-documents':
       if opts.strategy == 'baseline':
         strategy = BaselineGeotagDocumentStrategy(opts.baseline_strategy)
       elif opts.strategy.startswith('naive-bayes-'):

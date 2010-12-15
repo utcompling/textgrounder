@@ -839,6 +839,139 @@ def backquote(command, input=None, shell=None, include_stderr=True, throw=True):
   return output[0]
 
 def oserror(mess, err):
-    e = OSError(mess)
-    e.errno = err
-    raise e
+  e = OSError(mess)
+  e.errno = err
+  raise e
+
+#############################################################################
+#                              Generating XML                               #
+#############################################################################
+
+# This is old code I wrote originally for ccg.ply (the ccg2xml converter),
+# for generating XML.  It doesn't use the functions in xml.dom.minidom,
+# which in any case are significantly more cumbersome than the list/tuple-based
+# structure used below.
+
+# --------- XML ----------
+#
+# Thankfully, the structure of XML is extremely simple.  We represent
+# a single XML statement of the form
+#
+# <biteme foo="1" blorp="baz">
+#   <bitemetoo ...>
+#     ...
+#   gurgle
+# </biteme>
+#
+# as a list
+#
+# ['biteme', [('foo', '1'), ('blorp', 'baz')],
+#    ['bitemetoo', ...],
+#    'gurgle'
+# ]
+#
+# i.e. an XML statement corresponds to a list where the first element
+# is the statement name, the second element lists any properties, and
+# the remaining elements list items inside the statement.
+#
+# ----------- Property lists -------------
+#
+# The second element of an XML statement in list form is a "property list",
+# a list of two-element tuples (property and value).  Some functions below
+# (e.g. `getprop', `putprop') manipulate property lists.
+#
+# FIXME: Just use a hash table.
+
+def check_arg_type(errtype, arg, ty):
+  if type(arg) is not ty:
+    raise TypeError("%s: Type is not %s: %s" % (errtype, ty, arg))
+
+def xml_sub(text):
+  if not isinstance(text, basestring):
+    text = text.__str__()
+  if type(text) is unicode:
+    text = text.encode("utf-8")
+  text = text.replace('&', '&amp;')
+  text = text.replace('<', '&lt;')
+  text = text.replace('>', '&gt;')
+  return text
+
+def print_xml_1(file, xml, indent=0):
+  #if xml_debug > 1:
+  #  errout("%sPrinting: %s\n" % (' ' * indent, str(xml)))
+  if type(xml) is not list:
+    file.write('%s%s\n' % (' ' * indent, xml_sub(xml)))
+  else:
+    check_arg_type("XML statement", xml[0], str)
+    file.write(' ' * indent)
+    file.write('<%s' % xml_sub(xml[0]))
+    for x in xml[1]:
+      check_arg_type("XML statement", x, tuple)
+      if len(x) != 2:
+        raise TypeError("Bad tuple pair: " + str(x))
+      file.write(' %s="%s"' % (xml_sub(x[0]), xml_sub(x[1])))
+    subargs = xml[2:]
+    if len(subargs) == 1 and type(subargs[0]) is not list:
+      file.write('>%s</%s>\n' % (xml_sub(subargs[0]), xml_sub(xml[0])))
+    elif not subargs:
+      file.write('/>\n')
+    else:
+      file.write('>\n')
+      for x in subargs:
+        print_xml_1(file, x, indent + 2)
+      file.write(' ' * indent)
+      file.write('</%s>\n' % xml_sub(xml[0]))
+
+# Pretty-print a section of XML, in the format above, to FILE.
+# Start at indent INDENT.
+
+def print_xml(file, xml):
+  print_xml_1(file, xml)
+
+# Function to output a particular XML file
+def output_xml_file(filename, xml):
+  fil = open(filename, 'w')
+  fil.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+  print_xml(fil, xml)
+  fil.close()
+
+# Return True if PROP is seen as a property in PROPLIST, a list of tuples
+# of (prop, value)
+def property_specified(prop, proplist):
+  return not not ['foo' for (x,y) in proplist if x == prop]
+
+# Return value of property PROP in PROPLIST; signal an error if not found.
+def getprop(prop, proplist):
+  for (x,y) in proplist:
+    if x == prop:
+      return y
+  raise ValueError("Property %s not found in %s" % (prop, proplist))
+
+# Return value of property PROP in PROPLIST, or DEFAULT.
+def getoptprop(prop, proplist, default=None):
+  for (x,y) in proplist:
+    if x == prop:
+      return y
+  return default
+
+# Replace value of property PROP with VALUE in PROPLIST.
+def putprop(prop, value, proplist):
+  for i in xrange(len(proplist)):
+    if proplist[i][0] == prop:
+      proplist[i] = (prop, value)
+      return
+  else:
+    proplist += [(prop, value)]
+    
+# Replace property named PROP with NEW in PROPLIST.  Often this is called with
+# with PROP equal to None; the None occurs when a PROP=VALUE clause is expected
+# but a bare value is supplied.  The context will supply a particular default
+# property (e.g. 'name') to be used when the property name is omitted, but the
+# generic code to handle property-value clauses doesn't know what this is.
+# The surrounding code calls property_name_replace() to fill in the proper name.
+
+def property_name_replace(prop, new, proplist):
+  for i in xrange(len(proplist)):
+    if proplist[i][0] == prop:
+      proplist[i] = (new, proplist[i][1])
+
