@@ -11,7 +11,10 @@
 # sort = Sort each split file
 # combine = Combine results
 
-TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+if [ -z "$TEXTGROUNDER_PYTHON" ]; then
+  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+fi
+
 NO_USE_PERMUTED=t
 . $TEXTGROUNDER_PYTHON/config-wikigrounder
 

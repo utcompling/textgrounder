@@ -13,7 +13,10 @@
 # combined = Combined article data file, only for articles with coordinates or
 #            redirects to such articles
 
-TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+if [ -z "$TEXTGROUNDER_PYTHON" ]; then
+  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+fi
+
 . $TEXTGROUNDER_PYTHON/config-wikigrounder
 
 PROCESSWIKI="$TEXTGROUNDER_PYTHON/processwiki.py"

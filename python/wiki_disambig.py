@@ -2071,9 +2071,20 @@ class BaselineGeotagDocumentStrategy(GeotagDocumentStrategy):
             key=lambda x:x[1], reverse=True)]
       if debug['commontop']:
         errprint("  sorted candidates = %s" % cands)
+
+      def find_good_regions_for_coord(cands):
+        for cand in cands:
+          reg = StatRegion.find_region_for_coord(cand.coord)
+          if reg.latind is None:
+            errprint("Strange, found no region for candidate %s" % cand)
+          else:
+            yield reg
+
       # Convert to regions
-      cands = [StatRegion.find_region_for_coord(cand.coord) for cand in cands]
-      errprint("  region candidates = %s" % cands)
+      cands = [x for x in find_good_regions_for_coord(cands)]
+
+      if debug['commontop']:
+        errprint("  region candidates = %s" % cands)
     else:
       cands = []
     # Append random regions and remove duplicates

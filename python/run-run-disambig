@@ -5,7 +5,9 @@
 # Allow -i STR or --id STR to be specified at the beginning of the options,
 # specifying an ID to use in the outfiles.
 
-TGP_DIR=$HOME/devel/textgrounder/python
+if [ -z "$TEXTGROUNDER_PYTHON" ]; then
+  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+fi
 
 if [ "$1" = "-i" -o "$1" = "--id" ]; then
   ID=".$2"
@@ -32,4 +34,4 @@ else
   echo "Run without arguments"
 fi
 
-nohup $TGP_DIR/run-disambig ${1+"$@"} > $OUTFILE 2>&1
+nohup $TEXTGROUNDER_PYTHON/run-disambig ${1+"$@"} > $OUTFILE 2>&1

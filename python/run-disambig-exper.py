@@ -65,7 +65,7 @@ def main():
 
 MTS300 = iterate('--max-time-per-stage', [300])
 NonBaselineStrategies = iterate('--strategy',
-    ['partial-kl-divergence', 'per-word-region-distribution', 'naive-bayes-no-baseline'])
+    ['partial-kl-divergence', 'per-word-region-distribution', 'naive-bayes-no-baseline', 'partial-cosine-similarity'])
 BaselineStrategies = iterate('--strategy baseline --baseline-strategy',
     ['internal-link', 'random', 'num-articles',
      'link-most-common-toponym', 'regdist-most-common-toponym'])
@@ -73,7 +73,8 @@ AllStrategies = combine(NonBaselineStrategies, BaselineStrategies)
 
 CoarseDPR = iterate('--degrees-per-region',
     #[90, 30, 10, 5, 3, 2, 1, 0.5]
-    [0.5, 1, 2, 3, 5, 10, 30, 90])
+    #[0.5, 1, 2, 3, 5, 10, 30, 90]
+    [0.5, 1, 2, 3, 5, 10])
 OldFineDPR = iterate('--degrees-per-region',
     [90, 75, 60, 50, 40, 30, 25, 20, 15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2.5, 2,
      1.75, 1.5, 1.25, 1, 0.87, 0.75, 0.63, 0.5, 0.4, 0.3, 0.25, 0.2, 0.15, 0.1]
@@ -103,10 +104,24 @@ FinerExper = nest(MTS300, FinerDPR, KLDIVStrategy)
 # Missing experiments
 
 MissingNonBaselineStrategies = iterate('--strategy',
-    ['naive-bayes-no-baseline'])
+    ['naive-bayes-no-baseline', 'partial-cosine-similarity', 'cosine-similarity'])
 MissingBaselineStrategies = iterate('--strategy baseline --baseline-strategy',
-    ['link-most-common-toponym', 'regdist-most-common-toponym'])
-MissingAllStrategies = combine(MissingNonBaselineStrategies, MissingBaselineStrategies)
-MissingExper = nest(MTS300, CoarseDPR, MissingAllStrategies)
+    ['link-most-common-toponym'
+      #, 'regdist-most-common-toponym'
+      ])
+NBStrategy = iterate('--strategy',
+    ['naive-bayes-no-baseline'])
+MissingOtherNonBaselineStrategies = iterate('--strategy',
+    ['partial-cosine-similarity', 'cosine-similarity'])
+MissingAllButNBStrategies = combine(MissingOtherNonBaselineStrategies,
+    MissingBaselineStrategies)
+#Original MissingExper failed on or didn't include all but
+#regdist-most-common-toponym.
+#MissingExper = nest(MTS300, CoarseDPR, MissingAllStrategies)
+
+MissingNBExper = nest(MTS300, CoarseDPR, NBStrategy)
+MissingOtherExper = nest(MTS300, CoarseDPR, MissingAllButNBStrategies)
+MissingBaselineExper = nest(MTS300, CoarseDPR, MissingBaselineStrategies)
+
 
 main()

@@ -7,7 +7,10 @@
 # See also 'run-run-disambig', which will run this script using 'nohup'
 # while saving the output to a file.
 
-TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+if [ -z "$TEXTGROUNDER_PYTHON" ]; then
+  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+fi
+
 . $TEXTGROUNDER_PYTHON/config-wikigrounder
 
 WIKI_DISAMBIG="$TEXTGROUNDER_PYTHON/wiki_disambig.py"
