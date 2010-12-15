@@ -31,7 +31,7 @@ def read_incoming_link_info(filename, articles_hash):
       art = articles_hash.get(title, None)
       if art:
         art.incoming_links = int(links)
-    if status.item_processed() >= Opts.max_time_per_stage:
+    if status.item_processed(maxtime=Opts.max_time_per_stage):
       break
 
 # Parse the result of a previous run of --only-coords or coords-counts for
@@ -45,7 +45,7 @@ def read_coordinates_file(filename):
       title = m_[1]
     elif rematch('Article coordinates: (.*),(.*)$', line):
       coords_hash[title] = Coord(safe_float(m_[1]), safe_float(m_[2]))
-      if status.item_processed() >= Opts.max_time_per_stage:
+      if status.item_processed(maxtime=Opts.max_time_per_stage):
         break
   return coords_hash
 
@@ -66,8 +66,7 @@ def output_combined_article_data(filename, coords_file, links_file):
       return
     articles_hash[art.title] = art
     articles_seen.append(art)
-  read_article_data_file(filename, process,
-                         max_time_per_stage=Opts.max_time_per_stage)
+  read_article_data_file(filename, process, maxtime=Opts.max_time_per_stage)
 
   read_incoming_link_info(links_file, articles_hash)
 

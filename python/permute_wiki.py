@@ -46,7 +46,7 @@ def read_article_data(filename):
     all_articles.append(art)
 
   infields = read_article_data_file(filename, process,
-                                    max_time_per_stage=Opts.max_time_per_stage)
+                                    maxtime=Opts.max_time_per_stage)
   return infields
 
 def write_permutation(infields):
@@ -151,7 +151,7 @@ def split_files(infields, split_prefix, num_splits):
         warning("Can't find article %s in article data file" % id)
       else:
         splitfiles[splits[id]].write(text)
-    if status.item_processed() >= Opts.max_time_per_stage:
+    if status.item_processed(maxtime=Opts.max_time_per_stage):
       errprint("Interrupting processing")
       break
 
