@@ -7,8 +7,11 @@ dry_run = False
 
 # Run a series of disambiguation experiments.
 
-tgdir = os.environ['TEXTGROUNDER_DIR']
-runcmd = '%s/python/run-run-disambig' % tgdir
+if 'TEXTGROUNDER_PYTHON' in os.environ:
+  tgdir = os.environ['TEXTGROUNDER_PYTHON']
+else:
+  tgdir = '%s/python' % (os.environ['TEXTGROUNDER_DIR'])
+runcmd = '%s/run-run-disambig' % tgdir
 
 def runit(fun, id, args):
   command='%s --id %s documents %s' % (runcmd, id, args)
@@ -98,8 +101,11 @@ ParamExper = nest(MTS300, DPR1, MinWordCount, NonBaselineStrategies)
 # Fine experiments
 
 FinerDPR = iterate('--degrees-per-region', [0.3, 0.2, 0.1])
-KLDIVStrategy = iterate('--strategy', ['partial-kl-divergence'])
-FinerExper = nest(MTS300, FinerDPR, KLDIVStrategy)
+EvenFinerDPR = iterate('--degrees-per-region', [0.1, 0.05])
+KLDivStrategy = iterate('--strategy', ['partial-kl-divergence'])
+FullKLDivStrategy = iterate('--strategy', ['kl-divergence'])
+FinerExper = nest(MTS300, FinerDPR, KLDivStrategy)
+EvenFinerExper = nest(MTS300, EvenFinerDPR, KLDivStrategy)
 
 # Missing experiments
 
@@ -122,6 +128,7 @@ MissingAllButNBStrategies = combine(MissingOtherNonBaselineStrategies,
 MissingNBExper = nest(MTS300, CoarseDPR, NBStrategy)
 MissingOtherExper = nest(MTS300, CoarseDPR, MissingAllButNBStrategies)
 MissingBaselineExper = nest(MTS300, CoarseDPR, MissingBaselineStrategies)
+FullKLDivExper = nest(MTS300, CoarseDPR, FullKLDivStrategy)
 
 
 main()
