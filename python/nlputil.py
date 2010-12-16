@@ -548,7 +548,11 @@ Used for testing purposes.  Default %default.""")
     if self.canon_options:
       for (opt, mapper) in self.canon_options.iteritems():
         val = getattr(self.opts, opt)
-        if val in mapper:
+        if isinstance(val, list):
+          # If a list, then map all members, in case of multi-options
+          val = [mapper.get(x, x) for x in val]
+          setattr(self.opts, opt, val)
+        elif val in mapper:
           setattr(self.opts, opt, mapper[val])
 
     params = self.handle_arguments(self.opts, self.op, self.args)
