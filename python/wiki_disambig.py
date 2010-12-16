@@ -1785,6 +1785,13 @@ class TestFileEvaluator(object):
     pass
 
   def evaluate_and_output_results(self, files):
+    def output_final_results():
+      errprint("")
+      errprint("Final results for strategy %s: All %d documents processed:" %
+               (self.stratname, status.num_processed()))
+      self.output_results(final=True)
+      errprint("Ending final results for strategy %s" % self.stratname)
+
     status = StatusMessage('document')
     last_elapsed = 0
     last_processed = 0
@@ -1803,7 +1810,7 @@ class TestFileEvaluator(object):
             errprint("")
             errprint("Finishing evaluation after %d documents" %
                 new_processed)
-            self.output_results(final=True)
+            output_final_results()
             return
 
           # If five minutes and ten documents have gone by, print out results
@@ -1815,13 +1822,9 @@ class TestFileEvaluator(object):
             last_processed = new_processed
         else:
           errprint("Skipped document %s" % doc)
-  
-    errprint("")
-    errprint("Final results for strategy %s: All %d documents processed:" %
-             (self.stratname, status.num_processed()))
-    self.output_results(final=True)
-    errprint("Ending final results for strategy %s" % self.stratname)
 
+    output_final_results()
+  
 class GeotagToponymStrategy(object):
   def need_context(self):
     pass
@@ -2325,8 +2328,9 @@ class KLDivergenceStrategy(GeotagDocumentStrategy):
 # FIXME: Duplicates code from KLDivergenceStrategy
 
 class CosineSimilarityStrategy(GeotagDocumentStrategy):
-  def __init__(self, partial=True):
+  def __init__(self, smoothed=False, partial=False):
     self.partial = partial
+    self.smoothed = smoothed
 
   def return_ranked_regions(self, worddist):
     article_pq = PriorityQueue()
@@ -2339,8 +2343,12 @@ class CosineSimilarityStrategy(GeotagDocumentStrategy):
         errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s"
                  % (latind, longind, coord,
                     stat_region.worddist.num_arts_for_word_dist))
-      cossim = fast_cosine_similarity(worddist, stat_region.worddist,
-                                 partial=self.partial)
+      if self.smoothed:
+        cossim = fast_smoothed_cosine_similarity(worddist, stat_region.worddist,
+                                   partial=self.partial)
+      else:
+        cossim = fast_cosine_similarity(worddist, stat_region.worddist,
+                                   partial=self.partial)
       assert cossim >= 0.0
       # Just in case of round-off problems
       assert cossim <= 1.002
@@ -2929,6 +2937,8 @@ The test set is specified by --eval-file.  Default '%default'.""")
                            'symmetric-partial-kldiv',
                            'cosine-similarity', 'cossim',
                            'partial-cosine-similarity', 'partial-cossim',
+                           'smoothed-cosine-similarity',
+                           'smoothed-partial-cosine-similarity',
                            'per-word-region-distribution', 'regdist',
                            'naive-bayes-with-baseline', 'nb-base',
                            'naive-bayes-no-baseline', 'nb-nobase'],
@@ -3231,15 +3241,24 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
               use_baseline=(stratname == 'naive-bayes-with-baseline'))
         elif stratname == 'per-word-region-distribution':
           strategy = PerWordRegionDistributionsStrategy()
-        elif opts.strategy == 'cosine-similarity':
-          strategy = CosineSimilarityStrategy(partial=False)
-        elif opts.strategy == 'partial-cosine-similarity':
-          strategy = CosineSimilarityStrategy(partial=True)
+        elif stratname == 'cosine-similarity':
+          strategy = CosineSimilarityStrategy(smoothed=False, partial=False)
+        elif stratname == 'partial-cosine-similarity':
+          strategy = CosineSimilarityStrategy(smoothed=False, partial=True)
+        elif stratname == 'smoothed-cosine-similarity':
+          strategy = CosineSimilarityStrategy(smoothed=True, partial=False)
+        elif stratname == 'smoothed-partial-cosine-similarity':
+          strategy = CosineSimilarityStrategy(smoothed=True, partial=True)
+        elif stratname == 'kl-divergence':
+          strategy = KLDivergenceStrategy(symmetric=False, partial=False)
+        elif stratname == 'partial-kl-divergence':
+          strategy = KLDivergenceStrategy(symmetric=False, partial=True)
+        elif stratname == 'symmetric-kl-divergence':
+          strategy = KLDivergenceStrategy(symmetric=True, partial=False)
+        elif stratname == 'symmetric-partial-kl-divergence':
+          strategy = KLDivergenceStrategy(symmetric=True, partial=True)
         else:
-          assert stratname.endswith('kl-divergence')
-          partial = stratname.endswith('partial-kl-divergence')
-          symmetric = stratname.startswith('symmetric')
-          strategy = KLDivergenceStrategy(partial=partial, symmetric=symmetric)
+          assert False
         if opts.eval_format == 'pcl-travel':
           evalobj = PCLTravelGeotagDocumentEvaluator(opts, strategy, stratname)
         else:

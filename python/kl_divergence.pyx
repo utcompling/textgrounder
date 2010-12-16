@@ -71,7 +71,9 @@ inlines lookups as much as possible.'''
 
   return kldiv
 
-def fast_cosine_similarity(self, other, partial=False):
+# The older implementation that uses smoothed probabilities.
+
+def fast_smoothed_cosine_similarity(self, other, partial=False):
   '''A fast implementation of cosine similarity that uses Cython declarations
 and inlines lookups as much as possible.  It's always "partial" in that it
 ignores words neither in P nor Q, despite the fact that they have non-zero
@@ -139,4 +141,53 @@ proceed as with KL-divergence and ignore words not in P.'''
   #kldiv += self.kl_divergence_34(other, overall_probs_diff_words)
   #return kldiv
 
+  return pqsum / (sqrt(p2sum) * sqrt(q2sum))
+
+# The newer implementation that uses unsmoothed probabilities.
+
+def fast_cosine_similarity(self, other, partial=False):
+  '''A fast implementation of cosine similarity that uses Cython declarations
+and inlines lookups as much as possible.  It's always "partial" in that it
+ignores words neither in P nor Q, despite the fact that they have non-zero
+probability due to smoothing.  But with parameter "partial" to True we
+proceed as with KL-divergence and ignore words not in P.'''
+  cdef double p, q
+  cdef double pfact, qfact
+  cdef double pqsum, p2sum, q2sum
+  pqsum = 0.0
+  p2sum = 0.0
+  q2sum = 0.0
+  pfact = 1.0/self.total_tokens
+  qfact = 1.0/other.total_tokens
+  # 1.
+  pcounts = self.counts
+  qcounts = other.counts
+  cdef int pcount
+  # FIXME!! Length of p is the same for all calls of fast_cosine_similarity
+  # on this item, so we could cache it.  Not clear it would save much
+  # time, though.
+  for (word, pcount) in pcounts.iteritems():
+    p = pcount * pfact
+    qcount = qcounts.get(word, None)
+    if qcount is None:
+      q = 0.0
+    else:
+      q = qcount * qfact
+    #if q == 0.0:
+    #  print "Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s" % (word, qfact_globally_unseen_prob, qcount, qfact)
+    #if p == 0.0 or q == 0.0:
+    #  print "Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s" % (
+    #      p, q, word, pcount, qcount, qfact, qfact_unseen, owprobs[word])
+    pqsum += p * q
+    p2sum += p * p
+    q2sum += q * q
+
+  # 2.
+  if not partial:
+    for word in qcounts:
+      if word not in pcounts:
+        q = qcounts[word] * qfact
+        q2sum += q * q
+
+  if pqsum == 0.0: return 0.0
   return pqsum / (sqrt(p2sum) * sqrt(q2sum))
