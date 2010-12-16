@@ -23,8 +23,8 @@ public abstract class Evaluator {
 
   /* The given corpus should include either gold or selected candidates or
    * both. */
-  public Evaluator(Corpus<Token> corpus) {
-    this.corpus = corpus;
+  public Evaluator(Corpus<? extends Token> corpus) {
+    this.corpus = (Corpus<Token>) corpus;
   }
 
   /* Evaluate the "selected" candidates in the corpus using its "gold"

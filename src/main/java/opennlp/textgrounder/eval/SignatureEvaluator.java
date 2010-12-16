@@ -16,7 +16,6 @@ public class SignatureEvaluator extends Evaluator {
         super(corpus);
     }
 
-    @Override
     public Report evaluate() {
         return null;
     }

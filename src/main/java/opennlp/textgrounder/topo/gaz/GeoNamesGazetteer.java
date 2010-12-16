@@ -39,6 +39,7 @@ import opennlp.textgrounder.util.cluster.Clusterer;
 import opennlp.textgrounder.util.cluster.KMeans;
 
 public class GeoNamesGazetteer implements Gazetteer {
+  private final boolean expandRegions;
   private final double pointRatio;
   private final int minPoints;
   private final int maxPoints;
@@ -52,26 +53,31 @@ public class GeoNamesGazetteer implements Gazetteer {
   private final Map<String, List<Coordinate>> admPoints;
 
   public GeoNamesGazetteer(BufferedReader reader) throws IOException {
-    this(reader, 0.005);
+    this(reader, true, 0.005);
   }
 
-  public GeoNamesGazetteer(BufferedReader reader, int kPoints)
-    throws IOException {
-    this(reader, 1.0, kPoints, kPoints);
+  public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions) throws IOException {
+    this(reader, expandRegions, 0.005);
   }
 
-  public GeoNamesGazetteer(BufferedReader reader, double pointRatio)
+  public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions, int kPoints)
     throws IOException {
-    this(reader, pointRatio, 5, 30);
+    this(reader, expandRegions, 1.0, kPoints, kPoints);
   }
 
-  public GeoNamesGazetteer(BufferedReader reader, double pointRatio, int minPoints, int maxPoints)
+  public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions, double pointRatio)
     throws IOException {
-    this(reader, pointRatio, minPoints, maxPoints, 2000);
+    this(reader, expandRegions, pointRatio, 5, 30);
   }
 
-  public GeoNamesGazetteer(BufferedReader reader, double pointRatio, int minPoints, int maxPoints, int maxConsidered)
+  public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions, double pointRatio, int minPoints, int maxPoints)
     throws IOException {
+    this(reader, expandRegions, pointRatio, minPoints, maxPoints, 2000);
+  }
+
+  public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions, double pointRatio, int minPoints, int maxPoints, int maxConsidered)
+    throws IOException {
+    this.expandRegions = expandRegions;
     this.pointRatio = pointRatio;
     this.minPoints = minPoints;
     this.maxPoints = maxPoints;
@@ -85,7 +91,10 @@ public class GeoNamesGazetteer implements Gazetteer {
     this.admPoints = new HashMap<String, List<Coordinate>>();
 
     this.load(reader);
-    this.expandIPE();
+    if (this.expandRegions) {
+      this.expandIPE();
+      //this.expandADM();
+    }
   }
 
   private boolean ignore(String cat, String type) {
@@ -99,7 +108,7 @@ public class GeoNamesGazetteer implements Gazetteer {
   private void expandIPE() {
     Clusterer clusterer = new KMeans();
 
-    System.err.println("Selecting points for " + this.ipes.size() + " independent political entities.");
+    System.out.println("Selecting points for " + this.ipes.size() + " independent political entities.");
     for (String ipe : this.ipes.keySet()) {
       Location location = this.locations.get(this.ipes.get(ipe));
       List<Coordinate> contained = this.ipePoints.get(ipe);
@@ -112,43 +121,55 @@ public class GeoNamesGazetteer implements Gazetteer {
         k = this.maxPoints;
       }
 
-      System.err.format("Clustering: %d points for %s.\n", k, location.getName());
+      //System.err.format("Clustering: %d points for %s.\n", k, location.getName());
 
       if (contained.size() > this.maxConsidered) {
         Collections.shuffle(contained);
         contained = contained.subList(0, this.maxConsidered);
       }
 
-      List<Coordinate> representatives = clusterer.clusterList(contained, k, SphericalGeometry.g());
-      location.setRegion(new PointSetRegion(representatives));
+      if (contained.size() > 0) {
+        List<Coordinate> representatives = clusterer.clusterList(contained, k, SphericalGeometry.g());
+        location.setRegion(new PointSetRegion(representatives));
+      }
     }
   }
 
   private void expandADM() {
     Clusterer clusterer = new KMeans();
 
-    System.err.println("Selecting points for " + this.adms.size() + " administrative regions.");
+    System.out.println("Selecting points for " + this.adms.size() + " administrative regions.");
     for (String adm : this.adms.keySet()) {
       Location location = this.locations.get(this.adms.get(adm));
       List<Coordinate> contained = this.admPoints.get(adm);
 
-      int k = (int) Math.floor(contained.size() * this.pointRatio);
-      if (k < this.minPoints) {
-        k = this.minPoints;
-      }
-      if (k > this.maxPoints) {
-        k = this.maxPoints;
-      }
+      if (contained != null) {
+        int k = (int) Math.floor(contained.size() * this.pointRatio);
+        if (k < this.minPoints) {
+          k = this.minPoints;
+        }
+        if (k > this.maxPoints) {
+          k = this.maxPoints;
+        }
 
-      System.err.format("Clustering: %d points for %s.\n", k, location.getName());
+        //System.err.format("Clustering: %d points for %s.\n", k, location.getName());
 
-      if (contained.size() > this.maxConsidered) {
-        Collections.shuffle(contained);
-        contained = contained.subList(0, this.maxConsidered);
+        if (contained.size() > this.maxConsidered) {
+          Collections.shuffle(contained);
+          contained = contained.subList(0, this.maxConsidered);
+        }
+
+        if (contained.size() > 0) {
+          List<Coordinate> representatives = clusterer.clusterList(contained, k, SphericalGeometry.g());
+          location.setRegion(new PointSetRegion(representatives));
+
+          /*for (Coordinate c : representatives) {
+            System.out.println("<Placemark><Point><coordinates>" +
+                               c.getLngDegrees() + "," + c.getLatDegrees() +
+                               "</coordinates></Point></Placemark>");
+          }*/
+        }
       }
-
-      List<Coordinate> representatives = clusterer.clusterList(contained, k, SphericalGeometry.g());
-      location.setRegion(new PointSetRegion(representatives));
     }
   }
 
@@ -206,10 +227,10 @@ public class GeoNamesGazetteer implements Gazetteer {
           }
           this.ipePoints.get(ipe).add(coordinate);
 
-          if (!this.admPoints.containsKey(ipe)) {
+          if (!this.admPoints.containsKey(adm)) {
             this.admPoints.put(adm, new ArrayList<Coordinate>());
           }
-          this.ipePoints.get(ipe).add(coordinate);
+          this.admPoints.get(adm).add(coordinate);
 
           if (type.equals("PCLI")) {
             this.ipes.put(ipe, index);
