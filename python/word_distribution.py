@@ -152,6 +152,7 @@ add the word counts to the global word count statistics.'''
     if minimum_word_count > 1:
       for (word, count) in self.counts.iteritems():
         if count < minimum_word_count:
+          self.total_tokens -= count
           del self.counts[word]
 
     # make sure counts not None (eg article in coords file but not counts file)

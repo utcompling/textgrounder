@@ -612,6 +612,8 @@ class StatRegion(object):
   all_regions_computed = False
   num_empty_regions = 0
   num_non_empty_regions = 0
+  total_num_arts_for_word_dist = 0
+  total_num_arts_for_links = 0
 
   def __init__(self, latind, longind):
     self.latind = latind
@@ -733,9 +735,13 @@ class StatRegion(object):
         cls.corner_to_stat_region[(latind, longind)] = statreg
     return statreg
 
-  # Generate all clss that are non-empty.
+  # Generate all StatRegions that are non-empty.  Don't do anything if
+  # called multiple times.
   @classmethod
-  def generate_all_nonempty_regions(cls):
+  def initialize_regions(cls):
+    if cls.all_regions_computed:
+      return
+
     errprint("Generating all non-empty statistical regions...")
     status = StatusMessage('statistical region')
 
@@ -745,12 +751,14 @@ class StatRegion(object):
         if debug['region'] and not reg.worddist.is_empty():
           errprint("--> (%d,%d): %s" % (i, j, reg))
         status.item_processed()
-
     cls.all_regions_computed = True
-    
-  @classmethod
-  def initialize_regions(cls):
-    cls.generate_all_nonempty_regions()
+
+    cls.total_num_arts_for_links = 0
+    cls.total_num_arts_for_word_dist = 0
+    for reg in StatRegion.iter_nonempty_regions():
+      cls.total_num_arts_for_word_dist += reg.worddist.num_arts_for_word_dist
+      cls.total_num_arts_for_links += reg.worddist.num_arts_for_links
+
     errprint("Number of non-empty regions: %s" % cls.num_non_empty_regions)
     errprint("Number of empty regions: %s" % cls.num_empty_regions)
     # Save some memory by clearing this after it's not needed
@@ -1066,6 +1074,12 @@ class ArticleTable(object):
   # List of articles in each split.
   articles_by_split = listdict()
 
+  # Num of articles in each split with a computed distribution.
+  num_dist_articles_by_split = intdict()
+
+  # Total # of word tokens for all articles in each split.
+  word_tokens_by_split = intdict()
+
   # Total # of incoming links for all articles in each split.
   incoming_links_by_split = intdict()
 
@@ -1121,10 +1135,16 @@ class ArticleTable(object):
   @classmethod
   def finish_article_distributions(cls):
     # Figure out the value of OVERALL_UNSEEN_MASS for each article.
-    for table in cls.articles_by_split.itervalues():
+    for (split, table) in cls.articles_by_split.iteritems():
+      totaltoks = 0
+      numarts = 0
       for art in table:
         if art.dist:
           art.dist.finish(minimum_word_count=Opts.minimum_word_count)
+          totaltoks += art.dist.total_tokens
+          numarts += 1
+      cls.num_dist_articles_by_split[split] = numarts
+      cls.word_tokens_by_split[split] = totaltoks
 
   # Find Wikipedia article matching name NAME for location LOC.  NAME
   # will generally be one of the names of LOC (either its canonical
@@ -1515,9 +1535,14 @@ class GeotagDocumentEval(EvalWithRank):
     errprint("  Median degree error distance = %.2f" %
              median(self.degree_dists))
 
+def output_resource_usage():
+  errprint("Total elapsed time: %s" %
+           float_with_commas(get_program_time_usage()))
+  errprint("Memory usage: %s" %
+      int_with_commas(get_program_memory_usage_ps()))
 
-class Results(object):
-  ####### Results for geotagging toponyms
+####### Results for geotagging toponyms
+class GeotagToponymResults(object):
 
   incorrect_geotag_toponym_reasons = [
     ('incorrect_with_no_candidates',
@@ -1532,81 +1557,79 @@ class Results(object):
      'Incorrect, with one correct candidate'),
   ]
 
-  # Overall statistics
-  all_toponym = EvalWithCandidateList(incorrect_geotag_toponym_reasons) 
+  def __init__(self):
+    # Overall statistics
+    self.all_toponym = \
+        EvalWithCandidateList(self.incorrect_geotag_toponym_reasons) 
 
-  # Statistics when toponym not same as true name of location
-  diff_surface = EvalWithCandidateList(incorrect_geotag_toponym_reasons)
+    # Statistics when toponym not same as true name of location
+    self.diff_surface = \
+        EvalWithCandidateList(self.incorrect_geotag_toponym_reasons)
 
-  # Statistics when toponym not same as true name or short form of location
-  diff_short = EvalWithCandidateList(incorrect_geotag_toponym_reasons)
+    # Statistics when toponym not same as true name or short form of location
+    self.diff_short = \
+        EvalWithCandidateList(self.incorrect_geotag_toponym_reasons)
 
-  @classmethod
-  def record_geotag_toponym_result(cls, correct, toponym, trueloc, reason,
+  def record_geotag_toponym_result(self, correct, toponym, trueloc, reason,
                                    num_candidates):
-    cls.all_toponym.record_result(correct, reason, num_candidates)
+    self.all_toponym.record_result(correct, reason, num_candidates)
     if toponym != trueloc:
-      cls.diff_surface.record_result(correct, reason, num_candidates)
+      self.diff_surface.record_result(correct, reason, num_candidates)
       (short, div) = compute_short_form(trueloc)
       if toponym != short:
-        cls.diff_short.record_result(correct, reason, num_candidates)
+        self.diff_short.record_result(correct, reason, num_candidates)
 
-  @classmethod
-  def output_geotag_toponym_results(cls):
+  def output_geotag_toponym_results(self):
     errprint("Results for all toponyms:")
-    cls.all_toponym.output_results()
+    self.all_toponym.output_results()
     errprint("")
     errprint("Results for toponyms when different from true location name:")
-    cls.diff_surface.output_results()
+    self.diff_surface.output_results()
     errprint("")
     errprint("Results for toponyms when different from either true location name")
     errprint("  or its short form:")
-    cls.diff_short.output_results()
-    cls.output_resource_usage()
+    self.diff_short.output_results()
+    output_resource_usage()
 
-  @classmethod
-  def output_resource_usage(cls):
-    errprint("Total elapsed time: %s" %
-             float_with_commas(get_program_time_usage()))
-    errprint("Memory usage: %s" %
-        int_with_commas(get_program_memory_usage_ps()))
+####### Results for geotagging documents/articles
+class GeotagDocumentResults(object):
 
-  ####### Results for geotagging documents/articles
+  def __init__(self):
+    self.all_document = GeotagDocumentEval()
 
-  all_document = GeotagDocumentEval()
+    # naitr = "num articles in true region"
+    self.docs_by_naitr = TableByRange([1, 10, 25, 100], GeotagDocumentEval)
 
-  # naitr = "num articles in true region"
-  docs_by_naitr = TableByRange([1, 10, 25, 100], GeotagDocumentEval)
+    # Results for documents where the location is at a certain distance
+    # from the center of the true statistical region.  The key is measured in
+    # fractions of a tiling region (determined by 'dist_fraction_increment',
+    # e.g. if dist_fraction_increment = 0.25 then values in the range of
+    # [0.25, 0.5) go in one bin, [0.5, 0.75) go in another, etc.).  We measure
+    # distance is two ways: True distance (in miles or whatever) and "degree
+    # distance", as if degrees were a constant length both latitudinally
+    # and longitudinally.
+    self.dist_fraction_increment = 0.25
+    self.docs_by_degree_dist_to_true_center = \
+        collections.defaultdict(GeotagDocumentEval)
+    self.docs_by_true_dist_to_true_center = \
+        collections.defaultdict(GeotagDocumentEval)
 
-  # Results for documents where the location is at a certain distance
-  # from the center of the true statistical region.  The key is measured in
-  # fractions of a tiling region (determined by 'dist_fraction_increment',
-  # e.g. if dist_fraction_increment = 0.25 then values in the range of
-  # [0.25, 0.5) go in one bin, [0.5, 0.75) go in another, etc.).  We measure
-  # distance is two ways: True distance (in miles or whatever) and "degree
-  # distance", as if degrees were a constant length both latitudinally
-  # and longitudinally.
-  dist_fraction_increment = 0.25
-  docs_by_degree_dist_to_true_center = \
-      collections.defaultdict(GeotagDocumentEval)
-  docs_by_true_dist_to_true_center = \
-      collections.defaultdict(GeotagDocumentEval)
+    # Similar, but distance between location and center of top predicted
+    # region.
+    self.dist_fractions_for_error_dist = [
+        0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8,
+        12, 16, 24, 32, 48, 64, 96, 128, 192, 256,
+        # We're never going to see these
+        384, 512, 768, 1024, 1536, 2048]
+    self.docs_by_degree_dist_to_pred_center = \
+        TableByRange(self.dist_fractions_for_error_dist, GeotagDocumentEval)
+    self.docs_by_true_dist_to_pred_center = \
+        TableByRange(self.dist_fractions_for_error_dist, GeotagDocumentEval)
 
-  # Similar, but distance between location and center of top predicted region.
-  dist_fractions_for_error_dist = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8,
-                                   12, 16, 24, 32, 48, 64, 96, 128, 192, 256,
-                                   # We're never going to see these
-                                   384, 512, 768, 1024, 1536, 2048]
-  docs_by_degree_dist_to_pred_center = \
-      TableByRange(dist_fractions_for_error_dist, GeotagDocumentEval)
-  docs_by_true_dist_to_pred_center = \
-      TableByRange(dist_fractions_for_error_dist, GeotagDocumentEval)
+    self.true_error_dists = []
+    self.deg_error_dists = []
 
-  true_error_dists = []
-  deg_error_dists = []
-
-  @classmethod
-  def record_geotag_document_result(cls, rank, coord, pred_latind,
+  def record_geotag_document_result(self, rank, coord, pred_latind,
                                     pred_longind, num_arts_in_true_region,
                                     return_stats=False):
     def degree_dist(c1, c2):
@@ -1616,26 +1639,26 @@ class Results(object):
     pred_truedist = spheredist(coord, pred_center)
     pred_degdist = degree_dist(coord, pred_center)
 
-    cls.all_document.record_result(rank, pred_truedist, pred_degdist)
-    naitr = cls.docs_by_naitr.get_collector(rank)
+    self.all_document.record_result(rank, pred_truedist, pred_degdist)
+    naitr = self.docs_by_naitr.get_collector(rank)
     naitr.record_result(rank, pred_truedist, pred_degdist)
 
     true_latind, true_longind = coord_to_stat_region_indices(coord)
     true_center = stat_region_indices_to_center_coord(true_latind, true_longind)
     true_truedist = spheredist(coord, true_center)
     true_degdist = degree_dist(coord, true_center)
-    fracinc = cls.dist_fraction_increment
+    fracinc = self.dist_fraction_increment
     rounded_true_truedist = fracinc * (true_truedist // fracinc)
     rounded_true_degdist = fracinc * (true_degdist // fracinc)
 
-    cls.docs_by_true_dist_to_true_center[rounded_true_truedist]. \
+    self.docs_by_true_dist_to_true_center[rounded_true_truedist]. \
         record_result(rank, pred_truedist, pred_degdist)
-    cls.docs_by_degree_dist_to_true_center[rounded_true_degdist]. \
+    self.docs_by_degree_dist_to_true_center[rounded_true_degdist]. \
         record_result(rank, pred_truedist, pred_degdist)
 
-    cls.docs_by_true_dist_to_pred_center.get_collector(pred_truedist). \
+    self.docs_by_true_dist_to_pred_center.get_collector(pred_truedist). \
         record_result(rank, pred_truedist, pred_degdist)
-    cls.docs_by_degree_dist_to_pred_center.get_collector(pred_degdist). \
+    self.docs_by_degree_dist_to_pred_center.get_collector(pred_degdist). \
         record_result(rank, pred_truedist, pred_degdist)
 
     if return_stats:
@@ -1646,19 +1669,17 @@ class Results(object):
               'true_truedist':true_truedist,
               'true_degdist':true_degdist}
 
-  @classmethod
-  def record_geotag_document_other_stat(cls, othertype):
-    cls.all_document.record_other_stat(othertype)
+  def record_geotag_document_other_stat(self, othertype):
+    self.all_document.record_other_stat(othertype)
 
-  @classmethod
-  def output_geotag_document_results(cls, all_results=False):
+  def output_geotag_document_results(self, all_results=False):
     errprint("")
     errprint("Results for all documents/articles:")
-    cls.all_document.output_results()
+    self.all_document.output_results()
     #if all_results:
     if False:
       errprint("")
-      for (lower, upper, obj) in cls.docs_by_naitr.iter_ranges():
+      for (lower, upper, obj) in self.docs_by_naitr.iter_ranges():
         errprint("")
         errprint("Results for documents/articles where number of articles")
         errprint("  in true region is in the range [%s,%s]:" %
@@ -1666,10 +1687,10 @@ class Results(object):
         obj.output_results()
       errprint("")
       for (truedist, obj) in \
-          sorted(cls.docs_by_true_dist_to_true_center.iteritems(),
+          sorted(self.docs_by_true_dist_to_true_center.iteritems(),
                  key=lambda x:x[0]):
         lowrange = truedist * Opts.miles_per_region
-        highrange = ((truedist + cls.dist_fraction_increment) *
+        highrange = ((truedist + self.dist_fraction_increment) *
                      Opts.miles_per_region)
         errprint("")
         errprint("Results for documents/articles where distance to center")
@@ -1678,10 +1699,10 @@ class Results(object):
         obj.output_results()
       errprint("")
       for (degdist, obj) in \
-          sorted(cls.docs_by_degree_dist_to_true_center.iteritems(),
+          sorted(self.docs_by_degree_dist_to_true_center.iteritems(),
                  key=lambda x:x[0]):
         lowrange = degdist * degrees_per_region
-        highrange = ((degdist + cls.dist_fraction_increment) *
+        highrange = ((degdist + self.dist_fraction_increment) *
                      degrees_per_region)
         errprint("")
         errprint("Results for documents/articles where distance to center")
@@ -1692,7 +1713,7 @@ class Results(object):
     # maybe move this info info EvalByRank so that we can output the values
     # for each category
     errprint("")
-    cls.output_resource_usage()
+    output_resource_usage()
 
 
 ############################################################################
@@ -1746,8 +1767,10 @@ class GeogWord(object):
 # Abstract class for reading documents from a test file and evaluating on
 # them.
 class TestFileEvaluator(object):
-  def __init__(self, opts):
+  def __init__(self, opts, strategy, stratname):
     self.opts = opts
+    self.strategy = strategy
+    self.stratname = stratname
     self.documents_processed = 0
 
   def iter_documents(self, filename):
@@ -1773,6 +1796,16 @@ class TestFileEvaluator(object):
           status.item_processed()
           new_elapsed = status.elapsed_time()
           new_processed = status.num_processed()
+
+          # If max # of docs reached, stop
+          if (self.opts.num_test_docs and
+              new_processed >= self.opts.num_test_docs):
+            errprint("")
+            errprint("Finishing evaluation after %d documents" %
+                new_processed)
+            self.output_results(final=True)
+            return
+
           # If five minutes and ten documents have gone by, print out results
           if (new_elapsed - last_elapsed >= 300 and
               new_processed - last_processed >= 10):
@@ -1784,9 +1817,10 @@ class TestFileEvaluator(object):
           errprint("Skipped document %s" % doc)
   
     errprint("")
-    errprint("Final results: All %d documents processed:" %
-             status.num_processed())
+    errprint("Final results for strategy %s: All %d documents processed:" %
+             (self.stratname, status.num_processed()))
     self.output_results(final=True)
+    errprint("Ending final results for strategy %s" % self.stratname)
 
 class GeotagToponymStrategy(object):
   def need_context(self):
@@ -1886,9 +1920,9 @@ class NaiveBayesToponymStrategy(GeotagToponymStrategy):
     return get_adjusted_incoming_links(art)
 
 class GeotagToponymEvaluator(TestFileEvaluator):
-  def __init__(self, opts, strategy):
-    super(GeotagToponymEvaluator, self).__init__(opts)
-    self.strategy = strategy
+  def __init__(self, opts, strategy, stratname):
+    super(GeotagToponymEvaluator, self).__init__(opts, strategy, stratname)
+    self.results = GeotagToponymResults()
     
   # Given an evaluation file, read in the words specified, including the
   # toponyms.  Mark each word with the "document" (e.g. article) that it's
@@ -2010,8 +2044,8 @@ class GeotagToponymEvaluator(TestFileEvaluator):
     else:
       errprint("incorrect, reason = %s" % reason)
 
-    Results.record_geotag_toponym_result(correct, toponym, geogword.location,
-                                         reason, num_candidates)
+    self.results.record_geotag_toponym_result(correct, toponym,
+        geogword.location, reason, num_candidates)
 
     if debug['some'] and bestart:
       errprint("Best article = %s, score = %s, dist = %s, correct %s"
@@ -2024,7 +2058,7 @@ class GeotagToponymEvaluator(TestFileEvaluator):
     return True
 
   def output_results(self, final=False):
-    Results.output_geotag_toponym_results()
+    self.results.output_geotag_toponym_results()
 
 
 def get_adjusted_incoming_links(obj):
@@ -2232,8 +2266,9 @@ class BaselineGeotagDocumentStrategy(GeotagDocumentStrategy):
 
 
 class KLDivergenceStrategy(GeotagDocumentStrategy):
-  def __init__(self, partial=True):
+  def __init__(self, partial=True, symmetric=False):
     self.partial = partial
+    self.symmetric = symmetric
 
   def return_ranked_regions(self, worddist):
     article_pq = PriorityQueue()
@@ -2246,8 +2281,13 @@ class KLDivergenceStrategy(GeotagDocumentStrategy):
         errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s"
                  % (latind, longind, coord,
                     stat_region.worddist.num_arts_for_word_dist))
+
       kldiv = fast_kl_divergence(worddist, stat_region.worddist,
                                  partial=self.partial)
+      if self.symmetric:
+        kldiv2 = fast_kl_divergence(stat_region.worddist, worddist,
+                                    partial=self.partial)
+        kldiv = (kldiv + kldiv2) / 2.0
       #kldiv = worddist.test_kl_divergence(stat_region.worddist,
       #                           partial=self.partial)
       #errprint("For region %s, KL divergence %.3f" % (stat_region, kldiv))
@@ -2319,14 +2359,33 @@ class CosineSimilarityStrategy(GeotagDocumentStrategy):
 
 # Return the probability of seeing the given document 
 class NaiveBayesDocumentStrategy(GeotagDocumentStrategy):
-  def __init__(self, opts):
+  def __init__(self, opts, use_baseline=True):
     self.opts = opts
+    self.use_baseline = use_baseline
 
   def return_ranked_regions(self, worddist):
     regprobs = {}
+
+    # Determine respective weightings
+    if self.use_baseline:
+      if self.opts.naive_bayes_weighting == 'equal':
+        word_weight = 1.0
+        baseline_weight = 1.0
+      else:
+        baseline_weight = float(self.opts.baseline_weight)
+        word_weight = 1.0 - baseline_weight
+        word_weight /= worddist.total_tokens
+    else:
+      word_weight = 1.0
+      baseline_weight = 0.0
+
     for reg in \
         StatRegion.iter_nonempty_regions(nonempty_word_dist=True):
-      logprob = reg.worddist.get_nbayes_logprob(worddist, self.opts)
+      word_logprob = reg.worddist.get_nbayes_logprob(worddist, self.opts)
+      baseline_logprob = \
+          log(float(reg.worddist.num_arts_for_links) /
+              StatRegion.total_num_arts_for_links)
+      logprob = word_weight*word_logprob + baseline_weight*baseline_logprob
       regprobs[reg] = logprob
     return [reg for (reg, prob) in sorted(regprobs.iteritems(),
                                           key=lambda x:x[1], reverse=True)]
@@ -2338,13 +2397,13 @@ class PerWordRegionDistributionsStrategy(GeotagDocumentStrategy):
     return regdist.get_ranked_regions()
 
 class GeotagDocumentEvaluator(TestFileEvaluator):
-  def __init__(self, opts, strategy):
-    super(GeotagDocumentEvaluator, self).__init__(opts)
-    self.strategy = strategy
+  def __init__(self, opts, strategy, stratname):
+    super(GeotagDocumentEvaluator, self).__init__(opts, strategy, stratname)
+    self.results = GeotagDocumentResults()
     StatRegion.initialize_regions()
 
   def output_results(self, final=False):
-    Results.output_geotag_document_results(all_results=final)
+    self.results.output_geotag_document_results(all_results=final)
 
 
 class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
@@ -2378,7 +2437,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       # so that the counts for many articles don't get read in.
       if Opts.max_time_per_stage == 0:
         warning("Can't evaluate article %s without distribution" % article)
-      Results.record_geotag_document_other_stat('Skipped articles')
+      self.results.record_geotag_document_other_stat('Skipped articles')
       return False
     assert article.dist.finished
     true_latind, true_longind = coord_to_stat_region_indices(article.coord)
@@ -2396,11 +2455,12 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     else:
       rank = 1000000000
     want_indiv_results = debug['some'] or debug['indivresults']
-    stats = Results.record_geotag_document_result(rank, article.coord,
+    stats = self.results.record_geotag_document_result(rank, article.coord,
         regs[0].latind, regs[0].longind, num_arts_in_true_region=naitr,
         return_stats=want_indiv_results)
     if naitr == 0:
-      Results.record_geotag_document_other_stat('Articles with no training articles in region')
+      self.results.record_geotag_document_other_stat(
+          'Articles with no training articles in region')
     if want_indiv_results:
       errprint("Article %s:" % article)
       errprint("  True region at rank: %s" % rank)
@@ -2573,6 +2633,13 @@ def read_word_counts(filename):
       # Stop if we've reached the maximum
       if status.item_processed(maxtime=Opts.max_time_per_stage):
         break
+      if (Opts.num_training_docs and
+          status.num_processed() >= Opts.num_training_docs):
+        errprint("")
+        errprint("Finishing reading word counts after %d documents" %
+            status.num_processed())
+        break
+
       title = m.group(1)
       wordhash = intdict()
       total_tokens = 0
@@ -2597,6 +2664,12 @@ def read_word_counts(filename):
 
   WordDist.finish_global_distribution()
   ArticleTable.finish_article_distributions()
+  for (split, totaltoks) in ArticleTable.word_tokens_by_split.iteritems():
+    numarts = ArticleTable.num_dist_articles_by_split[split]
+    errprint("For split '%s': %s articles, %s total tokens, %.2f tokens/article"
+        % (split, numarts, totaltoks,
+          # Avoid division by zero
+          float(totaltoks)/(numarts + 1e-100)))
 
 class Gazetteer(object):
   # For each toponym (name of location), value is a list of Locality items,
@@ -2846,17 +2919,20 @@ covering a specific location and determines that location.
 'geotag-toponyms' finds the proper location for each toponym in the test set.
 The test set is specified by --eval-file.  Default '%default'.""")
 
-    op.add_option("-s", "--strategy", "--s", type='choice',
+    op.add_option("-s", "--strategy", "--s", type='choice', action='append',
                   default=None,
                   choices=['baseline',
                            'kl-divergence', 'kldiv',
                            'partial-kl-divergence', 'partial-kldiv',
+                           'symmetric-kl-divergence', 'symmetric-kldiv',
+                           'symmetric-partial-kl-divergence',
+                           'symmetric-partial-kldiv',
                            'cosine-similarity', 'cossim',
                            'partial-cosine-similarity', 'partial-cossim',
                            'per-word-region-distribution', 'regdist',
                            'naive-bayes-with-baseline', 'nb-base',
                            'naive-bayes-no-baseline', 'nb-nobase'],
-                  help="""Strategy to use for geotagging.
+                  help="""Strategy/strategies to use for geotagging.
 'baseline' means just use the baseline strategy (see --baseline-strategy).
 
 The other possible values depend on which mode is in use
@@ -2879,9 +2955,15 @@ just as well as the full KL divergence. 'per-word-region-distribution' (or
 'regdist') involves computing, for each word, a probability distribution over
 regions using the word distribution of each region, and then combining the
 distributions over all words in an article, weighted by the count the word in
-the article.  Default is 'partial-kl-divergence'.""")
+the article.  Default is 'partial-kl-divergence'.
+
+NOTE: Multiple --strategy options can be given, and each strategy will
+be tried, one after the other.""")
     canon_options['strategy'] = {'kldiv':'kl-divergence',
                                  'partial-kldiv':'partial-kl-divergence',
+                                 'symmetric-kldiv':'symmetric-kl-divergence',
+                                 'symmetric-partial-kldiv':
+                                   'symmetric-partial-kl-divergence',
                                  'cossim':'cosine-similarity',
                                  'partial-cossim':'partial-cosine-similarity',
                                  'regdist':'per-word-region-distribution',
@@ -2932,10 +3014,11 @@ probability) when doing weighted Naive Bayes.  Default %default.""")
                   help="""Strategy for weighting the different probabilities
 that go into Naive Bayes.  If 'equal', do pure Naive Bayes, weighting the
 prior probability (baseline) and all word probabilities the same.  If
-'equal-words', weight all the words the same but weight the baseline
-according to --baseline-weight, assigning the remainder to the words.  If
-'distance-weighted', use the --baseline-weight for the prior probability
-and weight the words according to distance from the toponym.""")
+'equal-words', weight all the words the same but collectively weight all words
+against the baseline, giving the baseline weight according to --baseline-weight
+and assigning the remainder to the words.  If 'distance-weighted', similar to
+'equal-words' but don't weight each word the same as each other word; instead,
+weight the words according to distance from the toponym.""")
     op.add_option("--width-of-stat-region", type='int', default=1,
                   help="""Width of the region used to compute a statistical
 distribution for geotagging purposes, in terms of number of tiling regions.
@@ -2978,6 +3061,13 @@ when generating KML, possibly to try and make the low values more visible.
 Possibilities are 'none' (no transformation), 'log' (take the log), and
 'logsquared' (negative of squared log).  Default '%default'.""")
 
+    op.add_option("--num-training-docs", "--ntrain", type='int', default=0,
+                  help="""Maximum number of training documents to use.
+0 means no limit.  Default %default.""")
+    op.add_option("--num-test-docs", "--ntest", type='int', default=0,
+                  help="""Maximum number of test documents to use.
+0 means no limit.  Default %default.""")
+
     return canon_options
 
   def handle_arguments(self, opts, op, args):
@@ -2999,12 +3089,17 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
     # Canonicalize options
     if not opts.strategy:
       if opts.mode == 'geotag-documents':
-        opts.strategy = 'partial-kl-divergence'
+        opts.strategy = ['partial-kl-divergence']
       elif opts.mode == 'geotag-toponyms':
-        opts.strategy = 'baseline'
+        opts.strategy = ['baseline']
 
-    if (opts.strategy == 'baseline' and
+    if ('baseline' in opts.strategy and
         opts.baseline_strategy.endswith('most-common-toponym')):
+      if len(opts.strategy) > 1:
+        # That's because we have to set --preserve-case-words, which we
+        # generally don't want set for other strategies and which affects
+        # the way we construct the training-document distributions.
+        op.error("Can't currently mix *-most-common-toponym baseline strategy with other strategies")
       opts.preserve_case_words = True
 
     # FIXME! Can only currently handle World-type gazetteers.
@@ -3038,7 +3133,7 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
 
     if opts.mode.startswith('geotag'):
       params.need_to_read_stopwords = True
-      if (opts.mode == 'geotag-toponyms' and opts.strategy == 'baseline'):
+      if (opts.mode == 'geotag-toponyms' and opts.strategy == ['baseline']):
         pass
       elif not opts.counts_file:
         op.error("Must specify counts file")
@@ -3056,10 +3151,11 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
       if opts.baseline_strategy.endswith('most-common-toponym'):
         op.error("--baseline-strategy=%s only compatible with --mode=geotag-documents"
             % opts.baseline_strategy)
-      if opts.strategy not in [
-          'baseline', 'naive-bayes-with-baseline', 'naive-bayes-no-baseline']:
-        op.error("Strategy '%s' invalid for --mode=geotag-toponyms" %
-                 opts.strategy)
+      for stratname in opts.strategy:
+        if stratname not in ['baseline', 'naive-bayes-with-baseline',
+            'naive-bayes-no-baseline']:
+          op.error("Strategy '%s' invalid for --mode=geotag-toponyms" %
+                   stratname)
       if opts.eval_format not in ['tr-conll', 'wiki']:
         op.error("For --mode=geotag-toponyms, eval-format must be 'tr-conll' or 'wiki'")
 
@@ -3108,45 +3204,49 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
         regdist.generate_kml_file('%s%s.kml' % (opts.kml_prefix, word))
       return
 
-    if opts.mode == 'geotag-toponyms':
-      # Generate strategy object
-      if opts.strategy == 'baseline':
-        strategy = BaselineGeotagToponymStrategy(opts)
-      else:
-        strategy = NaiveBayesToponymStrategy(opts)
+    for stratname in opts.strategy:
+      if opts.mode == 'geotag-toponyms':
+        # Generate strategy object
+        if stratname == 'baseline':
+          strategy = BaselineGeotagToponymStrategy(opts)
+        else:
+          strategy = NaiveBayesToponymStrategy(opts)
 
-      # Generate reader object
-      if opts.eval_format == 'tr-conll':
-        evalobj = TRCoNLLGeotagToponymEvaluator(opts, strategy)
-      else:
-        evalobj = WikipediaGeotagToponymEvaluator(opts, strategy)
-    elif opts.mode == 'geotag-documents':
-      if opts.strategy == 'baseline':
-        strategy = BaselineGeotagDocumentStrategy(opts.baseline_strategy)
-      elif opts.strategy.startswith('naive-bayes-'):
-        strategy = NaiveBayesDocumentStrategy(opts)
-      elif opts.strategy == 'per-word-region-distribution':
-        strategy = PerWordRegionDistributionsStrategy()
-      elif opts.strategy == 'cosine-similarity':
-        strategy = CosineSimilarityStrategy(partial=False)
-      elif opts.strategy == 'partial-cosine-similarity':
-        strategy = CosineSimilarityStrategy(partial=True)
-      else:
-        partial = opts.strategy == 'partial-kl-divergence'
-        strategy = KLDivergenceStrategy(partial=partial)
-      if opts.eval_format == 'pcl-travel':
-        evalobj = PCLTravelGeotagDocumentEvaluator(opts, strategy)
-      else:
-        evalobj = WikipediaGeotagDocumentEvaluator(opts, strategy)
-      # Hack: When running in --mode=geotag-documents and --eval-format=wiki,
-      # we don't need an eval file because we use the article counts we've
-      # already loaded.  But we will get an error if we don't set this to
-      # a file.
-      if not opts.eval_file:
-        opts.eval_file = opts.article_data_file
+        # Generate reader object
+        if opts.eval_format == 'tr-conll':
+          evalobj = TRCoNLLGeotagToponymEvaluator(opts, strategy, stratname)
+        else:
+          evalobj = WikipediaGeotagToponymEvaluator(opts, strategy, stratname)
+      elif opts.mode == 'geotag-documents':
+        # Hack: When running in --mode=geotag-documents and --eval-format=wiki,
+        # we don't need an eval file because we use the article counts we've
+        # already loaded.  But we will get an error if we don't set this to
+        # a file.
+        if not opts.eval_file:
+          opts.eval_file = opts.article_data_file
+        if stratname == 'baseline':
+          strategy = BaselineGeotagDocumentStrategy(opts.baseline_strategy)
+        elif stratname.startswith('naive-bayes-'):
+          strategy = NaiveBayesDocumentStrategy(opts,
+              use_baseline=(stratname == 'naive-bayes-with-baseline'))
+        elif stratname == 'per-word-region-distribution':
+          strategy = PerWordRegionDistributionsStrategy()
+        elif opts.strategy == 'cosine-similarity':
+          strategy = CosineSimilarityStrategy(partial=False)
+        elif opts.strategy == 'partial-cosine-similarity':
+          strategy = CosineSimilarityStrategy(partial=True)
+        else:
+          assert stratname.endswith('kl-divergence')
+          partial = stratname.endswith('partial-kl-divergence')
+          symmetric = stratname.startswith('symmetric')
+          strategy = KLDivergenceStrategy(partial=partial, symmetric=symmetric)
+        if opts.eval_format == 'pcl-travel':
+          evalobj = PCLTravelGeotagDocumentEvaluator(opts, strategy, stratname)
+        else:
+          evalobj = WikipediaGeotagDocumentEvaluator(opts, strategy, stratname)
 
-    errprint("Processing evaluation file/dir %s..." % opts.eval_file)
-    evalobj.evaluate_and_output_results(iter_directory_files(opts.eval_file))
+      errprint("Processing evaluation file/dir %s..." % opts.eval_file)
+      evalobj.evaluate_and_output_results(iter_directory_files(opts.eval_file))
 
 if __name__ == "__main__":
   WikiDisambigProgram()
