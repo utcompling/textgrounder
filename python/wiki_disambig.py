@@ -1783,7 +1783,7 @@ class TestFileEvaluator(object):
   def iter_documents(self, filename):
     pass
 
-  def evaluate_document(self, doc):
+  def evaluate_document(self, doc, doctag):
     # Return True if document was actually processed and evaluated; False
     # is skipped.
     return True
@@ -1807,7 +1807,9 @@ class TestFileEvaluator(object):
       errprint("Processing evaluation file %s..." % filename)
       for doc in self.iter_documents(filename):
         # errprint("Processing document: %s" % doc)
-        if self.evaluate_document(doc):
+        num_processed = status.num_processed()
+        doctag = '#%d' % (1+num_processed)
+        if self.evaluate_document(doc, doctag):
           status.item_processed()
           new_elapsed = status.elapsed_time()
           new_processed = status.num_processed()
@@ -2068,7 +2070,7 @@ class GeotagToponymEvaluator(TestFileEvaluator):
                % (bestart, bestscore, bestart.distance_to_coord(coord),
                   correct))
 
-  def evaluate_document(self, doc):
+  def evaluate_document(self, doc, doctag):
     for geogword in doc:
        self.disambiguate_toponym(geogword)
     return True
@@ -2452,11 +2454,11 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     #if title:
     #  yield (title, words)
 
-  def evaluate_document(self, article):
+  def evaluate_document(self, article, doctag):
     if not article.dist:
       # This can (and does) happen when --max-time-per-stage is set,
       # so that the counts for many articles don't get read in.
-      if Opts.max_time_per_stage == 0 and Opts.num_training_docs == 0:
+      if self.opts.max_time_per_stage == 0 and self.opts.num_training_docs == 0:
         warning("Can't evaluate article %s without distribution" % article)
       self.results.record_geotag_document_other_stat('Skipped articles')
       return False
@@ -2475,7 +2477,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       rank += 1
     else:
       rank = 1000000000
-    want_indiv_results = debug['some'] or debug['indivresults']
+    want_indiv_results = not self.opts.no_individual_results
     stats = self.results.record_geotag_document_result(rank, article.coord,
         regs[0].latind, regs[0].longind, num_arts_in_true_region=naitr,
         return_stats=want_indiv_results)
@@ -2483,15 +2485,16 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       self.results.record_geotag_document_other_stat(
           'Articles with no training articles in region')
     if want_indiv_results:
-      errprint("Article %s:" % article)
-      errprint("  True region at rank: %s" % rank)
-      errprint("  True region: %s" % true_statreg)
+      errprint("%s:Article %s:" % (doctag, article))
+      errprint("%s:  True region at rank: %s" % (doctag, rank))
+      errprint("%s:  True region: %s" % (doctag, true_statreg))
       for i in xrange(5):
-        errprint("  Predicted region (at rank %s): %s" % (i+1, regs[i]))
-      errprint("  Distance %.2f miles to true region center at %s" %
-               (stats['true_truedist'], stats['true_center']))
-      errprint("  Distance %.2f miles to predicted region center at %s" %
-               (stats['pred_truedist'], stats['pred_center']))
+        errprint("%s:  Predicted region (at rank %s): %s" %
+            (doctag, i+1, regs[i]))
+      errprint("%s:  Distance %.2f miles to true region center at %s" %
+               (doctag, stats['true_truedist'], stats['true_center']))
+      errprint("%s:  Distance %.2f miles to predicted region center at %s" %
+               (doctag, stats['pred_truedist'], stats['pred_center']))
     return True
 
 
@@ -2541,7 +2544,7 @@ class PCLTravelGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       #errprint("Non-head text: %s" % text)
       yield TitledDocument(headtext, text)
 
-  def evaluate_document(self, doc):
+  def evaluate_document(self, doc, doctag):
     dist = WordDist()
     if Opts.include_stopwords_in_article_dists:
       the_stopwords = {}
@@ -3095,6 +3098,9 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
     op.add_option("--num-test-docs", "--ntest", type='int', default=0,
                   help="""Maximum number of test documents to use.
 0 means no limit.  Default %default.""")
+    op.add_option("--no-individual-results", "--no-results",
+                  action='store_true', default=False,
+                  help="""Don't show individual results for each test document.""")
 
     return canon_options
 
