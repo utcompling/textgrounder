@@ -2699,6 +2699,7 @@ def finish_word_counts():
         % (split, numarts, totaltoks,
           # Avoid division by zero
           float(totaltoks)/(numarts + 1e-100)))
+  errprint("Finished reading distributions from %s articles." % (status.num_processed()))
 
 
 class Gazetteer(object):
@@ -2834,6 +2835,7 @@ class WorldGazetteer(Gazetteer):
         break
 
     Division.finish_all()
+    errprint("Finished matching %s gazetteer entries." % (status.num_processed()))
 
 # If given a directory, yield all the files in the directory; else just
 # yield the file.

@@ -159,6 +159,7 @@ def read_article_data_file(filename, process, article_type=Article,
     process(art)
     if status.item_processed(maxtime=maxtime):
       break
+  errprint("Finished reading %s articles." % (status.num_processed()))
   return fields
 
 def write_article_data_file(outfile, outfields, articles):
