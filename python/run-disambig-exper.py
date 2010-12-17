@@ -78,6 +78,9 @@ NonBaselineStrategies = iterate('--strategy',
 BaselineStrategies = iterate('--strategy baseline --baseline-strategy',
     ['link-most-common-toponym', 'regdist-most-common-toponym',
     'internal-link', 'num-articles', 'random'])
+CombinedBaselineStrategies1 = add_param('--strategy baseline --baseline-strategy link-most-common-toponym --baseline-strategy regdist-most-common-toponym')
+CombinedBaselineStrategies2 = add_param('--strategy baseline --baseline-strategy internal-link --baseline-strategy num-articles --baseline-strategy random')
+CombinedBaselineStrategies = combine(CombinedBaselineStrategies1, CombinedBaselineStrategies2)
 AllStrategies = combine(NonBaselineStrategies, BaselineStrategies)
 CombinedKL = add_param('--strategy symmetric-partial-kl-divergence --strategy symmetric-kl-divergence --strategy partial-kl-divergence --strategy kl-divergence')
 CombinedCosine = add_param('--strategy cosine-similarity --strategy smoothed-cosine-similarity --strategy partial-cosine-similarity --strategy smoothed-partial-cosine-similarity')
@@ -155,11 +158,11 @@ NewCoarser2Exper = nest(Train100k, Test500, Coarser2DPR, CombinedNonBaselineStra
 NewFiner3Exper = nest(Train100k, Test500, Finer3DPR, KLDivStrategy)
 
 NewDPR = iterate('--degrees-per-region', [0.1, 0.5, 1, 5])
+NewDPR2 = iterate('--degrees-per-region', [0.1, 0.5, 1, 5, 10])
 New10DPR = iterate('--degrees-per-region', [10])
 NewSmoothedCosineExper = nest(Train100k, Test500, SmoothedCosineStrategy, NewDPR)
 New10Exper = nest(Train100k, Test500, New10DPR, CombinedNonBaselineStrategies)
-
-#NewBaselineExper = nest(Train100k, Test500, AllBa SmoothedCosineStrategy, NewDPR)
+NewBaselineExper = nest(Train100k, Test500, NewDPR2, CombinedBaselineStrategies)
 
 # Test 
 

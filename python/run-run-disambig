@@ -27,6 +27,7 @@ if [ -e "$OUTFILE" ]; then
   exit 1
 fi
 
+echo "Running on `hostname` at time `date`"
 echo "Outputting to $OUTFILE"
 if [ -n "$1" ]; then
   echo "Arguments are" ${1+"$@"}
