@@ -1533,13 +1533,16 @@ class GeotagDocumentEval(EvalWithRank):
     super(GeotagDocumentEval, self).output_incorrect_results()
     self.true_dists.sort()
     self.degree_dists.sort()
-    errprint("  Mean true error distance = %.2f" %
-             mean(self.true_dists))
-    errprint("  Median true error distance = %.2f" %
-             median(self.true_dists))
-    errprint("  Mean degree error distance = %.2f" %
+    def miles_and_km(val):
+      km_per_mile = 1.609
+      return "%.2f miles (%.2f km)" % (val, val*km_per_mile)
+    errprint("  Mean true error distance = %s" %
+             miles_and_km(mean(self.true_dists)))
+    errprint("  Median true error distance = %s" %
+             miles_and_km(median(self.true_dists)))
+    errprint("  Mean degree error distance = %.2f degrees" %
              mean(self.degree_dists))
-    errprint("  Median degree error distance = %.2f" %
+    errprint("  Median degree error distance = %.2f degrees" %
              median(self.degree_dists))
 
 def output_resource_usage():

@@ -1,0 +1,57 @@
+#!/bin/sh
+
+# Run wiki_disambig.py, passing it various useful arguments for running
+# on Eisenstein et al (2010)'s Twitter data.  Extra arguments
+# can be specified on the command line, which will override any existing
+# arguments.
+#
+# See also 'run-run-twitter', which will run this script using 'nohup'
+# while saving the output to a file.
+
+if [ -z "$TEXTGROUNDER_PYTHON" ]; then
+  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+fi
+
+. $TEXTGROUNDER_PYTHON/config-wikigrounder
+
+WIKI_DISAMBIG="$TEXTGROUNDER_PYTHON/wiki_disambig.py"
+
+#MODE="match-only"
+#MODE="geotag-toponyms"
+MODE="geotag-documents"
+
+if [ "$1" = "toponyms" ]; then
+  MODE="geotag-toponyms"
+  shift
+elif [ "$1" = "documents" ]; then
+  MODE="geotag-documents"
+  shift
+fi
+
+MISCOPTS="--width-of-stat-region 1 --miles-per-region 100 \
+  --num-training-docs 100000 --num-test-docs 1000"
+if [ "$MODE" = "geotag-toponyms" -o "$MODE" = "match-only" ]; then
+  STRATEGY="--strategy baseline"
+  # Don't need counts file with baseline-only strategy
+  COUNTS_FILE=""
+  #STRATEGY="--strategy naive-bayes-with-baseline"
+  #STRATEGY="--strategy naive-bayes-no-baseline"
+  #MISCOPTS="$MISCOPTS --naive-bayes-weighting distance-weighted"
+  EVALFILE="--eval-file $TRCONLL_DEV_DIR"
+  EVALTYPE="--eval-format tr-conll"
+  #EVALFILE="--eval-file $PREFIX-toponym-eval.txt"
+elif [ "$MODE" = "geotag-documents" ]; then
+  EVALTYPE="--eval-format wiki"
+fi
+
+EVALSET="--eval-set test"
+
+GEOTEXT_PREFIX="$GEOTEXT_OUTPUT_DIR/geotext-twitter"
+
+COMBINED_ARTICLE_DATA_ARG="--article-data-file $GEOTEXT_PREFIX-combined-article-data.txt"
+COUNTS_ARG="--counts-file $GEOTEXT_PREFIX-counts-only-coord-articles.txt"
+
+$WIKI_DISAMBIG \
+  $STOPWORDS_ARG $COMBINED_ARTICLE_DATA_ARG $COUNTS_ARG $GAZETTEER_ARG \
+  --mode "$MODE" $STRATEGY $EVALFILE $EVALTYPE $EVALSET \
+ $MISCOPTS $MAXTIME $DEBUG ${1+"$@"}

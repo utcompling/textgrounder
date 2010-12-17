@@ -3,20 +3,17 @@
 import os
 from nlputil import *
 
-dry_run = False
-
 # Run a series of disambiguation experiments.
 
 if 'TEXTGROUNDER_PYTHON' in os.environ:
   tgdir = os.environ['TEXTGROUNDER_PYTHON']
 else:
   tgdir = '%s/python' % (os.environ['TEXTGROUNDER_DIR'])
-runcmd = '%s/run-run-disambig' % tgdir
 
 def runit(fun, id, args):
-  command='%s --id %s documents %s' % (runcmd, id, args)
+  command='%s --id %s documents %s' % (Opts.run_cmd, id, args)
   errprint("Executing: %s" % command)
-  if not dry_run:
+  if not Opts.dry_run:
     os.system("%s" % command)
 
 def combine(*funs):
@@ -53,10 +50,12 @@ def main():
   op = OptionParser(usage="%prog [options] experiment [...]")
   op.add_option("-n", "--dry-run", action="store_true",
 		  help="Don't execute anything; just output the commands that would be executed.")
+  def_runcmd = '%s/run-run-disambig' % tgdir
+  op.add_option("-c", "--run-cmd", "--cmd", default=def_runcmd,
+		  help="Command to execute; default '%default'.")
   (opts, args) = op.parse_args()
-  global dry_run
-  if opts.dry_run:
-    dry_run = True
+  global Opts
+  Opts = opts
   if not args:
     op.print_help()
   for exper in args:
@@ -170,6 +169,9 @@ New10Exper = nest(Train100k, Test500, New10DPR, CombinedNonBaselineStrategies)
 NewBaselineExper = nest(Train100k, Test500, NewDPR2, CombinedBaselineStrategies)
 NewBaseline2Exper1 = nest(Train100k, Test500, New1DPR, CombinedBaselineStrategies2)
 NewBaseline2Exper2 = nest(Train100k, Test500, New510DPR, CombinedBaselineStrategies)
+
+TwitterDPR = iterate('--degrees-per-region', [0.5, 1, 0.1, 5, 10])
+TwitterExper1 = nest(TwitterDPR, KLDivStrategy)
 
 # Test 
 

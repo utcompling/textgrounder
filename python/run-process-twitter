@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# Run twitter_geotext_process.py, passing it various useful arguments.
+# Extra arguments can be specified on the command line, which will override
+# any existing arguments.
+
+DEBUG="--debug 0"
+
+if [ -z "$TEXTGROUNDER_PYTHON" ]; then
+  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+fi
+
+. $TEXTGROUNDER_PYTHON/config-wikigrounder
+
+mkdir -p $GEOTEXT_OUTPUT_DIR
+
+TWITTER_PROC="$TEXTGROUNDER_PYTHON/twitter_geotext_process.py"
+
+$TWITTER_PROC --input-dir $GEOTEXT_INPUT_DIR --output-dir $GEOTEXT_OUTPUT_DIR $DEBUG ${1+"$@"}
+

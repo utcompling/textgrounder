@@ -10,6 +10,10 @@ fi
 
 TRCONLL_DEV_DIR="/groups/projects/pcl_travel/data/trconlldevtest/dev"
 
+GEOTEXT_TOP_DIR="$HOME/devel/geotext"
+GEOTEXT_INPUT_DIR="$GEOTEXT_TOP_DIR/GeoText.2010-10-12/processed_data"
+GEOTEXT_OUTPUT_DIR="$GEOTEXT_TOP_DIR/output"
+
 DUMP_PREFIX="enwiki-20100905"
 if [ -z "$NO_USE_PERMUTED" ]; then
   if [ -e "$WIKIPEDIA_DATA_DIR/$DUMP_PREFIX-permuted-pages-articles.xml.bz2" ]; then

@@ -200,7 +200,8 @@ add the word counts to the global word count statistics.'''
         float(count)/cls.num_word_tokens*
           (1 - cls.globally_unseen_word_prob))
     # A very rough estimate, perhaps totally wrong
-    cls.num_unseen_word_types = cls.num_types_seen_once
+    cls.num_unseen_word_types = \
+        max(cls.num_types_seen_once, cls.num_word_types/20)
     #if debug['tons']:
     #  errprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s" % (cls.num_word_types, cls.num_word_tokens, cls.num_types_seen_once, cls.globally_unseen_word_prob, cls.globally_unseen_word_prob + sum(cls.overall_word_probs.itervalues())))
 
