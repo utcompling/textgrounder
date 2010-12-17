@@ -67,13 +67,27 @@ def main():
 ##############################################################################
 
 MTS300 = iterate('--max-time-per-stage', [300])
+Train200k = iterate('--num-training-docs', [200000])
+Train100k = iterate('--num-training-docs', [100000])
+Test1k = iterate('--num-test-docs', [1000])
+Test500 = iterate('--num-test-docs', [500])
+#CombinedNonBaselineStrategies = add_param('--strategy partial-kl-divergence --strategy cosine-similarity --strategy naive-bayes-with-baseline --strategy per-word-region-distribution')
+CombinedNonBaselineStrategies = add_param('--strategy partial-kl-divergence --strategy smoothed-cosine-similarity --strategy naive-bayes-with-baseline --strategy per-word-region-distribution')
 NonBaselineStrategies = iterate('--strategy',
-    ['partial-kl-divergence', 'per-word-region-distribution', 'naive-bayes-no-baseline', 'partial-cosine-similarity'])
+    ['partial-kl-divergence', 'per-word-region-distribution', 'naive-bayes-with-baseline', 'smoothed-cosine-similarity'])
 BaselineStrategies = iterate('--strategy baseline --baseline-strategy',
-    ['internal-link', 'random', 'num-articles',
-     'link-most-common-toponym', 'regdist-most-common-toponym'])
+    ['link-most-common-toponym', 'regdist-most-common-toponym',
+    'internal-link', 'num-articles', 'random'])
 AllStrategies = combine(NonBaselineStrategies, BaselineStrategies)
+CombinedKL = add_param('--strategy symmetric-partial-kl-divergence --strategy symmetric-kl-divergence --strategy partial-kl-divergence --strategy kl-divergence')
+CombinedCosine = add_param('--strategy cosine-similarity --strategy smoothed-cosine-similarity --strategy partial-cosine-similarity --strategy smoothed-partial-cosine-similarity')
+KLDivStrategy = iterate('--strategy', ['partial-kl-divergence'])
+FullKLDivStrategy = iterate('--strategy', ['kl-divergence'])
+SmoothedCosineStrategy = iterate('--strategy', ['smoothed-cosine-similarity'])
+NBStrategy = iterate('--strategy', ['naive-bayes-no-baseline'])
 
+Coarser1DPR = iterate('--degrees-per-region', [0.1, 10])
+Coarser2DPR = iterate('--degrees-per-region', [0.5, 1, 5])
 CoarseDPR = iterate('--degrees-per-region',
     #[90, 30, 10, 5, 3, 2, 1, 0.5]
     #[0.5, 1, 2, 3, 5, 10, 30, 90]
@@ -82,6 +96,8 @@ OldFineDPR = iterate('--degrees-per-region',
     [90, 75, 60, 50, 40, 30, 25, 20, 15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2.5, 2,
      1.75, 1.5, 1.25, 1, 0.87, 0.75, 0.63, 0.5, 0.4, 0.3, 0.25, 0.2, 0.15, 0.1]
     )
+DPR3 = iterate('--degrees-per-region', [3])
+DPR5 = iterate('--degrees-per-region', [5])
 
 DPR1 = iterate('--degrees-per-region', [0.5, 1, 3])
 
@@ -102,8 +118,7 @@ ParamExper = nest(MTS300, DPR1, MinWordCount, NonBaselineStrategies)
 
 FinerDPR = iterate('--degrees-per-region', [0.3, 0.2, 0.1])
 EvenFinerDPR = iterate('--degrees-per-region', [0.1, 0.05])
-KLDivStrategy = iterate('--strategy', ['partial-kl-divergence'])
-FullKLDivStrategy = iterate('--strategy', ['kl-divergence'])
+Finer3DPR = iterate('--degrees-per-region', [0.01, 0.05])
 FinerExper = nest(MTS300, FinerDPR, KLDivStrategy)
 EvenFinerExper = nest(MTS300, EvenFinerDPR, KLDivStrategy)
 
@@ -115,8 +130,6 @@ MissingBaselineStrategies = iterate('--strategy baseline --baseline-strategy',
     ['link-most-common-toponym'
       #, 'regdist-most-common-toponym'
       ])
-NBStrategy = iterate('--strategy',
-    ['naive-bayes-no-baseline'])
 MissingOtherNonBaselineStrategies = iterate('--strategy',
     ['partial-cosine-similarity', 'cosine-similarity'])
 MissingAllButNBStrategies = combine(MissingOtherNonBaselineStrategies,
@@ -130,5 +143,24 @@ MissingOtherExper = nest(MTS300, CoarseDPR, MissingAllButNBStrategies)
 MissingBaselineExper = nest(MTS300, CoarseDPR, MissingBaselineStrategies)
 FullKLDivExper = nest(MTS300, CoarseDPR, FullKLDivStrategy)
 
+# Newer experiments on 200k/1k
+
+#CombinedKLExper = nest(Train100k, Test1k, DPR5, CombinedKL)
+#CombinedCosineExper = nest(Train100k, Test1k, DPR5, CombinedCosine)
+CombinedKLExper = nest(Train100k, Test500, DPR5, CombinedKL)
+CombinedCosineExper = nest(Train100k, Test500, DPR5, CombinedCosine)
+
+NewCoarser1Exper = nest(Train100k, Test500, Coarser1DPR, CombinedNonBaselineStrategies)
+NewCoarser2Exper = nest(Train100k, Test500, Coarser2DPR, CombinedNonBaselineStrategies)
+NewFiner3Exper = nest(Train100k, Test500, Finer3DPR, KLDivStrategy)
+
+NewDPR = iterate('--degrees-per-region', [0.1, 0.5, 1, 5])
+New10DPR = iterate('--degrees-per-region', [10])
+NewSmoothedCosineExper = nest(Train100k, Test500, SmoothedCosineStrategy, NewDPR)
+New10Exper = nest(Train100k, Test500, New10DPR, CombinedNonBaselineStrategies)
+
+#NewBaselineExper = nest(Train100k, Test500, AllBa SmoothedCosineStrategy, NewDPR)
+
+# Test 
 
 main()

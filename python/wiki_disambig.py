@@ -23,6 +23,7 @@ from process_article_data import *
 from kl_divergence import *
 from word_distribution import *
 import xml.dom.minidom as md
+import time
 
 ############################################################################
 #                              Documentation                               #
@@ -338,7 +339,7 @@ class RegionWordDist(WordDist):
         incoming_links += art.incoming_links
       num_arts_for_links += 1
       if not art.dist:
-        if Opts.max_time_per_stage == 0:
+        if Opts.max_time_per_stage == 0 and Opts.num_training_docs == 0:
           warning("Saw article %s without distribution" % art)
         continue
       assert art.dist.finished
@@ -763,6 +764,7 @@ class StatRegion(object):
     errprint("Number of empty regions: %s" % cls.num_empty_regions)
     # Save some memory by clearing this after it's not needed
     cls.tiling_region_to_articles = None
+    ArticleTable.clear_training_article_distributions()
 
   # Add the given article to the region map, which covers the earth in regions
   # of a particular size to aid in computing the regions used in region-based
@@ -1145,6 +1147,11 @@ class ArticleTable(object):
           numarts += 1
       cls.num_dist_articles_by_split[split] = numarts
       cls.word_tokens_by_split[split] = totaltoks
+
+  @classmethod
+  def clear_training_article_distributions(cls):
+    for art in cls.articles_by_split['training']:
+      art.dist = None
 
   # Find Wikipedia article matching name NAME for location LOC.  NAME
   # will generally be one of the names of LOC (either its canonical
@@ -1789,6 +1796,7 @@ class TestFileEvaluator(object):
       errprint("")
       errprint("Final results for strategy %s: All %d documents processed:" %
                (self.stratname, status.num_processed()))
+      errprint("Ending operation at %s" % (time.ctime()))
       self.output_results(final=True)
       errprint("Ending final results for strategy %s" % self.stratname)
 
@@ -1816,8 +1824,11 @@ class TestFileEvaluator(object):
           # If five minutes and ten documents have gone by, print out results
           if (new_elapsed - last_elapsed >= 300 and
               new_processed - last_processed >= 10):
-            errprint("Results after %d documents:" % status.num_processed())
+            errprint("Results after %d documents (strategy %s):" %
+                (status.num_processed(), self.stratname))
             self.output_results(final=False)
+            errprint("End of results after %d documents (strategy %s):" %
+                (status.num_processed(), self.stratname))
             last_elapsed = new_elapsed
             last_processed = new_processed
         else:
@@ -2443,7 +2454,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     if not article.dist:
       # This can (and does) happen when --max-time-per-stage is set,
       # so that the counts for many articles don't get read in.
-      if Opts.max_time_per_stage == 0:
+      if Opts.max_time_per_stage == 0 and Opts.num_training_docs == 0:
         warning("Can't evaluate article %s without distribution" % article)
       self.results.record_geotag_document_other_stat('Skipped articles')
       return False
