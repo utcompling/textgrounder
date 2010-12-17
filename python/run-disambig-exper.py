@@ -73,6 +73,7 @@ Test1k = iterate('--num-test-docs', [1000])
 Test500 = iterate('--num-test-docs', [500])
 #CombinedNonBaselineStrategies = add_param('--strategy partial-kl-divergence --strategy cosine-similarity --strategy naive-bayes-with-baseline --strategy per-word-region-distribution')
 CombinedNonBaselineStrategies = add_param('--strategy partial-kl-divergence --strategy smoothed-cosine-similarity --strategy naive-bayes-with-baseline --strategy per-word-region-distribution')
+CombinedNonBaselineNoCosineStrategies = add_param('--strategy partial-kl-divergence --strategy naive-bayes-with-baseline --strategy per-word-region-distribution')
 NonBaselineStrategies = iterate('--strategy',
     ['partial-kl-divergence', 'per-word-region-distribution', 'naive-bayes-with-baseline', 'smoothed-cosine-similarity'])
 BaselineStrategies = iterate('--strategy baseline --baseline-strategy',
@@ -103,6 +104,7 @@ DPR3 = iterate('--degrees-per-region', [3])
 DPR5 = iterate('--degrees-per-region', [5])
 
 DPR1 = iterate('--degrees-per-region', [0.5, 1, 3])
+DPRpoint5 = iterate('--degrees-per-region', [0.5])
 
 MinWordCount = iterate('--minimum-word-count', [1, 2, 3, 4, 5])
 
@@ -156,13 +158,18 @@ CombinedCosineExper = nest(Train100k, Test500, DPR5, CombinedCosine)
 NewCoarser1Exper = nest(Train100k, Test500, Coarser1DPR, CombinedNonBaselineStrategies)
 NewCoarser2Exper = nest(Train100k, Test500, Coarser2DPR, CombinedNonBaselineStrategies)
 NewFiner3Exper = nest(Train100k, Test500, Finer3DPR, KLDivStrategy)
+NewIndiv4Exper = nest(Train100k, Test500, DPRpoint5, CombinedNonBaselineNoCosineStrategies)
 
 NewDPR = iterate('--degrees-per-region', [0.1, 0.5, 1, 5])
 NewDPR2 = iterate('--degrees-per-region', [0.1, 0.5, 1, 5, 10])
 New10DPR = iterate('--degrees-per-region', [10])
+New510DPR = iterate('--degrees-per-region', [5, 10])
+New1DPR = iterate('--degrees-per-region', [1])
 NewSmoothedCosineExper = nest(Train100k, Test500, SmoothedCosineStrategy, NewDPR)
 New10Exper = nest(Train100k, Test500, New10DPR, CombinedNonBaselineStrategies)
 NewBaselineExper = nest(Train100k, Test500, NewDPR2, CombinedBaselineStrategies)
+NewBaseline2Exper1 = nest(Train100k, Test500, New1DPR, CombinedBaselineStrategies2)
+NewBaseline2Exper2 = nest(Train100k, Test500, New510DPR, CombinedBaselineStrategies)
 
 # Test 
 
