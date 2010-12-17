@@ -2689,6 +2689,7 @@ def read_word_counts(filename):
   else:
     one_article_probs()
 
+  errprint("Finished reading distributions from %s articles." % (status.num_processed()))
 
 def finish_word_counts():
   WordDist.finish_global_distribution()
@@ -2699,8 +2700,6 @@ def finish_word_counts():
         % (split, numarts, totaltoks,
           # Avoid division by zero
           float(totaltoks)/(numarts + 1e-100)))
-  errprint("Finished reading distributions from %s articles." % (status.num_processed()))
-
 
 class Gazetteer(object):
   # For each toponym (name of location), value is a list of Locality items,

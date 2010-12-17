@@ -179,6 +179,7 @@ TwitterExper2 = nest(TwitterDPR2, TwitterStrategy2)
 TwitterDPR3 = iterate('--degrees-per-region', [5, 10, 1, 0.5, 0.1])
 TwitterStrategy3 = add_param('--strategy cosine-similarity')
 TwitterExper3 = nest(TwitterDPR3, TwitterStrategy3)
+TwitterBaselineExper1 = nest(TwitterDPR3, BaselineStrategies)
 
 TwitterWikiNumTest = iterate('--num-test-docs', [1894])
 TwitterWikiDPR1 = iterate('--degrees-per-region', [0.1])
