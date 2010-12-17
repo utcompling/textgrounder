@@ -158,6 +158,7 @@ NewCoarser1Exper = nest(Train100k, Test500, Coarser1DPR, CombinedNonBaselineStra
 NewCoarser2Exper = nest(Train100k, Test500, Coarser2DPR, CombinedNonBaselineStrategies)
 NewFiner3Exper = nest(Train100k, Test500, Finer3DPR, KLDivStrategy)
 NewIndiv4Exper = nest(Train100k, Test500, DPRpoint5, CombinedNonBaselineNoCosineStrategies)
+NewIndiv5Exper = nest(Train100k, Test500, DPRpoint5, CombinedBaselineStrategies1)
 
 NewDPR = iterate('--degrees-per-region', [0.1, 0.5, 1, 5])
 NewDPR2 = iterate('--degrees-per-region', [0.1, 0.5, 1, 5, 10])
