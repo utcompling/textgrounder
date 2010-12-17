@@ -56,17 +56,20 @@ def read_vocab(filename):
   for line in open(filename):
     id += 1
     word = line.strip().split('\t')[0]
-    errprint("%s: %s" % (id, word))
+    #errprint("%s: %s" % (id, word))
     vocab_id_to_token["%s" % id] = word
 
 # Process user file
 def read_user_info(filename):
-  id = 0
+  id = 666000000
   for line in open(filename):
     id += 1
     userid = line.strip().split('\t')[0]
-    errprint("%s: %s" % (id, userid))
+    #errprint("%s: %s" % (id, userid))
     user_id_to_token[id] = userid
+    if userid in user_token_to_id:
+      errprint("User %s seen twice!  Current ID=%s, former=%s" % (
+        userid, id, user_token_to_id[userid]))
     user_token_to_id[userid] = id
 
 # Process a file of data in "LDA" format

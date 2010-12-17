@@ -170,8 +170,21 @@ NewBaselineExper = nest(Train100k, Test500, NewDPR2, CombinedBaselineStrategies)
 NewBaseline2Exper1 = nest(Train100k, Test500, New1DPR, CombinedBaselineStrategies2)
 NewBaseline2Exper2 = nest(Train100k, Test500, New510DPR, CombinedBaselineStrategies)
 
-TwitterDPR = iterate('--degrees-per-region', [0.5, 1, 0.1, 5, 10])
-TwitterExper1 = nest(TwitterDPR, KLDivStrategy)
+TwitterDPR1 = iterate('--degrees-per-region', [0.5, 1, 0.1, 5, 10])
+TwitterExper1 = nest(TwitterDPR1, KLDivStrategy)
+TwitterDPR2 = iterate('--degrees-per-region', [1, 5, 10, 0.5, 0.1])
+TwitterStrategy2 = add_param('--strategy naive-bayes-with-baseline --strategy smoothed-cosine-similarity --strategy per-word-region-distribution')
+TwitterExper2 = nest(TwitterDPR2, TwitterStrategy2)
+TwitterDPR3 = iterate('--degrees-per-region', [5, 10, 1, 0.5, 0.1])
+TwitterStrategy3 = add_param('--strategy cosine-similarity')
+TwitterExper3 = nest(TwitterDPR3, TwitterStrategy3)
+
+TwitterWikiNumTest = iterate('--num-test-docs', [1894])
+TwitterWikiDPR1 = iterate('--degrees-per-region', [5, 10, 1, 0.5, 0.1])
+TwitterWikiStrategy1 = add_param('--strategy partial-kl-divergence')
+TwitterWikiStrategy2 = add_param('--strategy naive-bayes-with-baseline --strategy smoothed-cosine-similarity --strategy per-word-region-distribution')
+TwitterWikiExper1 = nest(Train100k, TwitterWikiNumTest, TwitterWikiDPR1, TwitterWikiStrategy1)
+TwitterWikiExper2 = nest(Train100k, TwitterWikiNumTest, TwitterWikiDPR1, TwitterWikiStrategy2)
 
 # Test 
 

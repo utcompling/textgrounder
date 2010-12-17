@@ -2689,6 +2689,8 @@ def read_word_counts(filename):
   else:
     one_article_probs()
 
+
+def finish_word_counts():
   WordDist.finish_global_distribution()
   ArticleTable.finish_article_distributions()
   for (split, totaltoks) in ArticleTable.word_tokens_by_split.iteritems():
@@ -2697,6 +2699,7 @@ def read_word_counts(filename):
         % (split, numarts, totaltoks,
           # Avoid division by zero
           float(totaltoks)/(numarts + 1e-100)))
+
 
 class Gazetteer(object):
   # For each toponym (name of location), value is a list of Locality items,
@@ -2863,7 +2866,7 @@ class WikiDisambigProgram(NLPProgram):
     op.add_option("--stopwords-file",
                   help="""File containing list of stopwords.""",
                   metavar="FILE")
-    op.add_option("-a", "--article-data-file", "--a",
+    op.add_option("-a", "--article-data-file", "--a", action='append',
                   help="""File containing info about Wikipedia articles.""",
                   metavar="FILE")
     op.add_option("--gazetteer-file", "--gf",
@@ -2873,7 +2876,7 @@ class WikiDisambigProgram(NLPProgram):
                   choices=['world', 'db'],
                   help="""Type of gazetteer file specified using --gazetteer;
 default '%default'.""")
-    op.add_option("--counts-file", "--cf",
+    op.add_option("--counts-file", "--cf", action='append',
                   help="""File containing output from a prior run of
 --output-counts, listing for each article the words in the article and
 associated counts.""",
@@ -3223,7 +3226,8 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
   def implement_main(self, opts, params, args):
     if params.need_to_read_stopwords:
       read_stopwords(opts.stopwords_file)
-    read_article_data(opts.article_data_file)
+    for fn in opts.article_data_file:
+      read_article_data(fn)
 
     #errprint("Processing evaluation file(s) %s for toponym counts..." % opts.eval_file)
     #process_dir_files(opts.eval_file, count_toponyms_in_file)
@@ -3236,8 +3240,10 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
 
     # Read in the words-counts file
     if not opts.mode == 'match-only':
+      for fn in opts.counts_file:
+        read_word_counts(fn)
       if opts.counts_file:
-        read_word_counts(opts.counts_file)
+        finish_word_counts()
 
     WorldGazetteer.read_world_gazetteer_and_match(opts.gazetteer_file)
 
@@ -3250,13 +3256,6 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
         regdist = RegionDist.get_region_dist(word)
         regdist.generate_kml_file('%s%s.kml' % (opts.kml_prefix, word))
       return
-
-    if opts.mode == 'geotag-documents' and not opts.eval_file:
-      # Hack: When running in --mode=geotag-documents and --eval-format=wiki,
-      # we don't need an eval file because we use the article counts we've
-      # already loaded.  But we will get an error if we don't set this to
-      # a file.
-      opts.eval_file = opts.article_data_file
 
     def yield_strategies():
       for stratname in opts.strategy:
@@ -3316,7 +3315,11 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
           evalobj = WikipediaGeotagDocumentEvaluator(opts, strategy, stratname)
 
       errprint("Processing evaluation file/dir %s..." % opts.eval_file)
-      evalobj.evaluate_and_output_results(iter_directory_files(opts.eval_file))
+      if opts.eval_file:
+        iterfiles = iter_directory_files(opts.eval_file)
+      else:
+        iterfiles = ["foo"]
+      evalobj.evaluate_and_output_results(iterfiles)
 
 if __name__ == "__main__":
   WikiDisambigProgram()

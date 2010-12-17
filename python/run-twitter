@@ -28,8 +28,7 @@ elif [ "$1" = "documents" ]; then
   shift
 fi
 
-MISCOPTS="--width-of-stat-region 1 --miles-per-region 100 \
-  --num-training-docs 100000 --num-test-docs 1000"
+MISCOPTS="--width-of-stat-region 1 --miles-per-region 100"
 if [ "$MODE" = "geotag-toponyms" -o "$MODE" = "match-only" ]; then
   STRATEGY="--strategy baseline"
   # Don't need counts file with baseline-only strategy
