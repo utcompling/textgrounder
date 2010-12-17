@@ -1847,19 +1847,20 @@ class GeotagToponymStrategy(object):
 # (find the correct geographic location) using the "link baseline", i.e.
 # use the location with the highest number of incoming links.
 class BaselineGeotagToponymStrategy(GeotagToponymStrategy):
-  def __init__(self, opts):
+  def __init__(self, opts, baseline_strategy):
     self.opts = opts
+    self.baseline_strategy = baseline_strategy
 
   def need_context(self):
     return False
 
   def compute_score(self, geogword, art):
-    if self.opts.baseline_strategy == 'internal-link':
+    if self.baseline_strategy == 'internal-link':
       if self.opts.context_type == 'region':
         return get_adjusted_incoming_links(art.find_regworddist())
       else:
         return get_adjusted_incoming_links(art)
-    elif self.opts.baseline_strategy == 'num-articles':
+    elif self.baseline_strategy == 'num-articles':
       if self.opts.context_type == 'region':
         return art.find_regworddist().num_arts_for_links
       else:
@@ -1875,8 +1876,9 @@ class BaselineGeotagToponymStrategy(GeotagToponymStrategy):
 # (find the correct geographic location) using Naive Bayes, possibly
 # in conjunction with the baseline.
 class NaiveBayesToponymStrategy(GeotagToponymStrategy):
-  def __init__(self, opts):
+  def __init__(self, opts, use_baseline=True):
     self.opts = opts
+    self.use_baseline = use_baseline
 
   def need_context(self):
     return True
@@ -1892,7 +1894,7 @@ class NaiveBayesToponymStrategy(GeotagToponymStrategy):
       distobj = art.find_regworddist()
     totalprob = 0.0
     total_word_weight = 0.0
-    if not self.opts.baseline_strategy == 'naive-bayes-no-baseline':
+    if not self.use_baseline:
       word_weight = 1.0
       baseline_weight = 0.0
     elif self.opts.naive_bayes_weighting == 'equal':
@@ -2991,8 +2993,8 @@ be tried, one after the other.""")
                                  'nb-base':'naive-bayes-with-baseline',
                                  'nb-nobase':'naive-bayes-no-baseline'}
 
-    op.add_option("--baseline-strategy", "--bs", type='choice',
-                  default="internal-link",
+    op.add_option("--baseline-strategy", "--bs", type='choice', action='append',
+                  default=None,
                   choices=['internal-link', 'link',
                            'random',
                            'num-articles', 'num-arts', 'numarts',
@@ -3016,7 +3018,12 @@ then use the internal-link baseline to match it to a location.
 'regdist-most-common-toponym' (only in --mode=geotag-documents) is similar,
 but uses the region distribution of the most common toponym.
 
-Default '%default'.""")
+Default '%default'.
+
+NOTE: Multiple --baseline-strategy options can be given, and each strategy will
+be tried, one after the other.  Currently, however, the *-most-common-toponym
+strategies cannot be mixed with other baseline strategies, or with non-baseline
+strategies, since they require that --preserve-case-words be set internally.""")
     canon_options['baseline_strategy'] = (
         {'link':'internal-link',
          'num-arts':'num-articles',
@@ -3114,14 +3121,24 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
       elif opts.mode == 'geotag-toponyms':
         opts.strategy = ['baseline']
 
-    if ('baseline' in opts.strategy and
-        opts.baseline_strategy.endswith('most-common-toponym')):
-      if len(opts.strategy) > 1:
-        # That's because we have to set --preserve-case-words, which we
-        # generally don't want set for other strategies and which affects
-        # the way we construct the training-document distributions.
-        op.error("Can't currently mix *-most-common-toponym baseline strategy with other strategies")
-      opts.preserve_case_words = True
+    if not opts.baseline_strategy:
+      opts.baseline_strategy = ['internal-link']
+
+    if 'baseline' in opts.strategy:
+      need_case = False
+      need_no_case = False
+      for bstrat in opts.baseline_strategy:
+        if bstrat.endswith('most-common-toponym'):
+          need_case = True
+        else:
+          need_no_case = True
+      if need_case:
+        if len(opts.strategy) > 1 or need_no_case:
+          # That's because we have to set --preserve-case-words, which we
+          # generally don't want set for other strategies and which affects
+          # the way we construct the training-document distributions.
+          op.error("Can't currently mix *-most-common-toponym baseline strategy with other strategies")
+        opts.preserve_case_words = True
 
     # FIXME! Can only currently handle World-type gazetteers.
     if opts.gazetteer_type != 'world':
@@ -3225,51 +3242,65 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
         regdist.generate_kml_file('%s%s.kml' % (opts.kml_prefix, word))
       return
 
-    for stratname in opts.strategy:
-      if opts.mode == 'geotag-toponyms':
-        # Generate strategy object
-        if stratname == 'baseline':
-          strategy = BaselineGeotagToponymStrategy(opts)
-        else:
-          strategy = NaiveBayesToponymStrategy(opts)
+    if opts.mode == 'geotag-documents' and not opts.eval_file:
+      # Hack: When running in --mode=geotag-documents and --eval-format=wiki,
+      # we don't need an eval file because we use the article counts we've
+      # already loaded.  But we will get an error if we don't set this to
+      # a file.
+      opts.eval_file = opts.article_data_file
 
-        # Generate reader object
+    def yield_strategies():
+      for stratname in opts.strategy:
+        if opts.mode == 'geotag-toponyms':
+          # Generate strategy object
+          if stratname == 'baseline':
+            for basestratname in opts.baseline_strategy:
+              yield ('baseline ' + basestratname,
+                  BaselineGeotagToponymStrategy(opts, basestratname))
+          else:
+            strategy = NaiveBayesToponymStrategy(opts,
+                use_baseline=(stratname == 'naive-bayes-with-baseline'))
+            yield (stratname, strategy)
+
+        elif opts.mode == 'geotag-documents':
+          if stratname == 'baseline':
+            for basestratname in opts.baseline_strategy:
+              yield ('baseline ' + basestratname,
+                  BaselineGeotagDocumentStrategy(basestratname))
+          else:
+            if stratname.startswith('naive-bayes-'):
+              strategy = NaiveBayesDocumentStrategy(opts,
+                  use_baseline=(stratname == 'naive-bayes-with-baseline'))
+            elif stratname == 'per-word-region-distribution':
+              strategy = PerWordRegionDistributionsStrategy()
+            elif stratname == 'cosine-similarity':
+              strategy = CosineSimilarityStrategy(smoothed=False, partial=False)
+            elif stratname == 'partial-cosine-similarity':
+              strategy = CosineSimilarityStrategy(smoothed=False, partial=True)
+            elif stratname == 'smoothed-cosine-similarity':
+              strategy = CosineSimilarityStrategy(smoothed=True, partial=False)
+            elif stratname == 'smoothed-partial-cosine-similarity':
+              strategy = CosineSimilarityStrategy(smoothed=True, partial=True)
+            elif stratname == 'kl-divergence':
+              strategy = KLDivergenceStrategy(symmetric=False, partial=False)
+            elif stratname == 'partial-kl-divergence':
+              strategy = KLDivergenceStrategy(symmetric=False, partial=True)
+            elif stratname == 'symmetric-kl-divergence':
+              strategy = KLDivergenceStrategy(symmetric=True, partial=False)
+            elif stratname == 'symmetric-partial-kl-divergence':
+              strategy = KLDivergenceStrategy(symmetric=True, partial=True)
+            else:
+              assert False
+            yield (stratname, strategy)
+
+    for (stratname, strategy) in yield_strategies():
+      # Generate reader object
+      if opts.mode == 'geotag-toponyms':
         if opts.eval_format == 'tr-conll':
           evalobj = TRCoNLLGeotagToponymEvaluator(opts, strategy, stratname)
         else:
           evalobj = WikipediaGeotagToponymEvaluator(opts, strategy, stratname)
       elif opts.mode == 'geotag-documents':
-        # Hack: When running in --mode=geotag-documents and --eval-format=wiki,
-        # we don't need an eval file because we use the article counts we've
-        # already loaded.  But we will get an error if we don't set this to
-        # a file.
-        if not opts.eval_file:
-          opts.eval_file = opts.article_data_file
-        if stratname == 'baseline':
-          strategy = BaselineGeotagDocumentStrategy(opts.baseline_strategy)
-        elif stratname.startswith('naive-bayes-'):
-          strategy = NaiveBayesDocumentStrategy(opts,
-              use_baseline=(stratname == 'naive-bayes-with-baseline'))
-        elif stratname == 'per-word-region-distribution':
-          strategy = PerWordRegionDistributionsStrategy()
-        elif stratname == 'cosine-similarity':
-          strategy = CosineSimilarityStrategy(smoothed=False, partial=False)
-        elif stratname == 'partial-cosine-similarity':
-          strategy = CosineSimilarityStrategy(smoothed=False, partial=True)
-        elif stratname == 'smoothed-cosine-similarity':
-          strategy = CosineSimilarityStrategy(smoothed=True, partial=False)
-        elif stratname == 'smoothed-partial-cosine-similarity':
-          strategy = CosineSimilarityStrategy(smoothed=True, partial=True)
-        elif stratname == 'kl-divergence':
-          strategy = KLDivergenceStrategy(symmetric=False, partial=False)
-        elif stratname == 'partial-kl-divergence':
-          strategy = KLDivergenceStrategy(symmetric=False, partial=True)
-        elif stratname == 'symmetric-kl-divergence':
-          strategy = KLDivergenceStrategy(symmetric=True, partial=False)
-        elif stratname == 'symmetric-partial-kl-divergence':
-          strategy = KLDivergenceStrategy(symmetric=True, partial=True)
-        else:
-          assert False
         if opts.eval_format == 'pcl-travel':
           evalobj = PCLTravelGeotagDocumentEvaluator(opts, strategy, stratname)
         else:
