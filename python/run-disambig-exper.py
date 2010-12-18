@@ -172,6 +172,22 @@ NewBaselineExper = nest(Train100k, Test500, NewDPR2, CombinedBaselineStrategies)
 NewBaseline2Exper1 = nest(Train100k, Test500, New1DPR, CombinedBaselineStrategies2)
 NewBaseline2Exper2 = nest(Train100k, Test500, New510DPR, CombinedBaselineStrategies)
 
+TestDPR = iterate('--degrees-per-region', [0.1])
+TestSet = add_param('--eval-set test')
+TestStrat1 = iterate('--strategy', ['partial-kl-divergence'])
+TestStrat2 = iterate('--strategy', ['per-word-region-distribution'])
+TestStrat3 = iterate('--strategy', ['naive-bayes-with-baseline'])
+TestExper1 = nest(Train100k, Test1k, TestSet, TestDPR, TestStrat1)
+TestExper2 = nest(Train100k, Test1k, TestSet, TestDPR, TestStrat2)
+TestExper3 = nest(Train100k, Test1k, TestSet, TestDPR, TestStrat3)
+
+TestStratBase1 = add_param('--strategy baseline --baseline-strategy link-most-common-toponym --baseline-strategy regdist-most-common-toponym')
+TestStratBase2 = add_param('--strategy baseline --baseline-strategy num-articles --baseline-strategy random')
+TestExperBase1 = nest(Train100k, Test1k, TestSet, TestDPR, TestStratBase1)
+TestExperBase2 = nest(Train100k, Test1k, TestSet, TestDPR, TestStratBase2)
+
+
+
 TwitterDPR1 = iterate('--degrees-per-region', [0.5, 1, 0.1, 5, 10])
 TwitterExper1 = nest(TwitterDPR1, KLDivStrategy)
 TwitterDPR2 = iterate('--degrees-per-region', [1, 5, 10, 0.5, 0.1])
