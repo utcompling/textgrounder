@@ -186,8 +186,6 @@ TestStratBase2 = add_param('--strategy baseline --baseline-strategy num-articles
 TestExperBase1 = nest(Train100k, Test1k, TestSet, TestDPR, TestStratBase1)
 TestExperBase2 = nest(Train100k, Test1k, TestSet, TestDPR, TestStratBase2)
 
-
-
 TwitterDPR1 = iterate('--degrees-per-region', [0.5, 1, 0.1, 5, 10])
 TwitterExper1 = nest(TwitterDPR1, KLDivStrategy)
 TwitterDPR2 = iterate('--degrees-per-region', [1, 5, 10, 0.5, 0.1])
