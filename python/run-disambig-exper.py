@@ -182,6 +182,21 @@ TwitterStrategy3 = add_param('--strategy cosine-similarity')
 TwitterExper3 = nest(TwitterDPR3, TwitterStrategy3)
 TwitterBaselineExper1 = nest(TwitterDPR3, BaselineStrategies)
 
+
+TwitterDevStrategy1 = add_param('--strategy partial-kl-divergence --strategy naive-bayes-with-baseline --strategy per-word-region-distribution')
+TwitterDevStrategy2 = add_param('--strategy baseline --baseline-strategy link-most-common-toponym --baseline-strategy regdist-most-common-toponym')
+TwitterDevStrategy3 = add_param('--strategy baseline --baseline-strategy num-articles --baseline-strategy random')
+TwitterDevSet = add_param('--eval-set dev')
+TwitterDev1 = nest(TwitterDPR3, TwitterDevSet, TwitterDevStrategy1)
+TwitterDev2 = nest(TwitterDPR3, TwitterDevSet, TwitterDevStrategy2)
+TwitterDev3 = nest(TwitterDPR3, TwitterDevSet, TwitterDevStrategy3)
+
+
+WithStopwords = add_param('--include-stopwords-in-article-dists')
+TwitterExper4 = nest(WithStopwords, TwitterDPR3, KLDivStrategy)
+TwitterExper5 = nest(WithStopwords, TwitterDPR3, TwitterStrategy2)
+TwitterExper6 = nest(WithStopwords, TwitterDPR3, BaselineStrategies)
+
 TwitterWikiNumTest = iterate('--num-test-docs', [1894])
 TwitterWikiDPR1 = iterate('--degrees-per-region', [0.1])
 TwitterWikiStrategyAll = add_param('--strategy partial-kl-divergence --strategy naive-bayes-with-baseline --strategy smoothed-cosine-similarity --strategy per-word-region-distribution')

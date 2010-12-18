@@ -43,7 +43,7 @@ elif [ "$MODE" = "geotag-documents" ]; then
   EVALTYPE="--eval-format wiki"
 fi
 
-EVALSET="--eval-set test"
+#EVALSET="--eval-set test"
 
 GEOTEXT_PREFIX="$GEOTEXT_OUTPUT_DIR/geotext-twitter"
 
