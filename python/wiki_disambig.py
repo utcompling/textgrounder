@@ -1786,9 +1786,14 @@ class TestFileEvaluator(object):
   def iter_documents(self, filename):
     pass
 
+  def would_skip_document(self, doc, doctag):
+    # Return True if document would be processed and evaluated; False
+    # if skipped.
+    return False
+
   def evaluate_document(self, doc, doctag):
     # Return True if document was actually processed and evaluated; False
-    # is skipped.
+    # if skipped.
     return True
 
   def output_results(self, final=False):
@@ -1806,13 +1811,30 @@ class TestFileEvaluator(object):
     status = StatusMessage('document')
     last_elapsed = 0
     last_processed = 0
+    skip_initial = self.opts.skip_initial_test_docs
+    skip_n = 0
     for filename in files:
       errprint("Processing evaluation file %s..." % filename)
       for doc in self.iter_documents(filename):
         # errprint("Processing document: %s" % doc)
         num_processed = status.num_processed()
         doctag = '#%d' % (1+num_processed)
-        if self.evaluate_document(doc, doctag):
+        if self.would_skip_document(doc, doctag):
+          errprint("Skipped document %s" % doc)
+        else:
+          do_skip = False
+          if skip_initial:
+            skip_initial -= 1
+            do_skip = True
+          elif skip_n:
+            skip_n -= 1
+            do_skip = True
+          else:
+            skip_n = self.opts.skip_every_n_test_docs
+          if do_skip:
+            errprint("Passed over document %s" % doctag)
+          else:
+            assert self.evaluate_document(doc, doctag)
           status.item_processed()
           new_elapsed = status.elapsed_time()
           new_processed = status.num_processed()
@@ -1836,8 +1858,6 @@ class TestFileEvaluator(object):
                 (status.num_processed(), self.stratname))
             last_elapsed = new_elapsed
             last_processed = new_processed
-        else:
-          errprint("Skipped document %s" % doc)
 
     output_final_results()
   
@@ -2457,13 +2477,18 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     #if title:
     #  yield (title, words)
 
-  def evaluate_document(self, article, doctag):
+  def would_skip_document(self, article, doctag):
     if not article.dist:
       # This can (and does) happen when --max-time-per-stage is set,
       # so that the counts for many articles don't get read in.
       if self.opts.max_time_per_stage == 0 and self.opts.num_training_docs == 0:
         warning("Can't evaluate article %s without distribution" % article)
       self.results.record_geotag_document_other_stat('Skipped articles')
+      return True
+    return False
+
+  def evaluate_document(self, article, doctag):
+    if self.would_skip_document(article, doctag):
       return False
     assert article.dist.finished
     true_latind, true_longind = coord_to_stat_region_indices(article.coord)
@@ -3105,6 +3130,10 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
     op.add_option("--num-test-docs", "--ntest", type='int', default=0,
                   help="""Maximum number of test documents to use.
 0 means no limit.  Default %default.""")
+    op.add_option("--skip-initial-test-docs", "--skip-initial", type='int', default=0,
+                  help="""Skip this many test docs at beginning.  Default 0.""")
+    op.add_option("--skip-every-n-test-docs", "--skip-n", type='int', default=0,
+                  help="""Skip this many after each one processed.  Default 0.""")
     op.add_option("--no-individual-results", "--no-results",
                   action='store_true', default=False,
                   help="""Don't show individual results for each test document.""")
