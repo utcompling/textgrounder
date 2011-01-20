@@ -14,7 +14,6 @@
 //  limitations under the License.
 //  under the License.
 ///////////////////////////////////////////////////////////////////////////////
-
 package opennlp.textgrounder.bayesian.mathutils;
 
 import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
@@ -33,7 +32,7 @@ public class TGRand {
         return 0;
     }
 
-    public static double evalKappaLikelihood(double[] _kappa) {
+    public static double evalKappaLikelihood(double _kappa) {
         return 0;
     }
 
@@ -69,6 +68,24 @@ public class TGRand {
         return alpha;
     }
 
+    public static double[] sampleDirichlet(double[] _c0, int[] _n) {
+        double[] hyp = new double[_n.length];
+        for(int i = 0; i < _n.length; ++i) {
+            hyp[i] = _c0[i] + _n[i];
+        }
+        double[] phi = dirichletRnd(hyp);
+        return phi;
+    }
+
+    public static double[] sampleDirichlet(double _c0, int[] _n) {
+        double[] hyp = new double[_n.length];
+        for(int i = 0; i < _n.length; ++i) {
+            hyp[i] = _c0 + _n[i];
+        }
+        double[] phi = dirichletRnd(hyp);
+        return phi;
+    }
+
     public static double[] sampleVMFMeans(double[] _mu, double _k) {
         double[] newmean = vmfRnd(_mu, _k);
         double u = evalMuLikelihood(newmean) / evalMuLikelihood(_mu);
@@ -83,16 +100,16 @@ public class TGRand {
         }
     }
 
-    public static double[] sampleKappa(double[] _mu, double _k) {
-        double[] newmean = vmfRnd(_mu, _k);
-        double u = evalMuLikelihood(newmean) / evalMuLikelihood(_mu);
+    public static double sampleKappa(double _k, double _var) {
+        double newk = _var * mtfRand.nextGaussian() + _k;
+        double u = evalKappaLikelihood(newk) / evalKappaLikelihood(_k);
         if (u > 1) {
-            return newmean;
+            return newk;
         } else {
             if (mtfRand.nextDouble() < u) {
-                return newmean;
+                return newk;
             } else {
-                return _mu;
+                return _k;
             }
         }
     }
