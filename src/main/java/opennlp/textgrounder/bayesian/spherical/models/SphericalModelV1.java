@@ -250,26 +250,18 @@ public class SphericalModelV1 extends SphericalModelBase {
                                           doccount
                                           * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
                                 }
-//                                for (int k = curCoordCount; k < maxCoord; ++k) {
-//                                    regionProbs[regoff + k] = 0;
-//                                }
                             }
                         }
 
                         for (int j = 0; j < curCoordCount; ++j) {
                             regionProbs[emptyid * maxCoord + j] = crpalpha_mod / curCoordCount;
                         }
-//                        for (int j = curCoordCount; j < maxCoord; ++j) {
-//                            regionProbs[emptyid * maxCoord + j] = 0;
-//                        }
 
                         if (emptyid == currentR) {
                             totalprob = annealer.annealProbs((currentR + 1), curCoordCount, maxCoord, regionProbs);
                         } else {
                             totalprob = annealer.annealProbs(currentR, curCoordCount, maxCoord, regionProbs);
                         }
-
-//                        totalprob = annealer.annealProbs(0, currentR * maxCoord, regionProbs);
 
                         r = rand.nextDouble() * totalprob;
 
@@ -467,9 +459,6 @@ public class SphericalModelV1 extends SphericalModelBase {
                                       doccount
                                       * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
                             }
-//                            for (int k = curCoordCount; k < maxCoord; ++k) {
-//                                regionProbs[regoff + k] = 0;
-//                            }
                         }
                     }
 

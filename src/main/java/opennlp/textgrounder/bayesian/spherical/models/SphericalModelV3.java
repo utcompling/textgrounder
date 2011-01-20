@@ -54,13 +54,11 @@ public class SphericalModelV3 extends SphericalModelV2 {
         double[] probs = new double[expectedR * maxCoord];
         double[] regionmean;
         double totalprob = 0, max, r;
-        boolean addedEmptyR = false;
 
         while (_annealer.nextIter()) {
             for (int i = 0; i < N; ++i) {
                 isstopword = stopwordVector[i];
                 istoponym = toponymVector[i];
-                addedEmptyR = false;
                 if (isstopword == 0) {
                     if (istoponym == 1) {
                         wordid = wordVector[i];
@@ -82,7 +80,6 @@ public class SphericalModelV3 extends SphericalModelV2 {
 
                         if (regionCountsOfToponyms[regionid] == 0) {
                             emptyRSet.add(regionid);
-                            addedEmptyR = true;
                             emptyid = regionid;
 
                             regionmean = new double[3];
@@ -113,9 +110,6 @@ public class SphericalModelV3 extends SphericalModelV2 {
                                           * (wordByRegionCounts[wordoff + j] + beta)
                                           / (regionCountsOfAllWords[j] + betaW);
                                 }
-//                                for (int k = curCoordCount; k < maxCoord; ++k) {
-//                                    probs[regoff + k] = 0;
-//                                }
                             }
                         }
 
@@ -123,9 +117,6 @@ public class SphericalModelV3 extends SphericalModelV2 {
                             probs[emptyid * maxCoord + j] = crpalpha_mod / curCoordCount
                                   * beta / betaW;
                         }
-//                        for (int j = curCoordCount; j < maxCoord; ++j) {
-//                            probs[emptyid * maxCoord + j] = 0;
-//                        }
 
                         if (emptyid == currentR) {
                             totalprob = annealer.annealProbs((currentR + 1), curCoordCount, maxCoord, probs);
@@ -207,8 +198,7 @@ public class SphericalModelV3 extends SphericalModelV2 {
             }
 
             _annealer.collectSamples(wordByRegionCounts, regionByDocumentCounts,
-                  regionCountsOfAllWords, regionMeans,/*toponymByRegionCounts, nonToponymRegionCounts, */
-                  regionToponymCoordinateCounts);
+                  regionCountsOfAllWords, regionMeans, regionToponymCoordinateCounts);
         }
     }
 

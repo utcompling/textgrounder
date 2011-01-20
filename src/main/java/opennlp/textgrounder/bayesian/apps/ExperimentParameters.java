@@ -94,7 +94,7 @@ public class ExperimentParameters {
     /**
      * kappa (spread) for spherical model. Higher means more peaked.
      */
-    protected double kappa = 20;
+    protected double kappa = 3.5;
     /**
      * Number of training iterations
      */

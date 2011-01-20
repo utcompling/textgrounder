@@ -86,7 +86,6 @@ public class SphericalModelV2 extends SphericalModelBase {
                 regionByDocumentCounts[docoff + regionid]++;
                 wordByRegionCounts[wordoff + regionid]++;
 
-//                toponymByRegionCounts[wordoff + regionid]++;
                 int coordinates = toponymCoordinateLexicon[wordid].length;
                 int coordid = rand.nextInt(coordinates);
                 regionToponymCoordinateCounts[regionid][wordid][coordid] += 1;
@@ -167,13 +166,11 @@ public class SphericalModelV2 extends SphericalModelBase {
         double[] probs = new double[expectedR * maxCoord];
         double[] regionmean;
         double totalprob = 0, max, r;
-        boolean addedEmptyR = false;
 
         while (_annealer.nextIter()) {
             for (int i = 0; i < N; ++i) {
                 isstopword = stopwordVector[i];
                 istoponym = toponymVector[i];
-                addedEmptyR = false;
                 if (isstopword == 0) {
                     if (istoponym == 1) {
                         wordid = wordVector[i];
@@ -195,7 +192,6 @@ public class SphericalModelV2 extends SphericalModelBase {
 
                         if (regionCountsOfToponyms[regionid] == 0) {
                             emptyRSet.add(regionid);
-                            addedEmptyR = true;
                             emptyid = regionid;
 
                             regionmean = new double[3];
@@ -225,18 +221,12 @@ public class SphericalModelV2 extends SphericalModelBase {
                                           doccount
                                           * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa);
                                 }
-//                                for (int k = curCoordCount; k < maxCoord; ++k) {
-//                                    probs[regoff + k] = 0;
-//                                }
                             }
                         }
 
                         for (int j = 0; j < curCoordCount; ++j) {
                             probs[emptyid * maxCoord + j] = crpalpha_mod / curCoordCount;
                         }
-//                        for (int j = curCoordCount; j < maxCoord; ++j) {
-//                            probs[emptyid * maxCoord + j] = 0;
-//                        }
 
                         if (emptyid == currentR) {
                             totalprob = annealer.annealProbs((currentR + 1), curCoordCount, maxCoord, probs);
