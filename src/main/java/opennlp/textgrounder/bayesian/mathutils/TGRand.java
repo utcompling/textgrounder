@@ -1,45 +1,20 @@
-/* Copyright 2005 Robert Kern (robert.kern@gmail.com)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be included
- * in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
- * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+///////////////////////////////////////////////////////////////////////////////
+//  Copyright 2010 Taesun Moon <tsunmoon@gmail.com>.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//       http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+//  under the License.
+///////////////////////////////////////////////////////////////////////////////
 
-/* The implementations of rk_hypergeometric_hyp(), rk_hypergeometric_hrua(),
- * and rk_triangular() were adapted from Ivan Frohne's rv.py which has this
- * license:
- *
- * Copyright 1998 by Ivan Frohne; Wasilla, Alaska, U.S.A.
- * All Rights Reserved
- *
- * Permission to use, copy, modify and distribute this software and its
- * documentation for any purpose, free of charge, is granted subject to the
- * following conditions:
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the software.
- *
- * THE SOFTWARE AND DOCUMENTATION IS PROVIDED WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR
- * OR COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM OR DAMAGES IN A CONTRACT
- * ACTION, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- * SOFTWARE OR ITS DOCUMENTATION.
- */
 package opennlp.textgrounder.bayesian.mathutils;
 
 import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
@@ -53,6 +28,14 @@ import java.util.Arrays;
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
 public class TGRand {
+
+    public static double evalMuLikelihood(double[] _mu) {
+        return 0;
+    }
+
+    public static double evalKappaLikelihood(double[] _kappa) {
+        return 0;
+    }
 
     public static double[] cumSum(double[] _vec) {
         double[] cs = new double[_vec.length];
@@ -74,7 +57,44 @@ public class TGRand {
         return cs;
     }
 
-    public static void hypUpdate() {
+    public static double alphaUpdate(double _L, double _N, double _prevAlpha, double _d, double _f) {
+        double q = betaRnd(_prevAlpha + 1, _N);
+        double pq = (_d + _L - 1) / (_N * (_f - Math.log(q)));
+        int s = 0;
+        if (mtfRand.nextDouble() < pq) {
+            s = 1;
+        }
+        double alpha = gammaRnd(_d + _L + s - 1, _f - Math.log(q));
+
+        return alpha;
+    }
+
+    public static double[] sampleVMFMeans(double[] _mu, double _k) {
+        double[] newmean = vmfRnd(_mu, _k);
+        double u = evalMuLikelihood(newmean) / evalMuLikelihood(_mu);
+        if (u > 1) {
+            return newmean;
+        } else {
+            if (mtfRand.nextDouble() < u) {
+                return newmean;
+            } else {
+                return _mu;
+            }
+        }
+    }
+
+    public static double[] sampleKappa(double[] _mu, double _k) {
+        double[] newmean = vmfRnd(_mu, _k);
+        double u = evalMuLikelihood(newmean) / evalMuLikelihood(_mu);
+        if (u > 1) {
+            return newmean;
+        } else {
+            if (mtfRand.nextDouble() < u) {
+                return newmean;
+            } else {
+                return _mu;
+            }
+        }
     }
 
     public static double[] sampleRestaurantStickBreakingWeights(double[] _alpha, double[] _wglob, double[] _nl) {
@@ -134,6 +154,10 @@ public class TGRand {
     protected static MersenneTwisterFast mtfRand;
 //    protected static DistLib.uniform dlRand = new uniform();
 
+    public static double[] vmfRnd(double[] _mu, double _k) {
+        return null;
+    }
+
     public static double[] dirichletRnd(double[] _hyper) {
         double[] vals = new double[_hyper.length];
         for (int i = 0; i < _hyper.length; ++i) {
@@ -142,34 +166,37 @@ public class TGRand {
         return vals;
     }
 
+    /** Generate a random number from a beta random variable.
+     ** @param a    First parameter of the Beta random variable.
+     ** @param b    Second parameter of the Beta random variable.
+     ** @return     A double.
+     */
+    public static double betaRnd(double _alpha, double _beta) {
+
+        double try_x;
+        double try_y;
+        do {
+            try_x = Math.pow(mtfRand.nextDouble(), 1 / _alpha);
+            try_y = Math.pow(mtfRand.nextDouble(), 1 / _beta);
+        } while ((try_x + try_y) > 1);
+        return try_x / (try_x + try_y);
+
+        //        return beta.random(_alpha, _beta, dlRand);
+    }
+
     /**
-     * defined for where scale parameter beta is denominator, i.e.
-     * <pr>
-     * 1/gamma(a) * 1/b^a * x^(a-1) * e^(-x/b)
-     * </pr>
-     * where a=_alpha (shape parameter), b=_beta (scale parameter)
-     * 
-     * @param _alpha
-     * @param _beta
+     * defined for gamma dist where _scale is denominator
+     * @param _shape
+     * @param _scale
      * @return
      */
-    public static double gammaRnd(double _alpha, double _beta) {
-        return 0;
-//        return gamma.random(_alpha, _beta, dlRand);
-    }
-
-    public static double betaRnd(double _alpha, double _beta) {
-        return 0;
-//        return beta.random(_alpha, _beta, dlRand);
-    }
-
-    public static double gammaRnd2(double k, double theta) {
+    public static double gammaRnd(double _shape, double _scale) {
 
         boolean accept = false;
-        if (k < 1) {
+        if (_shape < 1) {
             // Weibull algorithm
-            double c = (1 / k);
-            double d = ((1 - k) * Math.pow(k, (k / (1 - k))));
+            double c = (1 / _shape);
+            double d = ((1 - _shape) * Math.pow(_shape, (_shape / (1 - _shape))));
             double u, v, z, e, x;
             do {
                 u = mtfRand.nextDouble();
@@ -181,19 +208,19 @@ public class TGRand {
                     accept = true;
                 }
             } while (!accept);
-            return (x * theta);
+            return (x * _scale);
         } else {
             // Cheng's algorithm
-            double b = (k - Math.log(4));
-            double c = (k + Math.sqrt(2 * k - 1));
-            double lam = Math.sqrt(2 * k - 1);
+            double b = (_shape - Math.log(4));
+            double c = (_shape + Math.sqrt(2 * _shape - 1));
+            double lam = Math.sqrt(2 * _shape - 1);
             double cheng = (1 + Math.log(4.5));
             double u, v, x, y, z, r;
             do {
                 u = mtfRand.nextDouble();
                 v = mtfRand.nextDouble();
                 y = ((1 / lam) * Math.log(v / (1 - v)));
-                x = (k * Math.exp(y));
+                x = (_shape * Math.exp(y));
                 z = (u * v * v);
                 r = (b + (c * y) - x);
                 if ((r >= ((4.5 * z) - cheng))
@@ -201,7 +228,7 @@ public class TGRand {
                     accept = true;
                 }
             } while (!accept);
-            return (x * theta);
+            return (x * _scale);
         }
     }
 }
