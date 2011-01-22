@@ -46,6 +46,14 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
      * 
      */
     protected double[] averagedTopicCounts;
+    /**
+     * 
+     */
+    protected double[] globalDishWeights;
+    /**
+     *
+     */
+    protected double[] localDishWeights;
 
     public SphericalTopicalModelV1(ExperimentParameters _parameters) {
         super(_parameters);
@@ -195,13 +203,11 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
         double[] topicProbs = new double[Z];
         double[] regionmean;
         double totalprob = 0, max, r;
-        boolean addedEmptyR;
 
         while (_annealer.nextIter()) {
             for (int i = 0; i < N; ++i) {
                 isstopword = stopwordVector[i];
                 istoponym = toponymVector[i];
-                addedEmptyR = false;
                 if (isstopword == 0) {
                     if (istoponym == 1) {
                         wordid = wordVector[i];
@@ -215,13 +221,13 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         regionByDocumentCounts[docoff + regionid]--;
                         regionToponymCoordinateCounts[regionid][wordid][coordid]--;
                         regionmean = regionMeans[regionid];
+
                         TGBLAS.daxpy(0, -1, toponymCoordinateLexicon[wordid][coordid], 1, regionmean, 1);
                         curCoordCount = toponymCoordinateLexicon[wordid].length;
                         curCoords = toponymCoordinateLexicon[wordid];
 
                         if (regionCountsOfToponyms[regionid] == 0) {
                             emptyRSet.add(regionid);
-                            addedEmptyR = true;
                             emptyid = regionid;
 
                             regionmean = new double[3];
@@ -451,5 +457,10 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
             averagedTopicCounts = averagedRegionCountsOfAllWords;
             averagedTopicByDocumentCounts = annealer.getTopicByDocumentCounts();
         }
+    }
+
+    @Override
+    protected void expandExpectedR() {
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 }
