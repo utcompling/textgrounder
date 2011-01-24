@@ -15,8 +15,8 @@ public class LabelPropContextSensitiveResolver extends Resolver {
     private static final double OTHER_WEIGHT = 1.0;
 
     private String pathToGraph;
-    private Lexicon<String> lexicon = new SimpleLexicon<String>();
-    private HashMap<Integer, String> reverseLexicon = new HashMap<Integer, String>();
+    private Lexicon<String> lexicon = null;// = new SimpleLexicon<String>();
+    //private HashMap<Integer, String> reverseLexicon = new HashMap<Integer, String>();
 
     private HashMap<Integer, HashMap<Integer, Double> > regionDistributions = null;
 
@@ -26,7 +26,15 @@ public class LabelPropContextSensitiveResolver extends Resolver {
 
     @Override
     public void train(StoredCorpus corpus){
-        TopoUtil.buildLexicons(corpus, lexicon, reverseLexicon);
+        //TopoUtil.buildLexicons(corpus, lexicon, reverseLexicon);
+        try {
+            ObjectInputStream ois = new ObjectInputStream(new FileInputStream("lexicon.ser"));
+            lexicon = (Lexicon)ois.readObject();
+            ois.close();
+        } catch(Exception e) {
+            e.printStackTrace();
+            System.exit(0);
+        }
 
         regionDistributions = new HashMap<Integer, HashMap<Integer, Double> >();
 
@@ -40,11 +48,12 @@ public class LabelPropContextSensitiveResolver extends Resolver {
                     break;
 
                 String[] tokens = curLine.split("\t");
+                if(tokens[0].endsWith("R")) continue; //tokens[0] = tokens[0].substring(0, tokens[0].length()-1);
 
                 int idx = Integer.parseInt(tokens[0]);
 
-                if(!reverseLexicon.containsKey(idx))
-                    continue;
+                //if(!reverseLexicon.containsKey(idx))
+                //    continue;
 
                 HashMap<Integer, Double> curDist = new HashMap<Integer, Double>();
                 regionDistributions.put(idx, curDist);
@@ -86,30 +95,34 @@ public class LabelPropContextSensitiveResolver extends Resolver {
                     if(outerToponym.getAmbiguity() > 0) {
                         int idx = lexicon.get(outerToponym.getForm());
 
-                        HashMap<Integer, Double> toponymWeights = new HashMap<Integer, Double>();
-                        toponymWeights.put(idx, CUR_TOP_WEIGHT);
+                        HashMap<Integer, Double> wordWeights = new HashMap<Integer, Double>();
+                        wordWeights.put(idx, CUR_TOP_WEIGHT);
 
-                        for(Toponym otherToponym : outerSent.getToponyms()) {
-                            if(otherToponym.getAmbiguity() > 0) {
-                                int otherToponymIdx = lexicon.get(otherToponym.getForm());
-                                if(!toponymWeights.containsKey(otherToponymIdx))
-                                    toponymWeights.put(otherToponymIdx, SAME_SENT_WEIGHT);
-                            }
+                        for(Token otherToken : outerSent.getTokens()) {//.getToponyms()) {
+                            //if(otherToponym.getAmbiguity() > 0) {
+                                Integer otherTokenIdx = lexicon.get(otherToken.getForm());
+                                if(otherTokenIdx == null)
+                                    continue;
+                                if(!wordWeights.containsKey(otherTokenIdx))
+                                    wordWeights.put(otherTokenIdx, SAME_SENT_WEIGHT);
+                            //}
                         }
 
                         int innerSentIndex = 0;
                         for(Sentence<StoredToken> innerSent : doc) {
-                            for(Toponym innerToponym : innerSent.getToponyms()) {
-                                if(innerToponym.getAmbiguity() > 0) {
-                                    int innerToponymIdx = lexicon.get(innerToponym.getForm());
-                                    if(!toponymWeights.containsKey(innerToponymIdx))
-                                        toponymWeights.put(innerToponymIdx, OTHER_WEIGHT);
-                                }
+                            for(Token innerToken : innerSent.getTokens()) {
+                                //if(innerToken.getAmbiguity() > 0) {
+                                    Integer innerTokenIdx = lexicon.get(innerToken.getForm());
+                                    if(innerTokenIdx == null)
+                                        continue;
+                                    if(!wordWeights.containsKey(innerTokenIdx))
+                                        wordWeights.put(innerTokenIdx, OTHER_WEIGHT);
+                                //}
                             }
                             innerSentIndex++;
                         }
 
-                        int bestRegionNumber = getBestRegionNumber(outerToponym, toponymWeights);
+                        int bestRegionNumber = getBestRegionNumber(outerToponym, wordWeights);
                         int indexToSelect = TopoUtil.getCorrectCandidateIndex(outerToponym, bestRegionNumber, DEGREES_PER_REGION);
                         if(indexToSelect == -1) {
                             System.out.println(outerToponym.getForm());
@@ -124,18 +137,20 @@ public class LabelPropContextSensitiveResolver extends Resolver {
         return corpus;
     }
 
-    private int getBestRegionNumber(Toponym toponym, Map<Integer, Double> toponymWeights) {
+    private int getBestRegionNumber(Toponym toponym, Map<Integer, Double> wordWeights) {
 
         Map<Integer, Double> weightedSum = new HashMap<Integer, Double>();
 
-        for(int outerIdx : toponymWeights.keySet()) {
-            double weight = toponymWeights.get(outerIdx);
+        for(int outerIdx : wordWeights.keySet()) {
+            double weight = wordWeights.get(outerIdx);
             Map<Integer, Double> curDist = regionDistributions.get(outerIdx);
-            for(int innerIdx : curDist.keySet()) {
-                Double prev = weightedSum.get(innerIdx);
-                if(prev == null)
-                    prev = 0.0;
-                weightedSum.put(innerIdx, prev + weight * curDist.get(innerIdx));
+            if(curDist != null) {
+                for(int innerIdx : curDist.keySet()) {
+                    Double prev = weightedSum.get(innerIdx);
+                    if(prev == null)
+                        prev = 0.0;
+                    weightedSum.put(innerIdx, prev + weight * curDist.get(innerIdx));
+                }
             }
         }
 

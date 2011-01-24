@@ -46,7 +46,17 @@ public class TopoUtil {
         return x * 1000 + y;
     }
 
+    public static int getRegionNumber(double lat, double lon, double dpr) {
+
+        if(lat < 0 || lat >= 180/dpr) return -1;
+        if(lon < 0) lon += 360/dpr;
+        if(lon >= 360/dpr) lon -= 360/dpr;
+
+        return (int)((int)(lat/dpr) * 1000 + (lon/dpr));
+    }
+
     public static int getCorrectCandidateIndex(Toponym toponym, int regionNumber, double dpr) {
+        if(regionNumber == -1) System.out.println("-1");
         int index = 0;
         for(Location location : toponym.getCandidates()) {
             if(getRegionNumber(location, dpr) == regionNumber)
