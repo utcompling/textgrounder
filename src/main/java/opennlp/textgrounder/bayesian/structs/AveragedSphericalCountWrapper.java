@@ -43,7 +43,7 @@ public class AveragedSphericalCountWrapper extends SphericalModelFields implemen
         kappa = _regionModel.getKappa();
 
         currentR = _regionModel.getCurrentR();
-        expectedR = _regionModel.getExpectedR();
+        L = _regionModel.getExpectedR();
         D = _regionModel.getD();
         N = _regionModel.getN();
         T = _regionModel.getT();

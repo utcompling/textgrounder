@@ -91,13 +91,9 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                 break;
         }
 
-        crpalpha = _experimentParameters.getCrpalpha();
         alpha = _experimentParameters.getAlpha();
         beta = _experimentParameters.getBeta();
         kappa = _experimentParameters.getKappa();
-        crpalpha_mod = crpalpha * 4 * Math.PI * Math.sinh(kappa) / kappa;
-
-        Z = _experimentParameters.getTopics();
 
         int randSeed = _experimentParameters.getRandomSeed();
         if (randSeed == 0) {
@@ -147,24 +143,19 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * </p>
      */
     protected void initializeCountArrays() {
-        expectedR = (int) Math.ceil(crpalpha * Math.log(1 + N / crpalpha)) * 3;
+        dishCountsOfToponyms = new int[L];
+        Arrays.fill(dishCountsOfToponyms, 0);
 
-        regionCountsOfToponyms = new int[expectedR];
-        Arrays.fill(regionCountsOfToponyms, 0);
-
-        regionCountsOfAllWords = new int[expectedR];
+        regionCountsOfAllWords = new int[L];
         Arrays.fill(regionCountsOfAllWords, 0);
 
-        regionByDocumentCounts = new int[D * expectedR];
+        regionByDocumentCounts = new int[D * L];
         Arrays.fill(regionByDocumentCounts, 0);
 
-        wordByRegionCounts = new int[W * expectedR];
-        Arrays.fill(wordByRegionCounts, 0);
+        regionMeans = new double[L][];
 
-        regionMeans = new double[expectedR][];
-
-        regionToponymCoordinateCounts = new int[expectedR][][];
-        for (int i = 0; i < expectedR; ++i) {
+        dishToponymCoordinateCounts = new int[L][][];
+        for (int i = 0; i < L; ++i) {
             int[][] toponymCoordinateCounts = new int[T][];
             for (int j = 0; j < T; ++j) {
                 int coordinates = toponymCoordinateLexicon[j].length;
@@ -172,7 +163,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                 Arrays.fill(coordcounts, 0);
                 toponymCoordinateCounts[j] = coordcounts;
             }
-            regionToponymCoordinateCounts[i] = toponymCoordinateCounts;
+            dishToponymCoordinateCounts[i] = toponymCoordinateCounts;
         }
     }
 
@@ -266,8 +257,6 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      */
     public void readRegionCoordinateList() {
 
-        emptyRSet = new HashSet<Integer>();
-
         HashMap<Integer, double[]> toprecords = new HashMap<Integer, double[]>();
         T = 0;
 
@@ -326,85 +315,10 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      */
     public abstract void decode();
 
-    /**
-     * 
-     */
-    protected abstract void expandExpectedR();
-
-    /**
-     *
-     */
-    protected void shrinkToCurrentR() {
-
-        double[] sampleRegionByDocumentCounts = annealer.getRegionByDocumentCounts();
-        sampleRegionByDocumentCounts = TGArrays.expandDoubleTierC(sampleRegionByDocumentCounts, D, currentR, expectedR);
-        annealer.setRegionByDocumentCounts(sampleRegionByDocumentCounts);
-
-        double[] sampleWordByRegionCounts = annealer.getWordByRegionCounts();
-        sampleWordByRegionCounts = TGArrays.expandDoubleTierC(sampleWordByRegionCounts, W, currentR, expectedR);
-        annealer.setWordByRegionCounts(sampleWordByRegionCounts);
-
-        double[][][] sampleRegionToponymCoordinateCounts = annealer.getRegionToponymCoordinateCounts();
-        double[][][] newSampleRegionToponymCoordinateCounts = new double[currentR][][];
-        for (int i = 0; i < currentR; ++i) {
-            newSampleRegionToponymCoordinateCounts[i] = sampleRegionToponymCoordinateCounts[i];
-        }
-
-        annealer.setRegionToponymCoordinateCounts(sampleRegionToponymCoordinateCounts);
-
-        double[][] sampleRegionMeans = annealer.getRegionMeans();
-        sampleRegionMeans = TGArrays.expandSingleTierR(sampleRegionMeans, currentR, expectedR, coordParamLen);
-        annealer.setRegionMeans(sampleRegionMeans);
-    }
-
-    protected void resetRegionID(SphericalAnnealer _annealer, int curregionid, int curdocid) {
-        double[] probs = new double[currentR];
-        regionCountsOfAllWords[curregionid] = 0;
-        for (int i = 0; i < D; ++i) {
-            regionByDocumentCounts[i * expectedR + curregionid] = 0;
-        }
-        for (int i = 0; i < W; ++i) {
-            wordByRegionCounts[i * expectedR + curregionid] = 0;
-        }
-
-        for (int i = 0; i < N; ++i) {
-            if (regionVector[i] == curregionid) {
-                if (stopwordVector[i] == 0 && toponymVector[i] == 0) {
-                    int wordid = wordVector[i];
-                    int docid = documentVector[i];
-                    int docoff = docid * expectedR;
-                    int wordoff = wordid * expectedR;
-                    for (int j = 0; j < currentR; ++j) {
-                        probs[j] = (wordByRegionCounts[wordoff + j] + beta)
-                              / (regionCountsOfAllWords[j] + betaW)
-                              * regionByDocumentCounts[docoff + j];
-                    }
-                    for (int j : emptyRSet) {
-                        probs[j] = 0;
-                    }
-
-                    double totalprob = annealer.annealProbs(0, currentR, probs);
-                    double r = rand.nextDouble() * totalprob;
-                    double max = probs[0];
-                    int regionid = 0;
-                    while (r > max) {
-                        regionid++;
-                        max += probs[regionid];
-                    }
-                    regionVector[i] = regionid;
-
-                    regionCountsOfAllWords[regionid]++;
-                    regionByDocumentCounts[docoff + regionid]++;
-                    wordByRegionCounts[wordoff + regionid]++;
-                }
-            }
-        }
-    }
-
     public void train() {
-        System.err.println(String.format("Randomly initializing with %d tokens, %d words, %d documents, and %d expected regions", N, W, D, expectedR));
+        System.err.println(String.format("Randomly initializing with %d tokens, %d words, %d documents, and %d expected regions", N, W, D, L));
         randomInitialize();
-        System.err.println(String.format("Beginning training with %d tokens, %d words, %d documents, and %d expected regions", N, W, D, expectedR));
+        System.err.println(String.format("Beginning training with %d tokens, %d words, %d documents, and %d expected regions", N, W, D, L));
         train(annealer);
         if (annealer.getSamples() != 0) {
             averagedWordByRegionCounts = annealer.getWordByRegionCounts();
