@@ -39,7 +39,6 @@ import opennlp.textgrounder.bayesian.utils.TGArrays;
  */
 public abstract class SphericalModelBase extends SphericalModelFields {
 
-    protected final static double EXPANSION_FACTOR = 0.25;
     /**
      * Random number generator. Implements the fast Mersenne Twister.
      */
@@ -93,7 +92,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
 
         alpha = _experimentParameters.getAlpha();
         beta = _experimentParameters.getBeta();
-        kappa = _experimentParameters.getKappa();
+//        kappa = _experimentParameters.getKappa();
 
         int randSeed = _experimentParameters.getRandomSeed();
         if (randSeed == 0) {

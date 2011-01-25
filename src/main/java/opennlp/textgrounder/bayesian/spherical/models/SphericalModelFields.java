@@ -17,7 +17,6 @@
 package opennlp.textgrounder.bayesian.spherical.models;
 
 import java.io.Serializable;
-import java.util.HashSet;
 
 /**
  *
@@ -25,10 +24,6 @@ import java.util.HashSet;
  */
 public class SphericalModelFields implements Serializable {
 
-    /**
-     * Hyperparameter for CRP
-     */
-    protected double crpalpha;
     /**
      * Hyperparameter for region*doc priors
      */
@@ -44,7 +39,7 @@ public class SphericalModelFields implements Serializable {
     /**
      * 
      */
-    protected double kappa;
+    protected double[] kappa;
     /**
      * Number of documents
      */
@@ -54,21 +49,9 @@ public class SphericalModelFields implements Serializable {
      */
     protected int N;
     /**
-     * Expected maximum number of regions/tables in the chinese restaurant
+     * Expected maximum number of dishes in the restaurants
      */
     protected int L;
-    /**
-     * Current number of regions/tables in the chinese restaurant
-     */
-    protected int currentR;
-    /**
-     *
-     */
-    protected HashSet<Integer> emptyRSet;
-    /**
-     *
-     */
-    protected int maxCoord;
     /**
      * Number of non-stopword word types.
      */
@@ -78,9 +61,9 @@ public class SphericalModelFields implements Serializable {
      */
     protected int T;
     /**
-     * number of non-toponym topics
+     *
      */
-    protected int Z;
+    protected int maxCoord;
     /**
      * cartesian coordinates is the default. see no reason to move to slower (but cheaper)
      * spherical coordinates
@@ -125,10 +108,6 @@ public class SphericalModelFields implements Serializable {
     /**
      * 
      */
-//    protected int[] toponymByRegionCounts;
-    /**
-     * 
-     */
     protected int[][][] dishToponymCoordinateCounts;
     /**
      * An index of toponyms and possible regions. The goal is fast lookup and not
@@ -146,13 +125,25 @@ public class SphericalModelFields implements Serializable {
      */
     protected int[] dishCountsOfToponyms;
     /**
-     * Counts of regions for all words
+     *
      */
-    protected int[] regionCountsOfAllWords;
+    protected int[] wordByDishCounts;
     /**
      *
      */
-//    protected double[] normalizedRegionCounts;
+    protected int[] globalDishCounts;
+    /**
+     *
+     */
+    protected double[] globalDishWeights;
+    /**
+     *
+     */
+    protected double[] localDishWeights;
+    /**
+     * Counts of regions for all words
+     */
+    protected int[] regionCountsOfAllWords;
     /**
      *
      */
@@ -298,22 +289,6 @@ public class SphericalModelFields implements Serializable {
         this.coordinateVector = coordinateVector;
     }
 
-    public double getCrpalpha() {
-        return crpalpha;
-    }
-
-    public void setCrpalpha(double crpalpha) {
-        this.crpalpha = crpalpha;
-    }
-
-    public int getCurrentR() {
-        return currentR;
-    }
-
-    public void setCurrentR(int currentR) {
-        this.currentR = currentR;
-    }
-
     public int[] getDocumentVector() {
         return documentVector;
     }
@@ -322,28 +297,12 @@ public class SphericalModelFields implements Serializable {
         this.documentVector = documentVector;
     }
 
-    public HashSet<Integer> getEmptyRSet() {
-        return emptyRSet;
-    }
-
-    public void setEmptyRSet(HashSet<Integer> emptyR) {
-        this.emptyRSet = emptyR;
-    }
-
-    public int getExpectedR() {
+    public int getL() {
         return L;
     }
 
-    public void setExpectedR(int expectedR) {
-        this.L = expectedR;
-    }
-
-    public double getKappa() {
-        return kappa;
-    }
-
-    public void setKappa(double kappa) {
-        this.kappa = kappa;
+    public void setL(int L) {
+        this.L = L;
     }
 
     public int getMaxCoord() {
@@ -424,14 +383,6 @@ public class SphericalModelFields implements Serializable {
 
     public void setWordVector(int[] wordVector) {
         this.wordVector = wordVector;
-    }
-
-    public int getZ() {
-        return Z;
-    }
-
-    public void setZ(int Z) {
-        this.Z = Z;
     }
 
     public double[] getAveragedTopicByDocumentCounts() {

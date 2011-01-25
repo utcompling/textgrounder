@@ -50,7 +50,7 @@ public abstract class ProbabilityPrettyPrinter {
     /**
      * Number of regions
      */
-    protected int R;
+    protected int L;
     /**
      * Number of non-stopword word types. Equivalent to <p>fW-sW</p>.
      */
