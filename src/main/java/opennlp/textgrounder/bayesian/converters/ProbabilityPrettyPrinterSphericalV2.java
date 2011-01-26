@@ -58,7 +58,7 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
         AveragedSphericalCountWrapper averagedCountWrapper = sphericalInputReader.readProbabilities();
 
         alpha = averagedCountWrapper.getAlpha();
-        beta = averagedCountWrapper.getBeta();
+//        beta = averagedCountWrapper.getBeta();
 //        kappa = averagedCountWrapper.getKappa();
 
         D = averagedCountWrapper.getD();

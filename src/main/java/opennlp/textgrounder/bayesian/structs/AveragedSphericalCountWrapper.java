@@ -37,8 +37,8 @@ public class AveragedSphericalCountWrapper extends SphericalModelFields implemen
         toponymCoordinateLexicon = _regionModel.getToponymCoordinateLexicon();
 
         alpha_H = _regionModel.getAlpha();
-        beta = _regionModel.getBeta();
-        betaW = _regionModel.getBetaW();
+//        beta = _regionModel.getBeta();
+//        betaW = _regionModel.getBetaW();
 //        kappa = _regionModel.getKappa();
 
         L = _regionModel.getL();

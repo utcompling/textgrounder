@@ -125,12 +125,12 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
         }
 
         for (int l = 0; l < L; ++l) {
-            regionMeans[l] = TGRand.sampleUniformVMF();
-            kappa[l] = RKRand.rk_gamma(a_0, b_0);
+            regionMeans[l] = TGRand.uniVMFRnd();
+            kappa[l] = RKRand.rk_gamma(kappa_hyper_shape, kappa_hyper_scale);
         }
 
         for (int i = 0; i < W; ++i) {
-            double[] dir = TGRand.dirichletRnd(c_0);
+            double[] dir = TGRand.dirichletRnd(phi_dirichlet_hyper, L);
             int wordoff = i * L;
             for (int l = 0; l < L; ++l) {
                 wordByTopicDirichlet[wordoff + l] = dir[l];
@@ -140,7 +140,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
         for (int i = 0; i < T; ++i) {
             double[][] coordinates = toponymCoordinateLexicon[i];
             int len = toponymCoordinateLexicon[i].length;
-            double[] dir = TGRand.dirichletRnd(d_0, len);
+            double[] dir = TGRand.dirichletRnd(ehta_dirichlet_hyper, len);
             toponymCoordinateWeights[i] = dir;
         }
     }
@@ -149,9 +149,12 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
         /**
          * careful, N needs to revised to only non-stopwords
          */
-        alpha_H = TGRand.alphaUpdate(L, N, alpha_H, d, f);
+        alpha_H = globalAlphaUpdate(globalDishCounts, N, alpha_H, alpha_h_hyper_1, alpha_h_hyper_2);
+        alpha = alphaUpdate(dishByRestaurantCounts, D, L, alpha, kappa_hyper_shape, kappa_hyper_shape);
+        globalDishWeights = globalStickBreakingWeightsUpdate(globalDishWeights, globalDishCounts, alpha_H);
+        localDishWeights = restaurantStickBreakingWeightsUpdate(alpha, localDishWeights, dishByRestaurantCounts);
     }
-    
+
     /**
      * Train topics
      *
@@ -351,11 +354,11 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                     wordoff = wordid * L;
 
                     try {
-                        for (int j = 0;; ++j) {
-                            topicProbs[j] = (averagedWordByTopicCounts[wordoff + j] + beta)
-                                  / (averagedTopicCounts[j] + betaW)
-                                  * (averagedTopicByDocumentCounts[docoff + j] + alpha_H);
-                        }
+//                        for (int j = 0;; ++j) {
+//                            topicProbs[j] = (averagedWordByTopicCounts[wordoff + j] + beta)
+//                                  / (averagedTopicCounts[j] + betaW)
+//                                  * (averagedTopicByDocumentCounts[docoff + j] + alpha_H);
+//                        }
                     } catch (ArrayIndexOutOfBoundsException e) {
                     }
 

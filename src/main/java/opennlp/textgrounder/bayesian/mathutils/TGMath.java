@@ -190,4 +190,14 @@ public class TGMath {
         }
         return cs;
     }
+
+    public static int[] inverseCumSum(int[] _vec) {
+        int[] cs = new int[_vec.length];
+        Arrays.fill(cs, 0);
+        cs[_vec.length - 1] = _vec[_vec.length - 1];
+        for (int i = _vec.length - 2; i >= 0; --i) {
+            cs[i] = cs[i + 1] + _vec[i];
+        }
+        return cs;
+    }
 }

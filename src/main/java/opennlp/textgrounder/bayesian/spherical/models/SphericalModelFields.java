@@ -29,30 +29,34 @@ public class SphericalModelFields implements Serializable {
      */
     protected double alpha_H;
     /**
+     * hyperparameters for sampling alpha_H in posterior update stage. corresponds
+     * to d and f respectively in algorithm paper
+     */
+    protected double alpha_h_hyper_1 = 0.1, alpha_h_hyper_2 = 0.1;
+    /**
      * restaurant local stick breaking prior
      */
     protected double[] alpha;
     /**
-     * 
+     * hyperparameters for sampling document specific alpha parameters in posterior
+     * update stage. corresponds to a and b respectively in algorithm paper
      */
-    protected double a_0, b_0;
+    protected double alpha_shape_a = 0.1;
+    protected double alpha_scale_b = 0.1;
     /**
-     * 
+     * gamma hyperparameters for kappa generation in metropolis-hastings
      */
-    protected double[] c_0;
+    protected double kappa_hyper_shape = 1, kappa_hyper_scale = 0.01;
     /**
-     * 
+     * dirichlet hyperparameter for non-toponym word by dish weights. corresponding
+     * random variable is labeled phi in the algorithm paper
      */
-    protected double d_0;
-    protected double d, f;
+    protected double phi_dirichlet_hyper = 0.1;
     /**
-     * Hyperparameter for word*region priors
+     * dirichlet hyperparameter for coordinate candidates of toponyms. corresponding
+     * random variable is ehta in the algorithm paper
      */
-    protected double beta;
-    /**
-     * Normalization term for word*region gibbs sampler
-     */
-    protected double betaW;
+    protected double ehta_dirichlet_hyper = 0.1;
     /**
      * 
      */
@@ -272,22 +276,6 @@ public class SphericalModelFields implements Serializable {
 
     public void setAveragedWordByRegionCounts(double[] averagedWordByRegionCounts) {
         this.averagedWordByRegionCounts = averagedWordByRegionCounts;
-    }
-
-    public double getBeta() {
-        return beta;
-    }
-
-    public void setBeta(double beta) {
-        this.beta = beta;
-    }
-
-    public double getBetaW() {
-        return betaW;
-    }
-
-    public void setBetaW(double betaW) {
-        this.betaW = betaW;
     }
 
     public int getCoordParamLen() {
