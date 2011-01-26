@@ -165,12 +165,20 @@ public class TGRand {
         return vals;
     }
 
+    public static double[] dirichletRnd(double _hyper, int _n) {
+        double[] vals = new double[_n];
+        for (int i = 0; i < _n; ++i) {
+            vals[i] = RKRand.rk_gamma(_hyper, 1);
+        }
+        return vals;
+    }
+
     public static double[] sampleUniformVMF() {
         double z = mtfRand.nextDouble() * 2 - 1;
         double t = mtfRand.nextDouble() * 2 * Math.PI;
-        double z2 = 1 - z * z;
-        double x = Math.sqrt(z2) * Math.cos(t);
-        double y = Math.sqrt(z2) * Math.sin(t);
+        double z2 = Math.sqrt(1 - z * z);
+        double x = z2 * Math.cos(t);
+        double y = z2 * Math.sin(t);
 
         return new double[]{x, y, z};
     }

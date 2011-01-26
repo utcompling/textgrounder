@@ -25,9 +25,26 @@ import java.io.Serializable;
 public class SphericalModelFields implements Serializable {
 
     /**
-     * Hyperparameter for region*doc priors
+     * global stick breaking prior
      */
     protected double alpha_H;
+    /**
+     * restaurant local stick breaking prior
+     */
+    protected double[] alpha;
+    /**
+     * 
+     */
+    protected double a_0, b_0;
+    /**
+     * 
+     */
+    protected double[] c_0;
+    /**
+     * 
+     */
+    protected double d_0;
+    protected double d, f;
     /**
      * Hyperparameter for word*region priors
      */

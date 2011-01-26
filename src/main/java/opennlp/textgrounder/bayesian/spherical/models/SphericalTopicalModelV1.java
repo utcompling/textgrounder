@@ -95,112 +95,63 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
         }
 
         {
+            double[] v = new double[L];
+            double[] wcs = new double[L];
+            wcs = TGMath.cumSum(globalDishWeights);
+
+            double[] vl = new double[L];
+            double[] ivl = new double[L];
+            double[] ilvl = new double[L];
+
             for (int d = 0; d < D; ++d) {
+                double dalpha = alpha[d];
+                int docoff = d * L;
                 for (int l = 0; l < L; ++l) {
+                    vl[l] = RKRand.rk_beta(dalpha * globalDishWeights[l],
+                          dalpha * (1 - wcs[l]));
+                }
+
+                vl[L] = 1;
+                for (int i = 0; i < L; ++i) {
+                    ilvl[i] = Math.log(1 - vl[i]);
+                }
+                ivl = TGMath.cumSum(ilvl);
+
+                localDishWeights[docoff] = vl[0];
+                for (int l = 1; l < L; ++l) {
+                    localDishWeights[docoff + l] = Math.exp(Math.log(vl[l]) + ivl[l - 1]);
                 }
             }
         }
 
-        int wordid, docid, regionid, topicid;
-        int istoponym, isstopword;
-        int wordoff, docoff;
-        double[] regionProbs = new double[L];
-        double[] topicProbs = new double[L];
-        double totalprob, max, r;
+        for (int l = 0; l < L; ++l) {
+            regionMeans[l] = TGRand.sampleUniformVMF();
+            kappa[l] = RKRand.rk_gamma(a_0, b_0);
+        }
 
-        for (int i = 0; i < N; ++i) {
-            isstopword = stopwordVector[i];
-            istoponym = toponymVector[i];
-            if (isstopword == 0 && istoponym == 1) {
-                wordid = wordVector[i];
-                docid = documentVector[i];
-                docoff = docid * L;
-                wordoff = wordid * L;
-
-                totalprob = 0;
-                for (int j = 0; j < L; ++j) {
-                    totalprob += regionProbs[j] = 1;
-                }
-
-                r = rand.nextDouble() * totalprob;
-
-                max = regionProbs[0];
-                regionid = 0;
-                while (r > max) {
-                    regionid++;
-                    max += regionProbs[regionid];
-                }
-
-                regionVector[i] = regionid;
-                dishCountsOfToponyms[regionid]++;
-                regionByDocumentCounts[docoff + regionid]++;
-
-                int coordinates = toponymCoordinateLexicon[wordid].length;
-                int coordid = rand.nextInt(coordinates);
-                dishToponymCoordinateCounts[regionid][wordid][coordid] += 1;
-                coordinateVector[i] = coordid;
+        for (int i = 0; i < W; ++i) {
+            double[] dir = TGRand.dirichletRnd(c_0);
+            int wordoff = i * L;
+            for (int l = 0; l < L; ++l) {
+                wordByTopicDirichlet[wordoff + l] = dir[l];
             }
         }
 
-        for (int i = 0; i < N; ++i) {
-            isstopword = stopwordVector[i];
-            istoponym = toponymVector[i];
-            if (isstopword == 0 && istoponym == 0) {
-                wordid = wordVector[i];
-                docid = documentVector[i];
-                docoff = docid * L;
-                wordoff = wordid * L;
-
-                totalprob = 0;
-                try {
-                    for (int j = 0;; ++j) {
-                        totalprob += topicProbs[j] = 1;
-                    }
-                } catch (ArrayIndexOutOfBoundsException e) {
-                }
-
-                r = rand.nextDouble() * totalprob;
-
-                max = topicProbs[0];
-                topicid = 0;
-                while (r > max) {
-                    topicid++;
-                    max += topicProbs[topicid];
-                }
-
-                topicVector[i] = topicid;
-                globalDishCounts[topicid]++;
-                dishByRestaurantCounts[docoff + topicid]++;
-                wordByDishCounts[wordoff + topicid]++;
-            }
-        }
-
-        for (int i = 0; i < L; ++i) {
-            int[][] toponymCoordinateCounts = dishToponymCoordinateCounts[i];
-            double[] mean = new double[3];
-            Arrays.fill(mean, 0);
-
-            for (int j = 0; j < T; ++j) {
-                int[] coordcounts = toponymCoordinateCounts[j];
-                double[][] coords = toponymCoordinateLexicon[j];
-                for (int k = 0; k < coordcounts.length; ++k) {
-                    int count = coordcounts[k];
-                    if (count != 0) {
-                        TGBLAS.daxpy(0, count, coords[k], 1, mean, 1);
-                    }
-                }
-            }
-
-            regionMeans[i] = mean;
-        }
-
-        for (int i = L; i < L; ++i) {
-            double[] mean = new double[3];
-            Arrays.fill(mean, 0);
-            regionMeans[i] = mean;
+        for (int i = 0; i < T; ++i) {
+            double[][] coordinates = toponymCoordinateLexicon[i];
+            int len = toponymCoordinateLexicon[i].length;
+            double[] dir = TGRand.dirichletRnd(d_0, len);
+            toponymCoordinateWeights[i] = dir;
         }
     }
 
+    public void resample() {
+        /**
+         * careful, N needs to revised to only non-stopwords
+         */
+        alpha_H = TGRand.alphaUpdate(L, N, alpha_H, d, f);
+    }
+    
     /**
      * Train topics
      *
@@ -327,6 +278,8 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                     System.exit(1);
                 }
             }
+
+            resample();
         }
     }
 
