@@ -70,6 +70,37 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
     public void randomInitialize() {
         baseSpecificInitialize();
 
+        /**
+         * Sampling initial global
+         */
+        {
+            double[] v = new double[L];
+            double[] ivl = new double[L];
+            double[] ilvl = new double[L];
+
+            for (int l = 0; l < L - 1; ++l) {
+                v[l] = RKRand.rk_beta(1, alpha_H);
+            }
+
+            v[L] = 1;
+            for (int i = 0; i < L; ++i) {
+                ilvl[i] = Math.log(1 - v[i]);
+            }
+            ivl = TGMath.cumSum(ilvl);
+
+            globalDishWeights[0] = v[0];
+            for (int l = 1; l < L; ++l) {
+                globalDishWeights[l] = Math.exp(Math.log(v[l]) + ivl[l - 1]);
+            }
+        }
+
+        {
+            for (int d = 0; d < D; ++d) {
+                for (int l = 0; l < L; ++l) {
+                }
+            }
+        }
+
         int wordid, docid, regionid, topicid;
         int istoponym, isstopword;
         int wordoff, docoff;
@@ -291,7 +322,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         break;
                     }
                 }
-                if(l == L) {
+                if (l == L) {
                     System.err.println("All tables were occupied in document " + docid);
                     System.exit(1);
                 }
@@ -370,7 +401,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         for (int j = 0;; ++j) {
                             topicProbs[j] = (averagedWordByTopicCounts[wordoff + j] + beta)
                                   / (averagedTopicCounts[j] + betaW)
-                                  * (averagedTopicByDocumentCounts[docoff + j] + alpha);
+                                  * (averagedTopicByDocumentCounts[docoff + j] + alpha_H);
                         }
                     } catch (ArrayIndexOutOfBoundsException e) {
                     }

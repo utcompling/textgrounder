@@ -52,14 +52,21 @@ import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
 public class RKRand {
 
     protected static double M_PI = 3.14159265358979323846264338328;
-//    protected static int RK_STATE_LEN = 624;
     protected static MersenneTwisterFast mtfRand;
+
+    /**
+     * 
+     * @param _mtfRand
+     */
+    public RKRand(MersenneTwisterFast _mtfRand) {
+        mtfRand = _mtfRand;
+    }
 
     /* log-gamma function to support some of these distributions. The
      * algorithm comes from SPECFUN by Shanjie Zhang and Jianming Jin and their
      * book "Computation of Special Functions", 1996, John Wiley & Sons, Inc.
      */
-    double loggam(double x) {
+    public static double loggam(double x) {
         double x0, x2, xp, gl, gl0;
         int k, n;
 
@@ -93,24 +100,24 @@ public class RKRand {
         return gl;
     }
 
-    double rk_normal(double loc, double scale) {
+    public static double rk_normal(double loc, double scale) {
         return loc + scale * mtfRand.nextGaussian();
     }
 
-    double rk_standard_exponential() {
+    public static double rk_standard_exponential() {
         /* We use -log(1-U) since U is [0, 1) */
         return -Math.log(1.0 - mtfRand.nextDouble());
     }
 
-    double rk_exponential(double scale) {
+    public static double rk_exponential(double scale) {
         return scale * rk_standard_exponential();
     }
 
-    double rk_uniform(double loc, double scale) {
+    public static double rk_uniform(double loc, double scale) {
         return loc + scale * mtfRand.nextDouble();
     }
 
-    double rk_standard_gamma(double shape) {
+    public static double rk_standard_gamma(double shape) {
         double b, c;
         double U, V, X, Y;
 
@@ -154,11 +161,11 @@ public class RKRand {
         }
     }
 
-    double rk_gamma(double shape, double scale) {
+    public static double rk_gamma(double shape, double scale) {
         return scale * rk_standard_gamma(shape);
     }
 
-    double rk_beta(double a, double b) {
+    public static double rk_beta(double a, double b) {
         double Ga, Gb;
 
         if ((a <= 1.0) && (b <= 1.0)) {
@@ -182,11 +189,11 @@ public class RKRand {
         }
     }
 
-    double rk_chisquare(double df) {
+    public static double rk_chisquare(double df) {
         return 2.0 * rk_standard_gamma(df / 2.0);
     }
 
-    double rk_noncentral_chisquare(double df, double nonc) {
+    public static double rk_noncentral_chisquare(double df, double nonc) {
         double Chi2, N;
 
         Chi2 = rk_chisquare(df - 1);
@@ -194,24 +201,24 @@ public class RKRand {
         return Chi2 + N * N;
     }
 
-    double rk_f(double dfnum, double dfden) {
+    public static double rk_f(double dfnum, double dfden) {
         return ((rk_chisquare(dfnum) * dfden)
               / (rk_chisquare(dfden) * dfnum));
     }
 
-    double rk_noncentral_f(double dfnum, double dfden, double nonc) {
+    public static double rk_noncentral_f(double dfnum, double dfden, double nonc) {
         return ((rk_noncentral_chisquare(dfnum, nonc) * dfden)
               / (rk_chisquare(dfden) * dfnum));
     }
 
-    long rk_negative_binomial(double n, double p) {
+    public static long rk_negative_binomial(double n, double p) {
         double Y;
 
         Y = rk_gamma(n, (1 - p) / p);
         return rk_poisson(Y);
     }
 
-    long rk_poisson_mult(double lam) {
+    public static long rk_poisson_mult(double lam) {
         long X;
         double prod, U, enlam;
 
@@ -228,10 +235,14 @@ public class RKRand {
             }
         }
     }
+    //////////////////////////////////////////////////////////////////
+    /**
+     * 
+     */
     protected static double LS2PI = 0.91893853320467267;
     protected static double TWELFTH = 0.083333333333333333333333;
 
-    long rk_poisson_ptrs(double lam) {
+    public static long rk_poisson_ptrs(double lam) {
         long k;
         double U, V, slam, loglam, a, b, invalpha, vr, us;
 
@@ -264,7 +275,7 @@ public class RKRand {
 
     }
 
-    long rk_poisson(double lam) {
+    public static long rk_poisson(double lam) {
         if (lam >= 10) {
             return rk_poisson_ptrs(lam);
         } else if (lam == 0) {
@@ -274,11 +285,11 @@ public class RKRand {
         }
     }
 
-    double rk_standard_cauchy() {
+    public static double rk_standard_cauchy() {
         return mtfRand.nextGaussian() / mtfRand.nextGaussian();
     }
 
-    double rk_standard_t(double df) {
+    public static double rk_standard_t(double df) {
         double N, G, X;
 
         N = mtfRand.nextGaussian();
@@ -293,7 +304,7 @@ public class RKRand {
     http://cg.scs.carleton.ca/~luc/rnbookindex.html
     (but corrected to match the algorithm in R and Python)
      */
-    double rk_vonmises(double mu, double kappa) {
+    public static double rk_vonmises(double mu, double kappa) {
         double r, rho, s;
         double U, V, W, Y, Z;
         double result, mod;
@@ -335,19 +346,19 @@ public class RKRand {
         }
     }
 
-    double rk_pareto(double a) {
+    public static double rk_pareto(double a) {
         return Math.exp(rk_standard_exponential() / a) - 1;
     }
 
-    double rk_weibull(double a) {
+    public static double rk_weibull(double a) {
         return Math.pow(rk_standard_exponential(), 1. / a);
     }
 
-    double rk_power(double a) {
+    public static double rk_power(double a) {
         return Math.pow(1 - Math.exp(-rk_standard_exponential()), 1. / a);
     }
 
-    double rk_laplace(double loc, double scale) {
+    public static double rk_laplace(double loc, double scale) {
         double U;
 
         U = mtfRand.nextDouble();
@@ -359,29 +370,29 @@ public class RKRand {
         return U;
     }
 
-    double rk_gumbel(double loc, double scale) {
+    public static double rk_gumbel(double loc, double scale) {
         double U;
 
         U = 1.0 - mtfRand.nextDouble();
         return loc - scale * Math.log(-Math.log(U));
     }
 
-    double rk_logistic(double loc, double scale) {
+    public static double rk_logistic(double loc, double scale) {
         double U;
 
         U = mtfRand.nextDouble();
         return loc + scale * Math.log(U / (1.0 - U));
     }
 
-    double rk_lognormal(double mean, double sigma) {
+    public static double rk_lognormal(double mean, double sigma) {
         return Math.exp(rk_normal(mean, sigma));
     }
 
-    double rk_rayleigh(double mode) {
+    public static double rk_rayleigh(double mode) {
         return mode * Math.sqrt(-2.0 * Math.log(1.0 - mtfRand.nextDouble()));
     }
 
-    double rk_wald(double mean, double scale) {
+    public static double rk_wald(double mean, double scale) {
         double U, X, Y;
         double mu_2l;
 
@@ -397,7 +408,7 @@ public class RKRand {
         }
     }
 
-    long rk_zipf(double a) {
+    public static long rk_zipf(double a) {
         double T, U, V;
         long X;
         double am1, b;
@@ -419,7 +430,7 @@ public class RKRand {
         return X;
     }
 
-    int rk_geometric_search(double p) {
+    public static int rk_geometric_search(double p) {
         double U;
         int X;
         double sum, prod, q;
@@ -436,11 +447,11 @@ public class RKRand {
         return X;
     }
 
-    int rk_geometric_inversion(double p) {
+    public static int rk_geometric_inversion(double p) {
         return (int) Math.ceil(Math.log(1.0 - mtfRand.nextDouble()) / Math.log(1.0 - p));
     }
 
-    int rk_geometric(double p) {
+    public static int rk_geometric(double p) {
         if (p >= 0.333333333333333333333333) {
             return rk_geometric_search(p);
         } else {
@@ -448,7 +459,7 @@ public class RKRand {
         }
     }
 
-    long rk_hypergeometric_hyp(long good, long bad, long sample) {
+    public static long rk_hypergeometric_hyp(long good, long bad, long sample) {
         long d1, K, Z;
         double d2, U, Y;
 
@@ -477,7 +488,7 @@ public class RKRand {
     protected static double D1 = 1.7155277699214135;
     protected static double D2 = 0.8989161620588988;
 
-    long rk_hypergeometric_hrua(long good, long bad, long sample) {
+    public static long rk_hypergeometric_hrua(long good, long bad, long sample) {
         long mingoodbad, maxgoodbad, popsize, m, d9;
         double d4, d5, d6, d7, d8, d10, d11;
         long Z;
@@ -540,7 +551,7 @@ public class RKRand {
         return Z;
     }
 
-    long rk_hypergeometric(long good, long bad, long sample) {
+    public static long rk_hypergeometric(long good, long bad, long sample) {
         if (sample > 10) {
             return rk_hypergeometric_hrua(good, bad, sample);
         } else {
@@ -548,7 +559,7 @@ public class RKRand {
         }
     }
 
-    double rk_triangular(double left, double mode, double right) {
+    public static double rk_triangular(double left, double mode, double right) {
         double base, leftbase, ratio, leftprod, rightprod;
         double U;
 
@@ -566,7 +577,7 @@ public class RKRand {
         }
     }
 
-    long rk_logseries(double p) {
+    public static long rk_logseries(double p) {
         double q, r, U, V;
         long result;
 

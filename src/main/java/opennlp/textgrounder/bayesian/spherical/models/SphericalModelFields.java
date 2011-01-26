@@ -27,7 +27,7 @@ public class SphericalModelFields implements Serializable {
     /**
      * Hyperparameter for region*doc priors
      */
-    protected double alpha;
+    protected double alpha_H;
     /**
      * Hyperparameter for word*region priors
      */
@@ -210,11 +210,11 @@ public class SphericalModelFields implements Serializable {
     }
 
     public double getAlpha() {
-        return alpha;
+        return alpha_H;
     }
 
     public void setAlpha(double alpha) {
-        this.alpha = alpha;
+        this.alpha_H = alpha;
     }
 
     public double[] getAveragedAllWordsRegionCounts() {

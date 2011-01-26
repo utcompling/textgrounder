@@ -17,7 +17,6 @@
 package opennlp.textgrounder.bayesian.mathutils;
 
 import java.util.Arrays;
-import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
 
 /**
  *
@@ -91,6 +90,13 @@ public class TGMath {
         return geo;
     }
 
+    /**
+     * convert cartesian coordinate to spherical. first element is azimuthal,
+     * second element is radial
+     *
+     * @param _x
+     * @return
+     */
     public static double[] cartesianToSpherical(double[] _x) {
         double[] spher = new double[2];
         spher[0] = Math.acos(_x[2]);
@@ -117,15 +123,71 @@ public class TGMath {
         return (_long / 180) * Math.PI;
     }
 
-    public static double[] sampleFromFisher(MersenneTwisterFast _mtf, int _N) {
-        throw new UnsupportedOperationException("Not yet supported");
-//        double[] samples = new double[_N];
-//        try {
-//            for (int i = 0;; ++i) {
-//                samples[i] = _mtf.nextDouble();
-//            }
-//        } catch (ArrayIndexOutOfBoundsException e) {
-//        }
-//        return samples;
+    public static double safeLogSum(double[] _vals, int _n) {
+        double max = _vals[0];
+        for (int i = 0; i < _n; ++i) {
+            if (_vals[i] > max) {
+                max = _vals[i];
+            }
+        }
+
+        if (Double.isInfinite(max)) // the largest probability is 0 (log prob= -inf)
+        {
+            return max;   // return log 0
+        }
+
+        double p = 0;
+        for (int i = 0; i < _n; ++i) {
+            p += Math.exp(_vals[i] - max);
+        }
+        return max + Math.log(p);
+    }
+
+    public static double[] cumLogSum(double[] _vec) {
+        double[] lvec = new double[_vec.length];
+        for (int i = 0; i < _vec.length; ++i) {
+            lvec[i] = Math.log(_vec[i]);
+        }
+
+        double[] cs = new double[_vec.length];
+        for (int i = 1; i < _vec.length + 1; ++i) {
+            cs[i - 1] = Math.exp(safeLogSum(lvec, i));
+        }
+
+        return cs;
+    }
+
+    public static double[] inverseCumLogSum(double[] _vec) {
+        double[] lvec = new double[_vec.length];
+        for (int i = 0; i < _vec.length; ++i) {
+            lvec[i] = Math.log(_vec[i]);
+        }
+
+        double[] cs = new double[_vec.length];
+        cs[_vec.length - 1] = _vec[_vec.length - 1];
+        for (int i = _vec.length - 2; i >= 0; --i) {
+            cs[i] = cs[i + 1] + _vec[i];
+        }
+        return cs;
+    }
+
+    public static double[] cumSum(double[] _vec) {
+        double[] cs = new double[_vec.length];
+        Arrays.fill(cs, 0);
+        cs[0] = _vec[0];
+        for (int i = 1; i < _vec.length; ++i) {
+            cs[i] = cs[i - 1] + _vec[i];
+        }
+        return cs;
+    }
+
+    public static double[] inverseCumSum(double[] _vec) {
+        double[] cs = new double[_vec.length];
+        Arrays.fill(cs, 0);
+        cs[_vec.length - 1] = _vec[_vec.length - 1];
+        for (int i = _vec.length - 2; i >= 0; --i) {
+            cs[i] = cs[i + 1] + _vec[i];
+        }
+        return cs;
     }
 }

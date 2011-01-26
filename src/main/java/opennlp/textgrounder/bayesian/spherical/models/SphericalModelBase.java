@@ -90,7 +90,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                 break;
         }
 
-        alpha = _experimentParameters.getAlpha();
+        alpha_H = _experimentParameters.getAlpha();
         beta = _experimentParameters.getBeta();
 //        kappa = _experimentParameters.getKappa();
 
