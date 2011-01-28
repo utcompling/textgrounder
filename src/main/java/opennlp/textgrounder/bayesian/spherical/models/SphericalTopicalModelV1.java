@@ -322,7 +322,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         for (int k = 0; k < curCoordCount; ++k) {
                             regionProbs[regoff + k] =
                                   doccount
-                                  * TGMath.unnormalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa[k]);
+                                  * TGMath.normalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa[k]);
                         }
                     }
 

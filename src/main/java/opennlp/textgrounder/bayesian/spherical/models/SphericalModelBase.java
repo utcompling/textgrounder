@@ -20,7 +20,6 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -31,7 +30,6 @@ import opennlp.textgrounder.bayesian.mathutils.*;
 import opennlp.textgrounder.bayesian.spherical.annealers.*;
 import opennlp.textgrounder.bayesian.spherical.io.*;
 import opennlp.textgrounder.bayesian.structs.*;
-import opennlp.textgrounder.bayesian.utils.TGArrays;
 
 /**
  *
@@ -358,12 +356,56 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * @param _mu
      * @return
      */
-    public double evalMuLikelihood(double[] _mu) {
-        return 0;
+    public double evalMuLogLikelihood(double[] _mu, int _l) {
+        double logLikelihood = 0;
+        for (int i = 0; i < N; ++i) {
+            int istoponym = toponymVector[i];
+            if (istoponym == 1) {
+                if (regionVector[i] == _l) {
+                    int coordid = coordinateVector[i];
+                    int wordid = wordVector[i];
+                    double[] coord = toponymCoordinateLexicon[wordid][coordid];
+                    double likelihood = TGBLAS.ddot(0, coord, 1, _mu, 1);
+                    logLikelihood += likelihood;
+                }
+            }
+        }
+        return logLikelihood;
     }
 
-    public double evalKappaLikelihood(double _kappa) {
-        return 0;
+    public double evalKappaLogLikelihood(double _kappa, double[] _mu, int _l) {
+        double logLikelihood = 0;
+        int lcount = 0;
+        if (_kappa > 5) {
+            for (int i = 0; i < N; ++i) {
+                int istoponym = toponymVector[i];
+                if (istoponym == 1) {
+                    if (regionVector[i] == _l) {
+                        lcount += 1;
+                        int coordid = coordinateVector[i];
+                        int wordid = wordVector[i];
+                        double[] coord = toponymCoordinateLexicon[wordid][coordid];
+                        logLikelihood += TGBLAS.ddot(0, coord, 1, _mu, 1);
+                    }
+                }
+            }
+            logLikelihood = lcount * (Math.log(0.5 * _kappa / Math.PI) - _kappa) + _kappa * logLikelihood;
+        } else {
+            for (int i = 0; i < N; ++i) {
+                int istoponym = toponymVector[i];
+                if (istoponym == 1) {
+                    if (regionVector[i] == _l) {
+                        lcount += 1;
+                        int coordid = coordinateVector[i];
+                        int wordid = wordVector[i];
+                        double[] coord = toponymCoordinateLexicon[wordid][coordid];
+                        logLikelihood += TGBLAS.ddot(0, coord, 1, _mu, 1);
+                    }
+                }
+            }
+            logLikelihood = lcount * (Math.log(_kappa / (4 * Math.PI * Math.sinh(_kappa)))) + _kappa * logLikelihood;
+        }
+        return logLikelihood;
     }
 
     public double globalAlphaUpdate(int[] _dishCount, double _N, double _prevAlpha, double _d, double _f) {
@@ -423,13 +465,13 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         return phi;
     }
 
-    public double[] vmfMeansUpdate(double[] _mu, double _k) {
+    public double[] vmfMeansUpdate(int _l, double[] _mu, double _k) {
         double[] newmean = TGRand.vmfRnd(_mu, _k);
-        double u = evalMuLikelihood(newmean) / evalMuLikelihood(_mu);
-        if (u > 1) {
+        double u = evalMuLogLikelihood(newmean, _l) - evalMuLogLikelihood(_mu, _l);
+        if (u > 0) {
             return newmean;
         } else {
-            if (rand.nextDouble() < u) {
+            if (rand.nextDouble() < Math.exp(u)) {
                 return newmean;
             } else {
                 return _mu;
@@ -437,16 +479,19 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         }
     }
 
-    public double kappaUpdate(double _k, double _var) {
-        double newk = _var * rand.nextGaussian() + _k;
-        double u = evalKappaLikelihood(newk) / evalKappaLikelihood(_k);
-        if (u > 1) {
-            return newk;
+    public double kappaUpdate(double _kappa, double[] _mu, int _l, double _var) {
+        double newkappa = _var * rand.nextGaussian() + _kappa;
+        while (newkappa < 0) {
+            newkappa = _var * rand.nextGaussian() + _kappa;
+        }
+        double u = evalKappaLogLikelihood(newkappa, _mu, _l) - evalKappaLogLikelihood(_kappa, _mu, _l);
+        if (u > 0) {
+            return newkappa;
         } else {
-            if (rand.nextDouble() < u) {
-                return newk;
+            if (rand.nextDouble() < Math.exp(u)) {
+                return newkappa;
             } else {
-                return _k;
+                return _kappa;
             }
         }
     }

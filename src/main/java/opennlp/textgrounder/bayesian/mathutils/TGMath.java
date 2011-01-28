@@ -29,6 +29,17 @@ public class TGMath {
         return _kappa * Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, _mu, 1)) / (4 * Math.PI * Math.sinh(_kappa));
     }
 
+    public static double logSphericalDensity(double[] _x, double[] _mu,
+          double _kappa) {
+        double d = 0;
+        if (_kappa > 5) {
+            d = Math.log(0.5 * _kappa / Math.PI) + _kappa * TGBLAS.ddot(0, _x, 1, _mu, 1) - _kappa;
+        } else {
+            d = Math.log(sphericalDensity(_x, _mu, _kappa));
+        }
+        return d;
+    }
+
     public static double sphericalDensity(double _alpha, double _beta,
           double _theta, double _phi, double _kappa) {
         return _kappa * Math.exp(_kappa
@@ -37,18 +48,46 @@ public class TGMath {
               / (4 * Math.PI * Math.sinh(_kappa));
     }
 
+    public static double logSphericalDensity(double _alpha, double _beta,
+          double _theta, double _phi, double _kappa) {
+        double d = 0;
+        if (_kappa > 5) {
+            d = Math.log(0.5 * _kappa / Math.PI) + _kappa
+                  * (Math.cos(_alpha) * Math.cos(_theta)
+                  + Math.sin(_alpha) * Math.sin(_theta) * Math.cos(_phi - _beta))
+                  - _kappa;
+        } else {
+            d = sphericalDensity(_alpha, _beta, _theta, _phi, _kappa);
+        }
+        return d;
+    }
+
     public static double proportionalSphericalDensity(double[] _x, double[] _mu,
           double _kappa) {
         return Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, _mu, 1));
     }
 
-    public static double unnormalizedProportionalSphericalDensity(double[] _x,
+    public static double logProportionalSphericalDensity(double[] _x, double[] _mu,
+          double _kappa) {
+        return _kappa * TGBLAS.ddot(0, _x, 1, _mu, 1);
+    }
+
+    public static double normalizedProportionalSphericalDensity(double[] _x,
           double[] _mu, double _kappa) {
         double[] nrmmean = new double[3];
         Arrays.fill(nrmmean, 0);
 
         TGBLAS.daxpy(0, 1 / TGBLAS.dnrm2(0, _mu, 1), _mu, 1, nrmmean, 1);
         return Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, nrmmean, 1));
+    }
+
+    public static double logNormalizedProportionalSphericalDensity(double[] _x,
+          double[] _mu, double _kappa) {
+        double[] nrmmean = new double[3];
+        Arrays.fill(nrmmean, 0);
+
+        TGBLAS.daxpy(0, 1 / TGBLAS.dnrm2(0, _mu, 1), _mu, 1, nrmmean, 1);
+        return _kappa * TGBLAS.ddot(0, _x, 1, nrmmean, 1);
     }
 
     public static double[] normalizeVector(double[] _mu) {
