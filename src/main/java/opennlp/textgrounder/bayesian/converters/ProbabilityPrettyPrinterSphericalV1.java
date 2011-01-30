@@ -140,7 +140,7 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
         }
 
         averagedRegionMeans = averagedCountWrapper.getAveragedRegionMeans();
-        averagedRegionToponymCoordinateCounts = averagedCountWrapper.getAveragedRegionToponymCoordinateCounts();
+//        averagedRegionToponymCoordinateCounts = averagedCountWrapper.getAveragedRegionToponymCoordinateCounts();
         averagedRegionByDocumentCounts = averagedCountWrapper.getAveragedRegionByDocumentCounts();
         averagedToponymByRegionCounts = averagedWordByRegionCounts = averagedCountWrapper.getAveragedWordByRegionCounts();
 

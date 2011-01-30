@@ -150,17 +150,14 @@ public abstract class SphericalModelBase extends SphericalModelFields {
 
         regionMeans = new double[L][];
 
-        dishToponymCoordinateCounts = new int[L][][];
-        for (int i = 0; i < L; ++i) {
-            int[][] toponymCoordinateCounts = new int[T][];
-            for (int j = 0; j < T; ++j) {
-                int coordinates = toponymCoordinateLexicon[j].length;
-                int[] coordcounts = new int[coordinates];
-                Arrays.fill(coordcounts, 0);
-                toponymCoordinateCounts[j] = coordcounts;
-            }
-            dishToponymCoordinateCounts[i] = toponymCoordinateCounts;
+        toponymCoordinateCounts = new int[T][];
+        for (int j = 0; j < T; ++j) {
+            int coordinates = toponymCoordinateLexicon[j].length;
+            int[] coordcounts = new int[coordinates];
+            Arrays.fill(coordcounts, 0);
+            toponymCoordinateCounts[j] = coordcounts;
         }
+
     }
 
     /**
@@ -320,7 +317,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             averagedRegionCountsOfAllWords = annealer.getAllWordsRegionCounts();
             averagedRegionByDocumentCounts = annealer.getRegionByDocumentCounts();
             averagedRegionMeans = annealer.getRegionMeans();
-            averagedRegionToponymCoordinateCounts = annealer.getRegionToponymCoordinateCounts();
+            averagedToponymCoordinateWeights = annealer.getRegionToponymCoordinateCounts();
         }
     }
 

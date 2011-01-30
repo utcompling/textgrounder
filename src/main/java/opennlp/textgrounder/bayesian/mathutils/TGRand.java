@@ -34,18 +34,54 @@ public class TGRand {
         mtfRand = _mtfRand;
     }
 
+    public static double[] dirichletRnd(double[] _hyper, int[] _n) {
+        double[] vals = new double[_hyper.length];
+        double s = 0;
+        for (int i = 0; i < _hyper.length; ++i) {
+            s += vals[i] = RKRand.rk_gamma(_hyper[i] + _n[i], 1);
+        }
+        s = Math.log(s);
+        for (int i = 0; i < _n.length; ++i) {
+            vals[i] = Math.exp(Math.log(vals[i]) - s);
+        }
+        return vals;
+    }
+
+    public static double[] dirichletRnd(double _hyper, int[] _n) {
+        double[] vals = new double[_n.length];
+        double s = 0;
+        for (int i = 0; i < _n.length; ++i) {
+            s += vals[i] = RKRand.rk_gamma(_hyper + _n[i], 1);
+        }
+        s = Math.log(s);
+        for (int i = 0; i < _n.length; ++i) {
+            vals[i] = Math.exp(Math.log(vals[i]) - s);
+        }
+        return vals;
+    }
+
     public static double[] dirichletRnd(double[] _hyper) {
         double[] vals = new double[_hyper.length];
+        double s = 0;
         for (int i = 0; i < _hyper.length; ++i) {
-            vals[i] = RKRand.rk_gamma(_hyper[i], 1);
+            s = vals[i] = RKRand.rk_gamma(_hyper[i], 1);
+        }
+        s = Math.log(s);
+        for (int i = 0; i < _hyper.length; ++i) {
+            vals[i] = Math.exp(Math.log(vals[i]) - s);
         }
         return vals;
     }
 
     public static double[] dirichletRnd(double _hyper, int _n) {
         double[] vals = new double[_n];
+        double s = 0;
         for (int i = 0; i < _n; ++i) {
-            vals[i] = RKRand.rk_gamma(_hyper, 1);
+            s += vals[i] = RKRand.rk_gamma(_hyper, 1);
+        }
+        s = Math.log(s);
+        for (int i = 0; i < _n; ++i) {
+            vals[i] = Math.exp(Math.log(vals[i]) - s);
         }
         return vals;
     }

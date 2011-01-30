@@ -150,7 +150,7 @@ public class SphericalModelFields implements Serializable {
     /**
      * 
      */
-    protected int[][][] dishToponymCoordinateCounts;
+    protected int[][] toponymCoordinateCounts;
     /**
      * An index of toponyms and possible regions. The goal is fast lookup and not
      * frugality with memory. The dimensions are equivalent to the wordByRegionCounts
@@ -169,7 +169,7 @@ public class SphericalModelFields implements Serializable {
     /**
      *
      */
-    protected int[] wordByDishCounts;
+    protected int[] nonToponymByDishCounts;
     /**
      *
      */
@@ -189,7 +189,7 @@ public class SphericalModelFields implements Serializable {
     /**
      *
      */
-    protected double[] wordByTopicDirichlet;
+    protected double[] nonToponymByDishDirichlet;
     /**
      *
      */
@@ -217,7 +217,7 @@ public class SphericalModelFields implements Serializable {
     /**
      * 
      */
-    protected double[][][] averagedRegionToponymCoordinateCounts;
+    protected double[][] averagedToponymCoordinateWeights;
 
     public int getD() {
         return D;
@@ -291,12 +291,12 @@ public class SphericalModelFields implements Serializable {
         this.averagedRegionMeans = averagedRegionMeans;
     }
 
-    public double[][][] getAveragedRegionToponymCoordinateCounts() {
-        return averagedRegionToponymCoordinateCounts;
+    public double[][] getAveragedRegionToponymCoordinateCounts() {
+        return averagedToponymCoordinateWeights;
     }
 
-    public void setAveragedRegionToponymCoordinateCounts(double[][][] averagedRegionToponymCoordinateCounts) {
-        this.averagedRegionToponymCoordinateCounts = averagedRegionToponymCoordinateCounts;
+    public void setAveragedRegionToponymCoordinateCounts(double[][] averagedRegionToponymCoordinateCounts) {
+        this.averagedToponymCoordinateWeights = averagedRegionToponymCoordinateCounts;
     }
 
     public double[] getAveragedWordByRegionCounts() {
@@ -371,12 +371,12 @@ public class SphericalModelFields implements Serializable {
         this.regionMeans = regionMeans;
     }
 
-    public int[][][] getRegionToponymCoordinateCounts() {
-        return dishToponymCoordinateCounts;
+    public int[][] getRegionToponymCoordinateCounts() {
+        return toponymCoordinateCounts;
     }
 
-    public void setRegionToponymCoordinateCounts(int[][][] regionToponymCoordinateCounts) {
-        this.dishToponymCoordinateCounts = regionToponymCoordinateCounts;
+    public void setRegionToponymCoordinateCounts(int[][] regionToponymCoordinateCounts) {
+        this.toponymCoordinateCounts = regionToponymCoordinateCounts;
     }
 
     public int[] getRegionVector() {
