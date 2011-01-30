@@ -26,7 +26,15 @@ public class TGMath {
 
     public static double sphericalDensity(double[] _x, double[] _mu,
           double _kappa) {
-        return _kappa * Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, _mu, 1)) / (4 * Math.PI * Math.sinh(_kappa));
+        double d = 0;
+        if (_kappa > 5) {
+            d = 0.5 * _kappa / Math.PI * Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, _mu, 1)
+                  - _kappa);
+        } else {
+            d = _kappa * Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, _mu, 1))
+                  / (4 * Math.PI * Math.sinh(_kappa));
+        }
+        return d;
     }
 
     public static double logSphericalDensity(double[] _x, double[] _mu,
@@ -42,10 +50,18 @@ public class TGMath {
 
     public static double sphericalDensity(double _alpha, double _beta,
           double _theta, double _phi, double _kappa) {
-        return _kappa * Math.exp(_kappa
-              * (Math.cos(_alpha) * Math.cos(_theta)
-              + Math.sin(_alpha) * Math.sin(_theta) * Math.cos(_phi - _beta)))
-              / (4 * Math.PI * Math.sinh(_kappa));
+        double d = 0;
+        if (_kappa > 5) {
+            d = 0.5 * _kappa / Math.PI * Math.exp(_kappa
+                  * (Math.cos(_alpha) * Math.cos(_theta)
+                  + Math.sin(_alpha) * Math.sin(_theta) * Math.cos(_phi - _beta)) - _kappa);
+        } else {
+            d = _kappa * Math.exp(_kappa
+                  * (Math.cos(_alpha) * Math.cos(_theta)
+                  + Math.sin(_alpha) * Math.sin(_theta) * Math.cos(_phi - _beta)))
+                  / (4 * Math.PI * Math.sinh(_kappa));
+        }
+        return d;
     }
 
     public static double logSphericalDensity(double _alpha, double _beta,
@@ -62,6 +78,14 @@ public class TGMath {
         return d;
     }
 
+    /**
+     * vMF density without constant normalization factor
+     *
+     * @param _x
+     * @param _mu
+     * @param _kappa
+     * @return
+     */
     public static double proportionalSphericalDensity(double[] _x, double[] _mu,
           double _kappa) {
         return Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, _mu, 1));
@@ -236,6 +260,26 @@ public class TGMath {
         cs[_vec.length - 1] = _vec[_vec.length - 1];
         for (int i = _vec.length - 2; i >= 0; --i) {
             cs[i] = cs[i + 1] + _vec[i];
+        }
+        return cs;
+    }
+
+    /**
+     * accumulate numbers in an array backwards. Not inclusive of _end. Inclusive
+     * of _begin. _end must be bigger than _begin.
+     *
+     * @param _vec
+     * @param _end
+     * @param _begin
+     * @return
+     */
+    public static int[] inverseCumSum(int[] _vec, int _end, int _begin) {
+        int len = _end - _begin;
+        int[] cs = new int[len];
+        Arrays.fill(cs, 0);
+        cs[len - 1] = _vec[_begin + len - 1];
+        for (int i = len - 2; i >= 0; --i) {
+            cs[i] = cs[i + 1] + _vec[_begin + i];
         }
         return cs;
     }

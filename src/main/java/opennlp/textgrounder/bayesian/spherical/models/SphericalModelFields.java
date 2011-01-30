@@ -25,14 +25,20 @@ import java.io.Serializable;
 public class SphericalModelFields implements Serializable {
 
     /**
-     * global stick breaking prior
+     * global stick breaking prior. is specified from param file on first
+     * iteration.
      */
     protected double alpha_H;
     /**
-     * hyperparameters for sampling alpha_H in posterior update stage. corresponds
-     * to d and f respectively in algorithm paper
+     * fixed intermediate parameters for resampling alpha_H. corresponds to
+     * d and f in paper
      */
-    protected double alpha_h_hyper_1 = 0.1, alpha_h_hyper_2 = 0.1;
+    protected double alpha_h_d, alpha_h_f;
+    /**
+     * uniform hyperparameter for restaurant local stick breaking weights. only
+     * used in first iteration. set from param file
+     */
+    protected double alpha_init;
     /**
      * restaurant local stick breaking prior
      */
@@ -49,14 +55,24 @@ public class SphericalModelFields implements Serializable {
     protected double kappa_hyper_shape = 1, kappa_hyper_scale = 0.01;
     /**
      * dirichlet hyperparameter for non-toponym word by dish weights. corresponding
-     * random variable is labeled phi in the algorithm paper
+     * random variable is labeled phi in the algorithm paper. corresponding hyperparameter
+     * is c_0 in paper.
      */
     protected double phi_dirichlet_hyper = 0.1;
     /**
      * dirichlet hyperparameter for coordinate candidates of toponyms. corresponding
-     * random variable is ehta in the algorithm paper
+     * random variable is ehta in the algorithm paper. corresponding hyperparameter
+     * is d_0 in paper.
      */
     protected double ehta_dirichlet_hyper = 0.1;
+    /**
+     * the concentration parameter in the proposal distribution for region means
+     */
+    protected double vmf_proposal_kappa = 50;
+    /**
+     * the standard deviation in the proposal distribution for region kappas
+     */
+    protected double vmf_proposal_sigma = 1;
     /**
      * 
      */
@@ -69,6 +85,11 @@ public class SphericalModelFields implements Serializable {
      * Number of tokens
      */
     protected int N;
+    /**
+     * Number of tokens minus stopwords. Or total number of valid customers
+     * across restaurants
+     */
+    protected int Nn;
     /**
      * Expected maximum number of dishes in the restaurants
      */
@@ -165,6 +186,14 @@ public class SphericalModelFields implements Serializable {
      * Counts of regions for all words
      */
     protected int[] regionCountsOfAllWords;
+    /**
+     *
+     */
+    protected double[] wordByTopicDirichlet;
+    /**
+     *
+     */
+    protected double[][] toponymCoordinateWeights;
     /**
      *
      */

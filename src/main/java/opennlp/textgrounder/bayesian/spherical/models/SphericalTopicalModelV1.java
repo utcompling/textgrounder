@@ -35,14 +35,6 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
      * 
      */
     protected double[] averagedTopicCounts;
-    /**
-     *
-     */
-    protected double[] wordByTopicDirichlet;
-    /**
-     * 
-     */
-    protected double[][] toponymCoordinateWeights;
 
     public SphericalTopicalModelV1(ExperimentParameters _parameters) {
         super(_parameters);
@@ -60,6 +52,9 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
 
         wordByDishCounts = new int[W * L];
         Arrays.fill(wordByDishCounts, 0);
+
+        alpha = new double[D];
+        Arrays.fill(alpha, alpha_init);
     }
 
     /**
@@ -104,11 +99,12 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
             double[] ilvl = new double[L];
 
             for (int d = 0; d < D; ++d) {
-                double dalpha = alpha[d];
+                
                 int docoff = d * L;
+                double ai = alpha[d];
                 for (int l = 0; l < L; ++l) {
-                    vl[l] = RKRand.rk_beta(dalpha * globalDishWeights[l],
-                          dalpha * (1 - wcs[l]));
+                    vl[l] = RKRand.rk_beta(ai * globalDishWeights[l],
+                          ai * (1 - wcs[l]));
                 }
 
                 vl[L] = 1;
@@ -138,7 +134,6 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
         }
 
         for (int i = 0; i < T; ++i) {
-            double[][] coordinates = toponymCoordinateLexicon[i];
             int len = toponymCoordinateLexicon[i].length;
             double[] dir = TGRand.dirichletRnd(ehta_dirichlet_hyper, len);
             toponymCoordinateWeights[i] = dir;
@@ -149,10 +144,12 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
         /**
          * careful, N needs to revised to only non-stopwords
          */
-        alpha_H = globalAlphaUpdate(globalDishCounts, N, alpha_H, alpha_h_hyper_1, alpha_h_hyper_2);
-        alpha = alphaUpdate(dishByRestaurantCounts, D, L, alpha, kappa_hyper_shape, kappa_hyper_shape);
-        globalDishWeights = globalStickBreakingWeightsUpdate(globalDishWeights, globalDishCounts, alpha_H);
-        localDishWeights = restaurantStickBreakingWeightsUpdate(alpha, localDishWeights, dishByRestaurantCounts);
+        alpha_H = globalAlphaUpdate();
+        alpha = alphaUpdate();
+        globalDishWeights = globalStickBreakingWeightsUpdate();
+        localDishWeights = restaurantStickBreakingWeightsUpdate();
+        regionMeans = regionMeansUpdate();
+        kappa = kappaUpdate();
     }
 
     /**

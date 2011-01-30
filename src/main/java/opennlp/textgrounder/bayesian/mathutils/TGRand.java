@@ -16,8 +16,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.mathutils;
 
-import java.util.Arrays;
-
 import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
 
 /**

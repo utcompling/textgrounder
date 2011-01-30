@@ -408,40 +408,40 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         return logLikelihood;
     }
 
-    public double globalAlphaUpdate(int[] _dishCount, double _N, double _prevAlpha, double _d, double _f) {
+    public double globalAlphaUpdate() {
         int Ls = 0;
-        for (int d : _dishCount) {
+        for (int d : globalDishCounts) {
             if (d > 0) {
                 Ls++;
             }
         }
 
-        double q = RKRand.rk_beta(_prevAlpha + 1, _N);
-        double pq = (_d + Ls - 1) / (_N * (_f - Math.log(q)));
+        double q = RKRand.rk_beta(alpha_H + 1, Nn);
+        double pq = (alpha_h_d + Ls - 1) / (Nn * (alpha_h_f - Math.log(q)));
         int s = 0;
         if (rand.nextDouble() < pq) {
             s = 1;
         }
-        double new_alpha_H = RKRand.rk_gamma(_d + Ls + s - 1, _f - Math.log(q));
+        double new_alpha_H = RKRand.rk_gamma(alpha_h_d + Ls + s - 1, alpha_h_f - Math.log(q));
 
         return new_alpha_H;
     }
 
-    public double[] alphaUpdate(int[] _tableByRestaurantCount, int _D, int _L, double[] _alpha, double _a, double _b) {
-        double[] new_alpha = new double[_D];
+    public double[] alphaUpdate() {
+        double[] new_alpha = new double[D];
 
-        for (int d = 0; d < _D; ++d) {
-            int docoff = d * _L;
+        for (int d = 0; d < D; ++d) {
+            int docoff = d * L;
             int Is = 0;
-            for (int l = 0; l < _L; ++l) {
-                if (_tableByRestaurantCount[docoff + l] > 0) {
+            for (int l = 0; l < L; ++l) {
+                if (dishByRestaurantCounts[docoff + l] > 0) {
                     Is++;
                 }
             }
 
-            double q = RKRand.rk_beta(_alpha[d] + 1, Is);
+            double q = RKRand.rk_beta(alpha[d] + 1, Is);
             int s = rand.nextDouble() < q ? 1 : 0;
-            new_alpha[d] = RKRand.rk_gamma(_a + Is - s, _b - Math.log(q));
+            new_alpha[d] = RKRand.rk_gamma(alpha_shape_a + Is - s, alpha_scale_b - Math.log(q));
         }
 
         return new_alpha;
@@ -465,75 +465,95 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         return phi;
     }
 
-    public double[] vmfMeansUpdate(int _l, double[] _mu, double _k) {
-        double[] newmean = TGRand.vmfRnd(_mu, _k);
-        double u = evalMuLogLikelihood(newmean, _l) - evalMuLogLikelihood(_mu, _l);
-        if (u > 0) {
-            return newmean;
-        } else {
-            if (rand.nextDouble() < Math.exp(u)) {
-                return newmean;
+    public double[][] regionMeansUpdate() {
+        double[][] newRegionMeans = new double[L][];
+
+        for (int l = 0; l < L; ++l) {
+            double[] oldmean = regionMeans[l];
+
+            double[] newmean = TGRand.vmfRnd(oldmean, vmf_proposal_kappa);
+            double u = evalMuLogLikelihood(newmean, l) - evalMuLogLikelihood(oldmean, l);
+
+            if (u > 0) {
+                newRegionMeans[l] = newmean;
             } else {
-                return _mu;
+                if (rand.nextDouble() < Math.exp(u)) {
+                    newRegionMeans[l] = newmean;
+                } else {
+                    newRegionMeans[l] = oldmean;
+                }
             }
         }
+        return newRegionMeans;
     }
 
-    public double kappaUpdate(double _kappa, double[] _mu, int _l, double _var) {
-        double newkappa = _var * rand.nextGaussian() + _kappa;
-        while (newkappa < 0) {
-            newkappa = _var * rand.nextGaussian() + _kappa;
-        }
-        double u = evalKappaLogLikelihood(newkappa, _mu, _l) - evalKappaLogLikelihood(_kappa, _mu, _l);
-        if (u > 0) {
-            return newkappa;
-        } else {
-            if (rand.nextDouble() < Math.exp(u)) {
-                return newkappa;
+    public double[] kappaUpdate() {
+        double[] newkappa = new double[L];
+
+        for (int l = 0; l < L; ++l) {
+            double oldk = kappa[l];
+            double newk = vmf_proposal_sigma * rand.nextGaussian() + oldk;
+            while (newk < 0) {
+                newk = vmf_proposal_sigma * rand.nextGaussian() + oldk;
+            }
+            double[] means = regionMeans[l];
+
+            double u = evalKappaLogLikelihood(newk, means, l) - evalKappaLogLikelihood(oldk, means, l);
+            if (u > 0) {
+                newkappa[l] = newk;
             } else {
-                return _kappa;
+                if (rand.nextDouble() < Math.exp(u)) {
+                    newkappa[l] = newk;
+                } else {
+                    newkappa[l] = oldk;
+                }
             }
         }
+        return newkappa;
     }
 
-    public double[] restaurantStickBreakingWeightsUpdate(double[] _alpha, double[] _wglob, int[] _nl) {
-        double[] weights = new double[L];
-        double[] vl = new double[L];
-        double[] ivl = new double[L];
-        double[] ilvl = new double[L];
-        double[] wcs = TGMath.cumSum(_wglob);
-        int[] incs = TGMath.inverseCumSum(_nl);
+    public double[] restaurantStickBreakingWeightsUpdate() {
+        double[] weights = new double[D * L];
+        double[] wcs = TGMath.cumSum(globalDishWeights);
+        for (int d = 0; d < D; ++d) {
+            int docoff = d * L;
+            double ai = alpha[d];
 
-        for (int i = 0; i < L - 1; ++i) {
-            double a = _alpha[i] * _wglob[i] + _nl[i];
-            double b = _alpha[i] * (1 - wcs[i]) + incs[i + 1];
-            vl[i] = RKRand.rk_beta(a, b);
+            double[] vl = new double[L];
+            double[] ivl = new double[L];
+            double[] ilvl = new double[L];
+            int[] incs = TGMath.inverseCumSum(dishByRestaurantCounts, docoff, docoff + L);
+
+            for (int l = 0; l < L - 1; ++l) {
+                double a = ai * globalDishWeights[l] + dishByRestaurantCounts[docoff + l];
+                double b = ai * (1 - wcs[l]) + incs[l + 1];
+                vl[l] = RKRand.rk_beta(a, b);
+            }
+
+            vl[L] = 1;
+            for (int i = 0; i < L; ++i) {
+                ilvl[i] = Math.log(1 - vl[i]);
+            }
+            ivl = TGMath.cumSum(ilvl);
+
+            weights[docoff] = vl[0];
+            for (int l = 1; l < L; ++l) {
+                weights[docoff + l] = Math.exp(Math.log(vl[l]) + ivl[l - 1]);
+            }
         }
-
-        vl[L] = 1;
-        for (int i = 0; i < L; ++i) {
-            ilvl[i] = Math.log(1 - vl[i]);
-        }
-        ivl = TGMath.cumSum(ilvl);
-
-        weights[0] = vl[0];
-        for (int i = 1; i < L; ++i) {
-            weights[i] = Math.exp(Math.log(vl[i]) + ivl[i - 1]);
-        }
-
         return weights;
     }
 
-    public double[] globalStickBreakingWeightsUpdate(double[] _globalDishWeights, int[] _globalDishCounts, double _alpha_H) {
+    public double[] globalStickBreakingWeightsUpdate() {
         double[] weights = new double[L];
         double[] v = new double[L];
         double[] ivl = new double[L];
         double[] ilvl = new double[L];
-        int[] incs = TGMath.inverseCumSum(_globalDishCounts);
+        int[] incs = TGMath.inverseCumSum(globalDishCounts);
 
         for (int i = 0; i < L - 1; ++i) {
-            double a = 1 + _globalDishCounts[i];
-            double b = _alpha_H + incs[i + 1];
+            double a = 1 + globalDishCounts[i];
+            double b = alpha_H + incs[i + 1];
             v[i] = RKRand.rk_beta(a, b);
         }
 
