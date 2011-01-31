@@ -114,11 +114,7 @@ public class SphericalModelFields implements Serializable {
     /**
      * Vector of topics
      */
-    protected int[] regionVector;
-    /**
-     *
-     */
-    protected int[] topicVector;
+    protected int[] dishVector;
     /**
      * Vector of document indices
      */
@@ -380,11 +376,11 @@ public class SphericalModelFields implements Serializable {
     }
 
     public int[] getRegionVector() {
-        return regionVector;
+        return dishVector;
     }
 
     public void setRegionVector(int[] regionVector) {
-        this.regionVector = regionVector;
+        this.dishVector = regionVector;
     }
 
     public int[] getStopwordVector() {

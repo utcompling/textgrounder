@@ -37,7 +37,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
      */
     @Override
     public void randomInitialize() {
-        
+
         /**
          * Sampling initial global
          */
@@ -110,6 +110,117 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
             int len = toponymCoordinateLexicon[i].length;
             double[] dir = TGRand.dirichletRnd(ehta_dirichlet_hyper, len);
             toponymCoordinateWeights[i] = dir;
+        }
+
+        {
+            int wordid, docid, dishid, coordid;
+            int wordoff, docoff, regoff;
+            int istoponym, isstopword;
+            int curCoordCount;
+            double[][] curCoords;
+            double[] regionProbs = new double[L * maxCoord];
+            double[] dishProbs = new double[L];
+            double[] regionmean;
+            double totalprob = 0, max, r;
+
+            SphericalEmptyAnnealer sea = new SphericalEmptyAnnealer(experimentParameters);
+
+            for (int i = 0; i < N; ++i) {
+                isstopword = stopwordVector[i];
+                istoponym = toponymVector[i];
+                if (isstopword == 0) {
+                    if (istoponym == 1) {
+                        Arrays.fill(regionProbs, 0);
+
+                        wordid = wordVector[i];
+                        docid = documentVector[i];
+                        docoff = docid * L;
+                        wordoff = wordid * L;
+
+                        curCoordCount = toponymCoordinateLexicon[wordid].length;
+                        curCoords = toponymCoordinateLexicon[wordid];
+
+                        double[] coordinateWeights = toponymCoordinateWeights[wordid];
+
+                        for (int j = 0; j < L; ++j) {
+                            regoff = j * maxCoord;
+                            regionmean = regionMeans[j];
+                            double ldw = localDishWeights[docoff + j];
+                            for (int k = 0; k < curCoordCount; ++k) {
+                                regionProbs[regoff + k] =
+                                      ldw * coordinateWeights[k]
+                                      * TGMath.sphericalDensity(curCoords[k], regionmean, kappa[k]);
+                            }
+                        }
+
+                        totalprob = sea.annealProbs(L, curCoordCount, maxCoord, regionProbs);
+
+                        r = rand.nextDouble() * totalprob;
+
+                        max = regionProbs[0];
+                        coordid = 0;
+                        dishid = 0;
+                        while (r > max) {
+                            coordid++;
+                            if (coordid == curCoordCount) {
+                                dishid++;
+                                coordid = 0;
+                            }
+                            max += regionProbs[dishid * maxCoord + coordid];
+                        }
+                        dishVector[i] = dishid;
+                        coordinateVector[i] = coordid;
+
+                        dishCountsOfToponyms[dishid]++;
+                        dishByRestaurantCounts[docoff + dishid]++;
+                        toponymCoordinateCounts[wordid][coordid]++;
+                        globalDishCounts[dishid]++;
+                    } else {
+                        wordid = wordVector[i];
+                        docid = documentVector[i];
+                        docoff = docid * L;
+                        wordoff = wordid * L;
+
+                        try {
+                            for (int j = 0;; ++j) {
+                                dishProbs[j] = localDishWeights[docoff + j] * nonToponymByDishDirichlet[wordoff + j];
+                            }
+                        } catch (ArrayIndexOutOfBoundsException e) {
+                        }
+
+                        totalprob = sea.annealProbs(dishProbs);
+                        r = rand.nextDouble() * totalprob;
+
+                        max = dishProbs[0];
+                        dishid = 0;
+                        while (r > max) {
+                            dishid++;
+                            max += dishProbs[dishid];
+                        }
+                        dishVector[i] = dishid;
+
+                        globalDishCounts[dishid]++;
+                        dishByRestaurantCounts[docoff + dishid]++;
+                        nonToponymByDishCounts[wordoff + dishid]++;
+                    }
+                }
+            }
+
+            for (docid = 0; docid < D; ++docid) {
+                docoff = docid * L;
+                int l = 0;
+                int t = 0;
+                for (dishid = 0; dishid < L; ++dishid) {
+                    l += t = (dishByRestaurantCounts[docoff + dishid] > 0 ? 1 : 0);
+                    if (t == 0) {
+                        break;
+                    }
+                }
+                if (l == L) {
+                    System.err.println("All tables were occupied in document " + docid);
+                    System.exit(1);
+                }
+            }
         }
     }
 
@@ -185,7 +296,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
 
                         wordid = wordVector[i];
                         docid = documentVector[i];
-                        dishid = regionVector[i];
+                        dishid = dishVector[i];
                         coordid = coordinateVector[i];
                         docoff = docid * L;
                         wordoff = wordid * L;
@@ -225,7 +336,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                             }
                             max += regionProbs[dishid * maxCoord + coordid];
                         }
-                        regionVector[i] = dishid;
+                        dishVector[i] = dishid;
                         coordinateVector[i] = coordid;
 
                         dishCountsOfToponyms[dishid]++;
@@ -235,7 +346,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                     } else {
                         wordid = wordVector[i];
                         docid = documentVector[i];
-                        dishid = topicVector[i];
+                        dishid = dishVector[i];
                         istoponym = toponymVector[i];
                         docoff = docid * L;
                         wordoff = wordid * L;
@@ -260,7 +371,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                             dishid++;
                             max += dishProbs[dishid];
                         }
-                        topicVector[i] = dishid;
+                        dishVector[i] = dishid;
 
                         globalDishCounts[dishid]++;
                         dishByRestaurantCounts[docoff + dishid]++;
@@ -312,7 +423,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
 
                     wordid = wordVector[i];
                     docid = documentVector[i];
-                    dishid = regionVector[i];
+                    dishid = dishVector[i];
                     coordid = coordinateVector[i];
                     docoff = docid * L;
                     wordoff = wordid * L;
@@ -347,12 +458,12 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         }
                         max += regionProbs[dishid * maxCoord + coordid];
                     }
-                    regionVector[i] = dishid;
+                    dishVector[i] = dishid;
                     coordinateVector[i] = coordid;
                 } else {
                     wordid = wordVector[i];
                     docid = documentVector[i];
-                    dishid = topicVector[i];
+                    dishid = dishVector[i];
                     istoponym = toponymVector[i];
                     docoff = docid * L;
                     wordoff = wordid * L;
@@ -373,7 +484,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         dishid++;
                         max += dishProbs[dishid];
                     }
-                    topicVector[i] = dishid;
+                    dishVector[i] = dishid;
                 }
             }
         }

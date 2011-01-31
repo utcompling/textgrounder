@@ -164,8 +164,6 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             toponymCoordinateCounts[j] = coordcounts;
         }
 
-        topicVector = regionVector;
-
         dishByRestaurantCounts = new int[D * L];
         Arrays.fill(dishByRestaurantCounts, 0);
 
@@ -186,8 +184,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * <p>
      * W
      * D
-     * betaW
      * N
+     * Nn
      * </p>
      *
      * The following class variables are initialized in this procedure
@@ -253,8 +251,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         stopwordVector = new int[N];
         copyToArray(stopwordVector, stopwordArray);
 
-        regionVector = new int[N];
-        Arrays.fill(regionVector, -1);
+        dishVector = new int[N];
+        Arrays.fill(dishVector, -1);
 
         coordinateVector = new int[N];
         Arrays.fill(coordinateVector, -1);
@@ -360,7 +358,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
 
     public void write() {
         outputWriter = new SphericalBinaryOutputWriter(experimentParameters);
-        outputWriter.writeTokenArray(wordVector, documentVector, toponymVector, stopwordVector, regionVector, coordinateVector);
+        outputWriter.writeTokenArray(wordVector, documentVector, toponymVector, stopwordVector, dishVector, coordinateVector);
 
         AveragedSphericalCountWrapper averagedSphericalCountWrapper = new AveragedSphericalCountWrapper(this);
         outputWriter.writeProbabilities(averagedSphericalCountWrapper);
@@ -388,6 +386,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
     /**
      * 
      * @param _mu
+     * @param _l
      * @return
      */
     public double evalMuLogLikelihood(double[] _mu, int _l) {
@@ -395,7 +394,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         for (int i = 0; i < N; ++i) {
             int istoponym = toponymVector[i];
             if (istoponym == 1) {
-                if (regionVector[i] == _l) {
+                if (dishVector[i] == _l) {
                     int coordid = coordinateVector[i];
                     int wordid = wordVector[i];
                     double[] coord = toponymCoordinateLexicon[wordid][coordid];
@@ -414,7 +413,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             for (int i = 0; i < N; ++i) {
                 int istoponym = toponymVector[i];
                 if (istoponym == 1) {
-                    if (regionVector[i] == _l) {
+                    if (dishVector[i] == _l) {
                         lcount += 1;
                         int coordid = coordinateVector[i];
                         int wordid = wordVector[i];
@@ -428,7 +427,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             for (int i = 0; i < N; ++i) {
                 int istoponym = toponymVector[i];
                 if (istoponym == 1) {
-                    if (regionVector[i] == _l) {
+                    if (dishVector[i] == _l) {
                         lcount += 1;
                         int coordid = coordinateVector[i];
                         int wordid = wordVector[i];
