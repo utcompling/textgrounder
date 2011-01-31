@@ -27,38 +27,19 @@ import opennlp.textgrounder.bayesian.spherical.models.SphericalModelFields;
 public class AveragedSphericalCountWrapper extends SphericalModelFields implements Serializable {
 
     public AveragedSphericalCountWrapper(SphericalModelBase _regionModel) {
+        globalDishWeightsFM = _regionModel.getAveragedWordByRegionCounts();
         localDishWeightsFM = _regionModel.getAveragedAllWordsRegionCounts();
         kappaFM = _regionModel.getAveragedRegionByDocumentCounts();
-        nonToponymByDishDirichletFM = _regionModel.getAveragedTopicByDocumentCounts();
-        globalDishWeightsFM = _regionModel.getAveragedWordByRegionCounts();
         regionMeansFM = _regionModel.getAveragedRegionMeans();
         toponymCoordinateDirichletFM = _regionModel.getAveragedRegionToponymCoordinateCounts();
+        nonToponymByDishDirichletFM = _regionModel.getAveragedTopicByDocumentCounts();
 
         toponymCoordinateLexicon = _regionModel.getToponymCoordinateLexicon();
-
-        alpha_H = _regionModel.getAlpha();
-//        beta = _regionModel.getBeta();
-//        betaW = _regionModel.getBetaW();
-//        kappa = _regionModel.getKappa();
 
         L = _regionModel.getL();
         D = _regionModel.getD();
         N = _regionModel.getN();
         T = _regionModel.getT();
-        W = _regionModel.getW();
-        
-    }
-
-    public void addHyperparameters() {
-//        for (int i = 0; i < averagedRegionByDocumentCounts.length; ++i) {
-//            averagedRegionByDocumentCounts[i] += alpha;
-//        }
-//        for (int i = 0; i < averagedWordByRegionCounts.length; ++i) {
-//            averagedWordByRegionCounts[i] += beta;
-//        }
-//
-//        for (int i = 0; i < averagedAllWordsRegionCounts.length; ++i) {
-//            averagedAllWordsRegionCounts[i] += betaW;
-//        }
+        W = _regionModel.getW();        
     }
 }

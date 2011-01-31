@@ -57,10 +57,6 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * 
      */
     protected transient SphericalAnnealer annealer;
-    /**
-     * the crpalpha for use when spherical distributions are not normalized
-     */
-    protected transient double crpalpha_mod;
 
     /**
      * Default constructor. Take input from commandline and default _options
@@ -88,8 +84,18 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                 break;
         }
 
-        alpha_H = _experimentParameters.getAlpha();
-//        kappa = _experimentParameters.getKappa();
+        alpha_H = _experimentParameters.get_alpha_H();
+        alpha_h_d = _experimentParameters.get_alpha_h_d();
+        alpha_h_f = _experimentParameters.get_alpha_h_f();
+        alpha_init = _experimentParameters.get_alpha_init();
+        alpha_shape_a = _experimentParameters.get_alpha_shape_a();
+        alpha_scale_b = _experimentParameters.get_alpha_scale_b();
+        kappa_hyper_shape = _experimentParameters.get_kappa_hyper_shape();
+        kappa_hyper_scale = _experimentParameters.get_kappa_hyper_scale();
+        phi_dirichlet_hyper = _experimentParameters.get_phi_dirichlet_hyper();
+        ehta_dirichlet_hyper = _experimentParameters.get_ehta_dirichlet_hyper();
+        vmf_proposal_kappa = _experimentParameters.get_vmf_proposal_kappa();
+        vmf_proposal_sigma = _experimentParameters.get_vmf_proposal_sigma();
 
         int randSeed = _experimentParameters.getRandomSeed();
         if (randSeed == 0) {
@@ -117,7 +123,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         initialize(experimentParameters);
         readTokenArrayFile();
         readRegionCoordinateList();
-        initializeCountArrays();
+        initializeArrays();
     }
 
     /**
@@ -138,7 +144,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * regionToponymCoordinateCounts
      * </p>
      */
-    protected void initializeCountArrays() {
+    protected void initializeArrays() {
         dishCountsOfToponyms = new int[L];
         Arrays.fill(dishCountsOfToponyms, 0);
 
@@ -157,6 +163,21 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             Arrays.fill(coordcounts, 0);
             toponymCoordinateCounts[j] = coordcounts;
         }
+
+        topicVector = regionVector;
+
+        dishByRestaurantCounts = new int[D * L];
+        Arrays.fill(dishByRestaurantCounts, 0);
+
+        regionCountsOfAllWords = new int[L];
+        Arrays.fill(regionCountsOfAllWords, 0);
+        globalDishCounts = regionCountsOfAllWords;
+
+        nonToponymByDishCounts = new int[W * L];
+        Arrays.fill(nonToponymByDishCounts, 0);
+
+        alpha = new double[D];
+        Arrays.fill(alpha, alpha_init);
 
     }
 
@@ -181,6 +202,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      */
     protected void readTokenArrayFile() {
 
+        Nn = 0;
+
         ArrayList<Integer> wordArray = new ArrayList<Integer>(),
               docArray = new ArrayList<Integer>(),
               toponymArray = new ArrayList<Integer>(),
@@ -202,6 +225,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                         if (W < wordid) {
                             W = wordid;
                         }
+                        Nn += 1;
                     }
                     if (D < docid) {
                         D = docid;
@@ -318,6 +342,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             kappaFM = annealer.getKappaFM();
             regionMeansFM = annealer.getRegionMeansFM();
             toponymCoordinateDirichletFM = annealer.getToponymCoordinateWeightsFM();
+            nonToponymByDishDirichletFM = annealer.getNonToponymByDishDirichletFM();
         }
     }
 
@@ -338,9 +363,21 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         outputWriter.writeTokenArray(wordVector, documentVector, toponymVector, stopwordVector, regionVector, coordinateVector);
 
         AveragedSphericalCountWrapper averagedSphericalCountWrapper = new AveragedSphericalCountWrapper(this);
-//        averagedSphericalCountWrapper.addHyperparameters();
-
         outputWriter.writeProbabilities(averagedSphericalCountWrapper);
+    }
+
+    /**
+     * Copy a sequence of numbers from ta to array ia.
+     *
+     * @param <T>   Any number type
+     * @param ia    Target array of integers to be copied to
+     * @param ta    Source List<T> of numbers to be copied from
+     */
+    protected static <T extends Number> void copyToArray(int[] ia,
+          ArrayList<T> ta) {
+        for (int i = 0; i < ta.size(); ++i) {
+            ia[i] = ta.get(i).intValue();
+        }
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -566,19 +603,5 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         }
 
         return weights;
-    }
-
-    /**
-     * Copy a sequence of numbers from ta to array ia.
-     *
-     * @param <T>   Any number type
-     * @param ia    Target array of integers to be copied to
-     * @param ta    Source List<T> of numbers to be copied from
-     */
-    protected static <T extends Number> void copyToArray(int[] ia,
-          ArrayList<T> ta) {
-        for (int i = 0; i < ta.size(); ++i) {
-            ia[i] = ta.get(i).intValue();
-        }
     }
 }

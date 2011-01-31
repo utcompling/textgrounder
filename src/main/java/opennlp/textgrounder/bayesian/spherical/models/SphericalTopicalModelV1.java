@@ -27,34 +27,8 @@ import opennlp.textgrounder.bayesian.spherical.annealers.*;
  */
 public class SphericalTopicalModelV1 extends SphericalModelBase {
 
-    /**
-     *
-     */
-    protected double[] averagedWordByTopicCounts;
-    /**
-     * 
-     */
-    protected double[] averagedTopicCounts;
-
     public SphericalTopicalModelV1(ExperimentParameters _parameters) {
         super(_parameters);
-    }
-
-    protected void baseSpecificInitialize() {
-        topicVector = regionVector;
-
-        dishByRestaurantCounts = new int[D * L];
-        Arrays.fill(dishByRestaurantCounts, 0);
-
-        regionCountsOfAllWords = new int[L];
-        Arrays.fill(regionCountsOfAllWords, 0);
-        globalDishCounts = regionCountsOfAllWords;
-
-        nonToponymByDishCounts = new int[W * L];
-        Arrays.fill(nonToponymByDishCounts, 0);
-
-        alpha = new double[D];
-        Arrays.fill(alpha, alpha_init);
     }
 
     /**
@@ -63,8 +37,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
      */
     @Override
     public void randomInitialize() {
-        baseSpecificInitialize();
-
+        
         /**
          * Sampling initial global
          */
@@ -403,19 +376,6 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                     topicVector[i] = dishid;
                 }
             }
-        }
-    }
-
-    /**
-     *
-     */
-    @Override
-    public void train() {
-        super.train();
-        if (annealer.getSamples() != 0) {
-            averagedWordByTopicCounts = globalDishWeightsFM;
-            averagedTopicCounts = localDishWeightsFM;
-            nonToponymByDishDirichletFM = annealer.getNonToponymByDishDirichletFM();
         }
     }
 }
