@@ -238,7 +238,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                             }
                         }
 
-                        totalprob = annealer.annealProbs(L, curCoordCount, maxCoord, regionProbs);
+                        totalprob = _annealer.annealProbs(L, curCoordCount, maxCoord, regionProbs);
 
                         r = rand.nextDouble() * totalprob;
 
@@ -320,13 +320,13 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
     @Override
     public void decode() {
         SphericalAnnealer decoder = new SphericalMaximumPosteriorDecoder();
-        int wordid, docid, regionid, topicid, coordid;
+        int wordid, docid, dishid, topicid, coordid;
         int wordoff, docoff, regoff;
         int istoponym, isstopword;
         int curCoordCount;
         double[][] curCoords;
         double[] regionProbs = new double[L * maxCoord];
-        double[] topicProbs = new double[L];
+        double[] dishProbs = new double[L];
         double[] regionmean;
         double totalprob = 0, max, r;
 
@@ -335,75 +335,72 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
             istoponym = toponymVector[i];
             if (isstopword == 0) {
                 if (istoponym == 1) {
+                    Arrays.fill(regionProbs, 0);
+
                     wordid = wordVector[i];
                     docid = documentVector[i];
-                    regionid = regionVector[i];
+                    dishid = regionVector[i];
                     coordid = coordinateVector[i];
                     docoff = docid * L;
                     wordoff = wordid * L;
 
-                    regionmean = regionMeans[regionid];
                     curCoordCount = toponymCoordinateLexicon[wordid].length;
                     curCoords = toponymCoordinateLexicon[wordid];
+
+                    double[] coordinateWeights = toponymCoordinateDirichletFM[wordid];
 
                     for (int j = 0; j < L; ++j) {
                         regoff = j * maxCoord;
                         regionmean = regionMeansFM[j];
-                        double doccount = kappaFM[docoff + j];
+                        double ldw = localDishWeightsFM[docoff + j];
                         for (int k = 0; k < curCoordCount; ++k) {
                             regionProbs[regoff + k] =
-                                  doccount
-                                  * TGMath.normalizedProportionalSphericalDensity(curCoords[k], regionmean, kappa[k]);
+                                  ldw * coordinateWeights[k]
+                                  * TGMath.sphericalDensity(curCoords[k], regionmean, kappaFM[k]);
                         }
                     }
 
-                    totalprob = decoder.annealProbs(0, regionProbs);
+                    totalprob = decoder.annealProbs(L, curCoordCount, maxCoord, regionProbs);
 
                     r = rand.nextDouble() * totalprob;
 
                     max = regionProbs[0];
-                    regionid = 0;
                     coordid = 0;
                     while (r > max) {
                         coordid++;
                         if (coordid == curCoordCount) {
-                            regionid++;
+                            dishid++;
                             coordid = 0;
                         }
-                        max += regionProbs[regionid * maxCoord + coordid];
+                        max += regionProbs[dishid * maxCoord + coordid];
                     }
-
-                    regionVector[i] = regionid;
+                    regionVector[i] = dishid;
                     coordinateVector[i] = coordid;
-
                 } else {
                     wordid = wordVector[i];
                     docid = documentVector[i];
-                    topicid = topicVector[i];
+                    dishid = topicVector[i];
                     istoponym = toponymVector[i];
                     docoff = docid * L;
                     wordoff = wordid * L;
 
                     try {
-//                        for (int j = 0;; ++j) {
-//                            topicProbs[j] = (averagedWordByTopicCounts[wordoff + j] + beta)
-//                                  / (averagedTopicCounts[j] + betaW)
-//                                  * (averagedTopicByDocumentCounts[docoff + j] + alpha_H);
-//                        }
+                        for (int j = 0;; ++j) {
+                            dishProbs[j] = localDishWeightsFM[docoff + j] * nonToponymByDishDirichletFM[wordoff + j];
+                        }
                     } catch (ArrayIndexOutOfBoundsException e) {
                     }
 
-                    totalprob = decoder.annealProbs(0, topicProbs);
-
+                    totalprob = decoder.annealProbs(dishProbs);
                     r = rand.nextDouble() * totalprob;
-                    max = topicProbs[0];
-                    topicid = 0;
-                    while (r > max) {
-                        topicid++;
-                        max += topicProbs[topicid];
-                    }
 
-                    topicVector[i] = topicid;
+                    max = dishProbs[0];
+                    dishid = 0;
+                    while (r > max) {
+                        dishid++;
+                        max += dishProbs[dishid];
+                    }
+                    topicVector[i] = dishid;
                 }
             }
         }
