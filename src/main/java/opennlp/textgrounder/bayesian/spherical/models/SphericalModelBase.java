@@ -313,11 +313,11 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         System.err.println(String.format("Beginning training with %d tokens, %d words, %d documents, and %d expected regions", N, W, D, L));
         train(annealer);
         if (annealer.getSamples() != 0) {
-            averagedWordByRegionCounts = annealer.getWordByRegionCounts();
-            averagedRegionCountsOfAllWords = annealer.getAllWordsRegionCounts();
-            averagedRegionByDocumentCounts = annealer.getRegionByDocumentCounts();
-            averagedRegionMeans = annealer.getRegionMeans();
-            averagedToponymCoordinateWeights = annealer.getRegionToponymCoordinateCounts();
+            globalDishWeightsFM = annealer.getGlobalDishWeightsFM();
+            localDishWeightsFM = annealer.getLocalDishWeightsFM();
+            kappaFM = annealer.getKappaFM();
+            regionMeansFM = annealer.getRegionMeansFM();
+            toponymCoordinateDirichletFM = annealer.getToponymCoordinateWeightsFM();
         }
     }
 

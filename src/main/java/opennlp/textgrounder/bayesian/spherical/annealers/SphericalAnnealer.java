@@ -19,7 +19,6 @@ package opennlp.textgrounder.bayesian.spherical.annealers;
 import java.util.Arrays;
 import opennlp.textgrounder.bayesian.annealers.Annealer;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
-import opennlp.textgrounder.bayesian.mathutils.TGBLAS;
 
 /**
  *
@@ -28,42 +27,28 @@ import opennlp.textgrounder.bayesian.mathutils.TGBLAS;
 public abstract class SphericalAnnealer extends Annealer {
 
     /**
+     * collection of first moments
+     */
+    protected double[] globalDishWeightsFM;
+    protected double[] localDishWeightsFM;
+    protected double[][] regionMeansFM;
+    protected double[] kappaFM;
+    protected double[] nonToponymByDishDirichletFM;
+    protected double[][] toponymCoordinateDirichletFM;
+    /**
+     * collection of second moments
+     */
+    protected double[] globalDishWeightsSM;
+    protected double[] localDishWeightsSM;
+    protected double[][] regionMeansSM;
+    protected double[] kappaSM;
+    protected double[] nonToponymByDishDirichletSM;
+    protected double[][] toponymCoordinateDirichletSM;
+    /**
      * 
      */
     protected int geoMeanVecLen;
-    /**
-     * Counts of tcount per topic. However, since access more often occurs in
-     * terms of the tcount, it will be a topic by word matrix.
-     */
-    protected double[] wordByRegionFirstMoment;
-    /**
-     *
-     */
-    protected double[] allWordsRegionFirstMoment;
-    /**
-     * 
-     */
-    protected double[] regionByDocumentFirstMoment;
-    /**
-     * 
-     */
-    protected double[] topicByDocumentFirstMoment;
-    /**
-     *
-     */
-    protected double[][] regionMeansFirstMoment;
-    /**
-     *
-     */
-    protected double[][] regionMeansSecondMoment;
-    /**
-     *
-     */
-    protected double[][] toponymCoordinateFirstMoment;
-    /**
-     *
-     */
-    protected double[][] toponymCoordinateSecondMoment;
+    protected int geoCovVecLen;
 
     /**
      *
@@ -88,70 +73,77 @@ public abstract class SphericalAnnealer extends Annealer {
      * @param _regionMeans
      * @param _regionToponymCoordinateCounts
      */
-    protected void initializeCollectionArrays(int[] _wordByRegionCounts, int[] _regionByDocumentCounts,
-          int[] _allWordsRegionCounts, double[][] _regionMeans,
-          int[][][] _toponymCoordinateWeights) {
-        wordByRegionFirstMoment = new double[_wordByRegionCounts.length];
-        regionByDocumentFirstMoment = new double[_regionByDocumentCounts.length];
-        allWordsRegionFirstMoment = new double[_allWordsRegionCounts.length];
+    protected void initializeCollectionArrays(double[] _globalDishWeights, double[] _localDishWeights, double[][] _regionMeans,
+          double[] _kappa, double[] _nonToponymByDishDirichlet, double[][] _toponymCoordinateDirichlet) {
+        globalDishWeightsFM = new double[_globalDishWeights.length];
+        localDishWeightsFM = new double[_localDishWeights.length];
+        kappaFM = new double[_kappa.length];
+        nonToponymByDishDirichletFM = new double[_nonToponymByDishDirichlet.length];
 
-        Arrays.fill(wordByRegionFirstMoment, 0);
-        Arrays.fill(regionByDocumentFirstMoment, 0);
-        Arrays.fill(allWordsRegionFirstMoment, 0);
+        Arrays.fill(globalDishWeightsFM, 0);
+        Arrays.fill(localDishWeightsFM, 0);
+        Arrays.fill(kappaFM, 0);
+        Arrays.fill(nonToponymByDishDirichletFM, 0);
 
-        toponymCoordinateFirstMoment = new double[_toponymCoordinateWeights.length][];
-        toponymCoordinateSecondMoment = new double[_toponymCoordinateWeights.length][];
-        for (int i = 0; i < _toponymCoordinateWeights.length; ++i) {
-            toponymCoordinateFirstMoment[i] = new double[_toponymCoordinateWeights[i].length];
-            Arrays.fill(toponymCoordinateFirstMoment[i], 0);
-            toponymCoordinateSecondMoment[i] = new double[_toponymCoordinateWeights[i].length];
-            Arrays.fill(toponymCoordinateSecondMoment[i], 0);
-        }
+        globalDishWeightsSM = new double[_globalDishWeights.length];
+        localDishWeightsSM = new double[_localDishWeights.length];
+        kappaSM = new double[_kappa.length];
+        nonToponymByDishDirichletSM = new double[_nonToponymByDishDirichlet.length];
 
-        regionMeansFirstMoment = new double[_regionMeans.length][];
+        Arrays.fill(globalDishWeightsSM, 0);
+        Arrays.fill(localDishWeightsSM, 0);
+        Arrays.fill(kappaSM, 0);
+        Arrays.fill(nonToponymByDishDirichletSM, 0);
+
+        regionMeansFM = new double[_regionMeans.length][];
+        regionMeansSM = new double[_regionMeans.length][];
+
+        regionMeansFM = new double[_regionMeans.length][];
+        regionMeansSM = new double[_regionMeans.length][];
         geoMeanVecLen = _regionMeans[0].length;
+        geoCovVecLen = geoMeanVecLen * (geoMeanVecLen + 1) / 2;
         for (int i = 0; i < _regionMeans.length; ++i) {
             double[] mean = new double[geoMeanVecLen];
-            for (int j = 0; j < geoMeanVecLen; ++j) {
-                mean[j] = 0;
-            }
-            regionMeansFirstMoment[i] = mean;
+            Arrays.fill(mean, 0);
+            regionMeansFM[i] = mean;
+            double[] secmo = new double[geoCovVecLen];
+            Arrays.fill(secmo, 0);
+            regionMeansSM[i] = secmo;
+        }
+
+        toponymCoordinateDirichletFM = new double[_toponymCoordinateDirichlet.length][];
+        toponymCoordinateDirichletSM = new double[_toponymCoordinateDirichlet.length][];
+        for (int i = 0; i < _toponymCoordinateDirichlet.length; ++i) {
+            int len = _toponymCoordinateDirichlet[i].length;
+            toponymCoordinateDirichletFM[i] = new double[len];
+            Arrays.fill(toponymCoordinateDirichletFM[i], 0);
+            toponymCoordinateDirichletSM[i] = new double[len * (len + 1) / 2];
+            Arrays.fill(toponymCoordinateDirichletSM[i], 0);
         }
     }
 
-    protected void addToArrays(int[] _wordByRegionCounts, int[] _regionByDocumentCounts,
-          int[] _allWordsRegionCounts, double[][] _regionMeans,
-          int[][][] _regionToponymCoordinateCounts) {
-        addToArray(wordByRegionFirstMoment, _wordByRegionCounts);
-        addToArray(regionByDocumentFirstMoment, _regionByDocumentCounts);
-        addToArray(allWordsRegionFirstMoment, _allWordsRegionCounts);
-
-//        for (int i = 0; i < toponymCoordinateWeights.length; ++i) {
-//            for (int j = 0; j < toponymCoordinateWeights[i].length; ++j) {
-//                for (int k = 0; k < toponymCoordinateWeights[i][j].length; ++k) {
-//                    toponymCoordinateWeights[i][j][k] += _regionToponymCoordinateCounts[i][j][k];
-//                }
-//            }
-//        }
-
-        for (int i = 0; i < regionMeansFirstMoment.length; ++i) {
-            TGBLAS.daxpy(geoMeanVecLen, 1, _regionMeans[i], 1, regionMeansFirstMoment[i], 1);
+    protected void addToArrays(double[] _globalDishWeights, double[] _localDishWeights, double[][] _regionMeans,
+          double[] _kappa, double[] _nonToponymByDishDirichlet, double[][] _toponymCoordinateDirichlet) {
+        addToFirstMoment(globalDishWeightsFM, _globalDishWeights);
+        addToSecondMoment(globalDishWeightsSM, _globalDishWeights);
+        addToFirstMoment(localDishWeightsFM, _localDishWeights);
+        addToSecondMoment(localDishWeightsSM, _localDishWeights);
+        for (int l = 0; l < _regionMeans.length; ++l) {
+            addToFirstMoment(regionMeansFM[l], _regionMeans[l]);
+            addToCovariance(regionMeansFM[l], _regionMeans[l]);
+        }
+        addToFirstMoment(kappaFM, _kappa);
+        addToSecondMoment(kappaSM, _kappa);
+        addToFirstMoment(nonToponymByDishDirichletFM, _nonToponymByDishDirichlet);
+        addToSecondMoment(nonToponymByDishDirichletSM, _nonToponymByDishDirichlet);
+        for (int l = 0; l < _toponymCoordinateDirichlet.length; ++l) {
+            addToFirstMoment(toponymCoordinateDirichletFM[l], _toponymCoordinateDirichlet[l]);
+            addToCovariance(toponymCoordinateDirichletSM[l], _toponymCoordinateDirichlet[l]);
         }
     }
 
-    /**
-     * 
-     * @param _wordByRegionCounts
-     * @param _regionByDocumentCounts
-     * @param _allWordsRegionCounts
-     * @param _regionMeans
-     * @param _regionToponymCoordinateCounts
-     */
-    public void collectSamples(int[] _wordByRegionCounts, int[] _regionByDocumentCounts,
-          int[] _allWordsRegionCounts, double[][] _regionMeans,
-          //          int[] _toponymByRegionCounts, int[] _nonToponymRegionCounts,
-          int[][][] _regionToponymCoordinateCounts) {
-
+    public void collectSamples(double[] _globalDishWeights, double[] _localDishWeights, double[][] _regionMeans,
+          double[] _kappa, double[] _nonToponymByDishDirichlet, double[][] _toponymCoordinateDirichlet) {
         if (sampleCount < samples) {
             if (sampleiteration && (innerIter % lag == 0)) {
                 sampleCount += 1;
@@ -160,38 +152,10 @@ public abstract class SphericalAnnealer extends Annealer {
                 }
 
                 System.err.print("(sample:" + (innerIter + 1) / lag + ")");
-                if (wordByRegionFirstMoment == null) {
-                    initializeCollectionArrays(_wordByRegionCounts, _regionByDocumentCounts, _allWordsRegionCounts, _regionMeans, _regionToponymCoordinateCounts);
+                if (localDishWeightsFM == null) {
+                    initializeCollectionArrays(_globalDishWeights, _localDishWeights, _regionMeans, _kappa, _nonToponymByDishDirichlet, _toponymCoordinateDirichlet);
                 }
-                addToArrays(_wordByRegionCounts, _regionByDocumentCounts, _allWordsRegionCounts, _regionMeans, _regionToponymCoordinateCounts);
-            }
-            if (finishedCollection) {
-                averageSamples();
-            }
-        }
-    }
-
-    public void collectSamples(int[] _wordByRegionCounts, int[] _regionByDocumentCounts,
-          int[] _topicByDocumentCounts, int[] _allWordsRegionCounts, double[][] _regionMeans,
-          int[][][] _regionToponymCoordinateCounts) {
-
-        if (sampleCount < samples) {
-            if (sampleiteration && (innerIter % lag == 0)) {
-                sampleCount += 1;
-                if (samples == sampleCount) {
-                    finishedCollection = true;
-                }
-
-                System.err.print("(sample:" + (innerIter + 1) / lag + ")");
-                if (wordByRegionFirstMoment == null) {
-                    initializeCollectionArrays(_wordByRegionCounts, _regionByDocumentCounts, _allWordsRegionCounts, _regionMeans, _regionToponymCoordinateCounts);
-
-                    topicByDocumentFirstMoment = new double[_topicByDocumentCounts.length];
-                    Arrays.fill(topicByDocumentFirstMoment, 0);
-                }
-
-                addToArrays(_wordByRegionCounts, _regionByDocumentCounts, _allWordsRegionCounts, _regionMeans, _regionToponymCoordinateCounts);
-                addToArray(topicByDocumentFirstMoment, _topicByDocumentCounts);
+                addToArrays(_globalDishWeights, _localDishWeights, _regionMeans, _kappa, _nonToponymByDishDirichlet, _toponymCoordinateDirichlet);
             }
             if (finishedCollection) {
                 averageSamples();
@@ -200,78 +164,112 @@ public abstract class SphericalAnnealer extends Annealer {
     }
 
     protected void averageSamples() {
-        averageSamples(wordByRegionFirstMoment);
-        averageSamples(regionByDocumentFirstMoment);
-        averageSamples(allWordsRegionFirstMoment);
-        try {
-            averageSamples(topicByDocumentFirstMoment);
-        } catch (NullPointerException e) {
+        averageSamples(globalDishWeightsFM);
+        averageSamples(localDishWeightsFM);
+        for (int l = 0; l < regionMeansFM.length; ++l) {
+            averageSamples(regionMeansFM[l]);
         }
+        averageSamples(kappaFM);
+        averageSamples(nonToponymByDishDirichletFM);
 
-        for (int i = 0; i < toponymCoordinateFirstMoment.length;
-              ++i) {
-            for (int j = 0;
-                  j < toponymCoordinateFirstMoment[i].length; ++j) {
-//                for (int k = 0;
-//                      k < toponymCoordinateWeights[i][j].length;
-//                      ++k) {
-//                    toponymCoordinateWeights[i][j][k] /= sampleCount;
-//                }
-            }
-        }
-
-        for (int i = 0; i < regionMeansFirstMoment.length; ++i) {
-            for (int j = 0; j < geoMeanVecLen; ++j) {
-                regionMeansFirstMoment[i][j] /= sampleCount;
-            }
+        for (int l = 0; l < toponymCoordinateDirichletFM.length; ++l) {
+            averageSamples(toponymCoordinateDirichletFM[l]);
         }
     }
 
-    public double[] getRegionByDocumentCounts() {
-        return regionByDocumentFirstMoment;
+    public double[] getGlobalDishWeightsFM() {
+        return globalDishWeightsFM;
     }
 
-    public double[][] getRegionToponymCoordinateCounts() {
-        return toponymCoordinateFirstMoment;
+    public void setGlobalDishWeightsFM(double[] globalDishWeightsFM) {
+        this.globalDishWeightsFM = globalDishWeightsFM;
     }
 
-    public double[] getWordByRegionCounts() {
-        return wordByRegionFirstMoment;
+    public double[] getGlobalDishWeightsSM() {
+        return globalDishWeightsSM;
     }
 
-    public void setRegionByDocumentCounts(double[] _regionByDocumentCounts) {
-        regionByDocumentFirstMoment = _regionByDocumentCounts;
+    public void setGlobalDishWeightsSM(double[] globalDishWeightsSM) {
+        this.globalDishWeightsSM = globalDishWeightsSM;
     }
 
-    public void setRegionToponymCoordinateCounts(double[][] _regionToponymCoordinateCounts) {
-        toponymCoordinateFirstMoment = _regionToponymCoordinateCounts;
+    public double[] getKappaFM() {
+        return kappaFM;
     }
 
-    public void setWordByRegionCounts(double[] _wordByRegionCounts) {
-        wordByRegionFirstMoment = _wordByRegionCounts;
+    public void setKappaFM(double[] kappaFM) {
+        this.kappaFM = kappaFM;
     }
 
-    public double[] getAllWordsRegionCounts() {
-        return allWordsRegionFirstMoment;
+    public double[] getKappaSM() {
+        return kappaSM;
     }
 
-    public void setAllWordsRegionCounts(double[] _allWordsRegionCounts) {
-        allWordsRegionFirstMoment = _allWordsRegionCounts;
+    public void setKappaSM(double[] kappaSM) {
+        this.kappaSM = kappaSM;
     }
 
-    public double[][] getRegionMeans() {
-        return regionMeansFirstMoment;
+    public double[] getLocalDishWeightsFM() {
+        return localDishWeightsFM;
     }
 
-    public void setRegionMeans(double[][] _regionMeans) {
-        regionMeansFirstMoment = _regionMeans;
+    public void setLocalDishWeightsFM(double[] localDishWeightsFM) {
+        this.localDishWeightsFM = localDishWeightsFM;
     }
 
-    public double[] getTopicByDocumentCounts() {
-        return topicByDocumentFirstMoment;
+    public double[] getLocalDishWeightsSM() {
+        return localDishWeightsSM;
     }
 
-    public void setTopicByDocumentCounts(double[] topicByDocumentCounts) {
-        this.topicByDocumentFirstMoment = topicByDocumentCounts;
+    public void setLocalDishWeightsSM(double[] localDishWeightsSM) {
+        this.localDishWeightsSM = localDishWeightsSM;
+    }
+
+    public double[] getNonToponymByDishDirichletFM() {
+        return nonToponymByDishDirichletFM;
+    }
+
+    public void setNonToponymByDishDirichletFM(double[] nonToponymByDishDirichletFM) {
+        this.nonToponymByDishDirichletFM = nonToponymByDishDirichletFM;
+    }
+
+    public double[] getNonToponymByDishDirichletSM() {
+        return nonToponymByDishDirichletSM;
+    }
+
+    public void setNonToponymByDishDirichletSM(double[] nonToponymByDishDirichletSM) {
+        this.nonToponymByDishDirichletSM = nonToponymByDishDirichletSM;
+    }
+
+    public double[][] getRegionMeansFM() {
+        return regionMeansFM;
+    }
+
+    public void setRegionMeansFM(double[][] regionMeansFM) {
+        this.regionMeansFM = regionMeansFM;
+    }
+
+    public double[][] getRegionMeansSM() {
+        return regionMeansSM;
+    }
+
+    public void setRegionMeansSM(double[][] regionMeansSM) {
+        this.regionMeansSM = regionMeansSM;
+    }
+
+    public double[][] getToponymCoordinateWeightsFM() {
+        return toponymCoordinateDirichletFM;
+    }
+
+    public void setToponymCoordinateWeightsFM(double[][] toponymCoordinateDirichletFM) {
+        this.toponymCoordinateDirichletFM = toponymCoordinateDirichletFM;
+    }
+
+    public double[][] getToponymCoordinateWeightsSM() {
+        return toponymCoordinateDirichletSM;
+    }
+
+    public void setToponymCoordinateWeightsSM(double[][] toponymCoordinateDirichletSM) {
+        this.toponymCoordinateDirichletSM = toponymCoordinateDirichletSM;
     }
 }

@@ -27,12 +27,12 @@ import opennlp.textgrounder.bayesian.spherical.models.SphericalModelFields;
 public class AveragedSphericalCountWrapper extends SphericalModelFields implements Serializable {
 
     public AveragedSphericalCountWrapper(SphericalModelBase _regionModel) {
-        averagedRegionCountsOfAllWords = _regionModel.getAveragedAllWordsRegionCounts();
-        averagedRegionByDocumentCounts = _regionModel.getAveragedRegionByDocumentCounts();
-        averagedTopicByDocumentCounts = _regionModel.getAveragedTopicByDocumentCounts();
-        averagedWordByRegionCounts = _regionModel.getAveragedWordByRegionCounts();
-        averagedRegionMeans = _regionModel.getAveragedRegionMeans();
-        averagedToponymCoordinateWeights = _regionModel.getAveragedRegionToponymCoordinateCounts();
+        localDishWeightsFM = _regionModel.getAveragedAllWordsRegionCounts();
+        kappaFM = _regionModel.getAveragedRegionByDocumentCounts();
+        nonToponymByDishDirichletFM = _regionModel.getAveragedTopicByDocumentCounts();
+        globalDishWeightsFM = _regionModel.getAveragedWordByRegionCounts();
+        regionMeansFM = _regionModel.getAveragedRegionMeans();
+        toponymCoordinateDirichletFM = _regionModel.getAveragedRegionToponymCoordinateCounts();
 
         toponymCoordinateLexicon = _regionModel.getToponymCoordinateLexicon();
 

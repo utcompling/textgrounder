@@ -203,10 +203,32 @@ public abstract class Annealer {
         }
     }
 
-    protected void addToArray(double[] _target, int[] _source) {
+    protected void addToFirstMoment(double[] _target, double[] _source) {
         try {
             for (int i = 0;; ++i) {
                 _target[i] += _source[i];
+            }
+        } catch (ArrayIndexOutOfBoundsException e) {
+        }
+    }
+
+    protected void addToSecondMoment(double[] _target, double[] _source) {
+        try {
+            for (int i = 0;; ++i) {
+                _target[i] += _source[i] * _source[i];
+            }
+        } catch (ArrayIndexOutOfBoundsException e) {
+        }
+    }
+
+    protected void addToCovariance(double[] _target, double[] _source) {
+        try {
+            int c = _source.length;
+            for (int i = 0; i < c; ++i) {
+                int off = i * (2 * c - i + 1) / 2 - i;
+                for (int j = i; j < c; ++j) {
+                    _target[off + j] += _source[i] * _source[j];
+                }
             }
         } catch (ArrayIndexOutOfBoundsException e) {
         }

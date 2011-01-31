@@ -312,6 +312,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                 }
             }
 
+            annealer.collectSamples(globalDishWeights, localDishWeights, regionMeans, kappa, nonToponymByDishDirichlet, toponymCoordinateWeights);
             resample();
         }
     }
@@ -347,8 +348,8 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
 
                     for (int j = 0; j < L; ++j) {
                         regoff = j * maxCoord;
-                        regionmean = averagedRegionMeans[j];
-                        double doccount = averagedRegionByDocumentCounts[docoff + j];
+                        regionmean = regionMeansFM[j];
+                        double doccount = kappaFM[docoff + j];
                         for (int k = 0; k < curCoordCount; ++k) {
                             regionProbs[regoff + k] =
                                   doccount
@@ -415,9 +416,9 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
     public void train() {
         super.train();
         if (annealer.getSamples() != 0) {
-            averagedWordByTopicCounts = averagedWordByRegionCounts;
-            averagedTopicCounts = averagedRegionCountsOfAllWords;
-            averagedTopicByDocumentCounts = annealer.getTopicByDocumentCounts();
+            averagedWordByTopicCounts = globalDishWeightsFM;
+            averagedTopicCounts = localDishWeightsFM;
+            nonToponymByDishDirichletFM = annealer.getNonToponymByDishDirichletFM();
         }
     }
 }

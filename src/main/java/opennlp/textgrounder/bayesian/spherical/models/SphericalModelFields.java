@@ -197,27 +197,27 @@ public class SphericalModelFields implements Serializable {
     /**
      *
      */
-    protected double[] averagedWordByRegionCounts;
+    protected double[] globalDishWeightsFM;
     /**
      *
      */
-    protected double[] averagedRegionCountsOfAllWords;
+    protected double[] localDishWeightsFM;
     /**
      *
      */
-    protected double[] averagedRegionByDocumentCounts;
+    protected double[] kappaFM;
     /**
      * 
      */
-    protected double[] averagedTopicByDocumentCounts;
+    protected double[] nonToponymByDishDirichletFM;
     /**
      *
      */
-    protected double[][] averagedRegionMeans;
+    protected double[][] regionMeansFM;
     /**
      * 
      */
-    protected double[][] averagedToponymCoordinateWeights;
+    protected double[][] toponymCoordinateDirichletFM;
 
     public int getD() {
         return D;
@@ -268,43 +268,43 @@ public class SphericalModelFields implements Serializable {
     }
 
     public double[] getAveragedAllWordsRegionCounts() {
-        return averagedRegionCountsOfAllWords;
+        return localDishWeightsFM;
     }
 
     public void setAveragedAllWordsRegionCounts(double[] averagedAllWordsRegionCounts) {
-        this.averagedRegionCountsOfAllWords = averagedAllWordsRegionCounts;
+        this.localDishWeightsFM = averagedAllWordsRegionCounts;
     }
 
     public double[] getAveragedRegionByDocumentCounts() {
-        return averagedRegionByDocumentCounts;
+        return kappaFM;
     }
 
     public void setAveragedRegionByDocumentCounts(double[] averagedRegionByDocumentCounts) {
-        this.averagedRegionByDocumentCounts = averagedRegionByDocumentCounts;
+        this.kappaFM = averagedRegionByDocumentCounts;
     }
 
     public double[][] getAveragedRegionMeans() {
-        return averagedRegionMeans;
+        return regionMeansFM;
     }
 
     public void setAveragedRegionMeans(double[][] averagedRegionMeans) {
-        this.averagedRegionMeans = averagedRegionMeans;
+        this.regionMeansFM = averagedRegionMeans;
     }
 
     public double[][] getAveragedRegionToponymCoordinateCounts() {
-        return averagedToponymCoordinateWeights;
+        return toponymCoordinateDirichletFM;
     }
 
     public void setAveragedRegionToponymCoordinateCounts(double[][] averagedRegionToponymCoordinateCounts) {
-        this.averagedToponymCoordinateWeights = averagedRegionToponymCoordinateCounts;
+        this.toponymCoordinateDirichletFM = averagedRegionToponymCoordinateCounts;
     }
 
     public double[] getAveragedWordByRegionCounts() {
-        return averagedWordByRegionCounts;
+        return globalDishWeightsFM;
     }
 
     public void setAveragedWordByRegionCounts(double[] averagedWordByRegionCounts) {
-        this.averagedWordByRegionCounts = averagedWordByRegionCounts;
+        this.globalDishWeightsFM = averagedWordByRegionCounts;
     }
 
     public int getCoordParamLen() {
@@ -420,11 +420,11 @@ public class SphericalModelFields implements Serializable {
     }
 
     public double[] getAveragedTopicByDocumentCounts() {
-        return averagedTopicByDocumentCounts;
+        return nonToponymByDishDirichletFM;
     }
 
     public void setAveragedTopicByDocumentCounts(double[] averagedTopicByDocumentCounts) {
-        this.averagedTopicByDocumentCounts = averagedTopicByDocumentCounts;
+        this.nonToponymByDishDirichletFM = averagedTopicByDocumentCounts;
     }
 
     public int[] getTopicByDocumentCounts() {
