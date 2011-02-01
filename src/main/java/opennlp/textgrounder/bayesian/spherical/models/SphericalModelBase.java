@@ -572,7 +572,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
 
     public double[] restaurantStickBreakingWeightsUpdate() {
         double[] weights = new double[D * L];
-        double[] wcs = TGMath.cumSum(globalDishWeights);
+        double[] wcs = TGMath.cumProb(globalDishWeights);
         for (int d = 0; d < D; ++d) {
             int docoff = d * L;
             double ai = alpha[d];

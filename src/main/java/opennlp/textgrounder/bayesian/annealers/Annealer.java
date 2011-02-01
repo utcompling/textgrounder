@@ -149,7 +149,7 @@ public abstract class Annealer {
                 System.err.println("Beginning sampling!");
 
                 outerIter = 0;
-                innerIter = 0;
+                innerIter = 1;
 
                 temperatureReciprocal = 1. / targetTemperature;
                 innerIterationsMax = samples * lag;

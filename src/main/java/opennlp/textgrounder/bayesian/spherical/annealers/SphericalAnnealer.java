@@ -151,7 +151,7 @@ public abstract class SphericalAnnealer extends Annealer {
                     finishedCollection = true;
                 }
 
-                System.err.print("(sample:" + (innerIter + 1) / lag + ")");
+                System.err.print("(sample:" + sampleCount + ")");
                 if (localDishWeightsFM == null) {
                     initializeCollectionArrays(_globalDishWeights, _localDishWeights, _regionMeans, _kappa, _nonToponymByDishDirichlet, _toponymCoordinateDirichlet);
                 }
