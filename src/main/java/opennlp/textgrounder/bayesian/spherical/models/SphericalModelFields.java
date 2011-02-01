@@ -74,10 +74,6 @@ public class SphericalModelFields implements Serializable {
      */
     protected double vmf_proposal_sigma = 1;
     /**
-     * 
-     */
-    protected double[] kappa;
-    /**
      * Number of documents
      */
     protected int D;
@@ -136,9 +132,17 @@ public class SphericalModelFields implements Serializable {
      */
     protected int[] wordVector;
     /**
-     * Counts of topics per document
+     * An index of toponyms and possible regions. The goal is fast lookup and not
+     * frugality with memory. The dimensions are equivalent to the wordByRegionCounts
+     * array. Instead of counts, this array is populated with ones and zeros.
+     * If a toponym occurs in a certain region, the cell value is one, zero if not.
      */
-    protected int[] regionByDocumentCounts;
+    protected double[][][] toponymCoordinateLexicon;
+    ///////////////////////////////////////////////////////////////////////////
+    /**
+     * Count arrays
+     */
+    ///////////////////////////////////////////////////////////////////////////
     /**
      * only used if there is an independent topic model component to model
      */
@@ -148,20 +152,9 @@ public class SphericalModelFields implements Serializable {
      */
     protected int[][] toponymCoordinateCounts;
     /**
-     * An index of toponyms and possible regions. The goal is fast lookup and not
-     * frugality with memory. The dimensions are equivalent to the wordByRegionCounts
-     * array. Instead of counts, this array is populated with ones and zeros.
-     * If a toponym occurs in a certain region, the cell value is one, zero if not.
-     */
-    protected double[][][] toponymCoordinateLexicon;
-    /**
-     * 
-     */
-    protected double[][] regionMeans;
-    /**
      * Counts of regions but only for toponyms
      */
-    protected int[] dishCountsOfToponyms;
+    protected int[] toponymByDishCounts;
     /**
      *
      */
@@ -170,6 +163,19 @@ public class SphericalModelFields implements Serializable {
      *
      */
     protected int[] globalDishCounts;
+    ///////////////////////////////////////////////////////////////////////////
+    /**
+     * Weights/parameters at each iteration
+     */
+    ///////////////////////////////////////////////////////////////////////////
+    /**
+     *
+     */
+    protected double[][] regionMeans;
+    /**
+     *
+     */
+    protected double[] kappa;
     /**
      *
      */
@@ -179,17 +185,18 @@ public class SphericalModelFields implements Serializable {
      */
     protected double[] localDishWeights;
     /**
-     * Counts of regions for all words
-     */
-    protected int[] regionCountsOfAllWords;
-    /**
      *
      */
     protected double[] nonToponymByDishDirichlet;
     /**
      *
      */
-    protected double[][] toponymCoordinateWeights;
+    protected double[][] toponymCoordinateDirichlet;
+    ///////////////////////////////////////////////////////////////////////////
+    /**
+     * Sample averages. Sample first moments and second moments
+     */
+    ///////////////////////////////////////////////////////////////////////////
     /**
      *
      */
@@ -245,14 +252,6 @@ public class SphericalModelFields implements Serializable {
 
     public void setT(int T) {
         this.T = T;
-    }
-
-    public int[] getAllWordsRegionCounts() {
-        return regionCountsOfAllWords;
-    }
-
-    public void setAllWordsRegionCounts(int[] allWordsRegionCounts) {
-        this.regionCountsOfAllWords = allWordsRegionCounts;
     }
 
     public double getAlpha() {
@@ -343,20 +342,12 @@ public class SphericalModelFields implements Serializable {
         this.maxCoord = maxCoord;
     }
 
-    public int[] getRegionByDocumentCounts() {
-        return regionByDocumentCounts;
-    }
-
-    public void setRegionByDocumentCounts(int[] regionByDocumentCounts) {
-        this.regionByDocumentCounts = regionByDocumentCounts;
-    }
-
     public int[] getRegionCounts() {
-        return dishCountsOfToponyms;
+        return toponymByDishCounts;
     }
 
     public void setRegionCounts(int[] regionCounts) {
-        this.dishCountsOfToponyms = regionCounts;
+        this.toponymByDishCounts = regionCounts;
     }
 
     public double[][] getRegionMeans() {
@@ -432,10 +423,10 @@ public class SphericalModelFields implements Serializable {
     }
 
     public int[] getToponymRegionCounts() {
-        return dishCountsOfToponyms;
+        return toponymByDishCounts;
     }
 
     public void setToponymRegionCounts(int[] toponymRegionCounts) {
-        this.dishCountsOfToponyms = toponymRegionCounts;
+        this.toponymByDishCounts = toponymRegionCounts;
     }
 }

@@ -97,6 +97,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         vmf_proposal_kappa = _experimentParameters.get_vmf_proposal_kappa();
         vmf_proposal_sigma = _experimentParameters.get_vmf_proposal_sigma();
 
+        L = _experimentParameters.getL();
+
         int randSeed = _experimentParameters.getRandomSeed();
         if (randSeed == 0) {
             /**
@@ -109,6 +111,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
              */
             rand = new MersenneTwisterFast(randSeed);
         }
+        RKRand.setMtfRand(rand);
+        TGRand.setMtfRand(rand);
 
         double targetTemp = _experimentParameters.getTargetTemperature();
         double initialTemp = _experimentParameters.getInitialTemperature();
@@ -145,17 +149,11 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * </p>
      */
     protected void initializeArrays() {
-        dishCountsOfToponyms = new int[L];
-        Arrays.fill(dishCountsOfToponyms, 0);
-
-        regionCountsOfAllWords = new int[L];
-        Arrays.fill(regionCountsOfAllWords, 0);
-
-        regionByDocumentCounts = new int[D * L];
-        Arrays.fill(regionByDocumentCounts, 0);
-
-        regionMeans = new double[L][];
-
+        //////////////////////////////////////////////////////////////////////
+        /**
+         * count arrays
+         */
+        //////////////////////////////////////////////////////////////////////
         toponymCoordinateCounts = new int[T][];
         for (int j = 0; j < T; ++j) {
             int coordinates = toponymCoordinateLexicon[j].length;
@@ -167,16 +165,43 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         dishByRestaurantCounts = new int[D * L];
         Arrays.fill(dishByRestaurantCounts, 0);
 
-        regionCountsOfAllWords = new int[L];
-        Arrays.fill(regionCountsOfAllWords, 0);
-        globalDishCounts = regionCountsOfAllWords;
+        globalDishCounts = new int[L];
+        Arrays.fill(globalDishCounts, 0);
+
+        toponymByDishCounts = new int[T * L];
+        Arrays.fill(toponymByDishCounts, 0);
 
         nonToponymByDishCounts = new int[W * L];
         Arrays.fill(nonToponymByDishCounts, 0);
 
+        //////////////////////////////////////////////////////////////////////
+        /**
+         * parameter arrays
+         */
+        //////////////////////////////////////////////////////////////////////
+        regionMeans = new double[L][];
+
+        kappa = new double[L];
+        Arrays.fill(kappa, 0);
+
         alpha = new double[D];
         Arrays.fill(alpha, alpha_init);
 
+        globalDishWeights = new double[L];
+        Arrays.fill(globalDishWeights, 0);
+
+        localDishWeights = new double[D * L];
+        Arrays.fill(localDishWeights, 0);
+
+        nonToponymByDishDirichlet = new double[W * L];
+        Arrays.fill(nonToponymByDishDirichlet, 0);
+
+        toponymCoordinateDirichlet = new double[T][];
+        for (int t = 0; t < T; ++t) {
+            int len = toponymCoordinateLexicon[t].length;
+            toponymCoordinateDirichlet[t] = new double[len];
+            Arrays.fill(toponymCoordinateDirichlet[t], 0);
+        }
     }
 
     /**
@@ -563,7 +588,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                 vl[l] = RKRand.rk_beta(a, b);
             }
 
-            vl[L] = 1;
+            vl[L - 1] = 1;
             for (int i = 0; i < L; ++i) {
                 ilvl[i] = Math.log(1 - vl[i]);
             }
@@ -590,7 +615,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             v[i] = RKRand.rk_beta(a, b);
         }
 
-        v[L] = 1;
+        v[L - 1] = 1;
         for (int i = 0; i < L; ++i) {
             ilvl[i] = Math.log(1 - v[i]);
         }

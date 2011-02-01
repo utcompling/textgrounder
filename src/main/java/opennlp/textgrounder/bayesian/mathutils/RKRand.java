@@ -72,12 +72,8 @@ public class RKRand {
     protected static double M_PI = 3.14159265358979323846264338328;
     protected static MersenneTwisterFast mtfRand;
 
-    /**
-     * 
-     * @param _mtfRand
-     */
-    public RKRand(MersenneTwisterFast _mtfRand) {
-        mtfRand = _mtfRand;
+    public static void setMtfRand(MersenneTwisterFast mtfRand) {
+        RKRand.mtfRand = mtfRand;
     }
 
     /* log-gamma function to support some of these distributions. The

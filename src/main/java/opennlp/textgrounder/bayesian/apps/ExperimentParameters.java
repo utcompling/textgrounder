@@ -59,7 +59,7 @@ public class ExperimentParameters {
      * global stick breaking prior. is specified from param file on first
      * iteration.
      */
-    protected double alpha_H = 1;
+    protected double alpha_H = 10;
     /**
      * fixed intermediate parameters for resampling alpha_H. corresponds to
      * d and f in paper
@@ -69,7 +69,7 @@ public class ExperimentParameters {
      * uniform hyperparameter for restaurant local stick breaking weights. only
      * used in first iteration. set from param file
      */
-    protected double alpha_init = 1;
+    protected double alpha_init = 10;
     /**
      * hyperparameters for sampling document specific alpha parameters in posterior
      * update stage. corresponds to a and b respectively in algorithm paper
@@ -79,7 +79,7 @@ public class ExperimentParameters {
     /**
      * gamma hyperparameters for kappa generation in metropolis-hastings
      */
-    protected double kappa_hyper_shape = 1, kappa_hyper_scale = 0.01;
+    protected double kappa_hyper_shape = 50, kappa_hyper_scale = 1;
     /**
      * dirichlet hyperparameter for non-toponym word by dish weights. corresponding
      * random variable is labeled phi in the algorithm paper. corresponding hyperparameter
@@ -100,6 +100,10 @@ public class ExperimentParameters {
      * the standard deviation in the proposal distribution for region kappas
      */
     protected double vmf_proposal_sigma = 1;
+    /**
+     * number of dishes when starting out
+     */
+    protected int L = 1000;
     ////////////////////////////////////////////////////////////////////////
     /**
      * region model parameters
@@ -287,6 +291,10 @@ public class ExperimentParameters {
 
     public double get_vmf_proposal_sigma() {
         return vmf_proposal_sigma;
+    }
+
+    public int getL() {
+        return L;
     }
 
     public double getAlpha() {

@@ -26,12 +26,8 @@ public class TGRand {
 
     protected static MersenneTwisterFast mtfRand;
 
-    /**
-     * 
-     * @param _mtfRand
-     */
-    public TGRand(MersenneTwisterFast _mtfRand) {
-        mtfRand = _mtfRand;
+    public static void setMtfRand(MersenneTwisterFast mtfRand) {
+        TGRand.mtfRand = mtfRand;
     }
 
     public static double[] dirichletRnd(double[] _hyper, int[] _n) {

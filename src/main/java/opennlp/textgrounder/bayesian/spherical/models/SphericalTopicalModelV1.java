@@ -50,7 +50,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                 v[l] = RKRand.rk_beta(1, alpha_H);
             }
 
-            v[L] = 1;
+            v[L - 1] = 1;
             for (int i = 0; i < L; ++i) {
                 ilvl[i] = Math.log(1 - v[i]);
             }
@@ -65,7 +65,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
         {
             double[] v = new double[L];
             double[] wcs = new double[L];
-            wcs = TGMath.cumSum(globalDishWeights);
+            wcs = TGMath.cumProb(globalDishWeights);
 
             double[] vl = new double[L];
             double[] ivl = new double[L];
@@ -76,11 +76,16 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                 int docoff = d * L;
                 double ai = alpha[d];
                 for (int l = 0; l < L; ++l) {
-                    vl[l] = RKRand.rk_beta(ai * globalDishWeights[l],
+                    double val = RKRand.rk_beta(ai * globalDishWeights[l],
                           ai * (1 - wcs[l]));
+                    if (Double.isNaN(val)) {
+                        vl[l] = 0;
+                    } else {
+                        vl[l] = val;
+                    }
                 }
 
-                vl[L] = 1;
+                vl[L - 1] = 1;
                 for (int i = 0; i < L; ++i) {
                     ilvl[i] = Math.log(1 - vl[i]);
                 }
@@ -109,7 +114,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
         for (int i = 0; i < T; ++i) {
             int len = toponymCoordinateLexicon[i].length;
             double[] dir = TGRand.dirichletRnd(ehta_dirichlet_hyper, len);
-            toponymCoordinateWeights[i] = dir;
+            toponymCoordinateDirichlet[i] = dir;
         }
 
         {
@@ -140,7 +145,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         curCoordCount = toponymCoordinateLexicon[wordid].length;
                         curCoords = toponymCoordinateLexicon[wordid];
 
-                        double[] coordinateWeights = toponymCoordinateWeights[wordid];
+                        double[] coordinateWeights = toponymCoordinateDirichlet[wordid];
 
                         for (int j = 0; j < L; ++j) {
                             regoff = j * maxCoord;
@@ -171,7 +176,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         dishVector[i] = dishid;
                         coordinateVector[i] = coordid;
 
-                        dishCountsOfToponyms[dishid]++;
+                        toponymByDishCounts[dishid]++;
                         dishByRestaurantCounts[docoff + dishid]++;
                         toponymCoordinateCounts[wordid][coordid]++;
                         globalDishCounts[dishid]++;
@@ -264,7 +269,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
             int[] coordCounts = toponymCoordinateCounts[i];
             for (int j = 0; j < len; ++j) {
                 double[] dir = TGRand.dirichletRnd(ehta_dirichlet_hyper, coordCounts);
-                toponymCoordinateWeights[i] = dir;
+                toponymCoordinateDirichlet[i] = dir;
             }
         }
     }
@@ -302,14 +307,14 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         wordoff = wordid * L;
 
                         globalDishCounts[dishid]--;
-                        dishCountsOfToponyms[dishid]--;
+                        toponymByDishCounts[dishid]--;
                         dishByRestaurantCounts[docoff + dishid]--;
                         toponymCoordinateCounts[wordid][coordid]--;
 
                         curCoordCount = toponymCoordinateLexicon[wordid].length;
                         curCoords = toponymCoordinateLexicon[wordid];
 
-                        double[] coordinateWeights = toponymCoordinateWeights[wordid];
+                        double[] coordinateWeights = toponymCoordinateDirichlet[wordid];
 
                         for (int j = 0; j < L; ++j) {
                             regoff = j * maxCoord;
@@ -339,7 +344,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         dishVector[i] = dishid;
                         coordinateVector[i] = coordid;
 
-                        dishCountsOfToponyms[dishid]++;
+                        toponymByDishCounts[dishid]++;
                         dishByRestaurantCounts[docoff + dishid]++;
                         toponymCoordinateCounts[wordid][coordid]++;
                         globalDishCounts[dishid]++;
@@ -396,7 +401,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                 }
             }
 
-            annealer.collectSamples(globalDishWeights, localDishWeights, regionMeans, kappa, nonToponymByDishDirichlet, toponymCoordinateWeights);
+            annealer.collectSamples(globalDishWeights, localDishWeights, regionMeans, kappa, nonToponymByDishDirichlet, toponymCoordinateDirichlet);
             resample();
         }
     }

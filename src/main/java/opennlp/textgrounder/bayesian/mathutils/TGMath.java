@@ -206,6 +206,17 @@ public class TGMath {
         return max + Math.log(p);
     }
 
+    public static double safeLogSum2(double _logprob1, double _logprob2) {
+        if (Double.isInfinite(_logprob1) && Double.isInfinite(_logprob2)) {
+            return _logprob1; // both prob1 and prob2 are 0, return log 0.
+        }
+        if (_logprob1 > _logprob2) {
+            return _logprob1 + Math.log(1 + Math.exp(_logprob2 - _logprob1));
+        } else {
+            return _logprob2 + Math.log(1 + Math.exp(_logprob1 - _logprob2));
+        }
+    }
+
     public static double[] cumLogSum(double[] _vec) {
         double[] lvec = new double[_vec.length];
         for (int i = 0; i < _vec.length; ++i) {
@@ -244,12 +255,42 @@ public class TGMath {
         return cs;
     }
 
+    public static double[] cumProb(double[] _vec) {
+        double[] cs = new double[_vec.length];
+        Arrays.fill(cs, 0);
+        cs[0] = _vec[0];
+        for (int i = 1; i < _vec.length; ++i) {
+            double val = cs[i - 1] + _vec[i];
+            if (val > 1) {
+                cs[i] = 1;
+            } else {
+                cs[i] = val;
+            }
+        }
+        return cs;
+    }
+
     public static double[] inverseCumSum(double[] _vec) {
         double[] cs = new double[_vec.length];
         Arrays.fill(cs, 0);
         cs[_vec.length - 1] = _vec[_vec.length - 1];
         for (int i = _vec.length - 2; i >= 0; --i) {
             cs[i] = cs[i + 1] + _vec[i];
+        }
+        return cs;
+    }
+
+    public static double[] inverseCumProb(double[] _vec) {
+        double[] cs = new double[_vec.length];
+        Arrays.fill(cs, 0);
+        cs[_vec.length - 1] = _vec[_vec.length - 1];
+        for (int i = _vec.length - 2; i >= 0; --i) {
+            double val = cs[i + 1] + _vec[i];
+            if (val > 1) {
+                cs[i] = 1;
+            } else {
+                cs[i] = val;
+            }
         }
         return cs;
     }
