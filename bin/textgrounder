@@ -1,0 +1,35 @@
+#!/bin/bash
+
+JARS=`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`
+
+CP=$TEXTGROUNDER_DIR/target/classes:$TEXTGROUNDER_DIR/output/classes:$JARS:$CLASSPATH
+
+MEMORY=1g
+
+JAVA_COMMAND="java -Xmx$MEMORY -classpath $CP"
+
+CMD=$1
+shift
+
+help()
+{
+cat <<EOF
+Mallet 2.0 commands: 
+
+  resolve           run the toponomy resolver
+  run               run the main method of a given class
+
+Include --help with any option for more information
+EOF
+}
+
+CLASS=
+
+case $CMD in
+    resolve) CLASS=opennlp.textgrounder.app.RunResolver;;
+    run) CLASS=$1; shift;;
+    help) help; exit 1;;
+    *) echo "Unrecognized command: $CMD"; help; exit 1;;
+esac
+
+$JAVA_COMMAND $CLASS $*
