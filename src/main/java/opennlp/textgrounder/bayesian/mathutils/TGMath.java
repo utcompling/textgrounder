@@ -314,7 +314,7 @@ public class TGMath {
      * @param _begin
      * @return
      */
-    public static int[] inverseCumSum(int[] _vec, int _end, int _begin) {
+    public static int[] inverseCumSum(int[] _vec, int _begin, int _end) {
         int len = _end - _begin;
         int[] cs = new int[len];
         Arrays.fill(cs, 0);

@@ -332,6 +332,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         r = rand.nextDouble() * totalprob;
 
                         max = regionProbs[0];
+                        dishid = 0;
                         coordid = 0;
                         while (r > max) {
                             coordid++;

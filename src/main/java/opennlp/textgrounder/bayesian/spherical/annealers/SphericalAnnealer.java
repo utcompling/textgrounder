@@ -145,7 +145,7 @@ public abstract class SphericalAnnealer extends Annealer {
     public void collectSamples(double[] _globalDishWeights, double[] _localDishWeights, double[][] _regionMeans,
           double[] _kappa, double[] _nonToponymByDishDirichlet, double[][] _toponymCoordinateDirichlet) {
         if (sampleCount < samples) {
-            if (sampleiteration && (innerIter % lag == 0)) {
+            if (sampleiteration && ((innerIter + 1) % lag == 0)) {
                 sampleCount += 1;
                 if (samples == sampleCount) {
                     finishedCollection = true;

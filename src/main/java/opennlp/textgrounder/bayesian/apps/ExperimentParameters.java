@@ -236,7 +236,7 @@ public class ExperimentParameters {
     /**
      *
      */
-    protected Enum<MODEL_TYPE> modelType = MODEL_TYPE.RLDA;
+    protected Enum<MODEL_TYPE> modelType = MODEL_TYPE.SV1;
 
     /**
      * @return the estimateHyperparameter
