@@ -182,7 +182,22 @@ public class RKRand {
     public static double rk_beta(double a, double b) {
         double Ga, Gb;
 
-        if ((a <= 1.0) && (b <= 1.0)) {
+        if ((a <= 0.1) || (b <= 0.1)) {
+            double U, V, X, Y, Z;
+            /* Use Jonk's algorithm */
+
+            while (true) {
+                U = mtfRand.nextDouble();
+                V = mtfRand.nextDouble();
+                X = 1 / a * Math.log(U);
+                Y = 1 / b * Math.log(V);
+                Z = TGMath.safeLogSum2(X, Y);
+
+                if (Math.exp(Z) <= 1.0) {
+                    return Math.exp(X - Z);
+                }
+            }
+        } else if ((a <= 1.0) && (b <= 1.0)) {
             double U, V, X, Y;
             /* Use Jonk's algorithm */
 

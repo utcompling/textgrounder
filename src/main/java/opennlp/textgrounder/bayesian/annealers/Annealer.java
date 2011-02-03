@@ -17,6 +17,7 @@
 package opennlp.textgrounder.bayesian.annealers;
 
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.mathutils.TGMath;
 
 /**
  *
@@ -206,7 +207,7 @@ public abstract class Annealer {
     protected void addToFirstMoment(double[] _target, double[] _source) {
         try {
             for (int i = 0;; ++i) {
-                _target[i] += _source[i];
+                _target[i] = Math.exp(TGMath.safeLogSum2(Math.log(_target[i]), Math.log(_source[i])));
             }
         } catch (ArrayIndexOutOfBoundsException e) {
         }
@@ -215,7 +216,7 @@ public abstract class Annealer {
     protected void addToSecondMoment(double[] _target, double[] _source) {
         try {
             for (int i = 0;; ++i) {
-                _target[i] += _source[i] * _source[i];
+                _target[i] = Math.exp(TGMath.safeLogSum2(Math.log(_target[i]), 2 * Math.log(_source[i])));
             }
         } catch (ArrayIndexOutOfBoundsException e) {
         }
@@ -227,7 +228,7 @@ public abstract class Annealer {
             for (int i = 0; i < c; ++i) {
                 int off = i * (2 * c - i + 1) / 2 - i;
                 for (int j = i; j < c; ++j) {
-                    _target[off + j] += _source[i] * _source[j];
+                    _target[off + j] = Math.exp(TGMath.safeLogSum2(Math.log(_target[i]), Math.log(_source[i]) + Math.log(_source[j])));
                 }
             }
         } catch (ArrayIndexOutOfBoundsException e) {

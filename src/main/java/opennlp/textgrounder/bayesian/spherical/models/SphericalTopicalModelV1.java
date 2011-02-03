@@ -353,7 +353,6 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         wordid = wordVector[i];
                         docid = documentVector[i];
                         dishid = dishVector[i];
-                        istoponym = toponymVector[i];
                         docoff = docid * L;
                         wordoff = wordid * L;
 
@@ -429,8 +428,6 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
 
                     wordid = wordVector[i];
                     docid = documentVector[i];
-                    dishid = dishVector[i];
-                    coordid = coordinateVector[i];
                     docoff = docid * L;
                     wordoff = wordid * L;
 
@@ -455,6 +452,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                     r = rand.nextDouble() * totalprob;
 
                     max = regionProbs[0];
+                    dishid = 0;
                     coordid = 0;
                     while (r > max) {
                         coordid++;
@@ -469,8 +467,6 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                 } else {
                     wordid = wordVector[i];
                     docid = documentVector[i];
-                    dishid = dishVector[i];
-                    istoponym = toponymVector[i];
                     docoff = docid * L;
                     wordoff = wordid * L;
 
