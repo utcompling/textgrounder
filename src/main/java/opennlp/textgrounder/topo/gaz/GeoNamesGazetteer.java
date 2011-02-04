@@ -179,12 +179,17 @@ public class GeoNamesGazetteer implements Gazetteer {
 
   private int load(BufferedReader reader) {
     int index = 0;
+    int count = 0;
     try {
       for (String line = reader.readLine();
            line != null; line = reader.readLine()) {   
         String[] fields = line.split("\t");
         if (fields.length > 14) {
           String primaryName = fields[1];
+          count++;
+          if(count % 10000 == 0) {
+            //System.out.println(count + ": " + primaryName);
+          }
           Set<String> nameSet = new HashSet<String>();
           nameSet.add(this.standardize(primaryName));
 

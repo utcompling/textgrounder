@@ -1,6 +1,5 @@
 /*
  * Evaluator that uses signatures around each gold and predicted toponym to be used in the computation of P/R/F.
- * This Evaluator doesn't assume gold named entities.
  */
 
 package opennlp.textgrounder.eval;
