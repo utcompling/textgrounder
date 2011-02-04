@@ -23,8 +23,8 @@ public class RunResolver extends BaseApp {
 
         Tokenizer tokenizer = new OpenNLPTokenizer();
 
-        GeoNamesGazetteer gnGaz = new GeoNamesGazetteer(new BufferedReader(
-                new FileReader(Constants.getGazetteersDir() + File.separator + "allCountries.txt")));
+        //GeoNamesGazetteer gnGaz = new GeoNamesGazetteer(new BufferedReader(
+        //        new FileReader(Constants.getGazetteersDir() + File.separator + "allCountries.txt")));
         
 
         StoredCorpus testCorpus = Corpus.createStoredCorpus();
