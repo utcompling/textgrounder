@@ -23,19 +23,18 @@ public class RunResolver extends BaseApp {
 
         Tokenizer tokenizer = new OpenNLPTokenizer();
 
-        //GeoNamesGazetteer gnGaz = new GeoNamesGazetteer(new BufferedReader(
-        //        new FileReader(Constants.getGazetteersDir() + File.separator + "allCountries.txt")));
-        
-
         StoredCorpus testCorpus = Corpus.createStoredCorpus();
         System.out.print("Reading corpus from " + getInputPath() + " ...");
+
         testCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
+        //Uncomment these 4 lines and comment the one line above for system NER and multipoint representations with GeoNames:
+        //GeoNamesGazetteer gnGaz = new GeoNamesGazetteer(new BufferedReader(
+        //        new FileReader(Constants.getGazetteersDir() + File.separator + "allCountries.txt")));
         //testCorpus.addSource(new ToponymAnnotator(new ToponymRemover(new TrXMLDirSource(new File(getInputPath()), tokenizer)),
         //        new OpenNLPRecognizer(), gnGaz));
+        
         testCorpus.load();
         System.out.println("done.");
-
-        //System.exit(0);
 
         StoredCorpus trainCorpus = Corpus.createStoredCorpus();
         if(getAdditionalInputPath() != null) {

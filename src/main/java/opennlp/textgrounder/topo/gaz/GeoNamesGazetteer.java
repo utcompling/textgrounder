@@ -188,7 +188,7 @@ public class GeoNamesGazetteer implements Gazetteer {
           String primaryName = fields[1];
           count++;
           if(count % 10000 == 0) {
-            //System.out.println(count + ": " + primaryName);
+            System.out.println(count + ": " + primaryName);
           }
           Set<String> nameSet = new HashSet<String>();
           nameSet.add(this.standardize(primaryName));
