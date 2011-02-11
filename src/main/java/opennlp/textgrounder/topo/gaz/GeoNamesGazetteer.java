@@ -181,14 +181,15 @@ public class GeoNamesGazetteer implements Gazetteer {
     int index = 0;
     int count = 0;
     try {
+      System.out.print("[");
       for (String line = reader.readLine();
            line != null; line = reader.readLine()) {   
         String[] fields = line.split("\t");
         if (fields.length > 14) {
           String primaryName = fields[1];
           count++;
-          if(count % 10000 == 0) {
-            System.out.println(count + ": " + primaryName);
+          if(count % 750000 == 0) {
+            System.out.print(".");
           }
           Set<String> nameSet = new HashSet<String>();
           nameSet.add(this.standardize(primaryName));
@@ -259,6 +260,7 @@ public class GeoNamesGazetteer implements Gazetteer {
           }
         }
       }
+      System.out.println("]");
       reader.close();
     } catch (IOException e) {
       System.err.format("Error while reading GeoNames file: %s\n", e);

@@ -23,16 +23,21 @@ public class RunResolver extends BaseApp {
 
         Tokenizer tokenizer = new OpenNLPTokenizer();
 
+        System.out.print("Reading gold corpus from " + getInputPath() + " ...");
         StoredCorpus testCorpus = Corpus.createStoredCorpus();
-        System.out.print("Reading corpus from " + getInputPath() + " ...");
+        StoredCorpus goldCorpus = Corpus.createStoredCorpus();
+        goldCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
+        goldCorpus.load();
+        System.out.println("done.");
 
-        testCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
-        //Uncomment these 4 lines and comment the one line above for system NER and multipoint representations with GeoNames:
-        //GeoNamesGazetteer gnGaz = new GeoNamesGazetteer(new BufferedReader(
-        //        new FileReader(Constants.getGazetteersDir() + File.separator + "allCountries.txt")));
-        //testCorpus.addSource(new ToponymAnnotator(new ToponymRemover(new TrXMLDirSource(new File(getInputPath()), tokenizer)),
-        //        new OpenNLPRecognizer(), gnGaz));
-        
+        System.out.println("Reading GeoNames gazetteer from " + Constants.getGazetteersDir() + File.separator + "allCountries.txt ...");
+        GeoNamesGazetteer gnGaz = new GeoNamesGazetteer(new BufferedReader(
+                new FileReader(Constants.getGazetteersDir() + File.separator + "allCountries.txt")));
+        System.out.println("Done.");
+
+        System.out.print("Reading test corpus from " + getInputPath() + " ...");
+        testCorpus.addSource(new ToponymAnnotator(new ToponymRemover(new TrXMLDirSource(new File(getInputPath()), tokenizer)),
+                new OpenNLPRecognizer(), gnGaz));
         testCorpus.load();
         System.out.println("done.");
 
@@ -71,7 +76,7 @@ public class RunResolver extends BaseApp {
             resolver = new RandomResolver();
         }
         else if(getResolverType() == RESOLVER_TYPE.WEIGHTED_MIN_DIST) {
-            System.out.print("Running WEIGHTED MINIMUM DISTANCE resolver with " + getNumIterations() + " iteration(s)...");
+            System.out.println("Running WEIGHTED MINIMUM DISTANCE resolver with " + getNumIterations() + " iteration(s)...");
             resolver = new WeightedMinDistResolver(getNumIterations());
         }
         else if(getResolverType() == RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE) {
@@ -94,7 +99,7 @@ public class RunResolver extends BaseApp {
         System.out.println("done.");
 
         System.out.print("\nEvaluating...");
-        Evaluator evaluator = new SignatureEvaluator(testCorpus);
+        Evaluator evaluator = new SignatureEvaluator(goldCorpus);
         Report report = evaluator.evaluate(disambiguated, false);
         System.out.println("done.");
 
