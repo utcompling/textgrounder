@@ -39,11 +39,11 @@ Control Panel. For example, under WinXP, go to Control Panel, click on
 System Properties, choose the Advanced tab, click on Environment
 Variables, and add your settings in the User variables area.
 
-Next, likewise set TEXTGROUNDER_DIR to be the top level directory where you
+/*Next, likewise set TEXTGROUNDER_DIR to be the top level directory where you
 unzipped the download. In Unix, type 'pwd' in the directory where
 this file is and use the path given to you by the shell as
 TEXTGROUNDER_DIR.  You can set this in the same manner as for JAVA_HOME
-above.
+above.*/ //THIS WILL BE REMOVED
 
 Next, add the directory TEXTGROUNDER_DIR/bin to your path. For example, you
 can set the path in your .bashrc file as follows:
