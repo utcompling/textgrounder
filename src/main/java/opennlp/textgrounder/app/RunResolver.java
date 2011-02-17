@@ -26,17 +26,21 @@ public class RunResolver extends BaseApp {
         System.out.print("Reading gold corpus from " + getInputPath() + " ...");
         StoredCorpus testCorpus = Corpus.createStoredCorpus();
         StoredCorpus goldCorpus = Corpus.createStoredCorpus();
-        goldCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
+        goldCorpus.addSource(new PlainTextSource(
+                new BufferedReader(new FileReader(getInputPath())), new OpenNLPSentenceDivider(), tokenizer)
+        		/*new TrXMLDirSource(new File(getInputPath()), tokenizer)*/);
         goldCorpus.load();
         System.out.println("done.");
 
-        System.out.println("Reading GeoNames gazetteer from " + Constants.getGazetteersDir() + File.separator + "allCountries.txt ...");
+        System.out.println("Reading GeoNames gazetteer from " + Constants.getGazetteersDir() + File.separator + getGeoGazetteerFile()+" ...");
         GeoNamesGazetteer gnGaz = new GeoNamesGazetteer(new BufferedReader(
-                new FileReader(Constants.getGazetteersDir() + File.separator + "allCountries.txt")));
+                new FileReader(Constants.getGazetteersDir() + File.separator + getGeoGazetteerFile())));
         System.out.println("Done.");
 
         System.out.print("Reading test corpus from " + getInputPath() + " ...");
-        testCorpus.addSource(new ToponymAnnotator(new ToponymRemover(new TrXMLDirSource(new File(getInputPath()), tokenizer)),
+        testCorpus.addSource(new ToponymAnnotator(new PlainTextSource(
+                new BufferedReader(new FileReader(getInputPath())), new OpenNLPSentenceDivider(), tokenizer)
+        		/*new ToponymRemover(new TrXMLDirSource(new File(getInputPath()), tokenizer))*/,
                 new OpenNLPRecognizer(), gnGaz));
         testCorpus.load();
         System.out.println("done.");

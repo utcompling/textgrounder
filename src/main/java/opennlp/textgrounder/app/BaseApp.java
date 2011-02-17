@@ -15,7 +15,8 @@ public class BaseApp {
     private static String graphInputPath = null;
     private static String outputPath = null;
     private static String kmlOutputPath = null;
-
+    private static String geoGazetteerFile = null;
+    
     private static int numIterations = 1;
 
     public static enum RESOLVER_TYPE {
@@ -27,6 +28,8 @@ public class BaseApp {
     }
     private static Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
 
+	
+
     protected static void initializeOptionsFromCommandLine(String[] args) throws Exception {
 
         options.addOption("i", "input", true, "input path");
@@ -36,6 +39,7 @@ public class BaseApp {
         options.addOption("it", "iterations", true, "number of iterations for iterative models [default = 1]");
         options.addOption("o", "output", true, "output path [default = 'output.xml']");
         options.addOption("ok", "output-kml", true, "kml output path");
+        options.addOption("g", "geo-gazetteer-file", true, "geo gazetter file name");
 
         options.addOption("h", "help", false, "print help");
         
@@ -78,7 +82,10 @@ public class BaseApp {
                         resolverType = RESOLVER_TYPE.LABEL_PROP_CONTEXT_SENSITIVE;
                     else
                         resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
-                    break;
+                    break; 
+                case 'g':
+                	if(option.getOpt().equals("g"))
+                		geoGazetteerFile = value;
             }
         }
     }
@@ -110,4 +117,8 @@ public class BaseApp {
     public static String getKMLOutputPath() {
         return kmlOutputPath;
     }
+
+	public static String getGeoGazetteerFile() {
+		return geoGazetteerFile;
+	}
 }
