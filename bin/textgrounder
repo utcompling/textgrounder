@@ -4,7 +4,7 @@ JARS=`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUN
 
 CP=$TEXTGROUNDER_DIR/target/classes:$TEXTGROUNDER_DIR/output/classes:$JARS:$CLASSPATH
 
-MEMORY=1g
+MEMORY=2g
 
 JAVA_COMMAND="java -Xmx$MEMORY -classpath $CP"
 
@@ -14,7 +14,7 @@ shift
 help()
 {
 cat <<EOF
-Mallet 2.0 commands: 
+TextGrounder 0.1 commands: 
 
   resolve           run the toponomy resolver
   run               run the main method of a given class
