@@ -16,6 +16,7 @@ help()
 cat <<EOF
 TextGrounder 0.1 commands: 
 
+  import-gazetteer  import a gazetteer from raw form to serialized form
   resolve           run the toponomy resolver
   run               run the main method of a given class
 
