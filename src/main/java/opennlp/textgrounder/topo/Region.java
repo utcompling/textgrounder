@@ -16,8 +16,9 @@
 package opennlp.textgrounder.topo;
 
 import java.util.List;
+import java.io.Serializable;
 
-public abstract class Region {
+public abstract class Region implements Serializable {
   public abstract Coordinate getCenter();
   public abstract boolean contains(double lat, double lng);
 

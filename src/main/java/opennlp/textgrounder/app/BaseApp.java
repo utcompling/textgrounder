@@ -15,7 +15,9 @@ public class BaseApp {
     private static String graphInputPath = null;
     private static String outputPath = null;
     private static String kmlOutputPath = null;
-    private static String geoGazetteerFile = null;
+    private static String geoGazetteerFilename = null;
+    private static String serializedGazetteerPath = null;
+    private static boolean readAsTR = false;
     
     private static int numIterations = 1;
 
@@ -39,7 +41,10 @@ public class BaseApp {
         options.addOption("it", "iterations", true, "number of iterations for iterative models [default = 1]");
         options.addOption("o", "output", true, "output path [default = 'output.xml']");
         options.addOption("ok", "output-kml", true, "kml output path");
-        options.addOption("g", "geo-gazetteer-file", true, "geo gazetter file name");
+        options.addOption("g", "geo-gazetteer-filename", true, "GeoNames gazetteer filename");
+        options.addOption("sg", "serialized-gazetteer-path", true, "path to serialized GeoNames gazetteer");
+
+        options.addOption("tr", "tr-conll", false, "read input path as TR-CoNLL directory");
 
         options.addOption("h", "help", false, "print help");
         
@@ -48,7 +53,7 @@ public class BaseApp {
 
         if (cline.hasOption('h')) {
             HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp("java <app-class-name>", options);
+            formatter.printHelp("textgrounder resolve", options);
             System.exit(0);
         }
 
@@ -84,8 +89,15 @@ public class BaseApp {
                         resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
                     break; 
                 case 'g':
-                	if(option.getOpt().equals("g"))
-                		geoGazetteerFile = value;
+                    if(option.getOpt().equals("g"))
+                        geoGazetteerFilename = value;
+                    break;
+                case 's':
+                    serializedGazetteerPath = value;
+                    break;
+                case 't':
+                    readAsTR = true;
+                    break;
             }
         }
     }
@@ -118,7 +130,15 @@ public class BaseApp {
         return kmlOutputPath;
     }
 
-	public static String getGeoGazetteerFile() {
-		return geoGazetteerFile;
-	}
+    public static String getGeoGazetteerFilename() {
+        return geoGazetteerFilename;
+    }
+
+    public static String getSerializedGazetteerPath() {
+        return serializedGazetteerPath;
+    }
+
+    public static boolean isReadAsTR() {
+        return readAsTR;
+    }
 }

@@ -27,6 +27,7 @@ CLASS=
 
 case $CMD in
     resolve) CLASS=opennlp.textgrounder.app.RunResolver;;
+	import-gazetteer) CLASS=opennlp.textgrounder.app.ImportGazetteer;;
     run) CLASS=$1; shift;;
     help) help; exit 1;;
     *) echo "Unrecognized command: $CMD"; help; exit 1;;

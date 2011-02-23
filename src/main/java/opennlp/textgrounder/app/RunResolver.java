@@ -19,29 +19,60 @@ public class RunResolver extends BaseApp {
 
     public static void main(String[] args) throws Exception {
 
+        long startTime = System.currentTimeMillis();
+
         initializeOptionsFromCommandLine(args);
 
         Tokenizer tokenizer = new OpenNLPTokenizer();
+        OpenNLPRecognizer recognizer = new OpenNLPRecognizer();
 
-        System.out.print("Reading gold corpus from " + getInputPath() + " ...");
-        StoredCorpus testCorpus = Corpus.createStoredCorpus();
-        StoredCorpus goldCorpus = Corpus.createStoredCorpus();
-        goldCorpus.addSource(new PlainTextSource(
-                new BufferedReader(new FileReader(getInputPath())), new OpenNLPSentenceDivider(), tokenizer)
-        		/*new TrXMLDirSource(new File(getInputPath()), tokenizer)*/);
-        goldCorpus.load();
-        System.out.println("done.");
+        StoredCorpus goldCorpus = null;
+        if(isReadAsTR()) {
+            System.out.print("Reading gold corpus from " + getInputPath() + " ...");
+            goldCorpus = Corpus.createStoredCorpus();
+            goldCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
+            goldCorpus.load();
+            System.out.println("done.");
+        }
 
-        System.out.println("Reading GeoNames gazetteer from " + Constants.getGazetteersDir() + File.separator + getGeoGazetteerFile()+" ...");
-        GeoNamesGazetteer gnGaz = new GeoNamesGazetteer(new BufferedReader(
-                new FileReader(Constants.getGazetteersDir() + File.separator + getGeoGazetteerFile())));
-        System.out.println("Done.");
+        GeoNamesGazetteer gnGaz = null;
+        if(getSerializedGazetteerPath() != null) {
+            System.out.println("Reading serialized GeoNames gazetteer from " + getSerializedGazetteerPath() + " ...");
+            ObjectInputStream ois = null;
+            if(getSerializedGazetteerPath().toLowerCase().endsWith(".gz")) {
+                GZIPInputStream gis = new GZIPInputStream(new FileInputStream(getSerializedGazetteerPath()));
+                ois = new ObjectInputStream(gis);
+            }
+            else {
+                FileInputStream fis = new FileInputStream(getSerializedGazetteerPath());
+                ois = new ObjectInputStream(fis);
+            }
+            gnGaz = (GeoNamesGazetteer) ois.readObject();
+            System.out.println("Done.");
+        }
+        else if(getGeoGazetteerFilename() != null) {
+            System.out.println("Reading GeoNames gazetteer from " + Constants.getGazetteersDir() + File.separator + getGeoGazetteerFilename()+" ...");
+            gnGaz = new GeoNamesGazetteer(new BufferedReader(
+                    new FileReader(Constants.getGazetteersDir() + File.separator + getGeoGazetteerFilename())));
+            System.out.println("Done.");
+        }
+        else {
+            System.out.println("Must specify a gazetteer.");
+            System.exit(0);
+        }
 
         System.out.print("Reading test corpus from " + getInputPath() + " ...");
-        testCorpus.addSource(new ToponymAnnotator(new PlainTextSource(
-                new BufferedReader(new FileReader(getInputPath())), new OpenNLPSentenceDivider(), tokenizer)
-        		/*new ToponymRemover(new TrXMLDirSource(new File(getInputPath()), tokenizer))*/,
-                new OpenNLPRecognizer(), gnGaz));
+        StoredCorpus testCorpus = Corpus.createStoredCorpus();
+        if(isReadAsTR()) {
+            testCorpus.addSource(new ToponymAnnotator(
+                new ToponymRemover(new TrXMLDirSource(new File(getInputPath()), tokenizer)),
+                recognizer, gnGaz));
+        }
+        else {
+            testCorpus.addSource(new ToponymAnnotator(new PlainTextSource(
+                new BufferedReader(new FileReader(getInputPath())), new OpenNLPSentenceDivider(), tokenizer),
+                recognizer, gnGaz));
+        }
         testCorpus.load();
         System.out.println("done.");
 
@@ -58,17 +89,21 @@ public class RunResolver extends BaseApp {
             Gazetteer multiGaz = new MultiGazetteer(gazList);
             /*trainCorpus.addSource(new ToponymAnnotator(new PlainTextSource(
                     new BufferedReader(new FileReader(getAdditionalInputPath())), new OpenNLPSentenceDivider(), tokenizer),
-                    new OpenNLPRecognizer(),
+                    recognizer,
                     multiGaz));*/
             trainCorpus.addSource(new ToponymAnnotator(new GigawordSource(
                     new BufferedReader(new InputStreamReader(
                     new GZIPInputStream(new FileInputStream(getAdditionalInputPath())))), 10, 40000),
-                    new OpenNLPRecognizer(),
+                    recognizer,
                     multiGaz));
             trainCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
             trainCorpus.load();
             System.out.println("done.");
         }
+
+        long endTime = System.currentTimeMillis();
+        float seconds = (endTime - startTime) / 1000F;
+        System.out.println("\nInitialization took " + Float.toString(seconds/(float)60.0) + " minutes.");
 
         System.out.println("\nNumber of documents: " + testCorpus.getDocumentCount());
         System.out.println("Number of toponym types: " + testCorpus.getToponymTypeCount());
@@ -102,16 +137,18 @@ public class RunResolver extends BaseApp {
 
         System.out.println("done.");
 
-        System.out.print("\nEvaluating...");
-        Evaluator evaluator = new SignatureEvaluator(goldCorpus);
-        Report report = evaluator.evaluate(disambiguated, false);
-        System.out.println("done.");
+        if(goldCorpus != null) {
+            System.out.print("\nEvaluating...");
+            Evaluator evaluator = new SignatureEvaluator(goldCorpus);
+            Report report = evaluator.evaluate(disambiguated, false);
+            System.out.println("done.");
 
-        System.out.println("\nResults:");
-        System.out.println("P: " + report.getPrecision());
-        System.out.println("R: " + report.getRecall());
-        System.out.println("F: " + report.getFScore());
-        System.out.println("A: " + report.getAccuracy() + "\n");
+            System.out.println("\nResults:");
+            System.out.println("P: " + report.getPrecision());
+            System.out.println("R: " + report.getRecall());
+            System.out.println("F: " + report.getFScore());
+            System.out.println("A: " + report.getAccuracy() + "\n");
+        }
 
         if(getOutputPath() != null) {
             System.out.print("Writing resolved corpus in XML format to " + getOutputPath() + " ...");
@@ -126,5 +163,9 @@ public class RunResolver extends BaseApp {
             kw.write(new File(getKMLOutputPath()));
             System.out.println("done.");
         }
+
+        endTime = System.currentTimeMillis();
+        seconds = (endTime - startTime) / 1000F;
+        System.out.println("\nTotal time elapsed: " + Float.toString(seconds/(float)60.0) + " minutes.");
     }
 }

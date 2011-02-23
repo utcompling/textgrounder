@@ -16,10 +16,11 @@
 package opennlp.textgrounder.topo;
 
 import java.util.List;
+import java.io.Serializable;
 
 import opennlp.textgrounder.util.FastTrig;
 
-public class Coordinate {
+public class Coordinate implements Serializable {
     private final double lng;
     private final double lat;
     

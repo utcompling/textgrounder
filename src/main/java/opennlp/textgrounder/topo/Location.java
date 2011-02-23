@@ -18,7 +18,7 @@ package opennlp.textgrounder.topo;
 import java.io.Serializable;
 import java.util.*;
 
-public class Location {
+public class Location implements Serializable {
   public enum Type {
     STATE, WATER, CITY, SITE, PARK, TRANSPORT, MOUNTAIN, UNDERSEA, FOREST, UNKNOWN
   }
