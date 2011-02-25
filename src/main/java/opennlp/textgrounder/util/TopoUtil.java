@@ -39,11 +39,19 @@ public class TopoUtil {
         }
     }
 
-    public static int getRegionNumber(Location location, double dpr) {
-        int x = (int) ((location.getRegion().getCenter().getLng() + 180.0) / dpr);
-        int y = (int) ((location.getRegion().getCenter().getLat() + 90.0) / dpr);
+    public static Set<Integer> getRegionNumbers(Location location, double dpr) {
 
-        return x * 1000 + y;
+        Set<Integer> regionNumbers = new HashSet<Integer>();
+
+        for(Coordinate coord : location.getRegion().getRepresentatives()) {
+        
+            int x = (int) ((coord.getLng() + 180.0) / dpr);
+            int y = (int) ((coord.getLat() + 90.0) / dpr);
+
+            regionNumbers.add(x * 1000 + y);
+        }
+
+        return regionNumbers;
     }
 
     public static int getRegionNumber(double lat, double lon, double dpr) {
@@ -59,7 +67,7 @@ public class TopoUtil {
         if(regionNumber == -1) System.out.println("-1");
         int index = 0;
         for(Location location : toponym.getCandidates()) {
-            if(getRegionNumber(location, dpr) == regionNumber)
+            if(getRegionNumbers(location, dpr).contains(regionNumber))
                 return index;
             index++;
         }

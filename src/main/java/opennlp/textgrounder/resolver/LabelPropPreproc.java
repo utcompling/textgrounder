@@ -4,9 +4,11 @@ import opennlp.textgrounder.text.*;
 import opennlp.textgrounder.text.io.*;
 import opennlp.textgrounder.text.prep.*;
 import opennlp.textgrounder.topo.*;
+import opennlp.textgrounder.topo.gaz.*;
 import opennlp.textgrounder.util.*;
 import java.io.*;
 import java.util.*;
+import java.util.zip.*;
 
 public class LabelPropPreproc {
 
@@ -23,13 +25,27 @@ public class LabelPropPreproc {
 
     private static int toponymLexiconSize;
 
+    // arg0: path to corpus
+    // arg1: path to graph file
+    // arg2: path to seed file
+    // arg3: path to serialized Geonames gazetteer ([name].ser.gz)
+    // arg4: path to wiki file (article titles, article IDs, and word lists; as output by Ben's wikipedia processing code)
+    // arg5: path to stoplist filename (one stopword per line)
     public static void main(String[] args) throws Exception {
 
         Tokenizer tokenizer = new OpenNLPTokenizer();
+        OpenNLPRecognizer recognizer = new OpenNLPRecognizer();
+
+        System.out.println("Reading serialized GeoNames gazetteer from " + args[3] + " ...");
+        GZIPInputStream gis = new GZIPInputStream(new FileInputStream(args[3]));
+        ObjectInputStream ois = new ObjectInputStream(gis);
+        GeoNamesGazetteer gnGaz = (GeoNamesGazetteer) ois.readObject();
+        System.out.println("Done.");
 
         StoredCorpus corpus = Corpus.createStoredCorpus();
-        System.out.print("Reading corpus from " + args[0] + " ...");
-        corpus.addSource(new TrXMLDirSource(new File(args[0]), tokenizer));
+        System.out.print("Reading TR-CoNLL corpus from " + args[0] + " ...");
+        //corpus.addSource(new TrXMLDirSource(new File(args[0]), tokenizer));
+        corpus.addSource(new ToponymAnnotator(new ToponymRemover(new TrXMLDirSource(new File(args[0]), tokenizer)), recognizer, gnGaz));
         corpus.load();
         System.out.println("done.");
 
@@ -47,8 +63,9 @@ public class LabelPropPreproc {
                         if(regionSet == null) {
                             regionSet = new HashSet<Integer>();
                             for(Location location : toponym.getCandidates()) {
-                                int regionNumber = TopoUtil.getRegionNumber(location, DEGREES_PER_REGION);
-                                regionSet.add(regionNumber);
+                                //int regionNumber = TopoUtil.getRegionNumbers(location, DEGREES_PER_REGION);
+                                //regionSet.add(regionNumber);
+                                regionSet.addAll(TopoUtil.getRegionNumbers(location, DEGREES_PER_REGION));
                             }
                             toponymRegionEdges.put(idx, regionSet);
                         }
@@ -59,7 +76,7 @@ public class LabelPropPreproc {
 
         writeToponymRegionEdges(toponymRegionEdges, args[1]);
         writeRegionRegionEdges(args[1]);
-        writeWordWordEdges(toponymLexicon, args[3], args[1], args[4]);
+        writeWordWordEdges(toponymLexicon, args[4], args[1], args[5]);
 
         writeRegionLabels(toponymRegionEdges, args[2]);
     }
