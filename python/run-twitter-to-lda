@@ -1,0 +1,25 @@
+#!/bin/sh
+
+# Run twitter_to_lda.py, passing it various useful arguments.
+# Extra arguments can be specified on the command line, which will override
+# any existing arguments.
+
+DEBUG="--debug 0"
+
+if [ -z "$TEXTGROUNDER_PYTHON" ]; then
+  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+fi
+
+. $TEXTGROUNDER_PYTHON/config-wikigrounder
+
+TWITTER_LDA="$TEXTGROUNDER_PYTHON/twitter_to_lda.py"
+
+echo The input and output dir need to be set better, as this code is
+echo copied from run-twitter-process and GEOTEXT_INPUT_DIR and
+echo GEOTEXT_OUTPUT_DIR are designed for that program, not this one.
+exit 1
+
+mkdir -p $GEOTEXT_OUTPUT_DIR
+
+$TWITTER_LDA --input-dir $GEOTEXT_INPUT_DIR --output-dir $GEOTEXT_OUTPUT_DIR $DEBUG ${1+"$@"}
+

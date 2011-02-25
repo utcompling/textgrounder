@@ -1338,7 +1338,7 @@ class ArticleHandlerForUsefulText(ArticleHandler):
 # process_text_for_data(), uses ExtractCoordinatesFromSource() to extract
 # coordinates, and outputs all the coordinates seen.  Always returns True.
 
-class PrintWordsAndCoords(ArticleHandlerForUsefulText):
+class OutputWords(ArticleHandlerForUsefulText):
   def process_text_for_words(self, word_generator):
     splitprint("Article title: %s" % self.title)
     splitprint("Article ID: %s" % self.id)
@@ -1347,10 +1347,10 @@ class PrintWordsAndCoords(ArticleHandlerForUsefulText):
       else: splitprint("%s" % word)
 
   def process_text_for_data(self, text):
-    handler = ExtractCoordinatesFromSource()
-    for foo in handler.process_source_text(text): pass
-    for (temptype,lat,long) in handler.coords:
-      splitprint("Article coordinates: %s,%s" % (lat, long))
+    #handler = ExtractCoordinatesFromSource()
+    #for foo in handler.process_source_text(text): pass
+    #for (temptype,lat,long) in handler.coords:
+    #  splitprint("Article coordinates: %s,%s" % (lat, long))
     return True
 
   def finish_processing(self):
@@ -1366,6 +1366,12 @@ class PrintWordsAndCoords(ArticleHandlerForUsefulText):
   
       print "Notice: ending processing"
 
+
+class OutputCoordWords(OutputWords):
+  def process_text_for_data(self, text):
+    if extract_coordinates_from_article(text):
+      return True
+    return False
 
 
 # Just find redirects.
@@ -1725,8 +1731,11 @@ def main_process_input(wiki_handler):
 def main():
 
   op = OptionParser(usage="%prog [options] < file")
-  op.add_option("-p", "--words-coords",
-                help="Print all words and coordinates",
+  op.add_option("-w", "--output-words",
+                help="Output raw text.",
+                action="store_true")
+  op.add_option("--output-coord-words",
+                help="Output raw text, but only for articles with coordinates.",
                 action="store_true")
   op.add_option("-l", "--find-links",
                 help="""Find all links and print info about them.
@@ -1860,8 +1869,10 @@ Used for testing purposes.  Default %default.""")
     read_redirects_from_article_data(opts.article_data_file)
   if opts.disambig_id_file:
     read_disambig_id_file(opts.disambig_id_file)
-  if opts.words_coords:
-    main_process_input(PrintWordsAndCoords())
+  if opts.output_words:
+    main_process_input(OutputWords())
+  if opts.output_coord_words:
+    main_process_input(OutputCoordWords())
   elif opts.find_links:
     main_process_input(FindLinks())
   elif opts.find_redirects:

@@ -184,12 +184,17 @@ TwitterBaselineExper1 = nest(TwitterDPR3, BaselineStrategies)
 
 
 TwitterDevStrategy1 = add_param('--strategy partial-kl-divergence --strategy naive-bayes-with-baseline --strategy per-word-region-distribution')
-TwitterDevStrategy2 = add_param('--strategy baseline --baseline-strategy link-most-common-toponym --baseline-strategy regdist-most-common-toponym')
+#TwitterDevStrategy2 = add_param('--strategy baseline --baseline-strategy link-most-common-toponym --baseline-strategy regdist-most-common-toponym')
+TwitterDevStrategy2 = add_param('--strategy baseline --baseline-strategy link-most-common-toponym')
 TwitterDevStrategy3 = add_param('--strategy baseline --baseline-strategy num-articles --baseline-strategy random')
 TwitterDevSet = add_param('--eval-set dev')
 TwitterDev1 = nest(TwitterDPR3, TwitterDevSet, TwitterDevStrategy1)
 TwitterDev2 = nest(TwitterDPR3, TwitterDevSet, TwitterDevStrategy2)
 TwitterDev3 = nest(TwitterDPR3, TwitterDevSet, TwitterDevStrategy3)
+TwitterDPR4 = iterate('--degrees-per-region', [3, 4, 6, 7])
+TwitterDev4 = nest(TwitterDPR4, TwitterDevSet, TwitterDevStrategy1)
+TwitterDev5 = nest(TwitterDPR4, TwitterDevSet, TwitterDevStrategy2)
+TwitterDev6 = nest(TwitterDPR4, TwitterDevSet, TwitterDevStrategy3)
 
 
 WithStopwords = add_param('--include-stopwords-in-article-dists')

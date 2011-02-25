@@ -27,7 +27,7 @@ LOGFILE="generate-all-data.log"
 OTHEROPTS="$MAXTIME $DEBUG"
 
 if [ -z "$*" -o "$*" = "all" ]; then
-  steps="article-data coords links combine"
+  steps="article-data coords links combine words"
 else
   steps="$*"
 fi
@@ -81,6 +81,18 @@ bzcat $IN_DUMP_FILE | $PROCESSWIKI \
   $COORDS_ARG $ORIG_ARTICLE_DATA_ARG \
   --generate-toponym-eval \
   $OTHEROPTS > $OUT_TOPONYM_EVAL_FILE
+
+elif [ "$step" = words ]; then
+echo "Generating raw text ..."
+bzcat $IN_DUMP_FILE | $PROCESSWIKI \
+  --output-words \
+  $OTHEROPTS > $OUT_WORDS_FILE
+
+elif [ "$step" = coord-words ]; then
+echo "Generating raw text, coord aticles only ..."
+bzcat $IN_DUMP_FILE | $PROCESSWIKI \
+  --output-coord-words \
+  $OTHEROPTS > $OUT_COORD_WORDS_FILE
 
 else
 echo "Unrecognized step $step"

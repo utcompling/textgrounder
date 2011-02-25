@@ -125,12 +125,33 @@ the stream does this automatically); but this can be forced using FLUSH.'''
   if flush:
     outfile.flush()
 
+def uniout(text, outfile=sys.stdout, flush=False):
+  '''Output text string, converting Unicode as necessary.
+If string is Unicode, automatically convert to UTF-8, so it can be output
+without errors.  Send output to the file given in OUTFILE (default is
+stdout).  Uses the write() function, which outputs the text directly,
+without adding spaces or newlines.  Output is not normally flushed (unless
+the stream does this automatically); but this can be forced using FLUSH.'''
+  
+  if type(text) is unicode:
+    text = text.encode("utf-8")
+  outfile.write(text)
+  if flush:
+    outfile.flush()
+
 def errprint(text, nonl=False):
   '''Print text to stderr using 'print', converting Unicode as necessary.
 If string is Unicode, automatically convert to UTF-8, so it can be output
 without errors.  Uses the 'print' command, and normally outputs a newline; but
 this can be suppressed using NONL.'''
   uniprint(text, outfile=sys.stderr, nonl=nonl)
+
+def errout(text):
+  '''Output text to stderr, converting Unicode as necessary.
+If string is Unicode, automatically convert to UTF-8, so it can be output
+without errors.  Uses the write() function, which outputs the text directly,
+without adding spaces or newlines.'''
+  uniout(text, outfile=sys.stderr)
 
 def warning(text):
   '''Output a warning, formatting into UTF-8 as necessary'''

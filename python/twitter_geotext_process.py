@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 #######
-####### match_gazetteer.py
+####### twitter_geotext_process.py
 #######
 ####### Copyright (c) 2010 Ben Wing.
 #######
@@ -14,6 +14,10 @@ from nlputil import *
 ############################################################################
 #                              Documentation                               #
 ############################################################################
+
+# This program reads in data from the Geotext corpus provided by
+# Eisenstein et al., and converts it into the format used for the
+# Wikigrounder experiments.
 
 ############################################################################
 #                                   Code                                   #
@@ -110,7 +114,7 @@ def main():
   op.add_option("-o", "--output-dir", metavar="DIR",
                 help="""Dir to output processed files.""")
   op.add_option("-p", "--prefix", default="geotext-twitter-",
-                help="""Dir to output processed files.""")
+                help="""Prefix to use for outputted files.""")
   op.add_option("-d", "--debug", metavar="LEVEL",
                 help="Output debug info at given level")
 
