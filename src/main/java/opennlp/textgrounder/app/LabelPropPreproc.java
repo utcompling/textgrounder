@@ -1,4 +1,4 @@
-package opennlp.textgrounder.resolver;
+package opennlp.textgrounder.app;
 
 import opennlp.textgrounder.text.*;
 import opennlp.textgrounder.text.io.*;
@@ -10,9 +10,9 @@ import java.io.*;
 import java.util.*;
 import java.util.zip.*;
 
-public class LabelPropPreproc {
+public class LabelPropPreproc extends BaseApp {
 
-    public static final int DEGREES_PER_REGION = 1;
+    private static final int DEGREES_PER_REGION = 1;
     private static final double REGION_REGION_WEIGHT = 0.9;
 
     private static final double WORD_WORD_WEIGHT_THRESHOLD = 0.0;
@@ -23,36 +23,32 @@ public class LabelPropPreproc {
     private static final String ARTICLE_TITLE = "Article title: ";
     private static final String ARTICLE_ID = "Article ID: ";
 
-    private static int toponymLexiconSize;
+    //private static int toponymLexiconSize;
 
-    // arg0: path to corpus
-    // arg1: path to graph file
-    // arg2: path to seed file
-    // arg3: path to serialized Geonames gazetteer ([name].ser.gz)
-    // arg4: path to wiki file (article titles, article IDs, and word lists; as output by Ben's wikipedia processing code)
-    // arg5: path to stoplist filename (one stopword per line)
     public static void main(String[] args) throws Exception {
+
+        initializeOptionsFromCommandLine(args);
 
         Tokenizer tokenizer = new OpenNLPTokenizer();
         OpenNLPRecognizer recognizer = new OpenNLPRecognizer();
 
-        System.out.println("Reading serialized GeoNames gazetteer from " + args[3] + " ...");
-        GZIPInputStream gis = new GZIPInputStream(new FileInputStream(args[3]));
+        System.out.println("Reading serialized GeoNames gazetteer from " + getSerializedGazetteerPath() + " ...");
+        GZIPInputStream gis = new GZIPInputStream(new FileInputStream(getSerializedGazetteerPath()));
         ObjectInputStream ois = new ObjectInputStream(gis);
         GeoNamesGazetteer gnGaz = (GeoNamesGazetteer) ois.readObject();
         System.out.println("Done.");
 
         StoredCorpus corpus = Corpus.createStoredCorpus();
-        System.out.print("Reading TR-CoNLL corpus from " + args[0] + " ...");
-        //corpus.addSource(new TrXMLDirSource(new File(args[0]), tokenizer));
-        corpus.addSource(new ToponymAnnotator(new ToponymRemover(new TrXMLDirSource(new File(args[0]), tokenizer)), recognizer, gnGaz));
+        System.out.print("Reading TR-CoNLL corpus from " + getInputPath() + " ...");
+        //corpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
+        corpus.addSource(new ToponymAnnotator(new ToponymRemover(new TrXMLDirSource(new File(getInputPath()), tokenizer)), recognizer, gnGaz));
         corpus.load();
         System.out.println("done.");
 
         Map<Integer, Set<Integer> > toponymRegionEdges = new HashMap<Integer, Set<Integer> >();
 
         Lexicon<String> toponymLexicon = TopoUtil.buildLexicon(corpus);
-        toponymLexiconSize = toponymLexicon.size();
+        //toponymLexiconSize = toponymLexicon.size();
 
         for(Document<StoredToken> doc : corpus) {
             for(Sentence<StoredToken> sent : doc) {
@@ -74,11 +70,11 @@ public class LabelPropPreproc {
             }
         }
 
-        writeToponymRegionEdges(toponymRegionEdges, args[1]);
-        writeRegionRegionEdges(args[1]);
-        writeWordWordEdges(toponymLexicon, args[4], args[1], args[5]);
+        writeToponymRegionEdges(toponymRegionEdges, getGraphOutputPath());
+        writeRegionRegionEdges(getGraphOutputPath());
+        //writeWordWordEdges(toponymLexicon, getWikiInputPath(), getGraphOutputPath(), getStoplistInputPath());
 
-        writeRegionLabels(toponymRegionEdges, args[2]);
+        writeRegionLabels(toponymRegionEdges, getSeedOutputPath());
     }
 
     private static Set<String> buildStoplist(String stoplistFilename) throws Exception {

@@ -11,8 +11,8 @@ public class LabelPropContextSensitiveResolver extends Resolver {
     public static final int DEGREES_PER_REGION = 1;
 
     private static final double CUR_TOP_WEIGHT = 1.0;
-    private static final double SAME_SENT_WEIGHT = 1.0;
-    private static final double OTHER_WEIGHT = 1.0;
+    private static final double SAME_SENT_WEIGHT = 0.0;
+    private static final double OTHER_WEIGHT = 0.0;
 
     private String pathToGraph;
     private Lexicon<String> lexicon = null;// = new SimpleLexicon<String>();

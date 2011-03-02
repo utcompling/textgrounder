@@ -18,6 +18,13 @@ public class BaseApp {
     private static String geoGazetteerFilename = null;
     private static String serializedGazetteerPath = null;
     private static boolean readAsTR = false;
+
+    private static boolean doKMeans = false;
+
+    private static String graphOutputPath = null;
+    private static String seedOutputPath = null;
+    private static String wikiInputPath = null;
+    private static String stoplistInputPath = null;
     
     private static int numIterations = 1;
 
@@ -36,15 +43,26 @@ public class BaseApp {
 
         options.addOption("i", "input", true, "input path");
         options.addOption("ia", "input-additional", true, "path to additional input data to be used in training but not evaluation");
-        options.addOption("ig", "input-graph", true, "path to graph for label propagation resolvers");
+        options.addOption("ig", "input-graph", true, "path to input graph for label propagation resolvers");
         options.addOption("r", "resolver", true, "resolver (RandomResolver, BasicMinDistResolver, WeightedMinDistResolver, LabelPropDefaultRuleResolver, LabelPropContextSensitiveResolver) [default = BasicMinDistResolver]");
         options.addOption("it", "iterations", true, "number of iterations for iterative models [default = 1]");
-        options.addOption("o", "output", true, "output path [default = 'output.xml']");
+        options.addOption("o", "output", true, "output path");
         options.addOption("ok", "output-kml", true, "kml output path");
         options.addOption("g", "geo-gazetteer-filename", true, "GeoNames gazetteer filename");
         options.addOption("sg", "serialized-gazetteer-path", true, "path to serialized GeoNames gazetteer");
-
         options.addOption("tr", "tr-conll", false, "read input path as TR-CoNLL directory");
+
+        options.addOption("dkm", "do-k-means-multipoints", false,
+                "(import-gazetteer only) run k-means and create multipoint representations of regions (e.g. countries)");
+
+        options.addOption("og", "output-graph", true,
+                "(preprocess-labelprop only) path to output graph file");
+        options.addOption("os", "output-seed", true,
+                "(preprocess-labelprop only) path to output seed file");
+        options.addOption("iw", "input-wiki", true,
+                "(preprocess-labelprop only) path to wikipedia file (article titles, article IDs, and word lists)");
+        options.addOption("is", "input-stoplist", true,
+                "(preprocess-labelprob only) path to stop list input file (one stop word per line)");
 
         options.addOption("h", "help", false, "print help");
         
@@ -53,7 +71,7 @@ public class BaseApp {
 
         if (cline.hasOption('h')) {
             HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp("textgrounder resolve", options);
+            formatter.printHelp("textgrounder [command] ", options);
             System.exit(0);
         }
 
@@ -69,12 +87,20 @@ public class BaseApp {
                         additionalInputPath = value;
                     else if(option.getOpt().equals("ig"))
                         graphInputPath = value;
+                    else if(option.getOpt().equals("iw"))
+                        wikiInputPath = value;
+                    else if(option.getOpt().equals("is"))
+                        stoplistInputPath = value;
                     break;
                 case 'o':
                     if(option.getOpt().equals("o"))
                         outputPath = value;
+                    else if(option.getOpt().equals("og"))
+                        graphOutputPath = value;
                     else if(option.getOpt().equals("ok"))
                         kmlOutputPath = value;
+                    else if(option.getOpt().equals("os"))
+                        seedOutputPath = value;
                     break;
                 case 'r':
                     if(value.toLowerCase().startsWith("r"))
@@ -97,6 +123,9 @@ public class BaseApp {
                     break;
                 case 't':
                     readAsTR = true;
+                    break;
+                case 'd':
+                    doKMeans = true;
                     break;
             }
         }
@@ -140,5 +169,26 @@ public class BaseApp {
 
     public static boolean isReadAsTR() {
         return readAsTR;
+    }
+
+    
+    public static boolean isDoingKMeans() {
+        return doKMeans;
+    }
+
+    public static String getGraphOutputPath() {
+        return graphOutputPath;
+    }
+
+    public static String getSeedOutputPath() {
+        return seedOutputPath;
+    }
+
+    public static String getWikiInputPath() {
+        return wikiInputPath;
+    }
+
+    public static String getStoplistInputPath() {
+        return stoplistInputPath;
     }
 }
