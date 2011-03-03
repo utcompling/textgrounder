@@ -960,8 +960,11 @@ def yield_internal_link_args(text):
       else: yield link
       for arg in tempargs[1:]: yield arg
   else:
-    # For textual internal link, use all arguments
-    for chunk in tempargs: yield chunk
+    # For textual internal link, use all arguments, unless --raw-text
+    if Opts.raw_text:
+      yield tempargs[-1]
+    else:
+      for chunk in tempargs: yield chunk
 
 # Process a template into separate chunks for each interesting
 # argument.  Yield the chunks.  They will be recursively processed, and
@@ -994,6 +997,8 @@ def yield_template_args(text):
 
   # Extract the parameter and non-parameter arguments.
   (paramhash, nonparam) = find_template_params(tempargs[1:], False)
+  #uniprint("params: %s" % paramhash)
+  #uniprint("nonparam: %s" % nonparam)
 
   # For certain known template types, use the values from the interesting
   # parameter args and ignore the others.  For other template types,
@@ -1020,6 +1025,8 @@ def yield_template_args(text):
                  # Add more here
                  ):
         yield value
+  elif re.match(r'coord', temptype):
+    return
 
   # For other template types, ignore all parameters and yield the
   # remaining arguments.
@@ -1092,17 +1099,36 @@ def yield_table_chunks(text):
 # yield the words.  Also ignore words with a colon in the middle, indicating
 # likely URL's and similar directives.
 def split_text_into_words(text):
-  # This regexp splits on whitespace, but also handles the following cases:
-  # 1. Any of , ; . etc. at the end of a word
-  # 2. Parens or quotes in words like (foo) or "bar"
-  for word in re.split('[,;."):]*\s+[("]*', text):
-    # Sometimes URL's or other junk slips through.  Much of this junk has
-    # a colon in it and little useful stuff does.
-    if ':' not in word:
-      # Handle things like "Two-port_network#ABCD-parameters".  Do this after
-      # filtering for : so URL's don't get split up.
-      for word2 in re.split('[#_]', word):
-        if word2: yield word2
+  if Opts.raw_text:
+    # This regexp splits on whitespace, but also handles the following cases:
+    # 1. Any of , ; . etc. at the end of a word
+    # 2. Parens or quotes in words like (foo) or "bar"
+    off = 0
+    for word in re.split(r'([,;."):]*)\s+([("]*)', text):
+      if (off % 3) != 0:
+        for c in word:
+          yield c
+      else:
+        # Sometimes URL's or other junk slips through.  Much of this junk has
+        # a colon in it and little useful stuff does.
+        if ':' not in word:
+          # Handle things like "Two-port_network#ABCD-parameters".  Do this after
+          # filtering for : so URL's don't get split up.
+          for word2 in re.split('[#_]', word):
+            if word2: yield word2
+      off += 1
+  else:
+    # This regexp splits on whitespace, but also handles the following cases:
+    # 1. Any of , ; . etc. at the end of a word
+    # 2. Parens or quotes in words like (foo) or "bar"
+    for word in re.split(r'[,;."):]*\s+[("]*', text):
+      # Sometimes URL's or other junk slips through.  Much of this junk has
+      # a colon in it and little useful stuff does.
+      if ':' not in word:
+        # Handle things like "Two-port_network#ABCD-parameters".  Do this after
+        # filtering for : so URL's don't get split up.
+        for word2 in re.split('[#_]', word):
+          if word2: yield word2
 
 # Extract "useful" text (generally, text that will be seen by the user,
 # or hidden text of similar quality) and yield up chunks.
@@ -1208,10 +1234,10 @@ def format_text_second_pass(text):
  
   # Remove beginning-of-line markers indicating indentation, lists, headers,
   # etc.
-  (text, _) = re.subn(r"(?m)^[*#:=]+", '', text)
+  (text, _) = re.subn(r"(?m)^[*#:]+", '', text)
 
   # Remove end-of-line markers indicating headers (e.g. ===Introduction===)
-  (text, _) = re.subn(r"(?m)=+$", r'', text)
+  (text, _) = re.subn(r"(?m)^=+(.*?)=+$", r'\1', text)
 
   return text
 
@@ -1732,10 +1758,12 @@ def main():
 
   op = OptionParser(usage="%prog [options] < file")
   op.add_option("-w", "--output-words",
-                help="Output raw text.",
+                help="Output words of text.",
+                action="store_true")
+  op.add_option("--raw-text", help="Out raw text with little processing.",
                 action="store_true")
   op.add_option("--output-coord-words",
-                help="Output raw text, but only for articles with coordinates.",
+                help="Output text, but only for articles with coordinates.",
                 action="store_true")
   op.add_option("-l", "--find-links",
                 help="""Find all links and print info about them.
