@@ -91,7 +91,7 @@ bzcat $IN_DUMP_FILE | $PROCESSWIKI \
 elif [ "$step" = coord-words ]; then
 echo "Generating raw text, coord aticles only ..."
 bzcat $IN_DUMP_FILE | $PROCESSWIKI \
-  --output-coord-words \
+  --output-coord-words --raw-text \
   $OTHEROPTS > $OUT_COORD_WORDS_FILE
 
 else

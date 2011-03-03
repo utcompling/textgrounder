@@ -16,10 +16,11 @@ fi
 
 WIKI_DISAMBIG="$TEXTGROUNDER_PYTHON/wiki_disambig.py"
 
+####### Begin option processing
+
 #MODE="match-only"
 #MODE="geotag-toponyms"
 MODE="geotag-documents"
-
 if [ "$1" = "toponyms" ]; then
   MODE="geotag-toponyms"
   shift
@@ -27,6 +28,26 @@ elif [ "$1" = "documents" ]; then
   MODE="geotag-documents"
   shift
 fi
+
+#opts=""
+
+# Don't bother using getopt here.  Less portable (esp. on Mac OS X, where
+# the default getopt doesn't support --long format), and hardly buys us
+# much anything.
+
+while true ; do
+  case "$1" in
+    --doc-thresh) GEOTEXT_OUTPUT_DIR="$GEOTEXT_TOP_DIR/output-$2-docthresh" ;
+                  shift 2 ;;
+    # A no-argument option ....
+    #-n|--no-backup) opts="$opts --no-backup" ; shift ;;
+    --) shift ; break ;;
+    *) break ;;
+  esac
+done
+
+####### End option processing
+
 
 MISCOPTS="--width-of-stat-region 1 --miles-per-region 100"
 if [ "$MODE" = "geotag-toponyms" -o "$MODE" = "match-only" ]; then

@@ -11,8 +11,9 @@ fi
 TRCONLL_DEV_DIR="/groups/projects/pcl_travel/data/trconlldevtest/dev"
 
 GEOTEXT_TOP_DIR="$HOME/devel/geotext"
-GEOTEXT_INPUT_DIR="$GEOTEXT_TOP_DIR/GeoText.2010-10-12/processed_data"
-GEOTEXT_OUTPUT_DIR="$GEOTEXT_TOP_DIR/output"
+GEOTEXT_CORPUS_TOP="$HOME/devel/geotext/GeoText.2010-10-12"
+#GEOTEXT_INPUT_DIR="$GEOTEXT_CORPUS_TOP/processed_data"
+GEOTEXT_OUTPUT_DIR="$GEOTEXT_TOP_DIR/output-40-docthresh"
 
 DUMP_PREFIX="enwiki-20100905"
 if [ -z "$NO_USE_PERMUTED" ]; then

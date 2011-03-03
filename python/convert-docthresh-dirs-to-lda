@@ -1,0 +1,50 @@
+#!/bin/sh
+
+# For directories holding tokenized/preprocessed versions of the Geotext
+# Twitter corpus at varying levels of doc_count_thresh (parameter in
+# preproc/extract.py in the Geotext corpus).  Assume extract.py has been
+# run appropriately with the appropriate value of doc_count_thresh and
+# output is in processed-##-docthresh subdir in the corpus.  Generate
+# appropriate WikiGrounder-format files in output-##-docthresh subdirs
+# one level up from the corpus.
+#
+# Run this at the top level of the GeoText.####-##-## tree.
+
+### Standard boilerplate to get config ###
+
+DEBUG="--debug 0"
+
+if [ -z "$TEXTGROUNDER_PYTHON" ]; then
+    TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+fi
+
+TGP="$TEXTGROUNDER_PYTHON"
+
+. $TGP/config-wikigrounder
+
+### End boilerplate to get config ###
+
+### Do it ###
+
+# Change list of threshold values if you want; remember, you already
+# had to have run extract.py.
+
+
+STEP1="$TGP/twitter_to_lda.py"
+STEP2="$TGP/twitter_geotext_process.py"
+
+for x in 5 10 2 20 3; do
+  INDIR="processed-$x-docthresh"
+  OUTDIR="../../output-$x-docthresh"
+  cd $INDIR
+  echo "Working in $INDIR"
+  # Need to copy files indicating train/dev/test split.
+  cp -p ../processed_data/user_info.* .
+  echo "Running $STEP1"
+  $STEP1 -i . -o .
+  mkdir -p $OUTDIR
+  echo "Output dir is $OUTDIR"
+  echo "Running $STEP2"
+  $STEP2 -i . -o $OUTDIR
+  cd ..
+done
