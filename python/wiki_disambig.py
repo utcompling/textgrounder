@@ -405,7 +405,7 @@ class RegionDist(object):
 
   # It's expensive to compute the value for a given word so we cache word
   # distributions.
-  cached_dists = LRUCache(maxsize=1000)
+  cached_dists = LRUCache(maxsize=400)
 
   def __init__(self, word=None, regionprobs=None):
     if regionprobs:
