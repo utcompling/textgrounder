@@ -20,7 +20,6 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -31,7 +30,6 @@ import opennlp.textgrounder.bayesian.mathutils.*;
 import opennlp.textgrounder.bayesian.spherical.annealers.*;
 import opennlp.textgrounder.bayesian.spherical.io.*;
 import opennlp.textgrounder.bayesian.structs.*;
-import opennlp.textgrounder.bayesian.utils.TGArrays;
 
 /**
  *
@@ -39,7 +37,6 @@ import opennlp.textgrounder.bayesian.utils.TGArrays;
  */
 public abstract class SphericalModelBase extends SphericalModelFields {
 
-    protected final static double EXPANSION_FACTOR = 0.25;
     /**
      * Random number generator. Implements the fast Mersenne Twister.
      */
@@ -60,10 +57,6 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * 
      */
     protected transient SphericalAnnealer annealer;
-    /**
-     * the crpalpha for use when spherical distributions are not normalized
-     */
-    protected transient double crpalpha_mod;
 
     /**
      * Default constructor. Take input from commandline and default _options
@@ -91,13 +84,20 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                 break;
         }
 
-        crpalpha = _experimentParameters.getCrpalpha();
-        alpha = _experimentParameters.getAlpha();
-        beta = _experimentParameters.getBeta();
-        kappa = _experimentParameters.getKappa();
-        crpalpha_mod = crpalpha * 4 * Math.PI * Math.sinh(kappa) / kappa;
+        alpha_H = _experimentParameters.get_alpha_H();
+        alpha_h_d = _experimentParameters.get_alpha_h_d();
+        alpha_h_f = _experimentParameters.get_alpha_h_f();
+        alpha_init = _experimentParameters.get_alpha_init();
+        alpha_shape_a = _experimentParameters.get_alpha_shape_a();
+        alpha_scale_b = _experimentParameters.get_alpha_scale_b();
+        kappa_hyper_shape = _experimentParameters.get_kappa_hyper_shape();
+        kappa_hyper_scale = _experimentParameters.get_kappa_hyper_scale();
+        phi_dirichlet_hyper = _experimentParameters.get_phi_dirichlet_hyper();
+        ehta_dirichlet_hyper = _experimentParameters.get_ehta_dirichlet_hyper();
+        vmf_proposal_kappa = _experimentParameters.get_vmf_proposal_kappa();
+        vmf_proposal_sigma = _experimentParameters.get_vmf_proposal_sigma();
 
-        Z = _experimentParameters.getTopics();
+        L = _experimentParameters.getL();
 
         int randSeed = _experimentParameters.getRandomSeed();
         if (randSeed == 0) {
@@ -111,6 +111,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
              */
             rand = new MersenneTwisterFast(randSeed);
         }
+        RKRand.setMtfRand(rand);
+        TGRand.setMtfRand(rand);
 
         double targetTemp = _experimentParameters.getTargetTemperature();
         double initialTemp = _experimentParameters.getInitialTemperature();
@@ -125,7 +127,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         initialize(experimentParameters);
         readTokenArrayFile();
         readRegionCoordinateList();
-        initializeCountArrays();
+        initializeArrays();
     }
 
     /**
@@ -146,33 +148,59 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * regionToponymCoordinateCounts
      * </p>
      */
-    protected void initializeCountArrays() {
-        expectedR = (int) Math.ceil(crpalpha * Math.log(1 + N / crpalpha)) * 3;
+    protected void initializeArrays() {
+        //////////////////////////////////////////////////////////////////////
+        /**
+         * count arrays
+         */
+        //////////////////////////////////////////////////////////////////////
+        toponymCoordinateCounts = new int[T][];
+        for (int j = 0; j < T; ++j) {
+            int coordinates = toponymCoordinateLexicon[j].length;
+            int[] coordcounts = new int[coordinates];
+            Arrays.fill(coordcounts, 0);
+            toponymCoordinateCounts[j] = coordcounts;
+        }
 
-        regionCountsOfToponyms = new int[expectedR];
-        Arrays.fill(regionCountsOfToponyms, 0);
+        dishByRestaurantCounts = new int[D * L];
+        Arrays.fill(dishByRestaurantCounts, 0);
 
-        regionCountsOfAllWords = new int[expectedR];
-        Arrays.fill(regionCountsOfAllWords, 0);
+        globalDishCounts = new int[L];
+        Arrays.fill(globalDishCounts, 0);
 
-        regionByDocumentCounts = new int[D * expectedR];
-        Arrays.fill(regionByDocumentCounts, 0);
+        toponymByDishCounts = new int[T * L];
+        Arrays.fill(toponymByDishCounts, 0);
 
-        wordByRegionCounts = new int[W * expectedR];
-        Arrays.fill(wordByRegionCounts, 0);
+        nonToponymByDishCounts = new int[W * L];
+        Arrays.fill(nonToponymByDishCounts, 0);
 
-        regionMeans = new double[expectedR][];
+        //////////////////////////////////////////////////////////////////////
+        /**
+         * parameter arrays
+         */
+        //////////////////////////////////////////////////////////////////////
+        regionMeans = new double[L][];
 
-        regionToponymCoordinateCounts = new int[expectedR][][];
-        for (int i = 0; i < expectedR; ++i) {
-            int[][] toponymCoordinateCounts = new int[T][];
-            for (int j = 0; j < T; ++j) {
-                int coordinates = toponymCoordinateLexicon[j].length;
-                int[] coordcounts = new int[coordinates];
-                Arrays.fill(coordcounts, 0);
-                toponymCoordinateCounts[j] = coordcounts;
-            }
-            regionToponymCoordinateCounts[i] = toponymCoordinateCounts;
+        kappa = new double[L];
+        Arrays.fill(kappa, 0);
+
+        alpha = new double[D];
+        Arrays.fill(alpha, alpha_init);
+
+        globalDishWeights = new double[L];
+        Arrays.fill(globalDishWeights, 0);
+
+        localDishWeights = new double[D * L];
+        Arrays.fill(localDishWeights, 0);
+
+        nonToponymByDishDirichlet = new double[W * L];
+        Arrays.fill(nonToponymByDishDirichlet, 0);
+
+        toponymCoordinateDirichlet = new double[T][];
+        for (int t = 0; t < T; ++t) {
+            int len = toponymCoordinateLexicon[t].length;
+            toponymCoordinateDirichlet[t] = new double[len];
+            Arrays.fill(toponymCoordinateDirichlet[t], 0);
         }
     }
 
@@ -181,8 +209,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * <p>
      * W
      * D
-     * betaW
      * N
+     * Nn
      * </p>
      *
      * The following class variables are initialized in this procedure
@@ -196,6 +224,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * </p>
      */
     protected void readTokenArrayFile() {
+
+        Nn = 0;
 
         ArrayList<Integer> wordArray = new ArrayList<Integer>(),
               docArray = new ArrayList<Integer>(),
@@ -218,6 +248,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                         if (W < wordid) {
                             W = wordid;
                         }
+                        Nn += 1;
                     }
                     if (D < docid) {
                         D = docid;
@@ -230,7 +261,6 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         }
 
         W += 1;
-        betaW = beta * W;
         D += 1;
         N = wordArray.size();
 
@@ -246,8 +276,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         stopwordVector = new int[N];
         copyToArray(stopwordVector, stopwordArray);
 
-        regionVector = new int[N];
-        Arrays.fill(regionVector, -1);
+        dishVector = new int[N];
+        Arrays.fill(dishVector, -1);
 
         coordinateVector = new int[N];
         Arrays.fill(coordinateVector, -1);
@@ -265,8 +295,6 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      * @param _file
      */
     public void readRegionCoordinateList() {
-
-        emptyRSet = new HashSet<Integer>();
 
         HashMap<Integer, double[]> toprecords = new HashMap<Integer, double[]>();
         T = 0;
@@ -326,92 +354,18 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      */
     public abstract void decode();
 
-    /**
-     * 
-     */
-    protected abstract void expandExpectedR();
-
-    /**
-     *
-     */
-    protected void shrinkToCurrentR() {
-
-        double[] sampleRegionByDocumentCounts = annealer.getRegionByDocumentCounts();
-        sampleRegionByDocumentCounts = TGArrays.expandDoubleTierC(sampleRegionByDocumentCounts, D, currentR, expectedR);
-        annealer.setRegionByDocumentCounts(sampleRegionByDocumentCounts);
-
-        double[] sampleWordByRegionCounts = annealer.getWordByRegionCounts();
-        sampleWordByRegionCounts = TGArrays.expandDoubleTierC(sampleWordByRegionCounts, W, currentR, expectedR);
-        annealer.setWordByRegionCounts(sampleWordByRegionCounts);
-
-        double[][][] sampleRegionToponymCoordinateCounts = annealer.getRegionToponymCoordinateCounts();
-        double[][][] newSampleRegionToponymCoordinateCounts = new double[currentR][][];
-        for (int i = 0; i < currentR; ++i) {
-            newSampleRegionToponymCoordinateCounts[i] = sampleRegionToponymCoordinateCounts[i];
-        }
-
-        annealer.setRegionToponymCoordinateCounts(sampleRegionToponymCoordinateCounts);
-
-        double[][] sampleRegionMeans = annealer.getRegionMeans();
-        sampleRegionMeans = TGArrays.expandSingleTierR(sampleRegionMeans, currentR, expectedR, coordParamLen);
-        annealer.setRegionMeans(sampleRegionMeans);
-    }
-
-    protected void resetRegionID(SphericalAnnealer _annealer, int curregionid, int curdocid) {
-        double[] probs = new double[currentR];
-        regionCountsOfAllWords[curregionid] = 0;
-        for (int i = 0; i < D; ++i) {
-            regionByDocumentCounts[i * expectedR + curregionid] = 0;
-        }
-        for (int i = 0; i < W; ++i) {
-            wordByRegionCounts[i * expectedR + curregionid] = 0;
-        }
-
-        for (int i = 0; i < N; ++i) {
-            if (regionVector[i] == curregionid) {
-                if (stopwordVector[i] == 0 && toponymVector[i] == 0) {
-                    int wordid = wordVector[i];
-                    int docid = documentVector[i];
-                    int docoff = docid * expectedR;
-                    int wordoff = wordid * expectedR;
-                    for (int j = 0; j < currentR; ++j) {
-                        probs[j] = (wordByRegionCounts[wordoff + j] + beta)
-                              / (regionCountsOfAllWords[j] + betaW)
-                              * regionByDocumentCounts[docoff + j];
-                    }
-                    for (int j : emptyRSet) {
-                        probs[j] = 0;
-                    }
-
-                    double totalprob = annealer.annealProbs(0, currentR, probs);
-                    double r = rand.nextDouble() * totalprob;
-                    double max = probs[0];
-                    int regionid = 0;
-                    while (r > max) {
-                        regionid++;
-                        max += probs[regionid];
-                    }
-                    regionVector[i] = regionid;
-
-                    regionCountsOfAllWords[regionid]++;
-                    regionByDocumentCounts[docoff + regionid]++;
-                    wordByRegionCounts[wordoff + regionid]++;
-                }
-            }
-        }
-    }
-
     public void train() {
-        System.err.println(String.format("Randomly initializing with %d tokens, %d words, %d documents, and %d expected regions", N, W, D, expectedR));
+        System.err.println(String.format("Randomly initializing with %d tokens, %d words, %d documents, and %d expected regions", N, W, D, L));
         randomInitialize();
-        System.err.println(String.format("Beginning training with %d tokens, %d words, %d documents, and %d expected regions", N, W, D, expectedR));
+        System.err.println(String.format("Beginning training with %d tokens, %d words, %d documents, and %d expected regions", N, W, D, L));
         train(annealer);
         if (annealer.getSamples() != 0) {
-            averagedWordByRegionCounts = annealer.getWordByRegionCounts();
-            averagedRegionCountsOfAllWords = annealer.getAllWordsRegionCounts();
-            averagedRegionByDocumentCounts = annealer.getRegionByDocumentCounts();
-            averagedRegionMeans = annealer.getRegionMeans();
-            averagedRegionToponymCoordinateCounts = annealer.getRegionToponymCoordinateCounts();
+            globalDishWeightsFM = annealer.getGlobalDishWeightsFM();
+            localDishWeightsFM = annealer.getLocalDishWeightsFM();
+            kappaFM = annealer.getKappaFM();
+            regionMeansFM = annealer.getRegionMeansFM();
+            toponymCoordinateDirichletFM = annealer.getToponymCoordinateWeightsFM();
+            nonToponymByDishDirichletFM = annealer.getNonToponymByDishDirichletFM();
         }
     }
 
@@ -429,11 +383,9 @@ public abstract class SphericalModelBase extends SphericalModelFields {
 
     public void write() {
         outputWriter = new SphericalBinaryOutputWriter(experimentParameters);
-        outputWriter.writeTokenArray(wordVector, documentVector, toponymVector, stopwordVector, regionVector, coordinateVector);
+        outputWriter.writeTokenArray(wordVector, documentVector, toponymVector, stopwordVector, dishVector, coordinateVector);
 
         AveragedSphericalCountWrapper averagedSphericalCountWrapper = new AveragedSphericalCountWrapper(this);
-//        averagedSphericalCountWrapper.addHyperparameters();
-
         outputWriter.writeProbabilities(averagedSphericalCountWrapper);
     }
 
@@ -449,5 +401,231 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         for (int i = 0; i < ta.size(); ++i) {
             ia[i] = ta.get(i).intValue();
         }
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    /**
+     * parameter update routines
+     */
+    //////////////////////////////////////////////////////////////////////
+    /**
+     * 
+     * @param _mu
+     * @param _l
+     * @return
+     */
+    public double evalMuLogLikelihood(double[] _mu, int _l) {
+        double logLikelihood = 0;
+        for (int i = 0; i < N; ++i) {
+            int istoponym = toponymVector[i];
+            if (istoponym == 1) {
+                if (dishVector[i] == _l) {
+                    int coordid = coordinateVector[i];
+                    int wordid = wordVector[i];
+                    double[] coord = toponymCoordinateLexicon[wordid][coordid];
+                    double likelihood = TGBLAS.ddot(0, coord, 1, _mu, 1);
+                    logLikelihood += likelihood;
+                }
+            }
+        }
+        return logLikelihood;
+    }
+
+    public double evalKappaLogLikelihood(double _kappa, double[] _mu, int _l) {
+        double logLikelihood = 0;
+        int lcount = 0;
+        if (_kappa > 5) {
+            for (int i = 0; i < N; ++i) {
+                int istoponym = toponymVector[i];
+                if (istoponym == 1) {
+                    if (dishVector[i] == _l) {
+                        lcount += 1;
+                        int coordid = coordinateVector[i];
+                        int wordid = wordVector[i];
+                        double[] coord = toponymCoordinateLexicon[wordid][coordid];
+                        logLikelihood += TGBLAS.ddot(0, coord, 1, _mu, 1);
+                    }
+                }
+            }
+            logLikelihood = lcount * (Math.log(0.5 * _kappa / Math.PI) - _kappa) + _kappa * logLikelihood;
+        } else {
+            for (int i = 0; i < N; ++i) {
+                int istoponym = toponymVector[i];
+                if (istoponym == 1) {
+                    if (dishVector[i] == _l) {
+                        lcount += 1;
+                        int coordid = coordinateVector[i];
+                        int wordid = wordVector[i];
+                        double[] coord = toponymCoordinateLexicon[wordid][coordid];
+                        logLikelihood += TGBLAS.ddot(0, coord, 1, _mu, 1);
+                    }
+                }
+            }
+            logLikelihood = lcount * (Math.log(_kappa / (4 * Math.PI * Math.sinh(_kappa)))) + _kappa * logLikelihood;
+        }
+        return logLikelihood;
+    }
+
+    public double globalAlphaUpdate() {
+        int Ls = 0;
+        for (int d : globalDishCounts) {
+            if (d > 0) {
+                Ls++;
+            }
+        }
+
+        double q = RKRand.rk_beta(alpha_H + 1, Nn);
+        double pq = (alpha_h_d + Ls - 1) / (Nn * (alpha_h_f - Math.log(q)));
+        int s = 0;
+        if (rand.nextDouble() < pq) {
+            s = 1;
+        }
+        double new_alpha_H = RKRand.rk_gamma(alpha_h_d + Ls + s - 1, alpha_h_f - Math.log(q));
+
+        return new_alpha_H;
+    }
+
+    public double[] alphaUpdate() {
+        double[] new_alpha = new double[D];
+
+        for (int d = 0; d < D; ++d) {
+            int docoff = d * L;
+            int Is = 0;
+            for (int l = 0; l < L; ++l) {
+                if (dishByRestaurantCounts[docoff + l] > 0) {
+                    Is++;
+                }
+            }
+
+            double q = RKRand.rk_beta(alpha[d] + 1, Is);
+            int s = rand.nextDouble() < q ? 1 : 0;
+            new_alpha[d] = RKRand.rk_gamma(alpha_shape_a + Is - s, alpha_scale_b - Math.log(q));
+        }
+
+        return new_alpha;
+    }
+
+    public static double[] dirichletUpdate(double[] _c0, int[] _n) {
+        double[] hyp = new double[_n.length];
+        for (int i = 0; i < _n.length; ++i) {
+            hyp[i] = _c0[i] + _n[i];
+        }
+        double[] phi = TGRand.dirichletRnd(hyp);
+        return phi;
+    }
+
+    public double[] dirichletUpdate(double _c0, int[] _n) {
+        double[] hyp = new double[_n.length];
+        for (int i = 0; i < _n.length; ++i) {
+            hyp[i] = _c0 + _n[i];
+        }
+        double[] phi = TGRand.dirichletRnd(hyp);
+        return phi;
+    }
+
+    public double[][] regionMeansUpdate() {
+        double[][] newRegionMeans = new double[L][];
+
+        for (int l = 0; l < L; ++l) {
+            double[] oldmean = regionMeans[l];
+
+            double[] newmean = TGRand.vmfRnd(oldmean, vmf_proposal_kappa);
+            double u = evalMuLogLikelihood(newmean, l) - evalMuLogLikelihood(oldmean, l);
+
+            if (u > 0) {
+                newRegionMeans[l] = newmean;
+            } else {
+                if (rand.nextDouble() < Math.exp(u)) {
+                    newRegionMeans[l] = newmean;
+                } else {
+                    newRegionMeans[l] = oldmean;
+                }
+            }
+        }
+        return newRegionMeans;
+    }
+
+    public double[] kappaUpdate() {
+        double[] newkappa = new double[L];
+
+        for (int l = 0; l < L; ++l) {
+            double oldk = kappa[l];
+            double newk = vmf_proposal_sigma * rand.nextGaussian() + oldk;
+            while (newk < 0) {
+                newk = vmf_proposal_sigma * rand.nextGaussian() + oldk;
+            }
+            double[] means = regionMeans[l];
+
+            double u = evalKappaLogLikelihood(newk, means, l) - evalKappaLogLikelihood(oldk, means, l);
+            if (u > 0) {
+                newkappa[l] = newk;
+            } else {
+                if (rand.nextDouble() < Math.exp(u)) {
+                    newkappa[l] = newk;
+                } else {
+                    newkappa[l] = oldk;
+                }
+            }
+        }
+        return newkappa;
+    }
+
+    public double[] restaurantStickBreakingWeightsUpdate() {
+        double[] weights = new double[D * L];
+        double[] wcs = TGMath.cumProb(globalDishWeights);
+        for (int d = 0; d < D; ++d) {
+            int docoff = d * L;
+            double ai = alpha[d];
+
+            double[] vl = new double[L];
+            double[] ivl = new double[L];
+            double[] ilvl = new double[L];
+            int[] incs = TGMath.inverseCumSum(dishByRestaurantCounts, docoff, docoff + L);
+
+            for (int l = 0; l < L - 1; ++l) {
+                double a = ai * globalDishWeights[l] + dishByRestaurantCounts[docoff + l];
+                double b = ai * (1 - wcs[l]) + incs[l + 1];
+                vl[l] = RKRand.rk_beta(a, b);
+            }
+
+            vl[L - 1] = 1;
+            for (int i = 0; i < L; ++i) {
+                ilvl[i] = Math.log(1 - vl[i]);
+            }
+            ivl = TGMath.cumSum(ilvl);
+
+            weights[docoff] = vl[0];
+            for (int l = 1; l < L; ++l) {
+                weights[docoff + l] = Math.exp(Math.log(vl[l]) + ivl[l - 1]);
+            }
+        }
+        return weights;
+    }
+
+    public double[] globalStickBreakingWeightsUpdate() {
+        double[] weights = new double[L];
+        double[] v = new double[L];
+        double[] ivl = new double[L];
+        double[] ilvl = new double[L];
+        int[] incs = TGMath.inverseCumSum(globalDishCounts);
+
+        for (int i = 0; i < L - 1; ++i) {
+            double a = 1 + globalDishCounts[i];
+            double b = alpha_H + incs[i + 1];
+            v[i] = RKRand.rk_beta(a, b);
+        }
+
+        v[L - 1] = 1;
+        for (int i = 0; i < L; ++i) {
+            ilvl[i] = Math.log(1 - v[i]);
+        }
+        ivl = TGMath.cumSum(ilvl);
+
+        weights[0] = v[0];
+        for (int i = 1; i < L; ++i) {
+            weights[i] = Math.exp(Math.log(v[i]) + ivl[i - 1]);
+        }
+
+        return weights;
     }
 }

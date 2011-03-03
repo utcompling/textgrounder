@@ -37,6 +37,8 @@ public class LabelProcDefaultRuleResolver extends Resolver {
 
                 String[] tokens = curLine.split("\t");
 
+                if(tokens[0].endsWith("R")) continue;//tokens[0] = tokens[0].substring(0, tokens[0].length()-1);
+                
                 int idx = Integer.parseInt(tokens[0]);
 
                 if(!reverseLexicon.containsKey(idx))
@@ -57,8 +59,10 @@ public class LabelProcDefaultRuleResolver extends Resolver {
                     }
                 }
 
-                if(regionNumber == -1)
+                if(regionNumber == -1) {
+                    System.out.println("-1");
                     continue;
+                }
 
                 defaultRegions.put(idx, regionNumber);
             }

@@ -90,7 +90,7 @@ public class BaseApp {
             paramFilename = "exp-parameters.xml";
         }
 
-        ExperimentParameterManipulator.loadParameters(_experimentParameters, root + paramFilename, "RLDA");
+        ExperimentParameterManipulator.loadParameters(_experimentParameters, root + paramFilename, "ALL");
         _experimentParameters.setProjectRoot(root);
     }
 }

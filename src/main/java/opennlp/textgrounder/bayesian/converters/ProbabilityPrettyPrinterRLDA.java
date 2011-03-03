@@ -82,7 +82,7 @@ public class ProbabilityPrettyPrinterRLDA extends ProbabilityPrettyPrinter {
         betaW = averagedCountWrapper.betaW;
         D = averagedCountWrapper.D;
         N = averagedCountWrapper.N;
-        R = averagedCountWrapper.R;
+        L = averagedCountWrapper.R;
         W = averagedCountWrapper.W;
         averagedRegionByDocumentCounts = averagedCountWrapper.averagedRegionByDocumentCounts;
         averagedRegionCounts = averagedCountWrapper.averagedRegionCounts;
@@ -114,35 +114,35 @@ public class ProbabilityPrettyPrinterRLDA extends ProbabilityPrettyPrinter {
         double[] wordFreqTotals = new double[W];
         Arrays.fill(wordFreqTotals, 0.0);
 
-        for (int i = 0; i < R; ++i) {
+        for (int i = 0; i < L; ++i) {
             sum += averagedRegionCounts[i];
 
             for (int j = 0; j < W; ++j) {
-                wordFreqTotals[j] += averagedWordByRegionCounts[j * R + i];
+                wordFreqTotals[j] += averagedWordByRegionCounts[j * L + i];
             }
         }
 
         double[] idfs = new double[W];
         for (int i = 0; i < W; ++i) {
-            idfs[i] = Math.log(R / wordFreqTotals[i]);
+            idfs[i] = Math.log(L / wordFreqTotals[i]);
         }
 
-        double[] normalizedTfIdfs = new double[R * W];
-        for (int i = 0; i < R; ++i) {
+        double[] normalizedTfIdfs = new double[L * W];
+        for (int i = 0; i < L; ++i) {
             double total = 0.0;
             for (int j = 0; j < W; ++j) {
-                total += averagedWordByRegionCounts[j * R + i] * idfs[j];
+                total += averagedWordByRegionCounts[j * L + i] * idfs[j];
             }
 
             for (int j = 0; j < W; ++j) {
-                normalizedTfIdfs[j * R + i] = averagedWordByRegionCounts[j * R + i] * idfs[j] / total;
+                normalizedTfIdfs[j * L + i] = averagedWordByRegionCounts[j * L + i] * idfs[j] / total;
             }
         }
 
-        for (int i = 0; i < R; ++i) {
+        for (int i = 0; i < L; ++i) {
             ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
             for (int j = 0; j < W; ++j) {
-                topWords.add(new IntDoublePair(j, normalizedTfIdfs[j * R + i]));
+                topWords.add(new IntDoublePair(j, normalizedTfIdfs[j * L + i]));
             }
 
             Collections.sort(topWords);
@@ -190,14 +190,14 @@ public class ProbabilityPrettyPrinterRLDA extends ProbabilityPrettyPrinter {
                 w.writeStartElement(wordByRegionName);
 
                 double sum = 0.;
-                for (int i = 0; i < R; ++i) {
+                for (int i = 0; i < L; ++i) {
                     sum += averagedRegionCounts[i];
                 }
 
-                for (int i = 0; i < R; ++i) {
+                for (int i = 0; i < L; ++i) {
                     ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
                     for (int j = 0; j < W; ++j) {
-                        topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * R + i]));
+                        topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * L + i]));
                     }
                     Collections.sort(topWords);
 
@@ -229,16 +229,16 @@ public class ProbabilityPrettyPrinterRLDA extends ProbabilityPrettyPrinter {
 
                 for (int i = 0; i < W; ++i) {
                     wordCounts[i] = 0;
-                    int wordoff = i * R;
-                    for (int j = 0; j < R; ++j) {
+                    int wordoff = i * L;
+                    for (int j = 0; j < L; ++j) {
                         wordCounts[i] += averagedWordByRegionCounts[wordoff + j];
                     }
                 }
 
                 for (int i = 0; i < W; ++i) {
-                    int wordoff = i * R;
+                    int wordoff = i * L;
                     ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
-                    for (int j = 0; j < R; ++j) {
+                    for (int j = 0; j < L; ++j) {
                         topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j]));
                     }
                     Collections.sort(topRegions);
@@ -293,16 +293,16 @@ public class ProbabilityPrettyPrinterRLDA extends ProbabilityPrettyPrinter {
 
                 for (int i = 0; i < D; ++i) {
                     docWordCounts[i] = 0;
-                    int docoff = i * R;
-                    for (int j = 0; j < R; ++j) {
+                    int docoff = i * L;
+                    for (int j = 0; j < L; ++j) {
                         docWordCounts[i] += averagedRegionByDocumentCounts[docoff + j];
                     }
                 }
 
                 for (int i = 0; i < D; ++i) {
-                    int docoff = i * R;
+                    int docoff = i * L;
                     ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
-                    for (int j = 0; j < R; ++j) {
+                    for (int j = 0; j < L; ++j) {
                         topRegions.add(new IntDoublePair(j, averagedRegionByDocumentCounts[docoff + j]));
                     }
                     Collections.sort(topRegions);
@@ -348,14 +348,14 @@ public class ProbabilityPrettyPrinterRLDA extends ProbabilityPrettyPrinter {
             BufferedWriter wordByRegionWriter = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(wordByRegionFilename))));
 
             double sum = 0.;
-            for (int i = 0; i < R; ++i) {
+            for (int i = 0; i < L; ++i) {
                 sum += averagedRegionCounts[i];
             }
 
-            for (int i = 0; i < R; ++i) {
+            for (int i = 0; i < L; ++i) {
                 ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
                 for (int j = 0; j < W; ++j) {
-                    topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * R + i]));
+                    topWords.add(new IntDoublePair(j, averagedWordByRegionCounts[j * L + i]));
                 }
                 Collections.sort(topWords);
 
@@ -392,16 +392,16 @@ public class ProbabilityPrettyPrinterRLDA extends ProbabilityPrettyPrinter {
 
             for (int i = 0; i < W; ++i) {
                 wordCounts[i] = 0;
-                int wordoff = i * R;
-                for (int j = 0; j < R; ++j) {
+                int wordoff = i * L;
+                for (int j = 0; j < L; ++j) {
                     wordCounts[i] += averagedWordByRegionCounts[wordoff + j];
                 }
             }
 
             for (int i = 0; i < W; ++i) {
-                int wordoff = i * R;
+                int wordoff = i * L;
                 ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
-                for (int j = 0; j < R; ++j) {
+                for (int j = 0; j < L; ++j) {
                     topRegions.add(new IntDoublePair(j, averagedWordByRegionCounts[wordoff + j]));
                 }
                 Collections.sort(topRegions);
@@ -460,16 +460,16 @@ public class ProbabilityPrettyPrinterRLDA extends ProbabilityPrettyPrinter {
 
             for (int i = 0; i < D; ++i) {
                 docWordCounts[i] = 0;
-                int docoff = i * R;
-                for (int j = 0; j < R; ++j) {
+                int docoff = i * L;
+                for (int j = 0; j < L; ++j) {
                     docWordCounts[i] += averagedRegionByDocumentCounts[docoff + j];
                 }
             }
 
             for (int i = 0; i < D; ++i) {
-                int docoff = i * R;
+                int docoff = i * L;
                 ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
-                for (int j = 0; j < R; ++j) {
+                for (int j = 0; j < L; ++j) {
                     topRegions.add(new IntDoublePair(j, averagedRegionByDocumentCounts[docoff + j]));
                 }
                 Collections.sort(topRegions);

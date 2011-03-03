@@ -17,7 +17,6 @@
 package opennlp.textgrounder.bayesian.mathutils;
 
 import java.util.Arrays;
-import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
 
 /**
  *
@@ -27,29 +26,92 @@ public class TGMath {
 
     public static double sphericalDensity(double[] _x, double[] _mu,
           double _kappa) {
-        return _kappa * Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, _mu, 1)) / (4 * Math.PI * Math.sinh(_kappa));
+        double d = 0;
+        if (_kappa > 5) {
+            d = 0.5 * _kappa / Math.PI * Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, _mu, 1)
+                  - _kappa);
+        } else {
+            d = _kappa * Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, _mu, 1))
+                  / (4 * Math.PI * Math.sinh(_kappa));
+        }
+        return d;
+    }
+
+    public static double logSphericalDensity(double[] _x, double[] _mu,
+          double _kappa) {
+        double d = 0;
+        if (_kappa > 5) {
+            d = Math.log(0.5 * _kappa / Math.PI) + _kappa * TGBLAS.ddot(0, _x, 1, _mu, 1) - _kappa;
+        } else {
+            d = Math.log(sphericalDensity(_x, _mu, _kappa));
+        }
+        return d;
     }
 
     public static double sphericalDensity(double _alpha, double _beta,
           double _theta, double _phi, double _kappa) {
-        return _kappa * Math.exp(_kappa
-              * (Math.cos(_alpha) * Math.cos(_theta)
-              + Math.sin(_alpha) * Math.sin(_theta) * Math.cos(_phi - _beta)))
-              / (4 * Math.PI * Math.sinh(_kappa));
+        double d = 0;
+        if (_kappa > 5) {
+            d = 0.5 * _kappa / Math.PI * Math.exp(_kappa
+                  * (Math.cos(_alpha) * Math.cos(_theta)
+                  + Math.sin(_alpha) * Math.sin(_theta) * Math.cos(_phi - _beta)) - _kappa);
+        } else {
+            d = _kappa * Math.exp(_kappa
+                  * (Math.cos(_alpha) * Math.cos(_theta)
+                  + Math.sin(_alpha) * Math.sin(_theta) * Math.cos(_phi - _beta)))
+                  / (4 * Math.PI * Math.sinh(_kappa));
+        }
+        return d;
     }
 
+    public static double logSphericalDensity(double _alpha, double _beta,
+          double _theta, double _phi, double _kappa) {
+        double d = 0;
+        if (_kappa > 5) {
+            d = Math.log(0.5 * _kappa / Math.PI) + _kappa
+                  * (Math.cos(_alpha) * Math.cos(_theta)
+                  + Math.sin(_alpha) * Math.sin(_theta) * Math.cos(_phi - _beta))
+                  - _kappa;
+        } else {
+            d = sphericalDensity(_alpha, _beta, _theta, _phi, _kappa);
+        }
+        return d;
+    }
+
+    /**
+     * vMF density without constant normalization factor
+     *
+     * @param _x
+     * @param _mu
+     * @param _kappa
+     * @return
+     */
     public static double proportionalSphericalDensity(double[] _x, double[] _mu,
           double _kappa) {
         return Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, _mu, 1));
     }
 
-    public static double unnormalizedProportionalSphericalDensity(double[] _x,
+    public static double logProportionalSphericalDensity(double[] _x, double[] _mu,
+          double _kappa) {
+        return _kappa * TGBLAS.ddot(0, _x, 1, _mu, 1);
+    }
+
+    public static double normalizedProportionalSphericalDensity(double[] _x,
           double[] _mu, double _kappa) {
         double[] nrmmean = new double[3];
         Arrays.fill(nrmmean, 0);
 
         TGBLAS.daxpy(0, 1 / TGBLAS.dnrm2(0, _mu, 1), _mu, 1, nrmmean, 1);
         return Math.exp(_kappa * TGBLAS.ddot(0, _x, 1, nrmmean, 1));
+    }
+
+    public static double logNormalizedProportionalSphericalDensity(double[] _x,
+          double[] _mu, double _kappa) {
+        double[] nrmmean = new double[3];
+        Arrays.fill(nrmmean, 0);
+
+        TGBLAS.daxpy(0, 1 / TGBLAS.dnrm2(0, _mu, 1), _mu, 1, nrmmean, 1);
+        return _kappa * TGBLAS.ddot(0, _x, 1, nrmmean, 1);
     }
 
     public static double[] normalizeVector(double[] _mu) {
@@ -91,6 +153,13 @@ public class TGMath {
         return geo;
     }
 
+    /**
+     * convert cartesian coordinate to spherical. first element is azimuthal,
+     * second element is radial
+     *
+     * @param _x
+     * @return
+     */
     public static double[] cartesianToSpherical(double[] _x) {
         double[] spher = new double[2];
         spher[0] = Math.acos(_x[2]);
@@ -117,15 +186,142 @@ public class TGMath {
         return (_long / 180) * Math.PI;
     }
 
-    public static double[] sampleFromFisher(MersenneTwisterFast _mtf, int _N) {
-        throw new UnsupportedOperationException("Not yet supported");
-//        double[] samples = new double[_N];
-//        try {
-//            for (int i = 0;; ++i) {
-//                samples[i] = _mtf.nextDouble();
-//            }
-//        } catch (ArrayIndexOutOfBoundsException e) {
-//        }
-//        return samples;
+    public static double safeLogSum(double[] _vals, int _n) {
+        double max = _vals[0];
+        for (int i = 0; i < _n; ++i) {
+            if (_vals[i] > max) {
+                max = _vals[i];
+            }
+        }
+
+        if (Double.isInfinite(max)) // the largest probability is 0 (log prob= -inf)
+        {
+            return max;   // return log 0
+        }
+
+        double p = 0;
+        for (int i = 0; i < _n; ++i) {
+            p += Math.exp(_vals[i] - max);
+        }
+        return max + Math.log(p);
+    }
+
+    public static double safeLogSum2(double _logprob1, double _logprob2) {
+        if (Double.isInfinite(_logprob1) && Double.isInfinite(_logprob2)) {
+            return _logprob1; // both prob1 and prob2 are 0, return log 0.
+        }
+        if (_logprob1 > _logprob2) {
+            return _logprob1 + Math.log(1 + Math.exp(_logprob2 - _logprob1));
+        } else {
+            return _logprob2 + Math.log(1 + Math.exp(_logprob1 - _logprob2));
+        }
+    }
+
+    public static double[] cumLogSum(double[] _vec) {
+        double[] lvec = new double[_vec.length];
+        for (int i = 0; i < _vec.length; ++i) {
+            lvec[i] = Math.log(_vec[i]);
+        }
+
+        double[] cs = new double[_vec.length];
+        for (int i = 1; i < _vec.length + 1; ++i) {
+            cs[i - 1] = Math.exp(safeLogSum(lvec, i));
+        }
+
+        return cs;
+    }
+
+    public static double[] inverseCumLogSum(double[] _vec) {
+        double[] lvec = new double[_vec.length];
+        for (int i = 0; i < _vec.length; ++i) {
+            lvec[i] = Math.log(_vec[i]);
+        }
+
+        double[] cs = new double[_vec.length];
+        cs[_vec.length - 1] = _vec[_vec.length - 1];
+        for (int i = _vec.length - 2; i >= 0; --i) {
+            cs[i] = cs[i + 1] + _vec[i];
+        }
+        return cs;
+    }
+
+    public static double[] cumSum(double[] _vec) {
+        double[] cs = new double[_vec.length];
+        Arrays.fill(cs, 0);
+        cs[0] = _vec[0];
+        for (int i = 1; i < _vec.length; ++i) {
+            cs[i] = cs[i - 1] + _vec[i];
+        }
+        return cs;
+    }
+
+    public static double[] cumProb(double[] _vec) {
+        double[] cs = new double[_vec.length];
+        Arrays.fill(cs, 0);
+        cs[0] = _vec[0];
+        for (int i = 1; i < _vec.length; ++i) {
+            double val = cs[i - 1] + _vec[i];
+            if (val > 1) {
+                cs[i] = 1;
+            } else {
+                cs[i] = val;
+            }
+        }
+        return cs;
+    }
+
+    public static double[] inverseCumSum(double[] _vec) {
+        double[] cs = new double[_vec.length];
+        Arrays.fill(cs, 0);
+        cs[_vec.length - 1] = _vec[_vec.length - 1];
+        for (int i = _vec.length - 2; i >= 0; --i) {
+            cs[i] = cs[i + 1] + _vec[i];
+        }
+        return cs;
+    }
+
+    public static double[] inverseCumProb(double[] _vec) {
+        double[] cs = new double[_vec.length];
+        Arrays.fill(cs, 0);
+        cs[_vec.length - 1] = _vec[_vec.length - 1];
+        for (int i = _vec.length - 2; i >= 0; --i) {
+            double val = cs[i + 1] + _vec[i];
+            if (val > 1) {
+                cs[i] = 1;
+            } else {
+                cs[i] = val;
+            }
+        }
+        return cs;
+    }
+
+    public static int[] inverseCumSum(int[] _vec) {
+        int[] cs = new int[_vec.length];
+        Arrays.fill(cs, 0);
+        cs[_vec.length - 1] = _vec[_vec.length - 1];
+        for (int i = _vec.length - 2; i >= 0; --i) {
+            cs[i] = cs[i + 1] + _vec[i];
+        }
+        return cs;
+    }
+
+    /**
+     * accumulate numbers in an array backwards. Not inclusive of _end. Inclusive
+     * of _begin. _end must be bigger than _begin.
+     *
+     * @param _vec
+     * @param _end
+     * @param _begin
+     * @return
+     */
+    public static int[] inverseCumSum(int[] _vec, int _begin, int _end) {
+        int len = _end - _begin;
+        int[] cs = new int[len];
+        Arrays.fill(cs, 0);
+        cs[len - 1] = _vec[_begin + len - 1];
+        for (int i = len - 2; i >= 0; --i) {
+            cs[i] = cs[i + 1] + _vec[_begin + i];
+        }
+        return cs;
     }
 }

@@ -48,7 +48,7 @@ public class XMLToInternalConverterSpherical extends XMLToInternalConverter {
     public XMLToInternalConverterSpherical(
           ConverterExperimentParameters _converterExperimentParameters) {
         super(_converterExperimentParameters);
-                toponymToCoordinateMap = new ToponymToCoordinateMap();
+        toponymToCoordinateMap = new ToponymToCoordinateMap();
     }
 
     /**

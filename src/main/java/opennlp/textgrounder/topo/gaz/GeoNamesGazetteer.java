@@ -15,19 +15,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.topo.gaz;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.InputStreamReader;
-import java.io.IOException;
-import java.io.BufferedReader;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.io.*;
+import java.util.*;
 
 import opennlp.textgrounder.topo.Coordinate;
 import opennlp.textgrounder.topo.Location;
@@ -38,7 +27,7 @@ import opennlp.textgrounder.topo.SphericalGeometry;
 import opennlp.textgrounder.util.cluster.Clusterer;
 import opennlp.textgrounder.util.cluster.KMeans;
 
-public class GeoNamesGazetteer implements Gazetteer {
+public class GeoNamesGazetteer implements Gazetteer, Serializable {
   private final boolean expandRegions;
   private final double pointRatio;
   private final int minPoints;
@@ -49,7 +38,7 @@ public class GeoNamesGazetteer implements Gazetteer {
   private final Map<String, List<Location>> names;
   private final Map<String, Integer> ipes;
   private final Map<String, Integer> adms;
-  private final Map<String, List<Coordinate>> ipePoints;
+  private Map<String, List<Coordinate>> ipePoints; // made mutable so can assign to null when done for faster GC
   private final Map<String, List<Coordinate>> admPoints;
 
   public GeoNamesGazetteer(BufferedReader reader) throws IOException {
@@ -131,8 +120,13 @@ public class GeoNamesGazetteer implements Gazetteer {
       if (contained.size() > 0) {
         List<Coordinate> representatives = clusterer.clusterList(contained, k, SphericalGeometry.g());
         location.setRegion(new PointSetRegion(representatives));
+        contained.clear();
+        contained = null;
       }
+      this.ipePoints.get(ipe).clear();
     }
+    this.ipePoints.clear();
+    this.ipePoints = null;
   }
 
   private void expandADM() {
@@ -179,12 +173,18 @@ public class GeoNamesGazetteer implements Gazetteer {
 
   private int load(BufferedReader reader) {
     int index = 0;
+    int count = 0;
     try {
+      System.out.print("[");
       for (String line = reader.readLine();
            line != null; line = reader.readLine()) {   
         String[] fields = line.split("\t");
         if (fields.length > 14) {
           String primaryName = fields[1];
+          count++;
+          if(count % 750000 == 0) {
+            System.out.print(".");
+          }
           Set<String> nameSet = new HashSet<String>();
           nameSet.add(this.standardize(primaryName));
 
@@ -254,6 +254,7 @@ public class GeoNamesGazetteer implements Gazetteer {
           }
         }
       }
+      System.out.println("]");
       reader.close();
     } catch (IOException e) {
       System.err.format("Error while reading GeoNames file: %s\n", e);

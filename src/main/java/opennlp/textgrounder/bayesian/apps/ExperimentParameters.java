@@ -45,56 +45,78 @@ public class ExperimentParameters {
         SV3,
         SPHERICAL_V3_DEPENDENT_REGIONS
     }
+    ////////////////////////////////////////////////////////////////////////
+    /**
+     * spherical model parameters
+     */
+    ////////////////////////////////////////////////////////////////////////
     /**
      * Switch for whether hyperparameters should be reestimated or not.
      * 0 is no, 1 is yes.
      */
-    protected int estimateHyperparameter = 0;
+    protected int estimateHyperparameter = 1;
     /**
-     * alpha for the chinese restaurant process
+     * global stick breaking prior. is specified from param file on first
+     * iteration.
      */
-    protected double crpalpha = 20;
+    protected double alpha_H = 10;
     /**
-     * gamma prior rate parameter a for crpalpha
+     * fixed intermediate parameters for resampling alpha_H. corresponds to
+     * d and f in paper
      */
-    protected double crpalpha_a = 20;
+    protected double alpha_h_d = 1, alpha_h_f = 1;
     /**
-     * gamma prior shape parameter b for crpalpha
+     * uniform hyperparameter for restaurant local stick breaking weights. only
+     * used in first iteration. set from param file
      */
-    protected double crpalpha_b = 20;
+    protected double alpha_init = 10;
+    /**
+     * hyperparameters for sampling document specific alpha parameters in posterior
+     * update stage. corresponds to a and b respectively in algorithm paper
+     */
+    protected double alpha_shape_a = 0.1;
+    protected double alpha_scale_b = 0.1;
+    /**
+     * gamma hyperparameters for kappa generation in metropolis-hastings
+     */
+    protected double kappa_hyper_shape = 50, kappa_hyper_scale = 1;
+    /**
+     * dirichlet hyperparameter for non-toponym word by dish weights. corresponding
+     * random variable is labeled phi in the algorithm paper. corresponding hyperparameter
+     * is c_0 in paper.
+     */
+    protected double phi_dirichlet_hyper = 0.1;
+    /**
+     * dirichlet hyperparameter for coordinate candidates of toponyms. corresponding
+     * random variable is ehta in the algorithm paper. corresponding hyperparameter
+     * is d_0 in paper.
+     */
+    protected double ehta_dirichlet_hyper = 0.1;
+    /**
+     * the concentration parameter in the proposal distribution for region means
+     */
+    protected double vmf_proposal_kappa = 50;
+    /**
+     * the standard deviation in the proposal distribution for region kappas
+     */
+    protected double vmf_proposal_sigma = 1;
+    /**
+     * number of dishes when starting out
+     */
+    protected int L = 1000;
+    ////////////////////////////////////////////////////////////////////////
+    /**
+     * region model parameters
+     */
+    ////////////////////////////////////////////////////////////////////////
     /**
      * Hyperparameter of topic prior
      */
     protected double alpha = 1;
     /**
-     * gamma prior rate parameter a for alpha
-     */
-    protected double alpha_a = 1;
-    /**
-     * gamma prior shape parameter b for alpha
-     */
-    protected double alpha_b = 0.1;
-    /**
      * Hyperparameter for word/topic prior
      */
     protected double beta = 0.1;
-    /**
-     * gamma prior rate parameter a for beta
-     */
-    protected double beta_a = 0.1;
-    /**
-     * gamma prior shape parameter b for beta
-     */
-    protected double beta_b = 0.1;
-    /**
-     * Switch for whether kappa should be reestimated or not.
-     * 0 is no, 1 is yes.
-     */
-    protected int estimateKappa = 0;
-    /**
-     * kappa (spread) for spherical model. Higher means more peaked.
-     */
-    protected double kappa = 20;
     /**
      * Number of training iterations
      */
@@ -214,11 +236,7 @@ public class ExperimentParameters {
     /**
      *
      */
-    protected Enum<MODEL_TYPE> modelType = MODEL_TYPE.RLDA;
-
-    public double getCrpalpha() {
-        return crpalpha;
-    }
+    protected Enum<MODEL_TYPE> modelType = MODEL_TYPE.SV1;
 
     /**
      * @return the estimateHyperparameter
@@ -227,53 +245,56 @@ public class ExperimentParameters {
         return estimateHyperparameter;
     }
 
-    /**
-     * @return the crpalpha_a
-     */
-    public double getCrpalpha_a() {
-        return crpalpha_a;
+    public double get_alpha_H() {
+        return alpha_H;
     }
 
-    /**
-     * @return the crpalpha_b
-     */
-    public double getCrpalpha_b() {
-        return crpalpha_b;
+    public double get_alpha_h_d() {
+        return alpha_h_d;
     }
 
-    /**
-     * @return the alpha_a
-     */
-    public double getAlpha_a() {
-        return alpha_a;
+    public double get_alpha_h_f() {
+        return alpha_h_f;
     }
 
-    /**
-     * @return the alpha_b
-     */
-    public double getAlpha_b() {
-        return alpha_b;
+    public double get_alpha_init() {
+        return alpha_init;
     }
 
-    /**
-     * @return the beta_a
-     */
-    public double getBeta_a() {
-        return beta_a;
+    public double get_alpha_scale_b() {
+        return alpha_scale_b;
     }
 
-    /**
-     * @return the beta_b
-     */
-    public double getBeta_b() {
-        return beta_b;
+    public double get_alpha_shape_a() {
+        return alpha_shape_a;
     }
 
-    /**
-     * @return the estimateKappa
-     */
-    public int getEstimateKappa() {
-        return estimateKappa;
+    public double get_ehta_dirichlet_hyper() {
+        return ehta_dirichlet_hyper;
+    }
+
+    public double get_kappa_hyper_scale() {
+        return kappa_hyper_scale;
+    }
+
+    public double get_kappa_hyper_shape() {
+        return kappa_hyper_shape;
+    }
+
+    public double get_phi_dirichlet_hyper() {
+        return phi_dirichlet_hyper;
+    }
+
+    public double get_vmf_proposal_kappa() {
+        return vmf_proposal_kappa;
+    }
+
+    public double get_vmf_proposal_sigma() {
+        return vmf_proposal_sigma;
+    }
+
+    public int getL() {
+        return L;
     }
 
     public double getAlpha() {
@@ -282,10 +303,6 @@ public class ExperimentParameters {
 
     public double getBeta() {
         return beta;
-    }
-
-    public double getKappa() {
-        return kappa;
     }
 
     public int getBurnInIterations() {

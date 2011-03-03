@@ -16,8 +16,9 @@
 package opennlp.textgrounder.topo;
 
 import java.util.List;
+import java.io.Serializable;
 
-public abstract class Region {
+public abstract class Region implements Serializable {
   public abstract Coordinate getCenter();
   public abstract boolean contains(double lat, double lng);
 
@@ -48,11 +49,27 @@ public abstract class Region {
   }
 
   public double distance(Region other) {
-    return this.distance(other.getCenter());
+    //return this.distance(other.getCenter());
+    double minDist = Double.POSITIVE_INFINITY;
+    for(Coordinate coord : this.getRepresentatives()) {
+        for(Coordinate otherCoord : other.getRepresentatives()) {
+            double curDist = coord.distance(otherCoord);
+            if(curDist < minDist)
+                minDist = curDist;
+        }
+    }
+    return minDist;
   }
 
   public double distance(Coordinate coordinate) {
-    return this.getCenter().distance(coordinate);
+    //return this.getCenter().distance(coordinate);
+    double minDist = Double.POSITIVE_INFINITY;
+    for(Coordinate coord : this.getRepresentatives()) {
+        double curDist = coord.distance(coordinate);
+        if(curDist < minDist)
+            minDist = curDist;
+    }
+    return minDist;
   }
 }
 

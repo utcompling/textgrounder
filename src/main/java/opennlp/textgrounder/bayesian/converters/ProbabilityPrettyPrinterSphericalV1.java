@@ -121,20 +121,18 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
         AveragedSphericalCountWrapper averagedCountWrapper = sphericalInputReader.readProbabilities();
 
         alpha = averagedCountWrapper.getAlpha();
-        beta = averagedCountWrapper.getBeta();
-        betaW = averagedCountWrapper.getBetaW();
-        kappa = averagedCountWrapper.getKappa();
+//        beta = averagedCountWrapper.getBeta();
+//        betaW = averagedCountWrapper.getBetaW();
+//        kappa = averagedCountWrapper.getKappa();
 
         D = averagedCountWrapper.getD();
         N = averagedCountWrapper.getN();
-        R = averagedCountWrapper.getCurrentR();
+        L = averagedCountWrapper.getL();
         W = averagedCountWrapper.getW();
         T = averagedCountWrapper.getT();
-        Z = averagedCountWrapper.getZ();
 
-        emptyRSet = averagedCountWrapper.getEmptyRSet();
-        nonEmptyRArray = new int[R - emptyRSet.size()];
-        for (int count = 0, i = 0; i < R; ++i) {
+        nonEmptyRArray = new int[L - emptyRSet.size()];
+        for (int count = 0, i = 0; i < L; ++i) {
             if (!emptyRSet.contains(i)) {
                 nonEmptyRArray[count] = i;
                 count += 1;
@@ -142,7 +140,7 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
         }
 
         averagedRegionMeans = averagedCountWrapper.getAveragedRegionMeans();
-        averagedRegionToponymCoordinateCounts = averagedCountWrapper.getAveragedRegionToponymCoordinateCounts();
+//        averagedRegionToponymCoordinateCounts = averagedCountWrapper.getAveragedRegionToponymCoordinateCounts();
         averagedRegionByDocumentCounts = averagedCountWrapper.getAveragedRegionByDocumentCounts();
         averagedToponymByRegionCounts = averagedWordByRegionCounts = averagedCountWrapper.getAveragedWordByRegionCounts();
 
@@ -170,19 +168,19 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
                 w.writeStartElement(wordByRegionName);
 
                 double sum = 0.;
-                double[] averagedRegionCounts = new double[R];
+                double[] averagedRegionCounts = new double[L];
                 Arrays.fill(averagedRegionCounts, 0);
                 for (int i : nonEmptyRArray) {
                     for (int j = 0; j < T; ++j) {
-                        sum += averagedToponymByRegionCounts[j * R + i] + beta;
-                        averagedRegionCounts[i] += averagedToponymByRegionCounts[j * R + i] + beta;
+                        sum += averagedToponymByRegionCounts[j * L + i] + beta;
+                        averagedRegionCounts[i] += averagedToponymByRegionCounts[j * L + i] + beta;
                     }
                 }
 
                 for (int i : nonEmptyRArray) {
                     ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
                     for (int j = 0; j < T; ++j) {
-                        topWords.add(new IntDoublePair(j, averagedToponymByRegionCounts[j * R + i] + beta));
+                        topWords.add(new IntDoublePair(j, averagedToponymByRegionCounts[j * L + i] + beta));
                     }
                     Collections.sort(topWords);
 
@@ -217,7 +215,7 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
 
                 for (int i = 0; i < T; ++i) {
                     wordCounts[i] = 0;
-                    int wordoff = i * R;
+                    int wordoff = i * L;
                     for (int j : nonEmptyRArray) {
                         wordCounts[i] += averagedToponymByRegionCounts[wordoff + j] + beta;
                     }
@@ -225,7 +223,7 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
 
 
                 for (int i = 0; i < T; ++i) {
-                    int wordoff = i * R;
+                    int wordoff = i * L;
                     ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                     for (int j : nonEmptyRArray) {
                         topRegions.add(new IntDoublePair(j, averagedToponymByRegionCounts[wordoff + j] + beta));
@@ -289,14 +287,14 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
 
                 for (int i = 0; i < D; ++i) {
                     docWordCounts[i] = 0;
-                    int docoff = i * R;
+                    int docoff = i * L;
                     for (int j : nonEmptyRArray) {
                         docWordCounts[i] += averagedRegionByDocumentCounts[docoff + j] + alpha;
                     }
                 }
 
                 for (int i = 0; i < D; ++i) {
-                    int docoff = i * R;
+                    int docoff = i * L;
                     ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                     for (int j : nonEmptyRArray) {
                         topRegions.add(new IntDoublePair(j, averagedRegionByDocumentCounts[docoff + j] + alpha));
@@ -348,19 +346,19 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
             BufferedWriter toponymByRegionWriter = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(toponymByRegionFilename))));
 
             double sum = 0.;
-            double[] averagedRegionCounts = new double[R];
+            double[] averagedRegionCounts = new double[L];
             Arrays.fill(averagedRegionCounts, 0);
             for (int i : nonEmptyRArray) {
                 for (int j = 0; j < T; ++j) {
-                    sum += averagedToponymByRegionCounts[j * R + i] + beta;
-                    averagedRegionCounts[i] += averagedToponymByRegionCounts[j * R + i] + beta;
+                    sum += averagedToponymByRegionCounts[j * L + i] + beta;
+                    averagedRegionCounts[i] += averagedToponymByRegionCounts[j * L + i] + beta;
                 }
             }
 
             for (int i : nonEmptyRArray) {
                 ArrayList<IntDoublePair> topWords = new ArrayList<IntDoublePair>();
                 for (int j = 0; j < T; ++j) {
-                    topWords.add(new IntDoublePair(j, averagedToponymByRegionCounts[j * R + i] + beta));
+                    topWords.add(new IntDoublePair(j, averagedToponymByRegionCounts[j * L + i] + beta));
                 }
                 Collections.sort(topWords);
 
@@ -400,14 +398,14 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
 
             for (int i = 0; i < T; ++i) {
                 wordCounts[i] = 0;
-                int wordoff = i * R;
+                int wordoff = i * L;
                 for (int j : nonEmptyRArray) {
                     wordCounts[i] += averagedToponymByRegionCounts[wordoff + j] + beta;
                 }
             }
 
             for (int i = 0; i < T; ++i) {
-                int wordoff = i * R;
+                int wordoff = i * L;
                 ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                 for (int j : nonEmptyRArray) {
                     topRegions.add(new IntDoublePair(j, averagedToponymByRegionCounts[wordoff + j] + beta));
@@ -471,14 +469,14 @@ public class ProbabilityPrettyPrinterSphericalV1 extends ProbabilityPrettyPrinte
 
             for (int i = 0; i < D; ++i) {
                 docWordCounts[i] = 0;
-                int docoff = i * R;
+                int docoff = i * L;
                 for (int j : nonEmptyRArray) {
                     docWordCounts[i] += averagedRegionByDocumentCounts[docoff + j] + alpha;
                 }
             }
 
             for (int i = 0; i < D; ++i) {
-                int docoff = i * R;
+                int docoff = i * L;
                 ArrayList<IntDoublePair> topRegions = new ArrayList<IntDoublePair>();
                 for (int j : nonEmptyRArray) {
                     topRegions.add(new IntDoublePair(j, averagedRegionByDocumentCounts[docoff + j] + alpha));

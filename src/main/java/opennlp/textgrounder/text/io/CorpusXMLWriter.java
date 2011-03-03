@@ -43,6 +43,7 @@ import opennlp.textgrounder.text.Token;
 import opennlp.textgrounder.text.Toponym;
 
 import opennlp.textgrounder.topo.Location;
+import opennlp.textgrounder.topo.Coordinate;
 
 public class CorpusXMLWriter {
   protected final Corpus<? extends Token> corpus;
@@ -140,6 +141,16 @@ public class CorpusXMLWriter {
     if (location == selected) {
       out.writeAttribute("selected", "true");
     }
+    
+    out.writeStartElement("representatives");
+    for(Coordinate coord : location.getRegion().getRepresentatives()) {
+        out.writeStartElement("rep");
+        out.writeAttribute("lat", String.format("%f", coord.getLatDegrees()));
+        out.writeAttribute("long", String.format("%f", coord.getLngDegrees()));
+        out.writeEndElement();
+    }
+    out.writeEndElement();
+    
     out.writeEndElement();
   }
 
