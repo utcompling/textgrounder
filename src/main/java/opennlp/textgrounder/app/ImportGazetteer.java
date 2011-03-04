@@ -5,6 +5,7 @@
 package opennlp.textgrounder.app;
 
 import opennlp.textgrounder.topo.gaz.*;
+import opennlp.textgrounder.util.*;
 import java.io.*;
 import java.util.zip.*;
 
@@ -28,6 +29,9 @@ public class ImportGazetteer extends BaseApp {
         }
 
         System.out.println("Reading GeoNames gazetteer from " + gazInputPath + " ...");
+
+        //long startMemoryUse = MemoryUtil.getMemoryUsage();
+        
         GeoNamesGazetteer gnGaz = null;
         if(gazInputPath.toLowerCase().endsWith(".zip")) {
             ZipFile zf = new ZipFile(gazInputPath);
@@ -39,6 +43,11 @@ public class ImportGazetteer extends BaseApp {
         else {
             gnGaz = new GeoNamesGazetteer(new BufferedReader(new FileReader(gazInputPath)), runKMeans);
         }
+
+        //long endMemoryUse = MemoryUtil.getMemoryUsage();
+
+        //System.out.println(( endMemoryUse - startMemoryUse ));
+
         System.out.println("Done.");
 
         System.out.println("Serializing GeoNames gazetteer to " + serializedGazOutputPath + " ...");

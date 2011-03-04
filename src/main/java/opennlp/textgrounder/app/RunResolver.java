@@ -47,7 +47,10 @@ public class RunResolver extends BaseApp {
                 FileInputStream fis = new FileInputStream(getSerializedGazetteerPath());
                 ois = new ObjectInputStream(fis);
             }
+            //long startMemoryUse = MemoryUtil.getMemoryUsage();
             gnGaz = (GeoNamesGazetteer) ois.readObject();
+            //long endMemoryUse = MemoryUtil.getMemoryUsage();
+            //System.out.println(( endMemoryUse - startMemoryUse ));
             System.out.println("Done.");
         }
         else if(getGeoGazetteerFilename() != null) {

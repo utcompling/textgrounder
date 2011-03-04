@@ -11,8 +11,8 @@ public class LabelPropContextSensitiveResolver extends Resolver {
     public static final int DEGREES_PER_REGION = 1;
 
     private static final double CUR_TOP_WEIGHT = 1.0;
-    private static final double SAME_SENT_WEIGHT = 0.0;
-    private static final double OTHER_WEIGHT = 0.0;
+    private static final double SAME_SENT_WEIGHT = .5;
+    private static final double OTHER_WEIGHT = .33;
 
     private String pathToGraph;
     private Lexicon<String> lexicon = null;// = new SimpleLexicon<String>();
@@ -122,8 +122,10 @@ public class LabelPropContextSensitiveResolver extends Resolver {
                             innerSentIndex++;
                         }
 
-                        int bestRegionNumber = getBestRegionNumber(outerToponym, wordWeights);
-                        int indexToSelect = TopoUtil.getCorrectCandidateIndex(outerToponym, bestRegionNumber, DEGREES_PER_REGION);
+                        //int bestRegionNumber = getBestRegionNumber(outerToponym, wordWeights);
+                        //int indexToSelect = TopoUtil.getCorrectCandidateIndex(outerToponym, bestRegionNumber, DEGREES_PER_REGION);
+                        Map<Integer, Double> weightedSum = getWeightedSum(wordWeights);
+                        int indexToSelect = TopoUtil.getCorrectCandidateIndex(outerToponym, weightedSum, DEGREES_PER_REGION);
                         if(indexToSelect == -1) {
                             System.out.println(outerToponym.getForm());
                         }
@@ -137,7 +139,7 @@ public class LabelPropContextSensitiveResolver extends Resolver {
         return corpus;
     }
 
-    private int getBestRegionNumber(Toponym toponym, Map<Integer, Double> wordWeights) {
+    private Map<Integer, Double> getWeightedSum(Map<Integer, Double> wordWeights) {
 
         Map<Integer, Double> weightedSum = new HashMap<Integer, Double>();
 
@@ -153,6 +155,28 @@ public class LabelPropContextSensitiveResolver extends Resolver {
                 }
             }
         }
+
+        return weightedSum;
+    }
+
+    private int getBestRegionNumber(Toponym toponym, Map<Integer, Double> wordWeights) {
+
+        Map<Integer, Double> weightedSum = getWeightedSum(wordWeights);//new HashMap<Integer, Double>();
+
+        /*
+        for(int outerIdx : wordWeights.keySet()) {
+            double weight = wordWeights.get(outerIdx);
+            Map<Integer, Double> curDist = regionDistributions.get(outerIdx);
+            if(curDist != null) {
+                for(int innerIdx : curDist.keySet()) {
+                    Double prev = weightedSum.get(innerIdx);
+                    if(prev == null)
+                        prev = 0.0;
+                    weightedSum.put(innerIdx, prev + weight * curDist.get(innerIdx));
+                }
+            }
+        }
+        */
 
         int bestRegionNumber = -1;
         double greatestMass = 0.0;

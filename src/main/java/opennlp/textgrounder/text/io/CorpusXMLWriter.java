@@ -131,6 +131,7 @@ public class CorpusXMLWriter {
     out.writeAttribute("lat", String.format("%f", location.getRegion().getCenter().getLatDegrees()));
     out.writeAttribute("long", String.format("%f", location.getRegion().getCenter().getLngDegrees()));
     out.writeAttribute("type", String.format("%s", location.getType()));
+    out.writeAttribute("admin1code", String.format("%s", location.getAdmin1Code()));
     int population = location.getPopulation();
     if (population > 0) {
       out.writeAttribute("population", String.format("%d", population));

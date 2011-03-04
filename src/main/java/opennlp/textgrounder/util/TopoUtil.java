@@ -63,6 +63,32 @@ public class TopoUtil {
         return (int)((int)(lat/dpr) * 1000 + (lon/dpr));
     }
 
+    public static int getCorrectCandidateIndex(Toponym toponym, Map<Integer, Double> regionDistribution, double dpr) {
+        double maxMass = Double.NEGATIVE_INFINITY;
+        int maxIndex = -1;
+        int index = 0;
+        for(Location location : toponym.getCandidates()) {
+            double totalMass = 0.0;
+            for(int regionNumber : getRegionNumbers(location, dpr)) {
+                //if(regionDistribution == null)
+                //    System.err.println("regionDistribution is null!");
+                
+                Double mass = regionDistribution.get(regionNumber);
+                //if(mass == null)
+                //    System.err.println("mass null for regionNumber " + regionNumber);
+                if(mass != null)
+                    totalMass += mass;
+            }
+            if(totalMass > maxMass) {
+                maxMass = totalMass;
+                maxIndex = index;
+            }
+            index++;
+        }
+
+        return maxIndex;
+    }
+    
     public static int getCorrectCandidateIndex(Toponym toponym, int regionNumber, double dpr) {
         if(regionNumber == -1) System.out.println("-1");
         int index = 0;

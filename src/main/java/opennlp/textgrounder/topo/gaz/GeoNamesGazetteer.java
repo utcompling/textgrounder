@@ -100,7 +100,7 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
     System.out.println("Selecting points for " + this.ipes.size() + " independent political entities.");
     for (String ipe : this.ipes.keySet()) {
       Location location = this.locations.get(this.ipes.get(ipe));
-      List<Coordinate> contained = this.ipePoints.get(ipe);
+      List<Coordinate> contained = this.ipePoints.get(ipe);// ALL points in e.g. USA
 
       int k = (int) Math.floor(contained.size() * this.pointRatio);
       if (k < this.minPoints) {
@@ -203,6 +203,8 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
           String ipe = fields[8];
           String adm = ipe + fields[10];
 
+          String admin1code = ipe + "." + fields[10];
+
           double lat = 0.0;
           double lng = 0.0;
           try {      
@@ -240,7 +242,7 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
 
           if (this.store(cat, type)) {
             Region region = new PointRegion(coordinate);
-            Location location = new Location(index, primaryName, region, this.getLocationType(cat), population);
+            Location location = new Location(index, primaryName, region, this.getLocationType(cat), population, admin1code);
             this.locations.add(location);
 
             for (String name : nameSet) {
@@ -298,4 +300,3 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
     return this.names.get(query.toLowerCase());
   }
 }
-

@@ -28,13 +28,19 @@ public class Location implements Serializable {
   private Region region;
   private final Location.Type type;
   private final int population;
+  private final String admin1code;
 
-  public Location(int id, String name, Region region, Location.Type type, int population) {
+  public Location(int id, String name, Region region, Location.Type type, int population, String admin1code) {
     this.id = id;
     this.name = name;
     this.region = region;
     this.type = type;
     this.population = population;
+    this.admin1code = admin1code;
+  }
+
+  public Location(int id, String name, Region region, Location.Type type, int population) {
+    this(id, name, region, type, population, "00");
   }
 
   public Location(int id, String name, Region region, Location.Type type) {
@@ -79,6 +85,10 @@ public class Location implements Serializable {
 
   public int getPopulation() {
     return this.population;
+  }
+
+  public String getAdmin1Code() {
+    return admin1code;
   }
 
   public double distance(Location other) {
