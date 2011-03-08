@@ -17,3 +17,4 @@ tmp
 project/boot
 lib_managed
 data/models/*.bin
+data/gazetteers/*.zip

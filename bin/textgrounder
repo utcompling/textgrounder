@@ -4,7 +4,7 @@ JARS=`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUN
 
 CP=$TEXTGROUNDER_DIR/target/classes:$TEXTGROUNDER_DIR/output/classes:$JARS:$CLASSPATH
 
-MEMORY=2g
+MEMORY=24g
 
 JAVA_COMMAND="java -Xmx$MEMORY -classpath $CP"
 
