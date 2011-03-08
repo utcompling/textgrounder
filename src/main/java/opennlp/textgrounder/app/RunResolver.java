@@ -71,6 +71,12 @@ public class RunResolver extends BaseApp {
                 new ToponymRemover(new TrXMLDirSource(new File(getInputPath()), tokenizer)),
                 recognizer, gnGaz));
         }
+	else if (getInputPath().endsWith("txt")) {
+	    
+            testCorpus.addSource(new ToponymAnnotator(new PlainTextSource(
+									  new BufferedReader(new FileReader(getInputPath())), new OpenNLPSentenceDivider(), tokenizer),
+                recognizer, gnGaz));
+	}
         else {
             testCorpus.addSource(new ToponymAnnotator(new PlainTextDirSource(
                 new File(getInputPath()), new OpenNLPSentenceDivider(), tokenizer),

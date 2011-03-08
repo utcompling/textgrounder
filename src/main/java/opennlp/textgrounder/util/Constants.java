@@ -35,9 +35,6 @@ public class Constants {
     public final static String TEXTGROUNDER_DIR = System.getenv("TEXTGROUNDER_DIR");
     public final static String TEXTGROUNDER_DATA = "data";
 
-    // the location of the Stanford NER system
-    public final static String STANFORD_NER_HOME = System.getenv("STANFORD_NER_HOME");
-
     // the location of the OpenNLP models
     public final static String OPENNLP_MODELS = Constants.getOpenNLPModelsDir();
 
@@ -47,7 +44,8 @@ public class Constants {
       if (dir == null) {
         dir = System.getProperty("opennlp.models");
         if (dir == null) {
-          dir = System.getProperty("user.dir") + File.separator + "data/models";
+          dir = TEXTGROUNDER_DIR + File.separator + "data/models";
+          //dir = System.getProperty("user.dir") + File.separator + "data/models";
         }
       }
       return dir;
@@ -58,7 +56,8 @@ public class Constants {
       if (dir == null) {
         dir = System.getProperty("gazetteers");
         if (dir == null) {
-          dir = System.getProperty("user.dir") + File.separator + "data/gazetteers";
+          dir = TEXTGROUNDER_DIR + File.separator + "data/gazetteers";
+          //dir = System.getProperty("user.dir") + File.separator + "data/gazetteers";
         }
       }
       return dir;

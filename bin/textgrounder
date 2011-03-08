@@ -1,10 +1,11 @@
 #!/bin/bash
 
 JARS=`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`
+SCALA_LIB="$TEXTGROUNDER_DIR/project/boot/scala-2.8.1/lib/scala-library.jar"
 
-CP=$TEXTGROUNDER_DIR/target/classes:$TEXTGROUNDER_DIR/output/classes:$JARS:$CLASSPATH
+CP=$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH
 
-MEMORY=24g
+MEMORY=10g
 
 JAVA_COMMAND="java -Xmx$MEMORY -classpath $CP"
 
