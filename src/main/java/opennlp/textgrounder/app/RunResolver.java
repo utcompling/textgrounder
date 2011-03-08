@@ -72,8 +72,8 @@ public class RunResolver extends BaseApp {
                 recognizer, gnGaz));
         }
         else {
-            testCorpus.addSource(new ToponymAnnotator(new PlainTextSource(
-                new BufferedReader(new FileReader(getInputPath())), new OpenNLPSentenceDivider(), tokenizer),
+            testCorpus.addSource(new ToponymAnnotator(new PlainTextDirSource(
+                new File(getInputPath()), new OpenNLPSentenceDivider(), tokenizer),
                 recognizer, gnGaz));
         }
         testCorpus.load();
