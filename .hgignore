@@ -13,3 +13,7 @@ data/raw-trdev
 api
 target
 tmp
+*~
+project/boot
+project/build/sbt-launch-*.jar
+lib_managed

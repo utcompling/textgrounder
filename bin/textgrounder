@@ -25,15 +25,24 @@ Include --help with any option for more information
 EOF
 }
 
-CLASS=
 
-case $CMD in
-    resolve) CLASS=opennlp.textgrounder.app.RunResolver;;
+if [ $CMD = 'build' ]; then
+
+    java -jar $TEXTGROUNDER_DIR/project/build/sbt-launch-0.7.4.jar "$@"
+
+else 
+
+    CLASS=
+
+    case $CMD in
+	resolve) CLASS=opennlp.textgrounder.app.RunResolver;;
 	import-gazetteer) CLASS=opennlp.textgrounder.app.ImportGazetteer;;
 	preprocess-labelprop) CLASS=opennlp.textgrounder.app.LabelPropPreproc;;
-    run) CLASS=$1; shift;;
-    help) help; exit 1;;
-    *) echo "Unrecognized command: $CMD"; help; exit 1;;
-esac
+	run) CLASS=$1; shift;;
+	help) help; exit 1;;
+	*) echo "Unrecognized command: $CMD"; help; exit 1;;
+    esac
 
-$JAVA_COMMAND $CLASS $*
+    $JAVA_COMMAND $CLASS $*
+
+fi

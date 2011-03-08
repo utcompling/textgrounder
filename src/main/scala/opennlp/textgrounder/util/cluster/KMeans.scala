@@ -1,23 +1,23 @@
-///////////////////////////////////////////////////////////////////////////////
-//  Copyright (C) 2010 Travis Brown, The University of Texas at Austin
-//
-//  Licensed under the Apache License, Version 2.0 (the "License");
-//  you may not use this file except in compliance with the License.
-//  You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-//  Unless required by applicable law or agreed to in writing, software
-//  distributed under the License is distributed on an "AS IS" BASIS,
-//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  See the License for the specific language governing permissions and
-//  limitations under the License.
-///////////////////////////////////////////////////////////////////////////////
+/**
+ *  Copyright (C) 2010 Travis Brown, The University of Texas at Austin
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
 package opennlp.textgrounder.util.cluster
 
 
 import java.io._
-import scala.Math
+import scala.math._
 import scala.collection.immutable.Vector
 import scala.collection.mutable.Buffer
 import scala.collection.JavaConversions._
@@ -73,7 +73,7 @@ object EuclideanGeometry {
 
   implicit def g = new Geometry[Point] {
     def distance(x: Point)(y: Point): Double =
-      Math.sqrt(Math.pow(x._1 - y._1, 2) + Math.pow(x._2 - y._2, 2))
+      sqrt(pow(x._1 - y._1, 2) + pow(x._2 - y._2, 2))
 
     def centroid(ps: Seq[Point]): Point = {
       def pointPlus(x: Point, y: Point) = (x._1 + y._1, x._2 + y._2)
