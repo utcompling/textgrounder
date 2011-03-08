@@ -5,7 +5,6 @@ SCALA_LIB="$TEXTGROUNDER_DIR/project/boot/scala-2.8.1/lib/scala-library.jar"
 
 CP=$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH
 
-<<<<<<< local
 FIRSTARG=$1
 
 MEMORY=2g
@@ -17,11 +16,6 @@ case $FIRSTARG in
 	;;
     *) ;;
 esac
-
-
-=======
-MEMORY=10g
->>>>>>> other
 
 JAVA_COMMAND="java -Xmx$MEMORY -classpath $CP"
 
