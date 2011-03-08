@@ -1,6 +1,6 @@
 #!/bin/bash
 
-JARS=`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`
+JARS=`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`
 
 CP=$TEXTGROUNDER_DIR/target/classes:$TEXTGROUNDER_DIR/output/classes:$JARS:$CLASSPATH
 
