@@ -17,3 +17,4 @@ tmp
 project/boot
 project/build/sbt-launch-*.jar
 lib_managed
+data/models/*.bin
