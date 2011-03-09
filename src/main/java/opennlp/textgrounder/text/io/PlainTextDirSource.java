@@ -53,8 +53,9 @@ public class PlainTextDirSource extends DocumentSource {
 
 	private void listFiles(File directory, FilenameFilter filter) {
 		File[] childrenTextFiles=directory.listFiles(filter);
-		if(childrenTextFiles!=null){
-			files.addAll(Arrays.asList(childrenTextFiles));
+		for(File file : childrenTextFiles){
+			if(file!=null && !file.isDirectory())
+				files.add(file);
 		}
 		File[] childrenDir=directory.listFiles();
 		for(File file:childrenDir){
