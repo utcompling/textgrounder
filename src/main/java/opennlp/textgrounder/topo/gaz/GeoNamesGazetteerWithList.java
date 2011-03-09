@@ -26,45 +26,49 @@ import opennlp.textgrounder.topo.Region;
 import opennlp.textgrounder.topo.SphericalGeometry;
 import opennlp.textgrounder.util.cluster.Clusterer;
 import opennlp.textgrounder.util.cluster.KMeans;
+import opennlp.textgrounder.util.*;
 
-public class GeoNamesGazetteer implements Gazetteer, Serializable {
+public class GeoNamesGazetteerWithList implements Gazetteer, Serializable {
   private final boolean expandRegions;
   private final double pointRatio;
   private final int minPoints;
   private final int maxPoints;
   private final int maxConsidered;
 
-  private final List<Location> locations;
-  private final Map<String, List<Location>> names;
-  private final Map<String, Integer> ipes;
+  private List<Location> locations;
+  //private final Map<String, List<Location>> names;
+  private Map<String, Integer> ipes;
   //private final Map<String, Integer> adms;
   private Map<String, List<Coordinate>> ipePoints; // made mutable so can assign to null when done for faster GC
   //private final Map<String, List<Coordinate>> admPoints;
 
-  public GeoNamesGazetteer(BufferedReader reader) throws IOException {
+  private final Lexicon lexicon;
+  private final List<List<Location> > mainGaz; // instead of names
+
+  public GeoNamesGazetteerWithList(BufferedReader reader) throws IOException {
     this(reader, true, 0.005);
   }
 
-  public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions) throws IOException {
+  public GeoNamesGazetteerWithList(BufferedReader reader, boolean expandRegions) throws IOException {
     this(reader, expandRegions, 0.005);
   }
 
-  public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions, int kPoints)
+  public GeoNamesGazetteerWithList(BufferedReader reader, boolean expandRegions, int kPoints)
     throws IOException {
     this(reader, expandRegions, 1.0, kPoints, kPoints);
   }
 
-  public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions, double pointRatio)
+  public GeoNamesGazetteerWithList(BufferedReader reader, boolean expandRegions, double pointRatio)
     throws IOException {
     this(reader, expandRegions, pointRatio, 5, 30);
   }
 
-  public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions, double pointRatio, int minPoints, int maxPoints)
+  public GeoNamesGazetteerWithList(BufferedReader reader, boolean expandRegions, double pointRatio, int minPoints, int maxPoints)
     throws IOException {
     this(reader, expandRegions, pointRatio, minPoints, maxPoints, 2000);
   }
 
-  public GeoNamesGazetteer(BufferedReader reader, boolean expandRegions, double pointRatio, int minPoints, int maxPoints, int maxConsidered)
+  public GeoNamesGazetteerWithList(BufferedReader reader, boolean expandRegions, double pointRatio, int minPoints, int maxPoints, int maxConsidered)
     throws IOException {
     this.expandRegions = expandRegions;
     this.pointRatio = pointRatio;
@@ -73,11 +77,14 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
     this.maxConsidered = maxConsidered;
 
     this.locations = new ArrayList<Location>();
-    this.names = new HashMap<String, List<Location>>();
+    //this.names = new HashMap<String, List<Location>>();
     this.ipes = new HashMap<String, Integer>();
     //this.adms = new HashMap<String, Integer>();
     this.ipePoints = new HashMap<String, List<Coordinate>>();
     //this.admPoints = new HashMap<String, List<Coordinate>>();
+
+    this.lexicon = new SimpleLexicon();
+    this.mainGaz = new ArrayList<List<Location> >();
 
     this.load(reader);
     if (this.expandRegions) {
@@ -127,6 +134,11 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
     }
     this.ipePoints.clear();
     this.ipePoints = null;
+    this.ipes.clear();
+    this.ipes = null;
+    this.locations.clear();
+    this.locations = null;
+    System.gc();
   }
 
   /*private void expandADM() {
@@ -236,9 +248,9 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
 
           if (type.equals("PCLI")) {
             this.ipes.put(ipe, index);
-          } /*else if (type.equals("ADM1")) {
-            this.adms.put(adm, index);
-          }*/
+          } //else if (type.equals("ADM1")) {
+            //this.adms.put(adm, index);
+          //}
 
           if (this.store(cat, type)) {
             Region region = new PointRegion(coordinate);
@@ -246,10 +258,19 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
             this.locations.add(location);
 
             for (String name : nameSet) {
-              if (!this.names.containsKey(name)) {
+
+              int idx = this.lexicon.getOrAdd(name);
+
+              while(this.mainGaz.size() < idx+1) {
+                  this.mainGaz.add(new ArrayList<Location>());
+              }
+
+              this.mainGaz.get(idx).add(location);
+
+              /*if (!this.names.containsKey(name)) {
                 this.names.put(name, new ArrayList<Location>());
               }
-              this.names.get(name).add(location);
+              this.names.get(name).add(location);*/
             }
 
             index += 1;
@@ -297,6 +318,10 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
    * found.
    */
   public List<Location> lookup(String query) {
-    return this.names.get(query.toLowerCase());
+    //return this.names.get(query.toLowerCase());
+    int idx = this.lexicon.get(query.toLowerCase());
+    if(idx == -1)
+        return null;
+    return this.mainGaz.get(idx);
   }
 }

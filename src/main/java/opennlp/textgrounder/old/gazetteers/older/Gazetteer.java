@@ -15,7 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.old.gazetteers.older;
 
-import gnu.trove.*;
+import java.util.*;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
@@ -58,7 +58,7 @@ import opennlp.textgrounder.old.topostructs.*;
  * The various subtypes of this class handle data in different formats, from
  * gazetteers obtained from various sources.
  */
-public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
+public abstract class Gazetteer extends HashMap<Integer, Location> {
 
     /*public final static int USGS_TYPE = 0;
     public final static int US_CENSUS_TYPE = 1;
@@ -69,7 +69,7 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      * that we've already encountered in the corpus. Location ID's are used as
      * hash keys; see above.
      */
-    protected TIntObjectHashMap<Location> idxToLocationMap;
+    protected HashMap<Integer, Location> idxToLocationMap;
     /**
      * Flag for refreshing gazetteer from original database
      */
@@ -100,7 +100,7 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      *            empty parameter only to be overridden in derived classes
      */
     public Gazetteer(String location) {
-        idxToLocationMap = new TIntObjectHashMap<Location>();
+        idxToLocationMap = new HashMap<Integer, Location>();
         toponymLexicon = new Lexicon();
     }
 
@@ -129,7 +129,7 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      *         placename
      * @throws SQLException
      */
-    public TIntHashSet get(String placename) {
+    public HashSet<Integer> get(String placename) {
         int topid = toponymLexicon.addWord(placename);
         return get(placename, topid);
     }
@@ -145,12 +145,12 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      * @param topid
      * @return
      */
-    public TIntHashSet get(String placename, int topid) {
-        placename = placename.toLowerCase();
+    public HashSet<Integer> get(String placename, int topid) {
+        /*placename = placename.toLowerCase();
         try {
-            TIntHashSet locationsToReturn = get(topid);
+            HashSet<Integer> locationsToReturn = get(topid);
             if (locationsToReturn == null) {
-                locationsToReturn = new TIntHashSet();
+                locationsToReturn = new HashSet<Integer>();
                 ResultSet rs = stat.executeQuery("select * from places where name = \""
                       + placename + "\";");
                 while (rs.next()) {
@@ -176,7 +176,7 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
         } catch (SQLException e) {
             e.printStackTrace();
             System.exit(1);
-        }
+        }*/
         return null;
     }
 
@@ -188,10 +188,10 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      * @return
      * @throws Exception
      */
-    public TIntHashSet getAllLocalities() throws Exception { // overridden by
+    public HashSet<Integer> getAllLocalities() throws Exception { // overridden by
         // WGGazetteer only
         // right now
-        return new TIntHashSet();
+        return new HashSet<Integer>();
     }
 
     /**
@@ -199,7 +199,7 @@ public abstract class Gazetteer extends TIntObjectHashMap<TIntHashSet> {
      * 
      * @return the idxToLocationMap
      */
-    public TIntObjectHashMap<Location> getIdxToLocationMap() {
+    public HashMap<Integer, Location> getIdxToLocationMap() {
         return idxToLocationMap;
     }
 
