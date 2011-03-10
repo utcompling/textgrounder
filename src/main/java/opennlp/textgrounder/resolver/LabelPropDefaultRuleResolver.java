@@ -6,7 +6,7 @@ import opennlp.textgrounder.util.*;
 import java.io.*;
 import java.util.*;
 
-public class LabelProcDefaultRuleResolver extends Resolver {
+public class LabelPropDefaultRuleResolver extends Resolver {
 
     public static final int DEGREES_PER_REGION = 1;
 
@@ -17,7 +17,7 @@ public class LabelProcDefaultRuleResolver extends Resolver {
     private HashMap<Integer, HashMap<Integer, Double> > regionDistributions = null;//new HashMap<Integer, HashMap<Integer, Double> >();
     private HashMap<Integer, Integer> indexCache = new HashMap<Integer, Integer>();
 
-    public LabelProcDefaultRuleResolver(String pathToGraph) {
+    public LabelPropDefaultRuleResolver(String pathToGraph) {
         this.pathToGraph = pathToGraph;
     }
 

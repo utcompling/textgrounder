@@ -39,41 +39,41 @@ public class TopoUtil {
         }
     }
 
-    public static Set<Integer> getRegionNumbers(Location location, double dpr) {
+    public static Set<Integer> getCellNumbers(Location location, double dpc) {
 
-        Set<Integer> regionNumbers = new HashSet<Integer>();
+        Set<Integer> cellNumbers = new HashSet<Integer>();
 
         for(Coordinate coord : location.getRegion().getRepresentatives()) {
         
-            int x = (int) ((coord.getLng() + 180.0) / dpr);
-            int y = (int) ((coord.getLat() + 90.0) / dpr);
+            int x = (int) ((coord.getLng() + 180.0) / dpc);
+            int y = (int) ((coord.getLat() + 90.0) / dpc);
 
-            regionNumbers.add(x * 1000 + y);
+            cellNumbers.add(x * 1000 + y);
         }
 
-        return regionNumbers;
+        return cellNumbers;
     }
 
-    public static int getRegionNumber(double lat, double lon, double dpr) {
+    public static int getCellNumber(double lat, double lon, double dpc) {
 
-        if(lat < 0 || lat >= 180/dpr) return -1;
-        if(lon < 0) lon += 360/dpr;
-        if(lon >= 360/dpr) lon -= 360/dpr;
+        if(lat < 0 || lat >= 180/dpc) return -1;
+        if(lon < 0) lon += 360/dpc;
+        if(lon >= 360/dpc) lon -= 360/dpc;
 
-        return (int)((int)(lat/dpr) * 1000 + (lon/dpr));
+        return (int)((int)(lat/dpc) * 1000 + (lon/dpc));
     }
 
-    public static int getCorrectCandidateIndex(Toponym toponym, Map<Integer, Double> regionDistribution, double dpr) {
+    public static int getCorrectCandidateIndex(Toponym toponym, Map<Integer, Double> cellDistribution, double dpc) {
         double maxMass = Double.NEGATIVE_INFINITY;
         int maxIndex = -1;
         int index = 0;
         for(Location location : toponym.getCandidates()) {
             double totalMass = 0.0;
-            for(int regionNumber : getRegionNumbers(location, dpr)) {
+            for(int cellNumber : getCellNumbers(location, dpc)) {
                 //if(regionDistribution == null)
                 //    System.err.println("regionDistribution is null!");
                 
-                Double mass = regionDistribution.get(regionNumber);
+                Double mass = cellDistribution.get(cellNumber);
                 //if(mass == null)
                 //    System.err.println("mass null for regionNumber " + regionNumber);
                 if(mass != null)
@@ -89,11 +89,11 @@ public class TopoUtil {
         return maxIndex;
     }
     
-    public static int getCorrectCandidateIndex(Toponym toponym, int regionNumber, double dpr) {
-        if(regionNumber == -1) System.out.println("-1");
+    public static int getCorrectCandidateIndex(Toponym toponym, int cellNumber, double dpc) {
+        if(cellNumber == -1) System.out.println("-1");
         int index = 0;
         for(Location location : toponym.getCandidates()) {
-            if(getRegionNumbers(location, dpr).contains(regionNumber))
+            if(getCellNumbers(location, dpc).contains(cellNumber))
                 return index;
             index++;
         }

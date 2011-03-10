@@ -129,11 +129,15 @@ public class RunResolver extends BaseApp {
         }
         else if(getResolverType() == RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE) {
             System.out.print("Running LABEL PROP DEFAULT RULE resolver, using graph at " + getGraphInputPath() + " ...");
-            resolver = new LabelProcDefaultRuleResolver(getGraphInputPath());
+            resolver = new LabelPropDefaultRuleResolver(getGraphInputPath());
         }
         else if(getResolverType() == RESOLVER_TYPE.LABEL_PROP_CONTEXT_SENSITIVE) {
             System.out.print("Running LABEL PROP CONTEXT SENSITIVE resolver, using graph at " + getGraphInputPath() + " ...");
             resolver = new LabelPropContextSensitiveResolver(getGraphInputPath());
+        }
+        else if(getResolverType() == RESOLVER_TYPE.LABEL_PROP_COMPLEX) {
+            System.out.print("Running LABEL PROP COMPLEX resolver, using graph at " + getGraphInputPath() + " ...");
+            resolver = new LabelPropComplexResolver(getGraphInputPath());
         }
         else {//if(getResolverType() == RESOLVER_TYPE.BASIC_MIN_DIST) {
             System.out.print("Running BASIC MINIMUM DISTANCE resolver...");

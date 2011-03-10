@@ -15,7 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.textstructs;
 
-import gnu.trove.*;
+import java.util.*;
 
 import java.io.Serializable;
 
@@ -30,11 +30,11 @@ public class Lexicon implements Serializable {
      * Map from token to integer (index). Tokens might not be unigrams. Placename
      * tokens may be one or more words.
      */
-    public TObjectIntHashMap<String> wordsToInts = new TObjectIntHashMap<String>();
+    public HashMap<String, Integer> wordsToInts = new HashMap<String, Integer>();
     /**
      * Map from index to token.
      */
-    public TIntObjectHashMap<String> intsToWords = new TIntObjectHashMap<String>();
+    public HashMap<Integer, String> intsToWords = new HashMap<Integer, String>();
     /**
      * Current size of vocabulary. Every new word entered into the lexicon
      * assumes this as the index, and nextInt is incremented.

@@ -12,23 +12,167 @@ import java.util.zip.*;
 
 public class LabelPropPreproc extends BaseApp {
 
-    private static final int DEGREES_PER_REGION = 1;
-    private static final double REGION_REGION_WEIGHT = 0.9;
+    private static final int DPC = 1; // degrees per cell
 
-    private static final double WORD_WORD_WEIGHT_THRESHOLD = 0.0;
-
-    private static final int IN_DOC_COUNT_THRESHOLD = 5;
-    private static final int MATRIX_COUNT_THRESHOLD = 2;
-
-    private static final String ARTICLE_TITLE = "Article title: ";
-    private static final String ARTICLE_ID = "Article ID: ";
-
-    //private static int toponymLexiconSize;
+    // the public constants are used by LabelPropComplexResolver
+    private static final String CELL_ = "cell_";
+    public static final String CELL_LABEL_ = "cell_label_";
+    private static final String LOC_ = "loc_";
+    private static final String TPNM_TYPE_ = "tpnm_type_";
+    public static final String DOC_ = "doc_";
+    private static final String TYPE_ = "type_";
+    public static final String TOK_ = "tok_";
 
     public static void main(String[] args) throws Exception {
-
         initializeOptionsFromCommandLine(args);
+        StoredCorpus corpus = loadCorpus(getInputPath(), getSerializedGazetteerPath());
 
+        Map<Integer, Set<Integer> > locationCellEdges = new HashMap<Integer, Set<Integer> >();
+        Set<Toponym> uniqueToponyms = new HashSet<Toponym>();
+        Map<String, Set<Toponym> > docToponyms = new HashMap<String, Set<Toponym> >();
+        Map<String, String> docTokenToDocTypeEdges = new HashMap<String, String>();
+
+        for(Document<StoredToken> doc : corpus) {
+            docToponyms.put(doc.getId(), new HashSet<Toponym>());
+            int tokenIndex = 0;
+            for(Sentence<StoredToken> sent : doc) {
+                for(Toponym toponym : sent.getToponyms()) {
+                    if(toponym.getAmbiguity() > 0) {
+                        uniqueToponyms.add(toponym);
+                        docToponyms.get(doc.getId()).add(toponym);
+                        docTokenToDocTypeEdges.put(DOC_ + doc.getId() + "_" + TOK_ + tokenIndex,
+                                DOC_ + doc.getId() + "_" + TYPE_ + toponym.getForm());
+                        for(Location location : toponym.getCandidates()) {
+                            int locationID = location.getId();
+                            Set<Integer> curLocationCellEdges = locationCellEdges.get(locationID);
+                            if(curLocationCellEdges != null)
+                                continue; // already processed this location
+                            curLocationCellEdges = new HashSet<Integer>();
+                            for(int cellNumber : TopoUtil.getCellNumbers(location, DPC)) {
+                                curLocationCellEdges.add(cellNumber);
+                            }
+                            locationCellEdges.put(locationID, curLocationCellEdges);
+                        }
+                    }
+                }
+                tokenIndex++;
+            }
+        }
+
+        writeCellSeeds(locationCellEdges, getSeedOutputPath());
+
+        writeCellCellEdges(getGraphOutputPath());
+        writeLocationCellEdges(locationCellEdges, getGraphOutputPath());
+        writeToponymTypeLocationEdges(uniqueToponyms, getGraphOutputPath());
+        writeDocTypeToponymTypeEdges(docToponyms, getGraphOutputPath());
+        writeDocTokenToDocTypeEdges(docTokenToDocTypeEdges, getGraphOutputPath());
+    }
+
+    private static void writeCellSeeds(Map<Integer, Set<Integer> > locationCellEdges, String seedOutputPath) throws Exception {
+        BufferedWriter out = new BufferedWriter(new FileWriter(seedOutputPath));
+
+        Set<Integer> uniqueCellNumbers = new HashSet<Integer>();
+
+        for(int locationID : locationCellEdges.keySet()) {
+            Set<Integer> curLocationCellEdges = locationCellEdges.get(locationID);
+            uniqueCellNumbers.addAll(curLocationCellEdges);
+        }
+
+        for(int cellNumber : uniqueCellNumbers) {
+            writeEdge(out, CELL_ + cellNumber, CELL_LABEL_ + cellNumber, 1.0);
+        }
+
+        out.close();
+    }
+
+    private static void writeCellCellEdges(String graphOutputPath) throws Exception {
+        BufferedWriter out = new BufferedWriter(new FileWriter(graphOutputPath));
+
+        for(int lon = 0; lon < 360 / DPC; lon += DPC) {
+            for(int lat = 0; lat < 180 / DPC; lat += DPC) {
+                int curCellNumber = TopoUtil.getCellNumber(lat, lon, DPC);
+                int leftCellNumber = TopoUtil.getCellNumber(lat, lon - DPC, DPC);
+                int rightCellNumber = TopoUtil.getCellNumber(lat, lon + DPC, DPC);
+                int topCellNumber = TopoUtil.getCellNumber(lat + DPC, lon, DPC);
+                int bottomCellNumber = TopoUtil.getCellNumber(lat - DPC, lon, DPC);
+
+                writeEdge(out, CELL_ + curCellNumber, CELL_ + leftCellNumber, 1.0);
+                writeEdge(out, CELL_ + curCellNumber, CELL_ + rightCellNumber, 1.0);
+                if(topCellNumber >= 0)
+                    writeEdge(out, CELL_ + curCellNumber, CELL_ + topCellNumber, 1.0);
+                if(bottomCellNumber >= 0)
+                    writeEdge(out, CELL_ + curCellNumber, CELL_ + bottomCellNumber, 1.0);
+            }
+        }
+
+        out.close();
+    }
+
+    private static void writeLocationCellEdges(Map<Integer, Set<Integer> > locationCellEdges, String graphOutputPath) throws Exception {
+        BufferedWriter out = new BufferedWriter(new FileWriter(graphOutputPath, true));
+
+        for(int locationID : locationCellEdges.keySet()) {
+            Set<Integer> curLocationCellEdges = locationCellEdges.get(locationID);
+            for(int cellNumber : curLocationCellEdges) {
+                writeEdge(out, LOC_ + locationID, CELL_ + cellNumber, 1.0);
+            }
+            //if(curLocationCellEdges.size() > 1)
+            //    System.out.println("Wrote " + curLocationCellEdges.size() + " edges for location " + locationID);
+        }
+
+        out.close();
+    }
+
+    private static void writeToponymTypeLocationEdges(Set<Toponym> uniqueToponyms, String graphOutputPath) throws Exception {
+        BufferedWriter out = new BufferedWriter(new FileWriter(graphOutputPath, true));
+
+        Set<String> toponymNamesAlreadyWritten = new HashSet<String>();
+
+        for(Toponym toponym : uniqueToponyms) {
+            if(!toponymNamesAlreadyWritten.contains(toponym.getForm())) {
+                for(Location location : toponym.getCandidates()) {
+                    writeEdge(out, TPNM_TYPE_ + toponym.getForm(), LOC_ + location.getId(), 1.0);
+                }
+                toponymNamesAlreadyWritten.add(toponym.getForm());
+            }
+        }
+
+        out.close();
+    }
+
+    private static void writeDocTypeToponymTypeEdges(Map<String, Set<Toponym> > docToponyms, String graphOutputPath) throws Exception {
+        BufferedWriter out = new BufferedWriter(new FileWriter(graphOutputPath, true));
+
+        Set<String> docTypesAlreadyWritten = new HashSet<String>();
+
+        for(String docId : docToponyms.keySet()) {
+            for(Toponym toponym : docToponyms.get(docId)) {
+                String docType = DOC_ + docId + "_" + TYPE_ + toponym.getForm();
+                if(!docTypesAlreadyWritten.contains(docType)) {
+                    writeEdge(out, docType, TPNM_TYPE_ + toponym.getForm(), 1.0);
+                    docTypesAlreadyWritten.add(docType);
+                }
+            }
+        }
+
+        out.close();
+    }
+
+    private static void writeDocTokenToDocTypeEdges(Map<String, String> docTokenToDocTypeEdges, String graphOutputPath) throws Exception {
+        BufferedWriter out = new BufferedWriter(new FileWriter(graphOutputPath, true));
+
+        for(String docToken : docTokenToDocTypeEdges.keySet()) {
+            writeEdge(out, docToken, docTokenToDocTypeEdges.get(docToken), 1.0);
+        }
+
+        out.close();
+    }
+
+    private static void writeEdge(BufferedWriter out, String node1, String node2, double weight) throws Exception {
+        out.write(node1 + "\t" + node2 + "\t" + weight + "\n");
+    }
+
+    private static StoredCorpus loadCorpus(String corpusInputPath, String serGazPath) throws Exception {
         Tokenizer tokenizer = new OpenNLPTokenizer();
         OpenNLPRecognizer recognizer = new OpenNLPRecognizer();
 
@@ -40,233 +184,10 @@ public class LabelPropPreproc extends BaseApp {
 
         StoredCorpus corpus = Corpus.createStoredCorpus();
         System.out.print("Reading TR-CoNLL corpus from " + getInputPath() + " ...");
-        //corpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
         corpus.addSource(new ToponymAnnotator(new ToponymRemover(new TrXMLDirSource(new File(getInputPath()), tokenizer)), recognizer, gnGaz));
         corpus.load();
         System.out.println("done.");
 
-        Map<Integer, Set<Integer> > toponymRegionEdges = new HashMap<Integer, Set<Integer> >();
-
-        Lexicon<String> toponymLexicon = TopoUtil.buildLexicon(corpus);
-        //toponymLexiconSize = toponymLexicon.size();
-
-        for(Document<StoredToken> doc : corpus) {
-            for(Sentence<StoredToken> sent : doc) {
-                for(Toponym toponym : sent.getToponyms()) {
-                    if(toponym.getAmbiguity() > 0) {
-                        int idx = toponymLexicon.get(toponym.getForm());
-                        Set<Integer> regionSet = toponymRegionEdges.get(idx);
-                        if(regionSet == null) {
-                            regionSet = new HashSet<Integer>();
-                            for(Location location : toponym.getCandidates()) {
-                                //int regionNumber = TopoUtil.getRegionNumbers(location, DEGREES_PER_REGION);
-                                //regionSet.add(regionNumber);
-                                regionSet.addAll(TopoUtil.getRegionNumbers(location, DEGREES_PER_REGION));
-                            }
-                            toponymRegionEdges.put(idx, regionSet);
-                        }
-                    }
-                }
-            }
-        }
-
-        writeToponymRegionEdges(toponymRegionEdges, getGraphOutputPath());
-        writeRegionRegionEdges(getGraphOutputPath());
-        //writeWordWordEdges(toponymLexicon, getWikiInputPath(), getGraphOutputPath(), getStoplistInputPath());
-
-        writeRegionLabels(toponymRegionEdges, getSeedOutputPath());
-    }
-
-    private static Set<String> buildStoplist(String stoplistFilename) throws Exception {
-        Set<String> stoplist = new HashSet<String>();
-
-        BufferedReader in = new BufferedReader(new FileReader(stoplistFilename));
-
-        String curLine;
-        while(true) {
-            curLine = in.readLine();
-            if(curLine == null)
-                break;
-
-            if(curLine.length() > 0)
-                stoplist.add(curLine.toLowerCase());
-        }
-
-        in.close();
-
-        return stoplist;
-    }
-
-    private static void writeWordWordEdges(Lexicon<String> lexicon, String wikiFilename,
-            String outputFilename, String stoplistFilename) throws Exception {
-
-        Set<String> stoplist = buildStoplist(stoplistFilename);
-
-        int docCount = 0;
-        Map<Integer, Map<Integer, Integer> > countMatrix = new HashMap<Integer, Map<Integer, Integer> >();
-
-        BufferedReader wikiIn = new BufferedReader(new FileReader(wikiFilename));
-
-        boolean skip = true;
-
-        String curLine;
-        String articleTitle = null;
-        Set<Integer> wordsInDoc = null;
-        while(true) {
-            curLine = wikiIn.readLine();
-            if(curLine == null)
-                break;
-
-            if(curLine.startsWith(ARTICLE_ID)) {
-                System.err.println(curLine + (skip?" skipped":""));
-                continue;
-            }
-
-            if(curLine.startsWith(ARTICLE_TITLE)) {
-                if(wordsInDoc != null && wordsInDoc.size() > 0) {
-                    for(Integer i1 : wordsInDoc) {
-                        Map<Integer, Integer> curMap = countMatrix.get(i1);
-                        if(curMap == null) {
-                            curMap = new HashMap<Integer, Integer>();
-                        }
-                        for(Integer i2 : wordsInDoc) {
-                            Integer curCount = curMap.get(i2);
-                            if(curCount == null) {
-                                curCount = 0;
-                            }
-                            curMap.put(i2, curCount + 1);
-                        }
-                        countMatrix.put(i1, curMap);
-                    }
-
-                    docCount++;
-                }
-
-                articleTitle = curLine.substring(ARTICLE_TITLE.length()).trim().toLowerCase();
-                if(lexicon.contains(articleTitle)) {
-                    skip = false;
-                    wordsInDoc = new HashSet<Integer>();
-                }
-                else
-                    skip = true;
-            }
-
-            else if(!skip) {
-                //System.err.println(curLine);
-
-                String[] tokens = curLine.split(" ");
-                String word = tokens[0].toLowerCase();
-
-                if(!stoplist.contains(word) && Integer.parseInt(tokens[2]) >= IN_DOC_COUNT_THRESHOLD) {
-                    wordsInDoc.add(lexicon.getOrAdd(word));
-                }
-                //System.err.println(curLine);
-            }
-
-        }
-
-        //System.err.println(countMatrix.get(17).get(17));
-
-        wikiIn.close();
-
-        ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("lexicon.ser"));
-        oos.writeObject(lexicon);
-        oos.close();
-
-        BufferedWriter out = new BufferedWriter(new FileWriter(outputFilename, true));
-
-        for(int i1 : countMatrix.keySet()) {
-            Map<Integer, Integer> innerMap = countMatrix.get(i1);
-            double i1count = innerMap.get(i1);
-            if(i1count < MATRIX_COUNT_THRESHOLD) continue;
-            for(int i2 : innerMap.keySet()) {
-                if(i1 != i2) {
-
-                    double i2count = countMatrix.get(i2).get(i2);
-                    double i1i2count = innerMap.get(i2);
-
-                    if(i1i2count < MATRIX_COUNT_THRESHOLD) continue;
-
-                    double probi1 = i1count / docCount;
-                    double probi2 = i2count / docCount;
-                    double probi1i2 = i1i2count / docCount;
-
-                    /*System.err.println(i1);
-                    System.err.println(i2);
-                    System.err.println(docCount);
-
-                    System.err.println(probi1);
-                    System.err.println(probi2);
-                    System.err.println(probi1i2);*/
-
-                    double wordWordWeight = Math.log(probi1i2 / (probi1 * probi2));
-
-                    /*System.err.println(pmi);
-                    System.err.println("---");*/
-
-                    
-                    if(wordWordWeight > WORD_WORD_WEIGHT_THRESHOLD)
-                        out.write(i1 + "\t" + i2 + "\t" + wordWordWeight + "\n");
-                }
-            }
-        }
-
-        out.close();
-    }
-
-    private static void writeToponymRegionEdges(Map<Integer, Set<Integer> > toponymRegionEdges, String filename) throws Exception {
-        BufferedWriter out = new BufferedWriter(new FileWriter(filename));
-
-        for(int idx : toponymRegionEdges.keySet()) {
-            int size = toponymRegionEdges.get(idx).size();
-            double weight = 1.0/size;
-            for(int regionNumber : toponymRegionEdges.get(idx)) {
-                out.write(idx + "\t" + regionNumber + "R\t" + weight + "\n");
-                out.write(regionNumber + "R\t" + idx + "\t1.0\n");
-            }
-        }
-
-        out.close();
-    }
-
-    private static void writeRegionRegionEdges(String filename) throws Exception {
-        BufferedWriter out = new BufferedWriter(new FileWriter(filename, true));
-
-        for(int lon = 0; lon < 360 / DEGREES_PER_REGION; lon += DEGREES_PER_REGION) {
-            for(int lat = 0; lat < 180 / DEGREES_PER_REGION; lat += DEGREES_PER_REGION) {
-                int curRegionNumber = TopoUtil.getRegionNumber(lat, lon, DEGREES_PER_REGION);
-                int leftRegionNumber = TopoUtil.getRegionNumber(lat, lon - DEGREES_PER_REGION, DEGREES_PER_REGION);
-                int rightRegionNumber = TopoUtil.getRegionNumber(lat, lon + DEGREES_PER_REGION, DEGREES_PER_REGION);
-                int topRegionNumber = TopoUtil.getRegionNumber(lat + DEGREES_PER_REGION, lon, DEGREES_PER_REGION);
-                int bottomRegionNumber = TopoUtil.getRegionNumber(lat - DEGREES_PER_REGION, lon, DEGREES_PER_REGION);
-
-                out.write(curRegionNumber + "R\t" + leftRegionNumber + "R\t" + REGION_REGION_WEIGHT + "\n");
-                out.write(curRegionNumber + "R\t" + rightRegionNumber + "R\t" + REGION_REGION_WEIGHT + "\n");
-                if(topRegionNumber >= 0)
-                    out.write(curRegionNumber + "R\t" + topRegionNumber + "R\t" + REGION_REGION_WEIGHT + "\n");
-                if(bottomRegionNumber >= 0)
-                    out.write(curRegionNumber + "R\t" + bottomRegionNumber + "R\t" + REGION_REGION_WEIGHT + "\n");
-            }
-        }
-
-        out.close();
-    }
-
-    private static void writeRegionLabels(Map<Integer, Set<Integer> > toponymRegionEdges, String filename) throws Exception {
-        BufferedWriter out = new BufferedWriter(new FileWriter(filename));
-
-        Set<Integer> uniqueRegionNumbers = new HashSet<Integer>();
-
-        for(int idx : toponymRegionEdges.keySet()) {
-            for(int regionNumber : toponymRegionEdges.get(idx)) {
-                uniqueRegionNumbers.add(regionNumber);
-            }
-        }
-
-        for(int regionNumber : uniqueRegionNumbers) {
-            out.write(regionNumber + "R\t" + regionNumber + "L\t1.0\n");
-        }
-
-        out.close();
+        return corpus;
     }
 }
