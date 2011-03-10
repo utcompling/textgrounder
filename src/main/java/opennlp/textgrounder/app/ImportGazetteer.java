@@ -30,7 +30,7 @@ public class ImportGazetteer extends BaseApp {
 
         System.out.println("Reading GeoNames gazetteer from " + gazInputPath + " ...");
 
-        //long startMemoryUse = MemoryUtil.getMemoryUsage();
+        long startMemoryUse = MemoryUtil.getMemoryUsage();
         
         GeoNamesGazetteer gnGaz = null;
         if(gazInputPath.toLowerCase().endsWith(".zip")) {
@@ -44,9 +44,9 @@ public class ImportGazetteer extends BaseApp {
             gnGaz = new GeoNamesGazetteer(new BufferedReader(new FileReader(gazInputPath)), runKMeans);
         }
 
-        //long endMemoryUse = MemoryUtil.getMemoryUsage();
+        long endMemoryUse = MemoryUtil.getMemoryUsage();
 
-        //System.out.println(( endMemoryUse - startMemoryUse ));
+        System.out.println("Size of gazetteer object in bytes: " + (endMemoryUse - startMemoryUse));
 
         System.out.println("Done.");
 

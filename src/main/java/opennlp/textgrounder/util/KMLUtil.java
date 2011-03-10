@@ -31,8 +31,10 @@ public class KMLUtil {
   // Minimum number of pixels the (small) square region (NOT our Region) represented by each city must occupy on the screen for its label to appear:
   private final static int MIN_LOD_PIXELS = 16;
 
-  public static double RADIUS = .15;
-  public static double SPIRAL_RADIUS = .2;
+    //public static double RADIUS = .15;
+    //public static double SPIRAL_RADIUS = .2;
+  public static double RADIUS = .05;
+  public static double SPIRAL_RADIUS = .05;
   public static int SIDES = 10;
   public static int BARSCALE = 50000;
 

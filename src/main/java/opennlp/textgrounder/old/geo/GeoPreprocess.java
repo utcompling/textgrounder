@@ -80,11 +80,10 @@ public class GeoPreprocess {
     /**
      * Named entity recognizer (NER) used to process raw text, etc. The possible types are:
      * <pre>
-     * "stanford": The Stanford NER
      * "opennlp": The NER that comes as part of OpenNLP
      * </pre>
      */
-    protected String nerType = "stanford";
+    protected String nerType = "opennlp";
 
     /**
      * NamedEntityRecognizer object.
@@ -136,10 +135,7 @@ public class GeoPreprocess {
             }
         }
         
-        if (nerType.equals("stanford"))
-            ner = new StanfordNER();
-        else
-            ner = new OpenNLPNER();
+	ner = new OpenNLPNER();
     }
 
     protected String canonicalPath(String _path) {
@@ -187,7 +183,7 @@ public class GeoPreprocess {
         options.addOption("p", "paragraphs-as-docs", true, "number of paragraphs to treat as a document. Set the argument to 0 if documents should be treated whole");
         options.addOption("wg", "whole-gazetteer", false, "activate regions and run program for entire gazetteer (the -i flag will be ignored in this case)");
         options.addOption("f", "format", true, "format of input [auto, tr, teixml, raw, trxml, default = auto]");
-        options.addOption("n", "ner", true, "named entity recognizer to use [stanford, opennlp, default = stanford]");
+        options.addOption("n", "ner", true, "named entity recognizer to use [opennlp, default = opennlp]");
 
         options.addOption("h", "help", false, "print help");
     }

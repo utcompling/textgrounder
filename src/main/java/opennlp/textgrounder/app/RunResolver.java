@@ -47,10 +47,10 @@ public class RunResolver extends BaseApp {
                 FileInputStream fis = new FileInputStream(getSerializedGazetteerPath());
                 ois = new ObjectInputStream(fis);
             }
-            //long startMemoryUse = MemoryUtil.getMemoryUsage();
+            long startMemoryUse = MemoryUtil.getMemoryUsage();
             gnGaz = (GeoNamesGazetteer) ois.readObject();
-            //long endMemoryUse = MemoryUtil.getMemoryUsage();
-            //System.out.println(( endMemoryUse - startMemoryUse ));
+            long endMemoryUse = MemoryUtil.getMemoryUsage();
+            System.out.println("Size of gazetteer object in bytes: " + (endMemoryUse - startMemoryUse));
             System.out.println("Done.");
         }
         else if(getGeoGazetteerFilename() != null) {
@@ -71,6 +71,12 @@ public class RunResolver extends BaseApp {
                 new ToponymRemover(new TrXMLDirSource(new File(getInputPath()), tokenizer)),
                 recognizer, gnGaz));
         }
+	else if (getInputPath().endsWith("txt")) {
+	    
+            testCorpus.addSource(new ToponymAnnotator(new PlainTextSource(
+									  new BufferedReader(new FileReader(getInputPath())), new OpenNLPSentenceDivider(), tokenizer),
+                recognizer, gnGaz));
+	}
         else {
             testCorpus.addSource(new ToponymAnnotator(new PlainTextDirSource(
                 new File(getInputPath()), new OpenNLPSentenceDivider(), tokenizer),

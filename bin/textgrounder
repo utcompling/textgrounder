@@ -1,10 +1,21 @@
 #!/bin/bash
 
-JARS=`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`
+JARS=`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`
+SCALA_LIB="$TEXTGROUNDER_DIR/project/boot/scala-2.8.1/lib/scala-library.jar"
 
-CP=$TEXTGROUNDER_DIR/target/classes:$TEXTGROUNDER_DIR/output/classes:$JARS:$CLASSPATH
+CP=$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH
+
+FIRSTARG=$1
 
 MEMORY=2g
+
+case $FIRSTARG in
+  [0-9] | [0-9][0-9]) 
+	MEMORY="${FIRSTARG}g"
+	shift
+	;;
+    *) ;;
+esac
 
 JAVA_COMMAND="java -Xmx$MEMORY -classpath $CP"
 
@@ -25,15 +36,24 @@ Include --help with any option for more information
 EOF
 }
 
-CLASS=
 
-case $CMD in
-    resolve) CLASS=opennlp.textgrounder.app.RunResolver;;
+if [ $CMD = 'build' ]; then
+
+    java -jar $TEXTGROUNDER_DIR/project/build/sbt-launch-0.7.4.jar "$@"
+
+else 
+
+    CLASS=
+
+    case $CMD in
+	resolve) CLASS=opennlp.textgrounder.app.RunResolver;;
 	import-gazetteer) CLASS=opennlp.textgrounder.app.ImportGazetteer;;
 	preprocess-labelprop) CLASS=opennlp.textgrounder.app.LabelPropPreproc;;
-    run) CLASS=$1; shift;;
-    help) help; exit 1;;
-    *) echo "Unrecognized command: $CMD"; help; exit 1;;
-esac
+	run) CLASS=$1; shift;;
+	help) help; exit 1;;
+	*) echo "Unrecognized command: $CMD"; help; exit 1;;
+    esac
 
-$JAVA_COMMAND $CLASS $*
+    $JAVA_COMMAND $CLASS $*
+
+fi

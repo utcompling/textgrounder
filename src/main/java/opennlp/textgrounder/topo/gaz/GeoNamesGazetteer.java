@@ -37,9 +37,9 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
   private final List<Location> locations;
   private final Map<String, List<Location>> names;
   private final Map<String, Integer> ipes;
-  private final Map<String, Integer> adms;
+  //private final Map<String, Integer> adms;
   private Map<String, List<Coordinate>> ipePoints; // made mutable so can assign to null when done for faster GC
-  private final Map<String, List<Coordinate>> admPoints;
+  //private final Map<String, List<Coordinate>> admPoints;
 
   public GeoNamesGazetteer(BufferedReader reader) throws IOException {
     this(reader, true, 0.005);
@@ -75,9 +75,9 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
     this.locations = new ArrayList<Location>();
     this.names = new HashMap<String, List<Location>>();
     this.ipes = new HashMap<String, Integer>();
-    this.adms = new HashMap<String, Integer>();
+    //this.adms = new HashMap<String, Integer>();
     this.ipePoints = new HashMap<String, List<Coordinate>>();
-    this.admPoints = new HashMap<String, List<Coordinate>>();
+    //this.admPoints = new HashMap<String, List<Coordinate>>();
 
     this.load(reader);
     if (this.expandRegions) {
@@ -129,7 +129,7 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
     this.ipePoints = null;
   }
 
-  private void expandADM() {
+  /*private void expandADM() {
     Clusterer clusterer = new KMeans();
 
     System.out.println("Selecting points for " + this.adms.size() + " administrative regions.");
@@ -161,11 +161,11 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
             System.out.println("<Placemark><Point><coordinates>" +
                                c.getLngDegrees() + "," + c.getLatDegrees() +
                                "</coordinates></Point></Placemark>");
-          }*/
+          }*SLASH
         }
       }
     }
-  }
+  }*/
 
   private String standardize(String name) {
     return name.toLowerCase().replace("’", "'");
@@ -229,16 +229,16 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
           }
           this.ipePoints.get(ipe).add(coordinate);
 
-          if (!this.admPoints.containsKey(adm)) {
+          /*if (!this.admPoints.containsKey(adm)) {
             this.admPoints.put(adm, new ArrayList<Coordinate>());
           }
-          this.admPoints.get(adm).add(coordinate);
+          this.admPoints.get(adm).add(coordinate);*/
 
           if (type.equals("PCLI")) {
             this.ipes.put(ipe, index);
-          } else if (type.equals("ADM1")) {
+          } /*else if (type.equals("ADM1")) {
             this.adms.put(adm, index);
-          }
+          }*/
 
           if (this.store(cat, type)) {
             Region region = new PointRegion(coordinate);
