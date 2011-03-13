@@ -31,17 +31,25 @@ public class LabelPropPreproc extends BaseApp {
         Set<Toponym> uniqueToponyms = new HashSet<Toponym>();
         Map<String, Set<Toponym> > docToponyms = new HashMap<String, Set<Toponym> >();
         Map<String, String> docTokenToDocTypeEdges = new HashMap<String, String>();
+        Map<String, String> toponymTokenToDocEdges = new HashMap<String, String>();
+        Map<String, String> linearTopTokToTopTokEdges = new HashMap<String, String>();
 
         for(Document<StoredToken> doc : corpus) {
             docToponyms.put(doc.getId(), new HashSet<Toponym>());
             int tokenIndex = 0;
+            String prevTokenString = null;
             for(Sentence<StoredToken> sent : doc) {
                 for(Toponym toponym : sent.getToponyms()) {
                     if(toponym.getAmbiguity() > 0) {
                         uniqueToponyms.add(toponym);
                         docToponyms.get(doc.getId()).add(toponym);
-                        docTokenToDocTypeEdges.put(DOC_ + doc.getId() + "_" + TOK_ + tokenIndex,
+                        String curTokenString = DOC_ + doc.getId() + "_" + TOK_ + tokenIndex;
+                        docTokenToDocTypeEdges.put(curTokenString,
                                 DOC_ + doc.getId() + "_" + TYPE_ + toponym.getForm());
+                        toponymTokenToDocEdges.put(curTokenString, DOC_ + doc.getId());
+                        if(prevTokenString != null)
+                            linearTopTokToTopTokEdges.put(prevTokenString, curTokenString);
+                        prevTokenString = curTokenString;
                         for(Location location : toponym.getCandidates()) {
                             int locationID = location.getId();
                             Set<Integer> curLocationCellEdges = locationCellEdges.get(locationID);
@@ -65,7 +73,9 @@ public class LabelPropPreproc extends BaseApp {
         writeLocationCellEdges(locationCellEdges, getGraphOutputPath());
         writeToponymTypeLocationEdges(uniqueToponyms, getGraphOutputPath());
         writeDocTypeToponymTypeEdges(docToponyms, getGraphOutputPath());
-        writeDocTokenToDocTypeEdges(docTokenToDocTypeEdges, getGraphOutputPath());
+        writeStringStringEdges(docTokenToDocTypeEdges, getGraphOutputPath());
+        writeStringStringEdges(toponymTokenToDocEdges, getGraphOutputPath());
+        writeStringStringEdges(linearTopTokToTopTokEdges, getGraphOutputPath());
     }
 
     private static void writeCellSeeds(Map<Integer, Set<Integer> > locationCellEdges, String seedOutputPath) throws Exception {
@@ -158,11 +168,11 @@ public class LabelPropPreproc extends BaseApp {
         out.close();
     }
 
-    private static void writeDocTokenToDocTypeEdges(Map<String, String> docTokenToDocTypeEdges, String graphOutputPath) throws Exception {
+    private static void writeStringStringEdges(Map<String, String> edgeMap, String graphOutputPath) throws Exception {
         BufferedWriter out = new BufferedWriter(new FileWriter(graphOutputPath, true));
 
-        for(String docToken : docTokenToDocTypeEdges.keySet()) {
-            writeEdge(out, docToken, docTokenToDocTypeEdges.get(docToken), 1.0);
+        for(String key : edgeMap.keySet()) {
+            writeEdge(out, key, edgeMap.get(key), 1.0);
         }
 
         out.close();
