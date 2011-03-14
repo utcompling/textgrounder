@@ -19,6 +19,12 @@ DEPENDENCIES:
 
 INSTALLATION: 
 
+1. Environment variables:
+
+TEXTGROUNDER_DIR needs to be set to the 
+
+2. Compilation:
+
 Most everything here is written in Python.  However, some of the code, for
 speed reasons, was created using Cython, which allows annotating Python code
 so it can be compiled into C code.  Cython must be obtained and installed,

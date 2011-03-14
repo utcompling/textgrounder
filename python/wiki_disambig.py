@@ -401,7 +401,7 @@ class RegionWordDist(WordDist):
 #   regionprobs: Hash table listing probabilities associated with regions
 
 class RegionDist(object):
-  __slots__ = ['word', 'regionprobs']
+  __slots__ = ['word', 'regionprobs', 'normalized']
 
   # It's expensive to compute the value for a given word so we cache word
   # distributions.
@@ -420,11 +420,24 @@ class RegionDist(object):
     for reg in \
         StatRegion.iter_nonempty_regions(nonempty_word_dist=True):
       prob = reg.worddist.lookup_word(word)
+      # Another way of handling zero probabilities.
+      ## Zero probabilities are just a bad idea.  They lead to all sorts of
+      ## pathologies when trying to do things like "normalize".
+      #if prob == 0.0:
+      #  prob = 1e-50
       self.regionprobs[reg] = prob
       totalprob += prob
-    # Normalize the probabilities
-    for (reg, prob) in self.regionprobs.iteritems():
-      self.regionprobs[reg] /= totalprob
+    # Normalize the probabilities; but if all probabilities are 0, then
+    # we can't normalize, so leave as-is. (FIXME When can this happen?
+    # It does happen when you use --mode=generate-kml and specify words
+    # that aren't seen.  In other circumstances, the smoothing ought to
+    # ensure that 0 probabilities don't exist?  Anything else I missed?)
+    if totalprob:
+      self.normalized = True
+      for (reg, prob) in self.regionprobs.iteritems():
+        self.regionprobs[reg] /= totalprob
+    else:
+      self.normalized = False
 
   def get_ranked_regions(self):
     return [reg for (reg, prob) in sorted(self.regionprobs.iteritems(),
@@ -2967,7 +2980,10 @@ in the test set.
 
 'generate-kml' generates KML files for some set of words, showing the
 distribution over regions that the word determines.  Use '--kml-words' to
-specify the words whose distributions should be outputted.
+specify the words whose distributions should be outputted.  See also
+'--kml-prefix' to specify the prefix of the files outputted, and
+'--kml-transform' to specify the function to use (if any) to transform
+the probabilities to make the distinctions among them more visible.
 
 'segment-geotag-documents' simultaneously segments a document into sections
 covering a specific location and determines that location.
@@ -3162,6 +3178,8 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
         opts.strategy = ['partial-kl-divergence']
       elif opts.mode == 'geotag-toponyms':
         opts.strategy = ['baseline']
+      else:
+        opts.strategy = []
 
     if not opts.baseline_strategy:
       opts.baseline_strategy = ['internal-link']
@@ -3284,7 +3302,11 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
       words = opts.kml_words.split(',')
       for word in words:
         regdist = RegionDist.get_region_dist(word)
-        regdist.generate_kml_file('%s%s.kml' % (opts.kml_prefix, word))
+        if not regdist.normalized:
+          warning("""Non-normalized distribution, apparently word %s not seen anywhere.
+Not generating an empty KML file.""" % word)
+        else:
+          regdist.generate_kml_file('%s%s.kml' % (opts.kml_prefix, word))
       return
 
     def yield_strategies():

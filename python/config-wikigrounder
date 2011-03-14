@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Shorter name to refer to same thing
+TGP="$TEXTGROUNDER_PYTHON"
+
 if [ -z "$WIKIPEDIA_DATA_DIR" ]; then
   WIKIPEDIA_DATA_DIR="/groups/corpora/wikipedia"
 fi
@@ -10,8 +13,8 @@ fi
 
 TRCONLL_DEV_DIR="/groups/projects/pcl_travel/data/trconlldevtest/dev"
 
-GEOTEXT_TOP_DIR="$HOME/devel/geotext"
-GEOTEXT_CORPUS_TOP="$HOME/devel/geotext/GeoText.2010-10-12"
+GEOTEXT_TOP_DIR="/groups/corpora/geotext"
+GEOTEXT_CORPUS_TOP="$GEOTEXT_TOP_DIR/GeoText.2010-10-12"
 #GEOTEXT_INPUT_DIR="$GEOTEXT_CORPUS_TOP/processed_data"
 GEOTEXT_OUTPUT_DIR="$GEOTEXT_TOP_DIR/output-40-docthresh"
 
