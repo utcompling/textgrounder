@@ -1,0 +1,52 @@
+README.txt for WikiGrounder
+Copyright (c) 2011 Ben Wing.
+
+Currently this sits in the Python directory of TextGrounder, but soon
+it will be moved elsewhere -- at least to a wikigrounder part of
+TextGrounder.
+
+I. GETTING STARTED
+
+DEPENDENCIES:
+
+1. Cython
+2. A Wikipedia dump
+3. A gazetteer -- specifically, the "World" Gazetteer ('word-dataen-fixed.txt')
+   NOTE: We should get rid of this requirement and eliminate the gazetteer
+   dependency, if possible.
+4. A stopwords file (e.g. 'stopwords.english')
+5. For Twitter, the GeoText Twitter corpus.
+
+INSTALLATION: 
+
+1. Environment variables:
+
+TEXTGROUNDER_DIR needs to be set to the 
+
+2. Compilation:
+
+Most everything here is written in Python.  However, some of the code, for
+speed reasons, was created using Cython, which allows annotating Python code
+so it can be compiled into C code.  Cython must be obtained and installed,
+then run 'make', which will build the Cython code into .so libraries.
+
+II. RUNNING
+
+FIXME: Fill this in with examples of how to run
+
+Example of how to generate KML graphs for use with Google Earth, showing
+the region-specific distribution of various words in a corpus.
+
+For example: For different levels of the document threshold for discarding
+words, and for the four words "cool, coo, kool and kewl", plot the distribution
+of each of the words across a region of degree size 1x1.  --mts=300 is more
+for debugging and stops loading further data for generating the distribution
+after 300 seconds (5 minutes) has passed.  It's unnecessary here but may be
+useful if you have an enormous amount of data (e.g. all of Wikipedia).
+
+for x in 0 5 40; do $TGP/run-twitter --doc-thresh $x --mts=300 --degrees-per-region=1 --mode=generate-kml --kml-words='cool,coo,kool,kewl' --kml-prefix=kml-dist.$x.none. --kml-transform=none; done 
+
+Another example, just for the words "cool" and "coo", but with different kinds
+of transformation of the probabilities.
+
+for x in none log logsquared; do $TGP/run-twitter --doc-thresh 5 --mts=300 --degrees-per-region=1 --mode=generate-kml --kml-words='cool,coo' --kml-prefix=kml-dist.5.$x. --kml-transform=$x; done 
