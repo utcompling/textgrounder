@@ -13,24 +13,11 @@ public class ImportGazetteer extends BaseApp {
 
     public static void main(String[] args) throws Exception {
         initializeOptionsFromCommandLine(args);
-        doImport(getInputPath(), getOutputPath(), isDoingKMeans());
+        serialize(doImport(getInputPath(), isDoingKMeans()), getOutputPath());
     }
 
-    public static void doImport(String gazInputPath, String serializedGazOutputPath, boolean runKMeans) throws Exception {
-
-        long startTime = System.currentTimeMillis();
-        
-        if(gazInputPath == null) {
-            System.out.println("Must specify gazetteer input path.");
-            System.exit(0);
-        }
-        if(serializedGazOutputPath == null) {
-            serializedGazOutputPath = gazInputPath + ".ser";
-        }
-
+    public static GeoNamesGazetteer doImport(String gazInputPath, boolean runKMeans) throws Exception {
         System.out.println("Reading GeoNames gazetteer from " + gazInputPath + " ...");
-
-        long startMemoryUse = MemoryUtil.getMemoryUsage();
         
         GeoNamesGazetteer gnGaz = null;
         if(gazInputPath.toLowerCase().endsWith(".zip")) {
@@ -44,13 +31,13 @@ public class ImportGazetteer extends BaseApp {
             gnGaz = new GeoNamesGazetteer(new BufferedReader(new FileReader(gazInputPath)), runKMeans);
         }
 
-        long endMemoryUse = MemoryUtil.getMemoryUsage();
-
-        System.out.println("Size of gazetteer object in bytes: " + (endMemoryUse - startMemoryUse));
-
         System.out.println("Done.");
 
-        System.out.println("Serializing GeoNames gazetteer to " + serializedGazOutputPath + " ...");
+        return gnGaz;
+    }
+
+    public static void serialize(GeoNamesGazetteer gnGaz, String serializedGazOutputPath) throws Exception {
+        System.out.print("Serializing GeoNames gazetteer to " + serializedGazOutputPath + " ...");
 
         ObjectOutputStream oos = null;
         if(serializedGazOutputPath.toLowerCase().endsWith(".gz")) {
@@ -64,8 +51,6 @@ public class ImportGazetteer extends BaseApp {
         oos.writeObject(gnGaz);
         oos.close();
 
-        long endTime = System.currentTimeMillis();
-        float seconds = (endTime - startTime) / 1000F;
-        System.out.println("Done. Time elapsed: " + Float.toString(seconds/(float)60.0) + " minutes.");
+        System.out.println("done.");
     }
 }

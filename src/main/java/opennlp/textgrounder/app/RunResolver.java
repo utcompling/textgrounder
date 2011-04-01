@@ -23,6 +23,11 @@ public class RunResolver extends BaseApp {
 
         initializeOptionsFromCommandLine(args);
 
+        if(getSerializedGazetteerPath() == null && getSerializedCorpusPath() == null) {
+            System.out.println("Abort: you must specify a path to a serialized gazetteer or corpus. To generate one, run ImportGazetteer and/or ImportCorpus.");
+            System.exit(0);
+        }
+
         Tokenizer tokenizer = new OpenNLPTokenizer();
         OpenNLPRecognizer recognizer = new OpenNLPRecognizer();
 
@@ -35,55 +40,24 @@ public class RunResolver extends BaseApp {
             System.out.println("done.");
         }
 
-        GeoNamesGazetteer gnGaz = null;
-        if(getSerializedGazetteerPath() != null) {
-            System.out.println("Reading serialized GeoNames gazetteer from " + getSerializedGazetteerPath() + " ...");
+        StoredCorpus testCorpus;
+        if(getSerializedCorpusPath() != null) {
+            System.out.print("Reading serialized corpus from " + getSerializedCorpusPath() + " ...");
             ObjectInputStream ois = null;
-            if(getSerializedGazetteerPath().toLowerCase().endsWith(".gz")) {
-                GZIPInputStream gis = new GZIPInputStream(new FileInputStream(getSerializedGazetteerPath()));
+            if(getSerializedCorpusPath().toLowerCase().endsWith(".gz")) {
+                GZIPInputStream gis = new GZIPInputStream(new FileInputStream(getSerializedCorpusPath()));
                 ois = new ObjectInputStream(gis);
             }
             else {
-                FileInputStream fis = new FileInputStream(getSerializedGazetteerPath());
+                FileInputStream fis = new FileInputStream(getSerializedCorpusPath());
                 ois = new ObjectInputStream(fis);
             }
-            long startMemoryUse = MemoryUtil.getMemoryUsage();
-            gnGaz = (GeoNamesGazetteer) ois.readObject();
-            long endMemoryUse = MemoryUtil.getMemoryUsage();
-            System.out.println("Size of gazetteer object in bytes: " + (endMemoryUse - startMemoryUse));
-            System.out.println("Done.");
-        }
-        else if(getGeoGazetteerFilename() != null) {
-            System.out.println("Reading GeoNames gazetteer from " + Constants.getGazetteersDir() + File.separator + getGeoGazetteerFilename()+" ...");
-            gnGaz = new GeoNamesGazetteer(new BufferedReader(
-                    new FileReader(Constants.getGazetteersDir() + File.separator + getGeoGazetteerFilename())));
-            System.out.println("Done.");
+            testCorpus = (StoredCorpus) ois.readObject();
+            System.out.println("done.");
         }
         else {
-            System.out.println("Must specify a gazetteer.");
-            System.exit(0);
+            testCorpus = ImportCorpus.doImport(getInputPath(), getSerializedGazetteerPath(), isReadAsTR());
         }
-
-        System.out.print("Reading test corpus from " + getInputPath() + " ...");
-        StoredCorpus testCorpus = Corpus.createStoredCorpus();
-        if(isReadAsTR()) {
-            testCorpus.addSource(new ToponymAnnotator(
-                new ToponymRemover(new TrXMLDirSource(new File(getInputPath()), tokenizer)),
-                recognizer, gnGaz));
-        }
-	else if (getInputPath().endsWith("txt")) {
-	    
-            testCorpus.addSource(new ToponymAnnotator(new PlainTextSource(
-									  new BufferedReader(new FileReader(getInputPath())), new OpenNLPSentenceDivider(), tokenizer),
-                recognizer, gnGaz));
-	}
-        else {
-            testCorpus.addSource(new ToponymAnnotator(new PlainTextDirSource(
-                new File(getInputPath()), new OpenNLPSentenceDivider(), tokenizer),
-                recognizer, gnGaz));
-        }
-        testCorpus.load();
-        System.out.println("done.");
 
         StoredCorpus trainCorpus = Corpus.createStoredCorpus();
         if(getAdditionalInputPath() != null) {
@@ -114,9 +88,9 @@ public class RunResolver extends BaseApp {
         float seconds = (endTime - startTime) / 1000F;
         System.out.println("\nInitialization took " + Float.toString(seconds/(float)60.0) + " minutes.");
 
-        System.out.println("\nNumber of documents: " + testCorpus.getDocumentCount());
-        System.out.println("Number of toponym types: " + testCorpus.getToponymTypeCount());
-        System.out.println("Maximum ambiguity (locations per toponym): " + testCorpus.getMaxToponymAmbiguity() + "\n");
+        //System.out.println("\nNumber of documents: " + testCorpus.getDocumentCount());
+        //System.out.println("Number of toponym types: " + testCorpus.getToponymTypeCount());
+        //System.out.println("Maximum ambiguity (locations per toponym): " + testCorpus.getMaxToponymAmbiguity() + "\n");
 
         Resolver resolver;
         if(getResolverType() == RESOLVER_TYPE.RANDOM) {

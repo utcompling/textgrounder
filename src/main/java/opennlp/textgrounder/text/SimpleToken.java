@@ -15,7 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-public class SimpleToken implements Token {
+import java.io.*;
+
+public class SimpleToken implements Token, Serializable {
   private final String form;
 
   public SimpleToken(String form) {

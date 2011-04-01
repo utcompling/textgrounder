@@ -12,7 +12,7 @@ import java.util.zip.*;
 
 public class LabelPropPreproc extends BaseApp {
 
-    private static final int DPC = 1; // degrees per cell
+    private static final double DPC = 1.0; // degrees per cell
 
     // the public constants are used by LabelPropComplexResolver
     private static final String CELL_ = "cell_";
@@ -25,7 +25,7 @@ public class LabelPropPreproc extends BaseApp {
 
     public static void main(String[] args) throws Exception {
         initializeOptionsFromCommandLine(args);
-        StoredCorpus corpus = loadCorpus(getInputPath(), getSerializedGazetteerPath());
+        StoredCorpus corpus = loadCorpus(getInputPath(), getSerializedGazetteerPath(), getSerializedCorpusPath());
 
         Map<Integer, Set<Integer> > locationCellEdges = new HashMap<Integer, Set<Integer> >();
         Set<Toponym> uniqueToponyms = new HashSet<Toponym>();
@@ -182,21 +182,26 @@ public class LabelPropPreproc extends BaseApp {
         out.write(node1 + "\t" + node2 + "\t" + weight + "\n");
     }
 
-    private static StoredCorpus loadCorpus(String corpusInputPath, String serGazPath) throws Exception {
-        Tokenizer tokenizer = new OpenNLPTokenizer();
-        OpenNLPRecognizer recognizer = new OpenNLPRecognizer();
+    private static StoredCorpus loadCorpus(String corpusInputPath, String serGazPath, String serCorpusPath) throws Exception {
 
-        System.out.println("Reading serialized GeoNames gazetteer from " + getSerializedGazetteerPath() + " ...");
-        GZIPInputStream gis = new GZIPInputStream(new FileInputStream(getSerializedGazetteerPath()));
-        ObjectInputStream ois = new ObjectInputStream(gis);
-        GeoNamesGazetteer gnGaz = (GeoNamesGazetteer) ois.readObject();
-        System.out.println("Done.");
-
-        StoredCorpus corpus = Corpus.createStoredCorpus();
-        System.out.print("Reading TR-CoNLL corpus from " + getInputPath() + " ...");
-        corpus.addSource(new ToponymAnnotator(new ToponymRemover(new TrXMLDirSource(new File(getInputPath()), tokenizer)), recognizer, gnGaz));
-        corpus.load();
-        System.out.println("done.");
+        StoredCorpus corpus;
+        if(serCorpusPath != null) {
+            System.out.print("Reading serialized corpus from " + serCorpusPath + " ...");
+            ObjectInputStream ois = null;
+            if(serCorpusPath.toLowerCase().endsWith(".gz")) {
+                GZIPInputStream gis = new GZIPInputStream(new FileInputStream(serCorpusPath));
+                ois = new ObjectInputStream(gis);
+            }
+            else {
+                FileInputStream fis = new FileInputStream(serCorpusPath);
+                ois = new ObjectInputStream(fis);
+            }
+            corpus = (StoredCorpus) ois.readObject();
+            System.out.println("done.");
+        }
+        else {
+            corpus = ImportCorpus.doImport(corpusInputPath, serGazPath, isReadAsTR());
+        }
 
         return corpus;
     }

@@ -18,7 +18,7 @@ package opennlp.textgrounder.util;
 import java.io.Serializable;
 import java.util.List;
 
-public interface CountingLexicon<A extends Serializable> extends Lexicon<A> {
+public interface CountingLexicon<A extends Serializable> extends Lexicon<A>, Serializable {
   public int count(A entry);
   public int countAtIndex(int index);
 }

@@ -19,8 +19,9 @@ import opennlp.textgrounder.topo.Location;
 import opennlp.textgrounder.util.CountingLexicon;
 import opennlp.textgrounder.util.SimpleCountingLexicon;
 import opennlp.textgrounder.util.Span;
+import java.io.*;
 
-public abstract class StoredCorpus extends Corpus<StoredToken> {
+public abstract class StoredCorpus extends Corpus<StoredToken> implements Serializable {
   public abstract int getDocumentCount();
   public abstract int getTokenTypeCount();
   public abstract int getTokenOrigTypeCount();

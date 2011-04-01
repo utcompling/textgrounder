@@ -15,7 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-public interface Token {
+import java.io.*;
+
+public interface Token extends Serializable {
   public String getForm();
   public String getOrigForm();
   public boolean isToponym();

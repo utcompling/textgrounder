@@ -20,13 +20,14 @@ import java.util.Iterator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.io.*;
 
 import opennlp.textgrounder.topo.Location;
 import opennlp.textgrounder.util.CountingLexicon;
 import opennlp.textgrounder.util.SimpleCountingLexicon;
 import opennlp.textgrounder.util.Span;
 
-public class CompactCorpus extends StoredCorpus {
+public class CompactCorpus extends StoredCorpus implements Serializable {
   private Corpus<Token> wrapped;
 
   private final CountingLexicon<String> tokenLexicon;
@@ -169,7 +170,7 @@ public class CompactCorpus extends StoredCorpus {
     return this.documents.iterator();
   }
 
-  private class StoredDocument extends Document<StoredToken> {
+  private class StoredDocument extends Document<StoredToken> implements Serializable {
     private final List<Sentence<StoredToken>> sentences;
 
     private StoredDocument(String id, List<Sentence<StoredToken>> sentences) {
@@ -182,7 +183,7 @@ public class CompactCorpus extends StoredCorpus {
     }
   }
 
-  private class StoredSentence extends Sentence<StoredToken> {
+  private class StoredSentence extends Sentence<StoredToken> implements Serializable {
     private final int[] tokens;
     private final ArrayList<Span<StoredToken>> toponymSpans;
 

@@ -15,7 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
 
-public abstract class Document<A extends Token> implements Iterable<Sentence<A>> {
+import java.io.*;
+
+public abstract class Document<A extends Token> implements Iterable<Sentence<A>>, Serializable {
   private final String id;
 
   protected Document(String id) {

@@ -16,10 +16,11 @@
 package opennlp.textgrounder.text;
 
 import java.util.List;
+import java.io.*;
 
 import opennlp.textgrounder.topo.Location;
 
-public interface Toponym extends Token, Iterable<Location> {
+public interface Toponym extends Token, Iterable<Location>, Serializable {
   public boolean hasGold();
   public Location getGold();
   public int getGoldIdx();

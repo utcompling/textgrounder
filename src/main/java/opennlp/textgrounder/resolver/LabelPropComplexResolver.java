@@ -9,7 +9,7 @@ import java.util.*;
 
 public class LabelPropComplexResolver extends Resolver {
 
-    public static final int DPC = 1; // degrees per cell
+    public static final double DPC = 1.0; // degrees per cell
 
     private String pathToGraph;
     private Map<String, Map<Integer, Double> > cellDistributions = null;

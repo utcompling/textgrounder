@@ -17,6 +17,7 @@ public class BaseApp {
     private static String kmlOutputPath = null;
     private static String geoGazetteerFilename = null;
     private static String serializedGazetteerPath = null;
+    private static String serializedCorpusPath = null;
     private static boolean readAsTR = false;
 
     private static boolean doKMeans = false;
@@ -51,6 +52,7 @@ public class BaseApp {
         options.addOption("ok", "output-kml", true, "kml output path");
         options.addOption("g", "geo-gazetteer-filename", true, "GeoNames gazetteer filename");
         options.addOption("sg", "serialized-gazetteer-path", true, "path to serialized GeoNames gazetteer");
+        options.addOption("sc", "serialized-corpus-path", true, "path to serialized corpus");
         options.addOption("tr", "tr-conll", false, "read input path as TR-CoNLL directory");
 
         options.addOption("dkm", "do-k-means-multipoints", false,
@@ -122,7 +124,10 @@ public class BaseApp {
                         geoGazetteerFilename = value;
                     break;
                 case 's':
-                    serializedGazetteerPath = value;
+                    if(option.getOpt().equals("sg"))
+                        serializedGazetteerPath = value;
+                    else if(option.getOpt().equals("sc"))
+                        serializedCorpusPath = value;
                     break;
                 case 't':
                     readAsTR = true;
@@ -168,6 +173,10 @@ public class BaseApp {
 
     public static String getSerializedGazetteerPath() {
         return serializedGazetteerPath;
+    }
+
+    public static String getSerializedCorpusPath() {
+        return serializedCorpusPath;
     }
 
     public static boolean isReadAsTR() {

@@ -17,8 +17,9 @@ package opennlp.textgrounder.util;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.io.*;
 
-public class Span<A> {
+public class Span<A> implements Serializable {
   private final int start;
   private final int end;
   private final A item;

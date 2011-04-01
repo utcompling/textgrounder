@@ -21,8 +21,9 @@ import java.util.List;
 import java.util.NoSuchElementException;
 
 import opennlp.textgrounder.util.Span;
+import java.io.*;
 
-public class SimpleSentence<A extends Token> extends Sentence {
+public class SimpleSentence<A extends Token> extends Sentence implements Serializable {
   private final List<A> tokens;
   private final List<Span<A>> toponymSpans;
 

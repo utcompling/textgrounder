@@ -14,8 +14,9 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
+import java.io.*;
 
-public interface StoredToken extends Token {
+public interface StoredToken extends Token, Serializable {
   public int getIdx();
   public int getOrigIdx();
   public int getTypeCount();

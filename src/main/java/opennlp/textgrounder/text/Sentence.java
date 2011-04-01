@@ -19,10 +19,11 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.io.*;
 
 import opennlp.textgrounder.util.Span;
 
-public abstract class Sentence<A extends Token> implements Iterable<A> {
+public abstract class Sentence<A extends Token> implements Iterable<A>, Serializable {
   private final String id;
 
   protected Sentence(String id) {

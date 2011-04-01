@@ -19,8 +19,9 @@ import java.util.Iterator;
 import java.util.List;
 
 import opennlp.textgrounder.topo.Location;
+import java.io.*;
 
-public class SimpleToponym extends SimpleToken implements Toponym {
+public class SimpleToponym extends SimpleToken implements Toponym, Serializable {
   private final List<Location> candidates;
   private final int goldIdx;
   private int selectedIdx;

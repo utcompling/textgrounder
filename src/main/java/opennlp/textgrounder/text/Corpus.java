@@ -18,8 +18,9 @@ package opennlp.textgrounder.text;
 import java.util.Iterator;
 
 import opennlp.textgrounder.util.Lexicon;
+import java.io.*;
 
-public abstract class Corpus<A extends Token> implements Iterable<Document<A>> {
+public abstract class Corpus<A extends Token> implements Iterable<Document<A>>, Serializable {
   public abstract void addSource(DocumentSource source);
   public abstract void close();
 

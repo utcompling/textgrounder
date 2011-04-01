@@ -14,7 +14,8 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.text;
+import java.io.*;
 
-public interface StoredToponym extends StoredToken, Toponym {
+public interface StoredToponym extends StoredToken, Toponym, Serializable {
 }
 
