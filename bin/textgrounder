@@ -48,6 +48,7 @@ else
     case $CMD in
 	resolve) CLASS=opennlp.textgrounder.app.RunResolver;;
 	import-gazetteer) CLASS=opennlp.textgrounder.app.ImportGazetteer;;
+	import-corpus) CLASS=opennlp.textgrounder.app.ImportCorpus;;
 	preprocess-labelprop) CLASS=opennlp.textgrounder.app.LabelPropPreproc;;
 	run) CLASS=$1; shift;;
 	help) help; exit 1;;
