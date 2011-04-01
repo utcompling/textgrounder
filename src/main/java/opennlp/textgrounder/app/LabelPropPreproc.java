@@ -14,7 +14,7 @@ public class LabelPropPreproc extends BaseApp {
 
     private static final double DPC = 1.0; // degrees per cell
 
-    // the public constants are used by LabelPropComplexResolver
+    // the public constants are used by LabelPropComplexResolver //
     private static final String CELL_ = "cell_";
     public static final String CELL_LABEL_ = "cell_label_";
     private static final String LOC_ = "loc_";
