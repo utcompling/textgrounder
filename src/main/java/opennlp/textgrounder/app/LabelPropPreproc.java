@@ -25,7 +25,7 @@ public class LabelPropPreproc extends BaseApp {
 
     public static void main(String[] args) throws Exception {
         initializeOptionsFromCommandLine(args);
-        StoredCorpus corpus = loadCorpus(getInputPath(), getSerializedGazetteerPath(), getSerializedCorpusPath());
+        StoredCorpus corpus = loadCorpus(getInputPath(), getSerializedGazetteerPath(), getSerializedCorpusInputPath());
 
         Map<Integer, Set<Integer> > locationCellEdges = new HashMap<Integer, Set<Integer> >();
         Set<Toponym> uniqueToponyms = new HashSet<Toponym>();

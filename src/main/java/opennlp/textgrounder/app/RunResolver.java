@@ -23,7 +23,7 @@ public class RunResolver extends BaseApp {
 
         initializeOptionsFromCommandLine(args);
 
-        if(getSerializedGazetteerPath() == null && getSerializedCorpusPath() == null) {
+        if(getSerializedGazetteerPath() == null && getSerializedCorpusInputPath() == null) {
             System.out.println("Abort: you must specify a path to a serialized gazetteer or corpus. To generate one, run ImportGazetteer and/or ImportCorpus.");
             System.exit(0);
         }
@@ -41,15 +41,15 @@ public class RunResolver extends BaseApp {
         }
 
         StoredCorpus testCorpus;
-        if(getSerializedCorpusPath() != null) {
-            System.out.print("Reading serialized corpus from " + getSerializedCorpusPath() + " ...");
+        if(getSerializedCorpusInputPath() != null) {
+            System.out.print("Reading serialized corpus from " + getSerializedCorpusInputPath() + " ...");
             ObjectInputStream ois = null;
-            if(getSerializedCorpusPath().toLowerCase().endsWith(".gz")) {
-                GZIPInputStream gis = new GZIPInputStream(new FileInputStream(getSerializedCorpusPath()));
+            if(getSerializedCorpusInputPath().toLowerCase().endsWith(".gz")) {
+                GZIPInputStream gis = new GZIPInputStream(new FileInputStream(getSerializedCorpusInputPath()));
                 ois = new ObjectInputStream(gis);
             }
             else {
-                FileInputStream fis = new FileInputStream(getSerializedCorpusPath());
+                FileInputStream fis = new FileInputStream(getSerializedCorpusInputPath());
                 ois = new ObjectInputStream(fis);
             }
             testCorpus = (StoredCorpus) ois.readObject();
@@ -137,6 +137,10 @@ public class RunResolver extends BaseApp {
             System.out.println("A: " + report.getAccuracy() + "\n");
         }
 
+        if(getSerializedCorpusOutputPath() != null) {
+            ImportCorpus.serialize(disambiguated, getSerializedCorpusOutputPath());
+        }
+
         if(getOutputPath() != null) {
             System.out.print("Writing resolved corpus in XML format to " + getOutputPath() + " ...");
             CorpusXMLWriter w = new CorpusXMLWriter(disambiguated);
@@ -145,10 +149,7 @@ public class RunResolver extends BaseApp {
         }
 
         if(getKMLOutputPath() != null) {
-            System.out.print("Writing visualizable resolved corpus in KML format to " + getKMLOutputPath() + " ...");
-            CorpusKMLWriter kw = new CorpusKMLWriter(disambiguated);
-            kw.write(new File(getKMLOutputPath()));
-            System.out.println("done.");
+            WriteCorpusToKML.writeToKML(disambiguated, getKMLOutputPath());
         }
 
         endTime = System.currentTimeMillis();

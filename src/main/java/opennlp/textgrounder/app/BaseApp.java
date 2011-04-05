@@ -17,7 +17,8 @@ public class BaseApp {
     private static String kmlOutputPath = null;
     private static String geoGazetteerFilename = null;
     private static String serializedGazetteerPath = null;
-    private static String serializedCorpusPath = null;
+    private static String serializedCorpusInputPath = null;
+    private static String serializedCorpusOutputPath = null;
     private static boolean readAsTR = false;
 
     private static boolean doKMeans = false;
@@ -52,7 +53,8 @@ public class BaseApp {
         options.addOption("ok", "output-kml", true, "kml output path");
         options.addOption("g", "geo-gazetteer-filename", true, "GeoNames gazetteer filename");
         options.addOption("sg", "serialized-gazetteer-path", true, "path to serialized GeoNames gazetteer");
-        options.addOption("sc", "serialized-corpus-path", true, "path to serialized corpus");
+        options.addOption("sci", "serialized-corpus-input-path", true, "path to serialized corpus for input");
+        options.addOption("sco", "serialized-corpus-output-path", true, "path to serialized corpus for output");
         options.addOption("tr", "tr-conll", false, "read input path as TR-CoNLL directory");
 
         options.addOption("dkm", "do-k-means-multipoints", false,
@@ -126,8 +128,10 @@ public class BaseApp {
                 case 's':
                     if(option.getOpt().equals("sg"))
                         serializedGazetteerPath = value;
-                    else if(option.getOpt().equals("sc"))
-                        serializedCorpusPath = value;
+                    else if(option.getOpt().equals("sci"))
+                        serializedCorpusInputPath = value;
+                    else if(option.getOpt().equals("sco"))
+                        serializedCorpusOutputPath = value;
                     break;
                 case 't':
                     readAsTR = true;
@@ -175,8 +179,12 @@ public class BaseApp {
         return serializedGazetteerPath;
     }
 
-    public static String getSerializedCorpusPath() {
-        return serializedCorpusPath;
+    public static String getSerializedCorpusInputPath() {
+        return serializedCorpusInputPath;
+    }
+
+    public static String getSerializedCorpusOutputPath() {
+        return serializedCorpusOutputPath;
     }
 
     public static boolean isReadAsTR() {

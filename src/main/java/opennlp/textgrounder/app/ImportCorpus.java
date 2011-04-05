@@ -15,15 +15,15 @@ public class ImportCorpus extends BaseApp {
     public static void main(String[] args) throws Exception {
         initializeOptionsFromCommandLine(args);
 
-        if(getSerializedCorpusPath() == null && getOutputPath() == null) {
-            System.out.println("Please specify a serialized corpus output file with the -sc flag and/or an XML output file with the -o flag.");
+        if(getSerializedCorpusOutputPath() == null && getOutputPath() == null) {
+            System.out.println("Please specify a serialized corpus output file with the -sco flag and/or an XML output file with the -o flag.");
             System.exit(0);
         }
 
         StoredCorpus corpus = doImport(getInputPath(), getSerializedGazetteerPath(), isReadAsTR());
         
-        if(getSerializedCorpusPath() != null)
-            serialize(corpus, getSerializedCorpusPath());
+        if(getSerializedCorpusOutputPath() != null)
+            serialize(corpus, getSerializedCorpusOutputPath());
         if(getOutputPath() != null)
             writeToXML(corpus, getOutputPath());
     }
@@ -74,7 +74,7 @@ public class ImportCorpus extends BaseApp {
         return corpus;
     }
 
-    public static void serialize(StoredCorpus corpus, String serializedCorpusPath) throws Exception {
+    public static void serialize(Corpus corpus, String serializedCorpusPath) throws Exception {
 
         System.out.print("\nSerializing corpus to " + serializedCorpusPath + " ...");
         
@@ -93,7 +93,7 @@ public class ImportCorpus extends BaseApp {
         System.out.println("done.");
     }
 
-    public static void writeToXML(StoredCorpus corpus, String xmlOutputPath) throws Exception {
+    public static void writeToXML(Corpus corpus, String xmlOutputPath) throws Exception {
         System.out.print("\nWriting corpus in XML format to " + xmlOutputPath + " ...");
         CorpusXMLWriter w = new CorpusXMLWriter(corpus);
         w.write(new File(xmlOutputPath));
