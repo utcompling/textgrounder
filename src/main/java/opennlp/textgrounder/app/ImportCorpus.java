@@ -15,7 +15,17 @@ public class ImportCorpus extends BaseApp {
     public static void main(String[] args) throws Exception {
         initializeOptionsFromCommandLine(args);
 
-        serialize(doImport(getInputPath(), getSerializedGazetteerPath(), isReadAsTR()), getOutputPath());
+        if(getSerializedCorpusPath() == null && getOutputPath() == null) {
+            System.out.println("Please specify a serialized corpus output file with the -sc flag and/or an XML output file with the -o flag.");
+            System.exit(0);
+        }
+
+        StoredCorpus corpus = doImport(getInputPath(), getSerializedGazetteerPath(), isReadAsTR());
+        
+        if(getSerializedCorpusPath() != null)
+            serialize(corpus, getSerializedCorpusPath());
+        if(getOutputPath() != null)
+            writeToXML(corpus, getOutputPath());
     }
 
     public static StoredCorpus doImport(String corpusInputPath, String serGazInputPath, boolean isReadAsTR) throws Exception {
@@ -80,6 +90,13 @@ public class ImportCorpus extends BaseApp {
         oos.writeObject(corpus);
         oos.close();
         
+        System.out.println("done.");
+    }
+
+    public static void writeToXML(StoredCorpus corpus, String xmlOutputPath) throws Exception {
+        System.out.print("\nWriting corpus in XML format to " + xmlOutputPath + " ...");
+        CorpusXMLWriter w = new CorpusXMLWriter(corpus);
+        w.write(new File(xmlOutputPath));
         System.out.println("done.");
     }
 }
