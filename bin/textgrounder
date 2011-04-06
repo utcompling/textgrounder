@@ -32,6 +32,7 @@ TextGrounder 0.1 commands:
   preprocess-labelprop	preprocess label propagation
   resolve           	run the toponomy resolver
   write-to-kml			write a resolved corpus to visualizable KML format
+  eval					evaluated a resolved corpus against a gold corpus
   run               	run the main method of a given class
 
 Include --help with any option for more information
@@ -53,6 +54,7 @@ else
 	import-corpus) CLASS=opennlp.textgrounder.app.ImportCorpus;;
 	preprocess-labelprop) CLASS=opennlp.textgrounder.app.LabelPropPreproc;;
 	write-to-kml) CLASS=opennlp.textgrounder.app.WriteCorpusToKML;;
+	eval) CLASS=opennlp.textgrounder.app.EvaluateCorpus;;
 	run) CLASS=$1; shift;;
 	help) help; exit 1;;
 	*) echo "Unrecognized command: $CMD"; help; exit 1;;
