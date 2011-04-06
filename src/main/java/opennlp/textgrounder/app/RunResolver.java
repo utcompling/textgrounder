@@ -43,16 +43,7 @@ public class RunResolver extends BaseApp {
         StoredCorpus testCorpus;
         if(getSerializedCorpusInputPath() != null) {
             System.out.print("Reading serialized corpus from " + getSerializedCorpusInputPath() + " ...");
-            ObjectInputStream ois = null;
-            if(getSerializedCorpusInputPath().toLowerCase().endsWith(".gz")) {
-                GZIPInputStream gis = new GZIPInputStream(new FileInputStream(getSerializedCorpusInputPath()));
-                ois = new ObjectInputStream(gis);
-            }
-            else {
-                FileInputStream fis = new FileInputStream(getSerializedCorpusInputPath());
-                ois = new ObjectInputStream(fis);
-            }
-            testCorpus = (StoredCorpus) ois.readObject();
+            testCorpus = TopoUtil.readStoredCorpusFromSerialized(getSerializedCorpusInputPath());
             System.out.println("done.");
         }
         else {
@@ -88,10 +79,6 @@ public class RunResolver extends BaseApp {
         float seconds = (endTime - startTime) / 1000F;
         System.out.println("\nInitialization took " + Float.toString(seconds/(float)60.0) + " minutes.");
 
-        //System.out.println("\nNumber of documents: " + testCorpus.getDocumentCount());
-        //System.out.println("Number of toponym types: " + testCorpus.getToponymTypeCount());
-        //System.out.println("Maximum ambiguity (locations per toponym): " + testCorpus.getMaxToponymAmbiguity() + "\n");
-
         Resolver resolver;
         if(getResolverType() == RESOLVER_TYPE.RANDOM) {
             System.out.print("Running RANDOM resolver...");
@@ -122,19 +109,10 @@ public class RunResolver extends BaseApp {
             resolver.train(trainCorpus);
         Corpus disambiguated = resolver.disambiguate(testCorpus);
 
-        System.out.println("done.");
+        System.out.println("done.\n");
 
         if(goldCorpus != null) {
-            System.out.print("\nEvaluating...");
-            Evaluator evaluator = new SignatureEvaluator(goldCorpus);
-            Report report = evaluator.evaluate(disambiguated, false);
-            System.out.println("done.");
-
-            System.out.println("\nResults:");
-            System.out.println("P: " + report.getPrecision());
-            System.out.println("R: " + report.getRecall());
-            System.out.println("F: " + report.getFScore());
-            System.out.println("A: " + report.getAccuracy() + "\n");
+            EvaluateCorpus.doEval(disambiguated, goldCorpus);
         }
 
         if(getSerializedCorpusOutputPath() != null) {

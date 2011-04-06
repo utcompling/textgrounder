@@ -4,7 +4,7 @@
 
 package opennlp.textgrounder.resolver;
 
-import opennlp.textgrounder.text.StoredCorpus;
+import opennlp.textgrounder.text.*;
 
 /**
  * @param corpus

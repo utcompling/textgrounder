@@ -6,8 +6,8 @@ package opennlp.textgrounder.app;
 
 import opennlp.textgrounder.text.*;
 import opennlp.textgrounder.text.io.*;
+import opennlp.textgrounder.util.*;
 import java.io.*;
-import java.util.zip.*;
 
 public class WriteCorpusToKML extends BaseApp {
     public static void main(String[] args) throws Exception {
@@ -23,18 +23,8 @@ public class WriteCorpusToKML extends BaseApp {
             System.exit(0);
         }
 
-        Corpus corpus;
         System.out.print("Reading serialized corpus from " + getSerializedCorpusInputPath() + " ...");
-        ObjectInputStream ois = null;
-        if(getSerializedCorpusInputPath().toLowerCase().endsWith(".gz")) {
-            GZIPInputStream gis = new GZIPInputStream(new FileInputStream(getSerializedCorpusInputPath()));
-            ois = new ObjectInputStream(gis);
-        }
-        else {
-            FileInputStream fis = new FileInputStream(getSerializedCorpusInputPath());
-            ois = new ObjectInputStream(fis);
-        }
-        corpus = (StoredCorpus) ois.readObject();
+        Corpus corpus = TopoUtil.readCorpusFromSerialized(getSerializedCorpusInputPath());
         System.out.println("done.");
 
         writeToKML(corpus, getKMLOutputPath());

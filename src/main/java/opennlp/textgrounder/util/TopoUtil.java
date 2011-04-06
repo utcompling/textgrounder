@@ -3,6 +3,14 @@ package opennlp.textgrounder.util;
 import opennlp.textgrounder.text.*;
 import opennlp.textgrounder.topo.*;
 import java.util.*;
+import opennlp.textgrounder.resolver.*;
+import opennlp.textgrounder.text.io.*;
+import opennlp.textgrounder.text.prep.*;
+import opennlp.textgrounder.topo.gaz.*;
+import opennlp.textgrounder.eval.*;
+import opennlp.textgrounder.util.*;
+import java.io.*;
+import java.util.zip.*;
 
 public class TopoUtil {
     
@@ -99,5 +107,39 @@ public class TopoUtil {
         }
 
         return -1;
+    }
+
+    public static Corpus readCorpusFromSerialized(String serializedCorpusInputPath) throws Exception {
+
+        Corpus corpus;
+        ObjectInputStream ois = null;
+        if(serializedCorpusInputPath.toLowerCase().endsWith(".gz")) {
+            GZIPInputStream gis = new GZIPInputStream(new FileInputStream(serializedCorpusInputPath));
+            ois = new ObjectInputStream(gis);
+        }
+        else {
+            FileInputStream fis = new FileInputStream(serializedCorpusInputPath);
+            ois = new ObjectInputStream(fis);
+        }
+        corpus = (StoredCorpus) ois.readObject();
+
+        return corpus;
+    }
+
+    public static StoredCorpus readStoredCorpusFromSerialized(String serializedCorpusInputPath) throws Exception {
+
+        StoredCorpus corpus;
+        ObjectInputStream ois = null;
+        if(serializedCorpusInputPath.toLowerCase().endsWith(".gz")) {
+            GZIPInputStream gis = new GZIPInputStream(new FileInputStream(serializedCorpusInputPath));
+            ois = new ObjectInputStream(gis);
+        }
+        else {
+            FileInputStream fis = new FileInputStream(serializedCorpusInputPath);
+            ois = new ObjectInputStream(fis);
+        }
+        corpus = (StoredCorpus) ois.readObject();
+
+        return corpus;
     }
 }

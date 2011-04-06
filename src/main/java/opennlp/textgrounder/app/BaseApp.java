@@ -18,6 +18,7 @@ public class BaseApp {
     private static String geoGazetteerFilename = null;
     private static String serializedGazetteerPath = null;
     private static String serializedCorpusInputPath = null;
+    //private static String serializedGoldCorpusInputPath = null;
     private static String serializedCorpusOutputPath = null;
     private static boolean readAsTR = false;
 
@@ -54,6 +55,7 @@ public class BaseApp {
         options.addOption("g", "geo-gazetteer-filename", true, "GeoNames gazetteer filename");
         options.addOption("sg", "serialized-gazetteer-path", true, "path to serialized GeoNames gazetteer");
         options.addOption("sci", "serialized-corpus-input-path", true, "path to serialized corpus for input");
+        //options.addOption("sgci", "serialized-gold-corpus-input-path", true, "path to serialized gold corpus for input");
         options.addOption("sco", "serialized-corpus-output-path", true, "path to serialized corpus for output");
         options.addOption("tr", "tr-conll", false, "read input path as TR-CoNLL directory");
 
@@ -132,6 +134,8 @@ public class BaseApp {
                         serializedCorpusInputPath = value;
                     else if(option.getOpt().equals("sco"))
                         serializedCorpusOutputPath = value;
+                    //else if(option.getOpt().equals("sgci"))
+                    //    serializedGoldCorpusInputPath = value;
                     break;
                 case 't':
                     readAsTR = true;
@@ -182,6 +186,10 @@ public class BaseApp {
     public static String getSerializedCorpusInputPath() {
         return serializedCorpusInputPath;
     }
+
+    /*public static String getSerializedGoldCorpusInputPath() {
+        return serializedGoldCorpusInputPath;
+    }*/
 
     public static String getSerializedCorpusOutputPath() {
         return serializedCorpusOutputPath;

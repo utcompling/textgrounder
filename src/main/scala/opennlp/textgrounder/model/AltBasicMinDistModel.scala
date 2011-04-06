@@ -16,7 +16,8 @@
 package opennlp.textgrounder.resolver
 
 import scala.collection.JavaConversions._
-import opennlp.textgrounder.text.StoredCorpus
+import opennlp.textgrounder.text._
+
 
 class AltBasicMinDistResolver extends Resolver {
   def disambiguate(corpus: StoredCorpus): StoredCorpus = {
