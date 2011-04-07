@@ -42,7 +42,7 @@ public class TrXMLDirSource extends DocumentSource {
   private final Tokenizer tokenizer;
   private final File[] files;
   private int currentIdx;
-  private TrXMLSource current;
+    private TrXMLSource current;
 
   public TrXMLDirSource(File directory, Tokenizer tokenizer) {
     this.tokenizer = tokenizer;
