@@ -44,7 +44,7 @@ if [ $CMD = 'build' ]; then
 
     java -jar $TEXTGROUNDER_DIR/project/build/sbt-launch-0.7.4.jar "$@"
 
-else 
+else  
 
     CLASS=
 
