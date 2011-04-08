@@ -85,7 +85,7 @@ bzcat $IN_DUMP_FILE | $PROCESSWIKI \
 elif [ "$step" = words ]; then
 echo "Generating raw text ..."
 bzcat $IN_DUMP_FILE | $PROCESSWIKI \
-  --output-words \
+  --output-words --raw-text \
   $OTHEROPTS > $OUT_WORDS_FILE
 
 elif [ "$step" = coord-words ]; then
@@ -93,6 +93,12 @@ echo "Generating raw text, coord aticles only ..."
 bzcat $IN_DUMP_FILE | $PROCESSWIKI \
   --output-coord-words --raw-text \
   $OTHEROPTS > $OUT_COORD_WORDS_FILE
+
+elif [ "$step" = coord-words-untok ]; then
+echo "Generating raw text, coord aticles only, untokenized ..."
+bzcat $IN_DUMP_FILE | $PROCESSWIKI \
+  --output-coord-words --raw-text --no-tokenize \
+  $OTHEROPTS > $OUT_COORD_WORDS_UNTOK_FILE
 
 else
 echo "Unrecognized step $step"
