@@ -1099,7 +1099,16 @@ def yield_table_chunks(text):
 # yield the words.  Also ignore words with a colon in the middle, indicating
 # likely URL's and similar directives.
 def split_text_into_words(text):
-  if Opts.raw_text:
+  if Opts.no_tokenize:
+    # No tokenization requested.  Just split on whitespace.  But still try
+    # to eliminate URL's.  Rather than just look for :, we look for :/, which
+    # URL's are likely to contain.  Possibly we should look for a colon in
+    # the middle of a word, which is effectively what the checks down below
+    # do (or modify those checks to look for :/).
+    for word in re.split('\s+', text):
+      if ':/' not in word:
+        yield word
+  elif Opts.raw_text:
     # This regexp splits on whitespace, but also handles the following cases:
     # 1. Any of , ; . etc. at the end of a word
     # 2. Parens or quotes in words like (foo) or "bar"
@@ -1760,11 +1769,17 @@ def main():
   op.add_option("-w", "--output-words",
                 help="Output words of text.",
                 action="store_true")
-  op.add_option("--raw-text", help="Out raw text with little processing.",
-                action="store_true")
   op.add_option("--output-coord-words",
                 help="Output text, but only for articles with coordinates.",
                 action="store_true")
+  op.add_option("--raw-text", help="""When outputting words, make output
+resemble some concept of "raw text".  Currently, this just includes
+punctuation instead of omitting it, and shows only the anchor text of a
+link rather than both the anchor text and actual article name linked to,
+when different.""", action="store_true")
+  op.add_option("--no-tokenize", help="""When outputting words, don't tokenize.
+This causes words to only be split on whitespace, rather than also on
+punctuation.""", action="store_true")
   op.add_option("-l", "--find-links",
                 help="""Find all links and print info about them.
 Includes count of incoming links, and, for each anchor-text form, counts of
