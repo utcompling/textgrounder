@@ -111,7 +111,8 @@ CoarseDisambig = nest(MTS300, AllStrategies, CoarseDPR)
 
 # PCL experiments
 PCLDPR = iterate('--degrees-per-region', [1.5, 0.5, 1, 2, 3, 5])
-PCLEvalFile = add_param('-f pcl-travel -e /groups/corpora/pcl_travel/books')
+corpora_dir = os.getenv('CORPORA_DIR') or '/groups/corpora'
+PCLEvalFile = add_param('-f pcl-travel -e %s/pcl_travel/books' % corpora_dir)
 PCLDisambig = nest(MTS300, PCLEvalFile, NonBaselineStrategies, PCLDPR)
 
 # Param experiments
