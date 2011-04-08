@@ -200,7 +200,7 @@ public class LabelPropPreproc extends BaseApp {
             System.out.println("done.");
         }
         else {
-            corpus = ImportCorpus.doImport(corpusInputPath, serGazPath, isReadAsTR());
+            corpus = ImportCorpus.doImport(corpusInputPath, serGazPath, getCorpusFormat());
         }
 
         return corpus;

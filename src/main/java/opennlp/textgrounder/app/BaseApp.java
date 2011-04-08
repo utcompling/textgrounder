@@ -5,6 +5,7 @@
 package opennlp.textgrounder.app;
 
 import org.apache.commons.cli.*;
+import opennlp.textgrounder.topo.*;
 
 public class BaseApp {
 
@@ -20,7 +21,9 @@ public class BaseApp {
     private static String serializedCorpusInputPath = null;
     //private static String serializedGoldCorpusInputPath = null;
     private static String serializedCorpusOutputPath = null;
-    private static boolean readAsTR = false;
+    //private static boolean readAsTR = false;
+
+    private static Region boundingBox = null;
 
     private static boolean doKMeans = false;
 
@@ -41,6 +44,12 @@ public class BaseApp {
     }
     private static Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
 
+    public static enum CORPUS_FORMAT {
+        PLAIN,
+        TRCONLL,
+        GEOTEXT
+    }
+    private static Enum<CORPUS_FORMAT> corpusFormat = CORPUS_FORMAT.PLAIN;
 	
 
     protected static void initializeOptionsFromCommandLine(String[] args) throws Exception {
@@ -57,7 +66,17 @@ public class BaseApp {
         options.addOption("sci", "serialized-corpus-input-path", true, "path to serialized corpus for input");
         //options.addOption("sgci", "serialized-gold-corpus-input-path", true, "path to serialized gold corpus for input");
         options.addOption("sco", "serialized-corpus-output-path", true, "path to serialized corpus for output");
-        options.addOption("tr", "tr-conll", false, "read input path as TR-CoNLL directory");
+        //options.addOption("tr", "tr-conll", false, "read input path as TR-CoNLL directory");
+        options.addOption("cf", "corpus-format", true, "corpus format (Plain, TrCoNLL, GeoText) [default = Plain]");
+
+        options.addOption("minlat", "minimum-latitude", true,
+                "minimum latitude for bounding box");
+        options.addOption("maxlat", "maximum-latitude", true,
+                "maximum latitude for bounding box");
+        options.addOption("minlon", "minimum-longitude", true,
+                "minimum longitude for bounding box");
+        options.addOption("maxlon", "maximum-longitude", true,
+                "maximum longitude for bounding box");
 
         options.addOption("dkm", "do-k-means-multipoints", false,
                 "(import-gazetteer only) run k-means and create multipoint representations of regions (e.g. countries)");
@@ -72,6 +91,11 @@ public class BaseApp {
                 "(preprocess-labelprob only) path to stop list input file (one stop word per line)");
 
         options.addOption("h", "help", false, "print help");
+
+        Double minLat = null;
+        Double maxLat = null;
+        Double minLon = null;
+        Double maxLon = null;
         
         CommandLineParser optparse = new PosixParser();
         CommandLine cline = optparse.parse(options, args);
@@ -137,14 +161,36 @@ public class BaseApp {
                     //else if(option.getOpt().equals("sgci"))
                     //    serializedGoldCorpusInputPath = value;
                     break;
-                case 't':
+                case 'c':
+                    if(value.toLowerCase().startsWith("t"))
+                        corpusFormat = CORPUS_FORMAT.TRCONLL;
+                    else if(value.toLowerCase().startsWith("g"))
+                        corpusFormat = CORPUS_FORMAT.GEOTEXT;
+                    else//if(value.toLowerCase().startsWith("p"))
+                        corpusFormat = CORPUS_FORMAT.PLAIN;
+                    break;
+                    /*case 't':
                     readAsTR = true;
+                    break;*/
+
+                case 'm':
+                    if(option.getOpt().equals("minlat"))
+                        minLat = Double.parseDouble(value.replaceAll("n", "-"));
+                    else if(option.getOpt().equals("maxlat"))
+                        maxLat = Double.parseDouble(value.replaceAll("n", "-"));
+                    else if(option.getOpt().equals("minlon"))
+                        minLon = Double.parseDouble(value.replaceAll("n", "-"));
+                    else if(option.getOpt().equals("maxlon"))
+                        maxLon = Double.parseDouble(value.replaceAll("n", "-"));
                     break;
                 case 'd':
                     doKMeans = true;
                     break;
             }
         }
+
+        if(minLat != null && maxLat != null && minLon != null && maxLon != null)
+            boundingBox = RectRegion.fromDegrees(minLat, maxLat, minLon, maxLon);
     }
 
     public static String getInputPath() {
@@ -195,10 +241,13 @@ public class BaseApp {
         return serializedCorpusOutputPath;
     }
 
-    public static boolean isReadAsTR() {
+    /*public static boolean isReadAsTR() {
         return readAsTR;
-    }
+        }*/
 
+    public static Enum<CORPUS_FORMAT> getCorpusFormat() {
+        return corpusFormat;
+    }
     
     public static boolean isDoingKMeans() {
         return doKMeans;
@@ -218,5 +267,9 @@ public class BaseApp {
 
     public static String getStoplistInputPath() {
         return stoplistInputPath;
+    }
+
+    public static Region getBoundingBox() {
+        return boundingBox;
     }
 }

@@ -142,4 +142,21 @@ public class TopoUtil {
 
         return corpus;
     }
+
+    public static List<Location> filter(List<Location> locs, Region boundingBox) {
+        if(boundingBox == null) return locs;
+        
+        int i = 0;
+        for(Location loc : locs) {
+            for(Coordinate coord : loc.getRegion().getRepresentatives()) {
+                if(!boundingBox.contains(coord)) {
+                    locs.remove(i);
+                    i--;
+                    break;
+                }
+            }
+            i++;
+        }
+        return locs;
+    }
 }

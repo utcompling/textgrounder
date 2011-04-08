@@ -32,7 +32,7 @@ public class RunResolver extends BaseApp {
         OpenNLPRecognizer recognizer = new OpenNLPRecognizer();
 
         StoredCorpus goldCorpus = null;
-        if(isReadAsTR()) {
+        if(getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
             System.out.print("Reading gold corpus from " + getInputPath() + " ...");
             goldCorpus = Corpus.createStoredCorpus();
             goldCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
@@ -47,7 +47,7 @@ public class RunResolver extends BaseApp {
             System.out.println("done.");
         }
         else {
-            testCorpus = ImportCorpus.doImport(getInputPath(), getSerializedGazetteerPath(), isReadAsTR());
+            testCorpus = ImportCorpus.doImport(getInputPath(), getSerializedGazetteerPath(), getCorpusFormat());
         }
 
         StoredCorpus trainCorpus = Corpus.createStoredCorpus();
