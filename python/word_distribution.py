@@ -42,7 +42,7 @@ use_sorted_list = False
 #        where NUM_UNSEEN_WORDS is an estimate of the total number of words
 #        "exist" but haven't been seen in any articles.  One simple idea is
 #        to use the number of words seen once in any article.  This certainly
-#        underestimates this number of not too many articles have been seen
+#        underestimates this number if not too many articles have been seen
 #        but might be OK if many articles seen.
 #   total_tokens: Total number of word tokens seen
 
