@@ -74,8 +74,8 @@ class Article(object):
     self.is_list = is_list
 
   def __str__(self):
-    coordstr = " at %s" % self.coord if self.coord else ""
-    redirstr = ", redirect to %s" % self.redir if self.redir else ""
+    coordstr = self.coord and " at %s" % self.coord or ""
+    redirstr = self.redir and ", redirect to %s" % self.redir or ""
     return '%s(%s)%s%s' % (self.title, self.id, coordstr, redirstr)
 
 def yesno_to_boolean(foo):

@@ -645,7 +645,10 @@ class StatRegion(object):
       return "nowhere"
 
   def __str__(self):
-    unfinished = "" if self.worddist.finished else ", unfinished"
+    if self.worddist.finished:
+      unfinished = ""
+    else:
+      unfinished = ", unfinished"
     contains = ""
     if self.most_popular_article:
       contains = ", most-pop-art %s(%d links)" % (
@@ -797,8 +800,11 @@ class StatRegion(object):
   def iter_nonempty_regions(cls, nonempty_word_dist=False):
     assert cls.all_regions_computed
     for val in cls.corner_to_stat_region.itervalues():
-      if (val.worddist.is_empty_for_word_dist() if nonempty_word_dist
-          else val.worddist.is_empty()):
+      if nonempty_word_dist:
+        empty = val.worddist.is_empty_for_word_dist()
+      else:
+        empty = val.worddist.is_empty()
+      if empty:
         continue
       yield val
 
@@ -1208,7 +1214,7 @@ class ArticleTable(object):
           errprint("Warning: Saw %s toponym matches: %s" %
                    (len(goodarts), goodarts))
         sortedarts = \
-          sorted(goodarts, cmp=(lambda x,y:1 if prefer_match(loc, x,y) else -1),
+          sorted(goodarts, cmp=(lambda x,y:prefer_match(loc, x,y) and 1 or -1),
                  reverse=True)
         return sortedarts[0]
 
@@ -1320,11 +1326,11 @@ class StatArticle(Article):
     self.dist = None
 
   def __str__(self):
-    coordstr = " at %s" % self.coord if self.coord else ""
+    coordstr = self.coord and " at %s" % self.coord or ""
     if self.location:
       coordstr += (", matching location %s" %
                    self.location.__str__(no_article=True))
-    redirstr = ", redirect to %s" % self.redir if self.redir else ""
+    redirstr = self.redir and ", redirect to %s" % self.redir or ""
     divs = self.find_covering_divisions()
     top_divs = [div.__str__(no_article=True) for div in divs if div.level == 1]
     if top_divs:
@@ -1705,8 +1711,11 @@ class GeotagDocumentResults(object):
       for (lower, upper, obj) in self.docs_by_naitr.iter_ranges():
         errprint("")
         errprint("Results for documents/articles where number of articles")
-        errprint("  in true region is in the range [%s,%s]:" %
-                 (lower, upper - 1 if type(upper) is int else upper))
+        if type(upper) is int:
+          upval = upper - 1
+        else:
+          upval = upper
+        errprint("  in true region is in the range [%s,%s]:" % (lower, upval))
         obj.output_results()
       errprint("")
       for (truedist, obj) in \
@@ -2247,12 +2256,14 @@ class BaselineGeotagDocumentStrategy(GeotagDocumentStrategy):
     return regions
 
   def ranked_most_popular_regions(self, worddist):
+    if self.baseline_strategy == 'internal_link':
+      links = get_adjusted_incoming_links(reg.worddist)
+    else:
+      links = reg.worddist.num_arts_for_links
     if self.cached_ranked_mps is None:
       self.cached_ranked_mps = \
           [reg for reg, popularity
-              in sorted(((reg, (get_adjusted_incoming_links(reg.worddist)
-                                if self.baseline_strategy == 'internal_link'
-                                else reg.worddist.num_arts_for_links))
+              in sorted(((reg, links)
                         for reg in StatRegion.iter_nonempty_regions()),
                        key=lambda x:x[1],
                        reverse=True)]
