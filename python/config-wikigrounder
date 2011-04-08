@@ -3,17 +3,24 @@
 # Shorter name to refer to same thing
 TGP="$TEXTGROUNDER_PYTHON"
 
+if [ -z "$CORPORA_DIR" ]; then
+  CORPORA_DIR=/groups/corpora
+fi
+if [ -z "$PROJECTS_DIR" ]; then
+  PROJECTS_DIR=/groups/projects
+fi
+
 if [ -z "$WIKIPEDIA_DATA_DIR" ]; then
-  WIKIPEDIA_DATA_DIR="/groups/corpora/wikipedia"
+  WIKIPEDIA_DATA_DIR="$CORPORA_DIR/wikipedia"
 fi
 
 if [ -z "$WIKIPEDIA_AUX_DATA_DIR" ]; then
-  WIKIPEDIA_AUX_DATA_DIR="$HOME/devel/wikipedia"
+  WIKIPEDIA_AUX_DATA_DIR="$HOME/devel/wikigrounder"
 fi
 
-TRCONLL_DEV_DIR="/groups/projects/pcl_travel/data/trconlldevtest/dev"
+TRCONLL_DEV_DIR="$PROJECTS_DIR/pcl_travel/data/trconlldevtest/dev"
 
-GEOTEXT_TOP_DIR="/groups/corpora/geotext"
+GEOTEXT_TOP_DIR="$CORPORA_DIR/geotext"
 GEOTEXT_CORPUS_TOP="$GEOTEXT_TOP_DIR/GeoText.2010-10-12"
 #GEOTEXT_INPUT_DIR="$GEOTEXT_CORPUS_TOP/processed_data"
 GEOTEXT_OUTPUT_DIR="$GEOTEXT_TOP_DIR/output-40-docthresh"
