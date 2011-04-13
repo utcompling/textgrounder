@@ -144,19 +144,22 @@ public class TopoUtil {
     }
 
     public static List<Location> filter(List<Location> locs, Region boundingBox) {
-        if(boundingBox == null) return locs;
+        if(boundingBox == null || locs == null) return locs;
+
+        List<Location> toReturn = new ArrayList<Location>();
         
-        int i = 0;
         for(Location loc : locs) {
+            boolean containsAllPoints = true;
             for(Coordinate coord : loc.getRegion().getRepresentatives()) {
                 if(!boundingBox.contains(coord)) {
-                    locs.remove(i);
-                    i--;
+                    containsAllPoints = false;
                     break;
                 }
             }
-            i++;
+            if(containsAllPoints)
+                toReturn.add(loc);
         }
-        return locs;
+
+        return toReturn;
     }
 }
