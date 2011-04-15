@@ -28,7 +28,11 @@ import opennlp.textgrounder.util.cluster.Clusterer;
 import opennlp.textgrounder.util.cluster.KMeans;
 
 public class GeoNamesGazetteer implements Gazetteer, Serializable {
-  private final boolean expandRegions;
+  /**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
+private final boolean expandRegions;
   private final double pointRatio;
   private final int minPoints;
   private final int maxPoints;
@@ -298,5 +302,9 @@ public class GeoNamesGazetteer implements Gazetteer, Serializable {
    */
   public List<Location> lookup(String query) {
     return this.names.get(query.toLowerCase());
+  }
+  
+  public Set<String> getUniqueLocationNameSet(){
+	  return names.keySet();
   }
 }
