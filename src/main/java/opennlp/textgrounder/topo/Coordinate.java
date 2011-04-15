@@ -103,6 +103,14 @@ public class Coordinate implements Serializable {
            + Math.cos(this.lat) * Math.cos(other.lat) * Math.cos(other.lng - this.lng));
     }
 
+    public double distanceInKm(Coordinate other) {
+        return 6372.8 * this.distance(other);
+    }
+
+    public double distanceInMi(Coordinate other) {
+        return .621371 * this.distanceInKm(other);
+    }
+
     /**
      * Compute the approximate centroid by taking the average of the latitudes
      * and longitudes.

@@ -32,10 +32,11 @@ public class RunResolver extends BaseApp {
         OpenNLPRecognizer recognizer = new OpenNLPRecognizer();
 
         StoredCorpus goldCorpus = null;
-        if(isReadAsTR()) {
+        if(getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
             System.out.print("Reading gold corpus from " + getInputPath() + " ...");
             goldCorpus = Corpus.createStoredCorpus();
             goldCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
+            goldCorpus.setFormat(CORPUS_FORMAT.TRCONLL);
             goldCorpus.load();
             System.out.println("done.");
         }
@@ -47,7 +48,7 @@ public class RunResolver extends BaseApp {
             System.out.println("done.");
         }
         else {
-            testCorpus = ImportCorpus.doImport(getInputPath(), getSerializedGazetteerPath(), isReadAsTR());
+            testCorpus = ImportCorpus.doImport(getInputPath(), getSerializedGazetteerPath(), getCorpusFormat());
         }
 
         StoredCorpus trainCorpus = Corpus.createStoredCorpus();
@@ -71,6 +72,7 @@ public class RunResolver extends BaseApp {
                     recognizer,
                     multiGaz));
             trainCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
+            trainCorpus.setFormat(getCorpusFormat());
             trainCorpus.load();
             System.out.println("done.");
         }
@@ -107,12 +109,19 @@ public class RunResolver extends BaseApp {
 
         if(getAdditionalInputPath() != null)
             resolver.train(trainCorpus);
-        Corpus disambiguated = resolver.disambiguate(testCorpus);
+        StoredCorpus disambiguated = resolver.disambiguate(testCorpus);
+        disambiguated.setFormat(getCorpusFormat());
+        if(getCorpusFormat() == CORPUS_FORMAT.GEOTEXT) {
+            if(getBoundingBox() != null)
+                System.out.println("\nOnly disambiguating documents within bounding box: " + getBoundingBox().toString());
+            SimpleDocumentResolver dresolver = new SimpleDocumentResolver();
+            disambiguated = dresolver.disambiguate(disambiguated, getBoundingBox());
+        }
 
         System.out.println("done.\n");
 
-        if(goldCorpus != null) {
-            EvaluateCorpus.doEval(disambiguated, goldCorpus);
+        if(goldCorpus != null || getCorpusFormat() == CORPUS_FORMAT.GEOTEXT) {
+            EvaluateCorpus.doEval(disambiguated, goldCorpus, corpusFormat);
         }
 
         if(getSerializedCorpusOutputPath() != null) {

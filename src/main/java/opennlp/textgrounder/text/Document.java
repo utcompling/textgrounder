@@ -16,16 +16,51 @@
 package opennlp.textgrounder.text;
 
 import java.io.*;
+import opennlp.textgrounder.topo.*;
 
 public abstract class Document<A extends Token> implements Iterable<Sentence<A>>, Serializable {
-  private final String id;
+  protected final String id;
+  protected Coordinate goldCoord;
+  protected Coordinate systemCoord;
+  protected String timestamp;
 
-  protected Document(String id) {
+  public Document(String id) {
+      /*this.id = id;
+    this.goldCoord = null;
+    this.systemCoord = null;
+    this.timestamp = null;*/
+      this(id, null, null);
+  }
+
+  public Document(String id, String timestamp, Coordinate goldCoord) {
     this.id = id;
+    this.timestamp = timestamp;
+    this.goldCoord = goldCoord;
+    this.systemCoord = null;
   }
 
   public String getId() {
     return this.id;
   }
+
+    public Coordinate getGoldCoord() {
+        return this.goldCoord;
+    }
+
+    public Coordinate getSystemCoord() {
+        return this.systemCoord;
+    }
+
+    public void setSystemCoord(Coordinate systemCoord) {
+        this.systemCoord = systemCoord;
+    }
+
+    public void setSystemCoord(double systemLat, double systemLon) {
+        this.systemCoord = Coordinate.fromDegrees(systemLat, systemLon);
+    }
+
+    public String getTimestamp() {
+        return this.timestamp;
+    }
 }
 

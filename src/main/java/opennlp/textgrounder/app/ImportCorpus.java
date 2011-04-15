@@ -20,7 +20,7 @@ public class ImportCorpus extends BaseApp {
             System.exit(0);
         }
 
-        StoredCorpus corpus = doImport(getInputPath(), getSerializedGazetteerPath(), isReadAsTR());
+        StoredCorpus corpus = doImport(getInputPath(), getSerializedGazetteerPath(), getCorpusFormat());
         
         if(getSerializedCorpusOutputPath() != null)
             serialize(corpus, getSerializedCorpusOutputPath());
@@ -28,7 +28,7 @@ public class ImportCorpus extends BaseApp {
             writeToXML(corpus, getOutputPath());
     }
 
-    public static StoredCorpus doImport(String corpusInputPath, String serGazInputPath, boolean isReadAsTR) throws Exception {
+    public static StoredCorpus doImport(String corpusInputPath, String serGazInputPath, Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
 
         Tokenizer tokenizer = new OpenNLPTokenizer();
         OpenNLPRecognizer recognizer = new OpenNLPRecognizer();
@@ -49,21 +49,28 @@ public class ImportCorpus extends BaseApp {
 
         System.out.print("Reading raw corpus from " + corpusInputPath + " ...");
         StoredCorpus corpus = Corpus.createStoredCorpus();
-        if(isReadAsTR()) {
+        if(corpusFormat == CORPUS_FORMAT.TRCONLL) {
             corpus.addSource(new ToponymAnnotator(
                 new ToponymRemover(new TrXMLDirSource(new File(corpusInputPath), tokenizer)),
-                recognizer, gnGaz));
+                recognizer, gnGaz, null));
+        }
+        else if(corpusFormat == CORPUS_FORMAT.GEOTEXT) {
+            corpus.addSource(new ToponymAnnotator(new GeoTextSource(
+                new BufferedReader(new FileReader(corpusInputPath)), tokenizer),
+                recognizer, gnGaz, null));
         }
 	else if (corpusInputPath.endsWith("txt")) {
             corpus.addSource(new ToponymAnnotator(new PlainTextSource(
 		new BufferedReader(new FileReader(corpusInputPath)), new OpenNLPSentenceDivider(), tokenizer),
-                recognizer, gnGaz));
+                recognizer, gnGaz, null));
 	}
         else {
             corpus.addSource(new ToponymAnnotator(new PlainTextDirSource(
                 new File(corpusInputPath), new OpenNLPSentenceDivider(), tokenizer),
-                recognizer, gnGaz));
+                recognizer, gnGaz, null));
         }
+        corpus.setFormat(corpusFormat);
+        //if(corpusFormat != CORPUS_FORMAT.GEOTEXT)
         corpus.load();
         System.out.println("done.");
 
