@@ -225,7 +225,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      */
     protected void readTokenArrayFile() {
 
-        Nn = 0;
+        nonStopwordN = 0;
 
         ArrayList<Integer> wordArray = new ArrayList<Integer>(),
               docArray = new ArrayList<Integer>(),
@@ -248,7 +248,7 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                         if (W < wordid) {
                             W = wordid;
                         }
-                        Nn += 1;
+                        nonStopwordN += 1;
                     }
                     if (D < docid) {
                         D = docid;
@@ -474,8 +474,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             }
         }
 
-        double q = RKRand.rk_beta(alpha_H + 1, Nn);
-        double pq = (alpha_h_d + Ls - 1) / (Nn * (alpha_h_f - Math.log(q)));
+        double q = RKRand.rk_beta(alpha_H + 1, nonStopwordN);
+        double pq = (alpha_h_d + Ls - 1) / (nonStopwordN * (alpha_h_f - Math.log(q)));
         int s = 0;
         if (rand.nextDouble() < pq) {
             s = 1;

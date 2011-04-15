@@ -17,6 +17,7 @@
 package opennlp.textgrounder.bayesian.spherical.annealers;
 
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.mathutils.TGMath;
 
 /**
  *
@@ -33,34 +34,42 @@ public class SphericalEmptyAnnealer extends SphericalAnnealer {
 
     @Override
     public double annealProbs(int starti, double[] classes) {
-        double sum = 0;
-        try {
-            for (int i = starti;; ++i) {
-                sum += classes[i];
-            }
-        } catch (ArrayIndexOutOfBoundsException e) {
-        }
-        return sum;
+        int l = classes.length;
+        return TGMath.safeSum(classes, starti, l);
     }
 
     @Override
     public double annealProbs(int _starti, int _endi, double[] _classes) {
-        double sum = 0;
-        for (int i = _starti; i < _endi; ++i) {
-            sum += _classes[i];
-        }
-        return sum;
+        return TGMath.safeSum(_classes, _starti, _endi);
     }
 
     @Override
     public double annealProbs(int _R, int _subC, int _C, double[] _classes) {
-        double sum = 0;
+        double max = _classes[0];
+
         for (int i = 0; i < _R; ++i) {
             int off = i * _C;
             for (int j = 0; j < _subC; ++j) {
-                sum += _classes[off + j];
+                if (_classes[off + j] > max) {
+                    max = _classes[off + j];
+                }
             }
         }
-        return sum;
+
+        if (max == 0) {
+            return 0;
+        }
+
+        max = Math.log(max);
+        double p = 0;
+
+        for (int i = 0; i < _R; ++i) {
+            int off = i * _C;
+            for (int j = 0; j < _subC; ++j) {
+                p += Math.exp(Math.log(_classes[off + j]) - max);
+            }
+        }
+
+        return Math.exp(max + Math.log(p));
     }
 }

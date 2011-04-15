@@ -18,9 +18,13 @@ package opennlp.textgrounder.text;
 import java.util.Iterator;
 
 import opennlp.textgrounder.util.Lexicon;
+import opennlp.textgrounder.app.*;
 import java.io.*;
 
 public abstract class Corpus<A extends Token> implements Iterable<Document<A>>, Serializable {
+
+    private static Enum<BaseApp.CORPUS_FORMAT> corpusFormat = null;//BaseApp.CORPUS_FORMAT.PLAIN;
+
   public abstract void addSource(DocumentSource source);
   public abstract void close();
 
@@ -44,6 +48,14 @@ public abstract class Corpus<A extends Token> implements Iterable<Document<A>>, 
         return (Document<Token>) iterator.next();
       }
     };
+  }
+
+  public Enum<BaseApp.CORPUS_FORMAT> getFormat() {
+      return corpusFormat;
+  }
+
+  public void setFormat(Enum<BaseApp.CORPUS_FORMAT> corpusFormat) {
+      this.corpusFormat = corpusFormat;
   }
 }
 

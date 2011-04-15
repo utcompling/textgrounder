@@ -187,8 +187,12 @@ public class TGMath {
     }
 
     public static double safeLogSum(double[] _vals, int _n) {
-        double max = _vals[0];
-        for (int i = 0; i < _n; ++i) {
+        return safeLogSum(_vals, 0, _n);
+    }
+
+    public static double safeLogSum(double[] _vals, int _starti, int _endi) {
+        double max = _vals[_starti];
+        for (int i = _starti; i < _endi; ++i) {
             if (_vals[i] > max) {
                 max = _vals[i];
             }
@@ -200,13 +204,49 @@ public class TGMath {
         }
 
         double p = 0;
-        for (int i = 0; i < _n; ++i) {
+        for (int i = _starti; i < _endi; ++i) {
             p += Math.exp(_vals[i] - max);
         }
         return max + Math.log(p);
     }
 
-    public static double safeLogSum2(double _logprob1, double _logprob2) {
+    public static double safeSum(double[] _vals, int _n) {
+        return safeSum(_vals, 0, _n);
+    }
+
+    public static double safeSum(double[] _vals, int _starti, int _endi) {
+        double max = _vals[_starti];
+        for (int i = _starti; i < _endi; ++i) {
+            if (_vals[i] > max) {
+                max = _vals[i];
+            }
+        }
+
+        if (max == 0) {
+            return 0;
+        }
+
+        max = Math.log(max);
+        double p = 0;
+        for (int i = _starti; i < _endi; ++i) {
+            p += Math.exp(Math.log(_vals[i]) - max);
+        }
+        return Math.exp(max + Math.log(p));
+    }
+
+    public static double safeProd(double _val1, double _val2) {
+        return Math.exp(Math.log(_val1) + Math.log(_val2));
+    }
+
+    public static double safeProd(double... _vals) {
+        double sum = 0;
+        for (double v : _vals) {
+            sum += Math.log(v);
+        }
+        return Math.exp(sum);
+    }
+
+    public static double safeLogSum(double _logprob1, double _logprob2) {
         if (Double.isInfinite(_logprob1) && Double.isInfinite(_logprob2)) {
             return _logprob1; // both prob1 and prob2 are 0, return log 0.
         }
@@ -215,6 +255,10 @@ public class TGMath {
         } else {
             return _logprob2 + Math.log(1 + Math.exp(_logprob1 - _logprob2));
         }
+    }
+
+    public static double safeSum(double _prob1, double _prob2) {
+        return Math.exp(safeLogSum(Math.log(_prob1), Math.log(_prob2)));
     }
 
     public static double[] cumLogSum(double[] _vec) {
@@ -261,6 +305,21 @@ public class TGMath {
         cs[0] = _vec[0];
         for (int i = 1; i < _vec.length; ++i) {
             double val = cs[i - 1] + _vec[i];
+            if (val > 1) {
+                cs[i] = 1;
+            } else {
+                cs[i] = val;
+            }
+        }
+        return cs;
+    }
+
+    public static double[] stableCumProb(double[] _vec) {
+        double[] cs = new double[_vec.length];
+        Arrays.fill(cs, 0);
+        cs[0] = _vec[0];
+        for (int i = 1; i < _vec.length; ++i) {
+            double val = safeSum(cs[i - 1], _vec[i]);
             if (val > 1) {
                 cs[i] = 1;
             } else {

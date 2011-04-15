@@ -19,18 +19,10 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import opennlp.textgrounder.text.Corpus;
-import opennlp.textgrounder.text.Document;
-import opennlp.textgrounder.text.DocumentSource;
-import opennlp.textgrounder.text.DocumentSourceWrapper;
-import opennlp.textgrounder.text.Sentence;
-import opennlp.textgrounder.text.SimpleSentence;
-import opennlp.textgrounder.text.SimpleToponym;
-import opennlp.textgrounder.text.Token;
-import opennlp.textgrounder.text.Toponym;
-import opennlp.textgrounder.topo.Location;
-import opennlp.textgrounder.topo.gaz.Gazetteer;
-import opennlp.textgrounder.util.Span;
+import opennlp.textgrounder.text.*;
+import opennlp.textgrounder.topo.*;
+import opennlp.textgrounder.topo.gaz.*;
+import opennlp.textgrounder.util.*;
 
 /**
  * Wraps a document source, removes any toponym spans, and identifies toponyms
@@ -42,20 +34,29 @@ import opennlp.textgrounder.util.Span;
 public class ToponymAnnotator extends DocumentSourceWrapper {
   private final NamedEntityRecognizer recognizer;
   private final Gazetteer gazetteer;
+  private final Region boundingBox;
 
   public ToponymAnnotator(DocumentSource source,
                           NamedEntityRecognizer recognizer,
                           Gazetteer gazetteer) {
+      this(source, recognizer, gazetteer, null);
+  }
+
+  public ToponymAnnotator(DocumentSource source,
+                          NamedEntityRecognizer recognizer,
+                          Gazetteer gazetteer,
+                          Region boundingBox) {
     super(source);
     this.recognizer = recognizer;
     this.gazetteer = gazetteer;
+    this.boundingBox = boundingBox;
   }
 
   public Document<Token> next() {
     final Document<Token> document = this.getSource().next();
     final Iterator<Sentence<Token>> sentences = document.iterator();
 
-    return new Document<Token>(document.getId()) {
+    return new Document<Token>(document.getId(), document.getTimestamp(), document.getGoldCoord()) {
       public Iterator<Sentence<Token>> iterator() {
         return new SentenceIterator() {
           public boolean hasNext() {
@@ -85,7 +86,9 @@ public class ToponymAnnotator extends DocumentSourceWrapper {
                 }
 
                 String form = builder.toString();
-                List<Location> candidates = ToponymAnnotator.this.gazetteer.lookup(form.toLowerCase());
+                //List<Location> candidates = ToponymAnnotator.this.gazetteer.lookup(form.toLowerCase());
+                List<Location> candidates = TopoUtil.filter(
+                    ToponymAnnotator.this.gazetteer.lookup(form.toLowerCase()), boundingBox);
                 if (candidates != null) {
                   Toponym toponym = new SimpleToponym(form, candidates);
                   toponymSpans.add(new Span<Toponym>(span.getStart(), span.getEnd(), toponym));

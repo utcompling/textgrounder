@@ -85,7 +85,7 @@ public class SphericalModelFields implements Serializable {
      * Number of tokens minus stopwords. Or total number of valid customers
      * across restaurants
      */
-    protected int Nn;
+    protected int nonStopwordN;
     /**
      * Expected maximum number of dishes in the restaurants
      */

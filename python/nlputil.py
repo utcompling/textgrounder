@@ -1,4 +1,4 @@
-from __future__ import with_statement # For chompopen(), uchompopen()
+#from __future__ import with_statement # For chompopen(), uchompopen()
 from optparse import OptionParser
 import itertools
 from itertools import izip, chain, cycle
@@ -85,18 +85,33 @@ def research(pattern, string, flags=0):
 # Unicode strings, but with any terminating newline removed (similar to
 # "chomp" in Perl).
 def uchompopen(filename, errors='strict'):
-  with codecs.open(filename, encoding='utf-8', errors=errors) as f:
+  f = codecs.open(filename, encoding='utf-8', errors=errors)
+  try:
     for line in f:
       if line and line[-1] == '\n': line = line[:-1]
       yield line
+  except:
+    f.close()
+    raise
+  f.close()
+
+#  with codecs.open(filename, encoding='utf-8', errors=errors) as f:
+#    for line in f:
+#      if line and line[-1] == '\n': line = line[:-1]
+#      yield line
 
 # Open a filename and yield lines, but with any terminating newline
 # removed (similar to "chomp" in Perl).
 def chompopen(filename):
-  with open(filename) as f:
+  f = open(filename)
+  try:
     for line in f:
       if line and line[-1] == '\n': line = line[:-1]
       yield line
+  except:
+    f.close()
+    raise
+  f.close()
 
 #############################################################################
 #                         Other basic utility functions                     #
@@ -837,7 +852,10 @@ def backquote(command, input=None, shell=None, include_stderr=True, throw=True):
       shell = True
     else:
       shell = False
-  stderrval = STDOUT if include_stderr else PIPE
+  if include_stderr:
+    stderrval = STDOUT
+  else:
+    stderrval = PIPE
   if input is not None:
     popen = Popen(command, stdin=PIPE, stdout=PIPE, stderr=stderrval,
                   shell=shell, close_fds=True)
