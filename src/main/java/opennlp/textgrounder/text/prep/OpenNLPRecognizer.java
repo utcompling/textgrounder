@@ -32,8 +32,8 @@ import opennlp.textgrounder.util.Constants;
 import opennlp.textgrounder.util.Span;
 
 public class OpenNLPRecognizer implements NamedEntityRecognizer {
-  private final TokenNameFinder finder;
-  private final NamedEntityType type;
+  protected final TokenNameFinder finder;
+  protected final NamedEntityType type;
 
   public OpenNLPRecognizer() throws IOException, InvalidFormatException {
     this(new FileInputStream(

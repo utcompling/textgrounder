@@ -15,6 +15,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
+import opennlp.textgrounder.text.prep.HighRecallToponymRecognizer;
 import opennlp.textgrounder.text.prep.NamedEntityRecognizer;
 import opennlp.textgrounder.text.prep.NamedEntityType;
 import opennlp.textgrounder.text.prep.OpenNLPRecognizer;
@@ -39,35 +40,21 @@ public class ToponymFinder {
 	private final Tokenizer tokenizer;
 	private final NamedEntityRecognizer recognizer;
 	private BufferedReader input;
-	private BufferedReader gazetteer;
-	private HashSet<String> toponymsInGaz;
 	
-	public ToponymFinder(BufferedReader reader, String gazInputPath) throws InvalidFormatException, IOException{
+	public ToponymFinder(BufferedReader reader, String gazPath) throws Exception{
 		sentDivider = new OpenNLPSentenceDivider();
 		tokenizer = new OpenNLPTokenizer();
-		recognizer = new OpenNLPRecognizer();
+		recognizer = new HighRecallToponymRecognizer(gazPath);
 		this.input = reader;
-		toponymsInGaz = new HashSet<String>();
-		if(gazInputPath.toLowerCase().endsWith(".zip")) {
-            ZipFile zf = new ZipFile(gazInputPath);
-            ZipInputStream zis = new ZipInputStream(new FileInputStream(gazInputPath));
-            ZipEntry ze = zis.getNextEntry();
-            gazetteer = new BufferedReader(new InputStreamReader(zf.getInputStream(ze)));
-            zis.close();
-        }
-        else {
-        	gazetteer = new BufferedReader(new FileReader(gazInputPath));
-        }
-		String line;
-		while((line=gazetteer.readLine())!=null){
-			toponymsInGaz.add(line.split("\t")[1]);
-		}
 	}
 
 
-	public static void main(String[] args) throws IOException {
-		ToponymFinder finder = new ToponymFinder(new BufferedReader(new FileReader("TheStory.txt")),"./data/gazetteers/US.txt");
+	public static void main(String[] args) throws Exception {
+		ToponymFinder finder = new ToponymFinder(new BufferedReader(new FileReader(args[0]/*"TheStoryTemp.txt"*/)),args[1]/*"data/gazetteers/US.ser.gz"*/);
+//		long startTime = System.currentTimeMillis();
 		finder.find();
+//		long stopTime = System.currentTimeMillis();
+//		System.out.println((stopTime-startTime)/1000 + "secs");
 	}
 
 
@@ -83,19 +70,16 @@ public class ToponymFinder {
 				}
 				List<Span<NamedEntityType>> spans =recognizer.recognize(tokens);
 				for(Span<NamedEntityType> span:spans){
-					String resultToken="";
+					StringBuilder resultToken= new StringBuilder();
 					for(int i=span.getStart();i<span.getEnd();i++){
-						resultToken = resultToken + " " +tokens.get(i);
+						resultToken = resultToken.append(" ").append(tokens.get(i));
 					}
-					
-					if(span.getItem()==NamedEntityType.LOCATION){
-						resultSet.add(resultToken);
-					}else if(toponymsInGaz.contains(resultToken)){
-						resultSet.add(resultToken);
-					}
+					resultSet.add(resultToken.toString());
 				}
+				
 			}
 		}
+//		System.out.println(resultSet);
 		return resultSet;
 	}
 
