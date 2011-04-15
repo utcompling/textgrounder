@@ -329,16 +329,6 @@ public class TGMath {
         return cs;
     }
 
-    public static double[] inverseCumSum(double[] _vec) {
-        double[] cs = new double[_vec.length];
-        Arrays.fill(cs, 0);
-        cs[_vec.length - 1] = _vec[_vec.length - 1];
-        for (int i = _vec.length - 2; i >= 0; --i) {
-            cs[i] = cs[i + 1] + _vec[i];
-        }
-        return cs;
-    }
-
     public static double[] inverseCumProb(double[] _vec) {
         double[] cs = new double[_vec.length];
         Arrays.fill(cs, 0);
@@ -350,6 +340,16 @@ public class TGMath {
             } else {
                 cs[i] = val;
             }
+        }
+        return cs;
+    }
+
+    public static double[] inverseCumSum(double[] _vec) {
+        double[] cs = new double[_vec.length];
+        Arrays.fill(cs, 0);
+        cs[_vec.length - 1] = _vec[_vec.length - 1];
+        for (int i = _vec.length - 2; i >= 0; --i) {
+            cs[i] = cs[i + 1] + _vec[i];
         }
         return cs;
     }

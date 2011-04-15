@@ -69,6 +69,12 @@ import opennlp.textgrounder.bayesian.ec.util.MersenneTwisterFast;
  */
 public class RKRand {
 
+    public static class BetaEdgeException extends Exception {
+
+        public BetaEdgeException() {
+            super("The beta random number generator drew a one");
+        }
+    }
     protected static double M_PI = 3.14159265358979323846264338328;
     protected static MersenneTwisterFast mtfRand;
 
@@ -179,7 +185,7 @@ public class RKRand {
         return scale * rk_standard_gamma(shape);
     }
 
-    public static double rk_beta(double a, double b) {
+    public static double rk_beta(double a, double b) throws BetaEdgeException {
         double Ga, Gb;
 
         if ((a <= 0.1) || (b <= 0.1)) {
@@ -194,7 +200,11 @@ public class RKRand {
                 Z = TGMath.safeLogSum(X, Y);
 
                 if (Math.exp(Z) <= 1.0) {
-                    return Math.exp(X - Z);
+                    double val = Math.exp(X - Z);
+                    if (1 - val < 1e-10) {
+                        throw new BetaEdgeException();
+                    }
+                    return val;
                 }
             }
         } else if ((a <= 1.0) && (b <= 1.0)) {

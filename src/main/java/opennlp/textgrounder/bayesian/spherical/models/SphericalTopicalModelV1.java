@@ -19,6 +19,7 @@ package opennlp.textgrounder.bayesian.spherical.models;
 import java.util.Arrays;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 import opennlp.textgrounder.bayesian.mathutils.*;
+import opennlp.textgrounder.bayesian.mathutils.RKRand.BetaEdgeException;
 import opennlp.textgrounder.bayesian.spherical.annealers.*;
 
 /**
@@ -46,8 +47,13 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
             double[] ivl = new double[L];
             double[] ilvl = new double[L];
 
-            for (int l = 0; l < L - 1; ++l) {
-                v[l] = RKRand.rk_beta(1, alpha_H);
+            int l = 0;
+            try {
+                for (; l < L - 1; ++l) {
+                    v[l] = RKRand.rk_beta(1, alpha_H);
+                }
+            } catch (BetaEdgeException ex) {
+                v[l] = 1;
             }
 
             v[L - 1] = 1;
@@ -57,7 +63,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
             ivl = TGMath.cumSum(ilvl);
 
             globalDishWeights[0] = v[0];
-            for (int l = 1; l < L; ++l) {
+            for (l = 1; l < L; ++l) {
                 globalDishWeights[l] = Math.exp(Math.log(v[l]) + ivl[l - 1]);
             }
         }
@@ -76,25 +82,34 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                 int docoff = d * L;
                 double ai = alpha[d];
 
-                double val = RKRand.rk_beta(ai * globalDishWeights[0],
-                      ai);
-                if (Double.isNaN(val)) {
-                    vl[0] = 0;
-                } else {
-                    vl[0] = val;
-                }
-
-                for (int l = 1; l < L; ++l) {
-                    val = RKRand.rk_beta(ai * globalDishWeights[l],
-                          ai * (1 - wcs[l - 1]));
+                double val = 1;
+                try {
+                    val = RKRand.rk_beta(ai * globalDishWeights[0], ai);
                     if (Double.isNaN(val)) {
-                        vl[l] = 0;
-                    } else if (val == 1) {
-                        vl[l] = 1;
-                        break;
+                        vl[0] = 0;
                     } else {
-                        vl[l] = val;
+                        vl[0] = val;
                     }
+
+                    int l = 1;
+                    try {
+                        for (; l < L; ++l) {
+                            val = RKRand.rk_beta(ai * globalDishWeights[l], ai * (1 - wcs[l - 1]));
+                            if (Double.isNaN(val)) {
+                                vl[l] = 0;
+                            } else {
+                                vl[l] = val;
+                            }
+                        }
+                    } catch (BetaEdgeException ex) {
+                        vl[l] = 1;
+                        System.err.println(ex.getMessage());
+                        System.err.println("This happened at iteration " + l + " of randomInitialize");
+                    }
+                } catch (BetaEdgeException ex) {
+                    vl[0] = 1;
+                    System.err.println(ex.getMessage());
+                    System.err.println("This happened at iteration " + 0 + " of randomInitialize");
                 }
 
                 vl[L - 1] = 1;
