@@ -20,9 +20,9 @@ use_sorted_list = False
 #   finished: Whether we have finished computing the distribution in
 #             'counts'.
 #   unseen_mass: Total probability mass to be assigned to all words not
-#                seen in the article, estimated using Good-Turing smoothing
-#                as the unadjusted empirical probability of having seen a
-#                word once.
+#                seen in the article, estimated (motivated by Good-Turing
+#                smoothing) as the unadjusted empirical probability of
+#                having seen a word once.
 #   overall_unseen_mass:
 #     Probability mass assigned in 'overall_word_probs' to all words not seen
 #     in the article.  This is 1 - (sum over W in A of overall_word_probs[W]).

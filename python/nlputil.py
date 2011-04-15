@@ -1,4 +1,4 @@
-#from __future__ import with_statement # For chompopen(), uchompopen()
+from __future__ import with_statement # For chompopen(), uchompopen()
 from optparse import OptionParser
 import itertools
 from itertools import izip, chain, cycle
@@ -85,33 +85,18 @@ def research(pattern, string, flags=0):
 # Unicode strings, but with any terminating newline removed (similar to
 # "chomp" in Perl).
 def uchompopen(filename, errors='strict'):
-  f = codecs.open(filename, encoding='utf-8', errors=errors)
-  try:
+  with codecs.open(filename, encoding='utf-8', errors=errors) as f:
     for line in f:
       if line and line[-1] == '\n': line = line[:-1]
       yield line
-  except:
-    f.close()
-    raise
-  f.close()
-
-#  with codecs.open(filename, encoding='utf-8', errors=errors) as f:
-#    for line in f:
-#      if line and line[-1] == '\n': line = line[:-1]
-#      yield line
 
 # Open a filename and yield lines, but with any terminating newline
 # removed (similar to "chomp" in Perl).
 def chompopen(filename):
-  f = open(filename)
-  try:
+  with open(filename) as f:
     for line in f:
       if line and line[-1] == '\n': line = line[:-1]
       yield line
-  except:
-    f.close()
-    raise
-  f.close()
 
 #############################################################################
 #                         Other basic utility functions                     #
@@ -712,6 +697,37 @@ def get_program_memory_usage_ps():
     if line.strip() == 'RSS': continue
     return 1024*int(line.strip())
 
+# Get memory usage by running 'proc'; this works on Linux and doesn't require
+# spawning a subprocess, which can crash when your program is very large.
+def get_program_memory_usage_proc():
+  with open("/proc/self/status") as f:
+    for line in f:
+      line = line.strip()
+      if line.startswith('VmRSS:'):
+        rss = int(line.split()[1])
+        return 1024*rss
+  return 0
+
+def format_minutes_seconds(secs):
+  mins = int(secs / 60)
+  secs = secs % 60
+  hours = int(mins / 60)
+  mins = mins % 60
+  if hours > 0:
+    hourstr = "%s hour%s " % (hours, "" if hours == 1 else "s")
+  else:
+    hourstr = ""
+  secstr = "%s" % secs if type(secs) is int else "%0.1f" % secs
+  return hourstr + "%s minute%s %s second%s" % (
+      mins, "" if mins == 1 else "s",
+      secstr, "" if secs == 1 else "s")
+
+def output_resource_usage():
+  errprint("Total elapsed time since program start: %s" %
+           format_minutes_seconds(get_program_time_usage()))
+  errprint("Memory usage: %s bytes" %
+      int_with_commas(get_program_memory_usage_proc()))
+
 #############################################################################
 #                             Hash tables by range                          #
 #############################################################################
@@ -852,10 +868,7 @@ def backquote(command, input=None, shell=None, include_stderr=True, throw=True):
       shell = True
     else:
       shell = False
-  if include_stderr:
-    stderrval = STDOUT
-  else:
-    stderrval = PIPE
+  stderrval = STDOUT if include_stderr else PIPE
   if input is not None:
     popen = Popen(command, stdin=PIPE, stdout=PIPE, stderr=stderrval,
                   shell=shell, close_fds=True)

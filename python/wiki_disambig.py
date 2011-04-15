@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 #######
 ####### wiki_disambig.py
@@ -403,11 +403,11 @@ class RegionWordDist(WordDist):
 class RegionDist(object):
   __slots__ = ['word', 'regionprobs', 'normalized']
 
-  # It's expensive to compute the value for a given word so we cache word
-  # distributions.
-  cached_dists = LRUCache(maxsize=400)
+  cached_dists = None
 
   def __init__(self, word=None, regionprobs=None):
+    # It's expensive to compute the value for a given word so we cache word
+    # distributions.
     if regionprobs:
       self.regionprobs = regionprobs
     else:
@@ -447,6 +447,8 @@ class RegionDist(object):
   # cache to optimize access.
   @classmethod
   def get_region_dist(cls, word):
+    if not cls.cached_dists:
+      cls.cached_dists = LRUCache(maxsize=Opts.lru_cache_size)
     dist = cls.cached_dists.get(word, None)
     if not dist:
       dist = RegionDist(word)
@@ -645,10 +647,7 @@ class StatRegion(object):
       return "nowhere"
 
   def __str__(self):
-    if self.worddist.finished:
-      unfinished = ""
-    else:
-      unfinished = ", unfinished"
+    unfinished = "" if self.worddist.finished else ", unfinished"
     contains = ""
     if self.most_popular_article:
       contains = ", most-pop-art %s(%d links)" % (
@@ -800,11 +799,8 @@ class StatRegion(object):
   def iter_nonempty_regions(cls, nonempty_word_dist=False):
     assert cls.all_regions_computed
     for val in cls.corner_to_stat_region.itervalues():
-      if nonempty_word_dist:
-        empty = val.worddist.is_empty_for_word_dist()
-      else:
-        empty = val.worddist.is_empty()
-      if empty:
+      if (val.worddist.is_empty_for_word_dist() if nonempty_word_dist
+          else val.worddist.is_empty()):
         continue
       yield val
 
@@ -1095,7 +1091,18 @@ class ArticleTable(object):
   # List of articles in each split.
   articles_by_split = listdict()
 
+  # Num of articles with word-count information but not in table.
+  num_articles_with_word_counts_but_not_in_table = 0
+
+  # Num of articles with word-count information (whether or not in table).
+  num_articles_with_word_counts = 0
+
+  # Num of articles in each split with word-count information seen.
+  num_word_count_articles_by_split = intdict()
+
   # Num of articles in each split with a computed distribution.
+  # (Not the same as the previous since we don't compute the distribution of articles in
+  # either the test or dev set depending on which one is used.)
   num_dist_articles_by_split = intdict()
 
   # Total # of word tokens for all articles in each split.
@@ -1214,7 +1221,7 @@ class ArticleTable(object):
           errprint("Warning: Saw %s toponym matches: %s" %
                    (len(goodarts), goodarts))
         sortedarts = \
-          sorted(goodarts, cmp=(lambda x,y:prefer_match(loc, x,y) and 1 or -1),
+          sorted(goodarts, cmp=(lambda x,y:1 if prefer_match(loc, x,y) else -1),
                  reverse=True)
         return sortedarts[0]
 
@@ -1326,11 +1333,11 @@ class StatArticle(Article):
     self.dist = None
 
   def __str__(self):
-    coordstr = self.coord and " at %s" % self.coord or ""
+    coordstr = " at %s" % self.coord if self.coord else ""
     if self.location:
       coordstr += (", matching location %s" %
                    self.location.__str__(no_article=True))
-    redirstr = self.redir and ", redirect to %s" % self.redir or ""
+    redirstr = ", redirect to %s" % self.redir if self.redir else ""
     divs = self.find_covering_divisions()
     top_divs = [div.__str__(no_article=True) for div in divs if div.level == 1]
     if top_divs:
@@ -1564,12 +1571,6 @@ class GeotagDocumentEval(EvalWithRank):
     errprint("  Median degree error distance = %.2f degrees" %
              median(self.degree_dists))
 
-def output_resource_usage():
-  errprint("Total elapsed time: %s" %
-           float_with_commas(get_program_time_usage()))
-  errprint("Memory usage: %s" %
-      int_with_commas(get_program_memory_usage_ps()))
-
 ####### Results for geotagging toponyms
 class GeotagToponymResults(object):
 
@@ -1711,11 +1712,8 @@ class GeotagDocumentResults(object):
       for (lower, upper, obj) in self.docs_by_naitr.iter_ranges():
         errprint("")
         errprint("Results for documents/articles where number of articles")
-        if type(upper) is int:
-          upval = upper - 1
-        else:
-          upval = upper
-        errprint("  in true region is in the range [%s,%s]:" % (lower, upval))
+        errprint("  in true region is in the range [%s,%s]:" %
+                 (lower, upper - 1 if type(upper) is int else upper))
         obj.output_results()
       errprint("")
       for (truedist, obj) in \
@@ -2256,14 +2254,12 @@ class BaselineGeotagDocumentStrategy(GeotagDocumentStrategy):
     return regions
 
   def ranked_most_popular_regions(self, worddist):
-    if self.baseline_strategy == 'internal_link':
-      links = get_adjusted_incoming_links(reg.worddist)
-    else:
-      links = reg.worddist.num_arts_for_links
     if self.cached_ranked_mps is None:
       self.cached_ranked_mps = \
           [reg for reg, popularity
-              in sorted(((reg, links)
+              in sorted(((reg, (get_adjusted_incoming_links(reg.worddist)
+                                if self.baseline_strategy == 'internal_link'
+                                else reg.worddist.num_arts_for_links))
                         for reg in StatRegion.iter_nonempty_regions()),
                        key=lambda x:x[1],
                        reverse=True)]
@@ -2686,7 +2682,9 @@ def read_word_counts(filename):
     art = ArticleTable.lookup_article(title)
     if not art:
       warning("Skipping article %s, not in table" % title)
+      ArticleTable.num_articles_with_word_counts_but_not_in_table += 1
       return
+    ArticleTable.num_word_count_articles_by_split[art.split] += 1
     # If we are evaluating on the dev set, skip the test set and vice
     # versa, to save memory and avoid contaminating the results.
     if art.split != 'training' and art.split != Opts.eval_set:
@@ -2739,16 +2737,42 @@ def read_word_counts(filename):
     one_article_probs()
 
   errprint("Finished reading distributions from %s articles." % (status.num_processed()))
+  ArticleTable.num_articles_with_word_counts = status.num_processed()
+  output_resource_usage()
 
 def finish_word_counts():
   WordDist.finish_global_distribution()
   ArticleTable.finish_article_distributions()
+  errprint("")
+  errprint("-------------------------------------------------------------------------")
+  errprint("Article count statistics:")
+  total_arts_in_table = 0
+  total_arts_with_word_counts = 0
+  total_arts_with_dists = 0
   for (split, totaltoks) in ArticleTable.word_tokens_by_split.iteritems():
-    numarts = ArticleTable.num_dist_articles_by_split[split]
-    errprint("For split '%s': %s articles, %s total tokens, %.2f tokens/article"
-        % (split, numarts, totaltoks,
+    errprint("For split '%s':" % split)
+    arts_in_table = len(ArticleTable.articles_by_split[split])
+    arts_with_word_counts = ArticleTable.num_word_count_articles_by_split[split]
+    arts_with_dists = ArticleTable.num_dist_articles_by_split[split]
+    total_arts_in_table += arts_in_table
+    total_arts_with_word_counts += arts_with_word_counts
+    total_arts_with_dists += arts_with_dists
+    errprint("  %s articles in article table" % arts_in_table)
+    errprint("  %s articles with word counts seen (and in table)" % arts_with_word_counts)
+    errprint("  %s articles with distribution computed, %s total tokens, %.2f tokens/article"
+        % (arts_with_dists, totaltoks,
           # Avoid division by zero
-          float(totaltoks)/(numarts + 1e-100)))
+          float(totaltoks)/(arts_in_table + 1e-100)))
+  errprint("Total: %s articles with word counts seen" %
+           ArticleTable.num_articles_with_word_counts)
+  errprint("Total: %s articles in article table" % total_arts_in_table)
+  errprint("Total: %s articles with word counts seen but not in article table" %
+           ArticleTable.num_articles_with_word_counts_but_not_in_table)
+  errprint("Total: %s articles with word counts seen (and in table)" %
+           total_arts_with_word_counts)
+  errprint("Total: %s articles with distribution computed" %
+           total_arts_with_dists)
+
 
 class Gazetteer(object):
   # For each toponym (name of location), value is a list of Locality items,
@@ -2884,6 +2908,7 @@ class WorldGazetteer(Gazetteer):
 
     Division.finish_all()
     errprint("Finished matching %s gazetteer entries." % (status.num_processed()))
+    output_resource_usage()
 
 # If given a directory, yield all the files in the directory; else just
 # yield the file.
@@ -3164,6 +3189,9 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
     op.add_option("--no-individual-results", "--no-results",
                   action='store_true', default=False,
                   help="""Don't show individual results for each test document.""")
+    op.add_option("--lru-cache-size", "--lru",
+                  type='int', default=400,
+                  help="""Number of entries in the LRU cache.""")
 
     return canon_options
 
