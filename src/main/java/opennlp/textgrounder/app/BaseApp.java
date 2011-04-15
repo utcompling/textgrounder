@@ -42,14 +42,14 @@ public class BaseApp {
         LABEL_PROP_CONTEXT_SENSITIVE,
         LABEL_PROP_COMPLEX
     }
-    private static Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
+    protected static Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
 
     public static enum CORPUS_FORMAT {
         PLAIN,
         TRCONLL,
         GEOTEXT
     }
-    private static Enum<CORPUS_FORMAT> corpusFormat = CORPUS_FORMAT.PLAIN;
+    protected static Enum<CORPUS_FORMAT> corpusFormat = CORPUS_FORMAT.PLAIN;
 	
 
     protected static void initializeOptionsFromCommandLine(String[] args) throws Exception {

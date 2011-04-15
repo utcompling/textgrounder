@@ -56,7 +56,7 @@ public class ToponymAnnotator extends DocumentSourceWrapper {
     final Document<Token> document = this.getSource().next();
     final Iterator<Sentence<Token>> sentences = document.iterator();
 
-    return new Document<Token>(document.getId()) {
+    return new Document<Token>(document.getId(), document.getTimestamp(), document.getGoldCoord()) {
       public Iterator<Sentence<Token>> iterator() {
         return new SentenceIterator() {
           public boolean hasNext() {

@@ -52,23 +52,25 @@ public class ImportCorpus extends BaseApp {
         if(corpusFormat == CORPUS_FORMAT.TRCONLL) {
             corpus.addSource(new ToponymAnnotator(
                 new ToponymRemover(new TrXMLDirSource(new File(corpusInputPath), tokenizer)),
-                recognizer, gnGaz, getBoundingBox()));
+                recognizer, gnGaz, null));
         }
         else if(corpusFormat == CORPUS_FORMAT.GEOTEXT) {
             corpus.addSource(new ToponymAnnotator(new GeoTextSource(
                 new BufferedReader(new FileReader(corpusInputPath)), tokenizer),
-                recognizer, gnGaz, getBoundingBox()));
+                recognizer, gnGaz, null));
         }
 	else if (corpusInputPath.endsWith("txt")) {
             corpus.addSource(new ToponymAnnotator(new PlainTextSource(
 		new BufferedReader(new FileReader(corpusInputPath)), new OpenNLPSentenceDivider(), tokenizer),
-                recognizer, gnGaz, getBoundingBox()));
+                recognizer, gnGaz, null));
 	}
         else {
             corpus.addSource(new ToponymAnnotator(new PlainTextDirSource(
                 new File(corpusInputPath), new OpenNLPSentenceDivider(), tokenizer),
-                recognizer, gnGaz, getBoundingBox()));
+                recognizer, gnGaz, null));
         }
+        corpus.setFormat(corpusFormat);
+        //if(corpusFormat != CORPUS_FORMAT.GEOTEXT)
         corpus.load();
         System.out.println("done.");
 

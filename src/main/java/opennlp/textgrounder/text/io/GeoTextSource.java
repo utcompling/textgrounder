@@ -86,6 +86,10 @@ public class GeoTextSource extends DocumentSource {
     }
     }*/
 
+    public Iterator<GeoTextDocument> iterator() {
+        return documents.iterator();
+    }
+
   public boolean hasNext() {
       return this.curDocIndex < this.documents.size();//this.in.isStartElement() && this.in.getLocalName().equals("doc");
   }
