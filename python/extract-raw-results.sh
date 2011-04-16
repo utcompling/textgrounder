@@ -3,6 +3,18 @@
 for x in ${1+"$@"}; do
   echo $x
   echo ""
-  args="`grep '^Arguments:' $x | perl -pe 's/.*-([0-9]+)-docthresh.*degrees-per-region (.*?) .*/threshold: $1, grid-size: $2/'`"
-  sed -n '/^Final results/,/^Ending final results/p' $x | egrep '(^Final results|true error)' | perl -ne "print '$args', ' ', \$_"
+  thresh="`grep '^Arguments:' $x | perl -pe 's/.*-([0-9]+)-docthresh.*/$1/'`"
+  dpr="`grep '^Arguments:' $x | perl -pe 's/.*degrees-per-region ([^ ]*).*/$1/'`"
+  evalset="`grep '^Arguments:' $x | perl -pe 's/.*eval-set ([^ ]*).*/$1/'`"
+  strategy="`grep '^Arguments:' $x | perl -pe 's/.*strategy ([^ ]*).*/$1/'`"
+  args="evalset: $evalset, thresh: $thresh, grid: $dpr, strategy: $strategy"
+  sed -n '/^Final results/,/^Ending final results/p' $x | egrep '(^Final results|true error)' | perl -ne "print '$args', '  ', \$_"
+  mean="`sed -n '/^Final results/,/^Ending final results/p' $x | egrep 'Mean true error' | perl -pe 's/.*distance = (.*?) .*/$1/'`"
+  median="`sed -n '/^Final results/,/^Ending final results/p' $x | egrep 'Median true error' | perl -pe 's/.*distance = (.*?) .*/$1/'`"
+  #echo "Mean: $mean"
+  #echo "Median: $median"
+  if [ -n "$mean" -a -n "$median" ]; then
+    avg=`echo "5k $mean $median + 2/p" | dc`
+    echo "$args   Avg-mean-median true error distance = $avg miles"
+  fi
 done
