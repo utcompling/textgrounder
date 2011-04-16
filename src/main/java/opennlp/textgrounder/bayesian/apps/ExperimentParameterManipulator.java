@@ -149,7 +149,7 @@ public class ExperimentParameterManipulator {
                 double value = Double.parseDouble(_fieldValue);
                 _class.getDeclaredField(_fieldName).setDouble(_experimentParameters, value);
             } else if (_fieldTypeName.equals("boolean")) {
-                boolean value = Boolean.getBoolean(_fieldName);
+                boolean value = Boolean.parseBoolean(_fieldValue);
                 _class.getDeclaredField(_fieldName).setBoolean(_experimentParameters, value);
             } else if (_fieldTypeName.equals("string")) {
                 _class.getDeclaredField(_fieldName).set(_experimentParameters, _fieldValue);
