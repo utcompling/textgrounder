@@ -486,7 +486,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                             dishid++;
                             coordid = 0;
                         }
-                        max += regionProbs[dishid * maxCoord + coordid];
+                        max = TGMath.stableSum(max, regionProbs[dishid * maxCoord + coordid]);
                     }
                     dishVector[i] = dishid;
                     coordinateVector[i] = coordid;
@@ -510,7 +510,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                     dishid = 0;
                     while (r > max) {
                         dishid++;
-                        max += dishProbs[dishid];
+                        max = TGMath.stableSum(max, dishProbs[dishid]);
                     }
                     dishVector[i] = dishid;
                 }
