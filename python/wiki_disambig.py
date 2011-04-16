@@ -380,7 +380,14 @@ class RegionWordDist(WordDist):
   def get_nbayes_logprob(self, worddist, opts):
     logprob = 0.0
     for (word, count) in worddist.counts.iteritems():
-      logprob += log(self.lookup_word(word))
+      val = self.lookup_word(word)
+      if val <= 0:
+        # FIXME: Need to figure out why this happens (perhaps the word was
+        # never seen anywhere in the training data? But I thought we have
+        # a case to handle that) and what to do instead.
+        errprint("Warning! For word %s, prob %s out of range" % (word, val))
+      else:
+        logprob += log(val)
     # FIXME: Also use baseline (prior probability)
     return logprob
 

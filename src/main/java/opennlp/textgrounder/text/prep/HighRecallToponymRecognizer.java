@@ -9,6 +9,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -31,7 +32,8 @@ import scala.actors.threadpool.Arrays;
  *
  */
 public class HighRecallToponymRecognizer extends OpenNLPRecognizer {
-	private Set<String[]> nameSet;
+	private HashMap<String, Integer[]> nameHashMap;
+	private HashMap<String, Integer> stringInternHashMap;
 	private TokenNameFinder personFinder;
 	private TokenNameFinder orgFinder;
 	private Pattern splitPattern;
@@ -39,6 +41,8 @@ public class HighRecallToponymRecognizer extends OpenNLPRecognizer {
 	private static final String spaceRegEx = " ";
 	private static final String historyRegEx = "(historical)";
 	private boolean flagStart = false;
+	private int stringCount=Integer.MIN_VALUE;
+	private int lineCount=0;
 
 	public HighRecallToponymRecognizer(GeoNamesGazetteer gnGz) throws IOException, InvalidFormatException {
 		super();
@@ -60,13 +64,33 @@ public class HighRecallToponymRecognizer extends OpenNLPRecognizer {
 
 	private void getCleanedNameSet(Set<String> keySet) {
 //		System.out.println("Formatting Locations...");
-		this.nameSet = new HashSet<String[]>();
+		this.nameHashMap = new HashMap<String,Integer[]>(500000);
+		this.stringInternHashMap = new HashMap<String, Integer>(100000);
 		compilePatterns();
 		for (Iterator iterator = keySet.iterator(); iterator.hasNext();) {
 			String toponym = (String) iterator.next();
 			toponym = historicalPattern.matcher(toponym).replaceAll("");
-			nameSet.add(splitPattern.split(toponym));
-		}		
+			
+			
+			if(!nameHashMap.containsKey(toponym)){
+				String[] toponymTokens = splitPattern.split(toponym);
+				int xorNum = 0;
+				ArrayList<Integer> tokenIntList = new ArrayList<Integer>();
+				for (int i = 0; i < toponymTokens.length; i++) {
+					String token = toponymTokens[i];//.trim();
+					if(stringInternHashMap.containsKey(token)){
+						tokenIntList.add(stringInternHashMap.get(token));
+					}else{
+						stringInternHashMap.put(token, stringCount);
+						tokenIntList.add(stringCount);
+						stringCount++;
+					}
+				}
+				nameHashMap.put(toponym,tokenIntList.toArray(new Integer[0]));
+			}
+		}
+//		System.out.println(nameHashMap.size());
+//		System.out.println(stringInternHashMap.size());
 	}
 
 
@@ -100,9 +124,14 @@ public class HighRecallToponymRecognizer extends OpenNLPRecognizer {
 
 	public List<Span<NamedEntityType>> recognize(List<String> tokens) {
 		if(!flagStart){
-			System.out.println("\nRaw Corpus: Searching for Toponyms...");
+			System.out.print("\nRaw Corpus: Searching for Toponyms ");
 			flagStart=true;
 		}
+		if(lineCount==1000){
+			System.out.print(".");
+			lineCount=0;
+		}
+		lineCount++;
 		List<Span<NamedEntityType>> spans = new ArrayList<Span<NamedEntityType>>();
 		String[] tokensToBeLookedArray = (String[]) Arrays.copyOf(tokens.toArray(),tokens.toArray().length,String[].class);
 		for (opennlp.tools.util.Span span : this.finder.find(tokens.toArray(new String[0]))) {
@@ -134,21 +163,30 @@ public class HighRecallToponymRecognizer extends OpenNLPRecognizer {
 				if(startsWithCaps(token)){
 					boolean matched=true; 
 					int k=0;
-					for (Iterator iterator = nameSet.iterator(); iterator.hasNext();) {
-						String[] toponymTokens = ((String[]) iterator.next());
-						if(toponymTokens.length>tokensToBeLookedArray.length-i)
+					for (Iterator iterator = nameHashMap.keySet().iterator(); iterator.hasNext();) {
+						String toponymTokens = ((String) iterator.next());
+							
+						int toponymLength=nameHashMap.get(toponymTokens).length;
+						if(toponymLength>tokensToBeLookedArray.length-i)
 							continue;
+						
 						matched=true;
-						for (int j = 0; j < toponymTokens.length; j++) {
-							String topo=toponymTokens[j].intern();
-							String tobeLooked=tokensToBeLookedArray[j+i].toLowerCase().intern();
-							if(j+i>=tokensToBeLookedArray.length || !startsWithCaps(tokensToBeLookedArray[j+i]) || topo!=tobeLooked){
+							
+						ArrayList<Integer> suspectedTokenSet = new ArrayList<Integer>();
+						for (int j = 0; j < toponymLength; j++) {
+							if(!startsWithCaps(tokensToBeLookedArray[j+i])){
 								matched=false;
 								break;
 							}
+							suspectedTokenSet.add(stringInternHashMap.get(tokensToBeLookedArray[j+i].toLowerCase()));
+							
+						}
+						if(!stringMatch(suspectedTokenSet.toArray(new Integer[0]),nameHashMap.get(toponymTokens))){
+							matched=false;
+							continue;
 						}
 						if(matched){
-							k=i+toponymTokens.length-1;
+							k=i+toponymLength-1;
 							break;
 						}
 					}
@@ -157,6 +195,7 @@ public class HighRecallToponymRecognizer extends OpenNLPRecognizer {
 //						String endToken = tokensToBeLookedArray[k];
 						spans.add(new Span<NamedEntityType>(i, k+1, this.type));
 						i=k;
+//						System.out.println(startToken+endToken);
 					}
 				}
 		}
@@ -164,8 +203,49 @@ public class HighRecallToponymRecognizer extends OpenNLPRecognizer {
 	}
 
 
+	private boolean stringMatch(Integer[] suspectedSet,Integer[] toponymSet) {
+		for (int i = 0; i < suspectedSet.length; i++) {
+			if(suspectedSet[i]!=toponymSet[i])
+				return false;
+		}
+		return true;
+	}
+	
+	private boolean stringMatch(StringBuilder tokenCombined,
+			StringBuilder toponymCombined) {
+		if(tokenCombined.length()!=toponymCombined.length())
+			return false;
+		for (int i = 0; i < tokenCombined.length(); i++) {
+			if(tokenCombined.charAt(i)!=toponymCombined.charAt(i))
+				return false;
+		}
+		return true;
+	}
+
+
 
 	private boolean startsWithCaps(String tobeLooked) {
 		return new Integer('A')<=new Integer(tobeLooked.charAt(0)) && new Integer(tobeLooked.charAt(0))<=new Integer('Z');
 	}
+	
+	
+}
+
+class HashString {
+	
+	private String string;
+	private int hash;
+
+	HashString(String string ,int hash){
+		this.string=string;
+		this.hash=hash;
+	}
+	
+	public String toString(){
+		return string;
+	}
+	
+	public int hashCode() {
+	        return hash;
+	    }
 }
