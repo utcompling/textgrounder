@@ -197,7 +197,7 @@ public class RKRand {
                 V = mtfRand.nextDouble();
                 X = 1 / a * Math.log(U);
                 Y = 1 / b * Math.log(V);
-                Z = TGMath.safeLogSum(X, Y);
+                Z = TGMath.stableLogSum(X, Y);
 
                 if (Math.exp(Z) <= 1.0) {
                     double val = Math.exp(X - Z);

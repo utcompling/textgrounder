@@ -128,6 +128,11 @@ public class SphericalModelFields implements Serializable {
      */
     protected int[] toponymVector;
     /**
+     * Vector of toponyms offsets. It's a fast index to only the offsets of
+     * toponyms in wordVector 
+     */
+    protected int[] toponymIdxVector;
+    /**
      * Vector of word indices
      */
     protected int[] wordVector;

@@ -76,6 +76,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      */
     protected void initialize(ExperimentParameters _experimentParameters) {
 
+        _experimentParameters.setVerbosity();
+
         switch (_experimentParameters.getInputFormat()) {
             case BINARY:
                 inputReader = new SphericalGlobalToInternalBinaryInputReader(_experimentParameters);
@@ -231,9 +233,11 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         ArrayList<Integer> wordArray = new ArrayList<Integer>(),
               docArray = new ArrayList<Integer>(),
               toponymArray = new ArrayList<Integer>(),
-              stopwordArray = new ArrayList<Integer>();
+              stopwordArray = new ArrayList<Integer>(),
+              toponymIdxArray = new ArrayList<Integer>();
 
         try {
+            int offset = 0;
             while (true) {
                 int[] record = inputReader.nextTokenArrayRecord();
                 if (record != null) {
@@ -251,9 +255,13 @@ public abstract class SphericalModelBase extends SphericalModelFields {
                         }
                         nonStopwordN += 1;
                     }
+                    if (topstatus == 1) {
+                        toponymIdxArray.add(offset);
+                    }
                     if (D < docid) {
                         D = docid;
                     }
+                    offset += 1;
                 }
             }
         } catch (EOFException ex) {
@@ -282,6 +290,9 @@ public abstract class SphericalModelBase extends SphericalModelFields {
 
         coordinateVector = new int[N];
         Arrays.fill(coordinateVector, -1);
+
+        toponymIdxVector = new int[toponymIdxArray.size()];
+        copyToArray(toponymIdxVector, toponymIdxArray);
     }
 
     /**
@@ -417,16 +428,13 @@ public abstract class SphericalModelBase extends SphericalModelFields {
      */
     public double evalMuLogLikelihood(double[] _mu, int _l) {
         double logLikelihood = 0;
-        for (int i = 0; i < N; ++i) {
-            int istoponym = toponymVector[i];
-            if (istoponym == 1) {
-                if (dishVector[i] == _l) {
-                    int coordid = coordinateVector[i];
-                    int wordid = wordVector[i];
-                    double[] coord = toponymCoordinateLexicon[wordid][coordid];
-                    double likelihood = TGBLAS.ddot(0, coord, 1, _mu, 1);
-                    logLikelihood += likelihood;
-                }
+        for (int i : toponymIdxVector) {
+            if (dishVector[i] == _l) {
+                int coordid = coordinateVector[i];
+                int wordid = wordVector[i];
+                double[] coord = toponymCoordinateLexicon[wordid][coordid];
+                double likelihood = TGBLAS.ddot(0, coord, 1, _mu, 1);
+                logLikelihood += likelihood;
             }
         }
         return logLikelihood;
@@ -436,30 +444,24 @@ public abstract class SphericalModelBase extends SphericalModelFields {
         double logLikelihood = 0;
         int lcount = 0;
         if (_kappa > 5) {
-            for (int i = 0; i < N; ++i) {
-                int istoponym = toponymVector[i];
-                if (istoponym == 1) {
-                    if (dishVector[i] == _l) {
-                        lcount += 1;
-                        int coordid = coordinateVector[i];
-                        int wordid = wordVector[i];
-                        double[] coord = toponymCoordinateLexicon[wordid][coordid];
-                        logLikelihood += TGBLAS.ddot(0, coord, 1, _mu, 1);
-                    }
+            for (int i : toponymIdxVector) {
+                if (dishVector[i] == _l) {
+                    lcount += 1;
+                    int coordid = coordinateVector[i];
+                    int wordid = wordVector[i];
+                    double[] coord = toponymCoordinateLexicon[wordid][coordid];
+                    logLikelihood += TGBLAS.ddot(0, coord, 1, _mu, 1);
                 }
             }
             logLikelihood = lcount * (Math.log(0.5 * _kappa / Math.PI) - _kappa) + _kappa * logLikelihood;
         } else {
-            for (int i = 0; i < N; ++i) {
-                int istoponym = toponymVector[i];
-                if (istoponym == 1) {
-                    if (dishVector[i] == _l) {
-                        lcount += 1;
-                        int coordid = coordinateVector[i];
-                        int wordid = wordVector[i];
-                        double[] coord = toponymCoordinateLexicon[wordid][coordid];
-                        logLikelihood += TGBLAS.ddot(0, coord, 1, _mu, 1);
-                    }
+            for (int i : toponymIdxVector) {
+                if (dishVector[i] == _l) {
+                    lcount += 1;
+                    int coordid = coordinateVector[i];
+                    int wordid = wordVector[i];
+                    double[] coord = toponymCoordinateLexicon[wordid][coordid];
+                    logLikelihood += TGBLAS.ddot(0, coord, 1, _mu, 1);
                 }
             }
             logLikelihood = lcount * (Math.log(_kappa / (4 * Math.PI * Math.sinh(_kappa)))) + _kappa * logLikelihood;
@@ -595,24 +597,24 @@ public abstract class SphericalModelBase extends SphericalModelFields {
 
             int l = 1;
             try {
-                double a = TGMath.safeProd(ai, globalDishWeights[0]) + dishByRestaurantCounts[docoff];
-                double b = TGMath.safeProd(ai, 1 + incs[1]);
+                double a = TGMath.stableProd(ai, globalDishWeights[0]) + dishByRestaurantCounts[docoff];
+                double b = TGMath.stableProd(ai, 1 + incs[1]);
                 vl[l] = RKRand.rk_beta(a, b);
 
                 for (; l < L - 2; ++l) {
-                    a = TGMath.safeProd(ai, globalDishWeights[l]) + dishByRestaurantCounts[docoff + l];
-                    b = TGMath.safeProd(ai, 1 - wcs[l - 1]) + incs[l + 1];
+                    a = TGMath.stableProd(ai, globalDishWeights[l]) + dishByRestaurantCounts[docoff + l];
+                    b = TGMath.stableProd(ai, 1 - wcs[l - 1]) + incs[l + 1];
                     vl[l] = RKRand.rk_beta(a, b);
                 }
 
-                a = TGMath.safeProd(ai, globalDishWeights[l]) + dishByRestaurantCounts[docoff + l];
-                b = TGMath.safeProd(ai, 1 - wcs[l - 1]);
+                a = TGMath.stableProd(ai, globalDishWeights[l]) + dishByRestaurantCounts[docoff + l];
+                b = TGMath.stableProd(ai, 1 - wcs[l - 1]);
                 vl[l] = RKRand.rk_beta(a, b);
 
             } catch (BetaEdgeException ex) {
                 vl[l] = 1;
-                System.err.println(ex.getMessage());
-                System.err.println("This happened at restaurant" + d + " iteration " + l + " of restaurantStickBreakingWeightsUpdate");
+//                System.err.println(ex.getMessage());
+//                System.err.println("This happened at restaurant" + d + " iteration " + l + " of restaurantStickBreakingWeightsUpdate");
             }
 
             vl[L - 1] = 1;
@@ -645,8 +647,8 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             }
         } catch (BetaEdgeException ex) {
             v[i] = 1;
-            System.err.println(ex.getMessage());
-            System.err.println("This happened at iteration " + i + " of globalStickBreakingWeightsUpdate");
+//            System.err.println(ex.getMessage());
+//            System.err.println("This happened at iteration " + i + " of globalStickBreakingWeightsUpdate");
         }
 
         v[L - 1] = 1;

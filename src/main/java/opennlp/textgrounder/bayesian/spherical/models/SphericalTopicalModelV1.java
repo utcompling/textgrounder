@@ -103,20 +103,20 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         }
                     } catch (BetaEdgeException ex) {
                         vl[l] = 1;
-                        System.err.println(ex.getMessage());
-                        System.err.println("This happened at iteration " + l + " of randomInitialize");
+//                        System.err.println(ex.getMessage());
+//                        System.err.println("This happened at iteration " + l + " of randomInitialize");
                     }
                 } catch (BetaEdgeException ex) {
                     vl[0] = 1;
-                    System.err.println(ex.getMessage());
-                    System.err.println("This happened at iteration " + 0 + " of randomInitialize");
+//                    System.err.println(ex.getMessage());
+//                    System.err.println("This happened at iteration " + 0 + " of randomInitialize");
                 }
 
                 vl[L - 1] = 1;
                 for (int i = 0; i < L; ++i) {
                     ilvl[i] = Math.log(1 - vl[i]);
                 }
-                ivl = TGMath.cumProb(ilvl);
+                ivl = TGMath.cumSum(ilvl);
 
                 localDishWeights[docoff] = vl[0];
                 for (int l = 1; l < L; ++l) {
@@ -179,14 +179,14 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                             double ldw = localDishWeights[docoff + j];
                             for (int k = 0; k < curCoordCount; ++k) {
                                 regionProbs[regoff + k] =
-                                      TGMath.safeProd(ldw, coordinateWeights[k],
+                                      TGMath.stableProd(ldw, coordinateWeights[k],
                                       TGMath.sphericalDensity(curCoords[k], regionmean, kappa[k]));
                             }
                         }
 
                         totalprob = sea.annealProbs(L, curCoordCount, maxCoord, regionProbs);
 
-                        r = TGMath.safeProd(rand.nextDouble(), totalprob);
+                        r = TGMath.stableProd(rand.nextDouble(), totalprob);
 
                         max = regionProbs[0];
                         coordid = 0;
@@ -197,7 +197,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                                 dishid++;
                                 coordid = 0;
                             }
-                            max = TGMath.safeSum(max, regionProbs[dishid * maxCoord + coordid]);
+                            max = TGMath.stableSum(max, regionProbs[dishid * maxCoord + coordid]);
                         }
                         dishVector[i] = dishid;
                         coordinateVector[i] = coordid;
@@ -214,19 +214,19 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
 
                         try {
                             for (int j = 0;; ++j) {
-                                dishProbs[j] = TGMath.safeProd(localDishWeights[docoff + j], nonToponymByDishDirichlet[wordoff + j]);
+                                dishProbs[j] = TGMath.stableProd(localDishWeights[docoff + j], nonToponymByDishDirichlet[wordoff + j]);
                             }
                         } catch (ArrayIndexOutOfBoundsException e) {
                         }
 
                         totalprob = sea.annealProbs(dishProbs);
-                        r = TGMath.safeProd(rand.nextDouble(), totalprob);
+                        r = TGMath.stableProd(rand.nextDouble(), totalprob);
 
                         max = dishProbs[0];
                         dishid = 0;
                         while (r > max) {
                             dishid++;
-                            max = TGMath.safeSum(max, dishProbs[dishid]);
+                            max = TGMath.stableSum(max, dishProbs[dishid]);
                         }
                         dishVector[i] = dishid;
 
@@ -348,14 +348,14 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                             double ldw = localDishWeights[docoff + j];
                             for (int k = 0; k < curCoordCount; ++k) {
                                 regionProbs[regoff + k] =
-                                      TGMath.safeProd(ldw, coordinateWeights[k],
+                                      TGMath.stableProd(ldw, coordinateWeights[k],
                                       TGMath.sphericalDensity(curCoords[k], regionmean, kappa[k]));
                             }
                         }
 
                         totalprob = _annealer.annealProbs(L, curCoordCount, maxCoord, regionProbs);
 
-                        r = TGMath.safeProd(rand.nextDouble(), totalprob);
+                        r = TGMath.stableProd(rand.nextDouble(), totalprob);
 
                         max = regionProbs[0];
                         dishid = 0;
@@ -366,7 +366,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                                 dishid++;
                                 coordid = 0;
                             }
-                            max = TGMath.safeSum(max, regionProbs[dishid * maxCoord + coordid]);
+                            max = TGMath.stableSum(max, regionProbs[dishid * maxCoord + coordid]);
                         }
                         dishVector[i] = dishid;
                         coordinateVector[i] = coordid;
@@ -388,19 +388,19 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
 
                         try {
                             for (int j = 0;; ++j) {
-                                dishProbs[j] = TGMath.safeProd(localDishWeights[docoff + j], nonToponymByDishDirichlet[wordoff + j]);
+                                dishProbs[j] = TGMath.stableProd(localDishWeights[docoff + j], nonToponymByDishDirichlet[wordoff + j]);
                             }
                         } catch (ArrayIndexOutOfBoundsException e) {
                         }
 
                         totalprob = _annealer.annealProbs(dishProbs);
-                        r = TGMath.safeProd(rand.nextDouble(), totalprob);
+                        r = TGMath.stableProd(rand.nextDouble(), totalprob);
 
                         max = dishProbs[0];
                         dishid = 0;
                         while (r > max) {
                             dishid++;
-                            max = TGMath.safeSum(max, dishProbs[dishid]);
+                            max = TGMath.stableSum(max, dishProbs[dishid]);
                         }
                         dishVector[i] = dishid;
 
@@ -468,14 +468,14 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                         double ldw = localDishWeightsFM[docoff + j];
                         for (int k = 0; k < curCoordCount; ++k) {
                             regionProbs[regoff + k] =
-                                  ldw * coordinateWeights[k]
-                                  * TGMath.sphericalDensity(curCoords[k], regionmean, kappaFM[k]);
+                                  TGMath.stableProd(ldw, coordinateWeights[k],
+                                  TGMath.sphericalDensity(curCoords[k], regionmean, kappaFM[k]));
                         }
                     }
 
                     totalprob = decoder.annealProbs(L, curCoordCount, maxCoord, regionProbs);
 
-                    r = rand.nextDouble() * totalprob;
+                    r = TGMath.stableProd(rand.nextDouble(), totalprob);
 
                     max = regionProbs[0];
                     dishid = 0;
@@ -498,13 +498,13 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
 
                     try {
                         for (int j = 0;; ++j) {
-                            dishProbs[j] = localDishWeightsFM[docoff + j] * nonToponymByDishDirichletFM[wordoff + j];
+                            dishProbs[j] = TGMath.stableProd(localDishWeightsFM[docoff + j], nonToponymByDishDirichletFM[wordoff + j]);
                         }
                     } catch (ArrayIndexOutOfBoundsException e) {
                     }
 
                     totalprob = decoder.annealProbs(dishProbs);
-                    r = rand.nextDouble() * totalprob;
+                    r = TGMath.stableProd(rand.nextDouble(), totalprob);
 
                     max = dishProbs[0];
                     dishid = 0;
