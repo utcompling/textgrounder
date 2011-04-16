@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 #######
 ####### process_article_data.py
@@ -8,7 +8,7 @@
 
 from nlputil import *
 
-#!/usr/bin/python
+#!/usr/bin/env python
 
 ############################################################################
 #                                  Main code                               #
@@ -160,6 +160,7 @@ def read_article_data_file(filename, process, article_type=Article,
     if status.item_processed(maxtime=maxtime):
       break
   errprint("Finished reading %s articles." % (status.num_processed()))
+  output_resource_usage()
   return fields
 
 def write_article_data_file(outfile, outfields, articles):

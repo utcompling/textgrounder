@@ -20,9 +20,9 @@ use_sorted_list = False
 #   finished: Whether we have finished computing the distribution in
 #             'counts'.
 #   unseen_mass: Total probability mass to be assigned to all words not
-#                seen in the article, estimated using Good-Turing smoothing
-#                as the unadjusted empirical probability of having seen a
-#                word once.
+#                seen in the article, estimated (motivated by Good-Turing
+#                smoothing) as the unadjusted empirical probability of
+#                having seen a word once.
 #   overall_unseen_mass:
 #     Probability mass assigned in 'overall_word_probs' to all words not seen
 #     in the article.  This is 1 - (sum over W in A of overall_word_probs[W]).
@@ -42,7 +42,7 @@ use_sorted_list = False
 #        where NUM_UNSEEN_WORDS is an estimate of the total number of words
 #        "exist" but haven't been seen in any articles.  One simple idea is
 #        to use the number of words seen once in any article.  This certainly
-#        underestimates this number of not too many articles have been seen
+#        underestimates this number if not too many articles have been seen
 #        but might be OK if many articles seen.
 #   total_tokens: Total number of word tokens seen
 

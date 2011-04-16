@@ -52,10 +52,16 @@ public class RectRegion extends Region {
   }
 
   public boolean contains(double lat, double lng) {
-    return lat >= this.minLat &&
-           lat <= this.maxLat &&
-           lng >= this.minLng &&
-           lng <= this.maxLng;
+      if(this.minLng <= this.maxLng) {
+          return lat >= this.minLat &&
+                 lat <= this.maxLat &&
+                 lng >= this.minLng &&
+                 lng <= this.maxLng;
+      }
+      // for boxes around 180/-180 longitude:
+      return (lat >= minLat && lat <= maxLat) &&
+             ((lng >= this.minLat && lng <= 180) ||
+              (lng >= -180 && lng <= this.maxLat));
   }
 
   public double getMinLat() {
@@ -82,5 +88,12 @@ public class RectRegion extends Region {
     representatives.add(Coordinate.fromRadians(this.minLat, this.maxLng));
     return representatives;
   }
+
+    public String toString() {
+        return "lat: [" + (minLat*180.0/Math.PI) + ", "
+            + (maxLat*180.0/Math.PI) + "] lon: ["
+            + (minLng*180.0/Math.PI) + ", "
+            + (maxLng*180.0/Math.PI) + "]";
+    }
 }
 

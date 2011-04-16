@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 #######
 ####### wiki_disambig.py
@@ -380,7 +380,14 @@ class RegionWordDist(WordDist):
   def get_nbayes_logprob(self, worddist, opts):
     logprob = 0.0
     for (word, count) in worddist.counts.iteritems():
-      logprob += log(self.lookup_word(word))
+      val = self.lookup_word(word)
+      if val <= 0:
+        # FIXME: Need to figure out why this happens (perhaps the word was
+        # never seen anywhere in the training data? But I thought we have
+        # a case to handle that) and what to do instead.
+        errprint("Warning! For word %s, prob %s out of range" % (word, val))
+      else:
+        logprob += log(val)
     # FIXME: Also use baseline (prior probability)
     return logprob
 
@@ -403,11 +410,11 @@ class RegionWordDist(WordDist):
 class RegionDist(object):
   __slots__ = ['word', 'regionprobs', 'normalized']
 
-  # It's expensive to compute the value for a given word so we cache word
-  # distributions.
-  cached_dists = LRUCache(maxsize=400)
+  cached_dists = None
 
   def __init__(self, word=None, regionprobs=None):
+    # It's expensive to compute the value for a given word so we cache word
+    # distributions.
     if regionprobs:
       self.regionprobs = regionprobs
     else:
@@ -447,6 +454,8 @@ class RegionDist(object):
   # cache to optimize access.
   @classmethod
   def get_region_dist(cls, word):
+    if not cls.cached_dists:
+      cls.cached_dists = LRUCache(maxsize=Opts.lru_cache_size)
     dist = cls.cached_dists.get(word, None)
     if not dist:
       dist = RegionDist(word)
@@ -1089,7 +1098,18 @@ class ArticleTable(object):
   # List of articles in each split.
   articles_by_split = listdict()
 
+  # Num of articles with word-count information but not in table.
+  num_articles_with_word_counts_but_not_in_table = 0
+
+  # Num of articles with word-count information (whether or not in table).
+  num_articles_with_word_counts = 0
+
+  # Num of articles in each split with word-count information seen.
+  num_word_count_articles_by_split = intdict()
+
   # Num of articles in each split with a computed distribution.
+  # (Not the same as the previous since we don't compute the distribution of articles in
+  # either the test or dev set depending on which one is used.)
   num_dist_articles_by_split = intdict()
 
   # Total # of word tokens for all articles in each split.
@@ -1557,12 +1577,6 @@ class GeotagDocumentEval(EvalWithRank):
              mean(self.degree_dists))
     errprint("  Median degree error distance = %.2f degrees" %
              median(self.degree_dists))
-
-def output_resource_usage():
-  errprint("Total elapsed time: %s" %
-           float_with_commas(get_program_time_usage()))
-  errprint("Memory usage: %s" %
-      int_with_commas(get_program_memory_usage_ps()))
 
 ####### Results for geotagging toponyms
 class GeotagToponymResults(object):
@@ -2675,7 +2689,9 @@ def read_word_counts(filename):
     art = ArticleTable.lookup_article(title)
     if not art:
       warning("Skipping article %s, not in table" % title)
+      ArticleTable.num_articles_with_word_counts_but_not_in_table += 1
       return
+    ArticleTable.num_word_count_articles_by_split[art.split] += 1
     # If we are evaluating on the dev set, skip the test set and vice
     # versa, to save memory and avoid contaminating the results.
     if art.split != 'training' and art.split != Opts.eval_set:
@@ -2728,16 +2744,42 @@ def read_word_counts(filename):
     one_article_probs()
 
   errprint("Finished reading distributions from %s articles." % (status.num_processed()))
+  ArticleTable.num_articles_with_word_counts = status.num_processed()
+  output_resource_usage()
 
 def finish_word_counts():
   WordDist.finish_global_distribution()
   ArticleTable.finish_article_distributions()
+  errprint("")
+  errprint("-------------------------------------------------------------------------")
+  errprint("Article count statistics:")
+  total_arts_in_table = 0
+  total_arts_with_word_counts = 0
+  total_arts_with_dists = 0
   for (split, totaltoks) in ArticleTable.word_tokens_by_split.iteritems():
-    numarts = ArticleTable.num_dist_articles_by_split[split]
-    errprint("For split '%s': %s articles, %s total tokens, %.2f tokens/article"
-        % (split, numarts, totaltoks,
+    errprint("For split '%s':" % split)
+    arts_in_table = len(ArticleTable.articles_by_split[split])
+    arts_with_word_counts = ArticleTable.num_word_count_articles_by_split[split]
+    arts_with_dists = ArticleTable.num_dist_articles_by_split[split]
+    total_arts_in_table += arts_in_table
+    total_arts_with_word_counts += arts_with_word_counts
+    total_arts_with_dists += arts_with_dists
+    errprint("  %s articles in article table" % arts_in_table)
+    errprint("  %s articles with word counts seen (and in table)" % arts_with_word_counts)
+    errprint("  %s articles with distribution computed, %s total tokens, %.2f tokens/article"
+        % (arts_with_dists, totaltoks,
           # Avoid division by zero
-          float(totaltoks)/(numarts + 1e-100)))
+          float(totaltoks)/(arts_in_table + 1e-100)))
+  errprint("Total: %s articles with word counts seen" %
+           ArticleTable.num_articles_with_word_counts)
+  errprint("Total: %s articles in article table" % total_arts_in_table)
+  errprint("Total: %s articles with word counts seen but not in article table" %
+           ArticleTable.num_articles_with_word_counts_but_not_in_table)
+  errprint("Total: %s articles with word counts seen (and in table)" %
+           total_arts_with_word_counts)
+  errprint("Total: %s articles with distribution computed" %
+           total_arts_with_dists)
+
 
 class Gazetteer(object):
   # For each toponym (name of location), value is a list of Locality items,
@@ -2873,6 +2915,7 @@ class WorldGazetteer(Gazetteer):
 
     Division.finish_all()
     errprint("Finished matching %s gazetteer entries." % (status.num_processed()))
+    output_resource_usage()
 
 # If given a directory, yield all the files in the directory; else just
 # yield the file.
@@ -3153,6 +3196,9 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
     op.add_option("--no-individual-results", "--no-results",
                   action='store_true', default=False,
                   help="""Don't show individual results for each test document.""")
+    op.add_option("--lru-cache-size", "--lru",
+                  type='int', default=400,
+                  help="""Number of entries in the LRU cache.""")
 
     return canon_options
 

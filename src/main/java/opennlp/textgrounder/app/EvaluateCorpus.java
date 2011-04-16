@@ -18,36 +18,61 @@ public class EvaluateCorpus extends BaseApp {
     public static void main(String[] args) throws Exception {
         initializeOptionsFromCommandLine(args);
 
-        if(getInputPath() == null || getSerializedCorpusInputPath() == null) {
-            System.out.println("Please specify both a system serialized corpus file via the -sci flag and a gold plaintext corpus file via the -i flag.");
-            System.exit(0);
+        if(getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
+            if(getInputPath() == null || getSerializedCorpusInputPath() == null) {
+                System.out.println("Please specify both a system serialized corpus file via the -sci flag and a gold plaintext corpus file via the -i flag.");
+                System.exit(0);
+            }
+        }
+        else {
+            if(getSerializedCorpusInputPath() == null) {
+                System.out.println("Please specify a system serialized corpus file via the -sci flag.");
+                System.exit(0);
+            }
         }
 
         System.out.print("Reading serialized system corpus from " + getSerializedCorpusInputPath() + " ...");
         Corpus systemCorpus = TopoUtil.readCorpusFromSerialized(getSerializedCorpusInputPath());
         System.out.println("done.");
 
-        Tokenizer tokenizer = new OpenNLPTokenizer();
-        System.out.print("Reading plaintext gold corpus from " + getInputPath() + " ...");
-        StoredCorpus goldCorpus;
-        goldCorpus = Corpus.createStoredCorpus();
-        goldCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
-        goldCorpus.load();
-        System.out.println("done.");
+        StoredCorpus goldCorpus = null;
 
-        doEval(systemCorpus, goldCorpus);
+        if(getInputPath() != null) {
+            Tokenizer tokenizer = new OpenNLPTokenizer();
+            System.out.print("Reading plaintext gold corpus from " + getInputPath() + " ...");
+            goldCorpus = Corpus.createStoredCorpus();
+            goldCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
+            goldCorpus.load();
+            System.out.println("done.");
+        }
+
+        doEval(systemCorpus, goldCorpus, getCorpusFormat());
     }
 
-    public static void doEval(Corpus systemCorpus, Corpus goldCorpus) throws Exception {
-        System.out.print("\nEvaluating...");
-        Evaluator evaluator = new SignatureEvaluator(goldCorpus);
-        Report report = evaluator.evaluate(systemCorpus, false);
-        System.out.println("done.");
+    public static void doEval(Corpus systemCorpus, Corpus goldCorpus, Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
+        if(corpusFormat == CORPUS_FORMAT.GEOTEXT) {
+            System.out.print("\nEvaluating...");
+            DocDistanceEvaluator evaluator = new DocDistanceEvaluator(systemCorpus);
+            DistanceReport dreport = evaluator.evaluate();
+            System.out.println("done.");
+            
+            System.out.println("\nMean error distance (km): " + dreport.getMeanDistance());
+            System.out.println("Median error distance (km): " + dreport.getMedianDistance());
+            System.out.println("Minimum error distance (km): " + dreport.getMinDistance());
+            System.out.println("Maximum error distance (km): " + dreport.getMaxDistance());
+            System.out.println("Total documents evaluated: " + dreport.getNumDistances());
+        }
+        else {
+            System.out.print("\nEvaluating...");
+            Evaluator evaluator = new SignatureEvaluator(goldCorpus);
+            Report report = evaluator.evaluate(systemCorpus, false);
+            System.out.println("done.");
 
-        System.out.println("\nResults:");
-        System.out.println("P: " + report.getPrecision());
-        System.out.println("R: " + report.getRecall());
-        System.out.println("F: " + report.getFScore());
-        System.out.println("A: " + report.getAccuracy());
+            System.out.println("\nResults:");
+            System.out.println("P: " + report.getPrecision());
+            System.out.println("R: " + report.getRecall());
+            System.out.println("F: " + report.getFScore());
+            System.out.println("A: " + report.getAccuracy());
+        }
     }
 }

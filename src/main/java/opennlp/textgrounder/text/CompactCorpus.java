@@ -22,10 +22,9 @@ import java.util.List;
 import java.util.Map;
 import java.io.*;
 
-import opennlp.textgrounder.topo.Location;
-import opennlp.textgrounder.util.CountingLexicon;
-import opennlp.textgrounder.util.SimpleCountingLexicon;
-import opennlp.textgrounder.util.Span;
+import opennlp.textgrounder.topo.*;
+import opennlp.textgrounder.util.*;
+import opennlp.textgrounder.app.*;
 
 public class CompactCorpus extends StoredCorpus implements Serializable {
   private Corpus<Token> wrapped;
@@ -131,8 +130,14 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
         sentences.add(stored);
       }
 
+      //System.out.println(document.getClass().getName());
+
       sentences.trimToSize();
-      this.documents.add(new StoredDocument(document.getId(), sentences));
+      if(this.getFormat() == BaseApp.CORPUS_FORMAT.GEOTEXT)
+          this.documents.add(new StoredDocument(document.getId(), sentences,
+                                                null, document.getGoldCoord()));
+      else
+          this.documents.add(new StoredDocument(document.getId(), sentences));
     }
 
     this.tokenOrigMap = new int[this.tokenOrigLexicon.size()];
@@ -176,6 +181,18 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
     private StoredDocument(String id, List<Sentence<StoredToken>> sentences) {
       super(id);
       this.sentences = sentences;
+    }
+
+    private StoredDocument(String id, List<Sentence<StoredToken>> sentences, String timestamp, double goldLat, double goldLon) {
+        this(id, sentences);
+        this.timestamp = timestamp;
+        this.goldCoord = Coordinate.fromDegrees(goldLat, goldLon);
+    }
+
+    private StoredDocument(String id, List<Sentence<StoredToken>> sentences, String timestamp, Coordinate goldCoord) {
+        this(id, sentences);
+        this.timestamp = timestamp;
+        this.goldCoord = goldCoord;
     }
 
     public Iterator<Sentence<StoredToken>> iterator() {

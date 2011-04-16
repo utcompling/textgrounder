@@ -107,13 +107,13 @@ public class CorpusXMLWriter {
 
   protected void writeToken(XMLStreamWriter out, Token token) throws XMLStreamException {
     out.writeStartElement("w");
-    out.writeAttribute("tok", token.getForm());
+    out.writeAttribute("tok", token.getOrigForm());
     out.writeEndElement();
   }
 
   protected void writeToponym(XMLStreamWriter out, Toponym toponym) throws XMLStreamException {
     out.writeStartElement("toponym");
-    out.writeAttribute("term", toponym.getForm());
+    out.writeAttribute("term", toponym.getOrigForm());
     out.writeStartElement("candidates");
     Location gold = toponym.hasGold() ? toponym.getGold() : null;
     Location selected = toponym.hasSelected() ? toponym.getSelected() : null;

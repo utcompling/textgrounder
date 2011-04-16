@@ -697,6 +697,37 @@ def get_program_memory_usage_ps():
     if line.strip() == 'RSS': continue
     return 1024*int(line.strip())
 
+# Get memory usage by running 'proc'; this works on Linux and doesn't require
+# spawning a subprocess, which can crash when your program is very large.
+def get_program_memory_usage_proc():
+  with open("/proc/self/status") as f:
+    for line in f:
+      line = line.strip()
+      if line.startswith('VmRSS:'):
+        rss = int(line.split()[1])
+        return 1024*rss
+  return 0
+
+def format_minutes_seconds(secs):
+  mins = int(secs / 60)
+  secs = secs % 60
+  hours = int(mins / 60)
+  mins = mins % 60
+  if hours > 0:
+    hourstr = "%s hour%s " % (hours, "" if hours == 1 else "s")
+  else:
+    hourstr = ""
+  secstr = "%s" % secs if type(secs) is int else "%0.1f" % secs
+  return hourstr + "%s minute%s %s second%s" % (
+      mins, "" if mins == 1 else "s",
+      secstr, "" if secs == 1 else "s")
+
+def output_resource_usage():
+  errprint("Total elapsed time since program start: %s" %
+           format_minutes_seconds(get_program_time_usage()))
+  errprint("Memory usage: %s bytes" %
+      int_with_commas(get_program_memory_usage_proc()))
+
 #############################################################################
 #                             Hash tables by range                          #
 #############################################################################
