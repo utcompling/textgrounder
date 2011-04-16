@@ -141,7 +141,7 @@ public class InternalToXMLConverterRLDA extends InternalToXMLConverter {
     }
 
     @Override
-    protected void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid) {
+    protected void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid, int _offset) {
         if (!_candidates.isEmpty()) {
             Coordinate coord = matchCandidate(_candidates, _regid);
             _token.setAttribute("long", String.format("%.2f", coord.longitude));

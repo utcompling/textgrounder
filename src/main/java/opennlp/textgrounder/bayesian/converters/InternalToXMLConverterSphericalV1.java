@@ -116,7 +116,8 @@ public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
     }
 
     @Override
-    protected void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid) {
+    protected void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid, int _offset) {
+        _coordid = coordArray.get(_offset);
         if (!_candidates.isEmpty()) {
             Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(toponymCoordinateLexicon[_wordid][_coordid]));
             _token.setAttribute("long", String.format("%.6f", coord.longitude));

@@ -86,7 +86,7 @@ public abstract class InternalToXMLConverter {
 
     protected abstract void setTokenAttribute(Element _token, int _wordid, int _regid, int _coordid);
 
-    protected abstract void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid);
+    protected abstract void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid, int _offset);
 
     public void convert(String TRXMLPath) {
 
@@ -148,7 +148,7 @@ public abstract class InternalToXMLConverter {
                     } else if (token.getName().equals("toponym")) {
                         word = token.getAttributeValue("term").toLowerCase();
                         ArrayList<Element> candidates = new ArrayList<Element>(token.getChild("candidates").getChildren());
-                        setToponymAttribute(candidates, outtoken, wordid, regid, 0);
+                        setToponymAttribute(candidates, outtoken, wordid, regid, 0, counter);
                         counter += 1;
                     } else {
                         continue;
