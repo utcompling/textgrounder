@@ -84,4 +84,16 @@ public class XMLToInternalConverterSpherical extends XMLToInternalConverter {
 
         toponymToCoordinateMap.get(_wordid).add(_coord);
     }
+
+    @Override
+    public void addToken(String _string) {
+    }
+
+    @Override
+    public void addToponym(String _string) {
+    }
+
+    @Override
+    public void addCoordinate(double _long, double _lat) {
+    }
 }

@@ -148,4 +148,19 @@ public class InternalToXMLConverterRLDA extends InternalToXMLConverter {
             _token.setAttribute("lat", String.format("%.2f", coord.latitude));
         }
     }
+
+    @Override
+    public void addToken(String _string) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void addToponym(String _string) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void addCoordinate(double _long, double _lat) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 }

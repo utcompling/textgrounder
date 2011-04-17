@@ -21,6 +21,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.mathutils.TGMath;
 import opennlp.textgrounder.bayesian.topostructs.*;
@@ -123,5 +128,17 @@ public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
             _token.setAttribute("long", String.format("%.6f", coord.longitude));
             _token.setAttribute("lat", String.format("%.6f", coord.latitude));
         }
+    }
+
+    @Override
+    public void addToken(String _string) {
+    }
+
+    @Override
+    public void addToponym(String _string) {
+    }
+
+    @Override
+    public void addCoordinate(double _long, double _lat) {
     }
 }

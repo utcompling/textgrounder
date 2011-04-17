@@ -16,12 +16,20 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.converters;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.textstructs.*;
 import org.jdom.Attribute;
@@ -36,7 +44,7 @@ import org.jdom.output.XMLOutputter;
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class InternalToXMLConverter {
+public abstract class InternalToXMLConverter implements ConverterInterface {
 
     /**
      *
@@ -93,91 +101,109 @@ public abstract class InternalToXMLConverter {
         /**
          * read in xml
          */
-        File TRXMLPathFile = new File(TRXMLPath);
-
-        SAXBuilder builder = new SAXBuilder();
-        Document indoc = null;
-        Document outdoc = new Document();
+        XMLSource xmlSource;
         try {
-            indoc = builder.build(TRXMLPathFile);
-        } catch (JDOMException ex) {
-            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        } catch (IOException ex) {
-            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
-
-        Element inroot = indoc.getRootElement();
-        Element outroot = new Element(inroot.getName());
-        outdoc.addContent(outroot);
-
-        int counter = 0;
-        int docid = 0;
-
-        ArrayList<Element> documents = new ArrayList<Element>(inroot.getChildren());
-        for (Element document : documents) {
-            Element outdocument = new Element(document.getName());
-            copyAttributes(document, outdocument);
-            outroot.addContent(outdocument);
-
-            ArrayList<Element> sentences = new ArrayList<Element>(document.getChildren());
-            for (Element sentence : sentences) {
-
-                Element outsentence = new Element(sentence.getName());
-                copyAttributes(sentence, outsentence);
-                outdocument.addContent(outsentence);
-
-                ArrayList<Element> tokens = new ArrayList<Element>(sentence.getChildren());
-                for (Element token : tokens) {
-
-                    Element outtoken = new Element(token.getName());
-                    copyAttributes(token, outtoken);
-                    outsentence.addContent(outtoken);
-
-                    int isstopword = stopwordArray.get(counter);
-                    int regid = regionArray.get(counter);
-                    int wordid = wordArray.get(counter);
-                    String word = "";
-                    if (token.getName().equals("w")) {
-                        word = token.getAttributeValue("tok").toLowerCase();
-                        if (isstopword == 0) {
-                            setTokenAttribute(outtoken, wordid, regid, 0);
-                        }
-                        counter += 1;
-                    } else if (token.getName().equals("toponym")) {
-                        word = token.getAttributeValue("term").toLowerCase();
-                        ArrayList<Element> candidates = new ArrayList<Element>(token.getChild("candidates").getChildren());
-                        setToponymAttribute(candidates, outtoken, wordid, regid, 0, counter);
-                        counter += 1;
-                    } else {
-                        continue;
-                    }
-
-                    String outword = lexicon.getWordForInt(wordid);
-                    if (!word.equals(outword)) {
-                        String did = document.getAttributeValue("id");
-                        String sid = sentence.getAttributeValue("id");
-                        int outdocid = docArray.get(counter);
-                        System.err.println(String.format("Mismatch between "
-                              + "tokens. Occurred at source document %s, "
-                              + "sentence %s, token %s and target document %d, "
-                              + "offset %d, token %s, token id %d",
-                              did, sid, word, outdocid, counter, outword, wordid));
-                        System.exit(1);
-                    }
-                }
+            xmlSource = new XMLSource(new BufferedReader(new FileReader(new File(TRXMLPath))), this);
+            while (xmlSource.hasNext()) {
             }
-            docid += 1;
+            xmlSource.close();
+        } catch (XMLStreamException ex) {
+            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        try {
-            XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
-            xout.output(outdoc, new FileOutputStream(new File(pathToOutput)));
-        } catch (IOException ex) {
-            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
+
+
+
+//            XMLInputFactory factory = XMLInputFactory.newInstance();
+//            XMLStreamReader xmlStreamReader = null;
+//            xmlStreamReader = factory.createXMLStreamReader(new BufferedReader(new FileReader(new File(TRXMLPath))));
+//            while (xmlStreamReader.hasNext() && xmlStreamReader.next() != XMLStreamReader.START_ELEMENT) {
+//            }
+//
+//            xmlStreamReader.next();
+//
+//
+//
+//            Element inroot = indoc.getRootElement();
+//            Element outroot = new Element(inroot.getName());
+//            outdoc.addContent(outroot);
+//
+//            int counter = 0;
+//            int docid = 0;
+//
+//            ArrayList<Element> documents = new ArrayList<Element>(inroot.getChildren());
+//            for (Element document : documents) {
+//                Element outdocument = new Element(document.getName());
+//                copyAttributes(document, outdocument);
+//                outroot.addContent(outdocument);
+//
+//                ArrayList<Element> sentences = new ArrayList<Element>(document.getChildren());
+//                for (Element sentence : sentences) {
+//
+//                    Element outsentence = new Element(sentence.getName());
+//                    copyAttributes(sentence, outsentence);
+//                    outdocument.addContent(outsentence);
+//
+//                    ArrayList<Element> tokens = new ArrayList<Element>(sentence.getChildren());
+//                    for (Element token : tokens) {
+//
+//                        Element outtoken = new Element(token.getName());
+//                        copyAttributes(token, outtoken);
+//                        outsentence.addContent(outtoken);
+//
+//                        int isstopword = stopwordArray.get(counter);
+//                        int regid = regionArray.get(counter);
+//                        int wordid = wordArray.get(counter);
+//                        String word = "";
+//                        if (token.getName().equals("w")) {
+//                            word = token.getAttributeValue("tok").toLowerCase();
+//                            if (isstopword == 0) {
+//                                setTokenAttribute(outtoken, wordid, regid, 0);
+//                            }
+//                            counter += 1;
+//                        } else if (token.getName().equals("toponym")) {
+//                            word = token.getAttributeValue("term").toLowerCase();
+//                            ArrayList<Element> candidates = new ArrayList<Element>(token.getChild("candidates").getChildren());
+//                            setToponymAttribute(candidates, outtoken, wordid, regid, 0, counter);
+//                            counter += 1;
+//                        } else {
+//                            continue;
+//                        }
+//
+//                        String outword = lexicon.getWordForInt(wordid);
+//                        if (!word.equals(outword)) {
+//                            String did = document.getAttributeValue("id");
+//                            String sid = sentence.getAttributeValue("id");
+//                            int outdocid = docArray.get(counter);
+//                            System.err.println(String.format("Mismatch between "
+//                                  + "tokens. Occurred at source document %s, "
+//                                  + "sentence %s, token %s and target document %d, "
+//                                  + "offset %d, token %s, token id %d",
+//                                  did, sid, word, outdocid, counter, outword, wordid));
+//                            System.exit(1);
+//                        }
+//                    }
+//                }
+//                docid += 1;
+//            }
+//
+//        } catch (XMLStreamException ex) {
+//            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+//            System.exit(1);
+//        } catch (FileNotFoundException ex) {
+//            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+//            System.exit(1);
+//        }
+//
+//        try {
+//            XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
+//            xout.output(outdoc, new FileOutputStream(new File(pathToOutput)));
+//        } catch (IOException ex) {
+//            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
+//            System.exit(1);
+//        }
     }
 
     protected void copyAttributes(Element src, Element trg) {
