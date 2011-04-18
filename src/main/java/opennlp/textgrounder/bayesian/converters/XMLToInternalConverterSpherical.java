@@ -32,6 +32,10 @@ public class XMLToInternalConverterSpherical extends XMLToInternalConverter {
      *
      */
     protected ToponymToCoordinateMap toponymToCoordinateMap;
+    /**
+     * 
+     */
+    protected int currentWID;
 
     /**
      * 
@@ -95,5 +99,22 @@ public class XMLToInternalConverterSpherical extends XMLToInternalConverter {
 
     @Override
     public void addCoordinate(double _long, double _lat) {
+        Coordinate coord = new Coordinate(_long, _lat);
+        
+        if (!toponymToCoordinateMap.containsKey(currentWID)) {
+            toponymToCoordinateMap.put(currentWID, new HashSet<Coordinate>());
+        }
+
+        toponymToCoordinateMap.get(currentWID).add(coord);
+    }
+
+    @Override
+    public void addCandidate(double _long, double _lat) {
+        return;
+    }
+
+    @Override
+    public void addRepresentative(double _long, double _lat) {
+        return;
     }
 }

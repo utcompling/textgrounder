@@ -86,10 +86,6 @@ public abstract class XMLToInternalConverter implements ConverterInterface {
      *
      */
     protected ConverterExperimentParameters converterExperimentParameters;
-    /**
-     * 
-     */
-    protected Pattern wordPattern = Pattern.compile("[a-z]+");
 
     /**
      * 
@@ -151,6 +147,11 @@ public abstract class XMLToInternalConverter implements ConverterInterface {
         try {
             xmlSource = new XMLSource(new BufferedReader(new FileReader(new File(TRXMLPath))), this);
             while (xmlSource.hasNext()) {
+                Iterator<Sentence<Token>> sentit = xmlSource.next().iterator();
+                while (sentit.hasNext()) {
+                    sentit.next();
+                }
+                xmlSource.nextTag();
             }
             xmlSource.close();
         } catch (XMLStreamException ex) {
@@ -231,93 +232,23 @@ public abstract class XMLToInternalConverter implements ConverterInterface {
      */
     protected void preprocess(String TRXMLPath) {
 
-        XMLSource<XMLToInternalConverter> xmlSource;
         try {
-            xmlSource = new XMLSource<XMLToInternalConverter>(new BufferedReader(new FileReader(new File(TRXMLPath))), this);
+            Preprocessor preprocessor = new Preprocessor();
+            XMLSource<Preprocessor> xmlSource = new XMLSource<Preprocessor>(new BufferedReader(new FileReader(new File(TRXMLPath))), preprocessor);
             while (xmlSource.hasNext()) {
-                opennlp.textgrounder.text.Document<Token> doc = xmlSource.next();
-                Iterator<Sentence<Token>> t = doc.iterator();
-                while (t.hasNext()) {
-                    Sentence<Token> s = t.next();
-                    Iterator<Token> it = s.iterator();
-                    while(it.hasNext()) {
-                        it.next();
-                    }
+                Iterator<Sentence<Token>> sentit = xmlSource.next().iterator();
+                while (sentit.hasNext()) {
+                    sentit.next();
                 }
+                xmlSource.nextTag();
             }
             xmlSource.close();
+            preprocessor.wrapUp();
         } catch (XMLStreamException ex) {
             Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
         } catch (FileNotFoundException ex) {
             Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
         }
-
-
-//        HashMap<String, Integer> countLexicon = new HashMap<String, Integer>();
-//        HashSet<String> toponymSet = new HashSet<String>();
-//
-//        File TRXMLPathFile = new File(TRXMLPath);
-//
-//        SAXBuilder builder = new SAXBuilder();
-//        Document trdoc = null;
-//        try {
-//            trdoc = builder.build(TRXMLPathFile);
-//        } catch (JDOMException ex) {
-//            Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
-//            System.exit(1);
-//        } catch (IOException ex) {
-//            Logger.getLogger(XMLToInternalConverter.class.getName()).log(Level.SEVERE, null, ex);
-//            System.exit(1);
-//        }
-//
-//        Element root = trdoc.getRootElement();
-//        ArrayList<Element> documents = new ArrayList<Element>(root.getChildren());
-//        for (Element document : documents) {
-//            ArrayList<Element> sentences = new ArrayList<Element>(document.getChildren());
-//            for (Element sentence : sentences) {
-//                ArrayList<Element> tokens = new ArrayList<Element>(sentence.getChildren());
-//                for (Element token : tokens) {
-//                    String word = "";
-//                    boolean istoponym = false;
-//                    if (token.getName().equals("w")) {
-//                        word = token.getAttributeValue("tok").toLowerCase();
-//                    } else if (token.getName().equals("toponym")) {
-//                        word = token.getAttributeValue("term").toLowerCase();
-//                        ArrayList<Element> candidates = new ArrayList<Element>(token.getChild("candidates").getChildren());
-//                        if (!candidates.isEmpty()) {
-//                            toponymSet.add(word);
-//                            istoponym = true;
-//                        }
-//                    } else {
-//                        continue;
-//                    }
-//
-//                    Matcher matcher = wordPattern.matcher(word);
-//                    boolean found = matcher.find();
-//                    if ((!stopwordList.isStopWord(word) || istoponym) && found) {
-//                        if (countLexicon.containsKey(word)) {
-//                            int count = countLexicon.get(word) + 1;
-//                            countLexicon.put(word, count);
-//                        } else {
-//                            countLexicon.put(word, 1);
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//
-//        for (String word : toponymSet) {
-//            lexicon.addOrGetWord(word);
-//        }
-//        validtoponyms = lexicon.getDictionarySize();
-//
-//        for (Map.Entry<String, Integer> entry : countLexicon.entrySet()) {
-//            if (entry.getValue() > countCutoff) {
-//                lexicon.addOrGetWord(entry.getKey());
-//            }
-//        }
-//
-//        validwords = lexicon.getDictionarySize();
     }
 
     /**
@@ -328,4 +259,74 @@ public abstract class XMLToInternalConverter implements ConverterInterface {
     protected abstract void addToTopoStructs(int _wordid, Coordinate _coord);
 
     protected abstract void initializeRegionArray();
+
+    public class Preprocessor implements ConverterInterface {
+
+        /**
+         *
+         */
+        Pattern wordPattern = Pattern.compile("[a-z]+");
+        HashMap<String, Integer> countLexicon = new HashMap<String, Integer>();
+        HashSet<String> toponymSet = new HashSet<String>();
+        boolean coordAdded = false;
+
+        public void wrapUp() {
+            for (String word : toponymSet) {
+                lexicon.addOrGetWord(word);
+            }
+            validtoponyms = lexicon.getDictionarySize();
+
+            for (Map.Entry<String, Integer> entry : countLexicon.entrySet()) {
+                if (entry.getValue() > countCutoff) {
+                    lexicon.addOrGetWord(entry.getKey());
+                }
+            }
+
+            validwords = lexicon.getDictionarySize();
+        }
+
+        @Override
+        public void addToken(String _string) {
+            Matcher matcher = wordPattern.matcher(_string);
+            boolean found = matcher.find();
+
+            if (!stopwordList.isStopWord(_string) && found) {
+                if (countLexicon.containsKey(_string)) {
+                    int count = countLexicon.get(_string) + 1;
+                    countLexicon.put(_string, count);
+                } else {
+                    countLexicon.put(_string, 1);
+                }
+            }
+        }
+
+        @Override
+        public void addToponym(String _string) {
+            if (coordAdded) {
+                if (countLexicon.containsKey(_string)) {
+                    int count = countLexicon.get(_string) + 1;
+                    countLexicon.put(_string, count);
+                } else {
+                    countLexicon.put(_string, 1);
+                }
+                toponymSet.add(_string);
+            }
+            coordAdded = false;
+        }
+
+        @Override
+        public void addCoordinate(double _long, double _lat) {
+            coordAdded = true;
+        }
+
+        @Override
+        public void addCandidate(double _long, double _lat) {
+            return;
+        }
+
+        @Override
+        public void addRepresentative(double _long, double _lat) {
+            return;
+        }
+    }
 }

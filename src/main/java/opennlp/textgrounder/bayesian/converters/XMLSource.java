@@ -15,46 +15,31 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.converters;
 
-import opennlp.textgrounder.text.io.*;
 import java.io.Reader;
-import java.io.IOException;
 
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 
-import opennlp.textgrounder.text.Corpus;
 import opennlp.textgrounder.text.Document;
 import opennlp.textgrounder.text.DocumentSource;
 import opennlp.textgrounder.text.Sentence;
 import opennlp.textgrounder.text.SimpleSentence;
-import opennlp.textgrounder.text.SimpleToken;
-import opennlp.textgrounder.text.SimpleToponym;
 import opennlp.textgrounder.text.Token;
-import opennlp.textgrounder.text.Toponym;
-import opennlp.textgrounder.text.prep.Tokenizer;
-import opennlp.textgrounder.topo.Coordinate;
-import opennlp.textgrounder.topo.Location;
-import opennlp.textgrounder.topo.PointRegion;
-import opennlp.textgrounder.topo.Region;
-import opennlp.textgrounder.util.Span;
 
 /**
  * Modified by
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public class XMLSource <T extends ConverterInterface> extends DocumentSource {
+public class XMLSource<T extends ConverterInterface> extends DocumentSource {
 
     private final XMLStreamReader in;
-    protected XMLToInternalConverter xmlToInternalConverter;
-    protected T ci;
+    protected T converterInterfaceObject;
 
-    public XMLSource (Reader _reader, T _ci) throws XMLStreamException {
-        ci = _ci;
+    public XMLSource(Reader _reader, T _ci) throws XMLStreamException {
+        converterInterfaceObject = _ci;
         XMLInputFactory factory = XMLInputFactory.newInstance();
         this.in = factory.createXMLStreamReader(_reader);
 
@@ -65,20 +50,7 @@ public class XMLSource <T extends ConverterInterface> extends DocumentSource {
         }
     }
 
-//    public XMLSource(Reader _reader, XMLToInternalConverter _xmlToInternalConverter) throws XMLStreamException {
-//        xmlToInternalConverter = _xmlToInternalConverter;
-//
-//        XMLInputFactory factory = XMLInputFactory.newInstance();
-//        this.in = factory.createXMLStreamReader(_reader);
-//
-//        while (this.in.hasNext() && this.in.next() != XMLStreamReader.START_ELEMENT) {
-//        }
-//        if (this.in.getLocalName().equals("corpus")) {
-//            this.in.nextTag();
-//        }
-//    }
-
-    private void nextTag() {
+    public void nextTag() {
         try {
             this.in.nextTag();
         } catch (XMLStreamException e) {
@@ -86,6 +58,7 @@ public class XMLSource <T extends ConverterInterface> extends DocumentSource {
         }
     }
 
+    @Override
     public void close() {
         try {
             this.in.close();
@@ -94,10 +67,12 @@ public class XMLSource <T extends ConverterInterface> extends DocumentSource {
         }
     }
 
+    @Override
     public boolean hasNext() {
         return this.in.isStartElement() && this.in.getLocalName().equals("doc");
     }
 
+    @Override
     public Document<Token> next() {
         assert this.in.isStartElement() && this.in.getLocalName().equals("doc");
         String id = XMLSource.this.in.getAttributeValue(null, "id");
@@ -105,9 +80,11 @@ public class XMLSource <T extends ConverterInterface> extends DocumentSource {
 
         return new Document(id) {
 
+            @Override
             public Iterator<Sentence<Token>> iterator() {
                 return new SentenceIterator() {
 
+                    @Override
                     public boolean hasNext() {
                         if (XMLSource.this.in.isStartElement()
                               && XMLSource.this.in.getLocalName().equals("s")) {
@@ -117,6 +94,7 @@ public class XMLSource <T extends ConverterInterface> extends DocumentSource {
                         }
                     }
 
+                    @Override
                     public Sentence<Token> next() {
                         String id = XMLSource.this.in.getAttributeValue(null, "id");
 
@@ -127,42 +105,58 @@ public class XMLSource <T extends ConverterInterface> extends DocumentSource {
                                 String name = XMLSource.this.in.getLocalName();
 
                                 if (name.equals("w")) {
-                                    ci.addToken(XMLSource.this.in.getAttributeValue(null, "tok"));
+                                    converterInterfaceObject.addToken(XMLSource.this.in.getAttributeValue(null, "tok"));
                                 } else {
                                     String toponym = XMLSource.this.in.getAttributeValue(null, "term");
-                                    ci.addToponym(toponym);
 
                                     if (XMLSource.this.in.nextTag() == XMLStreamReader.START_ELEMENT
                                           && XMLSource.this.in.getLocalName().equals("candidates")) {
                                         while (XMLSource.this.in.nextTag() == XMLStreamReader.START_ELEMENT
                                               && XMLSource.this.in.getLocalName().equals("cand")) {
 
-                                            double lat = Double.parseDouble(XMLSource.this.in.getAttributeValue(null, "lat"));
                                             double lng = Double.parseDouble(XMLSource.this.in.getAttributeValue(null, "long"));
-                                            ci.addCoordinate(lng, lat);
+                                            double lat = Double.parseDouble(XMLSource.this.in.getAttributeValue(null, "lat"));
+                                            converterInterfaceObject.addCoordinate(lng, lat);
 
-                                            while (XMLSource.this.in.nextTag() == XMLStreamReader.START_ELEMENT
+                                            if (XMLSource.this.in.nextTag() == XMLStreamReader.START_ELEMENT
                                                   && XMLSource.this.in.getLocalName().equals("representatives")) {
                                                 while (XMLSource.this.in.nextTag() == XMLStreamReader.START_ELEMENT
                                                       && XMLSource.this.in.getLocalName().equals("rep")) {
+                                                    lng = Double.parseDouble(XMLSource.this.in.getAttributeValue(null, "long"));
+                                                    lat = Double.parseDouble(XMLSource.this.in.getAttributeValue(null, "lat"));
+                                                    converterInterfaceObject.addRepresentative(lng, lat);
+
+                                                    /**
+                                                     * add closing nextTag calls only to elements that can have sister nodes.
+                                                     */
                                                     XMLSource.this.nextTag();
                                                     assert XMLSource.this.in.isEndElement()
                                                           && XMLSource.this.in.getLocalName().equals("rep");
                                                 }
-                                                XMLSource.this.nextTag();
                                                 assert XMLSource.this.in.isEndElement()
                                                       && XMLSource.this.in.getLocalName().equals("representatives");
+                                                /**
+                                                 * This weird kludge nextTag call is to accommodate the fact
+                                                 * that the representatives element is optional and therefore
+                                                 * must be walked out of if it does occur
+                                                 */
+                                                XMLSource.this.nextTag();
                                             }
-                                            XMLSource.this.nextTag();
                                             assert XMLSource.this.in.isEndElement()
                                                   && XMLSource.this.in.getLocalName().equals("cand");
                                         }
+                                        assert XMLSource.this.in.isEndElement()
+                                              && XMLSource.this.in.getLocalName().equals("candidates");
                                     }
+                                    converterInterfaceObject.addToponym(toponym);
                                 }
                                 XMLSource.this.nextTag();
+                                assert XMLSource.this.in.isEndElement()
+                                      && (XMLSource.this.in.getLocalName().equals("w")
+                                      || XMLSource.this.in.getLocalName().equals("toponym"));
                             }
                         } catch (XMLStreamException e) {
-                            System.err.println("Error while reading TR-XML file.");
+                            System.err.println("Error while reading XML file.");
                         }
 
                         XMLSource.this.nextTag();

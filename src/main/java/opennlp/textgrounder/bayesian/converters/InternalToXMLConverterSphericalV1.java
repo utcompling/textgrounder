@@ -22,10 +22,6 @@ import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
-
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.mathutils.TGMath;
 import opennlp.textgrounder.bayesian.topostructs.*;
@@ -140,5 +136,15 @@ public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
 
     @Override
     public void addCoordinate(double _long, double _lat) {
+    }
+
+    @Override
+    public void addCandidate(double _long, double _lat) {
+        return;
+    }
+
+    @Override
+    public void addRepresentative(double _long, double _lat) {
+        ;
     }
 }
