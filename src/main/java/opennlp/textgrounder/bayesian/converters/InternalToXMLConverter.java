@@ -17,34 +17,31 @@
 package opennlp.textgrounder.bayesian.converters;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
 
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.textstructs.*;
+import opennlp.textgrounder.text.Sentence;
+import opennlp.textgrounder.text.Token;
 import org.jdom.Attribute;
-import org.jdom.Document;
 import org.jdom.Element;
-import org.jdom.JDOMException;
-import org.jdom.input.SAXBuilder;
-import org.jdom.output.Format;
-import org.jdom.output.XMLOutputter;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class InternalToXMLConverter implements ConverterInterface {
+public abstract class InternalToXMLConverter implements InternalToXMLConverterInterface {
 
     /**
      *
@@ -87,7 +84,7 @@ public abstract class InternalToXMLConverter implements ConverterInterface {
      *
      */
     public void convert() {
-        convert(pathToInput);
+        convert(pathToInput, pathToOutput);
     }
 
     public abstract void initialize();
@@ -96,25 +93,28 @@ public abstract class InternalToXMLConverter implements ConverterInterface {
 
     protected abstract void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid, int _offset);
 
-    public void convert(String TRXMLPath) {
+    public void convert(String XMLInputPath, String XMLOutputPath) {
 
         /**
          * read in xml
          */
-        XMLSource xmlSource;
         try {
-            xmlSource = new XMLSource(new BufferedReader(new FileReader(new File(TRXMLPath))), this);
+            InternalToXMLSource<InternalToXMLConverter> xmlSource =
+                  new InternalToXMLSource<InternalToXMLConverter>(new BufferedReader(new FileReader(new File(XMLInputPath))),
+                  new BufferedWriter(new FileWriter(new File(XMLOutputPath))), this);
             while (xmlSource.hasNext()) {
+                Iterator<Sentence<Token>> sentit = xmlSource.next().iterator();
+                while (sentit.hasNext()) {
+                    sentit.next();
+                }
+                xmlSource.nextTag();
             }
             xmlSource.close();
+        } catch (IOException ex) {
+            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
         } catch (XMLStreamException ex) {
             Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
         }
-
-
-
 
 //            XMLInputFactory factory = XMLInputFactory.newInstance();
 //            XMLStreamReader xmlStreamReader = null;

@@ -147,4 +147,9 @@ public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
     public void addRepresentative(double _long, double _lat) {
         ;
     }
+
+    @Override
+    public void setCurrentToponym(String _string) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 }

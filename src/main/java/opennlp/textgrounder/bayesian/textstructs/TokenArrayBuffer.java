@@ -18,7 +18,6 @@ package opennlp.textgrounder.bayesian.textstructs;
 import java.io.*;
 
 import java.util.ArrayList;
-import opennlp.textgrounder.bayesian.converters.callbacks.*;
 
 /**
  * Class of integer sequences that indicate words in a stream of space
@@ -69,11 +68,6 @@ public class TokenArrayBuffer implements Serializable {
      * The lexicon of token indexes to tokens.
      */
     protected Lexicon lexicon;
-    /**
-     * Callback class for determing whether a word should be included as
-     * training material or not
-     */
-    protected TrainingMaterialCallback trainingMaterialCallback;
 
     /**
      * Constructor for derived classes only
@@ -87,17 +81,7 @@ public class TokenArrayBuffer implements Serializable {
      * @param lexicon
      */
     public TokenArrayBuffer(Lexicon lexicon) {
-        initialize(lexicon, new NullTrainingMaterialCallback(lexicon));
-    }
-
-    /**
-     * Default constructor. Allocates memory for arrays and assigns lexicon.
-     *
-     * @param lexicon
-     */
-    public TokenArrayBuffer(Lexicon lexicon,
-          TrainingMaterialCallback trainingMaterialCallback) {
-        initialize(lexicon, trainingMaterialCallback);
+        initialize(lexicon);
     }
 
     /**
@@ -105,15 +89,13 @@ public class TokenArrayBuffer implements Serializable {
      *
      * @param lexicon
      */
-    protected final void initialize(Lexicon lexicon,
-          TrainingMaterialCallback trainingMaterialCallback) {
+    protected final void initialize(Lexicon lexicon) {
         wordArrayList = new ArrayList<Integer>();
         documentArrayList = new ArrayList<Integer>();
         toponymArrayList = new ArrayList<Integer>();
         stopwordArrayList = new ArrayList<Integer>();
         size = 0;
 
-        this.trainingMaterialCallback = trainingMaterialCallback;
         this.lexicon = lexicon;
     }
 
@@ -138,8 +120,7 @@ public class TokenArrayBuffer implements Serializable {
         toponymArrayList.add(topStatus);
 
         String word = lexicon.getWordForInt(wordIdx);
-        int notTrainable = trainingMaterialCallback.isTrainable(word) ? 0 : 1;
-        stopwordArrayList.add(stopStatus | notTrainable);
+        stopwordArrayList.add(stopStatus);
         size += 1;
         numDocs = docIdx;
     }

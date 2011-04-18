@@ -165,4 +165,9 @@ public class XMLToInternalConverterRLDA extends XMLToInternalConverter {
     public void addRepresentative(double _long, double _lat) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
+
+    @Override
+    public void setCurrentToponym(String _string) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 }

@@ -29,6 +29,10 @@ import opennlp.textgrounder.bayesian.wrapper.io.*;
 public class XMLToInternalConverterSpherical extends XMLToInternalConverter {
 
     /**
+     * 
+     */
+    protected boolean coordAdded = false;
+    /**
      *
      */
     protected ToponymToCoordinateMap toponymToCoordinateMap;
@@ -91,21 +95,30 @@ public class XMLToInternalConverterSpherical extends XMLToInternalConverter {
 
     @Override
     public void addToken(String _string) {
+        currentWID = lexicon.addOrGetWord(_string);
+        int isstopword = (stopwordList.isStopWord(_string) ? 1 : 0) | (currentWID >= validwords
+              ? 1 : 0);
+        tokenArrayBuffer.addElement(currentWID, docid, 0, isstopword);
     }
 
     @Override
     public void addToponym(String _string) {
+        if (coordAdded) {
+            tokenArrayBuffer.addElement(currentWID, docid, 1, 0);
+        }
+        coordAdded = false;
     }
 
     @Override
     public void addCoordinate(double _long, double _lat) {
         Coordinate coord = new Coordinate(_long, _lat);
-        
+
         if (!toponymToCoordinateMap.containsKey(currentWID)) {
             toponymToCoordinateMap.put(currentWID, new HashSet<Coordinate>());
         }
 
         toponymToCoordinateMap.get(currentWID).add(coord);
+        coordAdded = true;
     }
 
     @Override
@@ -116,5 +129,10 @@ public class XMLToInternalConverterSpherical extends XMLToInternalConverter {
     @Override
     public void addRepresentative(double _long, double _lat) {
         return;
+    }
+
+    @Override
+    public void setCurrentToponym(String _string) {
+        currentWID = lexicon.addOrGetWord(_string);
     }
 }
