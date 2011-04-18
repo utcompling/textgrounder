@@ -67,6 +67,26 @@ public abstract class InternalToXMLConverter implements InternalToXMLConverterIn
     protected ArrayList<Integer> toponymArray;
     protected ArrayList<Integer> stopwordArray;
     protected ArrayList<Integer> regionArray;
+    /**
+     *
+     */
+    String currentDocumentID;
+    /**
+     *
+     */
+    String currentSentenceID;
+    /**
+     *
+     */
+    protected String currentWord;
+    /**
+     *
+     */
+    protected int currentWordID;
+    /**
+     *
+     */
+    protected int offset = 0;
 
     /**
      *

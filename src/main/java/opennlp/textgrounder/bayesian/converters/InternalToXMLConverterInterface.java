@@ -16,16 +16,29 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.converters;
 
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import javax.xml.stream.XMLStreamWriter;
+
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
 public interface InternalToXMLConverterInterface {
 
-    public void addToken(String _string);
-    public void addToponym(String _string);
-    public void addCoordinate(double _long, double _lat);
-    public void addCandidate(double _long, double _lat);
-    public void addRepresentative(double _long, double _lat);
-    public void setCurrentToponym(String _string);
+    public void confirmCoordinate(double _long, double _lat);
+
+    public void setCurrentWord(String _string);
+
+    public void setCurrentDocumentID(String _string);
+
+    public void setCurrentSentenceID(String _string);
+
+    public void incrementOffset();
+
+    public void setTokenAttribute(XMLStreamReader in, XMLStreamWriter out) throws XMLStreamException;
+
+    public void setToponymAttribute(XMLStreamReader in, XMLStreamWriter out);
+
+    public void setCandidateAttribute(XMLStreamReader in, XMLStreamWriter out);
 }

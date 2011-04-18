@@ -16,6 +16,8 @@
 package opennlp.textgrounder.bayesian.topostructs;
 
 import java.io.*;
+import opennlp.textgrounder.bayesian.mathutils.TGBLAS;
+import opennlp.textgrounder.bayesian.mathutils.TGMath;
 
 /**
  * A Coordinate represents a location somewhere on a sphere and just
@@ -38,6 +40,12 @@ public class Coordinate implements Serializable {
     public Coordinate(double[] coord) {
         longitude = coord[1];
         latitude = coord[0];
+    }
+
+    public double cosine(Coordinate _coord) {
+        double[] c1 = TGMath.sphericalToCartesian(TGMath.geographicToSpherical(_coord.latitude, _coord.longitude));
+        double[] c2 = TGMath.sphericalToCartesian(TGMath.geographicToSpherical(latitude, longitude));
+        return TGBLAS.ddot(3, c1, 1, c2, 1);
     }
 
     /**

@@ -21,6 +21,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import javax.xml.stream.XMLStreamWriter;
 
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.mathutils.TGMath;
@@ -44,6 +47,10 @@ public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
      * 
      */
     double[][] regionMeans;
+    /**
+     *
+     */
+    double[] kappa;
     /**
      *
      */
@@ -72,7 +79,8 @@ public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
     public void readCoordinateList() {
         AveragedSphericalCountWrapper ascw = inputReader.readProbabilities();
 
-        regionMeans = ascw.getAveragedRegionMeans();
+        regionMeans = ascw.getRegionMeansFM();
+        kappa = ascw.getKappaFM();
         toponymCoordinateLexicon = ascw.getToponymCoordinateLexicon();
     }
 
@@ -116,9 +124,8 @@ public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
         return;
     }
 
-    @Override
-    protected void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid, int _offset) {
-        _coordid = coordArray.get(_offset);
+    protected void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid) {
+        _coordid = coordArray.get(offset);
         if (!_candidates.isEmpty()) {
             Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(toponymCoordinateLexicon[_wordid][_coordid]));
             _token.setAttribute("long", String.format("%.6f", coord.longitude));
@@ -127,28 +134,72 @@ public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
     }
 
     @Override
-    public void addToken(String _string) {
-    }
+    public void confirmCoordinate(double _long, double _lat) {
+        int _coordid = coordArray.get(offset);
+        Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(toponymCoordinateLexicon[currentWordID][_coordid]));
 
-    @Override
-    public void addToponym(String _string) {
-    }
-
-    @Override
-    public void addCoordinate(double _long, double _lat) {
-    }
-
-    @Override
-    public void addCandidate(double _long, double _lat) {
         return;
     }
 
     @Override
-    public void addRepresentative(double _long, double _lat) {
-        ;
+    public void setCurrentWord(String _string) {
+        currentWord = _string;
+        currentWordID = lexicon.addOrGetWord(_string);
     }
 
     @Override
-    public void setCurrentToponym(String _string) {
+    public void incrementOffset() {
+        offset += 1;
+    }
+
+    @Override
+    protected void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid, int _offset) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void setTokenAttribute(XMLStreamReader in, XMLStreamWriter out) throws XMLStreamException {
+        int isstopword = stopwordArray.get(offset);
+        int wordid = wordArray.get(offset);
+
+        if (isstopword == 0) {
+            String word = in.getAttributeValue(null, "tok");
+            String outword = lexicon.getWordForInt(wordid);
+            int coordid = coordArray.get(offset);
+            if (word.toLowerCase().equals(outword)) {
+                int regid = regionArray.get(offset);
+
+                out.writeAttribute("kappa", Double.toString(kappa[coordid]));
+                double[] means = regionMeans[coordid];
+            } else {
+                int outdocid = docArray.get(offset);
+                System.err.println(String.format("Mismatch between "
+                      + "tokens. Occurred at source document %s, "
+                      + "sentence %s, token %s and target document %d, "
+                      + "offset %d, token %s, token id %d",
+                      currentDocumentID, currentSentenceID, word, outdocid, offset, outword, wordid));
+                System.exit(1);
+            }
+        }
+    }
+
+    @Override
+    public void setToponymAttribute(XMLStreamReader in, XMLStreamWriter out) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void setCandidateAttribute(XMLStreamReader in, XMLStreamWriter out) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void setCurrentDocumentID(String _string) {
+        currentDocumentID = _string;
+    }
+
+    @Override
+    public void setCurrentSentenceID(String _string) {
+        currentSentenceID = _string;
     }
 }

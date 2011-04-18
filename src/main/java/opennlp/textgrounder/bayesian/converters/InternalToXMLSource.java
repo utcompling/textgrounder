@@ -18,8 +18,6 @@ package opennlp.textgrounder.bayesian.converters;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
 
 import java.util.Iterator;
 import java.util.logging.Level;
@@ -43,8 +41,8 @@ import opennlp.textgrounder.text.Token;
  */
 public class InternalToXMLSource<T extends InternalToXMLConverterInterface> extends DocumentSource {
 
-    private final XMLStreamReader in;
-    private final XMLStreamWriter out;
+    protected final XMLStreamReader in;
+    protected final XMLStreamWriter out;
     private final BufferedWriter writer;
     protected T converterInterfaceObject;
 
@@ -148,18 +146,13 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
                                 String name = InternalToXMLSource.this.in.getLocalName();
 
                                 if (name.equals("w")) {
-                                    converterInterfaceObject.addToken(InternalToXMLSource.this.in.getAttributeValue(null, "tok"));
+                                    String tok = InternalToXMLSource.this.in.getAttributeValue(null, "tok");
+                                    converterInterfaceObject.setCurrentWord(tok);
+                                    converterInterfaceObject.setTokenAttribute(InternalToXMLSource.this.in, InternalToXMLSource.this.out);
                                 } else {
                                     String toponym = InternalToXMLSource.this.in.getAttributeValue(null, "term");
-                                    /**
-                                     * We don't know whether a toponym has candidate
-                                     * coordinates or not until the next elements in the stream
-                                     * have been processed. But we do need to know
-                                     * what the toponym is to map stuff to proper
-                                     * structures if need. This is what the following
-                                     * function call does.
-                                     */
-                                    converterInterfaceObject.setCurrentToponym(toponym);
+                                    converterInterfaceObject.setCurrentWord(toponym);
+                                    converterInterfaceObject.setToponymAttribute(InternalToXMLSource.this.in, InternalToXMLSource.this.out);
 
                                     if (InternalToXMLSource.this.nextTag() == XMLStreamReader.START_ELEMENT
                                           && InternalToXMLSource.this.in.getLocalName().equals("candidates")) {
@@ -168,7 +161,7 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
 
                                             double lng = Double.parseDouble(InternalToXMLSource.this.in.getAttributeValue(null, "long"));
                                             double lat = Double.parseDouble(InternalToXMLSource.this.in.getAttributeValue(null, "lat"));
-                                            converterInterfaceObject.addCoordinate(lng, lat);
+                                            converterInterfaceObject.confirmCoordinate(lng, lat);
 
                                             if (InternalToXMLSource.this.nextTag() == XMLStreamReader.START_ELEMENT
                                                   && InternalToXMLSource.this.in.getLocalName().equals("representatives")) {
@@ -176,7 +169,6 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
                                                       && InternalToXMLSource.this.in.getLocalName().equals("rep")) {
                                                     lng = Double.parseDouble(InternalToXMLSource.this.in.getAttributeValue(null, "long"));
                                                     lat = Double.parseDouble(InternalToXMLSource.this.in.getAttributeValue(null, "lat"));
-                                                    converterInterfaceObject.addRepresentative(lng, lat);
 
                                                     /**
                                                      * add closing nextTag calls only to elements that can have sister nodes.
@@ -204,7 +196,6 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
                                         assert InternalToXMLSource.this.in.isEndElement()
                                               && InternalToXMLSource.this.in.getLocalName().equals("candidates");
                                     }
-                                    converterInterfaceObject.addToponym(toponym);
                                 }
                                 InternalToXMLSource.this.writeEndElement();
                                 InternalToXMLSource.this.nextTag();

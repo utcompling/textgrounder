@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.xml.stream.XMLStreamReader;
+import javax.xml.stream.XMLStreamWriter;
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.topostructs.*;
 import opennlp.textgrounder.bayesian.wrapper.io.*;
@@ -150,32 +152,42 @@ public class InternalToXMLConverterRLDA extends InternalToXMLConverter {
     }
 
     @Override
-    public void addToken(String _string) {
+    public void confirmCoordinate(double _long, double _lat) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public void addToponym(String _string) {
+    public void setCurrentWord(String _string) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public void addCoordinate(double _long, double _lat) {
+    public void incrementOffset() {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public void addCandidate(double _long, double _lat) {
+    public void setTokenAttribute(XMLStreamReader in, XMLStreamWriter out) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public void addRepresentative(double _long, double _lat) {
+    public void setToponymAttribute(XMLStreamReader in, XMLStreamWriter out) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public void setCurrentToponym(String _string) {
+    public void setCandidateAttribute(XMLStreamReader in, XMLStreamWriter out) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void setCurrentDocumentID(String _string) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void setCurrentSentenceID(String _string) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 }
