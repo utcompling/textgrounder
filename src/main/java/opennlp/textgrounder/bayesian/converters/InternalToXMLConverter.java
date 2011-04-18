@@ -107,6 +107,7 @@ public abstract class InternalToXMLConverter implements InternalToXMLConverterIn
                 while (sentit.hasNext()) {
                     sentit.next();
                 }
+                xmlSource.writeEndElement();
                 xmlSource.nextTag();
             }
             xmlSource.close();
@@ -116,43 +117,6 @@ public abstract class InternalToXMLConverter implements InternalToXMLConverterIn
             Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-//            XMLInputFactory factory = XMLInputFactory.newInstance();
-//            XMLStreamReader xmlStreamReader = null;
-//            xmlStreamReader = factory.createXMLStreamReader(new BufferedReader(new FileReader(new File(TRXMLPath))));
-//            while (xmlStreamReader.hasNext() && xmlStreamReader.next() != XMLStreamReader.START_ELEMENT) {
-//            }
-//
-//            xmlStreamReader.next();
-//
-//
-//
-//            Element inroot = indoc.getRootElement();
-//            Element outroot = new Element(inroot.getName());
-//            outdoc.addContent(outroot);
-//
-//            int counter = 0;
-//            int docid = 0;
-//
-//            ArrayList<Element> documents = new ArrayList<Element>(inroot.getChildren());
-//            for (Element document : documents) {
-//                Element outdocument = new Element(document.getName());
-//                copyAttributes(document, outdocument);
-//                outroot.addContent(outdocument);
-//
-//                ArrayList<Element> sentences = new ArrayList<Element>(document.getChildren());
-//                for (Element sentence : sentences) {
-//
-//                    Element outsentence = new Element(sentence.getName());
-//                    copyAttributes(sentence, outsentence);
-//                    outdocument.addContent(outsentence);
-//
-//                    ArrayList<Element> tokens = new ArrayList<Element>(sentence.getChildren());
-//                    for (Element token : tokens) {
-//
-//                        Element outtoken = new Element(token.getName());
-//                        copyAttributes(token, outtoken);
-//                        outsentence.addContent(outtoken);
-//
 //                        int isstopword = stopwordArray.get(counter);
 //                        int regid = regionArray.get(counter);
 //                        int wordid = wordArray.get(counter);
@@ -188,22 +152,6 @@ public abstract class InternalToXMLConverter implements InternalToXMLConverterIn
 //                }
 //                docid += 1;
 //            }
-//
-//        } catch (XMLStreamException ex) {
-//            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
-//            System.exit(1);
-//        } catch (FileNotFoundException ex) {
-//            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
-//            System.exit(1);
-//        }
-//
-//        try {
-//            XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
-//            xout.output(outdoc, new FileOutputStream(new File(pathToOutput)));
-//        } catch (IOException ex) {
-//            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
-//            System.exit(1);
-//        }
     }
 
     protected void copyAttributes(Element src, Element trg) {

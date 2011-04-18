@@ -15,6 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.converters;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
 
@@ -23,7 +26,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -43,10 +45,12 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
 
     private final XMLStreamReader in;
     private final XMLStreamWriter out;
+    private final BufferedWriter writer;
     protected T converterInterfaceObject;
 
-    public InternalToXMLSource(Reader _reader, Writer _writer, T _converterInterfaceObject) throws XMLStreamException {
+    public InternalToXMLSource(BufferedReader _reader, BufferedWriter _writer, T _converterInterfaceObject) throws XMLStreamException, IOException {
         converterInterfaceObject = _converterInterfaceObject;
+        writer = _writer;
 
         XMLInputFactory ifactory = XMLInputFactory.newInstance();
         in = ifactory.createXMLStreamReader(_reader);
@@ -63,7 +67,7 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
         }
     }
 
-    public int nextTag() throws XMLStreamException {
+    public int nextTag() throws XMLStreamException, IOException {
         int nextel = in.nextTag();
         writeElement();
         return nextel;
@@ -87,15 +91,22 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
         return this.in.isStartElement() && this.in.getLocalName().equals("doc");
     }
 
-    protected void writeElement() throws XMLStreamException {
+    protected void writeElement() throws XMLStreamException, IOException {
         String name = in.getLocalName();
-        out.writeStartElement(name);
-        int c = in.getAttributeCount();
-        for (int i = 0; i < c; ++i) {
-            String attrname = in.getAttributeLocalName(i);
-            String attrval = in.getAttributeValue(i);
-            out.writeAttribute(attrname, attrval);
+        if (in.isStartElement()) {
+            out.writeStartElement(name);
+            int c = in.getAttributeCount();
+            for (int i = 0; i < c; ++i) {
+                String attrname = in.getAttributeLocalName(i);
+                String attrval = in.getAttributeValue(i);
+                out.writeAttribute(attrname, attrval);
+            }
         }
+    }
+
+    public void writeEndElement() throws XMLStreamException, IOException {
+        out.writeEndElement();
+        writer.newLine();
     }
 
     @Override
@@ -107,6 +118,7 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
             InternalToXMLSource.this.nextTag();
         } catch (XMLStreamException ex) {
             Logger.getLogger(InternalToXMLSource.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException e) {
         }
 
         return new Document(id) {
@@ -169,6 +181,7 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
                                                     /**
                                                      * add closing nextTag calls only to elements that can have sister nodes.
                                                      */
+                                                    InternalToXMLSource.this.writeEndElement();
                                                     InternalToXMLSource.this.nextTag();
                                                     assert InternalToXMLSource.this.in.isEndElement()
                                                           && InternalToXMLSource.this.in.getLocalName().equals("rep");
@@ -180,16 +193,20 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
                                                  * that the representatives element is optional and therefore
                                                  * must be walked out of if it does occur
                                                  */
+                                                InternalToXMLSource.this.writeEndElement();
                                                 InternalToXMLSource.this.nextTag();
                                             }
+                                            InternalToXMLSource.this.writeEndElement();
                                             assert InternalToXMLSource.this.in.isEndElement()
                                                   && InternalToXMLSource.this.in.getLocalName().equals("cand");
                                         }
+                                        InternalToXMLSource.this.writeEndElement();
                                         assert InternalToXMLSource.this.in.isEndElement()
                                               && InternalToXMLSource.this.in.getLocalName().equals("candidates");
                                     }
                                     converterInterfaceObject.addToponym(toponym);
                                 }
+                                InternalToXMLSource.this.writeEndElement();
                                 InternalToXMLSource.this.nextTag();
                                 assert InternalToXMLSource.this.in.isEndElement()
                                       && (InternalToXMLSource.this.in.getLocalName().equals("w")
@@ -197,11 +214,14 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
                             }
                         } catch (XMLStreamException e) {
                             System.err.println("Error while reading XML file.");
+                        } catch (IOException e) {
                         }
                         try {
+                            InternalToXMLSource.this.writeEndElement();
                             InternalToXMLSource.this.nextTag();
                         } catch (XMLStreamException ex) {
                             Logger.getLogger(InternalToXMLSource.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (IOException e) {
                         }
                         return new SimpleSentence(id, null, null);
                     }

@@ -150,6 +150,5 @@ public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
 
     @Override
     public void setCurrentToponym(String _string) {
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 }
