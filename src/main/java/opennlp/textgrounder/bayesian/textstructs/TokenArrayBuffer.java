@@ -119,7 +119,6 @@ public class TokenArrayBuffer implements Serializable {
         documentArrayList.add(docIdx);
         toponymArrayList.add(topStatus);
 
-        String word = lexicon.getWordForInt(wordIdx);
         stopwordArrayList.add(stopStatus);
         size += 1;
         numDocs = docIdx;

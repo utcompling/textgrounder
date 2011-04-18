@@ -17,9 +17,6 @@
 package opennlp.textgrounder.bayesian.converters;
 
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
-import opennlp.textgrounder.bayesian.mathutils.TGMath;
-import opennlp.textgrounder.bayesian.topostructs.*;
-import org.jdom.Element;
 
 /**
  *
@@ -34,12 +31,5 @@ public class InternalToXMLConverterSphericalV2 extends InternalToXMLConverterSph
     public InternalToXMLConverterSphericalV2(
           ConverterExperimentParameters _converterExperimentParameters) {
         super(_converterExperimentParameters);
-    }
-
-    @Override
-    protected void setTokenAttribute(Element _token, int _wordid, int _regid, int _coordid) {
-        Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(TGMath.normalizeVector(regionMeans[_regid])));
-        _token.setAttribute("long", String.format("%.6f", coord.longitude));
-        _token.setAttribute("lat", String.format("%.6f", coord.latitude));
     }
 }

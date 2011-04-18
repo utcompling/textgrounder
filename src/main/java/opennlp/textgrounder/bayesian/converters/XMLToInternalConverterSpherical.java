@@ -105,13 +105,15 @@ public class XMLToInternalConverterSpherical extends XMLToInternalConverter {
     public void addToponym(String _string) {
         if (coordAdded) {
             tokenArrayBuffer.addElement(currentWID, docid, 1, 0);
+        } else {
+            addToken(_string);
         }
         coordAdded = false;
     }
 
     @Override
-    public void addCoordinate(double _long, double _lat) {
-        Coordinate coord = new Coordinate(_long, _lat);
+    public void addCoordinate(double _lat, double _long) {
+        Coordinate coord = new Coordinate(_lat, _long);
 
         if (!toponymToCoordinateMap.containsKey(currentWID)) {
             toponymToCoordinateMap.put(currentWID, new HashSet<Coordinate>());
@@ -122,12 +124,12 @@ public class XMLToInternalConverterSpherical extends XMLToInternalConverter {
     }
 
     @Override
-    public void addCandidate(double _long, double _lat) {
+    public void addCandidate(double _lat, double _long) {
         return;
     }
 
     @Override
-    public void addRepresentative(double _long, double _lat) {
+    public void addRepresentative(double _lat, double _long) {
         return;
     }
 

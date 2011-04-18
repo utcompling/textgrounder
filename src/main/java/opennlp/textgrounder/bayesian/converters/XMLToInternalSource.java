@@ -123,17 +123,17 @@ public class XMLToInternalSource<T extends XMLToInternalConverterInterface> exte
                                         while (XMLToInternalSource.this.in.nextTag() == XMLStreamReader.START_ELEMENT
                                               && XMLToInternalSource.this.in.getLocalName().equals("cand")) {
 
-                                            double lng = Double.parseDouble(XMLToInternalSource.this.in.getAttributeValue(null, "long"));
                                             double lat = Double.parseDouble(XMLToInternalSource.this.in.getAttributeValue(null, "lat"));
-                                            converterInterfaceObject.addCoordinate(lng, lat);
+                                            double lng = Double.parseDouble(XMLToInternalSource.this.in.getAttributeValue(null, "long"));
+                                            converterInterfaceObject.addCoordinate(lat, lng);
 
                                             if (XMLToInternalSource.this.in.nextTag() == XMLStreamReader.START_ELEMENT
                                                   && XMLToInternalSource.this.in.getLocalName().equals("representatives")) {
                                                 while (XMLToInternalSource.this.in.nextTag() == XMLStreamReader.START_ELEMENT
                                                       && XMLToInternalSource.this.in.getLocalName().equals("rep")) {
-                                                    lng = Double.parseDouble(XMLToInternalSource.this.in.getAttributeValue(null, "long"));
                                                     lat = Double.parseDouble(XMLToInternalSource.this.in.getAttributeValue(null, "lat"));
-                                                    converterInterfaceObject.addRepresentative(lng, lat);
+                                                    lng = Double.parseDouble(XMLToInternalSource.this.in.getAttributeValue(null, "long"));
+                                                    converterInterfaceObject.addRepresentative(lat, lng);
 
                                                     /**
                                                      * add closing nextTag calls only to elements that can have sister nodes.

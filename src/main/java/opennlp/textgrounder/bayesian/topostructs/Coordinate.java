@@ -29,17 +29,17 @@ import opennlp.textgrounder.bayesian.mathutils.TGMath;
  */
 public class Coordinate implements Serializable {
 
-    public double longitude;
     public double latitude;
+    public double longitude;
 
-    public Coordinate(double lon, double lat) {
-        longitude = lon;
-        latitude = lat;
+    public Coordinate(double _lat, double _long) {
+        latitude = _lat;
+        longitude = _long;
     }
 
-    public Coordinate(double[] coord) {
-        longitude = coord[1];
-        latitude = coord[0];
+    public Coordinate(double[] _coord) {
+        latitude = _coord[0];
+        longitude = _coord[1];
     }
 
     public double cosine(Coordinate _coord) {
@@ -61,10 +61,10 @@ public class Coordinate implements Serializable {
             return false;
         }
         final Coordinate other = (Coordinate) obj;
-        if (this.longitude != other.longitude) {
+        if (this.latitude != other.latitude) {
             return false;
         }
-        if (this.latitude != other.latitude) {
+        if (this.longitude != other.longitude) {
             return false;
         }
         return true;

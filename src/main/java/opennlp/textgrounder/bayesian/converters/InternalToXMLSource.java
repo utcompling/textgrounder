@@ -159,16 +159,16 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
                                         while (InternalToXMLSource.this.nextTag() == XMLStreamReader.START_ELEMENT
                                               && InternalToXMLSource.this.in.getLocalName().equals("cand")) {
 
-                                            double lng = Double.parseDouble(InternalToXMLSource.this.in.getAttributeValue(null, "long"));
                                             double lat = Double.parseDouble(InternalToXMLSource.this.in.getAttributeValue(null, "lat"));
-                                            converterInterfaceObject.confirmCoordinate(lng, lat);
+                                            double lng = Double.parseDouble(InternalToXMLSource.this.in.getAttributeValue(null, "long"));
+                                            converterInterfaceObject.confirmCoordinate(lat, lng, InternalToXMLSource.this.out);
 
                                             if (InternalToXMLSource.this.nextTag() == XMLStreamReader.START_ELEMENT
                                                   && InternalToXMLSource.this.in.getLocalName().equals("representatives")) {
                                                 while (InternalToXMLSource.this.nextTag() == XMLStreamReader.START_ELEMENT
                                                       && InternalToXMLSource.this.in.getLocalName().equals("rep")) {
-                                                    lng = Double.parseDouble(InternalToXMLSource.this.in.getAttributeValue(null, "long"));
                                                     lat = Double.parseDouble(InternalToXMLSource.this.in.getAttributeValue(null, "lat"));
+                                                    lng = Double.parseDouble(InternalToXMLSource.this.in.getAttributeValue(null, "long"));
 
                                                     /**
                                                      * add closing nextTag calls only to elements that can have sister nodes.
@@ -202,6 +202,8 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
                                 assert InternalToXMLSource.this.in.isEndElement()
                                       && (InternalToXMLSource.this.in.getLocalName().equals("w")
                                       || InternalToXMLSource.this.in.getLocalName().equals("toponym"));
+
+                                converterInterfaceObject.incrementOffset();
                             }
                         } catch (XMLStreamException e) {
                             System.err.println("Error while reading XML file.");

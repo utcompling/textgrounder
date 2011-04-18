@@ -152,17 +152,17 @@ public class XMLToInternalConverterRLDA extends XMLToInternalConverter {
     }
 
     @Override
-    public void addCoordinate(double _long, double _lat) {
+    public void addCoordinate(double _lat, double _long) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public void addCandidate(double _long, double _lat) {
+    public void addCandidate(double _lat, double _long) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
-    public void addRepresentative(double _long, double _lat) {
+    public void addRepresentative(double _lat, double _long) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 

@@ -26,7 +26,7 @@ import javax.xml.stream.XMLStreamWriter;
  */
 public interface InternalToXMLConverterInterface {
 
-    public void confirmCoordinate(double _long, double _lat);
+    public void confirmCoordinate(double _lat, double _long, XMLStreamWriter out) throws XMLStreamException;
 
     public void setCurrentWord(String _string);
 
@@ -38,7 +38,5 @@ public interface InternalToXMLConverterInterface {
 
     public void setTokenAttribute(XMLStreamReader in, XMLStreamWriter out) throws XMLStreamException;
 
-    public void setToponymAttribute(XMLStreamReader in, XMLStreamWriter out);
-
-    public void setCandidateAttribute(XMLStreamReader in, XMLStreamWriter out);
+    public void setToponymAttribute(XMLStreamReader in, XMLStreamWriter out) throws XMLStreamException;
 }

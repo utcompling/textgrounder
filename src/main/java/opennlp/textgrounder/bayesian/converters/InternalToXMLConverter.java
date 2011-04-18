@@ -19,10 +19,10 @@ package opennlp.textgrounder.bayesian.converters;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.logging.Level;
@@ -34,8 +34,6 @@ import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.textstructs.*;
 import opennlp.textgrounder.text.Sentence;
 import opennlp.textgrounder.text.Token;
-import org.jdom.Attribute;
-import org.jdom.Element;
 
 /**
  *
@@ -70,11 +68,11 @@ public abstract class InternalToXMLConverter implements InternalToXMLConverterIn
     /**
      *
      */
-    String currentDocumentID;
+    protected String currentDocumentID;
     /**
      *
      */
-    String currentSentenceID;
+    protected String currentSentenceID;
     /**
      *
      */
@@ -87,6 +85,14 @@ public abstract class InternalToXMLConverter implements InternalToXMLConverterIn
      *
      */
     protected int offset = 0;
+    /**
+     * 
+     */
+    protected boolean candidateSelected = false;
+    /**
+     *
+     */
+    protected boolean needToSelectCandidates = false;
 
     /**
      *
@@ -108,10 +114,6 @@ public abstract class InternalToXMLConverter implements InternalToXMLConverterIn
     }
 
     public abstract void initialize();
-
-    protected abstract void setTokenAttribute(Element _token, int _wordid, int _regid, int _coordid);
-
-    protected abstract void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid, int _offset);
 
     public void convert(String XMLInputPath, String XMLOutputPath) {
 
@@ -136,47 +138,26 @@ public abstract class InternalToXMLConverter implements InternalToXMLConverterIn
         } catch (XMLStreamException ex) {
             Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
         }
-
-//                        int isstopword = stopwordArray.get(counter);
-//                        int regid = regionArray.get(counter);
-//                        int wordid = wordArray.get(counter);
-//                        String word = "";
-//                        if (token.getName().equals("w")) {
-//                            word = token.getAttributeValue("tok").toLowerCase();
-//                            if (isstopword == 0) {
-//                                setTokenAttribute(outtoken, wordid, regid, 0);
-//                            }
-//                            counter += 1;
-//                        } else if (token.getName().equals("toponym")) {
-//                            word = token.getAttributeValue("term").toLowerCase();
-//                            ArrayList<Element> candidates = new ArrayList<Element>(token.getChild("candidates").getChildren());
-//                            setToponymAttribute(candidates, outtoken, wordid, regid, 0, counter);
-//                            counter += 1;
-//                        } else {
-//                            continue;
-//                        }
-//
-//                        String outword = lexicon.getWordForInt(wordid);
-//                        if (!word.equals(outword)) {
-//                            String did = document.getAttributeValue("id");
-//                            String sid = sentence.getAttributeValue("id");
-//                            int outdocid = docArray.get(counter);
-//                            System.err.println(String.format("Mismatch between "
-//                                  + "tokens. Occurred at source document %s, "
-//                                  + "sentence %s, token %s and target document %d, "
-//                                  + "offset %d, token %s, token id %d",
-//                                  did, sid, word, outdocid, counter, outword, wordid));
-//                            System.exit(1);
-//                        }
-//                    }
-//                }
-//                docid += 1;
-//            }
     }
 
-    protected void copyAttributes(Element src, Element trg) {
-        for (Attribute attr : new ArrayList<Attribute>(src.getAttributes())) {
-            trg.setAttribute(attr.getName(), attr.getValue());
+    @Override
+    public void incrementOffset() {
+        if (needToSelectCandidates) {
+            int wordid = wordArray.get(offset);
+            String word = lexicon.getWordForInt(wordid);
+
+            System.err.println("A candidate has not been selected!");
+            System.err.println("This occurred with the word: " + word);
+            System.err.println("At offset: " + offset);
+            System.err.println("Terminating prematurely");
+            System.exit(1);
         }
+        offset += 1;
+    }
+
+    @Override
+    public void setCurrentWord(String _string) {
+        currentWord = _string;
+        currentWordID = lexicon.addOrGetWord(_string);
     }
 }

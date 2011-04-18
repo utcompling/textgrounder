@@ -23,9 +23,14 @@ package opennlp.textgrounder.bayesian.converters;
 public interface XMLToInternalConverterInterface {
 
     public void addToken(String _string);
+
     public void addToponym(String _string);
-    public void addCoordinate(double _long, double _lat);
-    public void addCandidate(double _long, double _lat);
-    public void addRepresentative(double _long, double _lat);
+
+    public void addCoordinate(double _lat, double _long);
+
+    public void addCandidate(double _lat, double _long);
+
+    public void addRepresentative(double _lat, double _long);
+
     public void setCurrentToponym(String _string);
 }
