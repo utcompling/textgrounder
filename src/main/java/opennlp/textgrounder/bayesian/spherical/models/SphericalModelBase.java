@@ -595,20 +595,20 @@ public abstract class SphericalModelBase extends SphericalModelFields {
             double[] ilvl = new double[L];
             int[] incs = TGMath.inverseCumSum(dishByRestaurantCounts, docoff, docoff + L);
 
-            int l = 1;
+            int l = 0;
             try {
-                double a = TGMath.stableProd(ai, globalDishWeights[0]) + dishByRestaurantCounts[docoff];
-                double b = TGMath.stableProd(ai, 1 + incs[1]);
-                vl[l] = RKRand.rk_beta(a, b);
+//                double a = TGMath.stableProd(ai, globalDishWeights[0]) + dishByRestaurantCounts[docoff];
+//                double b = TGMath.stableProd(ai, 1 + incs[1]);
+//                vl[l] = RKRand.rk_beta(a, b);
 
-                for (; l < L - 2; ++l) {
-                    a = TGMath.stableProd(ai, globalDishWeights[l]) + dishByRestaurantCounts[docoff + l];
-                    b = TGMath.stableProd(ai, 1 - wcs[l - 1]) + incs[l + 1];
+                for (; l < L - 1; ++l) {
+                    double a = TGMath.stableProd(ai, globalDishWeights[l]) + dishByRestaurantCounts[docoff + l];
+                    double b = TGMath.stableProd(ai, 1 - wcs[l]) + incs[l + 1];
                     vl[l] = RKRand.rk_beta(a, b);
                 }
 
-                a = TGMath.stableProd(ai, globalDishWeights[l]) + dishByRestaurantCounts[docoff + l];
-                b = TGMath.stableProd(ai, 1 - wcs[l - 1]);
+                double a = TGMath.stableProd(ai, globalDishWeights[l]) + dishByRestaurantCounts[docoff + l];
+                double b = TGMath.stableProd(ai, 1 - wcs[l]);
                 vl[l] = RKRand.rk_beta(a, b);
 
             } catch (BetaEdgeException ex) {

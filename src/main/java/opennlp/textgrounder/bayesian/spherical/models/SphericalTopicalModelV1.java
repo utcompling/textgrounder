@@ -83,33 +83,20 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                 double ai = alpha[d];
 
                 double val = 1;
+                int l = 0;
                 try {
-                    val = RKRand.rk_beta(ai * globalDishWeights[0], ai);
-                    if (Double.isNaN(val)) {
-                        vl[0] = 0;
-                    } else {
-                        vl[0] = val;
-                    }
-
-                    int l = 1;
-                    try {
-                        for (; l < L; ++l) {
-                            val = RKRand.rk_beta(ai * globalDishWeights[l], ai * (1 - wcs[l - 1]));
-                            if (Double.isNaN(val)) {
-                                vl[l] = 0;
-                            } else {
-                                vl[l] = val;
-                            }
+                    for (; l < L - 1; ++l) {
+                        val = RKRand.rk_beta(ai * globalDishWeights[l], ai * (1 - wcs[l]));
+                        if (Double.isNaN(val)) {
+                            vl[l] = 0;
+                        } else {
+                            vl[l] = val;
                         }
-                    } catch (BetaEdgeException ex) {
-                        vl[l] = 1;
-//                        System.err.println(ex.getMessage());
-//                        System.err.println("This happened at iteration " + l + " of randomInitialize");
                     }
                 } catch (BetaEdgeException ex) {
-                    vl[0] = 1;
-//                    System.err.println(ex.getMessage());
-//                    System.err.println("This happened at iteration " + 0 + " of randomInitialize");
+                    vl[l] = 1;
+//                        System.err.println(ex.getMessage());
+//                        System.err.println("This happened at iteration " + l + " of randomInitialize");
                 }
 
                 vl[L - 1] = 1;
@@ -119,7 +106,7 @@ public class SphericalTopicalModelV1 extends SphericalModelBase {
                 ivl = TGMath.cumSum(ilvl);
 
                 localDishWeights[docoff] = vl[0];
-                for (int l = 1; l < L; ++l) {
+                for (l = 1; l < L; ++l) {
                     localDishWeights[docoff + l] = Math.exp(Math.log(vl[l]) + ivl[l - 1]);
                 }
             }
