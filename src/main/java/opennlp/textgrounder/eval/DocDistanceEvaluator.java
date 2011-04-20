@@ -28,6 +28,7 @@ public class DocDistanceEvaluator {
             //    System.out.println("have system coord but no gold coord for " + doc.getId());
             if(systemCoord != null && goldCoord != null) {
                 dreport.addDistance(systemCoord.distanceInKm(goldCoord));
+                //System.out.println("system: " + systemCoord + " gold: " + goldCoord);
             }
         }
 
