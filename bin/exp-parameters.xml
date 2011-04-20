@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <experiments>
   <ALL>
-    <verbose type="boolean">false</verbose>
+    <verbose type="boolean">true</verbose>
     <trackSamples type="boolean">true</trackSamples>
     <estimateHyperparameter type="int">1</estimateHyperparameter>
     <alpha_H type="double">10.000000</alpha_H>
