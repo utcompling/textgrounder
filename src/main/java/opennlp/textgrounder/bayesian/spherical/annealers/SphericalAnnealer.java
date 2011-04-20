@@ -20,7 +20,6 @@ import java.util.Arrays;
 import opennlp.textgrounder.bayesian.annealers.Annealer;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
 import opennlp.textgrounder.bayesian.mathutils.TGBLAS;
-import opennlp.textgrounder.bayesian.mathutils.TGMath;
 
 /**
  *
@@ -127,21 +126,21 @@ public abstract class SphericalAnnealer extends Annealer {
     protected void addToArrays(double[] _globalDishWeights, double[] _localDishWeights, double[][] _regionMeans,
           double[] _kappa, double[] _nonToponymByDishDirichlet, double[][] _toponymCoordinateDirichlet) {
         addToFirstMoment(globalDishWeightsFM, _globalDishWeights);
-        addToSecondMoment(globalDishWeightsSM, _globalDishWeights);
+//        addToSecondMoment(globalDishWeightsSM, _globalDishWeights);
         addToFirstMoment(localDishWeightsFM, _localDishWeights);
-        addToSecondMoment(localDishWeightsSM, _localDishWeights);
+//        addToSecondMoment(localDishWeightsSM, _localDishWeights);
         for (int l = 0; l < _regionMeans.length; ++l) {
             TGBLAS.daxpy(3, 1, _regionMeans[l], 1, regionMeansFM[l], 1);
 //            addToFirstMoment(regionMeansFM[l], _regionMeans[l]);
 //            addToCovariance(regionMeansFM[l], _regionMeans[l]);
         }
         addToFirstMoment(kappaFM, _kappa);
-        addToSecondMoment(kappaSM, _kappa);
+//        addToSecondMoment(kappaSM, _kappa);
         addToFirstMoment(nonToponymByDishDirichletFM, _nonToponymByDishDirichlet);
-        addToSecondMoment(nonToponymByDishDirichletSM, _nonToponymByDishDirichlet);
+//        addToSecondMoment(nonToponymByDishDirichletSM, _nonToponymByDishDirichlet);
         for (int l = 0; l < _toponymCoordinateDirichlet.length; ++l) {
             addToFirstMoment(toponymCoordinateDirichletFM[l], _toponymCoordinateDirichlet[l]);
-            addToCovariance(toponymCoordinateDirichletSM[l], _toponymCoordinateDirichlet[l]);
+//            addToCovariance(toponymCoordinateDirichletSM[l], _toponymCoordinateDirichlet[l]);
         }
     }
 
