@@ -135,8 +135,8 @@ public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
                 System.err.println("The candidate for this element has already been selected!");
                 System.err.println("This occurred with the word: " + word);
                 System.err.println("At offset: " + offset);
-                System.err.println("Terminating prematurely");
-                System.exit(1);
+//                System.err.println("Terminating prematurely");
+//                System.exit(1);
             }
             _out.writeAttribute("selected", "true");
             candidateSelected = true;

@@ -149,8 +149,9 @@ public abstract class InternalToXMLConverter implements InternalToXMLConverterIn
             System.err.println("A candidate has not been selected!");
             System.err.println("This occurred with the word: " + word);
             System.err.println("At offset: " + offset);
-            System.err.println("Terminating prematurely");
-            System.exit(1);
+            needToSelectCandidates = false;
+//            System.err.println("Terminating prematurely");
+//            System.exit(1);
         }
         offset += 1;
     }
