@@ -316,6 +316,9 @@ def listdict():
 def strdict():
   return defdict(str, add_upon_ref=False)
 
+def dictdict():
+  return defdict(dict, add_upon_ref=True)
+
 def tupledict():
   return defdict(tuple, add_upon_ref=False)
 
@@ -391,6 +394,18 @@ class SortedList(object, UserDict.DictMixin):
 #############################################################################
 #                                Table Output                               #
 #############################################################################
+
+def key_sorted_items(d):
+  return sorted(d.iteritems(), key=lambda x:x[0])
+
+def value_sorted_items(d):
+  return sorted(d.iteritems(), key=lambda x:x[1])
+
+def reverse_key_sorted_items(d):
+  return sorted(d.iteritems(), key=lambda x:x[0], reverse=True)
+
+def reverse_value_sorted_items(d):
+  return sorted(d.iteritems(), key=lambda x:x[1], reverse=True)
 
 # Given a table with values that are numbers, output the table, sorted
 # on the numbers from bigger to smaller.

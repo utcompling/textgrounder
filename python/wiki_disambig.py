@@ -2541,6 +2541,8 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
           'Articles with no training articles in region')
     if want_indiv_results:
       errprint("%s:Article %s:" % (doctag, article))
+      errprint("%s:  %d types, %d tokens" % (
+        doctag, len(article.dist.counts), article.dist.total_tokens))
       errprint("%s:  True region at rank: %s" % (doctag, rank))
       errprint("%s:  True region: %s" % (doctag, true_statreg))
       for i in xrange(5):
