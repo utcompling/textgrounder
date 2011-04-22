@@ -51,6 +51,14 @@ public class ExperimentParameters {
      */
     ////////////////////////////////////////////////////////////////////////
     /**
+     * Print various error messages during execution
+     */
+    protected boolean verbose = false;
+    /**
+     * Track the sampler for analytic purposes and to test convergence
+     */
+    protected boolean trackSamples = true;
+    /**
      * Switch for whether hyperparameters should be reestimated or not.
      * 0 is no, 1 is yes.
      */
@@ -237,6 +245,10 @@ public class ExperimentParameters {
      *
      */
     protected Enum<MODEL_TYPE> modelType = MODEL_TYPE.SV1;
+
+    public boolean isVerbose() {
+        return verbose;
+    }
 
     /**
      * @return the estimateHyperparameter
@@ -426,6 +438,26 @@ public class ExperimentParameters {
             } catch (IOException ex) {
                 Logger.getLogger(ExperimentParameters.class.getName()).log(Level.SEVERE, null, ex);
             }
+        }
+    }
+
+    /**
+     * Sets the verbosity level at the root level.
+     */
+    public void setVerbosity() {
+        if (!verbose) {
+//            System.setOut(new java.io.PrintStream(new java.io.OutputStream() {
+//
+//                @Override
+//                public void write(int b) {
+//                }
+//            }));
+            System.setErr(new java.io.PrintStream(new java.io.OutputStream() {
+
+                @Override
+                public void write(int b) {
+                }
+            }));
         }
     }
 }

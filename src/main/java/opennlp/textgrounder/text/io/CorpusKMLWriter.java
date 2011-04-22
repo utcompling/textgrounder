@@ -12,16 +12,22 @@ import opennlp.textgrounder.util.*;
 public class CorpusKMLWriter {
 
       protected final Corpus<? extends Token> corpus;
-      private final XMLOutputFactory factory;
+      protected final XMLOutputFactory factory;
 
-      private Map<opennlp.textgrounder.topo.Location, Integer> locationCounts;
-      private Map<opennlp.textgrounder.topo.Location, List<String> > contexts;
+      protected Map<opennlp.textgrounder.topo.Location, Integer> locationCounts;
+      protected Map<opennlp.textgrounder.topo.Location, List<String> > contexts;
 
-      public CorpusKMLWriter(Corpus<? extends Token> corpus) {
+    protected boolean outputGoldLocations;
+
+    public CorpusKMLWriter(Corpus<? extends Token> corpus, boolean outputGoldLocations) {
         this.corpus = corpus;
         this.factory = XMLOutputFactory.newInstance();
-        countLocationsAndPopulateContexts(corpus);
+        this.outputGoldLocations = outputGoldLocations;
       }
+
+    public CorpusKMLWriter(Corpus<? extends Token> corpus) {
+        this(corpus, false);
+    }
 
       private void countLocationsAndPopulateContexts(Corpus<? extends Token> corpus) {
           locationCounts = new HashMap<opennlp.textgrounder.topo.Location, Integer>();
@@ -35,8 +41,13 @@ public class CorpusKMLWriter {
                 for(Token token : sent) {
                     if(token.isToponym()) {
                         Toponym toponym = (Toponym) token;
-                        if(toponym.getAmbiguity() > 0 && toponym.hasSelected()) {
-                            opennlp.textgrounder.topo.Location loc = toponym.getCandidates().get(toponym.getSelectedIdx());
+                        if((!outputGoldLocations && toponym.getAmbiguity() > 0 && toponym.hasSelected())
+                           || (outputGoldLocations && toponym.hasGold())) {
+                            opennlp.textgrounder.topo.Location loc;
+                            if(!outputGoldLocations)
+                                loc = toponym.getCandidates().get(toponym.getSelectedIdx());
+                            else
+                                loc = toponym.getCandidates().get(toponym.getGoldIdx());
                             Integer prevCount = locationCounts.get(loc);
                             if(prevCount == null)
                                 prevCount = 0;
@@ -130,6 +141,8 @@ public class CorpusKMLWriter {
       }
 
       protected void write(XMLStreamWriter out) throws Exception {
+          
+          countLocationsAndPopulateContexts(corpus);
 
           KMLUtil.writeHeader(out, "corpus");
           

@@ -57,6 +57,12 @@ public class SimpleDocumentResolver extends Resolver {
                 //System.out.println("Setting mostCommonLoc for " + doc.getId() + " to " + mostCommonLoc.getName());
                 //System.out.println("goldCoord was " + doc.getGoldCoord());
             }
+            else if(boundingBox != null) {
+                doc.setSystemCoord(boundingBox.getCenter());
+            }
+            else {
+                doc.setSystemCoord(Coordinate.fromDegrees(0.0, 0.0));
+            }
         }
 
         return corpus;

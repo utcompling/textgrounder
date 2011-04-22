@@ -21,13 +21,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import javax.xml.stream.XMLStreamWriter;
+
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.mathutils.TGMath;
 import opennlp.textgrounder.bayesian.topostructs.*;
 import opennlp.textgrounder.bayesian.spherical.io.*;
 import opennlp.textgrounder.bayesian.structs.AveragedSphericalCountWrapper;
 import opennlp.textgrounder.bayesian.wrapper.io.*;
-import org.jdom.Element;
 
 /**
  *
@@ -43,6 +46,10 @@ public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
      * 
      */
     double[][] regionMeans;
+    /**
+     *
+     */
+    double[] kappa;
     /**
      *
      */
@@ -71,7 +78,8 @@ public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
     public void readCoordinateList() {
         AveragedSphericalCountWrapper ascw = inputReader.readProbabilities();
 
-        regionMeans = ascw.getAveragedRegionMeans();
+        regionMeans = ascw.getRegionMeansFM();
+        kappa = ascw.getKappaFM();
         toponymCoordinateLexicon = ascw.getToponymCoordinateLexicon();
     }
 
@@ -111,16 +119,75 @@ public class InternalToXMLConverterSphericalV1 extends InternalToXMLConverter {
     }
 
     @Override
-    protected void setTokenAttribute(Element _token, int _wordid, int _regid, int _coordid) {
-        return;
+    public void confirmCoordinate(double _lat, double _long, XMLStreamWriter _out) throws XMLStreamException {
+        if (!needToSelectCandidates && !candidateSelected) {
+            needToSelectCandidates = true;
+        }
+        int _coordid = coordArray.get(offset);
+        Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(toponymCoordinateLexicon[currentWordID][_coordid]));
+        Coordinate cand = new Coordinate(_lat, _long);
+        double cos = coord.cosine(cand);
+        if (cos > 1 - 1e-8) {
+            if (candidateSelected) {
+                int wordid = wordArray.get(offset);
+                String word = lexicon.getWordForInt(wordid);
+
+                System.err.println("The candidate for this element has already been selected!");
+                System.err.println("This occurred with the word: " + word);
+                System.err.println("At offset: " + offset);
+//                System.err.println("Terminating prematurely");
+//                System.exit(1);
+            }
+            _out.writeAttribute("selected", "true");
+            candidateSelected = true;
+            needToSelectCandidates = false;
+        }
     }
 
     @Override
-    protected void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid) {
-        if (!_candidates.isEmpty()) {
-            Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(toponymCoordinateLexicon[_wordid][_coordid]));
-            _token.setAttribute("long", String.format("%.6f", coord.longitude));
-            _token.setAttribute("lat", String.format("%.6f", coord.latitude));
+    public void setTokenAttribute(XMLStreamReader in, XMLStreamWriter out) throws XMLStreamException {
+        setToponymAttribute(in, out, "tok");
+    }
+
+    @Override
+    public void setToponymAttribute(XMLStreamReader in, XMLStreamWriter out) throws XMLStreamException {
+        setToponymAttribute(in, out, "term");
+        candidateSelected = false;
+    }
+
+    protected void setToponymAttribute(XMLStreamReader in, XMLStreamWriter out, String _attr) throws XMLStreamException {
+        int isstopword = stopwordArray.get(offset);
+        int wordid = wordArray.get(offset);
+
+        if (isstopword == 0) {
+            String word = in.getAttributeValue(null, _attr);
+            String outword = lexicon.getWordForInt(wordid);
+            int regionid = regionArray.get(offset);
+            if (word.toLowerCase().equals(outword.toLowerCase())) {
+                out.writeAttribute("regionid", Integer.toString(regionid));
+                out.writeAttribute("kappa", Double.toString(kappa[regionid]));
+                Coordinate coord = new Coordinate(TGMath.cartesianToGeographic(regionMeans[regionid]));
+                out.writeAttribute("long", String.format("%.6f", coord.longitude));
+                out.writeAttribute("lat", String.format("%.6f", coord.latitude));
+            } else {
+                int outdocid = docArray.get(offset);
+                System.err.println(String.format("Mismatch between "
+                      + "tokens. Occurred at source document %s, "
+                      + "sentence %s, token %s and target document %d, "
+                      + "offset %d, token %s, token id %d",
+                      currentDocumentID, currentSentenceID, word, outdocid, offset, outword, wordid));
+                System.exit(1);
+            }
         }
+    }
+
+    @Override
+    public void setCurrentDocumentID(String _string) {
+        currentDocumentID = _string;
+    }
+
+    @Override
+    public void setCurrentSentenceID(String _string) {
+        currentSentenceID = _string;
     }
 }

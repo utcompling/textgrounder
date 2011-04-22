@@ -16,27 +16,30 @@
 ///////////////////////////////////////////////////////////////////////////////
 package opennlp.textgrounder.bayesian.converters;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
+
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import javax.xml.stream.XMLStreamException;
+
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.textstructs.*;
-import org.jdom.Attribute;
-import org.jdom.Document;
-import org.jdom.Element;
-import org.jdom.JDOMException;
-import org.jdom.input.SAXBuilder;
-import org.jdom.output.Format;
-import org.jdom.output.XMLOutputter;
+import opennlp.textgrounder.text.Sentence;
+import opennlp.textgrounder.text.Token;
 
 /**
  *
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
-public abstract class InternalToXMLConverter {
+public abstract class InternalToXMLConverter implements InternalToXMLConverterInterface {
 
     /**
      *
@@ -62,6 +65,34 @@ public abstract class InternalToXMLConverter {
     protected ArrayList<Integer> toponymArray;
     protected ArrayList<Integer> stopwordArray;
     protected ArrayList<Integer> regionArray;
+    /**
+     *
+     */
+    protected String currentDocumentID;
+    /**
+     *
+     */
+    protected String currentSentenceID;
+    /**
+     *
+     */
+    protected String currentWord;
+    /**
+     *
+     */
+    protected int currentWordID;
+    /**
+     *
+     */
+    protected int offset = 0;
+    /**
+     * 
+     */
+    protected boolean candidateSelected = false;
+    /**
+     *
+     */
+    protected boolean needToSelectCandidates = false;
 
     /**
      *
@@ -79,110 +110,55 @@ public abstract class InternalToXMLConverter {
      *
      */
     public void convert() {
-        convert(pathToInput);
+        convert(pathToInput, pathToOutput);
     }
 
     public abstract void initialize();
 
-    protected abstract void setTokenAttribute(Element _token, int _wordid, int _regid, int _coordid);
-
-    protected abstract void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid);
-
-    public void convert(String TRXMLPath) {
+    public void convert(String XMLInputPath, String XMLOutputPath) {
 
         /**
          * read in xml
          */
-        File TRXMLPathFile = new File(TRXMLPath);
-
-        SAXBuilder builder = new SAXBuilder();
-        Document indoc = null;
-        Document outdoc = new Document();
         try {
-            indoc = builder.build(TRXMLPathFile);
-        } catch (JDOMException ex) {
-            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        } catch (IOException ex) {
-            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
-        }
-
-        Element inroot = indoc.getRootElement();
-        Element outroot = new Element(inroot.getName());
-        outdoc.addContent(outroot);
-
-        int counter = 0;
-        int docid = 0;
-
-        ArrayList<Element> documents = new ArrayList<Element>(inroot.getChildren());
-        for (Element document : documents) {
-            Element outdocument = new Element(document.getName());
-            copyAttributes(document, outdocument);
-            outroot.addContent(outdocument);
-
-            ArrayList<Element> sentences = new ArrayList<Element>(document.getChildren());
-            for (Element sentence : sentences) {
-
-                Element outsentence = new Element(sentence.getName());
-                copyAttributes(sentence, outsentence);
-                outdocument.addContent(outsentence);
-
-                ArrayList<Element> tokens = new ArrayList<Element>(sentence.getChildren());
-                for (Element token : tokens) {
-
-                    Element outtoken = new Element(token.getName());
-                    copyAttributes(token, outtoken);
-                    outsentence.addContent(outtoken);
-
-                    int isstopword = stopwordArray.get(counter);
-                    int regid = regionArray.get(counter);
-                    int wordid = wordArray.get(counter);
-                    String word = "";
-                    if (token.getName().equals("w")) {
-                        word = token.getAttributeValue("tok").toLowerCase();
-                        if (isstopword == 0) {
-                            setTokenAttribute(outtoken, wordid, regid, 0);
-                        }
-                        counter += 1;
-                    } else if (token.getName().equals("toponym")) {
-                        word = token.getAttributeValue("term").toLowerCase();
-                        ArrayList<Element> candidates = new ArrayList<Element>(token.getChild("candidates").getChildren());
-                        setToponymAttribute(candidates, outtoken, wordid, regid, 0);
-                        counter += 1;
-                    } else {
-                        continue;
-                    }
-
-                    String outword = lexicon.getWordForInt(wordid);
-                    if (!word.equals(outword)) {
-                        String did = document.getAttributeValue("id");
-                        String sid = sentence.getAttributeValue("id");
-                        int outdocid = docArray.get(counter);
-                        System.err.println(String.format("Mismatch between "
-                              + "tokens. Occurred at source document %s, "
-                              + "sentence %s, token %s and target document %d, "
-                              + "offset %d, token %s, token id %d",
-                              did, sid, word, outdocid, counter, outword, wordid));
-                        System.exit(1);
-                    }
+            InternalToXMLSource<InternalToXMLConverter> xmlSource =
+                  new InternalToXMLSource<InternalToXMLConverter>(new BufferedReader(new FileReader(new File(XMLInputPath))),
+                  new BufferedWriter(new FileWriter(new File(XMLOutputPath))), this);
+            while (xmlSource.hasNext()) {
+                Iterator<Sentence<Token>> sentit = xmlSource.next().iterator();
+                while (sentit.hasNext()) {
+                    sentit.next();
                 }
+                xmlSource.writeEndElement();
+                xmlSource.nextTag();
             }
-            docid += 1;
-        }
-
-        try {
-            XMLOutputter xout = new XMLOutputter(Format.getPrettyFormat());
-            xout.output(outdoc, new FileOutputStream(new File(pathToOutput)));
+            xmlSource.close();
         } catch (IOException ex) {
             Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
-            System.exit(1);
+        } catch (XMLStreamException ex) {
+            Logger.getLogger(InternalToXMLConverter.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
-    protected void copyAttributes(Element src, Element trg) {
-        for (Attribute attr : new ArrayList<Attribute>(src.getAttributes())) {
-            trg.setAttribute(attr.getName(), attr.getValue());
+    @Override
+    public void incrementOffset() {
+        if (needToSelectCandidates) {
+            int wordid = wordArray.get(offset);
+            String word = lexicon.getWordForInt(wordid);
+
+            System.err.println("A candidate has not been selected!");
+            System.err.println("This occurred with the word: " + word);
+            System.err.println("At offset: " + offset);
+            needToSelectCandidates = false;
+//            System.err.println("Terminating prematurely");
+//            System.exit(1);
         }
+        offset += 1;
+    }
+
+    @Override
+    public void setCurrentWord(String _string) {
+        currentWord = _string;
+        currentWordID = lexicon.addOrGetWord(_string);
     }
 }

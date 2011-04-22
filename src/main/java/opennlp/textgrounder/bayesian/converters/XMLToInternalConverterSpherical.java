@@ -29,9 +29,17 @@ import opennlp.textgrounder.bayesian.wrapper.io.*;
 public class XMLToInternalConverterSpherical extends XMLToInternalConverter {
 
     /**
+     * 
+     */
+    protected boolean coordAdded = false;
+    /**
      *
      */
     protected ToponymToCoordinateMap toponymToCoordinateMap;
+    /**
+     * 
+     */
+    protected int currentWID;
 
     /**
      * 
@@ -83,5 +91,50 @@ public class XMLToInternalConverterSpherical extends XMLToInternalConverter {
         }
 
         toponymToCoordinateMap.get(_wordid).add(_coord);
+    }
+
+    @Override
+    public void addToken(String _string) {
+        currentWID = lexicon.addOrGetWord(_string);
+        int isstopword = (stopwordList.isStopWord(_string) ? 1 : 0) | (currentWID >= validwords
+              ? 1 : 0);
+        tokenArrayBuffer.addElement(currentWID, docid, 0, isstopword);
+    }
+
+    @Override
+    public void addToponym(String _string) {
+        if (coordAdded) {
+            tokenArrayBuffer.addElement(currentWID, docid, 1, 0);
+        } else {
+            addToken(_string);
+        }
+        coordAdded = false;
+    }
+
+    @Override
+    public void addCoordinate(double _lat, double _long) {
+        Coordinate coord = new Coordinate(_lat, _long);
+
+        if (!toponymToCoordinateMap.containsKey(currentWID)) {
+            toponymToCoordinateMap.put(currentWID, new HashSet<Coordinate>());
+        }
+
+        toponymToCoordinateMap.get(currentWID).add(coord);
+        coordAdded = true;
+    }
+
+    @Override
+    public void addCandidate(double _lat, double _long) {
+        return;
+    }
+
+    @Override
+    public void addRepresentative(double _lat, double _long) {
+        return;
+    }
+
+    @Override
+    public void setCurrentToponym(String _string) {
+        currentWID = lexicon.addOrGetWord(_string);
     }
 }

@@ -20,7 +20,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -96,6 +95,8 @@ public class ExperimentParameterManipulator {
                     fieldValue = String.format("%d", field.getInt(_experimentParameters));
                 } else if (fieldTypeName.equals("double")) {
                     fieldValue = String.format("%f", field.getDouble(_experimentParameters));
+                } else if (fieldTypeName.equals("boolean")) {
+                    fieldValue = Boolean.toString(field.getBoolean(_experimentParameters));
                 } else if (fieldTypeName.equals("java.lang.String")) {
                     String s = (String) field.get(_experimentParameters);
                     fieldValue = s;
@@ -147,6 +148,9 @@ public class ExperimentParameterManipulator {
             } else if (_fieldTypeName.equals("double")) {
                 double value = Double.parseDouble(_fieldValue);
                 _class.getDeclaredField(_fieldName).setDouble(_experimentParameters, value);
+            } else if (_fieldTypeName.equals("boolean")) {
+                boolean value = Boolean.parseBoolean(_fieldValue);
+                _class.getDeclaredField(_fieldName).setBoolean(_experimentParameters, value);
             } else if (_fieldTypeName.equals("string")) {
                 _class.getDeclaredField(_fieldName).set(_experimentParameters, _fieldValue);
             } else if (_fieldTypeName.equals("enum")) {

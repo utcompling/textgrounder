@@ -47,7 +47,7 @@ import opennlp.textgrounder.topo.Coordinate;
 
 public class CorpusXMLWriter {
   protected final Corpus<? extends Token> corpus;
-  private final XMLOutputFactory factory;
+  protected final XMLOutputFactory factory;
 
   public CorpusXMLWriter(Corpus<? extends Token> corpus) {
     this.corpus = corpus;

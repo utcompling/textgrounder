@@ -128,6 +128,11 @@ public class SphericalModelFields implements Serializable {
      */
     protected int[] toponymVector;
     /**
+     * Vector of toponyms offsets. It's a fast index to only the offsets of
+     * toponyms in wordVector 
+     */
+    protected int[] toponymIdxVector;
+    /**
      * Vector of word indices
      */
     protected int[] wordVector;
@@ -254,6 +259,14 @@ public class SphericalModelFields implements Serializable {
         this.T = T;
     }
 
+    public int getL() {
+        return L;
+    }
+
+    public void setL(int L) {
+        this.L = L;
+    }
+
     public double getAlpha() {
         return alpha_H;
     }
@@ -262,44 +275,44 @@ public class SphericalModelFields implements Serializable {
         this.alpha_H = alpha;
     }
 
-    public double[] getAveragedAllWordsRegionCounts() {
+    public double[] getLocalDishWeightsFM() {
         return localDishWeightsFM;
     }
 
-    public void setAveragedAllWordsRegionCounts(double[] averagedAllWordsRegionCounts) {
-        this.localDishWeightsFM = averagedAllWordsRegionCounts;
+    public void setLocalDishWeightsFM(double[] _localDishWeightsFM) {
+        this.localDishWeightsFM = _localDishWeightsFM;
     }
 
-    public double[] getAveragedRegionByDocumentCounts() {
+    public double[] getKappaFM() {
         return kappaFM;
     }
 
-    public void setAveragedRegionByDocumentCounts(double[] averagedRegionByDocumentCounts) {
-        this.kappaFM = averagedRegionByDocumentCounts;
+    public void setKappaFM(double[] _kappaFM) {
+        this.kappaFM = _kappaFM;
     }
 
-    public double[][] getAveragedRegionMeans() {
+    public double[][] getRegionMeansFM() {
         return regionMeansFM;
     }
 
-    public void setAveragedRegionMeans(double[][] averagedRegionMeans) {
-        this.regionMeansFM = averagedRegionMeans;
+    public void setRegionMeansFM(double[][] _regionMeansFM) {
+        this.regionMeansFM = _regionMeansFM;
     }
 
-    public double[][] getAveragedRegionToponymCoordinateCounts() {
+    public double[][] getToponymCoordinateDirichletFM() {
         return toponymCoordinateDirichletFM;
     }
 
-    public void setAveragedRegionToponymCoordinateCounts(double[][] averagedRegionToponymCoordinateCounts) {
-        this.toponymCoordinateDirichletFM = averagedRegionToponymCoordinateCounts;
+    public void setToponymCoordinateDirichletFM(double[][] _toponymCoordinateDirichletFM) {
+        this.toponymCoordinateDirichletFM = _toponymCoordinateDirichletFM;
     }
 
-    public double[] getAveragedWordByRegionCounts() {
+    public double[] getGlobalDishWeightsFM() {
         return globalDishWeightsFM;
     }
 
-    public void setAveragedWordByRegionCounts(double[] averagedWordByRegionCounts) {
-        this.globalDishWeightsFM = averagedWordByRegionCounts;
+    public void setGlobalDishWeightsFM(double[] _globalDishWeightsFM) {
+        this.globalDishWeightsFM = _globalDishWeightsFM;
     }
 
     public int getCoordParamLen() {
@@ -324,14 +337,6 @@ public class SphericalModelFields implements Serializable {
 
     public void setDocumentVector(int[] documentVector) {
         this.documentVector = documentVector;
-    }
-
-    public int getL() {
-        return L;
-    }
-
-    public void setL(int L) {
-        this.L = L;
     }
 
     public int getMaxCoord() {
@@ -366,12 +371,12 @@ public class SphericalModelFields implements Serializable {
         this.toponymCoordinateCounts = regionToponymCoordinateCounts;
     }
 
-    public int[] getRegionVector() {
+    public int[] getDishVector() {
         return dishVector;
     }
 
-    public void setRegionVector(int[] regionVector) {
-        this.dishVector = regionVector;
+    public void setDishVector(int[] _dishVector) {
+        this.dishVector = _dishVector;
     }
 
     public int[] getStopwordVector() {
@@ -406,27 +411,27 @@ public class SphericalModelFields implements Serializable {
         this.wordVector = wordVector;
     }
 
-    public double[] getAveragedTopicByDocumentCounts() {
+    public double[] getNonToponymByDishDirichletFM() {
         return nonToponymByDishDirichletFM;
     }
 
-    public void setAveragedTopicByDocumentCounts(double[] averagedTopicByDocumentCounts) {
-        this.nonToponymByDishDirichletFM = averagedTopicByDocumentCounts;
+    public void setNonToponymByDishDirichletFM(double[] _nonToponymByDishDirichletFM) {
+        this.nonToponymByDishDirichletFM = _nonToponymByDishDirichletFM;
     }
 
-    public int[] getTopicByDocumentCounts() {
+    public int[] getDishByRestaurantCounts() {
         return dishByRestaurantCounts;
     }
 
-    public void setTopicByDocumentCounts(int[] topicByDocumentCounts) {
-        this.dishByRestaurantCounts = topicByDocumentCounts;
+    public void setDishByRestaurantCounts(int[] _dishByRestaurantCounts) {
+        this.dishByRestaurantCounts = _dishByRestaurantCounts;
     }
 
-    public int[] getToponymRegionCounts() {
+    public int[] getToponymByDishCounts() {
         return toponymByDishCounts;
     }
 
-    public void setToponymRegionCounts(int[] toponymRegionCounts) {
-        this.toponymByDishCounts = toponymRegionCounts;
+    public void setToponymByDishCounts(int[] _toponymByDishCounts) {
+        this.toponymByDishCounts = _toponymByDishCounts;
     }
 }

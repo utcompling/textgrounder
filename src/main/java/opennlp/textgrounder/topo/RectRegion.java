@@ -47,8 +47,8 @@ public class RectRegion extends Region {
    * longitude. Should be changed to avoid problems around zero degrees.
    */
   public Coordinate getCenter() {
-    return Coordinate.fromRadians((this.maxLat - this.minLat) / 2.0,
-                                  (this.maxLng - this.minLng) / 2.0);
+    return Coordinate.fromRadians((this.maxLat + this.minLat) / 2.0,
+                                  (this.maxLng + this.minLng) / 2.0);
   }
 
   public boolean contains(double lat, double lng) {

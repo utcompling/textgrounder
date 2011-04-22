@@ -40,25 +40,31 @@ public class GeoTextSource extends DocumentSource {
             continue;
 
         String docId = tokens[0];
+        long userId = Long.parseLong(docId.substring(docId.indexOf("_")+1), 16);
+        
+        long fold = (userId % 5);
+        fold = fold==0? 5 : fold;
+        if(fold == 4) { // reads dev set only
 
-        if(!docId.equals(prevDocId)) {
-            curDoc = new GeoTextDocument(docId, tokens[1],
-                                         Double.parseDouble(tokens[3]),
-                                         Double.parseDouble(tokens[4]));
-            documents.add(curDoc);
-            sentIndex = -1;
+            if(!docId.equals(prevDocId)) {
+                curDoc = new GeoTextDocument(docId, tokens[1],
+                                             Double.parseDouble(tokens[3]),
+                                             Double.parseDouble(tokens[4]));
+                documents.add(curDoc);
+                sentIndex = -1;
+            }
+            prevDocId = docId;
+            
+            String rawSent = tokens[5];
+            sentIndex++;
+            List<Token> wList = new ArrayList<Token>();
+            
+            for(String w : tokenizer.tokenize(rawSent)) {
+                wList.add(new SimpleToken(w));
+            }
+            
+            curDoc.addSentence(new SimpleSentence("" + sentIndex, wList));
         }
-        prevDocId = docId;
-
-        String rawSent = tokens[5];
-        sentIndex++;
-        List<Token> wList = new ArrayList<Token>();
-
-        for(String w : tokenizer.tokenize(rawSent)) {
-            wList.add(new SimpleToken(w));
-        }
-
-        curDoc.addSentence(new SimpleSentence("" + sentIndex, wList));
     }
 
     //XMLInputFactory factory = XMLInputFactory.newInstance();
