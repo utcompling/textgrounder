@@ -14,6 +14,8 @@ from collections import deque # For breadth-first search
 from subprocess import * # For backquote
 from errno import * # For backquote
 import os # For get_program_memory_usage_ps()
+import os.path # For exists of /proc, etc.
+import fileinput # For uchompopen() etc.
 
 #############################################################################
 #                        Regular expression functions                       #
@@ -81,22 +83,93 @@ def research(pattern, string, flags=0):
 #### Same as chompopen() but specifically open the file as 'utf-8' and
 #### return Unicode strings.
 
-# Open a filename with UTF-8-encoded input and yield lines converted to
-# Unicode strings, but with any terminating newline removed (similar to
-# "chomp" in Perl).
-def uchompopen(filename, errors='strict'):
-  with codecs.open(filename, encoding='utf-8', errors=errors) as f:
-    for line in f:
+#"""
+#Test gopen
+#
+#import nlputil
+#for line in nlputil.gopen("foo.txt"):
+#  print line
+#for line in nlputil.gopen("foo.txt", chomp=True):
+#  print line
+#for line in nlputil.gopen("foo.txt", encoding='utf-8'):
+#  print line
+#for line in nlputil.gopen("foo.txt", encoding='utf-8', chomp=True):
+#  print line
+#for line in nlputil.gopen("foo.txt", encoding='iso-8859-1'):
+#  print line
+#for line in nlputil.gopen(["foo.txt"], encoding='iso-8859-1'):
+#  print line
+#for line in nlputil.gopen(["foo.txt"], encoding='utf-8'):
+#  print line
+#for line in nlputil.gopen(["foo.txt"], encoding='iso-8859-1', chomp=True):
+#  print line
+#for line in nlputil.gopen(["foo.txt", "foo2.txt"], encoding='iso-8859-1', chomp=True):
+#  print line
+#"""
+
+# General function for opening a file, with automatic closure after iterating
+# through the lines.  The encoding can be specified (e.g. 'utf-8'), and if so,
+# the error-handling can be given.  Whether to remove the final newline
+# (chomp=True) can be specified.  The filename can be either a regular
+# filename (opened with open) or codecs.open(), or a list of filenames or
+# None, in which case the argument is passed to fileinput.input()
+# (if a non-empty list is given, opens the list of filenames one after the
+# other; if an empty list is given, opens stdin; if None is given, takes
+# list from the command-line arguments and proceeds as above).  When using
+# fileinput.input(), the arguments "inplace", "backup" and "bufsize" can be
+# given, appropriate to that function (e.g. to do in-place filtering of a
+# file).  In all cases, 
+def gopen(filename, mode='r', encoding=None, errors='strict', chomp=False,
+    inplace=0, backup="", bufsize=0):
+  if isinstance(filename, basestring):
+    def yieldlines():
+      if encoding is None:
+        mgr = open(filename)
+      else:
+        mgr = codecs.open(filename, mode, encoding=encoding, errors=errors)
+      with mgr as f:
+        for line in f:
+          yield line
+    iterator = yieldlines()
+  else:
+    if encoding is None:
+      openhook = None
+    else:
+      def openhook(filename, mode):
+        return codecs.open(filename, mode, encoding=encoding, errors=errors)
+    iterator = fileinput.input(filename, inplace=inplace, backup=backup,
+        bufsize=bufsize, mode=mode, openhook=openhook)
+  if chomp:
+    for line in iterator:
       if line and line[-1] == '\n': line = line[:-1]
+      yield line
+  else:
+    for line in iterator:
       yield line
 
+# Open a filename with UTF-8-encoded input and yield lines converted to
+# Unicode strings, but with any terminating newline removed (similar to
+# "chomp" in Perl).  Basically same as gopen() but with defaults set
+# differently.
+def uchompopen(filename, mode='r', encoding='utf-8', errors='strict',
+    chomp=True, inplace=0, backup="", bufsize=0):
+  return gopen(filename, mode=mode, encoding=encoding, errors=errors,
+      chomp=chomp, inplace=inplace, backup=backup, bufsize=bufsize)
+
 # Open a filename and yield lines, but with any terminating newline
-# removed (similar to "chomp" in Perl).
-def chompopen(filename):
-  with open(filename) as f:
-    for line in f:
-      if line and line[-1] == '\n': line = line[:-1]
-      yield line
+# removed (similar to "chomp" in Perl).  Basically same as gopen() but
+# with defaults set differently.
+def chompopen(filename, mode='r', encoding=None, errors='strict',
+    chomp=True, inplace=0, backup="", bufsize=0):
+  return gopen(filename, mode=mode, encoding=encoding, errors=errors,
+      chomp=chomp, inplace=inplace, backup=backup, bufsize=bufsize)
+
+# Open a filename with UTF-8-encoded input.  Basically same as gopen()
+# but with defaults set differently.
+def uopen(filename, mode='r', encoding='utf-8', errors='strict',
+    chomp=False, inplace=0, backup="", bufsize=0):
+  return gopen(filename, mode=mode, encoding=encoding, errors=errors,
+      chomp=chomp, inplace=inplace, backup=backup, bufsize=bufsize)
 
 #############################################################################
 #                         Other basic utility functions                     #
@@ -681,6 +754,16 @@ def get_program_time_usage():
   return time.time() - beginning_prog_time
 
 def get_program_memory_usage():
+  if os.path.exists("/proc/self/status"):
+    return get_program_memory_usage_proc()
+  else:
+    try:
+      return get_program_memory_usage_ps()
+    except:
+      return get_program_memory_rusage()
+
+
+def get_program_memory_usage_rusage():
   res = resource.getrusage(resource.RUSAGE_SELF)
   # FIXME!  This is "maximum resident set size".  There are other more useful
   # values, but on the Mac at least they show up as 0 in this structure.
@@ -726,7 +809,7 @@ def output_resource_usage():
   errprint("Total elapsed time since program start: %s" %
            format_minutes_seconds(get_program_time_usage()))
   errprint("Memory usage: %s bytes" %
-      int_with_commas(get_program_memory_usage_proc()))
+      int_with_commas(get_program_memory_usage()))
 
 #############################################################################
 #                             Hash tables by range                          #
