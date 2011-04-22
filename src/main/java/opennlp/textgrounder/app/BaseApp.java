@@ -16,6 +16,8 @@ public class BaseApp {
     private static String graphInputPath = null;
     private static String outputPath = null;
     private static String kmlOutputPath = null;
+    private static boolean outputGoldLocations = false;
+    private static boolean outputUserKML = false;
     private static String geoGazetteerFilename = null;
     private static String serializedGazetteerPath = null;
     private static String serializedCorpusInputPath = null;
@@ -61,6 +63,8 @@ public class BaseApp {
         options.addOption("it", "iterations", true, "number of iterations for iterative models [default = 1]");
         options.addOption("o", "output", true, "output path");
         options.addOption("ok", "output-kml", true, "kml output path");
+        options.addOption("oku", "output-kml-users", false, "output user-based KML rather than toponym-based KML");
+        options.addOption("gold", "output-gold-locations", false, "output gold locations rather than system locations in KML");
         options.addOption("g", "geo-gazetteer-filename", true, "GeoNames gazetteer filename");
         options.addOption("sg", "serialized-gazetteer-path", true, "path to serialized GeoNames gazetteer");
         options.addOption("sci", "serialized-corpus-input-path", true, "path to serialized corpus for input");
@@ -130,6 +134,8 @@ public class BaseApp {
                         graphOutputPath = value;
                     else if(option.getOpt().equals("ok"))
                         kmlOutputPath = value;
+                    else if(option.getOpt().equals("oku"))
+                        outputUserKML = true;
                     else if(option.getOpt().equals("os"))
                         seedOutputPath = value;
                     break;
@@ -150,6 +156,8 @@ public class BaseApp {
                 case 'g':
                     if(option.getOpt().equals("g"))
                         geoGazetteerFilename = value;
+                    else if(option.getOpt().equals("gold"))
+                        outputGoldLocations = true;
                     break;
                 case 's':
                     if(option.getOpt().equals("sg"))
@@ -219,6 +227,14 @@ public class BaseApp {
 
     public static String getKMLOutputPath() {
         return kmlOutputPath;
+    }
+
+    public static boolean getOutputGoldLocations() {
+        return outputGoldLocations;
+    }
+
+    public static boolean getOutputUserKML() {
+        return outputUserKML;
     }
 
     public static String getGeoGazetteerFilename() {

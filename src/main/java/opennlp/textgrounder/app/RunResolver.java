@@ -136,7 +136,7 @@ public class RunResolver extends BaseApp {
         }
 
         if(getKMLOutputPath() != null) {
-            WriteCorpusToKML.writeToKML(disambiguated, getKMLOutputPath());
+            WriteCorpusToKML.writeToKML(disambiguated, getKMLOutputPath(), getOutputGoldLocations(), getOutputUserKML(), getCorpusFormat());
         }
 
         endTime = System.currentTimeMillis();

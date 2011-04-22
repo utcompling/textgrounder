@@ -160,17 +160,32 @@ public class KMLUtil {
     w.writeEndElement(); // LookAt
   }
 
+    public static void writePlacemark(XMLStreamWriter w, String name,
+                                      Coordinate coord, double radius) throws XMLStreamException {
+        w.writeStartElement("Placemark");
+        KMLUtil.writeWithCharacters(w, "name", name);
+        KMLUtil.writeRegion(w, coord, radius);
+        KMLUtil.writeWithCharacters(w, "styleUrl", "#bar");
+        w.writeStartElement("Point");
+        KMLUtil.writeWithCharacters(w, "coordinates", df.format(coord.getLngDegrees()) + "," + df.format(coord.getLatDegrees()));
+        w.writeEndElement(); // Point
+        w.writeEndElement(); // Placemark
+    }
+
   public static void writePolygon(XMLStreamWriter w, String name,
                                   Coordinate coord, int sides, double radius, double height)
     throws XMLStreamException {
-    w.writeStartElement("Placemark");
+      /*w.writeStartElement("Placemark");
     KMLUtil.writeWithCharacters(w, "name", name);
     KMLUtil.writeRegion(w, coord, radius);
     KMLUtil.writeWithCharacters(w, "styleUrl", "#bar");
     w.writeStartElement("Point");
     KMLUtil.writeWithCharacters(w, "coordinates", df.format(coord.getLngDegrees()) + "," + df.format(coord.getLatDegrees()));
     w.writeEndElement(); // Point
-    w.writeEndElement(); // Placemark
+    w.writeEndElement(); // Placemark*/
+
+      writePlacemark(w, name, coord, radius);
+
     w.writeStartElement("Placemark");
     KMLUtil.writeWithCharacters(w, "name", name + " POLYGON");
     KMLUtil.writeWithCharacters(w, "styleUrl", "#bar");
