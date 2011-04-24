@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Run wiki_disambig.py, passing it various useful arguments.  Extra arguments
+# Run disambig.py, passing it various useful arguments.  Extra arguments
 # can be specified on the command line, which will override any existing
 # arguments.
 #
@@ -8,12 +8,16 @@
 # while saving the output to a file.
 
 if [ -z "$TEXTGROUNDER_PYTHON" ]; then
-  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+  if [ -z "$TEXTGROUNDER_DIR" ]; then
+    echo "With TEXTGROUNDER_PYTHON unset, must set TEXTGROUNDER_DIR to point"
+    echo "to top-level directory where TextGrounder is installed."
+  fi
+  TEXTGROUNDER_PYTHON="$TEXTGROUNDER_DIR/python"
 fi
 
 . $TEXTGROUNDER_PYTHON/config-wikigrounder
 
-WIKI_DISAMBIG="$TEXTGROUNDER_PYTHON/wiki_disambig.py"
+WIKI_DISAMBIG="$TEXTGROUNDER_PYTHON/disambig.py"
 
 #MODE="match-only"
 #MODE="geotag-toponyms"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 #######
-####### wiki_disambig.py
+####### disambig.py
 #######
 ####### Copyright (c) 2010 Ben Wing.
 #######
@@ -2684,6 +2684,22 @@ def read_article_data(filename):
 
 def read_word_counts(filename):
 
+  # This is basically a one-off debug statement because of the fact that
+  # the experiments published in the paper used a word-count file generated
+  # using an older algorithm for determining the geotagged coordinate of
+  # a Wikipedia article.  We didn't record the corresponding article-data
+  # file, so we need a way of regenerating it using the intersection of
+  # articles in the article-data file we actually used for the experiments
+  # and the word-count file we used.
+  if debug['wordcountarts']:
+    # Change this if you want a different file name
+    wordcountarts_filename = 'wordcountarts-combined-article-data.txt'
+    wordcountarts_file = open(wordcountarts_filename, "w")
+    # See write_article_data_file() in process_article_data.py
+    outfields = combined_article_data_outfields
+    field_types = get_output_field_types(outfields)
+    uniprint('\t'.join(outfields), outfile=wordcountarts_file)
+
   def one_article_probs():
     if total_tokens == 0: return
     art = ArticleTable.lookup_article(title)
@@ -2691,6 +2707,8 @@ def read_word_counts(filename):
       warning("Skipping article %s, not in table" % title)
       ArticleTable.num_articles_with_word_counts_but_not_in_table += 1
       return
+    if debug['wordcountarts']:
+      art.output_row(wordcountarts_file, outfields, field_types)
     ArticleTable.num_word_count_articles_by_split[art.split] += 1
     # If we are evaluating on the dev set, skip the test set and vice
     # versa, to save memory and avoid contaminating the results.
@@ -2743,6 +2761,8 @@ def read_word_counts(filename):
   else:
     one_article_probs()
 
+  if debug['wordcountarts']:
+    wordcountarts_file.close()
   errprint("Finished reading distributions from %s articles." % (status.num_processed()))
   ArticleTable.num_articles_with_word_counts = status.num_processed()
   output_resource_usage()
@@ -3014,12 +3034,15 @@ any others in a division.  Points farther away than this are ignored as
                            'match-only'],
                   help="""Action to perform.
 
-'match-only' means to only do the stage that involves finding matches between
-gazetteer locations and Wikipedia articles (mostly useful when debugging
-output is enabled).
-
 'geotag-documents' finds the proper location for each document (or article)
 in the test set.
+
+'geotag-toponyms' finds the proper location for each toponym in the test set.
+The test set is specified by --eval-file.  Default '%default'.
+
+'segment-geotag-documents' simultaneously segments a document into sections
+covering a specific location and determines that location. (Not yet
+implemented.)
 
 'generate-kml' generates KML files for some set of words, showing the
 distribution over regions that the word determines.  Use '--kml-words' to
@@ -3028,11 +3051,10 @@ specify the words whose distributions should be outputted.  See also
 '--kml-transform' to specify the function to use (if any) to transform
 the probabilities to make the distinctions among them more visible.
 
-'segment-geotag-documents' simultaneously segments a document into sections
-covering a specific location and determines that location.
-
-'geotag-toponyms' finds the proper location for each toponym in the test set.
-The test set is specified by --eval-file.  Default '%default'.""")
+'match-only' means to only do the stage that involves finding matches between
+gazetteer locations and Wikipedia articles (mostly useful when debugging
+output is enabled).
+""")
 
     op.add_option("-s", "--strategy", "--s", type='choice', action='append',
                   default=None,

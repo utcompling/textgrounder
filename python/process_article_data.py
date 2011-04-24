@@ -78,6 +78,13 @@ class Article(object):
     redirstr = ", redirect to %s" % self.redir if self.redir else ""
     return '%s(%s)%s%s' % (self.title, self.id, coordstr, redirstr)
 
+  # Output row of an article-data file, normal format.  'outfields' is
+  # a list of the fields to output, and 'outfield_types' is a list of
+  # corresponding types, determined by a call to get_output_field_types().
+  def output_row(self, outfile, outfields, outfield_types):
+    fieldvals = [t(getattr(art, f)) for f,t in zip(outfields, field_types)]
+    uniprint('\t'.join(fieldvals), outfile=outfile)
+
 def yesno_to_boolean(foo):
   if foo == 'yes': return True
   else:
@@ -128,11 +135,21 @@ known_fields_output = {'id':tostr, 'title':tostr, 'split':tostr,
                        'is_list':boolean_to_yesno, 'coord':coord_to_commaval,
                        'incoming_links':put_int_or_blank}
 
+combined_article_data_outfields = ['id', 'title', 'split', 'redir',
+    'namespace', 'is_list_of', 'is_disambig', 'is_list', 'coord',
+    'incoming_links']
+
 def get_field_types(field_table, field_list):
   for f in field_list:
     if f not in field_table:
       warning("Saw unknown field name %s" % f)
   return [field_table.get(f, identity) for f in field_list]
+
+def get_input_field_types(field_list):
+  return get_field_types(known_fields_input, field_list)
+
+def get_output_field_types(field_list):
+  return get_field_types(known_fields_output, field_list)
 
 # Read in the article data file.  Call PROCESS on each article.
 # The type of the article created is given by ARTICLE_TYPE, which defaults
@@ -146,7 +163,7 @@ def read_article_data_file(filename, process, article_type=Article,
 
   fi = uchompopen(filename)
   fields = fi.next().split('\t')
-  field_types = get_field_types(known_fields_input, fields)
+  field_types = get_input_field_types(fields)
   for line in fi:
     fieldvals = line.split('\t')
     if len(fieldvals) != len(field_types):
@@ -164,9 +181,8 @@ def read_article_data_file(filename, process, article_type=Article,
   return fields
 
 def write_article_data_file(outfile, outfields, articles):
-  field_types = get_field_types(known_fields_output, outfields)
+  field_types = get_output_field_types(outfields)
   uniprint('\t'.join(outfields), outfile=outfile)
   for art in articles:
-    fieldvals = [t(getattr(art, f)) for f,t in zip(outfields, field_types)]
-    uniprint('\t'.join(fieldvals), outfile=outfile)
+    art.output_row(outfile, outfields, field_types)
   outfile.close()

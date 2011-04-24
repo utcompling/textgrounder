@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Run wiki_disambig.py, passing it various useful arguments for running
+# Run disambig.py, passing it various useful arguments for running
 # on Eisenstein et al (2010)'s Twitter data.  Extra arguments
 # can be specified on the command line, which will override any existing
 # arguments.
@@ -14,7 +14,7 @@ fi
 
 . $TEXTGROUNDER_PYTHON/config-wikigrounder
 
-WIKI_DISAMBIG="$TEXTGROUNDER_PYTHON/wiki_disambig.py"
+WIKI_DISAMBIG="$TEXTGROUNDER_PYTHON/disambig.py"
 
 #MODE="match-only"
 #MODE="geotag-toponyms"
