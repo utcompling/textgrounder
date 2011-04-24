@@ -1,7 +1,179 @@
 README.txt for WikiGrounder
-Copyright (c) 2011 Ben Wing.
+April 23, 2011
+Copyright (c) 2011 Ben Wing <ben@benwing.com>
 
-Currently this sits in the Python directory of TextGrounder, but soon
+WikiGrounder is software for automatically "grounding" a document -- i.e.
+assining a location somewhere on the Earth, as determined by a pair of
+latitude/longitude coordinates, to a document.
+
+This software implements the experiments described in the following paper:
+
+Benjamin Wing and Jason Baldridge (2011), "Simple Supervised Document
+    Geolocation with Geodesic Grids" in Proceedings of the 49th Annual
+    Meeting of the Association for Computational Linguistics: Human Language
+    Technologies, Portland, Oregon, USA, June 2011.
+
+If you use this system in academic research with published results,
+please cite this paper, or use this Bibtex:
+
+@InProceedings{wing-baldridge:2011:ACL,
+  author    = {Wing, Benjamin and Baldridge, Jason},
+  title     = {Simple Supervised Document Geolocation with Geodesic Grids},
+  booktitle = {Proceedings of the 49th Annual Meeting of the Association for Computational Linguistics: Human Language Technologies},
+  month     = {June},
+  year      = {2011},
+  address   = {Portland, Oregon, USA},
+  publisher = {Association for Computational Linguistics}
+}
+
+I. INSTALLATION
+
+===Quick Start===
+
+For those familiar with Unix environments who do not need detailed
+installation instructions:
+
+1. Obtain the data files from FIXME: where.
+2. Install Cython (www.cython.org), and build the Cython (.pyx) files using
+   'make'.
+3. Set the environment variables FIXME:
+4. FIXME:
+
+===Introduction===
+
+This system is mostly implemented in Python 2.6.  Python (www.python.org)
+is a high-level dynamic programming language that is platform-independent
+and available on all major platforms (Windows, Mac OS X, and all other
+versions of Unix/Linux).  A portion of the code is implemented in Cython
+(0.13 or later; see www.cython.org).  Cython is an extension to Python that
+allows the code to be translated into C and compiled directly to machine
+code, to speed up compute-intensive tasks.  Some small front-end wrapper
+programs whose purpose is to simplify preprocessing and experiment-running
+are written in Bourne Shell, a standard shell-scripting language available
+on all versions of Unix (including Mac OS X).
+
+This code should run on all major platforms, although it has only been
+tested on Linux and Mac OS X.  The code is intended to be run from the
+command line, in a Unix-type shell environment.  To run on Mac OS X,
+use the Terminal application to access the version of BSD Unix that
+underlies Mac OS X.  To run on Windows, download and install Cygwin
+(www.cygwin.com), a robust open-source Unix-emulation environment for
+Windows.
+
+In order to reproduce all of the experiments, you will need the following
+data, available from (FIXME: where):
+-- A preprocessed version of the English-language Wikipedia dump of
+   October 4, 2010
+-- A preprocessed version of the Twitter data, which originally comes from
+   the GeoText corpus provided by Jacob Eisenstein, Brendan O'Connor et al.
+-- A stopwords file
+-- A gazetteer, specificaly the "World Gazetteer" (FIXME: we should
+   remove this requirement; I don't think it is used much if at all)
+
+It is also possible to supply your own training and/or test data.  The
+program comes with the scripts used to generate the above prepreprocessed
+data files, and the script can be rerun to use a different Wikipedia
+data dump.  Data from other sources can be supplied without too much
+difficulty; see below.
+
+===Obtaining the software needed to build the system===
+
+(1) Overall
+
+The following pieces of software are needed in order to build and run
+the software in the system.
+
+1. Python 2.6 or later (www.python.org), but not Python 3.0 or later
+2. Cython 0.13 or later (www.cython.org)
+3. A C compiler (e.g. gcc)
+4. The Make utility (only very marginally needed)
+5. The Bourne Shell, aka 'sh'
+
+All of the above, except possibly Cython, are a standard part of nearly all
+distributions of Linux and most other Unix-type operating systems.
+
+Under Linux, it is highly likely that all of the above except for Cython
+are already installed on your system; for Cython, see below.
+
+For Mac OS X, Python 2.6 is distributed part of Snow Leopard (OS X 10.6),
+as is the Bourne Shell.  gcc and Make can be obtained by installing
+the Mac OS X Developer Tools (Xcode) available at
+http://developer.apple.com/mac/.  You need an Apple Developer Connection
+login, which you can get for free.  You may also want to install MacPorts
+(www.macports.org), which provides up-to-date versions of most of the
+well-known free-software/open-source packages, including Cython.  Note
+that Xcode must be installed in order for MacPorts to work.
+
+For Windows the recommended course is to download Cygwin (www.cygwin.com),
+as mentioned above.  A large number of pre-compiled open source applications
+are included in Cygwin.  By choosing appropriate installation options,
+you can have Python, sh, gcc and make installed -- all of the above
+dependencies except for Cython.
+
+(2) Python
+
+See above for how to install Python.  If you already have Python installed,
+and it is version 2.5, the code may still work; if not, it may be possible
+to get it working with some minor changes.  However, the code will
+definitely not work in Python 2.4 or earlier without major rewriting.
+In such case, it would be simpler to just download and install the latest
+version of Python 2.x from www.python.org.  Installation of Python is
+not difficult; if you do not have root access, you can install a private
+copy of Python by configuring it as follows:
+
+./configure --prefix="$HOME"
+
+After doing this, you need to place "$HOME/bin" in your PATH.
+
+(3) Cython
+
+Cython is part of many Linux distributions.  For example, if you have
+root access, you can install Cython under Ubuntu as follows:
+
+sudo aptitude install cython
+
+On Mac OS X, MacPorts (see above) includes Cython, which can be installed
+as follows:
+
+sudo port install py26-cython
+
+To install Cython on your own, download it from www.cython.org, and unpack
+it.  Since Cython is written in Python, it does not need compilation;
+however, it still needs installation.  If you have root access, you can
+install it by running the command 'sudo python setup.py install' from the
+top-level Cython source directory.  Otherwise, you need to set appropriate
+environment variables.  If you are using Bash as your shell, the following
+is an example of what to put in your .bashrc file:
+
+export CYTHON_DIR="$HOME/src/Cython-0.14.1"
+export PATH="$CYTHON_DIR/bin:$PATH"
+export PYTHONPATH="$CYTHON_DIR:$PYTHONPATH"
+
+If all else fails, you can avoid the use of Cython (at the expense of
+slower running time) by converting the Cython code into pure Python;
+see below.
+
+===Building the system===
+
+The only part of the system that needs compilation is the part written in
+Cython.  This can be built by typing 'make' in the source directory,
+and generates a dynamic library (e.g. 'kl_divergence.so') in the same
+directory, which will be loaded appropriately by an 'import' statement
+in the Python code.
+
+If you find it impossible to get Cython working, you can simply convert
+the Cython file 'kl_divergence.pyx' into normal Python by renaming it
+to end with '.py' and following the instructions found in the comments
+at the top of the file (which mostly just involve removing the added
+'cdef' declarations).  The resulting code will run somewhat slower, but
+should still work.
+
+===Installing the system===
+
+interfacing with the OS using bash (Bourne again shell). $ indicates
+shell prompt. 
+
+FIXME: Currently this sits in the Python directory of TextGrounder, but soon
 it will be moved elsewhere -- at least to a wikigrounder part of
 TextGrounder.
 

@@ -1,8 +1,5 @@
 #!/bin/sh
 
-# Shorter name to refer to same thing
-TGP="$TEXTGROUNDER_PYTHON"
-
 if [ -z "$CORPORA_DIR" ]; then
   CORPORA_DIR=/groups/corpora
 fi
