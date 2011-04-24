@@ -271,26 +271,23 @@ Options:
                         this are ignored as "outliers" (possible errors,
                         etc.).  Default 200.
   -m MODE, --mode=MODE, --m=MODE
-                        Action to perform.  'match-only' means to only do the
-                        stage that involves finding matches between gazetteer
-                        locations and Wikipedia articles (mostly useful when
-                        debugging output is enabled).  'geotag-documents'
-                        finds the proper location for each document (or
-                        article) in the test set.  'generate-kml' generates
-                        KML files for some set of words, showing the
-                        distribution over regions that the word determines.
-                        Use '--kml-words' to specify the words whose
-                        distributions should be outputted.  See also '--kml-
-                        prefix' to specify the prefix of the files outputted,
-                        and '--kml-transform' to specify the function to use
-                        (if any) to transform the probabilities to make the
-                        distinctions among them more visible.  'segment-
-                        geotag-documents' simultaneously segments a document
-                        into sections covering a specific location and
-                        determines that location.  'geotag-toponyms' finds the
-                        proper location for each toponym in the test set. The
-                        test set is specified by --eval-file.  Default 'match-
-                        only'.
+                        Action to perform.  'geotag-documents' finds the
+                        proper location for each document (or article) in the
+                        test set.  'geotag-toponyms' finds the proper location
+                        for each toponym in the test set. The test set is
+                        specified by --eval-file.  Default 'geotag-documents'.
+                        'segment-geotag-documents' simultaneously segments a
+                        document into sections covering a specific location
+                        and determines that location. (Not yet implemented.)
+                        'generate-kml' generates KML files for some set of
+                        words, showing the distribution over regions that the
+                        word determines.  Use '--kml-words' to specify the
+                        words whose distributions should be outputted.  See
+                        also '--kml-prefix' to specify the prefix of the files
+                        outputted, and '--kml-transform' to specify the
+                        function to use (if any) to transform the
+                        probabilities to make the distinctions among them more
+                        visible.
   -s STRATEGY, --strategy=STRATEGY, --s=STRATEGY
                         Strategy/strategies to use for geotagging. 'baseline'
                         means just use the baseline strategy (see --baseline-

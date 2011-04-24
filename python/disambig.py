@@ -3026,12 +3026,12 @@ any others in a division.  Points farther away than this are ignored as
 "outliers" (possible errors, etc.).  Default %default.""")
 
     ########## Basic options for determining operating mode and strategy
-    op.add_option("-m", "--mode", "--m", type='choice', default='match-only',
+    op.add_option("-m", "--mode", "--m", type='choice',
+                  default='geotag-documents',
                   choices=['geotag-toponyms',
                            'geotag-documents',
                            'generate-kml',
-                           'segment-geotag-documents',
-                           'match-only'],
+                           'segment-geotag-documents'],
                   help="""Action to perform.
 
 'geotag-documents' finds the proper location for each document (or article)
@@ -3050,15 +3050,11 @@ specify the words whose distributions should be outputted.  See also
 '--kml-prefix' to specify the prefix of the files outputted, and
 '--kml-transform' to specify the function to use (if any) to transform
 the probabilities to make the distinctions among them more visible.
-
-'match-only' means to only do the stage that involves finding matches between
-gazetteer locations and Wikipedia articles (mostly useful when debugging
-output is enabled).
 """)
 
     op.add_option("-s", "--strategy", "--s", type='choice', action='append',
                   default=None,
-                  choices=['baseline',
+                  choices=['baseline', 'none',
                            'kl-divergence', 'kldiv',
                            'partial-kl-divergence', 'partial-kldiv',
                            'symmetric-kl-divergence', 'symmetric-kldiv',
@@ -3073,6 +3069,9 @@ output is enabled).
                            'naive-bayes-no-baseline', 'nb-nobase'],
                   help="""Strategy/strategies to use for geotagging.
 'baseline' means just use the baseline strategy (see --baseline-strategy).
+
+'none' means don't do any geotagging.  Useful for testing the parts that
+read in data and generate internal structures.
 
 The other possible values depend on which mode is in use
 (--mode=geotag-toponyms or --mode=geotag-documents).
@@ -3355,15 +3354,12 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
     #                            outfile=sys.stderr)
 
     # Read in the words-counts file
-    if not opts.mode == 'match-only':
-      for fn in opts.counts_file:
-        read_word_counts(fn)
-      if opts.counts_file:
-        finish_word_counts()
+    for fn in opts.counts_file:
+      read_word_counts(fn)
+    if opts.counts_file:
+      finish_word_counts()
 
     WorldGazetteer.read_world_gazetteer_and_match(opts.gazetteer_file)
-
-    if opts.mode == 'match-only': return
 
     if opts.mode == 'generate-kml':
       StatRegion.initialize_regions()
@@ -3417,6 +3413,8 @@ Not generating an empty KML file.""" % word)
               strategy = KLDivergenceStrategy(symmetric=True, partial=False)
             elif stratname == 'symmetric-partial-kl-divergence':
               strategy = KLDivergenceStrategy(symmetric=True, partial=True)
+            elif stratname == 'none':
+              continue
             else:
               assert False
             yield (stratname, strategy)

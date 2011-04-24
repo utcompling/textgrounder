@@ -18,7 +18,6 @@ WIKI_DISAMBIG="$TEXTGROUNDER_PYTHON/disambig.py"
 
 ####### Begin option processing
 
-#MODE="match-only"
 #MODE="geotag-toponyms"
 MODE="geotag-documents"
 if [ "$1" = "toponyms" ]; then
@@ -50,7 +49,7 @@ done
 
 
 MISCOPTS="--width-of-stat-region 1 --miles-per-region 100"
-if [ "$MODE" = "geotag-toponyms" -o "$MODE" = "match-only" ]; then
+if [ "$MODE" = "geotag-toponyms" ]; then
   STRATEGY="--strategy baseline"
   # Don't need counts file with baseline-only strategy
   COUNTS_FILE=""

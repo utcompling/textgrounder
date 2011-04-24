@@ -1,38 +1,42 @@
 #!/bin/sh
 
-if [ -z "$CORPORA_DIR" ]; then
-  CORPORA_DIR=/groups/corpora
-fi
-if [ -z "$PROJECTS_DIR" ]; then
-  PROJECTS_DIR=/groups/projects
+if [ -z "$WG_WIKIPEDIA_DIR" ]; then
+  echo "Must set WG_WIKIPEDIA_DIR to location of Wikipedia data files"
+  exit 1
 fi
 
-if [ -z "$WIKIPEDIA_DATA_DIR" ]; then
-  WIKIPEDIA_DATA_DIR="$CORPORA_DIR/wikipedia"
+if [ -z "$WG_AUX_DIR" ]; then
+  echo "Must set WG_AUX_DIR to location of WikiGrounder aux files"
+  exit 1
 fi
 
-if [ -z "$WIKIPEDIA_AUX_DATA_DIR" ]; then
-  WIKIPEDIA_AUX_DATA_DIR="$HOME/devel/wikigrounder"
+if [ -z "$WG_TWITTER_DIR" ]; then
+  echo "WG_TWITTER_DIR should be set to the location of Twitter data files"
+  echo "Proceeding, because may not need to use these files"
+  WG_TWITTER_DIR="/nonexistent-location/download-wikigrounder-twitter-files-please"
 fi
 
-TRCONLL_DEV_DIR="$PROJECTS_DIR/pcl_travel/data/trconlldevtest/dev"
+if [ -z "$PCL_TRAVEL_DIR" ]; then
+  PCL_TRAVEL_DIR="$PROJECTS_DIR/pcl_travel"
+fi
 
-GEOTEXT_TOP_DIR="$CORPORA_DIR/geotext"
-GEOTEXT_CORPUS_TOP="$GEOTEXT_TOP_DIR/GeoText.2010-10-12"
+TRCONLL_DEV_DIR="$PCL_TRAVEL_DIR/data/trconlldevtest/dev"
+
+GEOTEXT_CORPUS_TOP="$WG_TWITTER_DIR/GeoText.2010-10-12"
 #GEOTEXT_INPUT_DIR="$GEOTEXT_CORPUS_TOP/processed_data"
-GEOTEXT_OUTPUT_DIR="$GEOTEXT_TOP_DIR/output-40-docthresh"
+GEOTEXT_OUTPUT_DIR="$WG_TWITTER_DIR/output-40-docthresh"
 
 DUMP_PREFIX="enwiki-20100905"
 if [ -z "$NO_USE_PERMUTED" ]; then
-  if [ -e "$WIKIPEDIA_DATA_DIR/$DUMP_PREFIX-permuted-pages-articles.xml.bz2" ]; then
+  if [ -e "$WG_WIKIPEDIA_DIR/$DUMP_PREFIX-permuted-pages-articles.xml.bz2" ]; then
     DUMP_PREFIX="$DUMP_PREFIX-permuted"
   fi
 fi
 
 PAGES_ARTICLES_PREFIX="$DUMP_PREFIX-pages-articles"
 
-WDIR="$WIKIPEDIA_DATA_DIR"
-AUXDIR="$WIKIPEDIA_AUX_DATA_DIR"
+WDIR="$WG_WIKIPEDIA_DIR"
+AUXDIR="$WG_AUX_DIR"
 
 ORIG_ARTICLE_DATA_SUFFIX="article-data.txt"
 COMBINED_ARTICLE_DATA_SUFFIX="combined-article-data.txt"

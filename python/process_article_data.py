@@ -82,7 +82,7 @@ class Article(object):
   # a list of the fields to output, and 'outfield_types' is a list of
   # corresponding types, determined by a call to get_output_field_types().
   def output_row(self, outfile, outfields, outfield_types):
-    fieldvals = [t(getattr(art, f)) for f,t in zip(outfields, field_types)]
+    fieldvals = [t(getattr(self, f)) for f,t in zip(outfields, outfield_types)]
     uniprint('\t'.join(fieldvals), outfile=outfile)
 
 def yesno_to_boolean(foo):
