@@ -44,7 +44,7 @@ hg clone http://textgrounder.googlecode.com/hg/ textgrounder
 
 4. Build the Cython (`.pyx`) files by running `make` in the !TextGrounder `python` subdirectory, where all the code for !WikiGrounder resides.
 
-5. Set the environment variables to indicate where !TextGrounder is.  You can either set `TEXTGROUNDER_DIR` to point to the top-level directory where you installed !TextGrounder, or set `TEXTGROUNDER_PYTHON` to directly point to the `python` subdirectory of this directory, where !WikiGrounder lives (useful e.g. if you maintain different versions of !WikiGrounder).
+5. Set the environment variables to indicate where !TextGrounder is.  You can either set `TEXTGROUNDER_DIR` to point to the top-level directory where you installed !TextGrounder, or set `WIKIGROUNDER_DIR` to directly point to the `python` subdirectory of this directory, where !WikiGrounder lives (useful e.g. if you maintain different versions of !WikiGrounder).
 
 If you need more information, see the `README.wikigrounder` file in the !WikiGrounder directory (i.e. the `python` directory in !TextGrounder).
 

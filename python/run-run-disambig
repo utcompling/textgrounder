@@ -5,13 +5,13 @@
 # Allow -i STR or --id STR to be specified at the beginning of the options,
 # specifying an ID to use in the outfiles.
 
-if [ -z "$TEXTGROUNDER_PYTHON" ]; then
+if [ -z "$WIKIGROUNDER_DIR" ]; then
   if [ -z "$TEXTGROUNDER_DIR" ]; then
-    echo "With TEXTGROUNDER_PYTHON unset, must set TEXTGROUNDER_DIR to point"
+    echo "With WIKIGROUNDER_DIR unset, must set TEXTGROUNDER_DIR to point"
     echo "to top-level directory where TextGrounder is installed."
     exit 1
   fi
-  TEXTGROUNDER_PYTHON="$TEXTGROUNDER_DIR/python"
+  WIKIGROUNDER_DIR="$TEXTGROUNDER_DIR/python"
 fi
 
 if [ "$1" = "-i" -o "$1" = "--id" ]; then
@@ -40,4 +40,4 @@ else
   echo "Run without arguments"
 fi
 
-nohup $TEXTGROUNDER_PYTHON/run-disambig ${1+"$@"} > $OUTFILE 2>&1
+nohup $WIKIGROUNDER_DIR/run-disambig ${1+"$@"} > $OUTFILE 2>&1

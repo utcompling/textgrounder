@@ -13,19 +13,19 @@
 # combined = Combined article data file, only for articles with coordinates or
 #            redirects to such articles
 
-if [ -z "$TEXTGROUNDER_PYTHON" ]; then
+if [ -z "$WIKIGROUNDER_DIR" ]; then
   if [ -z "$TEXTGROUNDER_DIR" ]; then
-    echo "With TEXTGROUNDER_PYTHON unset, must set TEXTGROUNDER_DIR to point"
+    echo "With WIKIGROUNDER_DIR unset, must set TEXTGROUNDER_DIR to point"
     echo "to top-level directory where TextGrounder is installed."
     exit 1
   fi
-  TEXTGROUNDER_PYTHON="$TEXTGROUNDER_DIR/python"
+  WIKIGROUNDER_DIR="$TEXTGROUNDER_DIR/python"
 fi
 
-. $TEXTGROUNDER_PYTHON/config-wikigrounder
+. $WIKIGROUNDER_DIR/config-wikigrounder
 
-PROCESSWIKI="$TEXTGROUNDER_PYTHON/processwiki.py"
-GENERATE_COMBINED="$TEXTGROUNDER_PYTHON/generate_combined.py"
+PROCESSWIKI="$WIKIGROUNDER_DIR/processwiki.py"
+GENERATE_COMBINED="$WIKIGROUNDER_DIR/generate_combined.py"
 
 LOGFILE="generate-all-data.log"
 

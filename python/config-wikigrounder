@@ -91,7 +91,7 @@ TITLE2ID_ARG="--title2id-file $IN_TITLE2ID_FILE"
 
 # Include local configuration if it exists
 
-if [ -e "$TEXTGROUNDER_PYTHON/local-config" ]; then
-  . "$TEXTGROUNDER_PYTHON/local-config"
+if [ -e "$WIKIGROUNDER_DIR/local-config" ]; then
+  . "$WIKIGROUNDER_DIR/local-config"
 fi
 

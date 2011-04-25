@@ -5,8 +5,8 @@ from nlputil import *
 
 # Run a series of disambiguation experiments.
 
-if 'TEXTGROUNDER_PYTHON' in os.environ:
-  tgdir = os.environ['TEXTGROUNDER_PYTHON']
+if 'WIKIGROUNDER_DIR' in os.environ:
+  tgdir = os.environ['WIKIGROUNDER_DIR']
 else:
   tgdir = '%s/python' % (os.environ['TEXTGROUNDER_DIR'])
 

@@ -6,18 +6,18 @@
 
 DEBUG="--debug 0"
 
-if [ -z "$TEXTGROUNDER_PYTHON" ]; then
+if [ -z "$WIKIGROUNDER_DIR" ]; then
   if [ -z "$TEXTGROUNDER_DIR" ]; then
-    echo "With TEXTGROUNDER_PYTHON unset, must set TEXTGROUNDER_DIR to point"
+    echo "With WIKIGROUNDER_DIR unset, must set TEXTGROUNDER_DIR to point"
     echo "to top-level directory where TextGrounder is installed."
     exit 1
   fi
-  TEXTGROUNDER_PYTHON="$TEXTGROUNDER_DIR/python"
+  WIKIGROUNDER_DIR="$TEXTGROUNDER_DIR/python"
 fi
 
-. $TEXTGROUNDER_PYTHON/config-wikigrounder
+. $WIKIGROUNDER_DIR/config-wikigrounder
 
-TWITTER_LDA="$TEXTGROUNDER_PYTHON/twitter_to_lda.py"
+TWITTER_LDA="$WIKIGROUNDER_DIR/twitter_to_lda.py"
 
 echo The input and output dir need to be set better, as this code is
 echo copied from run-twitter-process and GEOTEXT_INPUT_DIR and
