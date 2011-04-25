@@ -3303,7 +3303,8 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
       elif not opts.counts_file:
         op.error("Must specify counts file")
 
-    self.need('gazetteer_file')
+    if opts.mode == 'geotag-toponyms':
+      self.need('gazetteer_file')
 
     if opts.eval_format == 'raw-text':
       # FIXME!!!!
@@ -3359,7 +3360,8 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
     if opts.counts_file:
       finish_word_counts()
 
-    WorldGazetteer.read_world_gazetteer_and_match(opts.gazetteer_file)
+    if opts.gazetteer_file:
+      WorldGazetteer.read_world_gazetteer_and_match(opts.gazetteer_file)
 
     if opts.mode == 'generate-kml':
       StatRegion.initialize_regions()

@@ -54,7 +54,7 @@ class Coord(object):
 #   namespace: Namespace of article (e.g. 'Main', 'Wikipedia', 'File')
 #   is_list_of: Whether article title is 'List of *'
 #   is_disambig: Whether article is a disambiguation page.
-#   is_list: Whether article is a list of any time ('List of *', disambig,
+#   is_list: Whether article is a list of any type ('List of *', disambig,
 #            or in Category or Book namespaces)
 class Article(object):
   __slots__ = ['title', 'id', 'coord', 'incoming_links', 'split', 'redir',

@@ -466,9 +466,15 @@ class SortedList(object, UserDict.DictMixin):
 #############################################################################
 
 # Given a table with values that are numbers, output the table, sorted
-# on the numbers from bigger to smaller.
-def output_reverse_sorted_table(table, outfile=sys.stdout, indent=""):
-  for x in sorted(table.items(), key=lambda x:x[1], reverse=True):
+# on the numbers from bigger to smaller.  Within a given number, sort the
+# items alphabetically, unless keep_secondary_order is True, in which case
+# the original order of items is left.
+def output_reverse_sorted_table(table, outfile=sys.stdout, indent="",
+    keep_secondary_order=False):
+  items = table.items()
+  if not keep_secondary_order:
+    items = sorted(items, key=lambda x:x[0])
+  for x in sorted(items, key=lambda x:x[1], reverse=True):
     uniprint("%s%s = %s" % (indent, x[0], x[1]), outfile=outfile)
 
 #############################################################################

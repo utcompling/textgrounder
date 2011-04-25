@@ -1,5 +1,12 @@
 #!/bin/sh
 
+# Extract results from a number of runs.
+
+# Given output from a run-* front end, extract the mean and median errors
+# from each specified file, compute the avg mean/median error, and output
+# a line giving the errors along with relevant parameters for that particular
+# run.
+
 for x in ${1+"$@"}; do
   echo $x
   echo ""

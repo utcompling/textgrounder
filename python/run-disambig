@@ -11,32 +11,25 @@ if [ -z "$TEXTGROUNDER_PYTHON" ]; then
   if [ -z "$TEXTGROUNDER_DIR" ]; then
     echo "With TEXTGROUNDER_PYTHON unset, must set TEXTGROUNDER_DIR to point"
     echo "to top-level directory where TextGrounder is installed."
+    exit 1
   fi
   TEXTGROUNDER_PYTHON="$TEXTGROUNDER_DIR/python"
 fi
 
 . $TEXTGROUNDER_PYTHON/config-wikigrounder
 
-WIKI_DISAMBIG="$TEXTGROUNDER_PYTHON/disambig.py"
+DISAMBIG="$TEXTGROUNDER_PYTHON/disambig.py"
 
-#MODE="geotag-toponyms"
-MODE="geotag-documents"
+for x in ${1+"$@"}; do
+  if [ "$x" = "--mode=geotag-toponyms" ]; then
+    MODE=geotag-toponyms
+  elif [ "$x" = "--mode=geotag-documents" ]; then
+    MODE=geotag-documents
+  fi
+done
 
-if [ "$1" = "toponyms" ]; then
-  MODE="geotag-toponyms"
-  shift
-elif [ "$1" = "documents" ]; then
-  MODE="geotag-documents"
-  shift
-fi
-
-MISCOPTS="--width-of-stat-region 1 --miles-per-region 100"
-#MISCOPTS="--width-of-stat-region 1 --miles-per-region 100 \
-#  --num-training-docs 100000 --num-test-docs 1000"
 if [ "$MODE" = "geotag-toponyms" ]; then
   STRATEGY="--strategy baseline"
-  # Don't need counts file with baseline-only strategy
-  COUNTS_FILE=""
   #STRATEGY="--strategy naive-bayes-with-baseline"
   #STRATEGY="--strategy naive-bayes-no-baseline"
   #MISCOPTS="$MISCOPTS --naive-bayes-weighting distance-weighted"
@@ -47,7 +40,6 @@ elif [ "$MODE" = "geotag-documents" ]; then
   EVALTYPE="--eval-format wiki"
 fi
 
-$WIKI_DISAMBIG \
-  $STOPWORDS_ARG $COMBINED_ARTICLE_DATA_ARG $COUNTS_ARG $GAZETTEER_ARG \
-  --mode "$MODE" $STRATEGY $EVALFILE $EVALTYPE \
- $MISCOPTS $MAXTIME $DEBUG ${1+"$@"}
+$DISAMBIG \
+  $STOPWORDS_ARG $GAZETTEER_ARG $STRATEGY $EVALFILE $EVALTYPE \
+ $MISCOPTS $LOCAL_ARGS ${1+"$@"}

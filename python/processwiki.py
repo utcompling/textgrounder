@@ -677,6 +677,13 @@ def get_coord_1(args, nsew, convert_nsew):
   else: return (1, args[0])
   return (i+1, convert_dms(convert_nsew[args[i]], d, m, s))
 
+# FIXME!  To be more accurate, we need to look at the template parameters,
+# which, despite the claim below, ARE quite interesting.  In fact, if the
+# parameter 'display=title' is seen (or variant like 'display=inline,title'),
+# then we have *THE* correct coordinate for the article.  So we need to
+# return this fact if known, as an additional argument.  See comments
+# below at extract_coordinates_from_article().
+
 def get_coord(temptype, args):
   '''Parse a Coord template and return a tuple (lat,long) for latitude and
 longitude.  TEMPTYPE is the template name.  ARGS is the raw arguments for
@@ -690,9 +697,10 @@ the template.  Coord templates are one of four types:
 Note that all four of the above are equivalent.
 
 In addition, extra "template" or "coordinate" parameters can be given.
-The template parameters mostly control display and are basically uninteresting.
-However, the coordinate parameters contain lots of potentially useful
-information that can be used as features or whatever.  See
+The template parameters mostly control display and are basically
+uninteresting.  (FIXME: Not true, see above.) However, the coordinate
+parameters contain lots of potentially useful information that can be
+used as features or whatever.  See
 http://en.wikipedia.org/wiki/Template:Coord for more information.
 
 The types of coordinate parameters are:
@@ -1424,6 +1432,35 @@ def output_title(title, id):
 def output_title_and_coordinates(title, id, lat, long):
   output_title(title, id)
   splitprint("Article coordinates: %s,%s" % (lat, long))
+
+# FIXME:
+#
+# (1) Figure out whether coordinates had a display=title in them.
+#     If so, use the last one.
+# (2) Else, use the last other Coord, but possibly limit to Coords that
+#     appear on a line by themselves or at least are at top level (not
+#     inside some other template, table, etc.).
+# (3) Else, do what we prevously did.
+#
+# Also, we should test to see whether it's better in (2) to limit Coords
+# to those that apear on a line by themselves.  To do that, we'd generate
+# coordinates for Wikipedia, and in the process note
+#
+# (1) Whether it was step 1, 2 or 3 above that produced the coordinate;
+# (2) If step 2, would the result have been different if we did step 2
+#     differently?  Check the possibilities: No limit in step 2;
+#     (maybe, if not too hard) limit to those things at top level;
+#     limit to be on line by itself; don't ever use Coords in step 2.
+#     If there is a difference among the results of any of these strategies
+#     debug-output this fact along with the different values and the
+#     strategies that produced them.
+#
+# Then
+#
+# (1) Output counts of how many resolved through steps 1, 2, 3, and how
+#     many in step 2 triggered a debug-output.
+# (2) Go through manually and check e.g. 50 of the ones with debug-output
+#     and see which one is more correct.  
 
 def extract_coordinates_from_article(text):
   handler = ExtractCoordinatesFromSource()

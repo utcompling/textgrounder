@@ -9,24 +9,19 @@
 # while saving the output to a file.
 
 if [ -z "$TEXTGROUNDER_PYTHON" ]; then
-  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+  if [ -z "$TEXTGROUNDER_DIR" ]; then
+    echo "With TEXTGROUNDER_PYTHON unset, must set TEXTGROUNDER_DIR to point"
+    echo "to top-level directory where TextGrounder is installed."
+    exit 1
+  fi
+  TEXTGROUNDER_PYTHON="$TEXTGROUNDER_DIR/python"
 fi
 
 . $TEXTGROUNDER_PYTHON/config-wikigrounder
 
-WIKI_DISAMBIG="$TEXTGROUNDER_PYTHON/disambig.py"
+RUN_DISAMBIG="$TEXTGROUNDER_PYTHON/run-disambig"
 
 ####### Begin option processing
-
-#MODE="geotag-toponyms"
-MODE="geotag-documents"
-if [ "$1" = "toponyms" ]; then
-  MODE="geotag-toponyms"
-  shift
-elif [ "$1" = "documents" ]; then
-  MODE="geotag-documents"
-  shift
-fi
 
 #opts=""
 
@@ -48,29 +43,9 @@ done
 ####### End option processing
 
 
-MISCOPTS="--width-of-stat-region 1 --miles-per-region 100"
-if [ "$MODE" = "geotag-toponyms" ]; then
-  STRATEGY="--strategy baseline"
-  # Don't need counts file with baseline-only strategy
-  COUNTS_FILE=""
-  #STRATEGY="--strategy naive-bayes-with-baseline"
-  #STRATEGY="--strategy naive-bayes-no-baseline"
-  #MISCOPTS="$MISCOPTS --naive-bayes-weighting distance-weighted"
-  EVALFILE="--eval-file $TRCONLL_DEV_DIR"
-  EVALTYPE="--eval-format tr-conll"
-  #EVALFILE="--eval-file $PREFIX-toponym-eval.txt"
-elif [ "$MODE" = "geotag-documents" ]; then
-  EVALTYPE="--eval-format wiki"
-fi
-
-#EVALSET="--eval-set test"
-
 GEOTEXT_PREFIX="$GEOTEXT_OUTPUT_DIR/geotext-twitter"
 
 COMBINED_ARTICLE_DATA_ARG="--article-data-file $GEOTEXT_PREFIX-combined-article-data.txt"
 COUNTS_ARG="--counts-file $GEOTEXT_PREFIX-counts-only-coord-articles.txt"
 
-$WIKI_DISAMBIG \
-  $STOPWORDS_ARG $COMBINED_ARTICLE_DATA_ARG $COUNTS_ARG $GAZETTEER_ARG \
-  --mode "$MODE" $STRATEGY $EVALFILE $EVALTYPE $EVALSET \
- $MISCOPTS $MAXTIME $DEBUG ${1+"$@"}
+$RUN_DISAMBIG $COMBINED_ARTICLE_DATA_ARG $COUNTS_ARG ${1+"$@"}

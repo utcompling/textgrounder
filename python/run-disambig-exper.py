@@ -50,7 +50,7 @@ def main():
   op = OptionParser(usage="%prog [options] experiment [...]")
   op.add_option("-n", "--dry-run", action="store_true",
 		  help="Don't execute anything; just output the commands that would be executed.")
-  def_runcmd = '%s/run-run-disambig' % tgdir
+  def_runcmd = '%s/run-run-wikipedia' % tgdir
   op.add_option("-c", "--run-cmd", "--cmd", default=def_runcmd,
 		  help="Command to execute; default '%default'.")
   (opts, args) = op.parse_args()

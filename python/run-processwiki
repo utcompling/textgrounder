@@ -2,7 +2,7 @@
 
 # Generate the various necessary data files.  To generate everything, use
 #
-#  generate-data-files all
+#  run-processwiki all
 #
 # Else, do one of the steps:
 #
@@ -14,7 +14,12 @@
 #            redirects to such articles
 
 if [ -z "$TEXTGROUNDER_PYTHON" ]; then
-  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+  if [ -z "$TEXTGROUNDER_DIR" ]; then
+    echo "With TEXTGROUNDER_PYTHON unset, must set TEXTGROUNDER_DIR to point"
+    echo "to top-level directory where TextGrounder is installed."
+    exit 1
+  fi
+  TEXTGROUNDER_PYTHON="$TEXTGROUNDER_DIR/python"
 fi
 
 . $TEXTGROUNDER_PYTHON/config-wikigrounder

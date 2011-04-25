@@ -6,7 +6,12 @@
 # specifying an ID to use in the outfiles.
 
 if [ -z "$TEXTGROUNDER_PYTHON" ]; then
-  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+  if [ -z "$TEXTGROUNDER_DIR" ]; then
+    echo "With TEXTGROUNDER_PYTHON unset, must set TEXTGROUNDER_DIR to point"
+    echo "to top-level directory where TextGrounder is installed."
+    exit 1
+  fi
+  TEXTGROUNDER_PYTHON="$TEXTGROUNDER_DIR/python"
 fi
 
 if [ "$1" = "-i" -o "$1" = "--id" ]; then

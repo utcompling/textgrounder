@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Run an experiment using run-twitter-wiki, sending its output to a unique file
+# Run an experiment using run-wikipedia, sending its output to a unique file
 # and using 'nohup' so that exiting the session won't kill a background script.
 # Allow -i STR or --id STR to be specified at the beginning of the options,
 # specifying an ID to use in the outfiles.
@@ -23,9 +23,9 @@ if [ "`uname`" = "Darwin" ]; then
   # Darwin (BSD) is missing all sorts of stuff, naturally, including %P,
   # which gets you lowercase am or pm. (%p gets you uppercase AM or PM --
   # real logical, huh?)
-  OUTFILE="run-twitter-wiki.out$ID.`date '+%F.%H%M%p'`"
+  OUTFILE="run-wikipedia.out$ID.`date '+%F.%H%M%p'`"
 else
-  OUTFILE="run-twitter-wiki.out$ID.`date '+%F.%H%M%P'`"
+  OUTFILE="run-wikipedia.out$ID.`date '+%F.%H%M%P'`"
 fi
 if [ -e "$OUTFILE" ]; then
   echo "Output file $OUTFILE already exists!  Won't overwrite."
@@ -40,4 +40,4 @@ else
   echo "Run without arguments"
 fi
 
-nohup $TEXTGROUNDER_PYTHON/run-twitter-wiki ${1+"$@"} > $OUTFILE 2>&1
+nohup $TEXTGROUNDER_PYTHON/run-wikipedia ${1+"$@"} > $OUTFILE 2>&1
