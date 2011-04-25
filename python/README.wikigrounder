@@ -34,7 +34,9 @@ Note that !WikiGrounder is currently part of the !TextGrounder project and sits 
 
 Quick start:
 
-1. If you don't already have a copy of !TextGrounder, you can obtain it from Google Code using [http://mercurial.selenic.com Mercurial]:
+1. You can get !WikiGrounder on its own from the Downloads tab at [http://code.google.com/p/textgrounder/downloads/list the TextGrounder page on Google Code].
+
+Or get !TextGrounder.  If you don't already have it, you can obtain it from Google Code using [http://mercurial.selenic.com Mercurial]:
 
 hg clone http://textgrounder.googlecode.com/hg/ textgrounder  
 
@@ -188,3 +190,4 @@ the Wikipedia data files (but does not generate every possible file that can be 
 Similarly, to generate Twitter data, use `run-process-twitter`, which is a front end for `twitter_geotext_process.py`.
 
 FIXME: Document more.
+
