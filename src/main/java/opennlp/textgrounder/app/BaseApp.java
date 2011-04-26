@@ -24,6 +24,7 @@ public class BaseApp {
     //private static String serializedGoldCorpusInputPath = null;
     private static String serializedCorpusOutputPath = null;
     //private static boolean readAsTR = false;
+    private static boolean highRecallNER = false;
 
     private static Region boundingBox = null;
 
@@ -93,7 +94,9 @@ public class BaseApp {
                 "(preprocess-labelprop only) path to wikipedia file (article titles, article IDs, and word lists)");
         options.addOption("is", "input-stoplist", true,
                 "(preprocess-labelprob only) path to stop list input file (one stop word per line)");
-
+        options.addOption("ner", "named-entity-recognizer", true,
+        "option for using High Recall NER");
+        
         options.addOption("h", "help", false, "print help");
 
         Double minLat = null;
@@ -191,6 +194,10 @@ public class BaseApp {
                     else if(option.getOpt().equals("maxlon"))
                         maxLon = Double.parseDouble(value.replaceAll("n", "-"));
                     break;
+                case 'n':
+                	if(option.getOpt().equals("ner"))
+                		setHighRecallNER(new Integer(value)!=0);
+                		
                 case 'd':
                     doKMeans = true;
                     break;
@@ -288,4 +295,12 @@ public class BaseApp {
     public static Region getBoundingBox() {
         return boundingBox;
     }
+
+	public static void setHighRecallNER(boolean highRecallNER) {
+		BaseApp.highRecallNER = highRecallNER;
+	}
+
+	public static boolean isHighRecallNER() {
+		return highRecallNER;
+	}
 }

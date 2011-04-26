@@ -45,7 +45,8 @@ public class ImportCorpus extends BaseApp {
             ois = new ObjectInputStream(fis);
         }
         gnGaz = (GeoNamesGazetteer) ois.readObject();
-//        recognizer = new HighRecallToponymRecognizer(gnGaz.getUniqueLocationNameSet());
+        if(isHighRecallNER())
+        	recognizer = new HighRecallToponymRecognizer(gnGaz.getUniqueLocationNameSet());
         System.out.println("Done.");
 
         System.out.print("Reading raw corpus from " + corpusInputPath + " ...");
