@@ -20,13 +20,13 @@ public class EvaluateCorpus extends BaseApp {
 
         if(getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
             if(getInputPath() == null || (getSerializedCorpusInputPath() == null && getXMLInputPath() == null)) {
-                System.out.println("Please specify both a system serialized corpus file via the -sci or -ix flag and a gold plaintext corpus file via the -i flag.");
+                System.out.println("Please specify both a system annotated corpus file via the -sci or -ix flag and a gold plaintext corpus file via the -i flag.");
                 System.exit(0);
             }
         }
         else {
-            if(getSerializedCorpusInputPath() == null) {
-                System.out.println("Please specify a system serialized corpus file via the -sci flag.");
+            if(getSerializedCorpusInputPath() == null && getXMLInputPath() == null) {
+                System.out.println("Please specify a system annotated corpus file via the -sci or -ix flag.");
                 System.exit(0);
             }
         }
@@ -48,7 +48,7 @@ public class EvaluateCorpus extends BaseApp {
 
         StoredCorpus goldCorpus = null;
 
-        if(getInputPath() != null) {
+        if(getInputPath() != null && getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
             Tokenizer tokenizer = new OpenNLPTokenizer();
             System.out.print("Reading plaintext gold corpus from " + getInputPath() + " ...");
             goldCorpus = Corpus.createStoredCorpus();
