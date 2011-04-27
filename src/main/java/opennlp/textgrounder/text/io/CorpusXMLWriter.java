@@ -84,6 +84,19 @@ public class CorpusXMLWriter {
     if (document.getId() != null) {
       out.writeAttribute("id", document.getId());
     }
+    Coordinate systemCoord = document.getSystemCoord();
+    if(systemCoord != null) {
+        out.writeAttribute("systemLat", systemCoord.getLatDegrees() + "");
+        out.writeAttribute("systemLng", systemCoord.getLngDegrees() + "");
+    }
+    Coordinate goldCoord = document.getGoldCoord();
+    if(goldCoord != null) {
+        out.writeAttribute("goldLat", goldCoord.getLatDegrees() + "");
+        out.writeAttribute("goldLng", goldCoord.getLngDegrees() + "");
+    }
+    if(document.getTimestamp() != null) {
+        out.writeAttribute("timestamp", document.getTimestamp());
+    }
     for (Sentence<Token> sentence : document) {
       this.writeSentence(out, sentence);
     }

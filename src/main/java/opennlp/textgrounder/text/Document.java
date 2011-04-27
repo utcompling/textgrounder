@@ -25,10 +25,6 @@ public abstract class Document<A extends Token> implements Iterable<Sentence<A>>
   protected String timestamp;
 
   public Document(String id) {
-      /*this.id = id;
-    this.goldCoord = null;
-    this.systemCoord = null;
-    this.timestamp = null;*/
       this(id, null, null);
   }
 
