@@ -116,7 +116,13 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
               stored.addToponym(span.getStart(), span.getEnd(), idx, goldIdx);
             }
           } else {
-            stored.addToponym(span.getStart(), span.getEnd(), idx);
+              if(toponym.hasSelected()) {
+                  int selectedIdx = toponym.getSelectedIdx();
+                  stored.addToponym(span.getStart(), span.getEnd(), idx, -1, selectedIdx);
+              }
+              else {
+                  stored.addToponym(span.getStart(), span.getEnd(), idx);
+              }
           }
 
           if (this.candidateLists.size() <= idx) {
@@ -129,8 +135,6 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
         stored.compact();
         sentences.add(stored);
       }
-
-      //System.out.println(document.getClass().getName());
 
       sentences.trimToSize();
       if(this.getFormat() == BaseApp.CORPUS_FORMAT.GEOTEXT)

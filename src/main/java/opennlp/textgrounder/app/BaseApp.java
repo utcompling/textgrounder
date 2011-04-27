@@ -15,6 +15,7 @@ public class BaseApp {
     private static String additionalInputPath = null;
     private static String graphInputPath = null;
     private static String outputPath = null;
+    private static String xmlInputPath = null;
     private static String kmlOutputPath = null;
     private static boolean outputGoldLocations = false;
     private static boolean outputUserKML = false;
@@ -58,6 +59,7 @@ public class BaseApp {
     protected static void initializeOptionsFromCommandLine(String[] args) throws Exception {
 
         options.addOption("i", "input", true, "input path");
+        options.addOption("ix", "input-xml", true, "xml input path");
         options.addOption("ia", "input-additional", true, "path to additional input data to be used in training but not evaluation");
         options.addOption("ig", "input-graph", true, "path to input graph for label propagation resolvers");
         options.addOption("r", "resolver", true, "resolver (RandomResolver, BasicMinDistResolver, WeightedMinDistResolver, LabelPropDefaultRuleResolver, LabelPropContextSensitiveResolver, LabelPropComplexResolver) [default = BasicMinDistResolver]");
@@ -94,6 +96,7 @@ public class BaseApp {
                 "(preprocess-labelprop only) path to wikipedia file (article titles, article IDs, and word lists)");
         options.addOption("is", "input-stoplist", true,
                 "(preprocess-labelprob only) path to stop list input file (one stop word per line)");
+
         options.addOption("ner", "named-entity-recognizer", true,
         "option for using High Recall NER");
         
@@ -129,6 +132,8 @@ public class BaseApp {
                         wikiInputPath = value;
                     else if(option.getOpt().equals("is"))
                         stoplistInputPath = value;
+                    else if(option.getOpt().equals("ix"))
+                        xmlInputPath = value;
                     break;
                 case 'o':
                     if(option.getOpt().equals("o"))
@@ -210,6 +215,10 @@ public class BaseApp {
 
     public static String getInputPath() {
         return inputPath;
+    }
+
+    public static String getXMLInputPath() {
+        return xmlInputPath;
     }
 
     public static String getAdditionalInputPath() {

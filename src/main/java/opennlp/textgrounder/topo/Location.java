@@ -26,9 +26,18 @@ public class Location implements Serializable {
   private final int id;
   private final String name;
   private Region region;
-  private final Location.Type type;
-  private final int population;
-  private final String admin1code;
+  private Location.Type type;
+  private int population;
+  private String admin1code;
+
+    public Location(int id, String name, Region region, String typeString, Integer population, String admin1code) {
+        this(id, name, region, Location.convertTypeString(typeString),
+             population==null?0:population, admin1code==null?"00":admin1code);
+    }
+
+    public Location(String idWithC, String name, Region region, String typeString, Integer population, String admin1code) {
+        this(Integer.parseInt(idWithC.substring(1)), name, region, typeString, population, admin1code);
+    }
 
   public Location(int id, String name, Region region, Location.Type type, int population, String admin1code) {
     this.id = id;
@@ -79,9 +88,38 @@ public class Location implements Serializable {
     this.region = region;
   }
 
+    public void setType(Location.Type type) {
+        this.type = type;
+    }
+
   public Location.Type getType() {
     return this.type;
   }
+
+    public static Location.Type convertTypeString(String typeString) {
+        typeString = typeString.toUpperCase();
+        if(typeString.equals("STATE"))
+            return Location.Type.STATE;
+        if(typeString.equals("WATER"))
+            return Location.Type.WATER;
+        if(typeString.equals("CITY"))
+            return Location.Type.CITY;
+        if(typeString.equals("SITE"))
+            return Location.Type.SITE;
+        if(typeString.equals("PARK"))
+            return Location.Type.PARK;
+        if(typeString.equals("TRANSPORT"))
+            return Location.Type.TRANSPORT;
+        if(typeString.equals("MOUNTAIN"))
+            return Location.Type.MOUNTAIN;
+        if(typeString.equals("UNDERSEA"))
+            return Location.Type.UNDERSEA;
+        if(typeString.equals("FOREST"))
+            return Location.Type.FOREST;
+        else
+            return Location.Type.UNKNOWN;
+
+    }
 
   public int getPopulation() {
     return this.population;
