@@ -217,6 +217,21 @@ private final boolean expandRegions;
           } catch (NumberFormatException e) {
             System.err.format("Invalid coordinates: %s\n", primaryName);
           }
+
+          // try to get coordinates from right side in the case of weird characters in names messing up tabs between fields:
+          if((lat == Double.NaN || lng == Double.NaN) && fields.length > 19) {
+              try {
+                  lat = Double.parseDouble(fields[fields.length-15]);
+                  lng = Double.parseDouble(fields[fields.length-14]);
+              } catch (NumberFormatException e) {
+                  System.err.format("Invalid coordinates: %s\n", primaryName);
+              }
+          }
+
+          // give up on trying to get coordinates:
+          if(lat == Double.NaN || lng == Double.NaN)
+              continue;
+
           Coordinate coordinate = Coordinate.fromDegrees(lat, lng);
 
           int population = 0;
