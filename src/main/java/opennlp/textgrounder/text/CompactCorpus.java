@@ -139,7 +139,8 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
       sentences.trimToSize();
       if(this.getFormat() == BaseApp.CORPUS_FORMAT.GEOTEXT)
           this.documents.add(new StoredDocument(document.getId(), sentences,
-                                                null, document.getGoldCoord()));
+                                                document.getTimestamp(),
+                                                document.getGoldCoord(), document.getSystemCoord()));
       else
           this.documents.add(new StoredDocument(document.getId(), sentences));
     }
@@ -197,6 +198,11 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
         this(id, sentences);
         this.timestamp = timestamp;
         this.goldCoord = goldCoord;
+    }
+
+    private StoredDocument(String id, List<Sentence<StoredToken>> sentences, String timestamp, Coordinate goldCoord, Coordinate systemCoord) {
+        this(id, sentences, timestamp, goldCoord);
+        this.systemCoord = systemCoord;
     }
 
     public Iterator<Sentence<StoredToken>> iterator() {

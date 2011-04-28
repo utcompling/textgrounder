@@ -50,9 +50,21 @@ public class CorpusXMLSource extends DocumentSource {
   public Document<Token> next() {
     assert this.in.isStartElement() && this.in.getLocalName().equals("doc");
     String id = CorpusXMLSource.this.in.getAttributeValue(null, "id");
+    String goldLatS = CorpusXMLSource.this.in.getAttributeValue(null, "goldLat");
+    String goldLngS = CorpusXMLSource.this.in.getAttributeValue(null, "goldLng");
+    Coordinate goldCoord = null;
+    if(goldLatS != null && goldLngS != null)
+        goldCoord = Coordinate.fromDegrees(Double.parseDouble(goldLatS), Double.parseDouble(goldLngS));
+    String systemLatS = CorpusXMLSource.this.in.getAttributeValue(null, "systemLat");
+    String systemLngS = CorpusXMLSource.this.in.getAttributeValue(null, "systemLng");
+    Coordinate systemCoord = null;
+    if(systemLatS != null && systemLngS != null)
+        systemCoord = Coordinate.fromDegrees(Double.parseDouble(systemLatS), Double.parseDouble(systemLngS));
+    String timestamp = CorpusXMLSource.this.in.getAttributeValue(null, "timestamp");
+
     CorpusXMLSource.this.nextTag();
 
-    return new Document(id) {
+    return new Document(id, timestamp, goldCoord, systemCoord) {
       public Iterator<Sentence<Token>> iterator() {
         return new SentenceIterator() {
           public boolean hasNext() {

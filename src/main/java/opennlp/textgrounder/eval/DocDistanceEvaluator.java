@@ -20,15 +20,9 @@ public class DocDistanceEvaluator {
 
             Coordinate systemCoord = doc.getSystemCoord();
             Coordinate goldCoord = doc.getGoldCoord();
-            /*if(systemCoord == null)
-                System.out.println("systemCoord null for docid " + doc.getId());
-            if(goldCoord == null)
-            System.out.println("goldCoord null for docid " + doc.getId());*/
-            //if(systemCoord != null && goldCoord == null)
-            //    System.out.println("have system coord but no gold coord for " + doc.getId());
+
             if(systemCoord != null && goldCoord != null) {
                 dreport.addDistance(systemCoord.distanceInKm(goldCoord));
-                //System.out.println("system: " + systemCoord + " gold: " + goldCoord);
             }
         }
 
