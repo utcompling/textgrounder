@@ -48,7 +48,7 @@ public class RunResolver extends BaseApp {
             System.out.println("done.");
         }
         else {
-            testCorpus = ImportCorpus.doImport(getInputPath(), getSerializedGazetteerPath(), getCorpusFormat());
+            testCorpus = ImportCorpus.doImport(getInputPath(), getSerializedGazetteerPath(), getCorpusFormat(), getUseGoldToponyms());
         }
 
         StoredCorpus trainCorpus = Corpus.createStoredCorpus();

@@ -19,12 +19,12 @@ public class BaseApp {
     private static String kmlOutputPath = null;
     private static boolean outputGoldLocations = false;
     private static boolean outputUserKML = false;
+    private static boolean useGoldToponyms = false;
     private static String geoGazetteerFilename = null;
     private static String serializedGazetteerPath = null;
     private static String serializedCorpusInputPath = null;
-    //private static String serializedGoldCorpusInputPath = null;
     private static String serializedCorpusOutputPath = null;
-    //private static boolean readAsTR = false;
+
     private static boolean highRecallNER = false;
 
     private static Region boundingBox = null;
@@ -68,6 +68,7 @@ public class BaseApp {
         options.addOption("ok", "output-kml", true, "kml output path");
         options.addOption("oku", "output-kml-users", false, "output user-based KML rather than toponym-based KML");
         options.addOption("gold", "output-gold-locations", false, "output gold locations rather than system locations in KML");
+        options.addOption("gt", "gold-toponyms", false, "use gold toponyms (named entities) if available");
         options.addOption("g", "geo-gazetteer-filename", true, "GeoNames gazetteer filename");
         options.addOption("sg", "serialized-gazetteer-path", true, "path to serialized GeoNames gazetteer");
         options.addOption("sci", "serialized-corpus-input-path", true, "path to serialized corpus for input");
@@ -166,6 +167,8 @@ public class BaseApp {
                         geoGazetteerFilename = value;
                     else if(option.getOpt().equals("gold"))
                         outputGoldLocations = true;
+                    else if(option.getOpt().equals("gt"))
+                        useGoldToponyms = true;
                     break;
                 case 's':
                     if(option.getOpt().equals("sg"))
@@ -249,6 +252,10 @@ public class BaseApp {
         return outputGoldLocations;
     }
 
+    public static boolean getUseGoldToponyms() {
+        return useGoldToponyms;
+    }
+
     public static boolean getOutputUserKML() {
         return outputUserKML;
     }
@@ -265,17 +272,10 @@ public class BaseApp {
         return serializedCorpusInputPath;
     }
 
-    /*public static String getSerializedGoldCorpusInputPath() {
-        return serializedGoldCorpusInputPath;
-    }*/
-
     public static String getSerializedCorpusOutputPath() {
         return serializedCorpusOutputPath;
     }
 
-    /*public static boolean isReadAsTR() {
-        return readAsTR;
-        }*/
 
     public static Enum<CORPUS_FORMAT> getCorpusFormat() {
         return corpusFormat;

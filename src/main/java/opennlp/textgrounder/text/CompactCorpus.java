@@ -238,7 +238,7 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
 
     private class CompactToponym implements StoredToponym {
       private final int idx;
-      private final int goldIdx;
+      private int goldIdx;
       private int selectedIdx;
 
       private CompactToponym(int idx) {
@@ -276,6 +276,7 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
         }
       }
       public int getGoldIdx() { return this.goldIdx; }
+      public void setGoldIdx(int idx) { this.goldIdx = idx; }
 
       public boolean hasSelected() { return this.selectedIdx > -1; }
       public Location getSelected() {
@@ -291,6 +292,7 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
 
       public int getAmbiguity() { return CompactCorpus.this.candidateLists.get(this.idx).size(); }
       public List<Location> getCandidates() { return CompactCorpus.this.candidateLists.get(this.idx); }
+      public void setCandidates(List<Location> candidates) { CompactCorpus.this.candidateLists.set(this.idx, candidates); }
       public Iterator<Location> iterator() { return CompactCorpus.this.candidateLists.get(this.idx).iterator(); }
 
       public List<Token> getTokens() { throw new UnsupportedOperationException(); }
