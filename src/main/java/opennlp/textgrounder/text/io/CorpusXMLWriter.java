@@ -161,6 +161,7 @@ public class CorpusXMLWriter {
   }
 
   protected void writeLocation(XMLStreamWriter out, Location location, Location gold, Location selected) throws XMLStreamException {
+      //location.removeNaNs();
     out.writeStartElement("cand");
     out.writeAttribute("id", String.format("c%d", location.getId()));
     out.writeAttribute("lat", String.format("%f", location.getRegion().getCenter().getLatDegrees()));

@@ -100,6 +100,10 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
           Span<Token> span = it.next();
           Toponym toponym = (Toponym) span.getItem();
 
+          /*if(toponym.getForm().equalsIgnoreCase("syria")) {
+              System.out.println("TOP: " + toponym.getCandidates().get(2).getRegion().getCenter());
+              }*/
+
           if (toponym.getAmbiguity() > this.maxToponymAmbiguity) {
             this.maxToponymAmbiguity = toponym.getAmbiguity();
           }
@@ -130,6 +134,13 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
           } else {
             this.candidateLists.set(idx, toponym.getCandidates());
           }
+
+          /*if(toponym.getForm().equalsIgnoreCase("syria")) {
+              //for(Location loc : toponym.getCandidates())
+              System.out.println("MIDDLE: " + toponym.getCandidates().get(2).getRegion().getCenter());
+              //              for(Location loc : this.candidateLists.get(idx))
+              System.out.println("BOTTOM: " + this.candidateLists.get(idx).get(2).getRegion().getCenter());
+              }*/
         }
 
         stored.compact();
@@ -162,6 +173,20 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
     
     this.wrapped.close();
     this.wrapped = null;
+
+    this.removeNaNs();
+  }
+
+  private void removeNaNs() {
+      for(List<Location> candidates : candidateLists) {
+          for(Location loc : candidates) {
+              List<Coordinate> reps = loc.getRegion().getRepresentatives();
+              int prevSize = reps.size();
+              Coordinate.removeNaNs(reps);
+              if(reps.size() < prevSize)
+                  loc.getRegion().setCenter(Coordinate.centroid(reps));
+          }
+      }
   }
 
   public void addSource(DocumentSource source) {

@@ -51,6 +51,9 @@ public class RectRegion extends Region {
                                   (this.maxLng + this.minLng) / 2.0);
   }
 
+    public void setCenter(Coordinate coord) {
+    }
+
   public boolean contains(double lat, double lng) {
       if(this.minLng <= this.maxLng) {
           return lat >= this.minLat &&
@@ -88,6 +91,10 @@ public class RectRegion extends Region {
     representatives.add(Coordinate.fromRadians(this.minLat, this.maxLng));
     return representatives;
   }
+
+    public void setRepresentatives(List<Coordinate> coordinates) {
+        System.err.println("Warning: can't set representatives of RectRegion.");
+    }
 
     public String toString() {
         return "lat: [" + (minLat*180.0/Math.PI) + ", "

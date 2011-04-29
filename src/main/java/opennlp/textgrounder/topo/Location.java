@@ -72,6 +72,17 @@ public class Location implements Serializable {
     this(-1, name, region, type, population);
   }
 
+    /*public void removeNaNs() {
+        List<Coordinate> reps = this.getRegion().getRepresentatives();
+        int prevSize = reps.size();
+        reps = Coordinate.removeNaNs(reps);
+        if(reps.size() < prevSize) {
+            this.getRegion().setRepresentatives(reps);
+            System.out.println("Recalculating centroid");
+            this.getRegion().setCenter(Coordinate.centroid(reps));
+        }
+        }*/
+
   public int getId() {
     return this.id;
   }

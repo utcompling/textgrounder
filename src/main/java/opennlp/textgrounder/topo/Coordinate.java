@@ -16,6 +16,7 @@
 package opennlp.textgrounder.topo;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import opennlp.textgrounder.util.FastTrig;
@@ -122,6 +123,10 @@ public class Coordinate implements Serializable {
       double lngCoss = 0.0;
 
       for (int i = 0; i < coordinates.size(); i++) {
+
+          // if(coordinates.get(i).getLatDegrees() == Double.NaN || coordinates.get(i).getLngDegrees() == Double.NaN)
+          //   System.out.println("NaN up here");
+
         latSins += Math.sin(coordinates.get(i).getLat());
         latCoss += Math.cos(coordinates.get(i).getLat());
         lngSins += Math.sin(coordinates.get(i).getLng());
@@ -136,7 +141,37 @@ public class Coordinate implements Serializable {
       double lat = Math.atan2(latSins, latCoss);
       double lng = Math.atan2(lngSins, lngCoss);
 
+      /*if(lat == Double.NaN || lng == Double.NaN) {
+          System.out.println(lat + ", " + lng + " from " + coordinates.size() + " coordinates.");
+      }
+
+      Coordinate temp = Coordinate.fromRadians(lat, lng);
+
+      if(temp.getLatDegrees() == Double.NaN || temp.getLngDegrees() == Double.NaN) {
+          System.out.println(temp.getLatDegrees() + ", " + temp.getLngDegrees() + " from " + coordinates.size() + " coordinates.");
+          }*/
+
       return Coordinate.fromRadians(lat, lng);
+    }
+
+    private static Double nanDouble = Double.NaN;
+
+    public static List<Coordinate> removeNaNs(List<Coordinate> coordinates) {
+        List<Coordinate> toReturn = new ArrayList<Coordinate>();
+        //System.out.println("in removeNaNs");
+        for(Coordinate coord : coordinates) {
+            //if((coord.getLat() + "").length() == 3)
+            //    System.out.println("HIDDEN " + coord.getLat());
+            /*if(coord.getLat() == Double.NaN || coord.getLng() == Double.NaN
+               || coord.getLatDegrees() == Double.NaN || coord.getLngDegrees() == Double.NaN
+               || (coord.getLat() + "").equals("NaN") || (coord.getLng() + "").equals("NaN")
+               || (coord.getLatDegrees() + "").equals("NaN") || (coord.getLngDegrees() + "").equals("NaN")) {*/
+            if(!(nanDouble.equals(coord.getLatDegrees()) || nanDouble.equals(coord.getLngDegrees()))) {
+                //System.out.println("actually removing a NaN");
+                toReturn.add(coord);
+            }
+        }
+        return toReturn;
     }
 
     @Override

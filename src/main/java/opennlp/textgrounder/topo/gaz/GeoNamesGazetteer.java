@@ -85,7 +85,12 @@ private final boolean expandRegions;
 
     this.load(reader);
     if (this.expandRegions) {
+        //for(Location loc : this.lookup("united states"))
+        //    System.out.println(loc.getRegion().getCenter());
+        //System.out.println("------------"); RECOMPILE
       this.expandIPE();
+      //for(Location loc : this.lookup("united states"))
+      //     System.out.println(loc.getRegion().getCenter());
       //this.expandADM();
     }
   }
@@ -123,14 +128,19 @@ private final boolean expandRegions;
 
       if (contained.size() > 0) {
         List<Coordinate> representatives = clusterer.clusterList(contained, k, SphericalGeometry.g());
+        representatives = Coordinate.removeNaNs(representatives);
+        //if(location.getName().equalsIgnoreCase("united states"))
+        //    System.out.println(location.getRegion().getCenter());
         location.setRegion(new PointSetRegion(representatives));
-        contained.clear();
-        contained = null;
+        //if(location.getName().equalsIgnoreCase("united states"))
+        //    System.out.println(location.getRegion().getCenter());
+        //contained.clear();
+        //contained = null;
       }
-      this.ipePoints.get(ipe).clear();
+      //this.ipePoints.get(ipe).clear();
     }
-    this.ipePoints.clear();
-    this.ipePoints = null;
+    //this.ipePoints.clear();
+    //this.ipePoints = null;
   }
 
   /*private void expandADM() {
@@ -218,6 +228,9 @@ private final boolean expandRegions;
             System.err.format("Invalid coordinates: %s\n", primaryName);
           }
 
+          //if(primaryName.equalsIgnoreCase("united states"))
+          //    System.out.println(lat + ", " + lng);
+
           // try to get coordinates from right side in the case of weird characters in names messing up tabs between fields:
           if((lat == Double.NaN || lng == Double.NaN) && fields.length > 19) {
               try {
@@ -227,6 +240,9 @@ private final boolean expandRegions;
                   System.err.format("Invalid coordinates: %s\n", primaryName);
               }
           }
+
+          //if(primaryName.equalsIgnoreCase("united states"))
+          //    System.out.println(lat + ", " + lng);
 
           // give up on trying to get coordinates:
           if(lat == Double.NaN || lng == Double.NaN)
