@@ -18,6 +18,8 @@ public class ImportGazetteer extends BaseApp {
 
     public static GeoNamesGazetteer doImport(String gazInputPath, boolean runKMeans) throws Exception {
         System.out.println("Reading GeoNames gazetteer from " + gazInputPath + " ...");
+
+        checkExists(gazInputPath);
         
         GeoNamesGazetteer gnGaz = null;
         if(gazInputPath.toLowerCase().endsWith(".zip")) {

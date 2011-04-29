@@ -6,6 +6,7 @@ package opennlp.textgrounder.app;
 
 import org.apache.commons.cli.*;
 import opennlp.textgrounder.topo.*;
+import java.io.*;
 
 public class BaseApp {
 
@@ -214,6 +215,14 @@ public class BaseApp {
 
         if(minLat != null && maxLat != null && minLon != null && maxLon != null)
             boundingBox = RectRegion.fromDegrees(minLat, maxLat, minLon, maxLon);
+    }
+
+    protected static void checkExists(String filename) throws Exception {
+        File f = new File(filename);
+        if(!f.exists()) {
+            System.out.println(filename + " doesn't exist; aborting.");
+            System.exit(0);
+        }
     }
 
     public static String getInputPath() {

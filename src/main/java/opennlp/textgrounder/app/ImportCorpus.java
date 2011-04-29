@@ -37,6 +37,9 @@ public class ImportCorpus extends BaseApp {
                                         Enum<CORPUS_FORMAT> corpusFormat,
                                         boolean useGoldToponyms) throws Exception {
 
+        checkExists(corpusInputPath);
+        checkExists(serGazInputPath);
+
         Tokenizer tokenizer = new OpenNLPTokenizer();
         OpenNLPRecognizer recognizer = new OpenNLPRecognizer();
 
