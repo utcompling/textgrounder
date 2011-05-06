@@ -1,6 +1,7 @@
 from __future__ import with_statement # For chompopen(), uchompopen()
 from optparse import OptionParser
 from itertools import *
+import itertools
 import re # For regexp wrappers
 import sys, codecs # For uchompopen()
 import math # For float_with_commas()
@@ -317,6 +318,15 @@ def split_text_into_words(text, ignore_punc=False, include_nl=False):
         elif not ignore_punc: yield punc
     else:
       yield word
+
+def fromto(fro, to, step=1):
+  if fro <= to:
+    step = abs(step)
+    to += 1
+  else:
+    step = -abs(step)
+    to -= 1
+  return xrange(fro, to, step)
 
 #############################################################################
 #                             Default dictionaries                          #
@@ -684,12 +694,17 @@ class PriorityQueue(object):
     self.task_finder[task] = entry
     heappush(self.pq, entry)
 
-  def get_top_priority(self):
+  #Return the top-priority task. If 'return_priority' is false, just
+  #return the task itself; otherwise, return a tuple (task, priority).
+  def get_top_priority(self, return_priority=False):
     while True:
       priority, count, task = heappop(self.pq)
       if count is not PriorityQueue.INVALID:
         del self.task_finder[task]
-        return task
+        if return_priority:
+          return (task, priority)
+        else:
+          return task
 
   def delete_task(self, task):
     entry = self.task_finder[task]

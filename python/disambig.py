@@ -43,8 +43,19 @@ import time
 # List of stopwords
 stopwords = set()
 
-# Debug flags.  Different flags indicate different info to output.
-debug = booldict()
+# Debug params.  Different params indicate different info to output.
+# Specified using --debug.  Multiple params are separated by commas or spaces.
+# Params can be boolean, if given alone, or valueful, if given as
+# PARAM=VALUE.  Certain params are list-valued; multiple values are specified
+# by including the parameter multiple times, or by separating values by
+# a semicolon or colon.
+debug = listdict()
+
+list_debug_params = []
+
+# Register a list-valued debug param.
+def register_list_debug_param(param):
+  list_debug_params.append(param)
 
 ############################################################################
 #                               Structures                                 #
@@ -295,6 +306,28 @@ def stat_region_indices_to_far_corner_coord(latind, longind):
   return offset_region_indices_to_coord(latind, longind,
       Opts.width_of_stat_region)
 
+# Convert region indices of a statistical region to the coordinate of the
+# northwest corner of the region.
+def stat_region_indices_to_nw_corner_coord(latind, longind):
+  return region_indices_to_coord(latind + Opts.width_of_stat_region, longind,
+      coerce_within_bounds=True)
+
+# Convert region indices of a statistical region to the coordinate of the
+# southeast corner of the region.
+def stat_region_indices_to_se_corner_coord(latind, longind):
+  return region_indices_to_coord(latind, longind + Opts.width_of_stat_region,
+      coerce_within_bounds=True)
+
+# Convert region indices of a statistical region to the coordinate of the
+# southwest corner of the region.
+def stat_region_indices_to_sw_corner_coord(latind, longind):
+  return stat_region_indices_to_near_corner_coord(latind, longind)
+
+# Convert region indices of a statistical region to the coordinate of the
+# northeast corner of the region.
+def stat_region_indices_to_ne_corner_coord(latind, longind):
+  return stat_region_indices_to_far_corner_coord(latind, longind)
+
 ############################################################################
 #                             Word distributions                           #
 ############################################################################
@@ -447,7 +480,7 @@ class RegionDist(object):
       self.normalized = False
 
   def get_ranked_regions(self):
-    return [reg for (reg, prob) in sorted(self.regionprobs.iteritems(),
+    return [(reg, prob) for (reg, prob) in sorted(self.regionprobs.iteritems(),
                                           key=lambda x:x[1], reverse=True)]
 
   # Return a region distribution over a given word, using a least-recently-used
@@ -2258,12 +2291,12 @@ class BaselineGeotagDocumentStrategy(GeotagDocumentStrategy):
   def ranked_regions_random(self, worddist):
     regions = list(StatRegion.iter_nonempty_regions())
     random.shuffle(regions)
-    return regions
+    return [(reg, 0) for reg in regions]
 
   def ranked_most_popular_regions(self, worddist):
     if self.cached_ranked_mps is None:
       self.cached_ranked_mps = \
-          [reg for reg, popularity
+          [(reg, popularity) for (reg, popularity)
               in sorted(((reg, (get_adjusted_incoming_links(reg.worddist)
                                 if self.baseline_strategy == 'internal_link'
                                 else reg.worddist.num_arts_for_links))
@@ -2296,7 +2329,7 @@ class BaselineGeotagDocumentStrategy(GeotagDocumentStrategy):
       if debug['commontop']:
         errprint("  candidates = %s" % cands)
       # Sort candidate list by number of incoming links
-      cands = [cand for cand, links in
+      cands = [(cand, links) for (cand, links) in
           sorted(((cand, (get_adjusted_incoming_links(cand)))
             for cand in cands),
             key=lambda x:x[1], reverse=True)]
@@ -2304,12 +2337,12 @@ class BaselineGeotagDocumentStrategy(GeotagDocumentStrategy):
         errprint("  sorted candidates = %s" % cands)
 
       def find_good_regions_for_coord(cands):
-        for cand in cands:
+        for cand, links in cands:
           reg = StatRegion.find_region_for_coord(cand.coord)
           if reg.latind is None:
             errprint("Strange, found no region for candidate %s" % cand)
           else:
-            yield reg
+            yield reg, links
 
       # Convert to regions
       cands = [x for x in find_good_regions_for_coord(cands)]
@@ -2318,8 +2351,19 @@ class BaselineGeotagDocumentStrategy(GeotagDocumentStrategy):
         errprint("  region candidates = %s" % cands)
     else:
       cands = []
+
+    # Return an iterator over all elements in all the given sequences, omitting
+    # elements seen more than once and keeping the order.
+    def merge_numbered_sequences_uniquely(*seqs):
+      table = {}
+      for seq in seqs:
+        for s, val in seq:
+          if s not in table:
+            table[s] = True
+            yield s, val
+
     # Append random regions and remove duplicates
-    return list(merge_sequences_uniquely(cands,
+    return list(merge_numbered_sequences_uniquely(cands,
         self.ranked_regions_random(worddist)))
 
   def return_ranked_regions(self, worddist):
@@ -2364,7 +2408,7 @@ class KLDivergenceStrategy(GeotagDocumentStrategy):
     regions = []
     while True:
       try:
-        regions.append(article_pq.get_top_priority())
+        regions.append(article_pq.get_top_priority(return_priority=True))
       except IndexError:
         break
     if debug['kldiv']:
@@ -2375,8 +2419,8 @@ class KLDivergenceStrategy(GeotagDocumentStrategy):
       errprint("")
       errprint("KL-divergence debugging info:")
       for i in xrange(min(len(regions), num_contrib_regions)):
-        region = regions[i]
-        (kldiv, contribs) = worddist.slow_kl_divergence(region.worddist,
+        region, kldiv = regions[i]
+        kldiv, contribs = worddist.slow_kl_divergence(region.worddist,
             partial=self.partial, return_contributing_words=True)
         errprint("  At rank #%s, region %s:" % (i + 1, region))
         errprint("    %30s  %s" % ('Word', 'KL-div contribution'))
@@ -2423,7 +2467,7 @@ class CosineSimilarityStrategy(GeotagDocumentStrategy):
     regions = []
     while True:
       try:
-        regions.append(article_pq.get_top_priority())
+        regions.append(article_pq.get_top_priority(return_priority=True))
       except IndexError:
         break
 
@@ -2460,7 +2504,7 @@ class NaiveBayesDocumentStrategy(GeotagDocumentStrategy):
               StatRegion.total_num_arts_for_links)
       logprob = word_weight*word_logprob + baseline_weight*baseline_logprob
       regprobs[reg] = logprob
-    return [reg for (reg, prob) in sorted(regprobs.iteritems(),
+    return [(reg, prob) for (reg, prob) in sorted(regprobs.iteritems(),
                                           key=lambda x:x[1], reverse=True)]
 
 
@@ -2480,6 +2524,21 @@ class GeotagDocumentEvaluator(TestFileEvaluator):
 
 
 class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
+  # Debug flags:
+  #
+  #  gridrank: For the given test article number (starting at 1), output
+  #            a grid of the predicted rank for regions around the true
+  #            region.  Multiple articles can have the rank output by
+  #            specifying this option multiple times, e.g.
+  #
+  #            --debug 'gridrank=45,gridrank=58'
+  #
+  #  gridranksize: Size of the grid, in numbers of articles on a side.
+  #                This is a single number, and the grid will be a square
+  #                centered on the true region.
+  register_list_debug_param('gridrank')
+  debug['gridranksize'] = '11'
+
   def iter_documents(self, filename):
     for art in ArticleTable.articles_by_split[self.opts.eval_set]:
       yield art
@@ -2526,7 +2585,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
                (article, naitr))
     regs = self.strategy.return_ranked_regions(article.dist)
     rank = 1
-    for reg in regs:
+    for reg, val in regs:
       if reg.latind == true_latind and reg.longind == true_longind:
         break
       rank += 1
@@ -2534,7 +2593,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       rank = 1000000000
     want_indiv_results = not self.opts.no_individual_results
     stats = self.results.record_geotag_document_result(rank, article.coord,
-        regs[0].latind, regs[0].longind, num_arts_in_true_region=naitr,
+        regs[0][0].latind, regs[0][0].longind, num_arts_in_true_region=naitr,
         return_stats=want_indiv_results)
     if naitr == 0:
       self.results.record_geotag_document_other_stat(
@@ -2545,11 +2604,53 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       errprint("%s:  True region: %s" % (doctag, true_statreg))
       for i in xrange(5):
         errprint("%s:  Predicted region (at rank %s): %s" %
-            (doctag, i+1, regs[i]))
+            (doctag, i+1, regs[i][0]))
       errprint("%s:  Distance %.2f miles to true region center at %s" %
                (doctag, stats['true_truedist'], stats['true_center']))
       errprint("%s:  Distance %.2f miles to predicted region center at %s" %
                (doctag, stats['pred_truedist'], stats['pred_center']))
+      assert doctag[0] == '#'
+      if doctag[1:] in debug['gridrank']:
+        grsize = int(debug['gridranksize'])
+        min_latind = true_latind - grsize // 2
+        max_latind = min_latind + grsize - 1
+        min_longind = true_longind - grsize // 2
+        max_longind = min_longind + grsize - 1
+        grid = {}
+        rank = 1
+        for reg, val in regs:
+          if (reg.latind >= min_latind and reg.latind <= max_latind and
+              reg.longind >= min_longind and reg.longind <= max_longind):
+            grid[(reg.latind,reg.longind)] = (reg, val, rank)
+          rank += 1
+
+        errprint("Grid ranking, gridsize %dx%d" % (grsize, grsize))
+        errprint("NW corner: %s" %
+            stat_region_indices_to_nw_corner_coord(max_latind, min_longind))
+        errprint("SE corner: %s" %
+            stat_region_indices_to_se_corner_coord(min_latind, max_longind))
+        for doit in [0, 1]:
+          if doit == 0:
+            errprint("Grid for ranking:")
+          else:
+            errprint("Grid for goodness/distance:")
+          for lat in fromto(max_latind, min_latind):
+            for long in fromto(min_longind, max_longind):
+              regvalrank = grid.get((lat,long), None)
+              if not regvalrank:
+                errout(" %-8s" % "empty")
+              else:
+                reg, val, rank = regvalrank
+                if doit == 0:
+                  showit = rank
+                else:
+                  showit = val
+                if lat == true_latind and long == true_longind:
+                  errout("!%-8.6s" % showit)
+                else:
+                  errout(" %-8.6s" % showit)
+            errout("\n")
+
     return True
 
 
@@ -2614,12 +2715,13 @@ class PCLTravelGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     errprint("")
     errprint("Article with title: %s" % doc.title)
     num_regs_to_show = 5
-    for (rank, reg) in izip(xrange(1, 1 + num_regs_to_show), regs):
+    for (rank, regval) in izip(xrange(1, 1 + num_regs_to_show), regs):
+      reg, val = retval
       if debug['struct']:
-        errprint("  Rank %d:" % rank)
+        errprint("  Rank %d, goodness %g:" % (rank, val))
         print_structure(reg.struct(), indent=4)
       else:
-        errprint("  Rank %d: %s" % (rank, reg.shortstr()))
+        errprint("  Rank %d, goodness %g: %s" % (rank, val, reg.shortstr()))
     
     return True
 
@@ -3238,9 +3340,19 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
     Opts = opts
     global debug
     if opts.debug:
-      flags = re.split(r'[,\s]+', opts.debug)
-      for f in flags:
-        debug[f] = True
+      params = re.split(r'[;\s]+', opts.debug)
+      # Allow params with values, and allow lists of values to be given
+      # by repeating the param
+      for f in params:
+        if '=' in f:
+          (param, value) = re.split('=', f, 1)
+          if param in list_debug_params:
+            values = re.split('[,]', value)
+            debug[param] += values
+          else:
+            debug[param] = value
+        else:
+          debug[f] = True
       WordDist.set_debug(debug)
 
     class Params(object):
