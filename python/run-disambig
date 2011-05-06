@@ -40,6 +40,8 @@ elif [ "$MODE" = "geotag-documents" ]; then
   EVALTYPE="--eval-format wiki"
 fi
 
+GAZETTEER_ARG=
+
 $DISAMBIG \
   $STOPWORDS_ARG $GAZETTEER_ARG $STRATEGY $EVALFILE $EVALTYPE \
  $MISCOPTS $LOCAL_ARGS ${1+"$@"}
