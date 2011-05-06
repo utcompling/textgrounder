@@ -151,7 +151,7 @@ def gopen(filename, mode='r', encoding=None, errors='strict', chomp=False,
 # Unicode strings, but with any terminating newline removed (similar to
 # "chomp" in Perl).  Basically same as gopen() but with defaults set
 # differently.
-def uchompopen(filename, mode='r', encoding='utf-8', errors='strict',
+def uchompopen(filename=None, mode='r', encoding='utf-8', errors='strict',
     chomp=True, inplace=0, backup="", bufsize=0):
   return gopen(filename, mode=mode, encoding=encoding, errors=errors,
       chomp=chomp, inplace=inplace, backup=backup, bufsize=bufsize)
@@ -489,17 +489,34 @@ def reverse_key_sorted_items(d):
 def reverse_value_sorted_items(d):
   return sorted(d.iteritems(), key=lambda x:x[1], reverse=True)
 
+# Given a list of tuples, where the second element of the tuple is a number and
+# the first a key, output the list, sorted on the numbers from bigger to
+# smaller.  Within a given number, sort the items alphabetically, unless
+# keep_secondary_order is True, in which case the original order of items is
+# left.  If 'outfile' is specified, send output to this stream instead of
+# stdout.  If 'indent' is specified, indent all rows by this string (usually
+# some number of spaces).  If 'maxrows' is specified, output at most this many
+# rows.
+def output_reverse_sorted_list(items, outfile=sys.stdout, indent="",
+    keep_secondary_order=False, maxrows=None):
+  if not keep_secondary_order:
+    items = sorted(items, key=lambda x:x[0])
+  items = sorted(items, key=lambda x:x[1], reverse=True)
+  if maxrows:
+    items = items[0:maxrows]
+  for key, value in items:
+    uniprint("%s%s = %s" % (indent, key, value), outfile=outfile)
+
 # Given a table with values that are numbers, output the table, sorted
 # on the numbers from bigger to smaller.  Within a given number, sort the
 # items alphabetically, unless keep_secondary_order is True, in which case
-# the original order of items is left.
+# the original order of items is left.  If 'outfile' is specified, send
+# output to this stream instead of stdout.  If 'indent' is specified, indent
+# all rows by this string (usually some number of spaces).  If 'maxrows'
+# is specified, output at most this many rows.
 def output_reverse_sorted_table(table, outfile=sys.stdout, indent="",
-    keep_secondary_order=False):
-  items = table.items()
-  if not keep_secondary_order:
-    items = sorted(items, key=lambda x:x[0])
-  for x in sorted(items, key=lambda x:x[1], reverse=True):
-    uniprint("%s%s = %s" % (indent, x[0], x[1]), outfile=outfile)
+    keep_secondary_order=False, maxrows=None):
+  output_reverse_sorted_list(table.iteritems())
 
 #############################################################################
 #                             Status Messages                               #
