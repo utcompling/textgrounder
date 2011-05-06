@@ -3344,7 +3344,7 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
     Opts = opts
     global debug
     if opts.debug:
-      params = re.split(r'[;\s]+', opts.debug)
+      params = re.split(r'[:;\s]+', opts.debug)
       # Allow params with values, and allow lists of values to be given
       # by repeating the param
       for f in params:
