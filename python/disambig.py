@@ -1890,7 +1890,7 @@ class TestFileEvaluator(object):
             skip_n -= 1
             do_skip = True
           else:
-            skip_n = self.opts.skip_every_n_test_docs
+            skip_n = self.opts.every_nth_test_doc - 1
           if do_skip:
             errprint("Passed over document %s" % doctag)
           else:
@@ -2612,7 +2612,7 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
       errprint("%s:  Distance %.2f miles to predicted region center at %s" %
                (doctag, stats['pred_truedist'], stats['pred_center']))
       assert doctag[0] == '#'
-      if doctag[1:] in debug['gridrank']:
+      if debug['gridrank'] == True or doctag[1:] in debug['gridrank']:
         grsize = int(debug['gridranksize'])
         min_latind = true_latind - grsize // 2
         max_latind = min_latind + grsize - 1
@@ -3322,12 +3322,14 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
                   help="""Maximum number of training documents to use.
 0 means no limit.  Default %default.""")
     op.add_option("--num-test-docs", "--ntest", type='int', default=0,
-                  help="""Maximum number of test documents to use.
+                  help="""Maximum number of test documents to process.
 0 means no limit.  Default %default.""")
     op.add_option("--skip-initial-test-docs", "--skip-initial", type='int', default=0,
                   help="""Skip this many test docs at beginning.  Default 0.""")
-    op.add_option("--skip-every-n-test-docs", "--skip-n", type='int', default=0,
-                  help="""Skip this many after each one processed.  Default 0.""")
+    op.add_option("--every-nth-test-doc", "--every-nth", type='int', default=1,
+                  help="""Only process every Nth test doc.  Default 1, i.e. process all.""")
+#    op.add_option("--skip-every-n-test-docs", "--skip-n", type='int', default=0,
+#                  help="""Skip this many after each one processed.  Default 0.""")
     op.add_option("--no-individual-results", "--no-results",
                   action='store_true', default=False,
                   help="""Don't show individual results for each test document.""")
