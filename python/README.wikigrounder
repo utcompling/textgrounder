@@ -92,7 +92,7 @@ Set the split to evaluate on, either "dev" or "test".
 
 `--strategy STRAT ...` 
 
-Set the strategy to use for geolocating.  Sample strategies are `partial-kl-divergence` ("KL Divergence" in the paper), `per-word-region-distribution` ("ACP" in the paper), `naive-bayes-with-baseline` ("Naive Bayes" in the paper), and `baseline` (any of the baselines).  You can specify multiple `--strategy` options on the command line, and the specified strategies will be tried one after the other.
+Set the strategy to use for geolocating.  Sample strategies are `partial-kl-divergence` ("KL Divergence" in the paper), `average-cell-probability` ("ACP" in the paper), `naive-bayes-with-baseline` ("Naive Bayes" in the paper), and `baseline` (any of the baselines).  You can specify multiple `--strategy` options on the command line, and the specified strategies will be tried one after the other.
 
 `--baseline-strategy STRAT ...`
 

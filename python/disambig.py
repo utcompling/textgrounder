@@ -3052,22 +3052,24 @@ specify the words whose distributions should be outputted.  See also
 the probabilities to make the distinctions among them more visible.
 """)
 
-    op.add_option("-s", "--strategy", "--s", type='choice', action='append',
-                  default=None,
-                  choices=['baseline', 'none',
-                           'kl-divergence', 'kldiv',
-                           'partial-kl-divergence', 'partial-kldiv',
-                           'symmetric-kl-divergence', 'symmetric-kldiv',
-                           'symmetric-partial-kl-divergence',
-                           'symmetric-partial-kldiv',
-                           'cosine-similarity', 'cossim',
-                           'partial-cosine-similarity', 'partial-cossim',
-                           'smoothed-cosine-similarity',
-                           'smoothed-partial-cosine-similarity',
-                           'per-word-region-distribution', 'regdist',
-                           'naive-bayes-with-baseline', 'nb-base',
-                           'naive-bayes-no-baseline', 'nb-nobase'],
-                  help="""Strategy/strategies to use for geotagging.
+    op.add_option("-s", "--strategy", "--s", type='choice', action='append', 
+        default=None,
+        choices=[
+          'baseline', 'none',
+          'full-kl-divergence', 'full-kldiv', 'full-kl',
+          'partial-kl-divergence', 'partial-kldiv', 'partial-kl',
+          'symmetric-full-kl-divergence', 'sym-kldiv', 'sym-kl',
+          'symmetric-partial-kl-divergence', 'sym-partial-kldiv',
+            'sym-partial-kl',
+          'cosine-similarity', 'cossim',
+          'partial-cosine-similarity', 'partial-cossim',
+          'smoothed-cosine-similarity', 'smoothed-cossim',
+          'smoothed-partial-cosine-similarity', 'smoothed-partial-cossim',
+          'average-cell-probability', 'avg-cell-prob', 'acp',
+          'naive-bayes-with-baseline', 'nb-base',
+          'naive-bayes-no-baseline', 'nb-nobase'
+          ],
+        help="""Strategy/strategies to use for geotagging.
 'baseline' means just use the baseline strategy (see --baseline-strategy).
 
 'none' means don't do any geotagging.  Useful for testing the parts that
@@ -3085,11 +3087,12 @@ prior probability.  Default is 'baseline'.
 
 For geotag-documents:
 
-'kl-divergence' (or 'kldiv') searches for the region where the KL divergence
-between the article and region is smallest.  'partial-kl-divergence' (or
-'partial-kldiv') is similar but uses an abbreviated KL divergence measure that
-only considers the words seen in the article; empirically, this appears to work
-just as well as the full KL divergence. 'per-word-region-distribution' (or
+'full-kl-divergence' (or 'full-kldiv') searches for the region where the KL
+divergence between the article and region is smallest.
+'partial-kl-divergence' (or 'partial-kldiv') is similar but uses an
+abbreviated KL divergence measure that only considers the words seen in the
+article; empirically, this appears to work just as well as the full KL
+divergence. 'average-cell-probability' (or
 'regdist') involves computing, for each word, a probability distribution over
 regions using the word distribution of each region, and then combining the
 distributions over all words in an article, weighted by the count the word in
@@ -3097,16 +3100,23 @@ the article.  Default is 'partial-kl-divergence'.
 
 NOTE: Multiple --strategy options can be given, and each strategy will
 be tried, one after the other.""")
-    canon_options['strategy'] = {'kldiv':'kl-divergence',
-                                 'partial-kldiv':'partial-kl-divergence',
-                                 'symmetric-kldiv':'symmetric-kl-divergence',
-                                 'symmetric-partial-kldiv':
-                                   'symmetric-partial-kl-divergence',
-                                 'cossim':'cosine-similarity',
-                                 'partial-cossim':'partial-cosine-similarity',
-                                 'regdist':'per-word-region-distribution',
-                                 'nb-base':'naive-bayes-with-baseline',
-                                 'nb-nobase':'naive-bayes-no-baseline'}
+    canon_options['strategy'] = {
+        'full-kldiv':'full-kl-divergence',
+        'full-kl':'full-kl-divergence',
+        'partial-kldiv':'partial-kl-divergence',
+        'partial-kl':'partial-kl-divergence',
+        'sym-full-kldiv':'symmetric-full-kl-divergence',
+        'sym-full-kl':'symmetric-full-kl-divergence',
+        'sym-partial-kldiv':'symmetric-partial-kl-divergence',
+        'sym-partial-kl':'symmetric-partial-kl-divergence',
+        'cossim':'cosine-similarity',
+        'partial-cossim':'partial-cosine-similarity',
+        #'regdist':'average-cell-probability',
+        #'per-word-region-distribution':'average-cell-probability',
+        'avg-cell-prob':'average-cell-probability',
+        'acp':'average-cell-probability',
+        'nb-base':'naive-bayes-with-baseline',
+        'nb-nobase':'naive-bayes-no-baseline'}
 
     op.add_option("--baseline-strategy", "--bs", type='choice', action='append',
                   default=None,
@@ -3397,7 +3407,7 @@ Not generating an empty KML file.""" % word)
             if stratname.startswith('naive-bayes-'):
               strategy = NaiveBayesDocumentStrategy(opts,
                   use_baseline=(stratname == 'naive-bayes-with-baseline'))
-            elif stratname == 'per-word-region-distribution':
+            elif stratname == 'average-cell-probability':
               strategy = PerWordRegionDistributionsStrategy()
             elif stratname == 'cosine-similarity':
               strategy = CosineSimilarityStrategy(smoothed=False, partial=False)
@@ -3407,11 +3417,11 @@ Not generating an empty KML file.""" % word)
               strategy = CosineSimilarityStrategy(smoothed=True, partial=False)
             elif stratname == 'smoothed-partial-cosine-similarity':
               strategy = CosineSimilarityStrategy(smoothed=True, partial=True)
-            elif stratname == 'kl-divergence':
+            elif stratname == 'full-kl-divergence':
               strategy = KLDivergenceStrategy(symmetric=False, partial=False)
             elif stratname == 'partial-kl-divergence':
               strategy = KLDivergenceStrategy(symmetric=False, partial=True)
-            elif stratname == 'symmetric-kl-divergence':
+            elif stratname == 'symmetric-full-kl-divergence':
               strategy = KLDivergenceStrategy(symmetric=True, partial=False)
             elif stratname == 'symmetric-partial-kl-divergence':
               strategy = KLDivergenceStrategy(symmetric=True, partial=True)
