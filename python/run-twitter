@@ -31,7 +31,7 @@ RUN_DISAMBIG="$WIKIGROUNDER_DIR/run-disambig"
 
 while true ; do
   case "$1" in
-    --doc-thresh) GEOTEXT_OUTPUT_DIR="$GEOTEXT_TOP_DIR/output-$2-docthresh" ;
+    --doc-thresh) GEOTEXT_OUTPUT_DIR="$WG_TWITTER_DIR/output-$2-docthresh" ;
                   shift 2 ;;
     # A no-argument option ....
     #-n|--no-backup) opts="$opts --no-backup" ; shift ;;
