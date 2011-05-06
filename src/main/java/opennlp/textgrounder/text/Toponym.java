@@ -24,15 +24,16 @@ public interface Toponym extends Token, Iterable<Location>, Serializable {
   public boolean hasGold();
   public Location getGold();
   public int getGoldIdx();
+  public void setGoldIdx(int idx);
 
   public boolean hasSelected();
   public Location getSelected();
   public int getSelectedIdx();
-
   public void setSelectedIdx(int idx);
 
   public int getAmbiguity();
   public List<Location> getCandidates();
+  public void setCandidates(List<Location> candidates);
 
   public List<Token> getTokens();
 }

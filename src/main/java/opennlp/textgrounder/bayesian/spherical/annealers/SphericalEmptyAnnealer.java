@@ -35,12 +35,12 @@ public class SphericalEmptyAnnealer extends SphericalAnnealer {
     @Override
     public double annealProbs(int starti, double[] classes) {
         int l = classes.length;
-        return TGMath.safeSum(classes, starti, l);
+        return TGMath.stableSum(classes, starti, l);
     }
 
     @Override
     public double annealProbs(int _starti, int _endi, double[] _classes) {
-        return TGMath.safeSum(_classes, _starti, _endi);
+        return TGMath.stableSum(_classes, _starti, _endi);
     }
 
     @Override

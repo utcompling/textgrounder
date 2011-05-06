@@ -45,9 +45,11 @@ import opennlp.textgrounder.text.Toponym;
 import opennlp.textgrounder.topo.Location;
 import opennlp.textgrounder.topo.Coordinate;
 
+import opennlp.textgrounder.app.BaseApp;
+
 public class CorpusXMLWriter {
   protected final Corpus<? extends Token> corpus;
-  private final XMLOutputFactory factory;
+  protected final XMLOutputFactory factory;
 
   public CorpusXMLWriter(Corpus<? extends Token> corpus) {
     this.corpus = corpus;
@@ -84,6 +86,19 @@ public class CorpusXMLWriter {
     if (document.getId() != null) {
       out.writeAttribute("id", document.getId());
     }
+    Coordinate systemCoord = document.getSystemCoord();
+    if(systemCoord != null) {
+        out.writeAttribute("systemLat", systemCoord.getLatDegrees() + "");
+        out.writeAttribute("systemLng", systemCoord.getLngDegrees() + "");
+    }
+    Coordinate goldCoord = document.getGoldCoord();
+    if(goldCoord != null) {
+        out.writeAttribute("goldLat", goldCoord.getLatDegrees() + "");
+        out.writeAttribute("goldLng", goldCoord.getLngDegrees() + "");
+    }
+    if(document.getTimestamp() != null) {
+        out.writeAttribute("timestamp", document.getTimestamp());
+    }
     for (Sentence<Token> sentence : document) {
       this.writeSentence(out, sentence);
     }
@@ -105,15 +120,35 @@ public class CorpusXMLWriter {
     out.writeEndElement();
   }
 
+    private String okChars = "!?:;,'\"|+=-_*^%$#@`~(){}[]\\/";
+
+    private boolean isSanitary(String s) {
+        if(corpus.getFormat() != BaseApp.CORPUS_FORMAT.GEOTEXT)
+            return true;
+        for(int i = 0; i < s.length(); i++) {
+            char curChar = s.charAt(i);
+            if(!Character.isLetterOrDigit(curChar) && !okChars.contains(curChar + "")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
   protected void writeToken(XMLStreamWriter out, Token token) throws XMLStreamException {
     out.writeStartElement("w");
-    out.writeAttribute("tok", token.getOrigForm());
+    if(isSanitary(token.getOrigForm()))
+        out.writeAttribute("tok", token.getOrigForm());
+    else
+        out.writeAttribute("tok", " ");
     out.writeEndElement();
   }
 
   protected void writeToponym(XMLStreamWriter out, Toponym toponym) throws XMLStreamException {
     out.writeStartElement("toponym");
-    out.writeAttribute("term", toponym.getOrigForm());
+    if(isSanitary(toponym.getOrigForm()))
+       out.writeAttribute("term", toponym.getOrigForm());
+    else
+       out.writeAttribute("term", " ");
     out.writeStartElement("candidates");
     Location gold = toponym.hasGold() ? toponym.getGold() : null;
     Location selected = toponym.hasSelected() ? toponym.getSelected() : null;
@@ -126,6 +161,7 @@ public class CorpusXMLWriter {
   }
 
   protected void writeLocation(XMLStreamWriter out, Location location, Location gold, Location selected) throws XMLStreamException {
+      //location.removeNaNs();
     out.writeStartElement("cand");
     out.writeAttribute("id", String.format("c%d", location.getId()));
     out.writeAttribute("lat", String.format("%f", location.getRegion().getCenter().getLatDegrees()));

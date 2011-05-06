@@ -100,6 +100,10 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
           Span<Token> span = it.next();
           Toponym toponym = (Toponym) span.getItem();
 
+          /*if(toponym.getForm().equalsIgnoreCase("syria")) {
+              System.out.println("TOP: " + toponym.getCandidates().get(2).getRegion().getCenter());
+              }*/
+
           if (toponym.getAmbiguity() > this.maxToponymAmbiguity) {
             this.maxToponymAmbiguity = toponym.getAmbiguity();
           }
@@ -116,7 +120,13 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
               stored.addToponym(span.getStart(), span.getEnd(), idx, goldIdx);
             }
           } else {
-            stored.addToponym(span.getStart(), span.getEnd(), idx);
+              if(toponym.hasSelected()) {
+                  int selectedIdx = toponym.getSelectedIdx();
+                  stored.addToponym(span.getStart(), span.getEnd(), idx, -1, selectedIdx);
+              }
+              else {
+                  stored.addToponym(span.getStart(), span.getEnd(), idx);
+              }
           }
 
           if (this.candidateLists.size() <= idx) {
@@ -124,18 +134,24 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
           } else {
             this.candidateLists.set(idx, toponym.getCandidates());
           }
+
+          /*if(toponym.getForm().equalsIgnoreCase("syria")) {
+              //for(Location loc : toponym.getCandidates())
+              System.out.println("MIDDLE: " + toponym.getCandidates().get(2).getRegion().getCenter());
+              //              for(Location loc : this.candidateLists.get(idx))
+              System.out.println("BOTTOM: " + this.candidateLists.get(idx).get(2).getRegion().getCenter());
+              }*/
         }
 
         stored.compact();
         sentences.add(stored);
       }
 
-      //System.out.println(document.getClass().getName());
-
       sentences.trimToSize();
       if(this.getFormat() == BaseApp.CORPUS_FORMAT.GEOTEXT)
           this.documents.add(new StoredDocument(document.getId(), sentences,
-                                                null, document.getGoldCoord()));
+                                                document.getTimestamp(),
+                                                document.getGoldCoord(), document.getSystemCoord()));
       else
           this.documents.add(new StoredDocument(document.getId(), sentences));
     }
@@ -157,6 +173,20 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
     
     this.wrapped.close();
     this.wrapped = null;
+
+    this.removeNaNs();
+  }
+
+  private void removeNaNs() {
+      for(List<Location> candidates : candidateLists) {
+          for(Location loc : candidates) {
+              List<Coordinate> reps = loc.getRegion().getRepresentatives();
+              int prevSize = reps.size();
+              Coordinate.removeNaNs(reps);
+              if(reps.size() < prevSize)
+                  loc.getRegion().setCenter(Coordinate.centroid(reps));
+          }
+      }
   }
 
   public void addSource(DocumentSource source) {
@@ -195,6 +225,11 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
         this.goldCoord = goldCoord;
     }
 
+    private StoredDocument(String id, List<Sentence<StoredToken>> sentences, String timestamp, Coordinate goldCoord, Coordinate systemCoord) {
+        this(id, sentences, timestamp, goldCoord);
+        this.systemCoord = systemCoord;
+    }
+
     public Iterator<Sentence<StoredToken>> iterator() {
       return this.sentences.iterator();
     }
@@ -228,7 +263,7 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
 
     private class CompactToponym implements StoredToponym {
       private final int idx;
-      private final int goldIdx;
+      private int goldIdx;
       private int selectedIdx;
 
       private CompactToponym(int idx) {
@@ -266,6 +301,7 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
         }
       }
       public int getGoldIdx() { return this.goldIdx; }
+      public void setGoldIdx(int idx) { this.goldIdx = idx; }
 
       public boolean hasSelected() { return this.selectedIdx > -1; }
       public Location getSelected() {
@@ -281,6 +317,7 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
 
       public int getAmbiguity() { return CompactCorpus.this.candidateLists.get(this.idx).size(); }
       public List<Location> getCandidates() { return CompactCorpus.this.candidateLists.get(this.idx); }
+      public void setCandidates(List<Location> candidates) { CompactCorpus.this.candidateLists.set(this.idx, candidates); }
       public Iterator<Location> iterator() { return CompactCorpus.this.candidateLists.get(this.idx).iterator(); }
 
       public List<Token> getTokens() { throw new UnsupportedOperationException(); }

@@ -22,8 +22,8 @@ import opennlp.textgrounder.topo.Location;
 import java.io.*;
 
 public class SimpleToponym extends SimpleToken implements Toponym, Serializable {
-  private final List<Location> candidates;
-  private final int goldIdx;
+  private List<Location> candidates;
+  private int goldIdx;
   private int selectedIdx;
 
   public SimpleToponym(String form, List<Location> candidates) {
@@ -53,6 +53,10 @@ public class SimpleToponym extends SimpleToken implements Toponym, Serializable 
     return this.goldIdx;
   }
 
+    public void setGoldIdx(int idx) {
+        this.goldIdx = idx;
+    }
+
   public boolean hasSelected() {
     return this.selectedIdx > -1;
   }
@@ -75,6 +79,10 @@ public class SimpleToponym extends SimpleToken implements Toponym, Serializable 
 
   public List<Location> getCandidates() {
     return this.candidates;
+  }
+
+  public void setCandidates(List<Location> candidates) {
+    this.candidates = candidates;
   }
 
   public List<Token> getTokens() {

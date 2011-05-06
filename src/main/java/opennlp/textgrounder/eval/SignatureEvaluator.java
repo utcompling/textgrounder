@@ -34,12 +34,16 @@ public class SignatureEvaluator extends Evaluator {
                 for(Token token : sent) {
                     if(token.isToponym()) {
                         Toponym toponym = (Toponym) token;
-                        if((getGoldLocations && toponym.hasGold()) || (!getGoldLocations && toponym.hasSelected())) {
+                        if((getGoldLocations && toponym.hasGold()) ||
+                           (!getGoldLocations && (toponym.hasSelected() || toponym.getAmbiguity() == 0))) {
                             toponymStarts.add(sb.length());
                             if(getGoldLocations)
                                 curLocations.add(toponym.getCandidates().get(toponym.getGoldIdx()));
                             else {
-                                curLocations.add(toponym.getCandidates().get(toponym.getSelectedIdx()));
+                                if(toponym.getAmbiguity() > 0)
+                                    curLocations.add(toponym.getCandidates().get(toponym.getSelectedIdx()));
+                                else
+                                    curLocations.add(null);
                                 curCandidates.add(toponym.getCandidates());
                             }
                         }
@@ -100,6 +104,9 @@ public class SignatureEvaluator extends Evaluator {
     }
 
     private boolean isClosestMatch(Location goldLoc, Location predLoc, List<Location> curPredCandidates) {
+        if(predLoc == null)
+            return false;
+
         double distanceToBeat = predLoc.distance(goldLoc);
 
         for(Location otherLoc : curPredCandidates) {

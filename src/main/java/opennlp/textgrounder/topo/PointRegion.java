@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PointRegion extends Region {
-  private final Coordinate coordinate;
+  private Coordinate coordinate;
 
   public PointRegion(Coordinate coordinate) {
     this.coordinate = coordinate;
@@ -28,6 +28,10 @@ public class PointRegion extends Region {
   public Coordinate getCenter() {
     return this.coordinate;
   }
+
+    public void setCenter(Coordinate coord) {
+        this.coordinate = coord;
+    }
 
   public boolean contains(double lat, double lng) {
     return lat == this.coordinate.getLat() && lng == this.coordinate.getLng();
@@ -54,5 +58,9 @@ public class PointRegion extends Region {
     representatives.add(this.coordinate);
     return representatives;
   }
+
+    public void setRepresentatives(List<Coordinate> coordinates) {
+        this.coordinate = coordinates.get(0);
+    }
 }
 

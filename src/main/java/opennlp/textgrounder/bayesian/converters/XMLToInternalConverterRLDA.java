@@ -140,4 +140,34 @@ public class XMLToInternalConverterRLDA extends XMLToInternalConverter {
 
         toponymToRegionIDsMap.get(_wordid).add(regid);
     }
+
+    @Override
+    public void addToken(String _string) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void addToponym(String _string) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void addCoordinate(double _lat, double _long) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void addCandidate(double _lat, double _long) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void addRepresentative(double _lat, double _long) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void setCurrentToponym(String _string) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 }

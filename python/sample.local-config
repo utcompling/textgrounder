@@ -3,10 +3,12 @@
 # Local configuration.  If you want to be able to specify it, copy this
 # file from sample.local-config to local-config.
 
-DEBUG="--debug 1"
 #DEBUG="--debug 0"
+#DEBUG="--debug 1"
 #DEBUG="--debug 2"
 #MAXTIME="--max-time-per-stage 5"
 #MAXTIME="--max-time-per-stage 10"
 #MAXTIME="--max-time-per-stage 300"
+#LOCALOPTS="--num-training-docs 100000 --num-test-docs 1000"
 
+LOCAL_ARGS="$DEBUG $MAXTIME $LOCALOPTS"

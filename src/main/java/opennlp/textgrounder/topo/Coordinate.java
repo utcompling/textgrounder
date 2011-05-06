@@ -16,6 +16,7 @@
 package opennlp.textgrounder.topo;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import opennlp.textgrounder.util.FastTrig;
@@ -137,6 +138,16 @@ public class Coordinate implements Serializable {
       double lng = Math.atan2(lngSins, lngCoss);
 
       return Coordinate.fromRadians(lat, lng);
+    }
+
+    public static List<Coordinate> removeNaNs(List<Coordinate> coordinates) {
+        List<Coordinate> toReturn = new ArrayList<Coordinate>();
+        for(Coordinate coord : coordinates) {
+            if(!(Double.isNaN(coord.getLatDegrees()) || Double.isNaN(coord.getLngDegrees()))) {
+                toReturn.add(coord);
+            }
+        }
+        return toReturn;
     }
 
     @Override

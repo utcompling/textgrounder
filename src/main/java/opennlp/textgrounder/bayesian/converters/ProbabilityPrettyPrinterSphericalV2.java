@@ -76,15 +76,15 @@ public class ProbabilityPrettyPrinterSphericalV2 extends ProbabilityPrettyPrinte
             }
         }
 
-        averagedRegionMeans = averagedCountWrapper.getAveragedRegionMeans();
+        averagedRegionMeans = averagedCountWrapper.getRegionMeansFM();
 //        averagedRegionToponymCoordinateCounts = averagedCountWrapper.getAveragedRegionToponymCoordinateCounts();
-        averagedRegionByDocumentCounts = averagedCountWrapper.getAveragedRegionByDocumentCounts();
-        averagedWordByRegionCounts = averagedCountWrapper.getAveragedWordByRegionCounts();
+        averagedRegionByDocumentCounts = averagedCountWrapper.getKappaFM();
+        averagedWordByRegionCounts = averagedCountWrapper.getGlobalDishWeightsFM();
 
         /**
          * not yet used
          */
-        averagedRegionCountsOfAllWords = averagedCountWrapper.getAveragedAllWordsRegionCounts();
+        averagedRegionCountsOfAllWords = averagedCountWrapper.getLocalDishWeightsFM();
         toponymCoordinateLexicon = averagedCountWrapper.getToponymCoordinateLexicon();
 
         lexicon = inputReader.readLexicon();

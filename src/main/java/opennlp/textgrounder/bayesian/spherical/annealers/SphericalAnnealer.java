@@ -19,6 +19,7 @@ package opennlp.textgrounder.bayesian.spherical.annealers;
 import java.util.Arrays;
 import opennlp.textgrounder.bayesian.annealers.Annealer;
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.mathutils.TGBLAS;
 
 /**
  *
@@ -40,7 +41,7 @@ public abstract class SphericalAnnealer extends Annealer {
      */
     protected double[] globalDishWeightsSM;
     protected double[] localDishWeightsSM;
-    protected double[][] regionMeansSM;
+//    protected double[][] regionMeansSM;
     protected double[] kappaSM;
     protected double[] nonToponymByDishDirichletSM;
     protected double[][] toponymCoordinateDirichletSM;
@@ -96,10 +97,10 @@ public abstract class SphericalAnnealer extends Annealer {
         Arrays.fill(nonToponymByDishDirichletSM, 0);
 
         regionMeansFM = new double[_regionMeans.length][];
-        regionMeansSM = new double[_regionMeans.length][];
+//        regionMeansSM = new double[_regionMeans.length][];
 
         regionMeansFM = new double[_regionMeans.length][];
-        regionMeansSM = new double[_regionMeans.length][];
+//        regionMeansSM = new double[_regionMeans.length][];
         geoMeanVecLen = _regionMeans[0].length;
         geoCovVecLen = geoMeanVecLen * (geoMeanVecLen + 1) / 2;
         for (int i = 0; i < _regionMeans.length; ++i) {
@@ -108,7 +109,7 @@ public abstract class SphericalAnnealer extends Annealer {
             regionMeansFM[i] = mean;
             double[] secmo = new double[geoCovVecLen];
             Arrays.fill(secmo, 0);
-            regionMeansSM[i] = secmo;
+//            regionMeansSM[i] = secmo;
         }
 
         toponymCoordinateDirichletFM = new double[_toponymCoordinateDirichlet.length][];
@@ -125,27 +126,28 @@ public abstract class SphericalAnnealer extends Annealer {
     protected void addToArrays(double[] _globalDishWeights, double[] _localDishWeights, double[][] _regionMeans,
           double[] _kappa, double[] _nonToponymByDishDirichlet, double[][] _toponymCoordinateDirichlet) {
         addToFirstMoment(globalDishWeightsFM, _globalDishWeights);
-        addToSecondMoment(globalDishWeightsSM, _globalDishWeights);
+//        addToSecondMoment(globalDishWeightsSM, _globalDishWeights);
         addToFirstMoment(localDishWeightsFM, _localDishWeights);
-        addToSecondMoment(localDishWeightsSM, _localDishWeights);
+//        addToSecondMoment(localDishWeightsSM, _localDishWeights);
         for (int l = 0; l < _regionMeans.length; ++l) {
-            addToFirstMoment(regionMeansFM[l], _regionMeans[l]);
-            addToCovariance(regionMeansFM[l], _regionMeans[l]);
+            TGBLAS.daxpy(3, 1, _regionMeans[l], 1, regionMeansFM[l], 1);
+//            addToFirstMoment(regionMeansFM[l], _regionMeans[l]);
+//            addToCovariance(regionMeansFM[l], _regionMeans[l]);
         }
         addToFirstMoment(kappaFM, _kappa);
-        addToSecondMoment(kappaSM, _kappa);
+//        addToSecondMoment(kappaSM, _kappa);
         addToFirstMoment(nonToponymByDishDirichletFM, _nonToponymByDishDirichlet);
-        addToSecondMoment(nonToponymByDishDirichletSM, _nonToponymByDishDirichlet);
+//        addToSecondMoment(nonToponymByDishDirichletSM, _nonToponymByDishDirichlet);
         for (int l = 0; l < _toponymCoordinateDirichlet.length; ++l) {
             addToFirstMoment(toponymCoordinateDirichletFM[l], _toponymCoordinateDirichlet[l]);
-            addToCovariance(toponymCoordinateDirichletSM[l], _toponymCoordinateDirichlet[l]);
+//            addToCovariance(toponymCoordinateDirichletSM[l], _toponymCoordinateDirichlet[l]);
         }
     }
 
     public void collectSamples(double[] _globalDishWeights, double[] _localDishWeights, double[][] _regionMeans,
           double[] _kappa, double[] _nonToponymByDishDirichlet, double[][] _toponymCoordinateDirichlet) {
         if (sampleCount < samples) {
-            if (sampleiteration && ((innerIter + 1) % lag == 0)) {
+            if (sampleiteration && (innerIter % lag == 0)) {
                 sampleCount += 1;
                 if (samples == sampleCount) {
                     finishedCollection = true;
@@ -167,7 +169,13 @@ public abstract class SphericalAnnealer extends Annealer {
         averageSamples(globalDishWeightsFM);
         averageSamples(localDishWeightsFM);
         for (int l = 0; l < regionMeansFM.length; ++l) {
-            averageSamples(regionMeansFM[l]);
+            double nrm = TGBLAS.dnrm2(3, regionMeansFM[l], 1);
+            try {
+                for (int i = 0;; ++i) {
+                    regionMeansFM[l][i] /= nrm;
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
+            }
         }
         averageSamples(kappaFM);
         averageSamples(nonToponymByDishDirichletFM);
@@ -249,14 +257,13 @@ public abstract class SphericalAnnealer extends Annealer {
         this.regionMeansFM = regionMeansFM;
     }
 
-    public double[][] getRegionMeansSM() {
-        return regionMeansSM;
-    }
-
-    public void setRegionMeansSM(double[][] regionMeansSM) {
-        this.regionMeansSM = regionMeansSM;
-    }
-
+//    public double[][] getRegionMeansSM() {
+//        return regionMeansSM;
+//    }
+//
+//    public void setRegionMeansSM(double[][] regionMeansSM) {
+//        this.regionMeansSM = regionMeansSM;
+//    }
     public double[][] getToponymCoordinateWeightsFM() {
         return toponymCoordinateDirichletFM;
     }

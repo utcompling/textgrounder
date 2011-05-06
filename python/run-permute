@@ -11,16 +11,21 @@
 # sort = Sort each split file
 # combine = Combine results
 
-if [ -z "$TEXTGROUNDER_PYTHON" ]; then
-  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+if [ -z "$WIKIGROUNDER_DIR" ]; then
+  if [ -z "$TEXTGROUNDER_DIR" ]; then
+    echo "With WIKIGROUNDER_DIR unset, must set TEXTGROUNDER_DIR to point"
+    echo "to top-level directory where TextGrounder is installed."
+    exit 1
+  fi
+  WIKIGROUNDER_DIR="$TEXTGROUNDER_DIR/python"
 fi
 
 NO_USE_PERMUTED=t
-. $TEXTGROUNDER_PYTHON/config-wikigrounder
+. $WIKIGROUNDER_DIR/config-wikigrounder
 
 SPLIT_PREFIX="$DUMP_PREFIX-split"
 
-PERMUTE_WIKI="$TEXTGROUNDER_PYTHON/permute_wiki.py"
+PERMUTE_WIKI="$WIKIGROUNDER_DIR/permute_wiki.py"
 
 PERMUTED_DUMP_FILE="$DUMP_PREFIX-permuted-pages-articles.xml.bz2"
 PERMUTED_OUT_ORIG_ARTICLE_DATA_FILE="$DUMP_PREFIX-permuted-$ORIG_ARTICLE_DATA_SUFFIX"

@@ -19,25 +19,36 @@ public class EvaluateCorpus extends BaseApp {
         initializeOptionsFromCommandLine(args);
 
         if(getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
-            if(getInputPath() == null || getSerializedCorpusInputPath() == null) {
-                System.out.println("Please specify both a system serialized corpus file via the -sci flag and a gold plaintext corpus file via the -i flag.");
+            if(getInputPath() == null || (getSerializedCorpusInputPath() == null && getXMLInputPath() == null)) {
+                System.out.println("Please specify both a system annotated corpus file via the -sci or -ix flag and a gold plaintext corpus file via the -i flag.");
                 System.exit(0);
             }
         }
         else {
-            if(getSerializedCorpusInputPath() == null) {
-                System.out.println("Please specify a system serialized corpus file via the -sci flag.");
+            if(getSerializedCorpusInputPath() == null && getXMLInputPath() == null) {
+                System.out.println("Please specify a system annotated corpus file via the -sci or -ix flag.");
                 System.exit(0);
             }
         }
 
-        System.out.print("Reading serialized system corpus from " + getSerializedCorpusInputPath() + " ...");
-        Corpus systemCorpus = TopoUtil.readCorpusFromSerialized(getSerializedCorpusInputPath());
-        System.out.println("done.");
+        StoredCorpus systemCorpus;
+        if(getSerializedCorpusInputPath() != null) {
+            System.out.print("Reading serialized system corpus from " + getSerializedCorpusInputPath() + " ...");
+            systemCorpus = TopoUtil.readStoredCorpusFromSerialized(getSerializedCorpusInputPath());
+            System.out.println("done.");
+        }
+        else {// if(getXMLInputPath() != null) {
+            Tokenizer tokenizer = new OpenNLPTokenizer();
+            systemCorpus = Corpus.createStoredCorpus();
+            systemCorpus.addSource(new CorpusXMLSource(new BufferedReader(new FileReader(getXMLInputPath())),
+                                                       tokenizer));
+            systemCorpus.setFormat(getCorpusFormat()==null?CORPUS_FORMAT.PLAIN:getCorpusFormat());
+            systemCorpus.load();
+        }
 
         StoredCorpus goldCorpus = null;
 
-        if(getInputPath() != null) {
+        if(getInputPath() != null && getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
             Tokenizer tokenizer = new OpenNLPTokenizer();
             System.out.print("Reading plaintext gold corpus from " + getInputPath() + " ...");
             goldCorpus = Corpus.createStoredCorpus();

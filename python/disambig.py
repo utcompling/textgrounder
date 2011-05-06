@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 #######
-####### wiki_disambig.py
+####### disambig.py
 #######
 ####### Copyright (c) 2010 Ben Wing.
 #######
@@ -2686,6 +2686,22 @@ def read_article_data(filename):
 
 def read_word_counts(filename):
 
+  # This is basically a one-off debug statement because of the fact that
+  # the experiments published in the paper used a word-count file generated
+  # using an older algorithm for determining the geotagged coordinate of
+  # a Wikipedia article.  We didn't record the corresponding article-data
+  # file, so we need a way of regenerating it using the intersection of
+  # articles in the article-data file we actually used for the experiments
+  # and the word-count file we used.
+  if debug['wordcountarts']:
+    # Change this if you want a different file name
+    wordcountarts_filename = 'wordcountarts-combined-article-data.txt'
+    wordcountarts_file = open(wordcountarts_filename, "w")
+    # See write_article_data_file() in process_article_data.py
+    outfields = combined_article_data_outfields
+    field_types = get_output_field_types(outfields)
+    uniprint('\t'.join(outfields), outfile=wordcountarts_file)
+
   def one_article_probs():
     if total_tokens == 0: return
     art = ArticleTable.lookup_article(title)
@@ -2693,6 +2709,8 @@ def read_word_counts(filename):
       warning("Skipping article %s, not in table" % title)
       ArticleTable.num_articles_with_word_counts_but_not_in_table += 1
       return
+    if debug['wordcountarts']:
+      art.output_row(wordcountarts_file, outfields, field_types)
     ArticleTable.num_word_count_articles_by_split[art.split] += 1
     # If we are evaluating on the dev set, skip the test set and vice
     # versa, to save memory and avoid contaminating the results.
@@ -2745,6 +2763,8 @@ def read_word_counts(filename):
   else:
     one_article_probs()
 
+  if debug['wordcountarts']:
+    wordcountarts_file.close()
   errprint("Finished reading distributions from %s articles." % (status.num_processed()))
   ArticleTable.num_articles_with_word_counts = status.num_processed()
   output_resource_usage()
@@ -3008,20 +3028,23 @@ any others in a division.  Points farther away than this are ignored as
 "outliers" (possible errors, etc.).  Default %default.""")
 
     ########## Basic options for determining operating mode and strategy
-    op.add_option("-m", "--mode", "--m", type='choice', default='match-only',
+    op.add_option("-m", "--mode", "--m", type='choice',
+                  default='geotag-documents',
                   choices=['geotag-toponyms',
                            'geotag-documents',
                            'generate-kml',
-                           'segment-geotag-documents',
-                           'match-only'],
+                           'segment-geotag-documents'],
                   help="""Action to perform.
-
-'match-only' means to only do the stage that involves finding matches between
-gazetteer locations and Wikipedia articles (mostly useful when debugging
-output is enabled).
 
 'geotag-documents' finds the proper location for each document (or article)
 in the test set.
+
+'geotag-toponyms' finds the proper location for each toponym in the test set.
+The test set is specified by --eval-file.  Default '%default'.
+
+'segment-geotag-documents' simultaneously segments a document into sections
+covering a specific location and determines that location. (Not yet
+implemented.)
 
 'generate-kml' generates KML files for some set of words, showing the
 distribution over regions that the word determines.  Use '--kml-words' to
@@ -3029,30 +3052,30 @@ specify the words whose distributions should be outputted.  See also
 '--kml-prefix' to specify the prefix of the files outputted, and
 '--kml-transform' to specify the function to use (if any) to transform
 the probabilities to make the distinctions among them more visible.
+""")
 
-'segment-geotag-documents' simultaneously segments a document into sections
-covering a specific location and determines that location.
-
-'geotag-toponyms' finds the proper location for each toponym in the test set.
-The test set is specified by --eval-file.  Default '%default'.""")
-
-    op.add_option("-s", "--strategy", "--s", type='choice', action='append',
-                  default=None,
-                  choices=['baseline',
-                           'kl-divergence', 'kldiv',
-                           'partial-kl-divergence', 'partial-kldiv',
-                           'symmetric-kl-divergence', 'symmetric-kldiv',
-                           'symmetric-partial-kl-divergence',
-                           'symmetric-partial-kldiv',
-                           'cosine-similarity', 'cossim',
-                           'partial-cosine-similarity', 'partial-cossim',
-                           'smoothed-cosine-similarity',
-                           'smoothed-partial-cosine-similarity',
-                           'per-word-region-distribution', 'regdist',
-                           'naive-bayes-with-baseline', 'nb-base',
-                           'naive-bayes-no-baseline', 'nb-nobase'],
-                  help="""Strategy/strategies to use for geotagging.
+    op.add_option("-s", "--strategy", "--s", type='choice', action='append', 
+        default=None,
+        choices=[
+          'baseline', 'none',
+          'full-kl-divergence', 'full-kldiv', 'full-kl',
+          'partial-kl-divergence', 'partial-kldiv', 'partial-kl',
+          'symmetric-full-kl-divergence', 'sym-kldiv', 'sym-kl',
+          'symmetric-partial-kl-divergence', 'sym-partial-kldiv',
+            'sym-partial-kl',
+          'cosine-similarity', 'cossim',
+          'partial-cosine-similarity', 'partial-cossim',
+          'smoothed-cosine-similarity', 'smoothed-cossim',
+          'smoothed-partial-cosine-similarity', 'smoothed-partial-cossim',
+          'average-cell-probability', 'avg-cell-prob', 'acp',
+          'naive-bayes-with-baseline', 'nb-base',
+          'naive-bayes-no-baseline', 'nb-nobase'
+          ],
+        help="""Strategy/strategies to use for geotagging.
 'baseline' means just use the baseline strategy (see --baseline-strategy).
+
+'none' means don't do any geotagging.  Useful for testing the parts that
+read in data and generate internal structures.
 
 The other possible values depend on which mode is in use
 (--mode=geotag-toponyms or --mode=geotag-documents).
@@ -3066,11 +3089,12 @@ prior probability.  Default is 'baseline'.
 
 For geotag-documents:
 
-'kl-divergence' (or 'kldiv') searches for the region where the KL divergence
-between the article and region is smallest.  'partial-kl-divergence' (or
-'partial-kldiv') is similar but uses an abbreviated KL divergence measure that
-only considers the words seen in the article; empirically, this appears to work
-just as well as the full KL divergence. 'per-word-region-distribution' (or
+'full-kl-divergence' (or 'full-kldiv') searches for the region where the KL
+divergence between the article and region is smallest.
+'partial-kl-divergence' (or 'partial-kldiv') is similar but uses an
+abbreviated KL divergence measure that only considers the words seen in the
+article; empirically, this appears to work just as well as the full KL
+divergence. 'average-cell-probability' (or
 'regdist') involves computing, for each word, a probability distribution over
 regions using the word distribution of each region, and then combining the
 distributions over all words in an article, weighted by the count the word in
@@ -3078,16 +3102,23 @@ the article.  Default is 'partial-kl-divergence'.
 
 NOTE: Multiple --strategy options can be given, and each strategy will
 be tried, one after the other.""")
-    canon_options['strategy'] = {'kldiv':'kl-divergence',
-                                 'partial-kldiv':'partial-kl-divergence',
-                                 'symmetric-kldiv':'symmetric-kl-divergence',
-                                 'symmetric-partial-kldiv':
-                                   'symmetric-partial-kl-divergence',
-                                 'cossim':'cosine-similarity',
-                                 'partial-cossim':'partial-cosine-similarity',
-                                 'regdist':'per-word-region-distribution',
-                                 'nb-base':'naive-bayes-with-baseline',
-                                 'nb-nobase':'naive-bayes-no-baseline'}
+    canon_options['strategy'] = {
+        'full-kldiv':'full-kl-divergence',
+        'full-kl':'full-kl-divergence',
+        'partial-kldiv':'partial-kl-divergence',
+        'partial-kl':'partial-kl-divergence',
+        'sym-full-kldiv':'symmetric-full-kl-divergence',
+        'sym-full-kl':'symmetric-full-kl-divergence',
+        'sym-partial-kldiv':'symmetric-partial-kl-divergence',
+        'sym-partial-kl':'symmetric-partial-kl-divergence',
+        'cossim':'cosine-similarity',
+        'partial-cossim':'partial-cosine-similarity',
+        #'regdist':'average-cell-probability',
+        #'per-word-region-distribution':'average-cell-probability',
+        'avg-cell-prob':'average-cell-probability',
+        'acp':'average-cell-probability',
+        'nb-base':'naive-bayes-with-baseline',
+        'nb-nobase':'naive-bayes-no-baseline'}
 
     op.add_option("--baseline-strategy", "--bs", type='choice', action='append',
                   default=None,
@@ -3284,7 +3315,8 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
       elif not opts.counts_file:
         op.error("Must specify counts file")
 
-    self.need('gazetteer_file')
+    if opts.mode == 'geotag-toponyms':
+      self.need('gazetteer_file')
 
     if opts.eval_format == 'raw-text':
       # FIXME!!!!
@@ -3335,15 +3367,13 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
     #                            outfile=sys.stderr)
 
     # Read in the words-counts file
-    if not opts.mode == 'match-only':
-      for fn in opts.counts_file:
-        read_word_counts(fn)
-      if opts.counts_file:
-        finish_word_counts()
+    for fn in opts.counts_file:
+      read_word_counts(fn)
+    if opts.counts_file:
+      finish_word_counts()
 
-    WorldGazetteer.read_world_gazetteer_and_match(opts.gazetteer_file)
-
-    if opts.mode == 'match-only': return
+    if opts.gazetteer_file:
+      WorldGazetteer.read_world_gazetteer_and_match(opts.gazetteer_file)
 
     if opts.mode == 'generate-kml':
       StatRegion.initialize_regions()
@@ -3379,7 +3409,7 @@ Not generating an empty KML file.""" % word)
             if stratname.startswith('naive-bayes-'):
               strategy = NaiveBayesDocumentStrategy(opts,
                   use_baseline=(stratname == 'naive-bayes-with-baseline'))
-            elif stratname == 'per-word-region-distribution':
+            elif stratname == 'average-cell-probability':
               strategy = PerWordRegionDistributionsStrategy()
             elif stratname == 'cosine-similarity':
               strategy = CosineSimilarityStrategy(smoothed=False, partial=False)
@@ -3389,14 +3419,16 @@ Not generating an empty KML file.""" % word)
               strategy = CosineSimilarityStrategy(smoothed=True, partial=False)
             elif stratname == 'smoothed-partial-cosine-similarity':
               strategy = CosineSimilarityStrategy(smoothed=True, partial=True)
-            elif stratname == 'kl-divergence':
+            elif stratname == 'full-kl-divergence':
               strategy = KLDivergenceStrategy(symmetric=False, partial=False)
             elif stratname == 'partial-kl-divergence':
               strategy = KLDivergenceStrategy(symmetric=False, partial=True)
-            elif stratname == 'symmetric-kl-divergence':
+            elif stratname == 'symmetric-full-kl-divergence':
               strategy = KLDivergenceStrategy(symmetric=True, partial=False)
             elif stratname == 'symmetric-partial-kl-divergence':
               strategy = KLDivergenceStrategy(symmetric=True, partial=True)
+            elif stratname == 'none':
+              continue
             else:
               assert False
             yield (stratname, strategy)

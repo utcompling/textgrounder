@@ -27,12 +27,16 @@ public class WriteCorpusToKML extends BaseApp {
         Corpus corpus = TopoUtil.readCorpusFromSerialized(getSerializedCorpusInputPath());
         System.out.println("done.");
 
-        writeToKML(corpus, getKMLOutputPath());
+        writeToKML(corpus, getKMLOutputPath(), getOutputGoldLocations(), getOutputUserKML(), getCorpusFormat());
     }
 
-    public static void writeToKML(Corpus corpus, String kmlOutputPath) throws Exception {
+    public static void writeToKML(Corpus corpus, String kmlOutputPath, boolean outputGoldLocations, boolean outputUserKML, Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
         System.out.print("Writing visualizable corpus in KML format to " + kmlOutputPath + " ...");
-        CorpusKMLWriter kw = new CorpusKMLWriter(corpus);
+        CorpusKMLWriter kw;
+        if(corpusFormat == CORPUS_FORMAT.GEOTEXT && outputUserKML)
+            kw = new GeoTextCorpusKMLWriter(corpus, outputGoldLocations);
+        else
+            kw = new CorpusKMLWriter(corpus, outputGoldLocations);
         kw.write(new File(kmlOutputPath));
         System.out.println("done.");
     }

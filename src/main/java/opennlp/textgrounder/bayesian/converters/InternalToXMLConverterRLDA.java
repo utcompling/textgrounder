@@ -22,6 +22,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import javax.xml.stream.XMLStreamWriter;
 import opennlp.textgrounder.bayesian.apps.ConverterExperimentParameters;
 import opennlp.textgrounder.bayesian.topostructs.*;
 import opennlp.textgrounder.bayesian.wrapper.io.*;
@@ -134,18 +137,56 @@ public class InternalToXMLConverterRLDA extends InternalToXMLConverter {
     }
 
     @Override
-    protected void setTokenAttribute(Element _token, int _wordid, int _regid, int _coordid) {
-        Region reg = regionIdToRegionMap.get(_regid);
-        _token.setAttribute("long", String.format("%.2f", reg.centLon));
-        _token.setAttribute("lat", String.format("%.2f", reg.centLat));
+    public void confirmCoordinate(double _long, double _lat, XMLStreamWriter _out) throws XMLStreamException {
+//        if (!_candidates.isEmpty()) {
+//            Coordinate coord = matchCandidate(_candidates, _regid);
+//            _token.setAttribute("long", String.format("%.2f", coord.longitude));
+//            _token.setAttribute("lat", String.format("%.2f", coord.latitude));
+//        }
     }
 
     @Override
-    protected void setToponymAttribute(ArrayList<Element> _candidates, Element _token, int _wordid, int _regid, int _coordid) {
-        if (!_candidates.isEmpty()) {
-            Coordinate coord = matchCandidate(_candidates, _regid);
-            _token.setAttribute("long", String.format("%.2f", coord.longitude));
-            _token.setAttribute("lat", String.format("%.2f", coord.latitude));
+    public void setTokenAttribute(XMLStreamReader in, XMLStreamWriter out) throws XMLStreamException {
+        setToponymAttribute(in, out, "tok");
+    }
+
+    @Override
+    public void setToponymAttribute(XMLStreamReader in, XMLStreamWriter out) throws XMLStreamException {
+        setToponymAttribute(in, out, "term");
+    }
+
+    protected void setToponymAttribute(XMLStreamReader in, XMLStreamWriter out, String _attr) throws XMLStreamException {
+        int isstopword = stopwordArray.get(offset);
+        int wordid = wordArray.get(offset);
+
+        if (isstopword == 0) {
+            String word = in.getAttributeValue(null, _attr);
+            String outword = lexicon.getWordForInt(wordid);
+            if (word.toLowerCase().equals(outword)) {
+                int regid = regionArray.get(offset);
+
+                Region reg = regionIdToRegionMap.get(regid);
+                out.writeAttribute("long", String.format("%.2f", reg.centLon));
+                out.writeAttribute("lat", String.format("%.2f", reg.centLat));
+            } else {
+                int outdocid = docArray.get(offset);
+                System.err.println(String.format("Mismatch between "
+                      + "tokens. Occurred at source document %s, "
+                      + "sentence %s, token %s and target document %d, "
+                      + "offset %d, token %s, token id %d",
+                      currentDocumentID, currentSentenceID, word, outdocid, offset, outword, wordid));
+                System.exit(1);
+            }
         }
+    }
+
+    @Override
+    public void setCurrentDocumentID(String _string) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public void setCurrentSentenceID(String _string) {
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 }

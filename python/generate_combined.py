@@ -72,8 +72,7 @@ def output_combined_article_data(filename, coords_file, links_file):
 
   errprint("Writing combined data to stdout ...")
   write_article_data_file(sys.stdout,
-    outfields = ['id', 'title', 'split', 'redir', 'namespace', 'is_list_of',
-                 'is_disambig', 'is_list', 'coord', 'incoming_links'],
+    outfields = combined_article_data_outfields,
     articles = articles_seen)
   errprint("Done.")
 

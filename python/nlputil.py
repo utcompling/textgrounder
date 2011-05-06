@@ -1,7 +1,6 @@
 from __future__ import with_statement # For chompopen(), uchompopen()
 from optparse import OptionParser
-import itertools
-from itertools import izip, chain, cycle
+from itertools import *
 import re # For regexp wrappers
 import sys, codecs # For uchompopen()
 import math # For float_with_commas()
@@ -14,6 +13,8 @@ from collections import deque # For breadth-first search
 from subprocess import * # For backquote
 from errno import * # For backquote
 import os # For get_program_memory_usage_ps()
+import os.path # For exists of /proc, etc.
+import fileinput # For uchompopen() etc.
 
 #############################################################################
 #                        Regular expression functions                       #
@@ -81,22 +82,93 @@ def research(pattern, string, flags=0):
 #### Same as chompopen() but specifically open the file as 'utf-8' and
 #### return Unicode strings.
 
-# Open a filename with UTF-8-encoded input and yield lines converted to
-# Unicode strings, but with any terminating newline removed (similar to
-# "chomp" in Perl).
-def uchompopen(filename, errors='strict'):
-  with codecs.open(filename, encoding='utf-8', errors=errors) as f:
-    for line in f:
+#"""
+#Test gopen
+#
+#import nlputil
+#for line in nlputil.gopen("foo.txt"):
+#  print line
+#for line in nlputil.gopen("foo.txt", chomp=True):
+#  print line
+#for line in nlputil.gopen("foo.txt", encoding='utf-8'):
+#  print line
+#for line in nlputil.gopen("foo.txt", encoding='utf-8', chomp=True):
+#  print line
+#for line in nlputil.gopen("foo.txt", encoding='iso-8859-1'):
+#  print line
+#for line in nlputil.gopen(["foo.txt"], encoding='iso-8859-1'):
+#  print line
+#for line in nlputil.gopen(["foo.txt"], encoding='utf-8'):
+#  print line
+#for line in nlputil.gopen(["foo.txt"], encoding='iso-8859-1', chomp=True):
+#  print line
+#for line in nlputil.gopen(["foo.txt", "foo2.txt"], encoding='iso-8859-1', chomp=True):
+#  print line
+#"""
+
+# General function for opening a file, with automatic closure after iterating
+# through the lines.  The encoding can be specified (e.g. 'utf-8'), and if so,
+# the error-handling can be given.  Whether to remove the final newline
+# (chomp=True) can be specified.  The filename can be either a regular
+# filename (opened with open) or codecs.open(), or a list of filenames or
+# None, in which case the argument is passed to fileinput.input()
+# (if a non-empty list is given, opens the list of filenames one after the
+# other; if an empty list is given, opens stdin; if None is given, takes
+# list from the command-line arguments and proceeds as above).  When using
+# fileinput.input(), the arguments "inplace", "backup" and "bufsize" can be
+# given, appropriate to that function (e.g. to do in-place filtering of a
+# file).  In all cases, 
+def gopen(filename, mode='r', encoding=None, errors='strict', chomp=False,
+    inplace=0, backup="", bufsize=0):
+  if isinstance(filename, basestring):
+    def yieldlines():
+      if encoding is None:
+        mgr = open(filename)
+      else:
+        mgr = codecs.open(filename, mode, encoding=encoding, errors=errors)
+      with mgr as f:
+        for line in f:
+          yield line
+    iterator = yieldlines()
+  else:
+    if encoding is None:
+      openhook = None
+    else:
+      def openhook(filename, mode):
+        return codecs.open(filename, mode, encoding=encoding, errors=errors)
+    iterator = fileinput.input(filename, inplace=inplace, backup=backup,
+        bufsize=bufsize, mode=mode, openhook=openhook)
+  if chomp:
+    for line in iterator:
       if line and line[-1] == '\n': line = line[:-1]
+      yield line
+  else:
+    for line in iterator:
       yield line
 
+# Open a filename with UTF-8-encoded input and yield lines converted to
+# Unicode strings, but with any terminating newline removed (similar to
+# "chomp" in Perl).  Basically same as gopen() but with defaults set
+# differently.
+def uchompopen(filename, mode='r', encoding='utf-8', errors='strict',
+    chomp=True, inplace=0, backup="", bufsize=0):
+  return gopen(filename, mode=mode, encoding=encoding, errors=errors,
+      chomp=chomp, inplace=inplace, backup=backup, bufsize=bufsize)
+
 # Open a filename and yield lines, but with any terminating newline
-# removed (similar to "chomp" in Perl).
-def chompopen(filename):
-  with open(filename) as f:
-    for line in f:
-      if line and line[-1] == '\n': line = line[:-1]
-      yield line
+# removed (similar to "chomp" in Perl).  Basically same as gopen() but
+# with defaults set differently.
+def chompopen(filename, mode='r', encoding=None, errors='strict',
+    chomp=True, inplace=0, backup="", bufsize=0):
+  return gopen(filename, mode=mode, encoding=encoding, errors=errors,
+      chomp=chomp, inplace=inplace, backup=backup, bufsize=bufsize)
+
+# Open a filename with UTF-8-encoded input.  Basically same as gopen()
+# but with defaults set differently.
+def uopen(filename, mode='r', encoding='utf-8', errors='strict',
+    chomp=False, inplace=0, backup="", bufsize=0):
+  return gopen(filename, mode=mode, encoding=encoding, errors=errors,
+      chomp=chomp, inplace=inplace, backup=backup, bufsize=bufsize)
 
 #############################################################################
 #                         Other basic utility functions                     #
@@ -408,9 +480,15 @@ def reverse_value_sorted_items(d):
   return sorted(d.iteritems(), key=lambda x:x[1], reverse=True)
 
 # Given a table with values that are numbers, output the table, sorted
-# on the numbers from bigger to smaller.
-def output_reverse_sorted_table(table, outfile=sys.stdout, indent=""):
-  for x in sorted(table.items(), key=lambda x:x[1], reverse=True):
+# on the numbers from bigger to smaller.  Within a given number, sort the
+# items alphabetically, unless keep_secondary_order is True, in which case
+# the original order of items is left.
+def output_reverse_sorted_table(table, outfile=sys.stdout, indent="",
+    keep_secondary_order=False):
+  items = table.items()
+  if not keep_secondary_order:
+    items = sorted(items, key=lambda x:x[0])
+  for x in sorted(items, key=lambda x:x[1], reverse=True):
     uniprint("%s%s = %s" % (indent, x[0], x[1]), outfile=outfile)
 
 #############################################################################
@@ -696,6 +774,16 @@ def get_program_time_usage():
   return time.time() - beginning_prog_time
 
 def get_program_memory_usage():
+  if os.path.exists("/proc/self/status"):
+    return get_program_memory_usage_proc()
+  else:
+    try:
+      return get_program_memory_usage_ps()
+    except:
+      return get_program_memory_rusage()
+
+
+def get_program_memory_usage_rusage():
   res = resource.getrusage(resource.RUSAGE_SELF)
   # FIXME!  This is "maximum resident set size".  There are other more useful
   # values, but on the Mac at least they show up as 0 in this structure.
@@ -741,7 +829,7 @@ def output_resource_usage():
   errprint("Total elapsed time since program start: %s" %
            format_minutes_seconds(get_program_time_usage()))
   errprint("Memory usage: %s bytes" %
-      int_with_commas(get_program_memory_usage_proc()))
+      int_with_commas(get_program_memory_usage()))
 
 #############################################################################
 #                             Hash tables by range                          #
@@ -1045,4 +1133,164 @@ def property_name_replace(prop, new, proplist):
   for i in xrange(len(proplist)):
     if proplist[i][0] == prop:
       proplist[i] = (new, proplist[i][1])
+
+
+#############################################################################
+#                 Extra functions for working with sequences                #
+#                   Part of the Python docs for itertools                   #
+#############################################################################
+
+def take(n, iterable):
+    "Return first n items of the iterable as a list"
+    return list(islice(iterable, n))
+
+def tabulate(function, start=0):
+    "Return function(0), function(1), ..."
+    return imap(function, count(start))
+
+def consume(iterator, n):
+    "Advance the iterator n-steps ahead. If n is none, consume entirely."
+    # Use functions that consume iterators at C speed.
+    if n is None:
+        # feed the entire iterator into a zero-length deque
+        collections.deque(iterator, maxlen=0)
+    else:
+        # advance to the empty slice starting at position n
+        next(islice(iterator, n, n), None)
+
+def nth(iterable, n, default=None):
+    "Returns the nth item or a default value"
+    return next(islice(iterable, n, None), default)
+
+def quantify(iterable, pred=bool):
+    "Count how many times the predicate is true"
+    return sum(imap(pred, iterable))
+
+def padnone(iterable):
+    """Returns the sequence elements and then returns None indefinitely.
+
+    Useful for emulating the behavior of the built-in map() function.
+    """
+    return chain(iterable, repeat(None))
+
+def ncycles(iterable, n):
+    "Returns the sequence elements n times"
+    return chain.from_iterable(repeat(tuple(iterable), n))
+
+def dotproduct(vec1, vec2):
+    return sum(imap(operator.mul, vec1, vec2))
+
+def flatten(listOfLists):
+    "Flatten one level of nesting"
+    return chain.from_iterable(listOfLists)
+
+def repeatfunc(func, times=None, *args):
+    """Repeat calls to func with specified arguments.
+
+    Example:  repeatfunc(random.random)
+    """
+    if times is None:
+        return starmap(func, repeat(args))
+    return starmap(func, repeat(args, times))
+
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = tee(iterable)
+    next(b, None)
+    return izip(a, b)
+
+def grouper(n, iterable, fillvalue=None):
+    "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
+    args = [iter(iterable)] * n
+    return izip_longest(fillvalue=fillvalue, *args)
+
+def roundrobin(*iterables):
+    "roundrobin('ABC', 'D', 'EF') --> A D E B F C"
+    # Recipe credited to George Sakkis
+    pending = len(iterables)
+    nexts = cycle(iter(it).next for it in iterables)
+    while pending:
+        try:
+            for next in nexts:
+                yield next()
+        except StopIteration:
+            pending -= 1
+            nexts = cycle(islice(nexts, pending))
+
+def powerset(iterable):
+    "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+    s = list(iterable)
+    return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
+
+def unique_everseen(iterable, key=None):
+    "List unique elements, preserving order. Remember all elements ever seen."
+    # unique_everseen('AAAABBBCCDAABBB') --> A B C D
+    # unique_everseen('ABBCcAD', str.lower) --> A B C D
+    seen = set()
+    seen_add = seen.add
+    if key is None:
+        for element in ifilterfalse(seen.__contains__, iterable):
+            seen_add(element)
+            yield element
+    else:
+        for element in iterable:
+            k = key(element)
+            if k not in seen:
+                seen_add(k)
+                yield element
+
+def unique_justseen(iterable, key=None):
+    "List unique elements, preserving order. Remember only the element just seen."
+    # unique_justseen('AAAABBBCCDAABBB') --> A B C D A B
+    # unique_justseen('ABBCcAD', str.lower) --> A B C A D
+    return imap(next, imap(itemgetter(1), groupby(iterable, key)))
+
+def iter_except(func, exception, first=None):
+    """ Call a function repeatedly until an exception is raised.
+
+    Converts a call-until-exception interface to an iterator interface.
+    Like __builtin__.iter(func, sentinel) but uses an exception instead
+    of a sentinel to end the loop.
+
+    Examples:
+        bsddbiter = iter_except(db.next, bsddb.error, db.first)
+        heapiter = iter_except(functools.partial(heappop, h), IndexError)
+        dictiter = iter_except(d.popitem, KeyError)
+        dequeiter = iter_except(d.popleft, IndexError)
+        queueiter = iter_except(q.get_nowait, Queue.Empty)
+        setiter = iter_except(s.pop, KeyError)
+
+    """
+    try:
+        if first is not None:
+            yield first()
+        while 1:
+            yield func()
+    except exception:
+        pass
+
+def random_product(*args, **kwds):
+    "Random selection from itertools.product(*args, **kwds)"
+    pools = map(tuple, args) * kwds.get('repeat', 1)
+    return tuple(random.choice(pool) for pool in pools)
+
+def random_permutation(iterable, r=None):
+    "Random selection from itertools.permutations(iterable, r)"
+    pool = tuple(iterable)
+    r = len(pool) if r is None else r
+    return tuple(random.sample(pool, r))
+
+def random_combination(iterable, r):
+    "Random selection from itertools.combinations(iterable, r)"
+    pool = tuple(iterable)
+    n = len(pool)
+    indices = sorted(random.sample(xrange(n), r))
+    return tuple(pool[i] for i in indices)
+
+def random_combination_with_replacement(iterable, r):
+    "Random selection from itertools.combinations_with_replacement(iterable, r)"
+    pool = tuple(iterable)
+    n = len(pool)
+    indices = sorted(random.randrange(n) for i in xrange(r))
+    return tuple(pool[i] for i in indices)
 

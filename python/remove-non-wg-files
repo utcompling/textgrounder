@@ -1,0 +1,3 @@
+#!/bin/sh
+
+rm tei*.py trrraw*.py splitdevtest.py stanford2places.py

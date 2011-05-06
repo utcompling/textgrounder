@@ -20,7 +20,7 @@ public class ImportCorpus extends BaseApp {
             System.exit(0);
         }
 
-        StoredCorpus corpus = doImport(getInputPath(), getSerializedGazetteerPath(), getCorpusFormat());
+        StoredCorpus corpus = doImport(getInputPath(), getSerializedGazetteerPath(), getCorpusFormat(), getUseGoldToponyms());
         
         if(getSerializedCorpusOutputPath() != null)
             serialize(corpus, getSerializedCorpusOutputPath());
@@ -28,7 +28,17 @@ public class ImportCorpus extends BaseApp {
             writeToXML(corpus, getOutputPath());
     }
 
-    public static StoredCorpus doImport(String corpusInputPath, String serGazInputPath, Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
+    public static StoredCorpus doImport(String corpusInputPath, String serGazInputPath,
+                                        Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
+        return doImport(corpusInputPath, serGazInputPath, corpusFormat, false);
+    }
+
+    public static StoredCorpus doImport(String corpusInputPath, String serGazInputPath,
+                                        Enum<CORPUS_FORMAT> corpusFormat,
+                                        boolean useGoldToponyms) throws Exception {
+
+        checkExists(corpusInputPath);
+        checkExists(serGazInputPath);
 
         Tokenizer tokenizer = new OpenNLPTokenizer();
         OpenNLPRecognizer recognizer = new OpenNLPRecognizer();
@@ -45,15 +55,21 @@ public class ImportCorpus extends BaseApp {
             ois = new ObjectInputStream(fis);
         }
         gnGaz = (GeoNamesGazetteer) ois.readObject();
-        recognizer = new HighRecallToponymRecognizer(gnGaz.getUniqueLocationNameSet());
+        if(isHighRecallNER())
+        	recognizer = new HighRecallToponymRecognizer(gnGaz.getUniqueLocationNameSet());
         System.out.println("Done.");
 
         System.out.print("Reading raw corpus from " + corpusInputPath + " ...");
         StoredCorpus corpus = Corpus.createStoredCorpus();
         if(corpusFormat == CORPUS_FORMAT.TRCONLL) {
-            corpus.addSource(new ToponymAnnotator(
-                new ToponymRemover(new TrXMLDirSource(new File(corpusInputPath), tokenizer)),
-                recognizer, gnGaz, null));
+            if(useGoldToponyms) {
+                corpus.addSource(new CandidateRepopulator(new TrXMLDirSource(new File(corpusInputPath), tokenizer), gnGaz));
+            }
+            else {
+                corpus.addSource(new ToponymAnnotator(
+                    new ToponymRemover(new TrXMLDirSource(new File(corpusInputPath), tokenizer)),
+                    recognizer, gnGaz, null));
+            }
         }
         else if(corpusFormat == CORPUS_FORMAT.GEOTEXT) {
             corpus.addSource(new ToponymAnnotator(new GeoTextSource(

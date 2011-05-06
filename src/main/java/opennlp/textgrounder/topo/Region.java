@@ -20,6 +20,7 @@ import java.io.Serializable;
 
 public abstract class Region implements Serializable {
   public abstract Coordinate getCenter();
+  public abstract void setCenter(Coordinate coord);
   public abstract boolean contains(double lat, double lng);
 
   public abstract double getMinLat();
@@ -27,6 +28,7 @@ public abstract class Region implements Serializable {
   public abstract double getMinLng();
   public abstract double getMaxLng();
   public abstract List<Coordinate> getRepresentatives();
+  public abstract void setRepresentatives(List<Coordinate> coordinates);
 
   public boolean contains(Coordinate coordinate) {
     return this.contains(coordinate.getLat(), coordinate.getLng());

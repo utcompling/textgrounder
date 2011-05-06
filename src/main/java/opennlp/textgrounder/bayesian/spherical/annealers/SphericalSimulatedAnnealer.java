@@ -17,6 +17,7 @@
 package opennlp.textgrounder.bayesian.spherical.annealers;
 
 import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
+import opennlp.textgrounder.bayesian.mathutils.TGMath;
 
 /**
  *
@@ -32,41 +33,18 @@ public class SphericalSimulatedAnnealer extends SphericalAnnealer {
     }
 
     @Override
-    public double annealProbs(int starti, double[] classes) {
-        double sum = 0, sumw = 0;
-        try {
-            for (int i = starti;; ++i) {
-                sum += classes[i];
-            }
-        } catch (ArrayIndexOutOfBoundsException e) {
-        }
-        if (temperatureReciprocal != 1) {
-            try {
-                for (int i = starti;; ++i) {
-                    classes[i] /= sum;
-                    sumw += classes[i] = Math.pow(classes[i],
-                          temperatureReciprocal);
-                }
-            } catch (ArrayIndexOutOfBoundsException e) {
-            }
-        } else {
-            sumw = sum;
-        }
-        /**
-         * For now, we set everything so that it sums to one.
-         */
-        return sumw;
+    public double annealProbs(int _starti, double[] _classes) {
+        return annealProbs(_starti, _classes.length, _classes);
     }
 
     @Override
     public double annealProbs(int _starti, int _endi, double[] _classes) {
         double sum = 0, sumw = 0;
-        for (int i = _starti; i < _endi; ++i) {
-            sum += _classes[i];
-        }
+        sum = TGMath.stableSum(_classes, _starti, _endi);
+
         if (temperatureReciprocal != 1) {
             for (int i = _starti; i < _endi; ++i) {
-                _classes[i] /= sum;
+                _classes[i] = TGMath.stableDiv(_classes[i], sum);
                 sumw += _classes[i] = Math.pow(_classes[i], temperatureReciprocal);
             }
         } else {

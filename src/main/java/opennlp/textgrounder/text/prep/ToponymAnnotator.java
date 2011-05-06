@@ -89,8 +89,22 @@ public class ToponymAnnotator extends DocumentSourceWrapper {
                 //List<Location> candidates = ToponymAnnotator.this.gazetteer.lookup(form.toLowerCase());
                 List<Location> candidates = TopoUtil.filter(
                     ToponymAnnotator.this.gazetteer.lookup(form.toLowerCase()), boundingBox);
+                if(candidates != null) {
+                    for(Location loc : candidates) {
+                        List<Coordinate> reps = loc.getRegion().getRepresentatives();
+                        int prevSize = reps.size();
+                        Coordinate.removeNaNs(reps);
+                        if(reps.size() < prevSize)
+                            loc.getRegion().setCenter(Coordinate.centroid(reps));
+                    }
+                }
+                //if(form.equalsIgnoreCase("united states"))
+                //    for(Location loc : ToponymAnnotator.this.gazetteer.lookup("united states"))
+                //        System.out.println(loc.getRegion().getCenter());
                 if (candidates != null) {
                   Toponym toponym = new SimpleToponym(form, candidates);
+                  //if(form.equalsIgnoreCase("united states"))
+                  //    System.out.println(toponym.getCandidates().get(0).getRegion().getCenter());
                   toponymSpans.add(new Span<Toponym>(span.getStart(), span.getEnd(), toponym));
                 }
               }

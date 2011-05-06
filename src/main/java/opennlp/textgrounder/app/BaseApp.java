@@ -6,6 +6,7 @@ package opennlp.textgrounder.app;
 
 import org.apache.commons.cli.*;
 import opennlp.textgrounder.topo.*;
+import java.io.*;
 
 public class BaseApp {
 
@@ -15,13 +16,17 @@ public class BaseApp {
     private static String additionalInputPath = null;
     private static String graphInputPath = null;
     private static String outputPath = null;
+    private static String xmlInputPath = null;
     private static String kmlOutputPath = null;
+    private static boolean outputGoldLocations = false;
+    private static boolean outputUserKML = false;
+    private static boolean useGoldToponyms = false;
     private static String geoGazetteerFilename = null;
     private static String serializedGazetteerPath = null;
     private static String serializedCorpusInputPath = null;
-    //private static String serializedGoldCorpusInputPath = null;
     private static String serializedCorpusOutputPath = null;
-    //private static boolean readAsTR = false;
+
+    private static boolean highRecallNER = false;
 
     private static Region boundingBox = null;
 
@@ -55,12 +60,16 @@ public class BaseApp {
     protected static void initializeOptionsFromCommandLine(String[] args) throws Exception {
 
         options.addOption("i", "input", true, "input path");
+        options.addOption("ix", "input-xml", true, "xml input path");
         options.addOption("ia", "input-additional", true, "path to additional input data to be used in training but not evaluation");
         options.addOption("ig", "input-graph", true, "path to input graph for label propagation resolvers");
         options.addOption("r", "resolver", true, "resolver (RandomResolver, BasicMinDistResolver, WeightedMinDistResolver, LabelPropDefaultRuleResolver, LabelPropContextSensitiveResolver, LabelPropComplexResolver) [default = BasicMinDistResolver]");
         options.addOption("it", "iterations", true, "number of iterations for iterative models [default = 1]");
         options.addOption("o", "output", true, "output path");
         options.addOption("ok", "output-kml", true, "kml output path");
+        options.addOption("oku", "output-kml-users", false, "output user-based KML rather than toponym-based KML");
+        options.addOption("gold", "output-gold-locations", false, "output gold locations rather than system locations in KML");
+        options.addOption("gt", "gold-toponyms", false, "use gold toponyms (named entities) if available");
         options.addOption("g", "geo-gazetteer-filename", true, "GeoNames gazetteer filename");
         options.addOption("sg", "serialized-gazetteer-path", true, "path to serialized GeoNames gazetteer");
         options.addOption("sci", "serialized-corpus-input-path", true, "path to serialized corpus for input");
@@ -90,6 +99,9 @@ public class BaseApp {
         options.addOption("is", "input-stoplist", true,
                 "(preprocess-labelprob only) path to stop list input file (one stop word per line)");
 
+        options.addOption("ner", "named-entity-recognizer", true,
+        "option for using High Recall NER");
+        
         options.addOption("h", "help", false, "print help");
 
         Double minLat = null;
@@ -122,6 +134,8 @@ public class BaseApp {
                         wikiInputPath = value;
                     else if(option.getOpt().equals("is"))
                         stoplistInputPath = value;
+                    else if(option.getOpt().equals("ix"))
+                        xmlInputPath = value;
                     break;
                 case 'o':
                     if(option.getOpt().equals("o"))
@@ -130,6 +144,8 @@ public class BaseApp {
                         graphOutputPath = value;
                     else if(option.getOpt().equals("ok"))
                         kmlOutputPath = value;
+                    else if(option.getOpt().equals("oku"))
+                        outputUserKML = true;
                     else if(option.getOpt().equals("os"))
                         seedOutputPath = value;
                     break;
@@ -150,6 +166,10 @@ public class BaseApp {
                 case 'g':
                     if(option.getOpt().equals("g"))
                         geoGazetteerFilename = value;
+                    else if(option.getOpt().equals("gold"))
+                        outputGoldLocations = true;
+                    else if(option.getOpt().equals("gt"))
+                        useGoldToponyms = true;
                     break;
                 case 's':
                     if(option.getOpt().equals("sg"))
@@ -183,6 +203,10 @@ public class BaseApp {
                     else if(option.getOpt().equals("maxlon"))
                         maxLon = Double.parseDouble(value.replaceAll("n", "-"));
                     break;
+                case 'n':
+                	if(option.getOpt().equals("ner"))
+                		setHighRecallNER(new Integer(value)!=0);
+                		
                 case 'd':
                     doKMeans = true;
                     break;
@@ -193,8 +217,20 @@ public class BaseApp {
             boundingBox = RectRegion.fromDegrees(minLat, maxLat, minLon, maxLon);
     }
 
+    protected static void checkExists(String filename) throws Exception {
+        File f = new File(filename);
+        if(!f.exists()) {
+            System.out.println(filename + " doesn't exist; aborting.");
+            System.exit(0);
+        }
+    }
+
     public static String getInputPath() {
         return inputPath;
+    }
+
+    public static String getXMLInputPath() {
+        return xmlInputPath;
     }
 
     public static String getAdditionalInputPath() {
@@ -221,6 +257,18 @@ public class BaseApp {
         return kmlOutputPath;
     }
 
+    public static boolean getOutputGoldLocations() {
+        return outputGoldLocations;
+    }
+
+    public static boolean getUseGoldToponyms() {
+        return useGoldToponyms;
+    }
+
+    public static boolean getOutputUserKML() {
+        return outputUserKML;
+    }
+
     public static String getGeoGazetteerFilename() {
         return geoGazetteerFilename;
     }
@@ -233,17 +281,10 @@ public class BaseApp {
         return serializedCorpusInputPath;
     }
 
-    /*public static String getSerializedGoldCorpusInputPath() {
-        return serializedGoldCorpusInputPath;
-    }*/
-
     public static String getSerializedCorpusOutputPath() {
         return serializedCorpusOutputPath;
     }
 
-    /*public static boolean isReadAsTR() {
-        return readAsTR;
-        }*/
 
     public static Enum<CORPUS_FORMAT> getCorpusFormat() {
         return corpusFormat;
@@ -272,4 +313,12 @@ public class BaseApp {
     public static Region getBoundingBox() {
         return boundingBox;
     }
+
+	public static void setHighRecallNER(boolean highRecallNER) {
+		BaseApp.highRecallNER = highRecallNER;
+	}
+
+	public static boolean isHighRecallNER() {
+		return highRecallNER;
+	}
 }

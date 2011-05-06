@@ -5,8 +5,8 @@ from nlputil import *
 
 # Run a series of disambiguation experiments.
 
-if 'TEXTGROUNDER_PYTHON' in os.environ:
-  tgdir = os.environ['TEXTGROUNDER_PYTHON']
+if 'WIKIGROUNDER_DIR' in os.environ:
+  tgdir = os.environ['WIKIGROUNDER_DIR']
 else:
   tgdir = '%s/python' % (os.environ['TEXTGROUNDER_DIR'])
 
@@ -50,7 +50,7 @@ def main():
   op = OptionParser(usage="%prog [options] experiment [...]")
   op.add_option("-n", "--dry-run", action="store_true",
 		  help="Don't execute anything; just output the commands that would be executed.")
-  def_runcmd = '%s/run-run-disambig' % tgdir
+  def_runcmd = '%s/run-run-wikipedia' % tgdir
   op.add_option("-c", "--run-cmd", "--cmd", default=def_runcmd,
 		  help="Command to execute; default '%default'.")
   (opts, args) = op.parse_args()
@@ -71,11 +71,11 @@ Train100k = iterate('--num-training-docs', [100000])
 Test2k = iterate('--num-test-docs', [2000])
 Test1k = iterate('--num-test-docs', [1000])
 Test500 = iterate('--num-test-docs', [500])
-#CombinedNonBaselineStrategies = add_param('--strategy partial-kl-divergence --strategy cosine-similarity --strategy naive-bayes-with-baseline --strategy per-word-region-distribution')
-CombinedNonBaselineStrategies = add_param('--strategy partial-kl-divergence --strategy smoothed-cosine-similarity --strategy naive-bayes-with-baseline --strategy per-word-region-distribution')
-CombinedNonBaselineNoCosineStrategies = add_param('--strategy partial-kl-divergence --strategy naive-bayes-with-baseline --strategy per-word-region-distribution')
+#CombinedNonBaselineStrategies = add_param('--strategy partial-kl-divergence --strategy cosine-similarity --strategy naive-bayes-with-baseline --strategy average-cell-probability')
+CombinedNonBaselineStrategies = add_param('--strategy partial-kl-divergence --strategy smoothed-cosine-similarity --strategy naive-bayes-with-baseline --strategy average-cell-probability')
+CombinedNonBaselineNoCosineStrategies = add_param('--strategy partial-kl-divergence --strategy naive-bayes-with-baseline --strategy average-cell-probability')
 NonBaselineStrategies = iterate('--strategy',
-    ['partial-kl-divergence', 'per-word-region-distribution', 'naive-bayes-with-baseline', 'smoothed-cosine-similarity'])
+    ['partial-kl-divergence', 'average-cell-probability', 'naive-bayes-with-baseline', 'smoothed-cosine-similarity'])
 BaselineStrategies = iterate('--strategy baseline --baseline-strategy',
     ['link-most-common-toponym', 'regdist-most-common-toponym',
     'internal-link', 'num-articles', 'random'])
@@ -83,10 +83,10 @@ CombinedBaselineStrategies1 = add_param('--strategy baseline --baseline-strategy
 CombinedBaselineStrategies2 = add_param('--strategy baseline --baseline-strategy internal-link --baseline-strategy num-articles --baseline-strategy random')
 CombinedBaselineStrategies = combine(CombinedBaselineStrategies1, CombinedBaselineStrategies2)
 AllStrategies = combine(NonBaselineStrategies, BaselineStrategies)
-CombinedKL = add_param('--strategy symmetric-partial-kl-divergence --strategy symmetric-kl-divergence --strategy partial-kl-divergence --strategy kl-divergence')
+CombinedKL = add_param('--strategy symmetric-partial-kl-divergence --strategy symmetric-full-kl-divergence --strategy partial-kl-divergence --strategy full-kl-divergence')
 CombinedCosine = add_param('--strategy cosine-similarity --strategy smoothed-cosine-similarity --strategy partial-cosine-similarity --strategy smoothed-partial-cosine-similarity')
 KLDivStrategy = iterate('--strategy', ['partial-kl-divergence'])
-FullKLDivStrategy = iterate('--strategy', ['kl-divergence'])
+FullKLDivStrategy = iterate('--strategy', ['full-kl-divergence'])
 SmoothedCosineStrategy = iterate('--strategy', ['smoothed-cosine-similarity'])
 NBStrategy = iterate('--strategy', ['naive-bayes-no-baseline'])
 
@@ -183,7 +183,7 @@ NewBaseline2Exper2 = nest(Train100k, Test500, New510DPR, CombinedBaselineStrateg
 TestDPR = iterate('--degrees-per-region', [0.1])
 TestSet = add_param('--eval-set test')
 TestStrat1 = iterate('--strategy', ['partial-kl-divergence'])
-TestStrat2 = iterate('--strategy', ['per-word-region-distribution'])
+TestStrat2 = iterate('--strategy', ['average-cell-probability'])
 TestStrat3 = iterate('--strategy', ['naive-bayes-with-baseline'])
 Test2Sec1 = add_param('--skip-initial 31 --skip-n 2')
 Test2Sec2 = add_param('--skip-initial 32 --skip-n 2')
@@ -579,7 +579,7 @@ WikiFinalBase3DPR5Sec31 = nest(TestSet, DPR5, TestFinalStratBase3, Split32Sec31)
 TwitterDPR1 = iterate('--degrees-per-region', [0.5, 1, 0.1, 5, 10])
 TwitterExper1 = nest(TwitterDPR1, KLDivStrategy)
 TwitterDPR2 = iterate('--degrees-per-region', [1, 5, 10, 0.5, 0.1])
-TwitterStrategy2 = add_param('--strategy naive-bayes-with-baseline --strategy smoothed-cosine-similarity --strategy per-word-region-distribution')
+TwitterStrategy2 = add_param('--strategy naive-bayes-with-baseline --strategy smoothed-cosine-similarity --strategy average-cell-probability')
 TwitterExper2 = nest(TwitterDPR2, TwitterStrategy2)
 TwitterDPR3 = iterate('--degrees-per-region', [5, 10, 1, 0.5, 0.1])
 TwitterStrategy3 = add_param('--strategy cosine-similarity')
@@ -1180,7 +1180,7 @@ TwitterTestStratBase4Thresh0DPR10 =     nest(Thresh0, DPR10, TestFinalStratBase4
 TwitterTestStratBase4Thresh0DPRpoint1 = nest(Thresh0, DPRpoint1, TestFinalStratBase4, TwitterTestSet)
 TwitterTestStratBase4Thresh0DPRpoint5 = nest(Thresh0, DPRpoint5, TestFinalStratBase4, TwitterTestSet)
 
-TwitterDevStrategy1 = add_param('--strategy partial-kl-divergence --strategy naive-bayes-with-baseline --strategy per-word-region-distribution')
+TwitterDevStrategy1 = add_param('--strategy partial-kl-divergence --strategy naive-bayes-with-baseline --strategy average-cell-probability')
 #TwitterDevStrategy2 = add_param('--strategy baseline --baseline-strategy link-most-common-toponym --baseline-strategy regdist-most-common-toponym')
 TwitterDevStrategy2 = add_param('--strategy baseline --baseline-strategy link-most-common-toponym')
 TwitterDevStrategy3 = add_param('--strategy baseline --baseline-strategy num-articles --baseline-strategy random')
@@ -1200,12 +1200,12 @@ TwitterExper6 = nest(WithStopwords, TwitterDPR3, BaselineStrategies)
 
 TwitterWikiNumTest = iterate('--num-test-docs', [1894])
 TwitterWikiDPR1 = iterate('--degrees-per-region', [0.1])
-TwitterWikiStrategyAll = add_param('--strategy partial-kl-divergence --strategy naive-bayes-with-baseline --strategy smoothed-cosine-similarity --strategy per-word-region-distribution')
+TwitterWikiStrategyAll = add_param('--strategy partial-kl-divergence --strategy naive-bayes-with-baseline --strategy smoothed-cosine-similarity --strategy average-cell-probability')
 TwitterWikiDPR2 = iterate('--degrees-per-region', [0.5])
 TwitterWikiDPR3 = iterate('--degrees-per-region', [5, 10, 1])
 TwitterWikiStrategy3 = add_param('--strategy partial-kl-divergence')
 TwitterWikiDPR4 = iterate('--degrees-per-region', [5, 10, 1])
-TwitterWikiStrategy4 = add_param('--strategy naive-bayes-with-baseline --strategy smoothed-cosine-similarity --strategy per-word-region-distribution')
+TwitterWikiStrategy4 = add_param('--strategy naive-bayes-with-baseline --strategy smoothed-cosine-similarity --strategy average-cell-probability')
 TwitterWikiExper1 = nest(Train100k, TwitterWikiNumTest, TwitterWikiDPR1, TwitterWikiStrategyAll)
 TwitterWikiExper2 = nest(Train100k, TwitterWikiNumTest, TwitterWikiDPR2, TwitterWikiStrategyAll)
 TwitterWikiExper3 = nest(Train100k, TwitterWikiNumTest, TwitterWikiDPR3, TwitterWikiStrategy3)

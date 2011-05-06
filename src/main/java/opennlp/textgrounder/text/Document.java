@@ -25,18 +25,18 @@ public abstract class Document<A extends Token> implements Iterable<Sentence<A>>
   protected String timestamp;
 
   public Document(String id) {
-      /*this.id = id;
-    this.goldCoord = null;
-    this.systemCoord = null;
-    this.timestamp = null;*/
-      this(id, null, null);
+      this(id, null, null, null);
   }
 
   public Document(String id, String timestamp, Coordinate goldCoord) {
+      this(id, timestamp, goldCoord, null);
+  }
+
+  public Document(String id, String timestamp, Coordinate goldCoord, Coordinate systemCoord) {
     this.id = id;
     this.timestamp = timestamp;
     this.goldCoord = goldCoord;
-    this.systemCoord = null;
+    this.systemCoord = systemCoord;
   }
 
   public String getId() {

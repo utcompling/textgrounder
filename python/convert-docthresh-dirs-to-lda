@@ -14,11 +14,16 @@
 
 DEBUG="--debug 0"
 
-if [ -z "$TEXTGROUNDER_PYTHON" ]; then
-    TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+if [ -z "$WIKIGROUNDER_DIR" ]; then
+  if [ -z "$TEXTGROUNDER_DIR" ]; then
+    echo "With WIKIGROUNDER_DIR unset, must set TEXTGROUNDER_DIR to point"
+    echo "to top-level directory where TextGrounder is installed."
+    exit 1
+  fi
+  WIKIGROUNDER_DIR="$TEXTGROUNDER_DIR/python"
 fi
 
-TGP="$TEXTGROUNDER_PYTHON"
+TGP="$WIKIGROUNDER_DIR"
 
 . $TGP/config-wikigrounder
 

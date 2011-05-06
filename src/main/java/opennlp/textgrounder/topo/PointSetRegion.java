@@ -18,8 +18,8 @@ package opennlp.textgrounder.topo;
 import java.util.List;
 
 public class PointSetRegion extends Region {
-  private final List<Coordinate> coordinates;
-  private final Coordinate center;
+  private List<Coordinate> coordinates;
+  private Coordinate center;
   private final double minLat;
   private final double maxLat;
   private final double minLng;
@@ -54,6 +54,10 @@ public class PointSetRegion extends Region {
     return this.center;
   }
 
+    public void setCenter(Coordinate coord) {
+        this.center = coord;
+    }
+
   public boolean contains(double lat, double lng) {
     return lat == this.center.getLat() && lng == this.center.getLng();
   }
@@ -77,6 +81,11 @@ public class PointSetRegion extends Region {
   public List<Coordinate> getRepresentatives() {
     return this.coordinates;
   }
+
+    public void setRepresentatives(List<Coordinate> representatives) {
+        this.coordinates = representatives;
+        this.center = Coordinate.centroid(representatives);
+    }
 
   @Override
   public double distance(Coordinate coordinate) {

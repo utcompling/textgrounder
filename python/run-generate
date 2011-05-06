@@ -1,7 +1,12 @@
 #!/bin/sh
 
-if [ -z "$TEXTGROUNDER_PYTHON" ]; then
-  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+if [ -z "$WIKIGROUNDER_DIR" ]; then
+  if [ -z "$TEXTGROUNDER_DIR" ]; then
+    echo "With WIKIGROUNDER_DIR unset, must set TEXTGROUNDER_DIR to point"
+    echo "to top-level directory where TextGrounder is installed."
+    exit 1
+  fi
+  WIKIGROUNDER_DIR="$TEXTGROUNDER_DIR/python"
 fi
 
 DEBUG="--debug 1"
@@ -12,5 +17,5 @@ ARTICLEDATA='--article-data-file enwiki-20100905-article-data.txt'
 LINKS='--links-file enwiki-20100905-links-only-coord-articles.txt'
 COORDS='--coords-file enwiki-20100905-just-titles-coords.txt'
 
-$TEXTGROUNDER_PYTHON/generate_combined.py \
+$WIKIGROUNDER_DIR/generate_combined.py \
   $DEBUG $MAXTIME $ARTICLEDATA $LINKS $COORDS ${1+"$@"}

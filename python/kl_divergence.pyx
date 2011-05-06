@@ -8,9 +8,14 @@
 # For Mac OS X, you can install Cython using something like
 #
 # sudo port install py26-cython
-
-
-# For pure Python code, use this instead:
+#
+#
+# To convert this file to pure Python:
+#
+# (1) Remove all 'cdef' statements, as well as the 'cdef extern' block
+#     at the beginning of the file.
+#
+# (2) Add the following statement in place of the 'cdef extern' block:
 #
 # from math import log, sqrt
 

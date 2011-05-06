@@ -47,9 +47,12 @@ public class RectRegion extends Region {
    * longitude. Should be changed to avoid problems around zero degrees.
    */
   public Coordinate getCenter() {
-    return Coordinate.fromRadians((this.maxLat - this.minLat) / 2.0,
-                                  (this.maxLng - this.minLng) / 2.0);
+    return Coordinate.fromRadians((this.maxLat + this.minLat) / 2.0,
+                                  (this.maxLng + this.minLng) / 2.0);
   }
+
+    public void setCenter(Coordinate coord) {
+    }
 
   public boolean contains(double lat, double lng) {
       if(this.minLng <= this.maxLng) {
@@ -88,6 +91,10 @@ public class RectRegion extends Region {
     representatives.add(Coordinate.fromRadians(this.minLat, this.maxLng));
     return representatives;
   }
+
+    public void setRepresentatives(List<Coordinate> coordinates) {
+        System.err.println("Warning: can't set representatives of RectRegion.");
+    }
 
     public String toString() {
         return "lat: [" + (minLat*180.0/Math.PI) + ", "

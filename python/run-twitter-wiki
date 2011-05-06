@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Run wiki_disambig.py, passing it various useful arguments for running
+# Run disambig.py, passing it various useful arguments for running
 # on Eisenstein et al (2010)'s Twitter data.  Extra arguments
 # can be specified on the command line, which will override any existing
 # arguments.
@@ -8,15 +8,19 @@
 # See also 'run-run-twitter', which will run this script using 'nohup'
 # while saving the output to a file.
 
-if [ -z "$TEXTGROUNDER_PYTHON" ]; then
-  TEXTGROUNDER_PYTHON="$HOME/devel/textgrounder/python"
+if [ -z "$WIKIGROUNDER_DIR" ]; then
+  if [ -z "$TEXTGROUNDER_DIR" ]; then
+    echo "With WIKIGROUNDER_DIR unset, must set TEXTGROUNDER_DIR to point"
+    echo "to top-level directory where TextGrounder is installed."
+    exit 1
+  fi
+  WIKIGROUNDER_DIR="$TEXTGROUNDER_DIR/python"
 fi
 
-. $TEXTGROUNDER_PYTHON/config-wikigrounder
+. $WIKIGROUNDER_DIR/config-wikigrounder
 
-WIKI_DISAMBIG="$TEXTGROUNDER_PYTHON/wiki_disambig.py"
+WIKI_DISAMBIG="$WIKIGROUNDER_DIR/disambig.py"
 
-#MODE="match-only"
 #MODE="geotag-toponyms"
 MODE="geotag-documents"
 
@@ -29,7 +33,7 @@ elif [ "$1" = "documents" ]; then
 fi
 
 MISCOPTS="--width-of-stat-region 1 --miles-per-region 100"
-if [ "$MODE" = "geotag-toponyms" -o "$MODE" = "match-only" ]; then
+if [ "$MODE" = "geotag-toponyms" ]; then
   STRATEGY="--strategy baseline"
   # Don't need counts file with baseline-only strategy
   COUNTS_FILE=""
