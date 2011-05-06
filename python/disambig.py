@@ -2425,7 +2425,7 @@ class KLDivergenceStrategy(GeotagDocumentStrategy):
         errprint("  At rank #%s, region %s:" % (i + 1, region))
         errprint("    %30s  %s" % ('Word', 'KL-div contribution'))
         errprint("    %s" % ('-'*50))
-        items = sorted(contribs.iteritems(), key=lambda x:x[1], reverse=True)
+        items = sorted(contribs.iteritems(), key=lambda x:abs(x[1]), reverse=True)
         items = items[0:num_contrib_words]
         for (word, contribval) in items:
           errprint("    %30s  %s" % (word, contribval))
