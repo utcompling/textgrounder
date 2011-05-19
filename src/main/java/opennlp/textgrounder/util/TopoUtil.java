@@ -126,6 +126,7 @@ public class TopoUtil {
         return corpus;
     }
 
+
     public static StoredCorpus readStoredCorpusFromSerialized(String serializedCorpusInputPath) throws Exception {
 
         StoredCorpus corpus;

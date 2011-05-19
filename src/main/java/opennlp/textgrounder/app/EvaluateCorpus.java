@@ -15,52 +15,55 @@ import java.util.*;
 import java.util.zip.*;
 
 public class EvaluateCorpus extends BaseApp {
-    public static void main(String[] args) throws Exception {
-        initializeOptionsFromCommandLine(args);
 
-        if(getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
-            if(getInputPath() == null || (getSerializedCorpusInputPath() == null && getXMLInputPath() == null)) {
+    public static void main(String[] args) throws Exception {
+
+        EvaluateCorpus currentRun = new EvaluateCorpus();
+        currentRun.initializeOptionsFromCommandLine(args);
+
+        if(currentRun.getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
+            if(currentRun.getInputPath() == null || (currentRun.getSerializedCorpusInputPath() == null && currentRun.getXMLInputPath() == null)) {
                 System.out.println("Please specify both a system annotated corpus file via the -sci or -ix flag and a gold plaintext corpus file via the -i flag.");
                 System.exit(0);
             }
         }
         else {
-            if(getSerializedCorpusInputPath() == null && getXMLInputPath() == null) {
+            if(currentRun.getSerializedCorpusInputPath() == null && currentRun.getXMLInputPath() == null) {
                 System.out.println("Please specify a system annotated corpus file via the -sci or -ix flag.");
                 System.exit(0);
             }
         }
 
         StoredCorpus systemCorpus;
-        if(getSerializedCorpusInputPath() != null) {
-            System.out.print("Reading serialized system corpus from " + getSerializedCorpusInputPath() + " ...");
-            systemCorpus = TopoUtil.readStoredCorpusFromSerialized(getSerializedCorpusInputPath());
+        if(currentRun.getSerializedCorpusInputPath() != null) {
+            System.out.print("Reading serialized system corpus from " + currentRun.getSerializedCorpusInputPath() + " ...");
+            systemCorpus = TopoUtil.readStoredCorpusFromSerialized(currentRun.getSerializedCorpusInputPath());
             System.out.println("done.");
         }
         else {// if(getXMLInputPath() != null) {
             Tokenizer tokenizer = new OpenNLPTokenizer();
             systemCorpus = Corpus.createStoredCorpus();
-            systemCorpus.addSource(new CorpusXMLSource(new BufferedReader(new FileReader(getXMLInputPath())),
+            systemCorpus.addSource(new CorpusXMLSource(new BufferedReader(new FileReader(currentRun.getXMLInputPath())),
                                                        tokenizer));
-            systemCorpus.setFormat(getCorpusFormat()==null?CORPUS_FORMAT.PLAIN:getCorpusFormat());
+            systemCorpus.setFormat(currentRun.getCorpusFormat()==null?CORPUS_FORMAT.PLAIN:currentRun.getCorpusFormat());
             systemCorpus.load();
         }
 
         StoredCorpus goldCorpus = null;
 
-        if(getInputPath() != null && getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
+        if(currentRun.getInputPath() != null && currentRun.getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
             Tokenizer tokenizer = new OpenNLPTokenizer();
-            System.out.print("Reading plaintext gold corpus from " + getInputPath() + " ...");
+            System.out.print("Reading plaintext gold corpus from " + currentRun.getInputPath() + " ...");
             goldCorpus = Corpus.createStoredCorpus();
-            goldCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
+            goldCorpus.addSource(new TrXMLDirSource(new File(currentRun.getInputPath()), tokenizer));
             goldCorpus.load();
             System.out.println("done.");
         }
 
-        doEval(systemCorpus, goldCorpus, getCorpusFormat());
+        currentRun.doEval(systemCorpus, goldCorpus, currentRun.getCorpusFormat());
     }
 
-    public static void doEval(Corpus systemCorpus, Corpus goldCorpus, Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
+    public void doEval(Corpus systemCorpus, Corpus goldCorpus, Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
         if(corpusFormat == CORPUS_FORMAT.GEOTEXT) {
             System.out.print("\nEvaluating...");
             DocDistanceEvaluator evaluator = new DocDistanceEvaluator(systemCorpus);
@@ -86,4 +89,5 @@ public class EvaluateCorpus extends BaseApp {
             System.out.println("A: " + report.getAccuracy());
         }
     }
+
 }

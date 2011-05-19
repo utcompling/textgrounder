@@ -1,7 +1,7 @@
 #!/bin/bash
 
 JARS=`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`
-SCALA_LIB="$TEXTGROUNDER_DIR/project/boot/scala-2.8.1/lib/scala-library.jar"
+SCALA_LIB="$TEXTGROUNDER_DIR/project/boot/scala-2.9.0/lib/scala-library.jar"
 
 CP=$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH
 
@@ -18,6 +18,7 @@ case $FIRSTARG in
 esac
 
 JAVA_COMMAND="java -Xmx$MEMORY -classpath $CP"
+SCALA_COMMAND="scala -classpath $CP"
 
 CMD=$1
 shift
@@ -25,11 +26,12 @@ shift
 help()
 {
 cat <<EOF
-TextGrounder 0.1 commands: 
+TextGrounder 0.2 commands: 
 
   import-gazetteer  	import a gazetteer from raw form to serialized form
   import-corpus			import a corpus from raw form to serialized form
   preprocess-labelprop	preprocess label propagation
+  geotext-preproc-lp    preprocess label propagation for GeoText
   resolve           	run the toponomy resolver
   write-to-kml			write a resolved corpus to visualizable KML format
   eval					evaluated a resolved corpus against a gold corpus
@@ -43,6 +45,10 @@ EOF
 if [ $CMD = 'build' ]; then
 
     java -jar $TEXTGROUNDER_DIR/project/build/sbt-launch-0.7.4.jar "$@"
+
+elif [ $CMD = 'geotext-preproc-lp' ]; then
+
+    $SCALA_COMMAND opennlp.textgrounder.app.GeoTextLabelPropPreproc $*
 
 else  
 

@@ -12,6 +12,7 @@ import java.util.zip.*;
 
 public class LabelPropPreproc extends BaseApp {
 
+
     private static final double DPC = 1.0; // degrees per cell
 
     // the public constants are used by LabelPropComplexResolver //
@@ -23,9 +24,14 @@ public class LabelPropPreproc extends BaseApp {
     private static final String TYPE_ = "type_";
     public static final String TOK_ = "tok_";
 
+    
+
     public static void main(String[] args) throws Exception {
-        initializeOptionsFromCommandLine(args);
-        StoredCorpus corpus = loadCorpus(getInputPath(), getSerializedGazetteerPath(), getSerializedCorpusInputPath());
+
+        LabelPropPreproc currentRun = new LabelPropPreproc();
+
+        currentRun.initializeOptionsFromCommandLine(args);
+        StoredCorpus corpus = currentRun.loadCorpus(currentRun.getInputPath(), currentRun.getSerializedGazetteerPath(), currentRun.getSerializedCorpusInputPath(), currentRun.getCorpusFormat());
 
         Map<Integer, Set<Integer> > locationCellEdges = new HashMap<Integer, Set<Integer> >();
         Set<Toponym> uniqueToponyms = new HashSet<Toponym>();
@@ -67,18 +73,18 @@ public class LabelPropPreproc extends BaseApp {
             }
         }
 
-        writeCellSeeds(locationCellEdges, getSeedOutputPath());
+        currentRun.writeCellSeeds(locationCellEdges, currentRun.getSeedOutputPath());
 
-        writeCellCellEdges(getGraphOutputPath());
-        writeLocationCellEdges(locationCellEdges, getGraphOutputPath());
-        writeToponymTypeLocationEdges(uniqueToponyms, getGraphOutputPath());
-        writeDocTypeToponymTypeEdges(docToponyms, getGraphOutputPath());
-        writeStringStringEdges(docTokenToDocTypeEdges, getGraphOutputPath());
-        writeStringStringEdges(toponymTokenToDocEdges, getGraphOutputPath());
-        writeStringStringEdges(linearTopTokToTopTokEdges, getGraphOutputPath());
+        currentRun.writeCellCellEdges(currentRun.getGraphOutputPath());
+        currentRun.writeLocationCellEdges(locationCellEdges, currentRun.getGraphOutputPath());
+        currentRun.writeToponymTypeLocationEdges(uniqueToponyms, currentRun.getGraphOutputPath());
+        currentRun.writeDocTypeToponymTypeEdges(docToponyms, currentRun.getGraphOutputPath());
+        currentRun.writeStringStringEdges(docTokenToDocTypeEdges, currentRun.getGraphOutputPath());
+        currentRun.writeStringStringEdges(toponymTokenToDocEdges, currentRun.getGraphOutputPath());
+        currentRun.writeStringStringEdges(linearTopTokToTopTokEdges, currentRun.getGraphOutputPath());
     }
 
-    private static void writeCellSeeds(Map<Integer, Set<Integer> > locationCellEdges, String seedOutputPath) throws Exception {
+    private void writeCellSeeds(Map<Integer, Set<Integer> > locationCellEdges, String seedOutputPath) throws Exception {
         BufferedWriter out = new BufferedWriter(new FileWriter(seedOutputPath));
 
         Set<Integer> uniqueCellNumbers = new HashSet<Integer>();
@@ -95,7 +101,7 @@ public class LabelPropPreproc extends BaseApp {
         out.close();
     }
 
-    private static void writeCellCellEdges(String graphOutputPath) throws Exception {
+    private void writeCellCellEdges(String graphOutputPath) throws Exception {
         BufferedWriter out = new BufferedWriter(new FileWriter(graphOutputPath));
 
         for(int lon = 0; lon < 360 / DPC; lon += DPC) {
@@ -118,7 +124,7 @@ public class LabelPropPreproc extends BaseApp {
         out.close();
     }
 
-    private static void writeLocationCellEdges(Map<Integer, Set<Integer> > locationCellEdges, String graphOutputPath) throws Exception {
+    private void writeLocationCellEdges(Map<Integer, Set<Integer> > locationCellEdges, String graphOutputPath) throws Exception {
         BufferedWriter out = new BufferedWriter(new FileWriter(graphOutputPath, true));
 
         for(int locationID : locationCellEdges.keySet()) {
@@ -133,7 +139,7 @@ public class LabelPropPreproc extends BaseApp {
         out.close();
     }
 
-    private static void writeToponymTypeLocationEdges(Set<Toponym> uniqueToponyms, String graphOutputPath) throws Exception {
+    private void writeToponymTypeLocationEdges(Set<Toponym> uniqueToponyms, String graphOutputPath) throws Exception {
         BufferedWriter out = new BufferedWriter(new FileWriter(graphOutputPath, true));
 
         Set<String> toponymNamesAlreadyWritten = new HashSet<String>();
@@ -150,7 +156,7 @@ public class LabelPropPreproc extends BaseApp {
         out.close();
     }
 
-    private static void writeDocTypeToponymTypeEdges(Map<String, Set<Toponym> > docToponyms, String graphOutputPath) throws Exception {
+    private void writeDocTypeToponymTypeEdges(Map<String, Set<Toponym> > docToponyms, String graphOutputPath) throws Exception {
         BufferedWriter out = new BufferedWriter(new FileWriter(graphOutputPath, true));
 
         Set<String> docTypesAlreadyWritten = new HashSet<String>();
@@ -168,7 +174,7 @@ public class LabelPropPreproc extends BaseApp {
         out.close();
     }
 
-    private static void writeStringStringEdges(Map<String, String> edgeMap, String graphOutputPath) throws Exception {
+    private void writeStringStringEdges(Map<String, String> edgeMap, String graphOutputPath) throws Exception {
         BufferedWriter out = new BufferedWriter(new FileWriter(graphOutputPath, true));
 
         for(String key : edgeMap.keySet()) {
@@ -178,11 +184,11 @@ public class LabelPropPreproc extends BaseApp {
         out.close();
     }
 
-    private static void writeEdge(BufferedWriter out, String node1, String node2, double weight) throws Exception {
+    private void writeEdge(BufferedWriter out, String node1, String node2, double weight) throws Exception {
         out.write(node1 + "\t" + node2 + "\t" + weight + "\n");
     }
 
-    private static StoredCorpus loadCorpus(String corpusInputPath, String serGazPath, String serCorpusPath) throws Exception {
+    private StoredCorpus loadCorpus(String corpusInputPath, String serGazPath, String serCorpusPath, Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
 
         StoredCorpus corpus;
         if(serCorpusPath != null) {
@@ -200,7 +206,8 @@ public class LabelPropPreproc extends BaseApp {
             System.out.println("done.");
         }
         else {
-            corpus = ImportCorpus.doImport(corpusInputPath, serGazPath, getCorpusFormat());
+            ImportCorpus importCorpus = new ImportCorpus();
+            corpus = importCorpus.doImport(corpusInputPath, serGazPath, corpusFormat);
         }
 
         return corpus;

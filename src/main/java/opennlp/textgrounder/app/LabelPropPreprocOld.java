@@ -12,6 +12,8 @@ import java.util.zip.*;
 
 public class LabelPropPreprocOld extends BaseApp {
 
+    /*
+
     private static final int DEGREES_PER_REGION = 1;
     private static final double REGION_REGION_WEIGHT = 0.9;
 
@@ -197,12 +199,12 @@ public class LabelPropPreprocOld extends BaseApp {
 
                     System.err.println(probi1);
                     System.err.println(probi2);
-                    System.err.println(probi1i2);*/
+                    System.err.println(probi1i2);*SLASH
 
                     double wordWordWeight = Math.log(probi1i2 / (probi1 * probi2));
 
                     /*System.err.println(pmi);
-                    System.err.println("---");*/
+                    System.err.println("---");*SLASH
 
                     
                     if(wordWordWeight > WORD_WORD_WEIGHT_THRESHOLD)
@@ -269,4 +271,6 @@ public class LabelPropPreprocOld extends BaseApp {
 
         out.close();
     }
+
+*/
 }

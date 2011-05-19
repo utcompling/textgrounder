@@ -12,11 +12,12 @@ import java.util.zip.*;
 public class ImportGazetteer extends BaseApp {
 
     public static void main(String[] args) throws Exception {
-        initializeOptionsFromCommandLine(args);
-        serialize(doImport(getInputPath(), isDoingKMeans()), getOutputPath());
+        ImportGazetteer currentRun = new ImportGazetteer();
+        currentRun.initializeOptionsFromCommandLine(args);
+        currentRun.serialize(currentRun.doImport(currentRun.getInputPath(), currentRun.isDoingKMeans()), currentRun.getOutputPath());
     }
 
-    public static GeoNamesGazetteer doImport(String gazInputPath, boolean runKMeans) throws Exception {
+    public GeoNamesGazetteer doImport(String gazInputPath, boolean runKMeans) throws Exception {
         System.out.println("Reading GeoNames gazetteer from " + gazInputPath + " ...");
 
         checkExists(gazInputPath);
@@ -38,7 +39,7 @@ public class ImportGazetteer extends BaseApp {
         return gnGaz;
     }
 
-    public static void serialize(GeoNamesGazetteer gnGaz, String serializedGazOutputPath) throws Exception {
+    public void serialize(GeoNamesGazetteer gnGaz, String serializedGazOutputPath) throws Exception {
         System.out.print("Serializing GeoNames gazetteer to " + serializedGazOutputPath + " ...");
 
         ObjectOutputStream oos = null;

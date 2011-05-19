@@ -21,9 +21,10 @@ public class RunResolver extends BaseApp {
 
         long startTime = System.currentTimeMillis();
 
-        initializeOptionsFromCommandLine(args);
+        RunResolver currentRun = new RunResolver();
+        currentRun.initializeOptionsFromCommandLine(args);
 
-        if(getSerializedGazetteerPath() == null && getSerializedCorpusInputPath() == null) {
+        if(currentRun.getSerializedGazetteerPath() == null && currentRun.getSerializedCorpusInputPath() == null) {
             System.out.println("Abort: you must specify a path to a serialized gazetteer or corpus. To generate one, run ImportGazetteer and/or ImportCorpus.");
             System.exit(0);
         }
@@ -32,28 +33,29 @@ public class RunResolver extends BaseApp {
         OpenNLPRecognizer recognizer = new OpenNLPRecognizer();
 
         StoredCorpus goldCorpus = null;
-        if(getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
-            System.out.print("Reading gold corpus from " + getInputPath() + " ...");
+        if(currentRun.getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
+            System.out.print("Reading gold corpus from " + currentRun.getInputPath() + " ...");
             goldCorpus = Corpus.createStoredCorpus();
-            goldCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
+            goldCorpus.addSource(new TrXMLDirSource(new File(currentRun.getInputPath()), tokenizer));
             goldCorpus.setFormat(CORPUS_FORMAT.TRCONLL);
             goldCorpus.load();
             System.out.println("done.");
         }
 
         StoredCorpus testCorpus;
-        if(getSerializedCorpusInputPath() != null) {
-            System.out.print("Reading serialized corpus from " + getSerializedCorpusInputPath() + " ...");
-            testCorpus = TopoUtil.readStoredCorpusFromSerialized(getSerializedCorpusInputPath());
+        if(currentRun.getSerializedCorpusInputPath() != null) {
+            System.out.print("Reading serialized corpus from " + currentRun.getSerializedCorpusInputPath() + " ...");
+            testCorpus = TopoUtil.readStoredCorpusFromSerialized(currentRun.getSerializedCorpusInputPath());
             System.out.println("done.");
         }
         else {
-            testCorpus = ImportCorpus.doImport(getInputPath(), getSerializedGazetteerPath(), getCorpusFormat(), getUseGoldToponyms());
+            ImportCorpus importCorpus = new ImportCorpus();
+            testCorpus = importCorpus.doImport(currentRun.getInputPath(), currentRun.getSerializedGazetteerPath(), currentRun.getCorpusFormat(), currentRun.getUseGoldToponyms());
         }
 
         StoredCorpus trainCorpus = Corpus.createStoredCorpus();
-        if(getAdditionalInputPath() != null) {
-            System.out.print("Reading additional training corpus from " + getAdditionalInputPath() + " ...");
+        if(currentRun.getAdditionalInputPath() != null) {
+            System.out.print("Reading additional training corpus from " + currentRun.getAdditionalInputPath() + " ...");
             List<Gazetteer> gazList = new ArrayList<Gazetteer>();
             LoadableGazetteer trGaz = new InMemoryGazetteer();
             trGaz.load(new CorpusGazetteerReader(testCorpus));
@@ -63,16 +65,16 @@ public class RunResolver extends BaseApp {
             gazList.add(otherGaz);
             Gazetteer multiGaz = new MultiGazetteer(gazList);
             /*trainCorpus.addSource(new ToponymAnnotator(new PlainTextSource(
-                    new BufferedReader(new FileReader(getAdditionalInputPath())), new OpenNLPSentenceDivider(), tokenizer),
+                    new BufferedReader(new FileReader(currentRun.getAdditionalInputPath())), new OpenNLPSentenceDivider(), tokenizer),
                     recognizer,
                     multiGaz));*/
             trainCorpus.addSource(new ToponymAnnotator(new GigawordSource(
                     new BufferedReader(new InputStreamReader(
-                    new GZIPInputStream(new FileInputStream(getAdditionalInputPath())))), 10, 40000),
+                    new GZIPInputStream(new FileInputStream(currentRun.getAdditionalInputPath())))), 10, 40000),
                     recognizer,
                     multiGaz));
-            trainCorpus.addSource(new TrXMLDirSource(new File(getInputPath()), tokenizer));
-            trainCorpus.setFormat(getCorpusFormat());
+            trainCorpus.addSource(new TrXMLDirSource(new File(currentRun.getInputPath()), tokenizer));
+            trainCorpus.setFormat(currentRun.getCorpusFormat());
             trainCorpus.load();
             System.out.println("done.");
         }
@@ -82,65 +84,69 @@ public class RunResolver extends BaseApp {
         System.out.println("\nInitialization took " + Float.toString(seconds/(float)60.0) + " minutes.");
 
         Resolver resolver;
-        if(getResolverType() == RESOLVER_TYPE.RANDOM) {
+        if(currentRun.getResolverType() == RESOLVER_TYPE.RANDOM) {
             System.out.print("Running RANDOM resolver...");
             resolver = new RandomResolver();
         }
-        else if(getResolverType() == RESOLVER_TYPE.WEIGHTED_MIN_DIST) {
-            System.out.println("Running WEIGHTED MINIMUM DISTANCE resolver with " + getNumIterations() + " iteration(s)...");
-            resolver = new WeightedMinDistResolver(getNumIterations());
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.WEIGHTED_MIN_DIST) {
+            System.out.println("Running WEIGHTED MINIMUM DISTANCE resolver with " + currentRun.getNumIterations() + " iteration(s)...");
+            resolver = new WeightedMinDistResolver(currentRun.getNumIterations());
         }
-        else if(getResolverType() == RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE) {
-            System.out.print("Running LABEL PROP DEFAULT RULE resolver, using graph at " + getGraphInputPath() + " ...");
-            resolver = new LabelPropDefaultRuleResolver(getGraphInputPath());
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE) {
+            System.out.print("Running LABEL PROP DEFAULT RULE resolver, using graph at " + currentRun.getGraphInputPath() + " ...");
+            resolver = new LabelPropDefaultRuleResolver(currentRun.getGraphInputPath());
         }
-        else if(getResolverType() == RESOLVER_TYPE.LABEL_PROP_CONTEXT_SENSITIVE) {
-            System.out.print("Running LABEL PROP CONTEXT SENSITIVE resolver, using graph at " + getGraphInputPath() + " ...");
-            resolver = new LabelPropContextSensitiveResolver(getGraphInputPath());
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.LABEL_PROP_CONTEXT_SENSITIVE) {
+            System.out.print("Running LABEL PROP CONTEXT SENSITIVE resolver, using graph at " + currentRun.getGraphInputPath() + " ...");
+            resolver = new LabelPropContextSensitiveResolver(currentRun.getGraphInputPath());
         }
-        else if(getResolverType() == RESOLVER_TYPE.LABEL_PROP_COMPLEX) {
-            System.out.print("Running LABEL PROP COMPLEX resolver, using graph at " + getGraphInputPath() + " ...");
-            resolver = new LabelPropComplexResolver(getGraphInputPath());
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.LABEL_PROP_COMPLEX) {
+            System.out.print("Running LABEL PROP COMPLEX resolver, using graph at " + currentRun.getGraphInputPath() + " ...");
+            resolver = new LabelPropComplexResolver(currentRun.getGraphInputPath());
         }
         else {//if(getResolverType() == RESOLVER_TYPE.BASIC_MIN_DIST) {
             System.out.print("Running BASIC MINIMUM DISTANCE resolver...");
             resolver = new BasicMinDistResolver();
         }
 
-        if(getAdditionalInputPath() != null)
+        if(currentRun.getAdditionalInputPath() != null)
             resolver.train(trainCorpus);
         StoredCorpus disambiguated = resolver.disambiguate(testCorpus);
-        disambiguated.setFormat(getCorpusFormat());
-        if(getCorpusFormat() == CORPUS_FORMAT.GEOTEXT) {
-            if(getBoundingBox() != null)
-                System.out.println("\nOnly disambiguating documents within bounding box: " + getBoundingBox().toString());
+        disambiguated.setFormat(currentRun.getCorpusFormat());
+        if(currentRun.getCorpusFormat() == CORPUS_FORMAT.GEOTEXT) {
+            if(currentRun.getBoundingBox() != null)
+                System.out.println("\nOnly disambiguating documents within bounding box: " + currentRun.getBoundingBox().toString());
             SimpleDocumentResolver dresolver = new SimpleDocumentResolver();
-            disambiguated = dresolver.disambiguate(disambiguated, getBoundingBox());
+            disambiguated = dresolver.disambiguate(disambiguated, currentRun.getBoundingBox());
         }
 
         System.out.println("done.\n");
 
-        if(goldCorpus != null || getCorpusFormat() == CORPUS_FORMAT.GEOTEXT) {
-            EvaluateCorpus.doEval(disambiguated, goldCorpus, corpusFormat);
+        if(goldCorpus != null || currentRun.getCorpusFormat() == CORPUS_FORMAT.GEOTEXT) {
+            EvaluateCorpus evaluateCorpus = new EvaluateCorpus();
+            evaluateCorpus.doEval(disambiguated, goldCorpus, currentRun.getCorpusFormat());
         }
 
-        if(getSerializedCorpusOutputPath() != null) {
-            ImportCorpus.serialize(disambiguated, getSerializedCorpusOutputPath());
+        if(currentRun.getSerializedCorpusOutputPath() != null) {
+            ImportCorpus importCorpus = new ImportCorpus();
+            importCorpus.serialize(disambiguated, currentRun.getSerializedCorpusOutputPath());
         }
 
-        if(getOutputPath() != null) {
-            System.out.print("Writing resolved corpus in XML format to " + getOutputPath() + " ...");
+        if(currentRun.getOutputPath() != null) {
+            System.out.print("Writing resolved corpus in XML format to " + currentRun.getOutputPath() + " ...");
             CorpusXMLWriter w = new CorpusXMLWriter(disambiguated);
-            w.write(new File(getOutputPath()));
+            w.write(new File(currentRun.getOutputPath()));
             System.out.println("done.");
         }
 
-        if(getKMLOutputPath() != null) {
-            WriteCorpusToKML.writeToKML(disambiguated, getKMLOutputPath(), getOutputGoldLocations(), getOutputUserKML(), getCorpusFormat());
+        if(currentRun.getKMLOutputPath() != null) {
+            WriteCorpusToKML writeCorpusToKML = new WriteCorpusToKML();
+            writeCorpusToKML.writeToKML(disambiguated, currentRun.getKMLOutputPath(), currentRun.getOutputGoldLocations(), currentRun.getOutputUserKML(), currentRun.getCorpusFormat());
         }
 
         endTime = System.currentTimeMillis();
         seconds = (endTime - startTime) / 1000F;
         System.out.println("\nTotal time elapsed: " + Float.toString(seconds/(float)60.0) + " minutes.");
     }
+
 }

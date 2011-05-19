@@ -13,27 +13,30 @@ import java.util.zip.*;
 public class ImportCorpus extends BaseApp {
     
     public static void main(String[] args) throws Exception {
-        initializeOptionsFromCommandLine(args);
 
-        if(getSerializedCorpusOutputPath() == null && getOutputPath() == null) {
+        ImportCorpus currentRun = new ImportCorpus();
+
+        currentRun.initializeOptionsFromCommandLine(args);
+
+        if(currentRun.getSerializedCorpusOutputPath() == null && currentRun.getOutputPath() == null) {
             System.out.println("Please specify a serialized corpus output file with the -sco flag and/or an XML output file with the -o flag.");
             System.exit(0);
         }
 
-        StoredCorpus corpus = doImport(getInputPath(), getSerializedGazetteerPath(), getCorpusFormat(), getUseGoldToponyms());
+        StoredCorpus corpus = currentRun.doImport(currentRun.getInputPath(), currentRun.getSerializedGazetteerPath(), currentRun.getCorpusFormat(), currentRun.getUseGoldToponyms());
         
-        if(getSerializedCorpusOutputPath() != null)
-            serialize(corpus, getSerializedCorpusOutputPath());
-        if(getOutputPath() != null)
-            writeToXML(corpus, getOutputPath());
+        if(currentRun.getSerializedCorpusOutputPath() != null)
+            currentRun.serialize(corpus, currentRun.getSerializedCorpusOutputPath());
+        if(currentRun.getOutputPath() != null)
+            currentRun.writeToXML(corpus, currentRun.getOutputPath());
     }
 
-    public static StoredCorpus doImport(String corpusInputPath, String serGazInputPath,
+    public StoredCorpus doImport(String corpusInputPath, String serGazInputPath,
                                         Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
         return doImport(corpusInputPath, serGazInputPath, corpusFormat, false);
     }
 
-    public static StoredCorpus doImport(String corpusInputPath, String serGazInputPath,
+    public StoredCorpus doImport(String corpusInputPath, String serGazInputPath,
                                         Enum<CORPUS_FORMAT> corpusFormat,
                                         boolean useGoldToponyms) throws Exception {
 
@@ -98,7 +101,7 @@ public class ImportCorpus extends BaseApp {
         return corpus;
     }
 
-    public static void serialize(Corpus corpus, String serializedCorpusPath) throws Exception {
+    public void serialize(Corpus corpus, String serializedCorpusPath) throws Exception {
 
         System.out.print("\nSerializing corpus to " + serializedCorpusPath + " ...");
         
@@ -117,10 +120,11 @@ public class ImportCorpus extends BaseApp {
         System.out.println("done.");
     }
 
-    public static void writeToXML(Corpus corpus, String xmlOutputPath) throws Exception {
+    public void writeToXML(Corpus corpus, String xmlOutputPath) throws Exception {
         System.out.print("\nWriting corpus in XML format to " + xmlOutputPath + " ...");
         CorpusXMLWriter w = new CorpusXMLWriter(corpus);
         w.write(new File(xmlOutputPath));
         System.out.println("done.");
     }
+
 }

@@ -10,34 +10,34 @@ import java.io.*;
 
 public class BaseApp {
 
-    private static Options options = new Options();
+    private Options options = new Options();
 
-    private static String inputPath = null;
-    private static String additionalInputPath = null;
-    private static String graphInputPath = null;
-    private static String outputPath = null;
-    private static String xmlInputPath = null;
-    private static String kmlOutputPath = null;
-    private static boolean outputGoldLocations = false;
-    private static boolean outputUserKML = false;
-    private static boolean useGoldToponyms = false;
-    private static String geoGazetteerFilename = null;
-    private static String serializedGazetteerPath = null;
-    private static String serializedCorpusInputPath = null;
-    private static String serializedCorpusOutputPath = null;
+    private String inputPath = null;
+    private String additionalInputPath = null;
+    private String graphInputPath = null;
+    private String outputPath = null;
+    private String xmlInputPath = null;
+    private String kmlOutputPath = null;
+    private boolean outputGoldLocations = false;
+    private boolean outputUserKML = false;
+    private boolean useGoldToponyms = false;
+    private String geoGazetteerFilename = null;
+    private String serializedGazetteerPath = null;
+    private String serializedCorpusInputPath = null;
+    private String serializedCorpusOutputPath = null;
 
-    private static boolean highRecallNER = false;
+    private boolean highRecallNER = false;
 
-    private static Region boundingBox = null;
+    private Region boundingBox = null;
 
-    private static boolean doKMeans = false;
+    private boolean doKMeans = false;
 
-    private static String graphOutputPath = null;
-    private static String seedOutputPath = null;
-    private static String wikiInputPath = null;
-    private static String stoplistInputPath = null;
+    private String graphOutputPath = null;
+    private String seedOutputPath = null;
+    private String wikiInputPath = null;
+    private String stoplistInputPath = null;
     
-    private static int numIterations = 1;
+    private int numIterations = 1;
 
     public static enum RESOLVER_TYPE {
         RANDOM,
@@ -47,17 +47,17 @@ public class BaseApp {
         LABEL_PROP_CONTEXT_SENSITIVE,
         LABEL_PROP_COMPLEX
     }
-    protected static Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
+    protected Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
 
     public static enum CORPUS_FORMAT {
         PLAIN,
         TRCONLL,
         GEOTEXT
     }
-    protected static Enum<CORPUS_FORMAT> corpusFormat = CORPUS_FORMAT.PLAIN;
+    protected Enum<CORPUS_FORMAT> corpusFormat = CORPUS_FORMAT.PLAIN;
 	
 
-    protected static void initializeOptionsFromCommandLine(String[] args) throws Exception {
+    protected void initializeOptionsFromCommandLine(String[] args) throws Exception {
 
         options.addOption("i", "input", true, "input path");
         options.addOption("ix", "input-xml", true, "xml input path");
@@ -217,7 +217,11 @@ public class BaseApp {
             boundingBox = RectRegion.fromDegrees(minLat, maxLat, minLon, maxLon);
     }
 
-    protected static void checkExists(String filename) throws Exception {
+    public static void checkExists(String filename) throws Exception {
+        if(filename == null) {
+            System.out.println("Null filename; aborting.");
+            System.exit(0);
+        }
         File f = new File(filename);
         if(!f.exists()) {
             System.out.println(filename + " doesn't exist; aborting.");
@@ -225,100 +229,100 @@ public class BaseApp {
         }
     }
 
-    public static String getInputPath() {
+    public String getInputPath() {
         return inputPath;
     }
 
-    public static String getXMLInputPath() {
+    public String getXMLInputPath() {
         return xmlInputPath;
     }
 
-    public static String getAdditionalInputPath() {
+    public String getAdditionalInputPath() {
         return additionalInputPath;
     }
 
-    public static String getGraphInputPath() {
+    public String getGraphInputPath() {
         return graphInputPath;
     }
 
-    public static Enum<RESOLVER_TYPE> getResolverType() {
+    public Enum<RESOLVER_TYPE> getResolverType() {
         return resolverType;
     }
 
-    public static int getNumIterations() {
+    public int getNumIterations() {
         return numIterations;
     }
 
-    public static String getOutputPath() {
+    public String getOutputPath() {
         return outputPath;
     }
 
-    public static String getKMLOutputPath() {
+    public String getKMLOutputPath() {
         return kmlOutputPath;
     }
 
-    public static boolean getOutputGoldLocations() {
+    public boolean getOutputGoldLocations() {
         return outputGoldLocations;
     }
 
-    public static boolean getUseGoldToponyms() {
+    public boolean getUseGoldToponyms() {
         return useGoldToponyms;
     }
 
-    public static boolean getOutputUserKML() {
+    public boolean getOutputUserKML() {
         return outputUserKML;
     }
 
-    public static String getGeoGazetteerFilename() {
+    public String getGeoGazetteerFilename() {
         return geoGazetteerFilename;
     }
 
-    public static String getSerializedGazetteerPath() {
+    public String getSerializedGazetteerPath() {
         return serializedGazetteerPath;
     }
 
-    public static String getSerializedCorpusInputPath() {
+    public String getSerializedCorpusInputPath() {
         return serializedCorpusInputPath;
     }
 
-    public static String getSerializedCorpusOutputPath() {
+    public String getSerializedCorpusOutputPath() {
         return serializedCorpusOutputPath;
     }
 
 
-    public static Enum<CORPUS_FORMAT> getCorpusFormat() {
+    public Enum<CORPUS_FORMAT> getCorpusFormat() {
         return corpusFormat;
     }
     
-    public static boolean isDoingKMeans() {
+    public boolean isDoingKMeans() {
         return doKMeans;
     }
 
-    public static String getGraphOutputPath() {
+    public String getGraphOutputPath() {
         return graphOutputPath;
     }
 
-    public static String getSeedOutputPath() {
+    public String getSeedOutputPath() {
         return seedOutputPath;
     }
 
-    public static String getWikiInputPath() {
+    public String getWikiInputPath() {
         return wikiInputPath;
     }
 
-    public static String getStoplistInputPath() {
+    public String getStoplistInputPath() {
         return stoplistInputPath;
     }
 
-    public static Region getBoundingBox() {
+    public Region getBoundingBox() {
         return boundingBox;
     }
 
-	public static void setHighRecallNER(boolean highRecallNER) {
-		BaseApp.highRecallNER = highRecallNER;
+	public void setHighRecallNER(boolean highRecallNER) {
+		highRecallNER = highRecallNER;
 	}
 
-	public static boolean isHighRecallNER() {
+	public boolean isHighRecallNER() {
 		return highRecallNER;
 	}
 }

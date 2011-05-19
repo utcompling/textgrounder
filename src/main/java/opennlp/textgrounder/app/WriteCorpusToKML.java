@@ -10,27 +10,30 @@ import opennlp.textgrounder.util.*;
 import java.io.*;
 
 public class WriteCorpusToKML extends BaseApp {
-    public static void main(String[] args) throws Exception {
-        initializeOptionsFromCommandLine(args);
 
-        if(getSerializedCorpusInputPath() == null) {
+    public static void main(String[] args) throws Exception {
+
+        WriteCorpusToKML currentRun = new WriteCorpusToKML();
+        currentRun.initializeOptionsFromCommandLine(args);
+
+        if(currentRun.getSerializedCorpusInputPath() == null) {
             System.out.println("Please specify an input corpus in serialized format via the -sci flag.");
             System.exit(0);
         }
 
-        if(getKMLOutputPath() == null) {
+        if(currentRun.getKMLOutputPath() == null) {
             System.out.println("Please specify a KML output path via the -ok flag.");
             System.exit(0);
         }
 
-        System.out.print("Reading serialized corpus from " + getSerializedCorpusInputPath() + " ...");
-        Corpus corpus = TopoUtil.readCorpusFromSerialized(getSerializedCorpusInputPath());
+        System.out.print("Reading serialized corpus from " + currentRun.getSerializedCorpusInputPath() + " ...");
+        Corpus corpus = TopoUtil.readCorpusFromSerialized(currentRun.getSerializedCorpusInputPath());
         System.out.println("done.");
 
-        writeToKML(corpus, getKMLOutputPath(), getOutputGoldLocations(), getOutputUserKML(), getCorpusFormat());
+        currentRun.writeToKML(corpus, currentRun.getKMLOutputPath(), currentRun.getOutputGoldLocations(), currentRun.getOutputUserKML(), currentRun.getCorpusFormat());
     }
 
-    public static void writeToKML(Corpus corpus, String kmlOutputPath, boolean outputGoldLocations, boolean outputUserKML, Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
+    public void writeToKML(Corpus corpus, String kmlOutputPath, boolean outputGoldLocations, boolean outputUserKML, Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
         System.out.print("Writing visualizable corpus in KML format to " + kmlOutputPath + " ...");
         CorpusKMLWriter kw;
         if(corpusFormat == CORPUS_FORMAT.GEOTEXT && outputUserKML)

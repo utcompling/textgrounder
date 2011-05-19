@@ -17,6 +17,8 @@ import java.util.zip.*;
 
 public class RunRPResolver extends BaseApp {
 
+    /*
+
     public static void main(String[] args) throws Exception {
 System.out.println("Test!");
         initializeOptionsFromCommandLine(args);
@@ -52,7 +54,7 @@ System.out.println("Test!");
             /*trainCorpus.addSource(new ToponymAnnotator(new PlainTextSource(
                     new BufferedReader(new FileReader(getAdditionalInputPath())), new OpenNLPSentenceDivider(), tokenizer),
                     new OpenNLPRecognizer(),
-                    multiGaz));*/
+                    multiGaz));*SLASH
             trainCorpus.addSource(new ToponymAnnotator(new GigawordSource(
                     new BufferedReader(new InputStreamReader(
                     new GZIPInputStream(new FileInputStream(getAdditionalInputPath())))), 10, 40000),
@@ -120,4 +122,6 @@ System.out.println("Test!");
             System.out.println("done.");
         }
     }
+
+    */
 }
