@@ -32,6 +32,7 @@ TextGrounder 0.2 commands:
   import-corpus			import a corpus from raw form to serialized form
   preprocess-labelprop	preprocess label propagation
   geotext-preproc-lp    preprocess label propagation for GeoText
+  geotext-decode-lp     decode label preopagation for GeoText
   resolve           	run the toponomy resolver
   write-to-kml			write a resolved corpus to visualizable KML format
   eval					evaluated a resolved corpus against a gold corpus
@@ -49,6 +50,10 @@ if [ $CMD = 'build' ]; then
 elif [ $CMD = 'geotext-preproc-lp' ]; then
 
     $SCALA_COMMAND opennlp.textgrounder.app.GeoTextLabelPropPreproc $*
+
+elif [ $CMD = 'geotext-decode-lp' ]; then
+
+    $SCALA_COMMAND opennlp.textgrounder.app.GeoTextLabelPropDecoder $*
 
 else  
 

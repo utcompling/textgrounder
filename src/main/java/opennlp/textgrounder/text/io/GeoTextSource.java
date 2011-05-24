@@ -44,12 +44,13 @@ public class GeoTextSource extends DocumentSource {
         
         long fold = (userId % 5);
         fold = fold==0? 5 : fold;
-        if(fold == 4) { // reads dev set only
+        if(fold >= 1 && fold <= 4) { // reads train and dev set only
 
             if(!docId.equals(prevDocId)) {
                 curDoc = new GeoTextDocument(docId, tokens[1],
                                              Double.parseDouble(tokens[3]),
-                                             Double.parseDouble(tokens[4]));
+                                             Double.parseDouble(tokens[4]),
+                                             fold);
                 documents.add(curDoc);
                 sentIndex = -1;
             }

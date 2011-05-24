@@ -24,6 +24,14 @@ public abstract class Document<A extends Token> implements Iterable<Sentence<A>>
   protected Coordinate systemCoord;
   protected String timestamp;
 
+  public static enum SECTION {
+      TRAIN,
+      DEV,
+      TEST,
+      ANY
+  }
+  protected Enum<SECTION> section;
+
   public Document(String id) {
       this(id, null, null, null);
   }
@@ -33,10 +41,15 @@ public abstract class Document<A extends Token> implements Iterable<Sentence<A>>
   }
 
   public Document(String id, String timestamp, Coordinate goldCoord, Coordinate systemCoord) {
+    this(id, timestamp, goldCoord, systemCoord, SECTION.ANY);
+  }
+
+  public Document(String id, String timestamp, Coordinate goldCoord, Coordinate systemCoord, Enum<SECTION> section) {
     this.id = id;
     this.timestamp = timestamp;
     this.goldCoord = goldCoord;
     this.systemCoord = systemCoord;
+    this.section = section;
   }
 
   public String getId() {
@@ -61,6 +74,22 @@ public abstract class Document<A extends Token> implements Iterable<Sentence<A>>
 
     public String getTimestamp() {
         return this.timestamp;
+    }
+
+    public Enum<SECTION> getSection() {
+        return section;
+    }
+
+    public boolean isTrain() {
+        return getSection() == SECTION.TRAIN;
+    }
+
+    public boolean isDev() {
+        return getSection() == SECTION.DEV;
+    }
+
+    public boolean isTest() {
+        return getSection() == SECTION.TEST;
     }
 }
 

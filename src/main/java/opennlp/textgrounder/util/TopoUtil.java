@@ -71,6 +71,10 @@ public class TopoUtil {
         return (int)((int)(lat/dpc) * 1000 + (lon/dpc));
     }
 
+    public static int getCellNumber(Coordinate coord, double dpc) {
+        return getCellNumber(coord.getLatDegrees(), coord.getLngDegrees(), dpc);
+    }
+
     public static int getCorrectCandidateIndex(Toponym toponym, Map<Integer, Double> cellDistribution, double dpc) {
         double maxMass = Double.NEGATIVE_INFINITY;
         int maxIndex = -1;

@@ -16,28 +16,30 @@ public class BasicMinDistResolver extends Resolver {
   @Override
   public StoredCorpus disambiguate(StoredCorpus corpus) {
     for (Document<StoredToken> doc : corpus) {
-      for (Sentence<StoredToken> sent : doc) {
-        for (Toponym toponym : sent.getToponyms()) {
-          double min = Double.MAX_VALUE;
-          int minIdx = -1;
-
-          int idx = 0;
-          for (Location candidate : toponym) {
-            Double candidateMin = this.checkCandidate(toponym, candidate, doc, min);
-            if (candidateMin != null) {
-              min = candidateMin;
-              minIdx = idx;
+      if(!doc.isTrain() && !doc.isTest()) {
+        for (Sentence<StoredToken> sent : doc) {
+            for (Toponym toponym : sent.getToponyms()) {
+                double min = Double.MAX_VALUE;
+                int minIdx = -1;
+                
+                int idx = 0;
+                for (Location candidate : toponym) {
+                    Double candidateMin = this.checkCandidate(toponym, candidate, doc, min);
+                    if (candidateMin != null) {
+                        min = candidateMin;
+                        minIdx = idx;
+                    }
+                    idx++;
+                }
+                
+                if (minIdx > -1) {
+                    toponym.setSelectedIdx(minIdx);
+                }
             }
-            idx++;
-          }
-
-          if (minIdx > -1) {
-            toponym.setSelectedIdx(minIdx);
-          }
         }
       }
     }
-
+    
     return corpus;
   }
 

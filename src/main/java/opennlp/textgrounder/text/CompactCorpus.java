@@ -100,10 +100,6 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
           Span<Token> span = it.next();
           Toponym toponym = (Toponym) span.getItem();
 
-          /*if(toponym.getForm().equalsIgnoreCase("syria")) {
-              System.out.println("TOP: " + toponym.getCandidates().get(2).getRegion().getCenter());
-              }*/
-
           if (toponym.getAmbiguity() > this.maxToponymAmbiguity) {
             this.maxToponymAmbiguity = toponym.getAmbiguity();
           }
@@ -134,13 +130,6 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
           } else {
             this.candidateLists.set(idx, toponym.getCandidates());
           }
-
-          /*if(toponym.getForm().equalsIgnoreCase("syria")) {
-              //for(Location loc : toponym.getCandidates())
-              System.out.println("MIDDLE: " + toponym.getCandidates().get(2).getRegion().getCenter());
-              //              for(Location loc : this.candidateLists.get(idx))
-              System.out.println("BOTTOM: " + this.candidateLists.get(idx).get(2).getRegion().getCenter());
-              }*/
         }
 
         stored.compact();
@@ -148,10 +137,11 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
       }
 
       sentences.trimToSize();
-      if(this.getFormat() == BaseApp.CORPUS_FORMAT.GEOTEXT)
+      if(this.getFormat() == BaseApp.CORPUS_FORMAT.GEOTEXT) {
           this.documents.add(new StoredDocument(document.getId(), sentences,
                                                 document.getTimestamp(),
-                                                document.getGoldCoord(), document.getSystemCoord()));
+                                                document.getGoldCoord(), document.getSystemCoord(), document.getSection()));
+      }
       else
           this.documents.add(new StoredDocument(document.getId(), sentences));
     }
@@ -213,6 +203,11 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
       this.sentences = sentences;
     }
 
+    private StoredDocument(String id, List<Sentence<StoredToken>> sentences, String timestamp, Coordinate goldCoord, Coordinate systemCoord) {
+        this(id, sentences, timestamp, goldCoord);
+        this.systemCoord = systemCoord;
+    }
+
     private StoredDocument(String id, List<Sentence<StoredToken>> sentences, String timestamp, double goldLat, double goldLon) {
         this(id, sentences);
         this.timestamp = timestamp;
@@ -225,9 +220,9 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
         this.goldCoord = goldCoord;
     }
 
-    private StoredDocument(String id, List<Sentence<StoredToken>> sentences, String timestamp, Coordinate goldCoord, Coordinate systemCoord) {
-        this(id, sentences, timestamp, goldCoord);
-        this.systemCoord = systemCoord;
+    private StoredDocument(String id, List<Sentence<StoredToken>> sentences, String timestamp, Coordinate goldCoord, Coordinate systemCoord, Enum<Document.SECTION> section) {
+        this(id, sentences, timestamp, goldCoord, systemCoord);
+        this.section = section;
     }
 
     public Iterator<Sentence<StoredToken>> iterator() {

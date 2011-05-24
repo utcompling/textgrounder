@@ -112,7 +112,7 @@ public class WeightedMinDistResolver extends Resolver {
                         }
                     }
                 }
-            }
+            }       
         }
     }
 
@@ -126,39 +126,40 @@ public class WeightedMinDistResolver extends Resolver {
         for(int i = 0; i < counts.size(); i++) sums.add(initialCount * counts.get(i).size());
 
         for (Document<StoredToken> doc : corpus) {
-          for (Sentence<StoredToken> sent : doc) {
-            for (Toponym toponym : sent.getToponyms()) {
-              double min = Double.MAX_VALUE;
-              int minIdx = -1;
-
-              int idx = 0;
-              for (Location candidate : toponym) {
-                Double candidateMin = this.checkCandidate(toponym, candidate, idx, doc, min, weights, lexicon);
-                if (candidateMin != null) {
-                  min = candidateMin;
-                  minIdx = idx;
+            for (Sentence<StoredToken> sent : doc) {
+                for (Toponym toponym : sent.getToponyms()) {
+                    double min = Double.MAX_VALUE;
+                    int minIdx = -1;
+                    
+                    int idx = 0;
+                    for (Location candidate : toponym) {
+                        Double candidateMin = this.checkCandidate(toponym, candidate, idx, doc, min, weights, lexicon);
+                        if (candidateMin != null) {
+                            min = candidateMin;
+                            minIdx = idx;
+                        }
+                        idx++;
+                    }
+                    
+                    if (minIdx > -1) {
+                        int countIndex = lexicon.get(toponym.getForm());
+                        /*System.out.println(toponym.getForm());
+                          System.out.println(countIndex);
+                          System.out.println(minIdx);
+                          System.out.println(counts.get(countIndex).size());
+                          System.out.println(toponym.getAmbiguity());*/
+                        int prevCount = counts.get(countIndex)
+                            .get(minIdx);
+                        counts.get(countIndex).set(minIdx, prevCount + 1);
+                        int prevSum = sums.get(countIndex);
+                        sums.set(countIndex, prevSum + 1);
+                        
+                    }
                 }
-                idx++;
-              }
-
-              if (minIdx > -1) {
-                int countIndex = lexicon.get(toponym.getForm());
-                /*System.out.println(toponym.getForm());
-                System.out.println(countIndex);
-                System.out.println(minIdx);
-                System.out.println(counts.get(countIndex).size());
-                System.out.println(toponym.getAmbiguity());*/
-                int prevCount = counts.get(countIndex)
-                        .get(minIdx);
-                counts.get(countIndex).set(minIdx, prevCount + 1);
-                int prevSum = sums.get(countIndex);
-                sums.set(countIndex, prevSum + 1);
-
-              }
             }
-          }
         }
-
+    
+    
         for(int i = 0; i < weights.size(); i++) {
             List<Double> curWeights = weights.get(i);
             List<Integer> curCounts = counts.get(i);
@@ -169,32 +170,34 @@ public class WeightedMinDistResolver extends Resolver {
         }
     }
 
+
   /* This implementation of disambiguate immediately stops computing distance
    * totals for candidates when it becomes clear that they aren't minimal. */
   private StoredCorpus finalDisambiguationStep(StoredCorpus corpus, List<List<Double> > weights, Lexicon<String> lexicon) {
     for (Document<StoredToken> doc : corpus) {
-      for (Sentence<StoredToken> sent : doc) {
-        for (Toponym toponym : sent.getToponyms()) {
-          double min = Double.MAX_VALUE;
-          int minIdx = -1;
-
-          int idx = 0;
-          for (Location candidate : toponym) {
-            Double candidateMin = this.checkCandidate(toponym, candidate, idx, doc, min, weights, lexicon);
-            if (candidateMin != null) {
-              min = candidateMin;
-              minIdx = idx;
+        for (Sentence<StoredToken> sent : doc) {
+            for (Toponym toponym : sent.getToponyms()) {
+                double min = Double.MAX_VALUE;
+                int minIdx = -1;
+                
+                int idx = 0;
+                for (Location candidate : toponym) {
+                    Double candidateMin = this.checkCandidate(toponym, candidate, idx, doc, min, weights, lexicon);
+                    if (candidateMin != null) {
+                        min = candidateMin;
+                        minIdx = idx;
+                    }
+                    idx++;
+                }
+                
+                if (minIdx > -1) {
+                    toponym.setSelectedIdx(minIdx);
+                }
             }
-            idx++;
-          }
-
-          if (minIdx > -1) {
-            toponym.setSelectedIdx(minIdx);
-          }
         }
-      }
+        
     }
-
+    
     return corpus;
   }
 

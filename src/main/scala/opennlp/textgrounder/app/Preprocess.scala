@@ -23,7 +23,7 @@ import opennlp.textgrounder.text.io._
 import opennlp.textgrounder.text.prep._
 import opennlp.textgrounder.util.Constants
 
-object Preprocess extends Application {
+object Preprocess extends App {
   override def main(args: Array[String]) {
     val divider = new OpenNLPSentenceDivider
     val tokenizer = new OpenNLPTokenizer

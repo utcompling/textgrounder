@@ -18,11 +18,14 @@ public class DocDistanceEvaluator {
 
         for(Document<Token> doc : corpus) {
 
-            Coordinate systemCoord = doc.getSystemCoord();
-            Coordinate goldCoord = doc.getGoldCoord();
+            if(!doc.isTrain()) {
 
-            if(systemCoord != null && goldCoord != null) {
-                dreport.addDistance(systemCoord.distanceInKm(goldCoord));
+                Coordinate systemCoord = doc.getSystemCoord();
+                Coordinate goldCoord = doc.getGoldCoord();
+                
+                if(systemCoord != null && goldCoord != null) {
+                    dreport.addDistance(systemCoord.distanceInKm(goldCoord));
+                }
             }
         }
 

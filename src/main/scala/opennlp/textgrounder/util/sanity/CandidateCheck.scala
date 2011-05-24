@@ -24,7 +24,7 @@ import opennlp.textgrounder.text.io.TrXMLDirSource
 import opennlp.textgrounder.text.prep.OpenNLPTokenizer
 import opennlp.textgrounder.topo.Location
 
-object CandidateCheck extends Application {
+object CandidateCheck extends App {
   override def main(args: Array[String]) {
     val tokenizer = new OpenNLPTokenizer
     val corpus = Corpus.createStreamCorpus
