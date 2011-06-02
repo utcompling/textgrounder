@@ -63,7 +63,7 @@ public class EvaluateCorpus extends BaseApp {
         currentRun.doEval(systemCorpus, goldCorpus, currentRun.getCorpusFormat());
     }
 
-    public void doEval(Corpus systemCorpus, Corpus goldCorpus, Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
+    public void doEval(Corpus systemCorpus, Corpus goldCorpus, Enum<BaseApp.CORPUS_FORMAT> corpusFormat) throws Exception {
         if(corpusFormat == CORPUS_FORMAT.GEOTEXT) {
             System.out.print("\nEvaluating...");
             DocDistanceEvaluator evaluator = new DocDistanceEvaluator(systemCorpus);
