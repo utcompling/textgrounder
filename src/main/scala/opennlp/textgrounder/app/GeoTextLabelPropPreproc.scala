@@ -51,12 +51,12 @@ object GeoTextLabelPropPreproc extends BaseApp {
   def writeCellSeeds(corpus: StoredCorpus, seedOutputPath: String) = {
     val out = new FileWriter(seedOutputPath)
 
-    for(document <- corpus) {
-      if(document.isTrain) {
-        val cellNumber = TopoUtil.getCellNumber(document.getGoldCoord(), DPC)
-        writeEdge(out, CELL_ + cellNumber, CELL_LABEL_ + cellNumber, 1.0)
-      }
-    }
+    val edges = (for (doc <- corpus.filter(_.isTrain)) yield {
+      val cellNumber = TopoUtil.getCellNumber(doc.getGoldCoord, DPC)
+      Tuple3(CELL_ + cellNumber, CELL_LABEL_ + cellNumber, 1.0)
+    })
+
+    edges.map(writeEdge(out, _))
 
     out.close
   }
@@ -64,12 +64,9 @@ object GeoTextLabelPropPreproc extends BaseApp {
   def writeDocCellEdges(corpus: StoredCorpus, graphOutputPath: String) = {
     val out = new FileWriter(graphOutputPath)
 
-    for(document <- corpus) {
-      if(document.isTrain) {
-        val cellNumber = TopoUtil.getCellNumber(document.getGoldCoord(), DPC)
-        writeEdge(out, /*DOC_ + */document.getId, CELL_ + cellNumber, 1.0)
-      }
-    }
+    val edges = corpus.filter(_.isTrain).map(doc => Tuple3(doc.getId, CELL_ + TopoUtil.getCellNumber(doc.getGoldCoord, DPC), 1.0))
+
+    edges.map(writeEdge(out, _))
 
     out.close
   }
@@ -172,6 +169,10 @@ object GeoTextLabelPropPreproc extends BaseApp {
   }
 
   def writeEdge(out: FileWriter, node1: String, node2: String, weight: Double) = {
-    out.write(node1 + "\t" + node2 + "\t" + weight + "\n");
+    out.write(node1 + "\t" + node2 + "\t" + weight + "\n")
+  }
+
+  def writeEdge(out: FileWriter, e: Tuple3[String, String, Double]) = {
+    out.write(e._1 + "\t" + e._2 + "\t" + e._3 + "\n")
   }
 }
