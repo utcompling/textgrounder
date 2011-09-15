@@ -2718,7 +2718,7 @@ class PCLTravelGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     errprint("Article with title: %s" % doc.title)
     num_regs_to_show = 5
     for (rank, regval) in izip(xrange(1, 1 + num_regs_to_show), regs):
-      reg, val = retval
+      reg, val = regval
       if debug['struct']:
         errprint("  Rank %d, goodness %g:" % (rank, val))
         print_structure(reg.struct(), indent=4)
