@@ -5,7 +5,7 @@
   <groupId>opennlp</groupId>
   <artifactId>textgrounder</artifactId>
   <name>TextGrounder</name>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
@@ -63,7 +63,7 @@
       <plugin>
         <groupId>org.scala-tools</groupId>
         <artifactId>maven-scala-plugin</artifactId>
-        <!--<version>2.15.0</version>-->
+        <version>2.15.0</version>
         <executions>
           <execution>
             <id>compile</id>
