@@ -1710,7 +1710,7 @@ class GeotagDocumentResults(object):
     pred_degdist = degree_dist(coord, pred_center)
 
     self.all_document.record_result(rank, pred_truedist, pred_degdist)
-    naitr = self.docs_by_naitr.get_collector(rank)
+    naitr = self.docs_by_naitr.get_collector(num_arts_in_true_region)
     naitr.record_result(rank, pred_truedist, pred_degdist)
 
     true_latind, true_longind = coord_to_stat_region_indices(coord)
@@ -2013,12 +2013,6 @@ class NaiveBayesToponymStrategy(GeotagToponymStrategy):
     if debug['some']:
       errprint("Computed total log-likelihood as %s" % totalprob)
     return totalprob
-
-  def need_context(self):
-    return True
-
-  def compute_score(self, geogword, art):
-    return get_adjusted_incoming_links(art)
 
 class GeotagToponymEvaluator(TestFileEvaluator):
   def __init__(self, opts, strategy, stratname):
