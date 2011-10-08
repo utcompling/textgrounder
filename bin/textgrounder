@@ -1,11 +1,11 @@
 #!/bin/bash
 
 JARS=`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`
-SCALA_LIB="$TEXTGROUNDER_DIR/project/boot/scala-2.9.0/lib/scala-library.jar"
+SCALA_LIB="$TEXTGROUNDER_DIR/project/boot/scala-2.9.1/lib/scala-library.jar"
 
-CP=$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH
+CP="$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
 
-FIRSTARG=$1
+FIRSTARG="$1"
 
 MEMORY=2g
 
@@ -28,14 +28,17 @@ help()
 cat <<EOF
 TextGrounder 0.2 commands: 
 
-  import-gazetteer  	import a gazetteer from raw form to serialized form
-  import-corpus			import a corpus from raw form to serialized form
-  preprocess-labelprop	preprocess label propagation
+  build update compile  build TextGrounder from source using SBT
+  build                 enter SBT command line, to issue further commands
+  build COMMAND ...     run SBT using some other arbitrary command(s)
+  import-gazetteer      import a gazetteer from raw form to serialized form
+  import-corpus         import a corpus from raw form to serialized form
+  preprocess-labelprop  preprocess label propagation
   geotext-lp            run GeoText label propagation resolver
-  resolve           	run the toponomy resolver
-  write-to-kml			write a resolved corpus to visualizable KML format
-  eval					evaluated a resolved corpus against a gold corpus
-  run               	run the main method of a given class
+  resolve               run the toponomy resolver
+  write-to-kml          write a resolved corpus to visualizable KML format
+  eval                  evaluated a resolved corpus against a gold corpus
+  run                   run the main method of a given class
 
 Include --help with any option for more information
 EOF
@@ -44,19 +47,19 @@ EOF
 
 if [ $CMD = 'build' ]; then
 
-    java -jar $TEXTGROUNDER_DIR/project/build/sbt-launch-0.7.7.jar "$@"
+    java -jar $TEXTGROUNDER_DIR/project/build/sbt-launch-0.10.1.jar ${1+"$@"}
 
 #elif [ $CMD = 'geotext-preproc-lp' ]; then
 
-#    $SCALA_COMMAND opennlp.textgrounder.app.GeoTextLabelPropPreproc $*
+#    $SCALA_COMMAND opennlp.textgrounder.app.GeoTextLabelPropPreproc ${1+"$@"}
 
 #elif [ $CMD = 'geotext-decode-lp' ]; then
 
-#    $SCALA_COMMAND opennlp.textgrounder.app.GeoTextLabelPropDecoder $*
+#    $SCALA_COMMAND opennlp.textgrounder.app.GeoTextLabelPropDecoder ${1+"$@"}
 
 elif [ $CMD = 'geotext-lp' ]; then
 
-     $SCALA_COMMAND opennlp.textgrounder.app.GeoTextLabelProp $*
+     $SCALA_COMMAND opennlp.textgrounder.app.GeoTextLabelProp ${1+"$@"}
 
 else  
 
@@ -74,6 +77,6 @@ else
 	*) echo "Unrecognized command: $CMD"; help; exit 1;;
     esac
 
-    $JAVA_COMMAND $CLASS $*
+    $JAVA_COMMAND $CLASS ${1+"$@"}
 
 fi

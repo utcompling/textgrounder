@@ -25,6 +25,12 @@
       <name>Scala-tools Maven2 Repository</name>
       <url>http://scala-tools.org/repo-releases</url>
     </repository>
+    <!-- Local repository for Junto -->
+    <repository>
+        <id>project.local</id>
+        <name>project</name>
+        <url>file:${project.basedir}/repo</url>
+    </repository>
   </repositories>
   <pluginRepositories>
     <pluginRepository>
@@ -103,6 +109,11 @@
   </build>
   <dependencies>
     <dependency>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
+      <version>1.2</version>
+    </dependency>
+    <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
       <version>2.9.1</version>
@@ -161,14 +172,19 @@
       <version>0.3.5</version>
     </dependency>
     <dependency>
+      <groupId>upenn</groupId>
+      <artifactId>junto</artifactId>
+      <version>1.1</version>
+    </dependency>
+    <!--
+     <dependency>
       <groupId>upenn.junto</groupId>
       <artifactId>junto</artifactId>
-      <!-- ??? I *think* we have version 1.2.0.  Unclear.  Version should be
-           in name of JAR file. -->
       <version>1.2.0</version>
       <scope>system</scope>
       <systemPath>${project.basedir}/lib/junto.jar</systemPath>
     </dependency>
+     -->
 
   </dependencies>
 </project>

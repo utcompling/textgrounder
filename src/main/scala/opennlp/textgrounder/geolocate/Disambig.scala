@@ -3068,10 +3068,11 @@ object WorldGazetteer {
       }
     }
 
-    if (artmatch == null)
+    if (artmatch == null) {
       if (debug("lots"))
         errprint("Unmatched name %s", loc.name)
-    return
+      return
+    }
 
     // Record the match.
     loc.artmatch = artmatch

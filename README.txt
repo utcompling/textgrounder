@@ -117,3 +117,16 @@ Parts of this README and some of the directory structure and the build
 system for this project were borrowed from the JDOM project (kudos!).
 See www.jdom.org for more details.
 
+
+The repo dir
+============
+
+This is a hack to deal with the fact that Maven really doesn't like
+dependencies that sit as raw .jar files in your build tree rather than
+downloaded from somewhere.  The stuff here is a "created repository"
+built from lib/junto.jar as follows:
+
+% mvn install:install-file -Dfile=lib/junto.jar -DgroupId=upenn -DartifactId=junto -Dversion=1.1 -DlocalRepositoryPath=repo -Dpackaging=jar
+
+This creates files and makes it appear as a real local repository from
+which a "proper" dependency can be extracted.
