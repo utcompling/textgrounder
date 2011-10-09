@@ -1,0 +1,8 @@
+v 0.3.0
+-------
+ - Updated to SBT 0.11.0 (build system). (Wing, Baldridge)
+ - Port of Python code for Wing and Baldridge (2011) to Scala. (Wing)
+
+v 0.2.0
+-------
+ - Changes untracked up to this version.

@@ -1,6 +1,6 @@
 name := "TextGrounder"
 
-version := "0.2"
+version := "0.3.0"
 
 organization := "OpenNLP"
 
@@ -27,9 +27,4 @@ javacOptions ++= Seq("-Xlint")
 // append -deprecation to the options passed to the Scala compiler
 scalacOptions ++= Seq("-deprecation", "-Xlint")
 
-// defaultExcludes ~= (filter => filter || "*~")
-
-// seq(sbtassembly.Plugin.assemblySettings: _*)
-
-// jarName in Assembly := "textgrounder-assembly.jar"
 
