@@ -28,7 +28,7 @@ shift
 help()
 {
 cat <<EOF
-TextGrounder 0.2 commands: 
+TextGrounder 0.3.0 commands: 
 
   build update compile  build TextGrounder from source using SBT
   build                 enter SBT command line, to issue further commands
