@@ -230,6 +230,15 @@ object NlpUtil {
       autoflush,
       "UTF-8")
   
+  // If given a directory, yield all the files in the directory; else just
+  // yield the file.
+  def iter_directory_files(dir: String) = {
+    val dirfile = new File(dir)
+    if (dirfile.isDirectory) {
+      for (file <- dirfile.listFiles().toSeq) yield file.toString
+    } else Seq(dir)
+  }
+
 //  // Open a filename and yield lines, but with any terminating newline
 //  // removed (similar to "chomp" in Perl).  Basically same as gopen() but
 //  // with defaults set differently.

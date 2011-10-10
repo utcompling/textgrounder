@@ -35,6 +35,7 @@ TextGrounder 0.2 commands:
   import-corpus         import a corpus from raw form to serialized form
   preprocess-labelprop  preprocess label propagation
   geotext-lp            run GeoText label propagation resolver
+  geolocate             run the geolocation module
   resolve               run the toponomy resolver
   write-to-kml          write a resolved corpus to visualizable KML format
   eval                  evaluated a resolved corpus against a gold corpus
@@ -60,6 +61,10 @@ if [ $CMD = 'build' ]; then
 elif [ $CMD = 'geotext-lp' ]; then
 
      $SCALA_COMMAND opennlp.textgrounder.app.GeoTextLabelProp ${1+"$@"}
+
+elif [ $CMD = 'geolocate' ]; then
+
+     $SCALA_COMMAND opennlp.textgrounder.geolocate.Disambig ${1+"$@"}
 
 else  
 
