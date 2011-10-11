@@ -4,19 +4,18 @@ import util.control.Breaks._
 import collection.mutable
 import collection.mutable.{Builder, MapBuilder}
 import collection.generic.CanBuildFrom
-import io.Source
 import math._
 import java.io._
 import java.util.Date
 
 import OptParse._
 
-// from __future__ import with_statement // For chompopen(), uchompopen()
+// from __future__ import with_statement // For chompopen(), openr()
 // from optparse import OptionParser
 // from itertools import *
 // import itertools
 // import re // For regexp wrappers
-// import sys, codecs // For uchompopen()
+// import sys, codecs // For openr()
 // import math // For float_with_commas()
 // import bisect // For sorted lists
 // import time // For status messages, resource usage
@@ -26,7 +25,7 @@ import OptParse._
 // from collections import deque // For breadth-first search
 // from subprocess import * // For backquote
 // from errno import * // For backquote
-// import fileinput // For uchompopen() etc.
+// import fileinput // For openr() etc.
 
 object NlpUtil {
 
@@ -139,7 +138,7 @@ object NlpUtil {
   ///// removed (but no other whitespace removed).  Ensures that the file
   ///// will be automatically closed under all circumstances.
   /////
-  ///// 2. uchompopen():
+  ///// 2. openr():
   /////
   ///// Same as chompopen() but specifically open the file as 'utf-8' and
   ///// return Unicode strings.
@@ -208,19 +207,56 @@ object NlpUtil {
 //      for line in iterator:
 //        yield line
 //  
-  // Open a filename with UTF-8-encoded input and yield lines converted to
-  // Unicode strings, but with any terminating newline removed (similar to
-  // "chomp" in Perl).  Basically same as gopen() but with defaults set
-  // differently.
-  def uchompopen(filename:String=null, mode:String="r",
-        encoding:String="UTF-8", errors:String="strict", chomp:Boolean=true,
-        inplace:Int=0, backup:String="", bufsize:Int=0) = {
-    // FIXME!! Implement the various optional args, or at least some of them.
-    // At least we probably want the encoding to work properly.
-    Source.fromFile(filename).getLines()
+  // Open a filename with the given encoding (by default, UTF-8) and
+  // yield lines, but with any terminating newline removed if chomp is
+  // true (the default).  Buffer size and conversion error-handling
+  // can be set (FIXME: The latter has no effect currently.)
+  def openr(filename:String, encoding:String= "UTF-8", chomp:Boolean= true,
+        errors:String= "strict", bufsize:Int= 0) = {
+    class FileIterator extends Iterator[String] {
+      val ireader =
+        new InputStreamReader(new FileInputStream(filename), encoding)
+      var reader =
+        if (bufsize <= 0) new BufferedReader(ireader)
+        else new BufferedReader(ireader, bufsize)
+      var nextline:String = null
+      protected def getNextLine() = {
+        nextline = reader.readLine()
+        if (nextline == null) {
+          reader.close()
+          reader = null
+          false
+        } else {
+          if (chomp) {
+            if (nextline.endsWith("\r\n"))
+              nextline = nextline.dropRight(2)
+            else if (nextline.endsWith("\r"))
+              nextline = nextline.dropRight(1)
+            else if (nextline.endsWith("\n"))
+              nextline = nextline.dropRight(1)
+          }
+          true
+        }
+      }
+
+      def hasNext = {
+        if (nextline != null) true
+        else if (reader == null) false
+        else getNextLine()
+      }
+
+      def next() = {
+        if (!hasNext) null
+        else {
+          val ret = nextline
+          nextline = null
+          ret
+        }
+      }
+    }
+
+    new FileIterator
   }
-  //  return gopen(filename, mode=mode, encoding=encoding, errors=errors,
-  //      chomp=chomp, inplace=inplace, backup=backup, bufsize=bufsize)
   
   /** Open a file for writing and return a PrintStream that will write to
    *  this file in UTF-8.
@@ -337,15 +373,15 @@ object NlpUtil {
     // so print it directly rather than passing it to 'format', which might
     // munge % signs
     if (args.length == 0)
-      println(format)
+      System.err.println(format)
     else
-      println(format format (args: _*))
+      System.err.println(format format (args: _*))
   }
   def errout(format:String, args:Any*) {
     if (args.length == 0)
-      print(format)
+      System.err.print(format)
     else
-      print(format format (args: _*))
+      System.err.print(format format (args: _*))
   }
   
   /**
@@ -453,6 +489,27 @@ object NlpUtil {
     interval_texts grouped 2
   }
 
+  /* A function to make up for a bug in Scala.  The normal split() is broken
+     in that if the delimiter occurs at the end of the line, it gets ignored;
+     in fact, multiple such delimiters at end of line get ignored.  We hack
+     around that by adding an extra char at the end and then removing it
+     later. */
+  def splittext(str:String, ch:Char) = {
+    val ch2 = if (ch == 'x') 'y' else 'x'
+    val stradd = str + ch2
+    val ret = stradd.split(ch)
+    ret(ret.length - 1) = ret(ret.length - 1).dropRight(1)
+    ret
+  }
+
+  // A worse implementation -- it will fail if there are any NUL bytes
+  // in the input.
+  // def propersplit(str:String, ch:Char) = {
+  //   val chs = ch.toString
+  //   for (x <- str.replace(chs, chs + "\000").split(ch))
+  //     yield x.replace("\000", "")
+  // }
+
   def split_text_into_words(text:String, ignore_punc:Boolean=false,
     include_nl:Boolean=false) = {
     // This regexp splits on whitespace, but also handles the following cases:
@@ -463,7 +520,7 @@ object NlpUtil {
     // returned as their own words; otherwise, they are treated like all other
     // whitespace (i.e. ignored).
     (for (Seq(word, punc) <-
-          re_split_with_delimiter("""([,;."):]*\s+[("]*)""".r, text)) yield
+          re_split_with_delimiter("""([,;."):]*(?:\s+|$)[("]*)""".r, text)) yield
        Seq(word) ++ (
          for (p <- punc; if !(" \t\r\f\013" contains p)) yield (
            if (p == '\n') (if (include_nl) p.toString else "")
@@ -683,7 +740,7 @@ object NlpUtil {
   // rows.
   def output_reverse_sorted_list[T <% Ordered[T],U <% Ordered[U]](
       items:Seq[(T,U)],
-      outfile:PrintStream=stdout_stream, indent:String="",
+      outfile:PrintStream=System.out, indent:String="",
       keep_secondary_order:Boolean=false, maxrows:Int = -1) {
     var its = items
     if (!keep_secondary_order)
@@ -843,6 +900,12 @@ object NlpUtil {
     }
 
     def main() = {
+      // Fuck me to hell, have to fix things up in a non-obvious way to
+      // get UTF-8 output on the Mac (default is MacRoman???).
+      System.setOut(new PrintStream(System.out, true, "UTF-8"))
+      System.setErr(new PrintStream(System.err, true, "UTF-8"))
+      scala.Console.setOut(System.out)
+      scala.Console.setErr(System.err)
       errprint("Beginning operation at %s" format curtimehuman())
       errprint("Arguments: %s" format (args mkString " "))
       op.parse(opts, args)
@@ -853,8 +916,6 @@ object NlpUtil {
       errprint("Ending operation at %s" format curtimehuman())
       retval
     }
-
-    main()
   }
 //
 //  //////////////////////////////////////////////////////////////////////////////
@@ -1024,7 +1085,7 @@ object NlpUtil {
   // Get memory usage by running 'proc'; this works on Linux and doesn't require
   // spawning a subprocess, which can crash when your program is very large.
   def get_program_memory_usage_proc():Long = {
-    for (line <- uchompopen("proc/self/status")) {
+    for (line <- openr("proc/self/status")) {
         val trimline = line.trim
         if (trimline.startsWith("VmRSS:")) {
           val rss = ("""\s+""".r.split(trimline))(1).toLong
@@ -1034,7 +1095,7 @@ object NlpUtil {
     return 0
   }
   
-  def format_minutes_seconds(seconds:Double) {
+  def format_minutes_seconds(seconds:Double) = {
     var secs = seconds
     var mins = (secs / 60).toInt
     secs = secs % 60
@@ -1043,7 +1104,7 @@ object NlpUtil {
     var hourstr = (
       if (hours > 0) "%s hour%s " format (hours, if (hours == 1) "" else "s")
       else "")
-    val secstr = (if (secs.toInt == secs) "%s" else "%0.1f") format secs
+    val secstr = (if (secs.toInt == secs) "%s" else "%1.1f") format secs
     "%s%s minute%s %s second%s" format (
         hourstr,
         mins, if (mins == 1) "" else "s",

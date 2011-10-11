@@ -4,7 +4,6 @@ import NlpUtil._
 import Distances._
 import util.control.Breaks._
 import java.io._
-import io.Source
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                               //
@@ -35,19 +34,34 @@ object ArticleData {
     errprint("Reading article data from %s...", filename)
     val status = new StatusMessage("article")
 
-    val fi = Source.fromFile(filename).getLines()
-    val fields = fi.next().split('\t')
-    for (line <- fi) breakable {
-      val fieldvals = line.split('\t')
-      if (fieldvals.length != fields.length)
-        warning(
-        """Strange record at line #%s, expected %s fields, saw %s fields;
-    skipping line=%s""", status.num_processed(), fields.length,
-                         fieldvals.length, line)
-      else
-        process((fields zip fieldvals).toMap)
-      if (status.item_processed(maxtime=maxtime))
-        break
+    val fi = openr(filename)
+
+    val fields = splittext(fi.next(), '\t')
+    breakable {
+      for (line <- fi) {
+        // println("[%s]" format line)
+        val fieldvals = splittext(line, '\t')
+        if (fieldvals.length != fields.length)
+          warning(
+          """Strange record at line #%s, expected %s fields, saw %s fields;
+      skipping line=%s""", status.num_processed(), fields.length,
+                           fieldvals.length, line)
+        else {
+          var good = true
+          for ((field, value) <- fields zip fieldvals) {
+            if (!Article.validate_field(field, value)) {
+              good = false
+              warning(
+          """Bad field value at line #%s, field=%s, value=%s,
+      skipping line=%s""", status.num_processed(), field, value, line)
+            }
+          }
+          if (good)
+            process((fields zip fieldvals).toMap)
+        }
+        if (status.item_processed(maxtime=maxtime))
+          break
+      }
     }
     errprint("Finished reading %s articles.", status.num_processed())
     output_resource_usage()
@@ -169,6 +183,23 @@ object Article {
       }
     ail
   }
+
+  def validate_field(field:String, value:String) = {
+    import ArticleConverters._
+    field match {
+      case "id" => validate_int(value)
+      case "title" => true
+      case "split" => true
+      case "redir" => true
+      case "namespace" => true
+      case "is_list_of" => validate_boolean(value)
+      case "is_disambig" => validate_boolean(value)
+      case "is_list" => validate_boolean(value)
+      case "coord" => validate_coord(value)
+      case "incoming_links" => validate_int_or_blank(value)
+      case _ => false
+    }
+  }
 }
 
 /************************ Conversion functions ************************/
@@ -185,6 +216,8 @@ object ArticleConverters {
   }
   
   def boolean_to_yesno(foo:Boolean) = if (foo) "yes" else "no"
+
+  def validate_boolean(foo:String) = foo == "yes" || foo == "no"
   
   def commaval_to_coord(foo:String) = {
     if (foo != "") {
@@ -195,14 +228,41 @@ object ArticleConverters {
   
   def coord_to_commaval(foo:Coord) =
     if (foo != null) "%s,%s".format(foo.lat, foo.long) else ""
+
+  def validate_coord(foo:String):Boolean = {
+    if (foo == "") return true
+    val split = splittext(foo, ',')
+    if (split.length != 2) return false
+    val Array(lat, long) = split
+    try {
+      Coord(lat.toDouble, long.toDouble)
+    } catch {
+      case _ => return false
+    }
+    return true
+  }
   
   def get_int_or_blank(foo:String) =
     if (foo == "") None else Option[Int](foo.toInt)
-  
+ 
   def put_int_or_blank(foo:Option[Int]) = {
     foo match {
       case None => ""
       case Some(x) => x.toString
     }
+  }
+
+  def validate_int(foo:String):Boolean = {
+    try {
+      foo.toInt
+    } catch {
+      case _ => return false
+    }
+    return true
+  }
+
+  def validate_int_or_blank(foo:String):Boolean = {
+    if (foo == "") return true
+    validate_int(foo)
   }
 }

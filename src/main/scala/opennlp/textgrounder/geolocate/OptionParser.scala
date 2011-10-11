@@ -200,9 +200,8 @@ object OptParse {
   class OptionParser(prog: String) {
     import OptionParser._
     val op = new ArgotParser(prog)
-    val opts = mutable.Map[String, AnyRef]()
+    val argmap = mutable.Map[String, OptionAny[_]]()
     var argholder = null: AnyRef
-    var argmap = null: Map[String, OptionAny[_]]
 
     def optionSeq[T](opt: Seq[String],
       default: T = null.asInstanceOf[T],
@@ -211,7 +210,8 @@ object OptParse {
       canonicalize: Map[T, Iterable[T]] = null,
       help: String = "")(implicit convert: (String, OptionSingle[T]) => T) = {
       val control = controllingOpt(opt)
-      if (opts contains control) opts(control).asInstanceOf[OptionAny[T]].value
+      if (argmap contains control)
+        argmap(control).asInstanceOf[OptionAny[T]].value
       else {
         val met2 = computeMetavar(metavar, opt)
         val option = new OptionSingle(default)
@@ -223,7 +223,7 @@ object OptParse {
                 checkChoices(converted, choices, canonicalize)
               }
           }
-        opts(control) = option.asInstanceOf[AnyRef]
+        argmap(control) = option
         null.asInstanceOf[T]
       }
     }
@@ -246,11 +246,12 @@ object OptParse {
       help: String = "") = {
       import ArgotConverters._
       val control = controllingOpt(opt)
-      if (opts contains control) opts(control).asInstanceOf[OptionFlag].value
+      if (argmap contains control)
+        argmap(control).asInstanceOf[OptionFlag].value
       else {
         val option = new OptionFlag()
         option.wrap = op.flag[Boolean](opt.toList, help)
-        opts(control) = option.asInstanceOf[AnyRef]
+        argmap(control) = option
         null.asInstanceOf[Boolean]
       }
     }
@@ -270,7 +271,8 @@ object OptParse {
       canonicalize: Map[T, Iterable[T]] = null,
       help: String = "")(implicit convert: (String, OptionSingle[T]) => T) = {
       val control = controllingOpt(opt)
-      if (opts contains control) opts(control).asInstanceOf[OptionAny[Seq[T]]].value
+      if (argmap contains control)
+        argmap(control).asInstanceOf[OptionAny[Seq[T]]].value
       else {
         val met2 = computeMetavar(metavar, opt)
         val option = new OptionMulti[T]()
@@ -282,7 +284,7 @@ object OptParse {
                 checkChoices(converted, choices, canonicalize)
               }
           }
-        opts(control) = option.asInstanceOf[AnyRef]
+        argmap(control) = option
         null.asInstanceOf[Seq[T]]
       }
     }
@@ -309,12 +311,28 @@ object OptParse {
     def parse(obj: AnyRef, args: Seq[String]) {
       argholder = obj
       val objargs = obj.getClass.getDeclaredMethods
-      argmap = (for {
+      // Call each null-argument function, assumed to be an option.  The
+      // first time such functions are called, they will install the
+      // appropriate OptionAny-subclass object in 
+      for {
         arg <- objargs
-        val result = arg.invoke(obj)
-        if (result.isInstanceOf[OptionAny[_]])
-      } yield (arg.getName() -> result.asInstanceOf[OptionAny[_]])).
-        toMap
+        if {
+          // println(arg)
+          // println(arg.getName)
+          // println(arg.getParameterTypes)
+          // println(arg.getParameterTypes.length)
+          // val rettype = arg.getReturnType
+          // println(rettype)
+          // println(rettype.getName)
+          // val rettype2 = arg.getGenericReturnType
+          // println(rettype2)
+          // println(rettype2.getName)
+          (arg.getParameterTypes.length == 0)
+          // && arg.getReturnType.isAssignableFrom(classOf[OptionAny[_]]))
+        }
+      }
+      arg.invoke(obj)
+      // println(argmap)
       op.parse(args.toList)
     }
 
@@ -334,7 +352,7 @@ object OptParse {
     def need(arg: String, arg_english: String = null) {
       val marg_english =
         if (arg_english == null)
-          arg.replace("_", " ")
+          arg.replace("-", " ")
         else
           arg_english
       check_args_available()

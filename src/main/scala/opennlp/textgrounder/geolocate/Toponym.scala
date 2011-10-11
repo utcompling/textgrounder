@@ -1012,7 +1012,7 @@ object Toponym {
     def iter_geogwords(filename: String) = {
       var in_loc = false
       var wordstruct: GeogWord = null
-      val lines = uchompopen(filename, errors = "replace")
+      val lines = openr(filename, errors = "replace")
       def iter_1(): Stream[GeogWord] = {
         if (lines.hasNext) {
           val line = lines.next
@@ -1067,7 +1067,7 @@ object Toponym {
       var title: String = null
       val titlere = """Article title: (.*)$""".r
       val linkre = """Link: (.*)$""".r
-      val lines = uchompopen(filename, errors = "replace")
+      val lines = openr(filename, errors = "replace")
       def iter_1(): Stream[GeogWord] = {
         if (lines.hasNext) {
           val line = lines.next
@@ -1260,7 +1260,7 @@ object Toponym {
 
       // Match each entry in the gazetteer
       breakable {
-        for (line <- uchompopen(filename)) {
+        for (line <- openr(filename)) {
           if (debug("lots"))
             errprint("Processing line: %s", line)
           match_world_gazetteer_entry(line)

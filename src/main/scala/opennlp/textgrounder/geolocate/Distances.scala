@@ -77,30 +77,50 @@ object Distances {
   //
   //   lat, long: Latitude and longitude of coordinate.
 
-  case class Coord(lat:Double, long:Double) {
-    // Not sure why this code was implemented with coerce_within_bounds,
-    // but either always coerce, or check the bounds ...
-    require(lat >= minimum_latitude)
-    require(lat <= maximum_latitude)
-    require(long >= minimum_longitude)
-    require(long <= maximum_longitude)
+  case class Coord(lat:Double, long:Double,
+      validate:Boolean = true) {
+    if (validate) {
+      // Not sure why this code was implemented with coerce_within_bounds,
+      // but either always coerce, or check the bounds ...
+      require(lat >= minimum_latitude)
+      require(lat <= maximum_latitude)
+      require(long >= minimum_longitude)
+      require(long <= maximum_longitude)
+    }
     override def toString() = "(%.2f,%.2f)".format(lat, long)
   }
 
   object Coord {
-    //// If coerce_within_bounds=true, then force the values to be within
-    //// the allowed range, by wrapping longitude and bounding latitude.
-    def apply(lat:Double, long:Double, coerce_within_bounds:Boolean) = {
+    // Create a coord, with METHOD defining how to handle coordinates
+    // out of bounds.  If METHOD = "accept", just accept them; if
+    // "validate", check within bounds, and abort if not.  If "coerce",
+    // coerce within bounds (latitudes are cropped, longitudes are taken
+    // mod 360).
+    def apply(lat:Double, long:Double, method:String) = {
       var newlat = lat
       var newlong = long
-      if (coerce_within_bounds) {
-        if (newlat > maximum_latitude) newlat = maximum_latitude
-        while (newlong > maximum_longitude) newlong -= 360.
-        if (newlat < minimum_latitude) newlat = minimum_latitude
-        while (newlong < minimum_longitude) newlong += 360.
+      var validate = false
+      method match {
+        case "coerce" => {
+          if (newlat > maximum_latitude) newlat = maximum_latitude
+          while (newlong > maximum_longitude) newlong -= 360.
+          if (newlat < minimum_latitude) newlat = minimum_latitude
+          while (newlong < minimum_longitude) newlong += 360.
+        }
+        case "validate" => { validate = true }
+        case "accept" => { }
+        case _ => { require(method == "coerce" || method == "validate" ||
+                            method == "accept") }
       }
-      new Coord(newlat, newlong)
+      new Coord(newlat, newlong, validate = validate)
     }
+
+    def valid(lat:Double, long:Double) = (
+      lat >= minimum_latitude &&
+      lat <= maximum_latitude &&
+      long >= minimum_longitude &&
+      long <= maximum_longitude
+    )
   }
 
   // Compute spherical distance in miles (along a great circle) between two
@@ -162,16 +182,16 @@ object Distances {
   // coordinate of a location not exactly at a region index (e.g. the center
   // point).
   def region_indices_to_coord(latind:Double, longind:Double,
-                              coerce_within_bounds:Boolean=false) = {
+      method:String = "validate") = {
     Coord(latind * degrees_per_region, longind * degrees_per_region,
-        coerce_within_bounds=coerce_within_bounds)
+          method)
   }
   
   // Add 'offset' to both latind and longind and then convert to a
   // coordinate.  Coerce the coordinate to be within bounds.
-  def offset_region_indices_to_coord(latind:Regind, longind:Regind, offset:Double) = {
-    region_indices_to_coord(latind + offset, longind + offset,
-        coerce_within_bounds=true)
+  def offset_region_indices_to_coord(latind:Regind, longind:Regind,
+      offset:Double) = {
+    region_indices_to_coord(latind + offset, longind + offset, "coerce")
   }
   
   // Convert region indices of a tiling region to the coordinate of the
@@ -215,15 +235,13 @@ object Distances {
   // Convert region indices of a statistical region to the coordinate of the
   // northwest corner of the region.
   def stat_region_indices_to_nw_corner_coord(latind:Regind, longind:Regind) = {
-    region_indices_to_coord(latind + width_of_stat_region, longind,
-        coerce_within_bounds=true)
+    region_indices_to_coord(latind + width_of_stat_region, longind, "coerce")
   }
   
   // Convert region indices of a statistical region to the coordinate of the
   // southeast corner of the region.
   def stat_region_indices_to_se_corner_coord(latind:Regind, longind:Regind) = {
-    region_indices_to_coord(latind, longind + width_of_stat_region,
-        coerce_within_bounds=true)
+    region_indices_to_coord(latind, longind + width_of_stat_region, "coerce")
   }
   
   // Convert region indices of a statistical region to the coordinate of the

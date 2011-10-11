@@ -732,6 +732,13 @@ class StatArticleTable {
   // lowercased form, short form, etc.
   def record_article_name(name: String, art: StatArticle) {
     // Must pass in properly cased name
+    // errprint("name=%s, capfirst=%s", name, capfirst(name))
+    // println("length=%s" format name.length)
+    // if (name.length > 1) {
+    //   println("name(0)=0x%x" format name(0).toInt)
+    //   println("name(1)=0x%x" format name(1).toInt)
+    //   println("capfirst(0)=0x%x" format capfirst(name)(0).toInt)
+    // }
     assert(name == capfirst(name))
     name_to_article(name) = art
     val loname = name.toLowerCase
@@ -869,7 +876,7 @@ class StatArticleTable {
     // Written this way because there's another line after the for loop,
     // corresponding to the else clause of the Python for loop
     breakable {
-      for (line <- uchompopen(filename)) {
+      for (line <- openr(filename)) {
         if (line.startsWith("Article title: ")) {
           if (title != null)
             one_article_probs()
@@ -1673,7 +1680,7 @@ class WikipediaGeotagDocumentEvaluator(
 
   //title = None
   //words = []
-  //for line in uchompopen(filename, errors="replace"):
+  //for line in openr(filename, errors="replace"):
   //  if (rematch("Article title: (.*)$", line))
   //    if (title != null)
   //      yield (title, words)
@@ -1891,7 +1898,7 @@ object Stopwords {
   // Read in the list of stopwords from the given filename.
   def read_stopwords(filename: String) {
     errprint("Reading stopwords from %s...", filename)
-    stopwords = uchompopen(filename).toSet
+    stopwords = openr(filename).toSet
   }
 }
 
@@ -2222,6 +2229,7 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
 object Disambig extends NLPProgram {
   val opts = Opts
   val op = Opts.op
+  println("Setting opts, op")
 
   var need_to_read_stopwords = false
 
@@ -2324,7 +2332,7 @@ object Disambig extends NLPProgram {
     }
 
     if (Opts.mode == "geotag-toponyms")
-      need("gazetteer_file")
+      need("gazetteer-file")
 
     if (Opts.eval_format == "raw-text") {
       // FIXME!!!!
@@ -2353,14 +2361,14 @@ object Disambig extends NLPProgram {
     if (Opts.mode == "geotag-documents" && Opts.eval_format == "wiki")
       () // No need for evaluation file, uses the counts file
     else if (Opts.mode.startsWith("geotag"))
-      need("eval_file", "evaluation file(s)")
+      need("eval-file", "evaluation file(s)")
 
     if (Opts.mode == "generate-kml")
-      need("kml_words")
+      need("kml-words")
     else if (Opts.kml_words != null)
       op.error("--kml-words only compatible with --mode=generate-kml")
 
-    need("article_data_file")
+    need("article-data-file")
   }
 
   def implement_main(op: OptionParser, args: Seq[String]) {
@@ -2497,5 +2505,7 @@ Not generating an empty KML file.""", word)
       })
     }
   }
+
+  main()
 }
 
