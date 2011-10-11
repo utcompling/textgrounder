@@ -383,6 +383,12 @@ object NlpUtil {
     else
       System.err.print(format format (args: _*))
   }
+
+  // Same as errprint() but useful for temporary print statements so that
+  // they can more clearly be identified later when they need to be removed
+  def debprint(format:String, args:Any*) {
+    errprint(format, args: _*)
+  }
   
   /**
    Convert a string to floating point, but don't crash on errors;
