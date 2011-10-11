@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# Run geolocation, passing it various useful arguments, including arguments
+# for working with Wikipedia.  Extra arguments can be specified on the
+# command line, which will override any existing arguments.
+#
+# See also 'run-run-wikipedia', which will run this script using 'nohup'
+# while saving the output to a file.
+
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  exit 1
+fi
+
+. $TEXTGROUNDER_DIR/bin/config-geolocate
+
+RUN_GEOLOCATE="$TEXTGROUNDER_DIR/bin/run-geolocate"
+
+$RUN_GEOLOCATE $COMBINED_ARTICLE_DATA_ARG $COUNTS_ARG ${1+"$@"}

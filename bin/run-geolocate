@@ -1,0 +1,42 @@
+#!/bin/sh
+
+# Run disambig.py, passing it various useful arguments.  Extra arguments
+# can be specified on the command line, which will override any existing
+# arguments.
+#
+# See also 'run-run-disambig', which will run this script using 'nohup'
+# while saving the output to a file.
+
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  exit 1
+fi
+
+. $TEXTGROUNDER_DIR/bin/config-geolocate
+
+GEOLOCATE="$TEXTGROUNDER_DIR/bin/textgrounder geolocate"
+
+for x in ${1+"$@"}; do
+  if [ "$x" = "--mode=geotag-toponyms" ]; then
+    MODE=geotag-toponyms
+  elif [ "$x" = "--mode=geotag-documents" ]; then
+    MODE=geotag-documents
+  fi
+done
+
+if [ "$MODE" = "geotag-toponyms" ]; then
+  STRATEGY="--strategy baseline"
+  #STRATEGY="--strategy naive-bayes-with-baseline"
+  #STRATEGY="--strategy naive-bayes-no-baseline"
+  #MISCOPTS="$MISCOPTS --naive-bayes-weighting distance-weighted"
+  EVALFILE="--eval-file $TRCONLL_DEV_DIR"
+  EVALTYPE="--eval-format tr-conll"
+  #EVALFILE="--eval-file $PREFIX-toponym-eval.txt"
+elif [ "$MODE" = "geotag-documents" ]; then
+  EVALTYPE="--eval-format wiki"
+  GAZETTEER_ARG=
+fi
+
+$GEOLOCATE \
+  $STOPWORDS_ARG $GAZETTEER_ARG $STRATEGY $EVALFILE $EVALTYPE \
+ $MISCOPTS $LOCAL_ARGS ${1+"$@"}
