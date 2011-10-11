@@ -10,6 +10,8 @@ crossPaths := false
 
 retrieveManaged := true
 
+resolvers += "OpenNLP Maven Repository" at "http://opennlp.sourceforge.net/maven2"
+
 libraryDependencies ++= Seq(
   "com.google.inject" % "guice" % "2.0",
   "com.google.guava" % "guava" % "r06",
