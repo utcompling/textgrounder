@@ -2229,7 +2229,6 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
 object Disambig extends NLPProgram {
   val opts = Opts
   val op = Opts.op
-  println("Setting opts, op")
 
   var need_to_read_stopwords = false
 

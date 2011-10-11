@@ -63,7 +63,7 @@ object WordDist {
   // empirical frequency of a word among all articles, adjusted by the mass
   // to be assigned to globally unseen words (words never seen at all), i.e. the
   // value in 'globally_unseen_word_prob'.
-  val overall_word_counts = intmap()
+  var overall_word_counts = intmap()
 
   var overall_word_probs:mutable.Map[String,Double] = null
 
@@ -88,6 +88,7 @@ object WordDist {
       for ((wordind,count) <- overall_word_counts)
         yield (wordind, count.toDouble/num_word_tokens*
                         (1 - globally_unseen_word_prob))
+    overall_word_counts = null
     // A very rough estimate, perhaps totally wrong
     num_unseen_word_types = num_types_seen_once max (num_word_types/20)
     if (debug("tons"))
