@@ -566,9 +566,18 @@ object NlpUtil {
   // default(), so that different keys get different empty vectors.  Otherwise,
   // adding an element to the vector associated with one key will also add
   // it to the vectors for other keys, which is not what we want.
-  def gendefaultmap[F,T](defaultval: => T) = {
+  //
+  // SETKEY indicates whether we set the key to the default upon access.
+  // This is necessary when the value is something mutable, but mostly
+  // unimportant otherwise.
+  def gendefaultmap[F,T](defaultval: => T, setkey:Boolean = false) = {
     new mutable.HashMap[F,T] {
-      override def default(key:F) = defaultval
+      override def default(key:F) = {
+        val buf = defaultval
+        if (setkey)
+          this(key) = buf
+        buf
+      }
     }
   } 
   def genintmap[T]() = gendefaultmap[T,Int](0)
@@ -580,7 +589,8 @@ object NlpUtil {
   def genstringmap[T]() = gendefaultmap[T,String]("")
   def stringmap() = genstringmap[String]()
   // Similar but the default value is an empty collection.
-  def genbufmap[T,U]() = gendefaultmap[T,mutable.Buffer[U]](mutable.Buffer[U]())
+  def genbufmap[T,U]() =
+    gendefaultmap[T,mutable.Buffer[U]](mutable.Buffer[U](), setkey=true)
   def bufmap[T]() = genbufmap[String,T]()
   
   //def bufmap[T]() = {
