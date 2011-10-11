@@ -1,28 +1,37 @@
-#!/bin/bash
+#!/bin/sh
 
-JARS=`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`
+JARS="`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`"
 SCALA_LIB="$HOME/.sbt/boot/scala-2.9.1/lib/scala-library.jar"
 
 CP="$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
 
+JAVA="$JAVA_HOME/bin/java"
+
 FIRSTARG="$1"
 
-MEMORY=2g
+if $JAVA -version 2>&1 | grep '64-Bit' > /dev/null; then
+ JAVA_IS_64=true
+ # Maximum on Linux is about 127t (127 TB, i.e. 130,048 GB).  Maximum on
+ # MacOS X 10.6 (Snow Leopard) is about 125t, but values that big cause a
+ # pause of about 6 seconds at the beginning and a couple of seconds at
+ # the end on my 4GB Mac.  4t doesn't cause much of a pause.
+ MEMORY=4t
+else
+ JAVA_IS_64=false
+ MEMORY=2g
+fi
 
 case $FIRSTARG in
-  [0-9] | [0-9][0-9]) 
-	MEMORY="${FIRSTARG}g"
-	shift
-	;;
-    *) ;;
+  [0-9]*[tgmk]) MEMORY="${FIRSTARG}"; shift ;;
+  [0-9]*) MEMORY="${FIRSTARG}g"; shift ;;
+  *) ;;
 esac
 
-JAVA=$JAVA_HOME/bin/java
-
-JAVA_COMMAND="$JAVA -Xmx$MEMORY -classpath $CP"
+JAVA_MEMORY_OPT="-Xmx$MEMORY"
+JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT -classpath $CP"
 SCALA_COMMAND="scala -classpath $CP"
 
-CMD=$1
+CMD="$1"
 shift
 
 help()
@@ -30,19 +39,36 @@ help()
 cat <<EOF
 TextGrounder 0.3.0 commands: 
 
+General commands:
+
   build update compile  build TextGrounder from source using SBT
   build                 enter SBT command line, to issue further commands
   build COMMAND ...     run SBT using some other arbitrary command(s)
-  import-gazetteer      import a gazetteer from raw form to serialized form
-  import-corpus         import a corpus from raw form to serialized form
-  preprocess-labelprop  preprocess label propagation
-  geotext-lp            run GeoText label propagation resolver
-  geolocate             run the geolocation module
-  resolve               run the toponomy resolver
-  write-to-kml          write a resolved corpus to visualizable KML format
-  eval                  evaluated a resolved corpus against a gold corpus
-  run                   run the main method of a given class
+  run CLASS ...         run the main method of a given class
 
+Commands for toponym resolution:
+
+  import-gazetteer ...  import a gazetteer from raw form to serialized form
+  import-corpus ...     import a corpus from raw form to serialized form
+  preprocess-labelprop ...
+                        preprocess label propagation
+  geotext-lp ...        run GeoText label propagation resolver
+  resolve ...           run the toponomy resolver
+  write-to-kml ...      write a resolved corpus to visualizable KML format
+  eval ...              evaluated a resolved corpus against a gold corpus
+
+Commands for geolocation:
+  geolocate ...         run the geolocation module
+
+Commands for the Bayesian code:
+  rlda-run ...          train region model
+  spher-run ...         train spherical model
+  rlda-fcrm-run ...     train fully-constrained region model
+  rlda-convert-from ... convert from region-model format
+  rlda-convert-to ...   convert to region-model format
+  rlda-prob-out ...     pretty-print probabilities
+  rlda-xml-prob-out ... pretty-print probabilities in XML format
+  
 Include --help with any option for more information
 EOF
 }
@@ -54,20 +80,36 @@ if [ $CMD = 'build' ]; then
 
 elif [ $CMD = 'geolocate' ]; then
 
-     $SCALA_COMMAND opennlp.textgrounder.geolocate.Disambig ${1+"$@"}
+     JAVA_OPTS=$JAVA_MEMORY_OPT $SCALA_COMMAND opennlp.textgrounder.geolocate.Disambig ${1+"$@"}
 
 else  
 
     CLASS=
+    TGPACK=opennlp.textgrounder
+    TGAPP=$TGPACK.app
+    TGBAYESAPP=$TGPACK.bayesian.apps
 
     case $CMD in
-	resolve) CLASS=opennlp.textgrounder.app.RunResolver;;
-        geotext-lp) CLASS=opennlp.textgrounder.app.GeoTextLabelProp;;
-	import-gazetteer) CLASS=opennlp.textgrounder.app.ImportGazetteer;;
-	import-corpus) CLASS=opennlp.textgrounder.app.ImportCorpus;;
-	preprocess-labelprop) CLASS=opennlp.textgrounder.app.LabelPropPreproc;;
-	write-to-kml) CLASS=opennlp.textgrounder.app.WriteCorpusToKML;;
-	eval) CLASS=opennlp.textgrounder.app.EvaluateCorpus;;
+
+    # Various commands
+	resolve) CLASS=$TGAPP.RunResolver;;
+    geotext-lp) CLASS=$TGAPP.GeoTextLabelProp;;
+	import-gazetteer) CLASS=$TGAPP.ImportGazetteer;;
+	import-corpus) CLASS=$TGAPP.ImportCorpus;;
+	preprocess-labelprop) CLASS=$TGAPP.LabelPropPreproc;;
+	write-to-kml) CLASS=$TGAPP.WriteCorpusToKML;;
+	eval) CLASS=$TGAPP.EvaluateCorpus;;
+
+    # Commands in the Bayesian code (there are many more)
+    rlda-convert-from) CLASS=$TGBAYESAPP.ConvertFromRegionModelFormat;;
+    rlda-convert-to) CLASS=$TGBAYESAPP.ConvertToRegionModelFormat;;
+    rlda-fcrm-run) CLASS=$TGBAYESAPP.TrainFullyConstrainedRegionModel;;
+    rlda-prob-out) CLASS=$TGBAYESAPP.PrettyPrintProbabilities;;
+    rlda-xml-prob-out) CLASS=$TGBAYESAPP.PrettyPrintProbabilitiesXML;;
+    rlda-run) CLASS=$TGBAYESAPP.TrainRegionModel;;
+    spher-run) CLASS=$TGBAYESAPP.TrainSphericalModel;;
+
+    # Misc
 	run) CLASS=$1; shift;;
 	help) help; exit 1;;
 	*) echo "Unrecognized command: $CMD"; help; exit 1;;
