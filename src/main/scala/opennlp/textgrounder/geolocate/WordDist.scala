@@ -191,7 +191,8 @@ add the word counts to the global word count statistics.
           (1.0 max WordDist.num_types_seen_once)/total_tokens).toDouble
     else 0.5
     overall_unseen_mass = 1.0 - (
-      (for (ind <- counts.keys) yield WordDist.overall_word_probs(ind)) sum)
+      (for (ind <- counts.keys)
+        yield WordDist.overall_word_probs.getOrElse(ind, 0.0)) sum)
     //if use_sorted_list:
     //  self.counts = SortedList(self.counts)
     finished = true
@@ -256,7 +257,8 @@ other implementations.
       kldiv += p*(log(p) - log(q))
       if (return_contributing_words)
         contribs(word) = p*(log(p) - log(q))
-      overall_probs_diff_words += WordDist.overall_word_probs(word)
+      overall_probs_diff_words +=
+        WordDist.overall_word_probs.getOrElse(word, 0.0)
     }
 
     val retval = kldiv + kl_divergence_34(other, overall_probs_diff_words)
