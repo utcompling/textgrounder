@@ -82,12 +82,11 @@ object WordDist {
     //// globally_unseen_word_prob, num_types_seen_once cancels out and
     //// we never actually have to compute it.
     num_types_seen_once = overall_word_counts.values count (_ == 1)
-    globally_unseen_word_prob = (
-      num_types_seen_once.toDouble/num_word_tokens)
+    globally_unseen_word_prob = num_types_seen_once.toDouble/num_word_tokens
     overall_word_probs =
       for ((wordind,count) <- overall_word_counts)
         yield (wordind, count.toDouble/num_word_tokens*
-                        (1 - globally_unseen_word_prob))
+                        (1.0 - globally_unseen_word_prob))
     // A very rough estimate, perhaps totally wrong
     num_unseen_word_types = num_types_seen_once max (num_word_types/20)
     if (debug("tons"))
@@ -179,17 +178,16 @@ add the word counts to the global word count statistics.
     // words seen once, and adjust all other probs accordingly.
     WordDist.num_types_seen_once = counts.values count (_ == 1)
     unseen_mass =
-    if (total_tokens > 0)
-      // If no words seen only once, we will have a problem if we assign 0
-      // to the unseen mass, as unseen words will end up with 0 probability.
-      // However, if we assign a value of 1.0 to unseen_mass (which could
-      // happen in case all words seen exactly once), then we will end
-      // up assigning 0 probability to seen words.  So we arbitrarily
-      // limit it to 0.5, which is pretty damn much mass going to unseen
-      // words.
-        0.5 min (
-          (1.0 max WordDist.num_types_seen_once)/total_tokens).toDouble
-    else 0.5
+      if (total_tokens > 0)
+        // If no words seen only once, we will have a problem if we assign 0
+        // to the unseen mass, as unseen words will end up with 0 probability.
+        // However, if we assign a value of 1.0 to unseen_mass (which could
+        // happen in case all words seen exactly once), then we will end
+        // up assigning 0 probability to seen words.  So we arbitrarily
+        // limit it to 0.5, which is pretty damn much mass going to unseen
+        // words.
+          0.5 min ((1.0 max WordDist.num_types_seen_once)/total_tokens)
+      else 0.5
     overall_unseen_mass = 1.0 - (
       (for (ind <- counts.keys)
         yield WordDist.overall_word_probs.getOrElse(ind, 0.0)) sum)
@@ -328,30 +326,33 @@ other implementations.
             val wordprob = (unseen_mass*WordDist.globally_unseen_word_prob
                       / WordDist.num_unseen_word_types)
             if (debug("lots"))
-              errprint("Word %s, never seen at all, wordprob = %s", word, wordprob)
+              errprint("Word %s, never seen at all, wordprob = %s",
+                       word, wordprob)
             wordprob
           }
           case Some(owprob) => {
             val wordprob = unseen_mass * owprob / overall_unseen_mass
-            //if wordprob <= 0:
-            //  warning("Bad values; unseen_mass = %s, overall_word_probs[word] = %s, overall_unseen_mass = %s" % (unseen_mass, WordDist.overall_word_probs[word], WordDist.overall_unseen_mass))
+            //if (wordprob <= 0)
+            //  warning("Bad values; unseen_mass = %s, overall_word_probs[word] = %s, overall_unseen_mass = %s",
+            //    unseen_mass, WordDist.overall_word_probs[word],
+            //    WordDist.overall_unseen_mass)
             if (debug("lots"))
               errprint("Word %s, seen but not in article, wordprob = %s",
-                      word, wordprob)
+                       word, wordprob)
             wordprob
           }
         }
       }
       case Some(wordcount) => {
-        //if wordcount <= 0 or total_tokens <= 0 or unseen_mass >= 1.0:
-        //  warning("Bad values; wordcount = %s, unseen_mass = %s" %
-        //          (wordcount, unseen_mass))
-        //  for (word, count) in self.counts.iteritems():
-        //    errprint("%s: %s" % (word, count))
+        //if (wordcount <= 0 or total_tokens <= 0 or unseen_mass >= 1.0)
+        //  warning("Bad values; wordcount = %s, unseen_mass = %s",
+        //          wordcount, unseen_mass)
+        //  for ((word, count) <- self.counts)
+        //    errprint("%s: %s", word, count)
         val wordprob = wordcount.toDouble/total_tokens*(1.0 - unseen_mass)
         if (debug("lots"))
           errprint("Word %s, seen in article, wordprob = %s",
-                  word, wordprob)
+                   word, wordprob)
         wordprob
       }
     }

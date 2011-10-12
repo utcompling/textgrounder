@@ -1218,7 +1218,8 @@ object Toponym {
       for (name <- Seq(loc.name) ++ loc.altnames) {
         val loname = name.toLowerCase
         if (debug("lots"))
-          errprint("Noting lower_toponym_to_location for toponym %s, canonical name %s", (name, loc.name))
+          errprint("Noting lower_toponym_to_location for toponym %s, canonical name %s",
+                   name, loc.name)
         lower_toponym_to_location(loname) += loc
       }
 

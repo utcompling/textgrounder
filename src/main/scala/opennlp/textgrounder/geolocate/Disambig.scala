@@ -949,9 +949,10 @@ class StatArticleTable {
       total_arts_with_dists += arts_with_dists
       errprint("  %s articles in article table", arts_in_table)
       errprint("  %s articles with word counts seen (and in table)", arts_with_word_counts)
-      errprint("  %s articles with distribution computed, %s total tokens, %.2f tokens/article", (arts_with_dists, totaltoks,
+      errprint("  %s articles with distribution computed, %s total tokens, %.2f tokens/article",
+        arts_with_dists, totaltoks,
         // Avoid division by zero
-        totaltoks.toDouble / (arts_in_table + 1e-100)))
+        totaltoks.toDouble / (arts_in_table + 1e-100))
     }
     errprint("Total: %s articles with word counts seen",
       num_articles_with_word_counts)
@@ -1050,7 +1051,8 @@ class Eval(incorrect_reasons: Map[String, String]) {
 
   def output_fraction(header: String, amount: Int, total: Int) {
     if (amount > total) {
-      warning("Something wrong: Fractional quantity %s greater than total %s", (amount, total))
+      warning("Something wrong: Fractional quantity %s greater than total %s",
+        amount, total)
     }
     var percent =
       if (total == 0) "indeterminate percent"
