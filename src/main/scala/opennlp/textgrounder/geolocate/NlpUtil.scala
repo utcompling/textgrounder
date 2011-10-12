@@ -574,8 +574,9 @@ object NlpUtil {
   // it to the vectors for other keys, which is not what we want.
   //
   // SETKEY indicates whether we set the key to the default upon access.
-  // This is necessary when the value is something mutable, but mostly
-  // unimportant otherwise.
+  // This is necessary when the value is something mutable, but probably a
+  // bad idea otherwise, since looking up a nonexistent value in the table
+  // will cause a later "contains" call to return true on the value.
   def gendefaultmap[F,T](defaultval: => T, setkey:Boolean = false) = {
     new mutable.HashMap[F,T] {
       override def default(key:F) = {
@@ -594,17 +595,17 @@ object NlpUtil {
   def booleanmap() = genbooleanmap[String]()
   def genstringmap[T]() = gendefaultmap[T,String]("")
   def stringmap() = genstringmap[String]()
-  // Similar but the default value is an empty collection.
+  // The default value is an empty collection of type U.  Calls of the sort
+  // 'map(key) += item' will add the item to the collection stored as the
+  // value of the key rather than changing the value itself. (After doing
+  // this, the result of 'map(key)' will be the same collection, but the
+  // contents of the collection will be modified.  On the other hand, in
+  // the case of the above maps, the result of 'map(key)' will be
+  // different.)
   def genbufmap[T,U]() =
     gendefaultmap[T,mutable.Buffer[U]](mutable.Buffer[U](), setkey=true)
   def bufmap[T]() = genbufmap[String,T]()
   
-  //def bufmap[T]() = {
-  //  new HashMap[String, mutable.Seq[T]] {
-  //      override def default(key: String) = mutable.Seq[T]()
-  //  }
-  //} 
-
   // ORIGINAL: ---------------------------------------
 
   // Our own version similar to collections.defaultdict().  The difference is
@@ -901,7 +902,7 @@ object NlpUtil {
     errprint("")
   }
   
-  abstract class NLPProgram extends App {
+  abstract class NlpProgram extends App {
     // Things that must be implemented
     val opts:AnyRef
     val op:OptionParser
