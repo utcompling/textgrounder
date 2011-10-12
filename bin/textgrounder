@@ -1,5 +1,16 @@
 #!/bin/sh
 
+# Amount of memory (in megabytes) to reserve for system operation when
+# setting the maximum heap size.
+RESERVED_MEMORY=1024
+
+TEXTGROUNDER_VERSION=0.3.0
+
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  exit 1
+fi
+
 JARS="`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`"
 SCALA_LIB="$HOME/.sbt/boot/scala-2.9.1/lib/scala-library.jar"
 
@@ -7,29 +18,80 @@ CP="$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
 
 JAVA="$JAVA_HOME/bin/java"
 
-FIRSTARG="$1"
+VERBOSE=false
+DEBUG=false
 
-if $JAVA -version 2>&1 | grep '64-Bit' > /dev/null; then
- JAVA_IS_64=true
- # Maximum on Linux is about 127t (127 TB, i.e. 130,048 GB).  Maximum on
- # MacOS X 10.6 (Snow Leopard) is about 125t, but values that big cause a
- # pause of about 6 seconds at the beginning and a couple of seconds at
- # the end on my 4GB Mac.  4t doesn't cause much of a pause.
- MEMORY=4t
-else
- JAVA_IS_64=false
- MEMORY=2g
+# Process options
+
+while true; do
+  case "$1" in
+    -verbose | --verbose ) VERBOSE=true; shift ;;
+    -debug | --debug ) DEBUG=true; shift ;;
+    -m | -memory | --memory ) MEMORY="$1"; shift 2 ;;
+    * ) break ;;
+  esac
+done
+
+# For info on Sun JVM options, see:
+
+# http://java.sun.com/docs/hotspot/VMOptions.html
+#
+# (redirects to:
+#
+# http://www.oracle.com/technetwork/java/javase/tech/vmoptions-jsp-140102.html
+#
+# )
+#
+# Also see the following for tuning garbage collection:
+#
+# http://www.oracle.com/technetwork/java/gc-tuning-5-138395.html
+
+# Try to set the maximum heap size to something slightly less than
+# the physical memory of the machine.  
+if [ -z "$MEMORY" ]; then
+  MEMMB=`$TEXTGROUNDER_DIR/bin/textgrounder-memory`
+  if [ "$VERBOSE" = true ]; then
+    echo "Output from textgrounder-memory is: $MEMMB"
+  fi
+  if [ "$MEMMB" = unknown ]; then
+    # The old way we set the heap size, to a very high virtual size.
+    if [ -z "$MEMORY" ]; then
+      if $JAVA -version 2>&1 | grep '64-Bit' > /dev/null; then
+       JAVA_IS_64=true
+       # Maximum on Linux is about 127t (127 TB, i.e. 130,048 GB).  Maximum on
+       # MacOS X 10.6 (Snow Leopard) is about 125t, but values that big cause a
+       # pause of about 6 seconds at the beginning and a couple of seconds at
+       # the end on my 4GB Mac.  4t doesn't cause much of a pause.
+       MEMORY=4t
+      else
+       JAVA_IS_64=false
+       MEMORY=2g
+      fi
+    fi
+  else
+    MEMORY="`expr $MEMMB - $RESERVED_MEMORY`m"
+  fi
 fi
 
-case $FIRSTARG in
-  [0-9]*[tgmk]) MEMORY="${FIRSTARG}"; shift ;;
-  [0-9]*) MEMORY="${FIRSTARG}g"; shift ;;
-  *) ;;
-esac
+if [ "$VERBOSE" = true ]; then
+  echo "Setting maximum JVM heap size to $MEMORY"
+fi
 
 JAVA_MEMORY_OPT="-Xmx$MEMORY"
-JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT -classpath $CP"
+
+if [ "$DEBUG" = true ]; then
+  # Print details about when and how garbage collection happens; recommended
+  # in http://www.oracle.com/technetwork/java/gc-tuning-5-138395.html
+  JAVA_DEBUG_OPT="-XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+TraceClassUnloading"
+  #This will output a lot of stuff about class loading.
+  #JAVA_DEBUG_OPT="$JAVA_DEBUG_OPT -XX:+TraceClassLoading"
+fi
+
+JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT -classpath $CP"
 #SCALA_COMMAND="scala -classpath $CP"
+#Running Scala using Java currently works, and ensures that we will run
+#properly even if Scala isn't installed on the system or an older version
+#is installed. (Since we download our own Scala libraries.)
 SCALA_COMMAND="$JAVA_COMMAND"
 
 CMD="$1"
@@ -38,7 +100,13 @@ shift
 help()
 {
 cat <<EOF
-TextGrounder 0.3.0 commands: 
+TextGrounder $TEXTGROUNDER_VERSION usage:
+  textgrounder [OPTIONS ...] COMMAND [ARGS ...]
+
+Options:
+  --memory MEM          specify maximum heap size (e.g. 2048m or 20g)
+  --verbose             show what commands are being executed
+  --debug               tell the JVM to output debugging info
 
 General commands:
 
@@ -46,6 +114,7 @@ General commands:
   build                 enter SBT command line, to issue further commands
   build COMMAND ...     run SBT using some other arbitrary command(s)
   run CLASS ...         run the main method of a given class
+  help                  output this help message
 
 Commands for toponym resolution:
 
@@ -69,24 +138,42 @@ Commands for the Bayesian code:
   rlda-convert-to ...   convert to region-model format
   rlda-prob-out ...     pretty-print probabilities
   rlda-xml-prob-out ... pretty-print probabilities in XML format
-  
-Include --help with any option for more information
+
+The arguments for the various commands are specific to the particular
+command, and often include options and/or file names.  Use --help after the
+command for more information.
 EOF
 }
 
 RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=256m -Xmx512M -Xss2M -jar $TEXTGROUNDER_DIR/bin/sbt-launch-*.jar"
 
-if [ $CMD = 'build' ]; then
+execute()
+{
+  if [ "$VERBOSE" = true ]; then
+    echo Executing: $RUNCMD ${1+"$@"}
+  fi
+  $RUNCMD ${1+"$@"}
+}
 
-    $RUN_SBT ${1+"$@"}
+if [ "$CMD" = 'build' ]; then
 
-elif [ $CMD = 'build-all' ]; then
+  RUNCMD="$RUN_SBT"
+  execute
 
-    $RUN_SBT update compile ${1+"$@"}
+elif [ "$CMD" = 'build-all' ]; then
 
-elif [ $CMD = 'geolocate' ]; then
+  RUNCMD="$RUN_SBT update compile"
+  execute
 
-     JAVA_OPTS=$JAVA_MEMORY_OPT $SCALA_COMMAND opennlp.textgrounder.geolocate.Disambig ${1+"$@"}
+elif [ "$CMD" = 'geolocate' ]; then
+
+  CLASS=opennlp.textgrounder.geolocate.Disambig
+  RUNCMD="$SCALA_COMMAND $CLASS"
+  # execute() doesn't handle setting JAVA_OPTS like we do
+  if [ "$VERBOSE" = true ]; then
+    echo Executing: JAVA_OPTS="$JAVA_MEMORY_OPT" $RUNCMD ${1+"$@"}
+  fi
+  JAVA_OPTS="$JAVA_MEMORY_OPT" $RUNCMD ${1+"$@"}
 
 else  
 
@@ -116,11 +203,12 @@ else
     spher-run) CLASS=$TGBAYESAPP.TrainSphericalModel;;
 
     # Misc
-	run) CLASS=$1; shift;;
+	run) CLASS="$1"; shift;;
 	help) help; exit 1;;
 	*) echo "Unrecognized command: $CMD"; help; exit 1;;
     esac
 
-    $JAVA_COMMAND $CLASS ${1+"$@"}
+    RUNCMD="$JAVA_COMMAND $CLASS"
+    execute
 
 fi

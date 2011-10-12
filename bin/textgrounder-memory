@@ -1,0 +1,37 @@
+#!/bin/sh
+
+# Determine total physical memory and output result in megabytes
+
+# Author: Ben Wing <ben@benwing.com>
+
+if [ -e /proc/meminfo ]; then
+  # Linux
+  MEMORY=`cat /proc/meminfo | grep MemTotal | sed 's/^MemTotal: *//'`
+elif [ "`uname`" = Darwin ]; then
+  # Mac OS X
+  MEMORY=`system_profiler SPHardwareDataType | grep Memory | sed 's/^ *Memory: *//'`
+else
+  cat >&2 <<"EOF"
+Don't know how to compute physical memory!
+You might be able to retrieve it by running 'top -n 1' or 'top -l 1', or
+similar command to output one iteration of the 'top' command, followed
+by filtering for the total memory, probably shown in the header.
+EOF
+  echo "unknown"
+  exit 1
+fi
+
+MEMNUM=`echo "$MEMORY" | sed 's/^ *\([0-9]*\).*/\1/'`
+MEMUNITS=`echo "$MEMORY" | sed 's/^[0-9]* *//' | sed 's/ *$//'`
+
+# For debugging
+# echo "MEMNUM: $MEMNUM"
+# echo "MEMUNITS: $MEMUNITS"
+
+case "$MEMUNITS" in
+  [kK][bB] ) expr "$MEMNUM" / 1024 ;;
+  [mM][bB] ) echo "$MEMNUM" ;;
+  [gG][bB] ) expr "$MEMNUM" \* 1024 ;;
+  [tT][bB] ) expr "$MEMNUM" \* 1048576 ;;
+  * ) echo "Unparsable memory: $MEMORY" >&2; echo "unknown"; exit 1 ;;
+esac
