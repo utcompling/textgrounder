@@ -5,8 +5,8 @@
 # can be specified on the command line, which will override any existing
 # arguments.
 #
-# See also 'run-run-twitter', which will run this script using 'nohup'
-# while saving the output to a file.
+# See also 'run-run-geolocate-twitter', which will run this script using
+# 'nohup' while saving the output to a file.
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
   echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
