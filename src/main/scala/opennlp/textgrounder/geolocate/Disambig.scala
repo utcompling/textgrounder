@@ -992,7 +992,8 @@ class StatArticle(params: Map[String, String]) extends Article(params) {
 
   override def toString() = {
     var coordstr = if (coord != null) " at %s" format coord else ""
-    val redirstr = if (redir != null) ", redirect to %s" format redir else ""
+    val redirstr =
+      if (redir.length > 0) ", redirect to %s" format redir else ""
     "%s(%s)%s%s" format (title, id, coordstr, redirstr)
   }
 
@@ -1009,7 +1010,7 @@ class StatArticle(params: Map[String, String]) extends Article(params) {
           <location>{ coord }</location>
       }
       {
-        if (redir != null)
+        if (redir.length > 0)
           <redirectTo>{ redir }</redirectTo>
       }
     </StatArticle>
@@ -1536,7 +1537,7 @@ abstract class MinimumScoreStrategy extends GeotagDocumentStrategy {
       region_buf += ((stat_region, score))
     }
 
-    region_buf sortWith (_._2 > _._2)
+    region_buf sortWith (_._2 < _._2)
   }
 }
 

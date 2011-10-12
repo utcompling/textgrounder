@@ -97,21 +97,21 @@ object Distances {
     // coerce within bounds (latitudes are cropped, longitudes are taken
     // mod 360).
     def apply(lat:Double, long:Double, method:String) = {
-      var newlat = lat
-      var newlong = long
       var validate = false
-      method match {
-        case "coerce" => {
-          if (newlat > maximum_latitude) newlat = maximum_latitude
-          while (newlong > maximum_longitude) newlong -= 360.
-          if (newlat < minimum_latitude) newlat = minimum_latitude
-          while (newlong < minimum_longitude) newlong += 360.
+      val (newlat, newlong) =
+        method match {
+          case "coerce-warn" => {
+            if (!valid(lat, long))
+              warning("Coordinates out of bounds: (%.2f,%.2f)", lat, long)
+            coerce(lat, long)
+          }
+          case "coerce" => coerce(lat, long)
+          case "validate" => { validate = true; (lat, long) }
+          case "accept" => { (lat, long) }
+          case _ => { require(false,
+                              "Invalid method to Coord(): %s" format method)
+                      (0.0, 0.0) }
         }
-        case "validate" => { validate = true }
-        case "accept" => { }
-        case _ => { require(method == "coerce" || method == "validate" ||
-                            method == "accept") }
-      }
       new Coord(newlat, newlong, validate = validate)
     }
 
@@ -121,6 +121,16 @@ object Distances {
       long >= minimum_longitude &&
       long <= maximum_longitude
     )
+
+    def coerce(lat:Double, long:Double) = {
+      var newlat = lat
+      var newlong = long
+      if (newlat > maximum_latitude) newlat = maximum_latitude
+      while (newlong > maximum_longitude) newlong -= 360.
+      if (newlat < minimum_latitude) newlat = minimum_latitude
+      while (newlong < minimum_longitude) newlong += 360.
+      (newlat, newlong)
+    }
   }
 
   // Compute spherical distance in miles (along a great circle) between two
@@ -182,7 +192,7 @@ object Distances {
   // coordinate of a location not exactly at a region index (e.g. the center
   // point).
   def region_indices_to_coord(latind:Double, longind:Double,
-      method:String = "validate") = {
+      method:String = "coerce-warn") = {
     Coord(latind * degrees_per_region, longind * degrees_per_region,
           method)
   }

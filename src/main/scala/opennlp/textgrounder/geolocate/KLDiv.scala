@@ -28,16 +28,19 @@ object KLDiv {
       val q = qcounts.get(word) match {
         case Some(x) => x * qfact
         case None => {
-          // Can't do || on floating point values????
-          val fuck = owprobs(word) * qfact_unseen
-          if (fuck != 0.0) fuck else qfact_globally_unseen_prob
+          owprobs.get(word) match {
+            case Some(owprob) => owprob * qfact_unseen
+            case None => qfact_globally_unseen_prob
+          }
         }
       }
-      //if q == 0.0:
-      //  print "Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s" % (word, qfact_globally_unseen_prob, qcount, qfact)
-      //if p == 0.0 or q == 0.0:
-      //  print "Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s" % (
-      //      p, q, word, pcount, qcount, qfact, qfact_unseen, owprobs[word])
+      //if (q == 0.0)
+      //  errprint("Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s",
+      //           word, qfact_globally_unseen_prob, qcount, qfact)
+      //if (p == 0.0 || q == 0.0)
+      //  errprint("Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s",
+      //      p, q, word, pcount, qcount, qfact, qfact_unseen,
+      //      owprobs.getOrElse(word, 0.0))
       kldiv += p * (log(p) - log(q))
     }
   
@@ -47,7 +50,7 @@ object KLDiv {
     // 2.
     var overall_probs_diff_words = 0.0
     for ((word, qcount) <- qcounts if !(pcounts contains word)) {
-      val word_overall_prob = owprobs(word)
+      val word_overall_prob = owprobs.getOrElse(word, 0.0)
       val p = word_overall_prob * pfact_unseen
       val q = qcount * qfact
       kldiv += p * (log(p) - log(q))
@@ -89,15 +92,19 @@ object KLDiv {
       val q = qcounts.get(word) match {
         case Some(x) => x * qfact
         case None => {
-          val fuck = (owprobs(word) * qfact_unseen)
-          if (fuck != 0.0) fuck else qfact_globally_unseen_prob
+          owprobs.get(word) match {
+            case Some(owprob) => owprob * qfact_unseen
+            case None => qfact_globally_unseen_prob
+          }
         }
       }
-      //if q == 0.0:
-      //  print "Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s" % (word, qfact_globally_unseen_prob, qcount, qfact)
-      //if p == 0.0 or q == 0.0:
-      //  print "Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s" % (
-      //      p, q, word, pcount, qcount, qfact, qfact_unseen, owprobs[word])
+      //if (q == 0.0)
+      //  errprint("Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s",
+      //           word, qfact_globally_unseen_prob, qcount, qfact)
+      //if (p == 0.0 || q == 0.0)
+      //  errprint("Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s",
+      //      p, q, word, pcount, qcount, qfact, qfact_unseen,
+      //      owprobs.getOrElse(word, 0.0))
       pqsum += p * q
       p2sum += p * p
       q2sum += q * q
@@ -109,7 +116,7 @@ object KLDiv {
     // 2.
     var overall_probs_diff_words = 0.0
     for ((word, qcount) <- qcounts if !(pcounts contains word)) {
-      val word_overall_prob = owprobs(word)
+      val word_overall_prob = owprobs.getOrElse(word, 0.0)
       val p = word_overall_prob * pfact_unseen
       val q = qcount * qfact
       pqsum += p * q
@@ -158,11 +165,13 @@ object KLDiv {
         case Some(x) => x * qfact
         case None => 0.0
       }
-      //if q == 0.0:
-      //  print "Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s" % (word, qfact_globally_unseen_prob, qcount, qfact)
-      //if p == 0.0 or q == 0.0:
-      //  print "Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s" % (
-      //      p, q, word, pcount, qcount, qfact, qfact_unseen, owprobs[word])
+      //if (q == 0.0)
+      //  errprint("Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s",
+      //           word, qfact_globally_unseen_prob, qcount, qfact)
+      //if (p == 0.0 || q == 0.0)
+      //  errprint("Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s",
+      //      p, q, word, pcount, qcount, qfact, qfact_unseen,
+      //      owprobs.getOrElse(word, 0.0))
       pqsum += p * q
       p2sum += p * p
       q2sum += q * q

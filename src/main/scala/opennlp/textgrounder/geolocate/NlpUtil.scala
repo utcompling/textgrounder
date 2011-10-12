@@ -5,7 +5,12 @@ import collection.mutable
 import collection.mutable.{Builder, MapBuilder}
 import collection.generic.CanBuildFrom
 import math._
-import java.io._
+// The following says to import everything except java.io.Console, because
+// it conflicts with (and overrides) built-in scala.Console. (Technically,
+// it imports everything but in the process aliases Console to _, which
+// has the effect of making it inaccessible. _ is special in Scala and has
+// various meanings.)
+import java.io.{Console=>_,_}
 import java.util.Date
 
 import OptParse._
@@ -354,13 +359,6 @@ object NlpUtil {
 //  def errout(text):
 //    uniout(text, outfile=sys.stderr)
 //  
-  /**
-    Output a warning, formatting into UTF-8 as necessary.
-    */
-  def warning(format:String, args:Any*) {
-    errprint(format, args: _*)
-  }
-  
   def uniprint(text:String, outfile:PrintStream=System.out) {
     outfile.println(text)
   }
@@ -384,10 +382,22 @@ object NlpUtil {
       System.err.print(format format (args: _*))
   }
 
-  // Same as errprint() but useful for temporary print statements so that
-  // they can more clearly be identified later when they need to be removed
+  /**
+    Output a warning, formatting into UTF-8 as necessary.
+    */
+  def warning(format:String, args:Any*) {
+    errprint("Warning: " + format, args: _*)
+  }
+  
+  /**
+    Output a value, for debugging through print statements.
+    Basically same as just caling errprint() or println() or whatever,
+    but useful because the call to debprint() more clearly identifies a
+    temporary piece of debugging code that should be removed when the
+    bug has been identified.
+   */
   def debprint(format:String, args:Any*) {
-    errprint(format, args: _*)
+    errprint("Debug: " + format, args: _*)
   }
   
   /**
@@ -921,8 +931,8 @@ object NlpUtil {
       // get UTF-8 output on the Mac (default is MacRoman???).
       System.setOut(new PrintStream(System.out, true, "UTF-8"))
       System.setErr(new PrintStream(System.err, true, "UTF-8"))
-      scala.Console.setOut(System.out)
-      scala.Console.setErr(System.err)
+      Console.setOut(System.out)
+      Console.setErr(System.err)
       errprint("Beginning operation at %s" format curtimehuman())
       errprint("Arguments: %s" format (args mkString " "))
       op.parse(opts, args)
@@ -1167,7 +1177,12 @@ object NlpUtil {
     var seen_negative = false
   
     def get_collector(key:Numtype) = {
-      if (key < 0.asInstanceOf[Numtype])
+      // This somewhat scary-looking cast produces 0 for Int and 0.0 for
+      // Double.  If you write it as 0.asInstanceOf[Numtype], you get a
+      // class-cast error when < is called if Numtype is Double because the
+      // result of the cast ends up being a java.lang.Integer which can't
+      // be cast to java.lang.Double. (FMH!!!)
+      if (key < null.asInstanceOf[Numtype])
         seen_negative = true
       var lower_range = min_value
       // upper_range = "infinity"
