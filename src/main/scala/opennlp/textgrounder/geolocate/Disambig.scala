@@ -510,7 +510,8 @@ class StatRegion(
       }
       worddist.add_articles(arts)
       for (art <- arts) {
-        if (art.incoming_links.get > mostpopart_links) {
+        if (art.incoming_links != None &&
+            art.incoming_links.get > mostpopart_links) {
           mostpopart_links = art.incoming_links.get
           most_popular_article = art
         }
