@@ -7,8 +7,6 @@
 package opennlp.textgrounder.geolocate
 import KLDiv._
 import NlpUtil._
-import ArticleData._
-import Article._
 import WordDist._
 import OptParse._
 import Distances._
@@ -743,7 +741,7 @@ class StatArticleTable {
     name_to_article(name) = art
     val loname = name.toLowerCase
     lower_name_to_articles(loname) += art
-    val (short, div) = compute_short_form(loname)
+    val (short, div) = Article.compute_short_form(loname)
     if (div != null)
       lower_name_div_to_articles((short, div)) += art
     short_lower_name_to_articles(short) += art
@@ -788,7 +786,7 @@ class StatArticleTable {
       }
     }
 
-    read_article_data_file(filename, process,
+    ArticleData.read_article_data_file(filename, process,
       maxtime = Opts.max_time_per_stage)
 
     for (x <- redirects) {
@@ -843,7 +841,8 @@ class StatArticleTable {
       val wordcountarts_filename = "wordcountarts-combined-article-data.txt"
       stream = openw(wordcountarts_filename)
       // See write_article_data_file() in ArticleData.scala
-      writer = new ArticleWriter(stream, combined_article_data_outfields)
+      writer =
+        new ArticleWriter(stream, ArticleData.combined_article_data_outfields)
       writer.output_header()
     }
 
@@ -1507,13 +1506,18 @@ class BaselineGeotagDocumentStrategy(
   }
 }
 
-class KLDivergenceStrategy(
-  partial: Boolean = true,
-  symmetric: Boolean = false) extends GeotagDocumentStrategy {
+/**
+ *  Return ranked regions by scoring each region against the distribution
+ *  and returning the regions ordered by score, with the lower the better.
+ */
+
+abstract class MinimumScoreStrategy extends GeotagDocumentStrategy {
+  def score_region(worddist:WordDist, stat_region:StatRegion):Double
 
   def return_ranked_regions(worddist: WordDist) = {
     val region_buf = mutable.Buffer[(StatRegion, Double)]()
-    for (stat_region <- StatRegion.iter_nonempty_regions(nonempty_word_dist = true)) {
+    for (stat_region <-
+           StatRegion.iter_nonempty_regions(nonempty_word_dist = true)) {
       val inds = (stat_region.latind.get, stat_region.longind.get)
       if (debug("lots")) {
         val (latind, longind) = inds
@@ -1522,20 +1526,34 @@ class KLDivergenceStrategy(
           latind, longind, coord, stat_region.worddist.num_arts_for_word_dist)
       }
 
-      var kldiv = fast_kl_divergence(worddist, stat_region.worddist,
-        partial = partial)
-      if (symmetric) {
-        val kldiv2 = fast_kl_divergence(stat_region.worddist, worddist,
-          partial = partial)
-        kldiv = (kldiv + kldiv2) / 2.0
-      }
-      //kldiv = worddist.test_kl_divergence(stat_region.worddist,
-      //                           partial=partial)
-      //errprint("For region %s, KL divergence %.3f", stat_region, kldiv)
-      region_buf += ((stat_region, kldiv))
+      val score = score_region(worddist, stat_region)
+      region_buf += ((stat_region, score))
     }
 
-    val regions = region_buf sortWith (_._2 > _._2)
+    region_buf sortWith (_._2 > _._2)
+  }
+}
+
+class KLDivergenceStrategy(
+  partial: Boolean = true,
+  symmetric: Boolean = false) extends MinimumScoreStrategy {
+
+  def score_region(worddist:WordDist, stat_region:StatRegion) = {
+    var kldiv = fast_kl_divergence(worddist, stat_region.worddist,
+      partial = partial)
+    if (symmetric) {
+      val kldiv2 = fast_kl_divergence(stat_region.worddist, worddist,
+        partial = partial)
+      kldiv = (kldiv + kldiv2) / 2.0
+    }
+    //kldiv = worddist.test_kl_divergence(stat_region.worddist,
+    //                           partial=partial)
+    //errprint("For region %s, KL divergence %.3f", stat_region, kldiv)
+    kldiv
+  }
+
+  override def return_ranked_regions(worddist: WordDist) = {
+    val regions = super.return_ranked_regions(worddist)
 
     if (debug("kldiv")) {
       // Print out the words that contribute most to the KL divergence, for
@@ -1566,39 +1584,23 @@ class KLDivergenceStrategy(
   }
 }
 
-// FIXME: Duplicates code from KLDivergenceStrategy
-
 class CosineSimilarityStrategy(
   smoothed: Boolean = false,
-  partial: Boolean = false) extends GeotagDocumentStrategy {
+  partial: Boolean = false) extends MinimumScoreStrategy {
 
-  def return_ranked_regions(worddist: WordDist) = {
-    val region_buf = mutable.Buffer[(StatRegion, Double)]()
-    for (stat_region <- StatRegion.iter_nonempty_regions(nonempty_word_dist = true)) {
-      val inds = (stat_region.latind.get, stat_region.longind.get)
-      if (debug("lots")) {
-        val (latind, longind) = inds
-        val coord = region_indices_to_coord(latind, longind)
-        errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s",
-          latind, longind, coord, stat_region.worddist.num_arts_for_word_dist)
-      }
-      var cossim =
-        if (smoothed)
-          fast_smoothed_cosine_similarity(worddist, stat_region.worddist,
-            partial = partial)
-        else
-          fast_cosine_similarity(worddist, stat_region.worddist,
-            partial = partial)
-      assert(cossim >= 0.0)
-      // Just in case of round-off problems
-      assert(cossim <= 1.002)
-      cossim = 1.002 - cossim
-      region_buf += ((stat_region, cossim))
-    }
-
-    val regions = region_buf sortWith (_._2 > _._2)
-
-    regions
+  def score_region(worddist:WordDist, stat_region:StatRegion) = {
+    var cossim =
+      if (smoothed)
+        fast_smoothed_cosine_similarity(worddist, stat_region.worddist,
+          partial = partial)
+      else
+        fast_cosine_similarity(worddist, stat_region.worddist,
+          partial = partial)
+    assert(cossim >= 0.0)
+    // Just in case of round-off problems
+    assert(cossim <= 1.002)
+    cossim = 1.002 - cossim
+    cossim
   }
 }
 
@@ -2226,7 +2228,7 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
       help = "Output debug info of the given types (separated by spaces or commas)")
 }
 
-object Disambig extends NLPProgram {
+object Disambig extends NlpProgram {
   val opts = Opts
   val op = Opts.op
   println("Setting opts, op")
