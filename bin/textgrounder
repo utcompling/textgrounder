@@ -29,7 +29,8 @@ esac
 
 JAVA_MEMORY_OPT="-Xmx$MEMORY"
 JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT -classpath $CP"
-SCALA_COMMAND="scala -classpath $CP"
+#SCALA_COMMAND="scala -classpath $CP"
+SCALA_COMMAND="$JAVA_COMMAND"
 
 CMD="$1"
 shift
@@ -41,7 +42,7 @@ TextGrounder 0.3.0 commands:
 
 General commands:
 
-  build update compile  build TextGrounder from source using SBT
+  build-all             build TextGrounder from source using SBT
   build                 enter SBT command line, to issue further commands
   build COMMAND ...     run SBT using some other arbitrary command(s)
   run CLASS ...         run the main method of a given class
@@ -73,10 +74,15 @@ Include --help with any option for more information
 EOF
 }
 
+RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=256m -Xmx512M -Xss2M -jar $TEXTGROUNDER_DIR/bin/sbt-launch-*.jar"
 
 if [ $CMD = 'build' ]; then
 
-    $JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=256m -Xmx512M -Xss2M -jar $TEXTGROUNDER_DIR/bin/sbt-launch-*.jar ${1+"$@"}
+    $RUN_SBT ${1+"$@"}
+
+elif [ $CMD = 'build-all' ]; then
+
+    $RUN_SBT update compile ${1+"$@"}
 
 elif [ $CMD = 'geolocate' ]; then
 
