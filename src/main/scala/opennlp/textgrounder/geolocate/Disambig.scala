@@ -1359,8 +1359,11 @@ abstract class TestFileEvaluator(stratname: String) {
             skip_n = Opts.every_nth_test_doc - 1
           if (do_skip)
             errprint("Passed over document %s", doctag)
-          else
-            assert(evaluate_document(doc, doctag))
+          else {
+            // Don't put side-effecting code inside of an assert!
+            val not_skipped = evaluate_document(doc, doctag)
+            assert(not_skipped)
+          }
           status.item_processed()
           val new_elapsed = status.elapsed_time()
           val new_processed = status.num_processed()
@@ -1717,7 +1720,8 @@ class WikipediaGeotagDocumentEvaluator(
     if (would_skip_document(article, doctag))
       return false
     assert(article.dist.finished)
-    val (true_latind, true_longind) = coord_to_stat_region_indices(article.coord)
+    val (true_latind, true_longind) =
+      coord_to_stat_region_indices(article.coord)
     val true_statreg = StatRegion.find_region_for_coord(article.coord)
     val naitr = true_statreg.worddist.num_arts_for_word_dist
     if (debug("lots") || debug("commontop"))

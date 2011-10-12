@@ -87,11 +87,16 @@ object WordDist {
       for ((wordind,count) <- overall_word_counts)
         yield (wordind, count.toDouble/num_word_tokens*
                         (1.0 - globally_unseen_word_prob))
+    // Null out the word count map because it is no longer needed once
+    // converted to probabilities, and will take up memory.
     overall_word_counts = null
     // A very rough estimate, perhaps totally wrong
     num_unseen_word_types = num_types_seen_once max (num_word_types/20)
     if (debug("tons"))
-      errprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s", num_word_types, num_word_tokens, num_types_seen_once, globally_unseen_word_prob, globally_unseen_word_prob + (overall_word_probs.values sum))
+      errprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s",
+               num_word_types, num_word_tokens, num_types_seen_once,
+               globally_unseen_word_prob,
+               globally_unseen_word_prob + (overall_word_probs.values sum))
   }
 }
 
