@@ -1064,19 +1064,21 @@ object NlpUtil {
   val beginning_prog_time = curtimesecs()
   
   def get_program_time_usage() = curtimesecs() - beginning_prog_time
-  
-  def get_program_memory_usage(java:Boolean=true) = {
-    if (java)
-      get_program_memory_usage_java()
-    else {
-      if ((new File("/proc/self/status")).exists)
-        get_program_memory_usage_proc()
-      else {
-        try
-          get_program_memory_usage_ps()
-        catch {
-          case _ => get_program_memory_usage_rusage()
-        }
+
+  def get_program_memory_usage(method:String = "auto"):Long = {
+    method match {
+      case "java" => get_program_memory_usage_java()
+      case "proc" => get_program_memory_usage_proc()
+      case "ps" => get_program_memory_usage_ps()
+      case "rusage" => get_program_memory_usage_rusage()
+      case "auto" => {
+        val procmem = get_program_memory_usage_proc()
+        if (procmem > 0) return procmem
+        val psmem = get_program_memory_usage_ps()
+        if (psmem > 0) return psmem
+        val rusagemem = get_program_memory_usage_rusage()
+        if (rusagemem > 0) return rusagemem
+        return get_program_memory_usage_java()
       }
     }
   }
@@ -1094,24 +1096,38 @@ object NlpUtil {
     // // values, but on the Mac at least they show up as 0 in this structure.
     // // On Linux, alas, all values show up as 0 or garbage (e.g. negative).
     // res.ru_maxrss
-    0L
+    -1L
   }
   
+  def wrap_call[Ret](fn: => Ret, errval:Ret) = {
+    try {
+      fn
+    } catch {
+      case e@_ => { errprint("s", e); errval }
+    }
+  }
+
   // Get memory usage by running 'ps'; getrusage() doesn't seem to work very
   // well.  The following seems to work on both Mac OS X and Linux, at least.
-  def get_program_memory_usage_ps():Long = {
+  def get_program_memory_usage_ps(wraperr:Boolean = true):Long = {
+    if (wraperr)
+      return wrap_call(get_program_memory_usage_ps(wraperr=false), -1L)
     val pid = getpid()
     val input =
       capture_subprocess_output("ps", "-p", pid.toString, "-o", "rss")
     val lines = input.split('\n')
     for (line <- lines if line.trim != "RSS")
       return 1024*line.trim.toLong
-    0L
+    return -1L
   }
-  
+ 
   // Get memory usage by running 'proc'; this works on Linux and doesn't require
   // spawning a subprocess, which can crash when your program is very large.
-  def get_program_memory_usage_proc():Long = {
+  def get_program_memory_usage_proc(wraperr:Boolean = true):Long = {
+    if (wraperr)
+      return wrap_call(get_program_memory_usage_proc(wraperr=false), -1L)
+    if (!((new File("/proc/self/status")).exists))
+      return -1L
     for (line <- openr("proc/self/status")) {
         val trimline = line.trim
         if (trimline.startsWith("VmRSS:")) {
@@ -1119,7 +1135,7 @@ object NlpUtil {
           return 1024*rss
         }
       }
-    return 0
+    return -1L
   }
   
   def format_minutes_seconds(seconds:Double) = {
@@ -1138,11 +1154,27 @@ object NlpUtil {
         secstr, if (secs == 1) "" else "s")
   }
   
-  def output_resource_usage() {
+  def output_memory_usage() {
+    for (method <- List("auto", "java", "proc", "ps", "rusage")) {
+      val mem = get_program_memory_usage(method)
+      errout("Memory usage (%s): ", method)
+      if (mem <= 0)
+        errprint("Unknown")
+      else
+        errprint("%s bytes", long_with_commas(mem))
+    }
+  }
+
+  def output_resource_usage(dojava:Boolean = true) {
     errprint("Total elapsed time since program start: %s",
              format_minutes_seconds(get_program_time_usage()))
-    errprint("Memory usage: %s bytes",
-        long_with_commas(get_program_memory_usage()))
+    errprint("Memory usage (auto): %s bytes",
+        long_with_commas(get_program_memory_usage("auto")))
+    if (dojava) {
+      errprint("Memory usage (java): %s bytes",
+          long_with_commas(get_program_memory_usage("java")))
+    } else
+      System.gc()
   }
 
   //////////////////////////////////////////////////////////////////////////////
@@ -1668,4 +1700,8 @@ object NlpUtil {
 //      indices = sorted(random.randrange(n) for i in xrange(r))
 //      return tuple(pool[i] for i in indices)
 //
+}
+
+object TestMemUsage extends App {
+  NlpUtil.output_memory_usage()
 }
