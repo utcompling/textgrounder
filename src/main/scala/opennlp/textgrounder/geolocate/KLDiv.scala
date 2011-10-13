@@ -7,8 +7,8 @@ object KLDiv {
    A fast implementation of KL-divergence that uses inline lookups as much
    as possible.
    */
-  def fast_kl_divergence(self:WordDist, other:WordDist,
-    partial:Boolean=false):Double = {
+  def fast_kl_divergence(self: WordDist, other: WordDist,
+    partial: Boolean=false): Double = {
     var kldiv = 0.0
     val pfact = (1.0 - self.unseen_mass)/self.total_tokens
     val qfact = (1.0 - other.unseen_mass)/other.total_tokens
@@ -69,8 +69,8 @@ object KLDiv {
   probability due to smoothing.  But with parameter "partial" to true we
   proceed as with KL-divergence and ignore words not in P.
    */
-  def fast_smoothed_cosine_similarity(self:WordDist, other:WordDist,
-    partial:Boolean=false):Double = {
+  def fast_smoothed_cosine_similarity(self: WordDist, other: WordDist,
+    partial: Boolean=false): Double = {
     var pqsum = 0.0
     var p2sum = 0.0
     var q2sum = 0.0
@@ -146,8 +146,8 @@ object KLDiv {
   probability due to smoothing.  But with parameter "partial" to true we
   proceed as with KL-divergence and ignore words not in P.
    */
-  def fast_cosine_similarity(self:WordDist, other:WordDist,
-    partial:Boolean=false) = {
+  def fast_cosine_similarity(self: WordDist, other: WordDist,
+    partial: Boolean=false) = {
     var pqsum = 0.0
     var p2sum = 0.0
     var q2sum = 0.0

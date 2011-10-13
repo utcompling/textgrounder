@@ -55,10 +55,10 @@ object Distances {
 
   // Minimum, maximum latitude/longitude in indices (integers used to index the
   // set of regions that tile the earth)
-  var minimum_latind:Regind = 0
-  var maximum_latind:Regind = 0
-  var minimum_longind:Regind = 0
-  var maximum_longind:Regind = 0
+  var minimum_latind: Regind = 0
+  var maximum_latind: Regind = 0
+  var minimum_longind: Regind = 0
+  var maximum_longind: Regind = 0
   
   // Radius of the earth in miles.  Used to compute spherical distance in miles,
   // and miles per degree of latitude/longitude.
@@ -77,8 +77,8 @@ object Distances {
   //
   //   lat, long: Latitude and longitude of coordinate.
 
-  case class Coord(lat:Double, long:Double,
-      validate:Boolean = true) {
+  case class Coord(lat: Double, long: Double,
+      validate: Boolean = true) {
     if (validate) {
       // Not sure why this code was implemented with coerce_within_bounds,
       // but either always coerce, or check the bounds ...
@@ -96,7 +96,7 @@ object Distances {
     // "validate", check within bounds, and abort if not.  If "coerce",
     // coerce within bounds (latitudes are cropped, longitudes are taken
     // mod 360).
-    def apply(lat:Double, long:Double, method:String) = {
+    def apply(lat: Double, long: Double, method: String) = {
       var validate = false
       val (newlat, newlong) =
         method match {
@@ -115,14 +115,14 @@ object Distances {
       new Coord(newlat, newlong, validate = validate)
     }
 
-    def valid(lat:Double, long:Double) = (
+    def valid(lat: Double, long: Double) = (
       lat >= minimum_latitude &&
       lat <= maximum_latitude &&
       long >= minimum_longitude &&
       long <= maximum_longitude
     )
 
-    def coerce(lat:Double, long:Double) = {
+    def coerce(lat: Double, long: Double) = {
       var newlat = lat
       var newlong = long
       if (newlat > maximum_latitude) newlat = maximum_latitude
@@ -136,7 +136,7 @@ object Distances {
   // Compute spherical distance in miles (along a great circle) between two
   // coordinates.
   
-  def spheredist(p1:Coord, p2:Coord):Double = {
+  def spheredist(p1: Coord, p2: Coord): Double = {
     if (p1 == null || p2 == null) return 1000000.
     val thisRadLat = (p1.lat / 180.) * Pi
     val thisRadLong = (p1.long / 180.) * Pi
@@ -152,7 +152,8 @@ object Distances {
     // above 1, and acos() will complain.  So special-case this.
     if (abs(anglecos) > 1.0) {
       if (abs(anglecos) > 1.000001) {
-        warning("Something wrong in computation of spherical distance, out-of-range cosine value %f", anglecos)
+        warning("Something wrong in computation of spherical distance, out-of-range cosine value %f",
+          anglecos)
         return 1000000.
       } else
         return 0.
@@ -162,15 +163,15 @@ object Distances {
   
   // Convert a coordinate to the indices of the southwest corner of the
   // corresponding tiling region.
-  def coord_to_tiling_region_indices(coord:Coord) = {
-    val latind:Regind = floor(coord.lat / degrees_per_region).toInt
-    val longind:Regind = floor(coord.long / degrees_per_region).toInt
+  def coord_to_tiling_region_indices(coord: Coord) = {
+    val latind: Regind = floor(coord.lat / degrees_per_region).toInt
+    val longind: Regind = floor(coord.long / degrees_per_region).toInt
     (latind, longind)
   }
   
   // Convert a coordinate to the indices of the southwest corner of the
   // corresponding statistical region.
-  def coord_to_stat_region_indices(coord:Coord) = {
+  def coord_to_stat_region_indices(coord: Coord) = {
     // When width_of_stat_region = 1, don't subtract anything.
     // When width_of_stat_region = 2, subtract 0.5*degrees_per_region.
     // When width_of_stat_region = 3, subtract degrees_per_region.
@@ -191,78 +192,87 @@ object Distances {
   // their southwest corner.  Values are double since we may be requesting the
   // coordinate of a location not exactly at a region index (e.g. the center
   // point).
-  def region_indices_to_coord(latind:Double, longind:Double,
-      method:String = "coerce-warn") = {
+  def region_indices_to_coord(latind: Double, longind: Double,
+      method: String = "coerce-warn") = {
     Coord(latind * degrees_per_region, longind * degrees_per_region,
           method)
   }
   
   // Add 'offset' to both latind and longind and then convert to a
   // coordinate.  Coerce the coordinate to be within bounds.
-  def offset_region_indices_to_coord(latind:Regind, longind:Regind,
-      offset:Double) = {
+  def offset_region_indices_to_coord(latind: Regind, longind: Regind,
+      offset: Double) = {
     region_indices_to_coord(latind + offset, longind + offset, "coerce")
   }
   
   // Convert region indices of a tiling region to the coordinate of the
   // near (i.e. southwest) corner of the region.
-  def tiling_region_indices_to_near_corner_coord(latind:Regind, longind:Regind) = {
+  def tiling_region_indices_to_near_corner_coord(latind: Regind,
+      longind: Regind) = {
     region_indices_to_coord(latind, longind)
   }
   
   // Convert region indices of a tiling region to the coordinate of the
   // center of the region.
-  def tiling_region_indices_to_center_coord(latind:Regind, longind:Regind) = {
+  def tiling_region_indices_to_center_coord(latind: Regind,
+      longind: Regind) = {
     offset_region_indices_to_coord(latind, longind, 0.5)
   }
   
   // Convert region indices of a tiling region to the coordinate of the
   // far (i.e. northeast) corner of the region.
-  def tiling_region_indices_to_far_corner_coord(latind:Regind, longind:Regind) = {
+  def tiling_region_indices_to_far_corner_coord(latind: Regind,
+      longind: Regind) = {
     offset_region_indices_to_coord(latind, longind, 1)
   }
   
   // Convert region indices of a tiling region to the coordinate of the
   // near (i.e. southwest) corner of the region.
-  def stat_region_indices_to_near_corner_coord(latind:Regind, longind:Regind) = {
+  def stat_region_indices_to_near_corner_coord(latind: Regind,
+      longind: Regind) = {
     region_indices_to_coord(latind, longind)
   }
   
   // Convert region indices of a statistical region to the coordinate of the
   // center of the region.
-  def stat_region_indices_to_center_coord(latind:Regind, longind:Regind) = {
+  def stat_region_indices_to_center_coord(latind: Regind, longind: Regind) = {
     offset_region_indices_to_coord(latind, longind,
         width_of_stat_region/2.0)
   }
   
   // Convert region indices of a statistical region to the coordinate of the
   // far (i.e. northeast) corner of the region.
-  def stat_region_indices_to_far_corner_coord(latind:Regind, longind:Regind) = {
+  def stat_region_indices_to_far_corner_coord(latind: Regind,
+      longind: Regind) = {
     offset_region_indices_to_coord(latind, longind,
         width_of_stat_region)
   }
   
   // Convert region indices of a statistical region to the coordinate of the
   // northwest corner of the region.
-  def stat_region_indices_to_nw_corner_coord(latind:Regind, longind:Regind) = {
+  def stat_region_indices_to_nw_corner_coord(latind: Regind,
+      longind: Regind) = {
     region_indices_to_coord(latind + width_of_stat_region, longind, "coerce")
   }
   
   // Convert region indices of a statistical region to the coordinate of the
   // southeast corner of the region.
-  def stat_region_indices_to_se_corner_coord(latind:Regind, longind:Regind) = {
+  def stat_region_indices_to_se_corner_coord(latind: Regind,
+      longind: Regind) = {
     region_indices_to_coord(latind, longind + width_of_stat_region, "coerce")
   }
   
   // Convert region indices of a statistical region to the coordinate of the
   // southwest corner of the region.
-  def stat_region_indices_to_sw_corner_coord(latind:Regind, longind:Regind) = {
+  def stat_region_indices_to_sw_corner_coord(latind: Regind,
+      longind: Regind) = {
     stat_region_indices_to_near_corner_coord(latind, longind)
   }
   
   // Convert region indices of a statistical region to the coordinate of the
   // northeast corner of the region.
-  def stat_region_indices_to_ne_corner_coord(latind:Regind, longind:Regind) = {
+  def stat_region_indices_to_ne_corner_coord(latind: Regind,
+      longind: Regind) = {
     stat_region_indices_to_far_corner_coord(latind, longind)
   }
 }

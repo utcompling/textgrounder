@@ -4,6 +4,7 @@ import math._
 import NlpUtil._
 import KLDiv._
 import collection.mutable
+import WordDist._
 
 // val use_sorted_list = false
 
@@ -11,41 +12,56 @@ import collection.mutable
 //                             Word distributions                           //
 //////////////////////////////////////////////////////////////////////////////
 
-// Fields defined:
-//
-//   counts: A "sorted list" (tuple of sorted keys and values) of
-//           (word, count) items, specifying the counts of all words seen
-//           at least once.
-//   finished: Whether we have finished computing the distribution in
-//             'counts'.
-//   unseen_mass: Total probability mass to be assigned to all words not
-//                seen in the article, estimated (motivated by Good-Turing
-//                smoothing) as the unadjusted empirical probability of
-//                having seen a word once.
-//   overall_unseen_mass:
-//     Probability mass assigned in 'overall_word_probs' to all words not seen
-//     in the article.  This is 1 - (sum over W in A of overall_word_probs[W]).
-//     The idea is that we compute the probability of seeing a word W in
-//     article A as
-//
-//     -- if W has been seen before in A, use the following:
-//          COUNTS[W]/TOTAL_TOKENS*(1 - UNSEEN_MASS)
-//     -- else, if W seen in any articles (W in 'overall_word_probs'),
-//        use UNSEEN_MASS * (overall_word_probs[W] / OVERALL_UNSEEN_MASS).
-//        The idea is that overall_word_probs[W] / OVERALL_UNSEEN_MASS is
-//        an estimate of p(W | W not in A).  We have to divide by
-//        OVERALL_UNSEEN_MASS to make these probabilities be normalized
-//        properly.  We scale p(W | W not in A) by the total probability mass
-//        we have available for all words not seen in A.
-//     -- else, use UNSEEN_MASS * globally_unseen_word_prob / NUM_UNSEEN_WORDS,
-//        where NUM_UNSEEN_WORDS is an estimate of the total number of words
-//        "exist" but haven't been seen in any articles.  One simple idea is
-//        to use the number of words seen once in any article.  This certainly
-//        underestimates this number if not too many articles have been seen
-//        but might be OK if many articles seen.
-//   total_tokens: Total number of word tokens seen
+object IntStringMemoizer {
+  type Word = Int
+  val invalid_word: Word = 0
+
+  protected var next_word_count: Word = 1
+
+  // For replacing strings with ints.  This should save space on 64-bit
+  // machines (string pointers are 8 bytes, ints are 4 bytes) and might
+  // also speed lookup.
+  protected val word_id_map = mutable.Map[String,Word]()
+
+  // Map in the opposite direction.
+  protected val id_word_map = mutable.Map[Word,String]()
+
+  def memoize_word(word: String) = {
+    val index = word_id_map.getOrElse(word, 0)
+    if (index != 0) index
+    else {
+      val newind = next_word_count
+      next_word_count += 1
+      word_id_map(word) = index
+      id_word_map(index) = word
+      newind
+    }
+  }
+
+  def unmemoize_word(word: Word) = id_word_map(word)
+}
+
+object IdentityMemoizer {
+  type Word = String
+  val invalid_word: Word = null
+  def memoize_word(word: String): Word = word
+  def unmemoize_word(word: Word): String = word
+}
+
+object TrivialIntMemoizer {
+  type Word = Int
+  val invalid_word: Word = 0
+  def memoize_word(word: String): Word = 1
+  def unmemoize_word(word: Word): String = "foo"
+}
 
 object WordDist {
+  val memoizer = IdentityMemoizer
+  val invalid_word = memoizer.invalid_word
+  type Word = memoizer.Word
+  def memoize_word(word: String) = memoizer.memoize_word(word)
+  def unmemoize_word(word: Word) = memoizer.unmemoize_word(word)
+
   // Total number of word types seen (size of vocabulary)
   var num_word_types = 0
 
@@ -63,9 +79,9 @@ object WordDist {
   // empirical frequency of a word among all articles, adjusted by the mass
   // to be assigned to globally unseen words (words never seen at all), i.e. the
   // value in 'globally_unseen_word_prob'.
-  var overall_word_counts = intmap()
+  var overall_word_counts = genintmap[Word]()
 
-  var overall_word_probs:mutable.Map[String,Double] = null
+  var overall_word_probs: mutable.Map[Word,Double] = null
 
   // The total probability mass to be assigned to words not seen at all in
   // any article, estimated using Good-Turing smoothing as the unadjusted
@@ -84,8 +100,8 @@ object WordDist {
     num_types_seen_once = overall_word_counts.values count (_ == 1)
     globally_unseen_word_prob = num_types_seen_once.toDouble/num_word_tokens
     overall_word_probs =
-      for ((wordind,count) <- overall_word_counts)
-        yield (wordind, count.toDouble/num_word_tokens*
+      for ((word, count) <- overall_word_counts)
+        yield (word, count.toDouble/num_word_tokens*
                         (1.0 - globally_unseen_word_prob))
     // Null out the word count map because it is no longer needed once
     // converted to probabilities, and will take up memory.
@@ -100,32 +116,65 @@ object WordDist {
   }
 }
 
-class WordDist {
+/**
+  Create a word distribution given a table listing counts for each word.
+ */
+
+class WordDist(
+  /** A map (or possibly a "sorted list" of tuples, to save memory?) of
+      (word, count) items, specifying the counts of all words seen
+      at least once.
+   */
+  val counts: mutable.Map[Word,Int],
+  /** If true, add the word counts to the global word count statistics. */
+  note_globally: Boolean=true
+) {
+  /** Total number of word tokens seen */
+  var total_tokens = counts.values sum
+  /** Whether we have finished computing the distribution in 'counts'. */
   var finished = false
-  var counts:mutable.Map[String,Int] = intmap()
+  /** Total probability mass to be assigned to all words not
+      seen in the article, estimated (motivated by Good-Turing
+      smoothing) as the unadjusted empirical probability of
+      having seen a word once.
+   */
   var unseen_mass = 0.5
-  var total_tokens = 0
+  /**
+     Probability mass assigned in 'overall_word_probs' to all words not seen
+     in the article.  This is 1 - (sum over W in A of overall_word_probs[W]).
+     The idea is that we compute the probability of seeing a word W in
+     article A as
+
+     -- if W has been seen before in A, use the following:
+          COUNTS[W]/TOTAL_TOKENS*(1 - UNSEEN_MASS)
+     -- else, if W seen in any articles (W in 'overall_word_probs'),
+        use UNSEEN_MASS * (overall_word_probs[W] / OVERALL_UNSEEN_MASS).
+        The idea is that overall_word_probs[W] / OVERALL_UNSEEN_MASS is
+        an estimate of p(W | W not in A).  We have to divide by
+        OVERALL_UNSEEN_MASS to make these probabilities be normalized
+        properly.  We scale p(W | W not in A) by the total probability mass
+        we have available for all words not seen in A.
+     -- else, use UNSEEN_MASS * globally_unseen_word_prob / NUM_UNSEEN_WORDS,
+        where NUM_UNSEEN_WORDS is an estimate of the total number of words
+        "exist" but haven't been seen in any articles.  One simple idea is
+        to use the number of words seen once in any article.  This certainly
+        underestimates this number if not too many articles have been seen
+        but might be OK if many articles seen.
+    */
   var overall_unseen_mass = 1.0
 
-    /**
- Set the word distribution from the given table of words and counts.
-'total_tokens' is the total number of word tokens.  If 'note_globally',
-add the word counts to the global word count statistics.
-     */
-  def this(total_toks:Int, wordhash:mutable.Map[String,Int],
-      note_globally:Boolean=true) {
-    this()
-    total_tokens = total_toks
-    if (note_globally) {
-      for ((ind, count) <- wordhash) {
-        if (!(WordDist.overall_word_counts contains ind))
-          WordDist.num_word_types += 1
-        // Record in overall_word_counts; note more tokens seen.
-        WordDist.overall_word_counts(ind) += count
-        WordDist.num_word_tokens += count
-      }
+  if (note_globally) {
+    for ((word, count) <- counts) {
+      if (!(WordDist.overall_word_counts contains word))
+        WordDist.num_word_types += 1
+      // Record in overall_word_counts; note more tokens seen.
+      WordDist.overall_word_counts(word) += count
+      WordDist.num_word_tokens += count
     }
-    counts = wordhash
+  }
+
+  def this() {
+    this(genintmap[Word]())
   }
 
   override def toString = {
@@ -135,7 +184,7 @@ add the word counts to the global word count statistics.
     val need_dots = counts.size > num_words_to_print
     val items =
       for ((word, count) <- counts.view(0, num_words_to_print))
-      yield "%s=%s" format (word, count) 
+      yield "%s=%s" format (unmemoize_word(word), count) 
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
     "WordDist(%d tokens, %.2f unseen mass%s, %s)" format (
         total_tokens, unseen_mass, finished_str, words)
@@ -144,14 +193,15 @@ add the word counts to the global word count statistics.
   /**
    * Incorporate a list of words into the distribution.
    */
-  def add_words(words:Traversable[String], ignore_case:Boolean=true,
-      stopwords:Set[String]=Set[String]()) {
+  def add_words(words: Traversable[String], ignore_case: Boolean=true,
+      stopwords: Set[String]=Set[String]()) {
     assert(!finished)
     for {word <- words
          val wlower = if (ignore_case) word.toLowerCase() else word
-         if !stopwords(wlower) }
-      counts(word) += 1
+         if !stopwords(wlower) } {
+      counts(memoize_word(wlower)) += 1
       total_tokens += 1
+    }
   }
 
   /**
@@ -167,7 +217,7 @@ add the word counts to the global word count statistics.
   /**
   Finish computation of the word distribution.
   */
-  def finish(minimum_word_count:Int=0) {
+  def finish(minimum_word_count: Int=0) {
 
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.
@@ -205,7 +255,7 @@ add the word counts to the global word count statistics.
     /**
      Check fast and slow versions against each other.
      */
-  def test_kl_divergence(other:WordDist, partial:Boolean=false) {
+  def test_kl_divergence(other: WordDist, partial: Boolean=false) {
     assert(finished)
     assert(other.finished)
     val fast_kldiv = fast_kl_divergence(this, other, partial)
@@ -230,13 +280,13 @@ add the word counts to the global word count statistics.
      The basic implementation of KL-divergence.  Useful for checking against
 other implementations.
      */
-  def slow_kl_divergence_debug(other:WordDist, partial:Boolean=false,
-      return_contributing_words:Boolean=false) = {
+  def slow_kl_divergence_debug(other: WordDist, partial: Boolean=false,
+      return_contributing_words: Boolean=false) = {
     assert(finished)
     assert(other.finished)
     var kldiv = 0.0
     val contribs =
-      if (return_contributing_words) mutable.Map[String, Double]() else null
+      if (return_contributing_words) mutable.Map[Word, Double]() else null
     // 1.
     for (word <- counts.keys) {
       val p = lookup_word(word)
@@ -270,7 +320,7 @@ other implementations.
     }
   }
 
-  def slow_kl_divergence(other:WordDist, partial:Boolean=false) = {
+  def slow_kl_divergence(other: WordDist, partial: Boolean=false) = {
     val (kldiv, contribs) = slow_kl_divergence_debug(other, partial, false)
     kldiv
   }
@@ -278,7 +328,7 @@ other implementations.
   /**
    Steps 3 and 4 of KL-divergence computation.
    */
-  def kl_divergence_34(other:WordDist, overall_probs_diff_words:Double) = {
+  def kl_divergence_34(other: WordDist, overall_probs_diff_words: Double) = {
     var kldiv = 0.0
 
     // 3. For words seen in neither dist but seen globally:
@@ -313,11 +363,11 @@ other implementations.
     kldiv
   }
 
-  def symmetric_kldiv(other:WordDist) = {
+  def symmetric_kldiv(other: WordDist) = {
     0.5*fast_kl_divergence(this, other) + 0.5*fast_kl_divergence(other, this)
   }
 
-  def lookup_word(word:String) = {
+  def lookup_word(word: Word) = {
     assert(finished)
     // if (debug("some")) {
     //   errprint("Found counts for article %s, num word types = %s",
@@ -333,7 +383,7 @@ other implementations.
                       / WordDist.num_unseen_word_types)
             if (debug("lots"))
               errprint("Word %s, never seen at all, wordprob = %s",
-                       word, wordprob)
+                       unmemoize_word(word), wordprob)
             wordprob
           }
           case Some(owprob) => {
@@ -344,7 +394,7 @@ other implementations.
             //    WordDist.overall_unseen_mass)
             if (debug("lots"))
               errprint("Word %s, seen but not in article, wordprob = %s",
-                       word, wordprob)
+                       unmemoize_word(word), wordprob)
             wordprob
           }
         }
@@ -358,24 +408,27 @@ other implementations.
         val wordprob = wordcount.toDouble/total_tokens*(1.0 - unseen_mass)
         if (debug("lots"))
           errprint("Word %s, seen in article, wordprob = %s",
-                   word, wordprob)
+                   unmemoize_word(word), wordprob)
         wordprob
       }
     }
     retval
   }
   
-  def find_most_common_word(pred:String => Boolean) = {
+  def find_most_common_word(pred: String => Boolean) = {
     // Look for the most common word matching a given predicate.
+    // Predicate is passed the raw (unmemoized) form of a word.
     // But there may not be any.  max() will raise an error if given an
     // empty sequence, so insert a bogus value into the sequence with a
     // negative count.
-    val (maxword, maxcount) =
-      ((Seq((null, -1)) ++
-        (for ((word, count) <- counts if pred(word))
-           yield (word, count)))
-       maxBy (_._2))
-    maxword
+    val filtered =
+      (for ((word, count) <- counts if pred(unmemoize_word(word)))
+        yield (word, count)).toSeq
+    if (filtered.length == 0) None
+    else {
+      val (maxword, maxcount) = filtered maxBy (_._2)
+      Some(maxword)
+    }
   }
 }
 

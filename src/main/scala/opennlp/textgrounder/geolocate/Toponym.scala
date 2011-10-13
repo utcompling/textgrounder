@@ -429,7 +429,7 @@ object Toponym {
   // Static class maintaining additional tables listing mapping between
   // names, ID's and articles.  See comments at StatArticleTable.
   class TopoArticleTable extends StatArticleTable {
-    override def create_article(params:Map[String, String]) =
+    override def create_article(params: Map[String, String]) =
       new TopoArticle(params)
 
     // Construct the list of possible candidate articles for a given toponym
@@ -463,9 +463,9 @@ object Toponym {
     // should return TRUE if the first is to be preferred to the second.
     // Return the article matched, or None.
 
-    def find_one_wikipedia_match(loc:Location, name:String,
-      check_match:(StatArticle) => Boolean,
-      prefer_match:(StatArticle, StatArticle) => Boolean):StatArticle = {
+    def find_one_wikipedia_match(loc: Location, name: String,
+      check_match: (StatArticle) => Boolean,
+      prefer_match: (StatArticle, StatArticle) => Boolean): StatArticle = {
 
       val loname = name.toLowerCase
 
@@ -510,9 +510,9 @@ object Toponym {
     // Find Wikipedia article matching location LOC.  CHECK_MATCH and
     // PREFER_MATCH are as above.  Return the article matched, or None.
 
-    def find_wikipedia_match(loc:Location,
-      check_match:(StatArticle) => Boolean,
-      prefer_match:(StatArticle, StatArticle) => Boolean):StatArticle = {
+    def find_wikipedia_match(loc: Location,
+      check_match: (StatArticle) => Boolean,
+      prefer_match: (StatArticle, StatArticle) => Boolean): StatArticle = {
       // Try to find a match for the canonical name of the location
       val artmatch = find_one_wikipedia_match(loc, loc.name, check_match,
         prefer_match)
@@ -532,7 +532,7 @@ object Toponym {
     // Find Wikipedia article matching locality LOC; the two coordinates must
     // be at most MAXDIST away from each other.
 
-    def find_match_for_locality(loc:Locality, maxdist:Double) = {
+    def find_match_for_locality(loc: Locality, maxdist: Double) = {
 
       def check_match(art: StatArticle) = {
         val dist = spheredist(loc.coord, art.coord)
@@ -597,7 +597,7 @@ object Toponym {
     // Currently only one TopoArticleTable object.  This is the same as
     // the object in StatArticleTable.table but is of a different type
     // (a subclass), for easier access.
-    var table:TopoArticleTable = null
+    var table: TopoArticleTable = null
   }
 
   class EvalWithCandidateList(
@@ -774,7 +774,7 @@ object Toponym {
       for ((dist, word) <- geogword.context) {
         val lword =
           if (Opts.preserve_case_words) word else word.toLowerCase
-        val wordprob = distobj.lookup_word(lword)
+        val wordprob = distobj.lookup_word(WordDist.memoize_word(lword))
 
         // Compute weight for each word, based on distance from toponym
         val thisweight =
@@ -888,7 +888,7 @@ object Toponym {
       if (coord == null) return // If no ground-truth, skip it
       val articles = TopoArticleTable.table.construct_candidates(toponym)
       var bestscore = Double.MinValue
-      var bestart:TopoArticle = null
+      var bestart: TopoArticle = null
       if (articles.length == 0) {
         if (debug("some"))
           errprint("Unable to find any possibilities for %s", toponym)
@@ -1122,14 +1122,14 @@ object Toponym {
     /**
      * Record mapping from name to Division.
      */
-    def record_division(name:String, div:Division) {
+    def record_division(name: String, div: Division) {
       lower_toponym_to_division(name) += div
     }
 
     // Given an evaluation file, count the toponyms seen and add to the
     // global count in toponyms_seen_in_eval_files.
-    //  def count_toponyms_in_file(fname:String) {
-    //    def count_toponyms(geogword:GeogWord) {
+    //  def count_toponyms_in_file(fname: String) {
+    //    def count_toponyms(geogword: GeogWord) {
     //      toponyms_seen_in_eval_files(geogword.word.toLowerCase) += 1
     //    }
     //    process_eval_file(fname, count_toponyms, compute_context=false,
@@ -1140,10 +1140,10 @@ object Toponym {
   object Gazetteer {
     // The one and only currently existing gazetteer.
     // FIXME: Eventually this and other static objects should go elsewhere.
-    var gazetteer:Gazetteer = null
+    var gazetteer: Gazetteer = null
   }
 
-  class WorldGazetteer(filename:String) extends Gazetteer {
+  class WorldGazetteer(filename: String) extends Gazetteer {
 
     // Find the Wikipedia article matching an entry in the gazetteer.
     // The format of an entry is
@@ -1226,7 +1226,7 @@ object Toponym {
       // We start out looking for articles whose distance is very close,
       // then widen until we reach Opts.max_dist_for_close_match.
       var maxdist = 5
-      var artmatch:TopoArticle = null
+      var artmatch: TopoArticle = null
       breakable {
         while (maxdist <= Opts.max_dist_for_close_match) {
           artmatch =

@@ -9,12 +9,12 @@ import java.io._
 //                                  Main code                               //
 /////////////////////////////////////////////////////////////////////////////
 
-class ArticleWriter(outfile:PrintStream, outfields:Seq[String]) {
+class ArticleWriter(outfile: PrintStream, outfields: Seq[String]) {
   def output_header() {
     outfile.println(outfields mkString "\t")
   }
   
-  def output_row(art:Article) {
+  def output_row(art: Article) {
     outfile.println(art.get_fields(outfields) mkString "\t")    
   }
 }
@@ -29,8 +29,8 @@ object ArticleData {
   // to Article.  MAXTIME is a value in seconds, which limits the total
   // processing time (real time, not CPU time) used for reading in the
   // file, for testing purposes.
-  def read_article_data_file(filename:String, process:Map[String,String]=>Unit,
-                             maxtime:Double=0.0) = {
+  def read_article_data_file(filename: String,
+      process: Map[String,String] => Unit, maxtime: Double=0.0) = {
     errprint("Reading article data from %s...", filename)
     val status = new StatusMessage("article")
 
@@ -68,8 +68,8 @@ object ArticleData {
     fields
   }
 
-  def write_article_data_file(outfile:PrintStream, outfields:Seq[String],
-      articles:Iterable[Article]) {
+  def write_article_data_file(outfile: PrintStream, outfields: Seq[String],
+      articles: Iterable[Article]) {
     val writer = new ArticleWriter(outfile, outfields)
     writer.output_header()
     for (art <- articles)
@@ -92,11 +92,11 @@ object ArticleData {
 //   is_disambig: Whether article is a disambiguation page.
 //   is_list: Whether article is a list of any type ("List of *", disambig,
 //            or in Category or Book namespaces)
-class Article(params:Map[String,String]) {
+class Article(params: Map[String,String]) {
   var title="unknown"
   var id=0
-  var coord:Coord=null
-  var incoming_links:Option[Int]=None
+  var coord: Coord=null
+  var incoming_links: Option[Int]=None
   var split="unknown"
   var redir=""
   var namespace="Main"
@@ -120,7 +120,7 @@ class Article(params:Map[String,String]) {
       }
   }
 
-  def get_fields(fields:Traversable[String]) = {
+  def get_fields(fields: Traversable[String]) = {
     for (field <- fields) yield {
       field match {
         case "id" => id.toString
@@ -185,7 +185,7 @@ object Article {
     ail
   }
 
-  def validate_field(field:String, value:String) = {
+  def validate_field(field: String, value: String) = {
     import ArticleConverters._
     field match {
       case "id" => validate_int(value)
@@ -205,7 +205,7 @@ object Article {
 
 /************************ Conversion functions ************************/
 object ArticleConverters {
-  def yesno_to_boolean(foo:String)  = {
+  def yesno_to_boolean(foo: String)  = {
     foo match {
       case "yes" => true
       case "no" => false
@@ -216,21 +216,21 @@ object ArticleConverters {
     }
   }
   
-  def boolean_to_yesno(foo:Boolean) = if (foo) "yes" else "no"
+  def boolean_to_yesno(foo: Boolean) = if (foo) "yes" else "no"
 
-  def validate_boolean(foo:String) = foo == "yes" || foo == "no"
+  def validate_boolean(foo: String) = foo == "yes" || foo == "no"
   
-  def commaval_to_coord(foo:String) = {
+  def commaval_to_coord(foo: String) = {
     if (foo != "") {
       val Array(lat, long) = foo.split(',')
       Coord(lat.toDouble, long.toDouble)
     } else null
   }
   
-  def coord_to_commaval(foo:Coord) =
+  def coord_to_commaval(foo: Coord) =
     if (foo != null) "%s,%s".format(foo.lat, foo.long) else ""
 
-  def validate_coord(foo:String):Boolean = {
+  def validate_coord(foo: String): Boolean = {
     if (foo == "") return true
     val split = splittext(foo, ',')
     if (split.length != 2) return false
@@ -243,27 +243,27 @@ object ArticleConverters {
     return true
   }
   
-  def get_int_or_blank(foo:String) =
+  def get_int_or_blank(foo: String) =
     if (foo == "") None else Option[Int](foo.toInt)
  
-  def put_int_or_blank(foo:Option[Int]) = {
+  def put_int_or_blank(foo: Option[Int]) = {
     foo match {
       case None => ""
       case Some(x) => x.toString
     }
   }
 
-  def validate_int(foo:String):Boolean = {
+  def validate_int(foo: String) = {
     try {
       foo.toInt
+      true
     } catch {
-      case _ => return false
+      case _ => false
     }
-    return true
   }
 
-  def validate_int_or_blank(foo:String):Boolean = {
-    if (foo == "") return true
-    validate_int(foo)
+  def validate_int_or_blank(foo: String) = {
+    if (foo == "") true
+    else validate_int(foo)
   }
 }

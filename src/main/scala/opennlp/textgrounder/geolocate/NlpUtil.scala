@@ -47,7 +47,7 @@ object NlpUtil {
   var list_debug_params = Set[String]()
   
   // Register a list-valued debug param.
-  def register_list_debug_param(param:String) {
+  def register_list_debug_param(param: String) {
     list_debug_params += param
   }
 
@@ -76,7 +76,7 @@ object NlpUtil {
    */
 
   object Re {
-    def unapplySeq(x:Tuple2[String, String]) = {
+    def unapplySeq(x: Tuple2[String, String]) = {
       val (re, str) = x
       re.r.unapplySeq(str)
     }
@@ -216,15 +216,15 @@ object NlpUtil {
   // yield lines, but with any terminating newline removed if chomp is
   // true (the default).  Buffer size and conversion error-handling
   // can be set (FIXME: The latter has no effect currently.)
-  def openr(filename:String, encoding:String= "UTF-8", chomp:Boolean= true,
-        errors:String= "strict", bufsize:Int= 0) = {
+  def openr(filename: String, encoding: String= "UTF-8", chomp: Boolean= true,
+        errors: String= "strict", bufsize: Int= 0) = {
     class FileIterator extends Iterator[String] {
       val ireader =
         new InputStreamReader(new FileInputStream(filename), encoding)
       var reader =
         if (bufsize <= 0) new BufferedReader(ireader)
         else new BufferedReader(ireader, bufsize)
-      var nextline:String = null
+      var nextline: String = null
       protected def getNextLine() = {
         nextline = reader.readLine()
         if (nextline == null) {
@@ -266,7 +266,7 @@ object NlpUtil {
   /** Open a file for writing and return a PrintStream that will write to
    *  this file in UTF-8.
    */
-  def openw(filename:String, autoflush:Boolean=false) = new PrintStream(
+  def openw(filename: String, autoflush: Boolean=false) = new PrintStream(
       new BufferedOutputStream(new FileOutputStream(filename)),
       autoflush,
       "UTF-8")
@@ -359,14 +359,14 @@ object NlpUtil {
 //  def errout(text):
 //    uniout(text, outfile=sys.stderr)
 //  
-  def uniprint(text:String, outfile:PrintStream=System.out) {
+  def uniprint(text: String, outfile: PrintStream=System.out) {
     outfile.println(text)
   }
-  def uniout(text:String, outfile:PrintStream=System.out) {
+  def uniout(text: String, outfile: PrintStream=System.out) {
     outfile.print(text)
   }
   
-  def errprint(format:String, args:Any*) {
+  def errprint(format: String, args: Any*) {
     // If no arguments, assume that we've been passed a raw string to print,
     // so print it directly rather than passing it to 'format', which might
     // munge % signs
@@ -375,7 +375,7 @@ object NlpUtil {
     else
       System.err.println(format format (args: _*))
   }
-  def errout(format:String, args:Any*) {
+  def errout(format: String, args: Any*) {
     if (args.length == 0)
       System.err.print(format)
     else
@@ -385,7 +385,7 @@ object NlpUtil {
   /**
     Output a warning, formatting into UTF-8 as necessary.
     */
-  def warning(format:String, args:Any*) {
+  def warning(format: String, args: Any*) {
     errprint("Warning: " + format, args: _*)
   }
   
@@ -396,7 +396,7 @@ object NlpUtil {
     temporary piece of debugging code that should be removed when the
     bug has been identified.
    */
-  def debprint(format:String, args:Any*) {
+  def debprint(format: String, args: Any*) {
     errprint("Debug: " + format, args: _*)
   }
   
@@ -404,7 +404,7 @@ object NlpUtil {
    Convert a string to floating point, but don't crash on errors;
   instead, output a warning.
    */
-  def safe_float(x:String) = {
+  def safe_float(x: String) = {
     try {
       x.toDouble
     } catch {
@@ -419,7 +419,7 @@ object NlpUtil {
   /**
    Pluralize an English word, using a basic but effective algorithm.
    */
-  def pluralize(word:String) = {
+  def pluralize(word: String) = {
     val upper = word.last >= 'A' && word.last <= 'Z'
     val lowerword = word.toLowerCase()
     val ies_re = """.*[b-df-hj-np-tv-z]y$""".r
@@ -440,12 +440,12 @@ object NlpUtil {
   /**
    Capitalize the first letter of string, leaving the remainder alone.
    */
-  def capfirst(st:String) = {
+  def capfirst(st: String) = {
     if (st == "") st else st(0).toString.capitalize + st.drop(1)
   }
   
   // From: http://stackoverflow.com/questions/1823058/how-to-print-number-with-commas-as-thousands-separators-in-python-2-x
-  def long_with_commas(x:Long):String = {
+  def long_with_commas(x: Long): String = {
     var mx = x
     if (mx < 0)
       return "-" + long_with_commas(-mx)
@@ -459,7 +459,7 @@ object NlpUtil {
   }
   
   // My own version
-  def float_with_commas(x:Double) = {
+  def float_with_commas(x: Double) = {
     val intpart = floor(x).toInt
     val fracpart = x - intpart
     long_with_commas(intpart) + ("%.2f" format fracpart).drop(1)
@@ -468,7 +468,7 @@ object NlpUtil {
   /**
    *  Return the median value of a list.  List will be sorted, so this is O(n).
    */
-  def median(list:Seq[Double]) = {
+  def median(list: Seq[Double]) = {
     val sorted = list.sorted
     val len = sorted.length
     if (len % 2 == 1)
@@ -482,7 +482,7 @@ object NlpUtil {
   /**
    *  Return the mean of a list.
    */
-  def mean(list:Seq[Double]) = {
+  def mean(list: Seq[Double]) = {
     list.sum / list.length
   }
   
@@ -490,7 +490,7 @@ object NlpUtil {
   // into segments but also return the delimiters.  Regex matches the
   // delimiters.  Return a list of tuples (TEXT, DELIM).  The last tuple
   // with have an empty delim.
-  def re_split_with_delimiter(regex:util.matching.Regex, text:String) = {
+  def re_split_with_delimiter(regex: util.matching.Regex, text: String) = {
     val splits = regex.split(text)
     val delim_intervals =
       for (m <- regex.findAllIn(text).matchData) yield List(m.start, m.end)
@@ -510,7 +510,7 @@ object NlpUtil {
      in fact, multiple such delimiters at end of line get ignored.  We hack
      around that by adding an extra char at the end and then removing it
      later. */
-  def splittext(str:String, ch:Char) = {
+  def splittext(str: String, ch: Char) = {
     val ch2 = if (ch == 'x') 'y' else 'x'
     val stradd = str + ch2
     val ret = stradd.split(ch)
@@ -520,14 +520,14 @@ object NlpUtil {
 
   // A worse implementation -- it will fail if there are any NUL bytes
   // in the input.
-  // def propersplit(str:String, ch:Char) = {
+  // def propersplit(str: String, ch: Char) = {
   //   val chs = ch.toString
   //   for (x <- str.replace(chs, chs + "\000").split(ch))
   //     yield x.replace("\000", "")
   // }
 
-  def split_text_into_words(text:String, ignore_punc:Boolean=false,
-    include_nl:Boolean=false) = {
+  def split_text_into_words(text: String, ignore_punc: Boolean=false,
+    include_nl: Boolean=false) = {
     // This regexp splits on whitespace, but also handles the following cases:
     // 1. Any of , ; . etc. at the end of a word
     // 2. Parens or quotes in words like (foo) or "bar"
@@ -546,7 +546,7 @@ object NlpUtil {
     ) reduce (_ ++ _) filter (_ != "")
   }
  
-  def fromto(from:Int, too:Int) = {
+  def fromto(from: Int, too: Int) = {
     if (from <= too) (from to too)
     else (too to from)
   }
@@ -558,7 +558,7 @@ object NlpUtil {
   // Another way to do this, using subclassing.
   //
   // abstract class gendefaultmap[From,To] extends HashMap[From, To] {
-  //   val defaultval:To
+  //   val defaultval: To
   //   override def default(key: From) = defaultval
   // }
   //
@@ -587,9 +587,9 @@ object NlpUtil {
   // This is necessary when the value is something mutable, but probably a
   // bad idea otherwise, since looking up a nonexistent value in the table
   // will cause a later "contains" call to return true on the value.
-  def gendefaultmap[F,T](defaultval: => T, setkey:Boolean = false) = {
+  def gendefaultmap[F,T](defaultval: => T, setkey: Boolean = false) = {
     new mutable.HashMap[F,T] {
-      override def default(key:F) = {
+      override def default(key: F) = {
         val buf = defaultval
         if (setkey)
           this(key) = buf
@@ -766,9 +766,9 @@ object NlpUtil {
   // some number of spaces).  If 'maxrows' is specified, output at most this many
   // rows.
   def output_reverse_sorted_list[T <% Ordered[T],U <% Ordered[U]](
-      items:Seq[(T,U)],
-      outfile:PrintStream=System.out, indent:String="",
-      keep_secondary_order:Boolean=false, maxrows:Int = -1) {
+      items: Seq[(T,U)],
+      outfile: PrintStream=System.out, indent: String="",
+      keep_secondary_order: Boolean=false, maxrows: Int = -1) {
     var its = items
     if (!keep_secondary_order)
       its = its sortBy (_._1)
@@ -787,9 +787,9 @@ object NlpUtil {
   // all rows by this string (usually some number of spaces).  If 'maxrows'
   // is specified, output at most this many rows.
   def output_reverse_sorted_table[T <% Ordered[T],U <% Ordered[U]](
-    table:Map[T,U],
-    outfile:PrintStream=System.out, indent:String="",
-    keep_secondary_order:Boolean=false, maxrows:Int = -1) {
+    table: Map[T,U],
+    outfile: PrintStream=System.out, indent: String="",
+    keep_secondary_order: Boolean=false, maxrows: Int = -1) {
     output_reverse_sorted_list(table toList)
   }
 
@@ -801,7 +801,7 @@ object NlpUtil {
   // 'secs_between_output', measured in real time. 'item_name' is the name
   // of the items being processed.  Every time an item is processed, call
   // item_processed()
-  class StatusMessage(item_name:String, secs_between_output:Double=15) {
+  class StatusMessage(item_name: String, secs_between_output: Double=15) {
     val plural_item_name = pluralize(item_name)
     var items_processed = 0
     val first_time = curtimesecs()
@@ -818,7 +818,7 @@ object NlpUtil {
         plural_item_name
     }
   
-    def item_processed(maxtime:Double=0) = {
+    def item_processed(maxtime: Double=0) = {
       val curtime = curtimesecs()
       items_processed += 1
       val total_elapsed_secs = curtime - first_time
@@ -860,7 +860,7 @@ object NlpUtil {
   // the different split files; if the values are [1, 1.5, 1], the output
   // will be [1, 2, 3, 2, 1, 2, 3, ...]; etc.
   
-  def next_split_set(split_fractions:Seq[Double]):Iterable[Int] = {
+  def next_split_set(split_fractions: Seq[Double]): Iterable[Int] = {
   
     val num_splits = split_fractions.length
     val cumulative_articles = mutable.Seq.fill(num_splits)(0.0)
@@ -881,7 +881,7 @@ object NlpUtil {
     // any fractional quantity (e.g. 0.6 for a value of 7.6) is left over,
     // any will ensure that the total ratios still work out appropriately.
  
-    def fuckme_no_yield():Stream[Int] = {
+    def fuckme_no_yield(): Stream[Int] = {
       var yieldme = mutable.Buffer[Int]()
       for (j <- 0 until num_splits) {
         //println("j=%s, this_output=%s" format (j, this_output))
@@ -905,7 +905,7 @@ object NlpUtil {
   //                               NLP Programs                               //
   //////////////////////////////////////////////////////////////////////////////
 
-  def output_options(op:OptionParser) {
+  def output_options(op: OptionParser) {
     errprint("Parameter values:")
     for ((name, opt) <- op.get_argmap)
       errprint("%30s: %s", name, opt.value)
@@ -914,10 +914,10 @@ object NlpUtil {
   
   abstract class NlpProgram extends App {
     // Things that must be implemented
-    val opts:AnyRef
-    val op:OptionParser
-    def handle_arguments(op:OptionParser, args:Seq[String])
-    def implement_main(op:OptionParser, args:Seq[String])
+    val opts: AnyRef
+    val op: OptionParser
+    def handle_arguments(op: OptionParser, args: Seq[String])
+    def implement_main(op: OptionParser, args: Seq[String])
 
     // Things that may be overridden
     def output_parameters() {}
@@ -992,7 +992,7 @@ object NlpUtil {
   //                      Least-recently-used (LRU) Caches                    //
   //////////////////////////////////////////////////////////////////////////////
 
-  class LRUCache[T,U](maxsize:Int=1000) extends mutable.Map[T,U]
+  class LRUCache[T,U](maxsize: Int=1000) extends mutable.Map[T,U]
     with mutable.MapLike[T,U,LRUCache[T,U]] {
     val cache = mutable.LinkedHashMap[T,U]()
 
@@ -1012,7 +1012,7 @@ object NlpUtil {
       else None
     }
  
-    override def update(key:T, value:U) {
+    override def update(key: T, value: U) {
       if (cache contains key)
         reprioritize(key)
       else {
@@ -1065,7 +1065,7 @@ object NlpUtil {
   
   def get_program_time_usage() = curtimesecs() - beginning_prog_time
 
-  def get_program_memory_usage(method:String = "auto"):Long = {
+  def get_program_memory_usage(method: String = "auto"): Long = {
     method match {
       case "java" => get_program_memory_usage_java()
       case "proc" => get_program_memory_usage_proc()
@@ -1099,7 +1099,7 @@ object NlpUtil {
     -1L
   }
   
-  def wrap_call[Ret](fn: => Ret, errval:Ret) = {
+  def wrap_call[Ret](fn: => Ret, errval: Ret) = {
     try {
       fn
     } catch {
@@ -1109,7 +1109,7 @@ object NlpUtil {
 
   // Get memory usage by running 'ps'; getrusage() doesn't seem to work very
   // well.  The following seems to work on both Mac OS X and Linux, at least.
-  def get_program_memory_usage_ps(wraperr:Boolean = true):Long = {
+  def get_program_memory_usage_ps(wraperr: Boolean = true): Long = {
     if (wraperr)
       return wrap_call(get_program_memory_usage_ps(wraperr=false), -1L)
     val pid = getpid()
@@ -1123,7 +1123,7 @@ object NlpUtil {
  
   // Get memory usage by running 'proc'; this works on Linux and doesn't require
   // spawning a subprocess, which can crash when your program is very large.
-  def get_program_memory_usage_proc(wraperr:Boolean = true):Long = {
+  def get_program_memory_usage_proc(wraperr: Boolean = true): Long = {
     if (wraperr)
       return wrap_call(get_program_memory_usage_proc(wraperr=false), -1L)
     if (!((new File("/proc/self/status")).exists))
@@ -1138,7 +1138,7 @@ object NlpUtil {
     return -1L
   }
   
-  def format_minutes_seconds(seconds:Double) = {
+  def format_minutes_seconds(seconds: Double) = {
     var secs = seconds
     var mins = (secs / 60).toInt
     secs = secs % 60
@@ -1165,7 +1165,7 @@ object NlpUtil {
     }
   }
 
-  def output_resource_usage(dojava:Boolean = true) {
+  def output_resource_usage(dojava: Boolean = true) {
     errprint("Total elapsed time since program start: %s",
              format_minutes_seconds(get_program_time_usage()))
     errprint("Memory usage (auto): %s bytes",
@@ -1200,15 +1200,15 @@ object NlpUtil {
   // and can be an item of any type, e.g. the number 0, the string "-infinity",
   // etc.
   abstract class TableByRange[Coll,Numtype <% Ordered[Numtype]](
-    ranges:Seq[Numtype],
-    create:()=>Coll
+    ranges: Seq[Numtype],
+    create: ()=>Coll
   ) {
-    val min_value:Numtype
-    val max_value:Numtype
+    val min_value: Numtype
+    val max_value: Numtype
     val items_by_range = mutable.Map[Numtype,Coll]()
     var seen_negative = false
   
-    def get_collector(key:Numtype) = {
+    def get_collector(key: Numtype) = {
       // This somewhat scary-looking cast produces 0 for Int and 0.0 for
       // Double.  If you write it as 0.asInstanceOf[Numtype], you get a
       // class-cast error when < is called if Numtype is Double because the
@@ -1249,8 +1249,8 @@ object NlpUtil {
      'unseen_between' is true, only ranges between the lowest and highest
      actually-seen ranges will be returned.
      */
-    def iter_ranges(unseen_between:Boolean=true, unseen_all:Boolean=false) = {
-      var highest_seen:Numtype = 0.asInstanceOf[Numtype]
+    def iter_ranges(unseen_between: Boolean=true, unseen_all: Boolean=false) = {
+      var highest_seen: Numtype = 0.asInstanceOf[Numtype]
       val iteration_range =
         (List(if (seen_negative) min_value else 0.asInstanceOf[Numtype]) ++
           ranges) zip
@@ -1277,16 +1277,16 @@ object NlpUtil {
   }
 
   class IntTableByRange[Coll](
-    ranges:Seq[Int],
-    create:()=>Coll
+    ranges: Seq[Int],
+    create: ()=>Coll
   ) extends TableByRange[Coll,Int](ranges, create) {
     val min_value = java.lang.Integer.MIN_VALUE
     val max_value = java.lang.Integer.MAX_VALUE
   }
 
   class DoubleTableByRange[Coll](
-    ranges:Seq[Double],
-    create:()=>Coll
+    ranges: Seq[Double],
+    create: ()=>Coll
   ) extends TableByRange[Coll,Double](ranges, create) {
     val min_value = java.lang.Double.NEGATIVE_INFINITY
     val max_value = java.lang.Double.POSITIVE_INFINITY
@@ -1384,9 +1384,9 @@ object NlpUtil {
 //    e.errno = err
 //    raise e
 
-  def capture_subprocess_output(args:String*) = {
+  def capture_subprocess_output(args: String*) = {
     val output = new StringBuilder()
-    val proc = new ProcessBuilder(args:_*).start()
+    val proc = new ProcessBuilder(args: _*).start()
     val in = proc.getInputStream()
     val br = new BufferedReader(new InputStreamReader(in))
     val cbuf = new Array[Char](100)

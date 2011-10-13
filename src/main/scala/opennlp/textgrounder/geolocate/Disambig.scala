@@ -7,7 +7,7 @@
 package opennlp.textgrounder.geolocate
 import KLDiv._
 import NlpUtil._
-import WordDist._
+import WordDist.{Word, invalid_word, memoize_word, unmemoize_word}
 import OptParse._
 import Distances._
 
@@ -46,7 +46,7 @@ import java.io._
 //                               Structures                                //
 /////////////////////////////////////////////////////////////////////////////
 
-//  def print_structure(struct:Any, indent:Int=0) {
+//  def print_structure(struct: Any, indent: Int=0) {
 //    val indstr = " "*indent
 //    if (struct == null)
 //      errprint("%snull", indstr)
@@ -94,18 +94,16 @@ object KMLConstants {
 //                             Word distributions                          //
 /////////////////////////////////////////////////////////////////////////////
 
-// Distribution over words corresponding to a statistical region.  The following
-// fields are defined in addition to base class fields:
-//
-//   articles: Articles used in computing the distribution.
-//   num_arts_for_word_dist: Number of articles included in word distribution.
-//   num_arts_for_links: Number of articles included in incoming-link
-//                       computation.
-//   incoming_links: Total number of incoming links.
+/**
+  Distribution over words corresponding to a statistical region.
+ */
 
 class RegionWordDist extends WordDist {
+  /** Number of articles included in incoming-link computation. */
   var num_arts_for_links = 0
+  /** Total number of incoming links. */
   var incoming_links = 0
+  /** Number of articles included in word distribution. */
   var num_arts_for_word_dist = 0
 
   def is_empty_for_word_dist() = num_arts_for_word_dist == 0
@@ -187,6 +185,17 @@ class RegionWordDist extends WordDist {
 //                             Region distributions                        //
 /////////////////////////////////////////////////////////////////////////////
 
+// A simple distribution associating a probability with each region.
+
+class RegionDist(
+  val regionprobs: mutable.Map[StatRegion, Double]
+) {
+  def get_ranked_regions() = {
+    // sort by second element of tuple, in reverse order
+    regionprobs.toSeq sortWith (_._2 > _._2)
+  }
+}
+
 // Distribution over regions, as might be attached to a word.  If we have a
 // set of regions, each with a word distribution, then we can imagine
 // conceptually inverting the process to generate a region distribution over
@@ -198,11 +207,12 @@ class RegionWordDist extends WordDist {
 //   word: Word for which the region is computed
 //   regionprobs: Hash table listing probabilities associated with regions
 
-class RegionDist(val word: String = null,
-  val regionprobs: mutable.Map[StatRegion, Double] = mutable.Map[StatRegion, Double]()) {
+class WordRegionDist(
+  val word: Word
+) extends RegionDist(mutable.Map[StatRegion, Double]()) {
   var normalized = false
 
-  private def init() {
+  protected def init() {
     // It's expensive to compute the value for a given word so we cache word
     // distributions.
     var totalprob = 0.0
@@ -230,12 +240,8 @@ class RegionDist(val word: String = null,
       normalized = false
   }
 
-  if (word != null) init()
+  init()
 
-  def get_ranked_regions() = {
-    // sort by second element of tuple, in reverse order
-    regionprobs.toSeq sortWith (_._2 > _._2)
-  }
   // Convert region to a KML file showing the distribution
   def generate_kml_file(filename: String) {
     import KMLConstants._
@@ -359,9 +365,9 @@ class RegionDist(val word: String = null,
             </IconStyle>
           </Style>
           <Folder>
-            <name>{ word }</name>
+            <name>{ unmemoize_word(word) }</name>
             <open>1</open>
-            <description>{ "Region distribution for word '%s'" format word }</description>
+            <description>{ "Region distribution for word '%s'" format unmemoize_word(word) }</description>
             <LookAt>
               <latitude>42</latitude>
               <longitude>-102</longitude>
@@ -380,17 +386,17 @@ class RegionDist(val word: String = null,
 }
 
 object RegionDist {
-  var cached_dists: LRUCache[String, RegionDist] = null
+  var cached_dists: LRUCache[Word, WordRegionDist] = null
 
   // Return a region distribution over a given word, using a least-recently-used
   // cache to optimize access.
-  def get_region_dist(word: String) = {
+  def get_region_dist(word: Word) = {
     if (cached_dists == null)
       cached_dists = new LRUCache(maxsize = Opts.lru_cache_size)
     cached_dists.get(word) match {
       case Some(dist) => dist
       case None => {
-        val dist = new RegionDist(word)
+        val dist = new WordRegionDist(word)
         cached_dists(word) = dist
         dist
       }
@@ -410,7 +416,7 @@ object RegionDist {
     val totalprob = (regprobs.values sum)
     for ((reg, prob) <- regprobs)
       regprobs(reg) /= totalprob
-    new RegionDist(regionprobs = regprobs)
+    new RegionDist(regprobs)
   }
 }
 
@@ -770,7 +776,7 @@ class StatArticleTable {
     }
   }
 
-  def create_article(params:Map[String, String]) = new StatArticle(params)
+  def create_article(params: Map[String, String]) = new StatArticle(params)
 
   def read_article_data(filename: String) {
     val redirects = mutable.Buffer[StatArticle]()
@@ -826,7 +832,7 @@ class StatArticleTable {
   // the remaining probabilities accordingly.
 
   def read_word_counts(filename: String) {
-    var wordhash: mutable.Map[String, Int] = null
+    var wordhash: mutable.Map[Word, Int] = null
 
     // This is basically a one-off debug statement because of the fact that
     // the experiments published in the paper used a word-count file generated
@@ -866,7 +872,7 @@ class StatArticleTable {
       if (art.split != "training" && art.split != Opts.eval_set)
         return
       // Don't train on test set
-      art.dist = new WordDist(total_tokens, wordhash,
+      art.dist = new WordDist(wordhash,
         note_globally = (art.split == "training"))
     }
 
@@ -897,7 +903,7 @@ class StatArticleTable {
             case titlere(ti) => title = ti
             case _ => assert(false)
           }
-          wordhash = intmap()
+          wordhash = genintmap[Word]()
           total_tokens = 0
         } else if (line.startsWith("Article coordinates) ") ||
           line.startsWith("Article ID: "))
@@ -912,7 +918,7 @@ class StatArticleTable {
               if (!(Stopwords.stopwords contains word) ||
                 Opts.include_stopwords_in_article_dists) {
                 total_tokens += count
-                wordhash(word) += count
+                wordhash(memoize_word(word)) += count
               }
             }
             case _ =>
@@ -979,7 +985,7 @@ class StatArticleTable {
 
 object StatArticleTable {
   // Currently only one StatArticleTable object
-  var table:StatArticleTable = null
+  var table: StatArticleTable = null
 }
 
 ///////////////////////// Articles
@@ -1092,8 +1098,9 @@ class Eval(incorrect_reasons: Map[String, String]) {
   }
 }
 
-class EvalWithRank(max_rank_for_credit: Int = 10) extends Eval(
-  Map[String, String]()) {
+class EvalWithRank(
+  max_rank_for_credit: Int = 10
+) extends Eval(Map[String, String]()) {
   val incorrect_by_exact_rank = genintmap[Int]()
   val correct_by_up_to_rank = genintmap[Int]()
   var incorrect_past_max_rank = 0
@@ -1428,30 +1435,34 @@ class BaselineGeotagDocumentStrategy(
 
   def ranked_regions_regdist_most_common_toponym(worddist: WordDist) = {
     // Look for a toponym, then a proper noun, then any word.
+    // FIXME: How can 'word' be null?
+    // FIXME: Use invalid_word
+    // FIXME: Should predicate be passed an index and have to do its own
+    // unmemoizing?
     var maxword = worddist.find_most_common_word(
-      word => word != null && word(0).isUpper &&
-        StatArticleTable.table.word_is_toponym(word))
-    if (maxword == null) {
+      word => word(0).isUpper && StatArticleTable.table.word_is_toponym(word))
+    if (maxword == None) {
       maxword = worddist.find_most_common_word(
-        word => word != null && word(0).isUpper)
+        word => word(0).isUpper)
     }
-    if (maxword == null)
-      maxword = worddist.find_most_common_word(x => true)
-    RegionDist.get_region_dist(maxword).get_ranked_regions()
+    if (maxword == None)
+      maxword = worddist.find_most_common_word(word => true)
+    RegionDist.get_region_dist(maxword.get).get_ranked_regions()
   }
 
   def ranked_regions_link_most_common_toponym(worddist: WordDist) = {
     var maxword = worddist.find_most_common_word(
-      word => word != null && word(0).isUpper &&
-        StatArticleTable.table.word_is_toponym(word))
-    if (maxword == null) {
+      word => word(0).isUpper && StatArticleTable.table.word_is_toponym(word))
+    if (maxword == None) {
       maxword = worddist.find_most_common_word(
         word => StatArticleTable.table.word_is_toponym(word))
     }
     if (debug("commontop"))
       errprint("  maxword = %s", maxword)
     val cands =
-      if (maxword != null) StatArticleTable.table.construct_candidates(maxword)
+      if (maxword != None)
+        StatArticleTable.table.construct_candidates(
+          unmemoize_word(maxword.get))
       else Seq[StatArticle]()
     if (debug("commontop"))
       errprint("  candidates = %s", cands)
@@ -1519,7 +1530,7 @@ class BaselineGeotagDocumentStrategy(
  */
 
 abstract class MinimumScoreStrategy extends GeotagDocumentStrategy {
-  def score_region(worddist:WordDist, stat_region:StatRegion):Double
+  def score_region(worddist: WordDist, stat_region: StatRegion): Double
 
   def return_ranked_regions(worddist: WordDist) = {
     val region_buf = mutable.Buffer[(StatRegion, Double)]()
@@ -1545,7 +1556,7 @@ class KLDivergenceStrategy(
   partial: Boolean = true,
   symmetric: Boolean = false) extends MinimumScoreStrategy {
 
-  def score_region(worddist:WordDist, stat_region:StatRegion) = {
+  def score_region(worddist: WordDist, stat_region: StatRegion) = {
     var kldiv = fast_kl_divergence(worddist, stat_region.worddist,
       partial = partial)
     if (symmetric) {
@@ -1595,7 +1606,7 @@ class CosineSimilarityStrategy(
   smoothed: Boolean = false,
   partial: Boolean = false) extends MinimumScoreStrategy {
 
-  def score_region(worddist:WordDist, stat_region:StatRegion) = {
+  def score_region(worddist: WordDist, stat_region: StatRegion) = {
     var cossim =
       if (smoothed)
         fast_smoothed_cosine_similarity(worddist, stat_region.worddist,
@@ -1650,7 +1661,8 @@ class PerWordRegionDistributionsStrategy extends GeotagDocumentStrategy {
 
 abstract class GeotagDocumentEvaluator(
   strategy: GeotagDocumentStrategy,
-  stratname: String) extends TestFileEvaluator(stratname) {
+  stratname: String
+) extends TestFileEvaluator(stratname) {
   val results = new GeotagDocumentResults()
 
   // FIXME: Seems strange to have a static function like this called here
@@ -1663,7 +1675,8 @@ abstract class GeotagDocumentEvaluator(
 
 class WikipediaGeotagDocumentEvaluator(
   strategy: GeotagDocumentStrategy,
-  stratname: String) extends GeotagDocumentEvaluator(strategy, stratname) {
+  stratname: String
+) extends GeotagDocumentEvaluator(strategy, stratname) {
 
   type Document = StatArticle
 
@@ -1820,7 +1833,8 @@ class WikipediaGeotagDocumentEvaluator(
 
 class PCLTravelGeotagDocumentEvaluator(
   strategy: GeotagDocumentStrategy,
-  stratname: String) extends GeotagDocumentEvaluator(strategy, stratname) {
+  stratname: String
+) extends GeotagDocumentEvaluator(strategy, stratname) {
   case class TitledDocument(title: String, text: String)
   type Document = TitledDocument
 
@@ -2423,7 +2437,7 @@ object Disambig extends NlpProgram {
       StatRegion.initialize_regions()
       val words = Opts.kml_words.split(',')
       for (word <- words) {
-        val regdist = RegionDist.get_region_dist(word)
+        val regdist = RegionDist.get_region_dist(memoize_word(word))
         if (!regdist.normalized) {
           warning("""Non-normalized distribution, apparently word %s not seen anywhere.
 Not generating an empty KML file.""", word)
@@ -2434,7 +2448,8 @@ Not generating an empty KML file.""", word)
     }
 
     def process_strategies[T](
-      strat_unflat: Seq[Seq[(String, T)]])(geneval: (String, T) => TestFileEvaluator) {
+      strat_unflat: Seq[Seq[(String, T)]])(
+      geneval: (String, T) => TestFileEvaluator) {
       val strats = strat_unflat reduce (_ ++ _)
       for ((stratname, strategy) <- strats) {
         val evalobj = geneval(stratname, strategy)
