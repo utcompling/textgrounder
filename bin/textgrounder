@@ -160,27 +160,46 @@ RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=256m -Xmx512M -Xss2
 
 execute()
 {
+  local CD
+  if [ "$1" = "--cd" ]; then
+    CD=true
+    shift
+  else
+    CD=false
+  fi
+  RUNCMD="$1"; shift
   if [ "$VERBOSE" = true ]; then
+    if [ "$CD" = true ]; then
+      echo Executing: cd $TEXTGROUNDER_DIR
+    fi
     echo Executing: $RUNCMD ${1+"$@"}
+  fi
+  if [ "$CD" = true ]; then
+    cd $TEXTGROUNDER_DIR
   fi
   $RUNCMD ${1+"$@"}
 }
 
 if [ "$CMD" = 'build' ]; then
 
-  RUNCMD="$RUN_SBT"
-  execute
+  # We need to cd to the top-level TextGrounder dir when running SBT,
+  # so the proper build.sbt file gets picked up, etc.
+  execute --cd "$RUN_SBT" ${1+"$@"}
 
 elif [ "$CMD" = 'build-all' ]; then
 
-  RUNCMD="$RUN_SBT update compile"
-  execute
+  # We need to cd to the top-level TextGrounder dir when running SBT,
+  # so the proper build.sbt file gets picked up, etc.
+  execute --cd "$RUN_SBT update compile" ${1+"$@"}
 
 elif [ "$CMD" = 'geolocate' ]; then
 
   CLASS=opennlp.textgrounder.geolocate.Disambig
   RUNCMD="$SCALA_COMMAND $CLASS"
-  # execute() doesn't handle setting JAVA_OPTS like we do
+  # execute() doesn't handle setting JAVA_OPTS like we do, and they can't
+  # be included in a variable that is expanded and reparsed, the way that
+  # RUNCMD is (the reparsing seems to pretty much only involve breaking
+  # on white space).
   if [ "$VERBOSE" = true ]; then
     echo Executing: JAVA_OPTS="$JAVA_MEMORY_OPT" $RUNCMD ${1+"$@"}
   fi
@@ -188,21 +207,20 @@ elif [ "$CMD" = 'geolocate' ]; then
 
 else  
 
-    CLASS=
-    TGPACK=opennlp.textgrounder
-    TGAPP=$TGPACK.app
-    TGBAYESAPP=$TGPACK.bayesian.apps
+  CLASS=
+  TGPACK=opennlp.textgrounder
+  TGAPP=$TGPACK.app
+  TGBAYESAPP=$TGPACK.bayesian.apps
 
-    case $CMD in
-
+  case $CMD in
     # Various commands
-	resolve) CLASS=$TGAPP.RunResolver;;
+    resolve) CLASS=$TGAPP.RunResolver;;
     geotext-lp) CLASS=$TGAPP.GeoTextLabelProp;;
-	import-gazetteer) CLASS=$TGAPP.ImportGazetteer;;
-	import-corpus) CLASS=$TGAPP.ImportCorpus;;
-	preprocess-labelprop) CLASS=$TGAPP.LabelPropPreproc;;
-	write-to-kml) CLASS=$TGAPP.WriteCorpusToKML;;
-	eval) CLASS=$TGAPP.EvaluateCorpus;;
+    import-gazetteer) CLASS=$TGAPP.ImportGazetteer;;
+    import-corpus) CLASS=$TGAPP.ImportCorpus;;
+    preprocess-labelprop) CLASS=$TGAPP.LabelPropPreproc;;
+    write-to-kml) CLASS=$TGAPP.WriteCorpusToKML;;
+    eval) CLASS=$TGAPP.EvaluateCorpus;;
 
     # Commands in the Bayesian code (there are many more)
     rlda-convert-from) CLASS=$TGBAYESAPP.ConvertFromRegionModelFormat;;
@@ -214,12 +232,15 @@ else
     spher-run) CLASS=$TGBAYESAPP.TrainSphericalModel;;
 
     # Misc
-	run) CLASS="$1"; shift;;
-	help) help; exit 1;;
-	*) echo "Unrecognized command: $CMD"; help; exit 1;;
-    esac
+    run) CLASS="$1"; shift;;
+    help) help; exit 1;;
+    *) echo "Unrecognized command: $CMD"; help; exit 1;;
+  esac
 
-    RUNCMD="$JAVA_COMMAND $CLASS"
-    execute
+  # We need to *not* cd to the top-level TextGrounder dir, otherwise if
+  # there are command-line arguments referring relatively to files, the
+  # files won't be found because the lookup will be relative to the
+  # wrong directory.
+  execute "$JAVA_COMMAND $CLASS" ${1+"$@"}
 
 fi
