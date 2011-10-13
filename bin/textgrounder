@@ -23,11 +23,16 @@ DEBUG=false
 
 # Process options
 
+JAVA_HEAP_OPT=
 while true; do
   case "$1" in
     -verbose | --verbose ) VERBOSE=true; shift ;;
     -debug | --debug ) DEBUG=true; shift ;;
-    -m | -memory | --memory ) MEMORY="$1"; shift 2 ;;
+    -m | -memory | --memory ) MEMORY="$2"; shift 2 ;;
+    -minheap | --minheap )
+      JAVA_HEAP_OPT="$JAVA_HEAP_OPT -XX:MinHeapFreeRatio=$2"; shift 2 ;;
+    -maxheap | --maxheap )
+      JAVA_HEAP_OPT="$JAVA_HEAP_OPT -XX:MaxHeapFreeRatio=$2"; shift 2 ;;
     * ) break ;;
   esac
 done
@@ -82,12 +87,12 @@ JAVA_MEMORY_OPT="-Xmx$MEMORY"
 if [ "$DEBUG" = true ]; then
   # Print details about when and how garbage collection happens; recommended
   # in http://www.oracle.com/technetwork/java/gc-tuning-5-138395.html
-  JAVA_DEBUG_OPT="-XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+TraceClassUnloading"
+  JAVA_DEBUG_OPT="-verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+TraceClassUnloading"
   #This will output a lot of stuff about class loading.
   #JAVA_DEBUG_OPT="$JAVA_DEBUG_OPT -XX:+TraceClassLoading"
 fi
 
-JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT -classpath $CP"
+JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_HEAP_OPT -classpath $CP"
 #SCALA_COMMAND="scala -classpath $CP"
 #Running Scala using Java currently works, and ensures that we will run
 #properly even if Scala isn't installed on the system or an older version
@@ -107,6 +112,12 @@ Options:
   --memory MEM          specify maximum heap size (e.g. 2048m or 20g)
   --verbose             show what commands are being executed
   --debug               tell the JVM to output debugging info
+  --minheap RATIO, --maxheap RATIO
+                        Set the minimum and maximum heap ratios.  If the JVM
+                        is hogging memory, try --minheap 20 --maxheap 40
+                        to make it more aggressively release memory to the OS
+                        (or --minheap 10 --maxheap 20 to be even more
+                        aggressive).
 
 General commands:
 
