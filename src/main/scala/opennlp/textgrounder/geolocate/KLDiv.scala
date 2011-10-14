@@ -9,10 +9,8 @@ object KLDiv {
    */
   def fast_kl_divergence(self: WordDist, other: WordDist,
     partial: Boolean=false): Double = {
-    var kldiv = 0.0
     val pfact = (1.0 - self.unseen_mass)/self.total_tokens
     val qfact = (1.0 - other.unseen_mass)/other.total_tokens
-    val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
     val qfact_globally_unseen_prob = (other.unseen_mass*
         WordDist.globally_unseen_word_prob / WordDist.num_unseen_word_types)
@@ -20,18 +18,20 @@ object KLDiv {
     // 1.
     val pcounts = self.counts
     val qcounts = other.counts
+
     // FIXME!! p * log(p) is the same for all calls of fast_kl_divergence
     // on this item, so we could cache it.  Not clear it would save much
     // time, though.
+    var kldiv = 0.0
     for ((word, pcount) <- pcounts) {
       val p = pcount * pfact
-      val q = qcounts.get(word) match {
-        case Some(x) => x * qfact
-        case None => {
-          owprobs.get(word) match {
-            case Some(owprob) => owprob * qfact_unseen
-            case None => qfact_globally_unseen_prob
-          }
+      val q = {
+        val qcount = qcounts.getOrElse(word, 0)
+        if (qcount != 0) qcount * qfact
+        else {
+          val owprob = owprobs.getOrElse(word, 0.0)
+          if (owprob != 0.0) owprob * qfact_unseen
+          else qfact_globally_unseen_prob
         }
       }
       //if (q == 0.0)
@@ -48,6 +48,7 @@ object KLDiv {
       return kldiv
 
     // 2.
+    val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     var overall_probs_diff_words = 0.0
     for ((word, qcount) <- qcounts if !(pcounts contains word)) {
       val word_overall_prob = owprobs.getOrElse(word, 0.0)
@@ -71,12 +72,8 @@ object KLDiv {
    */
   def fast_smoothed_cosine_similarity(self: WordDist, other: WordDist,
     partial: Boolean=false): Double = {
-    var pqsum = 0.0
-    var p2sum = 0.0
-    var q2sum = 0.0
     val pfact = (1.0 - self.unseen_mass)/self.total_tokens
     val qfact = (1.0 - other.unseen_mass)/other.total_tokens
-    val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
     val qfact_globally_unseen_prob = (other.unseen_mass*
         WordDist.globally_unseen_word_prob / WordDist.num_unseen_word_types)
@@ -84,18 +81,22 @@ object KLDiv {
     // 1.
     val pcounts = self.counts
     val qcounts = other.counts
+
     // FIXME!! Length of p is the same for all calls of fast_cosine_similarity
     // on this item, so we could cache it.  Not clear it would save much
     // time, though.
+    var pqsum = 0.0
+    var p2sum = 0.0
+    var q2sum = 0.0
     for ((word, pcount) <- pcounts) {
       val p = pcount * pfact
-      val q = qcounts.get(word) match {
-        case Some(x) => x * qfact
-        case None => {
-          owprobs.get(word) match {
-            case Some(owprob) => owprob * qfact_unseen
-            case None => qfact_globally_unseen_prob
-          }
+      val q = {
+        val qcount = qcounts.getOrElse(word, 0)
+        if (qcount != 0) qcount * qfact
+        else {
+          val owprob = owprobs.getOrElse(word, 0.0)
+          if (owprob != 0.0) owprob * qfact_unseen
+          else qfact_globally_unseen_prob
         }
       }
       //if (q == 0.0)
@@ -114,6 +115,7 @@ object KLDiv {
       return pqsum / (sqrt(p2sum) * sqrt(q2sum))
   
     // 2.
+    val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     var overall_probs_diff_words = 0.0
     for ((word, qcount) <- qcounts if !(pcounts contains word)) {
       val word_overall_prob = owprobs.getOrElse(word, 0.0)
@@ -148,23 +150,21 @@ object KLDiv {
    */
   def fast_cosine_similarity(self: WordDist, other: WordDist,
     partial: Boolean=false) = {
-    var pqsum = 0.0
-    var p2sum = 0.0
-    var q2sum = 0.0
     val pfact = 1.0/self.total_tokens
     val qfact = 1.0/other.total_tokens
     // 1.
     val pcounts = self.counts
     val qcounts = other.counts
+
     // FIXME!! Length of p is the same for all calls of fast_cosine_similarity
     // on this item, so we could cache it.  Not clear it would save much
     // time, though.
+    var pqsum = 0.0
+    var p2sum = 0.0
+    var q2sum = 0.0
     for ((word, pcount) <- pcounts) {
       val p = pcount * pfact
-      val q = qcounts.get(word) match {
-        case Some(x) => x * qfact
-        case None => 0.0
-      }
+      val q = qcounts.getOrElse(word, 0) * qfact
       //if (q == 0.0)
       //  errprint("Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s",
       //           word, qfact_globally_unseen_prob, qcount, qfact)
