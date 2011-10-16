@@ -1178,7 +1178,7 @@ object NlpUtil {
       return wrap_call(get_program_memory_usage_proc(wraperr=false), -1L)
     if (!((new File("/proc/self/status")).exists))
       return -1L
-    for (line <- openr("proc/self/status")) {
+    for (line <- openr("/proc/self/status")) {
         val trimline = line.trim
         if (trimline.startsWith("VmRSS:")) {
           val rss = ("""\s+""".r.split(trimline))(1).toLong
