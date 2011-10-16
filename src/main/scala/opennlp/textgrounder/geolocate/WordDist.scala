@@ -122,9 +122,12 @@ object WordDist {
  */
 
 class WordDist(
-  /** Separate arrays of keys and values to use to initialize distribution. */
+  /** Separate arrays of keys and values to use to initialize distribution.
+      Also must pass in number of words because we may be using arrays taken
+      from DynamicArray objects, which may be oversize. */
   keys: Array[Word],
   values: Array[Int],
+  num_words: Int,
   /** If true, add the word counts to the global word count statistics. */
   note_globally: Boolean=true
 ) {
@@ -133,8 +136,7 @@ class WordDist(
       at least once.
    */
   val counts = intmap[Word]()
-  assert (keys.length == values.length)
-  for (i <- 0 until keys.length)
+  for (i <- 0 until num_words)
     counts(keys(i)) = values(i)
   /** Total number of word tokens seen */
   var total_tokens = counts.values sum
@@ -181,7 +183,7 @@ class WordDist(
   }
 
   def this() {
-    this(Array[Word](), Array[Int]())
+    this(Array[Word](), Array[Int](), 0)
   }
 
   override def toString = {

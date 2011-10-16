@@ -877,7 +877,7 @@ class StatArticleTable {
         return
       // Don't train on test set
       art.dist = new WordDist(keys_dynarr.array, values_dynarr.array,
-        note_globally = (art.split == "training"))
+        keys_dynarr.length, note_globally = (art.split == "training"))
     }
 
     errprint("Reading word counts from %s...", filename)
