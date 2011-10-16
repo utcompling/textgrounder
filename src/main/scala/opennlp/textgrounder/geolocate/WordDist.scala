@@ -33,7 +33,7 @@ object IntStringMemoizer {
     else {
       val newind = next_word_count
       next_word_count += 1
-      word_id_map(word) = index
+      word_id_map(word) = newind
       id_word_map(index) = word
       newind
     }
