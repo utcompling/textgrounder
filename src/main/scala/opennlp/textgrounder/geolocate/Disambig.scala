@@ -1565,6 +1565,8 @@ class KLDivergenceStrategy(
   def score_region(worddist: WordDist, stat_region: StatRegion) = {
     var kldiv = fast_kl_divergence(worddist, stat_region.worddist,
       partial = partial)
+    // var kldiv = worddist.test_kl_divergence(stat_region.worddist,
+    //  partial = partial)
     if (symmetric) {
       val kldiv2 = fast_kl_divergence(stat_region.worddist, worddist,
         partial = partial)

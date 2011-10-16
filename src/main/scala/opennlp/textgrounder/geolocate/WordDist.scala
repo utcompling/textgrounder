@@ -262,7 +262,7 @@ class WordDist(
     /**
      Check fast and slow versions against each other.
      */
-  def test_kl_divergence(other: WordDist, partial: Boolean=false) {
+  def test_kl_divergence(other: WordDist, partial: Boolean=false) = {
     assert(finished)
     assert(other.finished)
     val fast_kldiv = fast_kl_divergence(this, other, partial)
