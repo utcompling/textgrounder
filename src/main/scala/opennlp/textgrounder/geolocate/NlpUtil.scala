@@ -54,7 +54,7 @@ object NlpUtil {
   /**
     * Return floating-point value, number of seconds since the Epoch
     **/
-  def curtimesecs() = (new Date()).getTime()/1000.0
+  def curtimesecs() = System.currentTimeMillis()/1000.0
 
   def curtimehuman() = (new Date()) toString
 
@@ -464,7 +464,19 @@ object NlpUtil {
     val fracpart = x - intpart
     long_with_commas(intpart) + ("%.2f" format fracpart).drop(1)
   }
-  
+ 
+  // Try to format something with reasonable precision.
+  def format_float(x: Double) = {
+    var precision = 2
+    var xx = x
+    while (xx < 0.1) {
+      xx *= 10
+      precision += 1
+    }
+    val formatstr = "%%.%sf" format precision
+    formatstr format x
+  }
+
   /**
    *  Return the median value of a list.  List will be sorted, so this is O(n).
    */
@@ -670,7 +682,37 @@ object NlpUtil {
 //  
 //  def setdict():
 //    return defdict(set, add_upon_ref=true)
-  
+ 
+  /**
+   A simple class like ArrayBuilder but which gets you direct access
+   to the underlying array and lets you easily reset things, so that you
+   can reuse a Dynamic Array multiple times without constantly creating
+   new objects.  Also has specialization.
+   */
+  class DynamicArray[@specialized T:ClassManifest](initial_alloc:Int = 8) {
+    protected val multiply_factor = 1.5
+    var array = new Array[T](initial_alloc)
+    var length = 0
+    def ensure_at_least(size: Int) {
+      if (array.length < size) {
+        var newsize = array.length
+        while (newsize < size)
+          newsize = (newsize * multiply_factor).toInt
+        array = new Array[T](newsize)
+      }
+    }
+
+    def += (item: T) {
+      ensure_at_least(length + 1)
+      array(length) = item
+      length += 1
+    }
+
+    def clear() {
+      length = 0
+    }
+  }
+    
   //////////////////////////////////////////////////////////////////////////////
   //                                 Sorted lists                             //
   //////////////////////////////////////////////////////////////////////////////
@@ -832,10 +874,16 @@ object NlpUtil {
           ((total_elapsed_secs / secs_between_output).toInt *
            secs_between_output)
         last_time = first_time + rounded_elapsed
+
         errprint("Elapsed time: %s minutes %s seconds, %s %s processed",
                  (total_elapsed_secs / 60).toInt,
                  (total_elapsed_secs % 60).toInt,
                  items_processed, item_unit())
+        val items_per_second = items_processed.toDouble / total_elapsed_secs
+        val seconds_per_item = total_elapsed_secs / items_processed
+        errprint("Processing rate: %s items per second (%s seconds per item)",
+                 format_float(items_per_second),
+                 format_float(seconds_per_item))
       }
       if (maxtime > 0 && total_elapsed_secs >= maxtime) {
         errprint("Maximum time reached, interrupting processing after %s %s",
