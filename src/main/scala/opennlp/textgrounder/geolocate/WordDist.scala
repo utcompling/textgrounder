@@ -132,8 +132,10 @@ class WordDist(
       (word, count) items, specifying the counts of all words seen
       at least once.
    */
-  val counts: mutable.Map[Word,Int] =
-    mutable.Map((keys zip values) : _*)
+  val counts = intmap[Word]()
+  assert (keys.length == values.length)
+  for (i <- 0 until keys.length)
+    counts(keys(i)) = values(i)
   /** Total number of word tokens seen */
   var total_tokens = counts.values sum
   /** Whether we have finished computing the distribution in 'counts'. */
