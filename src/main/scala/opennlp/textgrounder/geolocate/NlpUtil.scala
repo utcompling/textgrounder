@@ -1151,7 +1151,7 @@ object NlpUtil {
     try {
       fn
     } catch {
-      case e@_ => { errprint("s", e); errval }
+      case e@_ => { errprint("%s", e); errval }
     }
   }
 
