@@ -407,7 +407,7 @@ object RegionDist {
   // by adding up the distributions of the individual words, weighting by
   // the count of the each word.
   def get_region_dist_for_word_dist(worddist: WordDist) = {
-    val regprobs = gendoublemap[StatRegion]()
+    val regprobs = doublemap[StatRegion]()
     for ((word, count) <- worddist.counts) {
       val dist = get_region_dist(word)
       for ((reg, prob) <- dist.regionprobs)
@@ -555,7 +555,7 @@ object StatRegion {
   // articles in them, esp. as we decrease the region size.  The idea is that
   // the regions provide a first approximation to the regions used to create the
   // article distributions.
-  var tiling_region_to_articles = genbufmap[(Regind, Regind), StatArticle]()
+  var tiling_region_to_articles = bufmap[(Regind, Regind), StatArticle]()
 
   // Mapping from center of statistical region to corresponding region object.
   // A "statistical region" is made up of a square of tiling regions, with
@@ -683,7 +683,7 @@ class StatArticleTable {
   val name_to_article = mutable.Map[String, StatArticle]()
 
   // List of articles in each split.
-  val articles_by_split = bufmap[StatArticle]()
+  val articles_by_split = bufmap[String,StatArticle]()
 
   // Num of articles with word-count information but not in table.
   var num_articles_with_word_counts_but_not_in_table = 0
@@ -692,18 +692,18 @@ class StatArticleTable {
   var num_articles_with_word_counts = 0
 
   // Num of articles in each split with word-count information seen.
-  val num_word_count_articles_by_split = intmap()
+  val num_word_count_articles_by_split = intmap[String]()
 
   // Num of articles in each split with a computed distribution.
   // (Not the same as the previous since we don't compute the distribution of articles in
   // either the test or dev set depending on which one is used.)
-  val num_dist_articles_by_split = intmap()
+  val num_dist_articles_by_split = intmap[String]()
 
   // Total # of word tokens for all articles in each split.
-  val word_tokens_by_split = intmap()
+  val word_tokens_by_split = intmap[String]()
 
   // Total # of incoming links for all articles in each split.
-  val incoming_links_by_split = intmap()
+  val incoming_links_by_split = intmap[String]()
 
   // Map from short name (lowercased) to list of Wikipedia articles.  The
   // short name for an article is computed from the article's name.  If
@@ -712,17 +712,17 @@ class StatArticleTable {
   // If the name has no comma, the short name is the same as the article
   // name.  The idea is that the short name should be the same as one of
   // the toponyms used to refer to the article.
-  val short_lower_name_to_articles = bufmap[StatArticle]()
+  val short_lower_name_to_articles = bufmap[String,StatArticle]()
 
   // Map from tuple (NAME, DIV) for Wikipedia articles of the form
   // "Springfield, Ohio", lowercased.
-  val lower_name_div_to_articles = genbufmap[(String, String), StatArticle]()
+  val lower_name_div_to_articles = bufmap[(String, String), StatArticle]()
 
   // For each toponym, list of Wikipedia articles matching the name.
-  val lower_toponym_to_article = bufmap[StatArticle]()
+  val lower_toponym_to_article = bufmap[String,StatArticle]()
 
   // Mapping from lowercased article names to TopoArticle objects
-  val lower_name_to_articles = bufmap[StatArticle]()
+  val lower_name_to_articles = bufmap[String,StatArticle]()
 
   // Look up an article named NAME and return the associated article.
   // Note that article names are case-sensitive but the first letter needs to
@@ -1042,9 +1042,9 @@ class Eval(incorrect_reasons: Map[String, String]) {
   var total_instances = 0
   var correct_instances = 0
   var incorrect_instances = 0
-  val other_stats = intmap()
+  val other_stats = intmap[String]()
   // Map from reason ID's to counts
-  var results = intmap()
+  var results = intmap[String]()
 
   def record_result(correct: Boolean, reason: String = null) {
     if (reason != null)
@@ -1107,8 +1107,8 @@ class Eval(incorrect_reasons: Map[String, String]) {
 class EvalWithRank(
   max_rank_for_credit: Int = 10
 ) extends Eval(Map[String, String]()) {
-  val incorrect_by_exact_rank = genintmap[Int]()
-  val correct_by_up_to_rank = genintmap[Int]()
+  val incorrect_by_exact_rank = intmap[Int]()
+  val correct_by_up_to_rank = intmap[Int]()
   var incorrect_past_max_rank = 0
   var total_credit = 0
 
@@ -1196,9 +1196,9 @@ class GeotagDocumentResults {
   // distance", as if degrees were a constant length both latitudinally
   // and longitudinally.
   val dist_fraction_increment = 0.25
-  def gendocmap() = gendefaultmap[Double, GeotagDocumentEval](create_doc())
-  val docs_by_degree_dist_to_true_center = gendocmap()
-  val docs_by_true_dist_to_true_center = gendocmap()
+  def docmap() = defaultmap[Double, GeotagDocumentEval](create_doc())
+  val docs_by_degree_dist_to_true_center = docmap()
+  val docs_by_true_dist_to_true_center = docmap()
 
   // Similar, but distance between location and center of top predicted
   // region.

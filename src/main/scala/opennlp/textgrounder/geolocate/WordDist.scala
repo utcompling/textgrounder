@@ -80,7 +80,7 @@ object WordDist {
   // empirical frequency of a word among all articles, adjusted by the mass
   // to be assigned to globally unseen words (words never seen at all), i.e. the
   // value in 'globally_unseen_word_prob'.
-  var overall_word_counts = genintmap[Word]()
+  var overall_word_counts = intmap[Word]()
 
   var overall_word_probs: mutable.Map[Word,Double] = null
 

@@ -40,9 +40,9 @@ object NlpUtil {
   // PARAM=VALUE.  Certain params are list-valued; multiple values are specified
   // by including the parameter multiple times, or by separating values by
   // a semicolon or colon.
-  val debug = booleanmap()
-  val debugval = stringmap()
-  val debuglist = bufmap[String]()
+  val debug = booleanmap[String]()
+  val debugval = stringmap[String]()
+  val debuglist = bufmap[String,String]()
   
   var list_debug_params = Set[String]()
   
@@ -569,19 +569,17 @@ object NlpUtil {
   
   // Another way to do this, using subclassing.
   //
-  // abstract class gendefaultmap[From,To] extends HashMap[From, To] {
+  // abstract class defaultmap[From,To] extends HashMap[From, To] {
   //   val defaultval: To
   //   override def default(key: From) = defaultval
   // }
   //
-  // class genintmap[T] extends gendefaultmap[T, Int] { val defaultval = 0 }
-  //
-  // def intmap() = new genintmap[String]()
+  // class intmap[T] extends defaultmap[T, Int] { val defaultval = 0 }
   //
 
   // The original way
   //
-  // def booleanmap() = {
+  // def booleanmap[String]() = {
   //   new HashMap[String, Boolean] {
   //     override def default(key: String) = false
   //   }
@@ -599,7 +597,7 @@ object NlpUtil {
   // This is necessary when the value is something mutable, but probably a
   // bad idea otherwise, since looking up a nonexistent value in the table
   // will cause a later "contains" call to return true on the value.
-  def gendefaultmap[F,T](defaultval: => T, setkey: Boolean = false) = {
+  def defaultmap[F,T](defaultval: => T, setkey: Boolean = false) = {
     new mutable.HashMap[F,T] {
       override def default(key: F) = {
         val buf = defaultval
@@ -608,25 +606,29 @@ object NlpUtil {
         buf
       }
     }
-  } 
-  def genintmap[T]() = gendefaultmap[T,Int](0)
-  def intmap() = genintmap[String]()
-  def gendoublemap[T]() = gendefaultmap[T,Double](0.0)
-  def doublemap() = gendoublemap[String]()
-  def genbooleanmap[T]() = gendefaultmap[T,Boolean](false)
-  def booleanmap() = genbooleanmap[String]()
-  def genstringmap[T]() = gendefaultmap[T,String]("")
-  def stringmap() = genstringmap[String]()
-  // The default value is an empty collection of type U.  Calls of the sort
-  // 'map(key) += item' will add the item to the collection stored as the
-  // value of the key rather than changing the value itself. (After doing
-  // this, the result of 'map(key)' will be the same collection, but the
-  // contents of the collection will be modified.  On the other hand, in
-  // the case of the above maps, the result of 'map(key)' will be
-  // different.)
-  def genbufmap[T,U]() =
-    gendefaultmap[T,mutable.Buffer[U]](mutable.Buffer[U](), setkey=true)
-  def bufmap[T]() = genbufmap[String,T]()
+  }
+  /* These next four are maps from T to Int, Double, Boolean or String,
+     which automatically use a default value if the key isn't seen.
+     They can be used in some cases where you simply want to be able to
+     look anything up, whether set or not; but especially useful when
+     accumulating counts and such, where you want to add to the existing
+     value and want keys not yet seen to automatically spring into
+     existence with the value of 0 (or empty string). */
+  def intmap[T]() = defaultmap[T,Int](0)
+  def doublemap[T]() = defaultmap[T,Double](0.0)
+  def booleanmap[T]() = defaultmap[T,Boolean](false)
+  def stringmap[T]() = defaultmap[T,String]("")
+  /** A default map which maps from T to an (extendible) array of type U.
+      The default value is an empty Buffer of type U.  Calls of the sort
+      'map(key) += item' will add the item to the Buffer stored as the
+      value of the key rather than changing the value itself. (After doing
+      this, the result of 'map(key)' will be the same collection, but the
+      contents of the collection will be modified.  On the other hand, in
+      the case of the above maps, the result of 'map(key)' will be
+      different.)
+    */
+  def bufmap[T,U]() =
+    defaultmap[T,mutable.Buffer[U]](mutable.Buffer[U](), setkey=true)
   
   // ORIGINAL: ---------------------------------------
 

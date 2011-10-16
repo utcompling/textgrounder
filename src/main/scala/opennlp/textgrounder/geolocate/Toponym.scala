@@ -265,7 +265,7 @@ object Toponym {
     val path_to_division = mutable.Map[Seq[String], Division]()
 
     // For each tiling region, list of divisions that have territory in it
-    val tiling_region_to_divisions = genbufmap[(Regind, Regind), Division]()
+    val tiling_region_to_divisions = bufmap[(Regind, Regind), Division]()
 
     // Find the division for a point in the division with a given path,
     // add the point to the division.  Create the division if necessary.
@@ -604,9 +604,9 @@ object Toponym {
     incorrect_reasons: Map[String, String],
     max_individual_candidates: Int = 5) extends Eval(incorrect_reasons) {
     // Toponyms by number of candidates available
-    val total_instances_by_num_candidates = genintmap[Int]()
-    val correct_instances_by_num_candidates = genintmap[Int]()
-    val incorrect_instances_by_num_candidates = genintmap[Int]()
+    val total_instances_by_num_candidates = intmap[Int]()
+    val correct_instances_by_num_candidates = intmap[Int]()
+    val incorrect_instances_by_num_candidates = intmap[Int]()
 
     def record_result(correct: Boolean, reason: String, num_candidates: Int) {
       super.record_result(correct, reason)
@@ -1108,16 +1108,16 @@ object Toponym {
     // For each toponym (name of location), value is a list of Locality
     // items, listing gazetteer locations and corresponding matching
     // Wikipedia articles.
-    val lower_toponym_to_location = bufmap[Locality]()
+    val lower_toponym_to_location = bufmap[String,Locality]()
 
     // For each toponym corresponding to a division higher than a locality,
     // list of divisions with this name.
-    val lower_toponym_to_division = bufmap[Division]()
+    val lower_toponym_to_division = bufmap[String,Division]()
 
     // Table of all toponyms seen in evaluation files, along with how many
     // times seen.  Used to determine when caching of certain
     // toponym-specific values should be done.
-    //val toponyms_seen_in_eval_files = intmap()
+    //val toponyms_seen_in_eval_files = intmap[String]()
 
     /**
      * Record mapping from name to Division.
