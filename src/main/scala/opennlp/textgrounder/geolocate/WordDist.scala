@@ -5,6 +5,7 @@ import NlpUtil._
 import KLDiv._
 import collection.mutable
 import WordDist._
+import gnu.trove.map.hash
 
 // val use_sorted_list = false
 
@@ -121,14 +122,18 @@ object WordDist {
  */
 
 class WordDist(
+  /** Separate arrays of keys and values to use to initialize distribution. */
+  keys: Array[Word],
+  values: Array[Int],
+  /** If true, add the word counts to the global word count statistics. */
+  note_globally: Boolean=true
+) {
   /** A map (or possibly a "sorted list" of tuples, to save memory?) of
       (word, count) items, specifying the counts of all words seen
       at least once.
    */
-  val counts: mutable.Map[Word,Int],
-  /** If true, add the word counts to the global word count statistics. */
-  note_globally: Boolean=true
-) {
+  val counts: mutable.Map[Word,Int] =
+    mutable.Map((keys zip values) : _*)
   /** Total number of word tokens seen */
   var total_tokens = counts.values sum
   /** Whether we have finished computing the distribution in 'counts'. */
@@ -174,7 +179,7 @@ class WordDist(
   }
 
   def this() {
-    this(genintmap[Word]())
+    this(Array[Word](), Array[Int]())
   }
 
   override def toString = {

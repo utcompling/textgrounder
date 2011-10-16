@@ -832,7 +832,11 @@ class StatArticleTable {
   // the remaining probabilities accordingly.
 
   def read_word_counts(filename: String) {
-    var wordhash: mutable.Map[Word, Int] = null
+    val initial_dynarr_size = 1000
+    val keys_dynarr =
+      new DynamicArray[WordDist.Word](initial_alloc = initial_dynarr_size)
+    val values_dynarr =
+      new DynamicArray[Int](initial_alloc = initial_dynarr_size)
 
     // This is basically a one-off debug statement because of the fact that
     // the experiments published in the paper used a word-count file generated
@@ -872,7 +876,7 @@ class StatArticleTable {
       if (art.split != "training" && art.split != Opts.eval_set)
         return
       // Don't train on test set
-      art.dist = new WordDist(wordhash,
+      art.dist = new WordDist(keys_dynarr.array, values_dynarr.array,
         note_globally = (art.split == "training"))
     }
 
@@ -903,7 +907,8 @@ class StatArticleTable {
             case titlere(ti) => title = ti
             case _ => assert(false)
           }
-          wordhash = genintmap[Word]()
+          keys_dynarr.clear()
+          values_dynarr.clear()
           total_tokens = 0
         } else if (line.startsWith("Article coordinates) ") ||
           line.startsWith("Article ID: "))
@@ -918,7 +923,8 @@ class StatArticleTable {
               if (!(Stopwords.stopwords contains word) ||
                 Opts.include_stopwords_in_article_dists) {
                 total_tokens += count
-                wordhash(memoize_word(word)) += count
+                keys_dynarr += memoize_word(word)
+                values_dynarr += count
               }
             }
             case _ =>
