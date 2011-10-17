@@ -575,7 +575,7 @@ class RegionWordDist extends WordDist {
 //                             Region distributions                        //
 /////////////////////////////////////////////////////////////////////////////
 
-// A simple distribution associating a probability with each region.
+/** A simple distribution associating a probability with each region. */
 
 class RegionDist(
   val regionprobs: mutable.Map[StatRegion, Double]
@@ -586,16 +586,15 @@ class RegionDist(
   }
 }
 
-// Distribution over regions, as might be attached to a word.  If we have a
-// set of regions, each with a word distribution, then we can imagine
-// conceptually inverting the process to generate a region distribution over
-// words.  Basically, for a given word, look to see what its probability is
-// in all regions; normalize, and we have a region distribution.
+/** Distribution over regions, as might be attached to a word.  If we have a
+  set of regions, each with a word distribution, then we can imagine
+  conceptually inverting the process to generate a region distribution over
+  words.  Basically, for a given word, look to see what its probability is
+  in all regions; normalize, and we have a region distribution.
 
-// Fields defined:
-//
-//   word: Word for which the region is computed
-//   regionprobs: Hash table listing probabilities associated with regions
+  @param word Word for which the region is computed
+  @param regionprobs Hash table listing probabilities associated with regions
+*/
 
 class WordRegionDist(
   val word: Word
@@ -2025,13 +2024,13 @@ abstract class MinimumScoreStrategy extends GeotagDocumentStrategy {
   the word distributions differ).  Note that the KL-divergence as currently
   implemented uses the smoothed word distributions.
 
-  @tparam partial If true (the default), only do "partial" KL-divergence.
-          This only computes the divergence involving words in the article
-          distribution, rather than considering all words in the vocabulary.
-  @tparam symmetric If true, do a symmetric KL-divergence by computing
-          the divergence in both directions and averaging the two values.
-          (Not by default; the comparison is fundamentally asymmetric in
-          any case since it's comparing articles against regions.)
+  @param partial If true (the default), only do "partial" KL-divergence.
+         This only computes the divergence involving words in the article
+         distribution, rather than considering all words in the vocabulary.
+  @param symmetric If true, do a symmetric KL-divergence by computing
+         the divergence in both directions and averaging the two values.
+         (Not by default; the comparison is fundamentally asymmetric in
+         any case since it's comparing articles against regions.)
  */
 class KLDivergenceStrategy(
   partial: Boolean = true,
@@ -2092,11 +2091,11 @@ class KLDivergenceStrategy(
   FIXME: We really should transform the distributions by TF/IDF before
   doing this.
 
-  @tparam smoothed If true, use the smoothed word distributions. (By default,
-          use unsmoothed distributions.)
-  @tparam partial If true, only do "partial" cosine similarity.
-          This only computes the similarity involving words in the article
-          distribution, rather than considering all words in the vocabulary.
+  @param smoothed If true, use the smoothed word distributions. (By default,
+         use unsmoothed distributions.)
+  @param partial If true, only do "partial" cosine similarity.
+         This only computes the similarity involving words in the article
+         distribution, rather than considering all words in the vocabulary.
  */
 class CosineSimilarityStrategy(
   smoothed: Boolean = false,
