@@ -2986,11 +2986,9 @@ object Disambig extends NlpApp {
   val the_op = Opts.op
 
   var need_to_read_stopwords = false
-  var stopwords_file = null: String
 
   override def output_parameters() {
     errprint("Need to read stopwords: %s", need_to_read_stopwords)
-    errprint("Actual stopwords file: %s", stopwords_file)
   }
 
   def handle_arguments(op: OptionParser, args: Seq[String]) {
@@ -3130,7 +3128,7 @@ object Disambig extends NlpApp {
     import Toponym._
 
     if (need_to_read_stopwords) {
-      stopwords_file =
+      val stopwords_file =
         Stopwords.compute_stopwords_filename(Opts.stopwords_file)
       Stopwords.read_stopwords(stopwords_file)
     }
