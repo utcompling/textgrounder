@@ -57,7 +57,7 @@ object TrivialIntMemoizer {
 }
 
 object WordDist {
-  val memoizer = IdentityMemoizer
+  val memoizer = IntStringMemoizer
   val invalid_word = memoizer.invalid_word
   type Word = memoizer.Word
   def memoize_word(word: String) = memoizer.memoize_word(word)
