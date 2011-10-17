@@ -1,5 +1,5 @@
 ////////
-//////// Disambig.scala
+//////// Geolocate.scala
 ////////
 //////// Copyright (c) 2010, 2011 Ben Wing.
 ////////
@@ -113,7 +113,7 @@ The Twitter data was generated from [http://www.ark.cs.cmu.edu/GeoText/ The Geo-
 
 === Replicating the experiments ===
 
-The code in Disambig.scala does the actual geolocating.  It can be invoked
+The code in Geolocate.scala does the actual geolocating.  It can be invoked
 directly using 'textgrounder geolocate', but the normal route is to go through
 a front-end script.  The following is a list of the front-end scripts available:
   * `tg-geolocate` is the most basic script, which reads parameters from the
@@ -341,7 +341,7 @@ one of `none`, `log` and `logsquared` (actually computes the negative
 of the squared log).  The argument `--kml-max-height` can be used to
 specify the heights of the bars in the graph.  It is also possible to
 specify the colors of the bars in the graph by modifying constants given
-in `Disambig.scala`, near the beginning (`object KMLConstants`).
+in `Geolocate.scala`, near the beginning (`object KMLConstants`).
 
 For example: For the Twitter corpus, running on different levels of the
 document threshold for discarding words, and for the four words "cool",
@@ -2445,9 +2445,9 @@ object Stopwords {
 //                                  Main code                              //
 /////////////////////////////////////////////////////////////////////////////
 
-class DocGrounderOptions {
-  //// Basic options for determining operating mode and strategy
+class GeolocateOptions {
 
+  //// Basic options for determining operating mode and strategy
   var mode = "geotag-documents"
   var strategy = Seq[String]()
   var baseline_strategy = Seq[String]()
@@ -2980,7 +2980,7 @@ object Debug {
   }
 }
 
-object Disambig extends NlpApp {
+object GeolocateApp extends NlpApp {
   val the_opts = Opts
   val the_op = Opts.op
 

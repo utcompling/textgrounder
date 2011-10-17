@@ -194,7 +194,7 @@ elif [ "$CMD" = 'build-all' ]; then
 
 elif [ "$CMD" = 'geolocate' ]; then
 
-  CLASS=opennlp.textgrounder.geolocate.Disambig
+  CLASS=opennlp.textgrounder.geolocate.GeolocateApp
   RUNCMD="$SCALA_COMMAND $CLASS"
   # execute() doesn't handle setting JAVA_OPTS like we do, and they can't
   # be included in a variable that is expanded and reparsed, the way that
