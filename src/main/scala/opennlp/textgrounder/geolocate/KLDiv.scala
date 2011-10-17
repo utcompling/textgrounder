@@ -88,7 +88,7 @@ object KLDiv {
     setup_static_arrays(self)
     val pkeys = static_key_array.array
     val pvalues = static_value_array.array
-    val psize = pkeys.length
+    val psize = self.counts.size
 
     // FIXME!! p * log(p) is the same for all calls of fast_kl_divergence
     // on this item, so we could cache it.  Not clear it would save much
