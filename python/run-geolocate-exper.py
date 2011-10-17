@@ -3,7 +3,7 @@
 import os
 from nlputil import *
 
-# Run a series of disambiguation experiments.
+# Run a series of geolocation experiments.
 
 tgdir = os.environ['TEXTGROUNDER_DIR']
 if not tgdir:

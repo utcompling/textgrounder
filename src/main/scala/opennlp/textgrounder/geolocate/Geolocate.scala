@@ -140,7 +140,7 @@ a front-end script.  The following is a list of the front-end scripts available:
   * `nohup-geolocate-twitter` is the same, but calls `geolocate-twitter`.
   * `nohup-geolocate-twitter-wiki` is the same, but calls
     `geolocate-twitter-wiki`.
-  * `python/run-disambig-exper.py` is a framework for running a series of
+  * `python/run-geolocate-exper.py` is a framework for running a series of
     experiments on similar arguments.  It was used extensively in running
     the experiments for the paper.
 
@@ -2507,7 +2507,7 @@ class GeolocateOptions {
 }
 
 object Opts {
-  val op = new OptionParser("disambig")
+  val op = new OptionParser("geolocate")
   
   //// Basic options for determining operating mode and strategy
   def mode =
