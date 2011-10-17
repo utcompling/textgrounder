@@ -1798,14 +1798,18 @@ abstract class TestFileEvaluator(stratname: String) {
           break
       }
       for (dir <- files) {
-        val dirfile = new File(dir)
-        if (dirfile.isDirectory) {
-          errprint("Processing evaluation directory %s...", dir)
-          for (file <- dirfile.listFiles().toSeq) {
-            val filename = file.toString
-            process_one_file(filename)
-          }
-        } else process_one_file(dir)
+        if (dir == null)
+          process_one_file(dir)
+        else {
+          val dirfile = new File(dir)
+          if (dirfile.isDirectory) {
+            errprint("Processing evaluation directory %s...", dir)
+            for (file <- dirfile.listFiles().toSeq) {
+              val filename = file.toString
+              process_one_file(filename)
+            }
+          } else process_one_file(dir)
+        }
       }
     }
 
