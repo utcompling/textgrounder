@@ -2,6 +2,8 @@ package opennlp.textgrounder.geolocate
 
 import NlpUtil._
 import Distances._
+import Debug._
+
 import util.control.Breaks._
 import java.io._
 

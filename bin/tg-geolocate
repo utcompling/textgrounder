@@ -1,10 +1,10 @@
 #!/bin/sh
 
-# Run disambig.py, passing it various useful arguments.  Extra arguments
-# can be specified on the command line, which will override any existing
-# arguments.
+# Run 'textgrounder geolocate', passing it various useful arguments.
+# Extra arguments can be specified on the command line, which will
+# override any existing arguments.
 #
-# See also 'run-run-disambig', which will run this script using 'nohup'
+# See also 'nohup-tg-geolocate', which will run this script using 'nohup'
 # while saving the output to a file.
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
@@ -16,6 +16,7 @@ fi
 
 GEOLOCATE="$TEXTGROUNDER_DIR/bin/textgrounder geolocate"
 
+MODE=geotag-documents
 for x in ${1+"$@"}; do
   if [ "$x" = "--mode=geotag-toponyms" ]; then
     MODE=geotag-toponyms
@@ -32,11 +33,9 @@ if [ "$MODE" = "geotag-toponyms" ]; then
   EVALFILE="--eval-file $TRCONLL_DEV_DIR"
   EVALTYPE="--eval-format tr-conll"
   #EVALFILE="--eval-file $PREFIX-toponym-eval.txt"
-else # if [ "$MODE" = "geotag-documents" ]; then
-  EVALTYPE="--eval-format wiki"
-  GAZETTEER_ARG=
+  MODE_ARG="$GAZETTEER_ARG $STRATEGY $EVALFILE $EVALTYPE"
+else
+  MODE_ARG=
 fi
 
-$GEOLOCATE \
-  $STOPWORDS_ARG $GAZETTEER_ARG $STRATEGY $EVALFILE $EVALTYPE \
- $MISCOPTS $LOCAL_ARGS ${1+"$@"}
+$GEOLOCATE $MODE_ARG $MISCOPTS $LOCAL_ARGS ${1+"$@"}

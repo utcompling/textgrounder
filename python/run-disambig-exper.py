@@ -5,10 +5,10 @@ from nlputil import *
 
 # Run a series of disambiguation experiments.
 
-if 'WIKIGROUNDER_DIR' in os.environ:
-  tgdir = os.environ['WIKIGROUNDER_DIR']
-else:
-  tgdir = '%s/python' % (os.environ['TEXTGROUNDER_DIR'])
+tgdir = os.environ['TEXTGROUNDER_DIR']
+if not tgdir:
+  raise EnvironmentError("TEXTGROUNDER_DIR must be set to the base of the TextGrounder distribution.")
+tgbin = '%s/bin' % tgdir
 
 def runit(fun, id, args):
   command='%s --id %s documents %s' % (Opts.run_cmd, id, args)
@@ -50,7 +50,7 @@ def main():
   op = OptionParser(usage="%prog [options] experiment [...]")
   op.add_option("-n", "--dry-run", action="store_true",
 		  help="Don't execute anything; just output the commands that would be executed.")
-  def_runcmd = '%s/run-run-wikipedia' % tgdir
+  def_runcmd = '%s/nohup-geolocate-wikipedia' % tgbin
   op.add_option("-c", "--run-cmd", "--cmd", default=def_runcmd,
 		  help="Command to execute; default '%default'.")
   (opts, args) = op.parse_args()

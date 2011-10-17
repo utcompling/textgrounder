@@ -381,7 +381,7 @@ class RegionWordDist(WordDist):
       self.add_word_distribution(art.dist)
       num_arts_for_word_dist += 1
     self.num_arts_for_links += num_arts_for_links
-    self.num_arts_for_word_dist = num_arts_for_word_dist
+    self.num_arts_for_word_dist += num_arts_for_word_dist
     self.incoming_links += incoming_links
     if num_arts_for_word_dist and debug['lots']:
       errprint("""--> Finished processing, number articles handled = %s/%s,

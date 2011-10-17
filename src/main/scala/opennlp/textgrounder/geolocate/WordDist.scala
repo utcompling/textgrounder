@@ -1,10 +1,12 @@
 package opennlp.textgrounder.geolocate
 
-import math._
+import WordDist._
 import NlpUtil._
 import KLDiv._
+import Debug._
+
+import math._
 import collection.mutable
-import WordDist._
 import gnu.trove.map.hash
 
 // val use_sorted_list = false
