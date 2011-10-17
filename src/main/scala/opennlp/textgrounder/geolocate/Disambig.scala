@@ -483,12 +483,15 @@ class RegionWordDist extends WordDist {
         case _ =>
       }
       this_num_arts_for_links += 1
-      if (art.dist == null) {
-        if (Opts.max_time_per_stage == 0.0 && Opts.num_training_docs == 0)
-          warning("Saw article %s without distribution", art)
-      } else {
-        assert(art.dist.finished)
-        if (art.split == "training") {
+
+      /* Add word counts of article to region, but only if in the
+         training set. */
+      if (art.split == "training") {
+        if (art.dist == null) {
+          if (Opts.max_time_per_stage == 0.0 && Opts.num_training_docs == 0)
+            warning("Saw article %s without distribution", art)
+        } else {
+          assert(art.dist.finished)
           add_word_distribution(art.dist)
           this_num_arts_for_word_dist += 1
         }
