@@ -495,7 +495,7 @@ class RegionWordDist extends WordDist {
       }
     }
     num_arts_for_links += this_num_arts_for_links
-    num_arts_for_word_dist = this_num_arts_for_word_dist
+    num_arts_for_word_dist += this_num_arts_for_word_dist
     incoming_links += this_incoming_links
     if (this_num_arts_for_word_dist > 0 && debug("lots")) {
       errprint("""--> Finished processing, number articles handled = %s/%s,
