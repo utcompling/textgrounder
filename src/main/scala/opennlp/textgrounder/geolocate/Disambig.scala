@@ -476,9 +476,38 @@ class RegionWordDist extends WordDist {
     val old_total_tokens = total_tokens
     var this_num_arts_for_links = 0
     var this_num_arts_for_word_dist = 0
+    /* We are passed in all articles, regardless of the split.
+       The decision was made to accumulate link counts from all articles,
+       even in the evaluation set.  Strictly, this is a violation of the
+       "don't train on your evaluation set" rule.  The reason we do this
+       is that
+
+       (1) The links are used only in Naive Bayes, and only in establishing
+       a prior probability.  Hence they aren't the main indicator.
+       (2) Often, nearly all the link count for a given region comes from
+       a particular article -- e.g. the Wikipedia article for the primary
+       city in the region.  If we pull the link count for this article
+       out of the region because it happens to be in the evaluation set,
+       we will totally distort the link count for this region.  In a "real"
+       usage case, we would be testing against an unknown article, not
+       against an article in our training set that we've artificially
+       removed so as to construct an evaluation set, and this problem
+       wouldn't arise, so by doing this we are doing a more realistic
+       evaluation.
+       
+       Note that we do NOT include word counts from dev-set or test-set
+       articles in the word distribution for a region.  This keeps to the
+       above rule about only training on your training set, and is OK
+       because (1) each article in a region contributes a similar amount of
+       word counts (assuming the articles are somewhat similar in size),
+       hence in a region with multiple articles, each individual article
+       only computes a fairly small fraction of the total word counts;
+       (2) distributions are normalized in any case, so the exact number
+       of articles in a region does not affect the distribution. */
     for (art <- articles) {
-      // Might be None, for unknown link count
+      /* Add link count of article to region. */
       art.incoming_links match {
+        // Might be None, for unknown link count
         case Some(x) => this_incoming_links += x
         case _ =>
       }
