@@ -10,6 +10,7 @@ import NlpUtil._
 import WordDist.{Word, invalid_word, memoize_word, unmemoize_word}
 import OptParse._
 import Distances._
+import Debug._
 
 import util.matching.Regex
 import util.Random
@@ -31,16 +32,376 @@ import java.io._
 //                              Documentation                              //
 /////////////////////////////////////////////////////////////////////////////
 
-////// Quick start
+/*
 
-// This program does disambiguation of geographic names on the TR-CONLL corpus.
-// It uses data from Wikipedia to do this.  It is "unsupervised" in the sense
-// that it does not do any supervised learning using the correct matches
-// provided in the corpus; instead, it uses them only for evaluation purposes.
+=== Introduction ===
 
-/////////////////////////////////////////////////////////////////////////////
-//                                  Globals                                //
-/////////////////////////////////////////////////////////////////////////////
+This program does geolocation (i.e. identification of the geographic
+location -- as a pair of latitude/longitude coordinates, somewhere on the
+Earth -- either of individual toponyms in a document or of the entire
+document).  It uses a statistical model derived from a large corpus
+of already geolocated documents, such as Wikipedia -- i.e. it is
+supervised (at least in some sense).
+
+The software implements the experiments described in the following paper:
+
+Benjamin Wing and Jason Baldridge (2011), "Simple Supervised Document
+Geolocation with Geodesic Grids." In Proceedings of the 49th Annual
+Meeting of the Association for Computational Linguistics: Human Language
+Technologies, Portland, Oregon, USA, June 2011.
+
+(See http://www.jasonbaldridge.com/papers/wing-baldridge-acl2011.pdf.)
+
+It operates in four basic modes (specified by --mode):
+
+1. Document geolocation.  This identifies the location of a document.
+   Training comes from "articles", which currently are described simply
+   by (smoothed) unigram distributions, i.e. counts of the words seen
+   in the article.  In addition, each article optionally can be tagged
+   with a location (specified as a pair of latitude/longitude values),
+   used for training and evaluation; some other per-article data exists
+   as well, much of it currently underused or not used at all.  The
+   articles themselves are often Wikipedia articles, but the source data
+   can come from anywhere (e.g. Twitter feeds, i.e. concatenation of all
+   tweets from a given user).  Evaluation is either on other articles
+   (with each article treated as a document) or on documents from some
+   other source, e.g. chapters from books stored in PCL-Travel format.
+
+2. Toponym geolocation.  This disambiguates each toponym in a document,
+   where a toponym is a word such as "London" or "Georgia" that refers
+   to a geographic entity such as a city, state, province or country.
+   A statistical model is created from article data, as above, but a
+   gazetteer can also be used as an additional source of data listing
+   valid toponyms.  Evaluation is either on the geographic names in a
+   TR-CONLL corpus or links extracted from a Wikipedia article.
+
+3. KML generation.  This generates per-word region distributions of the
+   sort used in the ACP strategy (--strategy=average-cell-probability),
+   then outputs KML files for given words showing the distribution of
+   the words across the Earth.
+
+4. Simultaneous segmentation and geolocation.  This assumes that a
+   document is composed of segments of unknown size, each of which
+   refers to a different location, and simultaneously finds the
+   best segmentation and best location of each segment. (NOT YET
+   implemented.)
+
+=== Obtaining the Data ===
+
+If you don't have the data already (you do if you have access to the Comp
+Ling machines), download and unzip the processed Wikipedia/Twitter data and
+aux files from http://wing.best.vwh.net/wikigrounder.
+
+There are three sets of data to download:
+  * The processed Wikipedia data, in `wikipedia/`.  The files are
+    listed separately here and bzipped, in case you don't want them all.
+    If you're not sure, get them all; or read down below to see which ones
+    you need.
+  * Auxiliary files, in `wikigrounder-aux-1.0.tar.bz2`. NOTE: Currently the
+    only auxiliary file you need is the World Gazetteer, and that is needed
+    only when doing toponym resolution (--mode=geotag-toponyms).
+  * The processed Twitter data, in `wikigrounder-twitter-1.0.tar.bz2`.
+
+Untar these files somewhere.  Then set the following environment variables:
+  * `TG_WIKIPEDIA_DIR` points to the directory containing the Wikipedia data.
+  * `TG_TWITTER_DIR` points to the directory containing the Twitter data.
+  * `TG_AUX_DIR` points to the directory containing the auxiliary data.
+
+The Wikipedia data was generated from [http://download.wikimedia.org/enwiki/20100904/enwiki-20100904-pages-articles.xml.bz2 the original English-language Wikipedia dump of September 4, 2010].
+
+The Twitter data was generated from [http://www.ark.cs.cmu.edu/GeoText/ The Geo-tagged Microblog corpus] created by [http://aclweb.org/anthology-new/D/D10/D10-1124.pdf Eisenstein et al (2010)].
+
+=== Replicating the experiments ===
+
+The code in Disambig.scala does the actual geolocating.  It can be invoked
+directly using 'textgrounder geolocate', but the normal route is to go through
+a front-end script.  The following is a list of the front-end scripts available:
+  * `tg-geolocate` is the most basic script, which reads parameters from the
+    script `config-geolocate` (which in turn can read from a script
+    `local-config-geolocate` that you create in the TextGrounder bin/
+    directory, if you want to add local configuration info; see the
+    `sample.local-config-geolocate` file in bin/ for an example).  This
+    takes care of specifying the auxiliary data files (see above).
+  * `geolocate-wikipedia` is a similar script, but specifically runs on
+    the downloaded Wikipedia data.
+  * `geolocate-twitter` is a similar script, but specifically runs on the
+    downloaded Twitter data.
+  * `geolocate-twitter-wiki` is a similar script, but runs on the combination
+    of the downloaded Wikipedia and Twitter data. (FIXME: This isn't the
+    right way to combine the two types of data.)
+  * `nohup-tg-geolocate` is a higher-level front-end to `tg-geolocate`,
+    which runs `tg-geolocate` using `nohup` (so that a long-running
+    experiment will not get terminated if your shell session ends), and
+    saves the output to a file.  The output file is named in such a way
+    that it contains the current date and time, as well as any optional ID
+    specified using the `-i` or `--id` argument.  It will refuse to
+    overwrite an existing file.
+  * `nohup-geolocate-wikipedia` is the same, but calls `geolocate-wikipedia`.
+  * `nohup-geolocate-twitter` is the same, but calls `geolocate-twitter`.
+  * `nohup-geolocate-twitter-wiki` is the same, but calls
+    `geolocate-twitter-wiki`.
+  * `python/run-disambig-exper.py` is a framework for running a series of
+    experiments on similar arguments.  It was used extensively in running
+    the experiments for the paper.
+
+You can invoke `geolocate-wikipedia` with no parameters, and it will do
+something reasonable: It will attempt to geolocate the entire dev set of
+the Wikipedia corpus, using KL divergence as a strategy, with a grid size
+of 1 degrees.  Options you may find useful (which also apply to
+`textgrounder geolocate` and all front ends):
+
+`--degrees-per-region NUM`
+`--dpr NUM`
+
+Set the size of a region in degrees, which can be a fractional value.
+
+`--eval-set SET`
+
+Set the split to evaluate on, either "dev" or "test".
+
+`--strategy STRAT ...`
+
+Set the strategy to use for geolocating.  Sample strategies are
+`partial-kl-divergence` ("KL Divergence" in the paper),
+`average-cell-probability` ("ACP" in the paper),
+`naive-bayes-with-baseline` ("Naive Bayes" in the paper), and `baseline`
+(any of the baselines).  You can specify multiple `--strategy` options
+on the command line, and the specified strategies will be tried one after
+the other.
+
+`--baseline-strategy STRAT ...`
+
+Set the baseline strategy to use for geolocating. (It's a separate
+argument because some strategies use a baseline strategy as a fallback,
+and in those cases, both the strategy and baseline strategy need to be
+given.) Sample strategies are `link-most-common-toponym` ("??" in the
+paper), `num-articles`  ("??" in the paper), and `random` ("Random" in
+the paper).  You can specify multiple `--baseline-strategy` options,
+just like for `--strategy`.
+
+`--num-training-docs, --num-test-docs`
+
+One way of controlling how much work is done.  These specify the maximum
+number of documents (training and testing, respectively) to load/evaluate.
+
+`--max-time-per-stage SECS`
+`--mts SECS`
+
+Another way of controlling how much work is done.  Set the maximum amount
+of time to spend in each "stage" of processing.  A value of 300 will
+load enough to give you fairly reasonable results but not take too much
+time running.
+
+`--skip-initial N, --every-nth N`
+
+A final way of controlling how much work is done.  `--skip-initial`
+specifies a number of test documents to skip at the beginning before
+stating to evaluate.  `--every-nth` processes only every Nth document
+rather than all, if N > 1.  Used judiciously, they can be used to split
+up a long run.
+
+An additional argument specific to the Twitter front ends is
+`--doc-thresh`, which specifies the threshold (in number of documents)
+below which vocabulary is ignored.  See the paper for more details.
+
+=== Extracting results ===
+
+A few scripts are provided to extract the results (i.e. mean and median
+errors) from a series of runs with different parameters, and output the
+results either directly or sorted by error distance:
+
+  * `extract-raw-results.sh` extracts results from a number of runs of
+    any of the above front end programs.  It extracts the mean and median
+    errors from each specified file, computes the avg mean/median error,
+    and outputs a line giving the errors along with relevant parameters
+    for that particular run.
+
+  * `extract-results.sh` is similar but also sorts by distance (both
+    median and mean, as well as avg mean/median), to see which parameter
+    combinations gave the best results.
+
+=== Specifying data ===
+
+Data is specified in two main files, given with the options
+`--article-data-file` and `--counts-file`.  The article data file lists
+all of the articles to be processed and includes various pieces of data
+for each article, e.g. title, latitude/longitude coordinates, split
+(training, dev, test), number of incoming links (i.e. how many times is
+there a link to this article), etc.  The counts file gives word counts
+for each article, i.e. which word types occur in the article and how
+many times. (Note, the term "article" is used because of the focus on
+Wikipedia; but it should be seen as equivalent to "document".)
+
+Additional data files (which are automatically handled by the
+`tg-geolocate` script) are specified using `--stopwords-file` and
+`--gazetteer-file`.  The stopwords file is a list of stopwords (one per
+line), i.e. words to be ignored when generating a distribution from the
+word counts in the counts file.  You don't normally have to specify this
+at all; if not, a default stopwords file is retrieved from inside the
+TextGrounder distribution.  The optional gazetteer file is used only
+when doing toponym resolution (--mode=geotag-toponyms), and doesn't
+apply at all when doing the normal document resolution, as was done in
+the paper.
+
+The article data file is formatted as a simple database.  Each line is
+an entry (i.e. an article) and consists of a fixed number of fields,
+each separated by a tab character.  The first line gives the names of
+the fields.  Fields are accessed by name; hence, rearranging fields, and
+in most cases, omitting fields, is not a problem as long as the field
+names are correct.  The following is a list of the defined fields:
+
+  * `id`: The numeric ID of the article.  Can be arbitrary and currently
+  used only when printing out articles.  For Wikipedia articles, this
+  corresponds to the internally-assigned ID.
+
+  * `title`: Title of the article.  Must be unique, and must be given
+  since it used to look up articles in the counts file.
+
+  * `split`: One of the strings "training", "dev", "test".  Must be
+  given.
+
+  * `redir`: If this article is a Wikipedia redirect article, this
+  specifies the title of the article redirected to; otherwise, blank.
+  This field is not much used by the document-geotagging code (it is
+  more important during toponym geotagging).  Its main use in document
+  geotagging is in computing the incoming link count of an article (see
+  below).
+
+  * `namespace`: The Wikipedia namespace of the article.  Articles not
+  in the `Main` namespace have the namespace attached to the beginning
+  of the article name, followed by a colon (but not all articles with a
+  colon in them have a namespace prefix).  The main significance of this
+  field is that articles not in the `Main` namespace are ignored.  However,
+  this field can be omitted entirely, in which case all articles are
+  assumed to be in `Main`.
+
+  * `is_list_of`, `is_disambig`, `is_list`: These fields should either
+  have  the value of "yes" or "no".  These are Wikipedia-specific fields
+  (identifying, respectively, whether the article title is "List of ...";
+  whether the article is a Wikipedia "disambiguation" page; and whether
+  the article is a list of any type, which includes the previous two
+  categories as well as some others).  None of these fields are currently
+  used.
+
+  * `coord`: Coordinates of an article, or blank.  If specified, the
+  format is two floats separated by a comma, giving latitude and longitude,
+  respectively (positive for north and east, negative for south and
+  west).
+
+  * `incoming_links`: Number of incoming links, or blank if unknown.
+  This specifies the number of links pointing to the article from anywhere
+  within Wikipedia.  This is primarily used as part of certain baselines
+  (`internal-link` and `link-most-common-toponym`).  Note that the actual
+  incoming link count of an article includes the incoming link counts
+  of any redirects to that article.
+
+The format of the counts file is like this:
+
+{{{
+Article title: Ampasimboraka
+Article ID: 17242049
+population = 16
+area = 15
+of = 10
+mi = 10
+sq = 10
+leader = 9
+density = 8
+km2 = 8
+image = 8
+blank1 = 8
+metro = 5
+blank = 5
+urban = 5
+Madagascar = 5
+}}}
+
+Multiple articles should follow one directly after the other, with no
+blank lines.  The article ID is currently ignored entirely.  There is
+no need for the words to be sorted by count (or in any other way); this
+is simply done here for ease in debugging.  Note also that, although the
+code that generates word counts currently ensures that no word has a
+space in it, spaces in general are not a problem, as the code that parses
+the word counts specifically looks for an equal sign surrounded by spaces
+and followed by a number (hence a "word" containing such a sequence would
+be problematic).
+
+=== Generating KML files ===
+
+It is possible to use `textgrounder geolocate` to generate KML files
+showing the distribution of particular words over the Earth's surface,
+which can be viewed using [http://earth.google.com Google Earth].  The
+basic argument to invoke this is `--mode=generate-kml`.  `--kml-words`
+is a comma-separated list of the words to generate distributions for.
+Each word is saved in a file named by appending the word to whatever is
+specified using `--kml-prefix`.  Another argument is `--kml-transform`,
+which is used to specify a function to apply to transform the probabilities
+in order to make the distinctions among them more visible.  It can be
+one of `none`, `log` and `logsquared` (actually computes the negative
+of the squared log).  The argument `--kml-max-height` can be used to
+specify the heights of the bars in the graph.  It is also possible to
+specify the colors of the bars in the graph by modifying constants given
+in `Disambig.scala`, near the beginning (`object KMLConstants`).
+
+For example: For the Twitter corpus, running on different levels of the
+document threshold for discarding words, and for the four words "cool",
+"coo", "kool" and "kewl", the following code plots the distribution of
+each of the words across a region of degree size 1x1. `--mts=300` is
+more for debugging and stops loading further data for generating the
+distribution after 300 seconds (5 minutes) has passed.  It's unnecessary
+here but may be useful if you have an enormous amount of data (e.g. all
+of Wikipedia).
+
+{{{
+for x in 0 5 40; do geolocate-twitter --doc-thresh $x --mts=300 --degrees-per-region=1 --mode=generate-kml --kml-words='cool,coo,kool,kewl' --kml-prefix=kml-dist.$x.none. --kml-transform=none; done 
+}}}
+
+Another example, just for the words "cool" and "coo", but with different
+kinds of transformation of the probabilities.
+
+{{{
+for x in none log logsquared; do geolocate-twitter --doc-thresh 5 --mts=300 --degrees-per-region=1 --mode=generate-kml --kml-words='cool,coo' --kml-prefix=kml-dist.5.$x. --kml-transform=$x; done 
+}}}
+
+=== Generating data ===
+
+Scripts were written to extract data from the raw Wikipedia dump files
+and from the Twitter corpus and output in the format required above for
+`textgrounder geolocate`.
+
+*NOTE*: Parsing raw Wikipedia dump files is not easy.  Perhaps better
+would have been to download and run the MediaWiki software that generates
+the HTML that is actually output.  As it is, there may be occasional
+errors in processing.  For example, the code that locates the geotagged
+coordinate from an article uses various heuristics to locate the coordinate
+from various templates which might specify it, and other heuristics to
+fetch the correct coordinate if there is more than one.  In some cases,
+this will fetch the correct coordinate even if the MediaWiki software
+fails to find it (due to slightly incorrect formatting in the article);
+but in other cases, it may find a spurious coordinate. (This happens
+particularly for articles that mention a coordinate but don't happen to
+be themselves tagged with a coordinate, or when two coordinates are
+mentioned in an article. FIXME: We make things worse here by picking the
+first coordinate and ignoring `display=title`.  See comments in
+`get_coord()` about how to fix this.)
+
+The main script to extract data from a Wikipedia dump is `processwiki.py`.
+It takes the (unzipped) dump file as stdin and processes it according
+to command-line arguments.  Normally the front end `run-processwiki` is
+run instead.
+
+To run `run-processwiki`, specify steps to do.  Each step generates one
+file.  As a shorthand, `all` does all the necessary steps to generate
+the Wikipedia data files (but does not generate every possible file that
+can be generated).  If you have your own dump file, change the name in
+`config-wikigrounder`.
+
+Similarly, to generate Twitter data, use `run-process-twitter`, which
+is a front end for `twitter_geotext_process.py`.
+
+FIXME: Document more.
+
+*/
 
 /////////////////////////////////////////////////////////////////////////////
 //                               Structures                                //
@@ -82,9 +443,6 @@ import java.io._
 //  }
 
 object KMLConstants {
-  // Height of highest bar in meters
-  val kml_max_height = 2000000
-
   // Minimum and maximum colors
   val kml_mincolor = Array(255.0, 255.0, 0.0) // yellow
   val kml_maxcolor = Array(255.0, 0.0, 0.0) // red
@@ -126,7 +484,7 @@ class RegionWordDist extends WordDist {
       }
       this_num_arts_for_links += 1
       if (art.dist == null) {
-        if (Opts.max_time_per_stage == 0 && Opts.num_training_docs == 0)
+        if (Opts.max_time_per_stage == 0.0 && Opts.num_training_docs == 0)
           warning("Saw article %s without distribution", art)
       } else {
         assert(art.dist.finished)
@@ -266,7 +624,8 @@ class WordRegionDist(
       for (coord <- Seq(swcoord, nwcoord, necoord, secoord, swcoord)) {
         val lat = (center.lat + coord.lat) / 2
         val long = (center.long + coord.long) / 2
-        coordtext += "%s,%s,%s\n" format (long, lat, fracprob * kml_max_height)
+        coordtext += "%s,%s,%s\n" format (
+          long, lat, fracprob * Opts.kml_max_height)
       }
       val name =
         if (reg.most_popular_article != null) reg.most_popular_article.title
@@ -640,7 +999,7 @@ object StatRegion {
     StatArticleTable.table.clear_training_article_distributions()
   }
 
-  // Add the given article to the region map, which covers the earth in regions
+  // Add the given article to the region map, which covers the Earth in regions
   // of a particular size to aid in computing the regions used in region-based
   // Naive Bayes.
   def add_article_to_region(article: StatArticle) {
@@ -667,7 +1026,7 @@ object StatRegion {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//                             Wikipedia articles                          //
+//                         Wikipedia/Twitter articles                      //
 /////////////////////////////////////////////////////////////////////////////
 
 //////////////////////  Article table
@@ -705,20 +1064,24 @@ class StatArticleTable {
   // Total # of incoming links for all articles in each split.
   val incoming_links_by_split = intmap[String]()
 
-  // Map from short name (lowercased) to list of Wikipedia articles.  The
-  // short name for an article is computed from the article's name.  If
-  // the article name has a comma, the short name is the part before the
-  // comma, e.g. the short name of "Springfield, Ohio" is "Springfield".
-  // If the name has no comma, the short name is the same as the article
-  // name.  The idea is that the short name should be the same as one of
-  // the toponyms used to refer to the article.
+  /** 
+    Map from short name (lowercased) to list of articles.
+    The short name for an article is computed from the article's name.  If
+    the article name has a comma, the short name is the part before the
+    comma, e.g. the short name of "Springfield, Ohio" is "Springfield".
+    If the name has no comma, the short name is the same as the article
+    name.  The idea is that the short name should be the same as one of
+    the toponyms used to refer to the article.
+   */
   val short_lower_name_to_articles = bufmap[String,StatArticle]()
 
-  // Map from tuple (NAME, DIV) for Wikipedia articles of the form
-  // "Springfield, Ohio", lowercased.
+  /**
+    Map from tuple (NAME, DIV) for articles of the form "Springfield, Ohio",
+    lowercased.
+   */
   val lower_name_div_to_articles = bufmap[(String, String), StatArticle]()
 
-  // For each toponym, list of Wikipedia articles matching the name.
+  // For each toponym, list of articles matching the name.
   val lower_toponym_to_article = bufmap[String,StatArticle]()
 
   // Mapping from lowercased article names to TopoArticle objects
@@ -841,7 +1204,7 @@ class StatArticleTable {
     // This is basically a one-off debug statement because of the fact that
     // the experiments published in the paper used a word-count file generated
     // using an older algorithm for determining the geotagged coordinate of
-    // a Wikipedia article.  We didn't record the corresponding article-data
+    // an article.  We didn't record the corresponding article-data
     // file, so we need a way of regenerating it using the intersection of
     // articles in the article-data file we actually used for the experiments
     // and the word-count file we used.
@@ -996,7 +1359,10 @@ object StatArticleTable {
 
 ///////////////////////// Articles
 
-// A Wikipedia article for geotagging.
+// An "article" for geotagging.  Articles can come from Wikipedia, but
+// also from Twitter, etc., provided that the data is in the same format.
+// (In Twitter, generally each "article" is the set of tweets from a given
+// user.)
 
 class StatArticle(params: Map[String, String]) extends Article(params) {
   // Object containing word distribution of this article.
@@ -1150,7 +1516,8 @@ class EvalWithRank(
 }
 
 class GeotagDocumentEval(
-  max_rank_for_credit: Int = 10) extends EvalWithRank(max_rank_for_credit) {
+  max_rank_for_credit: Int = 10
+) extends EvalWithRank(max_rank_for_credit) {
   val true_dists = mutable.Buffer[Double]()
   val degree_dists = mutable.Buffer[Double]()
 
@@ -1163,7 +1530,6 @@ class GeotagDocumentEval(
   override def output_incorrect_results() {
     super.output_incorrect_results()
     def miles_and_km(miledist: Double) = {
-      val km_per_mile = 1.609
       "%.2f miles (%.2f km)" format (miledist, miledist * km_per_mile)
     }
     errprint("  Mean true error distance = %s",
@@ -1280,9 +1646,9 @@ class GeotagDocumentResults {
       for (
         (truedist, obj) <- docs_by_true_dist_to_true_center.toSeq sortBy (_._1)
       ) {
-        val lowrange = truedist * Opts.miles_per_region
+        val lowrange = truedist * miles_per_region
         val highrange = ((truedist + dist_fraction_increment) *
-          Opts.miles_per_region)
+          miles_per_region)
         errprint("")
         errprint("Results for documents/articles where distance to center")
         errprint("  of true region in miles is in the range [%.2f,%.2f):",
@@ -1315,29 +1681,45 @@ class GeotagDocumentResults {
 //                             Main geotagging code                        //
 /////////////////////////////////////////////////////////////////////////////
 
-// Abstract class for reading documents from a test file and evaluating on
-// them.
+/**
+  Abstract class for reading documents from a test file and evaluating on them.
+ */
 abstract class TestFileEvaluator(stratname: String) {
   var documents_processed = 0
 
   type Document
 
-  // Return an Iterable listing the documents retrievable from the given
-  // filename.
+  /**
+    Return an Iterable listing the documents retrievable from the given
+    filename.
+   */
   def iter_documents(filename: String): Iterable[Document]
 
-  // Return true if document would be skipped; false if processed and
-  // evaluated.
+  /**
+    Return true if document would be skipped; false if processed and
+    evaluated.
+   */
   def would_skip_document(doc: Document, doctag: String) = false
 
-  // Return true if document was actually processed and evaluated; false
-  // if skipped.
+  /**
+    Return true if document was actually processed and evaluated; false
+    if skipped.
+   */
   def evaluate_document(doc: Document, doctag: String): Boolean
 
-  // Output results so far.  If 'isfinal', this is the last call, so
-  // output more results.
+  /**
+    Output results so far.  If 'isfinal', this is the last call, so
+    output more results.
+   */
   def output_results(isfinal: Boolean = false): Unit
 
+  /**
+    Evaluate on all of the given files, outputting periodic results and
+    results after all files are done.  If the evaluator uses articles as
+    documents (so that it doesn't need any external test files), the value
+    of 'files' should be a sequence of one item, which is null. (If an
+    empty sequence is passed in, no evaluation will happen.)
+   */
   def evaluate_and_output_results(files: Iterable[String]) {
     val status = new StatusMessage("document")
     var last_elapsed = 0.0
@@ -1345,17 +1727,10 @@ abstract class TestFileEvaluator(stratname: String) {
     var skip_initial = Opts.skip_initial_test_docs
     var skip_n = 0
 
-    def output_final_results() {
-      errprint("")
-      errprint("Final results for strategy %s: All %d documents processed:",
-        stratname, status.num_processed())
-      errprint("Ending operation at %s", curtimehuman())
-      output_results(isfinal = true)
-      errprint("Ending final results for strategy %s", stratname)
-    }
-
-    for (filename <- files) {
-      errprint("Processing evaluation file %s...", filename)
+    /* Process all documents in a given file.  If return value is false,
+       processing was interrupted due to a limit being reached, and
+       no more files should be processed. */
+    def process_file(filename: String): Boolean = {
       for (doc <- iter_documents(filename)) {
         // errprint("Processing document: %s", doc)
         val num_processed = status.num_processed()
@@ -1389,8 +1764,7 @@ abstract class TestFileEvaluator(stratname: String) {
             errprint("")
             errprint("Finishing evaluation after %d documents",
               new_processed)
-            output_final_results()
-            return
+            return false
           }
 
           // If five minutes and ten documents have gone by, print out results
@@ -1406,19 +1780,66 @@ abstract class TestFileEvaluator(stratname: String) {
           }
         }
       }
+
+      return true
+    }
+
+    breakable {
+      def process_one_file(filename: String) {
+        if (filename != null)
+          errprint("Processing evaluation file %s...", filename)
+        if (!process_file(filename))
+          // This works because of the way 'breakable' is implemented
+          // (dynamically-scoped).  Might "break" (stop working) if break
+          // is made totally lexically-scoped.
+          break
+      }
+      for (dir <- files) {
+        val dirfile = new File(dir)
+        if (dirfile.isDirectory) {
+          errprint("Processing evaluation directory %s...", dir)
+          for (file <- dirfile.listFiles().toSeq) {
+            val filename = file.toString
+            process_one_file(filename)
+          }
+        } else process_one_file(dir)
+      }
+    }
+
+    def output_final_results() {
+      errprint("")
+      errprint("Final results for strategy %s: All %d documents processed:",
+        stratname, status.num_processed())
+      errprint("Ending operation at %s", curtimehuman())
+      output_results(isfinal = true)
+      errprint("Ending final results for strategy %s", stratname)
     }
 
     output_final_results()
   }
 }
 
+/**
+  Abstract class for reading documents from a test file and doing
+  document geolocation on them (as opposed e.g. to toponym resolution).
+ */
 abstract class GeotagDocumentStrategy {
+  /**
+   For a given word distribution (describing a test document), return
+   an Iterable of tuples, each listing a particular region on the Earth
+   and a score of some sort (the lower the better).  The results should
+   be in sorted order, with better regions earlier.
+   */
   def return_ranked_regions(worddist: WordDist): Iterable[(StatRegion, Double)]
 }
 
+/**
+  Class that implements the baseline strategies for document geolocation.
+  'baseline_strategy' specifies the particular strategy to use.
+ */
 class BaselineGeotagDocumentStrategy(
-  baseline_strategy: String)
-  extends GeotagDocumentStrategy {
+  baseline_strategy: String
+) extends GeotagDocumentStrategy {
   var cached_ranked_mps: Iterable[(StatRegion, Double)] = null
 
   def ranked_regions_random(worddist: WordDist) = {
@@ -1531,11 +1952,15 @@ class BaselineGeotagDocumentStrategy(
 }
 
 /**
- *  Return ranked regions by scoring each region against the distribution
- *  and returning the regions ordered by score, with the lower the better.
+  Abstract class that implements a strategy for document geolocation that
+  involves directly comparing the article distribution against each region
+  in turn and computing a score, with lower values better.
  */
-
 abstract class MinimumScoreStrategy extends GeotagDocumentStrategy {
+  /**
+    Function to return the score of an article distribution against a
+    region.
+   */
   def score_region(worddist: WordDist, stat_region: StatRegion): Double
 
   def return_ranked_regions(worddist: WordDist) = {
@@ -1558,9 +1983,24 @@ abstract class MinimumScoreStrategy extends GeotagDocumentStrategy {
   }
 }
 
+/**
+  Class that implements a strategy for document geolocation by computing
+  the KL-divergence between article and region (approximately, how much
+  the word distributions differ).  Note that the KL-divergence as currently
+  implemented uses the smoothed word distributions.
+
+  @tparam partial If true (the default), only do "partial" KL-divergence.
+          This only computes the divergence involving words in the article
+          distribution, rather than considering all words in the vocabulary.
+  @tparam symmetric If true, do a symmetric KL-divergence by computing
+          the divergence in both directions and averaging the two values.
+          (Not by default; the comparison is fundamentally asymmetric in
+          any case since it's comparing articles against regions.)
+ */
 class KLDivergenceStrategy(
   partial: Boolean = true,
-  symmetric: Boolean = false) extends MinimumScoreStrategy {
+  symmetric: Boolean = false
+) extends MinimumScoreStrategy {
 
   def score_region(worddist: WordDist, stat_region: StatRegion) = {
     var kldiv = fast_kl_divergence(worddist, stat_region.worddist,
@@ -1610,9 +2050,22 @@ class KLDivergenceStrategy(
   }
 }
 
+/**
+  Class that implements a strategy for document geolocation by computing
+  the cosine similarity between the distributions of article and region.
+  FIXME: We really should transform the distributions by TF/IDF before
+  doing this.
+
+  @tparam smoothed If true, use the smoothed word distributions. (By default,
+          use unsmoothed distributions.)
+  @tparam partial If true, only do "partial" cosine similarity.
+          This only computes the similarity involving words in the article
+          distribution, rather than considering all words in the vocabulary.
+ */
 class CosineSimilarityStrategy(
   smoothed: Boolean = false,
-  partial: Boolean = false) extends MinimumScoreStrategy {
+  partial: Boolean = false
+) extends MinimumScoreStrategy {
 
   def score_region(worddist: WordDist, stat_region: StatRegion) = {
     var cossim =
@@ -1630,9 +2083,10 @@ class CosineSimilarityStrategy(
   }
 }
 
-// Return the probability of seeing the given document 
+/** Use a Naive Bayes strategy for comparing document and region. */
 class NaiveBayesDocumentStrategy(
-  use_baseline: Boolean = true) extends GeotagDocumentStrategy {
+  use_baseline: Boolean = true
+) extends GeotagDocumentStrategy {
 
   def return_ranked_regions(worddist: WordDist) = {
 
@@ -1641,7 +2095,7 @@ class NaiveBayesDocumentStrategy(
       if (use_baseline) {
         if (Opts.naive_bayes_weighting == "equal") (1.0, 1.0)
         else {
-          val bw = Opts.baseline_weight.toDouble
+          val bw = Opts.naive_bayes_baseline_weight.toDouble
           ((1.0 - bw) / worddist.total_tokens, bw)
         }
       } else (1.0, 0.0))
@@ -1681,7 +2135,11 @@ abstract class GeotagDocumentEvaluator(
   }
 }
 
-class WikipediaGeotagDocumentEvaluator(
+/**
+  Class to do document geotagging on articles from the article data, in
+  the dev or test set.
+ */
+class ArticleGeotagDocumentEvaluator(
   strategy: GeotagDocumentStrategy,
   stratname: String
 ) extends GeotagDocumentEvaluator(strategy, stratname) {
@@ -1692,10 +2150,11 @@ class WikipediaGeotagDocumentEvaluator(
   //
   //  gridrank: For the given test article number (starting at 1), output
   //            a grid of the predicted rank for regions around the true
-  //            region.  Multiple articles can have the rank output by
-  //            specifying this option multiple times, e.g.
+  //            region.  Multiple articles can have the rank output, e.g.
   //
-  //            --debug 'gridrank=45,gridrank=58'
+  //            --debug 'gridrank=45,58'
+  //
+  //            (This will output info for articles 45 and 58.)
   //
   //  gridranksize: Size of the grid, in numbers of articles on a side.
   //                This is a single number, and the grid will be a square
@@ -1704,6 +2163,7 @@ class WikipediaGeotagDocumentEvaluator(
   debugval("gridranksize") = "11"
 
   def iter_documents(filename: String) = {
+    assert(filename == null)
     for (art <- StatArticleTable.table.articles_by_split(Opts.eval_set))
       yield art
   }
@@ -1732,7 +2192,7 @@ class WikipediaGeotagDocumentEvaluator(
     if (article.dist == null) {
       // This can (and does) happen when --max-time-per-stage is set,
       // so that the counts for many articles don't get read in.
-      if (Opts.max_time_per_stage == 0 && Opts.num_training_docs == 0)
+      if (Opts.max_time_per_stage == 0.0 && Opts.num_training_docs == 0)
         warning("Can't evaluate article %s without distribution", article)
       results.record_geotag_document_other_stat("Skipped articles")
       true
@@ -1887,7 +2347,7 @@ class PCLTravelGeotagDocumentEvaluator(
     val num_regs_to_show = 5
     for ((rank, regval) <- (1 to num_regs_to_show) zip regs) {
       val (reg, vall) = regval
-      if (debug("struct")) {
+      if (debug("pcl-travel")) {
         errprint("  Rank %d, goodness %g:", rank, vall)
         errprint(reg.struct().toString) // indent=4
       } else
@@ -1924,8 +2384,20 @@ class PCLTravelGeotagDocumentEvaluator(
 /////////////////////////////////////////////////////////////////////////////
 
 object Stopwords {
+  val stopwords_file_in_tg = "data/lists/stopwords.english"
+
   // List of stopwords
   var stopwords: Set[String] = null
+
+
+  def compute_stopwords_filename(filename: String) = {
+    if (filename != null) filename
+    else {
+      val tgdir = TextGrounderInfo.textgrounder_dir
+      // Concatenate directory and rest in most robust way
+      new File(tgdir, stopwords_file_in_tg).toString
+    }
+  }
 
   // Read in the list of stopwords from the given filename.
   def read_stopwords(filename: String) {
@@ -1938,89 +2410,71 @@ object Stopwords {
 //                                  Main code                              //
 /////////////////////////////////////////////////////////////////////////////
 
+class DocGrounderOptions {
+  //// Basic options for determining operating mode and strategy
+
+  var mode = "geotag-documents"
+  var strategy = Seq[String]()
+  var baseline_strategy = Seq[String]()
+  var stopwords_file = null: String
+  var article_data_file = Seq[String]()
+  var counts_file = Seq[String]()
+  var eval_file = Seq[String]()
+  var eval_format = "default"
+
+  //// Input files, toponym resolution only
+  var gazetteer_file = null: String
+  var gazetteer_type = "world"
+
+  //// Options indicating which documents to train on or evaluate
+  var eval_set = "dev"
+  var num_training_docs = 0
+  var num_test_docs = 0
+  var skip_initial_test_docs = 0
+  var every_nth_test_doc = 1
+
+  //// Options indicating how to generate the regions we compare against
+  var degrees_per_region = 1.0
+  var miles_per_region = 0.0
+  var width_of_stat_region = 1
+
+  //// Options used when creating word distributions
+  var preserve_case_words = false
+  var include_stopwords_in_article_dists = false
+  var minimum_word_count = 1
+
+  //// Options used when doing Naive Bayes geotagging
+  var naive_bayes_weighting = "equal"
+  var naive_bayes_baseline_weight = 0.5
+
+  //// Options used when doing ACP geotagging
+  var lru_cache_size = 400
+
+  //// Debugging/output options
+  var max_time_per_stage = 0.0
+  var no_individual_results = false
+  var debug = null: String
+
+  //// Options used only in KML generation (--mode=generate-kml)
+  var kml_words = null: String
+  var kml_prefix = "kml-dist."
+  var kml_transform = "none"
+  var kml_max_height = 2000000.0
+
+  //// Options used only in toponym resolution (--mode=geotag-toponyms)
+  //// (Note, gazetteer-file options also used only in toponym resolution,
+  //// see above)
+  var naive_bayes_context_len = 10
+  var max_dist_for_close_match = 80.0
+  def max_dist_for_outliers = 200.0
+  def context_type = "region-dist-article-links"
+
+}
+
 object Opts {
   val op = new OptionParser("disambig")
-  //////////// Input files
-  def stopwords_file =
-    op.option[String]("stopwords-file",
-      metavar = "FILE",
-      help = """File containing list of stopwords.""")
-  def article_data_file =
-    op.multiOption[String]("a", "article-data-file",
-      metavar = "FILE",
-      help = """File containing info about Wikipedia articles.  Multiple
-such files can be given.""")
-  def gazetteer_file =
-    op.option[String]("gf", "gazetteer-file",
-      help = """File containing gazetteer information to match.""")
-  def gazetteer_type =
-    op.option[String]("gt", "gazetteer-type",
-      metavar = "FILE",
-      default = "world", choices = Seq("world", "db"),
-      help = """Type of gazetteer file specified using --gazetteer;
-default '%default'.""")
-  def counts_file =
-    op.multiOption[String]("counts-file", "cf",
-      metavar = "FILE",
-      help = """File containing output from a prior run of
---output-counts, listing for each article the words in the article and
-associated counts.  Multiple such files can be given.""")
-  def eval_file =
-    op.option[String]("e", "eval-file",
-      metavar = "FILE",
-      help = """File or directory containing files to evaluate on.
-Each file is read in and then disambiguation is performed.""")
-  def eval_format =
-    op.option[String]("f", "eval-format",
-      default = "wiki",
-      choices = Seq("tr-conll", "wiki", "raw-text", "pcl-travel"),
-      help = """Format of evaluation file(s).  Default '%default'.""")
-  def eval_set =
-    op.option[String]("eval-set", "es",
-      default = "dev",
-      choices = Seq("dev", "test"),
-      canonicalize = Map("dev" -> Seq("devel")),
-      help = """Set to use for evaluation when --eval-format=wiki
-and --mode=geotag-documents ('dev' or 'devel' for the development set,
-'test' for the test set).  Default '%default'.""")
-
-  /////////// Misc options for handling distributions
-  def opt_preserve_case_words =
-    op.flag("preserve-case-words", "pcw",
-      help = """Don't fold the case of words used to compute and
-match against article distributions.  Note that this does not apply to
-toponyms; currently, toponyms are always matched case-insensitively.""")
-  var preserve_case_words = false
-
-  def include_stopwords_in_article_dists =
-    op.flag("include-stopwords-in-article-dists",
-      help = """Include stopwords when computing word
-distributions.""")
-  def naive_bayes_context_len =
-    op.option[Int]("naive-bayes-context-len", "nbcl",
-      default = 10,
-      help = """Number of words on either side of a toponym to use
-in Naive Bayes matching.  Default %default.""")
-  def minimum_word_count =
-    op.option[Int]("minimum-word-count", "mwc",
-      default = 1,
-      help = """Minimum count of words to consider in word
-distributions.  Words whose count is less than this value are ignored.""")
-
-  /////////// Misc options for controlling matching
-  def max_dist_for_close_match =
-    op.option[Double]("max-dist-for-close-match", "mdcm",
-      default = 80,
-      help = """Maximum number of miles allowed when looking for a
-close match.  Default %default.""")
-  def max_dist_for_outliers =
-    op.option[Double]("max-dist-for-outliers", "mdo",
-      default = 200,
-      help = """Maximum number of miles allowed between a point and
-any others in a division.  Points farther away than this are ignored as
-"outliers" (possible errors, etc.).  Default %default.""")
-
-  /////////// Basic options for determining operating mode and strategy
+  
+  //// Basic options for determining operating mode and strategy
   def mode =
     op.option[String]("m", "mode",
       default = "geotag-documents",
@@ -2156,12 +2610,169 @@ strategies cannot be mixed with other baseline strategies, or with non-baseline
 strategies, since they require that --preserve-case-words be set internally.""")
   var baseline_strategy: Seq[String] = null
 
-  def baseline_weight =
-    op.option[Double]("baseline-weight", "bw",
-      metavar = "WEIGHT",
-      default = 0.5,
-      help = """Relative weight to assign to the baseline (prior
-probability) when doing weighted Naive Bayes.  Default %default.""")
+  //// Input files
+  def opt_stopwords_file =
+    op.option[String]("stopwords-file",
+      metavar = "FILE",
+      help = """File containing list of stopwords.  If not specified,
+a default list of English stopwords (stored in the TextGrounder distribution)
+is used.""")
+  var stopwords_file: String = null
+
+  def article_data_file =
+    op.multiOption[String]("a", "article-data-file",
+      metavar = "FILE",
+      help = """File containing info about Wikipedia or Twitter articles.
+(For Twitter, an "article" is typically the set of all tweets from a single
+user, and the name of the article is the user's name or some per-user
+handle.) This file lists per-article information such as the article's title,
+the split (training, dev, or test) that the article is in, and the article's
+location.  It does not list the actual word-count information for the
+articles; that is held in a separate counts file, specified using
+--counts-file.
+
+Multiple such files can be given by specifying the option multiple
+times.""")
+  def counts_file =
+    op.multiOption[String]("counts-file", "cf",
+      metavar = "FILE",
+      help = """File containing word counts for Wikipedia or Twitter articles.
+There are scripts in the 'python' directory for generating counts in the
+proper format.  Multiple such files can be given by specifying the
+option multiple times.""")
+  def eval_file =
+    op.multiOption[String]("e", "eval-file",
+      metavar = "FILE",
+      help = """File or directory containing files to evaluate on.
+Multiple such files/directories can be given by specifying the option multiple
+times.  If a directory is given, all files in the directory will be
+considered (but if an error occurs upon parsing a file, it will be ignored).
+Each file is read in and then disambiguation is performed.  Not used when
+--eval-format=internal (which is the default with --mode=geotag-documents).""")
+  def opt_eval_format =
+    op.option[String]("f", "eval-format",
+      default = "default",
+      choices = Seq("default", "internal", "pcl-travel",
+                    "raw-text", "article", "tr-conll"),
+      help = """Format of evaluation file(s).  The evaluation files themselves
+are specified using --eval-file.  The following formats are
+recognized:
+
+'default' is the default value.  It means use 'internal' when
+--mode=geotag-documents, but use 'article' when --mode=geotag-toponyms.
+
+'internal' is the normal format when --mode=geotag-documents.  It means
+to consider articles to be documents to evaluate, and to use the
+development or test set specified in the article-data file as the set of
+documents to evaluate.
+
+'pcl-travel' is an alternative for use with --mode=geotag-documents.  It
+assumes that each evaluation file is in PCL-Travel XML format, and uses
+each chapter in the evaluation file as a document to evaluate.
+
+'raw-text' can be used with either --mode=geotag-documents or
+--mode=geotag-toponyms.  It assumes that the eval is simply raw text.
+(NOT YET IMPLEMENTED.)
+
+'article' is the normal format when --mode=geotag-toponyms.  The data file
+is in a format very similar to that of the counts file, but has "toponyms"
+identified using the prefix 'Link: ' followed either by a toponym name or
+the format 'ARTICLE-NAME|TOPONYM', indicating a toponym (e.g. 'London')
+that maps to a given article that disambiguates the toponym
+(e.g. 'London, Ontario').  When a raw toponym is given, the article is
+assumed to have the same name as the toponym. (This format comes from the
+way that links are specified in Wikipedia articles.) The mapping here is
+used for evaluation but not for constructing training data.
+
+'tr-conll' is an alternative for use with --mode=geotag-toponyms.  It
+specifies the toponyms in a document along with possible locations to map
+to, with the correct one identified.  As with the 'article' format, the
+correct location is used only for evaluation, not for constructing training
+data; the other locations are ignored.""")
+  var eval_format: String = null
+
+  //// Input files, toponym resolution only
+  def gazetteer_file =
+    op.option[String]("gazetteer-file", "gf",
+      help = """File containing gazetteer information to match.  Only used
+during toponym resolution (--mode=geotag-toponyms).""")
+  def gazetteer_type =
+    op.option[String]("gazetteer-type", "gt",
+      metavar = "FILE",
+      default = "world", choices = Seq("world", "db"),
+      help = """Type of gazetteer file specified using --gazetteer-file.
+Only used during toponym resolution (--mode=geotag-toponyms).  NOTE: type
+'world' is the only one currently implemented.  Default '%default'.""")
+
+  //// Options indicating which documents to train on or evaluate
+  def eval_set =
+    op.option[String]("eval-set", "es",
+      default = "dev",
+      choices = Seq("dev", "test"),
+      canonicalize = Map("dev" -> Seq("devel")),
+      help = """Set to use for evaluation when --eval-format=internal
+and --mode=geotag-documents ('dev' or 'devel' for the development set,
+'test' for the test set).  Default '%default'.""")
+  def num_training_docs =
+    op.option[Int]("num-training-docs", "ntrain", default = 0,
+      help = """Maximum number of training documents to use.
+0 means no limit.  Default 0, i.e. no limit.""")
+  def num_test_docs =
+    op.option[Int]("num-test-docs", "ntest", default = 0,
+      help = """Maximum number of test (evaluation) documents to process.
+0 means no limit.  Default 0, i.e. no limit.""")
+  def skip_initial_test_docs =
+    op.option[Int]("skip-initial-test-docs", "skip-initial", default = 0,
+      help = """Skip this many test docs at beginning.  Default 0, i.e.
+don't skip any documents.""")
+  def every_nth_test_doc =
+    op.option[Int]("every-nth-test-doc", "every-nth", default = 1,
+      help = """Only process every Nth test doc.  Default 1, i.e.
+process all.""")
+  //  def skip_every_n_test_docs =
+  //    op.option[Int]("skip-every-n-test-docs", "skip-n", default=0,
+  //      help="""Skip this many after each one processed.  Default 0.""")
+
+  //// Options indicating how to generate the regions we compare against
+  def degrees_per_region =
+    op.option[Double]("degrees-per-region", "dpr",
+      default = 1.0,
+      help = """Size (in degrees, a floating-point number) of the tiling
+regions that cover the Earth.  Default %default. """)
+  def miles_per_region =
+    op.option[Double]("miles-per-region", "mpr",
+      help = """Size (in miles, a floating-point number) of the tiling
+regions that cover the Earth.  If given, it overrides the value of
+--degrees-per-region.  No default, as the default of --degrees-per-region
+is used.""")
+  def width_of_stat_region =
+    op.option[Int]("width-of-stat-region", default = 1,
+      help = """Width of the region used to compute a statistical
+distribution for geotagging purposes, in terms of number of tiling regions.
+NOTE: It's unlikely you want to change this.  It may be removed entirely in
+later versions.  In normal circumstances, the value is 1, i.e. use a single
+tiling region to compute each statistical region.  If the value is more than
+1, the statistical regions overlap.""")
+
+  //// Options used when creating word distributions
+  def opt_preserve_case_words =
+    op.flag("preserve-case-words", "pcw",
+      help = """Don't fold the case of words used to compute and
+match against article distributions.  Note that in toponym resolution
+(--mode=geotag-toponyms), this applies only to words in articles
+(currently used only in Naive Bayes matching), not to toponyms, which
+are always matched case-insensitively.""")
+  var preserve_case_words = false
+  def include_stopwords_in_article_dists =
+    op.flag("include-stopwords-in-article-dists",
+      help = """Include stopwords when computing word distributions.""")
+  def minimum_word_count =
+    op.option[Int]("minimum-word-count", "mwc",
+      default = 1,
+      help = """Minimum count of words to consider in word
+distributions.  Words whose count is less than this value are ignored.""")
+
+  //// Options used when doing Naive Bayes geotagging
   def naive_bayes_weighting =
     op.option[String]("naive-bayes-weighting", "nbw",
       default = "equal",
@@ -2174,23 +2785,115 @@ against the baseline, giving the baseline weight according to --baseline-weight
 and assigning the remainder to the words.  If 'distance-weighted', similar to
 'equal-words' but don't weight each word the same as each other word; instead,
 weight the words according to distance from the toponym.""")
-  def width_of_stat_region =
-    op.option[Int]("width-of-stat-region", default = 1,
-      help = """Width of the region used to compute a statistical
-distribution for geotagging purposes, in terms of number of tiling regions.
-Default %default.""")
-  def degrees_per_region =
-    op.option[Double]("degrees-per-region", "dpr",
-      help = """Size (in degrees) of the tiling regions that cover
-the earth.  Some number of tiling regions are put together to form the region
-used to construct a statistical distribution.  No default; the default of
-'--miles-per-region' is used instead.""")
-  def miles_per_region =
-    op.option[Double]("miles-per-region", "mpr",
-      default = 100.0,
-      help = """Size (in miles) of the tiling regions that cover
-the earth.  Some number of tiling regions are put together to form the region
-used to construct a statistical distribution.  Default %default.""")
+  def naive_bayes_baseline_weight =
+    op.option[Double]("naive-bayes-baseline-weight", "nbbw",
+      metavar = "WEIGHT",
+      default = 0.5,
+      help = """Relative weight to assign to the baseline (prior
+probability) when doing weighted Naive Bayes.  Default %default.""")
+
+  //// Options used when doing ACP geotagging
+  def lru_cache_size =
+    op.option[Int]("lru-cache-size", "lru", default = 400,
+      help = """Number of entries in the LRU cache.  Default %default.
+Used only when --strategy=average-cell-probability.""")
+
+  //// Debugging/output options
+  def max_time_per_stage =
+    op.option[Double]("max-time-per-stage", "mts", default = 0.0,
+      help = """Maximum time per stage in seconds.  If 0, no limit.
+Used for testing purposes.  Default 0, i.e. no limit.""")
+  def no_individual_results =
+    op.flag("no-individual-results", "no-results",
+      help = """Don't show individual results for each test document.""")
+  def debug =
+    op.option[String]("d", "debug", metavar = "FLAGS",
+      help = """Output debug info of the given types.  Multiple debug
+parameters can be specified, indicating different types of info to output.
+Separate parameters by spaces, colons or semicolons.  Params can be boolean,
+if given alone, or valueful, if given as PARAM=VALUE.  Certain params are
+list-valued; multiple values are specified by including the parameter
+multiple times, or by separating values by a comma.
+
+The best way to figure out the possible parameters is by reading the
+source code. (Look for references to debug("foo") for boolean params,
+debugval("foo") for valueful params, or debuglist("foo") for list-valued
+params.) Some known debug flags:
+
+gridrank: For the given test article number (starting at 1), output
+a grid of the predicted rank for regions around the true region.
+Multiple articles can have the rank output, e.g. --debug 'gridrank=45,58'
+(This will output info for articles 45 and 58.) This output can be
+postprocessed to generate nice graphs; this is used e.g. in Wing's thesis.
+
+gridranksize: Size of the grid, in numbers of articles on a side.
+This is a single number, and the grid will be a square centered on the
+true region. (Default currently 11.)
+
+kldiv: Print out words contributing most to KL divergence.
+
+wordcountarts: Regenerate article-data file, filtering out articles not
+seen in any counts file.
+
+some, lots, tons: General info of various sorts. (Document me.)
+
+region: Print out info on each region of the Earth as it's generated.  Also
+triggers some additional info when --mode=geotag-toponyms. (Document me.)
+
+commontop: Extra info for debugging
+ --baseline-strategy=link-most-common-toponym.
+
+pcl-travel: Extra info for debugging --eval-format=pcl-travel.
+""")
+
+  //// Options used only in KML generation (--mode=generate-kml)
+  def kml_words =
+    op.option[String]("k", "kml-words", "kw",
+      help = """Words to generate KML distributions for, when
+--mode=generate-kml.  Each word should be separated by a comma.  A separate
+file is generated for each word, using the value of '--kml-prefix' and adding
+'.kml' to it.""")
+  def kml_prefix =
+    op.option[String]("kml-prefix", "kp",
+      default = "kml-dist.",
+      help = """Prefix to use for KML files outputted in --mode=generate-kml.
+The actual filename is created by appending the word, and then the suffix
+'.kml'.  Default '%default'.""")
+  def kml_transform =
+    op.option[String]("kml-transform", "kt", "kx",
+      default = "none",
+      choices = Seq("none", "log", "logsquared"),
+      help = """Type of transformation to apply to the probabilities
+when generating KML (--mode=generate-kml), possibly to try and make the
+low values more visible.  Possibilities are 'none' (no transformation),
+'log' (take the log), and 'logsquared' (negative of squared log).  Default
+'%default'.""")
+  def kml_max_height =
+    op.option[Double]("kml-max-height", "kmh",
+      default = 2000000.0,
+      help = """Height of highest bar, in meters.  Default %default.""")
+
+  //// Options used only in toponym resolution (--mode=geotag-toponyms)
+  //// (Note, gazetteer-file options also used only in toponym resolution,
+  //// see above)
+  def naive_bayes_context_len =
+    op.option[Int]("naive-bayes-context-len", "nbcl",
+      default = 10,
+      help = """Number of words on either side of a toponym to use
+in Naive Bayes matching.  Only applicable to toponym resolution
+(--mode=geotag-toponyms).  Default %default.""")
+  def max_dist_for_close_match =
+    op.option[Double]("max-dist-for-close-match", "mdcm",
+      default = 80.0,
+      help = """Maximum number of miles allowed when looking for a
+close match for a toponym (--mode=geotag-toponyms).  Default %default.""")
+  def max_dist_for_outliers =
+    op.option[Double]("max-dist-for-outliers", "mdo",
+      default = 200.0,
+      help = """Maximum number of miles allowed between a point and
+any others in a division (--mode=geotag-toponyms).  Points farther away than
+this are ignored as "outliers" (possible errors, etc.).  NOTE: Not
+currently implemented. Default %default.""")
   def context_type =
     op.option[String]("context-type", "ct",
       default = "region-dist-article-links",
@@ -2204,87 +2907,59 @@ computing a word distribution, but the article for counting the number of
 incoming internal links.  Note that this only applies when
 --mode='geotag-toponyms'; in --mode='geotag-documents', only regions are
 considered.  Default '%default'.""")
-
-  def kml_words =
-    op.option[String]("k", "kml-words", "kw",
-      help = """Words to generate KML distributions for, when
---mode='generate-kml'.  Each word should be separated by a comma.  A separate
-file is generated for each word, using '--kml-prefix' and adding '.kml'.""")
-  def kml_prefix =
-    op.option[String]("kml-prefix", "kp",
-      default = "kml-dist.",
-      help = """Prefix to use for KML files outputted.
-Default '%default',""")
-  def kml_transform =
-    op.option[String]("kml-transform", "kt", "kx",
-      default = "none",
-      choices = Seq("none", "log", "logsquared"),
-      help = """Type of transformation to apply to the probabilities
-when generating KML, possibly to try and make the low values more visible.
-Possibilities are 'none' (no transformation), 'log' (take the log), and
-'logsquared' (negative of squared log).  Default '%default'.""")
-
-  def num_training_docs =
-    op.option[Int]("num-training-docs", "ntrain", default = 0,
-      help = """Maximum number of training documents to use.
-0 means no limit.  Default %default.""")
-  def num_test_docs =
-    op.option[Int]("num-test-docs", "ntest", default = 0,
-      help = """Maximum number of test documents to process.
-0 means no limit.  Default %default.""")
-  def skip_initial_test_docs =
-    op.option[Int]("skip-initial-test-docs", "skip-initial", default = 0,
-      help = """Skip this many test docs at beginning.  Default 0.""")
-  def every_nth_test_doc =
-    op.option[Int]("every-nth-test-doc", "every-nth", default = 1,
-      help = """Only process every Nth test doc.  Default 1, i.e. process all.""")
-  //  def skip_every_n_test_docs =
-  //    op.option[Int]("skip-every-n-test-docs", "skip-n", default=0,
-  //      help="""Skip this many after each one processed.  Default 0.""")
-  def no_individual_results =
-    op.flag("no-individual-results", "no-results",
-      help = """Don't show individual results for each test document.""")
-  def lru_cache_size =
-    op.option[Int]("lru-cache-size", "lru", default = 400,
-      help = """Number of entries in the LRU cache.""")
-
-  // Shared options in old code
-  def max_time_per_stage =
-    op.option[Int]("max-time-per-stage", "mts", default = 0,
-      help = """Maximum time per stage in seconds.  If 0, no limit.
-  Used for testing purposes.  Default %default.""")
-  def debug =
-    op.option[String]("d", "debug", metavar = "FLAGS",
-      help = "Output debug info of the given types (separated by spaces or commas)")
 }
 
-object Disambig extends NlpProgram {
-  val opts = Opts
-  val op = Opts.op
+object Debug {
+  // Debug params.  Different params indicate different info to output.
+  // Specified using --debug.  Multiple params are separated by spaces,
+  // colons or semicolons.  Params can be boolean, if given alone, or
+  // valueful, if given as PARAM=VALUE.  Certain params are list-valued;
+  // multiple values are specified by including the parameter multiple
+  // times, or by separating values by a comma.
+  val debug = booleanmap[String]()
+  val debugval = stringmap[String]()
+  val debuglist = bufmap[String,String]()
+  
+  var list_debug_params = Set[String]()
+  
+  // Register a list-valued debug param.
+  def register_list_debug_param(param: String) {
+    list_debug_params += param
+  }
+
+  def parse_debug_spec(debugspec: String) {
+    val params = """[:;\s]+""".r.split(debugspec)
+    // Allow params with values, and allow lists of values to be given
+    // by repeating the param
+    for (f <- params) {
+      if (f contains '=') {
+        val Array(param, value) = f.split("=", 2)
+        if (list_debug_params contains param) {
+          val values = "[,]".split(value)
+          debuglist(param) ++= values
+        } else
+          debugval(param) = value
+      } else
+        debug(f) = true
+    }
+  }
+}
+
+object Disambig extends NlpApp {
+  val the_opts = Opts
+  val the_op = Opts.op
 
   var need_to_read_stopwords = false
+  var stopwords_file = null: String
 
   override def output_parameters() {
     errprint("Need to read stopwords: %s", need_to_read_stopwords)
+    errprint("Actual stopwords file: %s", stopwords_file)
   }
 
   def handle_arguments(op: OptionParser, args: Seq[String]) {
-    if (Opts.debug != null) {
-      val params = """[:;\s]+""".r.split(Opts.debug)
-      // Allow params with values, and allow lists of values to be given
-      // by repeating the param
-      for (f <- params) {
-        if (f contains '=') {
-          val Array(param, value) = f.split("=", 2)
-          if (list_debug_params contains param) {
-            val values = "[,]".split(value)
-            debuglist(param) ++= values
-          } else
-            debugval(param) = value
-        } else
-          debug(f) = true
-      }
-    }
+    if (Opts.debug != null)
+      parse_debug_spec(Opts.debug)
 
     // Canonicalize options
     Opts.strategy = Opts.opt_strategy
@@ -2327,11 +3002,16 @@ object Disambig extends NlpProgram {
     if (Opts.gazetteer_type != "world")
       op.error("Currently can only handle world-type gazetteers")
 
-    if (Opts.miles_per_region <= 0)
+    if (Opts.miles_per_region < 0)
       op.error("Miles per region must be positive")
-    Distances.degrees_per_region =
-      if (Opts.degrees_per_region > 0) Opts.degrees_per_region
-      else Opts.miles_per_region / miles_per_degree
+    if (Opts.degrees_per_region < 0)
+      op.error("Degrees per region must be positive")
+    degrees_per_region =
+      if (Opts.miles_per_region > 0)
+        Opts.miles_per_region / miles_per_degree
+      else
+        Opts.degrees_per_region
+    miles_per_region = degrees_per_region * miles_per_degree
     // The actual maximum latitude is exactly 90 (the North Pole).  But if we
     // set degrees per region to be a number that exactly divides 180, and we
     // use maximum_latitude = 90 in the following computations, then we would
@@ -2354,11 +3034,17 @@ object Disambig extends NlpProgram {
 
     //// Start reading in the files and operating on them ////
 
+    Opts.eval_format =
+      if (Opts.opt_eval_format == "default") {
+        if (Opts.mode == "geotag-toponyms") "article"
+        else "internal"
+      } else Opts.opt_eval_format
+
     if (Opts.mode.startsWith("geotag")) {
       need_to_read_stopwords = true
       if (Opts.mode == "geotag-toponyms" && Opts.strategy == Seq("baseline"))
         ()
-      else if (Opts.counts_file == null)
+      else if (Opts.counts_file.length == 0)
         op.error("Must specify counts file")
     }
 
@@ -2371,8 +3057,8 @@ object Disambig extends NlpProgram {
     }
 
     if (Opts.mode == "geotag-documents") {
-      if (!(Seq("pcl-travel", "wiki") contains Opts.eval_format))
-        op.error("For --mode=geotag-documents, eval-format must be 'pcl-travel' or 'wiki'")
+      if (!(Seq("pcl-travel", "internal") contains Opts.eval_format))
+        op.error("For --mode=geotag-documents, eval-format must be 'internal' or 'pcl-travel'")
     } else if (Opts.mode == "geotag-toponyms") {
       if (Opts.baseline_strategy.endsWith("most-common-toponym")) {
         op.error("--baseline-strategy=%s only compatible with --mode=geotag-documents"
@@ -2385,12 +3071,14 @@ object Disambig extends NlpProgram {
             stratname)
         }
       }
-      if (!(Seq("tr-conll", "wiki") contains Opts.eval_format))
-        op.error("For --mode=geotag-toponyms, eval-format must be 'tr-conll' or 'wiki'")
+      if (!(Seq("tr-conll", "article") contains Opts.eval_format))
+        op.error("For --mode=geotag-toponyms, eval-format must be 'article' or 'tr-conll'")
     }
 
-    if (Opts.mode == "geotag-documents" && Opts.eval_format == "wiki")
-      () // No need for evaluation file, uses the counts file
+    if (Opts.mode == "geotag-documents" && Opts.eval_format == "internal") {
+      if (Opts.eval_file.length > 0)
+        op.error("--eval-file should not be given when --eval-format=internal")
+    }
     else if (Opts.mode.startsWith("geotag"))
       need("eval-file", "evaluation file(s)")
 
@@ -2405,8 +3093,11 @@ object Disambig extends NlpProgram {
   def implement_main(op: OptionParser, args: Seq[String]) {
     import Toponym._
 
-    if (need_to_read_stopwords)
-      Stopwords.read_stopwords(Opts.stopwords_file)
+    if (need_to_read_stopwords) {
+      stopwords_file =
+        Stopwords.compute_stopwords_filename(Opts.stopwords_file)
+      Stopwords.read_stopwords(stopwords_file)
+    }
 
     val table =
     if (Opts.mode == "geotag-toponyms") {
@@ -2461,10 +3152,12 @@ Not generating an empty KML file.""", word)
       val strats = strat_unflat reduce (_ ++ _)
       for ((stratname, strategy) <- strats) {
         val evalobj = geneval(stratname, strategy)
-        errprint("Processing evaluation file/dir %s...", Opts.eval_file)
+        // For --eval-format=internal, there is no eval file.  To make the
+        // evaluation loop work properly, we pretend like there's a single
+        // eval file whose value is null.
         val iterfiles =
-          if (Opts.eval_file != null) iter_directory_files(Opts.eval_file)
-          else Seq("foo")
+          if (Opts.eval_file.length > 0) Opts.eval_file
+          else Seq[String](null)
         evalobj.evaluate_and_output_results(iterfiles)
       }
     }
@@ -2487,7 +3180,7 @@ Not generating an empty KML file.""", word)
         if (Opts.eval_format == "tr-conll")
           new TRCoNLLGeotagToponymEvaluator(strategy, stratname)
         else
-          new WikipediaGeotagToponymEvaluator(strategy, stratname)
+          new ArticleGeotagToponymEvaluator(strategy, stratname)
       })
     } else if (Opts.mode == "geotag-documents") {
       val strats = (
@@ -2533,7 +3226,7 @@ Not generating an empty KML file.""", word)
         if (Opts.eval_format == "pcl-travel")
           new PCLTravelGeotagDocumentEvaluator(strategy, stratname)
         else
-          new WikipediaGeotagDocumentEvaluator(strategy, stratname)
+          new ArticleGeotagDocumentEvaluator(strategy, stratname)
       })
     }
   }

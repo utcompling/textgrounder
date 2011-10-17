@@ -2,6 +2,7 @@ package opennlp.textgrounder.geolocate
 
 import NlpUtil._
 import Distances._
+import Debug._
 
 import collection.mutable
 import util.control.Breaks._
@@ -770,7 +771,8 @@ object Toponym {
       val (word_weight, baseline_weight) =
         if (!use_baseline) (1.0, 0.0)
         else if (Opts.naive_bayes_weighting == "equal") (1.0, 1.0)
-        else (1 - Opts.baseline_weight, Opts.baseline_weight)
+        else (1 - Opts.naive_bayes_baseline_weight,
+              Opts.naive_bayes_baseline_weight)
       for ((dist, word) <- geogword.context) {
         val lword =
           if (Opts.preserve_case_words) word else word.toLowerCase
@@ -1060,7 +1062,7 @@ object Toponym {
     }
   }
 
-  class WikipediaGeotagToponymEvaluator(
+  class ArticleGeotagToponymEvaluator(
     strategy: GeotagToponymStrategy,
     stratname: String) extends GeotagToponymEvaluator(strategy, stratname) {
     def iter_geogwords(filename: String) = {

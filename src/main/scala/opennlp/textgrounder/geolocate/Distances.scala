@@ -3,55 +3,107 @@ package opennlp.textgrounder.geolocate
 import math._
 import NlpUtil.warning
 
-object Distances {
-  /////////////////////////////////////////////////////////////////////////////
-  //                       Coordinates and regions                           //
-  /////////////////////////////////////////////////////////////////////////////
+/*
+  The coordinates of a point are spherical coordinates, indicating a
+  latitude and longitude.  Latitude ranges from -90 degrees (south) to
+  +90 degrees (north), with the Equator at 0 degrees.  Longitude ranges
+  from -180 degrees (west) to +179.9999999.... degrees (east). -180 and +180
+  degrees correspond to the same north-south parallel, and we arbitrarily
+  choose -180 degrees over +180 degrees.  0 degrees longitude has been
+  arbitrarily chosen as the north-south parallel that passes through
+  Greenwich, England (near London).  Note that longitude wraps around, but
+  latitude does not.  Furthermore, the distance between latitude lines is
+  always the same (about 69 miles per degree), but the distance between
+  longitude lines varies according to the latitude, ranging from about
+  69 miles per degree at the Equator to 0 miles at the North and South Pole.
   
-  // The coordinates of a point are spherical coordinates, indicating a
-  // latitude and longitude.  Latitude ranges from -90 degrees (south) to
-  // +90 degrees (north), with the Equator at 0 degrees.  Longitude ranges
-  // from -180 degrees (west) to +179.9999999.... degrees (east). -180 and +180
-  // degrees correspond to the same north-south parallel, and we arbitrarily
-  // choose -180 degrees over +180 degrees.  0 degrees longitude has been
-  // arbitrarily chosen as the north-south parallel that passes through
-  // Greenwich, England (near London).  Note that longitude wraps around, but
-  // latitude does not.  Furthermore, the distance between latitude lines is
-  // always the same (about 69 miles per degree), but the distance between
-  // longitude lines varies according to the latitude, ranging from about
-  // 69 miles per degree at the Equator to 0 miles at the North and South Pole.
-  //
-  // We divide the earth's surface into "tiling regions", using the value
-  // of --region-size, which is specified in miles; we convert it to degrees
-  // using 'miles_per_degree', which is derived from the value for the
-  // Earth's radius in miles.  In addition, we form a square of tiling regions
-  // in order to create a "statistical region", which is used to compute a
-  // distribution over words.  The numbe of tiling regions on a side is
-  // determined by --width-of-stat-region.  Note that if this is greater than
-  // 1, different statistical regions will overlap.
-  //
-  // To specify a region, we use region indices, which are derived from
-  // coordinates by dividing by degrees_per_region.  Hence, if for example
-  // degrees_per_region is 2, then region indices are in the range [-45,+45]
-  // for latitude and [-90,+90) for longitude.  In general, an arbitrary
-  // coordinate will have fractional region indices; however, the region
-  // indices of the corners of a region (tiling or statistical) will be
-  // integers.  Normally, we use the southwest corner to specify a region.
-  //
-  // Near the edges, tiling regions may be truncated.  Statistical regions
-  // will wrap around longitudinally, and will still have the same number
-  // of tiling regions, but may be smaller.
+  We divide the earth's surface into "tiling regions", using the value
+  of --region-size, which is specified in miles; we convert it to degrees
+  using 'miles_per_degree', which is derived from the value for the
+  Earth's radius in miles.  In addition, we form a square of tiling regions
+  in order to create a "statistical region", which is used to compute a
+  distribution over words.  The numbe of tiling regions on a side is
+  determined by --width-of-stat-region.  Note that if this is greater than
+  1, different statistical regions will overlap.
+  
+  To specify a region, we use region indices, which are derived from
+  coordinates by dividing by degrees_per_region.  Hence, if for example
+  degrees_per_region is 2, then region indices are in the range [-45,+45]
+  for latitude and [-90,+90) for longitude.  In general, an arbitrary
+  coordinate will have fractional region indices; however, the region
+  indices of the corners of a region (tiling or statistical) will be
+  integers.  Normally, we use the southwest corner to specify a region.
+  
+  Near the edges, tiling regions may be truncated.  Statistical regions
+  will wrap around longitudinally, and will still have the same number
+  of tiling regions, but may be smaller.
+*/
 
+/**
+  Singleton object holding information of various sorts related to distances
+  on the Earth and coordinates, objects for handling coordinates and region
+  indices, and miscellaneous functions for computing distance and converting
+  between different coordinate formats.
+
+  The following is contained:
+
+  1. Fixed information: e.g. radius of Earth in miles, number of miles per
+     degree at the Equator, number of kilometers per mile, minimum/maximum
+     latitude/longitude.
+
+  2. Information computed from command-line settings, e.g. number of
+     degrees per tiling region, number of miles per tiling region (on a
+     vertical side, or on a horizontal side at the Equator), minimum and
+     maximum region indices.
+
+  3. The Coord class (holding a latitude/longitude pair)
+  
+  4. The Regind type (specifying the basic integral type of region indices,
+     which directly index tiling regions as if they were in an array; note
+     that the region indices are set up so that directly multiplying by
+     the appropriate factor gives the latitude/longitude coordinates of the
+     southwest corner of the tiling region being referenced)
+  
+  5. Function spheredist() to compute spherical (great-circle) distance
+     between two Coords
+  
+  6. Functions to convert between pairs of Reginds and Coords (depending on
+     where in the particular region the Coord is wanted, e.g. one of the
+     corners or the center)
+ */
+object Distances {
+ 
   type Regind = Int
-  
-  // Size of each region in degrees.  Determined by the --region-size option
-  // (however, that option is expressed in miles).
-  var degrees_per_region = 0.0
-  
+ 
+  /***** Fixed values *****/
+
   val minimum_latitude = -90.0
   val maximum_latitude = 90.0
   val minimum_longitude = -180.0
   val maximum_longitude = 180.0 - 1e-10
+
+  // Radius of the earth in miles.  Used to compute spherical distance in miles,
+  // and miles per degree of latitude/longitude.
+  val earth_radius_in_miles = 3963.191
+ 
+  // Number of kilometers per mile.
+  val km_per_mile = 1.609
+
+  // Number of miles per degree, at the equator.  For longitude, this is the
+  // same everywhere, but for latitude it is proportional to the degrees away
+  // from the equator.
+  val miles_per_degree = Pi * 2 * earth_radius_in_miles / 360.
+ 
+  /***** Computed values based on command-line params *****/
+
+  // Size of each region in degrees.  Determined by the --degrees-per-region
+  // option, unless --miles-per-region is set, in which case it takes
+  // priority.
+  var degrees_per_region = 0.0
+  
+  // Size of each region (vertical dimension; horizontal dimension only near
+  // the equator) in miles.  Determined from degrees_per_region.
+  var miles_per_region = 0.0
 
   // Minimum, maximum latitude/longitude in indices (integers used to index the
   // set of regions that tile the earth)
@@ -60,15 +112,6 @@ object Distances {
   var minimum_longind: Regind = 0
   var maximum_longind: Regind = 0
   
-  // Radius of the earth in miles.  Used to compute spherical distance in miles,
-  // and miles per degree of latitude/longitude.
-  val earth_radius_in_miles = 3963.191
-  
-  // Number of miles per degree, at the equator.  For longitude, this is the
-  // same everywhere, but for latitude it is proportional to the degrees away
-  // from the equator.
-  val miles_per_degree = Pi * 2 * earth_radius_in_miles / 360.
- 
   var width_of_stat_region = 1
 
   // A 2-dimensional coordinate.

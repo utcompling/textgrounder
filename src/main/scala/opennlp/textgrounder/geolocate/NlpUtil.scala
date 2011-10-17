@@ -13,8 +13,6 @@ import math._
 import java.io.{Console=>_,_}
 import java.util.Date
 
-import OptParse._
-
 // from __future__ import with_statement // For chompopen(), openr()
 // from optparse import OptionParser
 // from itertools import *
@@ -33,23 +31,6 @@ import OptParse._
 // import fileinput // For openr() etc.
 
 object NlpUtil {
-
-  // Debug params.  Different params indicate different info to output.
-  // Specified using --debug.  Multiple params are separated by commas or
-  // spaces.  Params can be boolean, if given alone, or valueful, if given as
-  // PARAM=VALUE.  Certain params are list-valued; multiple values are specified
-  // by including the parameter multiple times, or by separating values by
-  // a semicolon or colon.
-  val debug = booleanmap[String]()
-  val debugval = stringmap[String]()
-  val debuglist = bufmap[String,String]()
-  
-  var list_debug_params = Set[String]()
-  
-  // Register a list-valued debug param.
-  def register_list_debug_param(param: String) {
-    list_debug_params += param
-  }
 
   /**
     * Return floating-point value, number of seconds since the Epoch
@@ -271,15 +252,6 @@ object NlpUtil {
       autoflush,
       "UTF-8")
   
-  // If given a directory, yield all the files in the directory; else just
-  // yield the file.
-  def iter_directory_files(dir: String) = {
-    val dirfile = new File(dir)
-    if (dirfile.isDirectory) {
-      for (file <- dirfile.listFiles().toSeq) yield file.toString
-    } else Seq(dir)
-  }
-
 //  // Open a filename and yield lines, but with any terminating newline
 //  // removed (similar to "chomp" in Perl).  Basically same as gopen() but
 //  // with defaults set differently.
@@ -358,7 +330,21 @@ object NlpUtil {
 //   */
 //  def errout(text):
 //    uniout(text, outfile=sys.stderr)
-//  
+// 
+  /**
+    Set Java System.out and System.err, and Scala Console.out and Console.err,
+    so that they convert text to UTF-8 upon output (rather than e.g. MacRoman,
+    the default on Mac OS X).
+   */
+  def set_stdout_stderr_utf_8() {
+    // Fuck me to hell, have to fix things up in a non-obvious way to
+    // get UTF-8 output on the Mac (default is MacRoman???).
+    System.setOut(new PrintStream(System.out, true, "UTF-8"))
+    System.setErr(new PrintStream(System.err, true, "UTF-8"))
+    Console.setOut(System.out)
+    Console.setErr(System.err)
+  }
+
   def uniprint(text: String, outfile: PrintStream=System.out) {
     outfile.println(text)
   }
@@ -862,7 +848,7 @@ object NlpUtil {
         plural_item_name
     }
   
-    def item_processed(maxtime: Double=0) = {
+    def item_processed(maxtime: Double = 0.0) = {
       val curtime = curtimesecs()
       items_processed += 1
       val total_elapsed_secs = curtime - first_time
@@ -951,50 +937,6 @@ object NlpUtil {
     fuckme_no_yield()
   }
 
-  //////////////////////////////////////////////////////////////////////////////
-  //                               NLP Programs                               //
-  //////////////////////////////////////////////////////////////////////////////
-
-  def output_options(op: OptionParser) {
-    errprint("Parameter values:")
-    for ((name, opt) <- op.get_argmap)
-      errprint("%30s: %s", name, opt.value)
-    errprint("")
-  }
-  
-  abstract class NlpProgram extends App {
-    // Things that must be implemented
-    val opts: AnyRef
-    val op: OptionParser
-    def handle_arguments(op: OptionParser, args: Seq[String])
-    def implement_main(op: OptionParser, args: Seq[String])
-
-    // Things that may be overridden
-    def output_parameters() {}
-
-    def need(arg: String, arg_english: String = null) {
-      op.need(arg, arg_english)
-    }
-
-    def main() = {
-      // Fuck me to hell, have to fix things up in a non-obvious way to
-      // get UTF-8 output on the Mac (default is MacRoman???).
-      System.setOut(new PrintStream(System.out, true, "UTF-8"))
-      System.setErr(new PrintStream(System.err, true, "UTF-8"))
-      Console.setOut(System.out)
-      Console.setErr(System.err)
-      errprint("Beginning operation at %s" format curtimehuman())
-      errprint("Arguments: %s" format (args mkString " "))
-      op.parse(opts, args)
-      handle_arguments(op, args)
-      output_options(op)
-      output_parameters()
-      val retval = implement_main(op, args)
-      errprint("Ending operation at %s" format curtimehuman())
-      retval
-    }
-  }
-//
 //  //////////////////////////////////////////////////////////////////////////////
 //  //                               Priority Queues                            //
 //  //////////////////////////////////////////////////////////////////////////////

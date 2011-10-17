@@ -3,26 +3,51 @@
 # Environment variables required/optional on input:
 
 # TEXTGROUNDER_DIR: required: top level of TextGrounder distribution
+# TG_ON_COMP_LING_MACHINES: optional: if set, indicates that we are running on
+#                                     the UTexas comp ling machines, in which
+#                                     case the following TG_*_DIR variables
+#                                     will automatically be set correctly.
 # TG_WIKIPEDIA_DIR: required: location of Wikipedia data files
 # TG_TWITTER_DIR: optional: location of Twitter data files
+# TG_AUX_DIR: optional: location of auxiliary files (currently only the World
+#                       Gazetteer, needed only when --mode=geotag-toponyms)
 # PCL_TRAVEL_DIR: optional: location of PCL travel corpus and related files
 # NO_USE_PERMUTED: optional: if non-blank, don't use permuted version of
 #                            Wikipedia data files
-
-if [ -z "$TG_WIKIPEDIA_DIR" ]; then
-  echo "Must set TG_WIKIPEDIA_DIR to location of Wikipedia data files"
-  exit 1
-fi
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
   echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
+if [ -n "$TG_ON_COMP_LING_MACHINES" ]; then
+  if [ -z "$TG_WIKIPEDIA_DIR" ]; then
+    TG_WIKIPEDIA_DIR=/groups/corpora/wikipedia
+  fi
+  if [ -z "$TG_TWITTER_DIR" ]; then
+    TG_TWITTER_DIR=/groups/corpora/geotext
+  fi
+  if [ -z "$TG_AUX_DIR" ]; then
+    TG_AUX_DIR=/groups/projects/wikigrounder/data
+  fi
+fi
+
+if [ -z "$TG_WIKIPEDIA_DIR" ]; then
+  echo "Must set TG_WIKIPEDIA_DIR to location of Wikipedia data files"
+  exit 1
+fi
+
 if [ -z "$TG_TWITTER_DIR" ]; then
   echo "TG_TWITTER_DIR should be set to the location of Twitter data files"
   echo "Proceeding, because may not need to use these files"
-  TG_TWITTER_DIR="/nonexistent-location/download-wikigrounder-twitter-files-please"
+  TG_TWITTER_DIR="/nonexistent-location/download-textgrounder-twitter-files-please"
+fi
+
+if [ -z "$TG_AUX_DIR" ]; then
+  echo "TG_AUX_DIR should be set to the location of aux data files"
+  echo "Proceeding, because may not need to use these files (only needed"
+  echo "when using --mode=geotag-toponyms)"
+  TG_AUX_DIR="/nonexistent-location/download-textgrounder-aux-files-please"
 fi
 
 if [ -z "$PCL_TRAVEL_DIR" ]; then
@@ -59,7 +84,6 @@ DISAMBIG_ID_SUFFIX="disambig.id.txt"
 TITLE2ID_SUFFIX="title2id.txt"
 DUMP_SUFFIX="xml.bz2"
 
-OUT_STOPWORDS_FILE="stopwords.english"
 OUT_GAZETTEER_FILE="world-dataen-fixed.txt"
 OUT_ORIG_ARTICLE_DATA_FILE="$DUMP_PREFIX-$ORIG_ARTICLE_DATA_SUFFIX"
 OUT_COMBINED_ARTICLE_DATA_FILE="$DUMP_PREFIX-$COMBINED_ARTICLE_DATA_SUFFIX"
@@ -74,8 +98,7 @@ OUT_DISAMBIG_ID_FILE="$PAGES_ARTICLES_PREFIX.$DISAMBIG_ID_SUFFIX"
 OUT_TITLE2ID_FILE="$PAGES_ARTICLES_PREFIX.$TITLE2ID_SUFFIX"
 OUT_DUMP_FILE="$PAGES_ARTICLES_PREFIX.$DUMP_SUFFIX"
 
-IN_STOPWORDS_FILE="$TEXTGROUNDER_DIR/data/lists/$OUT_STOPWORDS_FILE"
-IN_GAZETTEER_FILE="$TEXTGROUNDER_DIR/data/gazetteers/$OUT_GAZETTEER_FILE"
+IN_GAZETTEER_FILE="$TX_AUX_DIR/$OUT_GAZETTEER_FILE"
 IN_ORIG_ARTICLE_DATA_FILE="$WDIR/$OUT_ORIG_ARTICLE_DATA_FILE"
 IN_COMBINED_ARTICLE_DATA_FILE="$WDIR/$OUT_COMBINED_ARTICLE_DATA_FILE"
 IN_COORDS_FILE="$WDIR/$OUT_COORDS_FILE"
@@ -86,14 +109,13 @@ IN_DISAMBIG_ID_FILE="$WDIR/$OUT_DISAMBIG_ID_FILE"
 IN_TITLE2ID_FILE="$WDIR/$OUT_TITLE2ID_FILE"
 IN_DUMP_FILE="$WDIR/$OUT_DUMP_FILE"
 
-STOPWORDS_ARG="--stopwords-file $IN_STOPWORDS_FILE"
 GAZETTEER_ARG="--gazetteer-file $IN_GAZETTEER_FILE"
 ORIG_ARTICLE_DATA_ARG="--article-data-file $IN_ORIG_ARTICLE_DATA_FILE"
 COMBINED_ARTICLE_DATA_ARG="--article-data-file $IN_COMBINED_ARTICLE_DATA_FILE"
 COORDS_ARG="--coords-file $IN_COORDS_FILE"
 COUNTS_ARG="--counts-file $IN_COUNTS_FILE"
 LINKS_ARG="--links-file $IN_LINKS_FILE"
-#No TOPONYM_EVAL_ARG; used in --evalfile
+#No TOPONYM_EVAL_ARG; used in --eval-file
 DISAMBIG_ID_ARG="--disambig-id-file $IN_DISAMBIG_ID_FILE"
 TITLE2ID_ARG="--title2id-file $IN_TITLE2ID_FILE"
 
