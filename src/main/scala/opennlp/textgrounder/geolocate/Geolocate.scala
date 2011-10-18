@@ -386,19 +386,19 @@ mentioned in an article. FIXME: We make things worse here by picking the
 first coordinate and ignoring `display=title`.  See comments in
 `get_coord()` about how to fix this.)
 
-The main script to extract data from a Wikipedia dump is `processwiki.py`.
-It takes the (unzipped) dump file as stdin and processes it according
-to command-line arguments.  Normally the front end `run-processwiki` is
-run instead.
+The main script to extract data from a Wikipedia dump is
+`python/processwiki.py`.  It takes the (unzipped) dump file as stdin and
+processes it according to command-line arguments.  Normally the front
+end `python/run-processwiki` is run instead.
 
-To run `run-processwiki`, specify steps to do.  Each step generates one
-file.  As a shorthand, `all` does all the necessary steps to generate
+To run `python/run-processwiki`, specify steps to do.  Each step generates
+one file.  As a shorthand, `all` does all the necessary steps to generate
 the Wikipedia data files (but does not generate every possible file that
 can be generated).  If you have your own dump file, change the name in
-`config-wikigrounder`.
+`config-geolocate`.
 
-Similarly, to generate Twitter data, use `run-process-twitter`, which
-is a front end for `twitter_geotext_process.py`.
+Similarly, to generate Twitter data, use `python/run-process-twitter`, which
+is a front end for `python/twitter_geotext_process.py`.
 
 FIXME: Document more.
 
