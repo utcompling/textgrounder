@@ -1,31 +1,41 @@
 #!/bin/sh
 
-# Run an experiment using run-geolocate-wikipedia, sending its output to a
+# Run an experiment using tg-geolocate or similar, sending its output to a
 # unique file and using 'nohup' so that exiting the session won't kill a
 # background script.
 #
 # Allow -i STR or --id STR to be specified at the beginning of the options,
 # specifying an ID to use in the outfiles.
+#
+# The option --run-prog can also be given at the beginning, to specify
+# the name of a program other than tg-geolocate to run (e.g.
+# geolocate-wikipedia).
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
   echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
-RUN_GEOLOCATE_WIKIPEDIA="$TEXTGROUNDER_DIR/bin/run-geolocate-wikipedia"
+ID=""
+RUN_PROG=tg-geolocate
 
-if [ "$1" = "-i" -o "$1" = "--id" ]; then
-  ID=".$2"
-  shift 2
-fi
+while true ; do
+  case "$1" in
+    -i | --id ) ID=".$2"; shift 2 ;;
+    --run-prog ) RUN_PROG="$2"; shift 2 ;;
+    * ) break ;;
+  esac
+done
+
+DO_GEOLOCATE="$TEXTGROUNDER_DIR/bin/$RUN_PROG"
 
 if [ "`uname`" = "Darwin" ]; then
   # Darwin (BSD) is missing all sorts of stuff, naturally, including %P,
   # which gets you lowercase am or pm. (%p gets you uppercase AM or PM --
   # real logical, huh?)
-  OUTFILE="run-geolocate-wikipedia.out$ID.`date '+%F.%H%M%p'`"
+  OUTFILE="$RUN_PROG.out$ID.`date '+%F.%H%M%p'`"
 else
-  OUTFILE="run-geolocate-wikipedia.out$ID.`date '+%F.%H%M%P'`"
+  OUTFILE="$RUN_PROG.out$ID.`date '+%F.%H%M%P'`"
 fi
 if [ -e "$OUTFILE" ]; then
   echo "Output file $OUTFILE already exists!  Won't overwrite."
@@ -40,4 +50,4 @@ else
   echo "Run without arguments"
 fi
 
-nohup $RUN_GEOLOCATE_WIKIPEDIA ${1+"$@"} > $OUTFILE 2>&1
+nohup "$DO_GEOLOCATE" ${1+"$@"} > $OUTFILE 2>&1

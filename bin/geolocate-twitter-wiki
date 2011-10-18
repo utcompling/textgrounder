@@ -1,0 +1,23 @@
+#!/bin/sh
+
+# Run geolocation, passing it various useful arguments for running
+# on Eisenstein et al (2010)'s Twitter data.  Extra arguments
+# can be specified on the command line, which will override any existing
+# arguments.
+#
+# See also 'nohup-geolocate-twitter-wiki', which will run this script using
+# 'nohup' while saving the output to a file.
+
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  exit 1
+fi
+
+# Here we simply run geolocate-twitter, telling it to run geolocate-wikipedia
+# as its underlying program, rather than tg-geolocate.  This way the
+# Wikipedia article and count files will be processed along with the
+# Twitter files. (FIXME: This way we also evaluate on both Wikipedia and
+# Twitter articles, perhaps not what we want.)
+GEOLOCATE_TWITTER="$TEXTGROUNDER_DIR/bin/geolocate-twitter"
+
+$GEOLOCATE_TWITTER --run-prog geolocate-wikipedia ${1+"$@"}

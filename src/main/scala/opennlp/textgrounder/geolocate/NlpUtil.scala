@@ -13,8 +13,6 @@ import math._
 import java.io.{Console=>_,_}
 import java.util.Date
 
-import OptParse._
-
 // from __future__ import with_statement // For chompopen(), openr()
 // from optparse import OptionParser
 // from itertools import *
@@ -34,27 +32,10 @@ import OptParse._
 
 object NlpUtil {
 
-  // Debug params.  Different params indicate different info to output.
-  // Specified using --debug.  Multiple params are separated by commas or
-  // spaces.  Params can be boolean, if given alone, or valueful, if given as
-  // PARAM=VALUE.  Certain params are list-valued; multiple values are specified
-  // by including the parameter multiple times, or by separating values by
-  // a semicolon or colon.
-  val debug = booleanmap()
-  val debugval = stringmap()
-  val debuglist = bufmap[String]()
-  
-  var list_debug_params = Set[String]()
-  
-  // Register a list-valued debug param.
-  def register_list_debug_param(param: String) {
-    list_debug_params += param
-  }
-
   /**
     * Return floating-point value, number of seconds since the Epoch
     **/
-  def curtimesecs() = (new Date()).getTime()/1000.0
+  def curtimesecs() = System.currentTimeMillis()/1000.0
 
   def curtimehuman() = (new Date()) toString
 
@@ -271,15 +252,6 @@ object NlpUtil {
       autoflush,
       "UTF-8")
   
-  // If given a directory, yield all the files in the directory; else just
-  // yield the file.
-  def iter_directory_files(dir: String) = {
-    val dirfile = new File(dir)
-    if (dirfile.isDirectory) {
-      for (file <- dirfile.listFiles().toSeq) yield file.toString
-    } else Seq(dir)
-  }
-
 //  // Open a filename and yield lines, but with any terminating newline
 //  // removed (similar to "chomp" in Perl).  Basically same as gopen() but
 //  // with defaults set differently.
@@ -358,7 +330,21 @@ object NlpUtil {
 //   */
 //  def errout(text):
 //    uniout(text, outfile=sys.stderr)
-//  
+// 
+  /**
+    Set Java System.out and System.err, and Scala Console.out and Console.err,
+    so that they convert text to UTF-8 upon output (rather than e.g. MacRoman,
+    the default on Mac OS X).
+   */
+  def set_stdout_stderr_utf_8() {
+    // Fuck me to hell, have to fix things up in a non-obvious way to
+    // get UTF-8 output on the Mac (default is MacRoman???).
+    System.setOut(new PrintStream(System.out, true, "UTF-8"))
+    System.setErr(new PrintStream(System.err, true, "UTF-8"))
+    Console.setOut(System.out)
+    Console.setErr(System.err)
+  }
+
   def uniprint(text: String, outfile: PrintStream=System.out) {
     outfile.println(text)
   }
@@ -464,7 +450,19 @@ object NlpUtil {
     val fracpart = x - intpart
     long_with_commas(intpart) + ("%.2f" format fracpart).drop(1)
   }
-  
+ 
+  // Try to format something with reasonable precision.
+  def format_float(x: Double) = {
+    var precision = 2
+    var xx = x
+    while (xx < 0.1) {
+      xx *= 10
+      precision += 1
+    }
+    val formatstr = "%%.%sf" format precision
+    formatstr format x
+  }
+
   /**
    *  Return the median value of a list.  List will be sorted, so this is O(n).
    */
@@ -557,19 +555,17 @@ object NlpUtil {
   
   // Another way to do this, using subclassing.
   //
-  // abstract class gendefaultmap[From,To] extends HashMap[From, To] {
+  // abstract class defaultmap[From,To] extends HashMap[From, To] {
   //   val defaultval: To
   //   override def default(key: From) = defaultval
   // }
   //
-  // class genintmap[T] extends gendefaultmap[T, Int] { val defaultval = 0 }
-  //
-  // def intmap() = new genintmap[String]()
+  // class intmap[T] extends defaultmap[T, Int] { val defaultval = 0 }
   //
 
   // The original way
   //
-  // def booleanmap() = {
+  // def booleanmap[String]() = {
   //   new HashMap[String, Boolean] {
   //     override def default(key: String) = false
   //   }
@@ -587,7 +583,7 @@ object NlpUtil {
   // This is necessary when the value is something mutable, but probably a
   // bad idea otherwise, since looking up a nonexistent value in the table
   // will cause a later "contains" call to return true on the value.
-  def gendefaultmap[F,T](defaultval: => T, setkey: Boolean = false) = {
+  def defaultmap[F,T](defaultval: => T, setkey: Boolean = false) = {
     new mutable.HashMap[F,T] {
       override def default(key: F) = {
         val buf = defaultval
@@ -596,25 +592,29 @@ object NlpUtil {
         buf
       }
     }
-  } 
-  def genintmap[T]() = gendefaultmap[T,Int](0)
-  def intmap() = genintmap[String]()
-  def gendoublemap[T]() = gendefaultmap[T,Double](0.0)
-  def doublemap() = gendoublemap[String]()
-  def genbooleanmap[T]() = gendefaultmap[T,Boolean](false)
-  def booleanmap() = genbooleanmap[String]()
-  def genstringmap[T]() = gendefaultmap[T,String]("")
-  def stringmap() = genstringmap[String]()
-  // The default value is an empty collection of type U.  Calls of the sort
-  // 'map(key) += item' will add the item to the collection stored as the
-  // value of the key rather than changing the value itself. (After doing
-  // this, the result of 'map(key)' will be the same collection, but the
-  // contents of the collection will be modified.  On the other hand, in
-  // the case of the above maps, the result of 'map(key)' will be
-  // different.)
-  def genbufmap[T,U]() =
-    gendefaultmap[T,mutable.Buffer[U]](mutable.Buffer[U](), setkey=true)
-  def bufmap[T]() = genbufmap[String,T]()
+  }
+  /* These next four are maps from T to Int, Double, Boolean or String,
+     which automatically use a default value if the key isn't seen.
+     They can be used in some cases where you simply want to be able to
+     look anything up, whether set or not; but especially useful when
+     accumulating counts and such, where you want to add to the existing
+     value and want keys not yet seen to automatically spring into
+     existence with the value of 0 (or empty string). */
+  def intmap[T]() = defaultmap[T,Int](0)
+  def doublemap[T]() = defaultmap[T,Double](0.0)
+  def booleanmap[T]() = defaultmap[T,Boolean](false)
+  def stringmap[T]() = defaultmap[T,String]("")
+  /** A default map which maps from T to an (extendible) array of type U.
+      The default value is an empty Buffer of type U.  Calls of the sort
+      'map(key) += item' will add the item to the Buffer stored as the
+      value of the key rather than changing the value itself. (After doing
+      this, the result of 'map(key)' will be the same collection, but the
+      contents of the collection will be modified.  On the other hand, in
+      the case of the above maps, the result of 'map(key)' will be
+      different.)
+    */
+  def bufmap[T,U]() =
+    defaultmap[T,mutable.Buffer[U]](mutable.Buffer[U](), setkey=true)
   
   // ORIGINAL: ---------------------------------------
 
@@ -670,7 +670,37 @@ object NlpUtil {
 //  
 //  def setdict():
 //    return defdict(set, add_upon_ref=true)
-  
+ 
+  /**
+   A simple class like ArrayBuilder but which gets you direct access
+   to the underlying array and lets you easily reset things, so that you
+   can reuse a Dynamic Array multiple times without constantly creating
+   new objects.  Also has specialization.
+   */
+  class DynamicArray[@specialized T:ClassManifest](initial_alloc:Int = 8) {
+    protected val multiply_factor = 1.5
+    var array = new Array[T](initial_alloc)
+    var length = 0
+    def ensure_at_least(size: Int) {
+      if (array.length < size) {
+        var newsize = array.length
+        while (newsize < size)
+          newsize = (newsize * multiply_factor).toInt
+        array = new Array[T](newsize)
+      }
+    }
+
+    def += (item: T) {
+      ensure_at_least(length + 1)
+      array(length) = item
+      length += 1
+    }
+
+    def clear() {
+      length = 0
+    }
+  }
+    
   //////////////////////////////////////////////////////////////////////////////
   //                                 Sorted lists                             //
   //////////////////////////////////////////////////////////////////////////////
@@ -818,7 +848,7 @@ object NlpUtil {
         plural_item_name
     }
   
-    def item_processed(maxtime: Double=0) = {
+    def item_processed(maxtime: Double = 0.0) = {
       val curtime = curtimesecs()
       items_processed += 1
       val total_elapsed_secs = curtime - first_time
@@ -832,10 +862,16 @@ object NlpUtil {
           ((total_elapsed_secs / secs_between_output).toInt *
            secs_between_output)
         last_time = first_time + rounded_elapsed
+
         errprint("Elapsed time: %s minutes %s seconds, %s %s processed",
                  (total_elapsed_secs / 60).toInt,
                  (total_elapsed_secs % 60).toInt,
                  items_processed, item_unit())
+        val items_per_second = items_processed.toDouble / total_elapsed_secs
+        val seconds_per_item = total_elapsed_secs / items_processed
+        errprint("Processing rate: %s items per second (%s seconds per item)",
+                 format_float(items_per_second),
+                 format_float(seconds_per_item))
       }
       if (maxtime > 0 && total_elapsed_secs >= maxtime) {
         errprint("Maximum time reached, interrupting processing after %s %s",
@@ -901,50 +937,6 @@ object NlpUtil {
     fuckme_no_yield()
   }
 
-  //////////////////////////////////////////////////////////////////////////////
-  //                               NLP Programs                               //
-  //////////////////////////////////////////////////////////////////////////////
-
-  def output_options(op: OptionParser) {
-    errprint("Parameter values:")
-    for ((name, opt) <- op.get_argmap)
-      errprint("%30s: %s", name, opt.value)
-    errprint("")
-  }
-  
-  abstract class NlpProgram extends App {
-    // Things that must be implemented
-    val opts: AnyRef
-    val op: OptionParser
-    def handle_arguments(op: OptionParser, args: Seq[String])
-    def implement_main(op: OptionParser, args: Seq[String])
-
-    // Things that may be overridden
-    def output_parameters() {}
-
-    def need(arg: String, arg_english: String = null) {
-      op.need(arg, arg_english)
-    }
-
-    def main() = {
-      // Fuck me to hell, have to fix things up in a non-obvious way to
-      // get UTF-8 output on the Mac (default is MacRoman???).
-      System.setOut(new PrintStream(System.out, true, "UTF-8"))
-      System.setErr(new PrintStream(System.err, true, "UTF-8"))
-      Console.setOut(System.out)
-      Console.setErr(System.err)
-      errprint("Beginning operation at %s" format curtimehuman())
-      errprint("Arguments: %s" format (args mkString " "))
-      op.parse(opts, args)
-      handle_arguments(op, args)
-      output_options(op)
-      output_parameters()
-      val retval = implement_main(op, args)
-      errprint("Ending operation at %s" format curtimehuman())
-      retval
-    }
-  }
-//
 //  //////////////////////////////////////////////////////////////////////////////
 //  //                               Priority Queues                            //
 //  //////////////////////////////////////////////////////////////////////////////
@@ -1103,7 +1095,7 @@ object NlpUtil {
     try {
       fn
     } catch {
-      case e@_ => { errprint("s", e); errval }
+      case e@_ => { errprint("%s", e); errval }
     }
   }
 
@@ -1128,7 +1120,7 @@ object NlpUtil {
       return wrap_call(get_program_memory_usage_proc(wraperr=false), -1L)
     if (!((new File("/proc/self/status")).exists))
       return -1L
-    for (line <- openr("proc/self/status")) {
+    for (line <- openr("/proc/self/status")) {
         val trimline = line.trim
         if (trimline.startsWith("VmRSS:")) {
           val rss = ("""\s+""".r.split(trimline))(1).toLong

@@ -1,10 +1,13 @@
 package opennlp.textgrounder.geolocate
 
-import math._
+import WordDist._
 import NlpUtil._
 import KLDiv._
+import Debug._
+
+import math._
 import collection.mutable
-import WordDist._
+import gnu.trove.map.hash
 
 // val use_sorted_list = false
 
@@ -32,7 +35,7 @@ object IntStringMemoizer {
     else {
       val newind = next_word_count
       next_word_count += 1
-      word_id_map(word) = index
+      word_id_map(word) = newind
       id_word_map(index) = word
       newind
     }
@@ -56,7 +59,7 @@ object TrivialIntMemoizer {
 }
 
 object WordDist {
-  val memoizer = IdentityMemoizer
+  val memoizer = IntStringMemoizer
   val invalid_word = memoizer.invalid_word
   type Word = memoizer.Word
   def memoize_word(word: String) = memoizer.memoize_word(word)
@@ -79,7 +82,7 @@ object WordDist {
   // empirical frequency of a word among all articles, adjusted by the mass
   // to be assigned to globally unseen words (words never seen at all), i.e. the
   // value in 'globally_unseen_word_prob'.
-  var overall_word_counts = genintmap[Word]()
+  var overall_word_counts = intmap[Word]()
 
   var overall_word_probs: mutable.Map[Word,Double] = null
 
@@ -121,14 +124,22 @@ object WordDist {
  */
 
 class WordDist(
+  /** Separate arrays of keys and values to use to initialize distribution.
+      Also must pass in number of words because we may be using arrays taken
+      from DynamicArray objects, which may be oversize. */
+  keys: Array[Word],
+  values: Array[Int],
+  num_words: Int,
+  /** If true, add the word counts to the global word count statistics. */
+  note_globally: Boolean=true
+) {
   /** A map (or possibly a "sorted list" of tuples, to save memory?) of
       (word, count) items, specifying the counts of all words seen
       at least once.
    */
-  val counts: mutable.Map[Word,Int],
-  /** If true, add the word counts to the global word count statistics. */
-  note_globally: Boolean=true
-) {
+  val counts = intmap[Word]()
+  for (i <- 0 until num_words)
+    counts(keys(i)) = values(i)
   /** Total number of word tokens seen */
   var total_tokens = counts.values sum
   /** Whether we have finished computing the distribution in 'counts'. */
@@ -174,7 +185,7 @@ class WordDist(
   }
 
   def this() {
-    this(genintmap[Word]())
+    this(Array[Word](), Array[Int](), 0)
   }
 
   override def toString = {
@@ -255,7 +266,7 @@ class WordDist(
     /**
      Check fast and slow versions against each other.
      */
-  def test_kl_divergence(other: WordDist, partial: Boolean=false) {
+  def test_kl_divergence(other: WordDist, partial: Boolean=false) = {
     assert(finished)
     assert(other.finished)
     val fast_kldiv = fast_kl_divergence(this, other, partial)
