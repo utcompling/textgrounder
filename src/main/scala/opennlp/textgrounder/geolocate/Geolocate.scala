@@ -2983,6 +2983,7 @@ object Debug {
 object GeolocateApp extends NlpApp {
   val the_opts = Opts
   val the_op = Opts.op
+  val allow_other_fields_in_obj = true
 
   var need_to_read_stopwords = false
 
