@@ -13,19 +13,17 @@
 # combined = Combined article data file, only for articles with coordinates or
 #            redirects to such articles
 
-if [ -z "$WIKIGROUNDER_DIR" ]; then
-  if [ -z "$TEXTGROUNDER_DIR" ]; then
-    echo "With WIKIGROUNDER_DIR unset, must set TEXTGROUNDER_DIR to point"
-    echo "to top-level directory where TextGrounder is installed."
-    exit 1
-  fi
-  WIKIGROUNDER_DIR="$TEXTGROUNDER_DIR/python"
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  exit 1
 fi
 
-. $WIKIGROUNDER_DIR/config-wikigrounder
+. $TEXTGROUNDER_DIR/bin/config-geolocate
 
-PROCESSWIKI="$WIKIGROUNDER_DIR/processwiki.py"
-GENERATE_COMBINED="$WIKIGROUNDER_DIR/generate_combined.py"
+TG_PYTHON_DIR="$TEXTGROUNDER_DIR/python"
+
+PROCESSWIKI="$TG_PYTHON_DIR/processwiki.py"
+GENERATE_COMBINED="$TG_PYTHON_DIR/generate_combined.py"
 
 LOGFILE="generate-all-data.log"
 

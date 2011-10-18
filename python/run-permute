@@ -11,21 +11,24 @@
 # sort = Sort each split file
 # combine = Combine results
 
-if [ -z "$WIKIGROUNDER_DIR" ]; then
-  if [ -z "$TEXTGROUNDER_DIR" ]; then
-    echo "With WIKIGROUNDER_DIR unset, must set TEXTGROUNDER_DIR to point"
-    echo "to top-level directory where TextGrounder is installed."
-    exit 1
-  fi
-  WIKIGROUNDER_DIR="$TEXTGROUNDER_DIR/python"
+### (Almost) standard boilerplate to get config ###
+
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  exit 1
 fi
 
+# Non-standard here: Don't use permuted dumps
 NO_USE_PERMUTED=t
-. $WIKIGROUNDER_DIR/config-wikigrounder
+. $TEXTGROUNDER_DIR/bin/config-geolocate
+
+TG_PYTHON_DIR="$TEXTGROUNDER_DIR/python"
+
+### End boilerplate to get config ###
 
 SPLIT_PREFIX="$DUMP_PREFIX-split"
 
-PERMUTE_WIKI="$WIKIGROUNDER_DIR/permute_wiki.py"
+PERMUTE_WIKI="$TG_PYTHON_DIR/permute_wiki.py"
 
 PERMUTED_DUMP_FILE="$DUMP_PREFIX-permuted-pages-articles.xml.bz2"
 PERMUTED_OUT_ORIG_ARTICLE_DATA_FILE="$DUMP_PREFIX-permuted-$ORIG_ARTICLE_DATA_SUFFIX"

@@ -10,33 +10,29 @@
 #
 # Run this at the top level of the GeoText.####-##-## tree.
 
-### Standard boilerplate to get config ###
-
 DEBUG="--debug 0"
 
-if [ -z "$WIKIGROUNDER_DIR" ]; then
-  if [ -z "$TEXTGROUNDER_DIR" ]; then
-    echo "With WIKIGROUNDER_DIR unset, must set TEXTGROUNDER_DIR to point"
-    echo "to top-level directory where TextGrounder is installed."
-    exit 1
-  fi
-  WIKIGROUNDER_DIR="$TEXTGROUNDER_DIR/python"
+### Standard boilerplate to get config ###
+
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  exit 1
 fi
 
-TGP="$WIKIGROUNDER_DIR"
+. $TEXTGROUNDER_DIR/bin/config-geolocate
 
-. $TGP/config-wikigrounder
+TG_PYTHON_DIR="$TEXTGROUNDER_DIR/python"
 
 ### End boilerplate to get config ###
 
 ### Do it ###
 
 # Change list of threshold values if you want; remember, you already
-# had to have run extract.py.
+# had to have run extract.py. (FIXME: Old name, what's the new name?)
 
 
-STEP1="$TGP/twitter_to_lda.py"
-STEP2="$TGP/twitter_geotext_process.py"
+STEP1="$TG_PYTHON_DIR/twitter_to_lda.py"
+STEP2="$TG_PYTHON_DIR/twitter_geotext_process.py"
 
 for x in 5 10 2 20 3; do
   INDIR="processed-$x-docthresh"
