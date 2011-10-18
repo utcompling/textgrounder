@@ -22,6 +22,9 @@ import java.io.Serializable;
 import opennlp.textgrounder.util.FastTrig;
 
 public class Coordinate implements Serializable {
+
+    private static final long serialVersionUID = 42L;
+
     private final double lng;
     private final double lat;
     

@@ -34,6 +34,8 @@ import java.io.Serializable;
  */
 public class Region implements Serializable {
 
+    private static final long serialVersionUID = 42L;
+
     public final int id;
     public final double minLon;
     public final double maxLon;

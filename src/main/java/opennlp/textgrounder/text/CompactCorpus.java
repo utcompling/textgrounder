@@ -266,6 +266,9 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
     }
 
     private class CompactToponym implements StoredToponym {
+
+      private static final long serialVersionUID = 42L;
+
       private final int idx;
       private int goldIdx;
       private int selectedIdx;
@@ -362,6 +365,9 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
           final int current = this.current++;
           final int idx = StoredSentence.this.tokens[current];
           return new StoredToken() {
+
+            private static final long serialVersionUID = 42L;
+
             public String getForm() {
               return CompactCorpus.this.tokenLexicon.atIndex(CompactCorpus.this.tokenOrigMap[idx]);
             }

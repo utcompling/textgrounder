@@ -204,9 +204,9 @@ public class BaseApp {
                         maxLon = Double.parseDouble(value.replaceAll("n", "-"));
                     break;
                 case 'n':
-                	if(option.getOpt().equals("ner"))
-                		setHighRecallNER(new Integer(value)!=0);
-                		
+                    if(option.getOpt().equals("ner"))
+                        setHighRecallNER(new Integer(value)!=0);
+                    break;
                 case 'd':
                     doKMeans = true;
                     break;

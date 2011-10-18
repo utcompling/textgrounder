@@ -80,6 +80,8 @@ public class XMLToInternalSource<T extends XMLToInternalConverterInterface> exte
 
         return new Document(id) {
 
+            private static final long serialVersionUID = 42L;
+
             @Override
             public Iterator<Sentence<Token>> iterator() {
                 return new SentenceIterator() {

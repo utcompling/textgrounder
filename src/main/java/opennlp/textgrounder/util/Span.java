@@ -20,6 +20,9 @@ import java.util.List;
 import java.io.*;
 
 public class Span<A> implements Serializable {
+
+  private static final long serialVersionUID = 42L;
+
   private final int start;
   private final int end;
   private final A item;

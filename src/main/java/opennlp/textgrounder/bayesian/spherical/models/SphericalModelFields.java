@@ -24,6 +24,8 @@ import java.io.Serializable;
  */
 public class SphericalModelFields implements Serializable {
 
+    private static final long serialVersionUID = 42L;
+
     /**
      * global stick breaking prior. is specified from param file on first
      * iteration.

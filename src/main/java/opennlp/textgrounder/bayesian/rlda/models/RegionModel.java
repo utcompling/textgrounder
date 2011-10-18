@@ -33,6 +33,8 @@ import opennlp.textgrounder.bayesian.structs.AveragedCountWrapper;
  */
 public class RegionModel extends RegionModelFields {
 
+    private static final long serialVersionUID = 42L;
+
     /**
      * Random number generator. Implements the fast Mersenne Twister.
      */

@@ -26,6 +26,8 @@ import opennlp.textgrounder.bayesian.spherical.models.SphericalModelFields;
  */
 public class AveragedSphericalCountWrapper extends SphericalModelFields implements Serializable {
 
+    private static final long serialVersionUID = 42L;
+
     public AveragedSphericalCountWrapper(SphericalModelBase _regionModel) {
         globalDishWeightsFM = _regionModel.getGlobalDishWeightsFM();
         localDishWeightsFM = _regionModel.getLocalDishWeightsFM();

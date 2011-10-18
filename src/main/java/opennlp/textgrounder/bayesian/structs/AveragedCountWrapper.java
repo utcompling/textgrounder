@@ -26,6 +26,8 @@ import opennlp.textgrounder.bayesian.spherical.models.SphericalModelBase;
  */
 public class AveragedCountWrapper implements Serializable {
 
+    private static final long serialVersionUID = 42L;
+
     /**
      * Hyperparameter for region*doc priors
      */

@@ -25,5 +25,5 @@ import java.util.HashSet;
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
 public class ToponymToRegionIDsMap extends HashMap<Integer, HashSet<Integer>>{
-
+    private static final long serialVersionUID = 42L;
 }

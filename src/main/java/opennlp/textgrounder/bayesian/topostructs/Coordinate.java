@@ -29,6 +29,8 @@ import opennlp.textgrounder.bayesian.mathutils.TGMath;
  */
 public class Coordinate implements Serializable {
 
+    private static final long serialVersionUID = 42L;
+
     public double latitude;
     public double longitude;
 
