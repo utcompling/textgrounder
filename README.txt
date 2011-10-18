@@ -5,7 +5,7 @@ See CHANGES for a description of the project status.
 
 This file contains the configuration and build instructions. 
 
-TextGrounder website: http://code.google.com/p/textgrounder/
+TextGrounder website: https://bitbucket.org/utcompling/textgrounder/
 
 
 Requirements
@@ -63,33 +63,31 @@ the value when on Unix, but you must *NOT* do this when under Windows.
 Building the system from source
 ===============================
 
-The TextGrounder build system is based on Apache Ant.  Ant is a little but very
-handy tool that uses a build file written in XML (build.xml) as building
-instructions.  Building the Java portion of TextGrounder is accomplished using the
-script `ant'; this works under Windows and Unix, but requires that
-you run it from the top-level directory (where the build.xml file is
-located).  If everything is right and all the required packages are
-visible, this action will generate a file called textgrounder.jar in the
-./output directory.
+TextGrounder uses SBT (Simple Build Tool) with a standard directory
+structure.  To build TextGrounder, type (in the $TEXTGROUNDER_DIR
+directory):
 
+$ textgrounder build update compile
 
-Build targets
-=============
+This will compile the source files and put them in
+./target/classes. If this is your first time running it, you will see
+messages about Scala being dowloaded -- this is fine and
+expected. Once that is over, the TextGrounder code will be compiled.
 
-These are the meaningful targets for the main build file:
+To try out other build targets, do:
 
-  package  --> generates the textgrounder.jar file 
-  compile  --> compiles the source code (default)
-  javadoc  --> generates the API documentation
-  clean    --> cleans up the compilation directory
+$ textgrounder build
 
-There are also build files in each sample grammar directory.
+This will drop you into the SBT interface. To see the actions that are
+possible, hit the TAB key. (In general, you can do auto-completion on
+any command prefix in SBT, hurrah!)
 
-To learn the details of what each target does, read the build.xml file.
-It is quite understandable.
+Documentation for SBT is here:
 
-If you create the javadocs (with "ant javadoc"), you can point your
-browser to ./docs/api/index.html to look at the TextGrounder API.
+https://github.com/harrah/xsbt/wiki
+
+Note: if you have SBT 0.11.0 already installed on your system, you can
+also just call it directly with "sbt" in TEXTGROUNDER_DIR.
 
 
 Trying it out
@@ -98,10 +96,7 @@ Trying it out
 You will need to obtain data to run the system on.  See the wiki for
 more info:
 
-http://code.google.com/p/textgrounder/wiki/DevelTips
-
-When we make an actual release, things will be shifted to a getting
-started page.
+https://bitbucket.org/utcompling/textgrounder/wiki/Home
 
 
 Bug Reports
