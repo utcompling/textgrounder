@@ -27,6 +27,9 @@ import opennlp.textgrounder.util.*;
 import opennlp.textgrounder.app.*;
 
 public class CompactCorpus extends StoredCorpus implements Serializable {
+
+  private static final long serialVersionUID = 42L;
+
   private Corpus<Token> wrapped;
 
   private final CountingLexicon<String> tokenLexicon;
@@ -196,6 +199,9 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
   }
 
   private class StoredDocument extends Document<StoredToken> implements Serializable {
+
+    private static final long serialVersionUID = 42L;
+
     private final List<Sentence<StoredToken>> sentences;
 
     private StoredDocument(String id, List<Sentence<StoredToken>> sentences) {
@@ -231,6 +237,9 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
   }
 
   private class StoredSentence extends Sentence<StoredToken> implements Serializable {
+
+    private static final long serialVersionUID = 42L;
+
     private final int[] tokens;
     private final ArrayList<Span<StoredToken>> toponymSpans;
 

@@ -57,6 +57,7 @@ public class ToponymAnnotator extends DocumentSourceWrapper {
     final Iterator<Sentence<Token>> sentences = document.iterator();
 
     return new Document<Token>(document.getId(), document.getTimestamp(), document.getGoldCoord(), document.getSystemCoord(), document.getSection()) {
+      private static final long serialVersionUID = 42L;
       public Iterator<Sentence<Token>> iterator() {
         return new SentenceIterator() {
           public boolean hasNext() {

@@ -19,6 +19,9 @@ import java.util.List;
 import java.io.Serializable;
 
 public abstract class Region implements Serializable {
+
+  private static final long serialVersionUID = 42L;
+
   public abstract Coordinate getCenter();
   public abstract void setCenter(Coordinate coord);
   public abstract boolean contains(double lat, double lng);

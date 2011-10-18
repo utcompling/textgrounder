@@ -28,6 +28,9 @@ import java.util.Map;
 
 public class SimpleCountingLexicon<A extends Serializable>
   extends SimpleLexicon<A> implements CountingLexicon<A> {
+
+  private static final long serialVersionUID = 42L;
+
   private ArrayList<Integer> counts;
 
   public SimpleCountingLexicon(int capacity) {
@@ -72,7 +75,7 @@ public class SimpleCountingLexicon<A extends Serializable>
   }
 
   private void readObject(ObjectInputStream in)
-    throws IOException, ClassNotFoundException {
+      throws IOException, ClassNotFoundException {
     this.growing = in.readBoolean();
     this.entries = (ArrayList<A>) in.readObject();
     this.counts = (ArrayList<Integer>) in.readObject();

@@ -24,6 +24,9 @@ import opennlp.textgrounder.util.Span;
 import java.io.*;
 
 public class SimpleSentence<A extends Token> extends Sentence implements Serializable {
+
+  private static final long serialVersionUID = 42L;
+
   private final List<A> tokens;
   private final List<Span<A>> toponymSpans;
 

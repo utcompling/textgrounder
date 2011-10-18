@@ -22,6 +22,9 @@ import opennlp.textgrounder.topo.Location;
 import java.io.*;
 
 public class SimpleToponym extends SimpleToken implements Toponym, Serializable {
+
+  private static final long serialVersionUID = 42L;
+
   private List<Location> candidates;
   private int goldIdx;
   private int selectedIdx;

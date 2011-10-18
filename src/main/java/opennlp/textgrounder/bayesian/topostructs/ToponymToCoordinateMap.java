@@ -25,5 +25,5 @@ import java.util.HashSet;
  * @author Taesun Moon <tsunmoon@gmail.com>
  */
 public class ToponymToCoordinateMap extends HashMap<Integer, HashSet<Coordinate>>{
-
+    private static final long serialVersionUID = 42L;
 }

@@ -23,6 +23,9 @@ import java.util.List;
 import com.google.common.collect.Iterators;
 
 public class StreamCorpus extends Corpus<Token> {
+
+  private static final long serialVersionUID = 42L;
+
   private final List<DocumentSource> sources;
   private boolean read;
 

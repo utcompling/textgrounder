@@ -53,6 +53,7 @@ public class CandidateAnnotator extends DocumentSourceWrapper {
     final Iterator<Sentence<Token>> sentences = document.iterator();
 
     return new Document<Token>(document.getId()) {
+      private static final long serialVersionUID = 42L;
       public Iterator<Sentence<Token>> iterator() {
         return new SentenceIterator() {
           public boolean hasNext() {
@@ -67,7 +68,7 @@ public class CandidateAnnotator extends DocumentSourceWrapper {
 
             Iterator<Span<Token>> spans = sentence.toponymSpans();
             while (spans.hasNext()) {
-              Span<Token> span = (Span<Token>) spans.next();
+              Span<Token> span = /*(Span<Token>)*/ spans.next();
               Toponym toponym = (Toponym) span.getItem();
               String form = toponym.getOrigForm();
 

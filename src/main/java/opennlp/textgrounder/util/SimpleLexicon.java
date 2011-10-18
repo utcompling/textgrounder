@@ -27,6 +27,9 @@ import java.util.List;
 import java.util.Map;
 
 public class SimpleLexicon<A extends Serializable> implements Lexicon<A> {
+
+  private static final long serialVersionUID = 42L;
+
   protected Map<A, Integer> map;
   protected ArrayList<A> entries;
   protected boolean growing;

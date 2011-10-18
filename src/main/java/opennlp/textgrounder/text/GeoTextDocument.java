@@ -7,6 +7,8 @@ import opennlp.textgrounder.topo.*;
 
 public class GeoTextDocument extends Document {
 
+    private static final long serialVersionUID = 42L;
+
     private List<Sentence<Token>> sentences;
 
     public GeoTextDocument(String id, String timestamp, double goldLat, double goldLon) {

@@ -28,5 +28,3 @@ javacOptions ++= Seq("-Xlint")
 
 // append -deprecation to the options passed to the Scala compiler
 scalacOptions ++= Seq("-deprecation", "-Xlint")
-
-
