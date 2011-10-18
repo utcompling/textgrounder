@@ -11,6 +11,7 @@ import WordDist.{Word, invalid_word, memoize_word, unmemoize_word}
 import OptParse._
 import Distances._
 import Debug._
+import GeolocateDriver.Opts
 
 import util.matching.Regex
 import util.Random
@@ -2445,70 +2446,96 @@ object Stopwords {
 //                                  Main code                              //
 /////////////////////////////////////////////////////////////////////////////
 
-class GeolocateOptions {
+/**
+ Class for specifying options for geolocation.  Note that currently this
+ is a fairly crude conversion of the original command-line interface, with
+ one field in this class for each possible command-line option.
+ Documentation for how these fields work is as described below in the help
+ for each corresponding command-line option.
+
+ @param defaults Object used to initialize the default values of each
+ argument.  By default, the corresponding default values for the
+ corresponding command-line arguments are used, but it's possible to pass
+ in an object corresponding to the arguments actually specified on the
+ command line, so that these values don't have to be explicitly copied.
+ */
+class GeolocateOptions(defaults: GeolocateCommandLineArguments = null) {
+  /* This is used to fetch the default values out of the command-line
+     arguments, so that we don't have to specify them twice, with
+     concomitant maintenance problems. */
+  protected val defs =
+    if (defaults == null)
+      new GeolocateCommandLineArguments(
+        new OptionParser("random", return_defaults = true))
+    else
+      defaults
 
   //// Basic options for determining operating mode and strategy
-  var mode = "geotag-documents"
-  var strategy = Seq[String]()
-  var baseline_strategy = Seq[String]()
-  var stopwords_file = null: String
-  var article_data_file = Seq[String]()
-  var counts_file = Seq[String]()
-  var eval_file = Seq[String]()
-  var eval_format = "default"
+  var mode = defs.mode
+  var strategy = defs.strategy
+  var baseline_strategy = defs.baseline_strategy
+  var stopwords_file = defs.stopwords_file
+  var article_data_file = defs.article_data_file
+  var counts_file = defs.counts_file
+  var eval_file = defs.eval_file
+  var eval_format = defs.eval_format
 
   //// Input files, toponym resolution only
-  var gazetteer_file = null: String
-  var gazetteer_type = "world"
+  var gazetteer_file = defs.gazetteer_file
+  var gazetteer_type = defs.gazetteer_type
 
   //// Options indicating which documents to train on or evaluate
-  var eval_set = "dev"
-  var num_training_docs = 0
-  var num_test_docs = 0
-  var skip_initial_test_docs = 0
-  var every_nth_test_doc = 1
+  var eval_set = defs.eval_set
+  var num_training_docs = defs.num_training_docs
+  var num_test_docs = defs.num_test_docs
+  var skip_initial_test_docs = defs.skip_initial_test_docs
+  var every_nth_test_doc = defs.every_nth_test_doc
 
   //// Options indicating how to generate the regions we compare against
-  var degrees_per_region = 1.0
-  var miles_per_region = 0.0
-  var width_of_stat_region = 1
+  var degrees_per_region = defs.degrees_per_region
+  var miles_per_region = defs.miles_per_region
+  var width_of_stat_region = defs.width_of_stat_region
 
   //// Options used when creating word distributions
-  var preserve_case_words = false
-  var include_stopwords_in_article_dists = false
-  var minimum_word_count = 1
+  var preserve_case_words = defs.preserve_case_words
+  var include_stopwords_in_article_dists = defs.include_stopwords_in_article_dists
+  var minimum_word_count = defs.minimum_word_count
 
   //// Options used when doing Naive Bayes geotagging
-  var naive_bayes_weighting = "equal"
-  var naive_bayes_baseline_weight = 0.5
+  var naive_bayes_weighting = defs.naive_bayes_weighting
+  var naive_bayes_baseline_weight = defs.naive_bayes_baseline_weight
 
   //// Options used when doing ACP geotagging
-  var lru_cache_size = 400
+  var lru_cache_size = defs.lru_cache_size
 
   //// Debugging/output options
-  var max_time_per_stage = 0.0
-  var no_individual_results = false
-  var debug = null: String
+  var max_time_per_stage = defs.max_time_per_stage
+  var no_individual_results = defs.no_individual_results
+  var debug = defs.debug
 
   //// Options used only in KML generation (--mode=generate-kml)
-  var kml_words = null: String
-  var kml_prefix = "kml-dist."
-  var kml_transform = "none"
-  var kml_max_height = 2000000.0
+  var kml_words = defs.kml_words
+  var kml_prefix = defs.kml_prefix
+  var kml_transform = defs.kml_transform
+  var kml_max_height = defs.kml_max_height
 
   //// Options used only in toponym resolution (--mode=geotag-toponyms)
   //// (Note, gazetteer-file options also used only in toponym resolution,
   //// see above)
-  var naive_bayes_context_len = 10
-  var max_dist_for_close_match = 80.0
-  def max_dist_for_outliers = 200.0
-  def context_type = "region-dist-article-links"
-
+  var naive_bayes_context_len = defs.naive_bayes_context_len
+  var max_dist_for_close_match = defs.max_dist_for_close_match
+  var max_dist_for_outliers = defs.max_dist_for_outliers
+  var context_type = defs.context_type
 }
 
-object Opts {
-  val op = new OptionParser("geolocate")
-  
+/**
+ Class for parsing and retrieving command-line arguments for GeolocateApp.
+
+ @param return_defaults If true, options return default values instead of
+   values given on the command line. NOTE: The operation of the defs below
+   is a bit tricky.  See comments in OptionParser.
+*/
+class GeolocateCommandLineArguments(op: OptionParser) {
   //// Basic options for determining operating mode and strategy
   def mode =
     op.option[String]("m", "mode",
@@ -2537,7 +2564,7 @@ specify the words whose distributions should be outputted.  See also
 the probabilities to make the distinctions among them more visible.
 """)
 
-  def opt_strategy =
+  def strategy =
     op.multiOption[String]("s", "strategy",
       //      choices=Seq(
       //        "baseline", "none",
@@ -2608,9 +2635,8 @@ the article.  Default is 'partial-kl-divergence'.
 
 NOTE: Multiple --strategy options can be given, and each strategy will
 be tried, one after the other.""")
-  var strategy: Seq[String] = null
 
-  def opt_baseline_strategy =
+  def baseline_strategy =
     op.multiOption[String]("baseline-strategy", "bs",
       choices = Seq("internal-link", "random",
         "num-articles", "link-most-common-toponym",
@@ -2643,16 +2669,14 @@ NOTE: Multiple --baseline-strategy options can be given, and each strategy will
 be tried, one after the other.  Currently, however, the *-most-common-toponym
 strategies cannot be mixed with other baseline strategies, or with non-baseline
 strategies, since they require that --preserve-case-words be set internally.""")
-  var baseline_strategy: Seq[String] = null
 
   //// Input files
-  def opt_stopwords_file =
+  def stopwords_file =
     op.option[String]("stopwords-file",
       metavar = "FILE",
       help = """File containing list of stopwords.  If not specified,
 a default list of English stopwords (stored in the TextGrounder distribution)
 is used.""")
-  var stopwords_file: String = null
 
   def article_data_file =
     op.multiOption[String]("a", "article-data-file",
@@ -2684,7 +2708,7 @@ times.  If a directory is given, all files in the directory will be
 considered (but if an error occurs upon parsing a file, it will be ignored).
 Each file is read in and then disambiguation is performed.  Not used when
 --eval-format=internal (which is the default with --mode=geotag-documents).""")
-  def opt_eval_format =
+  def eval_format =
     op.option[String]("f", "eval-format",
       default = "default",
       choices = Seq("default", "internal", "pcl-travel",
@@ -2724,7 +2748,6 @@ specifies the toponyms in a document along with possible locations to map
 to, with the correct one identified.  As with the 'article' format, the
 correct location is used only for evaluation, not for constructing training
 data; the other locations are ignored.""")
-  var eval_format: String = null
 
   //// Input files, toponym resolution only
   def gazetteer_file =
@@ -2790,14 +2813,13 @@ tiling region to compute each statistical region.  If the value is more than
 1, the statistical regions overlap.""")
 
   //// Options used when creating word distributions
-  def opt_preserve_case_words =
+  def preserve_case_words =
     op.flag("preserve-case-words", "pcw",
       help = """Don't fold the case of words used to compute and
 match against article distributions.  Note that in toponym resolution
 (--mode=geotag-toponyms), this applies only to words in articles
 (currently used only in Naive Bayes matching), not to toponyms, which
 are always matched case-insensitively.""")
-  var preserve_case_words = false
   def include_stopwords_in_article_dists =
     op.flag("include-stopwords-in-article-dists",
       help = """Include stopwords when computing word distributions.""")
@@ -2980,25 +3002,82 @@ object Debug {
   }
 }
 
-object GeolocateApp extends NlpApp {
-  val the_opts = Opts
-  val the_op = Opts.op
-  val allow_other_fields_in_obj = true
+/** Class for programmatic access to document/etc. geolocation.
 
-  var need_to_read_stopwords = false
+  NOTE: Currently this is a singleton object, not a class, because there
+  can be only one geolocation instance in existence.  This is because
+  of various other singleton objects (i.e. static methods/fields) scattered
+  throughout the code.  If this is a problem, let me know and I will
+  endeavor to fix it.
 
-  override def output_parameters() {
+  Basic operation:
+
+  1. Create an instance of GeolocateOptions and populate it with the
+     appropriate options.
+  2. Call set_options(), passing in the options instance you just created.
+  3. Call run().
+
+  NOTE: Currently, the GeolocateOptions instance is recorded directly inside
+  of this singleton object, without copying, and some of the fields are
+  changed to more canonical values.  If this is a problem, let me know and
+  I'll fix it.
+
+  All evaluation output is currently written to standard error, and must be
+  parsed appropriately. (There are some scripts to parse the output.)
+  If this is a problem, let me know and I can either (1) send the more
+  important output to stdout instead of stderr, and/or (2) create a
+  programmatic interface to report the results.
+ */
+object GeolocateDriver {
+  var Opts = null: GeolocateOptions
+
+  protected var need_to_read_stopwords = false
+
+  /** Output the values of some internal parameters.  Only needed
+      for debugging. */
+  def output_parameters() {
     errprint("Need to read stopwords: %s", need_to_read_stopwords)
   }
 
-  def handle_arguments(op: OptionParser, args: Seq[String]) {
-    if (Opts.debug != null)
-      parse_debug_spec(Opts.debug)
+  /** Signal an argument error, the same way that set_options() does by
+      default.  You don't normally need to call this.
+   */
+  def default_argument_error(string: String) {
+    throw new IllegalArgumentException(string)
+  }
 
-    // Canonicalize options
-    Opts.strategy = Opts.opt_strategy
-    Opts.baseline_strategy = Opts.opt_baseline_strategy
-    Opts.preserve_case_words = Opts.opt_preserve_case_words
+  /** Set the options to those as given.  NOTE: Currently, some of the
+      fields in this structure will be changed (canonicalized).  See above.
+      If options are illegal, an error will be signaled.
+      
+      @param options Object holding options to set
+      @param argerror Function to use to signal invalid arguments.  By
+        default, the function `default_argument_error()` is called. */
+  def set_options(options: GeolocateOptions,
+    argerror: String => Unit = default_argument_error _) {
+    def argument_needed(arg: String, arg_english: String = null) {
+      val marg_english =
+        if (arg_english == null)
+          arg.replace("-", " ")
+        else
+          arg_english
+      argerror("Must specify %s using --%s" format
+        (marg_english, arg.replace("_", "-")))
+    }
+
+    def need_seq(value: Seq[String], arg: String, arg_english: String = null) {
+      if (value.length == 0)
+        argument_needed(arg, arg_english)
+    }
+
+    def need(value: String, arg: String, arg_english: String = null) {
+      if (value == null || value.length == 0)
+        argument_needed(arg, arg_english)
+    }
+
+    Opts = options
+
+    /** Canonicalize options **/
 
     if (Opts.strategy.length == 0) {
       if (Opts.mode == "geotag-documents")
@@ -3026,20 +3105,31 @@ object GeolocateApp extends NlpApp {
           // That's because we have to set --preserve-case-words, which we
           // generally don't want set for other strategies and which affects
           // the way we construct the training-document distributions.
-          op.error("Can't currently mix *-most-common-toponym baseline strategy with other strategies")
+          argerror("Can't currently mix *-most-common-toponym baseline strategy with other strategies")
         }
         Opts.preserve_case_words = true
       }
     }
 
+    Opts.eval_format =
+      if (Opts.eval_format == "default") {
+        if (Opts.mode == "geotag-toponyms") "article"
+        else "internal"
+      } else Opts.eval_format
+
+    /** Set other values and check remaining options **/
+
+    if (Opts.debug != null)
+      parse_debug_spec(Opts.debug)
+
     // FIXME! Can only currently handle World-type gazetteers.
     if (Opts.gazetteer_type != "world")
-      op.error("Currently can only handle world-type gazetteers")
+      argerror("Currently can only handle world-type gazetteers")
 
     if (Opts.miles_per_region < 0)
-      op.error("Miles per region must be positive")
+      argerror("Miles per region must be positive")
     if (Opts.degrees_per_region < 0)
-      op.error("Degrees per region must be positive")
+      argerror("Degrees per region must be positive")
     degrees_per_region =
       if (Opts.miles_per_region > 0)
         Opts.miles_per_region / miles_per_degree
@@ -3063,68 +3153,63 @@ object GeolocateApp extends NlpApp {
     Distances.minimum_longind = minlongind
 
     if (Opts.width_of_stat_region <= 0)
-      op.error("Width of statistical region must be positive")
+      argerror("Width of statistical region must be positive")
     Distances.width_of_stat_region = Opts.width_of_stat_region
 
     //// Start reading in the files and operating on them ////
-
-    Opts.eval_format =
-      if (Opts.opt_eval_format == "default") {
-        if (Opts.mode == "geotag-toponyms") "article"
-        else "internal"
-      } else Opts.opt_eval_format
 
     if (Opts.mode.startsWith("geotag")) {
       need_to_read_stopwords = true
       if (Opts.mode == "geotag-toponyms" && Opts.strategy == Seq("baseline"))
         ()
       else if (Opts.counts_file.length == 0)
-        op.error("Must specify counts file")
+        argerror("Must specify counts file")
     }
 
     if (Opts.mode == "geotag-toponyms")
-      need("gazetteer-file")
+      need(Opts.gazetteer_file, "gazetteer-file")
 
     if (Opts.eval_format == "raw-text") {
       // FIXME!!!!
-      op.error("Raw-text reading not implemented yet")
+      argerror("Raw-text reading not implemented yet")
     }
 
     if (Opts.mode == "geotag-documents") {
       if (!(Seq("pcl-travel", "internal") contains Opts.eval_format))
-        op.error("For --mode=geotag-documents, eval-format must be 'internal' or 'pcl-travel'")
+        argerror("For --mode=geotag-documents, eval-format must be 'internal' or 'pcl-travel'")
     } else if (Opts.mode == "geotag-toponyms") {
       if (Opts.baseline_strategy.endsWith("most-common-toponym")) {
-        op.error("--baseline-strategy=%s only compatible with --mode=geotag-documents"
+        argerror("--baseline-strategy=%s only compatible with --mode=geotag-documents"
           format Opts.baseline_strategy)
       }
       for (stratname <- Opts.strategy) {
         if (!(Seq("baseline", "naive-bayes-with-baseline",
           "naive-bayes-no-baseline") contains stratname)) {
-          op.error("Strategy '%s' invalid for --mode=geotag-toponyms" format
+          argerror("Strategy '%s' invalid for --mode=geotag-toponyms" format
             stratname)
         }
       }
       if (!(Seq("tr-conll", "article") contains Opts.eval_format))
-        op.error("For --mode=geotag-toponyms, eval-format must be 'article' or 'tr-conll'")
+        argerror("For --mode=geotag-toponyms, eval-format must be 'article' or 'tr-conll'")
     }
 
     if (Opts.mode == "geotag-documents" && Opts.eval_format == "internal") {
       if (Opts.eval_file.length > 0)
-        op.error("--eval-file should not be given when --eval-format=internal")
+        argerror("--eval-file should not be given when --eval-format=internal")
     }
     else if (Opts.mode.startsWith("geotag"))
-      need("eval-file", "evaluation file(s)")
+      need_seq(Opts.eval_file, "eval-file", "evaluation file(s)")
 
     if (Opts.mode == "generate-kml")
-      need("kml-words")
+      need(Opts.kml_words, "kml-words")
     else if (Opts.kml_words != null)
-      op.error("--kml-words only compatible with --mode=generate-kml")
+      argerror("--kml-words only compatible with --mode=generate-kml")
 
-    need("article-data-file")
+    need_seq(Opts.article_data_file, "article-data-file")
   }
 
-  def implement_main(op: OptionParser, args: Seq[String]) {
+  /** Do the actual geolocation.  Results to stderr (see above). */
+  def run() {
     import Toponym._
 
     if (need_to_read_stopwords) {
@@ -3263,6 +3348,27 @@ Not generating an empty KML file.""", word)
           new ArticleGeotagDocumentEvaluator(strategy, stratname)
       })
     }
+  }
+}
+
+object GeolocateApp extends NlpApp {
+  val the_op = new OptionParser("geolocate")
+  val the_opts = new GeolocateCommandLineArguments(the_op)
+  val allow_other_fields_in_obj = false
+
+  override def output_parameters() {
+    GeolocateDriver.output_parameters()
+  }
+
+  def handle_arguments(op: OptionParser, args: Seq[String]) {
+    def argerror(str: String) {
+      op.error(str)
+    }
+    GeolocateDriver.set_options(new GeolocateOptions(the_opts), argerror _)
+  }
+
+  def implement_main(op: OptionParser, args: Seq[String]) {
+    GeolocateDriver.run()
   }
 
   main()

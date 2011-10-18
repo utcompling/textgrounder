@@ -3,6 +3,7 @@ package opennlp.textgrounder.geolocate
 import NlpUtil._
 import Distances._
 import Debug._
+import GeolocateDriver.Opts
 
 import collection.mutable
 import util.control.Breaks._

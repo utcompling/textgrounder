@@ -44,10 +44,6 @@ abstract class NlpApp extends App {
     errprint("")
   }
 
-  def need(arg: String, arg_english: String = null) {
-    the_op.need(arg, arg_english)
-  }
-
   def main() = {
     set_stdout_stderr_utf_8()
     errprint("Beginning operation at %s" format curtimehuman())

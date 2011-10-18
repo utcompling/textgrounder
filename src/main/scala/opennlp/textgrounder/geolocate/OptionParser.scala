@@ -728,19 +728,6 @@ object OptParse {
       checkArgsAvailable()
       for ((name, optobj) <- argmap) yield (name, optobj.value)
     }
-
-    def need(arg: String, arg_english: String = null) {
-      val marg_english =
-        if (arg_english == null)
-          arg.replace("-", " ")
-        else
-          arg_english
-      checkArgsAvailable()
-      val option = argmap(arg)
-      if (!option.specified)
-        error("Must specify %s using --%s" format
-          (marg_english, arg.replace("_", "-")))
-    }
   }
 }
 
