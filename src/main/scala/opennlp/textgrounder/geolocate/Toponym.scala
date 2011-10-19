@@ -1260,8 +1260,9 @@ object Toponym {
     // add them to the region-map that covers the earth if ADD_TO_REGION_MAP is
     // true.
     protected def read_world_gazetteer_and_match(filename: String) {
+      val status = new MeteredTask("gazetteer entry", "matching")
       errprint("Matching gazetteer entries in %s...", filename)
-      val status = new StatusMessage("gazetteer entry")
+      errprint("")
 
       // Match each entry in the gazetteer
       breakable {
@@ -1275,8 +1276,7 @@ object Toponym {
       }
 
       Division.finish_all()
-      errprint("Finished matching %s gazetteer entries.",
-        status.num_processed())
+      status.finish()
       output_resource_usage()
     }
 

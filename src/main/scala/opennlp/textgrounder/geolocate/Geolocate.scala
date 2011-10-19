@@ -1004,17 +1004,17 @@ object StatRegion {
     if (all_regions_computed)
       return
 
-    errprint("Generating all non-empty statistical regions...")
-    val status = new StatusMessage("statistical region")
+    val task = new MeteredTask("statistical region", "generating non-empty")
 
     for (i <- minimum_latind to maximum_latind view) {
       for (j <- minimum_longind to maximum_longind view) {
         val reg = find_region_for_region_indices(i, j, no_create_empty = true)
         if (debug("region") && !reg.worddist.is_empty)
           errprint("--> (%d,%d): %s", i, j, reg)
-        status.item_processed()
+        task.item_processed()
       }
     }
+    task.finish()
     all_regions_computed = true
 
     total_num_arts_for_links = 0
@@ -1275,8 +1275,9 @@ class StatArticleTable {
         keys_dynarr.length, note_globally = (art.split == "training"))
     }
 
+    val task = new MeteredTask("article", "reading distributions of")
     errprint("Reading word counts from %s...", filename)
-    val status = new StatusMessage("article")
+    errprint("")
 
     // Written this way because there's another line after the for loop,
     // corresponding to the else clause of the Python for loop
@@ -1286,13 +1287,13 @@ class StatArticleTable {
           if (title != null)
             one_article_probs()
           // Stop if we've reached the maximum
-          if (status.item_processed(maxtime = Opts.max_time_per_stage))
+          if (task.item_processed(maxtime = Opts.max_time_per_stage))
             break
           if ((Opts.num_training_docs > 0 &&
-            status.num_processed() >= Opts.num_training_docs)) {
+            task.num_processed >= Opts.num_training_docs)) {
             errprint("")
-            errprint("Finishing reading word counts after %d documents",
-              status.num_processed())
+            errprint("Stopping because limit of %s documents reached",
+              Opts.num_training_docs)
             break
           }
 
@@ -1333,8 +1334,8 @@ class StatArticleTable {
 
     if (debug("wordcountarts"))
       stream.close()
-    errprint("Finished reading distributions from %s articles.", status.num_processed())
-    num_articles_with_word_counts = status.num_processed()
+    task.finish()
+    num_articles_with_word_counts = task.num_processed
     output_resource_usage()
   }
 
@@ -1753,7 +1754,7 @@ abstract class TestFileEvaluator(stratname: String) {
     empty sequence is passed in, no evaluation will happen.)
    */
   def evaluate_and_output_results(files: Iterable[String]) {
-    val status = new StatusMessage("document")
+    val task = new MeteredTask("document", "evaluating")
     var last_elapsed = 0.0
     var last_processed = 0
     var skip_initial = Opts.skip_initial_test_docs
@@ -1765,7 +1766,7 @@ abstract class TestFileEvaluator(stratname: String) {
     def process_file(filename: String): Boolean = {
       for (doc <- iter_documents(filename)) {
         // errprint("Processing document: %s", doc)
-        val num_processed = status.num_processed()
+        val num_processed = task.num_processed
         val doctag = "#%d" format (1 + num_processed)
         if (would_skip_document(doc, doctag))
           errprint("Skipped document %s", doc)
@@ -1786,16 +1787,17 @@ abstract class TestFileEvaluator(stratname: String) {
             val not_skipped = evaluate_document(doc, doctag)
             assert(not_skipped)
           }
-          status.item_processed()
-          val new_elapsed = status.elapsed_time()
-          val new_processed = status.num_processed()
+          task.item_processed()
+          val new_elapsed = task.elapsed_time
+          val new_processed = task.num_processed
 
           // If max # of docs reached, stop
           if ((Opts.num_test_docs > 0 &&
             new_processed >= Opts.num_test_docs)) {
             errprint("")
-            errprint("Finishing evaluation after %d documents",
-              new_processed)
+            errprint("Stopping because limit of %s documents reached",
+              Opts.num_test_docs)
+            task.finish()
             return false
           }
 
@@ -1803,16 +1805,17 @@ abstract class TestFileEvaluator(stratname: String) {
           if ((new_elapsed - last_elapsed >= 300 &&
             new_processed - last_processed >= 10)) {
             errprint("Results after %d documents (strategy %s):",
-              status.num_processed(), stratname)
+              task.num_processed, stratname)
             output_results(isfinal = false)
             errprint("End of results after %d documents (strategy %s):",
-              status.num_processed(), stratname)
+              task.num_processed, stratname)
             last_elapsed = new_elapsed
             last_processed = new_processed
           }
         }
       }
 
+      task.finish()
       return true
     }
 
@@ -1845,7 +1848,7 @@ abstract class TestFileEvaluator(stratname: String) {
     def output_final_results() {
       errprint("")
       errprint("Final results for strategy %s: All %d documents processed:",
-        stratname, status.num_processed())
+        stratname, task.num_processed)
       errprint("Ending operation at %s", curtimehuman())
       output_results(isfinal = true)
       errprint("Ending final results for strategy %s", stratname)

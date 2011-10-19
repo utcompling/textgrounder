@@ -34,7 +34,7 @@ object ArticleData {
   def read_article_data_file(filename: String,
       process: Map[String,String] => Unit, maxtime: Double=0.0) = {
     errprint("Reading article data from %s...", filename)
-    val status = new StatusMessage("article")
+    val task = new MeteredTask("article", "reading")
 
     val fi = openr(filename)
 
@@ -46,7 +46,7 @@ object ArticleData {
         if (fieldvals.length != fields.length)
           warning(
           """Strange record at line #%s, expected %s fields, saw %s fields;
-      skipping line=%s""", status.num_processed(), fields.length,
+      skipping line=%s""", task.num_processed(), fields.length,
                            fieldvals.length, line)
         else {
           var good = true
@@ -55,17 +55,17 @@ object ArticleData {
               good = false
               warning(
           """Bad field value at line #%s, field=%s, value=%s,
-      skipping line=%s""", status.num_processed(), field, value, line)
+      skipping line=%s""", task.num_processed(), field, value, line)
             }
           }
           if (good)
             process((fields zip fieldvals).toMap)
         }
-        if (status.item_processed(maxtime=maxtime))
+        if (task.item_processed(maxtime=maxtime))
           break
       }
     }
-    errprint("Finished reading %s articles.", status.num_processed())
+    task.finish()
     output_resource_usage()
     fields
   }
