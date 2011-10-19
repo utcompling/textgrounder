@@ -8,7 +8,6 @@ import WordDist.memoizer._
 
 import math._
 import collection.mutable
-import gnu.trove.map.hash
 import com.codahale.trove.mutable._
 
 // val use_sorted_list = false
