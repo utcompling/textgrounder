@@ -26,16 +26,24 @@ object KLDiv {
   }
 
   /*
-   For very fast access, the Trove code allows you to retrieve all keys or
-   values into a given array.  This should be faster than executing a
-   function call on each (key, value) pair.  The retrieval code in Trove
-   accepts an array and will automatically create a larger one if it's not
-   big enough, but we want to do this ourselves so we have control over the
-   array recreation, to make sure this doesn't happen too often.
+   In normal operation of fast_kl_divergence(), we are passed the same
+   'self' distribution repeatedly with different 'other' distributions,
+   as we compare a given document/article against all the different
+   non-empty regions of the Earth.  In each call, we have to iterate
+   over all elements in the hash table, so we cache the elements and
+   only retrieve again next time we're passed a different 'self'
+   distribution.
+   
+   NOTE: This assumes no change to 'self' in the midst of these calls!
+   RESULTS WILL BE WRONG OTHERWISE!  You can use test_kl_divergence()
+   to test correct operation, which compares the result of this function
+   to a different, slower but safer KL-divergence implementation.
    */
   protected val initial_static_array_size = 1000
   protected val static_key_array =
     new DynamicArray[Word](initial_alloc = initial_static_array_size)
+  /* These arrays are specialized, so when we retrieve the underlying
+     array we get a raw array. */
   protected val static_value_array =
     new DynamicArray[Int](initial_alloc = initial_static_array_size)
   protected def size_static_arrays(size: Int) {
@@ -78,13 +86,15 @@ object KLDiv {
     val owprobs = WordDist.overall_word_probs
     val pcounts = self.counts
     val qcounts = other.counts
-    var i = 0
 
-    /** FIXME: How much this use of static arrays actually helps is
-        debatable.  Hotspot is pretty good at inlining function calls,
-        and it might be smart enough to inline even through function
-        pointers -- if so, the use of arrays doesn't buy anything. */
     // 1.
+
+    /* See comments above -- normal operation of fast_kl_divergence()
+       means that we can usually reuse the same arrays we retrieved
+       previously.  Since DynamicArray[T] is specialized on T, the
+       arrays in 'pkeys' and 'pvalues' will be direct Java arrays of
+       ints, and the array accesses below compile down to direct
+       array-access bytecodes. */
 
     setup_static_arrays(self)
     val pkeys = static_key_array.array
@@ -95,7 +105,6 @@ object KLDiv {
     // on this item, so we could cache it.  Not clear it would save much
     // time, though.
     var kldiv = 0.0
-    i = 0
     /* THIS IS THE INSIDE LOOP.  THIS IS THE CODE BOTTLENECK.  THIS IS IT.
        
        This code needs to scream.  Hence we do extra setup above involving
@@ -103,23 +112,25 @@ object KLDiv {
        pointer (through the "obvious" use of forEach()). FIXME: But see
        comment above.
       
-       Note that HotSpot is good about inlining function calls.  Hence we
-       can assume that the calls to getOrElse() below will be inlined.
-       However, it's *very important* to avoid doing anything that creates
-       objects each iteration, and best to avoid creating objects per call
-       to fast_kl_divergence().  This object creation will kill us, as it
-       will trigger tons and tons of garbage collection.
-       
+       Note that HotSpot is good about inlining function calls.
+       Hence we can assume that the calls to apply() below (e.g.
+       qcounts(word)) will be inlined.  However, it's *very important*
+       to avoid doing anything that creates objects each iteration,
+       and best to avoid creating objects per call to fast_kl_divergence().
+       This object creation will kill us, as it will trigger tons
+       and tons of garbage collection.
+
        Recent HotSpot implementations (6.0 rev 14 and above) have "escape
        analysis" that *might* make the object creation magically vanish,
        but don't count on it.
      */
+    var i = 0
     while (i < psize) {
       val word = pkeys(i)
       val pcount = pvalues(i)
       val p = pcount * pfact
       val q = {
-        val qcount = qcounts.getOrElse(word, 0)
+        val qcount = qcounts(word)
         if (qcount != 0) qcount * qfact
         else {
           val owprob = owprobs.getOrElse(word, 0.0)
@@ -185,7 +196,7 @@ object KLDiv {
     for ((word, pcount) <- pcounts) {
       val p = pcount * pfact
       val q = {
-        val qcount = qcounts.getOrElse(word, 0)
+        val qcount = qcounts(word)
         if (qcount != 0) qcount * qfact
         else {
           val owprob = owprobs.getOrElse(word, 0.0)
@@ -258,7 +269,7 @@ object KLDiv {
     var q2sum = 0.0
     for ((word, pcount) <- pcounts) {
       val p = pcount * pfact
-      val q = qcounts.getOrElse(word, 0) * qfact
+      val q = qcounts(word) * qfact
       //if (q == 0.0)
       //  errprint("Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s",
       //           word, qfact_globally_unseen_prob, qcount, qfact)
