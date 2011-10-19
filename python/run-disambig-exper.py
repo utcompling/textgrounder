@@ -11,7 +11,7 @@ else:
   tgdir = '%s/python' % (os.environ['TEXTGROUNDER_DIR'])
 
 def runit(fun, id, args):
-  command='%s --id %s documents %s' % (Opts.run_cmd, id, args)
+  command='%s --id %s %s' % (Opts.run_cmd, id, args)
   errprint("Executing: %s" % command)
   if not Opts.dry_run:
     os.system("%s" % command)
