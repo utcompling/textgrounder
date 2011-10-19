@@ -4,6 +4,7 @@ import scala.collection.mutable
 import math.{log, sqrt}
 
 import NlpUtil.DynamicArray
+import WordDist.memoizer.Word
 
 /**
   This code was originally broken out of WordDist so that it could be
@@ -13,9 +14,9 @@ import NlpUtil.DynamicArray
  */
 
 object KLDiv {
-  type Hashtab = mutable.Map[WordDist.Word, Int]
+  type Hashtab = mutable.Map[Word, Int]
   /* The only code that knows about how hash tables are implemented. */
-  def get_keys(hash:Hashtab, array:Array[WordDist.Word]) = {
+  def get_keys(hash:Hashtab, array:Array[Word]) = {
     hash.keys.copyToArray(array)
     array
   }
@@ -34,7 +35,7 @@ object KLDiv {
    */
   protected val initial_static_array_size = 1000
   protected val static_key_array =
-    new DynamicArray[WordDist.Word](initial_alloc = initial_static_array_size)
+    new DynamicArray[Word](initial_alloc = initial_static_array_size)
   protected val static_value_array =
     new DynamicArray[Int](initial_alloc = initial_static_array_size)
   protected def size_static_arrays(size: Int) {

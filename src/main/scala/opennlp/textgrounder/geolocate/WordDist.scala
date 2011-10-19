@@ -4,6 +4,7 @@ import WordDist._
 import NlpUtil._
 import KLDiv._
 import Debug._
+import WordDist.memoizer._
 
 import math._
 import collection.mutable
@@ -60,10 +61,6 @@ object TrivialIntMemoizer {
 
 object WordDist {
   val memoizer = IntStringMemoizer
-  val invalid_word = memoizer.invalid_word
-  type Word = memoizer.Word
-  def memoize_word(word: String) = memoizer.memoize_word(word)
-  def unmemoize_word(word: Word) = memoizer.unmemoize_word(word)
 
   // Total number of word types seen (size of vocabulary)
   var num_word_types = 0
@@ -120,17 +117,22 @@ object WordDist {
 }
 
 /**
-  Create a word distribution given a table listing counts for each word.
+ * Create a word distribution given a table listing counts for each word,
+ * initialized from the given key/value pairs.
+ *
+ * @param key Array holding keys, possibly over-sized, so that the internal
+ *   arrays from DynamicArray objects can be used
+ * @param values Array holding values corresponding to each key, possibly
+ *   oversize
+ * @param num_words Number of actual key/value pairs to be stored 
+ * @param note_globally If true, add the word counts to the global word count
+ *   statistics.
  */
 
 class WordDist(
-  /** Separate arrays of keys and values to use to initialize distribution.
-      Also must pass in number of words because we may be using arrays taken
-      from DynamicArray objects, which may be oversize. */
   keys: Array[Word],
   values: Array[Int],
   num_words: Int,
-  /** If true, add the word counts to the global word count statistics. */
   note_globally: Boolean=true
 ) {
   /** A map (or possibly a "sorted list" of tuples, to save memory?) of

@@ -777,7 +777,8 @@ object Toponym {
       for ((dist, word) <- geogword.context) {
         val lword =
           if (Opts.preserve_case_words) word else word.toLowerCase
-        val wordprob = distobj.lookup_word(WordDist.memoize_word(lword))
+        val wordprob =
+          distobj.lookup_word(WordDist.memoizer.memoize_word(lword))
 
         // Compute weight for each word, based on distance from toponym
         val thisweight =

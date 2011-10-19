@@ -7,7 +7,7 @@
 package opennlp.textgrounder.geolocate
 import KLDiv._
 import NlpUtil._
-import WordDist.{Word, invalid_word, memoize_word, unmemoize_word}
+import WordDist.memoizer._
 import OptParse._
 import Distances._
 import Debug._
@@ -1229,7 +1229,7 @@ class StatArticleTable {
   def read_word_counts(filename: String) {
     val initial_dynarr_size = 1000
     val keys_dynarr =
-      new DynamicArray[WordDist.Word](initial_alloc = initial_dynarr_size)
+      new DynamicArray[Word](initial_alloc = initial_dynarr_size)
     val values_dynarr =
       new DynamicArray[Int](initial_alloc = initial_dynarr_size)
 
