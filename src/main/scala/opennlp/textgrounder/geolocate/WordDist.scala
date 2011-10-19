@@ -9,6 +9,7 @@ import WordDist.memoizer._
 import math._
 import collection.mutable
 import gnu.trove.map.hash
+import com.codahale.trove.mutable._
 
 // val use_sorted_list = false
 
@@ -139,7 +140,7 @@ class WordDist(
       (word, count) items, specifying the counts of all words seen
       at least once.
    */
-  val counts = intmap[Word]()
+  val counts = IntIntMap()
   for (i <- 0 until num_words)
     counts(keys(i)) = values(i)
   /** Total number of word tokens seen */
