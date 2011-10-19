@@ -21,18 +21,21 @@ JAVA="$JAVA_HOME/bin/java"
 VERBOSE=false
 DEBUG=false
 
+# NOTE: If environment var TG_JAVA_OPT is set on entry, it will be used.
+
 # Process options
 
-JAVA_HEAP_OPT=
+JAVA_MISC_OPT=
 while true; do
   case "$1" in
     -verbose | --verbose ) VERBOSE=true; shift ;;
     -debug | --debug ) DEBUG=true; shift ;;
     -m | -memory | --memory ) MEMORY="$2"; shift 2 ;;
     -minheap | --minheap )
-      JAVA_HEAP_OPT="$JAVA_HEAP_OPT -XX:MinHeapFreeRatio=$2"; shift 2 ;;
+      JAVA_MISC_OPT="$JAVA_MISC_OPT -XX:MinHeapFreeRatio=$2"; shift 2 ;;
     -maxheap | --maxheap )
-      JAVA_HEAP_OPT="$JAVA_HEAP_OPT -XX:MaxHeapFreeRatio=$2"; shift 2 ;;
+      JAVA_MISC_OPT="$JAVA_MISC_OPT -XX:MaxHeapFreeRatio=$2"; shift 2 ;;
+    -escape-anal | --escape-anal ) JAVA_MISC_OPT="$JAVA_MISC_OPT -XX:+DoEscapeAnalysis"; shift ;;
     * ) break ;;
   esac
 done
@@ -84,6 +87,7 @@ fi
 
 JAVA_MEMORY_OPT="-Xmx$MEMORY"
 
+JAVA_DEBUG_OPT=
 if [ "$DEBUG" = true ]; then
   # Print details about when and how garbage collection happens; recommended
   # in http://www.oracle.com/technetwork/java/gc-tuning-5-138395.html
@@ -92,7 +96,7 @@ if [ "$DEBUG" = true ]; then
   #JAVA_DEBUG_OPT="$JAVA_DEBUG_OPT -XX:+TraceClassLoading"
 fi
 
-JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_HEAP_OPT -classpath $CP"
+JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $TG_JAVA_OPT -classpath $CP"
 #SCALA_COMMAND="scala -classpath $CP"
 #Running Scala using Java currently works, and ensures that we will run
 #properly even if Scala isn't installed on the system or an older version
@@ -118,6 +122,9 @@ Options:
                         to make it more aggressively release memory to the OS
                         (or --minheap 10 --maxheap 20 to be even more
                         aggressive).
+  --escape-anal         turn on escape analysis (on by default in 6u23 and
+                        later); may speed up code by reducing allocation
+                        for short-lived objects
 
 General commands:
 

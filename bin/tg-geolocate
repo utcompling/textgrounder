@@ -4,6 +4,11 @@
 # Extra arguments can be specified on the command line, which will
 # override any existing arguments.
 #
+# Various arguments to 'textgrounder' itself can be specified before other
+# arguments.  These have the same names as the arguments of 'textgrounder'
+# except that textgrounder's --debug is renamed --debug-jvm here because
+# --debug has a different meaning for geolocate.
+#
 # See also 'nohup-tg-geolocate', which will run this script using 'nohup'
 # while saving the output to a file.
 
@@ -14,14 +19,37 @@ fi
 
 . $TEXTGROUNDER_DIR/bin/config-geolocate
 
-GEOLOCATE="$TEXTGROUNDER_DIR/bin/textgrounder geolocate"
+# Option processing
+
+TGOPTS=
+while true ; do
+  case "$1" in
+    -minheap | --minheap ) TGOPTS="$TGOPTS --minheap $2"; shift 2 ;;
+    -maxheap | --maxheap ) TGOPTS="$TGOPTS --maxheap $2"; shift 2 ;;
+    -memory | --memory ) TGOPTS="$TGOPTS --memory $2"; shift 2 ;;
+    -escape-anal | --escape-anal ) TGOPTS="$TGOPTS --escape-anal"; shift ;;
+    -verbose | --verbose ) TGOPTS="$TGOPTS --verbose"; shift ;;
+    -debug-jvm | --debug-jvm ) TGOPTS="$TGOPTS --debug"; shift ;;
+    -- ) shift ; break ;;
+    * ) break ;;
+  esac
+done
+
+GEOLOCATE="$TEXTGROUNDER_DIR/bin/textgrounder $TGOPTS geolocate"
 
 MODE=geotag-documents
+sawmode=no
+# Only look for mode statements for toponyms.
 for x in ${1+"$@"}; do
   if [ "$x" = "--mode=geotag-toponyms" ]; then
     MODE=geotag-toponyms
-  elif [ "$x" = "--mode=geotag-documents" ]; then
-    MODE=geotag-documents
+  elif [ "$sawmode" = yes -a "$x" = "geotag-toponyms" ]; then
+    MODE=geotag-toponyms
+  fi
+  if [ "$x" = "--mode" -o "$x" = "-m" ]; then
+    sawmode=yes
+  else
+    sawmode=no
   fi
 done
 
@@ -38,4 +66,8 @@ else
   MODE_ARG=
 fi
 
-$GEOLOCATE $MODE_ARG $MISCOPTS $LOCAL_ARGS ${1+"$@"}
+# TG_EXTRA_ARGS are used to pass arguments down from front-end programs
+# without interfering with the options passed in and meant to be handled
+# by us.
+echo Executing: $GEOLOCATE $MODE_ARG $MISCOPTS $LOCAL_ARGS $TG_EXTRA_ARGS ${1+"$@"}
+$GEOLOCATE $MODE_ARG $MISCOPTS $LOCAL_ARGS $TG_EXTRA_ARGS ${1+"$@"}
