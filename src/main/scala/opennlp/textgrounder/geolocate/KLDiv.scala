@@ -133,7 +133,7 @@ object KLDiv {
         val qcount = qcounts(word)
         if (qcount != 0) qcount * qfact
         else {
-          val owprob = owprobs.getOrElse(word, 0.0)
+          val owprob = owprobs(word)
           if (owprob != 0.0) owprob * qfact_unseen
           else qfact_globally_unseen_prob
         }
@@ -144,7 +144,7 @@ object KLDiv {
       //if (p == 0.0 || q == 0.0)
       //  errprint("Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s",
       //      p, q, word, pcount, qcount, qfact, qfact_unseen,
-      //      owprobs.getOrElse(word, 0.0))
+      //      owprobs(word))
       kldiv += p * (log(p) - log(q))
       i += 1
     }
@@ -156,7 +156,7 @@ object KLDiv {
     val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     var overall_probs_diff_words = 0.0
     for ((word, qcount) <- qcounts if !(pcounts contains word)) {
-      val word_overall_prob = owprobs.getOrElse(word, 0.0)
+      val word_overall_prob = owprobs(word)
       val p = word_overall_prob * pfact_unseen
       val q = qcount * qfact
       kldiv += p * (log(p) - log(q))
@@ -199,7 +199,7 @@ object KLDiv {
         val qcount = qcounts(word)
         if (qcount != 0) qcount * qfact
         else {
-          val owprob = owprobs.getOrElse(word, 0.0)
+          val owprob = owprobs(word)
           if (owprob != 0.0) owprob * qfact_unseen
           else qfact_globally_unseen_prob
         }
@@ -210,7 +210,7 @@ object KLDiv {
       //if (p == 0.0 || q == 0.0)
       //  errprint("Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s",
       //      p, q, word, pcount, qcount, qfact, qfact_unseen,
-      //      owprobs.getOrElse(word, 0.0))
+      //      owprobs(word))
       pqsum += p * q
       p2sum += p * p
       q2sum += q * q
@@ -223,7 +223,7 @@ object KLDiv {
     val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     var overall_probs_diff_words = 0.0
     for ((word, qcount) <- qcounts if !(pcounts contains word)) {
-      val word_overall_prob = owprobs.getOrElse(word, 0.0)
+      val word_overall_prob = owprobs(word)
       val p = word_overall_prob * pfact_unseen
       val q = qcount * qfact
       pqsum += p * q
@@ -276,7 +276,7 @@ object KLDiv {
       //if (p == 0.0 || q == 0.0)
       //  errprint("Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s",
       //      p, q, word, pcount, qcount, qfact, qfact_unseen,
-      //      owprobs.getOrElse(word, 0.0))
+      //      owprobs(word))
       pqsum += p * q
       p2sum += p * p
       q2sum += q * q
