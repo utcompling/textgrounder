@@ -75,14 +75,16 @@ object WordDist {
   // Estimate of number of unseen word types for all articles
   var num_unseen_word_types = 0
 
-  // Overall probabilities over all articles of seeing a word in an article,
-  // for all words seen at least once in any article, computed using the
-  // empirical frequency of a word among all articles, adjusted by the mass
-  // to be assigned to globally unseen words (words never seen at all), i.e. the
-  // value in 'globally_unseen_word_prob'.
-  var overall_word_counts = intmap[Word]()
-
-  var overall_word_probs: mutable.Map[Word,Double] = null
+  /**
+   * Overall probabilities over all articles of seeing a word in an article,
+   * for all words seen at least once in any article, computed using the
+   * empirical frequency of a word among all articles, adjusted by the mass
+   * to be assigned to globally unseen words (words never seen at all), i.e.
+   * the value in 'globally_unseen_word_prob'.  We start out by storing raw
+   * counts, then adjusting them.
+   */
+  var overall_word_probs = doublemap[Word]()
+  var owp_adjusted = false
 
   // The total probability mass to be assigned to words not seen at all in
   // any article, estimated using Good-Turing smoothing as the unadjusted
@@ -94,19 +96,19 @@ object WordDist {
   // unknown_article_counts = ([], [])
 
   def finish_global_distribution() = {
+    /* We do in-place conversion of counts to probabilities.  Make sure
+       this isn't done twice!! */
+    assert (!owp_adjusted)
+    owp_adjusted = true
     // Now, adjust overall_word_probs accordingly.
     //// FIXME: A simple calculation reveals that in the scheme where we use
     //// globally_unseen_word_prob, num_types_seen_once cancels out and
     //// we never actually have to compute it.
-    num_types_seen_once = overall_word_counts.values count (_ == 1)
+    num_types_seen_once = overall_word_probs.values count (_ == 1.0)
     globally_unseen_word_prob = num_types_seen_once.toDouble/num_word_tokens
-    overall_word_probs =
-      for ((word, count) <- overall_word_counts)
-        yield (word, count.toDouble/num_word_tokens*
-                        (1.0 - globally_unseen_word_prob))
-    // Null out the word count map because it is no longer needed once
-    // converted to probabilities, and will take up memory.
-    overall_word_counts = null
+    for ((word, count) <- overall_word_probs)
+      overall_word_probs(word) = (
+        count.toDouble/num_word_tokens*(1.0 - globally_unseen_word_prob))
     // A very rough estimate, perhaps totally wrong
     num_unseen_word_types = num_types_seen_once max (num_word_types/20)
     if (debug("tons"))
@@ -178,17 +180,18 @@ class WordDist(
   var overall_unseen_mass = 1.0
 
   if (note_globally) {
+    assert(!WordDist.owp_adjusted)
     for ((word, count) <- counts) {
-      if (!(WordDist.overall_word_counts contains word))
+      if (!(WordDist.overall_word_probs contains word))
         WordDist.num_word_types += 1
-      // Record in overall_word_counts; note more tokens seen.
-      WordDist.overall_word_counts(word) += count
+      // Record in overall_word_probs; note more tokens seen.
+      WordDist.overall_word_probs(word) += count
       WordDist.num_word_tokens += count
     }
   }
 
   def this() {
-    this(Array[Word](), Array[Int](), 0)
+    this(Array[Word](), Array[Int](), 0, note_globally=false)
   }
 
   override def toString = {
