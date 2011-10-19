@@ -817,6 +817,14 @@ class StatRegion(object):
 
     errprint("Number of non-empty regions: %s" % cls.num_non_empty_regions)
     errprint("Number of empty regions: %s" % cls.num_empty_regions)
+    errprint("Percent non-empty regions: %g" %
+        (float(cls.num_non_empty_regions) /
+          (cls.num_empty_regions + cls.num_non_empty_regions)))
+    training_arts_with_word_counts = (
+        ArticleTable.num_word_count_articles_by_split['training'])
+    errprint("Training articles per non-empty region: %g" %
+        (float(training_arts_with_word_counts) / 
+          cls.num_non_empty_regions))
     # Save some memory by clearing this after it's not needed
     cls.tiling_region_to_articles = None
     ArticleTable.clear_training_article_distributions()
