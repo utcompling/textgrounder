@@ -44,6 +44,9 @@ object IntStringMemoizer {
   }
 
   def unmemoize_word(word: Word) = id_word_map(word)
+
+  def create_word_int_map() = IntIntMap()
+  def create_word_double_map() = IntDoubleMap()
 }
 
 object IdentityMemoizer {
@@ -51,6 +54,9 @@ object IdentityMemoizer {
   val invalid_word: Word = null
   def memoize_word(word: String): Word = word
   def unmemoize_word(word: Word): String = word
+
+  def create_word_int_map() = intmap[Word]()
+  def create_word_double_map() = doublemap[Word]()
 }
 
 object TrivialIntMemoizer {
@@ -58,6 +64,9 @@ object TrivialIntMemoizer {
   val invalid_word: Word = 0
   def memoize_word(word: String): Word = 1
   def unmemoize_word(word: Word): String = "foo"
+
+  def create_word_int_map() = IntStringMemoizer.create_word_int_map()
+  def create_word_double_map() = IntStringMemoizer.create_word_double_map()
 }
 
 object WordDist {
@@ -83,7 +92,7 @@ object WordDist {
    * the value in 'globally_unseen_word_prob'.  We start out by storing raw
    * counts, then adjusting them.
    */
-  var overall_word_probs = doublemap[Word]()
+  var overall_word_probs = create_word_double_map()
   var owp_adjusted = false
 
   // The total probability mass to be assigned to words not seen at all in
@@ -142,7 +151,7 @@ class WordDist(
       (word, count) items, specifying the counts of all words seen
       at least once.
    */
-  val counts = IntIntMap()
+  val counts = create_word_int_map()
   for (i <- 0 until num_words)
     counts(keys(i)) = values(i)
   /** Total number of word tokens seen */
