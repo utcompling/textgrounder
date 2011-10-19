@@ -65,6 +65,8 @@ def main():
 #                       Description of experiments                           #
 ##############################################################################
 
+MTS10 = iterate('--max-time-per-stage', [10])
+MTS50 = iterate('--max-time-per-stage', [50])
 MTS300 = iterate('--max-time-per-stage', [300])
 Train200k = iterate('--num-training-docs', [200000])
 Train100k = iterate('--num-training-docs', [100000])
@@ -215,6 +217,13 @@ Final1Sec3 = add_param('--skip-initial 2 --every-nth 6')
 Final1Sec4 = add_param('--skip-initial 3 --every-nth 6')
 Final1Sec5 = add_param('--skip-initial 4 --every-nth 6')
 Final1Sec6 = add_param('--skip-initial 5 --every-nth 6')
+
+OracleOnly = add_param('--oracle-results')
+WikiOracleDPRpoint1 = nest(TestSet, DPRpoint1, TestStratBase1, OracleOnly)
+WikiOracleDPRpoint5 = nest(TestSet, DPRpoint5, TestStratBase1, OracleOnly)
+WikiOracleDPR1 = nest(TestSet, DPR1, TestStratBase1, OracleOnly)
+WikiOracleDPR5 = nest(TestSet, DPR5, TestStratBase1, OracleOnly)
+WikiOracleDPR5Test = nest(TestSet, DPR5, TestStratBase1, OracleOnly, MTS10)
 
 WikiFinal1Sec1 = nest(TestSet, TestDPR, TestStrat1, Final1Sec1)
 WikiFinal1Sec2 = nest(TestSet, TestDPR, TestStrat1, Final1Sec2)
@@ -1212,6 +1221,14 @@ TwitterWikiExper3 = nest(Train100k, TwitterWikiNumTest, TwitterWikiDPR3, Twitter
 TwitterWikiExper4 = nest(Train100k, TwitterWikiNumTest, TwitterWikiDPR4, TwitterWikiStrategy4)
 
 # Error Analysis
+
+TwitterOracleDPRpoint1 = nest(Thresh5, TestSet, DPRpoint1, TestStratBase1, OracleOnly)
+TwitterOracleDPRpoint5 = nest(Thresh5, TestSet, DPRpoint5, TestStratBase1, OracleOnly)
+TwitterOracleDPR1 = nest(Thresh5, TestSet, DPR1, TestStratBase1, OracleOnly)
+TwitterOracleDPR5 = nest(Thresh5, TestSet, DPR5, TestStratBase1, OracleOnly)
+TwitterOracleThresh40DPR5 = nest(Thresh40, TestSet, DPR5, TestStratBase1, OracleOnly)
+TwitterOracleThresh40DPR10 = nest(Thresh40, TestSet, DPR10, TestStratBase1, OracleOnly)
+TwitterOracleDPR5Test = nest(Thresh5, TestSet, DPR5, TestStratBase1, OracleOnly, MTS10)
 
 
 DebugKLDiv = iterate('--debug', ['kldiv'])
