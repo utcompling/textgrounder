@@ -817,6 +817,14 @@ class StatRegion(object):
 
     errprint("Number of non-empty regions: %s" % cls.num_non_empty_regions)
     errprint("Number of empty regions: %s" % cls.num_empty_regions)
+    errprint("Percent non-empty regions: %g" %
+        (float(cls.num_non_empty_regions) /
+          (cls.num_empty_regions + cls.num_non_empty_regions)))
+    training_arts_with_word_counts = (
+        ArticleTable.num_word_count_articles_by_split['training'])
+    errprint("Training articles per non-empty region: %g" %
+        (float(training_arts_with_word_counts) / 
+          cls.num_non_empty_regions))
     # Save some memory by clearing this after it's not needed
     cls.tiling_region_to_articles = None
     ArticleTable.clear_training_article_distributions()
@@ -1587,18 +1595,29 @@ class EvalWithRank(Eval):
 class GeotagDocumentEval(EvalWithRank):
   def __init__(self, max_rank_for_credit=10):
     super(GeotagDocumentEval, self).__init__(max_rank_for_credit)
+    # "True dist" means actual distance in km's or whatever.
+    # "Degree dist" is the distance in degrees.
+
     self.true_dists = []
     self.degree_dists = []
+    self.oracle_true_dists = []
+    self.oracle_degree_dists = []
 
-  def record_result(self, rank, true_dist, degree_dist):
+  def record_result(self, rank, pred_true_dist, pred_degree_dist):
     super(GeotagDocumentEval, self).record_result(rank)
-    self.true_dists += [true_dist]
-    self.degree_dists += [degree_dist]
+    self.true_dists += [pred_true_dist]
+    self.degree_dists += [pred_degree_dist]
+
+  def record_oracle_result(self, oracle_true_dist, oracle_degree_dist):
+    self.oracle_true_dists += [oracle_true_dist]
+    self.oracle_degree_dists += [oracle_degree_dist]
 
   def output_incorrect_results(self):
     super(GeotagDocumentEval, self).output_incorrect_results()
     self.true_dists.sort()
     self.degree_dists.sort()
+    self.oracle_true_dists.sort()
+    self.oracle_degree_dists.sort()
     def miles_and_km(val):
       km_per_mile = 1.609
       return "%.2f miles (%.2f km)" % (val, val*km_per_mile)
@@ -1610,6 +1629,10 @@ class GeotagDocumentEval(EvalWithRank):
              mean(self.degree_dists))
     errprint("  Median degree error distance = %.2f degrees" %
              median(self.degree_dists))
+    errprint("  Mean oracle true error distance = %s" %
+             miles_and_km(mean(self.oracle_true_dists)))
+    errprint("  Median oracle true error distance = %s" %
+             miles_and_km(median(self.oracle_true_dists)))
 
 ####### Results for geotagging toponyms
 class GeotagToponymResults(object):
@@ -1721,6 +1744,7 @@ class GeotagDocumentResults(object):
     rounded_true_truedist = fracinc * (true_truedist // fracinc)
     rounded_true_degdist = fracinc * (true_degdist // fracinc)
 
+    self.all_document.record_oracle_result(true_truedist, true_degdist)
     self.docs_by_true_dist_to_true_center[rounded_true_truedist]. \
         record_result(rank, pred_truedist, pred_degdist)
     self.docs_by_degree_dist_to_true_center[rounded_true_degdist]. \
@@ -2577,17 +2601,25 @@ class WikipediaGeotagDocumentEvaluator(GeotagDocumentEvaluator):
     if debug['lots'] or debug['commontop']:
       errprint("Evaluating article %s with %s word-dist articles in true region" %
                (article, naitr))
-    regs = self.strategy.return_ranked_regions(article.dist)
-    rank = 1
-    for reg, val in regs:
-      if reg.latind == true_latind and reg.longind == true_longind:
-        break
-      rank += 1
+    if self.opts.oracle_results:
+      rank = 1
+      latind = true_latind
+      longind = true_longind
     else:
-      rank = 1000000000
-    want_indiv_results = not self.opts.no_individual_results
+      regs = self.strategy.return_ranked_regions(article.dist)
+      rank = 1
+      for reg, val in regs:
+        if reg.latind == true_latind and reg.longind == true_longind:
+          break
+        rank += 1
+      else:
+        rank = 1000000000
+      latind = regs[0][0].latind
+      longind = regs[0][0].longind
+    want_indiv_results = (not self.opts.oracle_results and
+        not self.opts.no_individual_results)
     stats = self.results.record_geotag_document_result(rank, article.coord,
-        regs[0][0].latind, regs[0][0].longind, num_arts_in_true_region=naitr,
+        latind, longind, num_arts_in_true_region=naitr,
         return_stats=want_indiv_results)
     if naitr == 0:
       self.results.record_geotag_document_other_stat(
@@ -3327,6 +3359,9 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
     op.add_option("--no-individual-results", "--no-results",
                   action='store_true', default=False,
                   help="""Don't show individual results for each test document.""")
+    op.add_option("--oracle-results",
+                  action='store_true', default=False,
+                  help="""Only compute oracle results (much faster).""")
     op.add_option("--lru-cache-size", "--lru",
                   type='int', default=400,
                   help="""Number of entries in the LRU cache.""")
