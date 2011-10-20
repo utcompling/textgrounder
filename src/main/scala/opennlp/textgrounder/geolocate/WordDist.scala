@@ -81,7 +81,7 @@ object WordDist {
   var num_word_tokens = 0
 
   def apply(keys: Array[Word], values: Array[Int], num_words: Int,
-            note_globally: Boolean=true) =
+            note_globally: Boolean) =
     new SmoothedWordDist(keys, values, num_words, note_globally)
 
   def apply():SmoothedWordDist =

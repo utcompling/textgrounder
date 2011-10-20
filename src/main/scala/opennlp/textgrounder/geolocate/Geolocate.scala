@@ -458,7 +458,7 @@ object KMLConstants {
  */
 
 class RegionWordDist extends SmoothedWordDist(
-    Array[Word](), Array[Int](), 0, note_globally=false) {
+    Array[Word](), Array[Int](), 0, note_globally = false) {
   /** Number of articles included in incoming-link computation. */
   var num_arts_for_links = 0
   /** Total number of incoming links. */

@@ -21,17 +21,6 @@ import WordDist.SmoothedWordDist
  */
 
 object FastPseudoGoodTuringSmoothedWordDist {
-  type Hashtab = mutable.Map[Word, Int]
-  /* The only code that knows about how hash tables are implemented. */
-  def get_keys(hash:Hashtab, array:Array[Word]) = {
-    hash.keys.copyToArray(array)
-    array
-  }
-  def get_values(hash:Hashtab, array:Array[Int]) = {
-    hash.values.copyToArray(array)
-    array
-  }
-
   /*
    In normal operation of fast_kl_divergence(), we are passed the same
    'self' distribution repeatedly with different 'other' distributions,
@@ -72,11 +61,8 @@ object FastPseudoGoodTuringSmoothedWordDist {
     size_static_arrays(cached_size)
     val keys = static_key_array.array
     val values = static_value_array.array
-    // Make sure we didn't mess up and pass in too-small arrays.
-    val new_keys = get_keys(pcounts, keys)
-    assert(keys eq new_keys)
-    val new_values = get_values(pcounts, values)
-    assert(values eq new_values)
+    pcounts.keys.copyToArray(keys)
+    pcounts.values.copyToArray(values)
   }
 
   /**
