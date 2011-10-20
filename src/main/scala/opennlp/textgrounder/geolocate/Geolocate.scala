@@ -1026,8 +1026,22 @@ object StatRegion {
 
     errprint("Number of non-empty regions: %s", num_non_empty_regions)
     errprint("Number of empty regions: %s", num_empty_regions)
+    errprint("Percent non-empty regions: %g",
+      num_non_empty_regions.toDouble /
+        (num_empty_regions + num_non_empty_regions))
+    val training_arts_with_word_counts =
+      StatArticleTable.table.num_word_count_articles_by_split("training")
+    errprint("Training articles per non-empty region: %g",
+      training_arts_with_word_counts.toDouble / num_non_empty_regions)
     // Save some memory by clearing this after it's not needed
     tiling_region_to_articles = null
+    // Also clear out the article distributions of the training set, since
+    // only needed when computing regions.
+    //
+    // FIXME: Could perhaps save more memory, or at least total memory used,
+    // by never creating these distributions at all, but directly adding
+    // them to the regions.  Would require a bit of thinking when reading
+    // in the counts.
     StatArticleTable.table.clear_training_article_distributions()
   }
 
@@ -1551,13 +1565,24 @@ class EvalWithRank(
 class GeotagDocumentEval(
   max_rank_for_credit: Int = 10
 ) extends EvalWithRank(max_rank_for_credit) {
+  // "True dist" means actual distance in km's or whatever.
+  // "Degree dist" is the distance in degrees.
   val true_dists = mutable.Buffer[Double]()
   val degree_dists = mutable.Buffer[Double]()
+  val oracle_true_dists = mutable.Buffer[Double]()
+  val oracle_degree_dists = mutable.Buffer[Double]()
 
-  def record_result(rank: Int, true_dist: Double, degree_dist: Double) {
+  def record_result(rank: Int, pred_true_dist: Double,
+      pred_degree_dist: Double) {
     super.record_result(rank)
-    true_dists += true_dist
-    degree_dists += degree_dist
+    true_dists += pred_true_dist
+    degree_dists += pred_degree_dist
+  }
+
+  def record_oracle_result(oracle_true_dist: Double,
+      oracle_degree_dist: Double) {
+    oracle_true_dists += oracle_true_dist
+    oracle_degree_dists += oracle_degree_dist
   }
 
   override def output_incorrect_results() {
@@ -1573,6 +1598,10 @@ class GeotagDocumentEval(
       mean(degree_dists))
     errprint("  Median degree error distance = %.2f degrees",
       median(degree_dists))
+    errprint("  Mean oracle true error distance = %s",
+      miles_and_km(mean(oracle_true_dists)))
+    errprint("  Median oracle true error distance = %s",
+      miles_and_km(median(oracle_true_dists)))
   }
 }
 
@@ -1637,6 +1666,7 @@ class GeotagDocumentResults {
     val rounded_true_truedist = fracinc * floor(true_truedist / fracinc)
     val rounded_true_degdist = fracinc * floor(true_degdist / fracinc)
 
+    all_document.record_oracle_result(true_truedist, true_degdist)
     docs_by_true_dist_to_true_center(rounded_true_truedist).
       record_result(rank, pred_truedist, pred_degdist)
     docs_by_degree_dist_to_true_center(rounded_true_degdist).
@@ -2246,23 +2276,44 @@ class ArticleGeotagDocumentEvaluator(
     if (debug("lots") || debug("commontop"))
       errprint("Evaluating article %s with %s word-dist articles in true region",
         article, naitr)
-    val regs = strategy.return_ranked_regions(article.dist).toArray
-    var rank = 1
-    var broken = false
-    breakable {
-      for ((reg, value) <- regs) {
-        if (reg.latind.get == true_latind && reg.longind.get == true_longind) {
-          broken = true
-          break
+
+    /* That is:
+
+       pred_regs = List of predicted regions, from best to worst
+       true_rank = Rank of true region among predicted regions
+       pred_latind, pred_longind = Indices of topmost predicted region
+     */
+    val (pred_regs, true_rank, pred_latind, pred_longind) = {
+      if (Opts.oracle_results)
+        (null, 1, true_latind, true_longind)
+      else {
+        def get_computed_results() = {
+          val regs = strategy.return_ranked_regions(article.dist).toArray
+          var rank = 1
+          var broken = false
+          breakable {
+            for ((reg, value) <- regs) {
+              if (reg.latind.get == true_latind &&
+                  reg.longind.get == true_longind) {
+                broken = true
+                break
+              }
+              rank += 1
+            }
+          }
+          if (!broken)
+            rank = 1000000000
+          (regs, rank, regs(0)._1.latind.get, regs(0)._1.longind.get)
         }
-        rank += 1
+
+        get_computed_results()
       }
     }
-    if (!broken)
-      rank = 1000000000
-    val want_indiv_results = !Opts.no_individual_results
-    val stats = results.record_geotag_document_result(rank, article.coord,
-      regs(0)._1.latind.get, regs(0)._1.longind.get,
+
+    val want_indiv_results =
+      !Opts.oracle_results && !Opts.no_individual_results
+    val stats = results.record_geotag_document_result(true_rank, article.coord,
+      pred_latind, pred_longind,
       num_arts_in_true_region = naitr,
       return_stats = want_indiv_results)
     if (naitr == 0) {
@@ -2273,11 +2324,11 @@ class ArticleGeotagDocumentEvaluator(
       errprint("%s:Article %s:", doctag, article)
       errprint("%s:  %d types, %d tokens",
         doctag, article.dist.counts.size, article.dist.total_tokens)
-      errprint("%s:  true region at rank: %s", doctag, rank)
+      errprint("%s:  true region at rank: %s", doctag, true_rank)
       errprint("%s:  true region: %s", doctag, true_statreg)
       for (i <- 0 until 5) {
         errprint("%s:  Predicted region (at rank %s): %s",
-          doctag, i + 1, regs(i)._1)
+          doctag, i + 1, pred_regs(i)._1)
       }
       errprint("%s:  Distance %.2f miles to true region center at %s",
         doctag, stats("true_truedist"), stats("true_center"))
@@ -2292,13 +2343,11 @@ class ArticleGeotagDocumentEvaluator(
         val min_longind = true_longind - grsize / 2
         val max_longind = min_longind + grsize - 1
         val grid = mutable.Map[(Regind, Regind), (StatRegion, Double, Int)]()
-        rank = 1
-        for ((reg, value) <- regs) {
+        for (((reg, value), rank) <- pred_regs zip (1 to pred_regs.length)) {
           val (la, lo) = (reg.latind.get, reg.longind.get)
           if (la >= min_latind && la <= max_latind &&
             lo >= min_longind && lo <= max_longind)
             grid((la, lo)) = (reg, value, rank)
-          rank += 1
         }
 
         errprint("Grid ranking, gridsize %dx%d", grsize, grsize)
@@ -2317,8 +2366,8 @@ class ArticleGeotagDocumentEvaluator(
               if (regvalrank == null)
                 errout(" %-8s", "empty")
               else {
-                val (reg, vall, rank) = regvalrank
-                val showit = if (doit == 0) rank else vall
+                val (reg, value, rank) = regvalrank
+                val showit = if (doit == 0) rank else value
                 if (lat == true_latind && long == true_longind)
                   errout("!%-8.6s", showit)
                 else
@@ -2511,6 +2560,7 @@ class GeolocateOptions(defaults: GeolocateCommandLineArguments = null) {
   //// Debugging/output options
   var max_time_per_stage = defs.max_time_per_stage
   var no_individual_results = defs.no_individual_results
+  var oracle_results = defs.oracle_results
   var debug = defs.debug
 
   //// Options used only in KML generation (--mode=generate-kml)
@@ -2863,6 +2913,9 @@ Used for testing purposes.  Default 0, i.e. no limit.""")
   def no_individual_results =
     op.flag("no-individual-results", "no-results",
       help = """Don't show individual results for each test document.""")
+  def oracle_results =
+    op.flag("oracle-results",
+      help="""Only compute oracle results (much faster).""")
   def debug =
     op.option[String]("d", "debug", metavar = "FLAGS",
       help = """Output debug info of the given types.  Multiple debug
