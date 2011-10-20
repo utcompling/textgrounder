@@ -2166,9 +2166,6 @@ abstract class GeotagDocumentEvaluator(
 ) extends TestFileEvaluator(stratname) {
   val results = new GeotagDocumentResults()
 
-  // FIXME: Seems strange to have a static function like this called here
-  StatRegion.initialize_regions()
-
   def output_results(isfinal: Boolean = false) {
     results.output_geotag_document_results(all_results = isfinal)
   }
@@ -3305,6 +3302,8 @@ Not generating an empty KML file.""", word)
           new ArticleGeotagToponymEvaluator(strategy, stratname)
       })
     } else if (Opts.mode == "geotag-documents") {
+      StatRegion.initialize_regions()
+
       val strats = (
         for (stratname <- Opts.strategy) yield {
           if (stratname == "baseline") {

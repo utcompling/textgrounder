@@ -1,6 +1,5 @@
 package opennlp.textgrounder.geolocate
 
-import WordDist._
 import NlpUtil._
 import KLDiv._
 import Debug._
@@ -240,9 +239,17 @@ class WordDist(
   }
 
   /**
-  Finish computation of the word distribution.
-  */
-  def finish(minimum_word_count: Int=0) {
+   * Finish computation of the word distribution.  This must be called AFTER
+   * finish_global_distribution(), because of the computation below of
+   * overall_unseen_mass, which depends on the global overall_word_probs.
+   */
+  def finish(minimum_word_count: Int = 0) {
+
+    // make sure counts not null (eg article in coords file but not counts file)
+    if (counts == null || finished) return
+
+    // Make sure that overall_word_probs has been computed properly.
+    assert(WordDist.owp_adjusted)
 
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.
@@ -252,12 +259,10 @@ class WordDist(
         counts -= word
       }
 
-    // make sure counts not None (eg article in coords file but not counts file)
-    if (counts == null || finished) return
     // Compute probabilities.  Use a very simple version of Good-Turing
     // smoothing where we assign to unseen words the probability mass of
     // words seen once, and adjust all other probs accordingly.
-    WordDist.num_types_seen_once = counts.values count (_ == 1)
+    val num_types_seen_once = counts.values count (_ == 1)
     unseen_mass =
       if (total_tokens > 0)
         // If no words seen only once, we will have a problem if we assign 0
@@ -267,19 +272,19 @@ class WordDist(
         // up assigning 0 probability to seen words.  So we arbitrarily
         // limit it to 0.5, which is pretty damn much mass going to unseen
         // words.
-          0.5 min ((1.0 max WordDist.num_types_seen_once)/total_tokens)
+        0.5 min ((1.0 max num_types_seen_once)/total_tokens)
       else 0.5
     overall_unseen_mass = 1.0 - (
       (for (ind <- counts.keys)
-        yield WordDist.overall_word_probs.getOrElse(ind, 0.0)) sum)
+        yield WordDist.overall_word_probs(ind)) sum)
     //if use_sorted_list:
     //  self.counts = SortedList(self.counts)
     finished = true
   }
 
-    /**
-     Check fast and slow versions against each other.
-     */
+  /**
+   * Check fast and slow versions against each other.
+   */
   def test_kl_divergence(other: WordDist, partial: Boolean=false) = {
     assert(finished)
     assert(other.finished)
@@ -337,7 +342,7 @@ other implementations.
       if (return_contributing_words)
         contribs(word) = p*(log(p) - log(q))
       overall_probs_diff_words +=
-        WordDist.overall_word_probs.getOrElse(word, 0.0)
+        WordDist.overall_word_probs(word)
     }
 
     val retval = kldiv + kl_divergence_34(other, overall_probs_diff_words)
