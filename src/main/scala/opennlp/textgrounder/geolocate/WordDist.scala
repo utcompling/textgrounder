@@ -23,7 +23,7 @@ import WordDist.SmoothedWordDist
 
 import math._
 import collection.mutable
-import com.codahale.trove.mutable._
+import com.codahale.trove.{mutable => trovescala}
 
 // val use_sorted_list = false
 
@@ -59,10 +59,10 @@ object IntStringMemoizer {
 
   def unmemoize_word(word: Word) = id_word_map(word)
 
-  def create_word_int_map() = IntIntMap()
-  type WordIntMap = IntIntMap
-  def create_word_double_map() = IntDoubleMap()
-  type WordDoubleMap = IntDoubleMap
+  def create_word_int_map() = trovescala.IntIntMap()
+  type WordIntMap = trovescala.IntIntMap
+  def create_word_double_map() = trovescala.IntDoubleMap()
+  type WordDoubleMap = trovescala.IntDoubleMap
 }
 
 object IdentityMemoizer {
