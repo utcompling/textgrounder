@@ -27,7 +27,10 @@ while true ; do
     -minheap | --minheap ) TGOPTS="$TGOPTS --minheap $2"; shift 2 ;;
     -maxheap | --maxheap ) TGOPTS="$TGOPTS --maxheap $2"; shift 2 ;;
     -memory | --memory ) TGOPTS="$TGOPTS --memory $2"; shift 2 ;;
-    -escape-anal | --escape-anal ) TGOPTS="$TGOPTS --escape-anal"; shift ;;
+    -escape-analysis | --escape-analysis )
+      TGOPTS="$TGOPTS --escape-analysis"; shift ;;
+    -compressed-oops | --compressed-oops )
+      TGOPTS="$TGOPTS --compressed-oops"; shift ;;
     -verbose | --verbose ) TGOPTS="$TGOPTS --verbose"; shift ;;
     -debug-jvm | --debug-jvm ) TGOPTS="$TGOPTS --debug"; shift ;;
     -- ) shift ; break ;;
