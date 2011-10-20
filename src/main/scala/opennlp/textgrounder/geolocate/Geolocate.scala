@@ -5,9 +5,9 @@
 ////////
 
 package opennlp.textgrounder.geolocate
-import KLDiv._
 import NlpUtil._
 import WordDist.memoizer._
+import WordDist.SmoothedWordDist
 import OptParse._
 import Distances._
 import Debug._
@@ -457,7 +457,8 @@ object KMLConstants {
   Distribution over words corresponding to a statistical region.
  */
 
-class RegionWordDist extends WordDist {
+class RegionWordDist extends SmoothedWordDist(
+    Array[Word](), Array[Int](), 0, note_globally=false) {
   /** Number of articles included in incoming-link computation. */
   var num_arts_for_links = 0
   /** Total number of incoming links. */
@@ -1285,7 +1286,7 @@ class StatArticleTable {
       if (art.split != "training" && art.split != Opts.eval_set)
         return
       // Don't train on test set
-      art.dist = new WordDist(keys_dynarr.array, values_dynarr.array,
+      art.dist = WordDist(keys_dynarr.array, values_dynarr.array,
         keys_dynarr.length, note_globally = (art.split == "training"))
     }
 
@@ -1354,7 +1355,7 @@ class StatArticleTable {
   }
 
   def finish_word_counts() {
-    WordDist.finish_global_distribution()
+    SmoothedWordDist.finish_global_distribution()
     finish_article_distributions()
     errprint("")
     errprint("-------------------------------------------------------------------------")
@@ -2072,12 +2073,12 @@ class KLDivergenceStrategy(
 ) extends MinimumScoreStrategy {
 
   def score_region(worddist: WordDist, stat_region: StatRegion) = {
-    var kldiv = fast_kl_divergence(worddist, stat_region.worddist,
+    var kldiv = worddist.fast_kl_divergence(stat_region.worddist,
       partial = partial)
     //var kldiv = worddist.test_kl_divergence(stat_region.worddist,
     //  partial = partial)
     if (symmetric) {
-      val kldiv2 = fast_kl_divergence(stat_region.worddist, worddist,
+      val kldiv2 = stat_region.worddist.fast_kl_divergence(worddist,
         partial = partial)
       kldiv = (kldiv + kldiv2) / 2.0
     }
@@ -2139,10 +2140,10 @@ class CosineSimilarityStrategy(
   def score_region(worddist: WordDist, stat_region: StatRegion) = {
     var cossim =
       if (smoothed)
-        fast_smoothed_cosine_similarity(worddist, stat_region.worddist,
+        worddist.fast_smoothed_cosine_similarity(stat_region.worddist,
           partial = partial)
       else
-        fast_cosine_similarity(worddist, stat_region.worddist,
+        worddist.fast_cosine_similarity(stat_region.worddist,
           partial = partial)
     assert(cossim >= 0.0)
     // Just in case of round-off problems
@@ -2416,7 +2417,7 @@ class PCLTravelGeotagDocumentEvaluator(
   }
 
   def evaluate_document(doc: TitledDocument, doctag: String) = {
-    val dist = new WordDist()
+    val dist = WordDist()
     val the_stopwords =
       if (Opts.include_stopwords_in_article_dists) Set[String]()
       else Stopwords.stopwords
