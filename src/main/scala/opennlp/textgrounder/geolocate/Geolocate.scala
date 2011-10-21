@@ -3289,44 +3289,133 @@ object GeolocateDriver {
     need_seq(Opts.article_data_file, "article-data-file")
   }
 
-  /** Do the actual geolocation.  Results to stderr (see above), and
-      also returned.
-      
-      The current return type is as follows:
-      
-      Seq[(java.lang.String, ScalaObject, scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.TestFileEvaluator
-     
-      This means you get a sequence of tuples of
-        (strategyname, strategy, results)
-      where:
-        strategyname = name of strategy as given on command line
-        strategy = strategy object (given as ScalaObject because it's either
-          a GeotagDocumentStrategy or GeotagToponymStrategy, which have no
-          common superclass)
-        results = map listing results for each document (an abstract type
-          defined in TestFileEvaluator; the result type EvaluationResult
-          is practically an abstract type, too -- the most useful dynamic
-          type in practice is ArticleEvaluationResult)
-      */
-  def run() = {
-    import Toponym._
-
+  protected def read_stopwords_if() {
     if (need_to_read_stopwords) {
       val stopwords_file =
         Stopwords.compute_stopwords_filename(Opts.stopwords_file)
       Stopwords.read_stopwords(stopwords_file)
     }
+  }
 
-    val table =
-    if (Opts.mode == "geotag-toponyms") {
-        TopoArticleTable.table = new TopoArticleTable()
-        TopoArticleTable.table
-      } else
-        new StatArticleTable()
-    StatArticleTable.table = table
-
+  protected def read_articles(table: StatArticleTable) {
     for (fn <- Opts.article_data_file)
       table.read_article_data(fn)
+
+    // Read in the words-counts file
+    if (Opts.counts_file.length > 0) {
+      for (fn <- Opts.counts_file)
+        table.read_word_counts(fn)
+      table.finish_word_counts()
+    }
+  }
+
+  protected def read_data_for_geotag_documents() {
+    read_stopwords_if()
+    val table = new StatArticleTable()
+    StatArticleTable.table = table
+    read_articles(table)
+  }
+
+  protected def process_strategies[T](
+    strat_unflat: Seq[Seq[(String, T)]])(
+    geneval: (String, T) => TestFileEvaluator) = {
+    val strats = strat_unflat reduce (_ ++ _)
+    for ((stratname, strategy) <- strats) yield {
+      val evalobj = geneval(stratname, strategy)
+      // For --eval-format=internal, there is no eval file.  To make the
+      // evaluation loop work properly, we pretend like there's a single
+      // eval file whose value is null.
+      val iterfiles =
+        if (Opts.eval_file.length > 0) Opts.eval_file
+        else Seq[String](null)
+      val evalresults = evalobj.evaluate_and_output_results(iterfiles)
+      (stratname, strategy, evalresults)
+    }
+  }
+
+  /** Do the actual document geolocation.  Results to stderr (see above), and
+      also returned.
+      
+      The current return type is as follows:
+      
+      Seq[(java.lang.String, GeotagDocumentStrategy, scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.TestFileEvaluator
+     
+      This means you get a sequence of tuples of
+        (strategyname, strategy, results)
+      where:
+        strategyname = name of strategy as given on command line
+        strategy = strategy object
+        results = map listing results for each document (an abstract type
+          defined in TestFileEvaluator; the result type EvaluationResult
+          is practically an abstract type, too -- the most useful dynamic
+          type in practice is ArticleEvaluationResult)
+      */
+
+  def run_geotag_documents() = {
+    read_data_for_geotag_documents()
+    StatRegion.initialize_regions()
+
+    val strats = (
+      for (stratname <- Opts.strategy) yield {
+        if (stratname == "baseline") {
+          for (basestratname <- Opts.baseline_strategy) yield ("baseline " + basestratname,
+            new BaselineGeotagDocumentStrategy(basestratname))
+        } else {
+          val strategy =
+            if (stratname.startsWith("naive-bayes-"))
+              new NaiveBayesDocumentStrategy(
+                use_baseline = (stratname == "naive-bayes-with-baseline"))
+            else stratname match {
+              case "average-cell-probability" =>
+                new PerWordRegionDistributionsStrategy()
+              case "cosine-similarity" =>
+                new CosineSimilarityStrategy(smoothed = false, partial = false)
+              case "partial-cosine-similarity" =>
+                new CosineSimilarityStrategy(smoothed = false, partial = true)
+              case "smoothed-cosine-similarity" =>
+                new CosineSimilarityStrategy(smoothed = true, partial = false)
+              case "smoothed-partial-cosine-similarity" =>
+                new CosineSimilarityStrategy(smoothed = true, partial = true)
+              case "full-kl-divergence" =>
+                new KLDivergenceStrategy(symmetric = false, partial = false)
+              case "partial-kl-divergence" =>
+                new KLDivergenceStrategy(symmetric = false, partial = true)
+              case "symmetric-full-kl-divergence" =>
+                new KLDivergenceStrategy(symmetric = true, partial = false)
+              case "symmetric-partial-kl-divergence" =>
+                new KLDivergenceStrategy(symmetric = true, partial = true)
+              case "none" =>
+                null
+            }
+          if (strategy != null)
+            Seq((stratname, strategy))
+          else
+            Seq()
+        }
+      })
+    process_strategies(strats)((stratname, strategy) => {
+      // Generate reader object
+      if (Opts.eval_format == "pcl-travel")
+        new PCLTravelGeotagDocumentEvaluator(strategy, stratname)
+      else
+        new ArticleGeotagDocumentEvaluator(strategy, stratname)
+    })
+  }
+
+  /** Do the actual toponym geolocation.  Results to stderr (see above), and
+      also returned.
+     
+      Return value very much like for run_geotag_documents(), but less
+      useful info may be returned for each document processed.
+   */
+
+  def run_geotag_toponyms() = {
+    import Toponym._
+    read_stopwords_if()
+    val table = new TopoArticleTable()
+    TopoArticleTable.table = table
+    StatArticleTable.table = table
+    read_articles(table)
 
     // errprint("Processing evaluation file(s) %s for toponym counts...",
     //   Opts.eval_file)
@@ -3339,116 +3428,57 @@ object GeolocateDriver {
     // output_reverse_sorted_table(toponyms_seen_in_eval_files,
     //                             outfile=sys.stderr)
 
-    // Read in the words-counts file
-    if (Opts.counts_file.length > 0) {
-      for (fn <- Opts.counts_file)
-        table.read_word_counts(fn)
-      table.finish_word_counts()
-    }
-
     if (Opts.gazetteer_file != null)
       Gazetteer.gazetteer =
         new WorldGazetteer(Opts.gazetteer_file)
 
-    def process_strategies[T](
-      strat_unflat: Seq[Seq[(String, T)]])(
-      geneval: (String, T) => TestFileEvaluator) = {
-      val strats = strat_unflat reduce (_ ++ _)
-      for ((stratname, strategy) <- strats) yield {
-        val evalobj = geneval(stratname, strategy)
-        // For --eval-format=internal, there is no eval file.  To make the
-        // evaluation loop work properly, we pretend like there's a single
-        // eval file whose value is null.
-        val iterfiles =
-          if (Opts.eval_file.length > 0) Opts.eval_file
-          else Seq[String](null)
-        val evalresults = evalobj.evaluate_and_output_results(iterfiles)
-        (stratname, strategy, evalresults)
-      }
-    }
+    val strats = (
+      for (stratname <- Opts.strategy) yield {
+        // Generate strategy object
+        if (stratname == "baseline") {
+          for (basestratname <- Opts.baseline_strategy) yield ("baseline " + basestratname,
+            new BaselineGeotagToponymStrategy(basestratname))
+        } else {
+          val strategy = new NaiveBayesToponymStrategy(
+            use_baseline = (stratname == "naive-bayes-with-baseline"))
+          Seq((stratname, strategy))
+        }
+      })
+    process_strategies(strats)((stratname, strategy) => {
+      // Generate reader object
+      if (Opts.eval_format == "tr-conll")
+        new TRCoNLLGeotagToponymEvaluator(strategy, stratname)
+      else
+        new ArticleGeotagToponymEvaluator(strategy, stratname)
+    })
+  }
 
-    if (Opts.mode == "generate-kml") {
-      StatRegion.initialize_regions()
-      val words = Opts.kml_words.split(',')
-      for (word <- words) {
-        val regdist = RegionDist.get_region_dist(memoize_word(word))
-        if (!regdist.normalized) {
-          warning("""Non-normalized distribution, apparently word %s not seen anywhere.
+  /** Do the actual KML generation.  Some tracking info written to stderr.
+      KML files created and written on disk.
+   */
+
+  def run_generate_kml() {
+    read_data_for_geotag_documents()
+    StatRegion.initialize_regions()
+    val words = Opts.kml_words.split(',')
+    for (word <- words) {
+      val regdist = RegionDist.get_region_dist(memoize_word(word))
+      if (!regdist.normalized) {
+        warning("""Non-normalized distribution, apparently word %s not seen anywhere.
 Not generating an empty KML file.""", word)
-        } else
-          regdist.generate_kml_file("%s%s.kml" format (Opts.kml_prefix, word))
-      }
-      null
+      } else
+        regdist.generate_kml_file("%s%s.kml" format (Opts.kml_prefix, word))
     }
-    else if (Opts.mode == "geotag-toponyms") {
-      val strats = (
-        for (stratname <- Opts.strategy) yield {
-          // Generate strategy object
-          if (stratname == "baseline") {
-            for (basestratname <- Opts.baseline_strategy) yield ("baseline " + basestratname,
-              new BaselineGeotagToponymStrategy(basestratname))
-          } else {
-            val strategy = new NaiveBayesToponymStrategy(
-              use_baseline = (stratname == "naive-bayes-with-baseline"))
-            Seq((stratname, strategy))
-          }
-        })
-      process_strategies(strats)((stratname, strategy) => {
-        // Generate reader object
-        if (Opts.eval_format == "tr-conll")
-          new TRCoNLLGeotagToponymEvaluator(strategy, stratname)
-        else
-          new ArticleGeotagToponymEvaluator(strategy, stratname)
-      })
-    } else {
-      assert(Opts.mode == "geotag-documents")
-      StatRegion.initialize_regions()
+  }
 
-      val strats = (
-        for (stratname <- Opts.strategy) yield {
-          if (stratname == "baseline") {
-            for (basestratname <- Opts.baseline_strategy) yield ("baseline " + basestratname,
-              new BaselineGeotagDocumentStrategy(basestratname))
-          } else {
-            val strategy =
-              if (stratname.startsWith("naive-bayes-"))
-                new NaiveBayesDocumentStrategy(
-                  use_baseline = (stratname == "naive-bayes-with-baseline"))
-              else stratname match {
-                case "average-cell-probability" =>
-                  new PerWordRegionDistributionsStrategy()
-                case "cosine-similarity" =>
-                  new CosineSimilarityStrategy(smoothed = false, partial = false)
-                case "partial-cosine-similarity" =>
-                  new CosineSimilarityStrategy(smoothed = false, partial = true)
-                case "smoothed-cosine-similarity" =>
-                  new CosineSimilarityStrategy(smoothed = true, partial = false)
-                case "smoothed-partial-cosine-similarity" =>
-                  new CosineSimilarityStrategy(smoothed = true, partial = true)
-                case "full-kl-divergence" =>
-                  new KLDivergenceStrategy(symmetric = false, partial = false)
-                case "partial-kl-divergence" =>
-                  new KLDivergenceStrategy(symmetric = false, partial = true)
-                case "symmetric-full-kl-divergence" =>
-                  new KLDivergenceStrategy(symmetric = true, partial = false)
-                case "symmetric-partial-kl-divergence" =>
-                  new KLDivergenceStrategy(symmetric = true, partial = true)
-                case "none" =>
-                  null
-              }
-            if (strategy != null)
-              Seq((stratname, strategy))
-            else
-              Seq()
-          }
-        })
-      process_strategies(strats)((stratname, strategy) => {
-        // Generate reader object
-        if (Opts.eval_format == "pcl-travel")
-          new PCLTravelGeotagDocumentEvaluator(strategy, stratname)
-        else
-          new ArticleGeotagDocumentEvaluator(strategy, stratname)
-      })
+  def run() {
+    if (Opts.mode == "generate-kml")
+      run_generate_kml()
+    else if (Opts.mode == "geotag-toponyms")
+      run_geotag_toponyms()
+    else {
+      assert(Opts.mode == "geotag-documents")
+      run_geotag_documents()
     }
   }
 }
