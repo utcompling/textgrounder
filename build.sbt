@@ -22,9 +22,7 @@ resolvers ++= Seq(
 libraryDependencies ++= Seq(
   "com.google.inject" % "guice" % "2.0",
   "com.google.guava" % "guava" % "r06",
-  // Not needed; only if you run into error retrieving commons-cli
-  // (happened to me in the past)
-  // "commons-cli" % "commons-cli" % "1.2",
+  "commons-cli" % "commons-cli" % "1.2",
   "org.jdom" % "jdom" % "1.1",
   "org.xerial" % "sqlite-jdbc" % "3.6.20",
   "org.apache.opennlp" % "opennlp-maxent" % "3.0.1-incubating",
