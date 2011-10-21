@@ -38,16 +38,22 @@ else
   OUTFILE="$RUN_PROG.out$ID.`date '+%F.%H%M%P'`"
 fi
 if [ -e "$OUTFILE" ]; then
-  echo "Output file $OUTFILE already exists!  Won't overwrite."
-  exit 1
+  NUM=1
+  OUTFILE_BASE="$OUTFILE"
+  while true ; do
+    OUTFILE="$OUTFILE_BASE.$NUM"
+    if [ ! -e "$OUTFILE" ]; then
+      break
+    fi
+    NUM=`expr $NUM + 1`
+  done
 fi
 
-echo "Running on `hostname` at time `date`"
-echo "Outputting to $OUTFILE"
-if [ -n "$1" ]; then
-  echo "Arguments are" ${1+"$@"}
-else
-  echo "Run without arguments"
-fi
-
-nohup "$DO_GEOLOCATE" ${1+"$@"} > $OUTFILE 2>&1
+(
+echo "Nohup wrapper running on `hostname` at time `date`"
+echo "Output file: $OUTFILE"
+echo "Nohup script invoked as: $0" ${1+"$@"}
+echo "Invoking: $DO_GEOLOCATE" ${1+"$@"}
+echo "(all above info also sent to output file)"
+) | tee $OUTFILE
+nohup "$DO_GEOLOCATE" ${1+"$@"} >> $OUTFILE 2>&1
