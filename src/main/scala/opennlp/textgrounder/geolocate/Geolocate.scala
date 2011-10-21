@@ -1428,7 +1428,8 @@ object StatArticleTable {
 // (In Twitter, generally each "article" is the set of tweets from a given
 // user.)
 
-class StatArticle(params: Map[String, String]) extends Article(params) {
+class StatArticle(params: Map[String, String]) extends Article(params)
+  with EvaluationDocument {
   // Object containing word distribution of this article.
   var dist: WordDist = null
 
@@ -1622,9 +1623,9 @@ class GeotagDocumentEval(
   }
 }
 
-//////// Results for geotagging documents/articles
+//////// Statistics for geotagging documents/articles
 
-class GeotagDocumentResults {
+class GeotagDocumentStats {
 
   def create_doc() = new GeotagDocumentEval()
   val all_document = create_doc()
@@ -1657,51 +1658,25 @@ class GeotagDocumentResults {
   val docs_by_true_dist_to_pred_center =
     new DoubleTableByRange(dist_fractions_for_error_dist, create_doc _)
 
-  def record_geotag_document_result(rank: Int, coord: Coord,
-    pred_latind: Regind, pred_longind: Regind,
-    num_arts_in_true_region: Int,
-    return_stats: Boolean = false) = {
+  def record_geotag_document_result(res: ArticleEvaluationResult) {
+    all_document.record_result(res.rank, res.pred_truedist, res.pred_degdist)
+    val naitr = docs_by_naitr.get_collector(res.num_arts_in_true_region)
+    naitr.record_result(res.rank, res.pred_truedist, res.pred_degdist)
 
-    def degree_dist(c1: Coord, c2: Coord) = {
-      sqrt((c1.lat - c2.lat) * (c1.lat - c2.lat) +
-        (c1.long - c2.long) * (c1.long - c2.long))
-    }
-
-    val pred_center = stat_region_indices_to_center_coord(pred_latind, pred_longind)
-    val pred_truedist = spheredist(coord, pred_center)
-    val pred_degdist = degree_dist(coord, pred_center)
-
-    all_document.record_result(rank, pred_truedist, pred_degdist)
-    val naitr = docs_by_naitr.get_collector(num_arts_in_true_region)
-    naitr.record_result(rank, pred_truedist, pred_degdist)
-
-    val (true_latind, true_longind) = coord_to_stat_region_indices(coord)
-    val true_center = stat_region_indices_to_center_coord(true_latind, true_longind)
-    val true_truedist = spheredist(coord, true_center)
-    val true_degdist = degree_dist(coord, true_center)
     val fracinc = dist_fraction_increment
-    val rounded_true_truedist = fracinc * floor(true_truedist / fracinc)
-    val rounded_true_degdist = fracinc * floor(true_degdist / fracinc)
+    val rounded_true_truedist = fracinc * floor(res.true_truedist / fracinc)
+    val rounded_true_degdist = fracinc * floor(res.true_degdist / fracinc)
 
-    all_document.record_oracle_result(true_truedist, true_degdist)
+    all_document.record_oracle_result(res.true_truedist, res.true_degdist)
     docs_by_true_dist_to_true_center(rounded_true_truedist).
-      record_result(rank, pred_truedist, pred_degdist)
+      record_result(res.rank, res.pred_truedist, res.pred_degdist)
     docs_by_degree_dist_to_true_center(rounded_true_degdist).
-      record_result(rank, pred_truedist, pred_degdist)
+      record_result(res.rank, res.pred_truedist, res.pred_degdist)
 
-    docs_by_true_dist_to_pred_center.get_collector(pred_truedist).
-      record_result(rank, pred_truedist, pred_degdist)
-    docs_by_degree_dist_to_pred_center.get_collector(pred_degdist).
-      record_result(rank, pred_truedist, pred_degdist)
-
-    if (return_stats) {
-      Map("pred_center" -> pred_center,
-        "pred_truedist" -> pred_truedist,
-        "pred_degdist" -> pred_degdist,
-        "true_center" -> true_center,
-        "true_truedist" -> true_truedist,
-        "true_degdist" -> true_degdist)
-    } else Map[String, Double]()
+    docs_by_true_dist_to_pred_center.get_collector(res.pred_truedist).
+      record_result(res.rank, res.pred_truedist, res.pred_degdist)
+    docs_by_degree_dist_to_pred_center.get_collector(res.pred_degdist).
+      record_result(res.rank, res.pred_truedist, res.pred_degdist)
   }
 
   def record_geotag_document_other_stat(othertype: String) {
@@ -1761,6 +1736,12 @@ class GeotagDocumentResults {
 //                             Main geotagging code                        //
 /////////////////////////////////////////////////////////////////////////////
 
+trait EvaluationDocument {
+}
+
+trait EvaluationResult {
+}
+
 /**
   Abstract class for reading documents from a test file and evaluating on them.
  */
@@ -1785,7 +1766,8 @@ abstract class TestFileEvaluator(stratname: String) {
     Return true if document was actually processed and evaluated; false
     if skipped.
    */
-  def evaluate_document(doc: Document, doctag: String): Boolean
+  def evaluate_document(doc: Document, doctag: String):
+    EvaluationResult
 
   /**
     Output results so far.  If 'isfinal', this is the last call, so
@@ -1799,13 +1781,16 @@ abstract class TestFileEvaluator(stratname: String) {
     documents (so that it doesn't need any external test files), the value
     of 'files' should be a sequence of one item, which is null. (If an
     empty sequence is passed in, no evaluation will happen.)
+
+    Also returns an object containing the results.
    */
-  def evaluate_and_output_results(files: Iterable[String]) {
+  def evaluate_and_output_results(files: Iterable[String]) = {
     val task = new MeteredTask("document", "evaluating")
     var last_elapsed = 0.0
     var last_processed = 0
     var skip_initial = Opts.skip_initial_test_docs
     var skip_n = 0
+    val results = mutable.Map[Document, EvaluationResult]()
 
     /* Process all documents in a given file.  If return value is false,
        processing was interrupted due to a limit being reached, and
@@ -1831,8 +1816,9 @@ abstract class TestFileEvaluator(stratname: String) {
             errprint("Passed over document %s", doctag)
           else {
             // Don't put side-effecting code inside of an assert!
-            val not_skipped = evaluate_document(doc, doctag)
-            assert(not_skipped)
+            val result = evaluate_document(doc, doctag)
+            assert(result != null)
+            results(doc) = result
           }
           task.item_processed()
           val new_elapsed = task.elapsed_time
@@ -1902,6 +1888,7 @@ abstract class TestFileEvaluator(stratname: String) {
     }
 
     output_final_results()
+    results
   }
 }
 
@@ -2211,11 +2198,29 @@ abstract class GeotagDocumentEvaluator(
   strategy: GeotagDocumentStrategy,
   stratname: String
 ) extends TestFileEvaluator(stratname) {
-  val results = new GeotagDocumentResults()
+  val results = new GeotagDocumentStats()
 
   def output_results(isfinal: Boolean = false) {
     results.output_geotag_document_results(all_results = isfinal)
   }
+}
+
+case class ArticleEvaluationResult(
+  article: StatArticle,
+  rank: Int,
+  pred_latind: Regind,
+  pred_longind: Regind) extends EvaluationResult {
+
+  val true_statreg = StatRegion.find_region_for_coord(article.coord)
+  val num_arts_in_true_region = true_statreg.worddist.num_arts_for_word_dist
+  val (true_latind, true_longind) = coord_to_stat_region_indices(article.coord)
+  val true_center = stat_region_indices_to_center_coord(true_latind, true_longind)
+  val true_truedist = spheredist(article.coord, true_center)
+  val true_degdist = degree_dist(article.coord, true_center)
+  val pred_center =
+    stat_region_indices_to_center_coord(pred_latind, pred_longind)
+  val pred_truedist = spheredist(article.coord, pred_center)
+  val pred_degdist = degree_dist(article.coord, pred_center)
 }
 
 /**
@@ -2228,6 +2233,7 @@ class ArticleGeotagDocumentEvaluator(
 ) extends GeotagDocumentEvaluator(strategy, stratname) {
 
   type Document = StatArticle
+  type DocumentResult = ArticleEvaluationResult
 
   // Debug flags:
   //
@@ -2282,17 +2288,20 @@ class ArticleGeotagDocumentEvaluator(
     } else false
   }
 
-  def evaluate_document(article: StatArticle, doctag: String): Boolean = {
+  def evaluate_document(article: StatArticle, doctag: String):
+      EvaluationResult = {
     if (would_skip_document(article, doctag))
-      return false
+      return null
     assert(article.dist.finished)
     val (true_latind, true_longind) =
       coord_to_stat_region_indices(article.coord)
-    val true_statreg = StatRegion.find_region_for_coord(article.coord)
-    val naitr = true_statreg.worddist.num_arts_for_word_dist
-    if (debug("lots") || debug("commontop"))
-      errprint("Evaluating article %s with %s word-dist articles in true region",
+    if (debug("lots") || debug("commontop")) {
+      val true_statreg = StatRegion.find_region_for_coord(article.coord)
+      val naitr = true_statreg.worddist.num_arts_for_word_dist
+      errprint(
+        "Evaluating article %s with %s word-dist articles in true region",
         article, naitr)
+    }
 
     /* That is:
 
@@ -2326,14 +2335,13 @@ class ArticleGeotagDocumentEvaluator(
         get_computed_results()
       }
     }
+    val result =
+      new ArticleEvaluationResult(article, true_rank, pred_latind, pred_longind)
 
     val want_indiv_results =
       !Opts.oracle_results && !Opts.no_individual_results
-    val stats = results.record_geotag_document_result(true_rank, article.coord,
-      pred_latind, pred_longind,
-      num_arts_in_true_region = naitr,
-      return_stats = want_indiv_results)
-    if (naitr == 0) {
+    results.record_geotag_document_result(result)
+    if (result.num_arts_in_true_region == 0) {
       results.record_geotag_document_other_stat(
         "Articles with no training articles in region")
     }
@@ -2342,15 +2350,15 @@ class ArticleGeotagDocumentEvaluator(
       errprint("%s:  %d types, %d tokens",
         doctag, article.dist.counts.size, article.dist.total_tokens)
       errprint("%s:  true region at rank: %s", doctag, true_rank)
-      errprint("%s:  true region: %s", doctag, true_statreg)
+      errprint("%s:  true region: %s", doctag, result.true_statreg)
       for (i <- 0 until 5) {
         errprint("%s:  Predicted region (at rank %s): %s",
           doctag, i + 1, pred_regs(i)._1)
       }
       errprint("%s:  Distance %.2f miles to true region center at %s",
-        doctag, stats("true_truedist"), stats("true_center"))
+        doctag, result.true_truedist, result.true_center)
       errprint("%s:  Distance %.2f miles to predicted region center at %s",
-        doctag, stats("pred_truedist"), stats("pred_center"))
+        doctag, result.pred_truedist, result.pred_center)
       assert(doctag(0) == '#')
       if (debug("gridrank") ||
         (debuglist("gridrank") contains doctag.drop(1))) {
@@ -2397,16 +2405,21 @@ class ArticleGeotagDocumentEvaluator(
       }
     }
 
-    return true
+    return result
   }
+}
+
+class TitledDocumentResult extends EvaluationResult {
 }
 
 class PCLTravelGeotagDocumentEvaluator(
   strategy: GeotagDocumentStrategy,
   stratname: String
 ) extends GeotagDocumentEvaluator(strategy, stratname) {
-  case class TitledDocument(title: String, text: String)
+  case class TitledDocument(
+    title: String, text: String) extends EvaluationDocument 
   type Document = TitledDocument
+  type DocumentResult = TitledDocumentResult
 
   def iter_documents(filename: String) = {
 
@@ -2456,7 +2469,7 @@ class PCLTravelGeotagDocumentEvaluator(
         errprint("  Rank %d, goodness %g: %s", rank, vall, reg.shortstr())
     }
 
-    true
+    new TitledDocumentResult()
   }
 }
 
@@ -3085,18 +3098,16 @@ object Debug {
   1. Create an instance of GeolocateOptions and populate it with the
      appropriate options.
   2. Call set_options(), passing in the options instance you just created.
-  3. Call run().
+  3. Call run().  The return value contains some evaluation results.
 
   NOTE: Currently, the GeolocateOptions instance is recorded directly inside
   of this singleton object, without copying, and some of the fields are
   changed to more canonical values.  If this is a problem, let me know and
   I'll fix it.
 
-  All evaluation output is currently written to standard error, and must be
-  parsed appropriately. (There are some scripts to parse the output.)
-  If this is a problem, let me know and I can either (1) send the more
-  important output to stdout instead of stderr, and/or (2) create a
-  programmatic interface to report the results.
+  All evaluation output is currently written to standard error.
+  (There are some scripts to parse the output.) Some info is also returned
+  by the run() function.  See below.
  */
 object GeolocateDriver {
   var Opts = null: GeolocateOptions
@@ -3278,8 +3289,26 @@ object GeolocateDriver {
     need_seq(Opts.article_data_file, "article-data-file")
   }
 
-  /** Do the actual geolocation.  Results to stderr (see above). */
-  def run() {
+  /** Do the actual geolocation.  Results to stderr (see above), and
+      also returned.
+      
+      The current return type is as follows:
+      
+      Seq[(java.lang.String, ScalaObject, scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.TestFileEvaluator
+     
+      This means you get a sequence of tuples of
+        (strategyname, strategy, results)
+      where:
+        strategyname = name of strategy as given on command line
+        strategy = strategy object (given as ScalaObject because it's either
+          a GeotagDocumentStrategy or GeotagToponymStrategy, which have no
+          common superclass)
+        results = map listing results for each document (an abstract type
+          defined in TestFileEvaluator; the result type EvaluationResult
+          is practically an abstract type, too -- the most useful dynamic
+          type in practice is ArticleEvaluationResult)
+      */
+  def run() = {
     import Toponym._
 
     if (need_to_read_stopwords) {
@@ -3321,6 +3350,23 @@ object GeolocateDriver {
       Gazetteer.gazetteer =
         new WorldGazetteer(Opts.gazetteer_file)
 
+    def process_strategies[T](
+      strat_unflat: Seq[Seq[(String, T)]])(
+      geneval: (String, T) => TestFileEvaluator) = {
+      val strats = strat_unflat reduce (_ ++ _)
+      for ((stratname, strategy) <- strats) yield {
+        val evalobj = geneval(stratname, strategy)
+        // For --eval-format=internal, there is no eval file.  To make the
+        // evaluation loop work properly, we pretend like there's a single
+        // eval file whose value is null.
+        val iterfiles =
+          if (Opts.eval_file.length > 0) Opts.eval_file
+          else Seq[String](null)
+        val evalresults = evalobj.evaluate_and_output_results(iterfiles)
+        (stratname, strategy, evalresults)
+      }
+    }
+
     if (Opts.mode == "generate-kml") {
       StatRegion.initialize_regions()
       val words = Opts.kml_words.split(',')
@@ -3332,26 +3378,9 @@ Not generating an empty KML file.""", word)
         } else
           regdist.generate_kml_file("%s%s.kml" format (Opts.kml_prefix, word))
       }
-      return
+      null
     }
-
-    def process_strategies[T](
-      strat_unflat: Seq[Seq[(String, T)]])(
-      geneval: (String, T) => TestFileEvaluator) {
-      val strats = strat_unflat reduce (_ ++ _)
-      for ((stratname, strategy) <- strats) {
-        val evalobj = geneval(stratname, strategy)
-        // For --eval-format=internal, there is no eval file.  To make the
-        // evaluation loop work properly, we pretend like there's a single
-        // eval file whose value is null.
-        val iterfiles =
-          if (Opts.eval_file.length > 0) Opts.eval_file
-          else Seq[String](null)
-        evalobj.evaluate_and_output_results(iterfiles)
-      }
-    }
-
-    if (Opts.mode == "geotag-toponyms") {
+    else if (Opts.mode == "geotag-toponyms") {
       val strats = (
         for (stratname <- Opts.strategy) yield {
           // Generate strategy object
@@ -3371,7 +3400,8 @@ Not generating an empty KML file.""", word)
         else
           new ArticleGeotagToponymEvaluator(strategy, stratname)
       })
-    } else if (Opts.mode == "geotag-documents") {
+    } else {
+      assert(Opts.mode == "geotag-documents")
       StatRegion.initialize_regions()
 
       val strats = (

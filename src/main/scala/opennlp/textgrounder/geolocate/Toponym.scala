@@ -820,17 +820,23 @@ object Toponym {
     }
   }
 
+  class ToponymEvaluationResult extends EvaluationResult {
+  }
+
   abstract class GeotagToponymEvaluator(
     strategy: GeotagToponymStrategy,
     stratname: String) extends TestFileEvaluator(stratname) {
     val results = new GeotagToponymResults()
 
-    type Document = Iterable[GeogWord]
+    case class GeogWordDocument(
+      words: Iterable[GeogWord]) extends EvaluationDocument
+    type Document = GeogWordDocument
+    type DocumentResult = ToponymEvaluationResult
 
     // Given an evaluation file, read in the words specified, including the
     // toponyms.  Mark each word with the "document" (e.g. article) that it's
     // within.
-    def iter_geogwords(filename: String): Iterable[GeogWord]
+    def iter_geogwords(filename: String): GeogWordDocument
 
     // Retrieve the words yielded by iter_geowords() and separate by "document"
     // (e.g. article); yield each "document" as a list of such GeogWord objects.
@@ -851,7 +857,7 @@ object Toponym {
         word
       }
 
-      for ((k, g) <- iter_geogwords(filename).groupBy(_.document)) yield {
+      for ((k, g) <- iter_geogwords(filename).words.groupBy(_.document)) yield {
         if (k != null)
           errprint("Processing document %s...", k)
         val results = (for (word <- g) yield return_word(word)).toArray
@@ -887,7 +893,9 @@ object Toponym {
           }
         }
 
-        (for (word <- results if word.coord != null) yield word).toIterable
+        val geogwords =
+          (for (word <- results if word.coord != null) yield word).toIterable
+        new GeogWordDocument(geogwords)
       }
     }
 
@@ -980,10 +988,10 @@ object Toponym {
       }
     }
 
-    def evaluate_document(doc: Iterable[GeogWord], doctag: String) = {
-      for (geogword <- doc)
+    def evaluate_document(doc: GeogWordDocument, doctag: String) = {
+      for (geogword <- doc.words)
         disambiguate_toponym(geogword)
-      true
+      new ToponymEvaluationResult()
     }
 
     def output_results(isfinal: Boolean = false) {
@@ -1076,7 +1084,7 @@ object Toponym {
         else
           return Stream[GeogWord]()
       }
-      iter_1()
+      new GeogWordDocument(iter_1())
     }
   }
 
@@ -1120,7 +1128,7 @@ object Toponym {
         } else
           Stream[GeogWord]()
       }
-      iter_1()
+      new GeogWordDocument(iter_1())
     }
   }
 

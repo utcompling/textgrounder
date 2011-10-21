@@ -220,6 +220,11 @@ object Distances {
     return earth_radius_in_miles * acos(anglecos)
   }
   
+  def degree_dist(c1: Coord, c2: Coord) = {
+    sqrt((c1.lat - c2.lat) * (c1.lat - c2.lat) +
+      (c1.long - c2.long) * (c1.long - c2.long))
+  }
+
   // Convert a coordinate to the indices of the southwest corner of the
   // corresponding tiling region.
   def coord_to_tiling_region_indices(coord: Coord) = {
