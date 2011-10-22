@@ -1748,7 +1748,7 @@ trait EvaluationResult {
 abstract class TestFileEvaluator(stratname: String) {
   var documents_processed = 0
 
-  type Document
+  type Document <: EvaluationDocument
 
   /**
     Return an Iterable listing the documents retrievable from the given
@@ -1774,88 +1774,17 @@ abstract class TestFileEvaluator(stratname: String) {
     output more results.
    */
   def output_results(isfinal: Boolean = false): Unit
+}
 
-  /**
-    Evaluate on all of the given files, outputting periodic results and
-    results after all files are done.  If the evaluator uses articles as
-    documents (so that it doesn't need any external test files), the value
-    of 'files' should be a sequence of one item, which is null. (If an
-    empty sequence is passed in, no evaluation will happen.)
+abstract class FileProcessor {
+  def process_file(file: String): Boolean
 
-    Also returns an object containing the results.
-   */
-  def evaluate_and_output_results(files: Iterable[String]) = {
-    val task = new MeteredTask("document", "evaluating")
-    var last_elapsed = 0.0
-    var last_processed = 0
-    var skip_initial = Opts.skip_initial_test_docs
-    var skip_n = 0
-    val results = mutable.Map[Document, EvaluationResult]()
+  def begin_process_directory(dir: File) {
+  }
 
-    /* Process all documents in a given file.  If return value is false,
-       processing was interrupted due to a limit being reached, and
-       no more files should be processed. */
-    def process_file(filename: String): Boolean = {
-      for (doc <- iter_documents(filename)) {
-        // errprint("Processing document: %s", doc)
-        val num_processed = task.num_processed
-        val doctag = "#%d" format (1 + num_processed)
-        if (would_skip_document(doc, doctag))
-          errprint("Skipped document %s", doc)
-        else {
-          var do_skip = false
-          if (skip_initial != 0) {
-            skip_initial -= 1
-            do_skip = true
-          } else if (skip_n != 0) {
-            skip_n -= 1
-            do_skip = true
-          } else
-            skip_n = Opts.every_nth_test_doc - 1
-          if (do_skip)
-            errprint("Passed over document %s", doctag)
-          else {
-            // Don't put side-effecting code inside of an assert!
-            val result = evaluate_document(doc, doctag)
-            assert(result != null)
-            results(doc) = result
-          }
-          task.item_processed()
-          val new_elapsed = task.elapsed_time
-          val new_processed = task.num_processed
-
-          // If max # of docs reached, stop
-          if ((Opts.num_test_docs > 0 &&
-            new_processed >= Opts.num_test_docs)) {
-            errprint("")
-            errprint("Stopping because limit of %s documents reached",
-              Opts.num_test_docs)
-            task.finish()
-            return false
-          }
-
-          // If five minutes and ten documents have gone by, print out results
-          if ((new_elapsed - last_elapsed >= 300 &&
-            new_processed - last_processed >= 10)) {
-            errprint("Results after %d documents (strategy %s):",
-              task.num_processed, stratname)
-            output_results(isfinal = false)
-            errprint("End of results after %d documents (strategy %s):",
-              task.num_processed, stratname)
-            last_elapsed = new_elapsed
-            last_processed = new_processed
-          }
-        }
-      }
-
-      task.finish()
-      return true
-    }
-
+  def process_files(files: Iterable[String]) {
     breakable {
       def process_one_file(filename: String) {
-        if (filename != null)
-          errprint("Processing evaluation file %s...", filename)
         if (!process_file(filename))
           // This works because of the way 'breakable' is implemented
           // (dynamically-scoped).  Might "break" (stop working) if break
@@ -1868,7 +1797,6 @@ abstract class TestFileEvaluator(stratname: String) {
         else {
           val dirfile = new File(dir)
           if (dirfile.isDirectory) {
-            errprint("Processing evaluation directory %s...", dir)
             for (file <- dirfile.listFiles().toSeq) {
               val filename = file.toString
               process_one_file(filename)
@@ -1877,18 +1805,109 @@ abstract class TestFileEvaluator(stratname: String) {
         }
       }
     }
+  }
+}
 
-    def output_final_results() {
-      errprint("")
-      errprint("Final results for strategy %s: All %d documents processed:",
-        stratname, task.num_processed)
-      errprint("Ending operation at %s", curtimehuman())
-      output_results(isfinal = true)
-      errprint("Ending final results for strategy %s", stratname)
+abstract class EvaluationOutputter {
+  def evaluate_and_output_results(files: Iterable[String]): Unit
+}
+
+class DefaultEvaluationOutputter(stratname: String, evalobj: TestFileEvaluator
+    ) extends EvaluationOutputter {
+  val results = mutable.Map[EvaluationDocument, EvaluationResult]()
+  /**
+    Evaluate on all of the given files, outputting periodic results and
+    results after all files are done.  If the evaluator uses articles as
+    documents (so that it doesn't need any external test files), the value
+    of 'files' should be a sequence of one item, which is null. (If an
+    empty sequence is passed in, no evaluation will happen.)
+
+    Also returns an object containing the results.
+   */
+  def evaluate_and_output_results(files: Iterable[String]) {
+    val task = new MeteredTask("document", "evaluating")
+    var last_elapsed = 0.0
+    var last_processed = 0
+    var skip_initial = Opts.skip_initial_test_docs
+    var skip_n = 0
+
+    class EvaluationFileProcessor extends FileProcessor {
+      override def begin_process_directory(dir: File) {
+        errprint("Processing evaluation directory %s...", dir)
+      }
+
+      /* Process all documents in a given file.  If return value is false,
+         processing was interrupted due to a limit being reached, and
+         no more files should be processed. */
+      def process_file(filename: String): Boolean = {
+        if (filename != null)
+          errprint("Processing evaluation file %s...", filename)
+        for (doc <- evalobj.iter_documents(filename)) {
+          // errprint("Processing document: %s", doc)
+          val num_processed = task.num_processed
+          val doctag = "#%d" format (1 + num_processed)
+          if (evalobj.would_skip_document(doc, doctag))
+            errprint("Skipped document %s", doc)
+          else {
+            var do_skip = false
+            if (skip_initial != 0) {
+              skip_initial -= 1
+              do_skip = true
+            } else if (skip_n != 0) {
+              skip_n -= 1
+              do_skip = true
+            } else
+              skip_n = Opts.every_nth_test_doc - 1
+            if (do_skip)
+              errprint("Passed over document %s", doctag)
+            else {
+              // Don't put side-effecting code inside of an assert!
+              val result = evalobj.evaluate_document(doc, doctag)
+              assert(result != null)
+              results(doc) = result
+            }
+            task.item_processed()
+            val new_elapsed = task.elapsed_time
+            val new_processed = task.num_processed
+
+            // If max # of docs reached, stop
+            if ((Opts.num_test_docs > 0 &&
+              new_processed >= Opts.num_test_docs)) {
+              errprint("")
+              errprint("Stopping because limit of %s documents reached",
+                Opts.num_test_docs)
+              task.finish()
+              return false
+            }
+
+            // If five minutes and ten documents have gone by, print out results
+            if ((new_elapsed - last_elapsed >= 300 &&
+              new_processed - last_processed >= 10)) {
+              errprint("Results after %d documents (strategy %s):",
+                task.num_processed, stratname)
+              evalobj.output_results(isfinal = false)
+              errprint("End of results after %d documents (strategy %s):",
+                task.num_processed, stratname)
+              last_elapsed = new_elapsed
+              last_processed = new_processed
+            }
+          }
+        }
+
+        return true
+      }
     }
 
-    output_final_results()
-    results
+    new EvaluationFileProcessor().process_files(files)
+
+    task.finish()
+
+    errprint("")
+    errprint("Final results for strategy %s: All %d documents processed:",
+      stratname, task.num_processed)
+    errprint("Ending operation at %s", curtimehuman())
+    evalobj.output_results(isfinal = true)
+    errprint("Ending final results for strategy %s", stratname)
   }
 }
 
@@ -3318,7 +3337,7 @@ object GeolocateDriver {
 
   protected def process_strategies[T](
     strat_unflat: Seq[Seq[(String, T)]])(
-    geneval: (String, T) => TestFileEvaluator) = {
+    geneval: (String, T) => EvaluationOutputter) = {
     val strats = strat_unflat reduce (_ ++ _)
     for ((stratname, strategy) <- strats) yield {
       val evalobj = geneval(stratname, strategy)
@@ -3328,8 +3347,8 @@ object GeolocateDriver {
       val iterfiles =
         if (Opts.eval_file.length > 0) Opts.eval_file
         else Seq[String](null)
-      val evalresults = evalobj.evaluate_and_output_results(iterfiles)
-      (stratname, strategy, evalresults)
+      evalobj.evaluate_and_output_results(iterfiles)
+      (stratname, strategy, evalobj)
     }
   }
 
@@ -3394,11 +3413,13 @@ object GeolocateDriver {
         }
       })
     process_strategies(strats)((stratname, strategy) => {
-      // Generate reader object
-      if (Opts.eval_format == "pcl-travel")
-        new PCLTravelGeotagDocumentEvaluator(strategy, stratname)
-      else
-        new ArticleGeotagDocumentEvaluator(strategy, stratname)
+      val evaluator =
+        // Generate reader object
+        if (Opts.eval_format == "pcl-travel")
+          new PCLTravelGeotagDocumentEvaluator(strategy, stratname)
+        else
+          new ArticleGeotagDocumentEvaluator(strategy, stratname)
+      new DefaultEvaluationOutputter(stratname, evaluator)
     })
   }
 
@@ -3445,11 +3466,13 @@ object GeolocateDriver {
         }
       })
     process_strategies(strats)((stratname, strategy) => {
-      // Generate reader object
-      if (Opts.eval_format == "tr-conll")
-        new TRCoNLLGeotagToponymEvaluator(strategy, stratname)
-      else
-        new ArticleGeotagToponymEvaluator(strategy, stratname)
+      val evaluator =
+        // Generate reader object
+        if (Opts.eval_format == "tr-conll")
+          new TRCoNLLGeotagToponymEvaluator(strategy, stratname)
+        else
+          new ArticleGeotagToponymEvaluator(strategy, stratname)
+      new DefaultEvaluationOutputter(stratname, evaluator)
     })
   }
 
