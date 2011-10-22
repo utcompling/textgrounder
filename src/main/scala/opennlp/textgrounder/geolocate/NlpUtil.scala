@@ -30,109 +30,13 @@ import java.io.{Console=>_,_}
 import java.util.Date
 import java.text.DateFormat
 
-// from __future__ import with_statement // For chompopen(), openr()
-// from optparse import OptionParser
-// from itertools import *
-// import itertools
-// import re // For regexp wrappers
-// import sys, codecs // For openr()
-// import math // For float_with_commas()
 // import bisect // For sorted lists
-// import time // For status messages, resource usage
 // from heapq import * // For priority queue
-// import UserDict // For SortedList, LRUCache
 // import resource // For resource usage
 // from collections import deque // For breadth-first search
-// from subprocess import * // For backquote
-// from errno import * // For backquote
-// import fileinput // For openr() etc.
 
 object NlpUtil {
 
-  /**
-    * Return floating-point value, number of seconds since the Epoch
-    **/
-  def curtimesecs() = System.currentTimeMillis()/1000.0
-
-  def curtimehuman() = (new Date()) toString
-
-  def humandate_full(sectime: Double) =
-    (new Date((sectime*1000).toLong)) toString
-  def humandate_time(sectime: Double) =
-    DateFormat.getTimeInstance().format((sectime*1000).toLong)
-
-  // This stuff sucks.  Need to create new Print streams to get the expected
-  // UTF-8 output, since the existing System.out/System.err streams don't do it!
-  val stdout_stream = new PrintStream(System.out, true, "UTF-8") 
-  val stderr_stream = new PrintStream(System.err, true, "UTF-8") 
-  import java.lang.management._
-  def getpid() = ManagementFactory.getRuntimeMXBean().getName().split("@")(0)
-  /*
-    A simple object to make regexps a bit less awkward.  Works like this:
-
-    ("foo (.*)", "foo bar") match {
-      case Re(x) => println("matched 1 %s" format x)
-      case _ => println("no match 1")
-    }
-
-    This will print out "matched 1 bar".
-   */
-
-  object Re {
-    def unapplySeq(x: Tuple2[String, String]) = {
-      val (re, str) = x
-      re.r.unapplySeq(str)
-    }
-  }
-    
-  //////////////////////////////////////////////////////////////////////////////
-  //                        Regular expression functions                      //
-  //////////////////////////////////////////////////////////////////////////////
-//  
-//  
-//  ///// Some simple wrappers around basic text-processing Python functions to
-//  ///// make them easier to use.
-//  /////
-//  ///// 1. rematch() and research():
-//  /////
-//  ///// The functions 'rematch' and 'research' are wrappers around re.match()
-//  ///// and re.search(), respectively, but instead of returning a match object
-//  ///// None, they return true or false, and in the case a match object would
-//  ///// have been returned, a corresponding WreMatch object is stored in the
-//  ///// global variable m_.  Groups can be accessed from this variable using
-//  ///// m_.group() or m_.groups(), but they can also be accessed through direct
-//  ///// subscripting, i.e. m_[###] = m_.group(###).
-//
-//  class WreMatch(object):
-//    def setmatch(self, match):
-//      self.match = match
-//  
-//    def groups(self, *foo):
-//      return self.match.groups(*foo)
-//  
-//    def group(self, *foo):
-//      return self.match.group(*foo)
-//  
-//    def __getitem__(self, key):
-//      return self.match.group(key)
-//  
-//  m_ = WreMatch()
-//  
-//  def rematch(pattern, string, flags=0):
-//    m = re.match(pattern, string, flags)
-//    if m:
-//      m_.setmatch(m)
-//      return true
-//    return false
-//  
-//  def research(pattern, string, flags=0):
-//    global m_
-//    m = re.search(pattern, string, flags)
-//    if m:
-//      m_.setmatch(m)
-//      return true
-//    return false
-//
   //////////////////////////////////////////////////////////////////////////////
   //                            File reading functions                        //
   //////////////////////////////////////////////////////////////////////////////
@@ -322,70 +226,15 @@ object NlpUtil {
     }
   }
 
-//  //////////////////////////////////////////////////////////////////////////////
-//  //                         Other basic utility functions                    //
-//  //////////////////////////////////////////////////////////////////////////////
-//  /**
-//   Intern a string (for more efficient memory use, potentially faster lookup.
-//  If string is Unicode, automatically convert to UTF-8.
-//   */
-//  def internasc(text):
-//    if type(text) is unicode: text = text.encode("utf-8")
-//    return intern(text)
-//  
-//  /**
-//   Print text string using 'print', converting Unicode as necessary.
-//  If string is Unicode, automatically convert to UTF-8, so it can be output
-//  without errors.  Send output to the file given in OUTFILE (default is
-//  stdout).  Uses the 'print' command, and normally outputs a newline; but
-//  this can be suppressed using NONL.  Output is not normally flushed (unless
-//  the stream does this automatically); but this can be forced using FLUSH.
-//   */
-//  def uniprint(text, outfile=sys.stdout, nonl=false, flush=false):
-//    
-//    if type(text) is unicode:
-//      text = text.encode("utf-8")
-//    if nonl:
-//      print >>outfile, text,
-//    else:
-//      print >>outfile, text
-//    if flush:
-//      outfile.flush()
-//  
-//  /**
-//   Output text string, converting Unicode as necessary.
-//  If string is Unicode, automatically convert to UTF-8, so it can be output
-//  without errors.  Send output to the file given in OUTFILE (default is
-//  stdout).  Uses the write() function, which outputs the text directly,
-//  without adding spaces or newlines.  Output is not normally flushed (unless
-//  the stream does this automatically); but this can be forced using FLUSH.
-//   */
-//  def uniout(text, outfile=sys.stdout, flush=false):
-//    
-//    if type(text) is unicode:
-//      text = text.encode("utf-8")
-//    outfile.write(text)
-//    if flush:
-//      outfile.flush()
-//  
-//  /**
-//   Print text to stderr using 'print', converting Unicode as necessary.
-//  If string is Unicode, automatically convert to UTF-8, so it can be output
-//  without errors.  Uses the 'print' command, and normally outputs a newline; but
-//  this can be suppressed using NONL.
-//   */
-//  def errprint(text, nonl=false):
-//    uniprint(text, outfile=sys.stderr, nonl=nonl)
-//  
-//  /**
-//   Output text to stderr, converting Unicode as necessary.
-//  If string is Unicode, automatically convert to UTF-8, so it can be output
-//  without errors.  Uses the write() function, which outputs the text directly,
-//  without adding spaces or newlines.
-//   */
-//  def errout(text):
-//    uniout(text, outfile=sys.stderr)
-// 
+  ////////////////////////////////////////////////////////////////////////////
+  //                            Text output functions                       //
+  ////////////////////////////////////////////////////////////////////////////
+
+  // This stuff sucks.  Need to create new Print streams to get the expected
+  // UTF-8 output, since the existing System.out/System.err streams don't do it!
+  val stdout_stream = new PrintStream(System.out, true, "UTF-8") 
+  val stderr_stream = new PrintStream(System.err, true, "UTF-8") 
+
   /**
     Set Java System.out and System.err, and Scala Console.out and Console.err,
     so that they convert text to UTF-8 upon output (rather than e.g. MacRoman,
@@ -394,8 +243,8 @@ object NlpUtil {
   def set_stdout_stderr_utf_8() {
     // Fuck me to hell, have to fix things up in a non-obvious way to
     // get UTF-8 output on the Mac (default is MacRoman???).
-    System.setOut(new PrintStream(System.out, true, "UTF-8"))
-    System.setErr(new PrintStream(System.err, true, "UTF-8"))
+    System.setOut(stdout_stream)
+    System.setErr(stderr_stream)
     Console.setOut(System.out)
     Console.setErr(System.err)
   }
@@ -441,6 +290,10 @@ object NlpUtil {
     errprint("Debug: " + format, args: _*)
   }
   
+  ////////////////////////////////////////////////////////////////////////////
+  //                    String functions involving numbers                  //
+  ////////////////////////////////////////////////////////////////////////////
+
   /**
    Convert a string to floating point, but don't crash on errors;
   instead, output a warning.
@@ -456,36 +309,9 @@ object NlpUtil {
       }
     }
   }
-  
-  /**
-   Pluralize an English word, using a basic but effective algorithm.
-   */
-  def pluralize(word: String) = {
-    val upper = word.last >= 'A' && word.last <= 'Z'
-    val lowerword = word.toLowerCase()
-    val ies_re = """.*[b-df-hj-np-tv-z]y$""".r
-    val es_re = """.*([cs]h|[sx])$""".r
-    lowerword match {
-      case ies_re() =>
-        if (upper) word.dropRight(1) + "IES"
-        else word.dropRight(1) + "ies"
-      case es_re() =>
-        if (upper) word + "ES"
-        else word + "es"
-      case _ =>
-        if (upper) word + "S"
-        else word + "s"
-    }
-  }
 
-  /**
-   Capitalize the first letter of string, leaving the remainder alone.
-   */
-  def capfirst(st: String) = {
-    if (st == "") st else st(0).toString.capitalize + st.drop(1)
-  }
-  
-  // From: http://stackoverflow.com/questions/1823058/how-to-print-number-with-commas-as-thousands-separators-in-python-2-x
+  // Originally based on code from:
+  // http://stackoverflow.com/questions/1823058/how-to-print-number-with-commas-as-thousands-separators-in-python-2-x
   def long_with_commas(x: Long): String = {
     var mx = x
     if (mx < 0)
@@ -518,27 +344,26 @@ object NlpUtil {
     formatstr format x
   }
 
-  /**
-   *  Return the median value of a list.  List will be sorted, so this is O(n).
-   */
-  def median(list: Seq[Double]) = {
-    val sorted = list.sorted
-    val len = sorted.length
-    if (len % 2 == 1)
-      sorted(len / 2)
-    else {
-      val midp = len / 2
-      0.5*(sorted(midp-1) + sorted(midp))
-    }
+  def format_minutes_seconds(seconds: Double) = {
+    var secs = seconds
+    var mins = (secs / 60).toInt
+    secs = secs % 60
+    val hours = (mins / 60).toInt
+    mins = mins % 60
+    var hourstr = (
+      if (hours > 0) "%s hour%s " format (hours, if (hours == 1) "" else "s")
+      else "")
+    val secstr = (if (secs.toInt == secs) "%s" else "%1.1f") format secs
+    "%s%s minute%s %s second%s" format (
+        hourstr,
+        mins, if (mins == 1) "" else "s",
+        secstr, if (secs == 1) "" else "s")
   }
   
-  /**
-   *  Return the mean of a list.
-   */
-  def mean(list: Seq[Double]) = {
-    list.sum / list.length
-  }
-  
+  ////////////////////////////////////////////////////////////////////////////
+  //                           Other string functions                       //
+  ////////////////////////////////////////////////////////////////////////////
+
   // A function to make up for a missing feature in Scala.  Split a text
   // into segments but also return the delimiters.  Regex matches the
   // delimiters.  Return a list of tuples (TEXT, DELIM).  The last tuple
@@ -599,14 +424,56 @@ object NlpUtil {
     ) reduce (_ ++ _) filter (_ != "")
   }
  
-  def fromto(from: Int, too: Int) = {
-    if (from <= too) (from to too)
-    else (too to from)
+  
+  /**
+   Pluralize an English word, using a basic but effective algorithm.
+   */
+  def pluralize(word: String) = {
+    val upper = word.last >= 'A' && word.last <= 'Z'
+    val lowerword = word.toLowerCase()
+    val ies_re = """.*[b-df-hj-np-tv-z]y$""".r
+    val es_re = """.*([cs]h|[sx])$""".r
+    lowerword match {
+      case ies_re() =>
+        if (upper) word.dropRight(1) + "IES"
+        else word.dropRight(1) + "ies"
+      case es_re() =>
+        if (upper) word + "ES"
+        else word + "es"
+      case _ =>
+        if (upper) word + "S"
+        else word + "s"
+    }
   }
 
-  //////////////////////////////////////////////////////////////////////////////
-  //                             Default dictionaries                         //
-  //////////////////////////////////////////////////////////////////////////////
+  /**
+   Capitalize the first letter of string, leaving the remainder alone.
+   */
+  def capfirst(st: String) = {
+    if (st == "") st else st(0).toString.capitalize + st.drop(1)
+  }
+  
+  /*
+    A simple object to make regexps a bit less awkward.  Works like this:
+
+    ("foo (.*)", "foo bar") match {
+      case Re(x) => println("matched 1 %s" format x)
+      case _ => println("no match 1")
+    }
+
+    This will print out "matched 1 bar".
+   */
+
+  object Re {
+    def unapplySeq(x: Tuple2[String, String]) = {
+      val (re, str) = x
+      re.r.unapplySeq(str)
+    }
+  }
+    
+  ////////////////////////////////////////////////////////////////////////////
+  //                          Default dictionaries                          //
+  ////////////////////////////////////////////////////////////////////////////
   
   // Another way to do this, using subclassing.
   //
@@ -638,6 +505,30 @@ object NlpUtil {
   // This is necessary when the value is something mutable, but probably a
   // bad idea otherwise, since looking up a nonexistent value in the table
   // will cause a later "contains" call to return true on the value.
+  //
+  // For example:
+  //
+  // val foo = defaultmap[String,Int](0, setkey = false)
+  // foo("bar")              -> 0
+  // foo contains "bar"      -> false
+  //
+  // val foo = defaultmap[String,Int](0, setkey = true)
+  // foo("bar")              -> 0
+  // foo contains "bar"      -> true         (Probably not what we want)
+  //                
+  //
+  // val foo = defaultmap[String,mutable.Buffer[String]](mutable.Buffer(), setkey = false)
+  // foo("myfoods") += "spam"
+  // foo("myfoods") += "eggs"
+  // foo("myfoods") += "milk"
+  // foo("myfoods")             -> ArrayBuffer(milk)                (OOOOOPS)
+  //
+  // val foo = defaultmap[String,mutable.Buffer[String]](mutable.Buffer(), setkey = true)
+  // foo("myfoods") += "spam"
+  // foo("myfoods") += "eggs"
+  // foo("myfoods") += "milk"
+  // foo("myfoods")             -> ArrayBuffer(spam, eggs, milk)    (Good)
+  //
   def defaultmap[F,T](defaultval: => T, setkey: Boolean = false) = {
     new mutable.HashMap[F,T] {
       override def default(key: F) = {
@@ -671,61 +562,10 @@ object NlpUtil {
   def bufmap[T,U]() =
     defaultmap[T,mutable.Buffer[U]](mutable.Buffer[U](), setkey=true)
   
-  // ORIGINAL: ---------------------------------------
-
-  // Our own version similar to collections.defaultdict().  The difference is
-  // that we can specify whether or not simply referencing an unseen key
-  // automatically causes the key to permanently spring into existence with
-  // the "missing" value.  collections.defaultdict() always behaves as if
-  // 'add_upon_ref'=true, same as our default.  Basically:
-  //
-  // foo = defdict(list, add_upon_ref=false)
-  // foo["bar"]          -> []
-  // "bar" in foo        -> false
-  //
-  // foo = defdict(list, add_upon_ref=true)
-  // foo["bar"]          -> []
-  // "bar" in foo        -> true
-  //
-  // The former may be useful where you may make many queries involving
-  // non-existent keys, and you don't want all these keys added to the dict.
-  // The latter is useful with mutable objects like lists.  If I create
-  //
-  //   foo = defdict(list, add_upon_ref=false)
-  //
-  // and then call
-  //
-  //   foo["glorplebargle"].append("shazbat")
-  //
-  // where "glorplebargle" is a previously non-existent key, the call to
-  // 'append' will "appear" to work but in fact nothing will happen, because
-  // the reference foo["glorplebargle"] will create a new list and return
-  // it, but not store it in the dict, and 'append' will add to this
-  // temporary list, which will soon disappear.  Note that using += will
-  // actually work, but this is fragile behavior, not something to depend on.
-  //
-
-//  class defdict(dict):
-//    def __init__(self, factory, add_upon_ref=true):
-//      super(defdict, self).__init__()
-//      self.factory = factory
-//      self.add_upon_ref = add_upon_ref
-//  
-//    def __missing__(self, key):
-//      val = self.factory()
-//      if self.add_upon_ref:
-//        self[key] = val
-//      return val
-//
-//  def dictdict():
-//    return defdict(dict, add_upon_ref=true)
-//  
-//  def tupledict():
-//    return defdict(tuple, add_upon_ref=false)
-//  
-//  def setdict():
-//    return defdict(set, add_upon_ref=true)
- 
+  /////////////////////////////////////////////////////////////////////////////
+  //                              Dynamic arrays                             //
+  /////////////////////////////////////////////////////////////////////////////
+  
   /**
    A simple class like ArrayBuilder but which gets you direct access
    to the underlying array and lets you easily reset things, so that you
@@ -756,9 +596,9 @@ object NlpUtil {
     }
   }
     
-  //////////////////////////////////////////////////////////////////////////////
-  //                                 Sorted lists                             //
-  //////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
+  //                                Sorted lists                             //
+  /////////////////////////////////////////////////////////////////////////////
   
   // Return a tuple (keys, values) of lists of items corresponding to a hash
   // table.  Stored in sorted order according to the keys.  Use
@@ -822,26 +662,10 @@ object NlpUtil {
 //      for (key, value) in izip(keys, values):
 //        yield (key, value)
 //
-  //////////////////////////////////////////////////////////////////////////////
-  //                                Table Output                              //
-  //////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
+  //                              Table Output                              //
+  ////////////////////////////////////////////////////////////////////////////
 
-//  def key_sorted_items(d) {
-//    return sorted(d.iteritems(), key=x => x[0])
-//  }
-//  
-//  def value_sorted_items(d) {
-//    return sorted(d.iteritems(), key=x => x[1])
-//  }
-//  
-//  def reverse_key_sorted_items(d) {
-//    return sorted(d.iteritems(), key=x => x[0], reverse=true)
-//  }
-//  
-//  def reverse_value_sorted_items(d) {
-//    return sorted(d.iteritems(), key=x => x[1], reverse=true)
-//  }
-//  
   // Given a list of tuples, where the second element of the tuple is a number and
   // the first a key, output the list, sorted on the numbers from bigger to
   // smaller.  Within a given number, sort the items alphabetically, unless
@@ -984,9 +808,9 @@ object NlpUtil {
     }
   }
 
-  //////////////////////////////////////////////////////////////////////////////
-  //                               File Splitting                             //
-  //////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
+  //                             File Splitting                             //
+  ////////////////////////////////////////////////////////////////////////////
 
   // Return the next file to output to, when the instances being output to the
   // files are meant to be split according to SPLIT_FRACTIONS.  The absolute
@@ -1082,9 +906,9 @@ object NlpUtil {
 //      self.add_task(priority, task, entry[1])
 //      entry[1] = PriorityQueue.INVALID
 //
-  //////////////////////////////////////////////////////////////////////////////
-  //                      Least-recently-used (LRU) Caches                    //
-  //////////////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////////////
+  //                    Least-recently-used (LRU) Caches                   //
+  ///////////////////////////////////////////////////////////////////////////
 
   class LRUCache[T,U](maxsize: Int=1000) extends mutable.Map[T,U]
     with mutable.MapLike[T,U,LRUCache[T,U]] {
@@ -1151,10 +975,24 @@ object NlpUtil {
         }
   }
 
-  //////////////////////////////////////////////////////////////////////////////
-  //                               Resource Usage                             //
-  //////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
+  //                             Resource Usage                             //
+  ////////////////////////////////////////////////////////////////////////////
 
+  /**
+    * Return floating-point value, number of seconds since the Epoch
+    **/
+  def curtimesecs() = System.currentTimeMillis()/1000.0
+
+  def curtimehuman() = (new Date()) toString
+
+  def humandate_full(sectime: Double) =
+    (new Date((sectime*1000).toLong)) toString
+  def humandate_time(sectime: Double) =
+    DateFormat.getTimeInstance().format((sectime*1000).toLong)
+
+  import java.lang.management._
+  def getpid() = ManagementFactory.getRuntimeMXBean().getName().split("@")(0)
   val beginning_prog_time = curtimesecs()
   
   def get_program_time_usage() = curtimesecs() - beginning_prog_time
@@ -1243,22 +1081,6 @@ object NlpUtil {
     return -1L
   }
   
-  def format_minutes_seconds(seconds: Double) = {
-    var secs = seconds
-    var mins = (secs / 60).toInt
-    secs = secs % 60
-    val hours = (mins / 60).toInt
-    mins = mins % 60
-    var hourstr = (
-      if (hours > 0) "%s hour%s " format (hours, if (hours == 1) "" else "s")
-      else "")
-    val secstr = (if (secs.toInt == secs) "%s" else "%1.1f") format secs
-    "%s%s minute%s %s second%s" format (
-        hourstr,
-        mins, if (mins == 1) "" else "s",
-        secstr, if (secs == 1) "" else "s")
-  }
-  
   def output_memory_usage(virtual: Boolean = false) {
     for (method <- List("auto", "java", "proc", "ps", "rusage")) {
       val (meth, mem) =
@@ -1292,9 +1114,9 @@ object NlpUtil {
       System.gc()
   }
 
-  //////////////////////////////////////////////////////////////////////////////
-  //                             Hash tables by range                         //
-  //////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
+  //                           Hash tables by range                         //
+  ////////////////////////////////////////////////////////////////////////////
 
   // A table that groups all keys in a specific range together.  Instead of
   // directly storing the values for a group of keys, we store an object (termed a
@@ -1434,10 +1256,37 @@ object NlpUtil {
 //        yield node
 //      nodelist.extend(children(node))
 //
-//  //////////////////////////////////////////////////////////////////////////////
-//  //                               Merge sequences                            //
-//  //////////////////////////////////////////////////////////////////////////////
-//
+
+ /////////////////////////////////////////////////////////////////////////////
+ //                        Misc. list/iterator functions                    //
+ /////////////////////////////////////////////////////////////////////////////
+
+  /**
+   *  Return the median value of a list.  List will be sorted, so this is O(n).
+   */
+  def median(list: Seq[Double]) = {
+    val sorted = list.sorted
+    val len = sorted.length
+    if (len % 2 == 1)
+      sorted(len / 2)
+    else {
+      val midp = len / 2
+      0.5*(sorted(midp-1) + sorted(midp))
+    }
+  }
+  
+  /**
+   *  Return the mean of a list.
+   */
+  def mean(list: Seq[Double]) = {
+    list.sum / list.length
+  }
+  
+  def fromto(from: Int, too: Int) = {
+    if (from <= too) (from to too)
+    else (too to from)
+  }
+
 //  // Return an iterator over all elements in all the given sequences, omitting
 //  // elements seen more than once and keeping the order.
 //  def merge_sequences_uniquely(*seqs):
@@ -1449,18 +1298,54 @@ object NlpUtil {
 //          yield s
 //
 //  
-//  //////////////////////////////////////////////////////////////////////////////
-//  //                                Subprocesses                              //
-//  //////////////////////////////////////////////////////////////////////////////
-//
-//  // Run the specified command; return its combined output and stderr as a string.
-//  // 'command' can either be a string or a list of individual arguments.  Optional
-//  // argument 'shell' indicates whether to pass the command to the shell to run.
-//  // If unspecified, it defaults to true if 'command' is a string, false if a
-//  // list.  If optional arg 'input' is given, pass this string as the stdin to the
-//  // command.  If 'include_stderr' is true, stderr will be included along with
-//  // the output.  If return code is non-zero, throw CommandError if 'throw' is
-//  // specified; else, return tuple of (output, return-code).
+  ////////////////////////////////////////////////////////////////////////////
+  //                               Subprocesses                             //
+  ////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Run a subprocess and capture its output.  Arguments given are those
+   * that will be passed to the subprocess.
+   */
+
+  def capture_subprocess_output(args: String*) = {
+    val output = new StringBuilder()
+    val proc = new ProcessBuilder(args: _*).start()
+    val in = proc.getInputStream()
+    val br = new BufferedReader(new InputStreamReader(in))
+    val cbuf = new Array[Char](100)
+    var numread = 0
+    /* SCALABUG: The following compiles but will give incorrect results because
+       the result of an assignment is Unit! (You do get a warning but ...)
+     
+     while ((numread = br.read(cbuf, 0, cbuf.length)) != -1)
+       output.appendAll(cbuf, 0, numread)
+
+     */
+    numread = br.read(cbuf, 0, cbuf.length)
+    while (numread != -1) {
+      output.appendAll(cbuf, 0, numread)
+      numread = br.read(cbuf, 0, cbuf.length)
+    }
+    proc.waitFor()
+    in.close()
+    output.toString
+  }
+
+  // The original Python implementation, which had more functionality:
+
+  /*
+    Run the specified command; return its output (usually, the combined
+    stdout and stderr output) as a string.  'command' can either be a
+    string or a list of individual arguments.  Optional argument 'shell'
+    indicates whether to pass the command to the shell to run.  If
+    unspecified, it defaults to true if 'command' is a string, false if
+    a list.  If optional arg 'input' is given, pass this string as the
+    stdin to the command.  If 'include_stderr' is true (the default),
+    stderr will be included along with the output.  If return code is
+    non-zero, throw CommandError if 'throw' is specified; else, return
+    tuple of (output, return-code).
+  */
+
 //  def backquote(command, input=None, shell=None, include_stderr=true, throw=true):
 //    //logdebug("backquote called: %s" % command)
 //    if shell is None:
@@ -1499,324 +1384,9 @@ object NlpUtil {
 //    e.errno = err
 //    raise e
 
-  def capture_subprocess_output(args: String*) = {
-    val output = new StringBuilder()
-    val proc = new ProcessBuilder(args: _*).start()
-    val in = proc.getInputStream()
-    val br = new BufferedReader(new InputStreamReader(in))
-    val cbuf = new Array[Char](100)
-    var numread = 0
-    /* SCALABUG: The following compiles but will give incorrect results because
-       the result of an assignment is Unit! (You do get a warning but ...)
-     
-     while ((numread = br.read(cbuf, 0, cbuf.length)) != -1)
-       output.appendAll(cbuf, 0, numread)
-
-     */
-    numread = br.read(cbuf, 0, cbuf.length)
-    while (numread != -1) {
-      output.appendAll(cbuf, 0, numread)
-      numread = br.read(cbuf, 0, cbuf.length)
-    }
-    proc.waitFor()
-    in.close()
-    output.toString
-  }
-//
-//  //////////////////////////////////////////////////////////////////////////////
-//  //                              Generating XML                              //
-//  //////////////////////////////////////////////////////////////////////////////
-//
-//  // This is old code I wrote originally for ccg.ply (the ccg2xml converter),
-//  // for generating XML.  It doesn't use the functions in xml.dom.minidom,
-//  // which in any case are significantly more cumbersome than the list/tuple-based
-//  // structure used below.
-//  
-//  // --------- XML ----------
-//  //
-//  // Thankfully, the structure of XML is extremely simple.  We represent
-//  // a single XML statement of the form
-//  //
-//  // <biteme foo="1" blorp="baz">
-//  //   <bitemetoo ...>
-//  //     ...
-//  //   gurgle
-//  // </biteme>
-//  //
-//  // as a list
-//  //
-//  // ["biteme", [("foo", "1"), ("blorp", "baz")],
-//  //    ["bitemetoo", ...],
-//  //    "gurgle"
-//  // ]
-//  //
-//  // i.e. an XML statement corresponds to a list where the first element
-//  // is the statement name, the second element lists any properties, and
-//  // the remaining elements list items inside the statement.
-//  //
-//  // ----------- Property lists -------------
-//  //
-//  // The second element of an XML statement in list form is a "property list",
-//  // a list of two-element tuples (property and value).  Some functions below
-//  // (e.g. `getprop', `putprop') manipulate property lists.
-//  //
-//  // FIXME: Just use a hash table.
-//  
-//  def check_arg_type(errtype, arg, ty):
-//    if type(arg) is not ty:
-//      raise TypeError("%s: Type is not %s: %s" % (errtype, ty, arg))
-//  
-//  def xml_sub(text):
-//    if not isinstance(text, basestring):
-//      text = text.__str__()
-//    if type(text) is unicode:
-//      text = text.encode("utf-8")
-//    text = text.replace("&", "&amp;")
-//    text = text.replace("<", "&lt;")
-//    text = text.replace(">", "&gt;")
-//    return text
-//  
-//  def print_xml_1(file, xml, indent=0):
-//    //if xml_debug > 1:
-//    //  errout("%sPrinting: %s\n" % (" " * indent, str(xml)))
-//    if type(xml) is not list:
-//      file.write("%s%s\n" % (" " * indent, xml_sub(xml)))
-//    else:
-//      check_arg_type("XML statement", xml[0], str)
-//      file.write(" " * indent)
-//      file.write("<%s" % xml_sub(xml[0]))
-//      for x in xml[1]:
-//        check_arg_type("XML statement", x, tuple)
-//        if len(x) != 2:
-//          raise TypeError("Bad tuple pair: " + str(x))
-//        file.write(" %s=\"%s\"" % (xml_sub(x[0]), xml_sub(x[1])))
-//      subargs = xml[2:]
-//      if len(subargs) == 1 and type(subargs[0]) is not list:
-//        file.write(">%s</%s>\n" % (xml_sub(subargs[0]), xml_sub(xml[0])))
-//      elif not subargs:
-//        file.write("/>\n")
-//      else:
-//        file.write(">\n")
-//        for x in subargs:
-//          print_xml_1(file, x, indent + 2)
-//        file.write(" " * indent)
-//        file.write("</%s>\n" % xml_sub(xml[0]))
-//  
-//  // Pretty-print a section of XML, in the format above, to FILE.
-//  // Start at indent INDENT.
-//  
-//  def print_xml(file, xml):
-//    print_xml_1(file, xml)
-//  
-//  // Function to output a particular XML file
-//  def output_xml_file(filename, xml):
-//    fil = open(filename, "w")
-//    fil.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-//    print_xml(fil, xml)
-//    fil.close()
-//  
-//  // Return true if PROP is seen as a property in PROPLIST, a list of tuples
-//  // of (prop, value)
-//  def property_specified(prop, proplist):
-//    return not not ["foo" for (x,y) in proplist if x == prop]
-//  
-//  // Return value of property PROP in PROPLIST; signal an error if not found.
-//  def getprop(prop, proplist):
-//    for (x,y) in proplist:
-//      if x == prop:
-//        return y
-//    raise ValueError("Property %s not found in %s" % (prop, proplist))
-//  
-//  // Return value of property PROP in PROPLIST, or DEFAULT.
-//  def getoptprop(prop, proplist, default=None):
-//    for (x,y) in proplist:
-//      if x == prop:
-//        return y
-//    return default
-//  
-//  // Replace value of property PROP with VALUE in PROPLIST.
-//  def putprop(prop, value, proplist):
-//    for i in xrange(len(proplist)):
-//      if proplist[i][0] == prop:
-//        proplist[i] = (prop, value)
-//        return
-//    else:
-//      proplist += [(prop, value)]
-//      
-//  // Replace property named PROP with NEW in PROPLIST.  Often this is called with
-//  // with PROP equal to None; the None occurs when a PROP=VALUE clause is expected
-//  // but a bare value is supplied.  The context will supply a particular default
-//  // property (e.g. 'name') to be used when the property name is omitted, but the
-//  // generic code to handle property-value clauses doesn't know what this is.
-//  // The surrounding code calls property_name_replace() to fill in the proper name.
-//  
-//  def property_name_replace(prop, new, proplist):
-//    for i in xrange(len(proplist)):
-//      if proplist[i][0] == prop:
-//        proplist[i] = (new, proplist[i][1])
-//  
-//
-//  //////////////////////////////////////////////////////////////////////////////
-//  //                 Extra functions for working with sequences               //
-//  //                   Part of the Python docs for itertools                  //
-//  //////////////////////////////////////////////////////////////////////////////
-//
-//  def take(n, iterable):
-//      '''Return first n items of the iterable as a list'''
-//      return list(islice(iterable, n))
-//  
-//  def tabulate(function, start=0):
-//      '''Return function(0), function(1), ...'''
-//      return imap(function, count(start))
-//  
-//  def consume(iterator, n):
-//      '''Advance the iterator n-steps ahead. If n is none, consume entirely.'''
-//      // Use functions that consume iterators at C speed.
-//      if n is None:
-//          // feed the entire iterator into a zero-length deque
-//          collections.deque(iterator, maxlen=0)
-//      else:
-//          // advance to the empty slice starting at position n
-//          next(islice(iterator, n, n), None)
-//  
-//  def nth(iterable, n, default=None):
-//      '''Returns the nth item or a default value'''
-//      return next(islice(iterable, n, None), default)
-//  
-//  def quantify(iterable, pred=bool):
-//      '''Count how many times the predicate is true'''
-//      return sum(imap(pred, iterable))
-//  
-//  def padnone(iterable):
-//      '''Returns the sequence elements and then returns None indefinitely.
-//  
-//      Useful for emulating the behavior of the built-in map() function.
-//      '''
-//      return chain(iterable, repeat(None))
-//  
-//  def ncycles(iterable, n):
-//      '''Returns the sequence elements n times'''
-//      return chain.from_iterable(repeat(tuple(iterable), n))
-//  
-//  def dotproduct(vec1, vec2):
-//      return sum(imap(operator.mul, vec1, vec2))
-//  
-//  def flatten(listOfLists):
-//      '''Flatten one level of nesting'''
-//      return chain.from_iterable(listOfLists)
-//  
-//  def repeatfunc(func, times=None, *args):
-//      '''Repeat calls to func with specified arguments.
-//  
-//      Example:  repeatfunc(random.random)
-//      '''
-//      if times is None:
-//          return starmap(func, repeat(args))
-//      return starmap(func, repeat(args, times))
-//  
-//  def pairwise(iterable):
-//      '''s -> (s0,s1), (s1,s2), (s2, s3), ...'''
-//      a, b = tee(iterable)
-//      next(b, None)
-//      return izip(a, b)
-//  
-//  def grouper(n, iterable, fillvalue=None):
-//      '''grouper(3, "ABCDEFG", "x") --> ABC DEF Gxx'''
-//      args = [iter(iterable)] * n
-//      return izip_longest(fillvalue=fillvalue, *args)
-//  
-//  def roundrobin(*iterables):
-//      '''roundrobin("ABC", "D", "EF") --> A D E B F C'''
-//      // Recipe credited to George Sakkis
-//      pending = len(iterables)
-//      nexts = cycle(iter(it).next for it in iterables)
-//      while pending:
-//          try:
-//              for next in nexts:
-//                  yield next()
-//          except StopIteration:
-//              pending -= 1
-//              nexts = cycle(islice(nexts, pending))
-//  
-//  def powerset(iterable):
-//      '''powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)'''
-//      s = list(iterable)
-//      return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
-//  
-//  def unique_everseen(iterable, key=None):
-//      '''List unique elements, preserving order. Remember all elements ever seen.'''
-//      // unique_everseen("AAAABBBCCDAABBB") --> A B C D
-//      // unique_everseen("ABBCcAD", str.lower) --> A B C D
-//      seen = set()
-//      seen_add = seen.add
-//      if key is None:
-//          for element in ifilterfalse(seen.__contains__, iterable):
-//              seen_add(element)
-//              yield element
-//      else:
-//          for element in iterable:
-//              k = key(element)
-//              if k not in seen:
-//                  seen_add(k)
-//                  yield element
-//  
-//  def unique_justseen(iterable, key=None):
-//      '''List unique elements, preserving order. Remember only the element just seen.'''
-//      // unique_justseen("AAAABBBCCDAABBB") --> A B C D A B
-//      // unique_justseen("ABBCcAD", str.lower) --> A B C A D
-//      return imap(next, imap(itemgetter(1), groupby(iterable, key)))
-//  
-//  def iter_except(func, exception, first=None):
-//      ''' Call a function repeatedly until an exception is raised.
-//  
-//      Converts a call-until-exception interface to an iterator interface.
-//      Like __builtin__.iter(func, sentinel) but uses an exception instead
-//      of a sentinel to end the loop.
-//  
-//      Examples:
-//          bsddbiter = iter_except(db.next, bsddb.error, db.first)
-//          heapiter = iter_except(functools.partial(heappop, h), IndexError)
-//          dictiter = iter_except(d.popitem, KeyError)
-//          dequeiter = iter_except(d.popleft, IndexError)
-//          queueiter = iter_except(q.get_nowait, Queue.Empty)
-//          setiter = iter_except(s.pop, KeyError)
-//  
-//      '''
-//      try:
-//          if first is not None:
-//              yield first()
-//          while 1:
-//              yield func()
-//      except exception:
-//          pass
-//  
-//  def random_product(*args, **kwds):
-//      '''Random selection from itertools.product(*args, **kwds)'''
-//      pools = map(tuple, args) * kwds.get("repeat", 1)
-//      return tuple(random.choice(pool) for pool in pools)
-//  
-//  def random_permutation(iterable, r=None):
-//      '''Random selection from itertools.permutations(iterable, r)'''
-//      pool = tuple(iterable)
-//      r = len(pool) if r is None else r
-//      return tuple(random.sample(pool, r))
-//  
-//  def random_combination(iterable, r):
-//      '''Random selection from itertools.combinations(iterable, r)'''
-//      pool = tuple(iterable)
-//      n = len(pool)
-//      indices = sorted(random.sample(xrange(n), r))
-//      return tuple(pool[i] for i in indices)
-//  
-//  def random_combination_with_replacement(iterable, r):
-//      '''Random selection from itertools.combinations_with_replacement(iterable, r)'''
-//      pool = tuple(iterable)
-//      n = len(pool)
-//      indices = sorted(random.randrange(n) for i in xrange(r))
-//      return tuple(pool[i] for i in indices)
-//
 }
 
+/* For testing the output_memory_usage() function. */
 object TestMemUsage extends App {
   NlpUtil.output_memory_usage()
 }
