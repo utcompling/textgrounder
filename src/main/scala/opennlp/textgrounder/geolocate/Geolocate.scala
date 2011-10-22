@@ -92,7 +92,7 @@ It operates in four basic modes (specified by --mode):
    valid toponyms.  Evaluation is either on the geographic names in a
    TR-CONLL corpus or links extracted from a Wikipedia article.
 
-3. KML generation.  This generates per-word region distributions of the
+3. KML generation.  This generates per-word cell distributions of the
    sort used in the ACP strategy (--strategy=average-cell-probability),
    then outputs KML files for given words showing the distribution of
    the words across the Earth.
@@ -167,10 +167,10 @@ the Wikipedia corpus, using KL divergence as a strategy, with a grid size
 of 1 degrees.  Options you may find useful (which also apply to
 `textgrounder geolocate` and all front ends):
 
-`--degrees-per-region NUM`
-`--dpr NUM`
+`--degrees-per-cell NUM`
+`--dpc NUM`
 
-Set the size of a region in degrees, which can be a fractional value.
+Set the size of a cell in degrees, which can be a fractional value.
 
 `--eval-set SET`
 
@@ -363,21 +363,21 @@ in `Geolocate.scala`, near the beginning (`object KMLConstants`).
 For example: For the Twitter corpus, running on different levels of the
 document threshold for discarding words, and for the four words "cool",
 "coo", "kool" and "kewl", the following code plots the distribution of
-each of the words across a region of degree size 1x1. `--mts=300` is
+each of the words across a cell of degree size 1x1. `--mts=300` is
 more for debugging and stops loading further data for generating the
 distribution after 300 seconds (5 minutes) has passed.  It's unnecessary
 here but may be useful if you have an enormous amount of data (e.g. all
 of Wikipedia).
 
 {{{
-for x in 0 5 40; do geolocate-twitter --doc-thresh $x --mts=300 --degrees-per-region=1 --mode=generate-kml --kml-words='cool,coo,kool,kewl' --kml-prefix=kml-dist.$x.none. --kml-transform=none; done 
+for x in 0 5 40; do geolocate-twitter --doc-thresh $x --mts=300 --degrees-per-cell=1 --mode=generate-kml --kml-words='cool,coo,kool,kewl' --kml-prefix=kml-dist.$x.none. --kml-transform=none; done 
 }}}
 
 Another example, just for the words "cool" and "coo", but with different
 kinds of transformation of the probabilities.
 
 {{{
-for x in none log logsquared; do geolocate-twitter --doc-thresh 5 --mts=300 --degrees-per-region=1 --mode=generate-kml --kml-words='cool,coo' --kml-prefix=kml-dist.5.$x. --kml-transform=$x; done 
+for x in none log logsquared; do geolocate-twitter --doc-thresh 5 --mts=300 --degrees-per-cell=1 --mode=generate-kml --kml-words='cool,coo' --kml-prefix=kml-dist.5.$x. --kml-transform=$x; done 
 }}}
 
 === Generating data ===
@@ -470,10 +470,10 @@ object KMLConstants {
 /////////////////////////////////////////////////////////////////////////////
 
 /**
-  Distribution over words corresponding to a statistical region.
+  Distribution over words corresponding to a statistical cell.
  */
 
-class RegionWordDist extends SmoothedWordDist(
+class CellWordDist extends SmoothedWordDist(
     Array[Word](), Array[Int](), 0, note_globally = false) {
   /** Number of articles included in incoming-link computation. */
   var num_arts_for_links = 0
@@ -490,7 +490,7 @@ class RegionWordDist extends SmoothedWordDist(
   def add_articles(articles: Iterable[StatArticle]) {
     var this_incoming_links = 0
     if (debug("lots"))
-      errprint("Region dist, number of articles = %s", num_arts_for_word_dist)
+      errprint("Cell dist, number of articles = %s", num_arts_for_word_dist)
     val old_total_tokens = total_tokens
     var this_num_arts_for_links = 0
     var this_num_arts_for_word_dist = 0
@@ -502,11 +502,11 @@ class RegionWordDist extends SmoothedWordDist(
 
        (1) The links are used only in Naive Bayes, and only in establishing
        a prior probability.  Hence they aren't the main indicator.
-       (2) Often, nearly all the link count for a given region comes from
+       (2) Often, nearly all the link count for a given cell comes from
        a particular article -- e.g. the Wikipedia article for the primary
-       city in the region.  If we pull the link count for this article
-       out of the region because it happens to be in the evaluation set,
-       we will totally distort the link count for this region.  In a "real"
+       city in the cell.  If we pull the link count for this article
+       out of the cell because it happens to be in the evaluation set,
+       we will totally distort the link count for this cell.  In a "real"
        usage case, we would be testing against an unknown article, not
        against an article in our training set that we've artificially
        removed so as to construct an evaluation set, and this problem
@@ -514,16 +514,16 @@ class RegionWordDist extends SmoothedWordDist(
        evaluation.
        
        Note that we do NOT include word counts from dev-set or test-set
-       articles in the word distribution for a region.  This keeps to the
+       articles in the word distribution for a cell.  This keeps to the
        above rule about only training on your training set, and is OK
-       because (1) each article in a region contributes a similar amount of
+       because (1) each article in a cell contributes a similar amount of
        word counts (assuming the articles are somewhat similar in size),
-       hence in a region with multiple articles, each individual article
+       hence in a cell with multiple articles, each individual article
        only computes a fairly small fraction of the total word counts;
        (2) distributions are normalized in any case, so the exact number
-       of articles in a region does not affect the distribution. */
+       of articles in a cell does not affect the distribution. */
     for (art <- articles) {
-      /* Add link count of article to region. */
+      /* Add link count of article to cell. */
       art.incoming_links match {
         // Might be None, for unknown link count
         case Some(x) => this_incoming_links += x
@@ -531,7 +531,7 @@ class RegionWordDist extends SmoothedWordDist(
       }
       this_num_arts_for_links += 1
 
-      /* Add word counts of article to region, but only if in the
+      /* Add word counts of article to cell, but only if in the
          training set. */
       if (art.split == "training") {
         if (art.dist == null) {
@@ -562,7 +562,7 @@ class RegionWordDist extends SmoothedWordDist(
     super.finish(minimum_word_count = minimum_word_count)
 
     if (debug("lots")) {
-      errprint("""For region dist, num articles = %s, total tokens = %s,
+      errprint("""For cell dist, num articles = %s, total tokens = %s,
     unseen_mass = %s, incoming links = %s, overall unseen mass = %s""",
         num_arts_for_word_dist, total_tokens,
         unseen_mass, incoming_links,
@@ -571,7 +571,7 @@ class RegionWordDist extends SmoothedWordDist(
   }
 
   // For a document described by its distribution 'worddist', return the
-  // log probability log p(worddist|reg) using a Naive Bayes algorithm.
+  // log probability log p(worddist|cell) using a Naive Bayes algorithm.
   def get_nbayes_logprob(worddist: WordDist) = {
     var logprob = 0.0
     for ((word, count) <- worddist.counts) {
@@ -590,48 +590,48 @@ class RegionWordDist extends SmoothedWordDist(
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//                             Region distributions                        //
+//                             Cell distributions                        //
 /////////////////////////////////////////////////////////////////////////////
 
-/** A simple distribution associating a probability with each region. */
+/** A simple distribution associating a probability with each cell. */
 
-class RegionDist(
-  val regionprobs: mutable.Map[StatRegion, Double]
+class CellDist(
+  val cellprobs: mutable.Map[StatCell, Double]
 ) {
-  def get_ranked_regions() = {
+  def get_ranked_cells() = {
     // sort by second element of tuple, in reverse order
-    regionprobs.toSeq sortWith (_._2 > _._2)
+    cellprobs.toSeq sortWith (_._2 > _._2)
   }
 }
 
-/** Distribution over regions, as might be attached to a word.  If we have a
-  set of regions, each with a word distribution, then we can imagine
-  conceptually inverting the process to generate a region distribution over
+/** Distribution over cells, as might be attached to a word.  If we have a
+  set of cells, each with a word distribution, then we can imagine
+  conceptually inverting the process to generate a cell distribution over
   words.  Basically, for a given word, look to see what its probability is
-  in all regions; normalize, and we have a region distribution.
+  in all cells; normalize, and we have a cell distribution.
 
-  @param word Word for which the region is computed
-  @param regionprobs Hash table listing probabilities associated with regions
+  @param word Word for which the cell is computed
+  @param cellprobs Hash table listing probabilities associated with cells
 */
 
-class WordRegionDist(
+class WordCellDist(
   val word: Word
-) extends RegionDist(mutable.Map[StatRegion, Double]()) {
+) extends CellDist(mutable.Map[StatCell, Double]()) {
   var normalized = false
 
   protected def init() {
     // It's expensive to compute the value for a given word so we cache word
     // distributions.
     var totalprob = 0.0
-    // Compute and store un-normalized probabilities for all regions
-    for (reg <- StatRegion.iter_nonempty_regions(nonempty_word_dist = true)) {
-      val prob = reg.worddist.lookup_word(word)
+    // Compute and store un-normalized probabilities for all cells
+    for (cell <- StatCell.iter_nonempty_cells(nonempty_word_dist = true)) {
+      val prob = cell.worddist.lookup_word(word)
       // Another way of handling zero probabilities.
       /// Zero probabilities are just a bad idea.  They lead to all sorts of
       /// pathologies when trying to do things like "normalize".
       //if (prob == 0.0)
       //  prob = 1e-50
-      regionprobs(reg) = prob
+      cellprobs(cell) = prob
       totalprob += prob
     }
     // Normalize the probabilities; but if all probabilities are 0, then
@@ -641,34 +641,34 @@ class WordRegionDist(
     // ensure that 0 probabilities don't exist?  Anything else I missed?)
     if (totalprob != 0) {
       normalized = true
-      for ((reg, prob) <- regionprobs)
-        regionprobs(reg) /= totalprob
+      for ((cell, prob) <- cellprobs)
+        cellprobs(cell) /= totalprob
     } else
       normalized = false
   }
 
   init()
 
-  // Convert region to a KML file showing the distribution
+  // Convert cell to a KML file showing the distribution
   def generate_kml_file(filename: String) {
     import KMLConstants._
     val xform = if (Opts.kml_transform == "log") (x: Double) => log(x)
     else if (Opts.kml_transform == "logsquared") (x: Double) => -log(x) * log(x)
     else (x: Double) => x
 
-    val minxformprob = xform(regionprobs.values min)
-    val maxxformprob = xform(regionprobs.values max)
+    val minxformprob = xform(cellprobs.values min)
+    val maxxformprob = xform(cellprobs.values max)
 
-    // Generate KML for a single region
-    def one_reg_kml(reg: StatRegion, prob: Double) = {
-      val (latind, longind) = (reg.latind.get, reg.longind.get)
+    // Generate KML for a single cell
+    def one_cell_kml(cell: StatCell, prob: Double) = {
+      val (latind, longind) = (cell.latind.get, cell.longind.get)
       val offprob = xform(prob) - minxformprob
       val fracprob = offprob / (maxxformprob - minxformprob)
-      val swcoord = stat_region_indices_to_near_corner_coord(latind, longind)
-      val necoord = stat_region_indices_to_far_corner_coord(latind, longind)
+      val swcoord = stat_cell_indices_to_near_corner_coord(latind, longind)
+      val necoord = stat_cell_indices_to_far_corner_coord(latind, longind)
       val nwcoord = Coord(necoord.lat, swcoord.long)
       val secoord = Coord(swcoord.lat, necoord.long)
-      val center = stat_region_indices_to_center_coord(latind, longind)
+      val center = stat_cell_indices_to_center_coord(latind, longind)
       var coordtext = "\n"
       for (coord <- Seq(swcoord, nwcoord, necoord, secoord, swcoord)) {
         val lat = (center.lat + coord.lat) / 2
@@ -677,7 +677,7 @@ class WordRegionDist(
           long, lat, fracprob * Opts.kml_max_height)
       }
       val name =
-        if (reg.most_popular_article != null) reg.most_popular_article.title
+        if (cell.most_popular_article != null) cell.most_popular_article.title
         else ""
 
       // Placemark indicating name
@@ -687,7 +687,7 @@ class WordRegionDist(
         <Placemark>
           <name>{ name }</name>
           ,
-          <Region>
+          <Cell>
             <LatLonAltBox>
               <north>{ ((center.lat + necoord.lat) / 2).toString }</north>
               <south>{ ((center.lat + swcoord.lat) / 2).toString }</south>
@@ -697,7 +697,7 @@ class WordRegionDist(
             <Lod>
               <minLodPixels>16</minLodPixels>
             </Lod>
-          </Region>
+          </Cell>
           <styleURL>#bar</styleURL>
           <Point>
             <coordinates>{ "%s,%s" format (center.long, center.lat) }</coordinates>
@@ -744,15 +744,15 @@ class WordRegionDist(
       Seq(name_placemark, cylinder_placemark)
     }
 
-    def yield_reg_kml() {
+    def yield_cell_kml() {
       for {
-        (reg, prob) <- regionprobs
-        kml <- one_reg_kml(reg, prob)
+        (cell, prob) <- cellprobs
+        kml <- one_cell_kml(cell, prob)
         expr <- kml
       } yield expr
     }
 
-    val allregkml = yield_reg_kml()
+    val allcellkml = yield_cell_kml()
 
     val kml =
       <kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
@@ -775,7 +775,7 @@ class WordRegionDist(
           <Folder>
             <name>{ unmemoize_word(word) }</name>
             <open>1</open>
-            <description>{ "Region distribution for word '%s'" format unmemoize_word(word) }</description>
+            <description>{ "Cell distribution for word '%s'" format unmemoize_word(word) }</description>
             <LookAt>
               <latitude>42</latitude>
               <longitude>-102</longitude>
@@ -784,7 +784,7 @@ class WordRegionDist(
               <tilt>53.454348562403</tilt>
               <heading>0</heading>
             </LookAt>
-            { allregkml }
+            { allcellkml }
           </Folder>
         </Document>
       </kml>
@@ -793,38 +793,38 @@ class WordRegionDist(
   }
 }
 
-object RegionDist {
-  var cached_dists: LRUCache[Word, WordRegionDist] = null
+object CellDist {
+  var cached_dists: LRUCache[Word, WordCellDist] = null
 
-  // Return a region distribution over a given word, using a least-recently-used
+  // Return a cell distribution over a given word, using a least-recently-used
   // cache to optimize access.
-  def get_region_dist(word: Word) = {
+  def get_cell_dist(word: Word) = {
     if (cached_dists == null)
       cached_dists = new LRUCache(maxsize = Opts.lru_cache_size)
     cached_dists.get(word) match {
       case Some(dist) => dist
       case None => {
-        val dist = new WordRegionDist(word)
+        val dist = new WordCellDist(word)
         cached_dists(word) = dist
         dist
       }
     }
   }
 
-  // Return a region distribution over a distribution over words.  This works
+  // Return a cell distribution over a distribution over words.  This works
   // by adding up the distributions of the individual words, weighting by
   // the count of the each word.
-  def get_region_dist_for_word_dist(worddist: WordDist) = {
-    val regprobs = doublemap[StatRegion]()
+  def get_cell_dist_for_word_dist(worddist: WordDist) = {
+    val cellprobs = doublemap[StatCell]()
     for ((word, count) <- worddist.counts) {
-      val dist = get_region_dist(word)
-      for ((reg, prob) <- dist.regionprobs)
-        regprobs(reg) += count * prob
+      val dist = get_cell_dist(word)
+      for ((cell, prob) <- dist.cellprobs)
+        cellprobs(cell) += count * prob
     }
-    val totalprob = (regprobs.values sum)
-    for ((reg, prob) <- regprobs)
-      regprobs(reg) /= totalprob
-    new RegionDist(regprobs)
+    val totalprob = (cellprobs.values sum)
+    for ((cell, prob) <- cellprobs)
+      cellprobs(cell) /= totalprob
+    new CellDist(cellprobs)
   }
 }
 
@@ -832,31 +832,31 @@ object RegionDist {
 //                           Geographic locations                          //
 /////////////////////////////////////////////////////////////////////////////
 
-///////////// statistical regions ////////////
+///////////// statistical cells ////////////
 
 // This class contains values used in computing the distribution over all
-// locations in the statistical region surrounding the locality in question.
-// The statistical region is currently defined as a square of NxN tiling
-// regions, for N = width_of_stat_region.
+// locations in the statistical cell surrounding the locality in question.
+// The statistical cell is currently defined as a square of NxN tiling
+// cells, for N = width_of_stat_cell.
 // The following fields are defined: 
 //
-//   latind, longind: Region indices of southwest-most tiling region in
-//                    statistical region.
-//   worddist: Distribution corresponding to region.
+//   latind, longind: Cell indices of southwest-most tiling cell in
+//                    statistical cell.
+//   worddist: Distribution corresponding to cell.
 
-class StatRegion(
-  val latind: Option[Regind],
-  val longind: Option[Regind]) {
-  val worddist = new RegionWordDist()
+class StatCell(
+  val latind: Option[Cellind],
+  val longind: Option[Cellind]) {
+  val worddist = new CellWordDist()
   var most_popular_article: StatArticle = null
   var mostpopart_links = 0
 
   def boundstr() = {
     if (!latind.isEmpty) {
       val near =
-        stat_region_indices_to_near_corner_coord(latind.get, longind.get)
+        stat_cell_indices_to_near_corner_coord(latind.get, longind.get)
       val far =
-        stat_region_indices_to_far_corner_coord(latind.get, longind.get)
+        stat_cell_indices_to_far_corner_coord(latind.get, longind.get)
       "%s-%s" format (near, far)
     } else "nowhere"
   }
@@ -869,7 +869,7 @@ class StatRegion(
           most_popular_article, mostpopart_links)
       else ""
 
-    "StatRegion(%s%s%s, %d articles(dist), %d articles(links), %d links)" format (
+    "StatCell(%s%s%s, %d articles(dist), %d articles(links), %d links)" format (
       boundstr(), unfinished, contains,
       worddist.num_arts_for_word_dist, worddist.num_arts_for_links,
       worddist.incoming_links)
@@ -880,7 +880,7 @@ class StatRegion(
   // }
 
   def shortstr() = {
-    var str = "Region %s" format boundstr()
+    var str = "Cell %s" format boundstr()
     val mostpop = most_popular_article
     if (mostpop != null)
       str += ", most-popular %s" format mostpop.shortstr()
@@ -888,7 +888,7 @@ class StatRegion(
   }
 
   def struct() =
-    <StatRegion>
+    <StatCell>
       <bounds>{ boundstr() }</bounds>
       <finished>{ worddist.finished }</finished>
       {
@@ -899,28 +899,28 @@ class StatRegion(
       <numArticlesDist>{ worddist.num_arts_for_word_dist }</numArticlesDist>
       <numArticlesLink>{ worddist.num_arts_for_links }</numArticlesLink>
       <incomingLinks>{ worddist.incoming_links }</incomingLinks>
-    </StatRegion>
+    </StatCell>
 
-  // Generate the distribution for a statistical region from the tiling regions.
+  // Generate the distribution for a statistical cell from the tiling cells.
   def generate_dist() {
 
-    val reglat = latind.get
-    val reglong = longind.get
+    val celllat = latind.get
+    val celllong = longind.get
 
     if (debug("lots")) {
-      errprint("Generating distribution for statistical region centered at %s",
-        region_indices_to_coord(reglat, reglong))
+      errprint("Generating distribution for statistical cell centered at %s",
+        cell_indices_to_coord(celllat, celllong))
     }
 
-    // Accumulate counts for the given region
-    def process_one_region(latind: Regind, longind: Regind) {
+    // Accumulate counts for the given cell
+    def process_one_cell(latind: Cellind, longind: Cellind) {
       val arts =
-        StatRegion.tiling_region_to_articles.getOrElse((latind, longind), null)
+        StatCell.tiling_cell_to_articles.getOrElse((latind, longind), null)
       if (arts == null)
         return
       if (debug("lots")) {
-        errprint("--> Processing tiling region %s",
-          region_indices_to_coord(latind, longind))
+        errprint("--> Processing tiling cell %s",
+          cell_indices_to_coord(latind, longind))
       }
       worddist.add_articles(arts)
       for (art <- arts) {
@@ -932,17 +932,17 @@ class StatRegion(
       }
     }
 
-    // Process the tiling regions making up the statistical region;
+    // Process the tiling cells making up the statistical cell;
     // but be careful around the edges.  Truncate the latitude, wrap the
     // longitude.
     for (
-      i <- reglat until (maximum_latind + 1 min
-        reglat + width_of_stat_region)
+      i <- celllat until (maximum_latind + 1 min
+        celllat + width_of_stat_cell)
     ) {
-      for (j <- reglong until reglong + width_of_stat_region) {
+      for (j <- celllong until celllong + width_of_stat_cell) {
         var jj = j
         if (jj > maximum_longind) jj -= 360
-        process_one_region(i, jj)
+        process_one_cell(i, jj)
       }
     }
 
@@ -950,136 +950,136 @@ class StatRegion(
   }
 }
 
-object StatRegion {
-  // Mapping of region->locations in region, for region-based Naive Bayes
+object StatCell {
+  // Mapping of cell->locations in cell, for cell-based Naive Bayes
   // disambiguation.  The key is a tuple expressing the integer indices of the
-  // latitude and longitude of the southwest corner of the region. (Basically,
+  // latitude and longitude of the southwest corner of the cell. (Basically,
   // given an index, the latitude or longitude of the southwest corner is
-  // index*degrees_per_region, and the region includes all locations whose
+  // index*degrees_per_cell, and the cell includes all locations whose
   // latitude or longitude is in the half-open interval
-  // [index*degrees_per_region, (index+1)*degrees_per_region).
+  // [index*degrees_per_cell, (index+1)*degrees_per_cell).
   //
-  // We don't just create an array because we expect many regions to have no
-  // articles in them, esp. as we decrease the region size.  The idea is that
-  // the regions provide a first approximation to the regions used to create the
+  // We don't just create an array because we expect many cells to have no
+  // articles in them, esp. as we decrease the cell size.  The idea is that
+  // the cells provide a first approximation to the cells used to create the
   // article distributions.
-  var tiling_region_to_articles = bufmap[(Regind, Regind), StatArticle]()
+  var tiling_cell_to_articles = bufmap[(Cellind, Cellind), StatArticle]()
 
-  // Mapping from center of statistical region to corresponding region object.
-  // A "statistical region" is made up of a square of tiling regions, with
-  // the number of regions on a side determined by `width_of_stat_region'.  A
-  // word distribution is associated with each statistical region.
-  val corner_to_stat_region = mutable.Map[(Regind, Regind), StatRegion]()
+  // Mapping from center of statistical cell to corresponding cell object.
+  // A "statistical cell" is made up of a square of tiling cells, with
+  // the number of cells on a side determined by `width_of_stat_cell'.  A
+  // word distribution is associated with each statistical cell.
+  val corner_to_stat_cell = mutable.Map[(Cellind, Cellind), StatCell]()
 
-  var empty_stat_region: StatRegion = null // Can't compute this until class is initialized
-  var all_regions_computed = false
-  var num_empty_regions = 0
-  var num_non_empty_regions = 0
+  var empty_stat_cell: StatCell = null // Can't compute this until class is initialized
+  var all_cells_computed = false
+  var num_empty_cells = 0
+  var num_non_empty_cells = 0
   var total_num_arts_for_word_dist = 0
   var total_num_arts_for_links = 0
 
-  // Find the correct StatRegion for the given coordinates.
-  // If none, create the region.
-  def find_region_for_coord(coord: Coord) = {
-    val (latind, longind) = coord_to_stat_region_indices(coord)
-    find_region_for_region_indices(latind, longind)
+  // Find the correct StatCell for the given coordinates.
+  // If none, create the cell.
+  def find_cell_for_coord(coord: Coord) = {
+    val (latind, longind) = coord_to_stat_cell_indices(coord)
+    find_cell_for_cell_indices(latind, longind)
   }
 
-  // Find the StatRegion with the given indices at the southwest point.
-  // If none, create the region unless 'no_create' is true.  Otherwise, if
-  // 'no_create_empty' is true and the region is empty, a default empty
-  // region is returned.
-  def find_region_for_region_indices(latind: Regind, longind: Regind,
-    no_create: Boolean = false, no_create_empty: Boolean = false): StatRegion = {
-    var statreg = corner_to_stat_region.getOrElse((latind, longind), null)
-    if (statreg == null) {
+  // Find the StatCell with the given indices at the southwest point.
+  // If none, create the cell unless 'no_create' is true.  Otherwise, if
+  // 'no_create_empty' is true and the cell is empty, a default empty
+  // cell is returned.
+  def find_cell_for_cell_indices(latind: Cellind, longind: Cellind,
+    no_create: Boolean = false, no_create_empty: Boolean = false): StatCell = {
+    var statcell = corner_to_stat_cell.getOrElse((latind, longind), null)
+    if (statcell == null) {
       if (no_create)
         return null
-      if (all_regions_computed) {
-        if (empty_stat_region == null) {
-          empty_stat_region = new StatRegion(None, None)
-          empty_stat_region.worddist.finish()
+      if (all_cells_computed) {
+        if (empty_stat_cell == null) {
+          empty_stat_cell = new StatCell(None, None)
+          empty_stat_cell.worddist.finish()
         }
-        return empty_stat_region
+        return empty_stat_cell
       }
-      statreg = new StatRegion(Some(latind), Some(longind))
-      statreg.generate_dist()
-      val empty = statreg.worddist.is_empty()
+      statcell = new StatCell(Some(latind), Some(longind))
+      statcell.generate_dist()
+      val empty = statcell.worddist.is_empty()
       if (empty)
-        num_empty_regions += 1
+        num_empty_cells += 1
       else
-        num_non_empty_regions += 1
+        num_non_empty_cells += 1
       if (!empty || !no_create_empty)
-        corner_to_stat_region((latind, longind)) = statreg
+        corner_to_stat_cell((latind, longind)) = statcell
     }
-    return statreg
+    return statcell
   }
 
-  // Generate all StatRegions that are non-empty.  Don't do anything if
+  // Generate all StatCells that are non-empty.  Don't do anything if
   // called multiple times.
-  def initialize_regions() {
-    if (all_regions_computed)
+  def initialize_cells() {
+    if (all_cells_computed)
       return
 
-    val task = new MeteredTask("statistical region", "generating non-empty")
+    val task = new MeteredTask("statistical cell", "generating non-empty")
 
     for (i <- minimum_latind to maximum_latind view) {
       for (j <- minimum_longind to maximum_longind view) {
-        val reg = find_region_for_region_indices(i, j, no_create_empty = true)
-        if (debug("region") && !reg.worddist.is_empty)
-          errprint("--> (%d,%d): %s", i, j, reg)
+        val cell = find_cell_for_cell_indices(i, j, no_create_empty = true)
+        if (debug("cell") && !cell.worddist.is_empty)
+          errprint("--> (%d,%d): %s", i, j, cell)
         task.item_processed()
       }
     }
     task.finish()
-    all_regions_computed = true
+    all_cells_computed = true
 
     total_num_arts_for_links = 0
     total_num_arts_for_word_dist = 0
-    for (reg <- StatRegion.iter_nonempty_regions()) {
-      total_num_arts_for_word_dist += reg.worddist.num_arts_for_word_dist
-      total_num_arts_for_links += reg.worddist.num_arts_for_links
+    for (cell <- StatCell.iter_nonempty_cells()) {
+      total_num_arts_for_word_dist += cell.worddist.num_arts_for_word_dist
+      total_num_arts_for_links += cell.worddist.num_arts_for_links
     }
 
-    errprint("Number of non-empty regions: %s", num_non_empty_regions)
-    errprint("Number of empty regions: %s", num_empty_regions)
-    errprint("Percent non-empty regions: %g",
-      num_non_empty_regions.toDouble /
-        (num_empty_regions + num_non_empty_regions))
+    errprint("Number of non-empty cells: %s", num_non_empty_cells)
+    errprint("Number of empty cells: %s", num_empty_cells)
+    errprint("Percent non-empty cells: %g",
+      num_non_empty_cells.toDouble /
+        (num_empty_cells + num_non_empty_cells))
     val training_arts_with_word_counts =
       StatArticleTable.table.num_word_count_articles_by_split("training")
-    errprint("Training articles per non-empty region: %g",
-      training_arts_with_word_counts.toDouble / num_non_empty_regions)
+    errprint("Training articles per non-empty cell: %g",
+      training_arts_with_word_counts.toDouble / num_non_empty_cells)
     // Save some memory by clearing this after it's not needed
-    tiling_region_to_articles = null
+    tiling_cell_to_articles = null
     // Also clear out the article distributions of the training set, since
-    // only needed when computing regions.
+    // only needed when computing cells.
     //
     // FIXME: Could perhaps save more memory, or at least total memory used,
     // by never creating these distributions at all, but directly adding
-    // them to the regions.  Would require a bit of thinking when reading
+    // them to the cells.  Would require a bit of thinking when reading
     // in the counts.
     StatArticleTable.table.clear_training_article_distributions()
   }
 
-  // Add the given article to the region map, which covers the Earth in regions
-  // of a particular size to aid in computing the regions used in region-based
+  // Add the given article to the cell map, which covers the Earth in cells
+  // of a particular size to aid in computing the cells used in cell-based
   // Naive Bayes.
-  def add_article_to_region(article: StatArticle) {
-    val (latind, longind) = coord_to_tiling_region_indices(article.coord)
-    tiling_region_to_articles((latind, longind)) += article
+  def add_article_to_cell(article: StatArticle) {
+    val (latind, longind) = coord_to_tiling_cell_indices(article.coord)
+    tiling_cell_to_articles((latind, longind)) += article
   }
 
-  // Iterate over all non-empty regions.  If 'nonempty_word_dist' is given,
+  // Iterate over all non-empty cells.  If 'nonempty_word_dist' is given,
   // distributions must also have a non-empty word distribution; otherwise,
   // they just need to have at least one point in them. (Not all points
   // have word distributions, esp. when --max-time-per-stage is set so
   // that we only load the word distributions for a fraction of the whole
   // set of articles with distributions.)
-  def iter_nonempty_regions(nonempty_word_dist: Boolean = false) = {
-    assert(all_regions_computed)
+  def iter_nonempty_cells(nonempty_word_dist: Boolean = false) = {
+    assert(all_cells_computed)
     for {
-      v <- corner_to_stat_region.values
+      v <- corner_to_stat_cell.values
       val empty = (
         if (nonempty_word_dist) v.worddist.is_empty_for_word_dist()
         else v.worddist.is_empty())
@@ -1215,7 +1215,7 @@ class StatArticleTable {
         redirects += art
       else if (art.coord != null) {
         record_article(art, art)
-        StatRegion.add_article_to_region(art)
+        StatCell.add_article_to_cell(art)
       }
     }
 
@@ -1472,11 +1472,11 @@ class StatArticle(params: Map[String, String]) extends Article(params)
 abstract class GeotagDocumentStrategy {
   /**
    For a given word distribution (describing a test document), return
-   an Iterable of tuples, each listing a particular region on the Earth
+   an Iterable of tuples, each listing a particular cell on the Earth
    and a score of some sort (the lower the better).  The results should
-   be in sorted order, with better regions earlier.
+   be in sorted order, with better cells earlier.
    */
-  def return_ranked_regions(worddist: WordDist): Iterable[(StatRegion, Double)]
+  def return_ranked_cells(worddist: WordDist): Iterable[(StatCell, Double)]
 }
 
 /**
@@ -1486,27 +1486,27 @@ abstract class GeotagDocumentStrategy {
 class BaselineGeotagDocumentStrategy(
   baseline_strategy: String
 ) extends GeotagDocumentStrategy {
-  var cached_ranked_mps: Iterable[(StatRegion, Double)] = null
+  var cached_ranked_mps: Iterable[(StatCell, Double)] = null
 
-  def ranked_regions_random(worddist: WordDist) = {
-    val regions = StatRegion.iter_nonempty_regions()
-    val shuffled = (new Random()).shuffle(regions)
-    (for (reg <- shuffled) yield (reg, 0.0))
+  def ranked_cells_random(worddist: WordDist) = {
+    val cells = StatCell.iter_nonempty_cells()
+    val shuffled = (new Random()).shuffle(cells)
+    (for (cell <- shuffled) yield (cell, 0.0))
   }
 
-  def ranked_most_popular_regions(worddist: WordDist) = {
+  def ranked_most_popular_cells(worddist: WordDist) = {
     if (cached_ranked_mps == null) {
       cached_ranked_mps = (
-        (for (reg <- StatRegion.iter_nonempty_regions())
-          yield (reg, (if (baseline_strategy == "internal_link")
-          reg.worddist.incoming_links
-        else reg.worddist.num_arts_for_links).toDouble)).
+        (for (cell <- StatCell.iter_nonempty_cells())
+          yield (cell, (if (baseline_strategy == "internal_link")
+          cell.worddist.incoming_links
+        else cell.worddist.num_arts_for_links).toDouble)).
         toArray sortWith (_._2 > _._2))
     }
     cached_ranked_mps
   }
 
-  def ranked_regions_regdist_most_common_toponym(worddist: WordDist) = {
+  def ranked_cells_celldist_most_common_toponym(worddist: WordDist) = {
     // Look for a toponym, then a proper noun, then any word.
     // FIXME: How can 'word' be null?
     // FIXME: Use invalid_word
@@ -1520,10 +1520,10 @@ class BaselineGeotagDocumentStrategy(
     }
     if (maxword == None)
       maxword = worddist.find_most_common_word(word => true)
-    RegionDist.get_region_dist(maxword.get).get_ranked_regions()
+    CellDist.get_cell_dist(maxword.get).get_ranked_cells()
   }
 
-  def ranked_regions_link_most_common_toponym(worddist: WordDist) = {
+  def ranked_cells_link_most_common_toponym(worddist: WordDist) = {
     var maxword = worddist.find_most_common_word(
       word => word(0).isUpper && StatArticleTable.table.word_is_toponym(word))
     if (maxword == None) {
@@ -1547,24 +1547,24 @@ class BaselineGeotagDocumentStrategy(
     if (debug("commontop"))
       errprint("  sorted candidates = %s", candlinks)
 
-    def find_good_regions_for_coord(cands: Iterable[(StatArticle, Double)]) = {
+    def find_good_cells_for_coord(cands: Iterable[(StatArticle, Double)]) = {
       for {
         (cand, links) <- candlinks
-        val reg = {
-          val retval = StatRegion.find_region_for_coord(cand.coord)
+        val cell = {
+          val retval = StatCell.find_cell_for_coord(cand.coord)
           if (retval.latind == None)
-            errprint("Strange, found no region for candidate %s", cand)
+            errprint("Strange, found no cell for candidate %s", cand)
           retval
         }
-        if (reg.latind != None)
-      } yield (reg, links)
+        if (cell.latind != None)
+      } yield (cell, links)
     }
 
-    // Convert to regions
-    val candregs = find_good_regions_for_coord(candlinks)
+    // Convert to cells
+    val candcells = find_good_cells_for_coord(candlinks)
 
     if (debug("commontop"))
-      errprint("  region candidates = %s", candregs)
+      errprint("  cell candidates = %s", candcells)
 
     // Return an iterator over all elements in all the given sequences, omitting
     // elements seen more than once and keeping the order.
@@ -1580,58 +1580,58 @@ class BaselineGeotagDocumentStrategy(
       }
     }
 
-    // Append random regions and remove duplicates
-    merge_numbered_sequences_uniquely(candregs,
-      ranked_regions_random(worddist))
+    // Append random cells and remove duplicates
+    merge_numbered_sequences_uniquely(candcells,
+      ranked_cells_random(worddist))
   }
 
-  def return_ranked_regions(worddist: WordDist) = {
+  def return_ranked_cells(worddist: WordDist) = {
     if (baseline_strategy == "link-most-common-toponym")
-      ranked_regions_link_most_common_toponym(worddist)
-    else if (baseline_strategy == "regdist-most-common-toponym")
-      ranked_regions_regdist_most_common_toponym(worddist)
+      ranked_cells_link_most_common_toponym(worddist)
+    else if (baseline_strategy == "celldist-most-common-toponym")
+      ranked_cells_celldist_most_common_toponym(worddist)
     else if (baseline_strategy == "random")
-      ranked_regions_random(worddist)
+      ranked_cells_random(worddist)
     else
-      ranked_most_popular_regions(worddist)
+      ranked_most_popular_cells(worddist)
   }
 }
 
 /**
   Abstract class that implements a strategy for document geolocation that
-  involves directly comparing the article distribution against each region
+  involves directly comparing the article distribution against each cell
   in turn and computing a score, with lower values better.
  */
 abstract class MinimumScoreStrategy extends GeotagDocumentStrategy {
   /**
     Function to return the score of an article distribution against a
-    region.
+    cell.
    */
-  def score_region(worddist: WordDist, stat_region: StatRegion): Double
+  def score_cell(worddist: WordDist, stat_cell: StatCell): Double
 
-  def return_ranked_regions(worddist: WordDist) = {
-    val region_buf = mutable.Buffer[(StatRegion, Double)]()
-    for (stat_region <-
-           StatRegion.iter_nonempty_regions(nonempty_word_dist = true)) {
-      val inds = (stat_region.latind.get, stat_region.longind.get)
+  def return_ranked_cells(worddist: WordDist) = {
+    val cell_buf = mutable.Buffer[(StatCell, Double)]()
+    for (stat_cell <-
+           StatCell.iter_nonempty_cells(nonempty_word_dist = true)) {
+      val inds = (stat_cell.latind.get, stat_cell.longind.get)
       if (debug("lots")) {
         val (latind, longind) = inds
-        val coord = region_indices_to_coord(latind, longind)
-        errprint("Nonempty region at indices %s,%s = coord %s, num_articles = %s",
-          latind, longind, coord, stat_region.worddist.num_arts_for_word_dist)
+        val coord = cell_indices_to_coord(latind, longind)
+        errprint("Nonempty cell at indices %s,%s = coord %s, num_articles = %s",
+          latind, longind, coord, stat_cell.worddist.num_arts_for_word_dist)
       }
 
-      val score = score_region(worddist, stat_region)
-      region_buf += ((stat_region, score))
+      val score = score_cell(worddist, stat_cell)
+      cell_buf += ((stat_cell, score))
     }
 
-    region_buf sortWith (_._2 < _._2)
+    cell_buf sortWith (_._2 < _._2)
   }
 }
 
 /**
   Class that implements a strategy for document geolocation by computing
-  the KL-divergence between article and region (approximately, how much
+  the KL-divergence between article and cell (approximately, how much
   the word distributions differ).  Note that the KL-divergence as currently
   implemented uses the smoothed word distributions.
 
@@ -1641,46 +1641,46 @@ abstract class MinimumScoreStrategy extends GeotagDocumentStrategy {
   @param symmetric If true, do a symmetric KL-divergence by computing
          the divergence in both directions and averaging the two values.
          (Not by default; the comparison is fundamentally asymmetric in
-         any case since it's comparing articles against regions.)
+         any case since it's comparing articles against cells.)
  */
 class KLDivergenceStrategy(
   partial: Boolean = true,
   symmetric: Boolean = false
 ) extends MinimumScoreStrategy {
 
-  def score_region(worddist: WordDist, stat_region: StatRegion) = {
-    var kldiv = worddist.fast_kl_divergence(stat_region.worddist,
+  def score_cell(worddist: WordDist, stat_cell: StatCell) = {
+    var kldiv = worddist.fast_kl_divergence(stat_cell.worddist,
       partial = partial)
-    //var kldiv = worddist.test_kl_divergence(stat_region.worddist,
+    //var kldiv = worddist.test_kl_divergence(stat_cell.worddist,
     //  partial = partial)
     if (symmetric) {
-      val kldiv2 = stat_region.worddist.fast_kl_divergence(worddist,
+      val kldiv2 = stat_cell.worddist.fast_kl_divergence(worddist,
         partial = partial)
       kldiv = (kldiv + kldiv2) / 2.0
     }
-    //kldiv = worddist.test_kl_divergence(stat_region.worddist,
+    //kldiv = worddist.test_kl_divergence(stat_cell.worddist,
     //                           partial=partial)
-    //errprint("For region %s, KL divergence %.3f", stat_region, kldiv)
+    //errprint("For cell %s, KL divergence %.3f", stat_cell, kldiv)
     kldiv
   }
 
-  override def return_ranked_regions(worddist: WordDist) = {
-    val regions = super.return_ranked_regions(worddist)
+  override def return_ranked_cells(worddist: WordDist) = {
+    val cells = super.return_ranked_cells(worddist)
 
     if (debug("kldiv")) {
       // Print out the words that contribute most to the KL divergence, for
-      // the top-ranked regions
-      val num_contrib_regions = 5
+      // the top-ranked cells
+      val num_contrib_cells = 5
       val num_contrib_words = 25
       errprint("")
       errprint("KL-divergence debugging info:")
-      for (i <- 0 until (regions.length min num_contrib_regions)) {
-        val (region, _) = regions(i)
+      for (i <- 0 until (cells.length min num_contrib_cells)) {
+        val (cell, _) = cells(i)
         val (_, contribs) =
           worddist.slow_kl_divergence_debug(
-            region.worddist, partial = partial,
+            cell.worddist, partial = partial,
             return_contributing_words = true)
-        errprint("  At rank #%s, region %s:", i + 1, region)
+        errprint("  At rank #%s, cell %s:", i + 1, cell)
         errprint("    %30s  %s", "Word", "KL-div contribution")
         errprint("    %s", "-" * 50)
         // sort by absolute value of second element of tuple, in reverse order
@@ -1692,13 +1692,13 @@ class KLDivergenceStrategy(
       }
     }
 
-    regions
+    cells
   }
 }
 
 /**
   Class that implements a strategy for document geolocation by computing
-  the cosine similarity between the distributions of article and region.
+  the cosine similarity between the distributions of article and cell.
   FIXME: We really should transform the distributions by TF/IDF before
   doing this.
 
@@ -1713,13 +1713,13 @@ class CosineSimilarityStrategy(
   partial: Boolean = false
 ) extends MinimumScoreStrategy {
 
-  def score_region(worddist: WordDist, stat_region: StatRegion) = {
+  def score_cell(worddist: WordDist, stat_cell: StatCell) = {
     var cossim =
       if (smoothed)
-        worddist.fast_smoothed_cosine_similarity(stat_region.worddist,
+        worddist.fast_smoothed_cosine_similarity(stat_cell.worddist,
           partial = partial)
       else
-        worddist.fast_cosine_similarity(stat_region.worddist,
+        worddist.fast_cosine_similarity(stat_cell.worddist,
           partial = partial)
     assert(cossim >= 0.0)
     // Just in case of round-off problems
@@ -1729,12 +1729,12 @@ class CosineSimilarityStrategy(
   }
 }
 
-/** Use a Naive Bayes strategy for comparing document and region. */
+/** Use a Naive Bayes strategy for comparing document and cell. */
 class NaiveBayesDocumentStrategy(
   use_baseline: Boolean = true
 ) extends GeotagDocumentStrategy {
 
-  def return_ranked_regions(worddist: WordDist) = {
+  def return_ranked_cells(worddist: WordDist) = {
 
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
@@ -1747,23 +1747,23 @@ class NaiveBayesDocumentStrategy(
       } else (1.0, 0.0))
 
     (for {
-      reg <- StatRegion.iter_nonempty_regions(nonempty_word_dist = true)
-      val word_logprob = reg.worddist.get_nbayes_logprob(worddist)
-      val baseline_logprob = log(reg.worddist.num_arts_for_links.toDouble /
-        StatRegion.total_num_arts_for_links)
+      cell <- StatCell.iter_nonempty_cells(nonempty_word_dist = true)
+      val word_logprob = cell.worddist.get_nbayes_logprob(worddist)
+      val baseline_logprob = log(cell.worddist.num_arts_for_links.toDouble /
+        StatCell.total_num_arts_for_links)
       val logprob = (word_weight * word_logprob +
         baseline_weight * baseline_logprob)
-    } yield (reg -> logprob)).toArray.
+    } yield (cell -> logprob)).toArray.
       // Scala nonsense: sort on the second element of the tuple (foo._2),
       // reserved (_ > _).
       sortWith(_._2 > _._2)
   }
 }
 
-class PerWordRegionDistributionsStrategy extends GeotagDocumentStrategy {
-  def return_ranked_regions(worddist: WordDist) = {
-    val regdist = RegionDist.get_region_dist_for_word_dist(worddist)
-    regdist.get_ranked_regions()
+class AverageCellProbabilityStrategy extends GeotagDocumentStrategy {
+  def return_ranked_cells(worddist: WordDist) = {
+    val celldist = CellDist.get_cell_dist_for_word_dist(worddist)
+    celldist.get_ranked_cells()
   }
 }
 
@@ -1780,11 +1780,11 @@ class PerWordRegionDistributionsStrategy extends GeotagDocumentStrategy {
 // finding the best score for each of these.  This is a slow process -- for
 // each segmentation, we have to iterate over all segments, and for each
 // segment we have to look at all possible ways of splitting it, and for
-// each split we have to look at all assignments of regions to the two
+// each split we have to look at all assignments of cells to the two
 // new segments.  It also seems that we're likely to consider the same
 // segmentation multiple times.
 //
-// In the case of per-word region dists, we can maybe speed things up by
+// In the case of per-word cell dists, we can maybe speed things up by
 // computing the non-normalized distributions over each paragraph and then
 // summing them up as necessary.
 
@@ -1864,10 +1864,10 @@ class GeolocateOptions(defaults: GeolocateCommandLineArguments = null) {
   var skip_initial_test_docs = defs.skip_initial_test_docs
   var every_nth_test_doc = defs.every_nth_test_doc
 
-  //// Options indicating how to generate the regions we compare against
-  var degrees_per_region = defs.degrees_per_region
-  var miles_per_region = defs.miles_per_region
-  var width_of_stat_region = defs.width_of_stat_region
+  //// Options indicating how to generate the cells we compare against
+  var degrees_per_cell = defs.degrees_per_cell
+  var miles_per_cell = defs.miles_per_cell
+  var width_of_stat_cell = defs.width_of_stat_cell
 
   //// Options used when creating word distributions
   var preserve_case_words = defs.preserve_case_words
@@ -1931,7 +1931,7 @@ covering a specific location and determines that location. (Not yet
 implemented.)
 
 'generate-kml' generates KML files for some set of words, showing the
-distribution over regions that the word determines.  Use '--kml-words' to
+distribution over cells that the word determines.  Use '--kml-words' to
 specify the words whose distributions should be outputted.  See also
 '--kml-prefix' to specify the prefix of the files outputted, and
 '--kml-transform' to specify the function to use (if any) to transform
@@ -1996,14 +1996,14 @@ prior probability.  Default is 'baseline'.
 
 For geotag-documents:
 
-'full-kl-divergence' (or 'full-kldiv') searches for the region where the KL
-divergence between the article and region is smallest.
+'full-kl-divergence' (or 'full-kldiv') searches for the cell where the KL
+divergence between the article and cell is smallest.
 'partial-kl-divergence' (or 'partial-kldiv') is similar but uses an
 abbreviated KL divergence measure that only considers the words seen in the
 article; empirically, this appears to work just as well as the full KL
 divergence. 'average-cell-probability' (or
-'regdist') involves computing, for each word, a probability distribution over
-regions using the word distribution of each region, and then combining the
+'celldist') involves computing, for each word, a probability distribution over
+cells using the word distribution of each cell, and then combining the
 distributions over all words in an article, weighted by the count the word in
 the article.  Default is 'partial-kl-divergence'.
 
@@ -2014,28 +2014,28 @@ be tried, one after the other.""")
     op.multiOption[String]("baseline-strategy", "bs",
       choices = Seq("internal-link", "random",
         "num-articles", "link-most-common-toponym",
-        "region-distribution-most-common-toponym"),
+        "cell-distribution-most-common-toponym"),
       canonicalize = Map(
         "internal-link" -> Seq("link"),
         "num-articles" -> Seq("num-arts", "numarts"),
-        "region-distribution-most-common-toponym" ->
-          Seq("regdist-most-common-toponym")),
+        "cell-distribution-most-common-toponym" ->
+          Seq("celldist-most-common-toponym")),
       help = """Strategy to use to compute the baseline.
 
 'internal-link' (or 'link') means use number of internal links pointing to the
-article or region.
+article or cell.
 
 'random' means choose randomly.
 
-'num-articles' (or 'num-arts' or 'numarts'; only in region-type matching) means
-use number of articles in region.
+'num-articles' (or 'num-arts' or 'numarts'; only in cell-type matching) means
+use number of articles in cell.
 
 'link-most-common-toponym' (only in --mode=geotag-documents) means to look
 for the toponym that occurs the most number of times in the article, and
 then use the internal-link baseline to match it to a location.
 
-'regdist-most-common-toponym' (only in --mode=geotag-documents) is similar,
-but uses the region distribution of the most common toponym.
+'celldist-most-common-toponym' (only in --mode=geotag-documents) is similar,
+but uses the cell distribution of the most common toponym.
 
 Default '%default'.
 
@@ -2165,26 +2165,26 @@ process all.""")
   //    op.option[Int]("skip-every-n-test-docs", "skip-n", default=0,
   //      help="""Skip this many after each one processed.  Default 0.""")
 
-  //// Options indicating how to generate the regions we compare against
-  def degrees_per_region =
-    op.option[Double]("degrees-per-region", "dpr",
+  //// Options indicating how to generate the cells we compare against
+  def degrees_per_cell =
+    op.option[Double]("degrees-per-cell", "dpc",
       default = 1.0,
       help = """Size (in degrees, a floating-point number) of the tiling
-regions that cover the Earth.  Default %default. """)
-  def miles_per_region =
-    op.option[Double]("miles-per-region", "mpr",
+cells that cover the Earth.  Default %default. """)
+  def miles_per_cell =
+    op.option[Double]("miles-per-cell", "mpr",
       help = """Size (in miles, a floating-point number) of the tiling
-regions that cover the Earth.  If given, it overrides the value of
---degrees-per-region.  No default, as the default of --degrees-per-region
+cells that cover the Earth.  If given, it overrides the value of
+--degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
-  def width_of_stat_region =
-    op.option[Int]("width-of-stat-region", default = 1,
-      help = """Width of the region used to compute a statistical
-distribution for geotagging purposes, in terms of number of tiling regions.
+  def width_of_stat_cell =
+    op.option[Int]("width-of-stat-cell", default = 1,
+      help = """Width of the cell used to compute a statistical
+distribution for geotagging purposes, in terms of number of tiling cells.
 NOTE: It's unlikely you want to change this.  It may be removed entirely in
 later versions.  In normal circumstances, the value is 1, i.e. use a single
-tiling region to compute each statistical region.  If the value is more than
-1, the statistical regions overlap.""")
+tiling cell to compute each statistical cell.  If the value is more than
+1, the statistical cells overlap.""")
 
   //// Options used when creating word distributions
   def preserve_case_words =
@@ -2255,14 +2255,14 @@ debugval("foo") for valueful params, or debuglist("foo") for list-valued
 params.) Some known debug flags:
 
 gridrank: For the given test article number (starting at 1), output
-a grid of the predicted rank for regions around the true region.
+a grid of the predicted rank for cells around the true cell.
 Multiple articles can have the rank output, e.g. --debug 'gridrank=45,58'
 (This will output info for articles 45 and 58.) This output can be
 postprocessed to generate nice graphs; this is used e.g. in Wing's thesis.
 
 gridranksize: Size of the grid, in numbers of articles on a side.
 This is a single number, and the grid will be a square centered on the
-true region. (Default currently 11.)
+true cell. (Default currently 11.)
 
 kldiv: Print out words contributing most to KL divergence.
 
@@ -2271,7 +2271,7 @@ seen in any counts file.
 
 some, lots, tons: General info of various sorts. (Document me.)
 
-region: Print out info on each region of the Earth as it's generated.  Also
+cell: Print out info on each cell of the Earth as it's generated.  Also
 triggers some additional info when --mode=geotag-toponyms. (Document me.)
 
 commontop: Extra info for debugging
@@ -2330,16 +2330,16 @@ this are ignored as "outliers" (possible errors, etc.).  NOTE: Not
 currently implemented. Default %default.""")
   def context_type =
     op.option[String]("context-type", "ct",
-      default = "region-dist-article-links",
-      choices = Seq("article", "region", "region-dist-article-links"),
+      default = "cell-dist-article-links",
+      choices = Seq("article", "cell", "cell-dist-article-links"),
       help = """Type of context used when doing disambiguation.
 There are two cases where this choice applies: When computing a word
 distribution, and when counting the number of incoming internal links.
-'article' means use the article itself for both.  'region' means use the
-region for both. 'region-dist-article-links' means use the region for
+'article' means use the article itself for both.  'cell' means use the
+cell for both. 'cell-dist-article-links' means use the cell for
 computing a word distribution, but the article for counting the number of
 incoming internal links.  Note that this only applies when
---mode='geotag-toponyms'; in --mode='geotag-documents', only regions are
+--mode='geotag-toponyms'; in --mode='geotag-documents', only cells are
 considered.  Default '%default'.""")
 }
 
@@ -2501,35 +2501,35 @@ object GeolocateDriver {
     if (Opts.gazetteer_type != "world")
       argerror("Currently can only handle world-type gazetteers")
 
-    if (Opts.miles_per_region < 0)
-      argerror("Miles per region must be positive")
-    if (Opts.degrees_per_region < 0)
-      argerror("Degrees per region must be positive")
-    degrees_per_region =
-      if (Opts.miles_per_region > 0)
-        Opts.miles_per_region / miles_per_degree
+    if (Opts.miles_per_cell < 0)
+      argerror("Miles per cell must be positive")
+    if (Opts.degrees_per_cell < 0)
+      argerror("Degrees per cell must be positive")
+    degrees_per_cell =
+      if (Opts.miles_per_cell > 0)
+        Opts.miles_per_cell / miles_per_degree
       else
-        Opts.degrees_per_region
-    miles_per_region = degrees_per_region * miles_per_degree
+        Opts.degrees_per_cell
+    miles_per_cell = degrees_per_cell * miles_per_degree
     // The actual maximum latitude is exactly 90 (the North Pole).  But if we
-    // set degrees per region to be a number that exactly divides 180, and we
+    // set degrees per cell to be a number that exactly divides 180, and we
     // use maximum_latitude = 90 in the following computations, then we would
-    // end up with the North Pole in a region by itself, something we probably
+    // end up with the North Pole in a cell by itself, something we probably
     // don't want.
     val (maxlatind, maxlongind) =
-      coord_to_tiling_region_indices(Coord(maximum_latitude - 1e-10,
+      coord_to_tiling_cell_indices(Coord(maximum_latitude - 1e-10,
         maximum_longitude))
     Distances.maximum_latind = maxlatind
     Distances.maximum_longind = maxlongind
     val (minlatind, minlongind) =
-      coord_to_tiling_region_indices(Coord(minimum_latitude,
+      coord_to_tiling_cell_indices(Coord(minimum_latitude,
         minimum_longitude))
     Distances.minimum_latind = minlatind
     Distances.minimum_longind = minlongind
 
-    if (Opts.width_of_stat_region <= 0)
-      argerror("Width of statistical region must be positive")
-    Distances.width_of_stat_region = Opts.width_of_stat_region
+    if (Opts.width_of_stat_cell <= 0)
+      argerror("Width of statistical cell must be positive")
+    Distances.width_of_stat_cell = Opts.width_of_stat_cell
 
     //// Start reading in the files and operating on them ////
 
@@ -2647,7 +2647,7 @@ object GeolocateDriver {
 
   def run_geotag_documents() = {
     read_data_for_geotag_documents()
-    StatRegion.initialize_regions()
+    StatCell.initialize_cells()
 
     val strats = (
       for (stratname <- Opts.strategy) yield {
@@ -2661,7 +2661,7 @@ object GeolocateDriver {
                 use_baseline = (stratname == "naive-bayes-with-baseline"))
             else stratname match {
               case "average-cell-probability" =>
-                new PerWordRegionDistributionsStrategy()
+                new AverageCellProbabilityStrategy()
               case "cosine-similarity" =>
                 new CosineSimilarityStrategy(smoothed = false, partial = false)
               case "partial-cosine-similarity" =>
@@ -2757,15 +2757,15 @@ object GeolocateDriver {
 
   def run_generate_kml() {
     read_data_for_geotag_documents()
-    StatRegion.initialize_regions()
+    StatCell.initialize_cells()
     val words = Opts.kml_words.split(',')
     for (word <- words) {
-      val regdist = RegionDist.get_region_dist(memoize_word(word))
-      if (!regdist.normalized) {
+      val celldist = CellDist.get_cell_dist(memoize_word(word))
+      if (!celldist.normalized) {
         warning("""Non-normalized distribution, apparently word %s not seen anywhere.
 Not generating an empty KML file.""", word)
       } else
-        regdist.generate_kml_file("%s%s.kml" format (Opts.kml_prefix, word))
+        celldist.generate_kml_file("%s%s.kml" format (Opts.kml_prefix, word))
     }
   }
 

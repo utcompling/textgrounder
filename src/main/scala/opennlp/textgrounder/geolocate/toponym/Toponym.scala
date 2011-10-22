@@ -68,19 +68,19 @@ class Boundary(botleft: Coord, topright: Coord) {
       abs(lon1 - lon2)
   }
 
-  // Iterate over the regions that overlap the boundary.  If
-  // 'nonempty_word_dist' is true, only yield regions with a non-empty
-  // word distribution; else, yield all non-empty regions.
-  def iter_nonempty_tiling_regions() = {
-    val (latind1, longind1) = coord_to_tiling_region_indices(botleft)
-    val (latind2, longind2) = coord_to_tiling_region_indices(topright)
+  // Iterate over the cells that overlap the boundary.  If
+  // 'nonempty_word_dist' is true, only yield cells with a non-empty
+  // word distribution; else, yield all non-empty cells.
+  def iter_nonempty_tiling_cells() = {
+    val (latind1, longind1) = coord_to_tiling_cell_indices(botleft)
+    val (latind2, longind2) = coord_to_tiling_cell_indices(topright)
     for {
       i <- latind1 to latind2 view
       val it = if (longind1 <= longind2) longind1 to longind2 view
       else (longind1 to maximum_longind view) ++
         (minimum_longind to longind2 view)
       j <- it
-      if (StatRegion.tiling_region_to_articles contains ((i, j)))
+      if (StatCell.tiling_cell_to_articles contains ((i, j)))
     } yield (i, j)
   }
 }
@@ -116,8 +116,8 @@ abstract class Location(
 // The following fields are defined, in addition to those for Location:
 //
 //   coord: Coordinates of the location, as a Coord object.
-//   stat_region: The statistical region surrounding this location, including
-//             all necessary information to determine the region-based
+//   stat_cell: The statistical cell surrounding this location, including
+//             all necessary information to determine the cell-based
 //             distribution.
 
 case class Locality(
@@ -125,7 +125,7 @@ case class Locality(
   val coord: Coord,
   override val altnames: Seq[String],
   override val typ: String) extends Location(name, altnames, typ) {
-  var stat_region: StatRegion = null
+  var stat_cell: StatCell = null
 
   def toString(no_article: Boolean = false) = {
     var artmatch = ""
@@ -184,11 +184,11 @@ case class Division(
   // Boundary object specifying the boundary of the area of the
   // division.  Currently in the form of a rectangular bounding box.
   // Eventually may contain a convex hull or even more complex
-  // region (e.g. set of convex regions).
+  // cell (e.g. set of convex cells).
   var boundary: Boundary = null
-  // For region-based Naive Bayes disambiguation, a distribution
-  // over the division's article and all locations within the region.
-  var worddist: RegionWordDist = null
+  // For cell-based Naive Bayes disambiguation, a distribution
+  // over the division's article and all locations within the cell.
+  var worddist: CellWordDist = null
 
   def toString(no_article: Boolean = false) = {
     val artmatchstr =
@@ -219,8 +219,8 @@ case class Division(
 
   def matches_coord(coord: Coord) = this contains coord
 
-  // Compute the boundary of the geographic region of this division, based
-  // on the points in the region.
+  // Compute the boundary of the geographic cell of this division, based
+  // on the points in the cell.
   def compute_boundary() {
     // Yield up all points that are not "outliers", where outliers are defined
     // as points that are more than Opts.max_dist_for_outliers away from all
@@ -266,7 +266,7 @@ case class Division(
   }
 
   def generate_worddist() {
-    worddist = new RegionWordDist()
+    worddist = new CellWordDist()
     val arts =
       for (loc <- Seq(this) ++ goodlocs if loc.artmatch != null)
         yield loc.artmatch
@@ -281,8 +281,8 @@ object Division {
   // For each division, map from division's path to Division object.
   val path_to_division = mutable.Map[Seq[String], Division]()
 
-  // For each tiling region, list of divisions that have territory in it
-  val tiling_region_to_divisions = bufmap[(Regind, Regind), Division]()
+  // For each tiling cell, list of divisions that have territory in it
+  val tiling_cell_to_divisions = bufmap[(Cellind, Cellind), Division]()
 
   // Find the division for a point in the division with a given path,
   // add the point to the division.  Create the division if necessary.
@@ -342,12 +342,12 @@ object Division {
             division.name, division.path)
         }
       }
-      for (inds <- division.boundary.iter_nonempty_tiling_regions())
-        tiling_region_to_divisions(inds) += division
-      if (debug("region"))
+      for (inds <- division.boundary.iter_nonempty_tiling_cells())
+        tiling_cell_to_divisions(inds) += division
+      if (debug("cell"))
         divs_by_area += ((division, division.boundary.square_area()))
     }
-    if (debug("region")) {
+    if (debug("cell")) {
       // sort by second element of tuple, in reverse order
       for ((div, area) <- divs_by_area sortWith (_._2 > _._2))
         errprint("%.2f square miles: %s", area, div)
@@ -358,8 +358,8 @@ object Division {
 // A Wikipedia article for toponym resolution.
 
 class TopoArticle(params: Map[String, String]) extends StatArticle(params) {
-  // StatRegion object corresponding to this article.
-  var stat_region: StatRegion = null
+  // StatCell object corresponding to this article.
+  var stat_cell: StatCell = null
   // Corresponding location for this article.
   var location: Location = null
 
@@ -419,9 +419,9 @@ class TopoArticle(params: Map[String, String]) extends StatArticle(params) {
     else false
   }
 
-  // Determine the region word-distribution object for a given article:
+  // Determine the cell word-distribution object for a given article:
   // Create and populate one if necessary.
-  def find_regworddist() = {
+  def find_cellworddist() = {
     val loc = location
     if (loc != null && loc.isInstanceOf[Division]) {
       val div = loc.asInstanceOf[Division]
@@ -429,16 +429,16 @@ class TopoArticle(params: Map[String, String]) extends StatArticle(params) {
         div.generate_worddist()
       div.worddist
     } else {
-      if (stat_region == null)
-        stat_region = StatRegion.find_region_for_coord(coord)
-      stat_region.worddist
+      if (stat_cell == null)
+        stat_cell = StatCell.find_cell_for_coord(coord)
+      stat_cell.worddist
     }
   }
 
   // Find the divisions that cover the given article.
   def find_covering_divisions() = {
-    val inds = coord_to_tiling_region_indices(coord)
-    val divs = Division.tiling_region_to_divisions(inds)
+    val inds = coord_to_tiling_cell_indices(coord)
+    val divs = Division.tiling_cell_to_divisions(inds)
     (for (div <- divs if div contains coord) yield div)
   }
 }
@@ -748,13 +748,13 @@ class BaselineGeotagToponymStrategy(
 
   def compute_score(geogword: GeogWord, art: TopoArticle) = {
     if (baseline_strategy == "internal-link") {
-      if (Opts.context_type == "region")
-        art.find_regworddist().incoming_links
+      if (Opts.context_type == "cell")
+        art.find_cellworddist().incoming_links
       else
         art.adjusted_incoming_links
     } else if (baseline_strategy == "num-articles") {
-      if (Opts.context_type == "region")
-        art.find_regworddist().num_arts_for_links
+      if (Opts.context_type == "cell")
+        art.find_cellworddist().num_arts_for_links
       else {
         val location = art.location
         location match {
@@ -781,7 +781,7 @@ class NaiveBayesToponymStrategy(
 
     var distobj =
       if (Opts.context_type == "article") art.dist
-      else art.find_regworddist()
+      else art.find_cellworddist()
     var totalprob = 0.0
     var total_word_weight = 0.0
     val (word_weight, baseline_weight) =
@@ -1204,8 +1204,8 @@ class WorldGazetteer(filename: String) extends Gazetteer {
   // country) is given, even for third-level divisions (e.g. counties in the
   // U.S.).
   //
-  // For localities, add them to the region-map that covers the earth if
-  // ADD_TO_REGION_MAP is true.
+  // For localities, add them to the cell-map that covers the earth if
+  // ADD_TO_CELL_MAP is true.
 
   protected def match_world_gazetteer_entry(line: String) {
     // Split on tabs, make sure at least 11 fields present and strip off
@@ -1280,7 +1280,7 @@ class WorldGazetteer(filename: String) extends Gazetteer {
 
   // Read in the data from the World gazetteer in FILENAME and find the
   // Wikipedia article matching each entry in the gazetteer.  For localities,
-  // add them to the region-map that covers the earth if ADD_TO_REGION_MAP is
+  // add them to the cell-map that covers the earth if ADD_TO_CELL_MAP is
   // true.
   protected def read_world_gazetteer_and_match(filename: String) {
     val status = new MeteredTask("gazetteer entry", "matching")

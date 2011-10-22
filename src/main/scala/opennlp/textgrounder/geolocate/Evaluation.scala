@@ -177,7 +177,7 @@ class GeotagDocumentEvalStats(
 /**
  * Class for statistics for geotagging documents/articles, with separate
  * sets of statistics for different intervals of error distances and
- * number of articles in true region.
+ * number of articles in true cell.
  */
 
 class GroupedGeotagDocumentEvalStats {
@@ -185,12 +185,12 @@ class GroupedGeotagDocumentEvalStats {
   def create_doc() = new GeotagDocumentEvalStats()
   val all_document = create_doc()
 
-  // naitr = "num articles in true region"
+  // naitr = "num articles in true cell"
   val docs_by_naitr = new IntTableByRange(Seq(1, 10, 25, 100), create_doc _)
 
   // Results for documents where the location is at a certain distance
-  // from the center of the true statistical region.  The key is measured in
-  // fractions of a tiling region (determined by 'dist_fraction_increment',
+  // from the center of the true statistical cell.  The key is measured in
+  // fractions of a tiling cell (determined by 'dist_fraction_increment',
   // e.g. if dist_fraction_increment = 0.25 then values in the range of
   // [0.25, 0.5) go in one bin, [0.5, 0.75) go in another, etc.).  We measure
   // distance is two ways: true distance (in miles or whatever) and "degree
@@ -202,7 +202,7 @@ class GroupedGeotagDocumentEvalStats {
   val docs_by_true_dist_to_true_center = docmap()
 
   // Similar, but distance between location and center of top predicted
-  // region.
+  // cell.
   val dist_fractions_for_error_dist = Seq(
     0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8,
     12, 16, 24, 32, 48, 64, 96, 128, 192, 256,
@@ -215,7 +215,7 @@ class GroupedGeotagDocumentEvalStats {
 
   def record_result(res: ArticleEvaluationResult) {
     all_document.record_result(res.rank, res.pred_truedist, res.pred_degdist)
-    val naitr = docs_by_naitr.get_collector(res.num_arts_in_true_region)
+    val naitr = docs_by_naitr.get_collector(res.num_arts_in_true_cell)
     naitr.record_result(res.rank, res.pred_truedist, res.pred_degdist)
 
     val fracinc = dist_fraction_increment
@@ -248,7 +248,7 @@ class GroupedGeotagDocumentEvalStats {
       for ((lower, upper, obj) <- docs_by_naitr.iter_ranges()) {
         errprint("")
         errprint("Results for documents/articles where number of articles")
-        errprint("  in true region is in the range [%s,%s]:",
+        errprint("  in true cell is in the range [%s,%s]:",
           lower, upper - 1)
         obj.output_results()
       }
@@ -256,12 +256,12 @@ class GroupedGeotagDocumentEvalStats {
       for (
         (truedist, obj) <- docs_by_true_dist_to_true_center.toSeq sortBy (_._1)
       ) {
-        val lowrange = truedist * miles_per_region
+        val lowrange = truedist * miles_per_cell
         val highrange = ((truedist + dist_fraction_increment) *
-          miles_per_region)
+          miles_per_cell)
         errprint("")
         errprint("Results for documents/articles where distance to center")
-        errprint("  of true region in miles is in the range [%.2f,%.2f):",
+        errprint("  of true cell in miles is in the range [%.2f,%.2f):",
           lowrange, highrange)
         obj.output_results()
       }
@@ -269,12 +269,12 @@ class GroupedGeotagDocumentEvalStats {
       for (
         (degdist, obj) <- docs_by_degree_dist_to_true_center.toSeq sortBy (_._1)
       ) {
-        val lowrange = degdist * degrees_per_region
+        val lowrange = degdist * degrees_per_cell
         val highrange = ((degdist + dist_fraction_increment) *
-          degrees_per_region)
+          degrees_per_cell)
         errprint("")
         errprint("Results for documents/articles where distance to center")
-        errprint("  of true region in degrees is in the range [%.2f,%.2f):",
+        errprint("  of true cell in degrees is in the range [%.2f,%.2f):",
           lowrange, highrange)
         obj.output_results()
       }
@@ -352,17 +352,17 @@ abstract class GeotagDocumentEvaluator(
 case class ArticleEvaluationResult(
   article: StatArticle,
   rank: Int,
-  pred_latind: Regind,
-  pred_longind: Regind) extends EvaluationResult {
+  pred_latind: Cellind,
+  pred_longind: Cellind) extends EvaluationResult {
 
-  val true_statreg = StatRegion.find_region_for_coord(article.coord)
-  val num_arts_in_true_region = true_statreg.worddist.num_arts_for_word_dist
-  val (true_latind, true_longind) = coord_to_stat_region_indices(article.coord)
-  val true_center = stat_region_indices_to_center_coord(true_latind, true_longind)
+  val true_statcell = StatCell.find_cell_for_coord(article.coord)
+  val num_arts_in_true_cell = true_statcell.worddist.num_arts_for_word_dist
+  val (true_latind, true_longind) = coord_to_stat_cell_indices(article.coord)
+  val true_center = stat_cell_indices_to_center_coord(true_latind, true_longind)
   val true_truedist = spheredist(article.coord, true_center)
   val true_degdist = degree_dist(article.coord, true_center)
   val pred_center =
-    stat_region_indices_to_center_coord(pred_latind, pred_longind)
+    stat_cell_indices_to_center_coord(pred_latind, pred_longind)
   val pred_truedist = spheredist(article.coord, pred_center)
   val pred_degdist = degree_dist(article.coord, pred_center)
 }
@@ -382,8 +382,8 @@ class ArticleGeotagDocumentEvaluator(
   // Debug flags:
   //
   //  gridrank: For the given test article number (starting at 1), output
-  //            a grid of the predicted rank for regions around the true
-  //            region.  Multiple articles can have the rank output, e.g.
+  //            a grid of the predicted rank for cells around the true
+  //            cell.  Multiple articles can have the rank output, e.g.
   //
   //            --debug 'gridrank=45,58'
   //
@@ -391,7 +391,7 @@ class ArticleGeotagDocumentEvaluator(
   //
   //  gridranksize: Size of the grid, in numbers of articles on a side.
   //                This is a single number, and the grid will be a square
-  //                centered on the true region.
+  //                centered on the true cell.
   register_list_debug_param("gridrank")
   debugval("gridranksize") = "11"
 
@@ -438,33 +438,33 @@ class ArticleGeotagDocumentEvaluator(
       return null
     assert(article.dist.finished)
     val (true_latind, true_longind) =
-      coord_to_stat_region_indices(article.coord)
+      coord_to_stat_cell_indices(article.coord)
     if (debug("lots") || debug("commontop")) {
-      val true_statreg = StatRegion.find_region_for_coord(article.coord)
-      val naitr = true_statreg.worddist.num_arts_for_word_dist
+      val true_statcell = StatCell.find_cell_for_coord(article.coord)
+      val naitr = true_statcell.worddist.num_arts_for_word_dist
       errprint(
-        "Evaluating article %s with %s word-dist articles in true region",
+        "Evaluating article %s with %s word-dist articles in true cell",
         article, naitr)
     }
 
     /* That is:
 
-       pred_regs = List of predicted regions, from best to worst
-       true_rank = Rank of true region among predicted regions
-       pred_latind, pred_longind = Indices of topmost predicted region
+       pred_cells = List of predicted cells, from best to worst
+       true_rank = Rank of true cell among predicted cells
+       pred_latind, pred_longind = Indices of topmost predicted cell
      */
-    val (pred_regs, true_rank, pred_latind, pred_longind) = {
+    val (pred_cells, true_rank, pred_latind, pred_longind) = {
       if (Opts.oracle_results)
         (null, 1, true_latind, true_longind)
       else {
         def get_computed_results() = {
-          val regs = strategy.return_ranked_regions(article.dist).toArray
+          val cells = strategy.return_ranked_cells(article.dist).toArray
           var rank = 1
           var broken = false
           breakable {
-            for ((reg, value) <- regs) {
-              if (reg.latind.get == true_latind &&
-                  reg.longind.get == true_longind) {
+            for ((cell, value) <- cells) {
+              if (cell.latind.get == true_latind &&
+                  cell.longind.get == true_longind) {
                 broken = true
                 break
               }
@@ -473,7 +473,7 @@ class ArticleGeotagDocumentEvaluator(
           }
           if (!broken)
             rank = 1000000000
-          (regs, rank, regs(0)._1.latind.get, regs(0)._1.longind.get)
+          (cells, rank, cells(0)._1.latind.get, cells(0)._1.longind.get)
         }
 
         get_computed_results()
@@ -485,23 +485,23 @@ class ArticleGeotagDocumentEvaluator(
     val want_indiv_results =
       !Opts.oracle_results && !Opts.no_individual_results
     evalstats.record_result(result)
-    if (result.num_arts_in_true_region == 0) {
+    if (result.num_arts_in_true_cell == 0) {
       evalstats.record_other_stat(
-        "Articles with no training articles in region")
+        "Articles with no training articles in cell")
     }
     if (want_indiv_results) {
       errprint("%s:Article %s:", doctag, article)
       errprint("%s:  %d types, %d tokens",
         doctag, article.dist.counts.size, article.dist.total_tokens)
-      errprint("%s:  true region at rank: %s", doctag, true_rank)
-      errprint("%s:  true region: %s", doctag, result.true_statreg)
+      errprint("%s:  true cell at rank: %s", doctag, true_rank)
+      errprint("%s:  true cell: %s", doctag, result.true_statcell)
       for (i <- 0 until 5) {
-        errprint("%s:  Predicted region (at rank %s): %s",
-          doctag, i + 1, pred_regs(i)._1)
+        errprint("%s:  Predicted cell (at rank %s): %s",
+          doctag, i + 1, pred_cells(i)._1)
       }
-      errprint("%s:  Distance %.2f miles to true region center at %s",
+      errprint("%s:  Distance %.2f miles to true cell center at %s",
         doctag, result.true_truedist, result.true_center)
-      errprint("%s:  Distance %.2f miles to predicted region center at %s",
+      errprint("%s:  Distance %.2f miles to predicted cell center at %s",
         doctag, result.pred_truedist, result.pred_center)
       assert(doctag(0) == '#')
       if (debug("gridrank") ||
@@ -511,19 +511,19 @@ class ArticleGeotagDocumentEvaluator(
         val max_latind = min_latind + grsize - 1
         val min_longind = true_longind - grsize / 2
         val max_longind = min_longind + grsize - 1
-        val grid = mutable.Map[(Regind, Regind), (StatRegion, Double, Int)]()
-        for (((reg, value), rank) <- pred_regs zip (1 to pred_regs.length)) {
-          val (la, lo) = (reg.latind.get, reg.longind.get)
+        val grid = mutable.Map[(Cellind, Cellind), (StatCell, Double, Int)]()
+        for (((cell, value), rank) <- pred_cells zip (1 to pred_cells.length)) {
+          val (la, lo) = (cell.latind.get, cell.longind.get)
           if (la >= min_latind && la <= max_latind &&
             lo >= min_longind && lo <= max_longind)
-            grid((la, lo)) = (reg, value, rank)
+            grid((la, lo)) = (cell, value, rank)
         }
 
         errprint("Grid ranking, gridsize %dx%d", grsize, grsize)
         errprint("NW corner: %s",
-          stat_region_indices_to_nw_corner_coord(max_latind, min_longind))
+          stat_cell_indices_to_nw_corner_coord(max_latind, min_longind))
         errprint("SE corner: %s",
-          stat_region_indices_to_se_corner_coord(min_latind, max_longind))
+          stat_cell_indices_to_se_corner_coord(min_latind, max_longind))
         for (doit <- Seq(0, 1)) {
           if (doit == 0)
             errprint("Grid for ranking:")
@@ -531,11 +531,11 @@ class ArticleGeotagDocumentEvaluator(
             errprint("Grid for goodness/distance:")
           for (lat <- max_latind to min_latind) {
             for (long <- fromto(min_longind, max_longind)) {
-              val regvalrank = grid.getOrElse((lat, long), null)
-              if (regvalrank == null)
+              val cellvalrank = grid.getOrElse((lat, long), null)
+              if (cellvalrank == null)
                 errout(" %-8s", "empty")
               else {
-                val (reg, value, rank) = regvalrank
+                val (cell, value, rank) = cellvalrank
                 val showit = if (doit == 0) rank else value
                 if (lat == true_latind && long == true_longind)
                   errout("!%-8.6s", showit)
@@ -600,17 +600,17 @@ class PCLTravelGeotagDocumentEvaluator(
         stopwords = the_stopwords)
     }
     dist.finish(minimum_word_count = Opts.minimum_word_count)
-    val regs = strategy.return_ranked_regions(dist)
+    val cells = strategy.return_ranked_cells(dist)
     errprint("")
     errprint("Article with title: %s", doc.title)
-    val num_regs_to_show = 5
-    for ((rank, regval) <- (1 to num_regs_to_show) zip regs) {
-      val (reg, vall) = regval
+    val num_cells_to_show = 5
+    for ((rank, cellval) <- (1 to num_cells_to_show) zip cells) {
+      val (cell, vall) = cellval
       if (debug("pcl-travel")) {
         errprint("  Rank %d, goodness %g:", rank, vall)
-        errprint(reg.struct().toString) // indent=4
+        errprint(cell.struct().toString) // indent=4
       } else
-        errprint("  Rank %d, goodness %g: %s", rank, vall, reg.shortstr())
+        errprint("  Rank %d, goodness %g: %s", rank, vall, cell.shortstr())
     }
 
     new TitledDocumentResult()

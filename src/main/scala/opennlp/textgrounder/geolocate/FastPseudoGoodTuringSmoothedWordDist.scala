@@ -41,7 +41,7 @@ object FastPseudoGoodTuringSmoothedWordDist {
    In normal operation of fast_kl_divergence(), we are passed the same
    'self' distribution repeatedly with different 'other' distributions,
    as we compare a given document/article against all the different
-   non-empty regions of the Earth.  In each call, we have to iterate
+   non-empty cells of the Earth.  In each call, we have to iterate
    over all elements in the hash table, so we cache the elements and
    only retrieve again next time we're passed a different 'self'
    distribution.
