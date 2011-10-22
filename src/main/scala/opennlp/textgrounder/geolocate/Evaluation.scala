@@ -325,38 +325,6 @@ abstract class TestFileEvaluator(stratname: String) {
   def output_results(isfinal: Boolean = false): Unit
 }
 
-abstract class FileProcessor {
-  def process_file(file: String): Boolean
-
-  def begin_process_directory(dir: File) {
-  }
-
-  def process_files(files: Iterable[String]) {
-    breakable {
-      def process_one_file(filename: String) {
-        if (!process_file(filename))
-          // This works because of the way 'breakable' is implemented
-          // (dynamically-scoped).  Might "break" (stop working) if break
-          // is made totally lexically-scoped.
-          break
-      }
-      for (dir <- files) {
-        if (dir == null)
-          process_one_file(dir)
-        else {
-          val dirfile = new File(dir)
-          if (dirfile.isDirectory) {
-            for (file <- dirfile.listFiles().toSeq) {
-              val filename = file.toString
-              process_one_file(filename)
-            }
-          } else process_one_file(dir)
-        }
-      }
-    }
-  }
-}
-
 abstract class EvaluationOutputter {
   def evaluate_and_output_results(files: Iterable[String]): Unit
 }

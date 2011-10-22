@@ -1461,6 +1461,10 @@ class StatArticle(params: Map[String, String]) extends Article(params)
   def distance_to_coord(coord2: Coord) = spheredist(coord, coord2)
 }
 
+/////////////////////////////////////////////////////////////////////////////
+//                           Evaluation strategies                         //
+/////////////////////////////////////////////////////////////////////////////
+
 /**
   Abstract class for reading documents from a test file and doing
   document geolocation on them (as opposed e.g. to toponym resolution).
