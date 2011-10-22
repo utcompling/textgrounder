@@ -11,12 +11,12 @@ import util.control.Breaks._
 import java.io._
 
 /////////////////////////////////////////////////////////////////////////////
-//                             Accumulate results                          //
+//                 General statistics on evaluation results                //
 /////////////////////////////////////////////////////////////////////////////
 
 // incorrect_reasons is a map from ID's for reasons to strings describing
 // them.
-class Eval(incorrect_reasons: Map[String, String]) {
+class EvalStats(incorrect_reasons: Map[String, String]) {
   // Statistics on the types of instances processed
   // Total number of instances
   var total_instances = 0
@@ -84,9 +84,9 @@ class Eval(incorrect_reasons: Map[String, String]) {
   }
 }
 
-class EvalWithRank(
+class EvalStatsWithRank(
   max_rank_for_credit: Int = 10
-) extends Eval(Map[String, String]()) {
+) extends EvalStats(Map[String, String]()) {
   val incorrect_by_exact_rank = intmap[Int]()
   val correct_by_up_to_rank = intmap[Int]()
   var incorrect_past_max_rank = 0
@@ -129,9 +129,11 @@ class EvalWithRank(
   }
 }
 
-class GeotagDocumentEval(
+//////// Statistics for geotagging documents/articles
+
+class GeotagDocumentEvalStats(
   max_rank_for_credit: Int = 10
-) extends EvalWithRank(max_rank_for_credit) {
+) extends EvalStatsWithRank(max_rank_for_credit) {
   // "True dist" means actual distance in km's or whatever.
   // "Degree dist" is the distance in degrees.
   val true_dists = mutable.Buffer[Double]()
@@ -172,11 +174,15 @@ class GeotagDocumentEval(
   }
 }
 
-//////// Statistics for geotagging documents/articles
+/**
+ * Class for statistics for geotagging documents/articles, with separate
+ * sets of statistics for different intervals of error distances and
+ * number of articles in true region.
+ */
 
-class GeotagDocumentStats {
+class GroupedGeotagDocumentEvalStats {
 
-  def create_doc() = new GeotagDocumentEval()
+  def create_doc() = new GeotagDocumentEvalStats()
   val all_document = create_doc()
 
   // naitr = "num articles in true region"
@@ -191,7 +197,7 @@ class GeotagDocumentStats {
   // distance", as if degrees were a constant length both latitudinally
   // and longitudinally.
   val dist_fraction_increment = 0.25
-  def docmap() = defaultmap[Double, GeotagDocumentEval](create_doc())
+  def docmap() = defaultmap[Double, GeotagDocumentEvalStats](create_doc())
   val docs_by_degree_dist_to_true_center = docmap()
   val docs_by_true_dist_to_true_center = docmap()
 
@@ -207,7 +213,7 @@ class GeotagDocumentStats {
   val docs_by_true_dist_to_pred_center =
     new DoubleTableByRange(dist_fractions_for_error_dist, create_doc _)
 
-  def record_geotag_document_result(res: ArticleEvaluationResult) {
+  def record_result(res: ArticleEvaluationResult) {
     all_document.record_result(res.rank, res.pred_truedist, res.pred_degdist)
     val naitr = docs_by_naitr.get_collector(res.num_arts_in_true_region)
     naitr.record_result(res.rank, res.pred_truedist, res.pred_degdist)
@@ -228,11 +234,11 @@ class GeotagDocumentStats {
       record_result(res.rank, res.pred_truedist, res.pred_degdist)
   }
 
-  def record_geotag_document_other_stat(othertype: String) {
+  def record_other_stat(othertype: String) {
     all_document.record_other_stat(othertype)
   }
 
-  def output_geotag_document_results(all_results: Boolean = false) {
+  def output_results(all_results: Boolean = false) {
     errprint("")
     errprint("Results for all documents/articles:")
     all_document.output_results()
@@ -432,10 +438,10 @@ abstract class GeotagDocumentEvaluator(
   strategy: GeotagDocumentStrategy,
   stratname: String
 ) extends TestFileEvaluator(stratname) {
-  val results = new GeotagDocumentStats()
+  val evalstats = new GroupedGeotagDocumentEvalStats()
 
   def output_results(isfinal: Boolean = false) {
-    results.output_geotag_document_results(all_results = isfinal)
+    evalstats.output_results(all_results = isfinal)
   }
 }
 
@@ -517,7 +523,7 @@ class ArticleGeotagDocumentEvaluator(
       // so that the counts for many articles don't get read in.
       if (Opts.max_time_per_stage == 0.0 && Opts.num_training_docs == 0)
         warning("Can't evaluate article %s without distribution", article)
-      results.record_geotag_document_other_stat("Skipped articles")
+      evalstats.record_other_stat("Skipped articles")
       true
     } else false
   }
@@ -574,9 +580,9 @@ class ArticleGeotagDocumentEvaluator(
 
     val want_indiv_results =
       !Opts.oracle_results && !Opts.no_individual_results
-    results.record_geotag_document_result(result)
+    evalstats.record_result(result)
     if (result.num_arts_in_true_region == 0) {
-      results.record_geotag_document_other_stat(
+      evalstats.record_other_stat(
         "Articles with no training articles in region")
     }
     if (want_indiv_results) {

@@ -618,9 +618,9 @@ object Toponym {
     var table: TopoArticleTable = null
   }
 
-  class EvalWithCandidateList(
+  class EvalStatsWithCandidateList(
     incorrect_reasons: Map[String, String],
-    max_individual_candidates: Int = 5) extends Eval(incorrect_reasons) {
+    max_individual_candidates: Int = 5) extends EvalStats(incorrect_reasons) {
     // Toponyms by number of candidates available
     val total_instances_by_num_candidates = intmap[Int]()
     val correct_instances_by_num_candidates = intmap[Int]()
@@ -683,11 +683,11 @@ object Toponym {
     import GeotagToponymResults._
 
     // Overall statistics
-    val all_toponym = new EvalWithCandidateList(incorrect_geotag_toponym_reasons)
+    val all_toponym = new EvalStatsWithCandidateList(incorrect_geotag_toponym_reasons)
     // Statistics when toponym not same as true name of location
-    val diff_surface = new EvalWithCandidateList(incorrect_geotag_toponym_reasons)
+    val diff_surface = new EvalStatsWithCandidateList(incorrect_geotag_toponym_reasons)
     // Statistics when toponym not same as true name or short form of location
-    val diff_short = new EvalWithCandidateList(incorrect_geotag_toponym_reasons)
+    val diff_short = new EvalStatsWithCandidateList(incorrect_geotag_toponym_reasons)
 
     def record_geotag_toponym_result(correct: Boolean, toponym: String,
         trueloc: String, reason: String, num_candidates: Int) {
