@@ -2706,7 +2706,7 @@ object GeolocateDriver {
    */
 
   def run_geotag_toponyms() = {
-    import Toponym._
+    import toponym._
     read_stopwords_if()
     val table = new TopoArticleTable()
     TopoArticleTable.table = table
