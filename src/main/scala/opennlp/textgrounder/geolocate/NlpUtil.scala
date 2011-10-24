@@ -35,7 +35,18 @@ import java.text.DateFormat
 // import resource // For resource usage
 // from collections import deque // For breadth-first search
 
-object NlpUtil {
+/**
+ * A 'package object' declaration creates a new subpackage and puts the
+ * stuff here directly in package scope.  This makes it possible to have
+ * functions in package scope instead of inside a class or object (i.e.
+ * singleton class).  This package is called 'tgutil' rather than simply
+ * 'util' to avoid conflicting with Scala's 'util' package.  The functions
+ * here are accessed using 'import tgutil._' inside of the package
+ * opennlp.textgrounder.geolocate, and using
+ * 'import opennlp.textgrounder.geolocate.tgutil._' elsewhere.
+ */
+
+package object tgutil {
 
   //////////////////////////////////////////////////////////////////////////////
   //                            File reading functions                        //
@@ -1448,5 +1459,5 @@ object NlpUtil {
 
 /* For testing the output_memory_usage() function. */
 object TestMemUsage extends App {
-  NlpUtil.output_memory_usage()
+  tgutil.output_memory_usage()
 }

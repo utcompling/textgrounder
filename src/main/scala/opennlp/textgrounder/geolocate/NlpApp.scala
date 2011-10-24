@@ -16,7 +16,7 @@
 
 package opennlp.textgrounder.geolocate
 
-import NlpUtil._
+import tgutil._
 import OptParse._
 
 /**

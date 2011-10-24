@@ -21,7 +21,7 @@
 ////////
 
 package opennlp.textgrounder.geolocate
-import NlpUtil._
+import tgutil._
 import WordDist.memoizer._
 import WordDist.SmoothedWordDist
 import OptParse._

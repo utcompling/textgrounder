@@ -16,7 +16,7 @@
 
 package opennlp.textgrounder.geolocate
 
-import NlpUtil._
+import tgutil._
 
 /**
  TextGrounder-specific information (e.g. env vars).

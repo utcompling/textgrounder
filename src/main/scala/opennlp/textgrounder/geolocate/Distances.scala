@@ -17,7 +17,7 @@
 package opennlp.textgrounder.geolocate
 
 import math._
-import NlpUtil.warning
+import tgutil.warning
 
 /*
   The coordinates of a point are spherical coordinates, indicating a

@@ -19,7 +19,7 @@ package opennlp.textgrounder.geolocate
 import scala.collection.mutable
 import math.{log, sqrt}
 
-import NlpUtil.DynamicArray
+import tgutil.DynamicArray
 import WordDist.memoizer.Word
 import WordDist.SmoothedWordDist
 

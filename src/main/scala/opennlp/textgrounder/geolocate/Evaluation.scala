@@ -1,6 +1,6 @@
 package opennlp.textgrounder.geolocate
 
-import NlpUtil._
+import tgutil._
 import Distances._
 import Debug._
 import GeolocateDriver.Opts
