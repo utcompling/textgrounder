@@ -21,7 +21,6 @@ import NlpUtil._
 import Distances._
 import Debug._
 import GeolocateDriver.Opts
-import MultiRegularCellGrid.Cellind // FIXME!!!
 
 import collection.mutable
 import util.control.Breaks._
@@ -77,16 +76,19 @@ class Boundary(botleft: Coord, topright: Coord) {
    *    the algorithm is done differently, or something.
    */
   def iter_nonempty_tiling_cells(cellgrid: MultiRegularCellGrid) = {
-    val (latind1, longind1) = cellgrid.coord_to_tiling_cell_indices(botleft)
-    val (latind2, longind2) = cellgrid.coord_to_tiling_cell_indices(topright)
+    val botleft_index = cellgrid.coord_to_tiling_cell_index(botleft)
+    val (latind1, longind1) = (botleft_index.latind, botleft_index.longind)
+    val topright_index = cellgrid.coord_to_tiling_cell_index(topright)
+    val (latind2, longind2) = (topright_index.latind, topright_index.longind)
     for {
       i <- latind1 to latind2 view
       val it = if (longind1 <= longind2) longind1 to longind2 view
       else (longind1 to cellgrid.maximum_longind view) ++
         (cellgrid.minimum_longind to longind2 view)
       j <- it
-      if (cellgrid.tiling_cell_to_articles contains ((i, j)))
-    } yield (i, j)
+      val index = RegularCellIndex(i, j)
+      if (cellgrid.tiling_cell_to_articles contains index)
+    } yield index
   }
 }
 
@@ -281,7 +283,7 @@ object Division {
   val path_to_division = mutable.Map[Seq[String], Division]()
 
   // For each tiling cell, list of divisions that have territory in it
-  val tiling_cell_to_divisions = bufmap[(Cellind, Cellind), Division]()
+  val tiling_cell_to_divisions = bufmap[RegularCellIndex, Division]()
 
   // FIXME: For converting cell indices to coordinates
   var tiling_cellgrid: MultiRegularCellGrid = null
@@ -350,8 +352,8 @@ object Division {
         }
       }
       tiling_cellgrid = cellgrid
-      for (inds <- division.boundary.iter_nonempty_tiling_cells(cellgrid))
-        tiling_cell_to_divisions(inds) += division
+      for (index <- division.boundary.iter_nonempty_tiling_cells(cellgrid))
+        tiling_cell_to_divisions(index) += division
       if (debug("cell"))
         divs_by_area += ((division, division.boundary.square_area()))
     }
@@ -454,7 +456,7 @@ class TopoArticle(params: Map[String, String]) extends StatArticle(params) {
 
   // Find the divisions that cover the given article.
   def find_covering_divisions() = {
-    val inds = Division.tiling_cellgrid.coord_to_tiling_cell_indices(coord)
+    val inds = Division.tiling_cellgrid.coord_to_tiling_cell_index(coord)
     val divs = Division.tiling_cell_to_divisions(inds)
     (for (div <- divs if div contains coord) yield div)
   }
