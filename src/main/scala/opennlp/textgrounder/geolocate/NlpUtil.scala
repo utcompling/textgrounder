@@ -52,8 +52,95 @@ package object tgutil {
   //                            File reading functions                        //
   //////////////////////////////////////////////////////////////////////////////
   
-  //// NOTE NOTE NOTE: Only works on Python 2.5 and above, due to using the
-  //// "with" statement.
+  // Open a filename with the given encoding (by default, UTF-8) and
+  // yield lines, but with any terminating newline removed if chomp is
+  // true (the default).  Buffer size and conversion error-handling
+  // can be set (FIXME: The latter has no effect currently.)
+  def openr(filename: String, encoding: String= "UTF-8", chomp: Boolean= true,
+        errors: String= "strict", bufsize: Int= 0) = {
+    class FileIterator extends Iterator[String] {
+      val ireader =
+        new InputStreamReader(new FileInputStream(filename), encoding)
+      var reader =
+        if (bufsize <= 0) new BufferedReader(ireader)
+        else new BufferedReader(ireader, bufsize)
+      var nextline: String = null
+      protected def getNextLine() = {
+        nextline = reader.readLine()
+        if (nextline == null) {
+          reader.close()
+          reader = null
+          false
+        } else {
+          if (chomp) {
+            if (nextline.endsWith("\r\n"))
+              nextline = nextline.dropRight(2)
+            else if (nextline.endsWith("\r"))
+              nextline = nextline.dropRight(1)
+            else if (nextline.endsWith("\n"))
+              nextline = nextline.dropRight(1)
+          }
+          true
+        }
+      }
+
+      def hasNext = {
+        if (nextline != null) true
+        else if (reader == null) false
+        else getNextLine()
+      }
+
+      def next() = {
+        if (!hasNext) null
+        else {
+          val ret = nextline
+          nextline = null
+          ret
+        }
+      }
+    }
+
+    new FileIterator
+  }
+  
+  /** Open a file for writing and return a PrintStream that will write to
+   *  this file in UTF-8.
+   */
+  def openw(filename: String, autoflush: Boolean=false) = new PrintStream(
+      new BufferedOutputStream(new FileOutputStream(filename)),
+      autoflush,
+      "UTF-8")
+
+  /* NOTE: Following is the original Python code, which worked slightly
+     differently and had a few additional features:
+
+     -- You could pass in a list of files and it would iterate through
+        all files in turn; you could pass in no files, in which case it
+        would read from stdin.
+     -- You could specify the way of handling errors when doing Unicode
+        encoding. (FIXME: How do we do this in Java?)
+     -- You could also specify a read mode.  This was primarily useful
+        for controlling the way that line endings are handled -- e.g.
+        "rU" or "U" turns on "universal newline" support, where the
+        various kinds of newline endings are automatically converted to
+        '\n'; and "rb", which turns on "binary" mode, which forces
+        newline conversion *not* to happen even on systems where it is
+        the default (particularly, on Windows, where text files are
+        terminated by '\r\n', which is normally converted to '\n' on
+        input).  Currently, when 'chomp' is true, we automatically
+        chomp off all kinds of newlines (whether '\n', '\r' or '\r\n');
+        otherwise, we do what the system wants to do by default.
+     -- You could specify "in-place modification".  This is built into
+        the underlying 'fileinput' module in Python and works like the
+        similar feature in Perl.  If you turn the feature on, the input
+        file (which cannot be stdin) is renamed upon input, and stdout
+        is opened so it writes to a file with the original name.
+        The backup file is normally formed by appending '.bak', and
+        is deleted automatically on close; but if the 'backup' argument
+        is given, the backup file will be maintained, and will be named
+        by appending the string given as the value of the argument.
+    */
+    
   
   ///// 1. chompopen():
   /////
@@ -130,65 +217,6 @@ package object tgutil {
 //      for line in iterator:
 //        yield line
 //  
-  // Open a filename with the given encoding (by default, UTF-8) and
-  // yield lines, but with any terminating newline removed if chomp is
-  // true (the default).  Buffer size and conversion error-handling
-  // can be set (FIXME: The latter has no effect currently.)
-  def openr(filename: String, encoding: String= "UTF-8", chomp: Boolean= true,
-        errors: String= "strict", bufsize: Int= 0) = {
-    class FileIterator extends Iterator[String] {
-      val ireader =
-        new InputStreamReader(new FileInputStream(filename), encoding)
-      var reader =
-        if (bufsize <= 0) new BufferedReader(ireader)
-        else new BufferedReader(ireader, bufsize)
-      var nextline: String = null
-      protected def getNextLine() = {
-        nextline = reader.readLine()
-        if (nextline == null) {
-          reader.close()
-          reader = null
-          false
-        } else {
-          if (chomp) {
-            if (nextline.endsWith("\r\n"))
-              nextline = nextline.dropRight(2)
-            else if (nextline.endsWith("\r"))
-              nextline = nextline.dropRight(1)
-            else if (nextline.endsWith("\n"))
-              nextline = nextline.dropRight(1)
-          }
-          true
-        }
-      }
-
-      def hasNext = {
-        if (nextline != null) true
-        else if (reader == null) false
-        else getNextLine()
-      }
-
-      def next() = {
-        if (!hasNext) null
-        else {
-          val ret = nextline
-          nextline = null
-          ret
-        }
-      }
-    }
-
-    new FileIterator
-  }
-  
-  /** Open a file for writing and return a PrintStream that will write to
-   *  this file in UTF-8.
-   */
-  def openw(filename: String, autoflush: Boolean=false) = new PrintStream(
-      new BufferedOutputStream(new FileOutputStream(filename)),
-      autoflush,
-      "UTF-8")
-  
 //  // Open a filename and yield lines, but with any terminating newline
 //  // removed (similar to "chomp" in Perl).  Basically same as gopen() but
 //  // with defaults set differently.
@@ -205,12 +233,39 @@ package object tgutil {
 //        chomp=chomp, inplace=inplace, backup=backup, bufsize=bufsize)
 //
 
+  /**
+   * Class that lets you process a series of files in turn; if any file
+   * names a directory, all files in the directory will be processed.
+   * If a file is given as 'null', that will be passed on unchanged.
+   * (Useful to signal input taken from an internal source.)
+   */
   abstract class FileProcessor {
+    /**
+     * Process a given file.
+     *
+     * @param file The file to process (possibly null, see above).
+     * @returns True if file processing should continue; false to
+     *   abort any further processing.
+     */
     def process_file(file: String): Boolean
 
+    /**
+     * Called when about to begin processing all files in a directory.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param dir File object for the directory.
+     */
     def begin_process_directory(dir: File) {
     }
 
+    /**
+     * Process all files, calling `process_file` on each.
+     *
+     * @param files Files to process.  If any file names a directory,
+     *   all files in the directory will be processed.  If any file
+     *   is null, it will be passed on unchanged (see above; useful
+     *   e.g. for specifying input from an internal source).
+     */
     def process_files(files: Iterable[String]) {
       breakable {
         def process_one_file(filename: String) {
