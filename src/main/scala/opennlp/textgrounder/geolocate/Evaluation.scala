@@ -156,21 +156,21 @@ class GeotagDocumentEvalStats(
 
   override def output_incorrect_results() {
     super.output_incorrect_results()
-    def miles_and_km(miledist: Double) = {
-      "%.2f miles (%.2f km)" format (miledist, miledist * km_per_mile)
+    def km_and_miles(kmdist: Double) = {
+      "%.2f km (%.2f miles)" format (kmdist, kmdist / km_per_mile)
     }
     errprint("  Mean true error distance = %s",
-      miles_and_km(mean(true_dists)))
+      km_and_miles(mean(true_dists)))
     errprint("  Median true error distance = %s",
-      miles_and_km(median(true_dists)))
+      km_and_miles(median(true_dists)))
     errprint("  Mean degree error distance = %.2f degrees",
       mean(degree_dists))
     errprint("  Median degree error distance = %.2f degrees",
       median(degree_dists))
     errprint("  Mean oracle true error distance = %s",
-      miles_and_km(mean(oracle_true_dists)))
+      km_and_miles(mean(oracle_true_dists)))
     errprint("  Median oracle true error distance = %s",
-      miles_and_km(median(oracle_true_dists)))
+      km_and_miles(median(oracle_true_dists)))
   }
 }
 
@@ -193,7 +193,7 @@ class GroupedGeotagDocumentEvalStats(cellgrid: CellGrid) {
   // fractions of a tiling cell (determined by 'dist_fraction_increment',
   // e.g. if dist_fraction_increment = 0.25 then values in the range of
   // [0.25, 0.5) go in one bin, [0.5, 0.75) go in another, etc.).  We measure
-  // distance is two ways: true distance (in miles or whatever) and "degree
+  // distance is two ways: true distance (in km or whatever) and "degree
   // distance", as if degrees were a constant length both latitudinally
   // and longitudinally.
   val dist_fraction_increment = 0.25
@@ -232,9 +232,9 @@ class GroupedGeotagDocumentEvalStats(cellgrid: CellGrid) {
          than width_of_multi_cell * size-of-tiling-cell); we convert to
          fractions of tiling-cell size and record in ranges corresponding
          to increments of 0.25 (see above). */
-      /* True distance (in both miles and degrees) as a fraction of
+      /* True distance (in both km and degrees) as a fraction of
          cell size */
-      val frac_true_truedist = res.true_truedist / multigrid.miles_per_cell
+      val frac_true_truedist = res.true_truedist / multigrid.km_per_cell
       val frac_true_degdist = res.true_degdist / multigrid.degrees_per_cell
       /* Round the fractional distances to multiples of
          dist_fraction_increment */
@@ -253,9 +253,9 @@ class GroupedGeotagDocumentEvalStats(cellgrid: CellGrid) {
          predicted cell may be nowhere near the true cell.  Again we convert
          to fractions of tiling-cell size and record in the ranges listed in
          dist_fractions_for_error_dist (see above). */
-      /* Predicted distance (in both miles and degrees) as a fraction of
+      /* Predicted distance (in both km and degrees) as a fraction of
          cell size */
-      val frac_pred_truedist = res.pred_truedist / multigrid.miles_per_cell
+      val frac_pred_truedist = res.pred_truedist / multigrid.km_per_cell
       val frac_pred_degdist = res.pred_degdist / multigrid.degrees_per_cell
       docs_by_true_dist_to_pred_center.get_collector(frac_pred_truedist).
         record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
@@ -297,12 +297,12 @@ class GroupedGeotagDocumentEvalStats(cellgrid: CellGrid) {
           (frac_truedist, obj) <-
             docs_by_true_dist_to_true_center.toSeq sortBy (_._1)
         ) {
-          val lowrange = frac_truedist * multigrid.miles_per_cell
+          val lowrange = frac_truedist * multigrid.km_per_cell
           val highrange = ((frac_truedist + dist_fraction_increment) *
-            multigrid.miles_per_cell)
+            multigrid.km_per_cell)
           errprint("")
           errprint("Results for documents/articles where distance to center")
-          errprint("  of true cell in miles is in the range [%.2f,%.2f):",
+          errprint("  of true cell in km is in the range [%.2f,%.2f):",
             lowrange, highrange)
           obj.output_results()
         }
@@ -536,9 +536,9 @@ class ArticleGeotagDocumentEvaluator(
         errprint("%s:  Predicted cell (at rank %s): %s",
           doctag, i + 1, pred_cells(i)._1)
       }
-      errprint("%s:  Distance %.2f miles to true cell center at %s",
+      errprint("%s:  Distance %.2f km to true cell center at %s",
         doctag, result.true_truedist, result.true_center)
-      errprint("%s:  Distance %.2f miles to predicted cell center at %s",
+      errprint("%s:  Distance %.2f km to predicted cell center at %s",
         doctag, result.pred_truedist, result.pred_center)
       assert(doctag(0) == '#')
       if (debug("gridrank") ||

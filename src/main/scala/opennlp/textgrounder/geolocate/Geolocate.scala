@@ -1060,9 +1060,9 @@ case class RegularCellIndex(latind: Int, longind: Int) {
   /* 
   We divide the earth's surface into "tiling cells", using the value
   of --degrees-per-cell. (Alternatively, the value of --miles-per-cell
-  is converted into degrees using 'miles_per_degree', which specifies
-  the size of a degree at the equator and is derived from the value for the
-  Earth's radius in miles.)
+  or --km-per-cell are converted into degrees using 'miles_per_degree' or
+  'km_per_degree', respectively, which specify the size of a degree at
+  the equator and is derived from the value for the Earth's radius.)
 
   In addition, we form a square of tiling cells in order to create a
   "multi cell", which is used to compute a distribution over words.  The
@@ -1104,9 +1104,9 @@ class MultiRegularCellGrid(
 
   /**
    * Size of each cell (vertical dimension; horizontal dimension only near
-   * the equator) in miles.  Determined from degrees_per_cell.
+   * the equator) in km.  Determined from degrees_per_cell.
    */
-  val miles_per_cell = degrees_per_cell * miles_per_degree
+  val km_per_cell = degrees_per_cell * km_per_degree
 
   /* Set minimum, maximum latitude/longitude in indices (integers used to
      index the set of cells that tile the earth).   The actual maximum
@@ -2178,6 +2178,7 @@ class GeolocateOptions(defaults: GeolocateCommandLineArguments = null) {
   //// Options indicating how to generate the cells we compare against
   var degrees_per_cell = defs.degrees_per_cell
   var miles_per_cell = defs.miles_per_cell
+  var km_per_cell = defs.km_per_cell
   var width_of_multi_cell = defs.width_of_multi_cell
 
   //// Options used when creating word distributions
@@ -2483,8 +2484,14 @@ process all.""")
       help = """Size (in degrees, a floating-point number) of the tiling
 cells that cover the Earth.  Default %default. """)
   def miles_per_cell =
-    op.option[Double]("miles-per-cell", "mpr",
+    op.option[Double]("miles-per-cell", "mpc",
       help = """Size (in miles, a floating-point number) of the tiling
+cells that cover the Earth.  If given, it overrides the value of
+--degrees-per-cell.  No default, as the default of --degrees-per-cell
+is used.""")
+  def km_per_cell =
+    op.option[Double]("km-per-cell", "kpc",
+      help = """Size (in kilometers, a floating-point number) of the tiling
 cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
@@ -2630,12 +2637,12 @@ in Naive Bayes matching.  Only applicable to toponym resolution
   def max_dist_for_close_match =
     op.option[Double]("max-dist-for-close-match", "mdcm",
       default = 80.0,
-      help = """Maximum number of miles allowed when looking for a
+      help = """Maximum number of km allowed when looking for a
 close match for a toponym (--mode=geotag-toponyms).  Default %default.""")
   def max_dist_for_outliers =
     op.option[Double]("max-dist-for-outliers", "mdo",
       default = 200.0,
-      help = """Maximum number of miles allowed between a point and
+      help = """Maximum number of km allowed between a point and
 any others in a division (--mode=geotag-toponyms).  Points farther away than
 this are ignored as "outliers" (possible errors, etc.).  NOTE: Not
 currently implemented. Default %default.""")
@@ -2817,12 +2824,18 @@ object GeolocateDriver {
       argerror("Currently can only handle world-type gazetteers")
 
     if (Opts.miles_per_cell < 0)
-      argerror("Miles per cell must be positive")
+      argerror("Miles per cell must be positive if specified")
+    if (Opts.km_per_cell < 0)
+      argerror("Kilometers per cell must be positive if specified")
     if (Opts.degrees_per_cell < 0)
-      argerror("Degrees per cell must be positive")
+      argerror("Degrees per cell must be positive if specified")
+    if (Opts.miles_per_cell > 0 && Opts.km_per_cell > 0)
+      argerror("Only one of --miles-per-cell and --km-per-cell can be given")
     degrees_per_cell =
       if (Opts.miles_per_cell > 0)
         Opts.miles_per_cell / miles_per_degree
+      else if (Opts.km_per_cell > 0)
+        Opts.km_per_cell / km_per_degree
       else
         Opts.degrees_per_cell
     if (Opts.width_of_multi_cell <= 0)

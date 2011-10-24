@@ -55,18 +55,7 @@ class Boundary(botleft: Coord, topright: Coord) {
     }
   }
 
-  def square_area() = {
-    var (lat1, lon1) = (botleft.lat, botleft.long)
-    var (lat2, lon2) = (topright.lat, topright.long)
-    lat1 = (lat1 / 180.) * Pi
-    lat2 = (lat2 / 180.) * Pi
-    lon1 = (lon1 / 180.) * Pi
-    lon2 = (lon2 / 180.) * Pi
-
-    (earth_radius_in_miles * earth_radius_in_miles) *
-      abs(sin(lat1) - sin(lat2)) *
-      abs(lon1 - lon2)
-  }
+  def square_area() = Distances.square_area(botleft, topright)
 
   /**
    * Iterate over the cells that overlap the boundary.
@@ -360,7 +349,7 @@ object Division {
     if (debug("cell")) {
       // sort by second element of tuple, in reverse order
       for ((div, area) <- divs_by_area sortWith (_._2 > _._2))
-        errprint("%.2f square miles: %s", area, div)
+        errprint("%.2f square km: %s", area, div)
     }
   }
 }

@@ -29,9 +29,10 @@ import NlpUtil.warning
   arbitrarily chosen as the north-south parallel that passes through
   Greenwich, England (near London).  Note that longitude wraps around, but
   latitude does not.  Furthermore, the distance between latitude lines is
-  always the same (about 69 miles per degree), but the distance between
-  longitude lines varies according to the latitude, ranging from about
-  69 miles per degree at the Equator to 0 miles at the North and South Pole.
+  always the same (about 111 km per degree, or about 69 miles per degree),
+  but the distance between longitude lines varies according to the
+  latitude, ranging from about 111 km per degree at the Equator to 0 km
+  at the North and South Pole.
 */
 
 /**
@@ -42,8 +43,8 @@ import NlpUtil.warning
 
   The following is contained:
 
-  1. Fixed information: e.g. radius of Earth in miles, number of miles per
-     degree at the Equator, number of kilometers per mile, minimum/maximum
+  1. Fixed information: e.g. radius of Earth in kilometers (km), number of
+     km per degree at the Equator, number of km per mile, minimum/maximum
      latitude/longitude.
 
   2. The Coord class (holding a latitude/longitude pair)
@@ -61,18 +62,22 @@ object Distances {
   val minimum_longitude = -180.0
   val maximum_longitude = 180.0 - 1e-10
 
-  // Radius of the earth in miles.  Used to compute spherical distance in miles,
-  // and miles per degree of latitude/longitude.
-  val earth_radius_in_miles = 3963.191
+  // Radius of the earth in km.  Used to compute spherical distance in km,
+  // and km per degree of latitude/longitude.
+  // val earth_radius_in_miles = 3963.191
+  val earth_radius_in_km = 6376.774
  
   // Number of kilometers per mile.
   val km_per_mile = 1.609
 
-  // Number of miles per degree, at the equator.  For longitude, this is the
+  // Number of km per degree, at the equator.  For longitude, this is the
   // same everywhere, but for latitude it is proportional to the degrees away
   // from the equator.
-  val miles_per_degree = Pi * 2 * earth_radius_in_miles / 360.
+  val km_per_degree = Pi * 2 * earth_radius_in_km / 360.
  
+  // Number of miles per degree, at the equator.
+  val miles_per_degree = km_per_degree / km_per_mile
+
   // A 2-dimensional coordinate.
   //
   // The following fields are defined:
@@ -135,7 +140,7 @@ object Distances {
     }
   }
 
-  // Compute spherical distance in miles (along a great circle) between two
+  // Compute spherical distance in km (along a great circle) between two
   // coordinates.
   
   def spheredist(p1: Coord, p2: Coord): Double = {
@@ -160,11 +165,37 @@ object Distances {
       } else
         return 0.
     }
-    return earth_radius_in_miles * acos(anglecos)
+    return earth_radius_in_km * acos(anglecos)
   }
   
   def degree_dist(c1: Coord, c2: Coord) = {
     sqrt((c1.lat - c2.lat) * (c1.lat - c2.lat) +
       (c1.long - c2.long) * (c1.long - c2.long))
   }
+
+  /**
+   * Square area in km^2 of a rectangle on the surface of a sphere made up
+   * of latitude and longitude lines. (Although the parameters below are
+   * described as bottom-left and top-right, respectively, the function as
+   * written is in fact insensitive to whether bottom-left/top-right or
+   * top-left/bottom-right pairs are given, and which order they are
+   * given.  All that matters is that opposite corners are supplied.  The
+   * use of `abs` below takes care of this.)
+   *
+   * @param botleft Coordinate of bottom left of rectangle
+   * @param topright Coordinate of top right of rectangle
+   */
+  def square_area(botleft: Coord, topright: Coord) = {
+    var (lat1, lon1) = (botleft.lat, botleft.long)
+    var (lat2, lon2) = (topright.lat, topright.long)
+    lat1 = (lat1 / 180.) * Pi
+    lat2 = (lat2 / 180.) * Pi
+    lon1 = (lon1 / 180.) * Pi
+    lon2 = (lon2 / 180.) * Pi
+
+    (earth_radius_in_km * earth_radius_in_km) *
+      abs(sin(lat1) - sin(lat2)) *
+      abs(lon1 - lon2)
+  }
+
 }
