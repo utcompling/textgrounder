@@ -32,27 +32,6 @@ import NlpUtil.warning
   always the same (about 69 miles per degree), but the distance between
   longitude lines varies according to the latitude, ranging from about
   69 miles per degree at the Equator to 0 miles at the North and South Pole.
-  
-  We divide the earth's surface into "tiling cells", using the value
-  of --cell-size, which is specified in miles; we convert it to degrees
-  using 'miles_per_degree', which is derived from the value for the
-  Earth's radius in miles.  In addition, we form a square of tiling cells
-  in order to create a "statistical cell", which is used to compute a
-  distribution over words.  The numbe of tiling cells on a side is
-  determined by --width-of-stat-cell.  Note that if this is greater than
-  1, different statistical cells will overlap.
-  
-  To specify a cell, we use cell indices, which are derived from
-  coordinates by dividing by degrees_per_cell.  Hence, if for example
-  degrees_per_cell is 2, then cell indices are in the range [-45,+45]
-  for latitude and [-90,+90) for longitude.  In general, an arbitrary
-  coordinate will have fractional cell indices; however, the cell
-  indices of the corners of a cell (tiling or statistical) will be
-  integers.  Normally, we use the southwest corner to specify a cell.
-  
-  Near the edges, tiling cells may be truncated.  Statistical cells
-  will wrap around longitudinally, and will still have the same number
-  of tiling cells, but may be smaller.
 */
 
 /**
@@ -67,29 +46,13 @@ import NlpUtil.warning
      degree at the Equator, number of kilometers per mile, minimum/maximum
      latitude/longitude.
 
-  2. Information computed from command-line settings, e.g. number of
-     degrees per tiling cell, number of miles per tiling cell (on a
-     vertical side, or on a horizontal side at the Equator), minimum and
-     maximum cell indices.
-
-  3. The Coord class (holding a latitude/longitude pair)
+  2. The Coord class (holding a latitude/longitude pair)
   
-  4. The Cellind type (specifying the basic integral type of cell indices,
-     which directly index tiling cells as if they were in an array; note
-     that the cell indices are set up so that directly multiplying by
-     the appropriate factor gives the latitude/longitude coordinates of the
-     southwest corner of the tiling cell being referenced)
-  
-  5. Function spheredist() to compute spherical (great-circle) distance
+  3. Function spheredist() to compute spherical (great-circle) distance
+     between two Coords; likewise degree_dist() to compute degree distance
      between two Coords
-  
-  6. Functions to convert between pairs of Cellinds and Coords (depending on
-     where in the particular cell the Coord is wanted, e.g. one of the
-     corners or the center)
  */
 object Distances {
- 
-  type Cellind = Int
  
   /***** Fixed values *****/
 
@@ -110,26 +73,6 @@ object Distances {
   // from the equator.
   val miles_per_degree = Pi * 2 * earth_radius_in_miles / 360.
  
-  /***** Computed values based on command-line params *****/
-
-  // Size of each cell in degrees.  Determined by the --degrees-per-cell
-  // option, unless --miles-per-cell is set, in which case it takes
-  // priority.
-  var degrees_per_cell = 0.0
-  
-  // Size of each cell (vertical dimension; horizontal dimension only near
-  // the equator) in miles.  Determined from degrees_per_cell.
-  var miles_per_cell = 0.0
-
-  // Minimum, maximum latitude/longitude in indices (integers used to index the
-  // set of cells that tile the earth)
-  var minimum_latind: Cellind = 0
-  var maximum_latind: Cellind = 0
-  var minimum_longind: Cellind = 0
-  var maximum_longind: Cellind = 0
-  
-  var width_of_stat_cell = 1
-
   // A 2-dimensional coordinate.
   //
   // The following fields are defined:
@@ -224,120 +167,4 @@ object Distances {
     sqrt((c1.lat - c2.lat) * (c1.lat - c2.lat) +
       (c1.long - c2.long) * (c1.long - c2.long))
   }
-
-  // Convert a coordinate to the indices of the southwest corner of the
-  // corresponding tiling cell.
-  def coord_to_tiling_cell_indices(coord: Coord) = {
-    val latind: Cellind = floor(coord.lat / degrees_per_cell).toInt
-    val longind: Cellind = floor(coord.long / degrees_per_cell).toInt
-    (latind, longind)
-  }
-  
-  // Convert a coordinate to the indices of the southwest corner of the
-  // corresponding statistical cell.
-  def coord_to_stat_cell_indices(coord: Coord) = {
-    // When width_of_stat_cell = 1, don't subtract anything.
-    // When width_of_stat_cell = 2, subtract 0.5*degrees_per_cell.
-    // When width_of_stat_cell = 3, subtract degrees_per_cell.
-    // When width_of_stat_cell = 4, subtract 1.5*degrees_per_cell.
-    // In general, subtract (width_of_stat_cell-1)/2.0*degrees_per_cell.
-  
-    // Compute the indices of the southwest cell
-    val subval = (width_of_stat_cell-1)/2.0*degrees_per_cell
-    val lat = coord.lat - subval
-    val long = coord.long - subval
-  
-    coord_to_tiling_cell_indices(Coord(lat, long))
-  }
-  
-  // Convert cell indices to the corresponding coordinate.  This can also
-  // be used to find the coordinate of the southwest corner of a tiling cell
-  // or statistical cell, as both are identified by the cell indices of
-  // their southwest corner.  Values are double since we may be requesting the
-  // coordinate of a location not exactly at a cell index (e.g. the center
-  // point).
-  def cell_indices_to_coord(latind: Double, longind: Double,
-      method: String = "coerce-warn") = {
-    Coord(latind * degrees_per_cell, longind * degrees_per_cell,
-          method)
-  }
-  
-  // Add 'offset' to both latind and longind and then convert to a
-  // coordinate.  Coerce the coordinate to be within bounds.
-  def offset_cell_indices_to_coord(latind: Cellind, longind: Cellind,
-      offset: Double) = {
-    cell_indices_to_coord(latind + offset, longind + offset, "coerce")
-  }
-  
-  // Convert cell indices of a tiling cell to the coordinate of the
-  // near (i.e. southwest) corner of the cell.
-  def tiling_cell_indices_to_near_corner_coord(latind: Cellind,
-      longind: Cellind) = {
-    cell_indices_to_coord(latind, longind)
-  }
-  
-  // Convert cell indices of a tiling cell to the coordinate of the
-  // center of the cell.
-  def tiling_cell_indices_to_center_coord(latind: Cellind,
-      longind: Cellind) = {
-    offset_cell_indices_to_coord(latind, longind, 0.5)
-  }
-  
-  // Convert cell indices of a tiling cell to the coordinate of the
-  // far (i.e. northeast) corner of the cell.
-  def tiling_cell_indices_to_far_corner_coord(latind: Cellind,
-      longind: Cellind) = {
-    offset_cell_indices_to_coord(latind, longind, 1)
-  }
-  
-  // Convert cell indices of a tiling cell to the coordinate of the
-  // near (i.e. southwest) corner of the cell.
-  def stat_cell_indices_to_near_corner_coord(latind: Cellind,
-      longind: Cellind) = {
-    cell_indices_to_coord(latind, longind)
-  }
-  
-  // Convert cell indices of a statistical cell to the coordinate of the
-  // center of the cell.
-  def stat_cell_indices_to_center_coord(latind: Cellind, longind: Cellind) = {
-    offset_cell_indices_to_coord(latind, longind,
-        width_of_stat_cell/2.0)
-  }
-  
-  // Convert cell indices of a statistical cell to the coordinate of the
-  // far (i.e. northeast) corner of the cell.
-  def stat_cell_indices_to_far_corner_coord(latind: Cellind,
-      longind: Cellind) = {
-    offset_cell_indices_to_coord(latind, longind,
-        width_of_stat_cell)
-  }
-  
-  // Convert cell indices of a statistical cell to the coordinate of the
-  // northwest corner of the cell.
-  def stat_cell_indices_to_nw_corner_coord(latind: Cellind,
-      longind: Cellind) = {
-    cell_indices_to_coord(latind + width_of_stat_cell, longind, "coerce")
-  }
-  
-  // Convert cell indices of a statistical cell to the coordinate of the
-  // southeast corner of the cell.
-  def stat_cell_indices_to_se_corner_coord(latind: Cellind,
-      longind: Cellind) = {
-    cell_indices_to_coord(latind, longind + width_of_stat_cell, "coerce")
-  }
-  
-  // Convert cell indices of a statistical cell to the coordinate of the
-  // southwest corner of the cell.
-  def stat_cell_indices_to_sw_corner_coord(latind: Cellind,
-      longind: Cellind) = {
-    stat_cell_indices_to_near_corner_coord(latind, longind)
-  }
-  
-  // Convert cell indices of a statistical cell to the coordinate of the
-  // northeast corner of the cell.
-  def stat_cell_indices_to_ne_corner_coord(latind: Cellind,
-      longind: Cellind) = {
-    stat_cell_indices_to_far_corner_coord(latind, longind)
-  }
 }
-

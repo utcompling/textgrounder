@@ -21,6 +21,7 @@ import NlpUtil._
 import Distances._
 import Debug._
 import GeolocateDriver.Opts
+import MultiRegularCellGrid.Cellind // FIXME!!!
 
 import collection.mutable
 import util.control.Breaks._
@@ -68,19 +69,23 @@ class Boundary(botleft: Coord, topright: Coord) {
       abs(lon1 - lon2)
   }
 
-  // Iterate over the cells that overlap the boundary.  If
-  // 'nonempty_word_dist' is true, only yield cells with a non-empty
-  // word distribution; else, yield all non-empty cells.
-  def iter_nonempty_tiling_cells() = {
-    val (latind1, longind1) = coord_to_tiling_cell_indices(botleft)
-    val (latind2, longind2) = coord_to_tiling_cell_indices(topright)
+  /**
+   * Iterate over the cells that overlap the boundary.
+   *
+   * @param cellgrid FIXME: Currently we need a cell grid of a certain type
+   *    passed in so we can iterate over the cells.  Fix this so that
+   *    the algorithm is done differently, or something.
+   */
+  def iter_nonempty_tiling_cells(cellgrid: MultiRegularCellGrid) = {
+    val (latind1, longind1) = cellgrid.coord_to_tiling_cell_indices(botleft)
+    val (latind2, longind2) = cellgrid.coord_to_tiling_cell_indices(topright)
     for {
       i <- latind1 to latind2 view
       val it = if (longind1 <= longind2) longind1 to longind2 view
-      else (longind1 to maximum_longind view) ++
-        (minimum_longind to longind2 view)
+      else (longind1 to cellgrid.maximum_longind view) ++
+        (cellgrid.minimum_longind to longind2 view)
       j <- it
-      if (StatCell.tiling_cell_to_articles contains ((i, j)))
+      if (cellgrid.tiling_cell_to_articles contains ((i, j)))
     } yield (i, j)
   }
 }
@@ -116,16 +121,12 @@ abstract class Location(
 // The following fields are defined, in addition to those for Location:
 //
 //   coord: Coordinates of the location, as a Coord object.
-//   stat_cell: The statistical cell surrounding this location, including
-//             all necessary information to determine the cell-based
-//             distribution.
 
 case class Locality(
   override val name: String,
   val coord: Coord,
   override val altnames: Seq[String],
   override val typ: String) extends Location(name, altnames, typ) {
-  var stat_cell: StatCell = null
 
   def toString(no_article: Boolean = false) = {
     var artmatch = ""
@@ -267,10 +268,8 @@ case class Division(
 
   def generate_worddist() {
     worddist = new CellWordDist()
-    val arts =
-      for (loc <- Seq(this) ++ goodlocs if loc.artmatch != null)
-        yield loc.artmatch
-    worddist.add_articles(arts)
+    for (loc <- Seq(this) ++ goodlocs if loc.artmatch != null)
+      yield worddist.add_article(loc.artmatch)
     worddist.finish(minimum_word_count = Opts.minimum_word_count)
   }
 
@@ -283,6 +282,9 @@ object Division {
 
   // For each tiling cell, list of divisions that have territory in it
   val tiling_cell_to_divisions = bufmap[(Cellind, Cellind), Division]()
+
+  // FIXME: For converting cell indices to coordinates
+  var tiling_cellgrid: MultiRegularCellGrid = null
 
   // Find the division for a point in the division with a given path,
   // add the point to the division.  Create the division if necessary.
@@ -317,10 +319,15 @@ object Division {
     }
   }
 
-  // Finish all computations related to Divisions, after we've processed
-  // all points (and hence all points have been added to the appropriate
-  // Divisions).
-  def finish_all() {
+  /**
+   * Finish all computations related to Divisions, after we've processed
+   * all points (and hence all points have been added to the appropriate
+   * Divisions).
+   *
+   * @param cellgrid FIXME: Currently required for certain internal reasons.
+   *   Fix so we don't need it, or it's created internally!
+   */
+  def finish_all(cellgrid: MultiRegularCellGrid) {
     val divs_by_area = mutable.Buffer[(Division, Double)]()
     for (division <- path_to_division.values) {
       if (debug("lots")) {
@@ -342,7 +349,8 @@ object Division {
             division.name, division.path)
         }
       }
-      for (inds <- division.boundary.iter_nonempty_tiling_cells())
+      tiling_cellgrid = cellgrid
+      for (inds <- division.boundary.iter_nonempty_tiling_cells(cellgrid))
         tiling_cell_to_divisions(inds) += division
       if (debug("cell"))
         divs_by_area += ((division, division.boundary.square_area()))
@@ -358,8 +366,8 @@ object Division {
 // A Wikipedia article for toponym resolution.
 
 class TopoArticle(params: Map[String, String]) extends StatArticle(params) {
-  // StatCell object corresponding to this article.
-  var stat_cell: StatCell = null
+  // Cell-based distribution corresponding to this article.
+  var worddist: CellWordDist = null
   // Corresponding location for this article.
   var location: Location = null
 
@@ -421,7 +429,7 @@ class TopoArticle(params: Map[String, String]) extends StatArticle(params) {
 
   // Determine the cell word-distribution object for a given article:
   // Create and populate one if necessary.
-  def find_cellworddist() = {
+  def find_cellworddist(cellgrid: CellGrid) = {
     val loc = location
     if (loc != null && loc.isInstanceOf[Division]) {
       val div = loc.asInstanceOf[Division]
@@ -429,15 +437,24 @@ class TopoArticle(params: Map[String, String]) extends StatArticle(params) {
         div.generate_worddist()
       div.worddist
     } else {
-      if (stat_cell == null)
-        stat_cell = StatCell.find_cell_for_coord(coord)
-      stat_cell.worddist
+      if (worddist == null) {
+        val stat_cell = cellgrid.find_best_cell_for_coord(coord)
+        if (stat_cell != null)
+          worddist = stat_cell.worddist
+        else {
+          warning("Couldn't find existing cell distribution for article %s",
+            this)
+          worddist = new CellWordDist()
+          worddist.finish()
+        }
+      }
+      worddist
     }
   }
 
   // Find the divisions that cover the given article.
   def find_covering_divisions() = {
-    val inds = coord_to_tiling_cell_indices(coord)
+    val inds = Division.tiling_cellgrid.coord_to_tiling_cell_indices(coord)
     val divs = Division.tiling_cell_to_divisions(inds)
     (for (div <- divs if div contains coord) yield div)
   }
@@ -743,18 +760,19 @@ abstract class GeotagToponymStrategy {
 // (find the correct geographic location) using the "link baseline", i.e.
 // use the location with the highest number of incoming links.
 class BaselineGeotagToponymStrategy(
+  cellgrid: CellGrid,
   val baseline_strategy: String) extends GeotagToponymStrategy {
   def need_context() = false
 
   def compute_score(geogword: GeogWord, art: TopoArticle) = {
     if (baseline_strategy == "internal-link") {
       if (Opts.context_type == "cell")
-        art.find_cellworddist().incoming_links
+        art.find_cellworddist(cellgrid).incoming_links
       else
         art.adjusted_incoming_links
     } else if (baseline_strategy == "num-articles") {
       if (Opts.context_type == "cell")
-        art.find_cellworddist().num_arts_for_links
+        art.find_cellworddist(cellgrid).num_arts_for_links
       else {
         val location = art.location
         location match {
@@ -770,6 +788,7 @@ class BaselineGeotagToponymStrategy(
 // (find the correct geographic location) using Naive Bayes, possibly
 // in conjunction with the baseline.
 class NaiveBayesToponymStrategy(
+  cellgrid: CellGrid,
   val use_baseline: Boolean) extends GeotagToponymStrategy {
   def need_context() = true
 
@@ -781,7 +800,7 @@ class NaiveBayesToponymStrategy(
 
     var distobj =
       if (Opts.context_type == "article") art.dist
-      else art.find_cellworddist()
+      else art.find_cellworddist(cellgrid)
     var totalprob = 0.0
     var total_word_weight = 0.0
     val (word_weight, baseline_weight) =
@@ -1170,7 +1189,18 @@ object Gazetteer {
   var gazetteer: Gazetteer = null
 }
 
-class WorldGazetteer(filename: String) extends Gazetteer {
+/**
+ * Gazetteer of the World-gazetteer format.
+ *
+ * @param filename File holding the World Gazetteer.
+ *
+ * @param cellgrid FIXME: Currently required for certain internal reasons.
+ *   Fix so we don't need it, or it's created internally!
+ */
+class WorldGazetteer(
+  filename: String,
+  cellgrid: MultiRegularCellGrid
+) extends Gazetteer {
 
   // Find the Wikipedia article matching an entry in the gazetteer.
   // The format of an entry is
@@ -1279,9 +1309,9 @@ class WorldGazetteer(filename: String) extends Gazetteer {
   }
 
   // Read in the data from the World gazetteer in FILENAME and find the
-  // Wikipedia article matching each entry in the gazetteer.  For localities,
-  // add them to the cell-map that covers the earth if ADD_TO_CELL_MAP is
-  // true.
+  // Wikipedia article matching each entry in the gazetteer.  (Unimplemented:
+  // For localities, add them to the cell-map that covers the earth if
+  // ADD_TO_CELL_MAP is true.)
   protected def read_world_gazetteer_and_match(filename: String) {
     val status = new MeteredTask("gazetteer entry", "matching")
     errprint("Matching gazetteer entries in %s...", filename)
@@ -1298,7 +1328,7 @@ class WorldGazetteer(filename: String) extends Gazetteer {
       }
     }
 
-    Division.finish_all()
+    Division.finish_all(cellgrid)
     status.finish()
     output_resource_usage()
   }

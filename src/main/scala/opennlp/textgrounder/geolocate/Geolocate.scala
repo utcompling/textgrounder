@@ -28,6 +28,7 @@ import OptParse._
 import Distances._
 import Debug._
 import GeolocateDriver.Opts
+import MultiRegularCellGrid.Cellind // FIXME!!!
 
 import util.matching.Regex
 import util.Random
@@ -470,7 +471,7 @@ object KMLConstants {
 /////////////////////////////////////////////////////////////////////////////
 
 /**
-  Distribution over words corresponding to a statistical cell.
+  Distribution over words corresponding to a cell.
  */
 
 class CellWordDist extends SmoothedWordDist(
@@ -486,14 +487,8 @@ class CellWordDist extends SmoothedWordDist(
 
   def is_empty() = num_arts_for_links == 0
 
-  // Add the given articles to the total distribution seen so far
-  def add_articles(articles: Iterable[StatArticle]) {
-    var this_incoming_links = 0
-    if (debug("lots"))
-      errprint("Cell dist, number of articles = %s", num_arts_for_word_dist)
-    val old_total_tokens = total_tokens
-    var this_num_arts_for_links = 0
-    var this_num_arts_for_word_dist = 0
+  // Add the given article to the total distribution seen so far
+  def add_article(art: StatArticle) {
     /* We are passed in all articles, regardless of the split.
        The decision was made to accumulate link counts from all articles,
        even in the evaluation set.  Strictly, this is a violation of the
@@ -522,39 +517,25 @@ class CellWordDist extends SmoothedWordDist(
        only computes a fairly small fraction of the total word counts;
        (2) distributions are normalized in any case, so the exact number
        of articles in a cell does not affect the distribution. */
-    for (art <- articles) {
-      /* Add link count of article to cell. */
-      art.incoming_links match {
-        // Might be None, for unknown link count
-        case Some(x) => this_incoming_links += x
-        case _ =>
-      }
-      this_num_arts_for_links += 1
-
-      /* Add word counts of article to cell, but only if in the
-         training set. */
-      if (art.split == "training") {
-        if (art.dist == null) {
-          if (Opts.max_time_per_stage == 0.0 && Opts.num_training_docs == 0)
-            warning("Saw article %s without distribution", art)
-        } else {
-          assert(art.dist.finished)
-          add_word_distribution(art.dist)
-          this_num_arts_for_word_dist += 1
-        }
-      }
+    /* Add link count of article to cell. */
+    art.incoming_links match {
+      // Might be None, for unknown link count
+      case Some(x) => incoming_links += x
+      case _ =>
     }
-    num_arts_for_links += this_num_arts_for_links
-    num_arts_for_word_dist += this_num_arts_for_word_dist
-    incoming_links += this_incoming_links
-    if (this_num_arts_for_word_dist > 0 && debug("lots")) {
-      errprint("""--> Finished processing, number articles handled = %s/%s,
-    skipped articles = %s, total tokens = %s/%s, incoming links = %s/%s""",
-        this_num_arts_for_word_dist,
-        num_arts_for_word_dist,
-        this_num_arts_for_links - this_num_arts_for_word_dist,
-        total_tokens - old_total_tokens,
-        total_tokens, this_incoming_links, incoming_links)
+    num_arts_for_links += 1
+
+    /* Add word counts of article to cell, but only if in the
+       training set. */
+    if (art.split == "training") {
+      if (art.dist == null) {
+        if (Opts.max_time_per_stage == 0.0 && Opts.num_training_docs == 0)
+          warning("Saw article %s without distribution", art)
+      } else {
+        assert(art.dist.finished)
+        add_word_distribution(art.dist)
+        num_arts_for_word_dist += 1
+      }
     }
   }
 
@@ -615,6 +596,7 @@ class CellDist(
 */
 
 class WordCellDist(
+  val cellgrid: CellGrid,
   val word: Word
 ) extends CellDist(mutable.Map[StatCell, Double]()) {
   var normalized = false
@@ -624,7 +606,7 @@ class WordCellDist(
     // distributions.
     var totalprob = 0.0
     // Compute and store un-normalized probabilities for all cells
-    for (cell <- StatCell.iter_nonempty_cells(nonempty_word_dist = true)) {
+    for (cell <- cellgrid.iter_nonempty_cells(nonempty_word_dist = true)) {
       val prob = cell.worddist.lookup_word(word)
       // Another way of handling zero probabilities.
       /// Zero probabilities are just a bad idea.  They lead to all sorts of
@@ -651,103 +633,17 @@ class WordCellDist(
 
   // Convert cell to a KML file showing the distribution
   def generate_kml_file(filename: String) {
-    import KMLConstants._
     val xform = if (Opts.kml_transform == "log") (x: Double) => log(x)
     else if (Opts.kml_transform == "logsquared") (x: Double) => -log(x) * log(x)
     else (x: Double) => x
 
-    val minxformprob = xform(cellprobs.values min)
-    val maxxformprob = xform(cellprobs.values max)
-
-    // Generate KML for a single cell
-    def one_cell_kml(cell: StatCell, prob: Double) = {
-      val (latind, longind) = (cell.latind.get, cell.longind.get)
-      val offprob = xform(prob) - minxformprob
-      val fracprob = offprob / (maxxformprob - minxformprob)
-      val swcoord = stat_cell_indices_to_near_corner_coord(latind, longind)
-      val necoord = stat_cell_indices_to_far_corner_coord(latind, longind)
-      val nwcoord = Coord(necoord.lat, swcoord.long)
-      val secoord = Coord(swcoord.lat, necoord.long)
-      val center = stat_cell_indices_to_center_coord(latind, longind)
-      var coordtext = "\n"
-      for (coord <- Seq(swcoord, nwcoord, necoord, secoord, swcoord)) {
-        val lat = (center.lat + coord.lat) / 2
-        val long = (center.long + coord.long) / 2
-        coordtext += "%s,%s,%s\n" format (
-          long, lat, fracprob * Opts.kml_max_height)
-      }
-      val name =
-        if (cell.most_popular_article != null) cell.most_popular_article.title
-        else ""
-
-      // Placemark indicating name
-      // !!PY2SCALA: BEGIN_PASSTHRU
-      // Because it tries to frob the # sign
-      val name_placemark =
-        <Placemark>
-          <name>{ name }</name>
-          ,
-          <Cell>
-            <LatLonAltBox>
-              <north>{ ((center.lat + necoord.lat) / 2).toString }</north>
-              <south>{ ((center.lat + swcoord.lat) / 2).toString }</south>
-              <east>{ ((center.long + necoord.long) / 2).toString }</east>
-              <west>{ ((center.long + swcoord.long) / 2).toString }</west>
-            </LatLonAltBox>
-            <Lod>
-              <minLodPixels>16</minLodPixels>
-            </Lod>
-          </Cell>
-          <styleURL>#bar</styleURL>
-          <Point>
-            <coordinates>{ "%s,%s" format (center.long, center.lat) }</coordinates>
-          </Point>
-        </Placemark>
-      // !!PY2SCALA: END_PASSTHRU
-
-      // Interpolate colors
-      val color = Array(0.0, 0.0, 0.0)
-      for (i <- 1 to 3) {
-        color(i) = (kml_mincolor(i) +
-          fracprob * (kml_maxcolor(i) - kml_mincolor(i)))
-      }
-      // Original color dc0155ff
-      //rgbcolor = "dc0155ff"
-      val revcol = color.reverse
-      val rgbcolor = "ff%02x%02x%02x" format (revcol(0), revcol(1), revcol(2))
-
-      // Yield cylinder indicating probability by height and color
-
-      // !!PY2SCALA: BEGIN_PASSTHRU
-      val cylinder_placemark =
-        <Placemark>
-          <name>{ "%s POLYGON" format name }</name>
-          <styleUrl>#bar</styleUrl>
-          <Style>
-            <PolyStyle>
-              <color>{ rgbcolor }</color>
-              <colorMode>normal</colorMode>
-            </PolyStyle>
-          </Style>
-          <Polygon>
-            <extrude>1</extrude>
-            <tessellate>1</tessellate>
-            <altitudeMode>relativeToGround</altitudeMode>
-            <outerBoundaryIs>
-              <LinearRing>
-                <coordinates>{ coordtext }</coordinates>
-              </LinearRing>
-            </outerBoundaryIs>
-          </Polygon>
-        </Placemark>
-      // !!PY2SCALA: END_PASSTHRU
-      Seq(name_placemark, cylinder_placemark)
-    }
+    val xf_minprob = xform(cellprobs.values min)
+    val xf_maxprob = xform(cellprobs.values max)
 
     def yield_cell_kml() {
       for {
         (cell, prob) <- cellprobs
-        kml <- one_cell_kml(cell, prob)
+        kml <- cell.generate_kml(xform(prob), xf_minprob, xf_maxprob)
         expr <- kml
       } yield expr
     }
@@ -798,13 +694,13 @@ object CellDist {
 
   // Return a cell distribution over a given word, using a least-recently-used
   // cache to optimize access.
-  def get_cell_dist(word: Word) = {
+  def get_cell_dist(cellgrid: CellGrid, word: Word) = {
     if (cached_dists == null)
       cached_dists = new LRUCache(maxsize = Opts.lru_cache_size)
     cached_dists.get(word) match {
       case Some(dist) => dist
       case None => {
-        val dist = new WordCellDist(word)
+        val dist = new WordCellDist(cellgrid, word)
         cached_dists(word) = dist
         dist
       }
@@ -814,10 +710,10 @@ object CellDist {
   // Return a cell distribution over a distribution over words.  This works
   // by adding up the distributions of the individual words, weighting by
   // the count of the each word.
-  def get_cell_dist_for_word_dist(worddist: WordDist) = {
+  def get_cell_dist_for_word_dist(cellgrid: CellGrid, worddist: WordDist) = {
     val cellprobs = doublemap[StatCell]()
     for ((word, count) <- worddist.counts) {
-      val dist = get_cell_dist(word)
+      val dist = get_cell_dist(cellgrid, word)
       for ((cell, prob) <- dist.cellprobs)
         cellprobs(cell) += count * prob
     }
@@ -832,34 +728,29 @@ object CellDist {
 //                           Geographic locations                          //
 /////////////////////////////////////////////////////////////////////////////
 
-///////////// statistical cells ////////////
-
-// This class contains values used in computing the distribution over all
-// locations in the statistical cell surrounding the locality in question.
-// The statistical cell is currently defined as a square of NxN tiling
-// cells, for N = width_of_stat_cell.
-// The following fields are defined: 
-//
-//   latind, longind: Cell indices of southwest-most tiling cell in
-//                    statistical cell.
-//   worddist: Distribution corresponding to cell.
-
-class StatCell(
-  val latind: Option[Cellind],
-  val longind: Option[Cellind]) {
+abstract class StatCell(val cellgrid: CellGrid) {
   val worddist = new CellWordDist()
   var most_popular_article: StatArticle = null
   var mostpopart_links = 0
 
-  def boundstr() = {
-    if (!latind.isEmpty) {
-      val near =
-        stat_cell_indices_to_near_corner_coord(latind.get, longind.get)
-      val far =
-        stat_cell_indices_to_far_corner_coord(latind.get, longind.get)
-      "%s-%s" format (near, far)
-    } else "nowhere"
-  }
+  /**
+   * Return a string describing the location of the cell in its grid,
+   * e.g. by its boundaries or similar.
+   */
+  def describe_location(): String
+
+  /**
+   * Return a string describing the indices of the cell in its grid.
+   * Only used for debugging.
+   */
+  def describe_indices(): String
+
+  /**
+   * Return an Iterable over articles, listing the articles in the cell.
+   */
+  def iterate_articles(): Iterable[StatArticle]
+
+  def get_center_coord(): Coord
 
   override def toString() = {
     val unfinished = if (worddist.finished) "" else ", unfinished"
@@ -870,7 +761,7 @@ class StatCell(
       else ""
 
     "StatCell(%s%s%s, %d articles(dist), %d articles(links), %d links)" format (
-      boundstr(), unfinished, contains,
+      describe_location(), unfinished, contains,
       worddist.num_arts_for_word_dist, worddist.num_arts_for_links,
       worddist.incoming_links)
   }
@@ -880,7 +771,7 @@ class StatCell(
   // }
 
   def shortstr() = {
-    var str = "Cell %s" format boundstr()
+    var str = "Cell %s" format describe_location()
     val mostpop = most_popular_article
     if (mostpop != null)
       str += ", most-popular %s" format mostpop.shortstr()
@@ -889,7 +780,7 @@ class StatCell(
 
   def struct() =
     <StatCell>
-      <bounds>{ boundstr() }</bounds>
+      <bounds>{ describe_location() }</bounds>
       <finished>{ worddist.finished }</finished>
       {
         if (most_popular_article != null)
@@ -901,56 +792,342 @@ class StatCell(
       <incomingLinks>{ worddist.incoming_links }</incomingLinks>
     </StatCell>
 
-  // Generate the distribution for a statistical cell from the tiling cells.
+  // Generate the distribution for a cell from the articles in it.
   def generate_dist() {
-
-    val celllat = latind.get
-    val celllong = longind.get
-
-    if (debug("lots")) {
-      errprint("Generating distribution for statistical cell centered at %s",
-        cell_indices_to_coord(celllat, celllong))
-    }
-
-    // Accumulate counts for the given cell
-    def process_one_cell(latind: Cellind, longind: Cellind) {
-      val arts =
-        StatCell.tiling_cell_to_articles.getOrElse((latind, longind), null)
-      if (arts == null)
-        return
-      if (debug("lots")) {
-        errprint("--> Processing tiling cell %s",
-          cell_indices_to_coord(latind, longind))
-      }
-      worddist.add_articles(arts)
-      for (art <- arts) {
-        if (art.incoming_links != None &&
-            art.incoming_links.get > mostpopart_links) {
-          mostpopart_links = art.incoming_links.get
-          most_popular_article = art
-        }
+    for (art <- iterate_articles()) {
+      worddist.add_article(art)
+      if (art.incoming_links != None &&
+          art.incoming_links.get > mostpopart_links) {
+        mostpopart_links = art.incoming_links.get
+        most_popular_article = art
       }
     }
-
-    // Process the tiling cells making up the statistical cell;
-    // but be careful around the edges.  Truncate the latitude, wrap the
-    // longitude.
-    for (
-      i <- celllat until (maximum_latind + 1 min
-        celllat + width_of_stat_cell)
-    ) {
-      for (j <- celllong until celllong + width_of_stat_cell) {
-        var jj = j
-        if (jj > maximum_longind) jj -= 360
-        process_one_cell(i, jj)
-      }
-    }
-
     worddist.finish(minimum_word_count = Opts.minimum_word_count)
+  }
+
+  // Generate KML for a single cell
+  def generate_kml(xfprob: Double, xf_minprob: Double, xf_maxprob: Double):
+    Iterable[xml.Elem]
+}
+
+abstract class PolygonalCell(
+  cellgrid: CellGrid
+) extends StatCell(cellgrid) {
+  def get_boundary(): Iterable[Coord]
+
+  def get_inner_boundary() = {
+    val center = get_center_coord()
+    for (coord <- get_boundary())
+      yield Coord ((center.lat + coord.lat) / 2.0, (center.long + coord.long))
+  }
+
+  def generate_kml_placemark(name: String): xml.Elem
+
+  def generate_kml(xfprob: Double, xf_minprob: Double, xf_maxprob: Double) = {
+    import KMLConstants._
+    val offprob = xfprob - xf_minprob
+    val fracprob = offprob / (xf_maxprob - xf_minprob)
+    var coordtext = "\n"
+    for (coord <- get_inner_boundary()) {
+      coordtext += "%s,%s,%s\n" format (
+        coord.long, coord.lat, fracprob * Opts.kml_max_height)
+    }
+    val name =
+      if (most_popular_article != null) most_popular_article.title
+      else ""
+
+    // Placemark indicating name
+    val name_placemark = generate_kml_placemark(name)
+
+    // Interpolate colors
+    val color = Array(0.0, 0.0, 0.0)
+    for (i <- 1 to 3) {
+      color(i) = (kml_mincolor(i) +
+        fracprob * (kml_maxcolor(i) - kml_mincolor(i)))
+    }
+    // Original color dc0155ff
+    //rgbcolor = "dc0155ff"
+    val revcol = color.reverse
+    val rgbcolor = "ff%02x%02x%02x" format (revcol(0), revcol(1), revcol(2))
+
+    // Yield cylinder indicating probability by height and color
+
+    // !!PY2SCALA: BEGIN_PASSTHRU
+    val cylinder_placemark =
+      <Placemark>
+        <name>{ "%s POLYGON" format name }</name>
+        <styleUrl>#bar</styleUrl>
+        <Style>
+          <PolyStyle>
+            <color>{ rgbcolor }</color>
+            <colorMode>normal</colorMode>
+          </PolyStyle>
+        </Style>
+        <Polygon>
+          <extrude>1</extrude>
+          <tessellate>1</tessellate>
+          <altitudeMode>relativeToGround</altitudeMode>
+          <outerBoundaryIs>
+            <LinearRing>
+              <coordinates>{ coordtext }</coordinates>
+            </LinearRing>
+          </outerBoundaryIs>
+        </Polygon>
+      </Placemark>
+    // !!PY2SCALA: END_PASSTHRU
+    Seq(name_placemark, cylinder_placemark)
   }
 }
 
-object StatCell {
+abstract class RectangularCell(
+  cellgrid: CellGrid
+) extends PolygonalCell(cellgrid) {
+  def get_southwest_coord(): Coord
+  def get_northeast_coord(): Coord
+  def get_center_coord() = {
+    val sw = get_southwest_coord()
+    val ne = get_northeast_coord()
+    Coord((sw.lat + ne.lat) / 2.0, (sw.long + ne.long) / 2.0)
+  }
+
+  def get_boundary() = {
+    val sw = get_southwest_coord()
+    val ne = get_northeast_coord()
+    val center = get_center_coord()
+    val nw = Coord(ne.lat, sw.long)
+    val se = Coord(sw.lat, ne.long)
+    Seq(sw, nw, ne, se, sw)
+  }
+
+  def generate_kml_placemark(name: String) = {
+    val sw = get_southwest_coord()
+    val ne = get_northeast_coord()
+    val center = get_center_coord()
+    // !!PY2SCALA: BEGIN_PASSTHRU
+    // Because it tries to frob the # sign
+    <Placemark>
+      <name>{ name }</name>
+      ,
+      <Cell>
+        <LatLonAltBox>
+          <north>{ ((center.lat + ne.lat) / 2).toString }</north>
+          <south>{ ((center.lat + sw.lat) / 2).toString }</south>
+          <east>{ ((center.long + ne.long) / 2).toString }</east>
+          <west>{ ((center.long + sw.long) / 2).toString }</west>
+        </LatLonAltBox>
+        <Lod>
+          <minLodPixels>16</minLodPixels>
+        </Lod>
+      </Cell>
+      <styleURL>#bar</styleURL>
+      <Point>
+        <coordinates>{ "%s,%s" format (center.long, center.lat) }</coordinates>
+      </Point>
+    </Placemark>
+    // !!PY2SCALA: END_PASSTHRU
+  }
+}
+
+///////////// multi cells ////////////
+
+// This class contains values used in computing the distribution over all
+// locations in the multi cell surrounding the locality in question.
+// The multi cell is currently defined as a square of NxN tiling
+// cells, for N = width_of_multi_cell.
+// The following fields are defined: 
+//
+//   latind, longind: Cell indices of southwest-most tiling cell in
+//                    multi cell.
+//   worddist: Distribution corresponding to cell.
+
+class MultiRegularCell(
+  cellgrid: MultiRegularCellGrid,
+  val latind: Cellind,
+  val longind: Cellind
+) extends RectangularCell(cellgrid) {
+
+  def get_southwest_coord() =
+      cellgrid.multi_cell_indices_to_near_corner_coord(latind, longind)
+
+  def get_northeast_coord() =
+      cellgrid.multi_cell_indices_to_far_corner_coord(latind, longind)
+
+  def describe_location() = {
+    "%s-%s" format (get_southwest_coord(), get_northeast_coord())
+  }
+
+  def describe_indices() = "%s,%s" format (latind, longind)
+
+  def iterate_articles() = {
+    val maxlatind =
+      (cellgrid.maximum_latind + 1) min (latind + cellgrid.width_of_multi_cell)
+
+    if (debug("lots")) {
+      errprint("Generating distribution for multi cell centered at %s",
+        cellgrid.cell_indices_to_coord(latind, longind))
+    }
+
+    // Process the tiling cells making up the multi cell;
+    // but be careful around the edges.  Truncate the latitude, wrap the
+    // longitude.
+    for { 
+      // The use of view() here in both iterators causes this iterable to
+      // be lazy; hence the print statement below doesn't get executed until
+      // we actually process the articles in question.
+      i <- (latind until maxlatind) view;
+      rawj <- (longind until longind + cellgrid.width_of_multi_cell) view;
+      val j = (if (rawj > cellgrid.maximum_longind) rawj - 360 else rawj)
+      art <- {
+        if (debug("lots")) {
+          errprint("--> Processing tiling cell %s",
+            cellgrid.cell_indices_to_coord(latind, longind))
+        }
+        cellgrid.tiling_cell_to_articles.getNoSet((i, j))
+      }
+    } yield art
+  }
+}
+
+/**
+ * Abstract class for a grid of cells covering the earth.
+ */
+abstract class CellGrid {
+  /* These are simply the sum of the corresponding counts
+     num_arts_for_word_dist and num_arts_for_links of each individual cell. */
+  var total_num_arts_for_word_dist = 0
+  var total_num_arts_for_links = 0
+  var all_cells_computed = false
+  var num_non_empty_cells = 0
+  var total_num_cells: Int
+
+  // Find the correct StatCell for the given coordinates.
+  // If none, create the cell.
+  def find_best_cell_for_coord(coord: Coord): StatCell
+
+  // Add the given article to the cell grid
+  def add_article_to_cell(article: StatArticle): Unit
+
+  // Generate all StatCells that are non-empty.  Don't do anything if
+  // called multiple times.
+  protected def initialize_cells(): Unit
+
+  def finish() {
+    if (all_cells_computed)
+      return
+
+    initialize_cells()
+
+    all_cells_computed = true
+
+    total_num_arts_for_links = 0
+    total_num_arts_for_word_dist = 0
+    for (cell <- iter_nonempty_cells()) {
+      total_num_arts_for_word_dist += cell.worddist.num_arts_for_word_dist
+      total_num_arts_for_links += cell.worddist.num_arts_for_links
+    }
+
+    errprint("Number of non-empty cells: %s", num_non_empty_cells)
+    errprint("Total number of cells: %s", total_num_cells)
+    errprint("Percent non-empty cells: %g",
+      num_non_empty_cells.toDouble / total_num_cells)
+    val training_arts_with_word_counts =
+      StatArticleTable.table.num_word_count_articles_by_split("training")
+    errprint("Training articles per non-empty cell: %g",
+      training_arts_with_word_counts.toDouble / num_non_empty_cells)
+    // Also clear out the article distributions of the training set, since
+    // only needed when computing cells.
+    //
+    // FIXME: Could perhaps save more memory, or at least total memory used,
+    // by never creating these distributions at all, but directly adding
+    // them to the cells.  Would require a bit of thinking when reading
+    // in the counts.
+    StatArticleTable.table.clear_training_article_distributions()
+  }
+
+  // Iterate over all non-empty cells.  If 'nonempty_word_dist' is given,
+  // distributions must also have a non-empty word distribution; otherwise,
+  // they just need to have at least one point in them. (Not all points
+  // have word distributions, esp. when --max-time-per-stage is set so
+  // that we only load the word distributions for a fraction of the whole
+  // set of articles with distributions.)
+  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[StatCell]
+}
+
+object MultiRegularCellGrid {
+  /* 
+  We divide the earth's surface into "tiling cells", using the value
+  of --degrees-per-cell. (Alternatively, the value of --miles-per-cell
+  is converted into degrees using 'miles_per_degree', which specifies
+  the size of a degree at the equator and is derived from the value for the
+  Earth's radius in miles.)
+
+  In addition, we form a square of tiling cells in order to create a
+  "multi cell", which is used to compute a distribution over words.  The
+  number of tiling cells on a side is determined by --width-of-multi-cell.
+  Note that if this is greater than 1, different multi cells will overlap.
+
+  To specify a cell, we use cell indices, which are derived from
+  coordinates by dividing by degrees_per_cell.  Hence, if for example
+  degrees_per_cell is 2, then cell indices are in the range [-45,+45]
+  for latitude and [-90,+90) for longitude.  In general, an arbitrary
+  coordinate will have fractional cell indices; however, the cell indices
+  of the corners of a cell (tiling or statistical) will be integers.
+  Normally, we use the southwest corner to specify a cell.
+
+  Near the edges, tiling cells may be truncated.  Statistical cells will
+  wrap around longitudinally, and will still have the same number of
+  tiling cells, but may be smaller.
+  */
+
+  /* The Cellind type, specifying the basic integral type of cell indices,
+     which directly index tiling cells as if they were in an array; note
+     that the cell indices are set up so that directly multiplying by
+     the appropriate factor gives the latitude/longitude coordinates of the
+     southwest corner of the tiling cell being referenced. */
+  type Cellind = Int
+}
+
+/**
+ * Grid of regularly-spaced rectangular tiles covering the earth, where
+ * the cells over which distributions are computed are be composed of
+ * NxN tiles, where possibly N > 1.
+ *
+ * @param degrees_per_cell Size of each cell in degrees.  Determined by the
+ *   --degrees-per-cell option, unless --miles-per-cell is set, in which
+ *   case it takes priority.
+ @ @param width_of_multi_cell Size of multi cells in tiling cells,
+ *   determined by the --width-of-multi-cell option.
+ */
+class MultiRegularCellGrid(
+  val degrees_per_cell: Double,
+  val width_of_multi_cell: Int
+) extends CellGrid {
+
+  /**
+   * Size of each cell (vertical dimension; horizontal dimension only near
+   * the equator) in miles.  Determined from degrees_per_cell.
+   */
+  val miles_per_cell = degrees_per_cell * miles_per_degree
+
+  /* Set minimum, maximum latitude/longitude in indices (integers used to
+     index the set of cells that tile the earth).   The actual maximum
+     latitude is exactly 90 (the North Pole).  But if we set degrees per
+     cell to be a number that exactly divides 180, and we use
+     maximum_latitude = 90 in the following computations, then we would
+     end up with the North Pole in a cell by itself, something we probably
+     don't want.
+   */
+  val (maxlatind, maxlongind) =
+    coord_to_tiling_cell_indices(Coord(maximum_latitude - 1e-10,
+      maximum_longitude))
+  val maximum_latind = maxlatind
+  val maximum_longind = maxlongind
+  val (minlatind, minlongind) =
+    coord_to_tiling_cell_indices(Coord(minimum_latitude,
+      minimum_longitude))
+  val minimum_latind = minlatind
+  val minimum_longind = minlongind
+
   // Mapping of cell->locations in cell, for cell-based Naive Bayes
   // disambiguation.  The key is a tuple expressing the integer indices of the
   // latitude and longitude of the southwest corner of the cell. (Basically,
@@ -965,23 +1142,139 @@ object StatCell {
   // article distributions.
   var tiling_cell_to_articles = bufmap[(Cellind, Cellind), StatArticle]()
 
-  // Mapping from center of statistical cell to corresponding cell object.
-  // A "statistical cell" is made up of a square of tiling cells, with
-  // the number of cells on a side determined by `width_of_stat_cell'.  A
-  // word distribution is associated with each statistical cell.
-  val corner_to_stat_cell = mutable.Map[(Cellind, Cellind), StatCell]()
+  /**
+   * Mapping from index of southwest corner of multi cell to corresponding
+   * cell object.  A "multi cell" is made up of a square of tiling cells,
+   * with the number of cells on a side determined by `width_of_multi_cell'.
+   * A word distribution is associated with each multi cell.
+   */
+  val corner_to_multi_cell = mutable.Map[(Cellind, Cellind), MultiRegularCell]()
 
-  var empty_stat_cell: StatCell = null // Can't compute this until class is initialized
-  var all_cells_computed = false
-  var num_empty_cells = 0
-  var num_non_empty_cells = 0
-  var total_num_arts_for_word_dist = 0
-  var total_num_arts_for_links = 0
+  var total_num_cells = 0
+ 
+  /*************** Conversion between Cellind pairs and Coords *************/
 
-  // Find the correct StatCell for the given coordinates.
-  // If none, create the cell.
-  def find_cell_for_coord(coord: Coord) = {
-    val (latind, longind) = coord_to_stat_cell_indices(coord)
+  /* The different functions vary depending on where in the particular cell
+     the Coord is wanted, e.g. one of the corners or the center. */
+
+  // Convert a coordinate to the indices of the southwest corner of the
+  // corresponding tiling cell.
+  def coord_to_tiling_cell_indices(coord: Coord) = {
+    val latind: Cellind = floor(coord.lat / degrees_per_cell).toInt
+    val longind: Cellind = floor(coord.long / degrees_per_cell).toInt
+    (latind, longind)
+  }
+  
+  // Convert a coordinate to the indices of the southwest corner of the
+  // corresponding statistical cell.
+  def coord_to_multi_cell_indices(coord: Coord) = {
+    // When width_of_multi_cell = 1, don't subtract anything.
+    // When width_of_multi_cell = 2, subtract 0.5*degrees_per_cell.
+    // When width_of_multi_cell = 3, subtract degrees_per_cell.
+    // When width_of_multi_cell = 4, subtract 1.5*degrees_per_cell.
+    // In general, subtract (width_of_multi_cell-1)/2.0*degrees_per_cell.
+  
+    // Compute the indices of the southwest cell
+    val subval = (width_of_multi_cell-1)/2.0*degrees_per_cell
+    coord_to_tiling_cell_indices(
+      Coord(coord.lat - subval, coord.long - subval))
+  }
+  
+  // Convert cell indices to the corresponding coordinate.  This can also
+  // be used to find the coordinate of the southwest corner of a tiling cell
+  // or statistical cell, as both are identified by the cell indices of
+  // their southwest corner.  Values are double since we may be requesting the
+  // coordinate of a location not exactly at a cell index (e.g. the center
+  // point).
+  def cell_indices_to_coord(latind: Double, longind: Double,
+      method: String = "coerce-warn") = {
+    Coord(latind * degrees_per_cell, longind * degrees_per_cell,
+          method)
+  }
+  
+  // Add 'offset' to both latind and longind and then convert to a
+  // coordinate.  Coerce the coordinate to be within bounds.
+  def offset_cell_indices_to_coord(latind: Cellind, longind: Cellind,
+      offset: Double) = {
+    cell_indices_to_coord(latind + offset, longind + offset, "coerce")
+  }
+  
+  // Convert cell indices of a tiling cell to the coordinate of the
+  // near (i.e. southwest) corner of the cell.
+  def tiling_cell_indices_to_near_corner_coord(latind: Cellind,
+      longind: Cellind) = {
+    cell_indices_to_coord(latind, longind)
+  }
+  
+  // Convert cell indices of a tiling cell to the coordinate of the
+  // center of the cell.
+  def tiling_cell_indices_to_center_coord(latind: Cellind,
+      longind: Cellind) = {
+    offset_cell_indices_to_coord(latind, longind, 0.5)
+  }
+  
+  // Convert cell indices of a tiling cell to the coordinate of the
+  // far (i.e. northeast) corner of the cell.
+  def tiling_cell_indices_to_far_corner_coord(latind: Cellind,
+      longind: Cellind) = {
+    offset_cell_indices_to_coord(latind, longind, 1)
+  }
+  // Convert cell indices of a tiling cell to the coordinate of the
+  // near (i.e. southwest) corner of the cell.
+  def multi_cell_indices_to_near_corner_coord(latind: Cellind,
+      longind: Cellind) = {
+    cell_indices_to_coord(latind, longind)
+  }
+  
+  // Convert cell indices of a statistical cell to the coordinate of the
+  // center of the cell.
+  def multi_cell_indices_to_center_coord(latind: Cellind, longind: Cellind) = {
+    offset_cell_indices_to_coord(latind, longind,
+        width_of_multi_cell/2.0)
+  }
+  
+  // Convert cell indices of a statistical cell to the coordinate of the
+  // far (i.e. northeast) corner of the cell.
+  def multi_cell_indices_to_far_corner_coord(latind: Cellind,
+      longind: Cellind) = {
+    offset_cell_indices_to_coord(latind, longind,
+        width_of_multi_cell)
+  }
+  
+  // Convert cell indices of a statistical cell to the coordinate of the
+  // northwest corner of the cell.
+  def multi_cell_indices_to_nw_corner_coord(latind: Cellind,
+      longind: Cellind) = {
+    cell_indices_to_coord(latind + width_of_multi_cell, longind, "coerce")
+  }
+  
+  // Convert cell indices of a statistical cell to the coordinate of the
+  // southeast corner of the cell.
+  def multi_cell_indices_to_se_corner_coord(latind: Cellind,
+      longind: Cellind) = {
+    cell_indices_to_coord(latind, longind + width_of_multi_cell, "coerce")
+  }
+  
+  // Convert cell indices of a statistical cell to the coordinate of the
+  // southwest corner of the cell.
+  def multi_cell_indices_to_sw_corner_coord(latind: Cellind,
+      longind: Cellind) = {
+    multi_cell_indices_to_near_corner_coord(latind, longind)
+  }
+  
+  // Convert cell indices of a statistical cell to the coordinate of the
+  // northeast corner of the cell.
+  def multi_cell_indices_to_ne_corner_coord(latind: Cellind,
+      longind: Cellind) = {
+    multi_cell_indices_to_far_corner_coord(latind, longind)
+  }
+
+  /*************** End conversion functions *************/
+
+  // Find the correct StatCell for the given coordinates.  Return null if
+  // no such cell.
+  def find_best_cell_for_coord(coord: Coord) = {
+    val (latind, longind) = coord_to_multi_cell_indices(coord)
     find_cell_for_cell_indices(latind, longind)
   }
 
@@ -989,77 +1282,25 @@ object StatCell {
   // If none, create the cell unless 'no_create' is true.  Otherwise, if
   // 'no_create_empty' is true and the cell is empty, a default empty
   // cell is returned.
-  def find_cell_for_cell_indices(latind: Cellind, longind: Cellind,
-    no_create: Boolean = false, no_create_empty: Boolean = false): StatCell = {
-    var statcell = corner_to_stat_cell.getOrElse((latind, longind), null)
-    if (statcell == null) {
-      if (no_create)
-        return null
-      if (all_cells_computed) {
-        if (empty_stat_cell == null) {
-          empty_stat_cell = new StatCell(None, None)
-          empty_stat_cell.worddist.finish()
-        }
-        return empty_stat_cell
-      }
-      statcell = new StatCell(Some(latind), Some(longind))
-      statcell.generate_dist()
-      val empty = statcell.worddist.is_empty()
-      if (empty)
-        num_empty_cells += 1
-      else
+  protected def find_cell_for_cell_indices(latind: Cellind, longind: Cellind,
+    create: Boolean = false) = {
+    if (!create)
+      assert(all_cells_computed)
+    val statcell = corner_to_multi_cell.getOrElse((latind, longind), null)
+    if (statcell != null)
+      statcell
+    else if (!create) null
+    else {
+      val newstat = new MultiRegularCell(this, latind, longind)
+      newstat.generate_dist()
+      if (newstat.worddist.is_empty())
+        null
+      else {
         num_non_empty_cells += 1
-      if (!empty || !no_create_empty)
-        corner_to_stat_cell((latind, longind)) = statcell
-    }
-    return statcell
-  }
-
-  // Generate all StatCells that are non-empty.  Don't do anything if
-  // called multiple times.
-  def initialize_cells() {
-    if (all_cells_computed)
-      return
-
-    val task = new MeteredTask("statistical cell", "generating non-empty")
-
-    for (i <- minimum_latind to maximum_latind view) {
-      for (j <- minimum_longind to maximum_longind view) {
-        val cell = find_cell_for_cell_indices(i, j, no_create_empty = true)
-        if (debug("cell") && !cell.worddist.is_empty)
-          errprint("--> (%d,%d): %s", i, j, cell)
-        task.item_processed()
+        corner_to_multi_cell((latind, longind)) = newstat
+        newstat
       }
     }
-    task.finish()
-    all_cells_computed = true
-
-    total_num_arts_for_links = 0
-    total_num_arts_for_word_dist = 0
-    for (cell <- StatCell.iter_nonempty_cells()) {
-      total_num_arts_for_word_dist += cell.worddist.num_arts_for_word_dist
-      total_num_arts_for_links += cell.worddist.num_arts_for_links
-    }
-
-    errprint("Number of non-empty cells: %s", num_non_empty_cells)
-    errprint("Number of empty cells: %s", num_empty_cells)
-    errprint("Percent non-empty cells: %g",
-      num_non_empty_cells.toDouble /
-        (num_empty_cells + num_non_empty_cells))
-    val training_arts_with_word_counts =
-      StatArticleTable.table.num_word_count_articles_by_split("training")
-    errprint("Training articles per non-empty cell: %g",
-      training_arts_with_word_counts.toDouble / num_non_empty_cells)
-    // Save some memory by clearing this after it's not needed
-    tiling_cell_to_articles = null
-    // Also clear out the article distributions of the training set, since
-    // only needed when computing cells.
-    //
-    // FIXME: Could perhaps save more memory, or at least total memory used,
-    // by never creating these distributions at all, but directly adding
-    // them to the cells.  Would require a bit of thinking when reading
-    // in the counts.
-    StatArticleTable.table.clear_training_article_distributions()
   }
 
   // Add the given article to the cell map, which covers the Earth in cells
@@ -1068,6 +1309,25 @@ object StatCell {
   def add_article_to_cell(article: StatArticle) {
     val (latind, longind) = coord_to_tiling_cell_indices(article.coord)
     tiling_cell_to_articles((latind, longind)) += article
+  }
+
+  // Create all StatCells that are non-empty.
+  protected def initialize_cells() {
+    val task = new MeteredTask("Earth-tiling cell", "generating non-empty")
+
+    for (i <- minimum_latind to maximum_latind view) {
+      for (j <- minimum_longind to maximum_longind view) {
+        total_num_cells += 1
+        val cell = find_cell_for_cell_indices(i, j, create = true)
+        if (debug("cell") && !cell.worddist.is_empty)
+          errprint("--> (%d,%d): %s", i, j, cell)
+        task.item_processed()
+      }
+    }
+    task.finish()
+
+    // Save some memory by clearing this after it's not needed
+    tiling_cell_to_articles = null
   }
 
   // Iterate over all non-empty cells.  If 'nonempty_word_dist' is given,
@@ -1079,12 +1339,56 @@ object StatCell {
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false) = {
     assert(all_cells_computed)
     for {
-      v <- corner_to_stat_cell.values
+      v <- corner_to_multi_cell.values
       val empty = (
         if (nonempty_word_dist) v.worddist.is_empty_for_word_dist()
         else v.worddist.is_empty())
       if (!empty)
     } yield v
+  }
+
+  def output_ranking_grid(pred_cells: Seq[(MultiRegularCell, Double)],
+      true_cell: MultiRegularCell, grsize: Int) {
+    val (true_latind, true_longind) = (true_cell.latind, true_cell.longind)
+    val min_latind = true_latind - grsize / 2
+    val max_latind = min_latind + grsize - 1
+    val min_longind = true_longind - grsize / 2
+    val max_longind = min_longind + grsize - 1
+    val grid = mutable.Map[(Cellind, Cellind), (StatCell, Double, Int)]()
+    for (((cell, value), rank) <- pred_cells zip (1 to pred_cells.length)) {
+      val (la, lo) = (cell.latind, cell.longind)
+      if (la >= min_latind && la <= max_latind &&
+        lo >= min_longind && lo <= max_longind)
+        grid((la, lo)) = (cell, value, rank)
+    }
+
+    errprint("Grid ranking, gridsize %dx%d", grsize, grsize)
+    errprint("NW corner: %s",
+      multi_cell_indices_to_nw_corner_coord(max_latind, min_longind))
+    errprint("SE corner: %s",
+      multi_cell_indices_to_se_corner_coord(min_latind, max_longind))
+    for (doit <- Seq(0, 1)) {
+      if (doit == 0)
+        errprint("Grid for ranking:")
+      else
+        errprint("Grid for goodness/distance:")
+      for (lat <- max_latind to min_latind) {
+        for (long <- fromto(min_longind, max_longind)) {
+          val cellvalrank = grid.getOrElse((lat, long), null)
+          if (cellvalrank == null)
+            errout(" %-8s", "empty")
+          else {
+            val (cell, value, rank) = cellvalrank
+            val showit = if (doit == 0) rank else value
+            if (lat == true_latind && long == true_longind)
+              errout("!%-8.6s", showit)
+            else
+              errout(" %-8.6s", showit)
+          }
+        }
+        errout("\n")
+      }
+    }
   }
 }
 
@@ -1204,7 +1508,7 @@ class StatArticleTable {
 
   def create_article(params: Map[String, String]) = new StatArticle(params)
 
-  def read_article_data(filename: String) {
+  def read_article_data(filename: String, cellgrid: CellGrid) {
     val redirects = mutable.Buffer[StatArticle]()
 
     def process(params: Map[String, String]) {
@@ -1215,7 +1519,7 @@ class StatArticleTable {
         redirects += art
       else if (art.coord != null) {
         record_article(art, art)
-        StatCell.add_article_to_cell(art)
+        cellgrid.add_article_to_cell(art)
       }
     }
 
@@ -1469,7 +1773,7 @@ class StatArticle(params: Map[String, String]) extends Article(params)
   Abstract class for reading documents from a test file and doing
   document geolocation on them (as opposed e.g. to toponym resolution).
  */
-abstract class GeotagDocumentStrategy {
+abstract class GeotagDocumentStrategy(val cellgrid: CellGrid) {
   /**
    For a given word distribution (describing a test document), return
    an Iterable of tuples, each listing a particular cell on the Earth
@@ -1484,12 +1788,13 @@ abstract class GeotagDocumentStrategy {
   'baseline_strategy' specifies the particular strategy to use.
  */
 class BaselineGeotagDocumentStrategy(
+  cellgrid: CellGrid,
   baseline_strategy: String
-) extends GeotagDocumentStrategy {
+) extends GeotagDocumentStrategy(cellgrid) {
   var cached_ranked_mps: Iterable[(StatCell, Double)] = null
 
   def ranked_cells_random(worddist: WordDist) = {
-    val cells = StatCell.iter_nonempty_cells()
+    val cells = cellgrid.iter_nonempty_cells()
     val shuffled = (new Random()).shuffle(cells)
     (for (cell <- shuffled) yield (cell, 0.0))
   }
@@ -1497,7 +1802,7 @@ class BaselineGeotagDocumentStrategy(
   def ranked_most_popular_cells(worddist: WordDist) = {
     if (cached_ranked_mps == null) {
       cached_ranked_mps = (
-        (for (cell <- StatCell.iter_nonempty_cells())
+        (for (cell <- cellgrid.iter_nonempty_cells())
           yield (cell, (if (baseline_strategy == "internal_link")
           cell.worddist.incoming_links
         else cell.worddist.num_arts_for_links).toDouble)).
@@ -1520,7 +1825,7 @@ class BaselineGeotagDocumentStrategy(
     }
     if (maxword == None)
       maxword = worddist.find_most_common_word(word => true)
-    CellDist.get_cell_dist(maxword.get).get_ranked_cells()
+    CellDist.get_cell_dist(cellgrid, maxword.get).get_ranked_cells()
   }
 
   def ranked_cells_link_most_common_toponym(worddist: WordDist) = {
@@ -1551,12 +1856,12 @@ class BaselineGeotagDocumentStrategy(
       for {
         (cand, links) <- candlinks
         val cell = {
-          val retval = StatCell.find_cell_for_coord(cand.coord)
-          if (retval.latind == None)
+          val retval = cellgrid.find_best_cell_for_coord(cand.coord)
+          if (retval == null)
             errprint("Strange, found no cell for candidate %s", cand)
           retval
         }
-        if (cell.latind != None)
+        if (cell != null)
       } yield (cell, links)
     }
 
@@ -1602,27 +1907,27 @@ class BaselineGeotagDocumentStrategy(
   involves directly comparing the article distribution against each cell
   in turn and computing a score, with lower values better.
  */
-abstract class MinimumScoreStrategy extends GeotagDocumentStrategy {
+abstract class MinimumScoreStrategy(
+  cellgrid: CellGrid
+) extends GeotagDocumentStrategy(cellgrid) {
   /**
     Function to return the score of an article distribution against a
     cell.
    */
-  def score_cell(worddist: WordDist, stat_cell: StatCell): Double
+  def score_cell(worddist: WordDist, cell: StatCell): Double
 
   def return_ranked_cells(worddist: WordDist) = {
     val cell_buf = mutable.Buffer[(StatCell, Double)]()
-    for (stat_cell <-
-           StatCell.iter_nonempty_cells(nonempty_word_dist = true)) {
-      val inds = (stat_cell.latind.get, stat_cell.longind.get)
+    for (cell <-
+           cellgrid.iter_nonempty_cells(nonempty_word_dist = true)) {
       if (debug("lots")) {
-        val (latind, longind) = inds
-        val coord = cell_indices_to_coord(latind, longind)
-        errprint("Nonempty cell at indices %s,%s = coord %s, num_articles = %s",
-          latind, longind, coord, stat_cell.worddist.num_arts_for_word_dist)
+        errprint("Nonempty cell at indices %s = location %s, num_articles = %s",
+          cell.describe_indices(), cell.describe_location(),
+          cell.worddist.num_arts_for_word_dist)
       }
 
-      val score = score_cell(worddist, stat_cell)
-      cell_buf += ((stat_cell, score))
+      val score = score_cell(worddist, cell)
+      cell_buf += ((cell, score))
     }
 
     cell_buf sortWith (_._2 < _._2)
@@ -1644,23 +1949,24 @@ abstract class MinimumScoreStrategy extends GeotagDocumentStrategy {
          any case since it's comparing articles against cells.)
  */
 class KLDivergenceStrategy(
+  cellgrid: CellGrid,
   partial: Boolean = true,
   symmetric: Boolean = false
-) extends MinimumScoreStrategy {
+) extends MinimumScoreStrategy(cellgrid) {
 
-  def score_cell(worddist: WordDist, stat_cell: StatCell) = {
-    var kldiv = worddist.fast_kl_divergence(stat_cell.worddist,
+  def score_cell(worddist: WordDist, cell: StatCell) = {
+    var kldiv = worddist.fast_kl_divergence(cell.worddist,
       partial = partial)
-    //var kldiv = worddist.test_kl_divergence(stat_cell.worddist,
+    //var kldiv = worddist.test_kl_divergence(cell.worddist,
     //  partial = partial)
     if (symmetric) {
-      val kldiv2 = stat_cell.worddist.fast_kl_divergence(worddist,
+      val kldiv2 = cell.worddist.fast_kl_divergence(worddist,
         partial = partial)
       kldiv = (kldiv + kldiv2) / 2.0
     }
-    //kldiv = worddist.test_kl_divergence(stat_cell.worddist,
+    //kldiv = worddist.test_kl_divergence(cell.worddist,
     //                           partial=partial)
-    //errprint("For cell %s, KL divergence %.3f", stat_cell, kldiv)
+    //errprint("For cell %s, KL divergence %.3f", cell, kldiv)
     kldiv
   }
 
@@ -1709,17 +2015,18 @@ class KLDivergenceStrategy(
          distribution, rather than considering all words in the vocabulary.
  */
 class CosineSimilarityStrategy(
+  cellgrid: CellGrid,
   smoothed: Boolean = false,
   partial: Boolean = false
-) extends MinimumScoreStrategy {
+) extends MinimumScoreStrategy(cellgrid) {
 
-  def score_cell(worddist: WordDist, stat_cell: StatCell) = {
+  def score_cell(worddist: WordDist, cell: StatCell) = {
     var cossim =
       if (smoothed)
-        worddist.fast_smoothed_cosine_similarity(stat_cell.worddist,
+        worddist.fast_smoothed_cosine_similarity(cell.worddist,
           partial = partial)
       else
-        worddist.fast_cosine_similarity(stat_cell.worddist,
+        worddist.fast_cosine_similarity(cell.worddist,
           partial = partial)
     assert(cossim >= 0.0)
     // Just in case of round-off problems
@@ -1731,8 +2038,9 @@ class CosineSimilarityStrategy(
 
 /** Use a Naive Bayes strategy for comparing document and cell. */
 class NaiveBayesDocumentStrategy(
+  cellgrid: CellGrid,
   use_baseline: Boolean = true
-) extends GeotagDocumentStrategy {
+) extends GeotagDocumentStrategy(cellgrid) {
 
   def return_ranked_cells(worddist: WordDist) = {
 
@@ -1747,10 +2055,10 @@ class NaiveBayesDocumentStrategy(
       } else (1.0, 0.0))
 
     (for {
-      cell <- StatCell.iter_nonempty_cells(nonempty_word_dist = true)
+      cell <- cellgrid.iter_nonempty_cells(nonempty_word_dist = true)
       val word_logprob = cell.worddist.get_nbayes_logprob(worddist)
       val baseline_logprob = log(cell.worddist.num_arts_for_links.toDouble /
-        StatCell.total_num_arts_for_links)
+        cellgrid.total_num_arts_for_links)
       val logprob = (word_weight * word_logprob +
         baseline_weight * baseline_logprob)
     } yield (cell -> logprob)).toArray.
@@ -1760,9 +2068,11 @@ class NaiveBayesDocumentStrategy(
   }
 }
 
-class AverageCellProbabilityStrategy extends GeotagDocumentStrategy {
+class AverageCellProbabilityStrategy(
+  cellgrid: CellGrid
+  ) extends GeotagDocumentStrategy(cellgrid) {
   def return_ranked_cells(worddist: WordDist) = {
-    val celldist = CellDist.get_cell_dist_for_word_dist(worddist)
+    val celldist = CellDist.get_cell_dist_for_word_dist(cellgrid, worddist)
     celldist.get_ranked_cells()
   }
 }
@@ -1867,7 +2177,7 @@ class GeolocateOptions(defaults: GeolocateCommandLineArguments = null) {
   //// Options indicating how to generate the cells we compare against
   var degrees_per_cell = defs.degrees_per_cell
   var miles_per_cell = defs.miles_per_cell
-  var width_of_stat_cell = defs.width_of_stat_cell
+  var width_of_multi_cell = defs.width_of_multi_cell
 
   //// Options used when creating word distributions
   var preserve_case_words = defs.preserve_case_words
@@ -2177,8 +2487,8 @@ cells that cover the Earth.  Default %default. """)
 cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
-  def width_of_stat_cell =
-    op.option[Int]("width-of-stat-cell", default = 1,
+  def width_of_multi_cell =
+    op.option[Int]("width-of-multi-cell", default = 1,
       help = """Width of the cell used to compute a statistical
 distribution for geotagging purposes, in terms of number of tiling cells.
 NOTE: It's unlikely you want to change this.  It may be removed entirely in
@@ -2405,6 +2715,10 @@ object Debug {
  */
 object GeolocateDriver {
   var Opts = null: GeolocateOptions
+  // NOTE: When different grids are allowed, we may set this to null here
+  // and initialize it later based on a command-line option or whatever.
+  var cellgrid = null: CellGrid
+  var degrees_per_cell = 0.0
 
   protected var need_to_read_stopwords = false
 
@@ -2510,26 +2824,8 @@ object GeolocateDriver {
         Opts.miles_per_cell / miles_per_degree
       else
         Opts.degrees_per_cell
-    miles_per_cell = degrees_per_cell * miles_per_degree
-    // The actual maximum latitude is exactly 90 (the North Pole).  But if we
-    // set degrees per cell to be a number that exactly divides 180, and we
-    // use maximum_latitude = 90 in the following computations, then we would
-    // end up with the North Pole in a cell by itself, something we probably
-    // don't want.
-    val (maxlatind, maxlongind) =
-      coord_to_tiling_cell_indices(Coord(maximum_latitude - 1e-10,
-        maximum_longitude))
-    Distances.maximum_latind = maxlatind
-    Distances.maximum_longind = maxlongind
-    val (minlatind, minlongind) =
-      coord_to_tiling_cell_indices(Coord(minimum_latitude,
-        minimum_longitude))
-    Distances.minimum_latind = minlatind
-    Distances.minimum_longind = minlongind
-
-    if (Opts.width_of_stat_cell <= 0)
-      argerror("Width of statistical cell must be positive")
-    Distances.width_of_stat_cell = Opts.width_of_stat_cell
+    if (Opts.width_of_multi_cell <= 0)
+      argerror("Width of multi cell must be positive")
 
     //// Start reading in the files and operating on them ////
 
@@ -2583,6 +2879,11 @@ object GeolocateDriver {
     need_seq(Opts.article_data_file, "article-data-file")
   }
 
+  protected def initialize_cellgrid() {
+    cellgrid = new MultiRegularCellGrid(degrees_per_cell,
+      Opts.width_of_multi_cell)
+  }
+
   protected def read_stopwords_if() {
     if (need_to_read_stopwords) {
       val stopwords_file =
@@ -2593,7 +2894,7 @@ object GeolocateDriver {
 
   protected def read_articles(table: StatArticleTable) {
     for (fn <- Opts.article_data_file)
-      table.read_article_data(fn)
+      table.read_article_data(fn, cellgrid)
 
     // Read in the words-counts file
     if (Opts.counts_file.length > 0) {
@@ -2604,6 +2905,7 @@ object GeolocateDriver {
   }
 
   protected def read_data_for_geotag_documents() {
+    initialize_cellgrid()
     read_stopwords_if()
     val table = new StatArticleTable()
     StatArticleTable.table = table
@@ -2647,37 +2949,37 @@ object GeolocateDriver {
 
   def run_geotag_documents() = {
     read_data_for_geotag_documents()
-    StatCell.initialize_cells()
+    cellgrid.finish()
 
     val strats = (
       for (stratname <- Opts.strategy) yield {
         if (stratname == "baseline") {
           for (basestratname <- Opts.baseline_strategy) yield ("baseline " + basestratname,
-            new BaselineGeotagDocumentStrategy(basestratname))
+            new BaselineGeotagDocumentStrategy(cellgrid, basestratname))
         } else {
           val strategy =
             if (stratname.startsWith("naive-bayes-"))
-              new NaiveBayesDocumentStrategy(
+              new NaiveBayesDocumentStrategy(cellgrid,
                 use_baseline = (stratname == "naive-bayes-with-baseline"))
             else stratname match {
               case "average-cell-probability" =>
-                new AverageCellProbabilityStrategy()
+                new AverageCellProbabilityStrategy(cellgrid)
               case "cosine-similarity" =>
-                new CosineSimilarityStrategy(smoothed = false, partial = false)
+                new CosineSimilarityStrategy(cellgrid, smoothed = false, partial = false)
               case "partial-cosine-similarity" =>
-                new CosineSimilarityStrategy(smoothed = false, partial = true)
+                new CosineSimilarityStrategy(cellgrid, smoothed = false, partial = true)
               case "smoothed-cosine-similarity" =>
-                new CosineSimilarityStrategy(smoothed = true, partial = false)
+                new CosineSimilarityStrategy(cellgrid, smoothed = true, partial = false)
               case "smoothed-partial-cosine-similarity" =>
-                new CosineSimilarityStrategy(smoothed = true, partial = true)
+                new CosineSimilarityStrategy(cellgrid, smoothed = true, partial = true)
               case "full-kl-divergence" =>
-                new KLDivergenceStrategy(symmetric = false, partial = false)
+                new KLDivergenceStrategy(cellgrid, symmetric = false, partial = false)
               case "partial-kl-divergence" =>
-                new KLDivergenceStrategy(symmetric = false, partial = true)
+                new KLDivergenceStrategy(cellgrid, symmetric = false, partial = true)
               case "symmetric-full-kl-divergence" =>
-                new KLDivergenceStrategy(symmetric = true, partial = false)
+                new KLDivergenceStrategy(cellgrid, symmetric = true, partial = false)
               case "symmetric-partial-kl-divergence" =>
-                new KLDivergenceStrategy(symmetric = true, partial = true)
+                new KLDivergenceStrategy(cellgrid, symmetric = true, partial = true)
               case "none" =>
                 null
             }
@@ -2707,6 +3009,7 @@ object GeolocateDriver {
 
   def run_geotag_toponyms() = {
     import toponym._
+    initialize_cellgrid()
     read_stopwords_if()
     val table = new TopoArticleTable()
     TopoArticleTable.table = table
@@ -2724,18 +3027,22 @@ object GeolocateDriver {
     // output_reverse_sorted_table(toponyms_seen_in_eval_files,
     //                             outfile=sys.stderr)
 
-    if (Opts.gazetteer_file != null)
+    if (Opts.gazetteer_file != null) {
+      /* FIXME!!! */
+      assert(cellgrid.isInstanceOf[MultiRegularCellGrid])
       Gazetteer.gazetteer =
-        new WorldGazetteer(Opts.gazetteer_file)
+        new WorldGazetteer(Opts.gazetteer_file,
+          cellgrid.asInstanceOf[MultiRegularCellGrid])
+    }
 
     val strats = (
       for (stratname <- Opts.strategy) yield {
         // Generate strategy object
         if (stratname == "baseline") {
           for (basestratname <- Opts.baseline_strategy) yield ("baseline " + basestratname,
-            new BaselineGeotagToponymStrategy(basestratname))
+            new BaselineGeotagToponymStrategy(cellgrid, basestratname))
         } else {
-          val strategy = new NaiveBayesToponymStrategy(
+          val strategy = new NaiveBayesToponymStrategy(cellgrid,
             use_baseline = (stratname == "naive-bayes-with-baseline"))
           Seq((stratname, strategy))
         }
@@ -2757,10 +3064,10 @@ object GeolocateDriver {
 
   def run_generate_kml() {
     read_data_for_geotag_documents()
-    StatCell.initialize_cells()
+    cellgrid.finish()
     val words = Opts.kml_words.split(',')
     for (word <- words) {
-      val celldist = CellDist.get_cell_dist(memoize_word(word))
+      val celldist = CellDist.get_cell_dist(cellgrid, memoize_word(word))
       if (!celldist.normalized) {
         warning("""Non-normalized distribution, apparently word %s not seen anywhere.
 Not generating an empty KML file.""", word)

@@ -180,7 +180,7 @@ class GeotagDocumentEvalStats(
  * number of articles in true cell.
  */
 
-class GroupedGeotagDocumentEvalStats {
+class GroupedGeotagDocumentEvalStats(cellgrid: CellGrid) {
 
   def create_doc() = new GeotagDocumentEvalStats()
   val all_document = create_doc()
@@ -214,24 +214,54 @@ class GroupedGeotagDocumentEvalStats {
     new DoubleTableByRange(dist_fractions_for_error_dist, create_doc _)
 
   def record_result(res: ArticleEvaluationResult) {
-    all_document.record_result(res.rank, res.pred_truedist, res.pred_degdist)
+    all_document.record_result(res.true_rank,
+      res.pred_truedist, res.pred_degdist)
     val naitr = docs_by_naitr.get_collector(res.num_arts_in_true_cell)
-    naitr.record_result(res.rank, res.pred_truedist, res.pred_degdist)
+    naitr.record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
 
-    val fracinc = dist_fraction_increment
-    val rounded_true_truedist = fracinc * floor(res.true_truedist / fracinc)
-    val rounded_true_degdist = fracinc * floor(res.true_degdist / fracinc)
+    /* FIXME: This code specific to MultiRegularCellGrid is kind of ugly.
+       Perhaps it should go elsewhere.
 
-    all_document.record_oracle_result(res.true_truedist, res.true_degdist)
-    docs_by_true_dist_to_true_center(rounded_true_truedist).
-      record_result(res.rank, res.pred_truedist, res.pred_degdist)
-    docs_by_degree_dist_to_true_center(rounded_true_degdist).
-      record_result(res.rank, res.pred_truedist, res.pred_degdist)
+       FIXME: Also note that we don't actually make use of the info we
+       record here. See below.
+     */
+    if (cellgrid.isInstanceOf[MultiRegularCellGrid]) {
+      val multigrid = cellgrid.asInstanceOf[MultiRegularCellGrid]
 
-    docs_by_true_dist_to_pred_center.get_collector(res.pred_truedist).
-      record_result(res.rank, res.pred_truedist, res.pred_degdist)
-    docs_by_degree_dist_to_pred_center.get_collector(res.pred_degdist).
-      record_result(res.rank, res.pred_truedist, res.pred_degdist)
+      /* For distance to center of true cell, which will be small (no more
+         than width_of_multi_cell * size-of-tiling-cell); we convert to
+         fractions of tiling-cell size and record in ranges corresponding
+         to increments of 0.25 (see above). */
+      /* True distance (in both miles and degrees) as a fraction of
+         cell size */
+      val frac_true_truedist = res.true_truedist / multigrid.miles_per_cell
+      val frac_true_degdist = res.true_degdist / multigrid.degrees_per_cell
+      /* Round the fractional distances to multiples of
+         dist_fraction_increment */
+      val fracinc = dist_fraction_increment
+      val rounded_frac_true_truedist =
+        fracinc * floor(frac_true_degdist / fracinc)
+      val rounded_frac_true_degdist =
+        fracinc * floor(frac_true_degdist / fracinc)
+      all_document.record_oracle_result(res.true_truedist, res.true_degdist)
+      docs_by_true_dist_to_true_center(rounded_frac_true_truedist).
+        record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
+      docs_by_degree_dist_to_true_center(rounded_frac_true_degdist).
+        record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
+
+      /* For distance to center of predicted cell, which may be large, since
+         predicted cell may be nowhere near the true cell.  Again we convert
+         to fractions of tiling-cell size and record in the ranges listed in
+         dist_fractions_for_error_dist (see above). */
+      /* Predicted distance (in both miles and degrees) as a fraction of
+         cell size */
+      val frac_pred_truedist = res.pred_truedist / multigrid.miles_per_cell
+      val frac_pred_degdist = res.pred_degdist / multigrid.degrees_per_cell
+      docs_by_true_dist_to_pred_center.get_collector(frac_pred_truedist).
+        record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
+      docs_by_degree_dist_to_pred_center.get_collector(frac_pred_degdist).
+        record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
+    }
   }
 
   def record_other_stat(othertype: String) {
@@ -242,6 +272,12 @@ class GroupedGeotagDocumentEvalStats {
     errprint("")
     errprint("Results for all documents/articles:")
     all_document.output_results()
+    /* FIXME: This code specific to MultiRegularCellGrid is kind of ugly.
+       Perhaps it should go elsewhere.
+
+       FIXME: Also note that we don't actually do anything here, because of
+       the 'if (false)'.  See above.
+     */
     //if (all_results)
     if (false) {
       errprint("")
@@ -253,30 +289,37 @@ class GroupedGeotagDocumentEvalStats {
         obj.output_results()
       }
       errprint("")
-      for (
-        (truedist, obj) <- docs_by_true_dist_to_true_center.toSeq sortBy (_._1)
-      ) {
-        val lowrange = truedist * miles_per_cell
-        val highrange = ((truedist + dist_fraction_increment) *
-          miles_per_cell)
+
+      if (cellgrid.isInstanceOf[MultiRegularCellGrid]) {
+        val multigrid = cellgrid.asInstanceOf[MultiRegularCellGrid]
+
+        for (
+          (frac_truedist, obj) <-
+            docs_by_true_dist_to_true_center.toSeq sortBy (_._1)
+        ) {
+          val lowrange = frac_truedist * multigrid.miles_per_cell
+          val highrange = ((frac_truedist + dist_fraction_increment) *
+            multigrid.miles_per_cell)
+          errprint("")
+          errprint("Results for documents/articles where distance to center")
+          errprint("  of true cell in miles is in the range [%.2f,%.2f):",
+            lowrange, highrange)
+          obj.output_results()
+        }
         errprint("")
-        errprint("Results for documents/articles where distance to center")
-        errprint("  of true cell in miles is in the range [%.2f,%.2f):",
-          lowrange, highrange)
-        obj.output_results()
-      }
-      errprint("")
-      for (
-        (degdist, obj) <- docs_by_degree_dist_to_true_center.toSeq sortBy (_._1)
-      ) {
-        val lowrange = degdist * degrees_per_cell
-        val highrange = ((degdist + dist_fraction_increment) *
-          degrees_per_cell)
-        errprint("")
-        errprint("Results for documents/articles where distance to center")
-        errprint("  of true cell in degrees is in the range [%.2f,%.2f):",
-          lowrange, highrange)
-        obj.output_results()
+        for (
+          (frac_degdist, obj) <-
+            docs_by_degree_dist_to_true_center.toSeq sortBy (_._1)
+        ) {
+          val lowrange = frac_degdist * multigrid.degrees_per_cell
+          val highrange = ((frac_degdist + dist_fraction_increment) *
+            multigrid.degrees_per_cell)
+          errprint("")
+          errprint("Results for documents/articles where distance to center")
+          errprint("  of true cell in degrees is in the range [%.2f,%.2f):",
+            lowrange, highrange)
+          obj.output_results()
+        }
       }
     }
     // FIXME: Output median and mean of true and degree error dists; also
@@ -342,7 +385,7 @@ abstract class GeotagDocumentEvaluator(
   strategy: GeotagDocumentStrategy,
   stratname: String
 ) extends TestFileEvaluator(stratname) {
-  val evalstats = new GroupedGeotagDocumentEvalStats()
+  val evalstats = new GroupedGeotagDocumentEvalStats(strategy.cellgrid)
 
   def output_results(isfinal: Boolean = false) {
     evalstats.output_results(all_results = isfinal)
@@ -351,18 +394,15 @@ abstract class GeotagDocumentEvaluator(
 
 case class ArticleEvaluationResult(
   article: StatArticle,
-  rank: Int,
-  pred_latind: Cellind,
-  pred_longind: Cellind) extends EvaluationResult {
-
-  val true_statcell = StatCell.find_cell_for_coord(article.coord)
-  val num_arts_in_true_cell = true_statcell.worddist.num_arts_for_word_dist
-  val (true_latind, true_longind) = coord_to_stat_cell_indices(article.coord)
-  val true_center = stat_cell_indices_to_center_coord(true_latind, true_longind)
+  pred_cell: StatCell,
+  true_rank: Int
+) extends EvaluationResult {
+  val true_cell = pred_cell.cellgrid.find_best_cell_for_coord(article.coord)
+  val num_arts_in_true_cell = true_cell.worddist.num_arts_for_word_dist
+  val true_center = true_cell.get_center_coord()
   val true_truedist = spheredist(article.coord, true_center)
   val true_degdist = degree_dist(article.coord, true_center)
-  val pred_center =
-    stat_cell_indices_to_center_coord(pred_latind, pred_longind)
+  val pred_center = pred_cell.get_center_coord()
   val pred_truedist = spheredist(article.coord, pred_center)
   val pred_degdist = degree_dist(article.coord, pred_center)
 }
@@ -437,25 +477,24 @@ class ArticleGeotagDocumentEvaluator(
     if (would_skip_document(article, doctag))
       return null
     assert(article.dist.finished)
-    val (true_latind, true_longind) =
-      coord_to_stat_cell_indices(article.coord)
+    val true_cell =
+      strategy.cellgrid.find_best_cell_for_coord(article.coord)
     if (debug("lots") || debug("commontop")) {
-      val true_statcell = StatCell.find_cell_for_coord(article.coord)
-      val naitr = true_statcell.worddist.num_arts_for_word_dist
-      errprint(
-        "Evaluating article %s with %s word-dist articles in true cell",
+      val naitr = true_cell.worddist.num_arts_for_word_dist
+      errprint("Evaluating article %s with %s word-dist articles in true cell",
         article, naitr)
     }
 
     /* That is:
 
-       pred_cells = List of predicted cells, from best to worst
+       pred_cells = List of predicted cells, from best to worst; each list
+          entry is actually a tuple of (cell, score) where lower scores
+          are better
        true_rank = Rank of true cell among predicted cells
-       pred_latind, pred_longind = Indices of topmost predicted cell
      */
-    val (pred_cells, true_rank, pred_latind, pred_longind) = {
+    val (pred_cells, true_rank) =
       if (Opts.oracle_results)
-        (null, 1, true_latind, true_longind)
+        (Array((true_cell, 0.0)), 1)
       else {
         def get_computed_results() = {
           val cells = strategy.return_ranked_cells(article.dist).toArray
@@ -463,8 +502,7 @@ class ArticleGeotagDocumentEvaluator(
           var broken = false
           breakable {
             for ((cell, value) <- cells) {
-              if (cell.latind.get == true_latind &&
-                  cell.longind.get == true_longind) {
+              if (cell eq true_cell) {
                 broken = true
                 break
               }
@@ -473,14 +511,13 @@ class ArticleGeotagDocumentEvaluator(
           }
           if (!broken)
             rank = 1000000000
-          (cells, rank, cells(0)._1.latind.get, cells(0)._1.longind.get)
+          (cells, rank)
         }
 
         get_computed_results()
       }
-    }
     val result =
-      new ArticleEvaluationResult(article, true_rank, pred_latind, pred_longind)
+      new ArticleEvaluationResult(article, pred_cells(0)._1, true_rank)
 
     val want_indiv_results =
       !Opts.oracle_results && !Opts.no_individual_results
@@ -494,7 +531,7 @@ class ArticleGeotagDocumentEvaluator(
       errprint("%s:  %d types, %d tokens",
         doctag, article.dist.counts.size, article.dist.total_tokens)
       errprint("%s:  true cell at rank: %s", doctag, true_rank)
-      errprint("%s:  true cell: %s", doctag, result.true_statcell)
+      errprint("%s:  true cell: %s", doctag, result.true_cell)
       for (i <- 0 until 5) {
         errprint("%s:  Predicted cell (at rank %s): %s",
           doctag, i + 1, pred_cells(i)._1)
@@ -507,44 +544,13 @@ class ArticleGeotagDocumentEvaluator(
       if (debug("gridrank") ||
         (debuglist("gridrank") contains doctag.drop(1))) {
         val grsize = debugval("gridranksize").toInt
-        val min_latind = true_latind - grsize / 2
-        val max_latind = min_latind + grsize - 1
-        val min_longind = true_longind - grsize / 2
-        val max_longind = min_longind + grsize - 1
-        val grid = mutable.Map[(Cellind, Cellind), (StatCell, Double, Int)]()
-        for (((cell, value), rank) <- pred_cells zip (1 to pred_cells.length)) {
-          val (la, lo) = (cell.latind.get, cell.longind.get)
-          if (la >= min_latind && la <= max_latind &&
-            lo >= min_longind && lo <= max_longind)
-            grid((la, lo)) = (cell, value, rank)
-        }
-
-        errprint("Grid ranking, gridsize %dx%d", grsize, grsize)
-        errprint("NW corner: %s",
-          stat_cell_indices_to_nw_corner_coord(max_latind, min_longind))
-        errprint("SE corner: %s",
-          stat_cell_indices_to_se_corner_coord(min_latind, max_longind))
-        for (doit <- Seq(0, 1)) {
-          if (doit == 0)
-            errprint("Grid for ranking:")
-          else
-            errprint("Grid for goodness/distance:")
-          for (lat <- max_latind to min_latind) {
-            for (long <- fromto(min_longind, max_longind)) {
-              val cellvalrank = grid.getOrElse((lat, long), null)
-              if (cellvalrank == null)
-                errout(" %-8s", "empty")
-              else {
-                val (cell, value, rank) = cellvalrank
-                val showit = if (doit == 0) rank else value
-                if (lat == true_latind && long == true_longind)
-                  errout("!%-8.6s", showit)
-                else
-                  errout(" %-8.6s", showit)
-              }
-            }
-            errout("\n")
-          }
+        if (!true_cell.isInstanceOf[MultiRegularCell])
+          warning("Can't output ranking grid, cell not of right type")
+        else {
+          strategy.cellgrid.asInstanceOf[MultiRegularCellGrid].
+            output_ranking_grid(
+              pred_cells.asInstanceOf[Seq[(MultiRegularCell, Double)]],
+              true_cell.asInstanceOf[MultiRegularCell], grsize)
         }
       }
     }
