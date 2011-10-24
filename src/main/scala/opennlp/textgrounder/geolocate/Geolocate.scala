@@ -470,11 +470,11 @@ object KMLConstants {
 /////////////////////////////////////////////////////////////////////////////
 
 /**
-  Distribution over words corresponding to a cell.
+ * Distribution over words corresponding to a cell.
  */
 
 class CellWordDist extends SmoothedWordDist(
-    Array[Word](), Array[Int](), 0, note_globally = false) {
+  Array[Word](), Array[Int](), 0, note_globally = false) {
   /** Number of articles included in incoming-link computation. */
   var num_arts_for_links = 0
   /** Total number of incoming links. */
@@ -486,7 +486,9 @@ class CellWordDist extends SmoothedWordDist(
 
   def is_empty() = num_arts_for_links == 0
 
-  // Add the given article to the total distribution seen so far
+  /**
+   *  Add the given article to the total distribution seen so far
+   */
   def add_article(art: StatArticle) {
     /* We are passed in all articles, regardless of the split.
        The decision was made to accumulate link counts from all articles,
@@ -550,8 +552,10 @@ class CellWordDist extends SmoothedWordDist(
     }
   }
 
-  // For a document described by its distribution 'worddist', return the
-  // log probability log p(worddist|cell) using a Naive Bayes algorithm.
+  /**
+   * For a document described by its distribution 'worddist', return the
+   * log probability log p(worddist|cell) using a Naive Bayes algorithm.
+   */
   def get_nbayes_logprob(worddist: WordDist) = {
     var logprob = 0.0
     for ((word, count) <- worddist.counts) {
@@ -570,34 +574,33 @@ class CellWordDist extends SmoothedWordDist(
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//                             Cell distributions                        //
+//                             Cell distributions                          //
 /////////////////////////////////////////////////////////////////////////////
 
 /** A simple distribution associating a probability with each cell. */
 
 class CellDist(
-  val cellprobs: mutable.Map[StatCell, Double]
-) {
+  val cellprobs: mutable.Map[StatCell, Double]) {
   def get_ranked_cells() = {
     // sort by second element of tuple, in reverse order
     cellprobs.toSeq sortWith (_._2 > _._2)
   }
 }
 
-/** Distribution over cells, as might be attached to a word.  If we have a
-  set of cells, each with a word distribution, then we can imagine
-  conceptually inverting the process to generate a cell distribution over
-  words.  Basically, for a given word, look to see what its probability is
-  in all cells; normalize, and we have a cell distribution.
-
-  @param word Word for which the cell is computed
-  @param cellprobs Hash table listing probabilities associated with cells
-*/
+/**
+ * Distribution over cells, as might be attached to a word.  If we have a
+ *  set of cells, each with a word distribution, then we can imagine
+ *  conceptually inverting the process to generate a cell distribution over
+ *  words.  Basically, for a given word, look to see what its probability is
+ *  in all cells; normalize, and we have a cell distribution.
+ *
+ *  @param word Word for which the cell is computed
+ *  @param cellprobs Hash table listing probabilities associated with cells
+ */
 
 class WordCellDist(
   val cellgrid: CellGrid,
-  val word: Word
-) extends CellDist(mutable.Map[StatCell, Double]()) {
+  val word: Word) extends CellDist(mutable.Map[StatCell, Double]()) {
   var normalized = false
 
   protected def init() {
@@ -706,9 +709,11 @@ object CellDist {
     }
   }
 
-  // Return a cell distribution over a distribution over words.  This works
-  // by adding up the distributions of the individual words, weighting by
-  // the count of the each word.
+  /**
+   * Return a cell distribution over a distribution over words.  This works
+   * by adding up the distributions of the individual words, weighting by
+   * the count of the each word.
+   */
   def get_cell_dist_for_word_dist(cellgrid: CellGrid, worddist: WordDist) = {
     val cellprobs = doublemap[StatCell]()
     for ((word, count) <- worddist.counts) {
@@ -724,9 +729,14 @@ object CellDist {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-//                           Geographic locations                          //
+//                             Cells in a grid                             //
 /////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Abstract class for a general cell in a cell grid.
+ * 
+ * @param cellgrid The CellGrid object for the grid this cell is in.
+ */
 abstract class StatCell(val cellgrid: CellGrid) {
   val worddist = new CellWordDist()
   var most_popular_article: StatArticle = null
@@ -749,8 +759,24 @@ abstract class StatCell(val cellgrid: CellGrid) {
    */
   def iterate_articles(): Iterable[StatArticle]
 
+  /**
+   * Return the coordinate of the "center" of the cell.  This is the
+   * coordinate used in computing distances between arbitary points and
+   * given cells, for evaluation and such.  For odd-shaped cells, the
+   * center can be more or less arbitrarily placed as long as it's somewhere
+   * central.
+   */
   def get_center_coord(): Coord
 
+  /**
+   * Generate KML for a single cell.
+   */
+  def generate_kml(xfprob: Double, xf_minprob: Double, xf_maxprob: Double): Iterable[xml.Elem]
+
+  /**
+   * Return a string representation of the cell.  Generally does not need
+   * to be overridden.
+   */
   override def toString() = {
     val unfinished = if (worddist.finished) "" else ", unfinished"
     val contains =
@@ -769,6 +795,10 @@ abstract class StatCell(val cellgrid: CellGrid) {
   //   toString.encode("utf-8")
   // }
 
+  /**
+   * Return a shorter string representation of the cell, for
+   * logging purposes.
+   */
   def shortstr() = {
     var str = "Cell %s" format describe_location()
     val mostpop = most_popular_article
@@ -777,6 +807,10 @@ abstract class StatCell(val cellgrid: CellGrid) {
     str
   }
 
+  /**
+   * Return an XML representation of the cell.  Currently used only for
+   * debugging-output purposes, so the exact representation isn't too important.
+   */
   def struct() =
     <StatCell>
       <bounds>{ describe_location() }</bounds>
@@ -791,36 +825,55 @@ abstract class StatCell(val cellgrid: CellGrid) {
       <incomingLinks>{ worddist.incoming_links }</incomingLinks>
     </StatCell>
 
-  // Generate the distribution for a cell from the articles in it.
+  /**
+   * Generate the distribution for a cell from the articles in it.
+   */
   def generate_dist() {
     for (art <- iterate_articles()) {
       worddist.add_article(art)
       if (art.incoming_links != None &&
-          art.incoming_links.get > mostpopart_links) {
+        art.incoming_links.get > mostpopart_links) {
         mostpopart_links = art.incoming_links.get
         most_popular_article = art
       }
     }
     worddist.finish(minimum_word_count = Opts.minimum_word_count)
   }
-
-  // Generate KML for a single cell
-  def generate_kml(xfprob: Double, xf_minprob: Double, xf_maxprob: Double):
-    Iterable[xml.Elem]
 }
 
+/**
+ * A cell in a polygonal shape.
+ *
+ * @param cellgrid The CellGrid object for the grid this cell is in.
+ */
 abstract class PolygonalCell(
-  cellgrid: CellGrid
-) extends StatCell(cellgrid) {
+  cellgrid: CellGrid) extends StatCell(cellgrid) {
+  /**
+   * Return the boundary of the cell as an Iterable of coordinates, tracing
+   * out the boundary vertex by vertex.  The last coordinate should be the
+   * same as the first, as befits a closed shape.
+   */
   def get_boundary(): Iterable[Coord]
 
+  /**
+   * Return the "inner boundary" -- something echoing the actual boundary of the
+   * cell but with smaller dimensions.  Used for outputting KML to make the
+   * output easier to read.
+   */
   def get_inner_boundary() = {
     val center = get_center_coord()
     for (coord <- get_boundary())
-      yield Coord ((center.lat + coord.lat) / 2.0, (center.long + coord.long))
+      yield Coord((center.lat + coord.lat) / 2.0, (center.long + coord.long))
   }
 
-  def generate_kml_placemark(name: String): xml.Elem
+  /**
+   * Generate the KML placemark for the cell's name.  Currently it's rectangular
+   * for rectangular cells.  FIXME: Perhaps it should be generalized so it doesn't
+   * need to be redefined for differently-shaped cells.
+   *
+   * @param name The name to display in the placemark
+   */
+  def generate_kml_name_placemark(name: String): xml.Elem
 
   def generate_kml(xfprob: Double, xf_minprob: Double, xf_maxprob: Double) = {
     import KMLConstants._
@@ -836,7 +889,7 @@ abstract class PolygonalCell(
       else ""
 
     // Placemark indicating name
-    val name_placemark = generate_kml_placemark(name)
+    val name_placemark = generate_kml_name_placemark(name)
 
     // Interpolate colors
     val color = Array(0.0, 0.0, 0.0)
@@ -878,17 +931,34 @@ abstract class PolygonalCell(
   }
 }
 
+/**
+ * A cell in a rectangular shape.
+ *
+ * @param cellgrid The CellGrid object for the grid this cell is in.
+ */
 abstract class RectangularCell(
-  cellgrid: CellGrid
-) extends PolygonalCell(cellgrid) {
+  cellgrid: CellGrid) extends PolygonalCell(cellgrid) {
+  /**
+   * Return the coordinate of the southwest point of the rectangle.
+   */
   def get_southwest_coord(): Coord
+  /**
+   * Return the coordinate of the northeast point of the rectangle.
+   */
   def get_northeast_coord(): Coord
+  /**
+   * Define the center based on the southwest and northeast points.
+   */
   def get_center_coord() = {
     val sw = get_southwest_coord()
     val ne = get_northeast_coord()
     Coord((sw.lat + ne.lat) / 2.0, (sw.long + ne.long) / 2.0)
   }
 
+  /**
+   * Define the boundary given the specified southwest and northeast
+   * points.
+   */
   def get_boundary() = {
     val sw = get_southwest_coord()
     val ne = get_northeast_coord()
@@ -898,7 +968,14 @@ abstract class RectangularCell(
     Seq(sw, nw, ne, se, sw)
   }
 
-  def generate_kml_placemark(name: String) = {
+  /**
+   * Generate the name placemark as a smaller rectangle within the
+   * larger rectangle. (FIXME: Currently it is exactly the size of
+   * the inner boundary.  Perhaps this should be generalized, so
+   * that the definition of this function can be handled up at the
+   * polygonal-shaped-cell level.)
+   */
+  def generate_kml_name_placemark(name: String) = {
     val sw = get_southwest_coord()
     val ne = get_northeast_coord()
     val center = get_center_coord()
@@ -927,92 +1004,66 @@ abstract class RectangularCell(
   }
 }
 
-///////////// multi cells ////////////
-
-/**
- * This class contains values used in computing the distribution over all
- * locations in a multi cell.
- *
- * @param cellgrid Cell grid specifying the grid size, etc.
- * @param index Index of this cell in the grid
- */
-
-class MultiRegularCell(
-  cellgrid: MultiRegularCellGrid,
-  val index: RegularCellIndex
-) extends RectangularCell(cellgrid) {
-
-  def get_southwest_coord() =
-      cellgrid.multi_cell_index_to_near_corner_coord(index)
-
-  def get_northeast_coord() =
-      cellgrid.multi_cell_index_to_far_corner_coord(index)
-
-  def describe_location() = {
-    "%s-%s" format (get_southwest_coord(), get_northeast_coord())
-  }
-
-  def describe_indices() = "%s,%s" format (index.latind, index.longind)
-
-  def iterate_articles() = {
-    val maxlatind = (
-      (cellgrid.maximum_latind + 1) min
-      (index.latind + cellgrid.width_of_multi_cell)
-    )
-
-    if (debug("lots")) {
-      errprint("Generating distribution for multi cell centered at %s",
-        cellgrid.cell_index_to_coord(index))
-    }
-
-    // Process the tiling cells making up the multi cell;
-    // but be careful around the edges.  Truncate the latitude, wrap the
-    // longitude.
-    for { 
-      // The use of view() here in both iterators causes this iterable to
-      // be lazy; hence the print statement below doesn't get executed until
-      // we actually process the articles in question.
-      i <- (index.latind until maxlatind) view;
-      rawj <- (index.longind until
-               (index.longind + cellgrid.width_of_multi_cell)) view;
-      val j = (if (rawj > cellgrid.maximum_longind) rawj - 360 else rawj)
-      art <- {
-        if (debug("lots")) {
-          errprint("--> Processing tiling cell %s",
-            cellgrid.cell_index_to_coord(index))
-        }
-        cellgrid.tiling_cell_to_articles.getNoSet(RegularCellIndex(i, j))
-      }
-    } yield art
-  }
-}
-
 /**
  * Abstract class for a grid of cells covering the earth.
  */
 abstract class CellGrid {
-  /* These are simply the sum of the corresponding counts
-     num_arts_for_word_dist and num_arts_for_links of each individual cell. */
-  var total_num_arts_for_word_dist = 0
-  var total_num_arts_for_links = 0
-  var all_cells_computed = false
-  var num_non_empty_cells = 0
+  /**
+   * Total number of cells in the grid.
+   */
   var total_num_cells: Int
 
-  // Find the correct StatCell for the given coordinates.
-  // If none, create the cell.
+  /**
+   * Find the correct cell for the given coordinates.  If no such cell
+   * exists, return null.
+   */
   def find_best_cell_for_coord(coord: Coord): StatCell
 
-  // Add the given article to the cell grid
+  /**
+   * Add the given article to the cell grid.
+   */
   def add_article_to_cell(article: StatArticle): Unit
 
-  // Generate all StatCells that are non-empty.  Don't do anything if
-  // called multiple times.
+  /**
+   * Generate all non-empty cells.  This will be called once (and only once),
+   * after all articles have been added to the cell grid by calling
+   * `add_article_to_cell`.  The generation happens internally; but after
+   * this, `iter_nonempty_cells` should work properly.
+   */
   protected def initialize_cells(): Unit
 
+  /**
+   * Iterate over all non-empty cells.
+   * 
+   * @param nonempty_word_dist If given, returned cells must also have a
+   *   non-empty word distribution; otherwise, they just need to have at least
+   *   one article in them. (Not all articles have word distributions, esp.
+   *   when --max-time-per-stage has been set to a non-zero value so that we
+   *   only load some subset of the word distributions for all articles.  But
+   *   even when not set, some articles may be listed in the article-data file
+   *   but have no corresponding word counts given in the counts file.)
+   */
+  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[StatCell]
+  
+  /*********************** Not meant to be overridden *********************/
+  
+  /* These are simply the sum of the corresponding counts
+     `num_arts_for_word_dist` and `num_arts_for_links` of each individual
+     cell. */
+  var total_num_arts_for_word_dist = 0
+  var total_num_arts_for_links = 0
+  /* Set once finish() is called. */
+  var all_cells_computed = false
+  /* Number of non-empty cells. */
+  var num_non_empty_cells = 0
+
+  /**
+   * This function is called externally to initialize the cells.  It is a
+   * wrapper around `initialize_cells()`, which is not meant to be called
+   * externally.  Normally this does not need to be overridden.
+   */
   def finish() {
-    if (all_cells_computed)
-      return
+    assert(!all_cells_computed)
 
     initialize_cells()
 
@@ -1033,7 +1084,7 @@ abstract class CellGrid {
       StatArticleTable.table.num_word_count_articles_by_split("training")
     errprint("Training articles per non-empty cell: %g",
       training_arts_with_word_counts.toDouble / num_non_empty_cells)
-    // Also clear out the article distributions of the training set, since
+    // Clear out the article distributions of the training set, since
     // only needed when computing cells.
     //
     // FIXME: Could perhaps save more memory, or at least total memory used,
@@ -1042,40 +1093,34 @@ abstract class CellGrid {
     // in the counts.
     StatArticleTable.table.clear_training_article_distributions()
   }
-
-  // Iterate over all non-empty cells.  If 'nonempty_word_dist' is given,
-  // distributions must also have a non-empty word distribution; otherwise,
-  // they just need to have at least one point in them. (Not all points
-  // have word distributions, esp. when --max-time-per-stage is set so
-  // that we only load the word distributions for a fraction of the whole
-  // set of articles with distributions.)
-  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[StatCell]
 }
 
-case class FractionalRegularCellIndex(latind: Double, longind: Double) {
-}
+/////////////////////////////////////////////////////////////////////////////
+//                         A regularly spaced grid                         //
+/////////////////////////////////////////////////////////////////////////////
 
-case class RegularCellIndex(latind: Int, longind: Int) {
-  def toFractional() = FractionalRegularCellIndex(latind, longind)
-  /* 
-  We divide the earth's surface into "tiling cells", using the value
-  of --degrees-per-cell. (Alternatively, the value of --miles-per-cell
+/* 
+  We divide the earth's surface into "tiling cells", all of which are the
+  same square size, running on latitude/longitude lines, and which have a
+  constant number of degrees on a size, set using the value of the command-
+  line option --degrees-per-cell. (Alternatively, the value of --miles-per-cell
   or --km-per-cell are converted into degrees using 'miles_per_degree' or
   'km_per_degree', respectively, which specify the size of a degree at
   the equator and is derived from the value for the Earth's radius.)
 
   In addition, we form a square of tiling cells in order to create a
   "multi cell", which is used to compute a distribution over words.  The
-  number of tiling cells on a side is determined by --width-of-multi-cell.
-  Note that if this is greater than 1, different multi cells will overlap.
+  number of tiling cells on a side of a multi cell is determined by
+  --width-of-multi-cell.  Note that if this is greater than 1, different
+  multi cells will overlap.
 
   To specify a cell, we use cell indices, which are derived from
   coordinates by dividing by degrees_per_cell.  Hence, if for example
   degrees_per_cell is 2.0, then cell indices are in the range [-45,+45]
   for latitude and [-90,+90) for longitude.  In general, an arbitrary
   coordinate will have fractional cell indices; however, the cell indices
-  of the corners of a cell (tiling or statistical) will be integers.
-  Normally, we use the southwest corner to specify a cell.
+  of the corners of a cell (tiling or multi) will be integers.  Normally,
+  we use the southwest corner to specify a cell.
 
   Correspondingly, to convert a cell index to a Coord, we multiply
   latitude and longitude by degrees_per_cell.
@@ -1084,23 +1129,100 @@ case class RegularCellIndex(latind: Int, longind: Int) {
   wrap around longitudinally, and will still have the same number of
   tiling cells, but may be smaller.
   */
+
+/**
+ * The index of a regular cell, using "cell index" integers, as described
+ * above.
+ */
+case class RegularCellIndex(latind: Int, longind: Int) {
+  def toFractional() = FractionalRegularCellIndex(latind, longind)
 }
 
 /**
- * Grid of regularly-spaced rectangular tiles covering the earth, where
- * the cells over which distributions are computed are be composed of
- * NxN tiles, where possibly N > 1.
+ * Similar to `RegularCellIndex`, but for the case where the indices are
+ * fractional, representing a location other than at the corners of a
+ * cell.
+ */
+case class FractionalRegularCellIndex(latind: Double, longind: Double) {
+}
+
+/**
+ * A cell where the cell grid is a MultiRegularCellGrid. (See that class.)
  *
+ * @param cellgrid The CellGrid object for the grid this cell is in,
+ *   an instance of MultiRegularCellGrid.
+ * @param index Index of this cell in the grid
+ */
+
+class MultiRegularCell(
+  cellgrid: MultiRegularCellGrid,
+  val index: RegularCellIndex) extends RectangularCell(cellgrid) {
+
+  def get_southwest_coord() =
+    cellgrid.multi_cell_index_to_near_corner_coord(index)
+
+  def get_northeast_coord() =
+    cellgrid.multi_cell_index_to_far_corner_coord(index)
+
+  def describe_location() = {
+    "%s-%s" format (get_southwest_coord(), get_northeast_coord())
+  }
+
+  def describe_indices() = "%s,%s" format (index.latind, index.longind)
+
+  def iterate_articles() = {
+    val maxlatind = (
+      (cellgrid.maximum_latind + 1) min
+      (index.latind + cellgrid.width_of_multi_cell))
+
+    if (debug("lots")) {
+      errprint("Generating distribution for multi cell centered at %s",
+        cellgrid.cell_index_to_coord(index))
+    }
+
+    // Process the tiling cells making up the multi cell;
+    // but be careful around the edges.  Truncate the latitude, wrap the
+    // longitude.
+    for {
+      // The use of view() here in both iterators causes this iterable to
+      // be lazy; hence the print statement below doesn't get executed until
+      // we actually process the articles in question.
+      i <- (index.latind until maxlatind) view;
+      rawj <- (index.longind until
+        (index.longind + cellgrid.width_of_multi_cell)) view;
+      val j = (if (rawj > cellgrid.maximum_longind) rawj - 360 else rawj)
+      art <- {
+        if (debug("lots")) {
+          errprint("--> Processing tiling cell %s",
+            cellgrid.cell_index_to_coord(index))
+        }
+        cellgrid.tiling_cell_to_articles.getNoSet(RegularCellIndex(i, j))
+      }
+    } yield art
+  }
+}
+
+/**
+ * Grid composed of possibly-overlapping multi cells, based on an underlying
+ * grid of regularly-spaced square cells tiling the earth.  The multi cells,
+ * over which word distributions are computed for comparison with the word
+ * distribution of a given article, are composed of NxN tiles, where possibly
+ * N > 1.
+ *
+ * FIXME: We should abstract out the concept of a grid composed of tiles and
+ * a grid composed of overlapping conglomerations of tiles; this could be
+ * useful e.g. for KD trees or other representations where we might want to
+ * compare with cells at multiple levels of granularity.
+ * 
  * @param degrees_per_cell Size of each cell in degrees.  Determined by the
  *   --degrees-per-cell option, unless --miles-per-cell is set, in which
  *   case it takes priority.
- @ @param width_of_multi_cell Size of multi cells in tiling cells,
+ * @ @param width_of_multi_cell Size of multi cells in tiling cells,
  *   determined by the --width-of-multi-cell option.
  */
 class MultiRegularCellGrid(
   val degrees_per_cell: Double,
-  val width_of_multi_cell: Int
-) extends CellGrid {
+  val width_of_multi_cell: Int) extends CellGrid {
 
   /**
    * Size of each cell (vertical dimension; horizontal dimension only near
@@ -1149,7 +1271,7 @@ class MultiRegularCellGrid(
   val corner_to_multi_cell = mutable.Map[RegularCellIndex, MultiRegularCell]()
 
   var total_num_cells = 0
- 
+
   /*************** Conversion between Cell indices and Coords *************/
 
   /* The different functions vary depending on where in the particular cell
@@ -1162,59 +1284,59 @@ class MultiRegularCellGrid(
     val longind = floor(coord.long / degrees_per_cell).toInt
     RegularCellIndex(latind, longind)
   }
-  
+
   // Convert a coordinate to the indices of the southwest corner of the
-  // corresponding statistical cell.
+  // corresponding multi cell.
   def coord_to_multi_cell_index(coord: Coord) = {
     // When width_of_multi_cell = 1, don't subtract anything.
     // When width_of_multi_cell = 2, subtract 0.5*degrees_per_cell.
     // When width_of_multi_cell = 3, subtract degrees_per_cell.
     // When width_of_multi_cell = 4, subtract 1.5*degrees_per_cell.
     // In general, subtract (width_of_multi_cell-1)/2.0*degrees_per_cell.
-  
+
     // Compute the indices of the southwest cell
-    val subval = (width_of_multi_cell-1)/2.0*degrees_per_cell
+    val subval = (width_of_multi_cell - 1) / 2.0 * degrees_per_cell
     coord_to_tiling_cell_index(
       Coord(coord.lat - subval, coord.long - subval))
   }
-  
+
   // Convert cell indices to the corresponding coordinate.  This can also
   // be used to find the coordinate of the southwest corner of a tiling cell
-  // or statistical cell, as both are identified by the cell indices of
+  // or multi cell, as both are identified by the cell indices of
   // their southwest corner.  Values are double since we may be requesting the
   // coordinate of a location not exactly at a cell index (e.g. the center
   // point).
   def fractional_cell_index_to_coord(index: FractionalRegularCellIndex,
-      method: String = "coerce-warn") = {
+    method: String = "coerce-warn") = {
     Coord(index.latind * degrees_per_cell, index.longind * degrees_per_cell,
-          method)
+      method)
   }
-  
+
   def cell_index_to_coord(index: RegularCellIndex,
-      method: String = "coerce-warn") =
+    method: String = "coerce-warn") =
     fractional_cell_index_to_coord(index.toFractional, method)
-  
+
   // Add 'offset' to both latind and longind of 'index' and then convert to a
   // coordinate.  Coerce the coordinate to be within bounds.
   def offset_cell_index_to_coord(index: RegularCellIndex,
-      offset: Double) = {
+    offset: Double) = {
     fractional_cell_index_to_coord(
       FractionalRegularCellIndex(index.latind + offset, index.longind + offset),
-        "coerce")
+      "coerce")
   }
-  
+
   // Convert cell indices of a tiling cell to the coordinate of the
   // near (i.e. southwest) corner of the cell.
   def tiling_cell_index_to_near_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(index)
   }
-  
+
   // Convert cell indices of a tiling cell to the coordinate of the
   // center of the cell.
   def tiling_cell_index_to_center_coord(index: RegularCellIndex) = {
     offset_cell_index_to_coord(index, 0.5)
   }
-  
+
   // Convert cell indices of a tiling cell to the coordinate of the
   // far (i.e. northeast) corner of the cell.
   def tiling_cell_index_to_far_corner_coord(index: RegularCellIndex) = {
@@ -1225,42 +1347,42 @@ class MultiRegularCellGrid(
   def multi_cell_index_to_near_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(index)
   }
-  
-  // Convert cell indices of a statistical cell to the coordinate of the
+
+  // Convert cell indices of a multi cell to the coordinate of the
   // center of the cell.
   def multi_cell_index_to_center_coord(index: RegularCellIndex) = {
-    offset_cell_index_to_coord(index, width_of_multi_cell/2.0)
+    offset_cell_index_to_coord(index, width_of_multi_cell / 2.0)
   }
-  
-  // Convert cell indices of a statistical cell to the coordinate of the
+
+  // Convert cell indices of a multi cell to the coordinate of the
   // far (i.e. northeast) corner of the cell.
   def multi_cell_index_to_far_corner_coord(index: RegularCellIndex) = {
     offset_cell_index_to_coord(index, width_of_multi_cell)
   }
-  
-  // Convert cell indices of a statistical cell to the coordinate of the
+
+  // Convert cell indices of a multi cell to the coordinate of the
   // northwest corner of the cell.
   def multi_cell_index_to_nw_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(
       RegularCellIndex(index.latind + width_of_multi_cell, index.longind),
       "coerce")
   }
-  
-  // Convert cell indices of a statistical cell to the coordinate of the
+
+  // Convert cell indices of a multi cell to the coordinate of the
   // southeast corner of the cell.
   def multi_cell_index_to_se_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(
       RegularCellIndex(index.latind, index.longind + width_of_multi_cell),
       "coerce")
   }
-  
-  // Convert cell indices of a statistical cell to the coordinate of the
+
+  // Convert cell indices of a multi cell to the coordinate of the
   // southwest corner of the cell.
   def multi_cell_index_to_sw_corner_coord(index: RegularCellIndex) = {
     multi_cell_index_to_near_corner_coord(index)
   }
-  
-  // Convert cell indices of a statistical cell to the coordinate of the
+
+  // Convert cell indices of a multi cell to the coordinate of the
   // northeast corner of the cell.
   def multi_cell_index_to_ne_corner_coord(index: RegularCellIndex) = {
     multi_cell_index_to_far_corner_coord(index)
@@ -1268,17 +1390,11 @@ class MultiRegularCellGrid(
 
   /*************** End conversion functions *************/
 
-  // Find the correct StatCell for the given coordinates.  Return null if
-  // no such cell.
   def find_best_cell_for_coord(coord: Coord) = {
     val index = coord_to_multi_cell_index(coord)
     find_cell_for_cell_index(index)
   }
 
-  // Find the StatCell with the given indices at the southwest point.
-  // If none, create the cell unless 'no_create' is true.  Otherwise, if
-  // 'no_create_empty' is true and the cell is empty, a default empty
-  // cell is returned.
   protected def find_cell_for_cell_index(index: RegularCellIndex,
     create: Boolean = false) = {
     if (!create)
@@ -1300,15 +1416,11 @@ class MultiRegularCellGrid(
     }
   }
 
-  // Add the given article to the cell map, which covers the Earth in cells
-  // of a particular size to aid in computing the cells used in cell-based
-  // Naive Bayes.
   def add_article_to_cell(article: StatArticle) {
     val index = coord_to_tiling_cell_index(article.coord)
     tiling_cell_to_articles(index) += article
   }
 
-  // Create all StatCells that are non-empty.
   protected def initialize_cells() {
     val task = new MeteredTask("Earth-tiling cell", "generating non-empty")
 
@@ -1328,12 +1440,6 @@ class MultiRegularCellGrid(
     tiling_cell_to_articles = null
   }
 
-  // Iterate over all non-empty cells.  If 'nonempty_word_dist' is given,
-  // distributions must also have a non-empty word distribution; otherwise,
-  // they just need to have at least one point in them. (Not all points
-  // have word distributions, esp. when --max-time-per-stage is set so
-  // that we only load the word distributions for a fraction of the whole
-  // set of articles with distributions.)
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false) = {
     assert(all_cells_computed)
     for {
@@ -1345,8 +1451,19 @@ class MultiRegularCellGrid(
     } yield v
   }
 
+  /**
+   * Output a "ranking grid" of information so that a nice 3-D graph
+   * can be created showing the ranks of cells surrounding the true
+   * cell, out to a certain distance.
+   * 
+   * @param pred_cells List of predicted cells, along with their scores.
+   * @true_cell True cell.
+   * @grsize Total size of the ranking grid. (For example, a total size
+   *   of 21 will result in a ranking grid with the true cell and 10
+   *   cells on each side shown.)
+   */
   def output_ranking_grid(pred_cells: Seq[(MultiRegularCell, Double)],
-      true_cell: MultiRegularCell, grsize: Int) {
+    true_cell: MultiRegularCell, grsize: Int) {
     val (true_latind, true_longind) =
       (true_cell.index.latind, true_cell.index.longind)
     val min_latind = true_latind - grsize / 2
@@ -1410,7 +1527,7 @@ class StatArticleTable {
   val name_to_article = mutable.Map[String, StatArticle]()
 
   // List of articles in each split.
-  val articles_by_split = bufmap[String,StatArticle]()
+  val articles_by_split = bufmap[String, StatArticle]()
 
   // Num of articles with word-count information but not in table.
   var num_articles_with_word_counts_but_not_in_table = 0
@@ -1432,28 +1549,28 @@ class StatArticleTable {
   // Total # of incoming links for all articles in each split.
   val incoming_links_by_split = intmap[String]()
 
-  /** 
-    Map from short name (lowercased) to list of articles.
-    The short name for an article is computed from the article's name.  If
-    the article name has a comma, the short name is the part before the
-    comma, e.g. the short name of "Springfield, Ohio" is "Springfield".
-    If the name has no comma, the short name is the same as the article
-    name.  The idea is that the short name should be the same as one of
-    the toponyms used to refer to the article.
+  /**
+   * Map from short name (lowercased) to list of articles.
+   * The short name for an article is computed from the article's name.  If
+   * the article name has a comma, the short name is the part before the
+   * comma, e.g. the short name of "Springfield, Ohio" is "Springfield".
+   * If the name has no comma, the short name is the same as the article
+   * name.  The idea is that the short name should be the same as one of
+   * the toponyms used to refer to the article.
    */
-  val short_lower_name_to_articles = bufmap[String,StatArticle]()
+  val short_lower_name_to_articles = bufmap[String, StatArticle]()
 
   /**
-    Map from tuple (NAME, DIV) for articles of the form "Springfield, Ohio",
-    lowercased.
+   * Map from tuple (NAME, DIV) for articles of the form "Springfield, Ohio",
+   * lowercased.
    */
   val lower_name_div_to_articles = bufmap[(String, String), StatArticle]()
 
   // For each toponym, list of articles matching the name.
-  val lower_toponym_to_article = bufmap[String,StatArticle]()
+  val lower_toponym_to_article = bufmap[String, StatArticle]()
 
   // Mapping from lowercased article names to TopoArticle objects
-  val lower_name_to_articles = bufmap[String,StatArticle]()
+  val lower_name_to_articles = bufmap[String, StatArticle]()
 
   // Look up an article named NAME and return the associated article.
   // Note that article names are case-sensitive but the first letter needs to
@@ -1488,7 +1605,7 @@ class StatArticleTable {
     if (short != loname && !(lower_toponym_to_article(short) contains art))
       lower_toponym_to_article(short) += art
   }
-  
+
   // Record either a normal article ('artfrom' same as 'artto') or a
   // redirect ('artfrom' redirects to 'artto').
   def record_article(artfrom: StatArticle, artto: StatArticle) {
@@ -1771,27 +1888,26 @@ class StatArticle(params: Map[String, String]) extends Article(params)
 /////////////////////////////////////////////////////////////////////////////
 
 /**
-  Abstract class for reading documents from a test file and doing
-  document geolocation on them (as opposed e.g. to toponym resolution).
+ * Abstract class for reading documents from a test file and doing
+ * document geolocation on them (as opposed e.g. to toponym resolution).
  */
 abstract class GeotagDocumentStrategy(val cellgrid: CellGrid) {
   /**
-   For a given word distribution (describing a test document), return
-   an Iterable of tuples, each listing a particular cell on the Earth
-   and a score of some sort (the lower the better).  The results should
-   be in sorted order, with better cells earlier.
+   * For a given word distribution (describing a test document), return
+   * an Iterable of tuples, each listing a particular cell on the Earth
+   * and a score of some sort (the lower the better).  The results should
+   * be in sorted order, with better cells earlier.
    */
   def return_ranked_cells(worddist: WordDist): Iterable[(StatCell, Double)]
 }
 
 /**
-  Class that implements the baseline strategies for document geolocation.
-  'baseline_strategy' specifies the particular strategy to use.
+ * Class that implements the baseline strategies for document geolocation.
+ * 'baseline_strategy' specifies the particular strategy to use.
  */
 class BaselineGeotagDocumentStrategy(
   cellgrid: CellGrid,
-  baseline_strategy: String
-) extends GeotagDocumentStrategy(cellgrid) {
+  baseline_strategy: String) extends GeotagDocumentStrategy(cellgrid) {
   var cached_ranked_mps: Iterable[(StatCell, Double)] = null
 
   def ranked_cells_random(worddist: WordDist) = {
@@ -1904,23 +2020,23 @@ class BaselineGeotagDocumentStrategy(
 }
 
 /**
-  Abstract class that implements a strategy for document geolocation that
-  involves directly comparing the article distribution against each cell
-  in turn and computing a score, with lower values better.
+ * Abstract class that implements a strategy for document geolocation that
+ * involves directly comparing the article distribution against each cell
+ * in turn and computing a score, with lower values better.
  */
 abstract class MinimumScoreStrategy(
-  cellgrid: CellGrid
-) extends GeotagDocumentStrategy(cellgrid) {
+  cellgrid: CellGrid) extends GeotagDocumentStrategy(cellgrid) {
   /**
-    Function to return the score of an article distribution against a
-    cell.
+   * Function to return the score of an article distribution against a
+   * cell.
    */
   def score_cell(worddist: WordDist, cell: StatCell): Double
 
   def return_ranked_cells(worddist: WordDist) = {
     val cell_buf = mutable.Buffer[(StatCell, Double)]()
-    for (cell <-
-           cellgrid.iter_nonempty_cells(nonempty_word_dist = true)) {
+    for (
+      cell <- cellgrid.iter_nonempty_cells(nonempty_word_dist = true)
+    ) {
       if (debug("lots")) {
         errprint("Nonempty cell at indices %s = location %s, num_articles = %s",
           cell.describe_indices(), cell.describe_location(),
@@ -1936,24 +2052,23 @@ abstract class MinimumScoreStrategy(
 }
 
 /**
-  Class that implements a strategy for document geolocation by computing
-  the KL-divergence between article and cell (approximately, how much
-  the word distributions differ).  Note that the KL-divergence as currently
-  implemented uses the smoothed word distributions.
-
-  @param partial If true (the default), only do "partial" KL-divergence.
-         This only computes the divergence involving words in the article
-         distribution, rather than considering all words in the vocabulary.
-  @param symmetric If true, do a symmetric KL-divergence by computing
-         the divergence in both directions and averaging the two values.
-         (Not by default; the comparison is fundamentally asymmetric in
-         any case since it's comparing articles against cells.)
+ * Class that implements a strategy for document geolocation by computing
+ * the KL-divergence between article and cell (approximately, how much
+ * the word distributions differ).  Note that the KL-divergence as currently
+ * implemented uses the smoothed word distributions.
+ *
+ * @param partial If true (the default), only do "partial" KL-divergence.
+ * This only computes the divergence involving words in the article
+ * distribution, rather than considering all words in the vocabulary.
+ * @param symmetric If true, do a symmetric KL-divergence by computing
+ * the divergence in both directions and averaging the two values.
+ * (Not by default; the comparison is fundamentally asymmetric in
+ * any case since it's comparing articles against cells.)
  */
 class KLDivergenceStrategy(
   cellgrid: CellGrid,
   partial: Boolean = true,
-  symmetric: Boolean = false
-) extends MinimumScoreStrategy(cellgrid) {
+  symmetric: Boolean = false) extends MinimumScoreStrategy(cellgrid) {
 
   def score_cell(worddist: WordDist, cell: StatCell) = {
     var kldiv = worddist.fast_kl_divergence(cell.worddist,
@@ -2004,22 +2119,21 @@ class KLDivergenceStrategy(
 }
 
 /**
-  Class that implements a strategy for document geolocation by computing
-  the cosine similarity between the distributions of article and cell.
-  FIXME: We really should transform the distributions by TF/IDF before
-  doing this.
-
-  @param smoothed If true, use the smoothed word distributions. (By default,
-         use unsmoothed distributions.)
-  @param partial If true, only do "partial" cosine similarity.
-         This only computes the similarity involving words in the article
-         distribution, rather than considering all words in the vocabulary.
+ * Class that implements a strategy for document geolocation by computing
+ * the cosine similarity between the distributions of article and cell.
+ * FIXME: We really should transform the distributions by TF/IDF before
+ * doing this.
+ *
+ * @param smoothed If true, use the smoothed word distributions. (By default,
+ * use unsmoothed distributions.)
+ * @param partial If true, only do "partial" cosine similarity.
+ * This only computes the similarity involving words in the article
+ * distribution, rather than considering all words in the vocabulary.
  */
 class CosineSimilarityStrategy(
   cellgrid: CellGrid,
   smoothed: Boolean = false,
-  partial: Boolean = false
-) extends MinimumScoreStrategy(cellgrid) {
+  partial: Boolean = false) extends MinimumScoreStrategy(cellgrid) {
 
   def score_cell(worddist: WordDist, cell: StatCell) = {
     var cossim =
@@ -2040,8 +2154,7 @@ class CosineSimilarityStrategy(
 /** Use a Naive Bayes strategy for comparing document and cell. */
 class NaiveBayesDocumentStrategy(
   cellgrid: CellGrid,
-  use_baseline: Boolean = true
-) extends GeotagDocumentStrategy(cellgrid) {
+  use_baseline: Boolean = true) extends GeotagDocumentStrategy(cellgrid) {
 
   def return_ranked_cells(worddist: WordDist) = {
 
@@ -2070,8 +2183,7 @@ class NaiveBayesDocumentStrategy(
 }
 
 class AverageCellProbabilityStrategy(
-  cellgrid: CellGrid
-  ) extends GeotagDocumentStrategy(cellgrid) {
+  cellgrid: CellGrid) extends GeotagDocumentStrategy(cellgrid) {
   def return_ranked_cells(worddist: WordDist) = {
     val celldist = CellDist.get_cell_dist_for_word_dist(cellgrid, worddist)
     celldist.get_ranked_cells()
@@ -2109,7 +2221,6 @@ object Stopwords {
   // List of stopwords
   var stopwords: Set[String] = null
 
-
   def compute_stopwords_filename(filename: String) = {
     if (filename != null) filename
     else {
@@ -2131,17 +2242,17 @@ object Stopwords {
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- Class for specifying options for geolocation.  Note that currently this
- is a fairly crude conversion of the original command-line interface, with
- one field in this class for each possible command-line option.
- Documentation for how these fields work is as described below in the help
- for each corresponding command-line option.
-
- @param defaults Object used to initialize the default values of each
- argument.  By default, the corresponding default values for the
- corresponding command-line arguments are used, but it's possible to pass
- in an object corresponding to the arguments actually specified on the
- command line, so that these values don't have to be explicitly copied.
+ * Class for specifying options for geolocation.  Note that currently this
+ * is a fairly crude conversion of the original command-line interface, with
+ * one field in this class for each possible command-line option.
+ * Documentation for how these fields work is as described below in the help
+ * for each corresponding command-line option.
+ *
+ * @param defaults Object used to initialize the default values of each
+ * argument.  By default, the corresponding default values for the
+ * corresponding command-line arguments are used, but it's possible to pass
+ * in an object corresponding to the arguments actually specified on the
+ * command line, so that these values don't have to be explicitly copied.
  */
 class GeolocateOptions(defaults: GeolocateCommandLineArguments = null) {
   /* This is used to fetch the default values out of the command-line
@@ -2215,12 +2326,12 @@ class GeolocateOptions(defaults: GeolocateCommandLineArguments = null) {
 }
 
 /**
- Class for parsing and retrieving command-line arguments for GeolocateApp.
-
- @param return_defaults If true, options return default values instead of
-   values given on the command line. NOTE: The operation of the defs below
-   is a bit tricky.  See comments in OptionParser.
-*/
+ * Class for parsing and retrieving command-line arguments for GeolocateApp.
+ *
+ * @param return_defaults If true, options return default values instead of
+ * values given on the command line. NOTE: The operation of the defs below
+ * is a bit tricky.  See comments in OptionParser.
+ */
 class GeolocateCommandLineArguments(op: OptionParser) {
   //// Basic options for determining operating mode and strategy
   def mode =
@@ -2398,7 +2509,7 @@ Each file is read in and then disambiguation is performed.  Not used when
     op.option[String]("f", "eval-format",
       default = "default",
       choices = Seq("default", "internal", "pcl-travel",
-                    "raw-text", "article", "tr-conll"),
+        "raw-text", "article", "tr-conll"),
       help = """Format of evaluation file(s).  The evaluation files themselves
 are specified using --eval-file.  The following formats are
 recognized:
@@ -2501,8 +2612,8 @@ is used.""")
 distribution for geotagging purposes, in terms of number of tiling cells.
 NOTE: It's unlikely you want to change this.  It may be removed entirely in
 later versions.  In normal circumstances, the value is 1, i.e. use a single
-tiling cell to compute each statistical cell.  If the value is more than
-1, the statistical cells overlap.""")
+tiling cell to compute each multi cell.  If the value is more than
+1, the multi cells overlap.""")
 
   //// Options used when creating word distributions
   def preserve_case_words =
@@ -2557,7 +2668,7 @@ Used for testing purposes.  Default 0, i.e. no limit.""")
       help = """Don't show individual results for each test document.""")
   def oracle_results =
     op.flag("oracle-results",
-      help="""Only compute oracle results (much faster).""")
+      help = """Only compute oracle results (much faster).""")
   def debug =
     op.option[String]("d", "debug", metavar = "FLAGS",
       help = """Output debug info of the given types.  Multiple debug
@@ -2670,10 +2781,10 @@ object Debug {
   // times, or by separating values by a comma.
   val debug = booleanmap[String]()
   val debugval = stringmap[String]()
-  val debuglist = bufmap[String,String]()
-  
+  val debuglist = bufmap[String, String]()
+
   var list_debug_params = Set[String]()
-  
+
   // Register a list-valued debug param.
   def register_list_debug_param(param: String) {
     list_debug_params += param
@@ -2697,29 +2808,30 @@ object Debug {
   }
 }
 
-/** Class for programmatic access to document/etc. geolocation.
-
-  NOTE: Currently this is a singleton object, not a class, because there
-  can be only one geolocation instance in existence.  This is because
-  of various other singleton objects (i.e. static methods/fields) scattered
-  throughout the code.  If this is a problem, let me know and I will
-  endeavor to fix it.
-
-  Basic operation:
-
-  1. Create an instance of GeolocateOptions and populate it with the
-     appropriate options.
-  2. Call set_options(), passing in the options instance you just created.
-  3. Call run().  The return value contains some evaluation results.
-
-  NOTE: Currently, the GeolocateOptions instance is recorded directly inside
-  of this singleton object, without copying, and some of the fields are
-  changed to more canonical values.  If this is a problem, let me know and
-  I'll fix it.
-
-  All evaluation output is currently written to standard error.
-  (There are some scripts to parse the output.) Some info is also returned
-  by the run() function.  See below.
+/**
+ * Class for programmatic access to document/etc. geolocation.
+ *
+ * NOTE: Currently this is a singleton object, not a class, because there
+ * can be only one geolocation instance in existence.  This is because
+ * of various other singleton objects (i.e. static methods/fields) scattered
+ * throughout the code.  If this is a problem, let me know and I will
+ * endeavor to fix it.
+ *
+ * Basic operation:
+ *
+ * 1. Create an instance of GeolocateOptions and populate it with the
+ * appropriate options.
+ * 2. Call set_options(), passing in the options instance you just created.
+ * 3. Call run().  The return value contains some evaluation results.
+ *
+ * NOTE: Currently, the GeolocateOptions instance is recorded directly inside
+ * of this singleton object, without copying, and some of the fields are
+ * changed to more canonical values.  If this is a problem, let me know and
+ * I'll fix it.
+ *
+ * All evaluation output is currently written to standard error.
+ * (There are some scripts to parse the output.) Some info is also returned
+ * by the run() function.  See below.
  */
 object GeolocateDriver {
   var Opts = null: GeolocateOptions
@@ -2730,26 +2842,31 @@ object GeolocateDriver {
 
   protected var need_to_read_stopwords = false
 
-  /** Output the values of some internal parameters.  Only needed
-      for debugging. */
+  /**
+   * Output the values of some internal parameters.  Only needed
+   * for debugging.
+   */
   def output_parameters() {
     errprint("Need to read stopwords: %s", need_to_read_stopwords)
   }
 
-  /** Signal an argument error, the same way that set_options() does by
-      default.  You don't normally need to call this.
+  /**
+   * Signal an argument error, the same way that set_options() does by
+   * default.  You don't normally need to call this.
    */
   def default_argument_error(string: String) {
     throw new IllegalArgumentException(string)
   }
 
-  /** Set the options to those as given.  NOTE: Currently, some of the
-      fields in this structure will be changed (canonicalized).  See above.
-      If options are illegal, an error will be signaled.
-      
-      @param options Object holding options to set
-      @param argerror Function to use to signal invalid arguments.  By
-        default, the function `default_argument_error()` is called. */
+  /**
+   * Set the options to those as given.  NOTE: Currently, some of the
+   * fields in this structure will be changed (canonicalized).  See above.
+   * If options are illegal, an error will be signaled.
+   *
+   * @param options Object holding options to set
+   * @param argerror Function to use to signal invalid arguments.  By
+   * default, the function `default_argument_error()` is called.
+   */
   def set_options(options: GeolocateOptions,
     argerror: String => Unit = default_argument_error _) {
     def argument_needed(arg: String, arg_english: String = null) {
@@ -2881,8 +2998,7 @@ object GeolocateDriver {
     if (Opts.mode == "geotag-documents" && Opts.eval_format == "internal") {
       if (Opts.eval_file.length > 0)
         argerror("--eval-file should not be given when --eval-format=internal")
-    }
-    else if (Opts.mode.startsWith("geotag"))
+    } else if (Opts.mode.startsWith("geotag"))
       need_seq(Opts.eval_file, "eval-file", "evaluation file(s)")
 
     if (Opts.mode == "generate-kml")
@@ -2928,7 +3044,7 @@ object GeolocateDriver {
 
   protected def process_strategies[T](
     strat_unflat: Seq[Seq[(String, T)]])(
-    geneval: (String, T) => EvaluationOutputter) = {
+      geneval: (String, T) => EvaluationOutputter) = {
     val strats = strat_unflat reduce (_ ++ _)
     for ((stratname, strategy) <- strats) yield {
       val evalobj = geneval(stratname, strategy)
@@ -2943,23 +3059,24 @@ object GeolocateDriver {
     }
   }
 
-  /** Do the actual document geolocation.  Results to stderr (see above), and
-      also returned.
-      
-      The current return type is as follows:
-      
-      Seq[(java.lang.String, GeotagDocumentStrategy, scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.TestFileEvaluator
-     
-      This means you get a sequence of tuples of
-        (strategyname, strategy, results)
-      where:
-        strategyname = name of strategy as given on command line
-        strategy = strategy object
-        results = map listing results for each document (an abstract type
-          defined in TestFileEvaluator; the result type EvaluationResult
-          is practically an abstract type, too -- the most useful dynamic
-          type in practice is ArticleEvaluationResult)
-      */
+  /**
+   * Do the actual document geolocation.  Results to stderr (see above), and
+   * also returned.
+   *
+   * The current return type is as follows:
+   *
+   * Seq[(java.lang.String, GeotagDocumentStrategy, scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.TestFileEvaluator
+   *
+   * This means you get a sequence of tuples of
+   * (strategyname, strategy, results)
+   * where:
+   * strategyname = name of strategy as given on command line
+   * strategy = strategy object
+   * results = map listing results for each document (an abstract type
+   * defined in TestFileEvaluator; the result type EvaluationResult
+   * is practically an abstract type, too -- the most useful dynamic
+   * type in practice is ArticleEvaluationResult)
+   */
 
   def run_geotag_documents() = {
     read_data_for_geotag_documents()
@@ -3014,11 +3131,12 @@ object GeolocateDriver {
     })
   }
 
-  /** Do the actual toponym geolocation.  Results to stderr (see above), and
-      also returned.
-     
-      Return value very much like for run_geotag_documents(), but less
-      useful info may be returned for each document processed.
+  /**
+   * Do the actual toponym geolocation.  Results to stderr (see above), and
+   * also returned.
+   *
+   * Return value very much like for run_geotag_documents(), but less
+   * useful info may be returned for each document processed.
    */
 
   def run_geotag_toponyms() = {
@@ -3072,8 +3190,9 @@ object GeolocateDriver {
     })
   }
 
-  /** Do the actual KML generation.  Some tracking info written to stderr.
-      KML files created and written on disk.
+  /**
+   * Do the actual KML generation.  Some tracking info written to stderr.
+   * KML files created and written on disk.
    */
 
   def run_generate_kml() {
