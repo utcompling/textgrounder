@@ -265,15 +265,21 @@ package object tgutil {
      *   all files in the directory will be processed.  If any file
      *   is null, it will be passed on unchanged (see above; useful
      *   e.g. for specifying input from an internal source).
+     * @returns True if file processing continued to completion,
+     *   false if interrupted because an invocation of `process_file`
+     *   returns false.
      */
-    def process_files(files: Iterable[String]) {
+    def process_files(files: Iterable[String]) = {
+      var broken = false
       breakable {
         def process_one_file(filename: String) {
-          if (!process_file(filename))
+          if (!process_file(filename)) {
             // This works because of the way 'breakable' is implemented
             // (dynamically-scoped).  Might "break" (stop working) if break
             // is made totally lexically-scoped.
+            broken = true
             break
+          }
         }
         for (dir <- files) {
           if (dir == null)
@@ -289,6 +295,7 @@ package object tgutil {
           }
         }
       }
+      !broken
     }
   }
 
