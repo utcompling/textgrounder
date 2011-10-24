@@ -393,8 +393,8 @@ abstract class GeotagDocumentEvaluator(
 }
 
 case class ArticleEvaluationResult(
-  article: StatArticle,
-  pred_cell: StatCell,
+  article: GeoArticle,
+  pred_cell: GeoCell,
   true_rank: Int
 ) extends EvaluationResult {
   val true_cell = pred_cell.cellgrid.find_best_cell_for_coord(article.coord)
@@ -416,7 +416,7 @@ class ArticleGeotagDocumentEvaluator(
   stratname: String
 ) extends GeotagDocumentEvaluator(strategy, stratname) {
 
-  type Document = StatArticle
+  type Document = GeoArticle
   type DocumentResult = ArticleEvaluationResult
 
   // Debug flags:
@@ -437,7 +437,7 @@ class ArticleGeotagDocumentEvaluator(
 
   def iter_documents(filename: String) = {
     assert(filename == null)
-    for (art <- StatArticleTable.table.articles_by_split(Opts.eval_set))
+    for (art <- GeoArticleTable.table.articles_by_split(Opts.eval_set))
       yield art
   }
 
@@ -461,7 +461,7 @@ class ArticleGeotagDocumentEvaluator(
   //if (title != null)
   //  yield (title, words)
 
-  override def would_skip_document(article: StatArticle, doctag: String) = {
+  override def would_skip_document(article: GeoArticle, doctag: String) = {
     if (article.dist == null) {
       // This can (and does) happen when --max-time-per-stage is set,
       // so that the counts for many articles don't get read in.
@@ -472,7 +472,7 @@ class ArticleGeotagDocumentEvaluator(
     } else false
   }
 
-  def evaluate_document(article: StatArticle, doctag: String):
+  def evaluate_document(article: GeoArticle, doctag: String):
       EvaluationResult = {
     if (would_skip_document(article, doctag))
       return null

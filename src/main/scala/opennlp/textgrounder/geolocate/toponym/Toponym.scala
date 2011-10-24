@@ -97,7 +97,7 @@ abstract class Location(
   val name: String,
   val altnames: Seq[String],
   val typ: String) {
-  var artmatch: StatArticle = null
+  var artmatch: GeoArticle = null
   var div: Division = null
   def toString(no_article: Boolean = false): String
   def shortstr(): String
@@ -356,7 +356,7 @@ object Division {
 
 // A Wikipedia article for toponym resolution.
 
-class TopoArticle(params: Map[String, String]) extends StatArticle(params) {
+class TopoArticle(params: Map[String, String]) extends GeoArticle(params) {
   // Cell-based distribution corresponding to this article.
   var worddist: CellWordDist = null
   // Corresponding location for this article.
@@ -452,8 +452,8 @@ class TopoArticle(params: Map[String, String]) extends StatArticle(params) {
 }
 
 // Static class maintaining additional tables listing mapping between
-// names, ID's and articles.  See comments at StatArticleTable.
-class TopoArticleTable extends StatArticleTable {
+// names, ID's and articles.  See comments at GeoArticleTable.
+class TopoArticleTable extends GeoArticleTable {
   override def create_article(params: Map[String, String]) =
     new TopoArticle(params)
 
@@ -489,8 +489,8 @@ class TopoArticleTable extends StatArticleTable {
   // Return the article matched, or None.
 
   def find_one_wikipedia_match(loc: Location, name: String,
-    check_match: (StatArticle) => Boolean,
-    prefer_match: (StatArticle, StatArticle) => Boolean): StatArticle = {
+    check_match: (GeoArticle) => Boolean,
+    prefer_match: (GeoArticle, GeoArticle) => Boolean): GeoArticle = {
 
     val loname = name.toLowerCase
 
@@ -536,8 +536,8 @@ class TopoArticleTable extends StatArticleTable {
   // PREFER_MATCH are as above.  Return the article matched, or None.
 
   def find_wikipedia_match(loc: Location,
-    check_match: (StatArticle) => Boolean,
-    prefer_match: (StatArticle, StatArticle) => Boolean): StatArticle = {
+    check_match: (GeoArticle) => Boolean,
+    prefer_match: (GeoArticle, GeoArticle) => Boolean): GeoArticle = {
     // Try to find a match for the canonical name of the location
     val artmatch = find_one_wikipedia_match(loc, loc.name, check_match,
       prefer_match)
@@ -559,7 +559,7 @@ class TopoArticleTable extends StatArticleTable {
 
   def find_match_for_locality(loc: Locality, maxdist: Double) = {
 
-    def check_match(art: StatArticle) = {
+    def check_match(art: GeoArticle) = {
       val dist = spheredist(loc.coord, art.coord)
       if (dist <= maxdist) true
       else {
@@ -571,7 +571,7 @@ class TopoArticleTable extends StatArticleTable {
       }
     }
 
-    def prefer_match(art1: StatArticle, art2: StatArticle) = {
+    def prefer_match(art1: GeoArticle, art2: GeoArticle) = {
       spheredist(loc.coord, art1.coord) < spheredist(loc.coord, art2.coord)
     }
 
@@ -584,7 +584,7 @@ class TopoArticleTable extends StatArticleTable {
 
   def find_match_for_division(div: Division) = {
 
-    def check_match(art: StatArticle) = {
+    def check_match(art: GeoArticle) = {
       if (art.coord != null && (div contains art.coord)) true
       else {
         if (debug("lots")) {
@@ -600,7 +600,7 @@ class TopoArticleTable extends StatArticleTable {
       }
     }
 
-    def prefer_match(art1: StatArticle, art2: StatArticle) = {
+    def prefer_match(art1: GeoArticle, art2: GeoArticle) = {
       val l1 = art1.incoming_links
       val l2 = art2.incoming_links
       // Prefer according to incoming link counts, if that info is available
@@ -620,7 +620,7 @@ class TopoArticleTable extends StatArticleTable {
 
 object TopoArticleTable {
   // Currently only one TopoArticleTable object.  This is the same as
-  // the object in StatArticleTable.table but is of a different type
+  // the object in GeoArticleTable.table but is of a different type
   // (a subclass), for easier access.
   var table: TopoArticleTable = null
 }

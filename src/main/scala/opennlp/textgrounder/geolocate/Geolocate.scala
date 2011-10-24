@@ -489,7 +489,7 @@ class CellWordDist extends SmoothedWordDist(
   /**
    *  Add the given article to the total distribution seen so far
    */
-  def add_article(art: StatArticle) {
+  def add_article(art: GeoArticle) {
     /* We are passed in all articles, regardless of the split.
        The decision was made to accumulate link counts from all articles,
        even in the evaluation set.  Strictly, this is a violation of the
@@ -580,7 +580,7 @@ class CellWordDist extends SmoothedWordDist(
 /** A simple distribution associating a probability with each cell. */
 
 class CellDist(
-  val cellprobs: mutable.Map[StatCell, Double]) {
+  val cellprobs: mutable.Map[GeoCell, Double]) {
   def get_ranked_cells() = {
     // sort by second element of tuple, in reverse order
     cellprobs.toSeq sortWith (_._2 > _._2)
@@ -600,7 +600,7 @@ class CellDist(
 
 class WordCellDist(
   val cellgrid: CellGrid,
-  val word: Word) extends CellDist(mutable.Map[StatCell, Double]()) {
+  val word: Word) extends CellDist(mutable.Map[GeoCell, Double]()) {
   var normalized = false
 
   protected def init() {
@@ -715,7 +715,7 @@ object CellDist {
    * the count of the each word.
    */
   def get_cell_dist_for_word_dist(cellgrid: CellGrid, worddist: WordDist) = {
-    val cellprobs = doublemap[StatCell]()
+    val cellprobs = doublemap[GeoCell]()
     for ((word, count) <- worddist.counts) {
       val dist = get_cell_dist(cellgrid, word)
       for ((cell, prob) <- dist.cellprobs)
@@ -737,9 +737,9 @@ object CellDist {
  * 
  * @param cellgrid The CellGrid object for the grid this cell is in.
  */
-abstract class StatCell(val cellgrid: CellGrid) {
+abstract class GeoCell(val cellgrid: CellGrid) {
   val worddist = new CellWordDist()
-  var most_popular_article: StatArticle = null
+  var most_popular_article: GeoArticle = null
   var mostpopart_links = 0
 
   /**
@@ -757,7 +757,7 @@ abstract class StatCell(val cellgrid: CellGrid) {
   /**
    * Return an Iterable over articles, listing the articles in the cell.
    */
-  def iterate_articles(): Iterable[StatArticle]
+  def iterate_articles(): Iterable[GeoArticle]
 
   /**
    * Return the coordinate of the "center" of the cell.  This is the
@@ -785,7 +785,7 @@ abstract class StatCell(val cellgrid: CellGrid) {
           most_popular_article, mostpopart_links)
       else ""
 
-    "StatCell(%s%s%s, %d articles(dist), %d articles(links), %d links)" format (
+    "GeoCell(%s%s%s, %d articles(dist), %d articles(links), %d links)" format (
       describe_location(), unfinished, contains,
       worddist.num_arts_for_word_dist, worddist.num_arts_for_links,
       worddist.incoming_links)
@@ -812,7 +812,7 @@ abstract class StatCell(val cellgrid: CellGrid) {
    * debugging-output purposes, so the exact representation isn't too important.
    */
   def struct() =
-    <StatCell>
+    <GeoCell>
       <bounds>{ describe_location() }</bounds>
       <finished>{ worddist.finished }</finished>
       {
@@ -823,7 +823,7 @@ abstract class StatCell(val cellgrid: CellGrid) {
       <numArticlesDist>{ worddist.num_arts_for_word_dist }</numArticlesDist>
       <numArticlesLink>{ worddist.num_arts_for_links }</numArticlesLink>
       <incomingLinks>{ worddist.incoming_links }</incomingLinks>
-    </StatCell>
+    </GeoCell>
 
   /**
    * Generate the distribution for a cell from the articles in it.
@@ -847,7 +847,7 @@ abstract class StatCell(val cellgrid: CellGrid) {
  * @param cellgrid The CellGrid object for the grid this cell is in.
  */
 abstract class PolygonalCell(
-  cellgrid: CellGrid) extends StatCell(cellgrid) {
+  cellgrid: CellGrid) extends GeoCell(cellgrid) {
   /**
    * Return the boundary of the cell as an Iterable of coordinates, tracing
    * out the boundary vertex by vertex.  The last coordinate should be the
@@ -1017,12 +1017,12 @@ abstract class CellGrid {
    * Find the correct cell for the given coordinates.  If no such cell
    * exists, return null.
    */
-  def find_best_cell_for_coord(coord: Coord): StatCell
+  def find_best_cell_for_coord(coord: Coord): GeoCell
 
   /**
    * Add the given article to the cell grid.
    */
-  def add_article_to_cell(article: StatArticle): Unit
+  def add_article_to_cell(article: GeoArticle): Unit
 
   /**
    * Generate all non-empty cells.  This will be called once (and only once),
@@ -1043,7 +1043,7 @@ abstract class CellGrid {
    *   even when not set, some articles may be listed in the article-data file
    *   but have no corresponding word counts given in the counts file.)
    */
-  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[StatCell]
+  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[GeoCell]
   
   /*********************** Not meant to be overridden *********************/
   
@@ -1081,7 +1081,7 @@ abstract class CellGrid {
     errprint("Percent non-empty cells: %g",
       num_non_empty_cells.toDouble / total_num_cells)
     val training_arts_with_word_counts =
-      StatArticleTable.table.num_word_count_articles_by_split("training")
+      GeoArticleTable.table.num_word_count_articles_by_split("training")
     errprint("Training articles per non-empty cell: %g",
       training_arts_with_word_counts.toDouble / num_non_empty_cells)
     // Clear out the article distributions of the training set, since
@@ -1091,7 +1091,7 @@ abstract class CellGrid {
     // by never creating these distributions at all, but directly adding
     // them to the cells.  Would require a bit of thinking when reading
     // in the counts.
-    StatArticleTable.table.clear_training_article_distributions()
+    GeoArticleTable.table.clear_training_article_distributions()
   }
 }
 
@@ -1260,7 +1260,7 @@ class MultiRegularCellGrid(
   // articles in them, esp. as we decrease the cell size.  The idea is that
   // the cells provide a first approximation to the cells used to create the
   // article distributions.
-  var tiling_cell_to_articles = bufmap[RegularCellIndex, StatArticle]()
+  var tiling_cell_to_articles = bufmap[RegularCellIndex, GeoArticle]()
 
   /**
    * Mapping from index of southwest corner of multi cell to corresponding
@@ -1416,7 +1416,7 @@ class MultiRegularCellGrid(
     }
   }
 
-  def add_article_to_cell(article: StatArticle) {
+  def add_article_to_cell(article: GeoArticle) {
     val index = coord_to_tiling_cell_index(article.coord)
     tiling_cell_to_articles(index) += article
   }
@@ -1470,7 +1470,7 @@ class MultiRegularCellGrid(
     val max_latind = min_latind + grsize - 1
     val min_longind = true_longind - grsize / 2
     val max_longind = min_longind + grsize - 1
-    val grid = mutable.Map[RegularCellIndex, (StatCell, Double, Int)]()
+    val grid = mutable.Map[RegularCellIndex, (GeoCell, Double, Int)]()
     for (((cell, value), rank) <- pred_cells zip (1 to pred_cells.length)) {
       val (la, lo) = (cell.index.latind, cell.index.longind)
       if (la >= min_latind && la <= max_latind &&
@@ -1521,13 +1521,13 @@ class MultiRegularCellGrid(
 // should not be present anywhere in this table; instead, the name of the
 // redirect article should point to the article object for the article
 // pointed to by the redirect.
-class StatArticleTable {
-  // Mapping from article names to StatArticle objects, using the actual case of
+class GeoArticleTable {
+  // Mapping from article names to GeoArticle objects, using the actual case of
   // the article.
-  val name_to_article = mutable.Map[String, StatArticle]()
+  val name_to_article = mutable.Map[String, GeoArticle]()
 
   // List of articles in each split.
-  val articles_by_split = bufmap[String, StatArticle]()
+  val articles_by_split = bufmap[String, GeoArticle]()
 
   // Num of articles with word-count information but not in table.
   var num_articles_with_word_counts_but_not_in_table = 0
@@ -1558,19 +1558,19 @@ class StatArticleTable {
    * name.  The idea is that the short name should be the same as one of
    * the toponyms used to refer to the article.
    */
-  val short_lower_name_to_articles = bufmap[String, StatArticle]()
+  val short_lower_name_to_articles = bufmap[String, GeoArticle]()
 
   /**
    * Map from tuple (NAME, DIV) for articles of the form "Springfield, Ohio",
    * lowercased.
    */
-  val lower_name_div_to_articles = bufmap[(String, String), StatArticle]()
+  val lower_name_div_to_articles = bufmap[(String, String), GeoArticle]()
 
   // For each toponym, list of articles matching the name.
-  val lower_toponym_to_article = bufmap[String, StatArticle]()
+  val lower_toponym_to_article = bufmap[String, GeoArticle]()
 
   // Mapping from lowercased article names to TopoArticle objects
-  val lower_name_to_articles = bufmap[String, StatArticle]()
+  val lower_name_to_articles = bufmap[String, GeoArticle]()
 
   // Look up an article named NAME and return the associated article.
   // Note that article names are case-sensitive but the first letter needs to
@@ -1583,7 +1583,7 @@ class StatArticleTable {
   // Record the article as having NAME as one of its names (there may be
   // multiple names, due to redirects).  Also add to related lists mapping
   // lowercased form, short form, etc.
-  def record_article_name(name: String, art: StatArticle) {
+  def record_article_name(name: String, art: GeoArticle) {
     // Must pass in properly cased name
     // errprint("name=%s, capfirst=%s", name, capfirst(name))
     // println("length=%s" format name.length)
@@ -1608,7 +1608,7 @@ class StatArticleTable {
 
   // Record either a normal article ('artfrom' same as 'artto') or a
   // redirect ('artfrom' redirects to 'artto').
-  def record_article(artfrom: StatArticle, artto: StatArticle) {
+  def record_article(artfrom: GeoArticle, artto: GeoArticle) {
     record_article_name(artfrom.title, artto)
     val redir = !(artfrom eq artto)
     val split = artto.split
@@ -1624,10 +1624,10 @@ class StatArticleTable {
     }
   }
 
-  def create_article(params: Map[String, String]) = new StatArticle(params)
+  def create_article(params: Map[String, String]) = new GeoArticle(params)
 
   def read_article_data(filename: String, cellgrid: CellGrid) {
-    val redirects = mutable.Buffer[StatArticle]()
+    val redirects = mutable.Buffer[GeoArticle]()
 
     def process(params: Map[String, String]) {
       val art = create_article(params)
@@ -1838,9 +1838,9 @@ class StatArticleTable {
   }
 }
 
-object StatArticleTable {
-  // Currently only one StatArticleTable object
-  var table: StatArticleTable = null
+object GeoArticleTable {
+  // Currently only one GeoArticleTable object
+  var table: GeoArticleTable = null
 }
 
 ///////////////////////// Articles
@@ -1850,7 +1850,7 @@ object StatArticleTable {
 // (In Twitter, generally each "article" is the set of tweets from a given
 // user.)
 
-class StatArticle(params: Map[String, String]) extends Article(params)
+class GeoArticle(params: Map[String, String]) extends Article(params)
   with EvaluationDocument {
   // Object containing word distribution of this article.
   var dist: WordDist = null
@@ -1867,7 +1867,7 @@ class StatArticle(params: Map[String, String]) extends Article(params)
   def shortstr() = "%s" format title
 
   def struct() =
-    <StatArticle>
+    <GeoArticle>
       <title>{ title }</title>
       <id>{ id }</id>
       {
@@ -1878,7 +1878,7 @@ class StatArticle(params: Map[String, String]) extends Article(params)
         if (redir.length > 0)
           <redirectTo>{ redir }</redirectTo>
       }
-    </StatArticle>
+    </GeoArticle>
 
   def distance_to_coord(coord2: Coord) = spheredist(coord, coord2)
 }
@@ -1898,7 +1898,7 @@ abstract class GeotagDocumentStrategy(val cellgrid: CellGrid) {
    * and a score of some sort (the lower the better).  The results should
    * be in sorted order, with better cells earlier.
    */
-  def return_ranked_cells(worddist: WordDist): Iterable[(StatCell, Double)]
+  def return_ranked_cells(worddist: WordDist): Iterable[(GeoCell, Double)]
 }
 
 /**
@@ -1908,7 +1908,7 @@ abstract class GeotagDocumentStrategy(val cellgrid: CellGrid) {
 class BaselineGeotagDocumentStrategy(
   cellgrid: CellGrid,
   baseline_strategy: String) extends GeotagDocumentStrategy(cellgrid) {
-  var cached_ranked_mps: Iterable[(StatCell, Double)] = null
+  var cached_ranked_mps: Iterable[(GeoCell, Double)] = null
 
   def ranked_cells_random(worddist: WordDist) = {
     val cells = cellgrid.iter_nonempty_cells()
@@ -1935,7 +1935,7 @@ class BaselineGeotagDocumentStrategy(
     // FIXME: Should predicate be passed an index and have to do its own
     // unmemoizing?
     var maxword = worddist.find_most_common_word(
-      word => word(0).isUpper && StatArticleTable.table.word_is_toponym(word))
+      word => word(0).isUpper && GeoArticleTable.table.word_is_toponym(word))
     if (maxword == None) {
       maxword = worddist.find_most_common_word(
         word => word(0).isUpper)
@@ -1947,18 +1947,18 @@ class BaselineGeotagDocumentStrategy(
 
   def ranked_cells_link_most_common_toponym(worddist: WordDist) = {
     var maxword = worddist.find_most_common_word(
-      word => word(0).isUpper && StatArticleTable.table.word_is_toponym(word))
+      word => word(0).isUpper && GeoArticleTable.table.word_is_toponym(word))
     if (maxword == None) {
       maxword = worddist.find_most_common_word(
-        word => StatArticleTable.table.word_is_toponym(word))
+        word => GeoArticleTable.table.word_is_toponym(word))
     }
     if (debug("commontop"))
       errprint("  maxword = %s", maxword)
     val cands =
       if (maxword != None)
-        StatArticleTable.table.construct_candidates(
+        GeoArticleTable.table.construct_candidates(
           unmemoize_word(maxword.get))
-      else Seq[StatArticle]()
+      else Seq[GeoArticle]()
     if (debug("commontop"))
       errprint("  candidates = %s", cands)
     // Sort candidate list by number of incoming links
@@ -1969,7 +1969,7 @@ class BaselineGeotagDocumentStrategy(
     if (debug("commontop"))
       errprint("  sorted candidates = %s", candlinks)
 
-    def find_good_cells_for_coord(cands: Iterable[(StatArticle, Double)]) = {
+    def find_good_cells_for_coord(cands: Iterable[(GeoArticle, Double)]) = {
       for {
         (cand, links) <- candlinks
         val cell = {
@@ -2030,10 +2030,10 @@ abstract class MinimumScoreStrategy(
    * Function to return the score of an article distribution against a
    * cell.
    */
-  def score_cell(worddist: WordDist, cell: StatCell): Double
+  def score_cell(worddist: WordDist, cell: GeoCell): Double
 
   def return_ranked_cells(worddist: WordDist) = {
-    val cell_buf = mutable.Buffer[(StatCell, Double)]()
+    val cell_buf = mutable.Buffer[(GeoCell, Double)]()
     for (
       cell <- cellgrid.iter_nonempty_cells(nonempty_word_dist = true)
     ) {
@@ -2070,7 +2070,7 @@ class KLDivergenceStrategy(
   partial: Boolean = true,
   symmetric: Boolean = false) extends MinimumScoreStrategy(cellgrid) {
 
-  def score_cell(worddist: WordDist, cell: StatCell) = {
+  def score_cell(worddist: WordDist, cell: GeoCell) = {
     var kldiv = worddist.fast_kl_divergence(cell.worddist,
       partial = partial)
     //var kldiv = worddist.test_kl_divergence(cell.worddist,
@@ -2135,7 +2135,7 @@ class CosineSimilarityStrategy(
   smoothed: Boolean = false,
   partial: Boolean = false) extends MinimumScoreStrategy(cellgrid) {
 
-  def score_cell(worddist: WordDist, cell: StatCell) = {
+  def score_cell(worddist: WordDist, cell: GeoCell) = {
     var cossim =
       if (smoothed)
         worddist.fast_smoothed_cosine_similarity(cell.worddist,
@@ -3022,7 +3022,7 @@ object GeolocateDriver {
     }
   }
 
-  protected def read_articles(table: StatArticleTable) {
+  protected def read_articles(table: GeoArticleTable) {
     for (fn <- Opts.article_data_file)
       table.read_article_data(fn, cellgrid)
 
@@ -3037,8 +3037,8 @@ object GeolocateDriver {
   protected def read_data_for_geotag_documents() {
     initialize_cellgrid()
     read_stopwords_if()
-    val table = new StatArticleTable()
-    StatArticleTable.table = table
+    val table = new GeoArticleTable()
+    GeoArticleTable.table = table
     read_articles(table)
   }
 
@@ -3145,7 +3145,7 @@ object GeolocateDriver {
     read_stopwords_if()
     val table = new TopoArticleTable()
     TopoArticleTable.table = table
-    StatArticleTable.table = table
+    GeoArticleTable.table = table
     read_articles(table)
 
     // errprint("Processing evaluation file(s) %s for toponym counts...",
