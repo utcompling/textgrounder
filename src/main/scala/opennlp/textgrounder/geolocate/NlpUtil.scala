@@ -475,69 +475,111 @@ object NlpUtil {
   //                          Default dictionaries                          //
   ////////////////////////////////////////////////////////////////////////////
   
-  // Another way to do this, using subclassing.
-  //
-  // abstract class defaultmap[From,To] extends HashMap[From, To] {
-  //   val defaultval: To
-  //   override def default(key: From) = defaultval
-  // }
-  //
-  // class intmap[T] extends defaultmap[T, Int] { val defaultval = 0 }
-  //
+  abstract class DefaultHashMap[F,T] extends mutable.HashMap[F,T] {
+    def getNoSet(key: F): T
+  }
 
-  // The original way
-  //
-  // def booleanmap[String]() = {
-  //   new HashMap[String, Boolean] {
-  //     override def default(key: String) = false
-  //   }
-  // }
+  /**
+   * Create a default hash table, i.e. a hash table where accesses to
+   * undefined values automatically return 'defaultval'.  This class also
+   * automatically sets the undefined key to 'defaultval' upon first
+   * access to that key.  If you don't want this behavior, call getNoSet()
+   * or use the non-setting variant below.  See the discussion below in
+   * defaultmap() for a discussion of when setting vs. non-setting is useful
+   * (in a nutshell, use the setting variant when type T is a mutable
+   * collection; otherwise, use the nonsetting variant).
+   */
+  class SettingDefaultHashMap[F,T](
+    defaultval: => T
+  ) extends DefaultHashMap[F,T] {
+    var internal_setkey = true
 
-  // Note the delayed evaluation of `defaultval', using =>.  This is done
-  // on purpose to exactly mimic the semantics of the "original way" above.
-  // This would matter, for example, if we use mutable Vectors or Sets as the
-  // value type.  We want a *different* empty vector or set each time we call
-  // default(), so that different keys get different empty vectors.  Otherwise,
-  // adding an element to the vector associated with one key will also add
-  // it to the vectors for other keys, which is not what we want.
-  //
-  // SETKEY indicates whether we set the key to the default upon access.
-  // This is necessary when the value is something mutable, but probably a
-  // bad idea otherwise, since looking up a nonexistent value in the table
-  // will cause a later "contains" call to return true on the value.
-  //
-  // For example:
-  //
-  // val foo = defaultmap[String,Int](0, setkey = false)
-  // foo("bar")              -> 0
-  // foo contains "bar"      -> false
-  //
-  // val foo = defaultmap[String,Int](0, setkey = true)
-  // foo("bar")              -> 0
-  // foo contains "bar"      -> true         (Probably not what we want)
-  //                
-  //
-  // val foo = defaultmap[String,mutable.Buffer[String]](mutable.Buffer(), setkey = false)
-  // foo("myfoods") += "spam"
-  // foo("myfoods") += "eggs"
-  // foo("myfoods") += "milk"
-  // foo("myfoods")             -> ArrayBuffer(milk)                (OOOOOPS)
-  //
-  // val foo = defaultmap[String,mutable.Buffer[String]](mutable.Buffer(), setkey = true)
-  // foo("myfoods") += "spam"
-  // foo("myfoods") += "eggs"
-  // foo("myfoods") += "milk"
-  // foo("myfoods")             -> ArrayBuffer(spam, eggs, milk)    (Good)
-  //
-  def defaultmap[F,T](defaultval: => T, setkey: Boolean = false) = {
-    new mutable.HashMap[F,T] {
-      override def default(key: F) = {
-        val buf = defaultval
-        if (setkey)
-          this(key) = buf
-        buf
-      }
+    override def default(key: F) = {
+      val buf = defaultval
+      if (internal_setkey)
+        this(key) = buf
+      buf
     }
+        
+    /**
+     * Retrieve the value of 'key'.  If the value isn't found, the
+     * default value (from 'defaultval') will be returned, but the
+     * key will *NOT* added to the table with that value.
+     *
+     * FIXME: This code should have the equivalent of
+     * synchronized(internal_setkey) around it so that it will work
+     * in a multi-threaded environment.
+     */
+    def getNoSet(key: F) = {
+      val oi_setkey = internal_setkey
+      try {
+        internal_setkey = false
+        this(key)
+      } finally { internal_setkey = oi_setkey }
+    }
+  }
+
+  /**
+   * Non-setting variant class for creating a default hash table.
+   * See class SettingDefaultHashMap and function defaultmap().
+   */
+  class NonSettingDefaultHashMap[F,T](
+    defaultval: => T
+  ) extends DefaultHashMap[F,T] {
+    override def default(key: F) = {
+      val buf = defaultval
+      buf
+    }
+        
+    def getNoSet(key: F) = this(key)
+  }
+
+  /**
+   * Create a default hash map that maps keys of type F to values of type
+   * T, automatically returning 'defaultval' rather than throwing an exception
+   * if the key is undefined.
+   *
+   * @param defaultval The default value to return.  Note the delayed
+   *   evaluation using =>.  This is done on purpose so that, for example,
+   *   if we use mutable Buffers or Sets as the value type, things will
+   *   work: We want a *different* empty vector or set each time we call
+   *   default(), so that different keys get different empty vectors.
+   *   Otherwise, adding an element to the buffer associated with one key
+   *   will also add it to the buffers for other keys, which is not what
+   *   we want.
+   * 
+   * @param setkey indicates whether we set the key to the default upon
+   *   access.  This is necessary when the value is something mutable, but
+   *   probably a bad idea otherwise, since looking up a nonexistent value
+   *   in the table will cause a later contains() call to return true on the
+   *   value.
+   * 
+   * For example:
+    
+    val foo = defaultmap[String,Int](0, setkey = false)
+    foo("bar")              -> 0
+    foo contains "bar"      -> false
+   
+    val foo = defaultmap[String,Int](0, setkey = true)
+    foo("bar")              -> 0
+    foo contains "bar"      -> true         (Probably not what we want)
+                   
+   
+    val foo = defaultmap[String,mutable.Buffer[String]](mutable.Buffer(), setkey = false)
+    foo("myfoods") += "spam"
+    foo("myfoods") += "eggs"
+    foo("myfoods") += "milk"
+    foo("myfoods")             -> ArrayBuffer(milk)                (OOOOOPS)
+   
+    val foo = defaultmap[String,mutable.Buffer[String]](mutable.Buffer(), setkey = true)
+    foo("myfoods") += "spam"
+    foo("myfoods") += "eggs"
+    foo("myfoods") += "milk"
+    foo("myfoods")             -> ArrayBuffer(spam, eggs, milk)    (Good)
+   */
+  def defaultmap[F,T](defaultval: => T, setkey: Boolean = false) = {
+    if (setkey) new SettingDefaultHashMap[F,T](defaultval)
+    else new NonSettingDefaultHashMap[F,T](defaultval)
   }
   /* These next four are maps from T to Int, Double, Boolean or String,
      which automatically use a default value if the key isn't seen.
@@ -562,6 +604,24 @@ object NlpUtil {
   def bufmap[T,U]() =
     defaultmap[T,mutable.Buffer[U]](mutable.Buffer[U](), setkey=true)
   
+  // Another way to do this, using subclassing.
+  //
+  // abstract class defaultmap[From,To] extends HashMap[From, To] {
+  //   val defaultval: To
+  //   override def default(key: From) = defaultval
+  // }
+  //
+  // class intmap[T] extends defaultmap[T, Int] { val defaultval = 0 }
+  //
+
+  // The original way
+  //
+  // def booleanmap[String]() = {
+  //   new HashMap[String, Boolean] {
+  //     override def default(key: String) = false
+  //   }
+  // }
+
   /////////////////////////////////////////////////////////////////////////////
   //                              Dynamic arrays                             //
   /////////////////////////////////////////////////////////////////////////////
