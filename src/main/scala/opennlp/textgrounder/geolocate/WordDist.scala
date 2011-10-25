@@ -105,12 +105,19 @@ object WordDist {
 }
 
 abstract class WordDist {
-  /** Total number of word tokens seen */
+  /** Number of word tokens seen in the distribution. */
   var num_word_tokens: Int
 
+  /**
+   * Number of word types seen in the distribution
+   * (i.e. number of different vocabulary items seen).
+   */
   def num_word_types: Int
   
-  /** Whether we have finished computing the distribution in 'counts'. */
+  /**
+   * Whether we have finished computing the distribution, and therefore can
+   * reliably do probability lookups.
+   */
   var finished = false
 
   /**
@@ -125,8 +132,9 @@ abstract class WordDist {
   def add_word_distribution(worddist: WordDist)
 
   /**
-   * Finish computation of distribution.  Called when no more words or
-   * distributions will be added to this one.
+   * Finish computation of distribution.  This does any additional changes
+   * needed when no more words or distributions will be added to this one,
+   * but which do not rely on other distributions also being finished.
    * @seealso #finish_after_global()
    * 
    * @param minimum_word_count If greater than zero, eliminate words seen
@@ -137,10 +145,8 @@ abstract class WordDist {
   /**
    * Completely finish computation of the word distribution.  This is called
    * after finish_global_distribution() on the factory method, and can be
-   * used to compute values that depend on global values computed from all
-   * word distributions.
-   * , because of the computation below of
-   * overall_unseen_mass, which depends on the global overall_word_probs.
+   * used to compute values for the distribution that depend on global values
+   * computed from all word distributions.
    */
   def finish_after_global()
 
@@ -164,21 +170,70 @@ abstract class WordDist {
     fast_kldiv
   }
 
+  /**
+   * Do a basic implementation of the computation of the KL-divergence
+   * between this distribution and another distribution, including possible
+   * debug information.  Useful for checking against other, faster
+   * implementations, e.g. `fast_kl_divergence`.
+   * 
+   * @param other The other distribution to compute against.
+   * @param partial If true, only compute the contribution involving words
+   *   that exist in our distribution; otherwise we also have to take into
+   *   account words in the other distribution even if we haven't seen them,
+   *   and often also (esp. in the presence of smoothing) the contribution
+   *   of all other words in the vocabulary.
+   * @param return_contributing_words If true, return a map listing
+   *   the words in both distributions (or, for a partial KL-divergence,
+   *   the words in our distribution) and the amount of total KL-divergence
+   *   they compute, useful for debugging.
+   *   
+   * @returns A tuple of (divergence, word_contribs) where the first
+   *   value is the actual KL-divergence and the second is the map
+   *   of word contributions as described above; will be null if
+   *   not requested.
+   */
   def slow_kl_divergence_debug(other: WordDist, partial: Boolean=false,
       return_contributing_words: Boolean=false):
     (Double, collection.Map[Word, Double])
 
+  /**
+   * Compute the KL-divergence using the "slow" algorithm of
+   * `slow_kl_divergence_debug`, but without requesting or returning debug
+   * info.
+   */
   def slow_kl_divergence(other: WordDist, partial: Boolean=false) = {
     val (kldiv, contribs) = slow_kl_divergence_debug(other, partial, false)
     kldiv
   }
 
+  /**
+   * A fast, optimized implementation of KL-divergence.  See the discussion in
+   * `slow_kl_divergence_debug`.
+   */
   def fast_kl_divergence(other: WordDist, partial: Boolean=false): Double
 
+  /**
+   * Implementation of the cosine similarity between this and another
+   * distribution, using unsmoothed probabilities.
+   * 
+   * @partial Same as in `slow_kl_divergence_debug`.
+   */
   def fast_cosine_similarity(other: WordDist, partial: Boolean=false): Double
 
+  /**
+   * Implementation of the cosine similarity between this and another
+   * distribution, using smoothed probabilities.
+   * 
+   * @partial Same as in `slow_kl_divergence_debug`.
+   */
   def fast_smoothed_cosine_similarity(other: WordDist, partial: Boolean=false): Double
 
+  /**
+   * Compute the symmetric KL-divergence between two distributions by averaging
+   * the respective one-way KL-divergences in each direction.
+   * 
+   * @partial Same as in `slow_kl_divergence_debug`.
+   */
   def symmetric_kldiv(other: WordDist, partial: Boolean=false) = {
     0.5*this.fast_kl_divergence(other, partial) +
     0.5*this.fast_kl_divergence(other, partial)
@@ -192,6 +247,12 @@ abstract class WordDist {
    */
   def get_nbayes_logprob(worddist: WordDist): Double
 
+  /**
+   * Return the probabilitiy of a given word in the distribution.
+   * FIXME: Should be moved into either UnigramWordDist or a new
+   * UnigramLikeWordDist, since for N-grams we really want the whole N-gram,
+   * and for some language models this type of lookup makes no sense at all. 
+   */
   def lookup_word(word: Word): Double
   
   /**
@@ -200,6 +261,8 @@ abstract class WordDist {
    *   Should return true if a word matches.
    * @returns Most common word matching the predicate (wrapped with
    *   Some()), or None if no match.
+   * 
+   * FIXME: Probably should be moved similar to `lookup_word`.
    */
   def find_most_common_word(pred: String => Boolean): Option[Word] 
 }
@@ -279,7 +342,80 @@ abstract class UnigramWordDist(
       }
     }
   }
-   
+
+    /**
+     * This is a basic unigram implementation of the computation of the
+     * KL-divergence between this distribution and another distribution.
+     * Useful for checking against other, faster implementations.
+     * 
+     * Computing the KL divergence is a bit tricky, especially in the
+     * presence of smoothing, which assigns probabilities even to words not
+     * seen in either distribution.  We have to take into account:
+     * 
+     * 1. Words in this distribution (may or may not be in the other).
+     * 2. Words in the other distribution that are not in this one.
+     * 3. Words in neither distribution but seen globally.
+     * 4. Words never seen at all.
+     * 
+     * The computation of steps 3 and 4 depends heavily on the particular
+     * smoothing algorithm; in the absence of smoothing, these steps
+     * contribute nothing to the overall KL-divergence.
+     * 
+     * @param xother The other distribution to compute against.
+     * @param partial If true, only do step 1 above.
+     * @param return_contributing_words If true, return a map listing
+     *   the words in both distributions and the amount of total
+     *   KL-divergence they compute, useful for debugging.
+     *   
+     * @returns A tuple of (divergence, word_contribs) where the first
+     *   value is the actual KL-divergence and the second is the map
+     *   of word contributions as described above; will be null if
+     *   not requested.
+     */
+  def slow_kl_divergence_debug(xother: WordDist, partial: Boolean=false,
+      return_contributing_words: Boolean=false) = {
+    val other = xother.asInstanceOf[UnigramWordDist]
+    assert(finished)
+    assert(other.finished)
+    var kldiv = 0.0
+    val contribs =
+      if (return_contributing_words) mutable.Map[Word, Double]() else null
+    // 1.
+    for (word <- counts.keys) {
+      val p = lookup_word(word)
+      val q = other.lookup_word(word)
+      if (p <= 0.0 || q <= 0.0)
+        errprint("Warning: problematic values: p=%s, q=%s, word=%s", p, q, word)
+      else {
+        kldiv += p*(log(p) - log(q))
+        if (return_contributing_words)
+          contribs(word) = p*(log(p) - log(q))
+      }
+    }
+
+    if (partial)
+      (kldiv, contribs)
+    else {
+      // Step 2.
+      for (word <- other.counts.keys if !(counts contains word)) {
+        val p = lookup_word(word)
+        val q = other.lookup_word(word)
+        kldiv += p*(log(p) - log(q))
+        if (return_contributing_words)
+          contribs(word) = p*(log(p) - log(q))
+      }
+
+      val retval = kldiv + kl_divergence_34(other)
+      (retval, contribs)
+    }
+  }
+
+  /**
+   * Steps 3 and 4 of KL-divergence computation.
+   * @seealso #slow_kl_divergence_debug
+   */
+  def kl_divergence_34(other: UnigramWordDist): Double
+  
   def get_nbayes_logprob(xworddist: WordDist) = {
     val worddist = xworddist.asInstanceOf[UnigramWordDist]
     var logprob = 0.0

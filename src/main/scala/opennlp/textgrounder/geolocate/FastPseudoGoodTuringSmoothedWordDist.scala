@@ -173,7 +173,7 @@ object FastPseudoGoodTuringSmoothedWordDist {
       overall_probs_diff_words += word_overall_prob
     }    
 
-    return kldiv + self.kl_divergence_34(other, overall_probs_diff_words)
+    return kldiv + self.inner_kl_divergence_34(other, overall_probs_diff_words)
   }
   
   // The older implementation that uses smoothed probabilities.

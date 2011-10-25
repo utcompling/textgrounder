@@ -147,6 +147,12 @@ class PseudoGoodTuringSmoothedWordDist(
 
   def innerToString = ", %.2f unseen mass" format unseen_mass
 
+   /**
+    * Here we compute the value of `overall_unseen_mass`, which depends
+    * on the global `overall_word_probs` computed from all of the
+    * distributions.
+    */
+
   def finish_after_global() {
     // Make sure that overall_word_probs has been computed properly.
     assert(compobj.owp_adjusted)
@@ -187,65 +193,23 @@ class PseudoGoodTuringSmoothedWordDist(
       this.asInstanceOf[SmoothedWordDist],
       other.asInstanceOf[SmoothedWordDist], partial = partial)
 
-  // Compute the KL divergence between this distribution and another
-  // distribution.  This is a bit tricky.  We have to take into account:
-  // 1. Words in this distribution (may or may not be in the other).
-  // 2. Words in the other distribution that are not in this one.
-  // 3. Words in neither distribution but seen globally.
-  // 4. Words never seen at all.
-  // If 'return_contributing_words', return a tuple of (val, word_contribs)
-  //   where word_contribs is a table of words and the amount each word
-  //   contributes to the KL divergence.
-    /**
-     The basic implementation of KL-divergence.  Useful for checking against
-other implementations.
-     */
-  def slow_kl_divergence_debug(xother: WordDist, partial: Boolean=false,
-      return_contributing_words: Boolean=false) = {
-    val other = xother.asInstanceOf[UnigramWordDist]
-    assert(finished)
-    assert(other.finished)
-    var kldiv = 0.0
-    val contribs =
-      if (return_contributing_words) mutable.Map[Word, Double]() else null
-    // 1.
-    for (word <- counts.keys) {
-      val p = lookup_word(word)
-      val q = other.lookup_word(word)
-      if (p <= 0.0 || q <= 0.0)
-        errprint("Warning: problematic values: p=%s, q=%s, word=%s", p, q, word)
-      else {
-        kldiv += p*(log(p) - log(q))
-        if (return_contributing_words)
-          contribs(word) = p*(log(p) - log(q))
-      }
-    }
-
-    if (partial)
-      (kldiv, contribs)
-    else {
-    // 2.
+  def kl_divergence_34(other: UnigramWordDist) = {      
     var overall_probs_diff_words = 0.0
     for (word <- other.counts.keys if !(counts contains word)) {
-      val p = lookup_word(word)
-      val q = other.lookup_word(word)
-      kldiv += p*(log(p) - log(q))
-      if (return_contributing_words)
-        contribs(word) = p*(log(p) - log(q))
       overall_probs_diff_words +=
         compobj.overall_word_probs(word)
     }
 
-    val retval = kldiv + kl_divergence_34(other.asInstanceOf[SmoothedWordDist],
+    inner_kl_divergence_34(other.asInstanceOf[SmoothedWordDist],
       overall_probs_diff_words)
-    (retval, contribs)
-    }
   }
-
+      
   /**
-   Steps 3 and 4 of KL-divergence computation.
+   * Actual implementation of steps 3 and 4 of KL-divergence computation, given
+   * a value that we may want to compute as part of step 2.
    */
-  def kl_divergence_34(other: SmoothedWordDist, overall_probs_diff_words: Double) = {
+  def inner_kl_divergence_34(other: SmoothedWordDist,
+      overall_probs_diff_words: Double) = {
     var kldiv = 0.0
 
     // 3. For words seen in neither dist but seen globally:
