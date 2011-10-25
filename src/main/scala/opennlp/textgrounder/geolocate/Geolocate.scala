@@ -546,7 +546,7 @@ class CellWordDist extends SmoothedWordDist(
     if (debug("lots")) {
       errprint("""For cell dist, num articles = %s, total tokens = %s,
     unseen_mass = %s, incoming links = %s, overall unseen mass = %s""",
-        num_arts_for_word_dist, total_tokens,
+        num_arts_for_word_dist, num_word_tokens,
         unseen_mass, incoming_links,
         overall_unseen_mass)
     }
@@ -1645,7 +1645,7 @@ class GeoArticleTable {
           /* FIXME: Move this finish() earlier, and split into
              before/after global. */
           art.dist.finish(minimum_word_count = Opts.minimum_word_count)
-          totaltoks += art.dist.total_tokens
+          totaltoks += art.dist.num_word_tokens
           numarts += 1
         }
       }
@@ -1691,11 +1691,11 @@ class GeoArticleTable {
       writer.output_header()
     }
 
-    var total_tokens = 0
+    var num_word_tokens = 0
     var title = null: String
 
     def one_article_probs() {
-      if (total_tokens == 0) return
+      if (num_word_tokens == 0) return
       val art = lookup_article(title)
       if (art == null) {
         warning("Skipping article %s, not in table", title)
@@ -1744,7 +1744,7 @@ class GeoArticleTable {
           }
           keys_dynarr.clear()
           values_dynarr.clear()
-          total_tokens = 0
+          num_word_tokens = 0
         } else if (line.startsWith("Article coordinates) ") ||
           line.startsWith("Article ID: "))
           ()
@@ -1757,7 +1757,7 @@ class GeoArticleTable {
               val count = xcount.toInt
               if (!(Stopwords.stopwords contains word) ||
                 Opts.include_stopwords_in_article_dists) {
-                total_tokens += count
+                num_word_tokens += count
                 keys_dynarr += memoize_word(word)
                 values_dynarr += count
               }
@@ -2162,7 +2162,7 @@ class NaiveBayesDocumentStrategy(
         if (Opts.naive_bayes_weighting == "equal") (1.0, 1.0)
         else {
           val bw = Opts.naive_bayes_baseline_weight.toDouble
-          ((1.0 - bw) / worddist.total_tokens, bw)
+          ((1.0 - bw) / worddist.num_word_tokens, bw)
         }
       } else (1.0, 0.0))
 

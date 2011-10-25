@@ -91,10 +91,10 @@ object WordDist {
   val SmoothedWordDist = PseudoGoodTuringSmoothedWordDist
 
   // Total number of word types seen (size of vocabulary)
-  var num_word_types = 0
+  var total_num_word_types = 0
 
   // Total number of word tokens seen
-  var num_word_tokens = 0
+  var total_num_word_tokens = 0
 
   def apply(keys: Array[Word], values: Array[Int], num_words: Int,
             note_globally: Boolean) =
@@ -106,7 +106,7 @@ object WordDist {
 
 abstract class WordDist {
   /** Total number of word tokens seen */
-  var total_tokens: Int
+  var num_word_tokens: Int
 
   def num_word_types: Int
   
@@ -228,7 +228,7 @@ abstract class UnigramWordDist(
   val counts = create_word_int_map()
   for (i <- 0 until num_words)
     counts(keys(i)) = values(i)
-  var total_tokens = counts.values.sum
+  var num_word_tokens = counts.values.sum
   
   def num_word_types = counts.size
 
@@ -244,7 +244,7 @@ abstract class UnigramWordDist(
       yield "%s=%s" format (unmemoize_word(word), count) 
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
     "WordDist(%d tokens%s%s, %s)" format (
-        total_tokens, innerToString, finished_str, words)
+        num_word_tokens, innerToString, finished_str, words)
   }
 
   def add_document(words: Traversable[String], ignore_case: Boolean=true,
@@ -254,7 +254,7 @@ abstract class UnigramWordDist(
          val wlower = if (ignore_case) word.toLowerCase() else word
          if !stopwords(wlower) } {
       counts(memoize_word(wlower)) += 1
-      total_tokens += 1
+      num_word_tokens += 1
     }
   }
 
@@ -263,7 +263,7 @@ abstract class UnigramWordDist(
     val worddist = xworddist.asInstanceOf[UnigramWordDist]
     for ((word, count) <- worddist.counts)
       counts(word) += count
-    total_tokens += worddist.total_tokens
+    num_word_tokens += worddist.num_word_tokens
   }
 
   def finish_before_global(minimum_word_count: Int = 0) {
@@ -274,7 +274,7 @@ abstract class UnigramWordDist(
     // is too small.
     if (minimum_word_count > 1) {
       for ((word, count) <- counts if count < minimum_word_count) {
-        total_tokens -= count
+        num_word_tokens -= count
         counts -= word
       }
     }
