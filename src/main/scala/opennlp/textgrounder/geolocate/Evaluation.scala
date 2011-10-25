@@ -529,7 +529,7 @@ class ArticleGeotagDocumentEvaluator(
     if (want_indiv_results) {
       errprint("%s:Article %s:", doctag, article)
       errprint("%s:  %d types, %d tokens",
-        doctag, article.dist.counts.size, article.dist.total_tokens)
+        doctag, article.dist.num_word_types, article.dist.total_tokens)
       errprint("%s:  true cell at rank: %s", doctag, true_rank)
       errprint("%s:  true cell: %s", doctag, result.true_cell)
       for (i <- 0 until 5) {
@@ -601,7 +601,7 @@ class PCLTravelGeotagDocumentEvaluator(
       if (Opts.include_stopwords_in_article_dists) Set[String]()
       else Stopwords.stopwords
     for (text <- Seq(doc.title, doc.text)) {
-      dist.add_words(split_text_into_words(text, ignore_punc = true),
+      dist.add_document(split_text_into_words(text, ignore_punc = true),
         ignore_case = !Opts.preserve_case_words,
         stopwords = the_stopwords)
     }

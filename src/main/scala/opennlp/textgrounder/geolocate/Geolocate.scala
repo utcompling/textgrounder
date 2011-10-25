@@ -551,26 +551,6 @@ class CellWordDist extends SmoothedWordDist(
         overall_unseen_mass)
     }
   }
-
-  /**
-   * For a document described by its distribution 'worddist', return the
-   * log probability log p(worddist|cell) using a Naive Bayes algorithm.
-   */
-  def get_nbayes_logprob(worddist: WordDist) = {
-    var logprob = 0.0
-    for ((word, count) <- worddist.counts) {
-      val value = lookup_word(word)
-      if (value <= 0) {
-        // FIXME: Need to figure out why this happens (perhaps the word was
-        // never seen anywhere in the training data? But I thought we have
-        // a case to handle that) and what to do instead.
-        errprint("Warning! For word %s, prob %s out of range", word, value)
-      } else
-        logprob += log(value)
-    }
-    // FIXME: Also use baseline (prior probability)
-    logprob
-  }
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -714,7 +694,11 @@ object CellDist {
    * by adding up the distributions of the individual words, weighting by
    * the count of the each word.
    */
-  def get_cell_dist_for_word_dist(cellgrid: CellGrid, worddist: WordDist) = {
+  def get_cell_dist_for_word_dist(cellgrid: CellGrid, xworddist: WordDist) = {
+    // FIXME!!! Figure out what to do if distribution is not a unigram dist.
+    // Can we break this up into smaller operations?  Or do we have to
+    // make it an interface for WordDist?
+    val worddist = xworddist.asInstanceOf[UnigramWordDist]
     val cellprobs = doublemap[GeoCell]()
     for ((word, count) <- worddist.counts) {
       val dist = get_cell_dist(cellgrid, word)
@@ -1658,6 +1642,8 @@ class GeoArticleTable {
       var numarts = 0
       for (art <- table) {
         if (art.dist != null) {
+          /* FIXME: Move this finish() earlier, and split into
+             before/after global. */
           art.dist.finish(minimum_word_count = Opts.minimum_word_count)
           totaltoks += art.dist.total_tokens
           numarts += 1

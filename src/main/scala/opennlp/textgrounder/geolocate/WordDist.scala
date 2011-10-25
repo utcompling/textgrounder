@@ -104,97 +104,50 @@ object WordDist {
     apply(Array[Word](), Array[Int](), 0, note_globally=false)
 }
 
-/**
- * Create a word distribution given a table listing counts for each word,
- * initialized from the given key/value pairs.
- *
- * @param key Array holding keys, possibly over-sized, so that the internal
- *   arrays from DynamicArray objects can be used
- * @param values Array holding values corresponding to each key, possibly
- *   oversize
- * @param num_words Number of actual key/value pairs to be stored 
- *   statistics.
- */
-
-abstract class WordDist(
-  keys: Array[Word],
-  values: Array[Int],
-  num_words: Int
-) {
-  /** A map (or possibly a "sorted list" of tuples, to save memory?) of
-      (word, count) items, specifying the counts of all words seen
-      at least once.
-   */
-  val counts = create_word_int_map()
-  for (i <- 0 until num_words)
-    counts(keys(i)) = values(i)
+abstract class WordDist {
   /** Total number of word tokens seen */
-  var total_tokens = counts.values.sum
+  var total_tokens: Int
 
+  def num_word_types: Int
+  
   /** Whether we have finished computing the distribution in 'counts'. */
   var finished = false
 
-  def innerToString: String
-
-  override def toString = {
-    val finished_str =
-      if (!finished) ", unfinished" else ""
-    val num_words_to_print = 15
-    val need_dots = counts.size > num_words_to_print
-    val items =
-      for ((word, count) <- counts.view(0, num_words_to_print))
-      yield "%s=%s" format (unmemoize_word(word), count) 
-    val words = (items mkString " ") + (if (need_dots) " ..." else "")
-    "WordDist(%d tokens%s%s, %s)" format (
-        total_tokens, innerToString, finished_str, words)
-  }
-
   /**
-   * Incorporate a list of words into the distribution.
+   * Incorporate a document into the distribution.
    */
-  def add_words(words: Traversable[String], ignore_case: Boolean=true,
-      stopwords: Set[String]=Set[String]()) {
-    assert(!finished)
-    for {word <- words
-         val wlower = if (ignore_case) word.toLowerCase() else word
-         if !stopwords(wlower) } {
-      counts(memoize_word(wlower)) += 1
-      total_tokens += 1
-    }
-  }
+  def add_document(words: Traversable[String], ignore_case: Boolean=true,
+      stopwords: Set[String]=Set[String]())
 
   /**
-   * Incorporate counts from the given distribution into our distribution.
+   * Incorporate the given distribution into our distribution.
    */
-  def add_word_distribution(worddist: WordDist) {
-    assert (!finished)
-    for ((word, count) <- worddist.counts)
-      counts(word) += count
-    total_tokens += worddist.total_tokens
-  }
+  def add_word_distribution(worddist: WordDist)
 
   /**
-   * Finish computation of the word distribution.  This must be called AFTER
-   * finish_global_distribution(), because of the computation below of
+   * Finish computation of distribution.  Called when no more words or
+   * distributions will be added to this one.
+   * @seealso #finish_after_global()
+   * 
+   * @param minimum_word_count If greater than zero, eliminate words seen
+   * less than this number of times.
+   */
+  def finish_before_global(minimum_word_count: Int = 0)
+
+  /**
+   * Completely finish computation of the word distribution.  This is called
+   * after finish_global_distribution() on the factory method, and can be
+   * used to compute values that depend on global values computed from all
+   * word distributions.
+   * , because of the computation below of
    * overall_unseen_mass, which depends on the global overall_word_probs.
    */
+  def finish_after_global()
+
   def finish(minimum_word_count: Int = 0) {
-
-    // make sure counts not null (eg article in coords file but not counts file)
-    if (counts == null || finished) return
-
-    // If 'minimum_word_count' was given, then eliminate words whose count
-    // is too small.
-    if (minimum_word_count > 1)
-      for ((word, count) <- counts if count < minimum_word_count) {
-        total_tokens -= count
-        counts -= word
-      }
-
+    finish_before_global(minimum_word_count)
     finish_after_global()
   }
-
-  def finish_after_global()
 
   /**
    * Check fast and slow versions against each other.
@@ -231,14 +184,120 @@ abstract class WordDist(
     0.5*this.fast_kl_divergence(other, partial)
   }
 
+  /**
+   * For a document described by its distribution 'worddist', return the
+   * log probability log p(worddist|cell) using a Naive Bayes algorithm.
+   *
+   * @param worddist Distribution of document.
+   */
+  def get_nbayes_logprob(worddist: WordDist): Double
+
   def lookup_word(word: Word): Double
   
+  /**
+   * Look for the most common word matching a given predicate.
+   * @param pred Predicate, passed the raw (unmemoized) form of a word.
+   *   Should return true if a word matches.
+   * @returns Most common word matching the predicate (wrapped with
+   *   Some()), or None if no match.
+   */
+  def find_most_common_word(pred: String => Boolean): Option[Word] 
+}
+
+/**
+ * Unigram word distribution with a table listing counts for each word,
+ * initialized from the given key/value pairs.
+ *
+ * @param key Array holding keys, possibly over-sized, so that the internal
+ *   arrays from DynamicArray objects can be used
+ * @param values Array holding values corresponding to each key, possibly
+ *   oversize
+ * @param num_words Number of actual key/value pairs to be stored 
+ *   statistics.
+ */
+
+abstract class UnigramWordDist(
+  keys: Array[Word],
+  values: Array[Int],
+  num_words: Int
+) extends WordDist {
+  /** A map (or possibly a "sorted list" of tuples, to save memory?) of
+      (word, count) items, specifying the counts of all words seen
+      at least once.
+   */
+  val counts = create_word_int_map()
+  for (i <- 0 until num_words)
+    counts(keys(i)) = values(i)
+  var total_tokens = counts.values.sum
+  
+  def num_word_types = counts.size
+
+  def innerToString: String
+
+  override def toString = {
+    val finished_str =
+      if (!finished) ", unfinished" else ""
+    val num_words_to_print = 15
+    val need_dots = counts.size > num_words_to_print
+    val items =
+      for ((word, count) <- counts.view(0, num_words_to_print))
+      yield "%s=%s" format (unmemoize_word(word), count) 
+    val words = (items mkString " ") + (if (need_dots) " ..." else "")
+    "WordDist(%d tokens%s%s, %s)" format (
+        total_tokens, innerToString, finished_str, words)
+  }
+
+  def add_document(words: Traversable[String], ignore_case: Boolean=true,
+      stopwords: Set[String]=Set[String]()) {
+    assert(!finished)
+    for {word <- words
+         val wlower = if (ignore_case) word.toLowerCase() else word
+         if !stopwords(wlower) } {
+      counts(memoize_word(wlower)) += 1
+      total_tokens += 1
+    }
+  }
+
+  def add_word_distribution(xworddist: WordDist) {
+    assert(!finished)
+    val worddist = xworddist.asInstanceOf[UnigramWordDist]
+    for ((word, count) <- worddist.counts)
+      counts(word) += count
+    total_tokens += worddist.total_tokens
+  }
+
+  def finish_before_global(minimum_word_count: Int = 0) {
+    // make sure counts not null (eg article in coords file but not counts file)
+    if (counts == null || finished) return
+
+    // If 'minimum_word_count' was given, then eliminate words whose count
+    // is too small.
+    if (minimum_word_count > 1) {
+      for ((word, count) <- counts if count < minimum_word_count) {
+        total_tokens -= count
+        counts -= word
+      }
+    }
+  }
+   
+  def get_nbayes_logprob(xworddist: WordDist) = {
+    val worddist = xworddist.asInstanceOf[UnigramWordDist]
+    var logprob = 0.0
+    for ((word, count) <- worddist.counts) {
+      val value = lookup_word(word)
+      if (value <= 0) {
+        // FIXME: Need to figure out why this happens (perhaps the word was
+        // never seen anywhere in the training data? But I thought we have
+        // a case to handle that) and what to do instead.
+        errprint("Warning! For word %s, prob %s out of range", word, value)
+      } else
+        logprob += log(value)
+    }
+    // FIXME: Also use baseline (prior probability)
+    logprob
+  }
+
   def find_most_common_word(pred: String => Boolean) = {
-    // Look for the most common word matching a given predicate.
-    // Predicate is passed the raw (unmemoized) form of a word.
-    // But there may not be any.  max() will raise an error if given an
-    // empty sequence, so insert a bogus value into the sequence with a
-    // negative count.
     val filtered =
       (for ((word, count) <- counts if pred(unmemoize_word(word)))
         yield (word, count)).toSeq
@@ -248,5 +307,5 @@ abstract class WordDist(
       Some(maxword)
     }
   }
-}
+}  
 

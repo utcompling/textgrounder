@@ -97,7 +97,7 @@ class PseudoGoodTuringSmoothedWordDist(
   values: Array[Int],
   num_words: Int,
   note_globally: Boolean=true
-) extends WordDist(keys, values, num_words) {
+) extends UnigramWordDist(keys, values, num_words) {
   val FastAlgorithms = FastPseudoGoodTuringSmoothedWordDist
   val compobj = PseudoGoodTuringSmoothedWordDist
 
@@ -197,8 +197,9 @@ class PseudoGoodTuringSmoothedWordDist(
      The basic implementation of KL-divergence.  Useful for checking against
 other implementations.
      */
-  def slow_kl_divergence_debug(other: WordDist, partial: Boolean=false,
+  def slow_kl_divergence_debug(xother: WordDist, partial: Boolean=false,
       return_contributing_words: Boolean=false) = {
+    val other = xother.asInstanceOf[UnigramWordDist]
     assert(finished)
     assert(other.finished)
     var kldiv = 0.0
