@@ -1420,17 +1420,20 @@ package object tgutil {
     else (too to from)
   }
 
-//  // Return an iterator over all elements in all the given sequences, omitting
-//  // elements seen more than once and keeping the order.
-//  def merge_sequences_uniquely(*seqs):
-//    table = {}
-//    for seq in seqs:
-//      for s in seq:
-//        if s not in table:
-//          table[s] = true
-//          yield s
-//
-//  
+  // Return an iterator over all elements in all the given sequences, omitting
+  // elements seen more than once and keeping the order.
+  def merge_numbered_sequences_uniquely[A, B](seqs: Iterable[(A, B)]*) = {
+    val keys_seen = mutable.Set[A]()
+    for {
+      seq <- seqs
+      (s, vall) <- seq
+      if (!(keys_seen contains s))
+    } yield {
+      keys_seen += s
+      (s, vall)
+    }
+  }
+
   ////////////////////////////////////////////////////////////////////////////
   //                               Subprocesses                             //
   ////////////////////////////////////////////////////////////////////////////

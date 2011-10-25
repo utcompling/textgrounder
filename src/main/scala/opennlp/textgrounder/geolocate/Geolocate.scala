@@ -1895,8 +1895,11 @@ abstract class GeotagDocumentStrategy(val cellgrid: CellGrid) {
   /**
    * For a given word distribution (describing a test document), return
    * an Iterable of tuples, each listing a particular cell on the Earth
-   * and a score of some sort (the lower the better).  The results should
-   * be in sorted order, with better cells earlier.
+   * and a score of some sort.  The results should be in sorted order,
+   * with better cells earlier.  Currently there is no guarantee about
+   * the particular scores returned; for some strategies, lower scores
+   * are better, while for others, higher scores are better.  Currently,
+   * the wrapper code outputs the score but doesn't otherwise use it.
    */
   def return_ranked_cells(worddist: WordDist): Iterable[(GeoCell, Double)]
 }
@@ -1905,30 +1908,40 @@ abstract class GeotagDocumentStrategy(val cellgrid: CellGrid) {
  * Class that implements the baseline strategies for document geolocation.
  * 'baseline_strategy' specifies the particular strategy to use.
  */
-class BaselineGeotagDocumentStrategy(
-  cellgrid: CellGrid,
-  baseline_strategy: String) extends GeotagDocumentStrategy(cellgrid) {
-  var cached_ranked_mps: Iterable[(GeoCell, Double)] = null
-
-  def ranked_cells_random(worddist: WordDist) = {
+class RandomGeotagDocumentStrategy(
+  cellgrid: CellGrid
+) extends GeotagDocumentStrategy(cellgrid) {
+  def return_ranked_cells(worddist: WordDist) = {
     val cells = cellgrid.iter_nonempty_cells()
     val shuffled = (new Random()).shuffle(cells)
     (for (cell <- shuffled) yield (cell, 0.0))
   }
+}
 
-  def ranked_most_popular_cells(worddist: WordDist) = {
+class MostPopularCellGeotagDocumentStrategy(
+  cellgrid: CellGrid,
+  internal_link: Boolean
+) extends GeotagDocumentStrategy(cellgrid) {
+  var cached_ranked_mps: Iterable[(GeoCell, Double)] = null
+  def return_ranked_cells(worddist: WordDist) = {
     if (cached_ranked_mps == null) {
       cached_ranked_mps = (
         (for (cell <- cellgrid.iter_nonempty_cells())
-          yield (cell, (if (baseline_strategy == "internal_link")
-          cell.worddist.incoming_links
-        else cell.worddist.num_arts_for_links).toDouble)).
+          yield (cell,
+            (if (internal_link)
+               cell.worddist.incoming_links
+             else
+               cell.worddist.num_arts_for_links).toDouble)).
         toArray sortWith (_._2 > _._2))
     }
     cached_ranked_mps
   }
+}
 
-  def ranked_cells_celldist_most_common_toponym(worddist: WordDist) = {
+class CellDistMostCommonToponymGeotagDocumentStrategy(
+  cellgrid: CellGrid
+) extends GeotagDocumentStrategy(cellgrid) {
+  def return_ranked_cells(worddist: WordDist) = {
     // Look for a toponym, then a proper noun, then any word.
     // FIXME: How can 'word' be null?
     // FIXME: Use invalid_word
@@ -1944,8 +1957,12 @@ class BaselineGeotagDocumentStrategy(
       maxword = worddist.find_most_common_word(word => true)
     CellDist.get_cell_dist(cellgrid, maxword.get).get_ranked_cells()
   }
+}
 
-  def ranked_cells_link_most_common_toponym(worddist: WordDist) = {
+class LinkMostCommonToponymGeotagDocumentStrategy(
+  cellgrid: CellGrid
+) extends GeotagDocumentStrategy(cellgrid) {
+  def return_ranked_cells(worddist: WordDist) = {
     var maxword = worddist.find_most_common_word(
       word => word(0).isUpper && GeoArticleTable.table.word_is_toponym(word))
     if (maxword == None) {
@@ -1988,50 +2005,35 @@ class BaselineGeotagDocumentStrategy(
     if (debug("commontop"))
       errprint("  cell candidates = %s", candcells)
 
-    // Return an iterator over all elements in all the given sequences, omitting
-    // elements seen more than once and keeping the order.
-    def merge_numbered_sequences_uniquely[A, B](seqs: Iterable[(A, B)]*) = {
-      val keys_seen = mutable.Set[A]()
-      for {
-        seq <- seqs
-        (s, vall) <- seq
-        if (!(keys_seen contains s))
-      } yield {
-        keys_seen += s
-        (s, vall)
-      }
-    }
-
     // Append random cells and remove duplicates
     merge_numbered_sequences_uniquely(candcells,
-      ranked_cells_random(worddist))
-  }
-
-  def return_ranked_cells(worddist: WordDist) = {
-    if (baseline_strategy == "link-most-common-toponym")
-      ranked_cells_link_most_common_toponym(worddist)
-    else if (baseline_strategy == "celldist-most-common-toponym")
-      ranked_cells_celldist_most_common_toponym(worddist)
-    else if (baseline_strategy == "random")
-      ranked_cells_random(worddist)
-    else
-      ranked_most_popular_cells(worddist)
+      new RandomGeotagDocumentStrategy(cellgrid).return_ranked_cells(worddist))
   }
 }
 
 /**
  * Abstract class that implements a strategy for document geolocation that
  * involves directly comparing the article distribution against each cell
- * in turn and computing a score, with lower values better.
+ * in turn and computing a score.
+ *
+ * @param prefer_minimum If true, lower scores are better; if false, higher
+ *   scores are better.
  */
-abstract class MinimumScoreStrategy(
-  cellgrid: CellGrid) extends GeotagDocumentStrategy(cellgrid) {
+abstract class MinMaxScoreStrategy(
+  cellgrid: CellGrid,
+  prefer_minimum: Boolean
+) extends GeotagDocumentStrategy(cellgrid) {
   /**
    * Function to return the score of an article distribution against a
    * cell.
    */
   def score_cell(worddist: WordDist, cell: GeoCell): Double
 
+  /**
+   * Compare a word distribution (for an article, typically) against all
+   * cells. Return a sequence of tuples (cell, score) where 'cell'
+   * indicates the cell and 'score' the score.
+   */
   def return_ranked_cells(worddist: WordDist) = {
     val cell_buf = mutable.Buffer[(GeoCell, Double)]()
     for (
@@ -2047,7 +2049,16 @@ abstract class MinimumScoreStrategy(
       cell_buf += ((cell, score))
     }
 
-    cell_buf sortWith (_._2 < _._2)
+    /* SCALABUG:
+       If written simply as 'cell_buf sortWith (_._2 < _._2)',
+       return type is mutable.Buffer.  However, if written as an
+       if/then as follows, return type is Iterable, even though both
+       forks have the same type of mutable.buffer!
+     */
+    if (prefer_minimum)
+      cell_buf sortWith (_._2 < _._2)
+    else
+      cell_buf sortWith (_._2 > _._2)
   }
 }
 
@@ -2068,7 +2079,8 @@ abstract class MinimumScoreStrategy(
 class KLDivergenceStrategy(
   cellgrid: CellGrid,
   partial: Boolean = true,
-  symmetric: Boolean = false) extends MinimumScoreStrategy(cellgrid) {
+  symmetric: Boolean = false
+) extends MinMaxScoreStrategy(cellgrid, true) {
 
   def score_cell(worddist: WordDist, cell: GeoCell) = {
     var kldiv = worddist.fast_kl_divergence(cell.worddist,
@@ -2096,8 +2108,7 @@ class KLDivergenceStrategy(
       val num_contrib_words = 25
       errprint("")
       errprint("KL-divergence debugging info:")
-      for (i <- 0 until (cells.length min num_contrib_cells)) {
-        val (cell, _) = cells(i)
+      for (((cell, _), i) <- cells.take(num_contrib_cells) zipWithIndex) {
         val (_, contribs) =
           worddist.slow_kl_divergence_debug(
             cell.worddist, partial = partial,
@@ -2133,7 +2144,8 @@ class KLDivergenceStrategy(
 class CosineSimilarityStrategy(
   cellgrid: CellGrid,
   smoothed: Boolean = false,
-  partial: Boolean = false) extends MinimumScoreStrategy(cellgrid) {
+  partial: Boolean = false
+) extends MinMaxScoreStrategy(cellgrid, true) {
 
   def score_cell(worddist: WordDist, cell: GeoCell) = {
     var cossim =
@@ -2154,10 +2166,10 @@ class CosineSimilarityStrategy(
 /** Use a Naive Bayes strategy for comparing document and cell. */
 class NaiveBayesDocumentStrategy(
   cellgrid: CellGrid,
-  use_baseline: Boolean = true) extends GeotagDocumentStrategy(cellgrid) {
+  use_baseline: Boolean = true
+) extends MinMaxScoreStrategy(cellgrid, false) {
 
-  def return_ranked_cells(worddist: WordDist) = {
-
+  def score_cell(worddist: WordDist, cell: GeoCell) = {
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
       if (use_baseline) {
@@ -2168,22 +2180,18 @@ class NaiveBayesDocumentStrategy(
         }
       } else (1.0, 0.0))
 
-    (for {
-      cell <- cellgrid.iter_nonempty_cells(nonempty_word_dist = true)
-      val word_logprob = cell.worddist.get_nbayes_logprob(worddist)
-      val baseline_logprob = log(cell.worddist.num_arts_for_links.toDouble /
-        cellgrid.total_num_arts_for_links)
-      val logprob = (word_weight * word_logprob +
-        baseline_weight * baseline_logprob)
-    } yield (cell -> logprob)).toArray.
-      // Scala nonsense: sort on the second element of the tuple (foo._2),
-      // reserved (_ > _).
-      sortWith(_._2 > _._2)
+    val word_logprob = cell.worddist.get_nbayes_logprob(worddist)
+    val baseline_logprob = log(cell.worddist.num_arts_for_links.toDouble /
+      cellgrid.total_num_arts_for_links)
+    val logprob = (word_weight * word_logprob +
+      baseline_weight * baseline_logprob)
+    logprob
   }
 }
 
 class AverageCellProbabilityStrategy(
-  cellgrid: CellGrid) extends GeotagDocumentStrategy(cellgrid) {
+  cellgrid: CellGrid
+) extends GeotagDocumentStrategy(cellgrid) {
   def return_ranked_cells(worddist: WordDist) = {
     val celldist = CellDist.get_cell_dist_for_word_dist(cellgrid, worddist)
     celldist.get_ranked_cells()
@@ -3085,8 +3093,26 @@ object GeolocateDriver {
     val strats = (
       for (stratname <- Opts.strategy) yield {
         if (stratname == "baseline") {
-          for (basestratname <- Opts.baseline_strategy) yield ("baseline " + basestratname,
-            new BaselineGeotagDocumentStrategy(cellgrid, basestratname))
+          for (basestratname <- Opts.baseline_strategy) yield {
+            val strategy = basestratname match {
+              case "link-most-common-toponym" =>
+                new LinkMostCommonToponymGeotagDocumentStrategy(cellgrid)
+              case "celldist-most-common-toponym" =>
+                new CellDistMostCommonToponymGeotagDocumentStrategy(cellgrid)
+              case "random" =>
+                new RandomGeotagDocumentStrategy(cellgrid)
+              case "internal-link" =>
+                new MostPopularCellGeotagDocumentStrategy(cellgrid, true)
+              case "num-articles" =>
+                new MostPopularCellGeotagDocumentStrategy(cellgrid, false)
+              case _ => {
+                assert(false,
+                  "Internal error: Unhandled strategy " + basestratname);
+                null
+              }
+            }
+            ("baseline " + basestratname, strategy)
+          }
         } else {
           val strategy =
             if (stratname.startsWith("naive-bayes-"))
