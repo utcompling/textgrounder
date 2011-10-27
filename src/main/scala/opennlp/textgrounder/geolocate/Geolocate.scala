@@ -2804,7 +2804,10 @@ object Debug {
  * Basic operation:
  *
  * 1. Create an instance of GeolocateParameters and populate it with the
- * appropriate parameters.
+ * appropriate parameters.  Don't pass in any OptionParser instance, as
+ * is the default; that way, the parameters will get initialized to their
+ * default values, and you only have to change the ones you want to be
+ * non-default.
  * 2. Call set_parameters(), passing in the instance you just created.
  * 3. Call run().  The return value contains some evaluation results.
  *
