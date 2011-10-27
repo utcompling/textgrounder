@@ -59,7 +59,7 @@ class KdTreeCellGrid extends CellGrid {
    * this, `iter_nonempty_cells` should work properly.
    */
   def initialize_cells: Unit = {
-      // we don't actually need to do anything here.
+      total_num_cells = kdtree.getLeaves.size
   }
 
   /**
@@ -73,7 +73,10 @@ class KdTreeCellGrid extends CellGrid {
    *   even when not set, some articles may be listed in the article-data file
    *   but have no corresponding word counts given in the counts file.)
    */
-  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[GeoCell] = { null }
+  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[GeoCell] = {
+      for (leaf <- kdtree.getLeaves)
+          yield new KdTreeCell(this, leaf)
+  }
 }
 
 object KdTreeTest {
@@ -90,7 +93,7 @@ object KdTreeTest {
     grid.add_article_to_cell(article1)
     grid.add_article_to_cell(article2)
 
-    grid.initialize_cells
+    grid.finish
 
     println(grid.find_best_cell_for_coord(new Coord(35, -98)).kdleaf)
     println(grid.find_best_cell_for_coord(new Coord(35, -98)))
