@@ -36,15 +36,6 @@ import collection.mutable
 import util.control.Breaks._
 import java.io._
 
-//import sys
-//import os
-//import os.path
-//import traceback
-//from itertools import *
-//import random
-//import gc
-//import time
-
 /////////////////////////////////////////////////////////////////////////////
 //                              Documentation                              //
 /////////////////////////////////////////////////////////////////////////////
@@ -580,7 +571,8 @@ class CellDist(
 
 class WordCellDist(
   val cellgrid: CellGrid,
-  val word: Word) extends CellDist(mutable.Map[GeoCell, Double]()) {
+  val word: Word
+) extends CellDist(mutable.Map[GeoCell, Double]()) {
   var normalized = false
 
   protected def init() {
@@ -921,7 +913,8 @@ abstract class PolygonalCell(
  * @param cellgrid The CellGrid object for the grid this cell is in.
  */
 abstract class RectangularCell(
-  cellgrid: CellGrid) extends PolygonalCell(cellgrid) {
+  cellgrid: CellGrid
+) extends PolygonalCell(cellgrid) {
   /**
    * Return the coordinate of the southwest point of the rectangle.
    */
@@ -1140,7 +1133,8 @@ case class FractionalRegularCellIndex(latind: Double, longind: Double) {
 
 class MultiRegularCell(
   cellgrid: MultiRegularCellGrid,
-  val index: RegularCellIndex) extends RectangularCell(cellgrid) {
+  val index: RegularCellIndex
+) extends RectangularCell(cellgrid) {
 
   def get_southwest_coord() =
     cellgrid.multi_cell_index_to_near_corner_coord(index)
@@ -1201,12 +1195,13 @@ class MultiRegularCell(
  * @param degrees_per_cell Size of each cell in degrees.  Determined by the
  *   --degrees-per-cell option, unless --miles-per-cell is set, in which
  *   case it takes priority.
- * @ @param width_of_multi_cell Size of multi cells in tiling cells,
+ * @param width_of_multi_cell Size of multi cells in tiling cells,
  *   determined by the --width-of-multi-cell option.
  */
 class MultiRegularCellGrid(
   val degrees_per_cell: Double,
-  val width_of_multi_cell: Int) extends CellGrid {
+  val width_of_multi_cell: Int
+) extends CellGrid {
 
   /**
    * Size of each cell (vertical dimension; horizontal dimension only near
@@ -1232,18 +1227,20 @@ class MultiRegularCellGrid(
   val minimum_latind = minimum_index.latind
   val minimum_longind = minimum_index.longind
 
-  // Mapping of cell->locations in cell, for cell-based Naive Bayes
-  // disambiguation.  The key is a tuple expressing the integer indices of the
-  // latitude and longitude of the southwest corner of the cell. (Basically,
-  // given an index, the latitude or longitude of the southwest corner is
-  // index*degrees_per_cell, and the cell includes all locations whose
-  // latitude or longitude is in the half-open interval
-  // [index*degrees_per_cell, (index+1)*degrees_per_cell).
-  //
-  // We don't just create an array because we expect many cells to have no
-  // articles in them, esp. as we decrease the cell size.  The idea is that
-  // the cells provide a first approximation to the cells used to create the
-  // article distributions.
+  /**
+   * Mapping of cell->locations in cell, for cell-based Naive Bayes
+   * disambiguation.  The key is a tuple expressing the integer indices of the
+   * latitude and longitude of the southwest corner of the cell. (Basically,
+   * given an index, the latitude or longitude of the southwest corner is
+   * index*degrees_per_cell, and the cell includes all locations whose
+   * latitude or longitude is in the half-open interval
+   * [index*degrees_per_cell, (index+1)*degrees_per_cell).
+   *
+   * We don't just create an array because we expect many cells to have no
+   * articles in them, esp. as we decrease the cell size.  The idea is that
+   * the cells provide a first approximation to the cells used to create the
+   * article distributions.
+   */
   var tiling_cell_to_articles = bufmap[RegularCellIndex, GeoArticle]()
 
   /**
@@ -1261,16 +1258,20 @@ class MultiRegularCellGrid(
   /* The different functions vary depending on where in the particular cell
      the Coord is wanted, e.g. one of the corners or the center. */
 
-  // Convert a coordinate to the indices of the southwest corner of the
-  // corresponding tiling cell.
+  /**
+   * Convert a coordinate to the indices of the southwest corner of the
+   * corresponding tiling cell.
+   */
   def coord_to_tiling_cell_index(coord: Coord) = {
     val latind = floor(coord.lat / degrees_per_cell).toInt
     val longind = floor(coord.long / degrees_per_cell).toInt
     RegularCellIndex(latind, longind)
   }
 
-  // Convert a coordinate to the indices of the southwest corner of the
-  // corresponding multi cell.
+  /**
+   * Convert a coordinate to the indices of the southwest corner of the
+   * corresponding multi cell.
+   */
   def coord_to_multi_cell_index(coord: Coord) = {
     // When width_of_multi_cell = 1, don't subtract anything.
     // When width_of_multi_cell = 2, subtract 0.5*degrees_per_cell.
@@ -1284,24 +1285,32 @@ class MultiRegularCellGrid(
       Coord(coord.lat - subval, coord.long - subval))
   }
 
-  // Convert cell indices to the corresponding coordinate.  This can also
-  // be used to find the coordinate of the southwest corner of a tiling cell
-  // or multi cell, as both are identified by the cell indices of
-  // their southwest corner.  Values are double since we may be requesting the
-  // coordinate of a location not exactly at a cell index (e.g. the center
-  // point).
+  /**
+   * Convert a fractional cell index to the corresponding coordinate.  Useful
+   * for indices not referring to the corner of a cell.
+   * 
+   * @seealso #cell_index_to_coord
+   */
   def fractional_cell_index_to_coord(index: FractionalRegularCellIndex,
     method: String = "coerce-warn") = {
     Coord(index.latind * degrees_per_cell, index.longind * degrees_per_cell,
       method)
   }
 
+  /**
+   * Convert cell indices to the corresponding coordinate.  This can also
+   * be used to find the coordinate of the southwest corner of a tiling cell
+   * or multi cell, as both are identified by the cell indices of
+   * their southwest corner.
+   */
   def cell_index_to_coord(index: RegularCellIndex,
     method: String = "coerce-warn") =
     fractional_cell_index_to_coord(index.toFractional, method)
 
-  // Add 'offset' to both latind and longind of 'index' and then convert to a
-  // coordinate.  Coerce the coordinate to be within bounds.
+  /** 
+   * Add 'offset' to both latind and longind of 'index' and then convert to a
+   * coordinate.  Coerce the coordinate to be within bounds.
+   */
   def offset_cell_index_to_coord(index: RegularCellIndex,
     offset: Double) = {
     fractional_cell_index_to_coord(
@@ -1309,65 +1318,85 @@ class MultiRegularCellGrid(
       "coerce")
   }
 
-  // Convert cell indices of a tiling cell to the coordinate of the
-  // near (i.e. southwest) corner of the cell.
+  /**
+   * Convert cell indices of a tiling cell to the coordinate of the
+   * near (i.e. southwest) corner of the cell.
+   */
   def tiling_cell_index_to_near_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(index)
   }
 
-  // Convert cell indices of a tiling cell to the coordinate of the
-  // center of the cell.
+  /**
+   * Convert cell indices of a tiling cell to the coordinate of the
+   * center of the cell.
+   */
   def tiling_cell_index_to_center_coord(index: RegularCellIndex) = {
     offset_cell_index_to_coord(index, 0.5)
   }
 
-  // Convert cell indices of a tiling cell to the coordinate of the
-  // far (i.e. northeast) corner of the cell.
+  /**
+   * Convert cell indices of a tiling cell to the coordinate of the
+   * far (i.e. northeast) corner of the cell.
+   */
   def tiling_cell_index_to_far_corner_coord(index: RegularCellIndex) = {
     offset_cell_index_to_coord(index, 1.0)
   }
-  // Convert cell indices of a tiling cell to the coordinate of the
-  // near (i.e. southwest) corner of the cell.
+  /**
+   * Convert cell indices of a tiling cell to the coordinate of the
+   * near (i.e. southwest) corner of the cell.
+   */
   def multi_cell_index_to_near_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(index)
   }
 
-  // Convert cell indices of a multi cell to the coordinate of the
-  // center of the cell.
+  /**
+   * Convert cell indices of a multi cell to the coordinate of the
+   * center of the cell.
+   */
   def multi_cell_index_to_center_coord(index: RegularCellIndex) = {
     offset_cell_index_to_coord(index, width_of_multi_cell / 2.0)
   }
 
-  // Convert cell indices of a multi cell to the coordinate of the
-  // far (i.e. northeast) corner of the cell.
+  /**
+   * Convert cell indices of a multi cell to the coordinate of the
+   * far (i.e. northeast) corner of the cell.
+   */
   def multi_cell_index_to_far_corner_coord(index: RegularCellIndex) = {
     offset_cell_index_to_coord(index, width_of_multi_cell)
   }
 
-  // Convert cell indices of a multi cell to the coordinate of the
-  // northwest corner of the cell.
+  /**
+   * Convert cell indices of a multi cell to the coordinate of the
+   * northwest corner of the cell.
+   */
   def multi_cell_index_to_nw_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(
       RegularCellIndex(index.latind + width_of_multi_cell, index.longind),
       "coerce")
   }
 
-  // Convert cell indices of a multi cell to the coordinate of the
-  // southeast corner of the cell.
+  /**
+   * Convert cell indices of a multi cell to the coordinate of the
+   * southeast corner of the cell.
+   */
   def multi_cell_index_to_se_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(
       RegularCellIndex(index.latind, index.longind + width_of_multi_cell),
       "coerce")
   }
 
-  // Convert cell indices of a multi cell to the coordinate of the
-  // southwest corner of the cell.
+  /**
+   * Convert cell indices of a multi cell to the coordinate of the
+   * southwest corner of the cell.
+   */
   def multi_cell_index_to_sw_corner_coord(index: RegularCellIndex) = {
     multi_cell_index_to_near_corner_coord(index)
   }
 
-  // Convert cell indices of a multi cell to the coordinate of the
-  // northeast corner of the cell.
+  /**
+   * Convert cell indices of a multi cell to the coordinate of the
+   * northeast corner of the cell.
+   */
   def multi_cell_index_to_ne_corner_coord(index: RegularCellIndex) = {
     multi_cell_index_to_far_corner_coord(index)
   }
@@ -1441,8 +1470,8 @@ class MultiRegularCellGrid(
    * cell, out to a certain distance.
    * 
    * @param pred_cells List of predicted cells, along with their scores.
-   * @true_cell True cell.
-   * @grsize Total size of the ranking grid. (For example, a total size
+   * @param true_cell True cell.
+   * @param grsize Total size of the ranking grid. (For example, a total size
    *   of 21 will result in a ranking grid with the true cell and 10
    *   cells on each side shown.)
    */
@@ -1500,37 +1529,55 @@ class MultiRegularCellGrid(
 
 //////////////////////  Article table
 
-// Class maintaining tables listing all articles and mapping between
-// names, ID's and articles.  Objects corresponding to redirect articles
-// should not be present anywhere in this table; instead, the name of the
-// redirect article should point to the article object for the article
-// pointed to by the redirect.
+/**
+ * Class maintaining tables listing all articles and mapping between
+ * names, ID's and articles.  Objects corresponding to redirect articles
+ * should not be present anywhere in this table; instead, the name of the
+ * redirect article should point to the article object for the article
+ * pointed to by the redirect.
+ */
 class GeoArticleTable {
-  // Mapping from article names to GeoArticle objects, using the actual case of
-  // the article.
+  /**
+   * Mapping from article names to GeoArticle objects, using the actual case of
+   * the article.
+   */
   val name_to_article = mutable.Map[String, GeoArticle]()
 
-  // List of articles in each split.
+  /**
+   * List of articles in each split.
+   */
   val articles_by_split = bufmap[String, GeoArticle]()
 
-  // Num of articles with word-count information but not in table.
+  /**
+   * Num of articles with word-count information but not in table.
+   */
   var num_articles_with_word_counts_but_not_in_table = 0
 
-  // Num of articles with word-count information (whether or not in table).
+  /**
+   * Num of articles with word-count information (whether or not in table).
+   */
   var num_articles_with_word_counts = 0
 
-  // Num of articles in each split with word-count information seen.
+  /** 
+   * Num of articles in each split with word-count information seen.
+   */
   val num_word_count_articles_by_split = intmap[String]()
 
-  // Num of articles in each split with a computed distribution.
-  // (Not the same as the previous since we don't compute the distribution of articles in
-  // either the test or dev set depending on which one is used.)
+  /**
+   * Num of articles in each split with a computed distribution.
+   * (Not the same as the previous since we don't compute the distribution of
+   * articles in either the test or dev set depending on which one is used.)
+   */
   val num_dist_articles_by_split = intmap[String]()
 
-  // Total # of word tokens for all articles in each split.
+  /**
+   * Total # of word tokens for all articles in each split.
+   */
   val word_tokens_by_split = intmap[String]()
 
-  // Total # of incoming links for all articles in each split.
+  /**
+   * Total # of incoming links for all articles in each split.
+   */
   val incoming_links_by_split = intmap[String]()
 
   /**
@@ -1550,23 +1597,31 @@ class GeoArticleTable {
    */
   val lower_name_div_to_articles = bufmap[(String, String), GeoArticle]()
 
-  // For each toponym, list of articles matching the name.
+  /**
+   * For each toponym, list of articles matching the name.
+   */
   val lower_toponym_to_article = bufmap[String, GeoArticle]()
 
-  // Mapping from lowercased article names to TopoArticle objects
+  /**
+   * Mapping from lowercased article names to TopoArticle objects
+   */
   val lower_name_to_articles = bufmap[String, GeoArticle]()
 
-  // Look up an article named NAME and return the associated article.
-  // Note that article names are case-sensitive but the first letter needs to
-  // be capitalized.
+  /**
+   * Look up an article named NAME and return the associated article.
+   * Note that article names are case-sensitive but the first letter needs to
+   * be capitalized.
+   */
   def lookup_article(name: String) = {
     assert(name != null)
     name_to_article.getOrElse(capfirst(name), null)
   }
 
-  // Record the article as having NAME as one of its names (there may be
-  // multiple names, due to redirects).  Also add to related lists mapping
-  // lowercased form, short form, etc.
+  /**
+   * Record the article as having NAME as one of its names (there may be
+   * multiple names, due to redirects).  Also add to related lists mapping
+   * lowercased form, short form, etc.
+   */ 
   def record_article_name(name: String, art: GeoArticle) {
     // Must pass in properly cased name
     // errprint("name=%s, capfirst=%s", name, capfirst(name))
@@ -1590,8 +1645,10 @@ class GeoArticleTable {
       lower_toponym_to_article(short) += art
   }
 
-  // Record either a normal article ('artfrom' same as 'artto') or a
-  // redirect ('artfrom' redirects to 'artto').
+  /**
+   * Record either a normal article ('artfrom' same as 'artto') or a
+   * redirect ('artfrom' redirects to 'artto').
+   */
   def record_article(artfrom: GeoArticle, artto: GeoArticle) {
     record_article_name(artfrom.title, artto)
     val redir = !(artfrom eq artto)
@@ -1659,12 +1716,13 @@ class GeoArticleTable {
       art.dist = null
   }
 
-  // Parse the result of a previous run of --output-counts and generate
-  // a unigram distribution for Naive Bayes matching.  We do a simple version
-  // of Good-Turing smoothing where we assign probability mass to unseen
-  // words equal to the probability mass of all words seen once, and rescale
-  // the remaining probabilities accordingly.
-
+  /**
+   * Parse the result of a previous run of --output-counts and generate
+   * a unigram distribution for Naive Bayes matching.  We do a simple version
+   * of Good-Turing smoothing where we assign probability mass to unseen
+   * words equal to the probability mass of all words seen once, and rescale
+   * the remaining probabilities accordingly.
+   */ 
   def read_word_counts(filename: String) {
     val initial_dynarr_size = 1000
     val keys_dynarr =
@@ -1825,20 +1883,25 @@ class GeoArticleTable {
 }
 
 object GeoArticleTable {
-  // Currently only one GeoArticleTable object
+  /**
+   * Currently only one GeoArticleTable object
+   */
   var table: GeoArticleTable = null
 }
 
 ///////////////////////// Articles
 
-// An "article" for geotagging.  Articles can come from Wikipedia, but
-// also from Twitter, etc., provided that the data is in the same format.
-// (In Twitter, generally each "article" is the set of tweets from a given
-// user.)
-
+/**
+ * An "article" for geotagging.  Articles can come from Wikipedia, but
+ * also from Twitter, etc., provided that the data is in the same format.
+ * (In Twitter, generally each "article" is the set of tweets from a given
+ * user.)
+ */ 
 class GeoArticle(params: Map[String, String]) extends Article(params)
   with EvaluationDocument {
-  // Object containing word distribution of this article.
+  /**
+   * Object containing word distribution of this article.
+   */
   var dist: WordDist = null
 
   override def toString() = {
