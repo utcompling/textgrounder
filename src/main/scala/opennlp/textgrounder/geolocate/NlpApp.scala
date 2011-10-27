@@ -55,8 +55,10 @@ abstract class NlpApp extends App {
   def output_options(op_par: OptionParser = null) {
     val op = if (op_par != null) op_par else the_op
     errprint("Parameter values:")
-    for ((name, value) <- op.argNameValues)
+    for ((name, value) <- op.argNameValues) {
       errprint("%30s: %s", name, value)
+      //errprint("%30s: %s", name, op.getType(name))
+    }
     errprint("")
   }
 
