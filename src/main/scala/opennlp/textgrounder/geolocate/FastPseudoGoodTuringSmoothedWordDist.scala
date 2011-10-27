@@ -87,11 +87,12 @@ object FastPseudoGoodTuringSmoothedWordDist {
    */
   def fast_kl_divergence(self: SmoothedWordDist, other: SmoothedWordDist,
     partial: Boolean=false): Double = {
-    val pfact = (1.0 - self.unseen_mass)/self.total_tokens
-    val qfact = (1.0 - other.unseen_mass)/other.total_tokens
+    val pfact = (1.0 - self.unseen_mass)/self.num_word_tokens
+    val qfact = (1.0 - other.unseen_mass)/other.num_word_tokens
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
     val qfact_globally_unseen_prob = (other.unseen_mass*
-        SmoothedWordDist.globally_unseen_word_prob / SmoothedWordDist.num_unseen_word_types)
+        SmoothedWordDist.globally_unseen_word_prob /
+        SmoothedWordDist.total_num_unseen_word_types)
     val owprobs = SmoothedWordDist.overall_word_probs
     val pcounts = self.counts
     val qcounts = other.counts
@@ -172,7 +173,7 @@ object FastPseudoGoodTuringSmoothedWordDist {
       overall_probs_diff_words += word_overall_prob
     }    
 
-    return kldiv + self.kl_divergence_34(other, overall_probs_diff_words)
+    return kldiv + self.inner_kl_divergence_34(other, overall_probs_diff_words)
   }
   
   // The older implementation that uses smoothed probabilities.
@@ -186,11 +187,12 @@ object FastPseudoGoodTuringSmoothedWordDist {
    */
   def fast_smoothed_cosine_similarity(self: SmoothedWordDist, other: SmoothedWordDist,
     partial: Boolean=false): Double = {
-    val pfact = (1.0 - self.unseen_mass)/self.total_tokens
-    val qfact = (1.0 - other.unseen_mass)/other.total_tokens
+    val pfact = (1.0 - self.unseen_mass)/self.num_word_tokens
+    val qfact = (1.0 - other.unseen_mass)/other.num_word_tokens
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
     val qfact_globally_unseen_prob = (other.unseen_mass*
-        SmoothedWordDist.globally_unseen_word_prob / SmoothedWordDist.num_unseen_word_types)
+        SmoothedWordDist.globally_unseen_word_prob /
+        SmoothedWordDist.total_num_unseen_word_types)
     val owprobs = SmoothedWordDist.overall_word_probs
     // 1.
     val pcounts = self.counts
@@ -264,8 +266,8 @@ object FastPseudoGoodTuringSmoothedWordDist {
    */
   def fast_cosine_similarity(self: SmoothedWordDist, other: SmoothedWordDist,
     partial: Boolean=false) = {
-    val pfact = 1.0/self.total_tokens
-    val qfact = 1.0/other.total_tokens
+    val pfact = 1.0/self.num_word_tokens
+    val qfact = 1.0/other.num_word_tokens
     // 1.
     val pcounts = self.counts
     val qcounts = other.counts

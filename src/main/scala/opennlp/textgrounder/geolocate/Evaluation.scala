@@ -529,7 +529,7 @@ class ArticleGeotagDocumentEvaluator(
     if (want_indiv_results) {
       errprint("%s:Article %s:", doctag, article)
       errprint("%s:  %d types, %d tokens",
-        doctag, article.dist.num_word_types, article.dist.total_tokens)
+        doctag, article.dist.num_word_types, article.dist.num_word_tokens)
       errprint("%s:  true cell at rank: %s", doctag, true_rank)
       errprint("%s:  true cell: %s", doctag, result.true_cell)
       for (i <- 0 until 5) {

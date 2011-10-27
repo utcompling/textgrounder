@@ -36,15 +36,6 @@ import collection.mutable
 import util.control.Breaks._
 import java.io._
 
-//import sys
-//import os
-//import os.path
-//import traceback
-//from itertools import *
-//import random
-//import gc
-//import time
-
 /////////////////////////////////////////////////////////////////////////////
 //                              Documentation                              //
 /////////////////////////////////////////////////////////////////////////////
@@ -546,7 +537,7 @@ class CellWordDist extends SmoothedWordDist(
     if (debug("lots")) {
       errprint("""For cell dist, num articles = %s, total tokens = %s,
     unseen_mass = %s, incoming links = %s, overall unseen mass = %s""",
-        num_arts_for_word_dist, total_tokens,
+        num_arts_for_word_dist, num_word_tokens,
         unseen_mass, incoming_links,
         overall_unseen_mass)
     }
@@ -580,7 +571,8 @@ class CellDist(
 
 class WordCellDist(
   val cellgrid: CellGrid,
-  val word: Word) extends CellDist(mutable.Map[GeoCell, Double]()) {
+  val word: Word
+) extends CellDist(mutable.Map[GeoCell, Double]()) {
   var normalized = false
 
   protected def init() {
@@ -921,7 +913,8 @@ abstract class PolygonalCell(
  * @param cellgrid The CellGrid object for the grid this cell is in.
  */
 abstract class RectangularCell(
-  cellgrid: CellGrid) extends PolygonalCell(cellgrid) {
+  cellgrid: CellGrid
+) extends PolygonalCell(cellgrid) {
   /**
    * Return the coordinate of the southwest point of the rectangle.
    */
@@ -1140,7 +1133,8 @@ case class FractionalRegularCellIndex(latind: Double, longind: Double) {
 
 class MultiRegularCell(
   cellgrid: MultiRegularCellGrid,
-  val index: RegularCellIndex) extends RectangularCell(cellgrid) {
+  val index: RegularCellIndex
+) extends RectangularCell(cellgrid) {
 
   def get_southwest_coord() =
     cellgrid.multi_cell_index_to_near_corner_coord(index)
@@ -1201,12 +1195,13 @@ class MultiRegularCell(
  * @param degrees_per_cell Size of each cell in degrees.  Determined by the
  *   --degrees-per-cell option, unless --miles-per-cell is set, in which
  *   case it takes priority.
- * @ @param width_of_multi_cell Size of multi cells in tiling cells,
+ * @param width_of_multi_cell Size of multi cells in tiling cells,
  *   determined by the --width-of-multi-cell option.
  */
 class MultiRegularCellGrid(
   val degrees_per_cell: Double,
-  val width_of_multi_cell: Int) extends CellGrid {
+  val width_of_multi_cell: Int
+) extends CellGrid {
 
   /**
    * Size of each cell (vertical dimension; horizontal dimension only near
@@ -1232,18 +1227,20 @@ class MultiRegularCellGrid(
   val minimum_latind = minimum_index.latind
   val minimum_longind = minimum_index.longind
 
-  // Mapping of cell->locations in cell, for cell-based Naive Bayes
-  // disambiguation.  The key is a tuple expressing the integer indices of the
-  // latitude and longitude of the southwest corner of the cell. (Basically,
-  // given an index, the latitude or longitude of the southwest corner is
-  // index*degrees_per_cell, and the cell includes all locations whose
-  // latitude or longitude is in the half-open interval
-  // [index*degrees_per_cell, (index+1)*degrees_per_cell).
-  //
-  // We don't just create an array because we expect many cells to have no
-  // articles in them, esp. as we decrease the cell size.  The idea is that
-  // the cells provide a first approximation to the cells used to create the
-  // article distributions.
+  /**
+   * Mapping of cell->locations in cell, for cell-based Naive Bayes
+   * disambiguation.  The key is a tuple expressing the integer indices of the
+   * latitude and longitude of the southwest corner of the cell. (Basically,
+   * given an index, the latitude or longitude of the southwest corner is
+   * index*degrees_per_cell, and the cell includes all locations whose
+   * latitude or longitude is in the half-open interval
+   * [index*degrees_per_cell, (index+1)*degrees_per_cell).
+   *
+   * We don't just create an array because we expect many cells to have no
+   * articles in them, esp. as we decrease the cell size.  The idea is that
+   * the cells provide a first approximation to the cells used to create the
+   * article distributions.
+   */
   var tiling_cell_to_articles = bufmap[RegularCellIndex, GeoArticle]()
 
   /**
@@ -1261,16 +1258,20 @@ class MultiRegularCellGrid(
   /* The different functions vary depending on where in the particular cell
      the Coord is wanted, e.g. one of the corners or the center. */
 
-  // Convert a coordinate to the indices of the southwest corner of the
-  // corresponding tiling cell.
+  /**
+   * Convert a coordinate to the indices of the southwest corner of the
+   * corresponding tiling cell.
+   */
   def coord_to_tiling_cell_index(coord: Coord) = {
     val latind = floor(coord.lat / degrees_per_cell).toInt
     val longind = floor(coord.long / degrees_per_cell).toInt
     RegularCellIndex(latind, longind)
   }
 
-  // Convert a coordinate to the indices of the southwest corner of the
-  // corresponding multi cell.
+  /**
+   * Convert a coordinate to the indices of the southwest corner of the
+   * corresponding multi cell.
+   */
   def coord_to_multi_cell_index(coord: Coord) = {
     // When width_of_multi_cell = 1, don't subtract anything.
     // When width_of_multi_cell = 2, subtract 0.5*degrees_per_cell.
@@ -1284,24 +1285,32 @@ class MultiRegularCellGrid(
       Coord(coord.lat - subval, coord.long - subval))
   }
 
-  // Convert cell indices to the corresponding coordinate.  This can also
-  // be used to find the coordinate of the southwest corner of a tiling cell
-  // or multi cell, as both are identified by the cell indices of
-  // their southwest corner.  Values are double since we may be requesting the
-  // coordinate of a location not exactly at a cell index (e.g. the center
-  // point).
+  /**
+   * Convert a fractional cell index to the corresponding coordinate.  Useful
+   * for indices not referring to the corner of a cell.
+   * 
+   * @seealso #cell_index_to_coord
+   */
   def fractional_cell_index_to_coord(index: FractionalRegularCellIndex,
     method: String = "coerce-warn") = {
     Coord(index.latind * degrees_per_cell, index.longind * degrees_per_cell,
       method)
   }
 
+  /**
+   * Convert cell indices to the corresponding coordinate.  This can also
+   * be used to find the coordinate of the southwest corner of a tiling cell
+   * or multi cell, as both are identified by the cell indices of
+   * their southwest corner.
+   */
   def cell_index_to_coord(index: RegularCellIndex,
     method: String = "coerce-warn") =
     fractional_cell_index_to_coord(index.toFractional, method)
 
-  // Add 'offset' to both latind and longind of 'index' and then convert to a
-  // coordinate.  Coerce the coordinate to be within bounds.
+  /** 
+   * Add 'offset' to both latind and longind of 'index' and then convert to a
+   * coordinate.  Coerce the coordinate to be within bounds.
+   */
   def offset_cell_index_to_coord(index: RegularCellIndex,
     offset: Double) = {
     fractional_cell_index_to_coord(
@@ -1309,65 +1318,85 @@ class MultiRegularCellGrid(
       "coerce")
   }
 
-  // Convert cell indices of a tiling cell to the coordinate of the
-  // near (i.e. southwest) corner of the cell.
+  /**
+   * Convert cell indices of a tiling cell to the coordinate of the
+   * near (i.e. southwest) corner of the cell.
+   */
   def tiling_cell_index_to_near_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(index)
   }
 
-  // Convert cell indices of a tiling cell to the coordinate of the
-  // center of the cell.
+  /**
+   * Convert cell indices of a tiling cell to the coordinate of the
+   * center of the cell.
+   */
   def tiling_cell_index_to_center_coord(index: RegularCellIndex) = {
     offset_cell_index_to_coord(index, 0.5)
   }
 
-  // Convert cell indices of a tiling cell to the coordinate of the
-  // far (i.e. northeast) corner of the cell.
+  /**
+   * Convert cell indices of a tiling cell to the coordinate of the
+   * far (i.e. northeast) corner of the cell.
+   */
   def tiling_cell_index_to_far_corner_coord(index: RegularCellIndex) = {
     offset_cell_index_to_coord(index, 1.0)
   }
-  // Convert cell indices of a tiling cell to the coordinate of the
-  // near (i.e. southwest) corner of the cell.
+  /**
+   * Convert cell indices of a tiling cell to the coordinate of the
+   * near (i.e. southwest) corner of the cell.
+   */
   def multi_cell_index_to_near_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(index)
   }
 
-  // Convert cell indices of a multi cell to the coordinate of the
-  // center of the cell.
+  /**
+   * Convert cell indices of a multi cell to the coordinate of the
+   * center of the cell.
+   */
   def multi_cell_index_to_center_coord(index: RegularCellIndex) = {
     offset_cell_index_to_coord(index, width_of_multi_cell / 2.0)
   }
 
-  // Convert cell indices of a multi cell to the coordinate of the
-  // far (i.e. northeast) corner of the cell.
+  /**
+   * Convert cell indices of a multi cell to the coordinate of the
+   * far (i.e. northeast) corner of the cell.
+   */
   def multi_cell_index_to_far_corner_coord(index: RegularCellIndex) = {
     offset_cell_index_to_coord(index, width_of_multi_cell)
   }
 
-  // Convert cell indices of a multi cell to the coordinate of the
-  // northwest corner of the cell.
+  /**
+   * Convert cell indices of a multi cell to the coordinate of the
+   * northwest corner of the cell.
+   */
   def multi_cell_index_to_nw_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(
       RegularCellIndex(index.latind + width_of_multi_cell, index.longind),
       "coerce")
   }
 
-  // Convert cell indices of a multi cell to the coordinate of the
-  // southeast corner of the cell.
+  /**
+   * Convert cell indices of a multi cell to the coordinate of the
+   * southeast corner of the cell.
+   */
   def multi_cell_index_to_se_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(
       RegularCellIndex(index.latind, index.longind + width_of_multi_cell),
       "coerce")
   }
 
-  // Convert cell indices of a multi cell to the coordinate of the
-  // southwest corner of the cell.
+  /**
+   * Convert cell indices of a multi cell to the coordinate of the
+   * southwest corner of the cell.
+   */
   def multi_cell_index_to_sw_corner_coord(index: RegularCellIndex) = {
     multi_cell_index_to_near_corner_coord(index)
   }
 
-  // Convert cell indices of a multi cell to the coordinate of the
-  // northeast corner of the cell.
+  /**
+   * Convert cell indices of a multi cell to the coordinate of the
+   * northeast corner of the cell.
+   */
   def multi_cell_index_to_ne_corner_coord(index: RegularCellIndex) = {
     multi_cell_index_to_far_corner_coord(index)
   }
@@ -1441,8 +1470,8 @@ class MultiRegularCellGrid(
    * cell, out to a certain distance.
    * 
    * @param pred_cells List of predicted cells, along with their scores.
-   * @true_cell True cell.
-   * @grsize Total size of the ranking grid. (For example, a total size
+   * @param true_cell True cell.
+   * @param grsize Total size of the ranking grid. (For example, a total size
    *   of 21 will result in a ranking grid with the true cell and 10
    *   cells on each side shown.)
    */
@@ -1500,37 +1529,55 @@ class MultiRegularCellGrid(
 
 //////////////////////  Article table
 
-// Class maintaining tables listing all articles and mapping between
-// names, ID's and articles.  Objects corresponding to redirect articles
-// should not be present anywhere in this table; instead, the name of the
-// redirect article should point to the article object for the article
-// pointed to by the redirect.
+/**
+ * Class maintaining tables listing all articles and mapping between
+ * names, ID's and articles.  Objects corresponding to redirect articles
+ * should not be present anywhere in this table; instead, the name of the
+ * redirect article should point to the article object for the article
+ * pointed to by the redirect.
+ */
 class GeoArticleTable {
-  // Mapping from article names to GeoArticle objects, using the actual case of
-  // the article.
+  /**
+   * Mapping from article names to GeoArticle objects, using the actual case of
+   * the article.
+   */
   val name_to_article = mutable.Map[String, GeoArticle]()
 
-  // List of articles in each split.
+  /**
+   * List of articles in each split.
+   */
   val articles_by_split = bufmap[String, GeoArticle]()
 
-  // Num of articles with word-count information but not in table.
+  /**
+   * Num of articles with word-count information but not in table.
+   */
   var num_articles_with_word_counts_but_not_in_table = 0
 
-  // Num of articles with word-count information (whether or not in table).
+  /**
+   * Num of articles with word-count information (whether or not in table).
+   */
   var num_articles_with_word_counts = 0
 
-  // Num of articles in each split with word-count information seen.
+  /** 
+   * Num of articles in each split with word-count information seen.
+   */
   val num_word_count_articles_by_split = intmap[String]()
 
-  // Num of articles in each split with a computed distribution.
-  // (Not the same as the previous since we don't compute the distribution of articles in
-  // either the test or dev set depending on which one is used.)
+  /**
+   * Num of articles in each split with a computed distribution.
+   * (Not the same as the previous since we don't compute the distribution of
+   * articles in either the test or dev set depending on which one is used.)
+   */
   val num_dist_articles_by_split = intmap[String]()
 
-  // Total # of word tokens for all articles in each split.
+  /**
+   * Total # of word tokens for all articles in each split.
+   */
   val word_tokens_by_split = intmap[String]()
 
-  // Total # of incoming links for all articles in each split.
+  /**
+   * Total # of incoming links for all articles in each split.
+   */
   val incoming_links_by_split = intmap[String]()
 
   /**
@@ -1550,23 +1597,31 @@ class GeoArticleTable {
    */
   val lower_name_div_to_articles = bufmap[(String, String), GeoArticle]()
 
-  // For each toponym, list of articles matching the name.
+  /**
+   * For each toponym, list of articles matching the name.
+   */
   val lower_toponym_to_article = bufmap[String, GeoArticle]()
 
-  // Mapping from lowercased article names to TopoArticle objects
+  /**
+   * Mapping from lowercased article names to TopoArticle objects
+   */
   val lower_name_to_articles = bufmap[String, GeoArticle]()
 
-  // Look up an article named NAME and return the associated article.
-  // Note that article names are case-sensitive but the first letter needs to
-  // be capitalized.
+  /**
+   * Look up an article named NAME and return the associated article.
+   * Note that article names are case-sensitive but the first letter needs to
+   * be capitalized.
+   */
   def lookup_article(name: String) = {
     assert(name != null)
     name_to_article.getOrElse(capfirst(name), null)
   }
 
-  // Record the article as having NAME as one of its names (there may be
-  // multiple names, due to redirects).  Also add to related lists mapping
-  // lowercased form, short form, etc.
+  /**
+   * Record the article as having NAME as one of its names (there may be
+   * multiple names, due to redirects).  Also add to related lists mapping
+   * lowercased form, short form, etc.
+   */ 
   def record_article_name(name: String, art: GeoArticle) {
     // Must pass in properly cased name
     // errprint("name=%s, capfirst=%s", name, capfirst(name))
@@ -1590,8 +1645,10 @@ class GeoArticleTable {
       lower_toponym_to_article(short) += art
   }
 
-  // Record either a normal article ('artfrom' same as 'artto') or a
-  // redirect ('artfrom' redirects to 'artto').
+  /**
+   * Record either a normal article ('artfrom' same as 'artto') or a
+   * redirect ('artfrom' redirects to 'artto').
+   */
   def record_article(artfrom: GeoArticle, artto: GeoArticle) {
     record_article_name(artfrom.title, artto)
     val redir = !(artfrom eq artto)
@@ -1645,7 +1702,7 @@ class GeoArticleTable {
           /* FIXME: Move this finish() earlier, and split into
              before/after global. */
           art.dist.finish(minimum_word_count = Opts.minimum_word_count)
-          totaltoks += art.dist.total_tokens
+          totaltoks += art.dist.num_word_tokens
           numarts += 1
         }
       }
@@ -1659,12 +1716,13 @@ class GeoArticleTable {
       art.dist = null
   }
 
-  // Parse the result of a previous run of --output-counts and generate
-  // a unigram distribution for Naive Bayes matching.  We do a simple version
-  // of Good-Turing smoothing where we assign probability mass to unseen
-  // words equal to the probability mass of all words seen once, and rescale
-  // the remaining probabilities accordingly.
-
+  /**
+   * Parse the result of a previous run of --output-counts and generate
+   * a unigram distribution for Naive Bayes matching.  We do a simple version
+   * of Good-Turing smoothing where we assign probability mass to unseen
+   * words equal to the probability mass of all words seen once, and rescale
+   * the remaining probabilities accordingly.
+   */ 
   def read_word_counts(filename: String) {
     val initial_dynarr_size = 1000
     val keys_dynarr =
@@ -1691,11 +1749,11 @@ class GeoArticleTable {
       writer.output_header()
     }
 
-    var total_tokens = 0
+    var num_word_tokens = 0
     var title = null: String
 
     def one_article_probs() {
-      if (total_tokens == 0) return
+      if (num_word_tokens == 0) return
       val art = lookup_article(title)
       if (art == null) {
         warning("Skipping article %s, not in table", title)
@@ -1744,7 +1802,7 @@ class GeoArticleTable {
           }
           keys_dynarr.clear()
           values_dynarr.clear()
-          total_tokens = 0
+          num_word_tokens = 0
         } else if (line.startsWith("Article coordinates) ") ||
           line.startsWith("Article ID: "))
           ()
@@ -1757,7 +1815,7 @@ class GeoArticleTable {
               val count = xcount.toInt
               if (!(Stopwords.stopwords contains word) ||
                 Opts.include_stopwords_in_article_dists) {
-                total_tokens += count
+                num_word_tokens += count
                 keys_dynarr += memoize_word(word)
                 values_dynarr += count
               }
@@ -1825,20 +1883,25 @@ class GeoArticleTable {
 }
 
 object GeoArticleTable {
-  // Currently only one GeoArticleTable object
+  /**
+   * Currently only one GeoArticleTable object
+   */
   var table: GeoArticleTable = null
 }
 
 ///////////////////////// Articles
 
-// An "article" for geotagging.  Articles can come from Wikipedia, but
-// also from Twitter, etc., provided that the data is in the same format.
-// (In Twitter, generally each "article" is the set of tweets from a given
-// user.)
-
+/**
+ * An "article" for geotagging.  Articles can come from Wikipedia, but
+ * also from Twitter, etc., provided that the data is in the same format.
+ * (In Twitter, generally each "article" is the set of tweets from a given
+ * user.)
+ */ 
 class GeoArticle(params: Map[String, String]) extends Article(params)
   with EvaluationDocument {
-  // Object containing word distribution of this article.
+  /**
+   * Object containing word distribution of this article.
+   */
   var dist: WordDist = null
 
   override def toString() = {
@@ -2162,7 +2225,7 @@ class NaiveBayesDocumentStrategy(
         if (Opts.naive_bayes_weighting == "equal") (1.0, 1.0)
         else {
           val bw = Opts.naive_bayes_baseline_weight.toDouble
-          ((1.0 - bw) / worddist.total_tokens, bw)
+          ((1.0 - bw) / worddist.num_word_tokens, bw)
         }
       } else (1.0, 0.0))
 
@@ -2236,99 +2299,25 @@ object Stopwords {
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * Class for specifying options for geolocation.  Note that currently this
- * is a fairly crude conversion of the original command-line interface, with
- * one field in this class for each possible command-line option.
- * Documentation for how these fields work is as described below in the help
- * for each corresponding command-line option.
+ * Class retrieving command-line arguments or storing programmatic
+ * configuration parameters.
  *
- * @param defaults Object used to initialize the default values of each
- * argument.  By default, the corresponding default values for the
- * corresponding command-line arguments are used, but it's possible to pass
- * in an object corresponding to the arguments actually specified on the
- * command line, so that these values don't have to be explicitly copied.
+ * @param parser If specified, should be a parser for retrieving the
+ *   value of command-line arguments from the command line.  Provided
+ *   that the parser has been created and initialized by creating a
+ *   previous instance of this same class with the same parser (a
+ *   "shadow field" class), the variables below will be initialized with
+ *   the values given by the user on the command line.  Otherwise, they
+ *   will be initialized with the default values for the parameters.
+ *   Because they are vars, they can be freely set to other values.
+ *
  */
-class GeolocateOptions(defaults: GeolocateCommandLineArguments = null) {
-  /* This is used to fetch the default values out of the command-line
-     arguments, so that we don't have to specify them twice, with
-     concomitant maintenance problems. */
-  protected val defs =
-    if (defaults == null)
-      new GeolocateCommandLineArguments(
-        new OptionParser("random", return_defaults = true))
-    else
-      defaults
+class GeolocateParameters(parser: OptionParser = null) {
+  protected val op =
+    if (parser == null) new OptionParser("unknown") else parser
 
   //// Basic options for determining operating mode and strategy
-  var mode = defs.mode
-  var strategy = defs.strategy
-  var baseline_strategy = defs.baseline_strategy
-  var stopwords_file = defs.stopwords_file
-  var article_data_file = defs.article_data_file
-  var counts_file = defs.counts_file
-  var eval_file = defs.eval_file
-  var eval_format = defs.eval_format
-
-  //// Input files, toponym resolution only
-  var gazetteer_file = defs.gazetteer_file
-  var gazetteer_type = defs.gazetteer_type
-
-  //// Options indicating which documents to train on or evaluate
-  var eval_set = defs.eval_set
-  var num_training_docs = defs.num_training_docs
-  var num_test_docs = defs.num_test_docs
-  var skip_initial_test_docs = defs.skip_initial_test_docs
-  var every_nth_test_doc = defs.every_nth_test_doc
-
-  //// Options indicating how to generate the cells we compare against
-  var degrees_per_cell = defs.degrees_per_cell
-  var miles_per_cell = defs.miles_per_cell
-  var km_per_cell = defs.km_per_cell
-  var width_of_multi_cell = defs.width_of_multi_cell
-
-  //// Options used when creating word distributions
-  var preserve_case_words = defs.preserve_case_words
-  var include_stopwords_in_article_dists = defs.include_stopwords_in_article_dists
-  var minimum_word_count = defs.minimum_word_count
-
-  //// Options used when doing Naive Bayes geotagging
-  var naive_bayes_weighting = defs.naive_bayes_weighting
-  var naive_bayes_baseline_weight = defs.naive_bayes_baseline_weight
-
-  //// Options used when doing ACP geotagging
-  var lru_cache_size = defs.lru_cache_size
-
-  //// Debugging/output options
-  var max_time_per_stage = defs.max_time_per_stage
-  var no_individual_results = defs.no_individual_results
-  var oracle_results = defs.oracle_results
-  var debug = defs.debug
-
-  //// Options used only in KML generation (--mode=generate-kml)
-  var kml_words = defs.kml_words
-  var kml_prefix = defs.kml_prefix
-  var kml_transform = defs.kml_transform
-  var kml_max_height = defs.kml_max_height
-
-  //// Options used only in toponym resolution (--mode=geotag-toponyms)
-  //// (Note, gazetteer-file options also used only in toponym resolution,
-  //// see above)
-  var naive_bayes_context_len = defs.naive_bayes_context_len
-  var max_dist_for_close_match = defs.max_dist_for_close_match
-  var max_dist_for_outliers = defs.max_dist_for_outliers
-  var context_type = defs.context_type
-}
-
-/**
- * Class for parsing and retrieving command-line arguments for GeolocateApp.
- *
- * @param return_defaults If true, options return default values instead of
- * values given on the command line. NOTE: The operation of the defs below
- * is a bit tricky.  See comments in OptionParser.
- */
-class GeolocateCommandLineArguments(op: OptionParser) {
-  //// Basic options for determining operating mode and strategy
-  def mode =
+  var mode =
     op.option[String]("m", "mode",
       default = "geotag-documents",
       choices = Seq("geotag-toponyms",
@@ -2355,7 +2344,7 @@ specify the words whose distributions should be outputted.  See also
 the probabilities to make the distinctions among them more visible.
 """)
 
-  def strategy =
+  var strategy =
     op.multiOption[String]("s", "strategy",
       //      choices=Seq(
       //        "baseline", "none",
@@ -2427,7 +2416,7 @@ the article.  Default is 'partial-kl-divergence'.
 NOTE: Multiple --strategy options can be given, and each strategy will
 be tried, one after the other.""")
 
-  def baseline_strategy =
+  var baseline_strategy =
     op.multiOption[String]("baseline-strategy", "bs",
       choices = Seq("internal-link", "random",
         "num-articles", "link-most-common-toponym",
@@ -2462,14 +2451,14 @@ strategies cannot be mixed with other baseline strategies, or with non-baseline
 strategies, since they require that --preserve-case-words be set internally.""")
 
   //// Input files
-  def stopwords_file =
+  var stopwords_file =
     op.option[String]("stopwords-file",
       metavar = "FILE",
       help = """File containing list of stopwords.  If not specified,
 a default list of English stopwords (stored in the TextGrounder distribution)
 is used.""")
 
-  def article_data_file =
+  var article_data_file =
     op.multiOption[String]("a", "article-data-file",
       metavar = "FILE",
       help = """File containing info about Wikipedia or Twitter articles.
@@ -2483,14 +2472,14 @@ articles; that is held in a separate counts file, specified using
 
 Multiple such files can be given by specifying the option multiple
 times.""")
-  def counts_file =
+  var counts_file =
     op.multiOption[String]("counts-file", "cf",
       metavar = "FILE",
       help = """File containing word counts for Wikipedia or Twitter articles.
 There are scripts in the 'python' directory for generating counts in the
 proper format.  Multiple such files can be given by specifying the
 option multiple times.""")
-  def eval_file =
+  var eval_file =
     op.multiOption[String]("e", "eval-file",
       metavar = "FILE",
       help = """File or directory containing files to evaluate on.
@@ -2499,7 +2488,7 @@ times.  If a directory is given, all files in the directory will be
 considered (but if an error occurs upon parsing a file, it will be ignored).
 Each file is read in and then disambiguation is performed.  Not used when
 --eval-format=internal (which is the default with --mode=geotag-documents).""")
-  def eval_format =
+  var eval_format =
     op.option[String]("f", "eval-format",
       default = "default",
       choices = Seq("default", "internal", "pcl-travel",
@@ -2541,7 +2530,7 @@ correct location is used only for evaluation, not for constructing training
 data; the other locations are ignored.""")
 
   //// Input files, toponym resolution only
-  def gazetteer_file =
+  var gazetteer_file =
     op.option[String]("gazetteer-file", "gf",
       help = """File containing gazetteer information to match.  Only used
 during toponym resolution (--mode=geotag-toponyms).""")
@@ -2554,7 +2543,7 @@ Only used during toponym resolution (--mode=geotag-toponyms).  NOTE: type
 'world' is the only one currently implemented.  Default '%default'.""")
 
   //// Options indicating which documents to train on or evaluate
-  def eval_set =
+  var eval_set =
     op.option[String]("eval-set", "es",
       default = "dev",
       choices = Seq("dev", "test"),
@@ -2562,19 +2551,19 @@ Only used during toponym resolution (--mode=geotag-toponyms).  NOTE: type
       help = """Set to use for evaluation when --eval-format=internal
 and --mode=geotag-documents ('dev' or 'devel' for the development set,
 'test' for the test set).  Default '%default'.""")
-  def num_training_docs =
+  var num_training_docs =
     op.option[Int]("num-training-docs", "ntrain", default = 0,
       help = """Maximum number of training documents to use.
 0 means no limit.  Default 0, i.e. no limit.""")
-  def num_test_docs =
+  var num_test_docs =
     op.option[Int]("num-test-docs", "ntest", default = 0,
       help = """Maximum number of test (evaluation) documents to process.
 0 means no limit.  Default 0, i.e. no limit.""")
-  def skip_initial_test_docs =
+  var skip_initial_test_docs =
     op.option[Int]("skip-initial-test-docs", "skip-initial", default = 0,
       help = """Skip this many test docs at beginning.  Default 0, i.e.
 don't skip any documents.""")
-  def every_nth_test_doc =
+  var every_nth_test_doc =
     op.option[Int]("every-nth-test-doc", "every-nth", default = 1,
       help = """Only process every Nth test doc.  Default 1, i.e.
 process all.""")
@@ -2583,24 +2572,24 @@ process all.""")
   //      help="""Skip this many after each one processed.  Default 0.""")
 
   //// Options indicating how to generate the cells we compare against
-  def degrees_per_cell =
+  var degrees_per_cell =
     op.option[Double]("degrees-per-cell", "dpc",
       default = 1.0,
       help = """Size (in degrees, a floating-point number) of the tiling
 cells that cover the Earth.  Default %default. """)
-  def miles_per_cell =
+  var miles_per_cell =
     op.option[Double]("miles-per-cell", "mpc",
       help = """Size (in miles, a floating-point number) of the tiling
 cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
-  def km_per_cell =
+  var km_per_cell =
     op.option[Double]("km-per-cell", "kpc",
       help = """Size (in kilometers, a floating-point number) of the tiling
 cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
-  def width_of_multi_cell =
+  var width_of_multi_cell =
     op.option[Int]("width-of-multi-cell", default = 1,
       help = """Width of the cell used to compute a statistical
 distribution for geotagging purposes, in terms of number of tiling cells.
@@ -2610,24 +2599,24 @@ tiling cell to compute each multi cell.  If the value is more than
 1, the multi cells overlap.""")
 
   //// Options used when creating word distributions
-  def preserve_case_words =
+  var preserve_case_words =
     op.flag("preserve-case-words", "pcw",
       help = """Don't fold the case of words used to compute and
 match against article distributions.  Note that in toponym resolution
 (--mode=geotag-toponyms), this applies only to words in articles
 (currently used only in Naive Bayes matching), not to toponyms, which
 are always matched case-insensitively.""")
-  def include_stopwords_in_article_dists =
+  var include_stopwords_in_article_dists =
     op.flag("include-stopwords-in-article-dists",
       help = """Include stopwords when computing word distributions.""")
-  def minimum_word_count =
+  var minimum_word_count =
     op.option[Int]("minimum-word-count", "mwc",
       default = 1,
       help = """Minimum count of words to consider in word
 distributions.  Words whose count is less than this value are ignored.""")
 
   //// Options used when doing Naive Bayes geotagging
-  def naive_bayes_weighting =
+  var naive_bayes_weighting =
     op.option[String]("naive-bayes-weighting", "nbw",
       default = "equal",
       choices = Seq("equal", "equal-words", "distance-weighted"),
@@ -2639,7 +2628,7 @@ against the baseline, giving the baseline weight according to --baseline-weight
 and assigning the remainder to the words.  If 'distance-weighted', similar to
 'equal-words' but don't weight each word the same as each other word; instead,
 weight the words according to distance from the toponym.""")
-  def naive_bayes_baseline_weight =
+  var naive_bayes_baseline_weight =
     op.option[Double]("naive-bayes-baseline-weight", "nbbw",
       metavar = "WEIGHT",
       default = 0.5,
@@ -2647,23 +2636,23 @@ weight the words according to distance from the toponym.""")
 probability) when doing weighted Naive Bayes.  Default %default.""")
 
   //// Options used when doing ACP geotagging
-  def lru_cache_size =
+  var lru_cache_size =
     op.option[Int]("lru-cache-size", "lru", default = 400,
       help = """Number of entries in the LRU cache.  Default %default.
 Used only when --strategy=average-cell-probability.""")
 
   //// Debugging/output options
-  def max_time_per_stage =
+  var max_time_per_stage =
     op.option[Double]("max-time-per-stage", "mts", default = 0.0,
       help = """Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default 0, i.e. no limit.""")
-  def no_individual_results =
+  var no_individual_results =
     op.flag("no-individual-results", "no-results",
       help = """Don't show individual results for each test document.""")
-  def oracle_results =
+  var oracle_results =
     op.flag("oracle-results",
       help = """Only compute oracle results (much faster).""")
-  def debug =
+  var debug =
     op.option[String]("d", "debug", metavar = "FLAGS",
       help = """Output debug info of the given types.  Multiple debug
 parameters can be specified, indicating different types of info to output.
@@ -2704,19 +2693,19 @@ pcl-travel: Extra info for debugging --eval-format=pcl-travel.
 """)
 
   //// Options used only in KML generation (--mode=generate-kml)
-  def kml_words =
+  var kml_words =
     op.option[String]("k", "kml-words", "kw",
       help = """Words to generate KML distributions for, when
 --mode=generate-kml.  Each word should be separated by a comma.  A separate
 file is generated for each word, using the value of '--kml-prefix' and adding
 '.kml' to it.""")
-  def kml_prefix =
+  var kml_prefix =
     op.option[String]("kml-prefix", "kp",
       default = "kml-dist.",
       help = """Prefix to use for KML files outputted in --mode=generate-kml.
 The actual filename is created by appending the word, and then the suffix
 '.kml'.  Default '%default'.""")
-  def kml_transform =
+  var kml_transform =
     op.option[String]("kml-transform", "kt", "kx",
       default = "none",
       choices = Seq("none", "log", "logsquared"),
@@ -2725,7 +2714,7 @@ when generating KML (--mode=generate-kml), possibly to try and make the
 low values more visible.  Possibilities are 'none' (no transformation),
 'log' (take the log), and 'logsquared' (negative of squared log).  Default
 '%default'.""")
-  def kml_max_height =
+  var kml_max_height =
     op.option[Double]("kml-max-height", "kmh",
       default = 2000000.0,
       help = """Height of highest bar, in meters.  Default %default.""")
@@ -2733,25 +2722,25 @@ low values more visible.  Possibilities are 'none' (no transformation),
   //// Options used only in toponym resolution (--mode=geotag-toponyms)
   //// (Note, gazetteer-file options also used only in toponym resolution,
   //// see above)
-  def naive_bayes_context_len =
+  var naive_bayes_context_len =
     op.option[Int]("naive-bayes-context-len", "nbcl",
       default = 10,
       help = """Number of words on either side of a toponym to use
 in Naive Bayes matching.  Only applicable to toponym resolution
 (--mode=geotag-toponyms).  Default %default.""")
-  def max_dist_for_close_match =
+  var max_dist_for_close_match =
     op.option[Double]("max-dist-for-close-match", "mdcm",
       default = 80.0,
       help = """Maximum number of km allowed when looking for a
 close match for a toponym (--mode=geotag-toponyms).  Default %default.""")
-  def max_dist_for_outliers =
+  var max_dist_for_outliers =
     op.option[Double]("max-dist-for-outliers", "mdo",
       default = 200.0,
       help = """Maximum number of km allowed between a point and
 any others in a division (--mode=geotag-toponyms).  Points farther away than
 this are ignored as "outliers" (possible errors, etc.).  NOTE: Not
 currently implemented. Default %default.""")
-  def context_type =
+  var context_type =
     op.option[String]("context-type", "ct",
       default = "cell-dist-article-links",
       choices = Seq("article", "cell", "cell-dist-article-links"),
@@ -2813,13 +2802,13 @@ object Debug {
  *
  * Basic operation:
  *
- * 1. Create an instance of GeolocateOptions and populate it with the
- * appropriate options.
- * 2. Call set_options(), passing in the options instance you just created.
+ * 1. Create an instance of GeolocateParameters and populate it with the
+ * appropriate parameters.
+ * 2. Call set_parameters(), passing in the instance you just created.
  * 3. Call run().  The return value contains some evaluation results.
  *
- * NOTE: Currently, the GeolocateOptions instance is recorded directly inside
- * of this singleton object, without copying, and some of the fields are
+ * NOTE: Currently, the GeolocateParameters instance is recorded directly
+ * inside of this singleton object, without copying, and some of the fields are
  * changed to more canonical values.  If this is a problem, let me know and
  * I'll fix it.
  *
@@ -2828,7 +2817,7 @@ object Debug {
  * by the run() function.  See below.
  */
 object GeolocateDriver {
-  var Opts = null: GeolocateOptions
+  var Opts = null: GeolocateParameters
   // NOTE: When different grids are allowed, we may set this to null here
   // and initialize it later based on a command-line option or whatever.
   var cellgrid = null: CellGrid
@@ -2840,12 +2829,12 @@ object GeolocateDriver {
    * Output the values of some internal parameters.  Only needed
    * for debugging.
    */
-  def output_parameters() {
+  def output_internal_parameters() {
     errprint("Need to read stopwords: %s", need_to_read_stopwords)
   }
 
   /**
-   * Signal an argument error, the same way that set_options() does by
+   * Signal an argument error, the same way that set_parameters() does by
    * default.  You don't normally need to call this.
    */
   def default_argument_error(string: String) {
@@ -2861,7 +2850,7 @@ object GeolocateDriver {
    * @param argerror Function to use to signal invalid arguments.  By
    * default, the function `default_argument_error()` is called.
    */
-  def set_options(options: GeolocateOptions,
+  def set_parameters(options: GeolocateParameters,
     argerror: String => Unit = default_argument_error _) {
     def argument_needed(arg: String, arg_english: String = null) {
       val marg_english =
@@ -3233,23 +3222,23 @@ Not generating an empty KML file.""", word)
   }
 }
 
-object GeolocateApp extends NlpApp {
-  val the_op = new OptionParser("geolocate")
-  val the_opts = new GeolocateCommandLineArguments(the_op)
-  val allow_other_fields_in_obj = false
+object GeolocateApp extends NlpApp("geolocate") {
+  type ArgClass = GeolocateParameters
 
-  override def output_parameters() {
-    GeolocateDriver.output_parameters()
+  def create_arg_class() = new GeolocateParameters(optparser)
+
+  override def output_internal_parameters() {
+    GeolocateDriver.output_internal_parameters()
   }
 
-  def handle_arguments(op: OptionParser, args: Seq[String]) {
+  def handle_arguments(args: Seq[String]) {
     def argerror(str: String) {
-      op.error(str)
+      optparser.error(str)
     }
-    GeolocateDriver.set_options(new GeolocateOptions(the_opts), argerror _)
+    GeolocateDriver.set_parameters(argholder, argerror _)
   }
 
-  def implement_main(op: OptionParser, args: Seq[String]) {
+  def implement_main(args: Seq[String]) {
     GeolocateDriver.run()
   }
 

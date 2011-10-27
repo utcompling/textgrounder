@@ -42,11 +42,12 @@ object ArticleData {
       "namespace", "is_list_of", "is_disambig", "is_list", "coord",
       "incoming_links")
 
-  // Read in the article data file.  Call PROCESS on each article.
-  // The type of the article created is given by ARTICLE_TYPE, which defaults
-  // to Article.  MAXTIME is a value in seconds, which limits the total
-  // processing time (real time, not CPU time) used for reading in the
-  // file, for testing purposes.
+  /** Read in the article data file.  Call PROCESS on each article.
+   * The type of the article created is given by ARTICLE_TYPE, which defaults
+   * to Article.  MAXTIME is a value in seconds, which limits the total
+   * processing time (real time, not CPU time) used for reading in the
+   * file, for testing purposes.
+   */
   def read_article_data_file(filename: String,
       process: Map[String,String] => Unit, maxtime: Double=0.0) = {
     errprint("Reading article data from %s...", filename)
@@ -96,20 +97,20 @@ object ArticleData {
   }
 }
 
-// A Wikipedia article.  Defined fields:
-//
-//   title: Title of article.
-//   id: ID of article, as an int.
-//   coord: Coordinates of article.
-//   incoming_links: Number of incoming links, or None if unknown.
-//   split: Split of article ("training", "dev", "test")
-//   redir: If this is a redirect, article title that it redirects to; else
-//          an empty string.
-//   namespace: Namespace of article (e.g. "Main", "Wikipedia", "File")
-//   is_list_of: Whether article title is "List of *"
-//   is_disambig: Whether article is a disambiguation page.
-//   is_list: Whether article is a list of any type ("List of *", disambig,
-//            or in Category or Book namespaces)
+/** A Wikipedia article.  Defined fields:
+ * title: Title of article.
+ * id: ID of article, as an int.
+ * coord: Coordinates of article.
+ * incoming_links: Number of incoming links, or None if unknown.
+ * split: Split of article ("training", "dev", "test")
+ * redir: If this is a redirect, article title that it redirects to; else
+ *          an empty string.
+ * namespace: Namespace of article (e.g. "Main", "Wikipedia", "File")
+ * is_list_of: Whether article title is "List of *"
+ * is_disambig: Whether article is a disambiguation page.
+ * is_list: Whether article is a list of any type ("List of *", disambig,
+ *          or in Category or Book namespaces)
+ */
 class Article(params: Map[String,String]) {
   var title="unknown"
   var id=0
@@ -166,10 +167,11 @@ class Article(params: Map[String,String]) {
 }
 
 object Article {
-  // Compute the short form of an article name.  If short form includes a
-  // division (e.g. "Tucson, Arizona"), return a tuple (SHORTFORM, DIVISION);
-  // else return a tuple (SHORTFORM, None).
-  
+  /**
+   * Compute the short form of an article name.  If short form includes a
+   * division (e.g. "Tucson, Arizona"), return a tuple (SHORTFORM, DIVISION);
+   * else return a tuple (SHORTFORM, None).
+   */
   def compute_short_form(name: String) = {
     val includes_div_re = """(.*?), (.*)$""".r
     val includes_parentag_re = """(.*) \(.*\)$""".r

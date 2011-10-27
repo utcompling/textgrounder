@@ -29,10 +29,10 @@ import collection.mutable
  */
 object PseudoGoodTuringSmoothedWordDist {
   // Total number of types seen once
-  var num_types_seen_once = 0
+  var total_num_types_seen_once = 0
 
   // Estimate of number of unseen word types for all articles
-  var num_unseen_word_types = 0
+  var total_num_unseen_word_types = 0
 
   /**
    * Overall probabilities over all articles of seeing a word in an article,
@@ -61,19 +61,22 @@ object PseudoGoodTuringSmoothedWordDist {
     owp_adjusted = true
     // Now, adjust overall_word_probs accordingly.
     //// FIXME: A simple calculation reveals that in the scheme where we use
-    //// globally_unseen_word_prob, num_types_seen_once cancels out and
+    //// globally_unseen_word_prob, total_num_types_seen_once cancels out and
     //// we never actually have to compute it.
-    num_types_seen_once = overall_word_probs.values count (_ == 1.0)
+    total_num_types_seen_once = overall_word_probs.values count (_ == 1.0)
     globally_unseen_word_prob =
-      num_types_seen_once.toDouble/WordDist.num_word_tokens
+      total_num_types_seen_once.toDouble/WordDist.total_num_word_tokens
     for ((word, count) <- overall_word_probs)
       overall_word_probs(word) = (
-        count.toDouble/WordDist.num_word_tokens*(1.0 - globally_unseen_word_prob))
+        count.toDouble/WordDist.total_num_word_tokens*
+        (1.0 - globally_unseen_word_prob))
     // A very rough estimate, perhaps totally wrong
-    num_unseen_word_types = num_types_seen_once max (WordDist.num_word_types/20)
+    total_num_unseen_word_types =
+      total_num_types_seen_once max (WordDist.total_num_word_types/20)
     if (debug("tons"))
-      errprint("Num types = %s, num tokens = %s, num_seen_once = %s, globally unseen word prob = %s, total mass = %s",
-               WordDist.num_word_types, WordDist.num_word_tokens, num_types_seen_once,
+      errprint("Total num types = %s, total num tokens = %s, total num_seen_once = %s, globally unseen word prob = %s, total mass = %s",
+               WordDist.total_num_word_types, WordDist.total_num_word_tokens,
+               total_num_types_seen_once,
                globally_unseen_word_prob,
                globally_unseen_word_prob + (overall_word_probs.values sum))
   }
@@ -135,14 +138,20 @@ class PseudoGoodTuringSmoothedWordDist(
     assert(!compobj.owp_adjusted)
     for ((word, count) <- counts) {
       if (!(compobj.overall_word_probs contains word))
-        WordDist.num_word_types += 1
+        WordDist.total_num_word_types += 1
       // Record in overall_word_probs; note more tokens seen.
       compobj.overall_word_probs(word) += count
-      WordDist.num_word_tokens += count
+      WordDist.total_num_word_tokens += count
     }
   }
 
   def innerToString = ", %.2f unseen mass" format unseen_mass
+
+   /**
+    * Here we compute the value of `overall_unseen_mass`, which depends
+    * on the global `overall_word_probs` computed from all of the
+    * distributions.
+    */
 
   def finish_after_global() {
     // Make sure that overall_word_probs has been computed properly.
@@ -153,7 +162,7 @@ class PseudoGoodTuringSmoothedWordDist(
     // words seen once, and adjust all other probs accordingly.
     val num_types_seen_once = counts.values count (_ == 1)
     unseen_mass =
-      if (total_tokens > 0)
+      if (num_word_tokens > 0)
         // If no words seen only once, we will have a problem if we assign 0
         // to the unseen mass, as unseen words will end up with 0 probability.
         // However, if we assign a value of 1.0 to unseen_mass (which could
@@ -161,7 +170,7 @@ class PseudoGoodTuringSmoothedWordDist(
         // up assigning 0 probability to seen words.  So we arbitrarily
         // limit it to 0.5, which is pretty damn much mass going to unseen
         // words.
-        0.5 min ((1.0 max num_types_seen_once)/total_tokens)
+        0.5 min ((1.0 max num_types_seen_once)/num_word_tokens)
       else 0.5
     overall_unseen_mass = 1.0 - (
       (for (ind <- counts.keys)
@@ -184,65 +193,23 @@ class PseudoGoodTuringSmoothedWordDist(
       this.asInstanceOf[SmoothedWordDist],
       other.asInstanceOf[SmoothedWordDist], partial = partial)
 
-  // Compute the KL divergence between this distribution and another
-  // distribution.  This is a bit tricky.  We have to take into account:
-  // 1. Words in this distribution (may or may not be in the other).
-  // 2. Words in the other distribution that are not in this one.
-  // 3. Words in neither distribution but seen globally.
-  // 4. Words never seen at all.
-  // If 'return_contributing_words', return a tuple of (val, word_contribs)
-  //   where word_contribs is a table of words and the amount each word
-  //   contributes to the KL divergence.
-    /**
-     The basic implementation of KL-divergence.  Useful for checking against
-other implementations.
-     */
-  def slow_kl_divergence_debug(xother: WordDist, partial: Boolean=false,
-      return_contributing_words: Boolean=false) = {
-    val other = xother.asInstanceOf[UnigramWordDist]
-    assert(finished)
-    assert(other.finished)
-    var kldiv = 0.0
-    val contribs =
-      if (return_contributing_words) mutable.Map[Word, Double]() else null
-    // 1.
-    for (word <- counts.keys) {
-      val p = lookup_word(word)
-      val q = other.lookup_word(word)
-      if (p <= 0.0 || q <= 0.0)
-        errprint("Warning: problematic values: p=%s, q=%s, word=%s", p, q, word)
-      else {
-        kldiv += p*(log(p) - log(q))
-        if (return_contributing_words)
-          contribs(word) = p*(log(p) - log(q))
-      }
-    }
-
-    if (partial)
-      (kldiv, contribs)
-    else {
-    // 2.
+  def kl_divergence_34(other: UnigramWordDist) = {      
     var overall_probs_diff_words = 0.0
     for (word <- other.counts.keys if !(counts contains word)) {
-      val p = lookup_word(word)
-      val q = other.lookup_word(word)
-      kldiv += p*(log(p) - log(q))
-      if (return_contributing_words)
-        contribs(word) = p*(log(p) - log(q))
       overall_probs_diff_words +=
         compobj.overall_word_probs(word)
     }
 
-    val retval = kldiv + kl_divergence_34(other.asInstanceOf[SmoothedWordDist],
+    inner_kl_divergence_34(other.asInstanceOf[SmoothedWordDist],
       overall_probs_diff_words)
-    (retval, contribs)
-    }
   }
-
+      
   /**
-   Steps 3 and 4 of KL-divergence computation.
+   * Actual implementation of steps 3 and 4 of KL-divergence computation, given
+   * a value that we may want to compute as part of step 2.
    */
-  def kl_divergence_34(other: SmoothedWordDist, overall_probs_diff_words: Double) = {
+  def inner_kl_divergence_34(other: SmoothedWordDist,
+      overall_probs_diff_words: Double) = {
     var kldiv = 0.0
 
     // 3. For words seen in neither dist but seen globally:
@@ -270,10 +237,10 @@ other implementations.
 
     // 4. For words never seen at all:
     val p = (unseen_mass*compobj.globally_unseen_word_prob /
-          compobj.num_unseen_word_types)
+          compobj.total_num_unseen_word_types)
     val q = (other.unseen_mass*compobj.globally_unseen_word_prob /
-          compobj.num_unseen_word_types)
-    kldiv += compobj.num_unseen_word_types*(p*(log(p) - log(q)))
+          compobj.total_num_unseen_word_types)
+    kldiv += compobj.total_num_unseen_word_types*(p*(log(p) - log(q)))
     kldiv
   }
 
@@ -290,7 +257,7 @@ other implementations.
         compobj.overall_word_probs.get(word) match {
           case None => {
             val wordprob = (unseen_mass*compobj.globally_unseen_word_prob
-                      / compobj.num_unseen_word_types)
+                      / compobj.total_num_unseen_word_types)
             if (debug("lots"))
               errprint("Word %s, never seen at all, wordprob = %s",
                        unmemoize_word(word), wordprob)
@@ -310,12 +277,12 @@ other implementations.
         }
       }
       case Some(wordcount) => {
-        //if (wordcount <= 0 or total_tokens <= 0 or unseen_mass >= 1.0)
+        //if (wordcount <= 0 or num_word_tokens <= 0 or unseen_mass >= 1.0)
         //  warning("Bad values; wordcount = %s, unseen_mass = %s",
         //          wordcount, unseen_mass)
         //  for ((word, count) <- self.counts)
         //    errprint("%s: %s", word, count)
-        val wordprob = wordcount.toDouble/total_tokens*(1.0 - unseen_mass)
+        val wordprob = wordcount.toDouble/num_word_tokens*(1.0 - unseen_mass)
         if (debug("lots"))
           errprint("Word %s, seen in article, wordprob = %s",
                    unmemoize_word(word), wordprob)
