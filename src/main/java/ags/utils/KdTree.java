@@ -21,8 +21,6 @@
 package ags.utils;
  
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
  
 /**
@@ -49,7 +47,7 @@ public class KdTree<T> {
     private double                     splitValue;
  
     // Bounds
-    private double[]                   minLimit, maxLimit;
+    public double[]                    minLimit, maxLimit;
     private boolean                    singularity;
 
     /**
@@ -69,7 +67,6 @@ public class KdTree<T> {
         this.parent = null;
     }
  
-    
     /**
      * Constructor for child nodes. Internal use only.
      */
@@ -91,6 +88,16 @@ public class KdTree<T> {
      */
     public int size() {
         return locationCount;
+    }
+
+    public ArrayList<T> getData() {
+        ArrayList<T> outData = new ArrayList<T>();
+        if (data == null)
+        	return outData;
+        for (int i = 0; i < locationCount; i++) {
+        	outData.add((T)data[i]);
+        }
+        return outData;
     }
 
     public KdTree<T> getLeaf(double[] location) {
