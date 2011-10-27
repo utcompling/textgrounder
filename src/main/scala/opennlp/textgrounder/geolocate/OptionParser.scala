@@ -401,7 +401,7 @@ object OptParse {
     protected val argpositional = mutable.Set[String]()
     /* Set specifying arguments that are flag options. */
     protected val argflag = mutable.Set[String]()
-    protected var argholder = null: AnyRef
+    protected var parsed = false
     protected var last_arg = null: String
 
     /**
@@ -495,7 +495,10 @@ object OptParse {
         if (is_flag)
           argflag += control
         last_arg = control
-        throw new OptParseFirstTimeException()
+        if (reflection_style)
+          throw new OptParseFirstTimeException()
+        else
+          default
       }
     }
 
@@ -757,85 +760,87 @@ object OptParse {
      */
     def parse(args: Seq[String], obj: AnyRef,
       allow_other_fields_in_obj: Boolean = false) = {
-      argholder = obj
-      val objargs = obj.getClass.getDeclaredMethods
-      // Call each null-argument function, assumed to be an option.  The
-      // first time such functions are called, they will install the
-      // appropriate OptionAny-subclass object in 
-      for {
-        arg <- objargs
-        if {
-          val (partial, full) =
-            if (debug_opts == "partial") (true, false)
-            else if (debug_opts == "full") (true, true)
-            else (false, false)
-          if (partial) {
-            println("Argument: " + arg)
-            println("Argument name: " + arg.getName)
-          }
-          if (full) {
-            println("Argument toGenericString(): " + arg.toGenericString)
-            println("Argument parameter types: " + arg.getParameterTypes)
-            println("Number of parameter types: " +
-              arg.getParameterTypes.length)
-            println("Modifiers: " + Modifier.toString(arg.getModifiers))
-            val rettype = arg.getReturnType
-            println("Return type: " + rettype)
-            println("Return type name: " + rettype.getName)
-            val rettype2 = arg.getGenericReturnType
-            println("Generic return type: " + rettype2)
-            println("Is bridge: " + arg.isBridge)
-            println("Is synthetic: " + arg.isSynthetic)
-            println("Is var args: " + arg.isVarArgs)
-            println("Is var args: " + arg.isVarArgs)
-            // Doesn't work: println(rettype2.getName)
-          }
-          /* Skip defs with the wrong number of arguments, as well as
-             static defs.  There might, for example, be a static no-
-             argument initialization function. */
-          (arg.getParameterTypes.length == 0 &&
-           !Modifier.isStatic(arg.getModifiers))
-          // && arg.getReturnType.isAssignableFrom(classOf[OptionAny[_]]))
-        }
-      } {
-        def constructNoNoMess(mess: String) = {
-          "%s.  You probably declared a var, val or no-argument def inside the structure with the option defs.  If you really want a var or val, you can allow this by setting 'allow_other_fields_in_obj' to true when calling parse().  DO NOT INCLUDE ANY NO-ARGUMENT DEFS, especially if they have side effects; you'll be sorry.  Field/method name is '%s', of full declaration as follows: %s" format (mess, arg.getName, arg)
-        }
-        var threw = false
-        try {
-          /* Invoke each option through reflection.  This should throw an
-             OptParseFirstTimeException.  When a call to invoke() throws
-             an exception, we see this as an InvocationTargetException that
-             wraps the actual exception thrown. */
-          arg.invoke(obj)
-        } catch {
-          case wrapped_e:InvocationTargetException => {
-            wrapped_e.getCause match {
-              case e:OptParseFirstTimeException => threw = true
-              /* The code invoked returned a weird exception.  That can
-                 happen if the user has some other functions or whatever
-                 in the argholder object other than an option def, and they
-                 throw an exception. */
-              case e@_ => throw new OptParseException(constructNoNoMess(
-                "Invalid exception during initialization"), e)
+      if (reflection_style) {
+        val objargs = obj.getClass.getDeclaredMethods
+        // Call each null-argument function, assumed to be an option.  The
+        // first time such functions are called, they will install the
+        // appropriate OptionAny-subclass object in 
+        for {
+          arg <- objargs
+          if {
+            val (partial, full) =
+              if (debug_opts == "partial") (true, false)
+              else if (debug_opts == "full") (true, true)
+              else (false, false)
+            if (partial) {
+              println("Argument: " + arg)
+              println("Argument name: " + arg.getName)
             }
+            if (full) {
+              println("Argument toGenericString(): " + arg.toGenericString)
+              println("Argument parameter types: " + arg.getParameterTypes)
+              println("Number of parameter types: " +
+                arg.getParameterTypes.length)
+              println("Modifiers: " + Modifier.toString(arg.getModifiers))
+              val rettype = arg.getReturnType
+              println("Return type: " + rettype)
+              println("Return type name: " + rettype.getName)
+              val rettype2 = arg.getGenericReturnType
+              println("Generic return type: " + rettype2)
+              println("Is bridge: " + arg.isBridge)
+              println("Is synthetic: " + arg.isSynthetic)
+              println("Is var args: " + arg.isVarArgs)
+              println("Is var args: " + arg.isVarArgs)
+              // Doesn't work: println(rettype2.getName)
+            }
+            /* Skip defs with the wrong number of arguments, as well as
+               static defs.  There might, for example, be a static no-
+               argument initialization function. */
+            (arg.getParameterTypes.length == 0 &&
+             !Modifier.isStatic(arg.getModifiers))
+            // && arg.getReturnType.isAssignableFrom(classOf[OptionAny[_]]))
           }
-          /* The call to invoke() itself returned some weird exception.
-             That means something is well and truly wrong with the code in
-             this module. */
-          case e@_ => throw new OptParseException(
-            "Unexpected exception during reflection invocation; internal error",
-            e)
-        }
-        if (!threw && !allow_other_fields_in_obj) {
-          /* No exception; definitely not an option def. */
-          throw new OptParseException(constructNoNoMess(
-            "Encountered a no-argument function that was not an option"))
+        } {
+          def constructNoNoMess(mess: String) = {
+            "%s.  You probably declared a var, val or no-argument def inside the structure with the option defs.  If you really want a var or val, you can allow this by setting 'allow_other_fields_in_obj' to true when calling parse().  DO NOT INCLUDE ANY NO-ARGUMENT DEFS, especially if they have side effects; you'll be sorry.  Field/method name is '%s', of full declaration as follows: %s" format (mess, arg.getName, arg)
+          }
+          var threw = false
+          try {
+            /* Invoke each option through reflection.  This should throw an
+               OptParseFirstTimeException.  When a call to invoke() throws
+               an exception, we see this as an InvocationTargetException that
+               wraps the actual exception thrown. */
+            arg.invoke(obj)
+          } catch {
+            case wrapped_e:InvocationTargetException => {
+              wrapped_e.getCause match {
+                case e:OptParseFirstTimeException => threw = true
+                /* The code invoked returned a weird exception.  That can
+                   happen if the user has some other functions or whatever
+                   in the argholder object other than an option def, and they
+                   throw an exception. */
+                case e@_ => throw new OptParseException(constructNoNoMess(
+                  "Invalid exception during initialization"), e)
+              }
+            }
+            /* The call to invoke() itself returned some weird exception.
+               That means something is well and truly wrong with the code in
+               this module. */
+            case e@_ => throw new OptParseException(
+              "Unexpected exception during reflection invocation; internal error",
+              e)
+          }
+          if (!threw && !allow_other_fields_in_obj) {
+            /* No exception; definitely not an option def. */
+            throw new OptParseException(constructNoNoMess(
+              "Encountered a no-argument function that was not an option"))
+          }
         }
       }
        
       // println(argmap)
       op.parse(args.toList)
+      parsed = true
     }
 
     def error(msg: String) {
@@ -843,7 +848,7 @@ object OptParse {
     }
 
     def checkArgsAvailable() {
-      assert(argholder != null,
+      assert(parsed,
       "Need to call 'parse()' first so that the arguments are known " +
       "(they are fetched from the first argument to 'parse()')")
     }
