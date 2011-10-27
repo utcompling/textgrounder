@@ -470,12 +470,14 @@ object OptParse {
      */
     def getMultiType(opt: String) = argtype_multi(opt)
 
-    protected def handle_option[T : Manifest, U : Manifest](opt: Seq[String],
+    protected def handle_argument[T : Manifest, U : Manifest](opt: Seq[String],
       default: U,
       metavar: String,
-      convert: (String, OptionSingle[T]) => T,
-      is_multi: Boolean,
-      create_underlying: (String, String) => OptionAny[U]) = {
+      create_underlying: (String, String) => OptionAny[U],
+      is_multi: Boolean = false,
+      is_positional: Boolean = false,
+      is_flag: Boolean = false
+    ) = {
       val control = controllingOpt(opt)
       if (return_defaults)
         default
@@ -488,6 +490,11 @@ object OptParse {
         argtype(control) = manifest[U].erasure
         if (is_multi)
           argtype_multi(control) = manifest[T].erasure
+        if (is_positional)
+          argpositional += control
+        if (is_flag)
+          argflag += control
+        last_arg = control
         throw new OptParseFirstTimeException()
       }
     }
@@ -511,8 +518,7 @@ object OptParse {
           }
         option
       }
-      handle_option[T,T](opt, default, metavar, convert, false,
-        create_underlying _)
+      handle_argument[T,T](opt, default, metavar, create_underlying _)
     }
 
     /**
@@ -590,19 +596,12 @@ object OptParse {
     def flagSeq(opt: Seq[String],
       help: String = "") = {
       import ArgotConverters._
-      val control = controllingOpt(opt)
-      if (return_defaults)
-        false
-      else if (argmap contains control)
-        argmap(control).asInstanceOf[OptionAny[Boolean]].value
-      else {
-        val option = new OptionFlag(control)
+      def create_underlying(controlling_opt: String, real_metavar: String) = {
+        val option = new OptionFlag(controlling_opt)
         option.wrap = op.flag[Boolean](opt.toList, help)
-        argmap(control) = option
-        argtype(control) = classOf[Boolean]
-        argflag += control
-        throw new OptParseFirstTimeException()
+        option
       }
+      handle_argument[Boolean,Boolean](opt, false, null, create_underlying _)
     }
 
     /**
@@ -650,8 +649,8 @@ object OptParse {
           }
         option
       }
-      handle_option[T,Seq[T]](opt, Seq[T](), metavar, convert, true,
-        create_underlying _)
+      handle_argument[T,Seq[T]](opt, Seq[T](), metavar, create_underlying _,
+        is_multi = true)
     }
 
     /**
@@ -697,13 +696,8 @@ object OptParse {
       help: String = "",
       optional: Boolean = false)
     (implicit convert: (String, OptionSingle[T]) => T, m: Manifest[T]) = {
-      val control = name
-      if (return_defaults)
-        default
-      else if (argmap contains control)
-        argmap(control).asInstanceOf[OptionAny[T]].value
-      else {
-        val option = new OptionSingle(default, control, is_param = true)
+      def create_underlying(controlling_opt: String, real_metavar: String) = {
+        val option = new OptionSingle(default, controlling_opt, is_param = true)
         option.wrap =
           op.parameter[T](name, help, optional) {
             // FUCK ME! Argot wants a Parameter[T], but this is private to
@@ -714,11 +708,10 @@ object OptParse {
                 checkChoices(converted, choices, canonicalize)
               }
           }
-        argmap(control) = option
-        argtype(control) = manifest[T].erasure
-        argpositional += control
-        throw new OptParseFirstTimeException()
+        option
       }
+      handle_argument[T,T](Seq(name), default, null, create_underlying _,
+        is_positional = true)
     }
 
     /**
@@ -731,13 +724,8 @@ object OptParse {
       help: String = "",
       optional: Boolean = true)
     (implicit convert: (String, OptionSingle[T]) => T, m: Manifest[T]) = {
-      val control = name
-      if (return_defaults)
-        Seq[T]()
-      else if (argmap contains control)
-        argmap(control).asInstanceOf[OptionAny[Seq[T]]].value
-      else {
-        val option = new OptionMulti[T](control, is_param = true)
+      def create_underlying(controlling_opt: String, real_metavar: String) = {
+        val option = new OptionMulti[T](controlling_opt, is_param = true)
         option.wrap =
           op.multiParameter[T](name, help, optional) {
             // FUCK ME! Argot wants a Parameter[T], but this is private to
@@ -748,12 +736,10 @@ object OptParse {
                 checkChoices(converted, choices, canonicalize)
               }
           }
-        argmap(control) = option
-        argtype(control) = manifest[Seq[T]].erasure
-        argtype_multi(control) = manifest[T].erasure
-        argpositional += control
-        throw new OptParseFirstTimeException()
+        option
       }
+      handle_argument[T,Seq[T]](Seq(name), Seq[T](), null, create_underlying _,
+        is_multi = true, is_positional = true)
     }
 
     /**
