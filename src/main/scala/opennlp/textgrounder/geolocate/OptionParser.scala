@@ -184,9 +184,6 @@ object OptParse {
     }
   }
 
-  class OptParseFirstTimeException extends RuntimeException {
-  }
-
   class OptParseException(val message: String,
     val cause: Option[Throwable] = None) extends Exception(message) {
     if (cause != None)
@@ -263,15 +260,30 @@ object OptParse {
   class OptParseConversionException(message: String)
     extends OptParseException(message)
 
+  class OptParseFirstTimeException(message: String)
+    extends OptParseException(message)
+
   /**
    * Thrown to indicate that OptParse encountered a problem in the caller's
-   * argument specification. This exception can be interpreted as a bug in
-   * the caller's program.
+   * argument specification, or something else indicating invalid coding.
+   * This indicates a big in the caller's code.
    *
    * @param message  exception message
    */
-  class OptParseSpecificationError(message: String)
-    extends OptParseException("(BUG) " + message)
+  class OptParseCodingError(message: String,
+    cause: Option[Throwable] = None
+  ) extends OptParseException("(CALLER BUG) " + message, cause)
+
+  /**
+   * Thrown to indicate that OptParse encountered a problem that should
+   * never occur under any circumstances, indicating a bug in the OptParse
+   * code itself.
+   *
+   * @param message  exception message
+   */
+  class OptParseInternalError(message: String,
+    cause: Option[Throwable] = None
+  ) extends OptParseException("(INTERNAL BUG) " + message, cause)
 
   class OptParseInvalidChoiceException(message: String)
     extends OptParseConversionException(message)
@@ -297,7 +309,8 @@ object OptParse {
         Seq(opt1, opt2, opt3, opt4, opt5, opt6, opt7, opt8, opt9) filter
           (_ != null)
       if (retval.length == 0)
-        throw new OptParseSpecificationError("Need to specify at least one command-line option")
+        throw new OptParseCodingError(
+          "Need to specify at least one command-line option")
       retval
     }
 
@@ -496,7 +509,7 @@ object OptParse {
           argflag += control
         last_arg = control
         if (reflection_style)
-          throw new OptParseFirstTimeException()
+          throw new OptParseFirstTimeException("If you see this, it means we're running reflection-style, and either you meant to use non-reflection-style ('reflection_style' = false), or you need to define your argument fields using 'def' instead of 'var' or 'val'.")
         else
           default
       }
@@ -760,7 +773,11 @@ object OptParse {
      */
     def parse(args: Seq[String], obj: AnyRef,
       allow_other_fields_in_obj: Boolean = false) = {
+      assert(!parsed)
       if (reflection_style) {
+        if (argmap.size > 0)
+          System.err.println("WARNING: Arguments initialized already, but we're using reflection to initialize the arguments.  If you didn't do this on purpose, you might be defining your argument fields with 'var' or 'val' instead of 'def'.")
+
         val objargs = obj.getClass.getDeclaredMethods
         // Call each null-argument function, assumed to be an option.  The
         // first time such functions are called, they will install the
@@ -819,23 +836,33 @@ object OptParse {
                    happen if the user has some other functions or whatever
                    in the argholder object other than an option def, and they
                    throw an exception. */
-                case e@_ => throw new OptParseException(constructNoNoMess(
-                  "Invalid exception during initialization"), e)
+                /* SCALABUG: If this throws 'new OptParseException', it
+                   compiles and works with 'e' (rather than 'Some(e)') as
+                   second argument, but if it throws
+                   'new OptParseCodingError', it gives an error,
+                   even though both have exactly the same signature! 
+                 */
+                case e@_ => throw new OptParseCodingError(constructNoNoMess(
+                  "Invalid exception during initialization"), Some(e))
               }
             }
             /* The call to invoke() itself returned some weird exception.
                That means something is well and truly wrong with the code in
                this module. */
-            case e@_ => throw new OptParseException(
-              "Unexpected exception during reflection invocation; internal error",
-              e)
+            /* SCALABUG: Identical problem to that described just above. */
+            case e@_ => throw new OptParseInternalError(
+              "Unexpected exception during reflection invocation",
+              Some(e))
           }
           if (!threw && !allow_other_fields_in_obj) {
             /* No exception; definitely not an option def. */
-            throw new OptParseException(constructNoNoMess(
+            throw new OptParseCodingError(constructNoNoMess(
               "Encountered a no-argument function that was not an option"))
           }
         }
+      } else {
+        if (argmap.size == 0)
+          throw new OptParseCodingError("No arguments initialized.  We are not using reflection to initialize arguments; maybe you need to set 'reflection_style' to true?  If not, and you thought you specified arguments, you might have defined the corresponding fields with 'def' instead of 'var' or 'val'.")
       }
        
       // println(argmap)
@@ -867,7 +894,7 @@ object OptParse {
 
 object TestOpts extends App {
   import OptParse._
-  val op = new OptionParser("test")
+  val op = new OptionParser("test", reflection_style = true)
   object Opts {
     /* An integer option named --foo, with a default value of 5.  Can also
        be specified using --spam or -f. */
@@ -900,6 +927,50 @@ object TestOpts extends App {
     /* A multi-positional parameter that sucks up all remaining arguments. */
     def files = op.multiParameter[String]("FILES", help = "Files to process")
   }
+  // op.parse(Opts, List("--foo", "7"))
+  op.parse(args, Opts)
+  /* Print out values of all parameters, whether options or positional */
+  for ((name, value) <- op.argNameValues)
+    println("%30s: %s" format (name, value))
+}
+
+object TestOpts2 extends App {
+  import OptParse._
+  val op = new OptionParser("test", reflection_style = false)
+  class MyOpts(op: OptionParser) {
+    /* An integer option named --foo, with a default value of 5.  Can also
+       be specified using --spam or -f. */
+    var foo = op.option[Int]("foo", "spam", "f", default = 5)
+    /* A string option named --bar, with a default value of "chinga".  Can
+       also be specified using -b. */
+    var bar = op.option[String]("bar", "b", default = "chinga")
+    /* A string option named --baz.  Default value is null. */
+    var baz = op.multiOption[String]("baz")
+    /* A floating-point option named --bat.  Default value is 0.0. */
+    var bat = op.multiOption[Double]("bat")
+    /* A flag --bezzaaf, alias -q.  Value is true if given, false if not. */
+    var bezzaaf = op.flag("bezzaaf", "q")
+    /* An integer option --blop, with only the values 1, 2, 4 or 7 are allowed.
+       Default is 2. (Note, in this case, if the default is not given, it
+       will end up as 0, even though this isn't technically a valid choice.
+       This allows detection of when no choice is given.)
+     */
+    var blop = op.option[Int]("blop", default = 1, choices = Seq(1, 2, 4, 7))
+    /* A string option --daniel, with only the values "mene", "tekel", and
+       "upharsin" allowed, but where values can be repeated, e.g.
+       --daniel mene --daniel mene --daniel tekel --daniel upharsin
+       . */
+    var daniel = op.multiOption[String]("daniel",
+      choices = Seq("mene", "tekel", "upharsin"))
+    /* FIXME: Order of retrieval during reflection may not be the same as
+       order of specification here. */
+    /* A required positional parameter. */
+    // def destfile = op.parameter[String]("DESTFILE", help = "Destination file to store output in")
+    /* A multi-positional parameter that sucks up all remaining arguments. */
+    var files = op.multiParameter[String]("FILES", help = "Files to process")
+  }
+  val first_shadow = new MyOpts(op)
+  val Opts = new MyOpts(op)
   // op.parse(Opts, List("--foo", "7"))
   op.parse(args, Opts)
   /* Print out values of all parameters, whether options or positional */
