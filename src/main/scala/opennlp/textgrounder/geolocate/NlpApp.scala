@@ -29,49 +29,49 @@ the researcher can see exactly which parameters this particular experiment
 was run with.
  */
 
-abstract class NlpApp extends App {
+/* SCALABUG: If this param isn't declared with a 'val', we get an error
+   below on the line creating OptionParser when trying to access progname,
+   saying "no such field". */
+abstract class NlpApp(val progname: String) extends App {
   // Things that must be implemented
-  /** An instance of OptionParser, for parsing options */
-  val the_op: OptionParser
-  /**
-   * An object containing def fields, one per command-line option.  See
-   * the comments in OptParse.scala.
-   */
-  val the_opts: AnyRef
-  /**
-   * Whether to allow fields other than option def fields in `the_opts`.
-   * If this is false, the presence of such fields will trigger an error.
-   * If true, the fields will be allowed, but NO ZERO-ARGUMENT FUNCTIONS
-   * CAN EXIST, because they will be called during parsing, and if they
-   * have side effects, bad things may happen.
-   */
-  val allow_other_fields_in_obj: Boolean
-  def handle_arguments(op: OptionParser, args: Seq[String])
-  def implement_main(op: OptionParser, args: Seq[String])
+
+  type ArgClass
+
+  def create_arg_class(): ArgClass
+
+  def handle_arguments(args: Seq[String])
+  def implement_main(args: Seq[String])
 
   // Things that may be overridden
-  def output_parameters() {}
+  def output_internal_parameters() {}
 
-  def output_options(op_par: OptionParser = null) {
-    val op = if (op_par != null) op_par else the_op
+  def output_parameters() {
     errprint("Parameter values:")
-    for ((name, value) <- op.argNameValues) {
+    for ((name, value) <- optparser.argNameValues) {
       errprint("%30s: %s", name, value)
       //errprint("%30s: %s", name, op.getType(name))
     }
     errprint("")
   }
 
+  /**
+   * An instance of OptionParser, for parsing options
+   */
+  val optparser = new OptionParser(progname)
+
+  var argholder: ArgClass = _
+
   def main() = {
     set_stdout_stderr_utf_8()
     errprint("Beginning operation at %s" format curtimehuman())
     errprint("Arguments: %s" format (args mkString " "))
-    the_op.parse(args, the_opts,
-      allow_other_fields_in_obj = allow_other_fields_in_obj)
-    handle_arguments(the_op, args)
-    output_options(the_op)
+    val shadow_fields = create_arg_class()
+    optparser.parse(args)
+    argholder = create_arg_class()
+    handle_arguments(args)
     output_parameters()
-    val retval = implement_main(the_op, args)
+    output_internal_parameters()
+    val retval = implement_main(args)
     errprint("Ending operation at %s" format curtimehuman())
     retval
   }

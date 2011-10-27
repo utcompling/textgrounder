@@ -392,7 +392,7 @@ object OptParse {
   }
 
   class OptionParser(prog: String,
-      reflection_style: Boolean = true,
+      reflection_style: Boolean = false,
       return_defaults: Boolean = false) {
     import OptionParser._
     import ArgotConverters._
@@ -764,14 +764,15 @@ object OptParse {
      * obtained simply by using the defs as fields.
      *
      * @param args Command-line arguments, from main() or the like
-     * @param obj Object holding defs specifying command-line options
+     * @param obj Object holding defs specifying command-line options; only
+     *        needs to be given when `reflection_style` is true.
      * @param allow_other_fields_in_obj If true, don't abort when other
      *        vars or vals are defined in `obj`.  DON'T DEFINE OTHER
      *        NO-ARGUMENT DEFS (whether or not an argument list is given);
      *        those functions will be called during parsing, any if they
      *        have any side effects, you'll be sorry.
      */
-    def parse(args: Seq[String], obj: AnyRef,
+    def parse(args: Seq[String], obj: AnyRef = null,
       allow_other_fields_in_obj: Boolean = false) = {
       assert(!parsed)
       if (reflection_style) {
