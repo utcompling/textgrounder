@@ -25,7 +25,7 @@ class KDTreeCellGrid extends CellGrid {
    * `add_article_to_cell`.  The generation happens internally; but after
    * this, `iter_nonempty_cells` should work properly.
    */
-  def initialize_cells: Unit = {}
+  protected def initialize_cells: Unit = {}
 
   /**
    * Iterate over all non-empty cells.
@@ -80,7 +80,7 @@ object KDTreeTest {
     grid.add_article_to_cell(article1)
     grid.add_article_to_cell(article2)
 
-    grid.initialize_cells
+    grid.finish
 
     println(grid.find_best_cell_for_coord(new Coord(35, -98)))
 

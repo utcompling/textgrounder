@@ -1005,7 +1005,8 @@ abstract class CellGrid {
    * Generate all non-empty cells.  This will be called once (and only once),
    * after all articles have been added to the cell grid by calling
    * `add_article_to_cell`.  The generation happens internally; but after
-   * this, `iter_nonempty_cells` should work properly.
+   * this, `iter_nonempty_cells` should work properly.  This is not meant
+   * to be called externally.
    */
   protected def initialize_cells(): Unit
 
