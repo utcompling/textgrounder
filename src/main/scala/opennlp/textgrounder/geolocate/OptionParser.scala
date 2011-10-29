@@ -149,7 +149,7 @@ object OptParse {
     catch {
       case e: NumberFormatException =>
         throw new OptParseConversionException(
-          "Cannot convert argument \"" + rawval + "\" to a number.")
+          """Cannot convert argument "%s" to an integer.""" format rawval)
     }
   }
 
@@ -158,7 +158,8 @@ object OptParse {
     catch {
       case e: NumberFormatException =>
         throw new OptParseConversionException(
-          "Cannot convert argument \"" + rawval + "\" to a number.")
+          """Cannot convert argument "%s" to a floatig-point number."""
+          format rawval)
     }
   }
 
@@ -166,7 +167,21 @@ object OptParse {
     rawval
   }
 
-  class OptParseFirstTimeException extends RuntimeException {
+  implicit def convertBoolean(rawval: String, op: OptionSingle[Boolean]) = {
+    rawval.toLowerCase match {
+      case "yes" => true
+      case "no" => false
+      case "true" => true
+      case "false" => false
+      case "t" => true
+      case "f" => false
+      case "on" => true
+      case "off" => false
+      case _ => throw new OptParseConversionException(
+          ("""Cannot convert argument "%s" to a boolean.  """ +
+           """Recognized values (case-insensitive) are """ +
+           """yes, no, true, false, t, f, on, off.""") format rawval)
+    }
   }
 
   class OptParseException(val message: String,
@@ -245,15 +260,30 @@ object OptParse {
   class OptParseConversionException(message: String)
     extends OptParseException(message)
 
+  class OptParseFirstTimeException(message: String)
+    extends OptParseException(message)
+
   /**
    * Thrown to indicate that OptParse encountered a problem in the caller's
-   * argument specification. This exception can be interpreted as a bug in
-   * the caller's program.
+   * argument specification, or something else indicating invalid coding.
+   * This indicates a big in the caller's code.
    *
    * @param message  exception message
    */
-  class OptParseSpecificationError(message: String)
-    extends OptParseException("(BUG) " + message)
+  class OptParseCodingError(message: String,
+    cause: Option[Throwable] = None
+  ) extends OptParseException("(CALLER BUG) " + message, cause)
+
+  /**
+   * Thrown to indicate that OptParse encountered a problem that should
+   * never occur under any circumstances, indicating a bug in the OptParse
+   * code itself.
+   *
+   * @param message  exception message
+   */
+  class OptParseInternalError(message: String,
+    cause: Option[Throwable] = None
+  ) extends OptParseException("(INTERNAL BUG) " + message, cause)
 
   class OptParseInvalidChoiceException(message: String)
     extends OptParseConversionException(message)
@@ -279,7 +309,8 @@ object OptParse {
         Seq(opt1, opt2, opt3, opt4, opt5, opt6, opt7, opt8, opt9) filter
           (_ != null)
       if (retval.length == 0)
-        throw new OptParseSpecificationError("Need to specify at least one command-line option")
+        throw new OptParseCodingError(
+          "Need to specify at least one command-line option")
       retval
     }
 
@@ -361,6 +392,7 @@ object OptParse {
   }
 
   class OptionParser(prog: String,
+      reflection_style: Boolean = false,
       return_defaults: Boolean = false) {
     import OptionParser._
     import ArgotConverters._
@@ -372,33 +404,137 @@ object OptParse {
        parameters is simply the name of the parameter.  Iteration over the
        map yields keys in the order they were added rather than random. */
     protected val argmap = mutable.LinkedHashMap[String, OptionAny[_]]()
-    protected var argholder = null: AnyRef
+    /* The type of each argument.  For multi options and parameters this will
+       be of type Seq.  Because of type erasure, the type of sequence must
+       be stored separately, using argtype_multi. */
+    protected val argtype = mutable.Map[String, Class[_]]()
+    /* For multi arguments, the type of each individual argument. */
+    protected val argtype_multi = mutable.Map[String, Class[_]]()
+    /* Set specifying arguments that are positional parameters. */
+    protected val argpositional = mutable.Set[String]()
+    /* Set specifying arguments that are flag options. */
+    protected val argflag = mutable.Set[String]()
+    protected var parsed = false
+    protected var last_arg = null: String
+
+    /**
+     * Return the value of an argument, or the default if not specified.
+     *
+     * @param opt The canonical name of the argument, i.e. the first
+     *   non-single-letter alias given.
+     * @returns The value, of type Any.
+     */
+    def apply(opt: String) = argmap(opt).value
+
+    /**
+     * Return the value of an argument, or the default if not specified.
+     *
+     * @param opt The canonical name of the argument, i.e. the first
+     *   non-single-letter alias given.
+     * @tparam T The type of the argument, which must match the type given
+     *   in its definition
+     *   
+     * @returns The value, of type T.
+     */
+    def get[T](opt: String) = argmap(opt).asInstanceOf[OptionAny[T]].value
+
+    /**
+     * Return whether an argument (either option or positional parameter)
+     * exists with the given canonical name.
+     */
+    def exists(opt: String) = argmap contains opt
+
+    /**
+     * Return whether an option exists with the given canonical name.
+     */
+    def isOption(opt: String) = exists(opt) && !isPositional(opt)
+
+    /**
+     * Return whether a positional parameter exists with the given name.
+     */
+    def isPositional(opt: String) = argpositional contains opt
+
+    /**
+     * Return whether a flag option exists with the given canonical name.
+     */
+    def isFlag(opt: String) = argflag contains opt
+
+    /**
+     * Return whether a multi argument (either option or positional parameter)
+     * exists with the given canonical name.
+     */
+    def isMulti(opt: String) = argtype_multi contains opt
+
+    /**
+     * Return whether the given argument's value was specified.
+     */
+    def specified(opt: String) = argmap(opt).specified
+
+    /**
+     * Return the type of the given argument.  For multi arguments, the
+     * type will be Seq, and the type of the individual arguments can only
+     * be retrieved using `getMultiType`, due to type erasure.
+     */
+    def getType(opt: String) = argtype(opt)
+
+    /**
+     * Return the type of an individual argument value of a multi argument.
+     * The actual type of the multi argument is a Seq of the returned type.
+     */
+    def getMultiType(opt: String) = argtype_multi(opt)
+
+    protected def handle_argument[T : Manifest, U : Manifest](opt: Seq[String],
+      default: U,
+      metavar: String,
+      create_underlying: (String, String) => OptionAny[U],
+      is_multi: Boolean = false,
+      is_positional: Boolean = false,
+      is_flag: Boolean = false
+    ) = {
+      val control = controllingOpt(opt)
+      if (return_defaults)
+        default
+      else if (argmap contains control)
+        argmap(control).asInstanceOf[OptionAny[U]].value
+      else {
+        val real_metavar = computeMetavar(metavar, opt)
+        val option = create_underlying(control, real_metavar)
+        argmap(control) = option
+        argtype(control) = manifest[U].erasure
+        if (is_multi)
+          argtype_multi(control) = manifest[T].erasure
+        if (is_positional)
+          argpositional += control
+        if (is_flag)
+          argflag += control
+        last_arg = control
+        if (reflection_style)
+          throw new OptParseFirstTimeException("If you see this, it means we're running reflection-style, and either you meant to use non-reflection-style ('reflection_style' = false), or you need to define your argument fields using 'def' instead of 'var' or 'val'.")
+        else
+          default
+      }
+    }
 
     def optionSeq[T](opt: Seq[String],
       default: T = null.asInstanceOf[T],
       metavar: String = null,
       choices: Seq[T] = null,
       canonicalize: Map[T, Iterable[T]] = null,
-      help: String = "")(implicit convert: (String, OptionSingle[T]) => T) = {
-      val control = controllingOpt(opt)
-      if (return_defaults)
-        default
-      else if (argmap contains control)
-        argmap(control).asInstanceOf[OptionAny[T]].value
-      else {
-        val met2 = computeMetavar(metavar, opt)
-        val option = new OptionSingle(default, control)
+      help: String = "")
+    (implicit convert: (String, OptionSingle[T]) => T, m: Manifest[T]) = {
+      def create_underlying(controlling_opt: String, real_metavar: String) = {
+        val option = new OptionSingle(default, controlling_opt)
         option.wrap =
-          op.option[T](opt.toList, met2, help) {
+          op.option[T](opt.toList, real_metavar, help) {
             (rawval: String, op: SingleValueOption[T]) =>
               {
                 val converted = convert(rawval, option)
                 checkChoices(converted, choices, canonicalize)
               }
           }
-        argmap(control) = option
-        throw new OptParseFirstTimeException()
+        option
       }
+      handle_argument[T,T](opt, default, metavar, create_underlying _)
     }
 
     /**
@@ -449,35 +585,39 @@ object OptParse {
      *    its canonical name, in case this is relevant to the conversion
      *    routine).  For standard types, this function does not need to be
      *    given.
+     * @tparam T The type of the option.  For non-standard types, a
+     *    converter must explicitly be given. (The standard types recognized
+     *    are currently Int, Double, Boolean and String.)
+     *
+     * @returns If class parameter `return_defaults` is true, the default
+     *    value.  Else, if the first time called, exits non-locally; this
+     *    is used internally.  Otherwise, the value of the parameter.
      */
-    def option[T](opt1: String, opt2: String = null, opt3: String = null,
+    def option[T](
+      opt1: String, opt2: String = null, opt3: String = null,
       opt4: String = null, opt5: String = null, opt6: String = null,
       opt7: String = null, opt8: String = null, opt9: String = null,
       default: T = null.asInstanceOf[T],
       metavar: String = null,
       choices: Seq[T] = null,
       canonicalize: Map[T, Iterable[T]] = null,
-      help: String = "")(implicit convert: (String, OptionSingle[T]) => T) = {
+      help: String = "")
+    (implicit convert: (String, OptionSingle[T]) => T, m: Manifest[T]) = {
       optionSeq[T](nonNullVals(opt1, opt2, opt3, opt4, opt5, opt6,
         opt7, opt8, opt9),
         metavar = metavar, default = default, choices = choices,
-        canonicalize = canonicalize, help = help)(convert)
+        canonicalize = canonicalize, help = help)(convert, m)
     }
 
     def flagSeq(opt: Seq[String],
       help: String = "") = {
       import ArgotConverters._
-      val control = controllingOpt(opt)
-      if (return_defaults)
-        false
-      else if (argmap contains control)
-        argmap(control).asInstanceOf[OptionAny[Boolean]].value
-      else {
-        val option = new OptionFlag(control)
+      def create_underlying(controlling_opt: String, real_metavar: String) = {
+        val option = new OptionFlag(controlling_opt)
         option.wrap = op.flag[Boolean](opt.toList, help)
-        argmap(control) = option
-        throw new OptParseFirstTimeException()
+        option
       }
+      handle_argument[Boolean,Boolean](opt, false, null, create_underlying _)
     }
 
     /**
@@ -511,26 +651,22 @@ object OptParse {
       metavar: String = null,
       choices: Seq[T] = null,
       canonicalize: Map[T, Iterable[T]] = null,
-      help: String = "")(implicit convert: (String, OptionSingle[T]) => T) = {
-      val control = controllingOpt(opt)
-      if (return_defaults)
-        Seq[T]()
-      else if (argmap contains control)
-        argmap(control).asInstanceOf[OptionAny[Seq[T]]].value
-      else {
-        val met2 = computeMetavar(metavar, opt)
-        val option = new OptionMulti[T](control)
+      help: String = "")
+    (implicit convert: (String, OptionSingle[T]) => T, m: Manifest[T]) = {
+      def create_underlying(controlling_opt: String, real_metavar: String) = {
+        val option = new OptionMulti[T](controlling_opt)
         option.wrap =
-          op.multiOption[T](opt.toList, met2, help) {
+          op.multiOption[T](opt.toList, real_metavar, help) {
             (rawval: String, op: MultiValueOption[T]) =>
               {
                 val converted = convert(rawval, option.wrapSingle)
                 checkChoices(converted, choices, canonicalize)
               }
           }
-        argmap(control) = option
-        throw new OptParseFirstTimeException()
+        option
       }
+      handle_argument[T,Seq[T]](opt, Seq[T](), metavar, create_underlying _,
+        is_multi = true)
     }
 
     /**
@@ -542,18 +678,19 @@ object OptParse {
      * default value can be explicitly specified, and if not given, will be
      * `null` for reference types.  Here, `null` will never occur.)
      */
-    def multiOption[T](opt1: String, opt2: String = null, opt3: String = null,
+    def multiOption[T](
+      opt1: String, opt2: String = null, opt3: String = null,
       opt4: String = null, opt5: String = null, opt6: String = null,
       opt7: String = null, opt8: String = null, opt9: String = null,
       metavar: String = null,
       choices: Seq[T] = null,
       canonicalize: Map[T, Iterable[T]] = null,
-      help: String = ""
-    )(implicit convert: (String, OptionSingle[T]) => T) = {
+      help: String = "")
+    (implicit convert: (String, OptionSingle[T]) => T, m: Manifest[T]) = {
       multiOptionSeq[T](nonNullVals(opt1, opt2, opt3, opt4, opt5, opt6,
         opt7, opt8, opt9),
         metavar = metavar, choices = choices,
-        canonicalize = canonicalize, help = help)(convert)
+        canonicalize = canonicalize, help = help)(convert, m)
     }
 
     /**
@@ -573,15 +710,10 @@ object OptParse {
       choices: Seq[T] = null,
       canonicalize: Map[T, Iterable[T]] = null,
       help: String = "",
-      optional: Boolean = false
-    )(implicit convert: (String, OptionSingle[T]) => T) = {
-      val control = name
-      if (return_defaults)
-        default
-      else if (argmap contains control)
-        argmap(control).asInstanceOf[OptionAny[T]].value
-      else {
-        val option = new OptionSingle(default, control, is_param = true)
+      optional: Boolean = false)
+    (implicit convert: (String, OptionSingle[T]) => T, m: Manifest[T]) = {
+      def create_underlying(controlling_opt: String, real_metavar: String) = {
+        val option = new OptionSingle(default, controlling_opt, is_param = true)
         option.wrap =
           op.parameter[T](name, help, optional) {
             // FUCK ME! Argot wants a Parameter[T], but this is private to
@@ -592,9 +724,10 @@ object OptParse {
                 checkChoices(converted, choices, canonicalize)
               }
           }
-        argmap(control) = option
-        throw new OptParseFirstTimeException()
+        option
       }
+      handle_argument[T,T](Seq(name), default, null, create_underlying _,
+        is_positional = true)
     }
 
     /**
@@ -605,15 +738,10 @@ object OptParse {
       choices: Seq[T] = null,
       canonicalize: Map[T, Iterable[T]] = null,
       help: String = "",
-      optional: Boolean = true
-    )(implicit convert: (String, OptionSingle[T]) => T) = {
-      val control = name
-      if (return_defaults)
-        Seq[T]()
-      else if (argmap contains control)
-        argmap(control).asInstanceOf[OptionAny[Seq[T]]].value
-      else {
-        val option = new OptionMulti[T](control, is_param = true)
+      optional: Boolean = true)
+    (implicit convert: (String, OptionSingle[T]) => T, m: Manifest[T]) = {
+      def create_underlying(controlling_opt: String, real_metavar: String) = {
+        val option = new OptionMulti[T](controlling_opt, is_param = true)
         option.wrap =
           op.multiParameter[T](name, help, optional) {
             // FUCK ME! Argot wants a Parameter[T], but this is private to
@@ -624,9 +752,10 @@ object OptParse {
                 checkChoices(converted, choices, canonicalize)
               }
           }
-        argmap(control) = option
-        throw new OptParseFirstTimeException()
+        option
       }
+      handle_argument[T,Seq[T]](Seq(name), Seq[T](), null, create_underlying _,
+        is_multi = true, is_positional = true)
     }
 
     /**
@@ -635,94 +764,111 @@ object OptParse {
      * obtained simply by using the defs as fields.
      *
      * @param args Command-line arguments, from main() or the like
-     * @param obj Object holding defs specifying command-line options
+     * @param obj Object holding defs specifying command-line options; only
+     *        needs to be given when `reflection_style` is true.
      * @param allow_other_fields_in_obj If true, don't abort when other
      *        vars or vals are defined in `obj`.  DON'T DEFINE OTHER
      *        NO-ARGUMENT DEFS (whether or not an argument list is given);
      *        those functions will be called during parsing, any if they
      *        have any side effects, you'll be sorry.
      */
-    def parse(args: Seq[String], obj: AnyRef,
+    def parse(args: Seq[String], obj: AnyRef = null,
       allow_other_fields_in_obj: Boolean = false) = {
-      argholder = obj
-      val objargs = obj.getClass.getDeclaredMethods
-      // Call each null-argument function, assumed to be an option.  The
-      // first time such functions are called, they will install the
-      // appropriate OptionAny-subclass object in 
-      for {
-        arg <- objargs
-        if {
-          val (partial, full) =
-            if (debug_opts == "partial") (true, false)
-            else if (debug_opts == "full") (true, true)
-            else (false, false)
-          if (partial) {
-            println("Argument: " + arg)
-            println("Argument name: " + arg.getName)
-          }
-          if (full) {
-            println("Argument toGenericString(): " + arg.toGenericString)
-            println("Argument parameter types: " + arg.getParameterTypes)
-            println("Number of parameter types: " +
-              arg.getParameterTypes.length)
-            println("Modifiers: " + Modifier.toString(arg.getModifiers))
-            val rettype = arg.getReturnType
-            println("Return type: " + rettype)
-            println("Return type name: " + rettype.getName)
-            val rettype2 = arg.getGenericReturnType
-            println("Generic return type: " + rettype2)
-            println("Is bridge: " + arg.isBridge)
-            println("Is synthetic: " + arg.isSynthetic)
-            println("Is var args: " + arg.isVarArgs)
-            println("Is var args: " + arg.isVarArgs)
-            // Doesn't work: println(rettype2.getName)
-          }
-          /* Skip defs with the wrong number of arguments, as well as
-             static defs.  There might, for example, be a static no-
-             argument initialization function. */
-          (arg.getParameterTypes.length == 0 &&
-           !Modifier.isStatic(arg.getModifiers))
-          // && arg.getReturnType.isAssignableFrom(classOf[OptionAny[_]]))
-        }
-      } {
-        def constructNoNoMess(mess: String) = {
-          "%s.  You probably declared a var, val or no-argument def inside the structure with the option defs.  If you really want a var or val, you can allow this by setting 'allow_other_fields_in_obj' to true when calling parse().  DO NOT INCLUDE ANY NO-ARGUMENT DEFS, especially if they have side effects; you'll be sorry.  Field/method name is '%s', of full declaration as follows: %s" format (mess, arg.getName, arg)
-        }
-        var threw = false
-        try {
-          /* Invoke each option through reflection.  This should throw an
-             OptParseFirstTimeException.  When a call to invoke() throws
-             an exception, we see this as an InvocationTargetException that
-             wraps the actual exception thrown. */
-          arg.invoke(obj)
-        } catch {
-          case wrapped_e:InvocationTargetException => {
-            wrapped_e.getCause match {
-              case e:OptParseFirstTimeException => threw = true
-              /* The code invoked returned a weird exception.  That can
-                 happen if the user has some other functions or whatever
-                 in the argholder object other than an option def, and they
-                 throw an exception. */
-              case e@_ => throw new OptParseException(constructNoNoMess(
-                "Invalid exception during initialization"), e)
+      assert(!parsed)
+      if (reflection_style) {
+        if (argmap.size > 0)
+          System.err.println("WARNING: Arguments initialized already, but we're using reflection to initialize the arguments.  If you didn't do this on purpose, you might be defining your argument fields with 'var' or 'val' instead of 'def'.")
+
+        val objargs = obj.getClass.getDeclaredMethods
+        // Call each null-argument function, assumed to be an option.  The
+        // first time such functions are called, they will install the
+        // appropriate OptionAny-subclass object in 
+        for {
+          arg <- objargs
+          if {
+            val (partial, full) =
+              if (debug_opts == "partial") (true, false)
+              else if (debug_opts == "full") (true, true)
+              else (false, false)
+            if (partial) {
+              println("Argument: " + arg)
+              println("Argument name: " + arg.getName)
             }
+            if (full) {
+              println("Argument toGenericString(): " + arg.toGenericString)
+              println("Argument parameter types: " + arg.getParameterTypes)
+              println("Number of parameter types: " +
+                arg.getParameterTypes.length)
+              println("Modifiers: " + Modifier.toString(arg.getModifiers))
+              val rettype = arg.getReturnType
+              println("Return type: " + rettype)
+              println("Return type name: " + rettype.getName)
+              val rettype2 = arg.getGenericReturnType
+              println("Generic return type: " + rettype2)
+              println("Is bridge: " + arg.isBridge)
+              println("Is synthetic: " + arg.isSynthetic)
+              println("Is var args: " + arg.isVarArgs)
+              println("Is var args: " + arg.isVarArgs)
+              // Doesn't work: println(rettype2.getName)
+            }
+            /* Skip defs with the wrong number of arguments, as well as
+               static defs.  There might, for example, be a static no-
+               argument initialization function. */
+            (arg.getParameterTypes.length == 0 &&
+             !Modifier.isStatic(arg.getModifiers))
+            // && arg.getReturnType.isAssignableFrom(classOf[OptionAny[_]]))
           }
-          /* The call to invoke() itself returned some weird exception.
-             That means something is well and truly wrong with the code in
-             this module. */
-          case e@_ => throw new OptParseException(
-            "Unexpected exception during reflection invocation; internal error",
-            e)
+        } {
+          def constructNoNoMess(mess: String) = {
+            "%s.  You probably declared a var, val or no-argument def inside the structure with the option defs.  If you really want a var or val, you can allow this by setting 'allow_other_fields_in_obj' to true when calling parse().  DO NOT INCLUDE ANY NO-ARGUMENT DEFS, especially if they have side effects; you'll be sorry.  Field/method name is '%s', of full declaration as follows: %s" format (mess, arg.getName, arg)
+          }
+          var threw = false
+          try {
+            /* Invoke each option through reflection.  This should throw an
+               OptParseFirstTimeException.  When a call to invoke() throws
+               an exception, we see this as an InvocationTargetException that
+               wraps the actual exception thrown. */
+            arg.invoke(obj)
+          } catch {
+            case wrapped_e:InvocationTargetException => {
+              wrapped_e.getCause match {
+                case e:OptParseFirstTimeException => threw = true
+                /* The code invoked returned a weird exception.  That can
+                   happen if the user has some other functions or whatever
+                   in the argholder object other than an option def, and they
+                   throw an exception. */
+                /* SCALABUG: If this throws 'new OptParseException', it
+                   compiles and works with 'e' (rather than 'Some(e)') as
+                   second argument, but if it throws
+                   'new OptParseCodingError', it gives an error,
+                   even though both have exactly the same signature! 
+                 */
+                case e@_ => throw new OptParseCodingError(constructNoNoMess(
+                  "Invalid exception during initialization"), Some(e))
+              }
+            }
+            /* The call to invoke() itself returned some weird exception.
+               That means something is well and truly wrong with the code in
+               this module. */
+            /* SCALABUG: Identical problem to that described just above. */
+            case e@_ => throw new OptParseInternalError(
+              "Unexpected exception during reflection invocation",
+              Some(e))
+          }
+          if (!threw && !allow_other_fields_in_obj) {
+            /* No exception; definitely not an option def. */
+            throw new OptParseCodingError(constructNoNoMess(
+              "Encountered a no-argument function that was not an option"))
+          }
         }
-        if (!threw && !allow_other_fields_in_obj) {
-          /* No exception; definitely not an option def. */
-          throw new OptParseException(constructNoNoMess(
-            "Encountered a no-argument function that was not an option"))
-        }
+      } else {
+        if (argmap.size == 0)
+          throw new OptParseCodingError("No arguments initialized.  We are not using reflection to initialize arguments; maybe you need to set 'reflection_style' to true?  If not, and you thought you specified arguments, you might have defined the corresponding fields with 'def' instead of 'var' or 'val'.")
       }
        
       // println(argmap)
       op.parse(args.toList)
+      parsed = true
     }
 
     def error(msg: String) {
@@ -730,7 +876,7 @@ object OptParse {
     }
 
     def checkArgsAvailable() {
-      assert(argholder != null,
+      assert(parsed,
       "Need to call 'parse()' first so that the arguments are known " +
       "(they are fetched from the first argument to 'parse()')")
     }
@@ -749,7 +895,7 @@ object OptParse {
 
 object TestOpts extends App {
   import OptParse._
-  val op = new OptionParser("test")
+  val op = new OptionParser("test", reflection_style = true)
   object Opts {
     /* An integer option named --foo, with a default value of 5.  Can also
        be specified using --spam or -f. */
@@ -782,6 +928,50 @@ object TestOpts extends App {
     /* A multi-positional parameter that sucks up all remaining arguments. */
     def files = op.multiParameter[String]("FILES", help = "Files to process")
   }
+  // op.parse(Opts, List("--foo", "7"))
+  op.parse(args, Opts)
+  /* Print out values of all parameters, whether options or positional */
+  for ((name, value) <- op.argNameValues)
+    println("%30s: %s" format (name, value))
+}
+
+object TestOpts2 extends App {
+  import OptParse._
+  val op = new OptionParser("test", reflection_style = false)
+  class MyOpts(op: OptionParser) {
+    /* An integer option named --foo, with a default value of 5.  Can also
+       be specified using --spam or -f. */
+    var foo = op.option[Int]("foo", "spam", "f", default = 5)
+    /* A string option named --bar, with a default value of "chinga".  Can
+       also be specified using -b. */
+    var bar = op.option[String]("bar", "b", default = "chinga")
+    /* A string option named --baz.  Default value is null. */
+    var baz = op.multiOption[String]("baz")
+    /* A floating-point option named --bat.  Default value is 0.0. */
+    var bat = op.multiOption[Double]("bat")
+    /* A flag --bezzaaf, alias -q.  Value is true if given, false if not. */
+    var bezzaaf = op.flag("bezzaaf", "q")
+    /* An integer option --blop, with only the values 1, 2, 4 or 7 are allowed.
+       Default is 2. (Note, in this case, if the default is not given, it
+       will end up as 0, even though this isn't technically a valid choice.
+       This allows detection of when no choice is given.)
+     */
+    var blop = op.option[Int]("blop", default = 1, choices = Seq(1, 2, 4, 7))
+    /* A string option --daniel, with only the values "mene", "tekel", and
+       "upharsin" allowed, but where values can be repeated, e.g.
+       --daniel mene --daniel mene --daniel tekel --daniel upharsin
+       . */
+    var daniel = op.multiOption[String]("daniel",
+      choices = Seq("mene", "tekel", "upharsin"))
+    /* FIXME: Order of retrieval during reflection may not be the same as
+       order of specification here. */
+    /* A required positional parameter. */
+    // def destfile = op.parameter[String]("DESTFILE", help = "Destination file to store output in")
+    /* A multi-positional parameter that sucks up all remaining arguments. */
+    var files = op.multiParameter[String]("FILES", help = "Files to process")
+  }
+  val first_shadow = new MyOpts(op)
+  val Opts = new MyOpts(op)
   // op.parse(Opts, List("--foo", "7"))
   op.parse(args, Opts)
   /* Print out values of all parameters, whether options or positional */
