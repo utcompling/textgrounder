@@ -20,8 +20,13 @@ import twitter, sys
 from operator import itemgetter
 import codecs
 import time
+import argparse
 
+#===============================================================================
+# Globals
+#===============================================================================
 api = None
+args = None
 
 #===============================================================================
 # Book Keeping
@@ -42,10 +47,9 @@ outFriendsTweets = None
 #===============================================================================
 # Parameters
 #===============================================================================
-# Minimum number of followers/followers the target user must have before we process their graphs
+# Minimum number of followers the target user must have before we process their graphs
 # Number must be at least 1 to be processed
-minNumFollowers = -1
-minNumFriends = 1
+minNumFollowers = 30
 
 # Minimum number of tweets the follower/friend must have
 minNumTweets = 30
@@ -53,8 +57,8 @@ minNumTweets = 30
 # Maximum number of followers the target user has (celebs...) 
 maxNumFollowers = 1000
 
-# Number of followers to extract
-numFollowersToProcess = 20
+# Number of users to extract
+numUsersToProcess = 20
 
 # Number of tweets to extract for follower/friend (max = 200)
 numTweetsPerTimeline = 200
@@ -99,7 +103,7 @@ def checkApiLimit():
     if api == None:
         return
 
-    minRequiredHits = numFollowersToProcess - 2
+    minRequiredHits = numUsersToProcess - 2
 
     if api.GetRateLimitStatus()[u'remaining_hits'] - minRequiredHits < 0:
         limit_sleep = round(api.GetRateLimitStatus()[u'reset_time_in_seconds'] - time.time() + 5)
@@ -116,6 +120,11 @@ def getTweets(user):
     print ("\tRetrieving Timeline for User: " +
            str(user.GetId()) + "/" + user.GetName() +
            "\tNumTweets: " + str(user.GetStatusesCount()))
+
+    if user.GetId() in processedOthers:
+        print "\t\tAlready Extracted tweets, so skipping..."
+        return "SKIP"
+
     attempts = 0
     maxAttempts = 3
 
@@ -123,7 +132,7 @@ def getTweets(user):
         try:
             attempts += 1
             tweets = api.GetUserTimeline(id = user.GetId(), count = numTweetsPerTimeline)
-            print "\t\tSuccesffuly Extracted %d tweets" % len(tweets)
+            print "\t\tSuccessfully Extracted %d tweets" % len(tweets)
             failGetTweets = 0
 
             return tweets
@@ -174,6 +183,7 @@ def outputGraphsAndTweets(user, fGraph, outGraph, outTweet):
                             "\n")
 
         for tweet in other[2]:
+
             geo = tweet.GetLocation()
 
             if geo == None or geo == '':
@@ -242,16 +252,17 @@ def relationshipGraph(user, gType):
             time.sleep(apiCallDelaySeconds)
 
             other = others[i]
+            tweets = getTweets(other)
+            processedOthers.add(other.GetId())
 
-            if not other.GetId() in processedOthers:
-                tweets = getTweets(other)
-                processedOthers.add(other.GetId())
+            if tweets == "SKIP":
+                fg += [(str(other.GetId()), other.GetName(), [])]
+                count += 1
+            elif not tweets == []:
+                fg += [(str(other.GetId()), other.GetName(), tweets)]
+                count += 1
 
-                if not tweets == []:
-                    fg += [(str(other.GetId()), other.GetName(), tweets)]
-                    count += 1
-
-            if count >= numFollowersToProcess:
+            if count >= numUsersToProcess:
                 break
     else:
         print "\tSkipping User because of too few or many followers (%d)." % user.GetFollowersCount()
@@ -267,11 +278,11 @@ def processUser(userID):
     try:
         user = api.GetUser(userID)
 
-        if minNumFollowers >= 1:
+        if args.f:
             followers = relationshipGraph(user, 'followers')
             outputGraphsAndTweets(user, followers, outFollowersGraph, outFollowersTweets)
 
-        if minNumFriends >= 1:
+        if args.g:
             friends = relationshipGraph(user, 'friends')
             outputGraphsAndTweets(user, friends, outFriendsGraph, outFriendsTweets)
 
@@ -327,28 +338,119 @@ def processUsers(users_file):
     fin.close()
 
 def main():
-    global outFollowersGraph, outUnprocessedUsers, outFollowersTweets, outFriendsGraph, outFriendsTweets
+    parser = argparse.ArgumentParser(description = 'Build Twitter Relation Graphs.')
+    setup = parser.add_argument_group('Script Setup')
+    graphs = parser.add_mutually_exclusive_group(required = True)
+    params = parser.add_argument_group('Script Parameters (Optional)')
 
-    if len(sys.argv) < 7:
-        print "Params: <authen-keys> <users> <followers output file>"
-        sys.exit()
+    setup.add_argument('-k',
+                        action = "store",
+                        help = 'Authentication Keys Input File',
+                        metavar = 'FILE',
+                        required = True)
+    setup.add_argument('-u',
+                        action = "store",
+                        help = 'Users Input File',
+                        metavar = 'FILE',
+                        required = True)
+    graphs.add_argument('-f',
+                        action = "store",
+                        metavar = 'FILE',
+                        help = 'Graph File, Tweets File',
+                        nargs = 2)
+    graphs.add_argument('-g',
+                        action = "store",
+                        metavar = 'FILE',
+                        help = 'Graph File, Tweets File',
+                        nargs = 2)
+    #Parameters
+    params.add_argument('-minNumFollowers',
+                        action = "store",
+                        help = 'Minimum number of followers the target user must have before we process their graphs. Default %(default)s',
+                        metavar = 'INT',
+                        type = int,
+                        default = 50)
+    params.add_argument('-minNumTweets',
+                        action = "store",
+                        help = 'Minimum number of tweets the follower/friend must have. Default %(default)s',
+                        metavar = 'INT',
+                        type = int,
+                        default = 30,)
+    params.add_argument('-maxNumFollowers',
+                        action = "store",
+                        help = 'Maximum number of followers the target user has. Default %(default)s',
+                        metavar = 'INT',
+                        type = int,
+                        default = 1000)
+    params.add_argument('-numUsersToProcess',
+                       action = "store",
+                       help = 'Number of followers/friends to extract for a user. Default %(default)s',
+                       metavar = 'INT',
+                       type = int,
+                       default = 20)
+    params.add_argument('-numTweetsPerTimeline',
+                       action = "store",
+                       help = 'Number of tweets to extract for follower/friend (max = 200). Default %(default)s',
+                       metavar = 'INT',
+                       type = int,
+                       default = 200)
+    params.add_argument('-apiCallDelaySeconds',
+                       action = "store",
+                       help = 'Twitter API Call delay between GetTimeline calls. Default %(default)s',
+                       metavar = 'INT',
+                       type = int,
+                       default = 1)
+    params.add_argument('-maxNumFailures',
+                       action = "store",
+                       help = 'Max number continuous of failures before we apiCallDelaySeconds. Default %(default)s',
+                       metavar = 'INT',
+                       type = int,
+                       default = 3)
+    params.add_argument('-failDelaySeconds',
+                       action = "store",
+                       help = 'Twitter API Call delay after maxNumFailures. Default %(default)s',
+                       metavar = 'INT',
+                       type = int,
+                       default = 7)
+    global args
+    args = parser.parse_args()
+
 
     #Parse Key File
-    fin = open(sys.argv[1], 'r')
+    fin = open(args.k, 'r')
     keys = fin.readlines()
     fin.close()
-    if not authenticate(keys[0].strip(), keys[1].strip(), keys[2].strip(),
-                    keys[3].strip()):
+    if not authenticate(keys[0].strip(),
+                        keys[1].strip(),
+                        keys[2].strip(),
+                        keys[3].strip()):
         sys.exit()
 
     #Create output files
-    outFollowersGraph = codecs.open(sys.argv[3], encoding = 'utf-8', mode = 'w')
-    outFollowersTweets = codecs.open(sys.argv[4], encoding = 'utf-8', mode = 'w')
-    outFriendsGraph = codecs.open(sys.argv[5], encoding = 'utf-8', mode = 'w')
-    outFriendsTweets = codecs.open(sys.argv[6], encoding = 'utf-8', mode = 'w')
+    if args.f:
+        global outFollowersGraph, outFollowersTweets
+        outFollowersGraph = codecs.open(args.f[0], encoding = 'utf-8', mode = 'w')
+        outFollowersTweets = codecs.open(args.f[1], encoding = 'utf-8', mode = 'w')
+
+    if args.g:
+        global outFriendsGraph, outFriendsTweets
+        outFriendsGraph = codecs.open(args.g[0], encoding = 'utf-8', mode = 'w')
+        outFriendsTweets = codecs.open(args.g[1], encoding = 'utf-8', mode = 'w')
+
+    #Set Parameters
+    global minNumTweets, minNumFollowers, maxNumFollowers, numUsersToProcess, numTweetsPerTimeline
+    global apiCallDelaySeconds, maxNumFailures, failDelaySeconds
+    minNumTweets = args.minNumTweets
+    minNumFollowers = max(1, args.minNumFollowers)
+    maxNumFollowers = args.maxNumFollowers
+    numUsersToProcess = args.numUsersToProcess
+    numTweetsPerTimeline = min(200, args.numTweetsPerTimeline)
+    apiCallDelaySeconds = args.apiCallDelaySeconds
+    maxNumFailures = args.maxNumFailures
+    failDelaySeconds = args.failDelaySeconds
 
     #Process Users
-    processUsers(sys.argv[2])
+    processUsers(args.u)
 
     #Cleanup
     cleanup()
