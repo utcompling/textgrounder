@@ -442,7 +442,6 @@ package object tgutil {
   // delimiters.  Return a list of tuples (TEXT, DELIM).  The last tuple
   // with have an empty delim.
   def re_split_with_delimiter(regex: util.matching.Regex, text: String) = {
-    val splits = regex.split(text)
     val delim_intervals =
       for (m <- regex.findAllIn(text).matchData) yield List(m.start, m.end)
     val flattened = List(0) ++ (delim_intervals reduce (_ ++ _)) ++
