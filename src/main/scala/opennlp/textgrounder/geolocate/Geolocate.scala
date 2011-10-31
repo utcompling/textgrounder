@@ -2359,34 +2359,6 @@ class GeolocateParameters(parser: ArgParser = null) {
   protected val ap =
     if (parser == null) new ArgParser("unknown") else parser
 
-  //// Basic options for determining operating mode and strategy
-  var mode =
-    ap.option[String]("m", "mode",
-      default = "geotag-documents",
-      choices = Seq("geotag-toponyms",
-        "geotag-documents",
-        "generate-kml",
-        "segment-geotag-documents"),
-      help = """Action to perform.
-
-'geotag-documents' finds the proper location for each document (or article)
-in the test set.
-
-'geotag-toponyms' finds the proper location for each toponym in the test set.
-The test set is specified by --eval-file.  Default '%default'.
-
-'segment-geotag-documents' simultaneously segments a document into sections
-covering a specific location and determines that location. (Not yet
-implemented.)
-
-'generate-kml' generates KML files for some set of words, showing the
-distribution over cells that the word determines.  Use '--kml-words' to
-specify the words whose distributions should be outputted.  See also
-'--kml-prefix' to specify the prefix of the files outputted, and
-'--kml-transform' to specify the function to use (if any) to transform
-the probabilities to make the distinctions among them more visible.
-""")
-
   //// Input files
   var stopwords_file =
     ap.option[String]("stopwords-file",
@@ -2428,7 +2400,7 @@ Each file is read in and then disambiguation is performed.  Not used when
 
   //// Options indicating which documents to train on or evaluate
   var eval_set =
-    ap.option[String]("eval-set", "es",
+    ap.option[String]("eval-set", "es", metavar = "SET",
       default = "dev",
       choices = Seq("dev", "test"),
       canonicalize = Map("dev" -> Seq("devel")),
@@ -2436,19 +2408,23 @@ Each file is read in and then disambiguation is performed.  Not used when
 and --mode=geotag-documents ('dev' or 'devel' for the development set,
 'test' for the test set).  Default '%default'.""")
   var num_training_docs =
-    ap.option[Int]("num-training-docs", "ntrain", default = 0,
+    ap.option[Int]("num-training-docs", "ntrain", metavar = "NUM",
+      default = 0,
       help = """Maximum number of training documents to use.
 0 means no limit.  Default 0, i.e. no limit.""")
   var num_test_docs =
-    ap.option[Int]("num-test-docs", "ntest", default = 0,
+    ap.option[Int]("num-test-docs", "ntest", metavar = "NUM",
+      default = 0,
       help = """Maximum number of test (evaluation) documents to process.
 0 means no limit.  Default 0, i.e. no limit.""")
   var skip_initial_test_docs =
-    ap.option[Int]("skip-initial-test-docs", "skip-initial", default = 0,
+    ap.option[Int]("skip-initial-test-docs", "skip-initial", metavar = "NUM",
+      default = 0,
       help = """Skip this many test docs at beginning.  Default 0, i.e.
 don't skip any documents.""")
   var every_nth_test_doc =
-    ap.option[Int]("every-nth-test-doc", "every-nth", default = 1,
+    ap.option[Int]("every-nth-test-doc", "every-nth", metavar = "NUM",
+      default = 1,
       help = """Only process every Nth test doc.  Default 1, i.e.
 process all.""")
   //  def skip_every_n_test_docs =
@@ -2457,24 +2433,24 @@ process all.""")
 
   //// Options indicating how to generate the cells we compare against
   var degrees_per_cell =
-    ap.option[Double]("degrees-per-cell", "dpc",
+    ap.option[Double]("degrees-per-cell", "dpc", metavar="DEGREES",
       default = 1.0,
       help = """Size (in degrees, a floating-point number) of the tiling
 cells that cover the Earth.  Default %default. """)
   var miles_per_cell =
-    ap.option[Double]("miles-per-cell", "mpc",
+    ap.option[Double]("miles-per-cell", "mpc", metavar="MILES",
       help = """Size (in miles, a floating-point number) of the tiling
 cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
   var km_per_cell =
-    ap.option[Double]("km-per-cell", "kpc",
+    ap.option[Double]("km-per-cell", "kpc", metavar="KM",
       help = """Size (in kilometers, a floating-point number) of the tiling
 cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
   var width_of_multi_cell =
-    ap.option[Int]("width-of-multi-cell", default = 1,
+    ap.option[Int]("width-of-multi-cell", metavar="CELLS", default = 1,
       help = """Width of the cell used to compute a statistical
 distribution for geotagging purposes, in terms of number of tiling cells.
 NOTE: It's unlikely you want to change this.  It may be removed entirely in
@@ -2494,14 +2470,14 @@ are always matched case-insensitively.""")
     ap.flag("include-stopwords-in-article-dists",
       help = """Include stopwords when computing word distributions.""")
   var minimum_word_count =
-    ap.option[Int]("minimum-word-count", "mwc",
+    ap.option[Int]("minimum-word-count", "mwc", metavar = "NUM",
       default = 1,
       help = """Minimum count of words to consider in word
 distributions.  Words whose count is less than this value are ignored.""")
 
   //// Options used when doing Naive Bayes geotagging
   var naive_bayes_weighting =
-    ap.option[String]("naive-bayes-weighting", "nbw",
+    ap.option[String]("naive-bayes-weighting", "nbw", metavar = "STRATEGY",
       default = "equal",
       choices = Seq("equal", "equal-words", "distance-weighted"),
       help = """Strategy for weighting the different probabilities
@@ -2521,13 +2497,15 @@ probability) when doing weighted Naive Bayes.  Default %default.""")
 
   //// Options used when doing ACP geotagging
   var lru_cache_size =
-    ap.option[Int]("lru-cache-size", "lru", default = 400,
+    ap.option[Int]("lru-cache-size", "lru", metavar = "SIZE",
+      default = 400,
       help = """Number of entries in the LRU cache.  Default %default.
 Used only when --strategy=average-cell-probability.""")
 
   //// Debugging/output options
   var max_time_per_stage =
-    ap.option[Double]("max-time-per-stage", "mts", default = 0.0,
+    ap.option[Double]("max-time-per-stage", "mts", metavar = "SECONDS",
+      default = 0.0,
       help = """Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default 0, i.e. no limit.""")
   var no_individual_results =
