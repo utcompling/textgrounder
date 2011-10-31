@@ -198,4 +198,16 @@ object Distances {
       abs(lon1 - lon2)
   }
 
+  /**
+   * Average two longitudes.  This is a bit tricky because of the way
+   * they wrap around.
+   */
+  def average_longitudes(long1: Double, long2: Double): Double = {
+    if (long1 - long2 > 180.)
+      average_longitudes(long1 - 360., long2)
+    else if (long2 - long1 > 180.)
+      average_longitudes(long1, long2 - 360.)
+    else
+      (long1 + long2) / 2.0
+  }
 }
