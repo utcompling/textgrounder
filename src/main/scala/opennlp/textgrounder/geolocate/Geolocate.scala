@@ -24,10 +24,10 @@ package opennlp.textgrounder.geolocate
 import tgutil._
 import WordDist.memoizer._
 import WordDist.SmoothedWordDist
-import OptParse._
+import argparser._
 import Distances._
 import Debug._
-import GeolocateDriver.Opts
+import GeolocateDriver.Args
 
 import util.matching.Regex
 import util.Random
@@ -60,7 +60,7 @@ Technologies, Portland, Oregon, USA, June 2011.
 
 (See http://www.jasonbaldridge.com/papers/wing-baldridge-acl2011.pdf.)
 
-It operates in four basic modes (specified by --mode):
+There are three main apps, each of which does a different task:
 
 1. Document geolocation.  This identifies the location of a document.
    Training comes from "articles", which currently are described simply
@@ -88,11 +88,11 @@ It operates in four basic modes (specified by --mode):
    then outputs KML files for given words showing the distribution of
    the words across the Earth.
 
-4. Simultaneous segmentation and geolocation.  This assumes that a
-   document is composed of segments of unknown size, each of which
-   refers to a different location, and simultaneously finds the
-   best segmentation and best location of each segment. (NOT YET
-   implemented.)
+A fourth, not-yet-written app is for simultaneous segmentation and
+geolocation.  This assumes that a document is composed of segments of
+unknown size, each of which refers to a different location, and
+simultaneously finds the best segmentation and best location of each
+segment.
 
 === Obtaining the Data ===
 
@@ -107,7 +107,7 @@ There are three sets of data to download:
     you need.
   * Auxiliary files, in `wikigrounder-aux-1.0.tar.bz2`. NOTE: Currently the
     only auxiliary file you need is the World Gazetteer, and that is needed
-    only when doing toponym resolution (--mode=geotag-toponyms).
+    only when doing toponym resolution.
   * The processed Twitter data, in `wikigrounder-twitter-1.0.tar.bz2`.
 
 Untar these files somewhere.  Then set the following environment variables:
@@ -115,44 +115,81 @@ Untar these files somewhere.  Then set the following environment variables:
   * `TG_TWITTER_DIR` points to the directory containing the Twitter data.
   * `TG_AUX_DIR` points to the directory containing the auxiliary data.
 
+(Alternatively, if you are running on a UT NLP machine, or a machine with
+a copy of the relevant portions of /groups/corpora and /groups/projects in
+the same places, set TG_ON_COMP_LING_MACHINES and it will initialize those
+three for you.)
+
 The Wikipedia data was generated from [http://download.wikimedia.org/enwiki/20100904/enwiki-20100904-pages-articles.xml.bz2 the original English-language Wikipedia dump of September 4, 2010].
 
 The Twitter data was generated from [http://www.ark.cs.cmu.edu/GeoText/ The Geo-tagged Microblog corpus] created by [http://aclweb.org/anthology-new/D/D10/D10-1124.pdf Eisenstein et al (2010)].
 
 === Replicating the experiments ===
 
-The code in Geolocate.scala does the actual geolocating.  It can be invoked
-directly using 'textgrounder geolocate', but the normal route is to go through
-a front-end script.  The following is a list of the front-end scripts available:
-  * `tg-geolocate` is the most basic script, which reads parameters from the
-    script `config-geolocate` (which in turn can read from a script
-    `local-config-geolocate` that you create in the TextGrounder bin/
-    directory, if you want to add local configuration info; see the
-    `sample.local-config-geolocate` file in bin/ for an example).  This
-    takes care of specifying the auxiliary data files (see above).
-  * `geolocate-wikipedia` is a similar script, but specifically runs on
-    the downloaded Wikipedia data.
-  * `geolocate-twitter` is a similar script, but specifically runs on the
-    downloaded Twitter data.
-  * `geolocate-twitter-wiki` is a similar script, but runs on the combination
-    of the downloaded Wikipedia and Twitter data. (FIXME: This isn't the
-    right way to combine the two types of data.)
-  * `nohup-tg-geolocate` is a higher-level front-end to `tg-geolocate`,
-    which runs `tg-geolocate` using `nohup` (so that a long-running
-    experiment will not get terminated if your shell session ends), and
-    saves the output to a file.  The output file is named in such a way
-    that it contains the current date and time, as well as any optional ID
-    specified using the `-i` or `--id` argument.  It will refuse to
-    overwrite an existing file.
-  * `nohup-geolocate-wikipedia` is the same, but calls `geolocate-wikipedia`.
-  * `nohup-geolocate-twitter` is the same, but calls `geolocate-twitter`.
-  * `nohup-geolocate-twitter-wiki` is the same, but calls
-    `geolocate-twitter-wiki`.
+The code in Geolocate.scala does the actual geolocating.  Although these
+are written in Java and can conceivably be run directly using `java`,
+in practice it's much more convenient using either the `textgrounder`
+driver script or some other even higher-level front-end script.
+`textgrounder` sets up the paths correctly so that all libraries, etc.
+will be found, and takes an application to run, knowing how to map that
+application to the actual class that implements the application.  Each
+application typically takes various command-line arguments, and
+`textgrounder` itself also takes various command-line options (given
+*before* the application name), which mostly control operation of the
+JVM.
+
+In this case, document geotagging can be invoked directly with `textgrounder`
+using `textgrounder geolocate-document`, but the normal route is to
+go through a front-end script.  The following is a list of the front-end
+scripts available:
+  * `tg-geolocate` is the script you probably want to use.  It takes a
+
+    CORPUS parameter to specify which corpus you want to act on (currently
+    recognized: `wikipedia`, `twitter`, and `twitter-wiki`, which is a
+    combination of both corpora).  This sets up additional arguments to
+    specify the data files for the corpus/corpora to be loaded/evaluated.
+    The application to run is specified by the `--app` option; if omitted,
+    it defaults to `geolocate-document` (other possibilities are
+    `generate-kml` and `geolocate-toponym`).  For the Twitter corpora,
+    an additional option `--doc-thresh NUM` can be used to specify the
+    threshold, i.e. minimum number of documents that a vocabulary item
+    must be seen in; uncommon vocabulary before that is ignored (or
+    rather, converted to an OOV token).  Additional arguments to both
+    the app and `textgrounder` itself can be given.  Configuration values
+    (e.g. indicating where to find Wikipedia and Twitter, given the above
+    environment variables) are read from `config-geolocate` in the
+    TextGrounder `bin` directory; additional site-specific configuration
+    will be read from `local-config-geolocate`, if you create that file
+    in the `bin` directory.  There's a `sample.local-config-geolocate`
+    file in the directory giving a sample local config file.
+
+  * `tg-generate-kml` is exactly the same as `tg-geolocate --app generate-kml`
+    but easier to type.
+  * `geolocate-toponym` is almost exactly the same as
+    `tg-geolocate --app geolocate-toponym`, but also specifies a gazetteer
+    file as an extra argument.  You still need to supply a value for
+    `--eval-file` and `--eval-type`.
+  * `geolocate-toponym-tr-conll` is almost exactly the same as
+    `geolocate-toponym`, but also specifies arguments to evaluate on the
+    PCL-CoNLL corpus.
+  * `run-nohup` is a script for wrapping other scripts.  The other script
+    is run using `nohup`, so that a long-running experiment will not get
+    terminated if your shell session ends.  In addition, starting times
+    and arguments, along with all output, are logged to a file with a
+    unique, not-currently existing name, where the name incorporates the
+    name of the underlying script run, the current time and date, an
+    optional ID string (specified using the `-i` or `--id` argument),
+    and possibly an additional number needed to ensure that the file is
+    unique -- it will refuse to overwrite an existing file.  This ID is
+    useful for identifying different experiments using the same script.
+    The experiment runner `run-geolocate-exper.py`, which allows iterating
+    over different parameter settings, generates an ID based on the
+    current parameter settings.
   * `python/run-geolocate-exper.py` is a framework for running a series of
     experiments on similar arguments.  It was used extensively in running
     the experiments for the paper.
 
-You can invoke `geolocate-wikipedia` with no parameters, and it will do
+You can invoke `tg-geolocate wikipedia` with no options, and it will do
 something reasonable: It will attempt to geolocate the entire dev set of
 the Wikipedia corpus, using KL divergence as a strategy, with a grid size
 of 1 degrees.  Options you may find useful (which also apply to
@@ -336,20 +373,21 @@ be problematic).
 
 === Generating KML files ===
 
-It is possible to use `textgrounder geolocate` to generate KML files
-showing the distribution of particular words over the Earth's surface,
-which can be viewed using [http://earth.google.com Google Earth].  The
-basic argument to invoke this is `--mode=generate-kml`.  `--kml-words`
-is a comma-separated list of the words to generate distributions for.
-Each word is saved in a file named by appending the word to whatever is
-specified using `--kml-prefix`.  Another argument is `--kml-transform`,
-which is used to specify a function to apply to transform the probabilities
-in order to make the distinctions among them more visible.  It can be
-one of `none`, `log` and `logsquared` (actually computes the negative
-of the squared log).  The argument `--kml-max-height` can be used to
-specify the heights of the bars in the graph.  It is also possible to
-specify the colors of the bars in the graph by modifying constants given
-in `Geolocate.scala`, near the beginning (`object KMLConstants`).
+It is possible to generate KML files showing the distribution of particular
+words over the Earth's surface, using `tg-generate-kml` (e.g.
+`tg-generate-kml wikipedia --kml-words mountain,beach,war`).  The resulting
+KML files can be viewed using [http://earth.google.com Google Earth].
+The only necessary arg is `--kml-words`, a comma-separated list
+of the words to generate distributions for.  Each word is saved in a
+file named by appending the word to whatever is specified using
+`--kml-prefix`.  Another argument is `--kml-transform`, which is used
+to specify a function to apply to transform the probabilities in order
+to make the distinctions among them more visible.  It can be one of
+`none`, `log` and `logsquared` (actually computes the negative of the
+squared log).  The argument `--kml-max-height` can be used to specify
+the heights of the bars in the graph.  It is also possible to specify
+the colors of the bars in the graph by modifying constants given in
+`Geolocate.scala`, near the beginning (`class KMLParameters`).
 
 For example: For the Twitter corpus, running on different levels of the
 document threshold for discarding words, and for the four words "cool",
@@ -450,10 +488,15 @@ FIXME: Document more.
 //    }
 //  }
 
-object KMLConstants {
+class KMLParameters {
   // Minimum and maximum colors
+  // FIXME: Allow these to be specified by command-line options
   val kml_mincolor = Array(255.0, 255.0, 0.0) // yellow
   val kml_maxcolor = Array(255.0, 0.0, 0.0) // red
+
+  var kml_max_height: Double = _
+
+  var kml_transform: String = _
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -521,7 +564,7 @@ class CellWordDist extends SmoothedWordDist(
        training set. */
     if (art.split == "training") {
       if (art.dist == null) {
-        if (Opts.max_time_per_stage == 0.0 && Opts.num_training_docs == 0)
+        if (Args.max_time_per_stage == 0.0 && Args.num_training_docs == 0)
           warning("Saw article %s without distribution", art)
       } else {
         assert(art.dist.finished)
@@ -606,18 +649,18 @@ class WordCellDist(
   init()
 
   // Convert cell to a KML file showing the distribution
-  def generate_kml_file(filename: String) {
-    val xform = if (Opts.kml_transform == "log") (x: Double) => log(x)
-    else if (Opts.kml_transform == "logsquared") (x: Double) => -log(x) * log(x)
+  def generate_kml_file(filename: String, params: KMLParameters) {
+    val xform = if (params.kml_transform == "log") (x: Double) => log(x)
+    else if (params.kml_transform == "logsquared") (x: Double) => -log(x) * log(x)
     else (x: Double) => x
 
     val xf_minprob = xform(cellprobs.values min)
     val xf_maxprob = xform(cellprobs.values max)
 
-    def yield_cell_kml() {
+    def yield_cell_kml() = {
       for {
         (cell, prob) <- cellprobs
-        kml <- cell.generate_kml(xform(prob), xf_minprob, xf_maxprob)
+        kml <- cell.generate_kml(xform(prob), xf_minprob, xf_maxprob, params)
         expr <- kml
       } yield expr
     }
@@ -670,7 +713,7 @@ object CellDist {
   // cache to optimize access.
   def get_cell_dist(cellgrid: CellGrid, word: Word) = {
     if (cached_dists == null)
-      cached_dists = new LRUCache(maxsize = Opts.lru_cache_size)
+      cached_dists = new LRUCache(maxsize = Args.lru_cache_size)
     cached_dists.get(word) match {
       case Some(dist) => dist
       case None => {
@@ -747,7 +790,8 @@ abstract class GeoCell(val cellgrid: CellGrid) {
   /**
    * Generate KML for a single cell.
    */
-  def generate_kml(xfprob: Double, xf_minprob: Double, xf_maxprob: Double): Iterable[xml.Elem]
+  def generate_kml(xfprob: Double, xf_minprob: Double, xf_maxprob: Double,
+    params: KMLParameters): Iterable[xml.Elem]
 
   /**
    * Return a string representation of the cell.  Generally does not need
@@ -813,7 +857,7 @@ abstract class GeoCell(val cellgrid: CellGrid) {
         most_popular_article = art
       }
     }
-    worddist.finish(minimum_word_count = Opts.minimum_word_count)
+    worddist.finish(minimum_word_count = Args.minimum_word_count)
   }
 }
 
@@ -839,7 +883,8 @@ abstract class PolygonalCell(
   def get_inner_boundary() = {
     val center = get_center_coord()
     for (coord <- get_boundary())
-      yield Coord((center.lat + coord.lat) / 2.0, (center.long + coord.long))
+      yield Coord((center.lat + coord.lat) / 2.0,
+                  average_longitudes(center.long, coord.long))
   }
 
   /**
@@ -851,14 +896,14 @@ abstract class PolygonalCell(
    */
   def generate_kml_name_placemark(name: String): xml.Elem
 
-  def generate_kml(xfprob: Double, xf_minprob: Double, xf_maxprob: Double) = {
-    import KMLConstants._
+  def generate_kml(xfprob: Double, xf_minprob: Double, xf_maxprob: Double,
+      params: KMLParameters) = {
     val offprob = xfprob - xf_minprob
     val fracprob = offprob / (xf_maxprob - xf_minprob)
     var coordtext = "\n"
     for (coord <- get_inner_boundary()) {
       coordtext += "%s,%s,%s\n" format (
-        coord.long, coord.lat, fracprob * Opts.kml_max_height)
+        coord.long, coord.lat, fracprob * params.kml_max_height)
     }
     val name =
       if (most_popular_article != null) most_popular_article.title
@@ -869,14 +914,15 @@ abstract class PolygonalCell(
 
     // Interpolate colors
     val color = Array(0.0, 0.0, 0.0)
-    for (i <- 1 to 3) {
-      color(i) = (kml_mincolor(i) +
-        fracprob * (kml_maxcolor(i) - kml_mincolor(i)))
+    for (i <- 0 until 3) {
+      color(i) = (params.kml_mincolor(i) +
+        fracprob * (params.kml_maxcolor(i) - params.kml_mincolor(i)))
     }
     // Original color dc0155ff
     //rgbcolor = "dc0155ff"
     val revcol = color.reverse
-    val rgbcolor = "ff%02x%02x%02x" format (revcol(0), revcol(1), revcol(2))
+    val rgbcolor = "ff%02x%02x%02x" format (
+      revcol(0).toInt, revcol(1).toInt, revcol(2).toInt)
 
     // Yield cylinder indicating probability by height and color
 
@@ -1684,7 +1730,7 @@ class GeoArticleTable {
     }
 
     ArticleData.read_article_data_file(filename, process,
-      maxtime = Opts.max_time_per_stage)
+      maxtime = Args.max_time_per_stage)
 
     for (x <- redirects) {
       val redart = lookup_article(x.redir)
@@ -1702,7 +1748,7 @@ class GeoArticleTable {
         if (art.dist != null) {
           /* FIXME: Move this finish() earlier, and split into
              before/after global. */
-          art.dist.finish(minimum_word_count = Opts.minimum_word_count)
+          art.dist.finish(minimum_word_count = Args.minimum_word_count)
           totaltoks += art.dist.num_word_tokens
           numarts += 1
         }
@@ -1766,7 +1812,7 @@ class GeoArticleTable {
       num_word_count_articles_by_split(art.split) += 1
       // If we are evaluating on the dev set, skip the test set and vice
       // versa, to save memory and avoid contaminating the results.
-      if (art.split != "training" && art.split != Opts.eval_set)
+      if (art.split != "training" && art.split != Args.eval_set)
         return
       // Don't train on test set
       art.dist = WordDist(keys_dynarr.array, values_dynarr.array,
@@ -1785,13 +1831,13 @@ class GeoArticleTable {
           if (title != null)
             one_article_probs()
           // Stop if we've reached the maximum
-          if (task.item_processed(maxtime = Opts.max_time_per_stage))
+          if (task.item_processed(maxtime = Args.max_time_per_stage))
             break
-          if ((Opts.num_training_docs > 0 &&
-            task.num_processed >= Opts.num_training_docs)) {
+          if ((Args.num_training_docs > 0 &&
+            task.num_processed >= Args.num_training_docs)) {
             errprint("")
             errprint("Stopping because limit of %s documents reached",
-              Opts.num_training_docs)
+              Args.num_training_docs)
             break
           }
 
@@ -1812,10 +1858,10 @@ class GeoArticleTable {
           line match {
             case linere(xword, xcount) => {
               var word = xword
-              if (!Opts.preserve_case_words) word = word.toLowerCase
+              if (!Args.preserve_case_words) word = word.toLowerCase
               val count = xcount.toInt
               if (!(Stopwords.stopwords contains word) ||
-                Opts.include_stopwords_in_article_dists) {
+                Args.include_stopwords_in_article_dists) {
                 num_word_tokens += count
                 keys_dynarr += memoize_word(word)
                 values_dynarr += count
@@ -2223,9 +2269,9 @@ class NaiveBayesDocumentStrategy(
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
       if (use_baseline) {
-        if (Opts.naive_bayes_weighting == "equal") (1.0, 1.0)
+        if (Args.naive_bayes_weighting == "equal") (1.0, 1.0)
         else {
-          val bw = Opts.naive_bayes_baseline_weight.toDouble
+          val bw = Args.naive_bayes_baseline_weight.toDouble
           ((1.0 - bw) / worddist.num_word_tokens, bw)
         }
       } else (1.0, 0.0))
@@ -2313,13 +2359,13 @@ object Stopwords {
  *   Because they are vars, they can be freely set to other values.
  *
  */
-class GeolocateParameters(parser: OptionParser = null) {
-  protected val op =
-    if (parser == null) new OptionParser("unknown") else parser
+class GeolocateParameters(parser: ArgParser = null) {
+  protected val ap =
+    if (parser == null) new ArgParser("unknown") else parser
 
   //// Basic options for determining operating mode and strategy
   var mode =
-    op.option[String]("m", "mode",
+    ap.option[String]("m", "mode",
       default = "geotag-documents",
       choices = Seq("geotag-toponyms",
         "geotag-documents",
@@ -2345,8 +2391,518 @@ specify the words whose distributions should be outputted.  See also
 the probabilities to make the distinctions among them more visible.
 """)
 
+  //// Input files
+  var stopwords_file =
+    ap.option[String]("stopwords-file",
+      metavar = "FILE",
+      help = """File containing list of stopwords.  If not specified,
+a default list of English stopwords (stored in the TextGrounder distribution)
+is used.""")
+
+  var article_data_file =
+    ap.multiOption[String]("a", "article-data-file",
+      metavar = "FILE",
+      help = """File containing info about Wikipedia or Twitter articles.
+(For Twitter, an "article" is typically the set of all tweets from a single
+user, and the name of the article is the user's name or some per-user
+handle.) This file lists per-article information such as the article's title,
+the split (training, dev, or test) that the article is in, and the article's
+location.  It does not list the actual word-count information for the
+articles; that is held in a separate counts file, specified using
+--counts-file.
+
+Multiple such files can be given by specifying the option multiple
+times.""")
+  var counts_file =
+    ap.multiOption[String]("counts-file", "cf",
+      metavar = "FILE",
+      help = """File containing word counts for Wikipedia or Twitter articles.
+There are scripts in the 'python' directory for generating counts in the
+proper format.  Multiple such files can be given by specifying the
+option multiple times.""")
+  var eval_file =
+    ap.multiOption[String]("e", "eval-file",
+      metavar = "FILE",
+      help = """File or directory containing files to evaluate on.
+Multiple such files/directories can be given by specifying the option multiple
+times.  If a directory is given, all files in the directory will be
+considered (but if an error occurs upon parsing a file, it will be ignored).
+Each file is read in and then disambiguation is performed.  Not used when
+--eval-format=internal (which is the default with --mode=geotag-documents).""")
+
+  //// Options indicating which documents to train on or evaluate
+  var eval_set =
+    ap.option[String]("eval-set", "es",
+      default = "dev",
+      choices = Seq("dev", "test"),
+      canonicalize = Map("dev" -> Seq("devel")),
+      help = """Set to use for evaluation when --eval-format=internal
+and --mode=geotag-documents ('dev' or 'devel' for the development set,
+'test' for the test set).  Default '%default'.""")
+  var num_training_docs =
+    ap.option[Int]("num-training-docs", "ntrain", default = 0,
+      help = """Maximum number of training documents to use.
+0 means no limit.  Default 0, i.e. no limit.""")
+  var num_test_docs =
+    ap.option[Int]("num-test-docs", "ntest", default = 0,
+      help = """Maximum number of test (evaluation) documents to process.
+0 means no limit.  Default 0, i.e. no limit.""")
+  var skip_initial_test_docs =
+    ap.option[Int]("skip-initial-test-docs", "skip-initial", default = 0,
+      help = """Skip this many test docs at beginning.  Default 0, i.e.
+don't skip any documents.""")
+  var every_nth_test_doc =
+    ap.option[Int]("every-nth-test-doc", "every-nth", default = 1,
+      help = """Only process every Nth test doc.  Default 1, i.e.
+process all.""")
+  //  def skip_every_n_test_docs =
+  //    ap.option[Int]("skip-every-n-test-docs", "skip-n", default=0,
+  //      help="""Skip this many after each one processed.  Default 0.""")
+
+  //// Options indicating how to generate the cells we compare against
+  var degrees_per_cell =
+    ap.option[Double]("degrees-per-cell", "dpc",
+      default = 1.0,
+      help = """Size (in degrees, a floating-point number) of the tiling
+cells that cover the Earth.  Default %default. """)
+  var miles_per_cell =
+    ap.option[Double]("miles-per-cell", "mpc",
+      help = """Size (in miles, a floating-point number) of the tiling
+cells that cover the Earth.  If given, it overrides the value of
+--degrees-per-cell.  No default, as the default of --degrees-per-cell
+is used.""")
+  var km_per_cell =
+    ap.option[Double]("km-per-cell", "kpc",
+      help = """Size (in kilometers, a floating-point number) of the tiling
+cells that cover the Earth.  If given, it overrides the value of
+--degrees-per-cell.  No default, as the default of --degrees-per-cell
+is used.""")
+  var width_of_multi_cell =
+    ap.option[Int]("width-of-multi-cell", default = 1,
+      help = """Width of the cell used to compute a statistical
+distribution for geotagging purposes, in terms of number of tiling cells.
+NOTE: It's unlikely you want to change this.  It may be removed entirely in
+later versions.  In normal circumstances, the value is 1, i.e. use a single
+tiling cell to compute each multi cell.  If the value is more than
+1, the multi cells overlap.""")
+
+  //// Options used when creating word distributions
+  var preserve_case_words =
+    ap.flag("preserve-case-words", "pcw",
+      help = """Don't fold the case of words used to compute and
+match against article distributions.  Note that in toponym resolution
+(--mode=geotag-toponyms), this applies only to words in articles
+(currently used only in Naive Bayes matching), not to toponyms, which
+are always matched case-insensitively.""")
+  var include_stopwords_in_article_dists =
+    ap.flag("include-stopwords-in-article-dists",
+      help = """Include stopwords when computing word distributions.""")
+  var minimum_word_count =
+    ap.option[Int]("minimum-word-count", "mwc",
+      default = 1,
+      help = """Minimum count of words to consider in word
+distributions.  Words whose count is less than this value are ignored.""")
+
+  //// Options used when doing Naive Bayes geotagging
+  var naive_bayes_weighting =
+    ap.option[String]("naive-bayes-weighting", "nbw",
+      default = "equal",
+      choices = Seq("equal", "equal-words", "distance-weighted"),
+      help = """Strategy for weighting the different probabilities
+that go into Naive Bayes.  If 'equal', do pure Naive Bayes, weighting the
+prior probability (baseline) and all word probabilities the same.  If
+'equal-words', weight all the words the same but collectively weight all words
+against the baseline, giving the baseline weight according to --baseline-weight
+and assigning the remainder to the words.  If 'distance-weighted', similar to
+'equal-words' but don't weight each word the same as each other word; instead,
+weight the words according to distance from the toponym.""")
+  var naive_bayes_baseline_weight =
+    ap.option[Double]("naive-bayes-baseline-weight", "nbbw",
+      metavar = "WEIGHT",
+      default = 0.5,
+      help = """Relative weight to assign to the baseline (prior
+probability) when doing weighted Naive Bayes.  Default %default.""")
+
+  //// Options used when doing ACP geotagging
+  var lru_cache_size =
+    ap.option[Int]("lru-cache-size", "lru", default = 400,
+      help = """Number of entries in the LRU cache.  Default %default.
+Used only when --strategy=average-cell-probability.""")
+
+  //// Debugging/output options
+  var max_time_per_stage =
+    ap.option[Double]("max-time-per-stage", "mts", default = 0.0,
+      help = """Maximum time per stage in seconds.  If 0, no limit.
+Used for testing purposes.  Default 0, i.e. no limit.""")
+  var no_individual_results =
+    ap.flag("no-individual-results", "no-results",
+      help = """Don't show individual results for each test document.""")
+  var oracle_results =
+    ap.flag("oracle-results",
+      help = """Only compute oracle results (much faster).""")
+  var debug =
+    ap.option[String]("d", "debug", metavar = "FLAGS",
+      help = """Output debug info of the given types.  Multiple debug
+parameters can be specified, indicating different types of info to output.
+Separate parameters by spaces, colons or semicolons.  Params can be boolean,
+if given alone, or valueful, if given as PARAM=VALUE.  Certain params are
+list-valued; multiple values are specified by including the parameter
+multiple times, or by separating values by a comma.
+
+The best way to figure out the possible parameters is by reading the
+source code. (Look for references to debug("foo") for boolean params,
+debugval("foo") for valueful params, or debuglist("foo") for list-valued
+params.) Some known debug flags:
+
+gridrank: For the given test article number (starting at 1), output
+a grid of the predicted rank for cells around the true cell.
+Multiple articles can have the rank output, e.g. --debug 'gridrank=45,58'
+(This will output info for articles 45 and 58.) This output can be
+postprocessed to generate nice graphs; this is used e.g. in Wing's thesis.
+
+gridranksize: Size of the grid, in numbers of articles on a side.
+This is a single number, and the grid will be a square centered on the
+true cell. (Default currently 11.)
+
+kldiv: Print out words contributing most to KL divergence.
+
+wordcountarts: Regenerate article-data file, filtering out articles not
+seen in any counts file.
+
+some, lots, tons: General info of various sorts. (Document me.)
+
+cell: Print out info on each cell of the Earth as it's generated.  Also
+triggers some additional info when --mode=geotag-toponyms. (Document me.)
+
+commontop: Extra info for debugging
+ --baseline-strategy=link-most-common-toponym.
+
+pcl-travel: Extra info for debugging --eval-format=pcl-travel.
+""")
+
+}
+
+object Debug {
+  // Debug params.  Different params indicate different info to output.
+  // Specified using --debug.  Multiple params are separated by spaces,
+  // colons or semicolons.  Params can be boolean, if given alone, or
+  // valueful, if given as PARAM=VALUE.  Certain params are list-valued;
+  // multiple values are specified by including the parameter multiple
+  // times, or by separating values by a comma.
+  val debug = booleanmap[String]()
+  val debugval = stringmap[String]()
+  val debuglist = bufmap[String, String]()
+
+  var list_debug_params = Set[String]()
+
+  // Register a list-valued debug param.
+  def register_list_debug_param(param: String) {
+    list_debug_params += param
+  }
+
+  def parse_debug_spec(debugspec: String) {
+    val params = """[:;\s]+""".r.split(debugspec)
+    // Allow params with values, and allow lists of values to be given
+    // by repeating the param
+    for (f <- params) {
+      if (f contains '=') {
+        val Array(param, value) = f.split("=", 2)
+        if (list_debug_params contains param) {
+          val values = "[,]".split(value)
+          debuglist(param) ++= values
+        } else
+          debugval(param) = value
+      } else
+        debug(f) = true
+    }
+  }
+}
+
+/**
+ * Class for programmatic access to document/etc. geolocation.
+ *
+ * NOTE: Currently this is a singleton object, not a class, because there
+ * can be only one geolocation instance in existence.  This is because
+ * of various other singleton objects (i.e. static methods/fields) scattered
+ * throughout the code.  If this is a problem, let me know and I will
+ * endeavor to fix it.
+ *
+ * Basic operation:
+ *
+ * 1. Create an instance of GeolocateParameters and populate it with the
+ * appropriate parameters.  Don't pass in any ArgParser instance, as
+ * is the default; that way, the parameters will get initialized to their
+ * default values, and you only have to change the ones you want to be
+ * non-default.
+ * 2. Call set_parameters(), passing in the instance you just created.
+ * 3. Call run().  The return value contains some evaluation results.
+ *
+ * NOTE: Currently, the GeolocateParameters instance is recorded directly
+ * inside of this singleton object, without copying, and some of the fields are
+ * changed to more canonical values.  If this is a problem, let me know and
+ * I'll fix it.
+ *
+ * All evaluation output is currently written to standard error.
+ * (There are some scripts to parse the output.) Some info is also returned
+ * by the run() function.  See below.
+ */
+abstract class GeolocateDriver {
+  type Params <: GeolocateParameters
+  type StrategyType
+  // NOTE: When different grids are allowed, we may set this to null here
+  // and initialize it later based on a command-line option or whatever.
+  var cellgrid = null: CellGrid
+  var degrees_per_cell = 0.0
+  var options: Params = _
+
+  protected var argerror = default_error_handler _
+
+  /**
+   * Output the values of some internal parameters.  Only needed
+   * for debugging.
+   */
+  def output_ancillary_parameters() {}
+
+  /**
+   * Default error handler for signalling an argument error.
+   */
+  def default_error_handler(string: String) {
+    throw new IllegalArgumentException(string)
+  }
+
+  /**
+   * Change the error handler.  Return the old handler.
+   */
+  def set_error_handler(handler: String => Unit) = {
+    /* FUCK ME TO HELL.  Want to make this either a function to override
+       or a class parameter, but both get awkward because Java type erasure
+       means there's no easy way for a generic class to create a new object
+       of the generic type. */
+    val old_handler = argerror
+    argerror = handler
+    old_handler
+  }
+
+  protected def argument_needed(arg: String, arg_english: String = null) {
+    val marg_english =
+      if (arg_english == null)
+        arg.replace("-", " ")
+      else
+        arg_english
+    argerror("Must specify %s using --%s" format
+      (marg_english, arg.replace("_", "-")))
+  }
+
+  def need_seq(value: Seq[String], arg: String, arg_english: String = null) {
+    if (value.length == 0)
+      argument_needed(arg, arg_english)
+  }
+
+  def need(value: String, arg: String, arg_english: String = null) {
+    if (value == null || value.length == 0)
+      argument_needed(arg, arg_english)
+  }
+
+  /**
+   * Set the options to those as given.  NOTE: Currently, some of the
+   * fields in this structure will be changed (canonicalized).  See above.
+   * If options are illegal, an error will be signaled.
+   *
+   * @param options Object holding options to set
+   */
+  def set_parameters(opts: Params) {
+    GeolocateDriver.Args = opts
+    options = opts
+
+    /** Canonicalize options **/
+
+    canonicalize_options(opts)
+
+    /** Set other values and check remaining options **/
+
+    if (opts.debug != null)
+      parse_debug_spec(opts.debug)
+
+    def check_common_options(opts: Params) {
+      if (opts.miles_per_cell < 0)
+        argerror("Miles per cell must be positive if specified")
+      if (opts.km_per_cell < 0)
+        argerror("Kilometers per cell must be positive if specified")
+      if (opts.degrees_per_cell < 0)
+        argerror("Degrees per cell must be positive if specified")
+      if (opts.miles_per_cell > 0 && opts.km_per_cell > 0)
+        argerror("Only one of --miles-per-cell and --km-per-cell can be given")
+      degrees_per_cell =
+        if (opts.miles_per_cell > 0)
+          opts.miles_per_cell / miles_per_degree
+        else if (opts.km_per_cell > 0)
+          opts.km_per_cell / km_per_degree
+        else
+          opts.degrees_per_cell
+      if (opts.width_of_multi_cell <= 0)
+        argerror("Width of multi cell must be positive")
+
+      need_seq(opts.article_data_file, "article-data-file")
+    }
+
+    check_common_options(options)
+    check_remaining_options(options)
+  }
+
+  def canonicalize_options(Args: Params)
+  def check_remaining_options(Args: Params)
+
+  protected def initialize_cellgrid() {
+    cellgrid = new MultiRegularCellGrid(degrees_per_cell,
+      Args.width_of_multi_cell)
+  }
+
+  protected def read_stopwords() {
+    val stopwords_file =
+      Stopwords.compute_stopwords_filename(Args.stopwords_file)
+    Stopwords.read_stopwords(stopwords_file)
+  }
+
+  protected def read_articles(table: GeoArticleTable) {
+    for (fn <- Args.article_data_file)
+      table.read_article_data(fn, cellgrid)
+
+    // Read in the words-counts file
+    if (Args.counts_file.length > 0) {
+      for (fn <- Args.counts_file)
+        table.read_word_counts(fn)
+      table.finish_word_counts()
+    }
+  }
+
+  protected def read_data_for_geotag_documents() {
+    initialize_cellgrid()
+    read_stopwords()
+    val table = new GeoArticleTable()
+    GeoArticleTable.table = table
+    read_articles(table)
+  }
+
+  protected def process_strategies[T](
+    strat_unflat: Seq[Seq[(String, T)]])(
+      geneval: (String, T) => EvaluationOutputter) = {
+    val strats = strat_unflat reduce (_ ++ _)
+    for ((stratname, strategy) <- strats) yield {
+      val evalobj = geneval(stratname, strategy)
+      // For --eval-format=internal, there is no eval file.  To make the
+      // evaluation loop work properly, we pretend like there's a single
+      // eval file whose value is null.
+      val iterfiles =
+        if (Args.eval_file.length > 0) Args.eval_file
+        else Seq[String](null)
+      evalobj.evaluate_and_output_results(iterfiles)
+      (stratname, strategy, evalobj)
+    }
+  }
+
+  /**
+   * Actually do the work.
+   */
+  def run(opts: Params): Seq[(String, StrategyType, EvaluationOutputter)]
+}
+
+object GeolocateDriver {
+  var Args: GeolocateParameters = _
+}
+
+class GenerateKMLParameters(
+  parser: ArgParser = null
+) extends GeolocateParameters(parser) {
+  //// Options used only in KML generation (--mode=generate-kml)
+  var kml_words =
+    ap.option[String]("k", "kml-words", "kw",
+      help = """Words to generate KML distributions for, when
+--mode=generate-kml.  Each word should be separated by a comma.  A separate
+file is generated for each word, using the value of '--kml-prefix' and adding
+'.kml' to it.""")
+  var kml_prefix =
+    ap.option[String]("kml-prefix", "kp",
+      default = "kml-dist.",
+      help = """Prefix to use for KML files outputted in --mode=generate-kml.
+The actual filename is created by appending the word, and then the suffix
+'.kml'.  Default '%default'.""")
+  var kml_transform =
+    ap.option[String]("kml-transform", "kt", "kx",
+      default = "none",
+      choices = Seq("none", "log", "logsquared"),
+      help = """Type of transformation to apply to the probabilities
+when generating KML (--mode=generate-kml), possibly to try and make the
+low values more visible.  Possibilities are 'none' (no transformation),
+'log' (take the log), and 'logsquared' (negative of squared log).  Default
+'%default'.""")
+  var kml_max_height =
+    ap.option[Double]("kml-max-height", "kmh",
+      default = 2000000.0,
+      help = """Height of highest bar, in meters.  Default %default.""")
+}
+
+object GenerateKMLDriver extends GeolocateDriver {
+  type Params = GenerateKMLParameters
+  type StrategyType = Nothing
+
+  def canonicalize_options(opts: Params) {
+  }
+
+  def check_remaining_options(opts: Params) {
+    need(opts.kml_words, "kml-words")
+  }
+
+  /**
+   * Do the actual KML generation.  Some tracking info written to stderr.
+   * KML files created and written on disk.
+   */
+
+  def run(opts: Params) = {
+    read_data_for_geotag_documents()
+    cellgrid.finish()
+    val words = opts.kml_words.split(',')
+    for (word <- words) {
+      val celldist = CellDist.get_cell_dist(cellgrid, memoize_word(word))
+      if (!celldist.normalized) {
+        warning("""Non-normalized distribution, apparently word %s not seen anywhere.
+Not generating an empty KML file.""", word)
+      } else {
+        val kmlparams = new KMLParameters()
+        kmlparams.kml_max_height = opts.kml_max_height
+        kmlparams.kml_transform = opts.kml_transform
+        celldist.generate_kml_file("%s%s.kml" format (opts.kml_prefix, word),
+          kmlparams)
+      }
+    }
+    null
+  }
+}
+
+class GeolocateDocumentParameters(
+  parser: ArgParser = null
+) extends GeolocateParameters(parser) {
+  var eval_format =
+    ap.option[String]("f", "eval-format",
+      default = "internal",
+      choices = Seq("internal", "raw-text", "pcl-travel"),
+      help = """Format of evaluation file(s).  The evaluation files themselves
+are specified using --eval-file.  The following formats are
+recognized:
+
+'internal' is the normal format.  It means to consider articles to be
+documents to evaluate, and to use the development or test set specified
+in the article-data file as the set of documents to evaluate.  There is
+no eval file for this format.
+
+'raw-text' assumes that the eval file is simply raw text.  (NOT YET
+IMPLEMENTED.)
+
+'pcl-travel' is another alternative.  It assumes that each evaluation file
+is in PCL-Travel XML format, and uses each chapter in the evaluation
+file as a document to evaluate.""")
+
   var strategy =
-    op.multiOption[String]("s", "strategy",
+    ap.multiOption[String]("s", "strategy",
       //      choices=Seq(
       //        "baseline", "none",
       //        "full-kl-divergence",
@@ -2418,7 +2974,7 @@ NOTE: Multiple --strategy options can be given, and each strategy will
 be tried, one after the other.""")
 
   var baseline_strategy =
-    op.multiOption[String]("baseline-strategy", "bs",
+    ap.multiOption[String]("baseline-strategy", "bs",
       choices = Seq("internal-link", "random",
         "num-articles", "link-most-common-toponym",
         "cell-distribution-most-common-toponym"),
@@ -2450,597 +3006,54 @@ NOTE: Multiple --baseline-strategy options can be given, and each strategy will
 be tried, one after the other.  Currently, however, the *-most-common-toponym
 strategies cannot be mixed with other baseline strategies, or with non-baseline
 strategies, since they require that --preserve-case-words be set internally.""")
-
-  //// Input files
-  var stopwords_file =
-    op.option[String]("stopwords-file",
-      metavar = "FILE",
-      help = """File containing list of stopwords.  If not specified,
-a default list of English stopwords (stored in the TextGrounder distribution)
-is used.""")
-
-  var article_data_file =
-    op.multiOption[String]("a", "article-data-file",
-      metavar = "FILE",
-      help = """File containing info about Wikipedia or Twitter articles.
-(For Twitter, an "article" is typically the set of all tweets from a single
-user, and the name of the article is the user's name or some per-user
-handle.) This file lists per-article information such as the article's title,
-the split (training, dev, or test) that the article is in, and the article's
-location.  It does not list the actual word-count information for the
-articles; that is held in a separate counts file, specified using
---counts-file.
-
-Multiple such files can be given by specifying the option multiple
-times.""")
-  var counts_file =
-    op.multiOption[String]("counts-file", "cf",
-      metavar = "FILE",
-      help = """File containing word counts for Wikipedia or Twitter articles.
-There are scripts in the 'python' directory for generating counts in the
-proper format.  Multiple such files can be given by specifying the
-option multiple times.""")
-  var eval_file =
-    op.multiOption[String]("e", "eval-file",
-      metavar = "FILE",
-      help = """File or directory containing files to evaluate on.
-Multiple such files/directories can be given by specifying the option multiple
-times.  If a directory is given, all files in the directory will be
-considered (but if an error occurs upon parsing a file, it will be ignored).
-Each file is read in and then disambiguation is performed.  Not used when
---eval-format=internal (which is the default with --mode=geotag-documents).""")
-  var eval_format =
-    op.option[String]("f", "eval-format",
-      default = "default",
-      choices = Seq("default", "internal", "pcl-travel",
-        "raw-text", "article", "tr-conll"),
-      help = """Format of evaluation file(s).  The evaluation files themselves
-are specified using --eval-file.  The following formats are
-recognized:
-
-'default' is the default value.  It means use 'internal' when
---mode=geotag-documents, but use 'article' when --mode=geotag-toponyms.
-
-'internal' is the normal format when --mode=geotag-documents.  It means
-to consider articles to be documents to evaluate, and to use the
-development or test set specified in the article-data file as the set of
-documents to evaluate.
-
-'pcl-travel' is an alternative for use with --mode=geotag-documents.  It
-assumes that each evaluation file is in PCL-Travel XML format, and uses
-each chapter in the evaluation file as a document to evaluate.
-
-'raw-text' can be used with either --mode=geotag-documents or
---mode=geotag-toponyms.  It assumes that the eval is simply raw text.
-(NOT YET IMPLEMENTED.)
-
-'article' is the normal format when --mode=geotag-toponyms.  The data file
-is in a format very similar to that of the counts file, but has "toponyms"
-identified using the prefix 'Link: ' followed either by a toponym name or
-the format 'ARTICLE-NAME|TOPONYM', indicating a toponym (e.g. 'London')
-that maps to a given article that disambiguates the toponym
-(e.g. 'London, Ontario').  When a raw toponym is given, the article is
-assumed to have the same name as the toponym. (This format comes from the
-way that links are specified in Wikipedia articles.) The mapping here is
-used for evaluation but not for constructing training data.
-
-'tr-conll' is an alternative for use with --mode=geotag-toponyms.  It
-specifies the toponyms in a document along with possible locations to map
-to, with the correct one identified.  As with the 'article' format, the
-correct location is used only for evaluation, not for constructing training
-data; the other locations are ignored.""")
-
-  //// Input files, toponym resolution only
-  var gazetteer_file =
-    op.option[String]("gazetteer-file", "gf",
-      help = """File containing gazetteer information to match.  Only used
-during toponym resolution (--mode=geotag-toponyms).""")
-  def gazetteer_type =
-    op.option[String]("gazetteer-type", "gt",
-      metavar = "FILE",
-      default = "world", choices = Seq("world", "db"),
-      help = """Type of gazetteer file specified using --gazetteer-file.
-Only used during toponym resolution (--mode=geotag-toponyms).  NOTE: type
-'world' is the only one currently implemented.  Default '%default'.""")
-
-  //// Options indicating which documents to train on or evaluate
-  var eval_set =
-    op.option[String]("eval-set", "es",
-      default = "dev",
-      choices = Seq("dev", "test"),
-      canonicalize = Map("dev" -> Seq("devel")),
-      help = """Set to use for evaluation when --eval-format=internal
-and --mode=geotag-documents ('dev' or 'devel' for the development set,
-'test' for the test set).  Default '%default'.""")
-  var num_training_docs =
-    op.option[Int]("num-training-docs", "ntrain", default = 0,
-      help = """Maximum number of training documents to use.
-0 means no limit.  Default 0, i.e. no limit.""")
-  var num_test_docs =
-    op.option[Int]("num-test-docs", "ntest", default = 0,
-      help = """Maximum number of test (evaluation) documents to process.
-0 means no limit.  Default 0, i.e. no limit.""")
-  var skip_initial_test_docs =
-    op.option[Int]("skip-initial-test-docs", "skip-initial", default = 0,
-      help = """Skip this many test docs at beginning.  Default 0, i.e.
-don't skip any documents.""")
-  var every_nth_test_doc =
-    op.option[Int]("every-nth-test-doc", "every-nth", default = 1,
-      help = """Only process every Nth test doc.  Default 1, i.e.
-process all.""")
-  //  def skip_every_n_test_docs =
-  //    op.option[Int]("skip-every-n-test-docs", "skip-n", default=0,
-  //      help="""Skip this many after each one processed.  Default 0.""")
-
-  //// Options indicating how to generate the cells we compare against
-  var degrees_per_cell =
-    op.option[Double]("degrees-per-cell", "dpc",
-      default = 1.0,
-      help = """Size (in degrees, a floating-point number) of the tiling
-cells that cover the Earth.  Default %default. """)
-  var miles_per_cell =
-    op.option[Double]("miles-per-cell", "mpc",
-      help = """Size (in miles, a floating-point number) of the tiling
-cells that cover the Earth.  If given, it overrides the value of
---degrees-per-cell.  No default, as the default of --degrees-per-cell
-is used.""")
-  var km_per_cell =
-    op.option[Double]("km-per-cell", "kpc",
-      help = """Size (in kilometers, a floating-point number) of the tiling
-cells that cover the Earth.  If given, it overrides the value of
---degrees-per-cell.  No default, as the default of --degrees-per-cell
-is used.""")
-  var width_of_multi_cell =
-    op.option[Int]("width-of-multi-cell", default = 1,
-      help = """Width of the cell used to compute a statistical
-distribution for geotagging purposes, in terms of number of tiling cells.
-NOTE: It's unlikely you want to change this.  It may be removed entirely in
-later versions.  In normal circumstances, the value is 1, i.e. use a single
-tiling cell to compute each multi cell.  If the value is more than
-1, the multi cells overlap.""")
-
-  //// Options used when creating word distributions
-  var preserve_case_words =
-    op.flag("preserve-case-words", "pcw",
-      help = """Don't fold the case of words used to compute and
-match against article distributions.  Note that in toponym resolution
-(--mode=geotag-toponyms), this applies only to words in articles
-(currently used only in Naive Bayes matching), not to toponyms, which
-are always matched case-insensitively.""")
-  var include_stopwords_in_article_dists =
-    op.flag("include-stopwords-in-article-dists",
-      help = """Include stopwords when computing word distributions.""")
-  var minimum_word_count =
-    op.option[Int]("minimum-word-count", "mwc",
-      default = 1,
-      help = """Minimum count of words to consider in word
-distributions.  Words whose count is less than this value are ignored.""")
-
-  //// Options used when doing Naive Bayes geotagging
-  var naive_bayes_weighting =
-    op.option[String]("naive-bayes-weighting", "nbw",
-      default = "equal",
-      choices = Seq("equal", "equal-words", "distance-weighted"),
-      help = """Strategy for weighting the different probabilities
-that go into Naive Bayes.  If 'equal', do pure Naive Bayes, weighting the
-prior probability (baseline) and all word probabilities the same.  If
-'equal-words', weight all the words the same but collectively weight all words
-against the baseline, giving the baseline weight according to --baseline-weight
-and assigning the remainder to the words.  If 'distance-weighted', similar to
-'equal-words' but don't weight each word the same as each other word; instead,
-weight the words according to distance from the toponym.""")
-  var naive_bayes_baseline_weight =
-    op.option[Double]("naive-bayes-baseline-weight", "nbbw",
-      metavar = "WEIGHT",
-      default = 0.5,
-      help = """Relative weight to assign to the baseline (prior
-probability) when doing weighted Naive Bayes.  Default %default.""")
-
-  //// Options used when doing ACP geotagging
-  var lru_cache_size =
-    op.option[Int]("lru-cache-size", "lru", default = 400,
-      help = """Number of entries in the LRU cache.  Default %default.
-Used only when --strategy=average-cell-probability.""")
-
-  //// Debugging/output options
-  var max_time_per_stage =
-    op.option[Double]("max-time-per-stage", "mts", default = 0.0,
-      help = """Maximum time per stage in seconds.  If 0, no limit.
-Used for testing purposes.  Default 0, i.e. no limit.""")
-  var no_individual_results =
-    op.flag("no-individual-results", "no-results",
-      help = """Don't show individual results for each test document.""")
-  var oracle_results =
-    op.flag("oracle-results",
-      help = """Only compute oracle results (much faster).""")
-  var debug =
-    op.option[String]("d", "debug", metavar = "FLAGS",
-      help = """Output debug info of the given types.  Multiple debug
-parameters can be specified, indicating different types of info to output.
-Separate parameters by spaces, colons or semicolons.  Params can be boolean,
-if given alone, or valueful, if given as PARAM=VALUE.  Certain params are
-list-valued; multiple values are specified by including the parameter
-multiple times, or by separating values by a comma.
-
-The best way to figure out the possible parameters is by reading the
-source code. (Look for references to debug("foo") for boolean params,
-debugval("foo") for valueful params, or debuglist("foo") for list-valued
-params.) Some known debug flags:
-
-gridrank: For the given test article number (starting at 1), output
-a grid of the predicted rank for cells around the true cell.
-Multiple articles can have the rank output, e.g. --debug 'gridrank=45,58'
-(This will output info for articles 45 and 58.) This output can be
-postprocessed to generate nice graphs; this is used e.g. in Wing's thesis.
-
-gridranksize: Size of the grid, in numbers of articles on a side.
-This is a single number, and the grid will be a square centered on the
-true cell. (Default currently 11.)
-
-kldiv: Print out words contributing most to KL divergence.
-
-wordcountarts: Regenerate article-data file, filtering out articles not
-seen in any counts file.
-
-some, lots, tons: General info of various sorts. (Document me.)
-
-cell: Print out info on each cell of the Earth as it's generated.  Also
-triggers some additional info when --mode=geotag-toponyms. (Document me.)
-
-commontop: Extra info for debugging
- --baseline-strategy=link-most-common-toponym.
-
-pcl-travel: Extra info for debugging --eval-format=pcl-travel.
-""")
-
-  //// Options used only in KML generation (--mode=generate-kml)
-  var kml_words =
-    op.option[String]("k", "kml-words", "kw",
-      help = """Words to generate KML distributions for, when
---mode=generate-kml.  Each word should be separated by a comma.  A separate
-file is generated for each word, using the value of '--kml-prefix' and adding
-'.kml' to it.""")
-  var kml_prefix =
-    op.option[String]("kml-prefix", "kp",
-      default = "kml-dist.",
-      help = """Prefix to use for KML files outputted in --mode=generate-kml.
-The actual filename is created by appending the word, and then the suffix
-'.kml'.  Default '%default'.""")
-  var kml_transform =
-    op.option[String]("kml-transform", "kt", "kx",
-      default = "none",
-      choices = Seq("none", "log", "logsquared"),
-      help = """Type of transformation to apply to the probabilities
-when generating KML (--mode=generate-kml), possibly to try and make the
-low values more visible.  Possibilities are 'none' (no transformation),
-'log' (take the log), and 'logsquared' (negative of squared log).  Default
-'%default'.""")
-  var kml_max_height =
-    op.option[Double]("kml-max-height", "kmh",
-      default = 2000000.0,
-      help = """Height of highest bar, in meters.  Default %default.""")
-
-  //// Options used only in toponym resolution (--mode=geotag-toponyms)
-  //// (Note, gazetteer-file options also used only in toponym resolution,
-  //// see above)
-  var naive_bayes_context_len =
-    op.option[Int]("naive-bayes-context-len", "nbcl",
-      default = 10,
-      help = """Number of words on either side of a toponym to use
-in Naive Bayes matching.  Only applicable to toponym resolution
-(--mode=geotag-toponyms).  Default %default.""")
-  var max_dist_for_close_match =
-    op.option[Double]("max-dist-for-close-match", "mdcm",
-      default = 80.0,
-      help = """Maximum number of km allowed when looking for a
-close match for a toponym (--mode=geotag-toponyms).  Default %default.""")
-  var max_dist_for_outliers =
-    op.option[Double]("max-dist-for-outliers", "mdo",
-      default = 200.0,
-      help = """Maximum number of km allowed between a point and
-any others in a division (--mode=geotag-toponyms).  Points farther away than
-this are ignored as "outliers" (possible errors, etc.).  NOTE: Not
-currently implemented. Default %default.""")
-  var context_type =
-    op.option[String]("context-type", "ct",
-      default = "cell-dist-article-links",
-      choices = Seq("article", "cell", "cell-dist-article-links"),
-      help = """Type of context used when doing disambiguation.
-There are two cases where this choice applies: When computing a word
-distribution, and when counting the number of incoming internal links.
-'article' means use the article itself for both.  'cell' means use the
-cell for both. 'cell-dist-article-links' means use the cell for
-computing a word distribution, but the article for counting the number of
-incoming internal links.  Note that this only applies when
---mode='geotag-toponyms'; in --mode='geotag-documents', only cells are
-considered.  Default '%default'.""")
 }
 
-object Debug {
-  // Debug params.  Different params indicate different info to output.
-  // Specified using --debug.  Multiple params are separated by spaces,
-  // colons or semicolons.  Params can be boolean, if given alone, or
-  // valueful, if given as PARAM=VALUE.  Certain params are list-valued;
-  // multiple values are specified by including the parameter multiple
-  // times, or by separating values by a comma.
-  val debug = booleanmap[String]()
-  val debugval = stringmap[String]()
-  val debuglist = bufmap[String, String]()
+object GeolocateDocumentDriver extends GeolocateDriver {
+  type Params = GeolocateDocumentParameters
+  type StrategyType = GeotagDocumentStrategy
 
-  var list_debug_params = Set[String]()
+  def canonicalize_options(opts: Params) {
+    if (opts.strategy.length == 0)
+      opts.strategy = Seq("partial-kl-divergence")
 
-  // Register a list-valued debug param.
-  def register_list_debug_param(param: String) {
-    list_debug_params += param
-  }
+    if (opts.baseline_strategy.length == 0)
+      opts.baseline_strategy = Seq("internal-link")
 
-  def parse_debug_spec(debugspec: String) {
-    val params = """[:;\s]+""".r.split(debugspec)
-    // Allow params with values, and allow lists of values to be given
-    // by repeating the param
-    for (f <- params) {
-      if (f contains '=') {
-        val Array(param, value) = f.split("=", 2)
-        if (list_debug_params contains param) {
-          val values = "[,]".split(value)
-          debuglist(param) ++= values
-        } else
-          debugval(param) = value
-      } else
-        debug(f) = true
-    }
-  }
-}
-
-/**
- * Class for programmatic access to document/etc. geolocation.
- *
- * NOTE: Currently this is a singleton object, not a class, because there
- * can be only one geolocation instance in existence.  This is because
- * of various other singleton objects (i.e. static methods/fields) scattered
- * throughout the code.  If this is a problem, let me know and I will
- * endeavor to fix it.
- *
- * Basic operation:
- *
- * 1. Create an instance of GeolocateParameters and populate it with the
- * appropriate parameters.
- * 2. Call set_parameters(), passing in the instance you just created.
- * 3. Call run().  The return value contains some evaluation results.
- *
- * NOTE: Currently, the GeolocateParameters instance is recorded directly
- * inside of this singleton object, without copying, and some of the fields are
- * changed to more canonical values.  If this is a problem, let me know and
- * I'll fix it.
- *
- * All evaluation output is currently written to standard error.
- * (There are some scripts to parse the output.) Some info is also returned
- * by the run() function.  See below.
- */
-object GeolocateDriver {
-  var Opts = null: GeolocateParameters
-  // NOTE: When different grids are allowed, we may set this to null here
-  // and initialize it later based on a command-line option or whatever.
-  var cellgrid = null: CellGrid
-  var degrees_per_cell = 0.0
-
-  protected var need_to_read_stopwords = false
-
-  /**
-   * Output the values of some internal parameters.  Only needed
-   * for debugging.
-   */
-  def output_internal_parameters() {
-    errprint("Need to read stopwords: %s", need_to_read_stopwords)
-  }
-
-  /**
-   * Signal an argument error, the same way that set_parameters() does by
-   * default.  You don't normally need to call this.
-   */
-  def default_argument_error(string: String) {
-    throw new IllegalArgumentException(string)
-  }
-
-  /**
-   * Set the options to those as given.  NOTE: Currently, some of the
-   * fields in this structure will be changed (canonicalized).  See above.
-   * If options are illegal, an error will be signaled.
-   *
-   * @param options Object holding options to set
-   * @param argerror Function to use to signal invalid arguments.  By
-   * default, the function `default_argument_error()` is called.
-   */
-  def set_parameters(options: GeolocateParameters,
-    argerror: String => Unit = default_argument_error _) {
-    def argument_needed(arg: String, arg_english: String = null) {
-      val marg_english =
-        if (arg_english == null)
-          arg.replace("-", " ")
-        else
-          arg_english
-      argerror("Must specify %s using --%s" format
-        (marg_english, arg.replace("_", "-")))
-    }
-
-    def need_seq(value: Seq[String], arg: String, arg_english: String = null) {
-      if (value.length == 0)
-        argument_needed(arg, arg_english)
-    }
-
-    def need(value: String, arg: String, arg_english: String = null) {
-      if (value == null || value.length == 0)
-        argument_needed(arg, arg_english)
-    }
-
-    Opts = options
-
-    /** Canonicalize options **/
-
-    if (Opts.strategy.length == 0) {
-      if (Opts.mode == "geotag-documents")
-        Opts.strategy = Seq("partial-kl-divergence")
-      else if (Opts.mode == "geotag-toponyms")
-        Opts.strategy = Seq("baseline")
-      else
-        Opts.strategy = Seq[String]()
-    }
-
-    if (Opts.baseline_strategy.length == 0)
-      Opts.baseline_strategy = Seq("internal-link")
-
-    if (Opts.strategy contains "baseline") {
+    if (opts.strategy contains "baseline") {
       var need_case = false
       var need_no_case = false
-      for (bstrat <- Opts.baseline_strategy) {
+      for (bstrat <- opts.baseline_strategy) {
         if (bstrat.endsWith("most-common-toponym"))
           need_case = true
         else
           need_no_case = true
       }
       if (need_case) {
-        if (Opts.strategy.length > 1 || need_no_case) {
+        if (opts.strategy.length > 1 || need_no_case) {
           // That's because we have to set --preserve-case-words, which we
           // generally don't want set for other strategies and which affects
           // the way we construct the training-document distributions.
           argerror("Can't currently mix *-most-common-toponym baseline strategy with other strategies")
         }
-        Opts.preserve_case_words = true
+        opts.preserve_case_words = true
       }
     }
+  }
 
-    Opts.eval_format =
-      if (Opts.eval_format == "default") {
-        if (Opts.mode == "geotag-toponyms") "article"
-        else "internal"
-      } else Opts.eval_format
+  def check_remaining_options(opts: Params) {
+    if (opts.counts_file.length == 0)
+      argerror("Must specify counts file")
 
-    /** Set other values and check remaining options **/
-
-    if (Opts.debug != null)
-      parse_debug_spec(Opts.debug)
-
-    // FIXME! Can only currently handle World-type gazetteers.
-    if (Opts.gazetteer_type != "world")
-      argerror("Currently can only handle world-type gazetteers")
-
-    if (Opts.miles_per_cell < 0)
-      argerror("Miles per cell must be positive if specified")
-    if (Opts.km_per_cell < 0)
-      argerror("Kilometers per cell must be positive if specified")
-    if (Opts.degrees_per_cell < 0)
-      argerror("Degrees per cell must be positive if specified")
-    if (Opts.miles_per_cell > 0 && Opts.km_per_cell > 0)
-      argerror("Only one of --miles-per-cell and --km-per-cell can be given")
-    degrees_per_cell =
-      if (Opts.miles_per_cell > 0)
-        Opts.miles_per_cell / miles_per_degree
-      else if (Opts.km_per_cell > 0)
-        Opts.km_per_cell / km_per_degree
-      else
-        Opts.degrees_per_cell
-    if (Opts.width_of_multi_cell <= 0)
-      argerror("Width of multi cell must be positive")
-
-    //// Start reading in the files and operating on them ////
-
-    if (Opts.mode.startsWith("geotag")) {
-      need_to_read_stopwords = true
-      if (Opts.mode == "geotag-toponyms" && Opts.strategy == Seq("baseline"))
-        ()
-      else if (Opts.counts_file.length == 0)
-        argerror("Must specify counts file")
-    }
-
-    if (Opts.mode == "geotag-toponyms")
-      need(Opts.gazetteer_file, "gazetteer-file")
-
-    if (Opts.eval_format == "raw-text") {
+    if (opts.eval_format == "raw-text") {
       // FIXME!!!!
       argerror("Raw-text reading not implemented yet")
     }
 
-    if (Opts.mode == "geotag-documents") {
-      if (!(Seq("pcl-travel", "internal") contains Opts.eval_format))
-        argerror("For --mode=geotag-documents, eval-format must be 'internal' or 'pcl-travel'")
-    } else if (Opts.mode == "geotag-toponyms") {
-      if (Opts.baseline_strategy.endsWith("most-common-toponym")) {
-        argerror("--baseline-strategy=%s only compatible with --mode=geotag-documents"
-          format Opts.baseline_strategy)
-      }
-      for (stratname <- Opts.strategy) {
-        if (!(Seq("baseline", "naive-bayes-with-baseline",
-          "naive-bayes-no-baseline") contains stratname)) {
-          argerror("Strategy '%s' invalid for --mode=geotag-toponyms" format
-            stratname)
-        }
-      }
-      if (!(Seq("tr-conll", "article") contains Opts.eval_format))
-        argerror("For --mode=geotag-toponyms, eval-format must be 'article' or 'tr-conll'")
-    }
-
-    if (Opts.mode == "geotag-documents" && Opts.eval_format == "internal") {
-      if (Opts.eval_file.length > 0)
+    if (opts.eval_format == "internal") {
+      if (opts.eval_file.length > 0)
         argerror("--eval-file should not be given when --eval-format=internal")
-    } else if (Opts.mode.startsWith("geotag"))
-      need_seq(Opts.eval_file, "eval-file", "evaluation file(s)")
-
-    if (Opts.mode == "generate-kml")
-      need(Opts.kml_words, "kml-words")
-    else if (Opts.kml_words != null)
-      argerror("--kml-words only compatible with --mode=generate-kml")
-
-    need_seq(Opts.article_data_file, "article-data-file")
-  }
-
-  protected def initialize_cellgrid() {
-    cellgrid = new MultiRegularCellGrid(degrees_per_cell,
-      Opts.width_of_multi_cell)
-  }
-
-  protected def read_stopwords_if() {
-    if (need_to_read_stopwords) {
-      val stopwords_file =
-        Stopwords.compute_stopwords_filename(Opts.stopwords_file)
-      Stopwords.read_stopwords(stopwords_file)
-    }
-  }
-
-  protected def read_articles(table: GeoArticleTable) {
-    for (fn <- Opts.article_data_file)
-      table.read_article_data(fn, cellgrid)
-
-    // Read in the words-counts file
-    if (Opts.counts_file.length > 0) {
-      for (fn <- Opts.counts_file)
-        table.read_word_counts(fn)
-      table.finish_word_counts()
-    }
-  }
-
-  protected def read_data_for_geotag_documents() {
-    initialize_cellgrid()
-    read_stopwords_if()
-    val table = new GeoArticleTable()
-    GeoArticleTable.table = table
-    read_articles(table)
-  }
-
-  protected def process_strategies[T](
-    strat_unflat: Seq[Seq[(String, T)]])(
-      geneval: (String, T) => EvaluationOutputter) = {
-    val strats = strat_unflat reduce (_ ++ _)
-    for ((stratname, strategy) <- strats) yield {
-      val evalobj = geneval(stratname, strategy)
-      // For --eval-format=internal, there is no eval file.  To make the
-      // evaluation loop work properly, we pretend like there's a single
-      // eval file whose value is null.
-      val iterfiles =
-        if (Opts.eval_file.length > 0) Opts.eval_file
-        else Seq[String](null)
-      evalobj.evaluate_and_output_results(iterfiles)
-      (stratname, strategy, evalobj)
-    }
+    } else
+      need_seq(opts.eval_file, "eval-file", "evaluation file(s)")
   }
 
   /**
@@ -3062,14 +3075,14 @@ object GeolocateDriver {
    * type in practice is ArticleEvaluationResult)
    */
 
-  def run_geotag_documents() = {
+  def run(opts: Params) = {
     read_data_for_geotag_documents()
     cellgrid.finish()
 
     val strats = (
-      for (stratname <- Opts.strategy) yield {
+      for (stratname <- opts.strategy) yield {
         if (stratname == "baseline") {
-          for (basestratname <- Opts.baseline_strategy) yield {
+          for (basestratname <- opts.baseline_strategy) yield {
             val strategy = basestratname match {
               case "link-most-common-toponym" =>
                 new LinkMostCommonToponymGeotagDocumentStrategy(cellgrid)
@@ -3125,124 +3138,51 @@ object GeolocateDriver {
     process_strategies(strats)((stratname, strategy) => {
       val evaluator =
         // Generate reader object
-        if (Opts.eval_format == "pcl-travel")
+        if (opts.eval_format == "pcl-travel")
           new PCLTravelGeotagDocumentEvaluator(strategy, stratname)
         else
           new ArticleGeotagDocumentEvaluator(strategy, stratname)
       new DefaultEvaluationOutputter(stratname, evaluator)
     })
   }
-
-  /**
-   * Do the actual toponym geolocation.  Results to stderr (see above), and
-   * also returned.
-   *
-   * Return value very much like for run_geotag_documents(), but less
-   * useful info may be returned for each document processed.
-   */
-
-  def run_geotag_toponyms() = {
-    import toponym._
-    initialize_cellgrid()
-    read_stopwords_if()
-    val table = new TopoArticleTable()
-    TopoArticleTable.table = table
-    GeoArticleTable.table = table
-    read_articles(table)
-
-    // errprint("Processing evaluation file(s) %s for toponym counts...",
-    //   Opts.eval_file)
-    // process_dir_files(Opts.eval_file, count_toponyms_in_file)
-    // errprint("Number of toponyms seen: %s",
-    //   toponyms_seen_in_eval_files.length)
-    // errprint("Number of toponyms seen more than once: %s",
-    //   (for {(foo,count) <- toponyms_seen_in_eval_files
-    //             if (count > 1)} yield foo).length)
-    // output_reverse_sorted_table(toponyms_seen_in_eval_files,
-    //                             outfile=sys.stderr)
-
-    if (Opts.gazetteer_file != null) {
-      /* FIXME!!! */
-      assert(cellgrid.isInstanceOf[MultiRegularCellGrid])
-      Gazetteer.gazetteer =
-        new WorldGazetteer(Opts.gazetteer_file,
-          cellgrid.asInstanceOf[MultiRegularCellGrid])
-    }
-
-    val strats = (
-      for (stratname <- Opts.strategy) yield {
-        // Generate strategy object
-        if (stratname == "baseline") {
-          for (basestratname <- Opts.baseline_strategy) yield ("baseline " + basestratname,
-            new BaselineGeotagToponymStrategy(cellgrid, basestratname))
-        } else {
-          val strategy = new NaiveBayesToponymStrategy(cellgrid,
-            use_baseline = (stratname == "naive-bayes-with-baseline"))
-          Seq((stratname, strategy))
-        }
-      })
-    process_strategies(strats)((stratname, strategy) => {
-      val evaluator =
-        // Generate reader object
-        if (Opts.eval_format == "tr-conll")
-          new TRCoNLLGeotagToponymEvaluator(strategy, stratname)
-        else
-          new ArticleGeotagToponymEvaluator(strategy, stratname)
-      new DefaultEvaluationOutputter(stratname, evaluator)
-    })
-  }
-
-  /**
-   * Do the actual KML generation.  Some tracking info written to stderr.
-   * KML files created and written on disk.
-   */
-
-  def run_generate_kml() {
-    read_data_for_geotag_documents()
-    cellgrid.finish()
-    val words = Opts.kml_words.split(',')
-    for (word <- words) {
-      val celldist = CellDist.get_cell_dist(cellgrid, memoize_word(word))
-      if (!celldist.normalized) {
-        warning("""Non-normalized distribution, apparently word %s not seen anywhere.
-Not generating an empty KML file.""", word)
-      } else
-        celldist.generate_kml_file("%s%s.kml" format (Opts.kml_prefix, word))
-    }
-  }
-
-  def run() {
-    if (Opts.mode == "generate-kml")
-      run_generate_kml()
-    else if (Opts.mode == "geotag-toponyms")
-      run_geotag_toponyms()
-    else {
-      assert(Opts.mode == "geotag-documents")
-      run_geotag_documents()
-    }
-  }
 }
 
-object GeolocateApp extends NlpApp("geolocate") {
-  type ArgClass = GeolocateParameters
+abstract class GeolocateApp(appname: String) extends ExperimentApp(appname) {
+  type ParamClass <: GeolocateParameters
+  type ArgClass = ParamClass
+  val Driver: GeolocateDriver
 
-  def create_arg_class() = new GeolocateParameters(optparser)
+  def argerror(str: String) {
+    the_argparser.error(str)
+  }
 
-  override def output_internal_parameters() {
-    GeolocateDriver.output_internal_parameters()
+  override def output_ancillary_parameters() {
+    Driver.output_ancillary_parameters()
   }
 
   def handle_arguments(args: Seq[String]) {
-    def argerror(str: String) {
-      optparser.error(str)
-    }
-    GeolocateDriver.set_parameters(argholder, argerror _)
+    Driver.set_error_handler(argerror _)
+    Driver.set_parameters(argholder.asInstanceOf[Driver.Params])
   }
 
   def implement_main(args: Seq[String]) {
-    GeolocateDriver.run()
+    Driver.run(Driver.options)
   }
+}
 
+object GeolocateDocumentApp extends GeolocateApp("geolocate-documents") {
+  type ParamClass = GeolocateDocumentParameters
+  val Driver = GeolocateDocumentDriver
+  // FUCKING TYPE ERASURE
+  def create_arg_class() = new ParamClass(the_argparser)
+  main()
+}
+
+object GenerateKMLApp extends GeolocateApp("generate-kml") {
+  type ParamClass = GenerateKMLParameters
+  val Driver = GenerateKMLDriver
+  // FUCKING TYPE ERASURE
+  def create_arg_class() = new ParamClass(the_argparser)
   main()
 }
 

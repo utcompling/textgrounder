@@ -3392,7 +3392,7 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
       pass
 
     params = Params()
-    params.need_to_read_stopwords = False
+    params.need_to_read_stopwords = True # Always needed!
    
     # Canonicalize options
     if not opts.strategy:
@@ -3452,7 +3452,6 @@ Possibilities are 'none' (no transformation), 'log' (take the log), and
     ### Start reading in the files and operating on them ###
 
     if opts.mode.startswith('geotag'):
-      params.need_to_read_stopwords = True
       if (opts.mode == 'geotag-toponyms' and opts.strategy == ['baseline']):
         pass
       elif not opts.counts_file:

@@ -18,9 +18,10 @@ package opennlp.textgrounder.geolocate.toponym
 
 import opennlp.textgrounder.geolocate._
 import tgutil._
+import argparser._
 import Distances._
 import Debug._
-import GeolocateDriver.Opts
+import GeolocateToponymDriver.Opts
 
 import collection.mutable
 import util.control.Breaks._
@@ -267,7 +268,7 @@ case class Division(
   def contains(coord: Coord) = boundary contains coord
 }
 
-object Division {
+class DivisionFactory(gazetteer: Gazetteer) {
   // For each division, map from division's path to Division object.
   val path_to_division = mutable.Map[Seq[String], Division]()
 
@@ -301,7 +302,7 @@ object Division {
           val newdiv = new Division(path)
           newdiv.div = higherdiv
           path_to_division(path) = newdiv
-          Gazetteer.gazetteer.record_division(path.last.toLowerCase, newdiv)
+          gazetteer.record_division(path.last.toLowerCase, newdiv)
           newdiv
         }
       }
@@ -356,7 +357,10 @@ object Division {
 
 // A Wikipedia article for toponym resolution.
 
-class TopoArticle(params: Map[String, String]) extends GeoArticle(params) {
+class TopoArticle(
+    params: Map[String, String],
+    table: TopoArticleTable
+) extends GeoArticle(params) {
   // Cell-based distribution corresponding to this article.
   var worddist: CellWordDist = null
   // Corresponding location for this article.
@@ -445,8 +449,11 @@ class TopoArticle(params: Map[String, String]) extends GeoArticle(params) {
 
   // Find the divisions that cover the given article.
   def find_covering_divisions() = {
-    val inds = Division.tiling_cellgrid.coord_to_tiling_cell_index(coord)
-    val divs = Division.tiling_cell_to_divisions(inds)
+    val inds = (
+      table.gazetteer.divfactory.tiling_cellgrid.
+      coord_to_tiling_cell_index(coord)
+    )
+    val divs = table.gazetteer.divfactory.tiling_cell_to_divisions(inds)
     (for (div <- divs if div contains coord) yield div)
   }
 }
@@ -455,14 +462,24 @@ class TopoArticle(params: Map[String, String]) extends GeoArticle(params) {
 // names, ID's and articles.  See comments at GeoArticleTable.
 class TopoArticleTable extends GeoArticleTable {
   override def create_article(params: Map[String, String]) =
-    new TopoArticle(params)
+    new TopoArticle(params, this)
+
+  var gazetteer: Gazetteer = null
+
+  /**
+   * Set the gazetteer.  Must do it this way because creation of the
+   * gazetteer wants the TopoArticleTable already created.
+   */
+  def set_gazetteer(gaz: Gazetteer) {
+    gazetteer = gaz
+  }
 
   // Construct the list of possible candidate articles for a given toponym
   override def construct_candidates(toponym: String) = {
     val lotop = toponym.toLowerCase
     val locs = (
-      Gazetteer.gazetteer.lower_toponym_to_location(lotop) ++
-      Gazetteer.gazetteer.lower_toponym_to_division(lotop))
+      gazetteer.lower_toponym_to_location(lotop) ++
+      gazetteer.lower_toponym_to_division(lotop))
     val articles = super.construct_candidates(toponym)
     articles ++ (
       for {loc <- locs
@@ -474,8 +491,8 @@ class TopoArticleTable extends GeoArticleTable {
   override def word_is_toponym(word: String) = {
     val lw = word.toLowerCase
     (super.word_is_toponym(word) ||
-      (Gazetteer.gazetteer.lower_toponym_to_location contains lw) ||
-      (Gazetteer.gazetteer.lower_toponym_to_division contains lw))
+      (gazetteer.lower_toponym_to_location contains lw) ||
+      (gazetteer.lower_toponym_to_division contains lw))
   }
 
   // Find Wikipedia article matching name NAME for location LOC.  NAME
@@ -1142,6 +1159,10 @@ class ArticleGeotagToponymEvaluator(
 }
 
 class Gazetteer {
+
+  // Factory object for creating new divisions relative to the gazetteer
+  val divfactory = new DivisionFactory(this)
+
   // For each toponym (name of location), value is a list of Locality
   // items, listing gazetteer locations and corresponding matching
   // Wikipedia articles.
@@ -1172,12 +1193,6 @@ class Gazetteer {
   //    process_eval_file(fname, count_toponyms, compute_context=false,
   //                      only_toponyms=true)
   //  }
-}
-
-object Gazetteer {
-  // The one and only currently existing gazetteer.
-  // FIXME: Eventually this and other static objects should go elsewhere.
-  var gazetteer: Gazetteer = null
 }
 
 /**
@@ -1254,7 +1269,7 @@ class WorldGazetteer(
     // Create and populate a Locality object
     val loc = new Locality(name, Coord(lat.toInt / 100., long.toInt / 100.),
       typ = typ, altnames = if (altnames != null) ", ".r.split(altnames) else null)
-    loc.div = Division.find_division_note_point(loc, Seq(div1, div2, div3))
+    loc.div = divfactory.find_division_note_point(loc, Seq(div1, div2, div3))
     if (debug("lots"))
       errprint("Saw location %s (div %s/%s/%s) with coordinates %s",
         loc.name, div1, div2, div3, loc.coord)
@@ -1319,11 +1334,246 @@ class WorldGazetteer(
       }
     }
 
-    Division.finish_all(cellgrid)
+    divfactory.finish_all(cellgrid)
     status.finish()
     output_resource_usage()
   }
 
   // Upon creation, populate gazetteer from file
   read_world_gazetteer_and_match(filename)
+}
+
+class GeolocateToponymParameters(
+  parser: ArgParser = null
+) extends GeolocateParameters(parser) {
+  var eval_format =
+    ap.option[String]("f", "eval-format",
+      default = "article",
+      choices = Seq("article", "raw-text", "tr-conll"),
+      help = """Format of evaluation file(s).  The evaluation files themselves
+are specified using --eval-file.  The following formats are
+recognized:
+
+'article' is the normal format.  The data file is in a format very similar
+to that of the counts file, but has "toponyms" identified using the
+prefix 'Link: ' followed either by a toponym name or the format
+'ARTICLE-NAME|TOPONYM', indicating a toponym (e.g. 'London') that maps
+to a given article that disambiguates the toponym (e.g. 'London, Ontario').
+When a raw toponym is given, the article is assumed to have the same
+name as the toponym. (This format comes from the way that links are
+specified in Wikipedia articles.) The mapping here is used for evaluation
+but not for constructing training data.
+
+'raw-text' assumes that the eval file is simply raw text.
+(NOT YET IMPLEMENTED.)
+
+'tr-conll' is an alternative.  It specifies the toponyms in a document
+along with possible locations to map to, with the correct one identified.
+As with the 'article' format, the correct location is used only for
+evaluation, not for constructing training data; the other locations are
+ignored.""")
+
+  //// Input files, toponym resolution only
+  var gazetteer_file =
+    ap.option[String]("gazetteer-file", "gf",
+      help = """File containing gazetteer information to match.  Only used
+during toponym resolution (--mode=geotag-toponyms).""")
+  var gazetteer_type =
+    ap.option[String]("gazetteer-type", "gt",
+      metavar = "FILE",
+      default = "world", choices = Seq("world", "db"),
+      help = """Type of gazetteer file specified using --gazetteer-file.
+Only used during toponym resolution (--mode=geotag-toponyms).  NOTE: type
+'world' is the only one currently implemented.  Default '%default'.""")
+
+  var strategy =
+    ap.multiOption[String]("s", "strategy",
+      //      choices=Seq(
+      //        "baseline", "none",
+      //        "naive-bayes-with-baseline",
+      //        "naive-bayes-no-baseline",
+      //        ),
+      canonicalize = Map(
+        "baseline" -> null, "none" -> null,
+        "naive-bayes-with-baseline" ->
+          Seq("nb-base"),
+        "naive-bayes-no-baseline" ->
+          Seq("nb-nobase")),
+      help = """Strategy/strategies to use for geotagging.
+'baseline' means just use the baseline strategy (see --baseline-strategy).
+
+'none' means don't do any geotagging.  Useful for testing the parts that
+read in data and generate internal structures.
+
+'naive-bayes-with-baseline' (or 'nb-base') means also use the words around the
+toponym to be disambiguated, in a Naive-Bayes scheme, using the baseline as the
+prior probability; 'naive-bayes-no-baseline' (or 'nb-nobase') means use uniform
+prior probability.
+
+Default is 'baseline'.
+
+NOTE: Multiple --strategy options can be given, and each strategy will
+be tried, one after the other.""")
+
+  var baseline_strategy =
+    ap.multiOption[String]("baseline-strategy", "bs",
+      choices = Seq("internal-link", "random",
+        "num-articles"),
+      canonicalize = Map(
+        "internal-link" -> Seq("link"),
+        "num-articles" -> Seq("num-arts", "numarts")),
+      help = """Strategy to use to compute the baseline.
+
+'internal-link' (or 'link') means use number of internal links pointing to the
+article or cell.
+
+'random' means choose randomly.
+
+'num-articles' (or 'num-arts' or 'numarts'; only in cell-type matching) means
+use number of articles in cell.
+
+Default '%default'.
+
+NOTE: Multiple --baseline-strategy options can be given, and each strategy will
+be tried, one after the other.""")
+
+  //// Options used only in toponym resolution (--mode=geotag-toponyms)
+  //// (Note, gazetteer-file options also used only in toponym resolution,
+  //// see above)
+  var naive_bayes_context_len =
+    ap.option[Int]("naive-bayes-context-len", "nbcl",
+      default = 10,
+      help = """Number of words on either side of a toponym to use
+in Naive Bayes matching.  Only applicable to toponym resolution
+(--mode=geotag-toponyms).  Default %default.""")
+  var max_dist_for_close_match =
+    ap.option[Double]("max-dist-for-close-match", "mdcm",
+      default = 80.0,
+      help = """Maximum number of km allowed when looking for a
+close match for a toponym (--mode=geotag-toponyms).  Default %default.""")
+  var max_dist_for_outliers =
+    ap.option[Double]("max-dist-for-outliers", "mdo",
+      default = 200.0,
+      help = """Maximum number of km allowed between a point and
+any others in a division (--mode=geotag-toponyms).  Points farther away than
+this are ignored as "outliers" (possible errors, etc.).  NOTE: Not
+currently implemented. Default %default.""")
+  var context_type =
+    ap.option[String]("context-type", "ct",
+      default = "cell-dist-article-links",
+      choices = Seq("article", "cell", "cell-dist-article-links"),
+      help = """Type of context used when doing disambiguation.
+There are two cases where this choice applies: When computing a word
+distribution, and when counting the number of incoming internal links.
+'article' means use the article itself for both.  'cell' means use the
+cell for both. 'cell-dist-article-links' means use the cell for
+computing a word distribution, but the article for counting the number of
+incoming internal links.  Note that this only applies when
+--mode='geotag-toponyms'; in --mode='geotag-documents', only cells are
+considered.  Default '%default'.""")
+}
+
+object GeolocateToponymDriver extends GeolocateDriver {
+  type Params = GeolocateToponymParameters
+  type StrategyType = GeotagToponymStrategy
+  var Opts: Params = _
+
+  def canonicalize_options(opts: Params) {
+    Opts = opts
+    if (opts.strategy.length == 0)
+      opts.strategy = Seq("baseline")
+
+    if (opts.baseline_strategy.length == 0)
+      opts.baseline_strategy = Seq("internal-link")
+  }
+
+  def check_remaining_options(opts: Params) {
+    need(opts.gazetteer_file, "gazetteer-file")
+    // FIXME! Can only currently handle World-type gazetteers.
+    if (opts.gazetteer_type != "world")
+      argerror("Currently can only handle world-type gazetteers")
+
+    if (opts.strategy == Seq("baseline"))
+      ()
+    else if (opts.counts_file.length == 0)
+      argerror("Must specify counts file")
+
+    if (opts.eval_format == "raw-text") {
+      // FIXME!!!!
+      argerror("Raw-text reading not implemented yet")
+    }
+
+    need_seq(opts.eval_file, "eval-file", "evaluation file(s)")
+  }
+
+  /**
+   * Do the actual toponym geolocation.  Results to stderr (see above), and
+   * also returned.
+   *
+   * Return value very much like for run_geotag_documents(), but less
+   * useful info may be returned for each document processed.
+   */
+
+  def run(opts: Params) = {
+    initialize_cellgrid()
+    read_stopwords()
+
+    val table = new TopoArticleTable()
+    TopoArticleTable.table = table
+    GeoArticleTable.table = table
+    read_articles(table)
+
+    // errprint("Processing evaluation file(s) %s for toponym counts...",
+    //   opts.eval_file)
+    // process_dir_files(opts.eval_file, count_toponyms_in_file)
+    // errprint("Number of toponyms seen: %s",
+    //   toponyms_seen_in_eval_files.length)
+    // errprint("Number of toponyms seen more than once: %s",
+    //   (for {(foo,count) <- toponyms_seen_in_eval_files
+    //             if (count > 1)} yield foo).length)
+    // output_reverse_sorted_table(toponyms_seen_in_eval_files,
+    //                             outfile=sys.stderr)
+
+    if (opts.gazetteer_file != null) {
+      /* FIXME!!! */
+      assert(cellgrid.isInstanceOf[MultiRegularCellGrid])
+      val gazetteer =
+        new WorldGazetteer(opts.gazetteer_file,
+          cellgrid.asInstanceOf[MultiRegularCellGrid])
+      // Bootstrapping issue: Creating the gazetteer requires that the
+      // TopoArticleTable already exist, but the TopoArticleTable wants
+      // a pointer to a gazetter, so have to set it afterwards.
+      TopoArticleTable.table.set_gazetteer(gazetteer)
+    }
+
+    val strats = (
+      for (stratname <- opts.strategy) yield {
+        // Generate strategy object
+        if (stratname == "baseline") {
+          for (basestratname <- opts.baseline_strategy) yield ("baseline " + basestratname,
+            new BaselineGeotagToponymStrategy(cellgrid, basestratname))
+        } else {
+          val strategy = new NaiveBayesToponymStrategy(cellgrid,
+            use_baseline = (stratname == "naive-bayes-with-baseline"))
+          Seq((stratname, strategy))
+        }
+      })
+    process_strategies(strats)((stratname, strategy) => {
+      val evaluator =
+        // Generate reader object
+        if (opts.eval_format == "tr-conll")
+          new TRCoNLLGeotagToponymEvaluator(strategy, stratname)
+        else
+          new ArticleGeotagToponymEvaluator(strategy, stratname)
+      new DefaultEvaluationOutputter(stratname, evaluator)
+    })
+  }
+}
+
+object GeolocateToponymApp extends GeolocateApp("geolocate-toponyms") {
+  type ParamClass = GeolocateToponymParameters
+  val Driver = GeolocateToponymDriver
+  // FUCKING TYPE ERASURE
+  def create_arg_class() = new ParamClass(the_argparser)
+  main()
 }

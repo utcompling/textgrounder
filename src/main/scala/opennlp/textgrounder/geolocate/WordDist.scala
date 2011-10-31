@@ -52,12 +52,22 @@ object IntStringMemoizer {
       val newind = next_word_count
       next_word_count += 1
       word_id_map(word) = newind
-      id_word_map(index) = word
+      id_word_map(newind) = word
+      // debprint("Memoizing word %s to ID %s", word, newind)
       newind
     }
   }
 
-  def unmemoize_word(word: Word) = id_word_map(word)
+  def unmemoize_word(word: Word) = {
+    if (!(id_word_map contains word)) {
+      debprint("Can't find ID %s in id_word_map", word)
+      debprint("Word map:")
+      var its = id_word_map.toList.sorted
+      for ((key, value) <- its)
+        debprint("%s = %s", key, value)
+    }
+    id_word_map(word)
+  }
 
   def create_word_int_map() = trovescala.IntIntMap()
   type WordIntMap = trovescala.IntIntMap

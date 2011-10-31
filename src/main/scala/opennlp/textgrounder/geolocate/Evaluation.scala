@@ -3,7 +3,7 @@ package opennlp.textgrounder.geolocate
 import tgutil._
 import Distances._
 import Debug._
-import GeolocateDriver.Opts
+import GeolocateDriver.Args
 
 import math._
 import collection.mutable
@@ -437,7 +437,7 @@ class ArticleGeotagDocumentEvaluator(
 
   def iter_documents(filename: String) = {
     assert(filename == null)
-    for (art <- GeoArticleTable.table.articles_by_split(Opts.eval_set))
+    for (art <- GeoArticleTable.table.articles_by_split(Args.eval_set))
       yield art
   }
 
@@ -465,7 +465,7 @@ class ArticleGeotagDocumentEvaluator(
     if (article.dist == null) {
       // This can (and does) happen when --max-time-per-stage is set,
       // so that the counts for many articles don't get read in.
-      if (Opts.max_time_per_stage == 0.0 && Opts.num_training_docs == 0)
+      if (Args.max_time_per_stage == 0.0 && Args.num_training_docs == 0)
         warning("Can't evaluate article %s without distribution", article)
       evalstats.record_other_stat("Skipped articles")
       true
@@ -493,7 +493,7 @@ class ArticleGeotagDocumentEvaluator(
        true_rank = Rank of true cell among predicted cells
      */
     val (pred_cells, true_rank) =
-      if (Opts.oracle_results)
+      if (Args.oracle_results)
         (Array((true_cell, 0.0)), 1)
       else {
         def get_computed_results() = {
@@ -520,7 +520,7 @@ class ArticleGeotagDocumentEvaluator(
       new ArticleEvaluationResult(article, pred_cells(0)._1, true_rank)
 
     val want_indiv_results =
-      !Opts.oracle_results && !Opts.no_individual_results
+      !Args.oracle_results && !Args.no_individual_results
     evalstats.record_result(result)
     if (result.num_arts_in_true_cell == 0) {
       evalstats.record_other_stat(
@@ -598,14 +598,14 @@ class PCLTravelGeotagDocumentEvaluator(
   def evaluate_document(doc: TitledDocument, doctag: String) = {
     val dist = WordDist()
     val the_stopwords =
-      if (Opts.include_stopwords_in_article_dists) Set[String]()
+      if (Args.include_stopwords_in_article_dists) Set[String]()
       else Stopwords.stopwords
     for (text <- Seq(doc.title, doc.text)) {
       dist.add_document(split_text_into_words(text, ignore_punc = true),
-        ignore_case = !Opts.preserve_case_words,
+        ignore_case = !Args.preserve_case_words,
         stopwords = the_stopwords)
     }
-    dist.finish(minimum_word_count = Opts.minimum_word_count)
+    dist.finish(minimum_word_count = Args.minimum_word_count)
     val cells = strategy.return_ranked_cells(dist)
     errprint("")
     errprint("Article with title: %s", doc.title)
@@ -643,7 +643,7 @@ class DefaultEvaluationOutputter(stratname: String, evalobj: TestFileEvaluator
     val task = new MeteredTask("document", "evaluating")
     var last_elapsed = 0.0
     var last_processed = 0
-    var skip_initial = Opts.skip_initial_test_docs
+    var skip_initial = Args.skip_initial_test_docs
     var skip_n = 0
 
     class EvaluationFileProcessor extends FileProcessor {
@@ -672,7 +672,7 @@ class DefaultEvaluationOutputter(stratname: String, evalobj: TestFileEvaluator
               skip_n -= 1
               do_skip = true
             } else
-              skip_n = Opts.every_nth_test_doc - 1
+              skip_n = Args.every_nth_test_doc - 1
             if (do_skip)
               errprint("Passed over document %s", doctag)
             else {
@@ -686,11 +686,11 @@ class DefaultEvaluationOutputter(stratname: String, evalobj: TestFileEvaluator
             val new_processed = task.num_processed
 
             // If max # of docs reached, stop
-            if ((Opts.num_test_docs > 0 &&
-              new_processed >= Opts.num_test_docs)) {
+            if ((Args.num_test_docs > 0 &&
+              new_processed >= Args.num_test_docs)) {
               errprint("")
               errprint("Stopping because limit of %s documents reached",
-                Opts.num_test_docs)
+                Args.num_test_docs)
               task.finish()
               return false
             }
