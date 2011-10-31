@@ -200,7 +200,7 @@ package object argparser {
     catch {
       case e: NumberFormatException =>
         throw new ArgParserConversionException(
-          """Cannot convert argument "%s" to a floatig-point number."""
+          """Cannot convert argument "%s" to a floating-point number."""
           format rawval)
     }
   }
@@ -292,19 +292,25 @@ package object argparser {
    * }
    * }}}
    *
-   * @param message  exception message
+   * @param message exception message
+   * @param cause exception, if propagating an exception
    */
-  class ArgParserUsageException(message: String)
-    extends ArgParserException(message)
+  class ArgParserUsageException(
+    message: String,
+    cause: Option[Throwable] = None
+  ) extends ArgParserException(message, cause)
 
   /**
    * Thrown to indicate that ArgParser could not convert a command line
    * parameter to the desired type.
    *
-   * @param message  exception message
+   * @param message exception message
+   * @param cause exception, if propagating an exception
    */
-  class ArgParserConversionException(message: String)
-    extends ArgParserException(message)
+  class ArgParserConversionException(
+    message: String,
+    cause: Option[Throwable] = None
+  ) extends ArgParserException(message, cause)
 
   /**
    * Thrown to indicate that ArgParser encountered a problem in the caller's
@@ -361,36 +367,49 @@ package object argparser {
       canon: Map[T, Iterable[T]]) = {
       var retval = converted
       var recanon: Map[T, T] = null
+      var rechoices: Seq[T] = choices
       if (canon != null) {
         // Convert to a map in the other direction
         recanon =
-          for ((full, abbrevs) <- canon; abbrev <- abbrevs)
+          for {(full, abbrevs) <- canon
+               abbrev <- if (abbrevs == null) Seq() else abbrevs}
             yield (abbrev -> full)
         retval = recanon.getOrElse(retval, retval)
+        if (rechoices == null)
+          rechoices = canon.keys.toSeq
       }
-      if (choices == null || (choices contains retval)) retval
+      if (rechoices == null || (rechoices contains retval)) retval
       else {
         // Mapping for all choices, including non-canonical versions
-        val allchoices = mutable.Set[String]()
-        for (c <- choices)
+        var allchoices = mutable.Buffer[String]()
+        for (c <- rechoices)
           allchoices += c.toString
-        if (recanon != null)
-          for ((abbrev, full) <- recanon)
-            allchoices += "%s(=%s)" format (abbrev, full)
-        throw new ArgParserInvalidChoiceException("Choice '%s' not one of the recognized choices: %s" format (retval, allchoices mkString ", "))
+        allchoices = allchoices.sorted
+        var allcanon = mutable.Buffer[String]()
+        if (recanon != null) {
+          for ((abbrev, full) <- recanon) {
+            if (!(allchoices contains abbrev.toString))
+              allcanon += "%s(=%s)" format (abbrev, full)
+          }
+          allcanon = allcanon.sorted
+        }
+        throw new ArgParserInvalidChoiceException("Choice '%s' not one of the recognized choices: %s" format (retval, (allchoices ++ allcanon) mkString ", "))
       }
     }
   }
 
-  abstract class ArgAny[T](name: String) {
+  abstract class ArgAny[T](
+    val parser: ArgParser,
+    val name: String) {
     def value: T
     def apply() = value
     def specified: Boolean
   }
 
   class ArgFlag(
-    val name: String
-  ) extends ArgAny[Boolean](name) {
+    parser: ArgParser,
+    name: String
+  ) extends ArgAny[Boolean](parser, name) {
     var wrap: FlagOption[Boolean] = null
     def value = {
       wrap.value match {
@@ -402,10 +421,11 @@ package object argparser {
   }
 
   class ArgSingle[T](
+    parser: ArgParser,
+    name: String,
     val default: T,
-    val name: String,
     val is_param: Boolean = false
-  ) extends ArgAny[T](name) {
+  ) extends ArgAny[T](parser, name) {
     var wrap: SingleValueArg[T] = null
     def value = {
       wrap.value match {
@@ -417,12 +437,13 @@ package object argparser {
   }
 
   class ArgMulti[T](
+    parser: ArgParser,
+    name: String,
     val default: Seq[T],
-    val name: String,
     val is_param: Boolean = false
-  ) extends ArgAny[Seq[T]](name) {
+  ) extends ArgAny[Seq[T]](parser, name) {
     var wrap: MultiValueArg[T] = null
-    val wrapSingle = new ArgSingle[T](null.asInstanceOf[T], name)
+    val wrapSingle = new ArgSingle[T](parser, name, null.asInstanceOf[T])
     def value = if (wrap.value.length == 0) default else wrap.value
     def specified = (wrap.value.length > 0)
   }
@@ -515,10 +536,12 @@ package object argparser {
      */
     def getMultiType(arg: String) = argtype_multi(arg)
 
-    protected def handle_argument[T : Manifest, U : Manifest](name: Seq[String],
+    protected def handle_argument[T : Manifest, U : Manifest](
+      name: Seq[String],
       default: U,
       metavar: String,
-      create_underlying: (String, String) => ArgAny[U],
+      help: String,
+      create_underlying: (String, String, String) => ArgAny[U],
       is_multi: Boolean = false,
       is_positional: Boolean = false,
       is_flag: Boolean = false
@@ -529,8 +552,20 @@ package object argparser {
       else if (argmap contains canon)
         argmap(canon).asInstanceOf[ArgAny[U]].value
       else {
-        val real_metavar = computeMetavar(metavar, name)
-        val underobj = create_underlying(canon, real_metavar)
+        val canon_metavar = computeMetavar(metavar, name)
+        val helpsplit = """(%%|%default|%metavar|%prog|%|[^%]+)""".r.findAllIn(
+          help.replaceAll("""\s+""", " "))
+        val canon_help =
+          (for (s <- helpsplit) yield {
+            s match {
+              case "%default" => default.toString
+              case "%metavar" => canon_metavar
+              case "%%" => "%"
+              case "%prog" => this.prog
+              case _ => s
+            }
+          }) mkString ""
+        val underobj = create_underlying(canon, canon_metavar, canon_help)
         argmap(canon) = underobj
         argtype(canon) = manifest[U].erasure
         if (is_multi)
@@ -550,10 +585,11 @@ package object argparser {
       canonicalize: Map[T, Iterable[T]] = null,
       help: String = "")
     (implicit convert: (String, ArgSingle[T]) => T, m: Manifest[T]) = {
-      def create_underlying(canon_name: String, real_metavar: String) = {
-        val arg = new ArgSingle(default, canon_name)
+      def create_underlying(canon_name: String, canon_metavar: String,
+          canon_help: String) = {
+        val arg = new ArgSingle(this, canon_name, default)
         arg.wrap =
-          argot.option[T](name.toList, real_metavar, help) {
+          argot.option[T](name.toList, canon_metavar, canon_help) {
             (rawval: String, argop: SingleValueOption[T]) =>
               {
                 val converted = convert(rawval, arg)
@@ -562,7 +598,7 @@ package object argparser {
           }
         arg
       }
-      handle_argument[T,T](name, default, metavar, create_underlying _)
+      handle_argument[T,T](name, default, metavar, help, create_underlying _)
     }
 
     /**
@@ -640,12 +676,14 @@ package object argparser {
     def flagSeq(name: Seq[String],
       help: String = "") = {
       import ArgotConverters._
-      def create_underlying(canon_name: String, real_metavar: String) = {
-        val arg = new ArgFlag(canon_name)
-        arg.wrap = argot.flag[Boolean](name.toList, help)
+      def create_underlying(canon_name: String, canon_metavar: String,
+          canon_help: String) = {
+        val arg = new ArgFlag(this, canon_name)
+        arg.wrap = argot.flag[Boolean](name.toList, canon_help)
         arg
       }
-      handle_argument[Boolean,Boolean](name, false, null, create_underlying _)
+      handle_argument[Boolean,Boolean](name, false, null, help,
+        create_underlying _)
     }
 
     /**
@@ -682,10 +720,11 @@ package object argparser {
       canonicalize: Map[T, Iterable[T]] = null,
       help: String = "")
     (implicit convert: (String, ArgSingle[T]) => T, m: Manifest[T]) = {
-      def create_underlying(canon_name: String, real_metavar: String) = {
-        val arg = new ArgMulti[T](default, canon_name)
+      def create_underlying(canon_name: String, canon_metavar: String,
+          canon_help: String) = {
+        val arg = new ArgMulti[T](this, canon_name, default)
         arg.wrap =
-          argot.multiOption[T](name.toList, real_metavar, help) {
+          argot.multiOption[T](name.toList, canon_metavar, canon_help) {
             (rawval: String, argop: MultiValueOption[T]) =>
               {
                 val converted = convert(rawval, arg.wrapSingle)
@@ -694,8 +733,8 @@ package object argparser {
           }
         arg
       }
-      handle_argument[T,Seq[T]](name, default, metavar, create_underlying _,
-        is_multi = true)
+      handle_argument[T,Seq[T]](name, default, metavar, help,
+        create_underlying _, is_multi = true)
     }
 
     /**
@@ -740,10 +779,11 @@ package object argparser {
       help: String = "",
       optional: Boolean = false)
     (implicit convert: (String, ArgSingle[T]) => T, m: Manifest[T]) = {
-      def create_underlying(canon_name: String, real_metavar: String) = {
-        val arg = new ArgSingle(default, canon_name, is_param = true)
+      def create_underlying(canon_name: String, canon_metavar: String,
+          canon_help: String) = {
+        val arg = new ArgSingle(this, canon_name, default, is_param = true)
         arg.wrap =
-          argot.parameter[T](name, help, optional) {
+          argot.parameter[T](canon_name, canon_help, optional) {
             // FUCK ME! Argot wants a Parameter[T], but this is private to
             // Argot.  So we have to pass in a superclass.
             (rawval: String, argop: CommandLineArgument[T]) =>
@@ -754,8 +794,8 @@ package object argparser {
           }
         arg
       }
-      handle_argument[T,T](Seq(name), default, null, create_underlying _,
-        is_positional = true)
+      handle_argument[T,T](Seq(name), default, null, help,
+        create_underlying _, is_positional = true)
     }
 
     /**
@@ -771,9 +811,10 @@ package object argparser {
       help: String = "",
       optional: Boolean = true)
     (implicit convert: (String, ArgSingle[T]) => T, m: Manifest[T]) = {
-      def create_underlying(canon_name: String, real_metavar: String) = {
-        val arg = new ArgMulti[T](default, canon_name, is_param = true)
-        arg.wrap = argot.multiParameter[T](name, help, optional) {
+      def create_underlying(canon_name: String, canon_metavar: String,
+          canon_help: String) = {
+        val arg = new ArgMulti[T](this, canon_name, default, is_param = true)
+        arg.wrap = argot.multiParameter[T](canon_name, canon_help, optional) {
             // FUCK ME! Argot wants a Parameter[T], but this is private to
             // Argot.  So we have to pass in a superclass.
             (rawval: String, argop: CommandLineArgument[T]) =>
@@ -784,8 +825,8 @@ package object argparser {
           }
         arg
       }
-      handle_argument[T,Seq[T]](Seq(name), default, null, create_underlying _,
-        is_multi = true, is_positional = true)
+      handle_argument[T,Seq[T]](Seq(name), default, null, help,
+        create_underlying _, is_multi = true, is_positional = true)
     }
 
     /**
@@ -798,13 +839,36 @@ package object argparser {
      * use for the consumer of the values.
      *
      * @param args Command-line arguments, from main() or the like
+     * @param catchErrors If true (the default), usage errors will
+     *   be caught, a message outputted (without a stack trace), and
+     *   the program will exit.  Otherwise, the errors will be allowed
+     *   through, and the application should catch them.
      */
-    def parse(args: Seq[String]) = {
+    def parse(args: Seq[String], catchErrors: Boolean = true) = {
       if (argmap.size == 0)
         throw new ArgParserCodingError("No arguments initialized.  If you thought you specified arguments, you might have defined the corresponding fields with 'def' instead of 'var' or 'val'.")
-       
-      // println(argmap)
-      argot.parse(args.toList)
+      
+      def call_parse() {
+        // println(argmap)
+        try {
+          argot.parse(args.toList)
+        } catch {
+          case e: ArgotUsageException => {
+            throw new ArgParserUsageException(e.message, Some(e))
+          }
+        }
+      }
+
+      if (catchErrors) {
+        try {
+          call_parse()
+        } catch {
+          case e: ArgParserException => {
+            System.out.println(e.message)
+            System.exit(1)
+          }
+        }
+      } else call_parse()
     }
 
     def error(msg: String) {
