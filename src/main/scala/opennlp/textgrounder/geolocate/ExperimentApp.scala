@@ -44,12 +44,12 @@ abstract class ExperimentApp(val progname: String) extends App {
    * arguments.  Needs to have an ArgParser object passed in to it, typically
    * as a constructor parameter.
    */
-  type ArgClass
+  type ArgType
 
   /**
-   * Function to create an ArgClass, passing in the value of `the_argparser`.
+   * Function to create an ArgType, passing in the value of `the_argparser`.
    */
-  def create_arg_class(): ArgClass
+  def create_arg_class(): ArgType
 
   def handle_arguments(args: Seq[String])
   def implement_main(args: Seq[String])
@@ -71,7 +71,7 @@ abstract class ExperimentApp(val progname: String) extends App {
    */
   val the_argparser = new ArgParser(progname)
 
-  var argholder: ArgClass = _
+  var argholder: ArgType = _
 
   def main() = {
     set_stdout_stderr_utf_8()

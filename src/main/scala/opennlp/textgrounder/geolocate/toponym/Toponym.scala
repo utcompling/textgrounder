@@ -21,7 +21,7 @@ import tgutil._
 import argparser._
 import Distances._
 import Debug._
-import GeolocateToponymApp.Opts
+import GeolocateToponymApp.Args
 
 import collection.mutable
 import util.control.Breaks._
@@ -152,7 +152,7 @@ case class Locality(
   def distance_to_coord(coord: Coord) = spheredist(coord, coord)
 
   def matches_coord(coord: Coord) = {
-    distance_to_coord(coord) <= Opts.max_dist_for_close_match
+    distance_to_coord(coord) <= Args.max_dist_for_close_match
   }
 }
 
@@ -216,7 +216,7 @@ case class Division(
   // on the points in the cell.
   def compute_boundary() {
     // Yield up all points that are not "outliers", where outliers are defined
-    // as points that are more than Opts.max_dist_for_outliers away from all
+    // as points that are more than Args.max_dist_for_outliers away from all
     // other points.
     def iter_non_outliers() = {
       // If not enough points, just return them; otherwise too much possibility
@@ -230,7 +230,7 @@ case class Division(
         //  p <- locs
         //  // Find minimum distance to all other points and check it.
         //  mindist = (for (x <- locs if !(x eq p)) yield spheredist(p, x)) min
-        //  if (mindist <= Opts.max_dist_for_outliers)
+        //  if (mindist <= Args.max_dist_for_outliers)
         //} yield p
       }
     }
@@ -262,7 +262,7 @@ case class Division(
     worddist = new CellWordDist()
     for (loc <- Seq(this) ++ goodlocs if loc.artmatch != null)
       yield worddist.add_article(loc.artmatch)
-    worddist.finish(minimum_word_count = Opts.minimum_word_count)
+    worddist.finish(minimum_word_count = Args.minimum_word_count)
   }
 
   def contains(coord: Coord) = boundary contains coord
@@ -417,7 +417,7 @@ class TopoArticle(
   }
 
   def matches_coord(coord: Coord) = {
-    if (distance_to_coord(coord) <= Opts.max_dist_for_close_match) true
+    if (distance_to_coord(coord) <= Args.max_dist_for_close_match) true
     else if (location != null && location.isInstanceOf[Division] &&
       location.matches_coord(coord)) true
     else false
@@ -768,12 +768,12 @@ class BaselineGeotagToponymStrategy(
 
   def compute_score(geogword: GeogWord, art: TopoArticle) = {
     if (baseline_strategy == "internal-link") {
-      if (Opts.context_type == "cell")
+      if (Args.context_type == "cell")
         art.find_cellworddist(cellgrid).incoming_links
       else
         art.adjusted_incoming_links
     } else if (baseline_strategy == "num-articles") {
-      if (Opts.context_type == "cell")
+      if (Args.context_type == "cell")
         art.find_cellworddist(cellgrid).num_arts_for_links
       else {
         val location = art.location
@@ -801,25 +801,25 @@ class NaiveBayesToponymStrategy(
       art.adjusted_incoming_links)
 
     var distobj =
-      if (Opts.context_type == "article") art.dist
+      if (Args.context_type == "article") art.dist
       else art.find_cellworddist(cellgrid)
     var totalprob = 0.0
     var total_word_weight = 0.0
     val (word_weight, baseline_weight) =
       if (!use_baseline) (1.0, 0.0)
-      else if (Opts.naive_bayes_weighting == "equal") (1.0, 1.0)
-      else (1 - Opts.naive_bayes_baseline_weight,
-            Opts.naive_bayes_baseline_weight)
+      else if (Args.naive_bayes_weighting == "equal") (1.0, 1.0)
+      else (1 - Args.naive_bayes_baseline_weight,
+            Args.naive_bayes_baseline_weight)
     for ((dist, word) <- geogword.context) {
       val lword =
-        if (Opts.preserve_case_words) word else word.toLowerCase
+        if (Args.preserve_case_words) word else word.toLowerCase
       val wordprob =
         distobj.lookup_word(WordDist.memoizer.memoize_word(lword))
 
       // Compute weight for each word, based on distance from toponym
       val thisweight =
-        if (Opts.naive_bayes_weighting == "equal" ||
-          Opts.naive_bayes_weighting == "equal-words") 1.0
+        if (Args.naive_bayes_weighting == "equal" ||
+          Args.naive_bayes_weighting == "equal-words") 1.0
         else 1.0 / (1 + dist)
 
       total_word_weight += thisweight
@@ -885,7 +885,7 @@ abstract class GeotagToponymEvaluator(
       val results = (for (word <- g) yield return_word(word)).toArray
 
       // Now compute context for words
-      val nbcl = Opts.naive_bayes_context_len
+      val nbcl = Args.naive_bayes_context_len
       if (strategy.need_context()) {
         // First determine whether each word is a stopword
         for (i <- 0 until results.length) {
@@ -1287,11 +1287,11 @@ class WorldGazetteer(
     }
 
     // We start out looking for articles whose distance is very close,
-    // then widen until we reach Opts.max_dist_for_close_match.
+    // then widen until we reach Args.max_dist_for_close_match.
     var maxdist = 5
     var artmatch: TopoArticle = null
     breakable {
-      while (maxdist <= Opts.max_dist_for_close_match) {
+      while (maxdist <= Args.max_dist_for_close_match) {
         artmatch =
           cellgrid.table.asInstanceOf[TopoArticleTable].
             find_match_for_locality(loc, maxdist)
@@ -1330,7 +1330,7 @@ class WorldGazetteer(
         if (debug("lots"))
           errprint("Processing line: %s", line)
         match_world_gazetteer_entry(line)
-        if (status.item_processed(maxtime = Opts.max_time_per_stage))
+        if (status.item_processed(maxtime = Args.max_time_per_stage))
           break
       }
     }
@@ -1475,38 +1475,38 @@ considered.  Default '%default'.""")
 }
 
 class GeolocateToponymDriver extends GeolocateDriver {
-  type Params = GeolocateToponymParameters
+  type ParamType = GeolocateToponymParameters
   type StrategyType = GeotagToponymStrategy
-  var Opts: Params = _
+  var Args: ParamType = _
 
-  def canonicalize_options(opts: Params) {
-    Opts = opts
-    GeolocateToponymApp.Opts = opts
+  def canonicalize_args(args: ParamType) {
+    Args = args
+    GeolocateToponymApp.Args = args
     
-    if (opts.strategy.length == 0)
-      opts.strategy = Seq("baseline")
+    if (args.strategy.length == 0)
+      args.strategy = Seq("baseline")
 
-    if (opts.baseline_strategy.length == 0)
-      opts.baseline_strategy = Seq("internal-link")
+    if (args.baseline_strategy.length == 0)
+      args.baseline_strategy = Seq("internal-link")
   }
 
-  def check_remaining_options(opts: Params) {
-    need(opts.gazetteer_file, "gazetteer-file")
+  def check_remaining_args(args: ParamType) {
+    need(args.gazetteer_file, "gazetteer-file")
     // FIXME! Can only currently handle World-type gazetteers.
-    if (opts.gazetteer_type != "world")
+    if (args.gazetteer_type != "world")
       argerror("Currently can only handle world-type gazetteers")
 
-    if (opts.strategy == Seq("baseline"))
+    if (args.strategy == Seq("baseline"))
       ()
-    else if (opts.counts_file.length == 0)
+    else if (args.counts_file.length == 0)
       argerror("Must specify counts file")
 
-    if (opts.eval_format == "raw-text") {
+    if (args.eval_format == "raw-text") {
       // FIXME!!!!
       argerror("Raw-text reading not implemented yet")
     }
 
-    need_seq(opts.eval_file, "eval-file", "evaluation file(s)")
+    need_seq(args.eval_file, "eval-file", "evaluation file(s)")
   }
 
   /**
@@ -1517,15 +1517,15 @@ class GeolocateToponymDriver extends GeolocateDriver {
    * useful info may be returned for each document processed.
    */
 
-  def implement_run(opts: Params) = {
+  def implement_run(args: ParamType) = {
     val topo_article_table = new TopoArticleTable()
     article_table = topo_article_table
     initialize_cellgrid(article_table)
     read_articles(article_table, stopwords)
 
     // errprint("Processing evaluation file(s) %s for toponym counts...",
-    //   opts.eval_file)
-    // process_dir_files(opts.eval_file, count_toponyms_in_file)
+    //   args.eval_file)
+    // process_dir_files(args.eval_file, count_toponyms_in_file)
     // errprint("Number of toponyms seen: %s",
     //   toponyms_seen_in_eval_files.length)
     // errprint("Number of toponyms seen more than once: %s",
@@ -1534,11 +1534,11 @@ class GeolocateToponymDriver extends GeolocateDriver {
     // output_reverse_sorted_table(toponyms_seen_in_eval_files,
     //                             outfile=sys.stderr)
 
-    if (opts.gazetteer_file != null) {
+    if (args.gazetteer_file != null) {
       /* FIXME!!! */
       assert(cellgrid.isInstanceOf[MultiRegularCellGrid])
       val gazetteer =
-        new WorldGazetteer(opts.gazetteer_file,
+        new WorldGazetteer(args.gazetteer_file,
           cellgrid.asInstanceOf[MultiRegularCellGrid])
       // Bootstrapping issue: Creating the gazetteer requires that the
       // TopoArticleTable already exist, but the TopoArticleTable wants
@@ -1547,10 +1547,10 @@ class GeolocateToponymDriver extends GeolocateDriver {
     }
 
     val strats = (
-      for (stratname <- opts.strategy) yield {
+      for (stratname <- args.strategy) yield {
         // Generate strategy object
         if (stratname == "baseline") {
-          for (basestratname <- opts.baseline_strategy) yield ("baseline " + basestratname,
+          for (basestratname <- args.baseline_strategy) yield ("baseline " + basestratname,
             new BaselineGeotagToponymStrategy(cellgrid, basestratname))
         } else {
           val strategy = new NaiveBayesToponymStrategy(cellgrid,
@@ -1561,7 +1561,7 @@ class GeolocateToponymDriver extends GeolocateDriver {
     process_strategies(strats)((stratname, strategy) => {
       val evaluator =
         // Generate reader object
-        if (opts.eval_format == "tr-conll")
+        if (args.eval_format == "tr-conll")
           new TRCoNLLGeotagToponymEvaluator(strategy, stratname, this)
         else
           new ArticleGeotagToponymEvaluator(strategy, stratname, this)
@@ -1571,12 +1571,12 @@ class GeolocateToponymDriver extends GeolocateDriver {
 }
 
 object GeolocateToponymApp extends GeolocateApp("geolocate-toponyms") {
-  type ParamClass = GeolocateToponymParameters
-  type DriverClass = GeolocateToponymDriver
+  type ParamType = GeolocateToponymParameters
+  type DriverType = GeolocateToponymDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class() = new ParamClass(the_argparser)
-  def create_driver() = new DriverClass()
-  var Opts: ParamClass = _
+  def create_arg_class() = new ParamType(the_argparser)
+  def create_driver() = new DriverType()
+  var Args: ParamType = _
   
   main()
 }

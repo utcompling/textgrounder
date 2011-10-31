@@ -2638,13 +2638,13 @@ object Debug {
  * by the run() function.  See below.
  */
 abstract class GeolocateDriver {
-  type Params <: GeolocateParameters
+  type ParamType <: GeolocateParameters
   type StrategyType
   // NOTE: When different grids are allowed, we may set this to null here
   // and initialize it later based on a command-line option or whatever.
   var cellgrid = null: CellGrid
   var degrees_per_cell = 0.0
-  var options: Params = _
+  var parameters: ParamType = _
   var stopwords: Set[String] = _
   var article_table: GeoArticleTable = _
 
@@ -2703,47 +2703,47 @@ abstract class GeolocateDriver {
    *
    * @param options Object holding options to set
    */
-  def set_parameters(opts: Params) {
-    GeolocateDriver.Args = opts
-    options = opts
+  def set_parameters(args: ParamType) {
+    GeolocateDriver.Args = args
+    parameters = args
 
-    /** Canonicalize options **/
+    /** Canonicalize arguments **/
 
-    canonicalize_options(opts)
+    canonicalize_args(args)
 
-    /** Set other values and check remaining options **/
+    /** Set other values and check remaining args **/
 
-    if (opts.debug != null)
-      parse_debug_spec(opts.debug)
+    if (args.debug != null)
+      parse_debug_spec(args.debug)
 
-    def check_common_options(opts: Params) {
-      if (opts.miles_per_cell < 0)
+    def check_common_args(args: ParamType) {
+      if (args.miles_per_cell < 0)
         argerror("Miles per cell must be positive if specified")
-      if (opts.km_per_cell < 0)
+      if (args.km_per_cell < 0)
         argerror("Kilometers per cell must be positive if specified")
-      if (opts.degrees_per_cell < 0)
+      if (args.degrees_per_cell < 0)
         argerror("Degrees per cell must be positive if specified")
-      if (opts.miles_per_cell > 0 && opts.km_per_cell > 0)
+      if (args.miles_per_cell > 0 && args.km_per_cell > 0)
         argerror("Only one of --miles-per-cell and --km-per-cell can be given")
       degrees_per_cell =
-        if (opts.miles_per_cell > 0)
-          opts.miles_per_cell / miles_per_degree
-        else if (opts.km_per_cell > 0)
-          opts.km_per_cell / km_per_degree
+        if (args.miles_per_cell > 0)
+          args.miles_per_cell / miles_per_degree
+        else if (args.km_per_cell > 0)
+          args.km_per_cell / km_per_degree
         else
-          opts.degrees_per_cell
-      if (opts.width_of_multi_cell <= 0)
+          args.degrees_per_cell
+      if (args.width_of_multi_cell <= 0)
         argerror("Width of multi cell must be positive")
 
-      need_seq(opts.article_data_file, "article-data-file")
+      need_seq(args.article_data_file, "article-data-file")
     }
 
-    check_common_options(options)
-    check_remaining_options(options)
+    check_common_args(parameters)
+    check_remaining_args(parameters)
   }
 
-  def canonicalize_options(Args: Params)
-  def check_remaining_options(Args: Params)
+  def canonicalize_args(Args: ParamType)
+  def check_remaining_args(Args: ParamType)
 
   protected def initialize_cellgrid(table: GeoArticleTable) {
     cellgrid = new MultiRegularCellGrid(degrees_per_cell,
@@ -2787,13 +2787,13 @@ abstract class GeolocateDriver {
 
   def run() = {
     stopwords = Stopwords.read_stopwords(Args.stopwords_file)
-    implement_run(options)
+    implement_run(parameters)
   }
 
   /**
    * Actually do the work.
    */
-  def implement_run(opts: Params): Seq[(String, StrategyType, EvaluationOutputter)]
+  def implement_run(args: ParamType): Seq[(String, StrategyType, EvaluationOutputter)]
 }
 
 object GeolocateDriver {
@@ -2832,14 +2832,14 @@ low values more visible.  Possibilities are 'none' (no transformation),
 }
 
 class GenerateKMLDriver extends GeolocateDriver {
-  type Params = GenerateKMLParameters
+  type ParamType = GenerateKMLParameters
   type StrategyType = Nothing
 
-  def canonicalize_options(opts: Params) {
+  def canonicalize_args(args: ParamType) {
   }
 
-  def check_remaining_options(opts: Params) {
-    need(opts.kml_words, "kml-words")
+  def check_remaining_args(args: ParamType) {
+    need(args.kml_words, "kml-words")
   }
 
   /**
@@ -2847,10 +2847,10 @@ class GenerateKMLDriver extends GeolocateDriver {
    * KML files created and written on disk.
    */
 
-  def implement_run(opts: Params) = {
+  def implement_run(args: ParamType) = {
     read_data_for_geotag_documents()
     cellgrid.finish()
-    val words = opts.kml_words.split(',')
+    val words = args.kml_words.split(',')
     for (word <- words) {
       val celldist = CellDist.get_cell_dist(cellgrid, memoize_word(word))
       if (!celldist.normalized) {
@@ -2858,9 +2858,9 @@ class GenerateKMLDriver extends GeolocateDriver {
 Not generating an empty KML file.""", word)
       } else {
         val kmlparams = new KMLParameters()
-        kmlparams.kml_max_height = opts.kml_max_height
-        kmlparams.kml_transform = opts.kml_transform
-        celldist.generate_kml_file("%s%s.kml" format (opts.kml_prefix, word),
+        kmlparams.kml_max_height = args.kml_max_height
+        kmlparams.kml_transform = args.kml_transform
+        celldist.generate_kml_file("%s%s.kml" format (args.kml_prefix, word),
           kmlparams)
       }
     }
@@ -2999,51 +2999,51 @@ strategies, since they require that --preserve-case-words be set internally.""")
 }
 
 class GeolocateDocumentDriver extends GeolocateDriver {
-  type Params = GeolocateDocumentParameters
+  type ParamType = GeolocateDocumentParameters
   type StrategyType = GeotagDocumentStrategy
 
-  def canonicalize_options(opts: Params) {
-    if (opts.strategy.length == 0)
-      opts.strategy = Seq("partial-kl-divergence")
+  def canonicalize_args(args: ParamType) {
+    if (args.strategy.length == 0)
+      args.strategy = Seq("partial-kl-divergence")
 
-    if (opts.baseline_strategy.length == 0)
-      opts.baseline_strategy = Seq("internal-link")
+    if (args.baseline_strategy.length == 0)
+      args.baseline_strategy = Seq("internal-link")
 
-    if (opts.strategy contains "baseline") {
+    if (args.strategy contains "baseline") {
       var need_case = false
       var need_no_case = false
-      for (bstrat <- opts.baseline_strategy) {
+      for (bstrat <- args.baseline_strategy) {
         if (bstrat.endsWith("most-common-toponym"))
           need_case = true
         else
           need_no_case = true
       }
       if (need_case) {
-        if (opts.strategy.length > 1 || need_no_case) {
+        if (args.strategy.length > 1 || need_no_case) {
           // That's because we have to set --preserve-case-words, which we
           // generally don't want set for other strategies and which affects
           // the way we construct the training-document distributions.
           argerror("Can't currently mix *-most-common-toponym baseline strategy with other strategies")
         }
-        opts.preserve_case_words = true
+        args.preserve_case_words = true
       }
     }
   }
 
-  def check_remaining_options(opts: Params) {
-    if (opts.counts_file.length == 0)
+  def check_remaining_args(args: ParamType) {
+    if (args.counts_file.length == 0)
       argerror("Must specify counts file")
 
-    if (opts.eval_format == "raw-text") {
+    if (args.eval_format == "raw-text") {
       // FIXME!!!!
       argerror("Raw-text reading not implemented yet")
     }
 
-    if (opts.eval_format == "internal") {
-      if (opts.eval_file.length > 0)
+    if (args.eval_format == "internal") {
+      if (args.eval_file.length > 0)
         argerror("--eval-file should not be given when --eval-format=internal")
     } else
-      need_seq(opts.eval_file, "eval-file", "evaluation file(s)")
+      need_seq(args.eval_file, "eval-file", "evaluation file(s)")
   }
 
   /**
@@ -3065,14 +3065,14 @@ class GeolocateDocumentDriver extends GeolocateDriver {
    * type in practice is ArticleEvaluationResult)
    */
 
-  def implement_run(opts: Params) = {
+  def implement_run(args: ParamType) = {
     read_data_for_geotag_documents()
     cellgrid.finish()
 
     val strats = (
-      for (stratname <- opts.strategy) yield {
+      for (stratname <- args.strategy) yield {
         if (stratname == "baseline") {
-          for (basestratname <- opts.baseline_strategy) yield {
+          for (basestratname <- args.baseline_strategy) yield {
             val strategy = basestratname match {
               case "link-most-common-toponym" =>
                 new LinkMostCommonToponymGeotagDocumentStrategy(cellgrid)
@@ -3128,7 +3128,7 @@ class GeolocateDocumentDriver extends GeolocateDriver {
     process_strategies(strats)((stratname, strategy) => {
       val evaluator =
         // Generate reader object
-        if (opts.eval_format == "pcl-travel")
+        if (args.eval_format == "pcl-travel")
           new PCLTravelGeotagDocumentEvaluator(strategy, stratname, this)
         else
           new ArticleGeotagDocumentEvaluator(strategy, stratname, this)
@@ -3138,12 +3138,12 @@ class GeolocateDocumentDriver extends GeolocateDriver {
 }
 
 abstract class GeolocateApp(appname: String) extends ExperimentApp(appname) {
-  type ParamClass <: GeolocateParameters
-  type ArgClass = ParamClass
-  type DriverClass <: GeolocateDriver
+  type ParamType <: GeolocateParameters
+  type ArgType = ParamType
+  type DriverType <: GeolocateDriver
   val driver = create_driver()
 
-  def create_driver(): DriverClass
+  def create_driver(): DriverType
 
   def argerror(str: String) {
     the_argparser.error(str)
@@ -3155,7 +3155,7 @@ abstract class GeolocateApp(appname: String) extends ExperimentApp(appname) {
 
   def handle_arguments(args: Seq[String]) {
     driver.set_error_handler(argerror _)
-    driver.set_parameters(argholder.asInstanceOf[driver.Params])
+    driver.set_parameters(argholder.asInstanceOf[driver.ParamType])
   }
 
   def implement_main(args: Seq[String]) {
@@ -3164,20 +3164,20 @@ abstract class GeolocateApp(appname: String) extends ExperimentApp(appname) {
 }
 
 object GeolocateDocumentApp extends GeolocateApp("geolocate-documents") {
-  type ParamClass = GeolocateDocumentParameters
-  type DriverClass = GeolocateDocumentDriver
+  type ParamType = GeolocateDocumentParameters
+  type DriverType = GeolocateDocumentDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class() = new ParamClass(the_argparser)
-  def create_driver() = new DriverClass()
+  def create_arg_class() = new ParamType(the_argparser)
+  def create_driver() = new DriverType()
   main()
 }
 
 object GenerateKMLApp extends GeolocateApp("generate-kml") {
-  type ParamClass = GenerateKMLParameters
-  type DriverClass = GenerateKMLDriver
+  type ParamType = GenerateKMLParameters
+  type DriverType = GenerateKMLDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class() = new ParamClass(the_argparser)
-  def create_driver() = new DriverClass()
+  def create_arg_class() = new ParamType(the_argparser)
+  def create_driver() = new DriverType()
   main()
 }
 
