@@ -18,7 +18,7 @@ package opennlp.textgrounder.geolocate.toponym
 
 import opennlp.textgrounder.geolocate._
 import tgutil._
-import OptParse._
+import argparser._
 import Distances._
 import Debug._
 import GeolocateToponymDriver.Opts
@@ -1344,10 +1344,10 @@ class WorldGazetteer(
 }
 
 class GeolocateToponymParameters(
-  parser: OptionParser = null
+  parser: ArgParser = null
 ) extends GeolocateParameters(parser) {
   var eval_format =
-    op.option[String]("f", "eval-format",
+    ap.option[String]("f", "eval-format",
       default = "article",
       choices = Seq("article", "raw-text", "tr-conll"),
       help = """Format of evaluation file(s).  The evaluation files themselves
@@ -1375,11 +1375,11 @@ ignored.""")
 
   //// Input files, toponym resolution only
   var gazetteer_file =
-    op.option[String]("gazetteer-file", "gf",
+    ap.option[String]("gazetteer-file", "gf",
       help = """File containing gazetteer information to match.  Only used
 during toponym resolution (--mode=geotag-toponyms).""")
   var gazetteer_type =
-    op.option[String]("gazetteer-type", "gt",
+    ap.option[String]("gazetteer-type", "gt",
       metavar = "FILE",
       default = "world", choices = Seq("world", "db"),
       help = """Type of gazetteer file specified using --gazetteer-file.
@@ -1387,7 +1387,7 @@ Only used during toponym resolution (--mode=geotag-toponyms).  NOTE: type
 'world' is the only one currently implemented.  Default '%default'.""")
 
   var strategy =
-    op.multiOption[String]("s", "strategy",
+    ap.multiOption[String]("s", "strategy",
       //      choices=Seq(
       //        "baseline", "none",
       //        "naive-bayes-with-baseline",
@@ -1416,7 +1416,7 @@ NOTE: Multiple --strategy options can be given, and each strategy will
 be tried, one after the other.""")
 
   var baseline_strategy =
-    op.multiOption[String]("baseline-strategy", "bs",
+    ap.multiOption[String]("baseline-strategy", "bs",
       choices = Seq("internal-link", "random",
         "num-articles"),
       canonicalize = Map(
@@ -1441,25 +1441,25 @@ be tried, one after the other.""")
   //// (Note, gazetteer-file options also used only in toponym resolution,
   //// see above)
   var naive_bayes_context_len =
-    op.option[Int]("naive-bayes-context-len", "nbcl",
+    ap.option[Int]("naive-bayes-context-len", "nbcl",
       default = 10,
       help = """Number of words on either side of a toponym to use
 in Naive Bayes matching.  Only applicable to toponym resolution
 (--mode=geotag-toponyms).  Default %default.""")
   var max_dist_for_close_match =
-    op.option[Double]("max-dist-for-close-match", "mdcm",
+    ap.option[Double]("max-dist-for-close-match", "mdcm",
       default = 80.0,
       help = """Maximum number of km allowed when looking for a
 close match for a toponym (--mode=geotag-toponyms).  Default %default.""")
   var max_dist_for_outliers =
-    op.option[Double]("max-dist-for-outliers", "mdo",
+    ap.option[Double]("max-dist-for-outliers", "mdo",
       default = 200.0,
       help = """Maximum number of km allowed between a point and
 any others in a division (--mode=geotag-toponyms).  Points farther away than
 this are ignored as "outliers" (possible errors, etc.).  NOTE: Not
 currently implemented. Default %default.""")
   var context_type =
-    op.option[String]("context-type", "ct",
+    ap.option[String]("context-type", "ct",
       default = "cell-dist-article-links",
       choices = Seq("article", "cell", "cell-dist-article-links"),
       help = """Type of context used when doing disambiguation.
@@ -1574,6 +1574,6 @@ object GeolocateToponymApp extends GeolocateApp("geolocate-toponyms") {
   type ParamClass = GeolocateToponymParameters
   val Driver = GeolocateToponymDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class() = new ParamClass(optparser)
+  def create_arg_class() = new ParamClass(the_argparser)
   main()
 }

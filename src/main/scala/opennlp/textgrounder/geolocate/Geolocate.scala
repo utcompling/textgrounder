@@ -24,10 +24,10 @@ package opennlp.textgrounder.geolocate
 import tgutil._
 import WordDist.memoizer._
 import WordDist.SmoothedWordDist
-import OptParse._
+import argparser._
 import Distances._
 import Debug._
-import GeolocateDriver.Opts
+import GeolocateDriver.Args
 
 import util.matching.Regex
 import util.Random
@@ -526,7 +526,7 @@ class CellWordDist extends SmoothedWordDist(
        training set. */
     if (art.split == "training") {
       if (art.dist == null) {
-        if (Opts.max_time_per_stage == 0.0 && Opts.num_training_docs == 0)
+        if (Args.max_time_per_stage == 0.0 && Args.num_training_docs == 0)
           warning("Saw article %s without distribution", art)
       } else {
         assert(art.dist.finished)
@@ -675,7 +675,7 @@ object CellDist {
   // cache to optimize access.
   def get_cell_dist(cellgrid: CellGrid, word: Word) = {
     if (cached_dists == null)
-      cached_dists = new LRUCache(maxsize = Opts.lru_cache_size)
+      cached_dists = new LRUCache(maxsize = Args.lru_cache_size)
     cached_dists.get(word) match {
       case Some(dist) => dist
       case None => {
@@ -819,7 +819,7 @@ abstract class GeoCell(val cellgrid: CellGrid) {
         most_popular_article = art
       }
     }
-    worddist.finish(minimum_word_count = Opts.minimum_word_count)
+    worddist.finish(minimum_word_count = Args.minimum_word_count)
   }
 }
 
@@ -1692,7 +1692,7 @@ class GeoArticleTable {
     }
 
     ArticleData.read_article_data_file(filename, process,
-      maxtime = Opts.max_time_per_stage)
+      maxtime = Args.max_time_per_stage)
 
     for (x <- redirects) {
       val redart = lookup_article(x.redir)
@@ -1710,7 +1710,7 @@ class GeoArticleTable {
         if (art.dist != null) {
           /* FIXME: Move this finish() earlier, and split into
              before/after global. */
-          art.dist.finish(minimum_word_count = Opts.minimum_word_count)
+          art.dist.finish(minimum_word_count = Args.minimum_word_count)
           totaltoks += art.dist.num_word_tokens
           numarts += 1
         }
@@ -1774,7 +1774,7 @@ class GeoArticleTable {
       num_word_count_articles_by_split(art.split) += 1
       // If we are evaluating on the dev set, skip the test set and vice
       // versa, to save memory and avoid contaminating the results.
-      if (art.split != "training" && art.split != Opts.eval_set)
+      if (art.split != "training" && art.split != Args.eval_set)
         return
       // Don't train on test set
       art.dist = WordDist(keys_dynarr.array, values_dynarr.array,
@@ -1793,13 +1793,13 @@ class GeoArticleTable {
           if (title != null)
             one_article_probs()
           // Stop if we've reached the maximum
-          if (task.item_processed(maxtime = Opts.max_time_per_stage))
+          if (task.item_processed(maxtime = Args.max_time_per_stage))
             break
-          if ((Opts.num_training_docs > 0 &&
-            task.num_processed >= Opts.num_training_docs)) {
+          if ((Args.num_training_docs > 0 &&
+            task.num_processed >= Args.num_training_docs)) {
             errprint("")
             errprint("Stopping because limit of %s documents reached",
-              Opts.num_training_docs)
+              Args.num_training_docs)
             break
           }
 
@@ -1820,10 +1820,10 @@ class GeoArticleTable {
           line match {
             case linere(xword, xcount) => {
               var word = xword
-              if (!Opts.preserve_case_words) word = word.toLowerCase
+              if (!Args.preserve_case_words) word = word.toLowerCase
               val count = xcount.toInt
               if (!(Stopwords.stopwords contains word) ||
-                Opts.include_stopwords_in_article_dists) {
+                Args.include_stopwords_in_article_dists) {
                 num_word_tokens += count
                 keys_dynarr += memoize_word(word)
                 values_dynarr += count
@@ -2231,9 +2231,9 @@ class NaiveBayesDocumentStrategy(
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
       if (use_baseline) {
-        if (Opts.naive_bayes_weighting == "equal") (1.0, 1.0)
+        if (Args.naive_bayes_weighting == "equal") (1.0, 1.0)
         else {
-          val bw = Opts.naive_bayes_baseline_weight.toDouble
+          val bw = Args.naive_bayes_baseline_weight.toDouble
           ((1.0 - bw) / worddist.num_word_tokens, bw)
         }
       } else (1.0, 0.0))
@@ -2321,13 +2321,13 @@ object Stopwords {
  *   Because they are vars, they can be freely set to other values.
  *
  */
-class GeolocateParameters(parser: OptionParser = null) {
-  protected val op =
-    if (parser == null) new OptionParser("unknown") else parser
+class GeolocateParameters(parser: ArgParser = null) {
+  protected val ap =
+    if (parser == null) new ArgParser("unknown") else parser
 
   //// Basic options for determining operating mode and strategy
   var mode =
-    op.option[String]("m", "mode",
+    ap.option[String]("m", "mode",
       default = "geotag-documents",
       choices = Seq("geotag-toponyms",
         "geotag-documents",
@@ -2355,14 +2355,14 @@ the probabilities to make the distinctions among them more visible.
 
   //// Input files
   var stopwords_file =
-    op.option[String]("stopwords-file",
+    ap.option[String]("stopwords-file",
       metavar = "FILE",
       help = """File containing list of stopwords.  If not specified,
 a default list of English stopwords (stored in the TextGrounder distribution)
 is used.""")
 
   var article_data_file =
-    op.multiOption[String]("a", "article-data-file",
+    ap.multiOption[String]("a", "article-data-file",
       metavar = "FILE",
       help = """File containing info about Wikipedia or Twitter articles.
 (For Twitter, an "article" is typically the set of all tweets from a single
@@ -2376,14 +2376,14 @@ articles; that is held in a separate counts file, specified using
 Multiple such files can be given by specifying the option multiple
 times.""")
   var counts_file =
-    op.multiOption[String]("counts-file", "cf",
+    ap.multiOption[String]("counts-file", "cf",
       metavar = "FILE",
       help = """File containing word counts for Wikipedia or Twitter articles.
 There are scripts in the 'python' directory for generating counts in the
 proper format.  Multiple such files can be given by specifying the
 option multiple times.""")
   var eval_file =
-    op.multiOption[String]("e", "eval-file",
+    ap.multiOption[String]("e", "eval-file",
       metavar = "FILE",
       help = """File or directory containing files to evaluate on.
 Multiple such files/directories can be given by specifying the option multiple
@@ -2394,7 +2394,7 @@ Each file is read in and then disambiguation is performed.  Not used when
 
   //// Options indicating which documents to train on or evaluate
   var eval_set =
-    op.option[String]("eval-set", "es",
+    ap.option[String]("eval-set", "es",
       default = "dev",
       choices = Seq("dev", "test"),
       canonicalize = Map("dev" -> Seq("devel")),
@@ -2402,45 +2402,45 @@ Each file is read in and then disambiguation is performed.  Not used when
 and --mode=geotag-documents ('dev' or 'devel' for the development set,
 'test' for the test set).  Default '%default'.""")
   var num_training_docs =
-    op.option[Int]("num-training-docs", "ntrain", default = 0,
+    ap.option[Int]("num-training-docs", "ntrain", default = 0,
       help = """Maximum number of training documents to use.
 0 means no limit.  Default 0, i.e. no limit.""")
   var num_test_docs =
-    op.option[Int]("num-test-docs", "ntest", default = 0,
+    ap.option[Int]("num-test-docs", "ntest", default = 0,
       help = """Maximum number of test (evaluation) documents to process.
 0 means no limit.  Default 0, i.e. no limit.""")
   var skip_initial_test_docs =
-    op.option[Int]("skip-initial-test-docs", "skip-initial", default = 0,
+    ap.option[Int]("skip-initial-test-docs", "skip-initial", default = 0,
       help = """Skip this many test docs at beginning.  Default 0, i.e.
 don't skip any documents.""")
   var every_nth_test_doc =
-    op.option[Int]("every-nth-test-doc", "every-nth", default = 1,
+    ap.option[Int]("every-nth-test-doc", "every-nth", default = 1,
       help = """Only process every Nth test doc.  Default 1, i.e.
 process all.""")
   //  def skip_every_n_test_docs =
-  //    op.option[Int]("skip-every-n-test-docs", "skip-n", default=0,
+  //    ap.option[Int]("skip-every-n-test-docs", "skip-n", default=0,
   //      help="""Skip this many after each one processed.  Default 0.""")
 
   //// Options indicating how to generate the cells we compare against
   var degrees_per_cell =
-    op.option[Double]("degrees-per-cell", "dpc",
+    ap.option[Double]("degrees-per-cell", "dpc",
       default = 1.0,
       help = """Size (in degrees, a floating-point number) of the tiling
 cells that cover the Earth.  Default %default. """)
   var miles_per_cell =
-    op.option[Double]("miles-per-cell", "mpc",
+    ap.option[Double]("miles-per-cell", "mpc",
       help = """Size (in miles, a floating-point number) of the tiling
 cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
   var km_per_cell =
-    op.option[Double]("km-per-cell", "kpc",
+    ap.option[Double]("km-per-cell", "kpc",
       help = """Size (in kilometers, a floating-point number) of the tiling
 cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
   var width_of_multi_cell =
-    op.option[Int]("width-of-multi-cell", default = 1,
+    ap.option[Int]("width-of-multi-cell", default = 1,
       help = """Width of the cell used to compute a statistical
 distribution for geotagging purposes, in terms of number of tiling cells.
 NOTE: It's unlikely you want to change this.  It may be removed entirely in
@@ -2450,24 +2450,24 @@ tiling cell to compute each multi cell.  If the value is more than
 
   //// Options used when creating word distributions
   var preserve_case_words =
-    op.flag("preserve-case-words", "pcw",
+    ap.flag("preserve-case-words", "pcw",
       help = """Don't fold the case of words used to compute and
 match against article distributions.  Note that in toponym resolution
 (--mode=geotag-toponyms), this applies only to words in articles
 (currently used only in Naive Bayes matching), not to toponyms, which
 are always matched case-insensitively.""")
   var include_stopwords_in_article_dists =
-    op.flag("include-stopwords-in-article-dists",
+    ap.flag("include-stopwords-in-article-dists",
       help = """Include stopwords when computing word distributions.""")
   var minimum_word_count =
-    op.option[Int]("minimum-word-count", "mwc",
+    ap.option[Int]("minimum-word-count", "mwc",
       default = 1,
       help = """Minimum count of words to consider in word
 distributions.  Words whose count is less than this value are ignored.""")
 
   //// Options used when doing Naive Bayes geotagging
   var naive_bayes_weighting =
-    op.option[String]("naive-bayes-weighting", "nbw",
+    ap.option[String]("naive-bayes-weighting", "nbw",
       default = "equal",
       choices = Seq("equal", "equal-words", "distance-weighted"),
       help = """Strategy for weighting the different probabilities
@@ -2479,7 +2479,7 @@ and assigning the remainder to the words.  If 'distance-weighted', similar to
 'equal-words' but don't weight each word the same as each other word; instead,
 weight the words according to distance from the toponym.""")
   var naive_bayes_baseline_weight =
-    op.option[Double]("naive-bayes-baseline-weight", "nbbw",
+    ap.option[Double]("naive-bayes-baseline-weight", "nbbw",
       metavar = "WEIGHT",
       default = 0.5,
       help = """Relative weight to assign to the baseline (prior
@@ -2487,23 +2487,23 @@ probability) when doing weighted Naive Bayes.  Default %default.""")
 
   //// Options used when doing ACP geotagging
   var lru_cache_size =
-    op.option[Int]("lru-cache-size", "lru", default = 400,
+    ap.option[Int]("lru-cache-size", "lru", default = 400,
       help = """Number of entries in the LRU cache.  Default %default.
 Used only when --strategy=average-cell-probability.""")
 
   //// Debugging/output options
   var max_time_per_stage =
-    op.option[Double]("max-time-per-stage", "mts", default = 0.0,
+    ap.option[Double]("max-time-per-stage", "mts", default = 0.0,
       help = """Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default 0, i.e. no limit.""")
   var no_individual_results =
-    op.flag("no-individual-results", "no-results",
+    ap.flag("no-individual-results", "no-results",
       help = """Don't show individual results for each test document.""")
   var oracle_results =
-    op.flag("oracle-results",
+    ap.flag("oracle-results",
       help = """Only compute oracle results (much faster).""")
   var debug =
-    op.option[String]("d", "debug", metavar = "FLAGS",
+    ap.option[String]("d", "debug", metavar = "FLAGS",
       help = """Output debug info of the given types.  Multiple debug
 parameters can be specified, indicating different types of info to output.
 Separate parameters by spaces, colons or semicolons.  Params can be boolean,
@@ -2592,7 +2592,7 @@ object Debug {
  * Basic operation:
  *
  * 1. Create an instance of GeolocateParameters and populate it with the
- * appropriate parameters.  Don't pass in any OptionParser instance, as
+ * appropriate parameters.  Don't pass in any ArgParser instance, as
  * is the default; that way, the parameters will get initialized to their
  * default values, and you only have to change the ones you want to be
  * non-default.
@@ -2623,8 +2623,7 @@ abstract class GeolocateDriver {
    * Output the values of some internal parameters.  Only needed
    * for debugging.
    */
-  def output_internal_parameters() {
-  }
+  def output_ancillary_parameters() {}
 
   /**
    * Default error handler for signalling an argument error.
@@ -2674,7 +2673,7 @@ abstract class GeolocateDriver {
    * @param options Object holding options to set
    */
   def set_parameters(opts: Params) {
-    GeolocateDriver.Opts = opts
+    GeolocateDriver.Args = opts
     options = opts
 
     /** Canonicalize options **/
@@ -2712,27 +2711,27 @@ abstract class GeolocateDriver {
     check_remaining_options(options)
   }
 
-  def canonicalize_options(Opts: Params)
-  def check_remaining_options(Opts: Params)
+  def canonicalize_options(Args: Params)
+  def check_remaining_options(Args: Params)
 
   protected def initialize_cellgrid() {
     cellgrid = new MultiRegularCellGrid(degrees_per_cell,
-      Opts.width_of_multi_cell)
+      Args.width_of_multi_cell)
   }
 
   protected def read_stopwords() {
     val stopwords_file =
-      Stopwords.compute_stopwords_filename(Opts.stopwords_file)
+      Stopwords.compute_stopwords_filename(Args.stopwords_file)
     Stopwords.read_stopwords(stopwords_file)
   }
 
   protected def read_articles(table: GeoArticleTable) {
-    for (fn <- Opts.article_data_file)
+    for (fn <- Args.article_data_file)
       table.read_article_data(fn, cellgrid)
 
     // Read in the words-counts file
-    if (Opts.counts_file.length > 0) {
-      for (fn <- Opts.counts_file)
+    if (Args.counts_file.length > 0) {
+      for (fn <- Args.counts_file)
         table.read_word_counts(fn)
       table.finish_word_counts()
     }
@@ -2756,7 +2755,7 @@ abstract class GeolocateDriver {
       // evaluation loop work properly, we pretend like there's a single
       // eval file whose value is null.
       val iterfiles =
-        if (Opts.eval_file.length > 0) Opts.eval_file
+        if (Args.eval_file.length > 0) Args.eval_file
         else Seq[String](null)
       evalobj.evaluate_and_output_results(iterfiles)
       (stratname, strategy, evalobj)
@@ -2770,27 +2769,27 @@ abstract class GeolocateDriver {
 }
 
 object GeolocateDriver {
-  var Opts: GeolocateParameters = _
+  var Args: GeolocateParameters = _
 }
 
 class GenerateKMLParameters(
-  parser: OptionParser = null
+  parser: ArgParser = null
 ) extends GeolocateParameters(parser) {
   //// Options used only in KML generation (--mode=generate-kml)
   var kml_words =
-    op.option[String]("k", "kml-words", "kw",
+    ap.option[String]("k", "kml-words", "kw",
       help = """Words to generate KML distributions for, when
 --mode=generate-kml.  Each word should be separated by a comma.  A separate
 file is generated for each word, using the value of '--kml-prefix' and adding
 '.kml' to it.""")
   var kml_prefix =
-    op.option[String]("kml-prefix", "kp",
+    ap.option[String]("kml-prefix", "kp",
       default = "kml-dist.",
       help = """Prefix to use for KML files outputted in --mode=generate-kml.
 The actual filename is created by appending the word, and then the suffix
 '.kml'.  Default '%default'.""")
   var kml_transform =
-    op.option[String]("kml-transform", "kt", "kx",
+    ap.option[String]("kml-transform", "kt", "kx",
       default = "none",
       choices = Seq("none", "log", "logsquared"),
       help = """Type of transformation to apply to the probabilities
@@ -2799,7 +2798,7 @@ low values more visible.  Possibilities are 'none' (no transformation),
 'log' (take the log), and 'logsquared' (negative of squared log).  Default
 '%default'.""")
   var kml_max_height =
-    op.option[Double]("kml-max-height", "kmh",
+    ap.option[Double]("kml-max-height", "kmh",
       default = 2000000.0,
       help = """Height of highest bar, in meters.  Default %default.""")
 }
@@ -2842,10 +2841,10 @@ Not generating an empty KML file.""", word)
 }
 
 class GeolocateDocumentParameters(
-  parser: OptionParser = null
+  parser: ArgParser = null
 ) extends GeolocateParameters(parser) {
   var eval_format =
-    op.option[String]("f", "eval-format",
+    ap.option[String]("f", "eval-format",
       default = "internal",
       choices = Seq("internal", "raw-text", "pcl-travel"),
       help = """Format of evaluation file(s).  The evaluation files themselves
@@ -2865,7 +2864,7 @@ is in PCL-Travel XML format, and uses each chapter in the evaluation
 file as a document to evaluate.""")
 
   var strategy =
-    op.multiOption[String]("s", "strategy",
+    ap.multiOption[String]("s", "strategy",
       //      choices=Seq(
       //        "baseline", "none",
       //        "full-kl-divergence",
@@ -2937,7 +2936,7 @@ NOTE: Multiple --strategy options can be given, and each strategy will
 be tried, one after the other.""")
 
   var baseline_strategy =
-    op.multiOption[String]("baseline-strategy", "bs",
+    ap.multiOption[String]("baseline-strategy", "bs",
       choices = Seq("internal-link", "random",
         "num-articles", "link-most-common-toponym",
         "cell-distribution-most-common-toponym"),
@@ -3110,17 +3109,17 @@ object GeolocateDocumentDriver extends GeolocateDriver {
   }
 }
 
-abstract class GeolocateApp(appname: String) extends NlpApp(appname) {
+abstract class GeolocateApp(appname: String) extends ExperimentApp(appname) {
   type ParamClass <: GeolocateParameters
   type ArgClass = ParamClass
   val Driver: GeolocateDriver
 
   def argerror(str: String) {
-    optparser.error(str)
+    the_argparser.error(str)
   }
 
-  override def output_internal_parameters() {
-    Driver.output_internal_parameters()
+  override def output_ancillary_parameters() {
+    Driver.output_ancillary_parameters()
   }
 
   def handle_arguments(args: Seq[String]) {
@@ -3137,7 +3136,7 @@ object GeolocateDocumentApp extends GeolocateApp("geolocate-documents") {
   type ParamClass = GeolocateDocumentParameters
   val Driver = GeolocateDocumentDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class() = new ParamClass(optparser)
+  def create_arg_class() = new ParamClass(the_argparser)
   main()
 }
 
@@ -3145,7 +3144,7 @@ object GenerateKMLApp extends GeolocateApp("generate-kml") {
   type ParamClass = GenerateKMLParameters
   val Driver = GenerateKMLDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class() = new ParamClass(optparser)
+  def create_arg_class() = new ParamClass(the_argparser)
   main()
 }
 
