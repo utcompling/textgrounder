@@ -18,20 +18,38 @@ package opennlp.textgrounder.geolocate
 import org.clapper.argot._
 import util.control.Breaks._
 import collection.mutable
-import java.lang.reflect._
 
 /**
   An option parser for Scala, built on top of Argot and made to work
   quite similar to the option-parsing mechanisms in Python.
 
   The parser tries to be easy to use, similar to how options work in
-  Python.  Unfortunately, limitations in Scala make this difficult --
-  in particular, there doesn't appear to currently be a way to
-  intercept field/method lookup on a class the way you can in Python.
+  Python.  This leads to the need to be very slightly tricky in the way
+  that options are declared; see below.
+
+  The basic features here that Argot doesn't have are:
+
+  (1) Argument specification is simplified through the use of optional
+      parameters to the argument-creation functions.
+  (2) A simpler and easier-to-use interface is provided for accessing
+      argument values given on the command line, so that the values can be
+      accessed as simple field references (re-assignable if needed).
+  (3) Default values can be given.
+  (4) "Choice"-type arguments can be specified (only one of a fixed number
+      of choices allowed).  This can include multiple aliases for a given
+      choice.
+  (5) The "flag" type is simplified to just handle boolean flags, which is
+      the most common usage. (FIXME: Eventually perhaps we should consider
+      also allowing more general Argot-type flags.)
+  (6) A reasonable default value is provided for the "meta-variable"
+      parameter to options.
+  (7) Conversion functions are easier to specify, since one function suffices
+      for all types of arguments (whether single, multi, optional, positional,
+      etc.).
   
-  So what we do is a bit tricky.  See the example under TestOpts below.
-  Basically, you need to create an object of type OptionParser, and then
-  add options to it by calling functions, typically:
+  In general, to parse options, you first create an object of type
+  OptionParser (call it `op`), and then add options to it by calling
+  functions, typically:
 
   -- op.option[T]() for a single-valued option of type T
   -- op.multiOption[T]() for a multi-valued option of type T (i.e. the option
@@ -42,66 +60,101 @@ import java.lang.reflect._
   -- op.multiParameter[T]() for a multi-valued positional parameter (i.e.
      eating up any remaining positional parameters given)
 
-  The tricky thing is that you want to assign the results of these functions
-  to def'd fields in some object (which internally are treated like
-  no-argument functions); and importantly, THERE MUST BE NOT BE ANY OTHER
-  NO-ARGUMENT FUNCTIONS IN THE OBJECT (and no vals or vars unless the
-  appropriate flag is set during parsing; see below).
+  There are two styles for accessing the values of arguments specified on the
+  command line.  One possibility is to simply declare options by calling the
+  above functions, then parse a command line using `op.parse()`, then retrieve
+  values using `op.get[T]()` to get the value of a particular option.
 
-  As an example, say your object has the following:
-    def foo = op.option[Int]("foo", default = 5)
+  However, this style is not as convenient as we'd like, especially since
+  the type must be specified.  In the original Python API, once the
+  equivalent calls have been made to specify options and a command line
+  parsed, the options can be directly retrieved from the OptionParser object
+  as if they were fields; e.g. if an option `--outfile` were declared using
+  a call like `op.option[String]("outfile", ...)`, then after parsing, the
+  value could simply be fetched using `op.outfile`, and assignment to
+  `op.outfile` would be possible, e.g. if the value is to be defaulted from
+  another argument.
+  
+  This functionality depends on the ability to dynamically intercept field
+  references and assignments, which doesn't currently exist in Scala.
+  However, it is possible to achieve a near-equivalent.  It works like this:
 
-  This declares an argument of type Int, with the given name(s), default
-  values, possible choices, help value used when outputting usage, etc.
-  The return value is of type Int.  Note that this is actually a function
-  call, and each time you read the value of 'foo', it makes a new function
-  call.
+  1) Functions like `op.option[T]()` are set up so that the first time they
+     are called for a given OptionParser object and option, they will note
+     the option, and return the default value of this option.  If called
+     again after parsing, however, they will return the value specified in
+     the command line (or the default if no value was specified). (If called
+     again *before* parsing, they simply return the default value, as before.)
 
-  The first time this function is called, it records it arguments in an
-  internal structure and then throws a particular exception.  This is
-  supposed to happen *before* the command-line arguments are parsed.
-  Later calls need to happen *after* the command-line arguments are parsed,
-  and return the value of the appropriate command-line argument.
-  (Note, however, that the OptionParser 'op' was created with the parameter
-  'return_defaults' to true, then all invocations of the function simply
-  return the default value.  This is so that the default values can be
-  queried.)
+  2) A class, e.g. ProgOptions, is created to hold the values returned from
+     the command line.  This class typically looks like this:
+     
+     class ProgOptions(op: OptionParser) {
+       var outfile = op.option[String]("outfile", "o", ...)
+       var verbose = op.flag("verbose", "v", ...)
+       ...
+     }
 
-  When you call op.parse(), you need to pass in the object holding all the
-  option defs.  Internally, the defs are queried using reflection, and
-  run once; this is how the special behavior on first-time invocation is
-  trigged.  Because the function can return many types, and because from
-  java's standpoint, vars, vals and no-argument defs are all just
-  no-argument functions, we don't know how to distinguish between these
-  possibilities, which is why they aren't normally allowed unless they're
-  options.  More specifically, we have to invoke each such "function".
-  In fact, if the "functions" correspond to vals or vars, such invocation
-  will be harmless, as it will simply return the value of the field.
-  However, if the functions are actual no-argument functions, and they
-  have side effects, these side effects will be triggered, which may be
-  very bad.
+  3) To parse a command line, we proceed as follows:
 
-  The reason an exception is thrown the first time the function is called
-  is so that internally we can figure out if the user accidentally declared
-  a var, val or wrong type of no-argument def, and abort if so with an
-  error. (This mechanism isn't sufficient to *detect* the different kinds
-  of fields because we had to invoke the function underlying the field,
-  which if it isn't actually an option might have who knows what side
-  effects that shouldn't have been triggered.) In practice, we allow the
-  user to override this with an appropriate option to parse(); but this
-  defeats the safety-checking mechanism, so it's not on by default.
+     a) Create an OptionParser object.
+     b) Create an instance of ProgOptions, passing in the OptionParser object.
+     c) Call `parse()` on the OptionParser object, to parse a command line.
+     d) Create *another* instance of ProgOptions, passing in the *same*
+        OptionParser object.
+     e) Now, the argument values specified on the command line can be
+        retrieved from this new instance of ProgOptions simply using field
+        accesses, and new values can likewise be set using field accesses.
+
+  Note how this actually works.  When the first instance of ProgOptions is
+  created, the initialization of the variables causes the arguments to be
+  specified on the OptionParser -- and the variables have the default values
+  of the arguments.  When the second instance is created, after parsing, and
+  given the *same* OptionParser object, the respective calls to "initialize"
+  the arguments have no effect, but now return the values specified on the
+  command line.  Because these are declared as `var`, they can be freely
+  re-assigned.  Furthermore, because no actual reflection or any such thing
+  is done, the above scheme will work completely fine if e.g. ProgOptions
+  subclasses another class that also declares some arguments (e.g. to
+  abstract out common arguments for multiple applications).  In addition,
+  there is no problem mixing and matching the scheme described here with the
+  conceptually simpler scheme where argument values are retrieved using
+  `op.get[T]()`.
  */
 
 object OptParse {
   /*
-  This was part of a failed attempt to make functions like optionSeq[T]()
-  return a wrapped object, so that we can reliably recognize def options
-  during reflection.
 
-  The problems were:
+  NOTE: At one point, in place of the second scheme described above, there
+  was a scheme involving reflection.  This didn't work as well, and ran
+  into various problems.  One such problem is described here, because it
+  shows some potential limitations/bugs in Scala.  In particular, in that
+  scheme, calls to `op.option[T]()` and similar were declared using `def`
+  instead of `var`, and the first call to them was made using reflection.
+  Underlyingly, all defs, vars and vals look like functions, and fields
+  declared as `def` simply look like no-argument functions.  Because the
+  return type can vary and generally is a simple type like Int or String,
+  there was no way to reliably recognize defs of this sort from other
+  variables, functions, etc. in the object.  To make this recognition
+  reliable, I tried wrapping the return value in some other object, with
+  bidirectional implicit conversions to/from the wrapped value, something
+  like this:
+      
+  class OptionWrap[T](vall: T) extends OptionAny[T] {
+    def value = vall
+    def specified = true
+  }
+
+  implicit def extractValue[T](opt: OptionAny[T]): T = opt.value
+
+  implicit def wrapValue[T](vall: T): OptionAny[T] = new OptionWrap(vall)
+
+  Unfortunately, this didn't work, for somewhat non-obvious reasons.
+  Specifically, the problems were:
 
   (1) Type unification between wrapped and unwrapped values fails.  This is
-      a problem e.g. in if-then-else statements like
+      a problem e.g. if I try to access a field value in an if-then-else
+      statements like this, I run into problems:
 
       val files =
         if (use_val)
@@ -109,10 +162,11 @@ object OptParse {
         else
           Seq[String]()
 
-      This unifies to AnyRef, not Seq[String].
+      This unifies to AnyRef, not Seq[String], even if Opts.files wraps
+      a Seq[String].
 
-  (2) Calls to methods can fail in weird ways.  For example, the following
-      fails:
+  (2) Calls to methods on the wrapped values (e.g. strings) can fail in
+      weird ways.  For example, the following fails:
 
       def words = op.option[String]("words")
 
@@ -120,29 +174,14 @@ object OptParse {
 
       val split_words = op.words.split(',')
 
-      In this case, if I have a string, I *can* call split with a character;
-      but this fails in the case of implicit conversion -- perhaps because
-      there is a split() implemented on java.lang.String that takes only
-      strings, whereas split() that takes a character is stored in
-      StringOps, which itself needs to be implemented using an implicit
-      conversion.
-      
-      
-  implicit def extractValue[T](opt: OptionAny[T]): T = opt.value
-
-  implicit def wrapValue[T](vall: T): OptionAny[T] = new OptionWrap(vall)
+      However, it doesn't fail if the argument passed in is a string rather
+      than a character.  In this case, if I have a string, I *can* call
+      split with a character as an argument - perhaps this fails in the case
+      of an implicit conversion because there is a split() implemented on
+      java.lang.String that takes only strings, whereas split() that takes
+      a character is stored in StringOps, which itself is handled using an
+      implicit conversion.
    */
-
-  /* If "full", output lots of information during the portion of code
-     where we do reflection on the argholder object inside of
-     OptionParse.parse().  This code is somewhat tricky and may break
-     if the internal java representation of Scala code changes in the
-     future.
-     
-     If "partial", just output the names of arguments as seen.
-     
-     If "none", no output. */
-  val debug_opts = "none"
 
   implicit def convertInt(rawval: String, op: OptionSingle[Int]) = {
     try { rawval.toInt }
@@ -210,21 +249,23 @@ object OptParse {
    * exception and print the message, which will be a fully fleshed-out usage
    * string. For instance:
    *
+   * (FIXME: Not implemented currently.)
+   *
    * {{{
    * import opennlp.textgrounder.geolocate.OptParse._
    *
    * object TestOpts extends App {
    *   val op = new OptionParser("test")
    *   object Opts {
-   *     def foo = op.option[Int]("foo", default=5)
-   *     def bar = op.option[String]("bar", default="fuck")
-   *     def baz = op.multiOption[String]("baz")
-   *     def bat = op.multiOption[Int]("bat")
-   *     def blop = op.option[String]("blop", choices=Seq("mene", "tekel", "upharsin"))
-   *     def blop2 = op.multiOption[String]("blop2", choices=Seq("mene", "tekel", "upharsin"))
+   *     var foo = op.option[Int]("foo", default=5)
+   *     var bar = op.option[String]("bar", default="fuck")
+   *     var baz = op.multiOption[String]("baz")
+   *     var bat = op.multiOption[Int]("bat")
+   *     var blop = op.option[String]("blop", choices=Seq("mene", "tekel", "upharsin"))
+   *     var blop2 = op.multiOption[String]("blop2", choices=Seq("mene", "tekel", "upharsin"))
    *   }
    *   ...
-   *   op.parse(Opts, args)
+   *   op.parse(args)
    *   ...
    *   println("foo: %s" format Opts.foo)
    *   println("bar: %s" format Opts.bar)
@@ -258,9 +299,6 @@ object OptParse {
    * @param message  exception message
    */
   class OptParseConversionException(message: String)
-    extends OptParseException(message)
-
-  class OptParseFirstTimeException(message: String)
     extends OptParseException(message)
 
   /**
@@ -342,17 +380,6 @@ object OptParse {
     def specified: Boolean
   }
 
-  /*
-  This was part of a failed attempt to make functions like optionSeq[T]()
-  return a wrapped object, so that we can reliably recognize def options
-  during reflection.  See above.
-
-  class OptionWrap[T](vall: T) extends OptionAny[T] {
-    def value = vall
-    def specified = true
-  }
-  */
-
   class OptionFlag(
     val name: String
   ) extends OptionAny[Boolean](name) {
@@ -382,17 +409,17 @@ object OptParse {
   }
 
   class OptionMulti[T](
+    val default: Seq[T],
     val name: String,
     val is_param: Boolean = false
   ) extends OptionAny[Seq[T]](name) {
     var wrap: MultiValueArg[T] = null
     val wrapSingle = new OptionSingle[T](null.asInstanceOf[T], name)
-    def value = wrap.value
-    def specified = (wrap != null && wrap.value.length > 0)
+    def value = if (wrap.value.length == 0) default else wrap.value
+    def specified = (wrap.value.length > 0)
   }
 
   class OptionParser(prog: String,
-      reflection_style: Boolean = false,
       return_defaults: Boolean = false) {
     import OptionParser._
     import ArgotConverters._
@@ -414,8 +441,6 @@ object OptParse {
     protected val argpositional = mutable.Set[String]()
     /* Set specifying arguments that are flag options. */
     protected val argflag = mutable.Set[String]()
-    protected var parsed = false
-    protected var last_arg = null: String
 
     /**
      * Return the value of an argument, or the default if not specified.
@@ -507,11 +532,7 @@ object OptParse {
           argpositional += control
         if (is_flag)
           argflag += control
-        last_arg = control
-        if (reflection_style)
-          throw new OptParseFirstTimeException("If you see this, it means we're running reflection-style, and either you meant to use non-reflection-style ('reflection_style' = false), or you need to define your argument fields using 'def' instead of 'var' or 'val'.")
-        else
-          default
+        default
       }
     }
 
@@ -648,13 +669,14 @@ object OptParse {
     }
 
     def multiOptionSeq[T](opt: Seq[String],
+      default: Seq[T] = Seq[T](),
       metavar: String = null,
       choices: Seq[T] = null,
       canonicalize: Map[T, Iterable[T]] = null,
       help: String = "")
     (implicit convert: (String, OptionSingle[T]) => T, m: Manifest[T]) = {
       def create_underlying(controlling_opt: String, real_metavar: String) = {
-        val option = new OptionMulti[T](controlling_opt)
+        val option = new OptionMulti[T](default, controlling_opt)
         option.wrap =
           op.multiOption[T](opt.toList, real_metavar, help) {
             (rawval: String, op: MultiValueOption[T]) =>
@@ -665,7 +687,7 @@ object OptParse {
           }
         option
       }
-      handle_argument[T,Seq[T]](opt, Seq[T](), metavar, create_underlying _,
+      handle_argument[T,Seq[T]](opt, default, metavar, create_underlying _,
         is_multi = true)
     }
 
@@ -735,13 +757,15 @@ object OptParse {
      * all other parameters.  @see parameter[T].
      */
     def multiParameter[T](name: String,
+      default: Seq[T] = Seq[T](),
       choices: Seq[T] = null,
       canonicalize: Map[T, Iterable[T]] = null,
       help: String = "",
       optional: Boolean = true)
     (implicit convert: (String, OptionSingle[T]) => T, m: Manifest[T]) = {
       def create_underlying(controlling_opt: String, real_metavar: String) = {
-        val option = new OptionMulti[T](controlling_opt, is_param = true)
+        val option =
+          new OptionMulti[T](default, controlling_opt, is_param = true)
         option.wrap =
           op.multiParameter[T](name, help, optional) {
             // FUCK ME! Argot wants a Parameter[T], but this is private to
@@ -754,7 +778,7 @@ object OptParse {
           }
         option
       }
-      handle_argument[T,Seq[T]](Seq(name), Seq[T](), null, create_underlying _,
+      handle_argument[T,Seq[T]](Seq(name), default, null, create_underlying _,
         is_multi = true, is_positional = true)
     }
 
@@ -764,130 +788,24 @@ object OptParse {
      * obtained simply by using the defs as fields.
      *
      * @param args Command-line arguments, from main() or the like
-     * @param obj Object holding defs specifying command-line options; only
-     *        needs to be given when `reflection_style` is true.
-     * @param allow_other_fields_in_obj If true, don't abort when other
-     *        vars or vals are defined in `obj`.  DON'T DEFINE OTHER
-     *        NO-ARGUMENT DEFS (whether or not an argument list is given);
-     *        those functions will be called during parsing, any if they
-     *        have any side effects, you'll be sorry.
      */
-    def parse(args: Seq[String], obj: AnyRef = null,
-      allow_other_fields_in_obj: Boolean = false) = {
-      assert(!parsed)
-      if (reflection_style) {
-        if (argmap.size > 0)
-          System.err.println("WARNING: Arguments initialized already, but we're using reflection to initialize the arguments.  If you didn't do this on purpose, you might be defining your argument fields with 'var' or 'val' instead of 'def'.")
-
-        val objargs = obj.getClass.getDeclaredMethods
-        // Call each null-argument function, assumed to be an option.  The
-        // first time such functions are called, they will install the
-        // appropriate OptionAny-subclass object in 
-        for {
-          arg <- objargs
-          if {
-            val (partial, full) =
-              if (debug_opts == "partial") (true, false)
-              else if (debug_opts == "full") (true, true)
-              else (false, false)
-            if (partial) {
-              println("Argument: " + arg)
-              println("Argument name: " + arg.getName)
-            }
-            if (full) {
-              println("Argument toGenericString(): " + arg.toGenericString)
-              println("Argument parameter types: " + arg.getParameterTypes)
-              println("Number of parameter types: " +
-                arg.getParameterTypes.length)
-              println("Modifiers: " + Modifier.toString(arg.getModifiers))
-              val rettype = arg.getReturnType
-              println("Return type: " + rettype)
-              println("Return type name: " + rettype.getName)
-              val rettype2 = arg.getGenericReturnType
-              println("Generic return type: " + rettype2)
-              println("Is bridge: " + arg.isBridge)
-              println("Is synthetic: " + arg.isSynthetic)
-              println("Is var args: " + arg.isVarArgs)
-              println("Is var args: " + arg.isVarArgs)
-              // Doesn't work: println(rettype2.getName)
-            }
-            /* Skip defs with the wrong number of arguments, as well as
-               static defs.  There might, for example, be a static no-
-               argument initialization function. */
-            (arg.getParameterTypes.length == 0 &&
-             !Modifier.isStatic(arg.getModifiers))
-            // && arg.getReturnType.isAssignableFrom(classOf[OptionAny[_]]))
-          }
-        } {
-          def constructNoNoMess(mess: String) = {
-            "%s.  You probably declared a var, val or no-argument def inside the structure with the option defs.  If you really want a var or val, you can allow this by setting 'allow_other_fields_in_obj' to true when calling parse().  DO NOT INCLUDE ANY NO-ARGUMENT DEFS, especially if they have side effects; you'll be sorry.  Field/method name is '%s', of full declaration as follows: %s" format (mess, arg.getName, arg)
-          }
-          var threw = false
-          try {
-            /* Invoke each option through reflection.  This should throw an
-               OptParseFirstTimeException.  When a call to invoke() throws
-               an exception, we see this as an InvocationTargetException that
-               wraps the actual exception thrown. */
-            arg.invoke(obj)
-          } catch {
-            case wrapped_e:InvocationTargetException => {
-              wrapped_e.getCause match {
-                case e:OptParseFirstTimeException => threw = true
-                /* The code invoked returned a weird exception.  That can
-                   happen if the user has some other functions or whatever
-                   in the argholder object other than an option def, and they
-                   throw an exception. */
-                /* SCALABUG: If this throws 'new OptParseException', it
-                   compiles and works with 'e' (rather than 'Some(e)') as
-                   second argument, but if it throws
-                   'new OptParseCodingError', it gives an error,
-                   even though both have exactly the same signature! 
-                 */
-                case e@_ => throw new OptParseCodingError(constructNoNoMess(
-                  "Invalid exception during initialization"), Some(e))
-              }
-            }
-            /* The call to invoke() itself returned some weird exception.
-               That means something is well and truly wrong with the code in
-               this module. */
-            /* SCALABUG: Identical problem to that described just above. */
-            case e@_ => throw new OptParseInternalError(
-              "Unexpected exception during reflection invocation",
-              Some(e))
-          }
-          if (!threw && !allow_other_fields_in_obj) {
-            /* No exception; definitely not an option def. */
-            throw new OptParseCodingError(constructNoNoMess(
-              "Encountered a no-argument function that was not an option"))
-          }
-        }
-      } else {
-        if (argmap.size == 0)
-          throw new OptParseCodingError("No arguments initialized.  We are not using reflection to initialize arguments; maybe you need to set 'reflection_style' to true?  If not, and you thought you specified arguments, you might have defined the corresponding fields with 'def' instead of 'var' or 'val'.")
-      }
+    def parse(args: Seq[String]) = {
+      if (argmap.size == 0)
+        throw new OptParseCodingError("No arguments initialized.  If  you thought you specified arguments, you might have defined the corresponding fields with 'def' instead of 'var' or 'val'.")
        
       // println(argmap)
       op.parse(args.toList)
-      parsed = true
     }
 
     def error(msg: String) {
       throw new OptParseConversionException(msg)
     }
 
-    def checkArgsAvailable() {
-      assert(parsed,
-      "Need to call 'parse()' first so that the arguments are known " +
-      "(they are fetched from the first argument to 'parse()')")
-    }
-
     def argNameObjects: Iterable[(String, OptionAny[_])] = {
-      checkArgsAvailable()
       argmap.toIterable
     }
 
     def argNameValues: Iterable[(String, Any)] = {
-      checkArgsAvailable()
       for ((name, optobj) <- argmap) yield (name, optobj.value)
     }
   }
@@ -895,49 +813,7 @@ object OptParse {
 
 object TestOpts extends App {
   import OptParse._
-  val op = new OptionParser("test", reflection_style = true)
-  object Opts {
-    /* An integer option named --foo, with a default value of 5.  Can also
-       be specified using --spam or -f. */
-    def foo = op.option[Int]("foo", "spam", "f", default = 5)
-    /* A string option named --bar, with a default value of "chinga".  Can
-       also be specified using -b. */
-    def bar = op.option[String]("bar", "b", default = "chinga")
-    /* A string option named --baz.  Default value is null. */
-    def baz = op.multiOption[String]("baz")
-    /* A floating-point option named --bat.  Default value is 0.0. */
-    def bat = op.multiOption[Double]("bat")
-    /* A flag --bezzaaf, alias -q.  Value is true if given, false if not. */
-    def bezzaaf = op.flag("bezzaaf", "q")
-    /* An integer option --blop, with only the values 1, 2, 4 or 7 are allowed.
-       Default is 2. (Note, in this case, if the default is not given, it
-       will end up as 0, even though this isn't technically a valid choice.
-       This allows detection of when no choice is given.)
-     */
-    def blop = op.option[Int]("blop", default = 1, choices = Seq(1, 2, 4, 7))
-    /* A string option --daniel, with only the values "mene", "tekel", and
-       "upharsin" allowed, but where values can be repeated, e.g.
-       --daniel mene --daniel mene --daniel tekel --daniel upharsin
-       . */
-    def daniel = op.multiOption[String]("daniel",
-      choices = Seq("mene", "tekel", "upharsin"))
-    /* FIXME: Order of retrieval during reflection may not be the same as
-       order of specification here. */
-    /* A required positional parameter. */
-    // def destfile = op.parameter[String]("DESTFILE", help = "Destination file to store output in")
-    /* A multi-positional parameter that sucks up all remaining arguments. */
-    def files = op.multiParameter[String]("FILES", help = "Files to process")
-  }
-  // op.parse(Opts, List("--foo", "7"))
-  op.parse(args, Opts)
-  /* Print out values of all parameters, whether options or positional */
-  for ((name, value) <- op.argNameValues)
-    println("%30s: %s" format (name, value))
-}
-
-object TestOpts2 extends App {
-  import OptParse._
-  val op = new OptionParser("test", reflection_style = false)
+  val op = new OptionParser("test")
   class MyOpts(op: OptionParser) {
     /* An integer option named --foo, with a default value of 5.  Can also
        be specified using --spam or -f. */
@@ -963,18 +839,19 @@ object TestOpts2 extends App {
        . */
     var daniel = op.multiOption[String]("daniel",
       choices = Seq("mene", "tekel", "upharsin"))
-    /* FIXME: Order of retrieval during reflection may not be the same as
-       order of specification here. */
     /* A required positional parameter. */
-    // def destfile = op.parameter[String]("DESTFILE", help = "Destination file to store output in")
+    var destfile = op.parameter[String]("DESTFILE", help = "Destination file to store output in")
     /* A multi-positional parameter that sucks up all remaining arguments. */
     var files = op.multiParameter[String]("FILES", help = "Files to process")
   }
+  // This first call is necessary, even though it doesn't appear to do
+  // anything.  In particular, this ensures that all arguments have been
+  // defined on `op` prior to parsing.
   val first_shadow = new MyOpts(op)
+  // op.parse(List("--foo", "7"))
+  op.parse(args)
   val Opts = new MyOpts(op)
-  // op.parse(Opts, List("--foo", "7"))
-  op.parse(args, Opts)
-  /* Print out values of all parameters, whether options or positional */
+  /* Print out values of all arguments, whether options or positional */
   for ((name, value) <- op.argNameValues)
     println("%30s: %s" format (name, value))
 }
