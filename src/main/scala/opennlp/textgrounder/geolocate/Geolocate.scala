@@ -60,7 +60,7 @@ Technologies, Portland, Oregon, USA, June 2011.
 
 (See http://www.jasonbaldridge.com/papers/wing-baldridge-acl2011.pdf.)
 
-It operates in four basic modes (specified by --mode):
+There are three main apps, each of which does a different task:
 
 1. Document geolocation.  This identifies the location of a document.
    Training comes from "articles", which currently are described simply
@@ -88,11 +88,11 @@ It operates in four basic modes (specified by --mode):
    then outputs KML files for given words showing the distribution of
    the words across the Earth.
 
-4. Simultaneous segmentation and geolocation.  This assumes that a
-   document is composed of segments of unknown size, each of which
-   refers to a different location, and simultaneously finds the
-   best segmentation and best location of each segment. (NOT YET
-   implemented.)
+A fourth, not-yet-written app is for simultaneous segmentation and
+geolocation.  This assumes that a document is composed of segments of
+unknown size, each of which refers to a different location, and
+simultaneously finds the best segmentation and best location of each
+segment.
 
 === Obtaining the Data ===
 
@@ -107,7 +107,7 @@ There are three sets of data to download:
     you need.
   * Auxiliary files, in `wikigrounder-aux-1.0.tar.bz2`. NOTE: Currently the
     only auxiliary file you need is the World Gazetteer, and that is needed
-    only when doing toponym resolution (--mode=geotag-toponyms).
+    only when doing toponym resolution.
   * The processed Twitter data, in `wikigrounder-twitter-1.0.tar.bz2`.
 
 Untar these files somewhere.  Then set the following environment variables:
@@ -115,44 +115,81 @@ Untar these files somewhere.  Then set the following environment variables:
   * `TG_TWITTER_DIR` points to the directory containing the Twitter data.
   * `TG_AUX_DIR` points to the directory containing the auxiliary data.
 
+(Alternatively, if you are running on a UT NLP machine, or a machine with
+a copy of the relevant portions of /groups/corpora and /groups/projects in
+the same places, set TG_ON_COMP_LING_MACHINES and it will initialize those
+three for you.)
+
 The Wikipedia data was generated from [http://download.wikimedia.org/enwiki/20100904/enwiki-20100904-pages-articles.xml.bz2 the original English-language Wikipedia dump of September 4, 2010].
 
 The Twitter data was generated from [http://www.ark.cs.cmu.edu/GeoText/ The Geo-tagged Microblog corpus] created by [http://aclweb.org/anthology-new/D/D10/D10-1124.pdf Eisenstein et al (2010)].
 
 === Replicating the experiments ===
 
-The code in Geolocate.scala does the actual geolocating.  It can be invoked
-directly using 'textgrounder geolocate', but the normal route is to go through
-a front-end script.  The following is a list of the front-end scripts available:
-  * `tg-geolocate` is the most basic script, which reads parameters from the
-    script `config-geolocate` (which in turn can read from a script
-    `local-config-geolocate` that you create in the TextGrounder bin/
-    directory, if you want to add local configuration info; see the
-    `sample.local-config-geolocate` file in bin/ for an example).  This
-    takes care of specifying the auxiliary data files (see above).
-  * `geolocate-wikipedia` is a similar script, but specifically runs on
-    the downloaded Wikipedia data.
-  * `geolocate-twitter` is a similar script, but specifically runs on the
-    downloaded Twitter data.
-  * `geolocate-twitter-wiki` is a similar script, but runs on the combination
-    of the downloaded Wikipedia and Twitter data. (FIXME: This isn't the
-    right way to combine the two types of data.)
-  * `nohup-tg-geolocate` is a higher-level front-end to `tg-geolocate`,
-    which runs `tg-geolocate` using `nohup` (so that a long-running
-    experiment will not get terminated if your shell session ends), and
-    saves the output to a file.  The output file is named in such a way
-    that it contains the current date and time, as well as any optional ID
-    specified using the `-i` or `--id` argument.  It will refuse to
-    overwrite an existing file.
-  * `nohup-geolocate-wikipedia` is the same, but calls `geolocate-wikipedia`.
-  * `nohup-geolocate-twitter` is the same, but calls `geolocate-twitter`.
-  * `nohup-geolocate-twitter-wiki` is the same, but calls
-    `geolocate-twitter-wiki`.
+The code in Geolocate.scala does the actual geolocating.  Although these
+are written in Java and can conceivably be run directly using `java`,
+in practice it's much more convenient using either the `textgrounder`
+driver script or some other even higher-level front-end script.
+`textgrounder` sets up the paths correctly so that all libraries, etc.
+will be found, and takes an application to run, knowing how to map that
+application to the actual class that implements the application.  Each
+application typically takes various command-line arguments, and
+`textgrounder` itself also takes various command-line options (given
+*before* the application name), which mostly control operation of the
+JVM.
+
+In this case, document geotagging can be invoked directly with `textgrounder`
+using `textgrounder geolocate-document`, but the normal route is to
+go through a front-end script.  The following is a list of the front-end
+scripts available:
+  * `tg-geolocate` is the script you probably want to use.  It takes a
+
+    CORPUS parameter to specify which corpus you want to act on (currently
+    recognized: `wikipedia`, `twitter`, and `twitter-wiki`, which is a
+    combination of both corpora).  This sets up additional arguments to
+    specify the data files for the corpus/corpora to be loaded/evaluated.
+    The application to run is specified by the `--app` option; if omitted,
+    it defaults to `geolocate-document` (other possibilities are
+    `generate-kml` and `geolocate-toponym`).  For the Twitter corpora,
+    an additional option `--doc-thresh NUM` can be used to specify the
+    threshold, i.e. minimum number of documents that a vocabulary item
+    must be seen in; uncommon vocabulary before that is ignored (or
+    rather, converted to an OOV token).  Additional arguments to both
+    the app and `textgrounder` itself can be given.  Configuration values
+    (e.g. indicating where to find Wikipedia and Twitter, given the above
+    environment variables) are read from `config-geolocate` in the
+    TextGrounder `bin` directory; additional site-specific configuration
+    will be read from `local-config-geolocate`, if you create that file
+    in the `bin` directory.  There's a `sample.local-config-geolocate`
+    file in the directory giving a sample local config file.
+
+  * `tg-generate-kml` is exactly the same as `tg-geolocate --app generate-kml`
+    but easier to type.
+  * `geolocate-toponym` is almost exactly the same as
+    `tg-geolocate --app geolocate-toponym`, but also specifies a gazetteer
+    file as an extra argument.  You still need to supply a value for
+    `--eval-file` and `--eval-type`.
+  * `geolocate-toponym-tr-conll` is almost exactly the same as
+    `geolocate-toponym`, but also specifies arguments to evaluate on the
+    PCL-CoNLL corpus.
+  * `run-nohup` is a script for wrapping other scripts.  The other script
+    is run using `nohup`, so that a long-running experiment will not get
+    terminated if your shell session ends.  In addition, starting times
+    and arguments, along with all output, are logged to a file with a
+    unique, not-currently existing name, where the name incorporates the
+    name of the underlying script run, the current time and date, an
+    optional ID string (specified using the `-i` or `--id` argument),
+    and possibly an additional number needed to ensure that the file is
+    unique -- it will refuse to overwrite an existing file.  This ID is
+    useful for identifying different experiments using the same script.
+    The experiment runner `run-geolocate-exper.py`, which allows iterating
+    over different parameter settings, generates an ID based on the
+    current parameter settings.
   * `python/run-geolocate-exper.py` is a framework for running a series of
     experiments on similar arguments.  It was used extensively in running
     the experiments for the paper.
 
-You can invoke `geolocate-wikipedia` with no parameters, and it will do
+You can invoke `tg-geolocate wikipedia` with no options, and it will do
 something reasonable: It will attempt to geolocate the entire dev set of
 the Wikipedia corpus, using KL divergence as a strategy, with a grid size
 of 1 degrees.  Options you may find useful (which also apply to
@@ -336,20 +373,21 @@ be problematic).
 
 === Generating KML files ===
 
-It is possible to use `textgrounder geolocate` to generate KML files
-showing the distribution of particular words over the Earth's surface,
-which can be viewed using [http://earth.google.com Google Earth].  The
-basic argument to invoke this is `--mode=generate-kml`.  `--kml-words`
-is a comma-separated list of the words to generate distributions for.
-Each word is saved in a file named by appending the word to whatever is
-specified using `--kml-prefix`.  Another argument is `--kml-transform`,
-which is used to specify a function to apply to transform the probabilities
-in order to make the distinctions among them more visible.  It can be
-one of `none`, `log` and `logsquared` (actually computes the negative
-of the squared log).  The argument `--kml-max-height` can be used to
-specify the heights of the bars in the graph.  It is also possible to
-specify the colors of the bars in the graph by modifying constants given
-in `Geolocate.scala`, near the beginning (`class KMLParameters`).
+It is possible to generate KML files showing the distribution of particular
+words over the Earth's surface, using `tg-generate-kml` (e.g.
+`tg-generate-kml wikipedia --kml-words mountain,beach,war`).  The resulting
+KML files can be viewed using [http://earth.google.com Google Earth].
+The only necessary arg is `--kml-words`, a comma-separated list
+of the words to generate distributions for.  Each word is saved in a
+file named by appending the word to whatever is specified using
+`--kml-prefix`.  Another argument is `--kml-transform`, which is used
+to specify a function to apply to transform the probabilities in order
+to make the distinctions among them more visible.  It can be one of
+`none`, `log` and `logsquared` (actually computes the negative of the
+squared log).  The argument `--kml-max-height` can be used to specify
+the heights of the bars in the graph.  It is also possible to specify
+the colors of the bars in the graph by modifying constants given in
+`Geolocate.scala`, near the beginning (`class KMLParameters`).
 
 For example: For the Twitter corpus, running on different levels of the
 document threshold for discarding words, and for the four words "cool",
