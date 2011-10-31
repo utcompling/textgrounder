@@ -706,14 +706,14 @@ class WordCellDist(
   }
 }
 
-object CellDist {
+class CellDistFactory(val lru_cache_size: Int) {
   var cached_dists: LRUCache[Word, WordCellDist] = null
 
   // Return a cell distribution over a given word, using a least-recently-used
   // cache to optimize access.
   def get_cell_dist(cellgrid: CellGrid, word: Word) = {
     if (cached_dists == null)
-      cached_dists = new LRUCache(maxsize = Args.lru_cache_size)
+      cached_dists = new LRUCache(maxsize = lru_cache_size)
     cached_dists.get(word) match {
       case Some(dist) => dist
       case None => {
@@ -2031,6 +2031,8 @@ class MostPopularCellGeotagDocumentStrategy(
 class CellDistMostCommonToponymGeotagDocumentStrategy(
   cellgrid: CellGrid
 ) extends GeotagDocumentStrategy(cellgrid) {
+  val cdist_factory = new CellDistFactory(Args.lru_cache_size)
+
   def return_ranked_cells(worddist: WordDist) = {
     // Look for a toponym, then a proper noun, then any word.
     // FIXME: How can 'word' be null?
@@ -2045,7 +2047,7 @@ class CellDistMostCommonToponymGeotagDocumentStrategy(
     }
     if (maxword == None)
       maxword = worddist.find_most_common_word(word => true)
-    CellDist.get_cell_dist(cellgrid, maxword.get).get_ranked_cells()
+    cdist_factory.get_cell_dist(cellgrid, maxword.get).get_ranked_cells()
   }
 }
 
@@ -2282,8 +2284,11 @@ class NaiveBayesDocumentStrategy(
 class AverageCellProbabilityStrategy(
   cellgrid: CellGrid
 ) extends GeotagDocumentStrategy(cellgrid) {
+  val cdist_factory = new CellDistFactory(Args.lru_cache_size)
+
   def return_ranked_cells(worddist: WordDist) = {
-    val celldist = CellDist.get_cell_dist_for_word_dist(cellgrid, worddist)
+    val celldist =
+      cdist_factory.get_cell_dist_for_word_dist(cellgrid, worddist)
     celldist.get_ranked_cells()
   }
 }
@@ -2644,7 +2649,7 @@ abstract class GeolocateDriver {
   // and initialize it later based on a command-line option or whatever.
   var cellgrid = null: CellGrid
   var degrees_per_cell = 0.0
-  var parameters: ParamType = _
+  var params: ParamType = _
   var stopwords: Set[String] = _
   var article_table: GeoArticleTable = _
 
@@ -2705,7 +2710,7 @@ abstract class GeolocateDriver {
    */
   def set_parameters(args: ParamType) {
     GeolocateDriver.Args = args
-    parameters = args
+    this.params = args
 
     /** Canonicalize arguments **/
 
@@ -2738,8 +2743,8 @@ abstract class GeolocateDriver {
       need_seq(args.article_data_file, "article-data-file")
     }
 
-    check_common_args(parameters)
-    check_remaining_args(parameters)
+    check_common_args(args)
+    check_remaining_args(args)
   }
 
   def canonicalize_args(Args: ParamType)
@@ -2787,7 +2792,7 @@ abstract class GeolocateDriver {
 
   def run() = {
     stopwords = Stopwords.read_stopwords(Args.stopwords_file)
-    implement_run(parameters)
+    implement_run(params)
   }
 
   /**
@@ -2850,9 +2855,10 @@ class GenerateKMLDriver extends GeolocateDriver {
   def implement_run(args: ParamType) = {
     read_data_for_geotag_documents()
     cellgrid.finish()
+    val cdist_factory = new CellDistFactory(args.lru_cache_size)
     val words = args.kml_words.split(',')
     for (word <- words) {
-      val celldist = CellDist.get_cell_dist(cellgrid, memoize_word(word))
+      val celldist = cdist_factory.get_cell_dist(cellgrid, memoize_word(word))
       if (!celldist.normalized) {
         warning("""Non-normalized distribution, apparently word %s not seen anywhere.
 Not generating an empty KML file.""", word)

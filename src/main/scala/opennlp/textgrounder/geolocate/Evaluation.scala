@@ -438,7 +438,7 @@ class ArticleGeotagDocumentEvaluator(
 
   def iter_documents(filename: String) = {
     assert(filename == null)
-    for (art <- driver.article_table.articles_by_split(Args.eval_set))
+    for (art <- driver.article_table.articles_by_split(driver.params.eval_set))
       yield art
   }
 
@@ -466,7 +466,7 @@ class ArticleGeotagDocumentEvaluator(
     if (article.dist == null) {
       // This can (and does) happen when --max-time-per-stage is set,
       // so that the counts for many articles don't get read in.
-      if (Args.max_time_per_stage == 0.0 && Args.num_training_docs == 0)
+      if (driver.params.max_time_per_stage == 0.0 && driver.params.num_training_docs == 0)
         warning("Can't evaluate article %s without distribution", article)
       evalstats.record_other_stat("Skipped articles")
       true
@@ -494,7 +494,7 @@ class ArticleGeotagDocumentEvaluator(
        true_rank = Rank of true cell among predicted cells
      */
     val (pred_cells, true_rank) =
-      if (Args.oracle_results)
+      if (driver.params.oracle_results)
         (Array((true_cell, 0.0)), 1)
       else {
         def get_computed_results() = {
@@ -521,7 +521,7 @@ class ArticleGeotagDocumentEvaluator(
       new ArticleEvaluationResult(article, pred_cells(0)._1, true_rank)
 
     val want_indiv_results =
-      !Args.oracle_results && !Args.no_individual_results
+      !driver.params.oracle_results && !driver.params.no_individual_results
     evalstats.record_result(result)
     if (result.num_arts_in_true_cell == 0) {
       evalstats.record_other_stat(
@@ -600,14 +600,14 @@ class PCLTravelGeotagDocumentEvaluator(
   def evaluate_document(doc: TitledDocument, doctag: String) = {
     val dist = WordDist()
     val the_stopwords =
-      if (Args.include_stopwords_in_article_dists) Set[String]()
+      if (driver.params.include_stopwords_in_article_dists) Set[String]()
       else driver.stopwords
     for (text <- Seq(doc.title, doc.text)) {
       dist.add_document(split_text_into_words(text, ignore_punc = true),
-        ignore_case = !Args.preserve_case_words,
+        ignore_case = !driver.params.preserve_case_words,
         stopwords = the_stopwords)
     }
-    dist.finish(minimum_word_count = Args.minimum_word_count)
+    dist.finish(minimum_word_count = driver.params.minimum_word_count)
     val cells = strategy.return_ranked_cells(dist)
     errprint("")
     errprint("Article with title: %s", doc.title)
