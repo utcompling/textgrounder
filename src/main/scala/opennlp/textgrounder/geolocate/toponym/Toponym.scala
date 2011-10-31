@@ -21,7 +21,7 @@ import tgutil._
 import argparser._
 import Distances._
 import Debug._
-import GeolocateToponymDriver.Opts
+import GeolocateToponymApp.Opts
 
 import collection.mutable
 import util.control.Breaks._
@@ -327,7 +327,8 @@ class DivisionFactory(gazetteer: Gazetteer) {
           division.name, division.path)
       }
       division.compute_boundary()
-      val artmatch = TopoArticleTable.table.find_match_for_division(division)
+      val artmatch = cellgrid.table.asInstanceOf[TopoArticleTable].
+        find_match_for_division(division)
       if (artmatch != null) {
         if (debug("lots")) {
           errprint("Matched article %s for division %s, path %s",
@@ -635,13 +636,6 @@ class TopoArticleTable extends GeoArticleTable {
   }
 }
 
-object TopoArticleTable {
-  // Currently only one TopoArticleTable object.  This is the same as
-  // the object in GeoArticleTable.table but is of a different type
-  // (a subclass), for easier access.
-  var table: TopoArticleTable = null
-}
-
 class EvalStatsWithCandidateList(
   incorrect_reasons: Map[String, String],
   max_individual_candidates: Int = 5) extends EvalStats(incorrect_reasons) {
@@ -851,7 +845,9 @@ class ToponymEvaluationResult extends EvaluationResult {
 
 abstract class GeotagToponymEvaluator(
   strategy: GeotagToponymStrategy,
-  stratname: String) extends TestFileEvaluator(stratname) {
+  stratname: String,
+  driver: GeolocateToponymDriver
+) extends TestFileEvaluator(stratname) {
   val results = new GeotagToponymResults()
 
   case class GeogWordDocument(
@@ -898,7 +894,7 @@ abstract class GeotagToponymEvaluator(
           // If a word tagged as a toponym is homonymous with a stopword, it
           // still isn't a stopword.
           results(i).is_stop = (results(i).coord == null &&
-            (Stopwords.stopwords contains results(i).word))
+            (driver.stopwords contains results(i).word))
         }
         // Now generate context for toponyms
         for (i <- 0 until results.length) {
@@ -913,7 +909,7 @@ abstract class GeotagToponymEvaluator(
             results(i).context =
               (for {
                 (dist, x) <- ((i - minind until i - maxind) zip results.slice(minind, maxind))
-                if (!(Stopwords.stopwords contains x.word))
+                if (!(driver.stopwords contains x.word))
               } yield (dist, x.word)).toArray
           }
         }
@@ -940,7 +936,7 @@ abstract class GeotagToponymEvaluator(
     val toponym = geogword.word
     val coord = geogword.coord
     if (coord == null) return // If no ground-truth, skip it
-    val articles = TopoArticleTable.table.construct_candidates(toponym)
+    val articles = driver.article_table.construct_candidates(toponym)
     var bestscore = Double.MinValue
     var bestart: TopoArticle = null
     if (articles.length == 0) {
@@ -1027,7 +1023,9 @@ abstract class GeotagToponymEvaluator(
 
 class TRCoNLLGeotagToponymEvaluator(
   strategy: GeotagToponymStrategy,
-  stratname: String) extends GeotagToponymEvaluator(strategy, stratname) {
+  stratname: String,
+  driver: GeolocateToponymDriver
+) extends GeotagToponymEvaluator(strategy, stratname, driver) {
   // Read a file formatted in TR-CONLL text format (.tr files).  An example of
   // how such files are fomatted is:
   //
@@ -1116,7 +1114,9 @@ class TRCoNLLGeotagToponymEvaluator(
 
 class ArticleGeotagToponymEvaluator(
   strategy: GeotagToponymStrategy,
-  stratname: String) extends GeotagToponymEvaluator(strategy, stratname) {
+  stratname: String,
+  driver: GeolocateToponymDriver
+) extends GeotagToponymEvaluator(strategy, stratname, driver) {
   def iter_geogwords(filename: String) = {
     var title: String = null
     val titlere = """Article title: (.*)$""".r
@@ -1140,7 +1140,7 @@ class ArticleGeotagToponymEvaluator(
             word.is_toponym = true
             word.location = trueart
             word.document = title
-            val art = TopoArticleTable.table.lookup_article(trueart)
+            val art = driver.article_table.lookup_article(trueart)
             if (art != null)
               word.coord = art.coord
             word #:: iter_1()
@@ -1293,7 +1293,8 @@ class WorldGazetteer(
     breakable {
       while (maxdist <= Opts.max_dist_for_close_match) {
         artmatch =
-          TopoArticleTable.table.find_match_for_locality(loc, maxdist)
+          cellgrid.table.asInstanceOf[TopoArticleTable].
+            find_match_for_locality(loc, maxdist)
         if (artmatch != null) break
         maxdist *= 2
       }
@@ -1473,13 +1474,15 @@ incoming internal links.  Note that this only applies when
 considered.  Default '%default'.""")
 }
 
-object GeolocateToponymDriver extends GeolocateDriver {
+class GeolocateToponymDriver extends GeolocateDriver {
   type Params = GeolocateToponymParameters
   type StrategyType = GeotagToponymStrategy
   var Opts: Params = _
 
   def canonicalize_options(opts: Params) {
     Opts = opts
+    GeolocateToponymApp.Opts = opts
+    
     if (opts.strategy.length == 0)
       opts.strategy = Seq("baseline")
 
@@ -1514,14 +1517,11 @@ object GeolocateToponymDriver extends GeolocateDriver {
    * useful info may be returned for each document processed.
    */
 
-  def run(opts: Params) = {
-    initialize_cellgrid()
-    read_stopwords()
-
-    val table = new TopoArticleTable()
-    TopoArticleTable.table = table
-    GeoArticleTable.table = table
-    read_articles(table)
+  def implement_run(opts: Params) = {
+    val topo_article_table = new TopoArticleTable()
+    article_table = topo_article_table
+    initialize_cellgrid(article_table)
+    read_articles(article_table, stopwords)
 
     // errprint("Processing evaluation file(s) %s for toponym counts...",
     //   opts.eval_file)
@@ -1543,7 +1543,7 @@ object GeolocateToponymDriver extends GeolocateDriver {
       // Bootstrapping issue: Creating the gazetteer requires that the
       // TopoArticleTable already exist, but the TopoArticleTable wants
       // a pointer to a gazetter, so have to set it afterwards.
-      TopoArticleTable.table.set_gazetteer(gazetteer)
+      topo_article_table.set_gazetteer(gazetteer)
     }
 
     val strats = (
@@ -1562,9 +1562,9 @@ object GeolocateToponymDriver extends GeolocateDriver {
       val evaluator =
         // Generate reader object
         if (opts.eval_format == "tr-conll")
-          new TRCoNLLGeotagToponymEvaluator(strategy, stratname)
+          new TRCoNLLGeotagToponymEvaluator(strategy, stratname, this)
         else
-          new ArticleGeotagToponymEvaluator(strategy, stratname)
+          new ArticleGeotagToponymEvaluator(strategy, stratname, this)
       new DefaultEvaluationOutputter(stratname, evaluator)
     })
   }
@@ -1572,8 +1572,11 @@ object GeolocateToponymDriver extends GeolocateDriver {
 
 object GeolocateToponymApp extends GeolocateApp("geolocate-toponyms") {
   type ParamClass = GeolocateToponymParameters
-  val Driver = GeolocateToponymDriver
+  type DriverClass = GeolocateToponymDriver
   // FUCKING TYPE ERASURE
   def create_arg_class() = new ParamClass(the_argparser)
+  def create_driver() = new DriverClass()
+  var Opts: ParamClass = _
+  
   main()
 }

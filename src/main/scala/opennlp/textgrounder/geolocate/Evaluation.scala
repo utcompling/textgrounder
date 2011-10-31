@@ -413,7 +413,8 @@ case class ArticleEvaluationResult(
  */
 class ArticleGeotagDocumentEvaluator(
   strategy: GeotagDocumentStrategy,
-  stratname: String
+  stratname: String,
+  driver: GeolocateDocumentDriver
 ) extends GeotagDocumentEvaluator(strategy, stratname) {
 
   type Document = GeoArticle
@@ -437,7 +438,7 @@ class ArticleGeotagDocumentEvaluator(
 
   def iter_documents(filename: String) = {
     assert(filename == null)
-    for (art <- GeoArticleTable.table.articles_by_split(Args.eval_set))
+    for (art <- driver.article_table.articles_by_split(Args.eval_set))
       yield art
   }
 
@@ -564,7 +565,8 @@ class TitledDocumentResult extends EvaluationResult {
 
 class PCLTravelGeotagDocumentEvaluator(
   strategy: GeotagDocumentStrategy,
-  stratname: String
+  stratname: String,
+  driver: GeolocateDocumentDriver
 ) extends GeotagDocumentEvaluator(strategy, stratname) {
   case class TitledDocument(
     title: String, text: String) extends EvaluationDocument 
@@ -599,7 +601,7 @@ class PCLTravelGeotagDocumentEvaluator(
     val dist = WordDist()
     val the_stopwords =
       if (Args.include_stopwords_in_article_dists) Set[String]()
-      else Stopwords.stopwords
+      else driver.stopwords
     for (text <- Seq(doc.title, doc.text)) {
       dist.add_document(split_text_into_words(text, ignore_punc = true),
         ignore_case = !Args.preserve_case_words,

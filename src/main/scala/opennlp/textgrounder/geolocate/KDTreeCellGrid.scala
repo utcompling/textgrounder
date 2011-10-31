@@ -2,7 +2,7 @@ package opennlp.textgrounder.geolocate
 
 import opennlp.textgrounder.geolocate.Distances.Coord
 
-class KDTreeCellGrid extends CellGrid {
+class KDTreeCellGrid(table: GeoArticleTable) extends CellGrid(table) {
   /**
    * Total number of cells in the grid.
    */
@@ -68,7 +68,8 @@ extends RectangularCell(cellgrid) {
 
 object KDTreeTest {
   def main(args:Array[String]) {
-    val grid = new KDTreeCellGrid
+    val table = new GeoArticleTable
+    val grid = new KDTreeCellGrid(table)
 
     val emptyParams = Map[String, String]()
 

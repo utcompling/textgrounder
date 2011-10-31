@@ -1030,7 +1030,7 @@ abstract class RectangularCell(
 /**
  * Abstract class for a grid of cells covering the earth.
  */
-abstract class CellGrid {
+abstract class CellGrid(val table: GeoArticleTable) {
   /**
    * Total number of cells in the grid.
    */
@@ -1105,7 +1105,7 @@ abstract class CellGrid {
     errprint("Percent non-empty cells: %g",
       num_non_empty_cells.toDouble / total_num_cells)
     val training_arts_with_word_counts =
-      GeoArticleTable.table.num_word_count_articles_by_split("training")
+      table.num_word_count_articles_by_split("training")
     errprint("Training articles per non-empty cell: %g",
       training_arts_with_word_counts.toDouble / num_non_empty_cells)
     // Clear out the article distributions of the training set, since
@@ -1115,7 +1115,7 @@ abstract class CellGrid {
     // by never creating these distributions at all, but directly adding
     // them to the cells.  Would require a bit of thinking when reading
     // in the counts.
-    GeoArticleTable.table.clear_training_article_distributions()
+    table.clear_training_article_distributions()
   }
 }
 
@@ -1247,8 +1247,9 @@ class MultiRegularCell(
  */
 class MultiRegularCellGrid(
   val degrees_per_cell: Double,
-  val width_of_multi_cell: Int
-) extends CellGrid {
+  val width_of_multi_cell: Int,
+  table: GeoArticleTable
+) extends CellGrid(table) {
 
   /**
    * Size of each cell (vertical dimension; horizontal dimension only near
@@ -1770,7 +1771,7 @@ class GeoArticleTable {
    * words equal to the probability mass of all words seen once, and rescale
    * the remaining probabilities accordingly.
    */ 
-  def read_word_counts(filename: String) {
+  def read_word_counts(filename: String, stopwords: Set[String]) {
     val initial_dynarr_size = 1000
     val keys_dynarr =
       new DynamicArray[Word](initial_alloc = initial_dynarr_size)
@@ -1860,7 +1861,7 @@ class GeoArticleTable {
               var word = xword
               if (!Args.preserve_case_words) word = word.toLowerCase
               val count = xcount.toInt
-              if (!(Stopwords.stopwords contains word) ||
+              if (!(stopwords contains word) ||
                 Args.include_stopwords_in_article_dists) {
                 num_word_tokens += count
                 keys_dynarr += memoize_word(word)
@@ -1927,13 +1928,6 @@ class GeoArticleTable {
     val lw = word.toLowerCase
     lower_toponym_to_article contains lw
   }
-}
-
-object GeoArticleTable {
-  /**
-   * Currently only one GeoArticleTable object
-   */
-  var table: GeoArticleTable = null
 }
 
 ///////////////////////// Articles
@@ -2044,7 +2038,7 @@ class CellDistMostCommonToponymGeotagDocumentStrategy(
     // FIXME: Should predicate be passed an index and have to do its own
     // unmemoizing?
     var maxword = worddist.find_most_common_word(
-      word => word(0).isUpper && GeoArticleTable.table.word_is_toponym(word))
+      word => word(0).isUpper && cellgrid.table.word_is_toponym(word))
     if (maxword == None) {
       maxword = worddist.find_most_common_word(
         word => word(0).isUpper)
@@ -2060,16 +2054,16 @@ class LinkMostCommonToponymGeotagDocumentStrategy(
 ) extends GeotagDocumentStrategy(cellgrid) {
   def return_ranked_cells(worddist: WordDist) = {
     var maxword = worddist.find_most_common_word(
-      word => word(0).isUpper && GeoArticleTable.table.word_is_toponym(word))
+      word => word(0).isUpper && cellgrid.table.word_is_toponym(word))
     if (maxword == None) {
       maxword = worddist.find_most_common_word(
-        word => GeoArticleTable.table.word_is_toponym(word))
+        word => cellgrid.table.word_is_toponym(word))
     }
     if (debug("commontop"))
       errprint("  maxword = %s", maxword)
     val cands =
       if (maxword != None)
-        GeoArticleTable.table.construct_candidates(
+        cellgrid.table.construct_candidates(
           unmemoize_word(maxword.get))
       else Seq[GeoArticle]()
     if (debug("commontop"))
@@ -2322,22 +2316,19 @@ class AverageCellProbabilityStrategy(
 object Stopwords {
   val stopwords_file_in_tg = "data/lists/stopwords.english"
 
-  // List of stopwords
-  var stopwords: Set[String] = null
-
-  def compute_stopwords_filename(filename: String) = {
-    if (filename != null) filename
-    else {
-      val tgdir = TextGrounderInfo.textgrounder_dir
-      // Concatenate directory and rest in most robust way
-      new File(tgdir, stopwords_file_in_tg).toString
-    }
-  }
-
   // Read in the list of stopwords from the given filename.
-  def read_stopwords(filename: String) {
+  def read_stopwords(stopwords_filename: String) = {
+    def compute_stopwords_filename(filename: String) = {
+      if (filename != null) filename
+      else {
+        val tgdir = TextGrounderInfo.textgrounder_dir
+        // Concatenate directory and rest in most robust way
+        new File(tgdir, stopwords_file_in_tg).toString
+      }
+    }
+    val filename = compute_stopwords_filename(stopwords_filename)
     errprint("Reading stopwords from %s...", filename)
-    stopwords = openr(filename).toSet
+    openr(filename).toSet
   }
 }
 
@@ -2654,6 +2645,8 @@ abstract class GeolocateDriver {
   var cellgrid = null: CellGrid
   var degrees_per_cell = 0.0
   var options: Params = _
+  var stopwords: Set[String] = _
+  var article_table: GeoArticleTable = _
 
   protected var argerror = default_error_handler _
 
@@ -2752,35 +2745,27 @@ abstract class GeolocateDriver {
   def canonicalize_options(Args: Params)
   def check_remaining_options(Args: Params)
 
-  protected def initialize_cellgrid() {
+  protected def initialize_cellgrid(table: GeoArticleTable) {
     cellgrid = new MultiRegularCellGrid(degrees_per_cell,
-      Args.width_of_multi_cell)
+      Args.width_of_multi_cell, table)
   }
 
-  protected def read_stopwords() {
-    val stopwords_file =
-      Stopwords.compute_stopwords_filename(Args.stopwords_file)
-    Stopwords.read_stopwords(stopwords_file)
-  }
-
-  protected def read_articles(table: GeoArticleTable) {
+  protected def read_articles(table: GeoArticleTable, stopwords: Set[String]) {
     for (fn <- Args.article_data_file)
       table.read_article_data(fn, cellgrid)
 
     // Read in the words-counts file
     if (Args.counts_file.length > 0) {
       for (fn <- Args.counts_file)
-        table.read_word_counts(fn)
+        table.read_word_counts(fn, stopwords)
       table.finish_word_counts()
     }
   }
 
   protected def read_data_for_geotag_documents() {
-    initialize_cellgrid()
-    read_stopwords()
-    val table = new GeoArticleTable()
-    GeoArticleTable.table = table
-    read_articles(table)
+    article_table = new GeoArticleTable()
+    initialize_cellgrid(article_table)
+    read_articles(article_table, stopwords)
   }
 
   protected def process_strategies[T](
@@ -2800,10 +2785,15 @@ abstract class GeolocateDriver {
     }
   }
 
+  def run() = {
+    stopwords = Stopwords.read_stopwords(Args.stopwords_file)
+    implement_run(options)
+  }
+
   /**
    * Actually do the work.
    */
-  def run(opts: Params): Seq[(String, StrategyType, EvaluationOutputter)]
+  def implement_run(opts: Params): Seq[(String, StrategyType, EvaluationOutputter)]
 }
 
 object GeolocateDriver {
@@ -2841,7 +2831,7 @@ low values more visible.  Possibilities are 'none' (no transformation),
       help = """Height of highest bar, in meters.  Default %default.""")
 }
 
-object GenerateKMLDriver extends GeolocateDriver {
+class GenerateKMLDriver extends GeolocateDriver {
   type Params = GenerateKMLParameters
   type StrategyType = Nothing
 
@@ -2857,7 +2847,7 @@ object GenerateKMLDriver extends GeolocateDriver {
    * KML files created and written on disk.
    */
 
-  def run(opts: Params) = {
+  def implement_run(opts: Params) = {
     read_data_for_geotag_documents()
     cellgrid.finish()
     val words = opts.kml_words.split(',')
@@ -3008,7 +2998,7 @@ strategies cannot be mixed with other baseline strategies, or with non-baseline
 strategies, since they require that --preserve-case-words be set internally.""")
 }
 
-object GeolocateDocumentDriver extends GeolocateDriver {
+class GeolocateDocumentDriver extends GeolocateDriver {
   type Params = GeolocateDocumentParameters
   type StrategyType = GeotagDocumentStrategy
 
@@ -3075,7 +3065,7 @@ object GeolocateDocumentDriver extends GeolocateDriver {
    * type in practice is ArticleEvaluationResult)
    */
 
-  def run(opts: Params) = {
+  def implement_run(opts: Params) = {
     read_data_for_geotag_documents()
     cellgrid.finish()
 
@@ -3139,9 +3129,9 @@ object GeolocateDocumentDriver extends GeolocateDriver {
       val evaluator =
         // Generate reader object
         if (opts.eval_format == "pcl-travel")
-          new PCLTravelGeotagDocumentEvaluator(strategy, stratname)
+          new PCLTravelGeotagDocumentEvaluator(strategy, stratname, this)
         else
-          new ArticleGeotagDocumentEvaluator(strategy, stratname)
+          new ArticleGeotagDocumentEvaluator(strategy, stratname, this)
       new DefaultEvaluationOutputter(stratname, evaluator)
     })
   }
@@ -3150,39 +3140,44 @@ object GeolocateDocumentDriver extends GeolocateDriver {
 abstract class GeolocateApp(appname: String) extends ExperimentApp(appname) {
   type ParamClass <: GeolocateParameters
   type ArgClass = ParamClass
-  val Driver: GeolocateDriver
+  type DriverClass <: GeolocateDriver
+  val driver = create_driver()
+
+  def create_driver(): DriverClass
 
   def argerror(str: String) {
     the_argparser.error(str)
   }
 
   override def output_ancillary_parameters() {
-    Driver.output_ancillary_parameters()
+    driver.output_ancillary_parameters()
   }
 
   def handle_arguments(args: Seq[String]) {
-    Driver.set_error_handler(argerror _)
-    Driver.set_parameters(argholder.asInstanceOf[Driver.Params])
+    driver.set_error_handler(argerror _)
+    driver.set_parameters(argholder.asInstanceOf[driver.Params])
   }
 
   def implement_main(args: Seq[String]) {
-    Driver.run(Driver.options)
+    driver.run()
   }
 }
 
 object GeolocateDocumentApp extends GeolocateApp("geolocate-documents") {
   type ParamClass = GeolocateDocumentParameters
-  val Driver = GeolocateDocumentDriver
+  type DriverClass = GeolocateDocumentDriver
   // FUCKING TYPE ERASURE
   def create_arg_class() = new ParamClass(the_argparser)
+  def create_driver() = new DriverClass()
   main()
 }
 
 object GenerateKMLApp extends GeolocateApp("generate-kml") {
   type ParamClass = GenerateKMLParameters
-  val Driver = GenerateKMLDriver
+  type DriverClass = GenerateKMLDriver
   // FUCKING TYPE ERASURE
   def create_arg_class() = new ParamClass(the_argparser)
+  def create_driver() = new DriverClass()
   main()
 }
 
