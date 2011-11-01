@@ -3,10 +3,18 @@
 # Environment variables required/optional on input:
 
 # TEXTGROUNDER_DIR: required: top level of TextGrounder distribution
+# TG_GROUPS_DIR: optional: use this if you have the extra data stored under
+#                the same directory structure as on the Comp Ling machines,
+#                i.e. similar to /groups/corpora and /groups/projects,
+#                possibly with a different directory in place of /groups.
 # TG_ON_COMP_LING_MACHINES: optional: if set, indicates that we are running on
 #                                     the UTexas comp ling machines, in which
 #                                     case the following TG_*_DIR variables
 #                                     will automatically be set correctly.
+# TG_ON_LONGHORN: optional: if set, indicates we are running on the UTexas
+#                           Longhorn cluster, in which case the following
+#                           TG_*_DIR variables will automatically be set
+#                           correctly.
 # TG_WIKIPEDIA_DIR: required: location of Wikipedia data files
 # TG_TWITTER_DIR: optional: location of Twitter data files
 # TG_AUX_DIR: optional: location of auxiliary files (currently only the World
@@ -21,26 +29,20 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
 fi
 
 if [ -n "$TG_ON_COMP_LING_MACHINES" ]; then
-  if [ -z "$TG_WIKIPEDIA_DIR" ]; then
-    TG_WIKIPEDIA_DIR=/groups/corpora/wikipedia
-  fi
-  if [ -z "$TG_TWITTER_DIR" ]; then
-    TG_TWITTER_DIR=/groups/corpora/geotext
-  fi
-  if [ -z "$TG_AUX_DIR" ]; then
-    TG_AUX_DIR=/groups/projects/wikigrounder/data
-  fi
+  TG_GROUPS_DIR=/groups
+elif [ -n "$TG_ON_LONGHORN" ]; then
+  TG_GROUPS_DIR=/scratch/01683/benwing
 fi
 
-if [ -n "$TG_ON_LONGHORN" ]; then
+if [ -n "$TG_GROUPS_DIR" ]; then
   if [ -z "$TG_WIKIPEDIA_DIR" ]; then
-    TG_WIKIPEDIA_DIR=/scratch/01683/benwing/corpora/wikipedia
+    TG_WIKIPEDIA_DIR=$TG_GROUPS_DIR/corpora/wikipedia
   fi
   if [ -z "$TG_TWITTER_DIR" ]; then
-    TG_TWITTER_DIR=/scratch/01683/benwing/corpora/geotext
+    TG_TWITTER_DIR=$TG_GROUPS_DIR/corpora/geotext
   fi
   if [ -z "$TG_AUX_DIR" ]; then
-    TG_AUX_DIR=/scratch/01683/benwing/projects/wikigrounder/data
+    TG_AUX_DIR=$TG_GROUPS_DIR/projects/wikigrounder/data
   fi
 fi
 
