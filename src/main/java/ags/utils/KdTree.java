@@ -95,7 +95,11 @@ public class KdTree<T> {
         if (data == null)
         	return outData;
         for (int i = 0; i < locationCount; i++) {
-        	outData.add((T)data[i]);
+            // No way around the warning other than either to suppress it,
+            // or not use Object[] arrays.
+            @SuppressWarnings("unchecked")
+            T suppress_warning = (T) data[i];
+        	outData.add(suppress_warning);
         }
         return outData;
     }
