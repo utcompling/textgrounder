@@ -59,9 +59,9 @@ abstract class ExperimentApp(val progname: String) extends App {
 
   def output_command_line_parameters() {
     errprint("Parameter values:")
-    for ((name, value) <- the_argparser.argNameValues) {
-      errprint("%30s: %s", name, value)
-      //errprint("%30s: %s", name, op.getType(name))
+    for (name <- the_argparser.argNames) {
+      errprint("%30s: %s", name, the_argparser(name))
+      //errprint("%30s: %s", name, the_argparser.getType(name))
     }
     errprint("")
   }

@@ -1394,7 +1394,7 @@ Only used during toponym resolution (--mode=geotag-toponyms).  NOTE: type
       //        "naive-bayes-with-baseline",
       //        "naive-bayes-no-baseline",
       //        ),
-      canonicalize = Map(
+      aliases = Map(
         "baseline" -> null, "none" -> null,
         "naive-bayes-with-baseline" ->
           Seq("nb-base"),
@@ -1420,7 +1420,7 @@ be tried, one after the other.""")
     ap.multiOption[String]("baseline-strategy", "bs",
       choices = Seq("internal-link", "random",
         "num-articles"),
-      canonicalize = Map(
+      aliases = Map(
         "internal-link" -> Seq("link"),
         "num-articles" -> Seq("num-arts", "numarts")),
       help = """Strategy to use to compute the baseline.

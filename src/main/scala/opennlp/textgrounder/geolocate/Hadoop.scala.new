@@ -168,6 +168,26 @@ class ArticleResultReducer extends Reducer[Text,IntWritable,Text,IntWritable] {
 }
 
 class GeolocateHadoopDriver extends Configured with Tool {
+  /**
+   * Convert the parameters in `parser` to Hadoop configuration settings in
+   * `conf`.
+   *
+   * @param prefix Prefix to prepend to the names of all parameters.
+   * @param parser ArgParser object to retrieve parameters from.
+   * @param conf JobConf object to store configuration settings into.
+   */
+  def convert_parameters_to_jobconf(prefix: String, parser: ArgParser,
+      conf: JobConf) {
+    for ((name, value) <- parser.argNameValues) {
+      parser.
+
+
+      errprint("%30s: %s", name, value)
+      //errprint("%30s: %s", name, op.getType(name))
+    }
+
+  }
+
   override def run(args: Array[String]): Int {
     val conf = getConf()
     val job = new Job(conf, "Geolocate document-geotag")

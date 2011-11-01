@@ -2403,7 +2403,7 @@ Each file is read in and then disambiguation is performed.  Not used when
     ap.option[String]("eval-set", "es", metavar = "SET",
       default = "dev",
       choices = Seq("dev", "test"),
-      canonicalize = Map("dev" -> Seq("devel")),
+      aliases = Map("dev" -> Seq("devel")),
       help = """Set to use for evaluation when --eval-format=internal
 and --mode=geotag-documents ('dev' or 'devel' for the development set,
 'test' for the test set).  Default '%default'.""")
@@ -2891,7 +2891,7 @@ file as a document to evaluate.""")
       //        "naive-bayes-with-baseline",
       //        "naive-bayes-no-baseline",
       //        ),
-      canonicalize = Map(
+      aliases = Map(
         "baseline" -> null, "none" -> null,
         "full-kl-divergence" ->
           Seq("full-kldiv", "full-kl"),
@@ -2952,7 +2952,7 @@ be tried, one after the other.""")
       choices = Seq("internal-link", "random",
         "num-articles", "link-most-common-toponym",
         "cell-distribution-most-common-toponym"),
-      canonicalize = Map(
+      aliases = Map(
         "internal-link" -> Seq("link"),
         "num-articles" -> Seq("num-arts", "numarts"),
         "cell-distribution-most-common-toponym" ->

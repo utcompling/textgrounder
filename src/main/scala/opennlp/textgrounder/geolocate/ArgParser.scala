@@ -44,10 +44,24 @@ import collection.mutable
   (5) The "flag" type is simplified to just handle boolean flags, which is
       the most common usage. (FIXME: Eventually perhaps we should consider
       also allowing more general Argot-type flags.)
-  (6) A reasonable default value is provided for the "meta-variable"
+  (6) The help text can be split across multiple lines using multi-line
+      strings, and extra whitespace/carriage returns will be absorbed
+      appropriately.  In addition, directives can be given, such as %default
+      for the default value, %choices for the list of choices, %metavar
+      for the meta-variable (see below), %prog for the name of the program,
+      %% for a literal percent sign, etc.
+  (7) A reasonable default value is provided for the "meta-variable"
       parameter for options (which specifies the type of the argument).
-  (7) Conversion functions are easier to specify, since one function suffices
+  (8) Conversion functions are easier to specify, since one function suffices
       for all types of arguments.
+  (9) A conversion function is provided for type Boolean for handling
+      valueful boolean options, where the value can be any of "yes, no,
+      y, n, true, false, t, f, on, off".
+  (10) There is no need to manually catch exceptions (e.g. from usage errors)
+       if you don't want to.  By default, exceptions are caught
+       automatically and printed out nicely, and then the program exits
+       with return code 1.  You can turn this off if you want to handle
+       exceptions yourself.
   
   In general, to parse arguments, you first create an object of type
   ArgParser (call it `ap`), and then add options to it by calling
@@ -123,6 +137,71 @@ import collection.mutable
   there is no problem mixing and matching the scheme described here with the
   conceptually simpler scheme where argument values are retrieved using
   `ap.get[T]()`.
+
+  Work being considered:
+
+  (1) Perhaps most important: Allow grouping of options.  Groups would be
+      kept together in the usage message, displayed under the group name.
+  (2) Add constructor parameters to allow for specification of the other
+      things allowed in Argot, e.g. pre-usage, post-usage, whether to sort
+      arguments in the usage message or leave as-is.
+  (3) Provide an option to control how meta-variable generation works.
+      Normally, an unspecified meta-variable is derived from the
+      canonical argument name in all uppercase (e.g. FOO or STRATEGY),
+      but some people e.g. might instead want it derived from the argument
+      type (e.g. NUM or STRING).  This would be controlled with a
+      constructor parameter to ArgParser.
+  (4) Add converters for other basic types, e.g. Float, Char, Byte, Short.
+  (5) Allow for something similar to Argot's typed flags (and related
+      generalizations).  I'd call it `ap.typedFlag[T]()` or something
+      similar.  But rather than use Argot's interface of "on" and "off"
+      flags, I'd prefer to follow the lead of Python's argparse, allowing
+      the "destination" argument name to be specified independently of
+      the argument name as it appears on the command line, so that
+      multiple arguments could write to the same place.  I'd also add a
+      "const" parameter that stores an arbitrary constant value if a
+      flag is tripped, so that you could simulate the equivalent of a
+      limited-choice option using multiple flag options.  In addition,
+      I'd add an optional "action" parameter that is passed in the old
+      and new values and returns the actual value to be stored; that
+      way, incrementing/decrementing or whatever could be implemented.
+      Note that I believe it's better to separate the conversion and
+      action routines, unlike what Argot does -- that way, the action
+      routine can work with properly-typed values and doesn't have to
+      worry about how to convert them to/from strings.  This also makes
+      it possible to supply action routines for all the various categories
+      of arguments (e.g. flags, options, multi-options), while keeping
+      the conversion routines simple -- the action routines necessarily
+      need to be differently-typed at least for single vs.  multi-options,
+      but the conversion routines shouldn't have to worry about this.
+      In fact, to truly implement all the generality of Python's 'argparse'
+      routine, we'd want expanded versions of option[], multiOption[],
+      etc. that take both a source type (to which the raw values are
+      initially converted) and a destination type (final type of the
+      value stored), so that e.g. a multiOption can sum values into a
+      single 'accumulator' destination argument, or a single String
+      option can parse a classpath into a List of File objects, or
+      whatever. (In fact, however, I think it's better to dispense
+      with such complexity in the ArgParser and require instead that the
+      calling routine deal with it on its own.  E.g. there's absolutely
+      nothing preventing a calling routine using field-style argument
+      values from declaring extra vars to hold destination values and
+      then e.g. simply fetching the classpath value, parsing it and
+      storing it, or fetching all values of a multiOption and summing
+      them.  The minimal support for the Argot example of increment and
+      decrement flags would be something like a call `ap.multiFlag`
+      that accumulates a list of Boolean "true" values, one per
+      invocation.  Then we just count the number of increment flags and
+      number of decrement flags given.  If we cared about the relative
+      way that these two flags were interleaved, we'd need a bit more
+      support -- (1) a 'destination' argument to allow two options to
+      store into the same place; (2) a typed `ap.multiFlag[T]`; (3)
+      a 'const' argument to specify what value to store.  Then our
+      destination gets a list of exactly which flags were invoked and
+      in what order. On the other hand, it's easily arguable that no
+      program should have such intricate option processing that requires
+      this -- it's unlikely the user will have a good understanding
+      of what these interleaved flags end up doing.
  */
 
 package object argparser {
@@ -186,7 +265,7 @@ package object argparser {
       implicit conversion.
    */
 
-  implicit def convertInt(rawval: String, arg: ArgSingle[Int]) = {
+  implicit def convertInt(rawval: String, name: String, ap: ArgParser) = {
     try { rawval.toInt }
     catch {
       case e: NumberFormatException =>
@@ -195,7 +274,7 @@ package object argparser {
     }
   }
 
-  implicit def convertDouble(rawval: String, arg: ArgSingle[Double]) = {
+  implicit def convertDouble(rawval: String, name: String, ap: ArgParser) = {
     try { rawval.toDouble }
     catch {
       case e: NumberFormatException =>
@@ -205,14 +284,16 @@ package object argparser {
     }
   }
 
-  implicit def convertString(rawval: String, arg: ArgSingle[String]) = {
+  implicit def convertString(rawval: String, name: String, ap: ArgParser) = {
     rawval
   }
 
-  implicit def convertBoolean(rawval: String, arg: ArgSingle[Boolean]) = {
+  implicit def convertBoolean(rawval: String, name: String, ap: ArgParser) = {
     rawval.toLowerCase match {
       case "yes" => true
       case "no" => false
+      case "y" => true
+      case "n" => false
       case "true" => true
       case "false" => false
       case "t" => true
@@ -222,7 +303,7 @@ package object argparser {
       case _ => throw new ArgParserConversionException(
           ("""Cannot convert argument "%s" to a boolean.  """ +
            """Recognized values (case-insensitive) are """ +
-           """yes, no, true, false, t, f, on, off.""") format rawval)
+           """yes, no, y, n, true, false, t, f, on, off.""") format rawval)
     }
   }
 
@@ -363,53 +444,83 @@ package object argparser {
       retval
     }
 
-    def checkChoices[T](converted: T, choices: Seq[T],
-      canon: Map[T, Iterable[T]]) = {
-      var retval = converted
-      var recanon: Map[T, T] = null
-      var rechoices: Seq[T] = choices
-      if (canon != null) {
-        // Convert to a map in the other direction
-        recanon =
-          for {(full, abbrevs) <- canon
-               abbrev <- if (abbrevs == null) Seq() else abbrevs}
-            yield (abbrev -> full)
-        retval = recanon.getOrElse(retval, retval)
-        if (rechoices == null)
-          rechoices = canon.keys.toSeq
-      }
-      if (rechoices == null || (rechoices contains retval)) retval
+    // Convert aliases map to a map in the other direction, i.e. from
+    // alias to canonical choice
+    protected def reverseAliases[T](aliases: Map[T, Iterable[T]]) = {
+      if (aliases == null)
+        Map[T, T]()
+      else
+        for {(full, abbrevs) <- aliases
+             abbrev <- if (abbrevs == null) Seq() else abbrevs}
+          yield (abbrev -> full)
+    }
+
+    protected def canonicalizeChoicesAliases[T](choices: Seq[T],
+        aliases: Map[T, Iterable[T]]) = {
+      val newaliases = if (aliases != null) aliases else Map[T, Iterable[T]]()
+      val newchoices =
+        if (choices != null) choices else newaliases.keys.toSeq
+      (newchoices, newaliases)
+    }
+
+    // Return a human-readable list of all choices.  If 'choices' is null,
+    // the list is derived from the canonical choices listed in 'aliases'.
+    // If 'include_aliases' is true, include the aliases in the list of
+    // choices, in parens after the canonical name.
+    protected def choicesList[T](choices: Seq[T],
+        aliases: Map[T, Iterable[T]], include_aliases: Boolean) = {
+      val (newchoices, newaliases) =
+        canonicalizeChoicesAliases(choices, aliases)
+      val sorted_choices = newchoices sortBy (_.toString)
+      if (!include_aliases)
+        sorted_choices mkString ", "
       else {
-        // Mapping for all choices, including non-canonical versions
-        var allchoices = mutable.Buffer[String]()
-        for (c <- rechoices)
-          allchoices += c.toString
-        allchoices = allchoices.sorted
-        var allcanon = mutable.Buffer[String]()
-        if (recanon != null) {
-          for ((abbrev, full) <- recanon) {
-            if (!(allchoices contains abbrev.toString))
-              allcanon += "%s(=%s)" format (abbrev, full)
+        (
+          for { choice <- sorted_choices
+                choice_aliases_raw = newaliases.getOrElse(choice, null)
+                choice_aliases = (
+                  if (choice_aliases_raw != null) choice_aliases_raw
+                  else Seq[T]()).toSeq sortBy (_.toString)
+              }
+          yield {
+            if (choice_aliases.length > 0)
+              "%s (%s)" format (choice, choice_aliases mkString "/")
+            else choice
           }
-          allcanon = allcanon.sorted
-        }
-        throw new ArgParserInvalidChoiceException("Choice '%s' not one of the recognized choices: %s" format (retval, (allchoices ++ allcanon) mkString ", "))
+        ) mkString ", "
+      }
+    }
+
+    def checkChoices[T](converted: T, choices: Seq[T],
+        aliases: Map[T, Iterable[T]]) = {
+      if (choices == null && aliases == null) converted
+      else {
+        var retval = converted
+        val (newchoices, newaliases) =
+          canonicalizeChoicesAliases(choices, aliases)
+        val revaliases = reverseAliases(aliases)
+        retval = revaliases.getOrElse(retval, retval)
+        if (newchoices contains retval) retval
+        else
+          throw new ArgParserInvalidChoiceException("Choice '%s' not one of the recognized choices: %s" format (retval, choicesList(choices, aliases, true)))
       }
     }
   }
 
-  abstract class ArgAny[T](
+  abstract protected class ArgAny[T](
     val parser: ArgParser,
-    val name: String) {
+    val name: String,
+    val default: T
+  ) {
     def value: T
     def apply() = value
     def specified: Boolean
   }
 
-  class ArgFlag(
+  protected class ArgFlag(
     parser: ArgParser,
     name: String
-  ) extends ArgAny[Boolean](parser, name) {
+  ) extends ArgAny[Boolean](parser, name, false) {
     var wrap: FlagOption[Boolean] = null
     def value = {
       wrap.value match {
@@ -420,12 +531,12 @@ package object argparser {
     def specified = (wrap != null && wrap.value != None)
   }
 
-  class ArgSingle[T](
+  protected class ArgSingle[T](
     parser: ArgParser,
     name: String,
-    val default: T,
+    default: T,
     val is_param: Boolean = false
-  ) extends ArgAny[T](parser, name) {
+  ) extends ArgAny[T](parser, name, default) {
     var wrap: SingleValueArg[T] = null
     def value = {
       wrap.value match {
@@ -436,12 +547,12 @@ package object argparser {
     def specified = (wrap != null && wrap.value != None)
   }
 
-  class ArgMulti[T](
+  protected class ArgMulti[T](
     parser: ArgParser,
     name: String,
-    val default: Seq[T],
+    default: Seq[T],
     val is_param: Boolean = false
-  ) extends ArgAny[Seq[T]](parser, name) {
+  ) extends ArgAny[Seq[T]](parser, name, default) {
     var wrap: MultiValueArg[T] = null
     val wrapSingle = new ArgSingle[T](parser, name, null.asInstanceOf[T])
     def value = if (wrap.value.length == 0) default else wrap.value
@@ -470,12 +581,18 @@ package object argparser {
     /* Set specifying arguments that are flag options. */
     protected val argflag = mutable.Set[String]()
 
+    /* NOTE NOTE NOTE: Currently we don't provide any programmatic way of
+       accessing the ArgAny-subclass object by name.  This is probably
+       a good thing -- these objects can be viewed as internal
+    */
     /**
      * Return the value of an argument, or the default if not specified.
      *
      * @param arg The canonical name of the argument, i.e. the first
      *   non-single-letter alias given.
-     * @returns The value, of type Any.
+     * @returns The value, of type Any.  It must be cast to the appropriate
+     *   type.
+     * @see #get[T]
      */
     def apply(arg: String) = argmap(arg).value
 
@@ -490,6 +607,19 @@ package object argparser {
      * @returns The value, of type T.
      */
     def get[T](arg: String) = argmap(arg).asInstanceOf[ArgAny[T]].value
+
+    /**
+     * Return the default value of an argument.
+     *
+     * @param arg The canonical name of the argument, i.e. the first
+     *   non-single-letter alias given.
+     * @tparam T The type of the argument, which must match the type given
+     *   in its definition
+     *   
+     * @returns The value, of type T.
+     */
+    def defaultValue[T](arg: String) =
+      argmap(arg).asInstanceOf[ArgAny[T]].default
 
     /**
      * Return whether an argument (either option or positional parameter)
@@ -519,7 +649,8 @@ package object argparser {
     def isMulti(arg: String) = argtype_multi contains arg
 
     /**
-     * Return whether the given argument's value was specified.
+     * Return whether the given argument's value was specified.  If not,
+     * fetching the argument's value returns its default value instead.
      */
     def specified(arg: String) = argmap(arg).specified
 
@@ -536,10 +667,24 @@ package object argparser {
      */
     def getMultiType(arg: String) = argtype_multi(arg)
 
+    /**
+     * Iterate over all defined arguments.
+     *
+     * @return an Iterable over the names of the arguments.  The argument
+     *   categories (e.g. option, multi-option, flag, etc.), argument
+     *   types (e.g. Int, Boolean, Double, String, Seq[String]), default
+     *   values and actual values can be retrieved using other functions.
+     */
+    def argNames: Iterable[String] = {
+      for ((name, argobj) <- argmap) yield name
+    }
+
     protected def handle_argument[T : Manifest, U : Manifest](
       name: Seq[String],
       default: U,
       metavar: String,
+      choices: Seq[T] = null,
+      aliases: Map[T, Iterable[T]] = null,
       help: String,
       create_underlying: (String, String, String) => ArgAny[U],
       is_multi: Boolean = false,
@@ -553,12 +698,14 @@ package object argparser {
         argmap(canon).asInstanceOf[ArgAny[U]].value
       else {
         val canon_metavar = computeMetavar(metavar, name)
-        val helpsplit = """(%%|%default|%metavar|%prog|%|[^%]+)""".r.findAllIn(
+        val helpsplit = """(%%|%default|%choices|%allchoices|%metavar|%prog|%|[^%]+)""".r.findAllIn(
           help.replaceAll("""\s+""", " "))
         val canon_help =
           (for (s <- helpsplit) yield {
             s match {
               case "%default" => default.toString
+              case "%choices" => choicesList(choices, aliases, false)
+              case "%allchoices" => choicesList(choices, aliases, true)
               case "%metavar" => canon_metavar
               case "%%" => "%"
               case "%prog" => this.prog
@@ -582,9 +729,9 @@ package object argparser {
       default: T = null.asInstanceOf[T],
       metavar: String = null,
       choices: Seq[T] = null,
-      canonicalize: Map[T, Iterable[T]] = null,
+      aliases: Map[T, Iterable[T]] = null,
       help: String = "")
-    (implicit convert: (String, ArgSingle[T]) => T, m: Manifest[T]) = {
+    (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
           canon_help: String) = {
         val arg = new ArgSingle(this, canon_name, default)
@@ -592,13 +739,14 @@ package object argparser {
           argot.option[T](name.toList, canon_metavar, canon_help) {
             (rawval: String, argop: SingleValueOption[T]) =>
               {
-                val converted = convert(rawval, arg)
-                checkChoices(converted, choices, canonicalize)
+                val converted = convert(rawval, canon_name, this)
+                checkChoices(converted, choices, aliases)
               }
           }
         arg
       }
-      handle_argument[T,T](name, default, metavar, help, create_underlying _)
+      handle_argument[T,T](name, default, metavar, choices, aliases,
+        help, create_underlying _)
     }
 
     /**
@@ -631,24 +779,26 @@ package object argparser {
      *    computed from the canonical option name by capitalizing it.
      * @param choices List of possible choices for this option.  If specified,
      *    it should be a sequence, and only the specified choices will be
-     *    allowed. (But see the `canonicalize` param below.) Otherwise, all
+     *    allowed. (But see the `aliases` param below.) Otherwise, all
      *    values will be allowed.
-     * @param canonicalize Mapping specifying aliases for choice values.
+     * @param aliases Mapping specifying aliases for choice values.
      *    The idea is that when there are a limited number of choices, there
      *    may be multiple aliases for a given choice, e.g. "dev", "devel" or
      *    "development".  If given, this should be a map, with the key a
      *    canonical choice and the value a sequence of aliases.  Note that
-     *    if `canonicalize` is given but `choices` is not given, the list
+     *    if `aliases` is given but `choices` is not given, the list
      *    of possible choices is automatically derived from the keys of the
-     *    `canonicalize` mapping.  To this end, choices with no aliases
+     *    `aliases` mapping.  To this end, choices with no aliases
      *    should be listed with `null` as the value instead of a sequence.
      * @param help Help string for the option, shown in the usage string.
      * @param convert Function to convert the raw option (a string) into
-     *    a value of type `T`.  The second parameter given is an object
-     *    giving some more information about the option (most notably,
-     *    its canonical name, in case this is relevant to the conversion
-     *    routine).  For standard types, this function does not need to be
-     *    given.
+     *    a value of type `T`.  The second and third parameters specify
+     *    the name of the argument whose value is being converted, and the
+     *    ArgParser object that the argument is defined on.  Under normal
+     *    circumstances, these parameters should not affect the result of
+     *    the conversion function.  For standard types, no conversion
+     *    function needs to be specified, as the correct conversion function
+     *    will be located automatically through Scala's 'implicit' mechanism.
      * @tparam T The type of the option.  For non-standard types, a
      *    converter must explicitly be given. (The standard types recognized
      *    are currently Int, Double, Boolean and String.)
@@ -664,13 +814,13 @@ package object argparser {
       default: T = null.asInstanceOf[T],
       metavar: String = null,
       choices: Seq[T] = null,
-      canonicalize: Map[T, Iterable[T]] = null,
+      aliases: Map[T, Iterable[T]] = null,
       help: String = "")
-    (implicit convert: (String, ArgSingle[T]) => T, m: Manifest[T]) = {
+    (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       optionSeq[T](nonNullVals(name1, name2, name3, name4, name5, name6,
         name7, name8, name9),
         metavar = metavar, default = default, choices = choices,
-        canonicalize = canonicalize, help = help)(convert, m)
+        aliases = aliases, help = help)(convert, m)
     }
 
     def flagSeq(name: Seq[String],
@@ -682,8 +832,8 @@ package object argparser {
         arg.wrap = argot.flag[Boolean](name.toList, canon_help)
         arg
       }
-      handle_argument[Boolean,Boolean](name, false, null, help,
-        create_underlying _)
+      handle_argument[Boolean,Boolean](name, false, null, Seq(true, false),
+        null, help, create_underlying _)
     }
 
     /**
@@ -717,9 +867,9 @@ package object argparser {
       default: Seq[T] = Seq[T](),
       metavar: String = null,
       choices: Seq[T] = null,
-      canonicalize: Map[T, Iterable[T]] = null,
+      aliases: Map[T, Iterable[T]] = null,
       help: String = "")
-    (implicit convert: (String, ArgSingle[T]) => T, m: Manifest[T]) = {
+    (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
           canon_help: String) = {
         val arg = new ArgMulti[T](this, canon_name, default)
@@ -727,14 +877,14 @@ package object argparser {
           argot.multiOption[T](name.toList, canon_metavar, canon_help) {
             (rawval: String, argop: MultiValueOption[T]) =>
               {
-                val converted = convert(rawval, arg.wrapSingle)
-                checkChoices(converted, choices, canonicalize)
+                val converted = convert(rawval, canon_name, this)
+                checkChoices(converted, choices, aliases)
               }
           }
         arg
       }
-      handle_argument[T,Seq[T]](name, default, metavar, help,
-        create_underlying _, is_multi = true)
+      handle_argument[T,Seq[T]](name, default, metavar, choices, aliases,
+        help, create_underlying _, is_multi = true)
     }
 
     /**
@@ -753,13 +903,13 @@ package object argparser {
       default: Seq[T] = Seq[T](),
       metavar: String = null,
       choices: Seq[T] = null,
-      canonicalize: Map[T, Iterable[T]] = null,
+      aliases: Map[T, Iterable[T]] = null,
       help: String = "")
-    (implicit convert: (String, ArgSingle[T]) => T, m: Manifest[T]) = {
+    (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       multiOptionSeq[T](nonNullVals(name1, name2, name3, name4, name5, name6,
         name7, name8, name9),
         default = default, metavar = metavar, choices = choices,
-        canonicalize = canonicalize, help = help)(convert, m)
+        aliases = aliases, help = help)(convert, m)
     }
 
     /**
@@ -775,27 +925,27 @@ package object argparser {
     def parameter[T](name: String,
       default: T = null.asInstanceOf[T],
       choices: Seq[T] = null,
-      canonicalize: Map[T, Iterable[T]] = null,
+      aliases: Map[T, Iterable[T]] = null,
       help: String = "",
       optional: Boolean = false)
-    (implicit convert: (String, ArgSingle[T]) => T, m: Manifest[T]) = {
+    (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
           canon_help: String) = {
         val arg = new ArgSingle(this, canon_name, default, is_param = true)
         arg.wrap =
           argot.parameter[T](canon_name, canon_help, optional) {
-            // FUCK ME! Argot wants a Parameter[T], but this is private to
+            // Whoops, Argot wants a Parameter[T], but this is private to
             // Argot.  So we have to pass in a superclass.
             (rawval: String, argop: CommandLineArgument[T]) =>
               {
-                val converted = convert(rawval, arg)
-                checkChoices(converted, choices, canonicalize)
+                val converted = convert(rawval, canon_name, this)
+                checkChoices(converted, choices, aliases)
               }
           }
         arg
       }
-      handle_argument[T,T](Seq(name), default, null, help,
-        create_underlying _, is_positional = true)
+      handle_argument[T,T](Seq(name), default, null, choices, aliases,
+        help, create_underlying _, is_positional = true)
     }
 
     /**
@@ -807,26 +957,27 @@ package object argparser {
     def multiParameter[T](name: String,
       default: Seq[T] = Seq[T](),
       choices: Seq[T] = null,
-      canonicalize: Map[T, Iterable[T]] = null,
+      aliases: Map[T, Iterable[T]] = null,
       help: String = "",
       optional: Boolean = true)
-    (implicit convert: (String, ArgSingle[T]) => T, m: Manifest[T]) = {
+    (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
           canon_help: String) = {
         val arg = new ArgMulti[T](this, canon_name, default, is_param = true)
         arg.wrap = argot.multiParameter[T](canon_name, canon_help, optional) {
-            // FUCK ME! Argot wants a Parameter[T], but this is private to
+            // Whoops, Argot wants a Parameter[T], but this is private to
             // Argot.  So we have to pass in a superclass.
             (rawval: String, argop: CommandLineArgument[T]) =>
               {
-                val converted = convert(rawval, arg.wrapSingle)
-                checkChoices(converted, choices, canonicalize)
+                val converted = convert(rawval, canon_name, this)
+                checkChoices(converted, choices, aliases)
               }
           }
         arg
       }
-      handle_argument[T,Seq[T]](Seq(name), default, null, help,
-        create_underlying _, is_multi = true, is_positional = true)
+      handle_argument[T,Seq[T]](Seq(name), default, null, choices,
+        aliases, help, create_underlying _,
+        is_multi = true, is_positional = true)
     }
 
     /**
@@ -874,34 +1025,33 @@ package object argparser {
     def error(msg: String) {
       throw new ArgParserConversionException(msg)
     }
-
-    def argNameObjects: Iterable[(String, ArgAny[_])] = {
-      argmap.toIterable
-    }
-
-    def argNameValues: Iterable[(String, Any)] = {
-      for ((name, argobj) <- argmap) yield (name, argobj.value)
-    }
   }
 }
 
 object TestArgs extends App {
   import argparser._
-  val ap = new ArgParser("test")
   class MyArgs(ap: ArgParser) {
     /* An integer option named --foo, with a default value of 5.  Can also
        be specified using --spam or -f. */
-    var foo = ap.option[Int]("foo", "spam", "f", default = 5)
+    var foo = ap.option[Int]("foo", "spam", "f", default = 5,
+    help="""An integer-valued option.  Default %default.""")
     /* A string option named --bar, with a default value of "chinga".  Can
        also be specified using -b. */
     var bar = ap.option[String]("bar", "b", default = "chinga")
     /* A string option named --baz, which can be given multiple times.
        Default value is an empty sequence. */
     var baz = ap.multiOption[String]("baz")
-    /* A floating-point option named --bat, which can be given multiple times.
-       Default value is the sequence Seq(2.5, 5.0, 7.5), which will obtain
+    /* A floating-point option named --tick, which can be given multiple times.
+       Default value is the sequence Seq(2.5, 5.0, 9.0), which will obtain
        when the option hasn't been given at all. */
-    var bat = ap.multiOption[Double]("bat", default = Seq(2.5, 5.0, 7.5))
+    var tick = ap.multiOption[Double]("tick", default = Seq(2.5, 5.0, 9.0),
+    help = """Option --tick, perhaps for specifying the position of
+tick marks along the X axis.  Multiple such options can be given.  If
+no marks are specified, the default is %default.  Note that we can
+         freely insert
+         spaces and carriage
+         returns into the help text; whitespace is compressed
+      to a single space.""")
     /* A flag --bezzaaf, alias -q.  Value is true if given, false if not. */
     var bezzaaf = ap.flag("bezzaaf", "q")
     /* An integer option --blop, with only the values 1, 2, 4 or 7 are
@@ -913,27 +1063,69 @@ object TestArgs extends App {
        detection of when no choice is given; but this can be determined
        in a more reliable way using `ap.specified("blop")`.)
      */
-    var blop = ap.option[Int]("blop", default = 1, choices = Seq(1, 2, 4, 7))
+    var blop = ap.option[Int]("blop", default = 1, choices = Seq(1, 2, 4, 7),
+    help = """An integral argument with limited choices.  Default is %default,
+possible choices are %choices.""")
     /* A string option --daniel, with only the values "mene", "tekel", and
        "upharsin" allowed, but where values can be repeated, e.g.
        --daniel mene --daniel mene --daniel tekel --daniel upharsin
        . */
     var daniel = ap.multiOption[String]("daniel",
       choices = Seq("mene", "tekel", "upharsin"))
+    var strategy =
+      ap.multiOption[String]("s", "strategy",
+        aliases = Map(
+          "baseline" -> null, "none" -> null,
+          "full-kl-divergence" ->
+            Seq("full-kldiv", "full-kl"),
+          "partial-kl-divergence" ->
+            Seq("partial-kldiv", "partial-kl", "part-kl"),
+          "symmetric-full-kl-divergence" ->
+            Seq("symmetric-full-kldiv", "symmetric-full-kl", "sym-full-kl"),
+          "symmetric-partial-kl-divergence" ->
+            Seq("symmetric-partial-kldiv", "symmetric-partial-kl", "sym-part-kl"),
+          "cosine-similarity" ->
+            Seq("cossim"),
+          "partial-cosine-similarity" ->
+            Seq("partial-cossim", "part-cossim"),
+          "smoothed-cosine-similarity" ->
+            Seq("smoothed-cossim"),
+          "smoothed-partial-cosine-similarity" ->
+            Seq("smoothed-partial-cossim", "smoothed-part-cossim"),
+          "average-cell-probability" ->
+            Seq("avg-cell-prob", "acp"),
+          "naive-bayes-with-baseline" ->
+            Seq("nb-base"),
+          "naive-bayes-no-baseline" ->
+            Seq("nb-nobase")),
+        help = """A multi-string option.  This is an actual option in
+one of my research programs.  Possible choices are %choices; the full list
+of choices, including all aliases, is %allchoices.""")
     /* A required positional parameter. */
     var destfile = ap.parameter[String]("DESTFILE",
       help = "Destination file to store output in")
     /* A multi-positional parameter that sucks up all remaining arguments. */
     var files = ap.multiParameter[String]("FILES", help = "Files to process")
   }
+  val ap = new ArgParser("test")
   // This first call is necessary, even though it doesn't appear to do
   // anything.  In particular, this ensures that all arguments have been
   // defined on `ap` prior to parsing.
-  val first_shadow = new MyArgs(ap)
+  new MyArgs(ap)
   // ap.parse(List("--foo", "7"))
   ap.parse(args)
   val Args = new MyArgs(ap)
-  /* Print out values of all arguments, whether options or positional */
-  for ((name, value) <- ap.argNameValues)
-    println("%30s: %s" format (name, value))
+  // Print out values of all arguments, whether options or positional.
+  // Also print out types and default values.
+  for (name <- ap.argNames)
+    println("%30s: %s (%s) (default=%s)" format (
+      name, ap(name), ap.getType(name), ap.defaultValue[Any](name)))
+  // Examples of how to retrieve individual arguments
+  for (file <- Args.files)
+    println("Process file: %s" format file)
+  println("Maximum tick mark seen: %s" format (Args.tick max))
+  // We can freely change the value of arguments if we want, since they're
+  // just vars.
+  if (Args.daniel contains "upharsin")
+    Args.bar = "chingamos"
 }
