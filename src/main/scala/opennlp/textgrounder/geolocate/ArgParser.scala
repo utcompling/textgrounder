@@ -265,6 +265,10 @@ package object argparser {
       implicit conversion.
    */
 
+   /**
+    * Implicit conversion function for Ints.  Automatically selected
+    * for Int-type arguments.
+    */
   implicit def convertInt(rawval: String, name: String, ap: ArgParser) = {
     try { rawval.toInt }
     catch {
@@ -274,6 +278,10 @@ package object argparser {
     }
   }
 
+   /**
+    * Implicit conversion function for Doubles.  Automatically selected
+    * for Int-type arguments.
+    */
   implicit def convertDouble(rawval: String, name: String, ap: ArgParser) = {
     try { rawval.toDouble }
     catch {
@@ -284,10 +292,18 @@ package object argparser {
     }
   }
 
+   /**
+    * Implicit conversion function for Strings.  Automatically selected
+    * for String-type arguments.
+    */
   implicit def convertString(rawval: String, name: String, ap: ArgParser) = {
     rawval
   }
 
+   /**
+    * Implicit conversion function for Boolean arguments, used for options
+    * that take a value (rather than flags).
+    */
   implicit def convertBoolean(rawval: String, name: String, ap: ArgParser) = {
     rawval.toLowerCase match {
       case "yes" => true
@@ -307,6 +323,22 @@ package object argparser {
     }
   }
 
+  /**
+   * Superclass of all exceptions related to `argparser`.  These exceptions
+   * are generally thrown during argument parsing.  Normally, the exceptions
+   * are automatically caught, their message displayed, and then the
+   * program exited with code 1, indicating a problem.  However, this
+   * behavior can be suppressed by setting the constructor parameter
+   * `catchErrors` on `ArgParser` to false.  In such a case, the exceptions
+   * will be propagated to the caller, which should catch them and handle
+   * appropriately; otherwise, the program will be terminated with a stack
+   * trace.
+   *
+   * @param message Message of the exception
+   * @param cause If not None, an exception, used for exception chaining
+   *   (when one exception is caught, wrapped in another exception and
+   *   rethrown)
+   */
   class ArgParserException(val message: String,
     val cause: Option[Throwable] = None) extends Exception(message) {
     if (cause != None)
@@ -329,51 +361,9 @@ package object argparser {
   }
 
   /**
-   * Thrown to indicate usage errors. The calling application can catch this
-   * exception and print the message, which will be a fully fleshed-out usage
-   * string. For instance:
+   * Thrown to indicate usage errors.
    *
-   * (FIXME: Not implemented currently.)
-   *
-   * {{{
-   * import opennlp.textgrounder.geolocate.argparser._
-   *
-   * object TestArgs extends App {
-   *   class Args {
-   *     var foo = ap.option[Int]("foo", default=5)
-   *     var bar = ap.option[String]("bar", default="chinga")
-   *     var baz = ap.multiOption[String]("baz")
-   *     var bat = ap.multiOption[Int]("bat")
-   *     var blop = ap.option[String]("blop", choices=Seq("mene", "tekel", "upharsin"))
-   *     var blop2 = ap.multiOption[String]("blop2", choices=Seq("mene", "tekel", "upharsin"))
-   *   }
-   *   ...
-   *   val ap = new ArgParser("test")
-   *   new Args(ap)    // necessary!
-   *   ap.parse(args)
-   *   val args = new Args(ap)
-   *   ...
-   *   println("foo: %s" format args.foo)
-   *   println("bar: %s" format args.bar)
-   *   println("baz: %s" format args.baz)
-   *   println("bat: %s" format args.bat)
-   *   println("blop: %s" format args.blop)
-   *   println("blop2: %s" format args.blop2)
-   * }
-   *
-   * val p = new ArgParser("MyProgram")
-   * ...
-   * try {
-   *   p.parse(args)
-   * }
-   * catch {
-   *   case e: ArgParserUsageException =>
-   *     println(e.message)
-   *     System.exit(1)
-   * }
-   * }}}
-   *
-   * @param message exception message
+   * @param message fully fleshed-out usage string.
    * @param cause exception, if propagating an exception
    */
   class ArgParserUsageException(
@@ -394,9 +384,21 @@ package object argparser {
   ) extends ArgParserException(message, cause)
 
   /**
+   * Thrown to indicate that an invalid choice was given for a limited-choice
+   * argument.  The message indicates both the problem and the list of
+   * possible choices.
+   *
+   * @param message  exception message
+   */
+  class ArgParserInvalidChoiceException(message: String,
+    cause: Option[Throwable] = None
+  ) extends ArgParserConversionException(message, cause)
+
+  /**
    * Thrown to indicate that ArgParser encountered a problem in the caller's
    * argument specification, or something else indicating invalid coding.
-   * This indicates a big in the caller's code.
+   * This indicates a bug in the caller's code.  These exceptions are not
+   * automatically caught.
    *
    * @param message  exception message
    */
@@ -407,7 +409,7 @@ package object argparser {
   /**
    * Thrown to indicate that ArgParser encountered a problem that should
    * never occur under any circumstances, indicating a bug in the ArgParser
-   * code itself.
+   * code itself.  These exceptions are not automatically caught.
    *
    * @param message  exception message
    */
@@ -415,10 +417,10 @@ package object argparser {
     cause: Option[Throwable] = None
   ) extends ArgParserException("(INTERNAL BUG) " + message, cause)
 
-  class ArgParserInvalidChoiceException(message: String)
-    extends ArgParserConversionException(message)
-
-  object ArgParser {
+  /* Some static functions related to ArgParser; all are for internal use */
+  protected object ArgParser {
+    // Given a list of aliases for an argument, return the canonical one
+    // (first one that's more than a single letter).
     def canonName(name: Seq[String]): String = {
       assert(name.length > 0)
       for (n <- name) {
@@ -427,11 +429,15 @@ package object argparser {
       return name(0)
     }
 
+    // Compute the metavar for an argument.  If the metavar has already
+    // been given, use it; else, use the upper case version of the
+    // canonical name of the argument.
     def computeMetavar(metavar: String, name: Seq[String]) = {
       if (metavar != null) metavar
       else canonName(name).toUpperCase
     }
 
+    // Return a sequence of all the given strings that aren't null.
     def nonNullVals(val1: String, val2: String, val3: String, val4: String,
       val5: String, val6: String, val7: String, val8: String,
       val9: String) = {
@@ -446,7 +452,7 @@ package object argparser {
 
     // Convert aliases map to a map in the other direction, i.e. from
     // alias to canonical choice
-    protected def reverseAliases[T](aliases: Map[T, Iterable[T]]) = {
+    def reverseAliases[T](aliases: Map[T, Iterable[T]]) = {
       if (aliases == null)
         Map[T, T]()
       else
@@ -455,7 +461,15 @@ package object argparser {
           yield (abbrev -> full)
     }
 
-    protected def canonicalizeChoicesAliases[T](choices: Seq[T],
+    // Get rid of nulls in `choices` or `aliases`.  If `aliases` is null,
+    // make it an empty map.  If `choices` is null, derive it from the
+    // canonical choices given in the `aliases` map.  Note that before
+    // calling this, a special check must be done for the case where
+    // `choices` is null *and* `aliases` is null, which is actually the
+    // most common situation.  In this case, no limited-choice restrictions
+    // apply at all.  Returns a tuple of canonicalized choices,
+    // canonicalized aliases.
+    def canonicalizeChoicesAliases[T](choices: Seq[T],
         aliases: Map[T, Iterable[T]]) = {
       val newaliases = if (aliases != null) aliases else Map[T, Iterable[T]]()
       val newchoices =
@@ -467,7 +481,7 @@ package object argparser {
     // the list is derived from the canonical choices listed in 'aliases'.
     // If 'include_aliases' is true, include the aliases in the list of
     // choices, in parens after the canonical name.
-    protected def choicesList[T](choices: Seq[T],
+    def choicesList[T](choices: Seq[T],
         aliases: Map[T, Iterable[T]], include_aliases: Boolean) = {
       val (newchoices, newaliases) =
         canonicalizeChoicesAliases(choices, aliases)
@@ -491,6 +505,8 @@ package object argparser {
       }
     }
 
+    // Check that the given value passes any restrictions imposed by
+    // `choices` and/or `aliases`.  If not, throw an exception.
     def checkChoices[T](converted: T, choices: Seq[T],
         aliases: Map[T, Iterable[T]]) = {
       if (choices == null && aliases == null) converted
@@ -507,15 +523,48 @@ package object argparser {
     }
   }
 
+  /**
+   * Base class of all argument-wrapping classes.  These are used to
+   * wrap the appropriate argument-category class from Argot, and return
+   * values by querying Argot for the value, returning the default value
+   * if Argot doesn't have a value recorded.
+   *
+   * NOTE that these classes are not meant to leak out to the user.  They
+   * should be considered implementation detail only and subject to change.
+   *
+   * @param parser ArgParser for which this argument exists.
+   * @param name Name of the argument.
+   * @param default Default value of the argument, used when the argument
+   *   wasn't specified on the command line.
+   * @tparam T Type of the argument (e.g. Int, Double, String, Boolean).
+   */
+
   abstract protected class ArgAny[T](
     val parser: ArgParser,
     val name: String,
     val default: T
   ) {
+    /**
+     * Return the value of the argument, if specified; else, the default
+     * value. */
     def value: T
+    /**
+     * When dereferenced as a function, also return the value.
+     */
     def apply() = value
+    /**
+     * Whether the argument's value was specified.  If not, the default
+     * value applies.
+     */
     def specified: Boolean
   }
+
+  /**
+   * Class for wrapping simple Boolean flags.
+   *
+   * @param parser ArgParser for which this argument exists.
+   * @param name Name of the argument.
+   */
 
   protected class ArgFlag(
     parser: ArgParser,
@@ -530,6 +579,19 @@ package object argparser {
     }
     def specified = (wrap != null && wrap.value != None)
   }
+
+  /**
+   * Class for wrapping a single (non-multi) argument (either option or
+   * positional param).
+   *
+   * @param parser ArgParser for which this argument exists.
+   * @param name Name of the argument.
+   * @param default Default value of the argument, used when the argument
+   *   wasn't specified on the command line.
+   * @param is_param Whether this is a positional parameter rather than
+   *   option (default false).
+   * @tparam T Type of the argument (e.g. Int, Double, String, Boolean).
+   */
 
   protected class ArgSingle[T](
     parser: ArgParser,
@@ -547,6 +609,18 @@ package object argparser {
     def specified = (wrap != null && wrap.value != None)
   }
 
+  /**
+   * Class for wrapping a multi argument (either option or positional param).
+   *
+   * @param parser ArgParser for which this argument exists.
+   * @param name Name of the argument.
+   * @param default Default value of the argument, used when the argument
+   *   wasn't specified on the command line even once.
+   * @param is_param Whether this is a positional parameter rather than
+   *   option (default false).
+   * @tparam T Type of the argument (e.g. Int, Double, String, Boolean).
+   */
+
   protected class ArgMulti[T](
     parser: ArgParser,
     name: String,
@@ -559,6 +633,13 @@ package object argparser {
     def specified = (wrap.value.length > 0)
   }
 
+  /**
+   * Main class for parsing arguments from a command line.
+   *
+   * @param prog Name of program being run, for the usage mssage.
+   * @param return_defaults If true, field values in field-based value
+   *  access always return the default value, even aft3r parsing.
+   */
   class ArgParser(prog: String, return_defaults: Boolean = false) {
     import ArgParser._
     import ArgotConverters._
