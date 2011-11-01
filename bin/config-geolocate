@@ -32,6 +32,18 @@ if [ -n "$TG_ON_COMP_LING_MACHINES" ]; then
   fi
 fi
 
+if [ -n "$TG_ON_LONGHORN" ]; then
+  if [ -z "$TG_WIKIPEDIA_DIR" ]; then
+    TG_WIKIPEDIA_DIR=/scratch/01683/benwing/corpora/wikipedia
+  fi
+  if [ -z "$TG_TWITTER_DIR" ]; then
+    TG_TWITTER_DIR=/scratch/01683/benwing/corpora/geotext
+  fi
+  if [ -z "$TG_AUX_DIR" ]; then
+    TG_AUX_DIR=/scratch/01683/benwing/projects/wikigrounder/data
+  fi
+fi
+
 if [ -z "$TG_WIKIPEDIA_DIR" ]; then
   echo "Must set TG_WIKIPEDIA_DIR to location of Wikipedia data files"
   exit 1
