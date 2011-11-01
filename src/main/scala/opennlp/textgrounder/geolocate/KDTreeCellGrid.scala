@@ -1,23 +1,56 @@
 package opennlp.textgrounder.geolocate
 
+import scala.collection.JavaConversions._
+import ags.utils.KdTree
 import opennlp.textgrounder.geolocate.Distances.Coord
+import scala.collection.immutable.Map
 
-class KDTreeCellGrid(table: GeoArticleTable) extends CellGrid(table) {
+class KdTreeCell(
+  cellgrid: KdTreeCellGrid,
+  val kdleaf : KdTree[GeoArticle]) extends RectangularCell(cellgrid) {
+
+    def get_northeast_coord () : Coord = {
+        new Coord(kdleaf.minLimit(0), kdleaf.minLimit(1))
+    }
+    
+    def get_southwest_coord () : Coord = {
+        new Coord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
+    }
+    
+    def iterate_articles () : Iterable[GeoArticle] = {
+        kdleaf.getData()
+    }
+    
+    def describe_indices () : String = {
+        "Placeholder"
+    }
+    
+    def describe_location () : String = {
+        get_boundary.toString
+    }
+}
+
+class KdTreeCellGrid(table: GeoArticleTable) extends CellGrid(table) {
   /**
    * Total number of cells in the grid.
    */
   var total_num_cells: Int = 0
+  var kdtree : KdTree[GeoArticle] = new KdTree[GeoArticle](2);
 
   /**
    * Find the correct cell for the given coordinates.  If no such cell
    * exists, return null.
    */
-  def find_best_cell_for_coord(coord: Coord): GeoCell = { null }
+  def find_best_cell_for_coord(coord: Coord): KdTreeCell = {
+      new KdTreeCell(this, kdtree.getLeaf(Array(coord.lat, coord.long)))
+  }
 
   /**
    * Add the given article to the cell grid.
    */
-  def add_article_to_cell(article: GeoArticle): Unit = {}
+  def add_article_to_cell(article: GeoArticle): Unit = {
+      kdtree.addPoint(Array(article.coord.lat, article.coord.long), article)
+  }
 
   /**
    * Generate all non-empty cells.  This will be called once (and only once),
@@ -25,7 +58,9 @@ class KDTreeCellGrid(table: GeoArticleTable) extends CellGrid(table) {
    * `add_article_to_cell`.  The generation happens internally; but after
    * this, `iter_nonempty_cells` should work properly.
    */
-  protected def initialize_cells: Unit = {}
+  def initialize_cells: Unit = {
+      total_num_cells = kdtree.getLeaves.size
+  }
 
   /**
    * Iterate over all non-empty cells.
@@ -38,38 +73,16 @@ class KDTreeCellGrid(table: GeoArticleTable) extends CellGrid(table) {
    *   even when not set, some articles may be listed in the article-data file
    *   but have no corresponding word counts given in the counts file.)
    */
-  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[GeoCell] = { null }
+  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[GeoCell] = {
+      for (leaf <- kdtree.getLeaves)
+          yield new KdTreeCell(this, leaf)
+  }
 }
 
-class KDTreeCell(cellgrid: CellGrid,
-                 val southwestCoord:Coord,
-                 val northeastCoord:Coord)
-extends RectangularCell(cellgrid) {
-  def get_southwest_coord: Coord = southwestCoord
-  def get_northeast_coord: Coord = northeastCoord
-
-  /**
-   * Return a string describing the location of the cell in its grid,
-   * e.g. by its boundaries or similar.
-   */
-  def describe_location: String = "SW: "+get_southwest_coord+", NE: "+get_northeast_coord
-
-  /**
-   * Return a string describing the indices of the cell in its grid.
-   * Only used for debugging.
-   */
-   def describe_indices: String = ""
-
-  /**
-   * Return an Iterable over articles, listing the articles in the cell.
-   */
-  def iterate_articles(): Iterable[GeoArticle] = null
-}
-
-object KDTreeTest {
+object KdTreeTest {
   def main(args:Array[String]) {
     val table = new GeoArticleTable
-    val grid = new KDTreeCellGrid(table)
+    val grid = new KdTreeCellGrid(table)
 
     val emptyParams = Map[String, String]()
 
@@ -83,6 +96,7 @@ object KDTreeTest {
 
     grid.finish
 
+    println(grid.find_best_cell_for_coord(new Coord(35, -98)).kdleaf)
     println(grid.find_best_cell_for_coord(new Coord(35, -98)))
 
   }
