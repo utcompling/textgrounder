@@ -20,23 +20,52 @@ import tgutil._
 import argparser._
 
 /**
- A general main application class for use in an application that performs
-experiments (currently used mostly for NLP -- i.e. natural language
-processing -- experiments, but not limited to this).  The program is assumed
-to have various parameters controlling its operation, some of which come
-from command-line arguments, some from constants hard-coded into the source
-code, some from environment variables or configuration files, some computed
-from other parameters, etc.  We divide them into two types: command-line
-(those coming from the command line) and ancillary (from any other source).
-Both types of parameters are output at the beginning of execution so that
-the researcher can see exactly which parameters this particular experiment
-was run with.
+ * A general main application class for use in an application that performs
+ * experiments (currently used mostly for experiments in NLP -- i.e. natural
+ * language processing -- but not limited to this).  The program is assumed
+ * to have various parameters controlling its operation, some of which come
+ * from command-line arguments, some from constants hard-coded into the source
+ * code, some from environment variables or configuration files, some computed
+ * from other parameters, etc.  We divide them into two types: command-line
+ * (those coming from the command line) and ancillary (from any other source).
+ * Both types of parameters are output at the beginning of execution so that
+ * the researcher can see exactly which parameters this particular experiment
+ * was run with.
+ *
+ * The general operation is as follows:
+ *
+ * (1) The command line is passed in, and we parse it.  Command-line parsing
+ *     uses the ArgParser class.  We use "field-style" access to the
+ *     arguments retrieved from the command line; this means that there is
+ *     a separate class taking the ArgParser as a construction parameter,
+ *     and containing vars, one per argument, each initialized using a
+ *     method call on the ArgParser that sets up all the features of that
+ *     particular argument.
+ * (2) Application verifies the parsed arguments passed in and initializes
+ *     its parameters based on the parsed arguments and possibly other
+ *     sources.
+ * (3) Application is run.
+ *
+ * A particular application customizes things as follows:
+ *
+ * (1) Consistent with "field-style" access, it creates a class that will
+ *     hold the user-specified values of command-line arguments, and also
+ *     initializes the ArgParser with the list of allowable arguments,
+ *     types, default values, etc. `ArgType` is the type of this class,
+ *     and `create_arg_class` must be implemented to create an instance
+ *     of this class.
+ * (2) `initialize_parameters` must be implemented to handle validation
+ *     of the command-line arguments and retrieval of any other parameters.
+ * (3) `run_program` must, of course, be implemented, to provide the
+ *     actual behavior of the application.
  */
 
 /* SCALABUG: If this param isn't declared with a 'val', we get an error
    below on the line creating ArgParser when trying to access progname,
    saying "no such field". */
-abstract class ExperimentApp(val progname: String) extends App {
+abstract class ExperimentApp(val progname: String) {
+  val beginning_time = curtimesecs()
+
   // Things that must be implemented
 
   /**
@@ -47,21 +76,38 @@ abstract class ExperimentApp(val progname: String) extends App {
   type ArgType
 
   /**
-   * Function to create an ArgType, passing in the value of `the_argparser`.
+   * Function to create an ArgType, passing in the value of `arg_parser`.
    */
   def create_arg_class(): ArgType
 
-  def handle_arguments(args: Seq[String])
-  def implement_main(args: Seq[String])
+  /**
+   * Function to initialize and verify internal parameters from command-line
+   * arguments and other sources.
+   */
+  def initialize_parameters()
+
+  /**
+   * Function to run the actual app, after parameters have been set.
+   * @return Exit code of program (0 for successful completion, > 0 for
+   *  an error
+   */
+  def run_program(): Int
 
   // Things that may be overridden
+
+  /**
+   * Output the values of "ancillary" parameters (see above)
+   */
   def output_ancillary_parameters() {}
 
+  /**
+   * Output the values of "command-line" parameters (see above)
+   */
   def output_command_line_parameters() {
     errprint("Parameter values:")
-    for (name <- the_argparser.argNames) {
-      errprint("%30s: %s", name, the_argparser(name))
-      //errprint("%30s: %s", name, the_argparser.getType(name))
+    for (name <- arg_parser.argNames) {
+      errprint("%30s: %s", name, arg_parser(name))
+      //errprint("%30s: %s", name, arg_parser.getType(name))
     }
     errprint("")
   }
@@ -69,23 +115,51 @@ abstract class ExperimentApp(val progname: String) extends App {
   /**
    * An instance of ArgParser, for parsing options
    */
-  val the_argparser = new ArgParser(progname)
+  val arg_parser = new ArgParser(progname)
 
-  var argholder: ArgType = _
+  /**
+   * A class for holding the values retrieved from the command-line
+   * options.  Note that the values themselves are also stored in the
+   * ArgParser object; this class provides easy access through the
+   * "field-style" paradigm enabled by ArgParser.
+   */
+  var arg_holder: ArgType = _
 
-  def main() = {
+  /**
+   * Code to implement main entrance point.  We move this to a separate
+   * function because a subclass might want to wrap the program entrance/
+   * exit (e.g. a Hadoop driver).
+   *
+   * @param args Command-line arguments, as specified by user
+   * @return Exit code, typically 0 for successful completion,
+   *   positive for errorThis needs to be called explicitly from the
+   */
+  def implement_main(args: Array[String]) = {
     set_stdout_stderr_utf_8()
-    errprint("Beginning operation at %s" format curtimehuman())
+    errprint("Beginning operation at %s" format humandate_full(beginning_time))
     errprint("Arguments: %s" format (args mkString " "))
     val shadow_fields = create_arg_class()
-    the_argparser.parse(args)
-    argholder = create_arg_class()
-    handle_arguments(args)
+    arg_parser.parse(args)
+    arg_holder = create_arg_class()
+    initialize_parameters()
     output_command_line_parameters()
     output_ancillary_parameters()
-    val retval = implement_main(args)
-    errprint("Ending operation at %s" format curtimehuman())
+    val retval = run_program()
+    val ending_time = curtimesecs()
+    errprint("Ending operation at %s" format humandate_full(ending_time))
+    errprint("Program running time: %s",
+      format_minutes_seconds(ending_time - beginning_time))
     retval
+  }
+
+  /**
+   * Actual entrance point from the JVM.  Does nothing but call
+   * `implement_main`, then call `System.exit()` with the returned exit code.
+   * @see #implement_main
+   */
+  def main(args: Array[String]) {
+    val retval = implement_main(args)
+    System.exit(retval)
   }
 }
 

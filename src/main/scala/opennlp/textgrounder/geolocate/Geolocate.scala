@@ -2593,13 +2593,16 @@ object Debug {
 }
 
 /**
- * Class for programmatic access to document/etc. geolocation.
+ * Base class for programmatic access to document/etc. geolocation.
+ * Subclasses are for particular apps, e.g. GeolocateDocumentDriver for
+ * document-level geolocation.
  *
- * NOTE: Currently this is a singleton object, not a class, because there
- * can be only one geolocation instance in existence.  This is because
- * of various other singleton objects (i.e. static methods/fields) scattered
- * throughout the code.  If this is a problem, let me know and I will
- * endeavor to fix it.
+ * NOTE: Currently the code has some values stored in singleton objects,
+ * and no clear provided interface for resetting them.  This basically
+ * means that there can be only one geolocation instance per JVM.
+ * By now, most of the singleton objects have been removed, and it should
+ * not be difficult to remove the final limitations so that multiple
+ * drivers per JVM (possibly not at the same time) can be done.
  *
  * Basic operation:
  *
@@ -3129,21 +3132,22 @@ abstract class GeolocateApp(appname: String) extends ExperimentApp(appname) {
 
   def create_driver(): DriverType
 
-  def argerror(str: String) {
-    the_argparser.error(str)
+  def arg_error(str: String) {
+    arg_parser.error(str)
   }
 
   override def output_ancillary_parameters() {
     driver.output_ancillary_parameters()
   }
 
-  def handle_arguments(args: Seq[String]) {
-    driver.set_error_handler(argerror _)
-    driver.set_parameters(argholder.asInstanceOf[driver.ParamType])
+  def initialize_parameters() {
+    driver.set_error_handler(arg_error _)
+    driver.set_parameters(arg_holder.asInstanceOf[driver.ParamType])
   }
 
-  def implement_main(args: Seq[String]) {
+  def run_program() = {
     driver.run()
+    0
   }
 }
 
@@ -3151,17 +3155,15 @@ object GeolocateDocumentApp extends GeolocateApp("geolocate-documents") {
   type ParamType = GeolocateDocumentParameters
   type DriverType = GeolocateDocumentDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class() = new ParamType(the_argparser)
+  def create_arg_class() = new ParamType(arg_parser)
   def create_driver() = new DriverType()
-  main()
 }
 
 object GenerateKMLApp extends GeolocateApp("generate-kml") {
   type ParamType = GenerateKMLParameters
   type DriverType = GenerateKMLDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class() = new ParamType(the_argparser)
+  def create_arg_class() = new ParamType(arg_parser)
   def create_driver() = new DriverType()
-  main()
 }
 
