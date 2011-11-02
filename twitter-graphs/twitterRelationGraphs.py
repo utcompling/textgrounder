@@ -49,7 +49,7 @@ outFriendsTweets = None
 #===============================================================================
 # Minimum number of followers the target user must have before we process their graphs
 # Number must be at least 1 to be processed
-minNumFollowers = 30
+minNumFollowers = 50
 
 # Minimum number of tweets the follower/friend must have
 minNumTweets = 30
@@ -109,11 +109,17 @@ def checkApiLimit():
             minRequiredHits = numUsersToProcess - 2
             print "Remaining Hits: " + str(api.GetRateLimitStatus()[u'remaining_hits'])
 
-            if api.GetRateLimitStatus()[u'remaining_hits'] - minRequiredHits < 0:
+            limit = api.GetRateLimitStatus()[u'remaining_hits']
+
+            if not outFollowersTweets == None or not outFriendsTweets == None:
+                limit -= minRequiredHits
+
+            if  limit <= 0:
                 limit_sleep = round(api.GetRateLimitStatus()[u'reset_time_in_seconds'] - time.time() + 5)
                 print "API limit reached, sleep for %d seconds..." % limit_sleep
                 time.sleep(limit_sleep)
-                return
+
+            return
         except twitter.TwitterError:
             print "Error checking for Rate Limit, Sleeping for 60 seconds..."
             time.sleep(60)
