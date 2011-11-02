@@ -547,16 +547,60 @@ package object argparser {
     /**
      * Return the value of the argument, if specified; else, the default
      * value. */
-    def value: T
+    def value = {
+      if (overridden)
+        overriddenValue
+      else if (specified)
+        wrappedValue
+      else
+        default
+    }
+
+    def setValue(newval: T) {
+      overriddenValue = newval
+      overridden = true
+    }
+
     /**
      * When dereferenced as a function, also return the value.
      */
     def apply() = value
+
     /**
      * Whether the argument's value was specified.  If not, the default
      * value applies.
      */
     def specified: Boolean
+
+    /**
+     * Clear out any stored values so that future queries return the default.
+     */
+    def clear() {
+      clearWrapped()
+      overridden = false
+    }
+
+    /**
+     * Return the value of the underlying Argot object, assuming it exists
+     * (possibly error thrown if not).
+     */
+    protected def wrappedValue: T
+
+    /**
+     * Clear away the wrapped value.
+     */
+    protected def clearWrapped()
+
+    /**
+     * Value if the user explicitly set a value.
+     */
+    protected var overriddenValue: T = _
+
+    /**
+     * Whether the user explicit set a value.
+     */
+    protected var overridden: Boolean = false
+
   }
 
   /**
@@ -571,13 +615,9 @@ package object argparser {
     name: String
   ) extends ArgAny[Boolean](parser, name, false) {
     var wrap: FlagOption[Boolean] = null
-    def value = {
-      wrap.value match {
-        case Some(x) => x
-        case None => false
-      }
-    }
+    def wrappedValue = wrap.value.get
     def specified = (wrap != null && wrap.value != None)
+    def clearWrapped() { if (wrap != null) wrap.reset() }
   }
 
   /**
@@ -600,13 +640,9 @@ package object argparser {
     val is_param: Boolean = false
   ) extends ArgAny[T](parser, name, default) {
     var wrap: SingleValueArg[T] = null
-    def value = {
-      wrap.value match {
-        case Some(x) => x
-        case None => default
-      }
-    }
+    def wrappedValue = wrap.value.get
     def specified = (wrap != null && wrap.value != None)
+    def clearWrapped() { if (wrap != null) wrap.reset() }
   }
 
   /**
@@ -629,8 +665,9 @@ package object argparser {
   ) extends ArgAny[Seq[T]](parser, name, default) {
     var wrap: MultiValueArg[T] = null
     val wrapSingle = new ArgSingle[T](parser, name, null.asInstanceOf[T])
-    def value = if (wrap.value.length == 0) default else wrap.value
-    def specified = (wrap.value.length > 0)
+    def wrappedValue = wrap.value
+    def specified = (wrap != null && wrap.value.length > 0)
+    def clearWrapped() { if (wrap != null) wrap.reset() }
   }
 
   /**
@@ -643,6 +680,7 @@ package object argparser {
   class ArgParser(prog: String, return_defaults: Boolean = false) {
     import ArgParser._
     import ArgotConverters._
+    /* The underlying ArgotParser object. */
     protected val argot = new ArgotParser(prog)
     /* A map from the parameter's canonical name to the subclass of ArgAny
        describing the parameter and holding its value.  The canonical name
@@ -688,6 +726,21 @@ package object argparser {
      * @returns The value, of type T.
      */
     def get[T](arg: String) = argmap(arg).asInstanceOf[ArgAny[T]].value
+
+    /**
+     * Explicitly set the value of an argument.
+     *
+     * @param arg The canonical name of the argument, i.e. the first
+     *   non-single-letter alias given.
+     * @param value The new value of the argument.
+     * @tparam T The type of the argument, which must match the type given
+     *   in its definition
+     *   
+     * @returns The value, of type T.
+     */
+    def set[T](arg: String, value: T) {
+      argmap(arg).asInstanceOf[ArgAny[T]].setValue(value)
+    }
 
     /**
      * Return the default value of an argument.
@@ -1091,6 +1144,9 @@ package object argparser {
         }
       }
 
+      // Reset everything, in case the user explicitly set some values
+      // (which otherwise override values retrieved from parsing)
+      clear()
       if (catchErrors) {
         try {
           call_parse()
@@ -1101,6 +1157,15 @@ package object argparser {
           }
         }
       } else call_parse()
+    }
+
+    /**
+     * Clear all arguments back to their default values.
+     */
+    def clear() {
+      for (obj <- argmap.values) {
+        obj.clear()
+      }
     }
 
     def error(msg: String) {
