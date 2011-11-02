@@ -17,7 +17,7 @@
 package opennlp.textgrounder.geolocate
 
 import tgutil._
-import Debug._
+import GeolocateDriver.Debug._
 import WordDist.memoizer._
 import WordDist.SmoothedWordDist
 

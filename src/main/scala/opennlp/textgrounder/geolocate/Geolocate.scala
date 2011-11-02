@@ -26,8 +26,8 @@ import WordDist.memoizer._
 import WordDist.SmoothedWordDist
 import argparser._
 import Distances._
-import Debug._
 import GeolocateDriver.Args
+import GeolocateDriver.Debug._
 
 import util.matching.Regex
 import util.Random
@@ -2556,7 +2556,7 @@ pcl-travel: Extra info for debugging --eval-format=pcl-travel.
 
 }
 
-object Debug {
+class DebugSettings {
   // Debug params.  Different params indicate different info to output.
   // Specified using --debug.  Multiple params are separated by spaces,
   // colons or semicolons.  Params can be boolean, if given alone, or
@@ -2693,43 +2693,38 @@ abstract class GeolocateDriver {
     GeolocateDriver.Args = args
     this.params = args
 
-    /** Canonicalize arguments **/
+    /** Canonicalize/verify arguments **/
 
-    canonicalize_args(args)
+    handle_common_args(args)
+    canonicalize_verify_args(args)
+  }
 
-    /** Set other values and check remaining args **/
-
+  protected def handle_common_args(args: ParamType) {
     if (args.debug != null)
       parse_debug_spec(args.debug)
 
-    def check_common_args(args: ParamType) {
-      if (args.miles_per_cell < 0)
-        argerror("Miles per cell must be positive if specified")
-      if (args.km_per_cell < 0)
-        argerror("Kilometers per cell must be positive if specified")
-      if (args.degrees_per_cell < 0)
-        argerror("Degrees per cell must be positive if specified")
-      if (args.miles_per_cell > 0 && args.km_per_cell > 0)
-        argerror("Only one of --miles-per-cell and --km-per-cell can be given")
-      degrees_per_cell =
-        if (args.miles_per_cell > 0)
-          args.miles_per_cell / miles_per_degree
-        else if (args.km_per_cell > 0)
-          args.km_per_cell / km_per_degree
-        else
-          args.degrees_per_cell
-      if (args.width_of_multi_cell <= 0)
-        argerror("Width of multi cell must be positive")
+    if (args.miles_per_cell < 0)
+      argerror("Miles per cell must be positive if specified")
+    if (args.km_per_cell < 0)
+      argerror("Kilometers per cell must be positive if specified")
+    if (args.degrees_per_cell < 0)
+      argerror("Degrees per cell must be positive if specified")
+    if (args.miles_per_cell > 0 && args.km_per_cell > 0)
+      argerror("Only one of --miles-per-cell and --km-per-cell can be given")
+    degrees_per_cell =
+      if (args.miles_per_cell > 0)
+        args.miles_per_cell / miles_per_degree
+      else if (args.km_per_cell > 0)
+        args.km_per_cell / km_per_degree
+      else
+        args.degrees_per_cell
+    if (args.width_of_multi_cell <= 0)
+      argerror("Width of multi cell must be positive")
 
-      need_seq(args.article_data_file, "article-data-file")
-    }
-
-    check_common_args(args)
-    check_remaining_args(args)
+    need_seq(args.article_data_file, "article-data-file")
   }
 
-  def canonicalize_args(Args: ParamType)
-  def check_remaining_args(Args: ParamType)
+  def canonicalize_verify_args(Args: ParamType)
 
   protected def initialize_cellgrid(table: GeoArticleTable) {
     cellgrid = new MultiRegularCellGrid(degrees_per_cell,
@@ -2784,6 +2779,7 @@ abstract class GeolocateDriver {
 
 object GeolocateDriver {
   var Args: GeolocateParameters = _
+  val Debug: DebugSettings = new DebugSettings
 }
 
 class GenerateKMLParameters(
@@ -2821,10 +2817,7 @@ class GenerateKMLDriver extends GeolocateDriver {
   type ParamType = GenerateKMLParameters
   type StrategyType = Nothing
 
-  def canonicalize_args(args: ParamType) {
-  }
-
-  def check_remaining_args(args: ParamType) {
+  def canonicalize_verify_args(args: ParamType) {
     need(args.kml_words, "kml-words")
   }
 
@@ -2880,6 +2873,7 @@ file as a document to evaluate.""")
 
   var strategy =
     ap.multiOption[String]("s", "strategy",
+      default = Seq("partial-kl-divergence"),
       //      choices=Seq(
       //        "baseline", "none",
       //        "full-kl-divergence",
@@ -2952,6 +2946,7 @@ be tried, one after the other.""")
 
   var baseline_strategy =
     ap.multiOption[String]("baseline-strategy", "bs",
+      default = Seq("internal-link"),
       choices = Seq("internal-link", "random",
         "num-articles", "link-most-common-toponym",
         "cell-distribution-most-common-toponym"),
@@ -2989,13 +2984,7 @@ class GeolocateDocumentDriver extends GeolocateDriver {
   type ParamType = GeolocateDocumentParameters
   type StrategyType = GeotagDocumentStrategy
 
-  def canonicalize_args(args: ParamType) {
-    if (args.strategy.length == 0)
-      args.strategy = Seq("partial-kl-divergence")
-
-    if (args.baseline_strategy.length == 0)
-      args.baseline_strategy = Seq("internal-link")
-
+  def canonicalize_verify_args(args: ParamType) {
     if (args.strategy contains "baseline") {
       var need_case = false
       var need_no_case = false
@@ -3015,9 +3004,7 @@ class GeolocateDocumentDriver extends GeolocateDriver {
         args.preserve_case_words = true
       }
     }
-  }
 
-  def check_remaining_args(args: ParamType) {
     if (args.counts_file.length == 0)
       argerror("Must specify counts file")
 

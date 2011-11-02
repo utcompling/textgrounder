@@ -20,7 +20,7 @@ import opennlp.textgrounder.geolocate._
 import tgutil._
 import argparser._
 import Distances._
-import Debug._
+import GeolocateDriver.Debug._
 import GeolocateToponymApp.Args
 
 import collection.mutable
@@ -1389,6 +1389,7 @@ Only used during toponym resolution (--mode=geotag-toponyms).  NOTE: type
 
   var strategy =
     ap.multiOption[String]("s", "strategy",
+      default = Seq("baseline"),
       //      choices=Seq(
       //        "baseline", "none",
       //        "naive-bayes-with-baseline",
@@ -1418,6 +1419,7 @@ be tried, one after the other.""")
 
   var baseline_strategy =
     ap.multiOption[String]("baseline-strategy", "bs",
+      default = Seq("internal-link"),
       choices = Seq("internal-link", "random",
         "num-articles"),
       aliases = Map(
@@ -1479,18 +1481,10 @@ class GeolocateToponymDriver extends GeolocateDriver {
   type StrategyType = GeotagToponymStrategy
   var Args: ParamType = _
 
-  def canonicalize_args(args: ParamType) {
+  def canonicalize_verify_args(args: ParamType) {
     Args = args
     GeolocateToponymApp.Args = args
     
-    if (args.strategy.length == 0)
-      args.strategy = Seq("baseline")
-
-    if (args.baseline_strategy.length == 0)
-      args.baseline_strategy = Seq("internal-link")
-  }
-
-  def check_remaining_args(args: ParamType) {
     need(args.gazetteer_file, "gazetteer-file")
     // FIXME! Can only currently handle World-type gazetteers.
     if (args.gazetteer_type != "world")
