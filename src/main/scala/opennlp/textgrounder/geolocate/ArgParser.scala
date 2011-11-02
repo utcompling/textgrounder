@@ -859,6 +859,14 @@ package object argparser {
       }
     }
 
+    protected def argot_converter[T](convert: (String, String, ArgParser) => T,
+        canon_name: String, choices: Seq[T], aliases: Map[T, Iterable[T]]) = {
+      (rawval: String, argop: CommandLineArgument[T]) => {
+        val converted = convert(rawval, canon_name, this)
+        checkChoices(converted, choices, aliases)
+      }
+    }
+
     def optionSeq[T](name: Seq[String],
       default: T = null.asInstanceOf[T],
       metavar: String = null,
@@ -870,13 +878,8 @@ package object argparser {
           canon_help: String) = {
         val arg = new ArgSingle(this, canon_name, default)
         arg.wrap =
-          argot.option[T](name.toList, canon_metavar, canon_help) {
-            (rawval: String, argop: SingleValueOption[T]) =>
-              {
-                val converted = convert(rawval, canon_name, this)
-                checkChoices(converted, choices, aliases)
-              }
-          }
+          (argot.option[T](name.toList, canon_metavar, canon_help)
+           (argot_converter(convert, canon_name, choices, aliases)))
         arg
       }
       handle_argument[T,T](name, default, metavar, choices, aliases,
@@ -1008,13 +1011,8 @@ package object argparser {
           canon_help: String) = {
         val arg = new ArgMulti[T](this, canon_name, default)
         arg.wrap =
-          argot.multiOption[T](name.toList, canon_metavar, canon_help) {
-            (rawval: String, argop: MultiValueOption[T]) =>
-              {
-                val converted = convert(rawval, canon_name, this)
-                checkChoices(converted, choices, aliases)
-              }
-          }
+          (argot.multiOption[T](name.toList, canon_metavar, canon_help)
+           (argot_converter(convert, canon_name, choices, aliases)))
         arg
       }
       handle_argument[T,Seq[T]](name, default, metavar, choices, aliases,
@@ -1067,15 +1065,8 @@ package object argparser {
           canon_help: String) = {
         val arg = new ArgSingle(this, canon_name, default, is_param = true)
         arg.wrap =
-          argot.parameter[T](canon_name, canon_help, optional) {
-            // Whoops, Argot wants a Parameter[T], but this is private to
-            // Argot.  So we have to pass in a superclass.
-            (rawval: String, argop: CommandLineArgument[T]) =>
-              {
-                val converted = convert(rawval, canon_name, this)
-                checkChoices(converted, choices, aliases)
-              }
-          }
+          (argot.parameter[T](canon_name, canon_help, optional)
+           (argot_converter(convert, canon_name, choices, aliases)))
         arg
       }
       handle_argument[T,T](Seq(name), default, null, choices, aliases,
@@ -1098,15 +1089,9 @@ package object argparser {
       def create_underlying(canon_name: String, canon_metavar: String,
           canon_help: String) = {
         val arg = new ArgMulti[T](this, canon_name, default, is_param = true)
-        arg.wrap = argot.multiParameter[T](canon_name, canon_help, optional) {
-            // Whoops, Argot wants a Parameter[T], but this is private to
-            // Argot.  So we have to pass in a superclass.
-            (rawval: String, argop: CommandLineArgument[T]) =>
-              {
-                val converted = convert(rawval, canon_name, this)
-                checkChoices(converted, choices, aliases)
-              }
-          }
+        arg.wrap =
+          (argot.multiParameter[T](canon_name, canon_help, optional)
+           (argot_converter(convert, canon_name, choices, aliases)))
         arg
       }
       handle_argument[T,Seq[T]](Seq(name), default, null, choices,
