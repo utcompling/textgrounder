@@ -137,10 +137,10 @@ import java.io._
    we have to compute a median, meaning we need all values.  Reducer
    computes mean/median for all values for a given cellgrid/strategy.
    NOTE: For identifying a particular cell, we use indices, since we
-   can't pass pointers.  KD trees and such, we conceivably might have
+   can't pass pointers.  For KD trees and such, we conceivably might have
    to pass in to the reducer some complex details identifying the
    cell grid parameters.  If so, this probably would get passed first
-   to all reducers using the trick of creating a customer partitioner
+   to all reducers using the trick of creating a custom partitioner
    that ensures the reducer gets this info first.
 */
    
@@ -149,8 +149,19 @@ class ArticleEvaluationMapper extends Mapper[Object, Text, Text, IntWritable] {
   val one = new IntWritable(1)
   var word = new Text
 
-  override
-  def map (key: Object, value: Text, context: Mapper[Object,Text,Text,IntWritable]#Context) {
+  type ContextType = Mapper[Object,Text,Text,IntWritable]#Context
+
+  override def setup(context: ContextType) {
+    import GeolocateHadoopConfiguration._
+
+    val conf = context.getConfiguration()
+    val ap = new ArgParser(progname)
+    // Initialize set of parameters in `ap`
+    new GeolocateDocumentParameters(ap)
+    convert_parameters_from_jobconf(confprefix, ap, conf)
+  }
+
+  override def map (key: Object, value: Text, context: ContextType) {
     value.toString.split("\\s").foreach { token => word.set(token); context.write(word, one) }
   }
 }
@@ -167,7 +178,10 @@ class ArticleResultReducer extends Reducer[Text,IntWritable,Text,IntWritable] {
   }
 }
 
-class GeolocateHadoopDriver extends Configured with Tool {
+object GeolocateHadoopConfiguration {
+  val progname = "hadoop geolocate-document"
+  val confprefix = "textgrounder.geolocate_document."
+
   /**
    * Convert the parameters in `parser` to Hadoop configuration settings in
    * `conf`.
@@ -178,19 +192,94 @@ class GeolocateHadoopDriver extends Configured with Tool {
    */
   def convert_parameters_to_jobconf(prefix: String, parser: ArgParser,
       conf: JobConf) {
-    for ((name, value) <- parser.argNameValues) {
-      parser.
-
-
-      errprint("%30s: %s", name, value)
-      //errprint("%30s: %s", name, op.getType(name))
+    for (name <- parser.argNames) {
+      val confname = prefix + name
+      parser.getType(name) match {
+        case classOf[Int] =>
+          conf.setInt(confname, parser.get[Int](name))
+        case classOf[Long] =>
+          conf.setLong(confname, parser.get[Long](name))
+        case classOf[Float] =>
+          conf.setFloat(confname, parser.get[Float](name))
+        case classOf[Double] =>
+          conf.setFloat(confname, parser.get[Double](name).toFloat)
+        case classOf[String] =>
+          conf.set(confname, parser.get[String](name))
+        case classOf[Boolean] =>
+          conf.setBoolean(confname, parser.get[Boolean](name))
+        case classOf[Seq[_]] => {
+          val multitype = parser.getMultiType(name)
+          if (multitype == classof[String])
+            conf.setStrings(confname, parser.get[Seq[String]](name): _*)
+          else
+            throw new UnsupportedOperationException(
+              "Don't know how to store sequence of type %s of parameter %s into a Hadoop JobConf"
+              format (multitype, name))
+        }
+        case ty:_ => {
+          throw new UnsupportedOperationException(
+            "Don't know how to store type %s of parameter %s into a Hadoop JobConf"
+            format (ty, name))
+        }
+      }
     }
-
   }
 
-  override def run(args: Array[String]): Int {
+  /**
+   * Convert the relevant Hadoop configuration settings in `conf`
+   * into the given ArgParser.
+   *
+   * @param prefix Prefix to prepend to the names of all parameters.
+   * @param parser ArgParser object to store parameters into.  The names
+   *   of parameters to fetch are taken from this object.
+   * @param conf JobConf object to retrieve settings from.
+   */
+  def convert_parameters_from_jobconf(prefix: String, parser: ArgParser,
+      conf: JobConf) {
+    for (name <- parser.argNames) {
+      val confname = prefix + name
+      parser.getType(name) match {
+        case classOf[Int] =>
+          parser.set[Int](name, conf.getInt(confname))
+        case classOf[Long] =>
+          parser.set[Long](name, conf.getLong(confname))
+        case classOf[Float] =>
+          parser.set[Float](name, conf.getFloat(confname))
+        case classOf[Double] =>
+          parser.set[Double](name, conf.getFloat(confname).toDouble)
+        case classOf[String] =>
+          parser.set[String](name, conf.get(confname))
+        case classOf[Boolean] =>
+          parser.set[Boolean](name, conf.getBoolean(confname))
+        case classOf[Seq[_]] => {
+          val multitype = parser.getMultiType(name)
+          if (multitype == classof[String])
+            parser.set[Seq[String]](name, conf.getStrings(confname).toSeq)
+          else
+            throw new UnsupportedOperationException(
+              "Don't know how to fetch sequence of type %s of parameter %s from a Hadoop JobConf"
+              format (multitype, name))
+        }
+        case ty:_ => {
+          throw new UnsupportedOperationException(
+            "Don't know how to store fetch %s of parameter %s from a Hadoop JobConf"
+            format (ty, name))
+        }
+      }
+    }
+  }
+}
+
+class GeolocateDocumentHadoopTool extends Configured with Tool {
+  override def run(args: Array[String]) = {
+    import GeolocateHadoopConfiguration._
     val conf = getConf()
-    val job = new Job(conf, "Geolocate document-geotag")
+    val job = new Job(conf, progname)
+    val ap = new ArgParser(progname)
+    // Initialize set of parameters in `ap`
+    new GeolocateDocumentParameters(ap)
+    ap.parse(args)
+    convert_parameters_to_jobconf(confprefix, ap, conf)
     job.setJarByClass(classOf[ArticleEvaluationMapper])
     job.setMapperClass(classOf[ArticleEvaluationMapper])
     job.setReducerClass(classOf[ArticleResultReducer])
@@ -202,7 +291,48 @@ class GeolocateHadoopDriver extends Configured with Tool {
   }
 }
 
-object GeolocateHadoop extends App {
+abstract class GeolocateHadoopApp(appname: String) extends ExperimentApp(appname) {
+  type ParamType <: GeolocateParameters
+  type ArgType = ParamType
+  type DriverType <: GeolocateDriver
+  val driver = create_driver()
+
+  def create_driver(): DriverType
+
+  def argerror(str: String) {
+    the_argparser.error(str)
+  }
+
+  override def output_ancillary_parameters() {
+    driver.output_ancillary_parameters()
+  }
+
+  def handle_arguments(args: Seq[String]) {
+    driver.set_error_handler(argerror _)
+    driver.set_parameters(argholder.asInstanceOf[driver.ParamType])
+  }
+
+}
+
+abstract class GeolocateHadoopApp(
+  appname: String
+) extends GeolocateApp(appname) {
+  def implement_main(args: Seq[String]) {
+    driver.run()
+  }
+}
+
+object GeolocateDocumentHadoopApp extends
+    GeolocateApp("hadoop geolocate-documents") {
+  type ParamType = GeolocateDocumentParameters
+  type DriverType = GeolocateDocumentDriver
+  // FUCKING TYPE ERASURE
+  def create_arg_class() = new ParamType(the_argparser)
+  def create_driver() = new DriverType()
+  main()
+}
+
+object GeolocateHadoopApp extends App {
   val exitCode = ToolRunner.run(new GeolocateHadoopDriver(), args)
   System.exit(exitCode)
 }
