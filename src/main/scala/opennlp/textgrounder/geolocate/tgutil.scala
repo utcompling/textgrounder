@@ -417,15 +417,19 @@ package object tgutil {
     formatstr format x
   }
 
-  def format_minutes_seconds(seconds: Double) = {
+  def format_minutes_seconds(seconds: Double, hours: Boolean = true) = {
     var secs = seconds
     var mins = (secs / 60).toInt
     secs = secs % 60
-    val hours = (mins / 60).toInt
-    mins = mins % 60
-    var hourstr = (
-      if (hours > 0) "%s hour%s " format (hours, if (hours == 1) "" else "s")
-      else "")
+    val hourstr = {
+      if (!hours) ""
+      else {
+        val hours = (mins / 60).toInt
+        mins = mins % 60
+        if (hours > 0) "%s hour%s " format (hours, if (hours == 1) "" else "s")
+        else ""
+      }
+    }
     val secstr = (if (secs.toInt == secs) "%s" else "%1.1f") format secs
     "%s%s minute%s %s second%s" format (
         hourstr,
@@ -885,10 +889,9 @@ package object tgutil {
       val total_elapsed_secs = curtime - first_time
       val attime =
         if (nohuman) "" else "At %s: " format humandate_time(curtime) 
-      errprint("%sElapsed time: %s minutes %s seconds, %s %s processed",
+      errprint("%sElapsed time: %s, %s %s processed",
                attime,
-               (total_elapsed_secs / 60).toInt,
-               (total_elapsed_secs % 60).toInt,
+               format_minutes_seconds(total_elapsed_secs, hours=false),
                items_processed, item_unit())
       val items_per_second = items_processed.toDouble / total_elapsed_secs
       val seconds_per_item = total_elapsed_secs / items_processed
@@ -1114,7 +1117,7 @@ package object tgutil {
   /**
     * Return floating-point value, number of seconds since the Epoch
     **/
-  def curtimesecs() = System.currentTimeMillis()/1000.0
+  def curtimesecs() = System.currentTimeMillis/1000.0
 
   def curtimehuman() = (new Date()) toString
 
