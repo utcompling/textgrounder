@@ -82,4 +82,4 @@ if [ "$quiet" != "yes" ]; then
   echo "(all above info also sent to output file)"
   ) | tee "$outfile"
 fi
-nohup "$runprog" ${1+"$@"} >> "$outfile 2>&1
+nohup "$runprog" ${1+"$@"} >> "$outfile" 2>&1

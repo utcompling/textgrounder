@@ -23,7 +23,7 @@ of the computer.  So instead, we split the task into chunks, proceeding
 as follows, keeping in mind that we have the list of article names
 available in a separate file:
 
-1. The dump consists of a prologue, a bunch of articles, and an epilogue.
+1. The dump consists of a prolog, a bunch of articles, and an epilog.
 2. (The 'permute' step:) Take the full list of articles, permute randomly
    and output again.
 3. (The 'split' step:) Split the dump into pieces, of perhaps a few GB each,
@@ -33,7 +33,7 @@ available in a separate file:
    create a mapping listing which split each article goes in; then we create
    a file for each split; then we read through the dump file, and each time we
    find an article, we look up its split and write it to the corresponding
-   split file.  We also write the prologue and epilogue into separate files.
+   split file.  We also write the prolog and epilog into separate files.
    Note that in this step we have effectively done a rough sort of the
    articles by split, preserving the original order within each split.
 4. (The 'sort' step:) Sort each split.  For each split, we read the permuted

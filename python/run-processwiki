@@ -345,7 +345,7 @@ else
   echo "$action, combining the files ..."
   all_files="$SPLIT_PREFIX.prolog $splits $SPLIT_PREFIX.epilog"
   echo "$action, concatenating all files ($all_files) ..."
-  cat $all_files > $OUTFILE
+  cat $all_files > $outfile
   echo "$action ... done."
 
 fi

@@ -1381,7 +1381,7 @@ class ArticleHandlerForUsefulText(ArticleHandler):
 # process_text_for_data(), uses ExtractCoordinatesFromSource() to extract
 # coordinates, and outputs all the coordinates seen.  Always returns True.
 
-class OutputWords(ArticleHandlerForUsefulText):
+class OutputAllWords(ArticleHandlerForUsefulText):
   def process_text_for_words(self, word_generator):
     splitprint("Article title: %s" % self.title)
     splitprint("Article ID: %s" % self.id)
@@ -1410,7 +1410,7 @@ class OutputWords(ArticleHandlerForUsefulText):
       print "Notice: ending processing"
 
 
-class OutputCoordWords(OutputWords):
+class OutputCoordWords(OutputAllWords):
   def process_text_for_data(self, text):
     if extract_coordinates_from_article(text):
       return True
