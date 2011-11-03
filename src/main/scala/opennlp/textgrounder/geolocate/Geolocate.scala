@@ -2772,8 +2772,12 @@ abstract class GeolocateDriver {
     }
   }
 
-  def run() = {
+  def read_stopwords() {
     stopwords = Stopwords.read_stopwords(Args.stopwords_file)
+  }
+
+  def run() = {
+    read_stopwords()
     implement_run(params)
   }
 

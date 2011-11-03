@@ -244,6 +244,7 @@ class ArticleEvaluationMapper extends
     // Now create a class containing the stored configuration values
     val params = new GeolocateDocumentParameters(ap)
     driver.set_parameters(params)
+    driver.read_stopwords()
     evaluators =
       for ((stratname, strategy) <- driver.setup_for_run(params))
         yield new ArticleGeotagDocumentEvaluator(strategy, stratname, driver)
