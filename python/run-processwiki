@@ -341,9 +341,8 @@ else
     wait
     numrun=0
   fi
-  splits=""
   echo "$action, combining the files ..."
-  all_files="$SPLIT_PREFIX.prolog $splits $SPLIT_PREFIX.epilog"
+  all_files="$splits"
   echo "$action, concatenating all files ($all_files) ..."
   cat $all_files > $outfile
   echo "$action ... done."
