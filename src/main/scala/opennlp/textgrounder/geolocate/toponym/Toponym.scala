@@ -1540,7 +1540,7 @@ class GeolocateToponymDriver extends GeolocateDriver {
       topo_article_table.set_gazetteer(gazetteer)
     }
 
-    val strats = (
+    val strats_unflat = (
       for (stratname <- args.strategy) yield {
         // Generate strategy object
         if (stratname == "baseline") {
@@ -1552,6 +1552,7 @@ class GeolocateToponymDriver extends GeolocateDriver {
           Seq((stratname, strategy))
         }
       })
+    val strats = strats_unflat reduce (_ ++ _)
     process_strategies(strats)((stratname, strategy) => {
       val evaluator =
         // Generate reader object

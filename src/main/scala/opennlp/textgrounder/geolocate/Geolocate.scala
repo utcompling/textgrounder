@@ -1715,6 +1715,14 @@ class GeoArticleTable {
 
   def create_article(params: Map[String, String]) = new GeoArticle(params)
 
+  def would_add_article_to_list(art: GeoArticle) = {
+    if (art.namespace != "Main")
+      false
+    else if (art.redir.length > 0)
+      false
+    else art.coord != null
+  }
+
   def read_article_data(filename: String, cellgrid: CellGrid) {
     val redirects = mutable.Buffer[GeoArticle]()
 
@@ -2749,11 +2757,9 @@ abstract class GeolocateDriver {
     read_articles(article_table, stopwords)
   }
 
-  protected def process_strategies[T](
-    strat_unflat: Seq[Seq[(String, T)]])(
+  protected def process_strategies[T](strategies: Seq[(String, T)])(
       geneval: (String, T) => EvaluationOutputter) = {
-    val strats = strat_unflat reduce (_ ++ _)
-    for ((stratname, strategy) <- strats) yield {
+    for ((stratname, strategy) <- strategies) yield {
       val evalobj = geneval(stratname, strategy)
       // For --eval-format=internal, there is no eval file.  To make the
       // evaluation loop work properly, we pretend like there's a single
@@ -2780,6 +2786,25 @@ abstract class GeolocateDriver {
 object GeolocateDriver {
   var Args: GeolocateParameters = _
   val Debug: DebugSettings = new DebugSettings
+
+  // Debug flags (from ArticleGeotagDocumentEvaluator) -- need to set them
+  // here before we parse the command-line debug settings. (FIXME, should
+  // be a better way that introduces fewer long-range dependencies like
+  // this)
+  //
+  //  gridrank: For the given test article number (starting at 1), output
+  //            a grid of the predicted rank for cells around the true
+  //            cell.  Multiple articles can have the rank output, e.g.
+  //
+  //            --debug 'gridrank=45,58'
+  //
+  //            (This will output info for articles 45 and 58.)
+  //
+  //  gridranksize: Size of the grid, in numbers of articles on a side.
+  //                This is a single number, and the grid will be a square
+  //                centered on the true cell.
+  register_list_debug_param("gridrank")
+  debugval("gridranksize") = "11"
 }
 
 class GenerateKMLParameters(
@@ -3021,29 +3046,15 @@ class GeolocateDocumentDriver extends GeolocateDriver {
   }
 
   /**
-   * Do the actual document geolocation.  Results to stderr (see above), and
-   * also returned.
-   *
-   * The current return type is as follows:
-   *
-   * Seq[(java.lang.String, GeotagDocumentStrategy, scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.TestFileEvaluator
-   *
-   * This means you get a sequence of tuples of
-   * (strategyname, strategy, results)
-   * where:
-   * strategyname = name of strategy as given on command line
-   * strategy = strategy object
-   * results = map listing results for each document (an abstract type
-   * defined in TestFileEvaluator; the result type EvaluationResult
-   * is practically an abstract type, too -- the most useful dynamic
-   * type in practice is ArticleEvaluationResult)
+   * Set everything up for document geolocation.  Return a sequence of
+   * strategy objects.  Used by e.g. the Hadoop interface, which does
+   * its own iteration over articles.
    */
-
-  def implement_run(args: ParamType) = {
+  def setup_for_run(args: ParamType) = {
     read_data_for_geotag_documents()
     cellgrid.finish()
 
-    val strats = (
+    val strats_unflat = (
       for (stratname <- args.strategy) yield {
         if (stratname == "baseline") {
           for (basestratname <- args.baseline_strategy) yield {
@@ -3099,7 +3110,31 @@ class GeolocateDocumentDriver extends GeolocateDriver {
             Seq()
         }
       })
-    process_strategies(strats)((stratname, strategy) => {
+    strats_unflat reduce (_ ++ _)
+  }
+
+  /**
+   * Do the actual document geolocation.  Results to stderr (see above), and
+   * also returned.
+   *
+   * The current return type is as follows:
+   *
+   * Seq[(java.lang.String, GeotagDocumentStrategy, scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.TestFileEvaluator
+   *
+   * This means you get a sequence of tuples of
+   * (strategyname, strategy, results)
+   * where:
+   * strategyname = name of strategy as given on command line
+   * strategy = strategy object
+   * results = map listing results for each document (an abstract type
+   * defined in TestFileEvaluator; the result type EvaluationResult
+   * is practically an abstract type, too -- the most useful dynamic
+   * type in practice is ArticleEvaluationResult)
+   */
+
+  def implement_run(args: ParamType) = {
+    val strategies = setup_for_run(args)
+    process_strategies(strategies)((stratname, strategy) => {
       val evaluator =
         // Generate reader object
         if (args.eval_format == "pcl-travel")

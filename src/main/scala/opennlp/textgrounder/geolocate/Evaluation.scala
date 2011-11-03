@@ -350,7 +350,7 @@ trait EvaluationResult {
  * Abstract class for reading documents from a test file and evaluating
  * on them.
  */
-abstract class TestFileEvaluator(stratname: String) {
+abstract class TestFileEvaluator(val stratname: String) {
   var documents_processed = 0
 
   type Document <: EvaluationDocument
@@ -382,7 +382,7 @@ abstract class TestFileEvaluator(stratname: String) {
 }
 
 abstract class GeotagDocumentEvaluator(
-  strategy: GeotagDocumentStrategy,
+  val strategy: GeotagDocumentStrategy,
   stratname: String
 ) extends TestFileEvaluator(stratname) {
   val evalstats = new GroupedGeotagDocumentEvalStats(strategy.cellgrid)
@@ -419,22 +419,6 @@ class ArticleGeotagDocumentEvaluator(
 
   type Document = GeoArticle
   type DocumentResult = ArticleEvaluationResult
-
-  // Debug flags:
-  //
-  //  gridrank: For the given test article number (starting at 1), output
-  //            a grid of the predicted rank for cells around the true
-  //            cell.  Multiple articles can have the rank output, e.g.
-  //
-  //            --debug 'gridrank=45,58'
-  //
-  //            (This will output info for articles 45 and 58.)
-  //
-  //  gridranksize: Size of the grid, in numbers of articles on a side.
-  //                This is a single number, and the grid will be a square
-  //                centered on the true cell.
-  register_list_debug_param("gridrank")
-  debugval("gridranksize") = "11"
 
   def iter_documents(filename: String) = {
     assert(filename == null)
@@ -629,8 +613,10 @@ abstract class EvaluationOutputter {
   def evaluate_and_output_results(files: Iterable[String]): Unit
 }
 
-class DefaultEvaluationOutputter(stratname: String, evalobj: TestFileEvaluator
-    ) extends EvaluationOutputter {
+class DefaultEvaluationOutputter(
+  val stratname: String,
+  val evalobj: TestFileEvaluator
+) extends EvaluationOutputter {
   val results = mutable.Map[EvaluationDocument, EvaluationResult]()
   /**
     Evaluate on all of the given files, outputting periodic results and

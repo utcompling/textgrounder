@@ -223,16 +223,17 @@ object GeolocateHadoopConfiguration {
   }
 }
 
-class ArticleEvaluationMapper extends Mapper[Object, Text, Text, IntWritable] {
+class ArticleEvaluationMapper extends
+    Mapper[Object, Text, Text, DoubleWritable] {
+  val reader = new ArticleReader(ArticleData.combined_article_data_outfields)
+  var evaluators: Iterable[ArticleGeotagDocumentEvaluator] = null
+  val task = new MeteredTask("document", "evaluating")
+  import GeolocateDocumentHadoopApp._
 
-  val one = new IntWritable(1)
-  var word = new Text
-
-  type ContextType = Mapper[Object,Text,Text,IntWritable]#Context
+  type ContextType = Mapper[Object, Text, Text, DoubleWritable]#Context
 
   override def setup(context: ContextType) {
     import GeolocateHadoopConfiguration._
-    import GeolocateDocumentHadoopApp._
 
     val conf = context.getConfiguration()
     val ap = new ArgParser(progname)
@@ -242,25 +243,56 @@ class ArticleEvaluationMapper extends Mapper[Object, Text, Text, IntWritable] {
     convert_parameters_from_jobconf(hadoop_conf_prefix, ap, conf)
     // Now create a class containing the stored configuration values
     val params = new GeolocateDocumentParameters(ap)
-    val driver = new GeolocateDocumentDriver
     driver.set_parameters(params)
+    evaluators =
+      for ((stratname, strategy) <- driver.setup_for_run(params))
+        yield new ArticleGeotagDocumentEvaluator(strategy, stratname, driver)
   }
 
-  override def map (key: Object, value: Text, context: ContextType) {
-    word.set("Saw input: " + value.toString)
-    context.write(word, one)
+  override def map(key: Object, value: Text, context: ContextType) {
+    def process(params: Map[String, String]) {
+      val table = driver.article_table
+      val in_article = table.create_article(params)
+      if (in_article.split == "training" &&
+          table.would_add_article_to_list(in_article)) {
+        val art = table.lookup_article(in_article.title)
+        if (art == null)
+          warning("Couldn't find article %s in table", in_article.title)
+        else {
+          for (e <- evaluators) {
+            val num_processed = task.num_processed
+            val doctag = "#%d" format (1 + num_processed)
+            if (e.would_skip_document(art, doctag))
+              errprint("Skipped article %s", art)
+            else {
+              // Don't put side-effecting code inside of an assert!
+              val result =
+                e.evaluate_document(art, doctag)
+              assert(result != null)
+              context.write(new Text(e.stratname),
+                new DoubleWritable(result.asInstanceOf[ArticleEvaluationResult].pred_truedist))
+              task.item_processed()
+            }
+          }
+        }
+      }
+    }
+    reader.process_row(value.toString, process _)
   }
 }
 
-class ArticleResultReducer extends Reducer[Text,IntWritable,Text,IntWritable] {
+class ArticleResultReducer extends
+    Reducer[Text, DoubleWritable, Text, DoubleWritable] {
 
-  val result = new IntWritable()
+  type ContextType = Reducer[Text, DoubleWritable, Text, DoubleWritable]#Context
 
-  override
-  def reduce (key: Text, values: java.lang.Iterable[IntWritable],
-              context: Reducer[Text,IntWritable,Text,IntWritable]#Context) {
-    result set(values.foldLeft(0) { _ + _.get })
-    context write(key, result)
+  override def reduce (key: Text, values: java.lang.Iterable[DoubleWritable],
+      context: ContextType) {
+    val errordists = (for (v <- values) yield v.get).toSeq
+    val mean_dist = mean(errordists)
+    val median_dist = median(errordists)
+    context.write(new Text(key.toString + " mean"), new DoubleWritable(mean_dist))
+    context.write(new Text(key.toString + " median"), new DoubleWritable(median_dist))
   }
 }
 
@@ -335,7 +367,7 @@ object GeolocateDocumentHadoopApp extends
     job.setMapperClass(classOf[ArticleEvaluationMapper])
     job.setReducerClass(classOf[ArticleResultReducer])
     job.setOutputKeyClass(classOf[Text])
-    job.setOutputValueClass(classOf[IntWritable])
+    job.setOutputValueClass(classOf[DoubleWritable])
   }
 }
 
