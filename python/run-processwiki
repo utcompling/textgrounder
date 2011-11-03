@@ -1,18 +1,5 @@
 #!/bin/sh
 
-# Generate the various necessary data files.  To generate everything, use
-#
-#  run-processwiki all
-#
-# Else, do one of the steps:
-#
-# article-data = Basic article data file
-# coords = Article coordinates
-# links = Article incoming links, only for articles with coordinates or
-#         redirects to such articles
-# combined = Combined article data file, only for articles with coordinates or
-#            redirects to such articles
-
 if [ -z "$TEXTGROUNDER_DIR" ]; then
   echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
@@ -29,21 +16,96 @@ LOGFILE="generate-all-data.log"
 
 OTHEROPTS="$MAXTIME $DEBUG"
 
-if [ -z "$*" -o "$*" = "all" ]; then
-  steps="article-data coords links combine words"
+if [ -z "$*" ]; then
+  cat <<FOO
+Usage: $0 [STEPS ...]
+
+Generate the various necessary data files.
+
+Possible steps:
+
+article-data = Basic article data file
+coords = Article coordinates
+links = Article incoming links, only for articles with coordinates or
+        redirects to such articles
+combine = Combined article data file, only for articles with coordinates or
+          redirects to such articles
+counts = Counts file
+words = Words file
+
+Also possible are combinations of steps, e.g.
+
+combined-article-data = article-data coords links combine
+all = article-data coords links combine counts words
+
+Input comes from the files in $TG_WIKIPEDIA_DIR (set by the environment
+variable TG_WIKIPEDIA_DIR or similar; see 'config-geolocate' in
+$TEXTGROUNDIR/bin), especially the dump file, which has a name like
+enwiki-20100905-pages-articles.xml.bz2 or
+enwiki-20100905-permuted-pages-articles.xml.bz2.
+
+Other important environment variables (with default settings in
+'config-geolocate', but which you might want to override):
+
+DUMP_PREFIX      Specifies which dump file to use, e.g. "enwiki-20100905".
+NO_USE_PERMUTED  If set, uses the non-permuted version of the dump file.
+
+Output files are in the current directory.
+
+
+The following is a possible set of steps to use to generate the necessary
+data files, assuming that the English dump from 20111007 has just been
+downloaded (i.e. October 7, 2011), and that DUMP_PREFIX is not set
+correctly in 'config-geolocate':
+
+1. Generate the basic article data file
+
+TG_WIKIPEDIA_DIR=. DUMP_PREFIX=enwiki-20111007 NO_USE_PERMUTED=t run-processwiki combined-article-data
+
+2. Generate a permuted dump file
+TG_WIKIPEDIA_DIR=. DUMP_PREFIX=enwiki-20111007 run-permute all
+
+3. Generate the permuted article data file, counts, and words
+TG_WIKIPEDIA_DIR=. DUMP_PREFIX=enwiki-20111007 run-processwiki all
+
+FOO
+  exit 1
+fi
+
+if [ "$*" = "all" ]; then
+  steps="article-data coords links combine counts words"
+elif [ "$*" = "combined-article-data" ]; then
+  steps="article-data coords links combine"
 else
   steps="$*"
 fi
 
 echo "Steps are $steps"
+echo "TG_WIKIPEDIA_DIR is set to $TG_WIKIPEDIA_DIR"
+if [ "$TG_WIKIPEDIA_DIR" != "." ]; then
+  cat <<BAR
+Warning: You might want to set TG_WIKIPEDIA_DIR to . and use a symlink
+to access the dump file.  Because output goes to the current directory
+anyway, this will ensure that you later steps use output from the
+current directory rather than any existing files in TG_WIKIPEDIA_DIR,
+and there's no chance of overwriting any of those files.
+BAR
+fi
+echo "Using dump file $IN_DUMP_FILE"
 
 for step in $steps; do
 echo "Executing step '$step' ..."
 
 if [ "$step" = article-data ]; then
+# Use a listing of disambiguation pages if it exists, but not otherwise
+if [ -e "$IN_DISAMBIG_ID_FILE" ]; then
+  DISAMBIG_ARG="--disambig-id-file $IN_DISAMBIG_ID_FILE"
+else
+  DISAMBIG_ARG=
+fi
 echo "Generating article data ..."
 bzcat $IN_DUMP_FILE | $PROCESSWIKI \
-  $DISAMBIG_ID_ARG \
+  $DISAMBIG_ARG \
   --split-training-dev-test foobar \
   --generate-article-data \
   $OTHEROPTS > $OUT_ORIG_ARTICLE_DATA_FILE
@@ -63,14 +125,18 @@ bzcat $IN_DUMP_FILE | $PROCESSWIKI \
 elif [ "$step" = links ]; then
 echo "Generating link data ..."
 bzcat $IN_DUMP_FILE | $PROCESSWIKI \
-  $COORDS_ARG $ORIG_ARTICLE_DATA_ARG \
+  --coords-file $OUT_COORDS_FILE \
+  --article-data-file $OUT_ORIG_ARTICLE_DATA_FILE \
   --find-links \
   $OTHEROPTS > $OUT_LINKS_FILE
 
 elif [ "$step" = combine ]; then
 echo "Combining data ..."
-$GENERATE_COMBINED $LINKS_ARG $COORDS_ARG \
-  $ORIG_ARTICLE_DATA_ARG > $OUT_COMBINED_ARTICLE_DATA_FILE
+$GENERATE_COMBINED \
+  --links-file $OUT_LINKS_FILE \
+  --coords-file $OUT_COORDS_FILE \
+  --article-data-file $OUT_ORIG_ARTICLE_DATA_FILE \
+  > $OUT_COMBINED_ARTICLE_DATA_FILE
 
 elif [ "$step" = counts ]; then
 echo "Generating word count data ..."
@@ -81,7 +147,8 @@ bzcat $IN_DUMP_FILE | $PROCESSWIKI \
 elif [ "$step" = toponym-eval ]; then
 echo "Generating toponym eval data ..."
 bzcat $IN_DUMP_FILE | $PROCESSWIKI \
-  $COORDS_ARG $ORIG_ARTICLE_DATA_ARG \
+  --coords-file $OUT_COORDS_FILE \
+  --article-data-file $OUT_ORIG_ARTICLE_DATA_FILE \
   --generate-toponym-eval \
   $OTHEROPTS > $OUT_TOPONYM_EVAL_FILE
 

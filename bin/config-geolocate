@@ -74,7 +74,10 @@ GEOTEXT_CORPUS_TOP="$TG_TWITTER_DIR/GeoText.2010-10-12"
 #GEOTEXT_INPUT_DIR="$GEOTEXT_CORPUS_TOP/processed_data"
 GEOTEXT_OUTPUT_DIR="$TG_TWITTER_DIR/output-40-docthresh"
 
-DUMP_PREFIX="enwiki-20100905"
+if [ -z "$DUMP_PREFIX" ]; then
+  DUMP_PREFIX="enwiki-20100905"
+fi
+
 if [ -z "$NO_USE_PERMUTED" ]; then
   if [ -e "$TG_WIKIPEDIA_DIR/$DUMP_PREFIX-permuted-pages-articles.xml.bz2" ]; then
     DUMP_PREFIX="$DUMP_PREFIX-permuted"
