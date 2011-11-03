@@ -8,6 +8,11 @@ This file contains the configuration and build instructions.
 TextGrounder website: https://bitbucket.org/utcompling/textgrounder/
 
 
+---------------------------------------------------------
+NOTE: See README.geolocate for more detailed instructions.
+---------------------------------------------------------
+
+
 Requirements
 ============
 
@@ -93,8 +98,11 @@ also just call it directly with "sbt" in TEXTGROUNDER_DIR.
 Trying it out
 =============
 
-You will need to obtain data to run the system on.  See the wiki for
-more info:
+---------------------------------------------------------
+NOTE: See README.geolocate for more detailed instructions.
+---------------------------------------------------------
+
+Also check out the web site:
 
 https://bitbucket.org/utcompling/textgrounder/wiki/Home
 
@@ -113,15 +121,3 @@ system for this project were borrowed from the JDOM project (kudos!).
 See www.jdom.org for more details.
 
 
-The repo dir
-============
-
-This is a hack to deal with the fact that Maven really doesn't like
-dependencies that sit as raw .jar files in your build tree rather than
-downloaded from somewhere.  The stuff here is a "created repository"
-built from lib/junto.jar as follows:
-
-% mvn install:install-file -Dfile=lib/junto.jar -DgroupId=upenn -DartifactId=junto -Dversion=1.1 -DlocalRepositoryPath=repo -Dpackaging=jar
-
-This creates files and makes it appear as a real local repository from
-which a "proper" dependency can be extracted.
