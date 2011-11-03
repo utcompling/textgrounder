@@ -1,20 +1,15 @@
 package opennlp.textgrounder.geolocate
 
-/* NOTE NOTE NOTE:
+import tgutil._
+import argparser._
 
-   This file doesn't yet compile.  It's being added nonetheless so it
-   will be version-tracked.  When it's ready it will be moved to
-   Hadoop.scala. --ben
- */
-
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
-// import org.apache.hadoop.io._
-import org.apache.hadoop.io.{IntWritable,Text}
-import org.apache.hadoop.mapreduce.{Job,Mapper,Reducer}
+import org.apache.hadoop.io._
+import org.apache.hadoop.util._
+import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
-import org.apache.hadoop.util.GenericOptionsParser
+import org.apache.hadoop.conf.{Configuration, Configured}
+import org.apache.hadoop.fs.Path
 import scala.collection.JavaConversions._
 
 import util.control.Breaks._
@@ -144,6 +139,87 @@ import java.io._
    that ensures the reducer gets this info first.
 */
    
+object GeolocateHadoopConfiguration {
+  /**
+   * Convert the parameters in `parser` to Hadoop configuration settings in
+   * `conf`.
+   *
+   * @param prefix Prefix to prepend to the names of all parameters.
+   * @param parser ArgParser object to retrieve parameters from.
+   * @param conf Configuration object to store configuration settings into.
+   */
+  def convert_parameters_to_jobconf(prefix: String, parser: ArgParser,
+      conf: Configuration) {
+    for (name <- parser.argNames) {
+      val confname = prefix + name
+      parser(name) match {
+        case e:Int => conf.setInt(confname, e)
+        case e:Long => conf.setLong(confname, e)
+        case e:Float => conf.setFloat(confname, e)
+        case e:Double => conf.setFloat(confname, e.toFloat)
+        case e:String => conf.set(confname, e)
+        case e:Boolean => conf.setBoolean(confname, e)
+        case e:Seq[_] => {
+          val multitype = parser.getMultiType(name)
+          if (multitype == classOf[String])
+            conf.setStrings(confname, parser.get[Seq[String]](name): _*)
+          else
+            throw new UnsupportedOperationException(
+              "Don't know how to store sequence of type %s of parameter %s into a Hadoop Configuration"
+              format (multitype, name))
+        }
+        case ty@_ => {
+          throw new UnsupportedOperationException(
+            "Don't know how to store type %s of parameter %s into a Hadoop Configuration"
+            format (ty, name))
+        }
+      }
+    }
+  }
+
+  /**
+   * Convert the relevant Hadoop configuration settings in `conf`
+   * into the given ArgParser.
+   *
+   * @param prefix Prefix to prepend to the names of all parameters.
+   * @param parser ArgParser object to store parameters into.  The names
+   *   of parameters to fetch are taken from this object.
+   * @param conf Configuration object to retrieve settings from.
+   */
+  def convert_parameters_from_jobconf(prefix: String, parser: ArgParser,
+      conf: Configuration) {
+    for (name <- parser.argNames) {
+      val confname = prefix + name
+      val ty = parser.getType(name)
+      if (ty == classOf[Int])
+        parser.set[Int](name, conf.getInt(confname, parser.defaultValue[Int](name)))
+      else if (ty == classOf[Long])
+        parser.set[Long](name, conf.getLong(confname, parser.defaultValue[Long](name)))
+      else if (ty == classOf[Float])
+        parser.set[Float](name, conf.getFloat(confname, parser.defaultValue[Float](name)))
+      else if (ty == classOf[Double])
+        parser.set[Double](name, conf.getFloat(confname, parser.defaultValue[Double](name).toFloat).toDouble)
+      else if (ty == classOf[String])
+        parser.set[String](name, conf.get(confname, parser.defaultValue[String](name)))
+      else if (ty == classOf[Boolean])
+        parser.set[Boolean](name, conf.getBoolean(confname, parser.defaultValue[Boolean](name)))
+      else if (ty == classOf[Seq[_]]) {
+        val multitype = parser.getMultiType(name)
+        if (multitype == classOf[String])
+          parser.set[Seq[String]](name, conf.getStrings(confname, parser.defaultValue[Seq[String]](name): _*).toSeq)
+        else
+          throw new UnsupportedOperationException(
+            "Don't know how to fetch sequence of type %s of parameter %s from a Hadoop Configuration"
+            format (multitype, name))
+      } else {
+        throw new UnsupportedOperationException(
+          "Don't know how to store fetch %s of parameter %s from a Hadoop Configuration"
+          format (ty, name))
+      }
+    }
+  }
+}
+
 class ArticleEvaluationMapper extends Mapper[Object, Text, Text, IntWritable] {
 
   val one = new IntWritable(1)
@@ -153,12 +229,18 @@ class ArticleEvaluationMapper extends Mapper[Object, Text, Text, IntWritable] {
 
   override def setup(context: ContextType) {
     import GeolocateHadoopConfiguration._
+    import GeolocateDocumentHadoopApp._
 
     val conf = context.getConfiguration()
     val ap = new ArgParser(progname)
     // Initialize set of parameters in `ap`
     new GeolocateDocumentParameters(ap)
-    convert_parameters_from_jobconf(confprefix, ap, conf)
+    // Retrieve configuration values and store in `ap`
+    convert_parameters_from_jobconf(hadoop_conf_prefix, ap, conf)
+    // Now create a class containing the stored configuration values
+    val params = new GeolocateDocumentParameters(ap)
+    val driver = new GeolocateDocumentDriver
+    driver.set_parameters(params)
   }
 
   override def map (key: Object, value: Text, context: ContextType) {
@@ -178,163 +260,78 @@ class ArticleResultReducer extends Reducer[Text,IntWritable,Text,IntWritable] {
   }
 }
 
-object GeolocateHadoopConfiguration {
-  val progname = "hadoop geolocate-document"
-  val confprefix = "textgrounder.geolocate_document."
+abstract class GeolocateHadoopApp(
+  appname: String
+) extends GeolocateApp(appname) {
+  var hadoop_conf: Configuration = _
 
-  /**
-   * Convert the parameters in `parser` to Hadoop configuration settings in
-   * `conf`.
-   *
-   * @param prefix Prefix to prepend to the names of all parameters.
-   * @param parser ArgParser object to retrieve parameters from.
-   * @param conf JobConf object to store configuration settings into.
+  /* Set by subclass -- Prefix used for storing parameters in a
+     Hadoop configuration */
+  val hadoop_conf_prefix: String
+
+  /* Set by subclass -- Initialize the various classes for map and reduce */
+  def initialize_hadoop_classes(job: Job)
+
+  /* Called after command-line arguments have been read, verified,
+     canonicalized and stored into `arg_parser`.  We convert the arguments
+     into configuration variables in the Hadoop configuration -- this is
+     one way to get "side data" passed into a mapper, and is designed
+     exactly for things like command-line arguments. (For big chunks of
+     side data, it's better to use the Hadoop file system.) Then we
+     tell Hadoop about the classes used to do map and reduce by calling
+     initialize_hadoop_classes(), set the input and output files, and
+     actually run the job.
    */
-  def convert_parameters_to_jobconf(prefix: String, parser: ArgParser,
-      conf: JobConf) {
-    for (name <- parser.argNames) {
-      val confname = prefix + name
-      parser.getType(name) match {
-        case classOf[Int] =>
-          conf.setInt(confname, parser.get[Int](name))
-        case classOf[Long] =>
-          conf.setLong(confname, parser.get[Long](name))
-        case classOf[Float] =>
-          conf.setFloat(confname, parser.get[Float](name))
-        case classOf[Double] =>
-          conf.setFloat(confname, parser.get[Double](name).toFloat)
-        case classOf[String] =>
-          conf.set(confname, parser.get[String](name))
-        case classOf[Boolean] =>
-          conf.setBoolean(confname, parser.get[Boolean](name))
-        case classOf[Seq[_]] => {
-          val multitype = parser.getMultiType(name)
-          if (multitype == classof[String])
-            conf.setStrings(confname, parser.get[Seq[String]](name): _*)
-          else
-            throw new UnsupportedOperationException(
-              "Don't know how to store sequence of type %s of parameter %s into a Hadoop JobConf"
-              format (multitype, name))
-        }
-        case ty:_ => {
-          throw new UnsupportedOperationException(
-            "Don't know how to store type %s of parameter %s into a Hadoop JobConf"
-            format (ty, name))
-        }
-      }
+  override def run_program() = {
+    import GeolocateHadoopConfiguration._
+    val job = new Job(hadoop_conf, progname)
+    convert_parameters_to_jobconf(hadoop_conf_prefix, arg_parser, hadoop_conf)
+    initialize_hadoop_classes(job)
+    val params = arg_holder.asInstanceOf[ParamType]
+    // FIXME! Here we only set one file as input.
+    FileInputFormat.addInputPath(job, new Path(params.counts_file(0)))
+    // FIXME!!
+    FileOutputFormat.setOutputPath(job, new Path("geolocate-results"))
+    if (job.waitForCompletion(true)) 0 else 1
+  }
+
+  class GeolocateHadoopTool extends Configured with Tool {
+    override def run(args: Array[String]) = {
+      /* Set the Hadoop configuration object and then thread execution
+         back to the ExperimentApp.  This will read command-line arguments,
+         call initialize_parameters() on GeolocateApp to verify
+         and canonicalize them, and then pass control back to us by
+         calling run_program(), which we override. */
+      hadoop_conf = getConf()
+      implement_main(args)
     }
   }
 
-  /**
-   * Convert the relevant Hadoop configuration settings in `conf`
-   * into the given ArgParser.
-   *
-   * @param prefix Prefix to prepend to the names of all parameters.
-   * @param parser ArgParser object to store parameters into.  The names
-   *   of parameters to fetch are taken from this object.
-   * @param conf JobConf object to retrieve settings from.
-   */
-  def convert_parameters_from_jobconf(prefix: String, parser: ArgParser,
-      conf: JobConf) {
-    for (name <- parser.argNames) {
-      val confname = prefix + name
-      parser.getType(name) match {
-        case classOf[Int] =>
-          parser.set[Int](name, conf.getInt(confname))
-        case classOf[Long] =>
-          parser.set[Long](name, conf.getLong(confname))
-        case classOf[Float] =>
-          parser.set[Float](name, conf.getFloat(confname))
-        case classOf[Double] =>
-          parser.set[Double](name, conf.getFloat(confname).toDouble)
-        case classOf[String] =>
-          parser.set[String](name, conf.get(confname))
-        case classOf[Boolean] =>
-          parser.set[Boolean](name, conf.getBoolean(confname))
-        case classOf[Seq[_]] => {
-          val multitype = parser.getMultiType(name)
-          if (multitype == classof[String])
-            parser.set[Seq[String]](name, conf.getStrings(confname).toSeq)
-          else
-            throw new UnsupportedOperationException(
-              "Don't know how to fetch sequence of type %s of parameter %s from a Hadoop JobConf"
-              format (multitype, name))
-        }
-        case ty:_ => {
-          throw new UnsupportedOperationException(
-            "Don't know how to store fetch %s of parameter %s from a Hadoop JobConf"
-            format (ty, name))
-        }
-      }
-    }
+  override def main(args: Array[String]) {
+    val exitCode = ToolRunner.run(new GeolocateHadoopTool(), args)
+    System.exit(exitCode)
   }
 }
 
-class GeolocateDocumentHadoopTool extends Configured with Tool {
-  override def run(args: Array[String]) = {
-    import GeolocateHadoopConfiguration._
-    val conf = getConf()
-    val job = new Job(conf, progname)
-    val ap = new ArgParser(progname)
-    // Initialize set of parameters in `ap`
-    new GeolocateDocumentParameters(ap)
-    ap.parse(args)
-    convert_parameters_to_jobconf(confprefix, ap, conf)
+class GeolocateDocumentHadoopParameters(
+  parser: ArgParser = null
+) extends GeolocateParameters(parser) {
+  var outfile =
+    ap.parameter[String]("outfile",
+      help = """File to store evaluation results in.""")
+}
+
+object GeolocateDocumentHadoopApp extends
+    GeolocateHadoopApp("hadoop-geolocate-documents") with
+    GeolocateDocumentTypes {
+  val hadoop_conf_prefix = "textgrounder.geolocate_documents."
+  def initialize_hadoop_classes(job: Job) {
     job.setJarByClass(classOf[ArticleEvaluationMapper])
     job.setMapperClass(classOf[ArticleEvaluationMapper])
     job.setReducerClass(classOf[ArticleResultReducer])
     job.setOutputKeyClass(classOf[Text])
     job.setOutputValueClass(classOf[IntWritable])
-    FileInputFormat.addInputPath(job, new Path(args(0)))
-    FileOutputFormat.setOutputPath(job, new Path(args(1)))
-    if (job.waitForCompletion(true)) 0 else 1
   }
-}
-
-abstract class GeolocateHadoopApp(appname: String) extends ExperimentApp(appname) {
-  type ParamType <: GeolocateParameters
-  type ArgType = ParamType
-  type DriverType <: GeolocateDriver
-  val driver = create_driver()
-
-  def create_driver(): DriverType
-
-  def argerror(str: String) {
-    the_argparser.error(str)
-  }
-
-  override def output_ancillary_parameters() {
-    driver.output_ancillary_parameters()
-  }
-
-  def handle_arguments(args: Seq[String]) {
-    driver.set_error_handler(argerror _)
-    driver.set_parameters(argholder.asInstanceOf[driver.ParamType])
-  }
-
-}
-
-abstract class GeolocateHadoopApp(
-  appname: String
-) extends GeolocateApp(appname) {
-  def implement_main(args: Seq[String]) {
-    driver.run()
-  }
-}
-
-object GeolocateDocumentHadoopApp extends
-    GeolocateApp("hadoop geolocate-documents") {
-  type ParamType = GeolocateDocumentParameters
-  type DriverType = GeolocateDocumentDriver
-  // FUCKING TYPE ERASURE
-  def create_arg_class() = new ParamType(the_argparser)
-  def create_driver() = new DriverType()
-  main()
-}
-
-object GeolocateHadoopApp extends App {
-  val exitCode = ToolRunner.run(new GeolocateHadoopDriver(), args)
-  System.exit(exitCode)
 }
 
 /**

@@ -1568,7 +1568,7 @@ object GeolocateToponymApp extends GeolocateApp("geolocate-toponyms") {
   type ParamType = GeolocateToponymParameters
   type DriverType = GeolocateToponymDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class() = new ParamType(arg_parser)
+  def create_arg_class(ap: ArgParser) = new ParamType(ap)
   def create_driver() = new DriverType()
   var Args: ParamType = _
 }

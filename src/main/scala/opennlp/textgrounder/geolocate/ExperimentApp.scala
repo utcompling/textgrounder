@@ -78,7 +78,7 @@ abstract class ExperimentApp(val progname: String) {
   /**
    * Function to create an ArgType, passing in the value of `arg_parser`.
    */
-  def create_arg_class(): ArgType
+  def create_arg_class(ap: ArgParser): ArgType
 
   /**
    * Function to initialize and verify internal parameters from command-line
@@ -138,9 +138,9 @@ abstract class ExperimentApp(val progname: String) {
     set_stdout_stderr_utf_8()
     errprint("Beginning operation at %s" format humandate_full(beginning_time))
     errprint("Arguments: %s" format (args mkString " "))
-    val shadow_fields = create_arg_class()
+    val shadow_fields = create_arg_class(arg_parser)
     arg_parser.parse(args)
-    arg_holder = create_arg_class()
+    arg_holder = create_arg_class(arg_parser)
     initialize_parameters()
     output_command_line_parameters()
     output_ancillary_parameters()

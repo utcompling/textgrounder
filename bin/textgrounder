@@ -17,6 +17,7 @@ SCALA_LIB="$HOME/.sbt/boot/scala-2.9.1/lib/scala-library.jar"
 CP="$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
 
 JAVA="$JAVA_HOME/bin/java"
+HADOOP_BINARY="${HADOOP_BINARY-hadoop}"
 
 # NOTE: If environment var TG_JAVA_OPT is set on entry, it will be used.
 
@@ -102,6 +103,7 @@ if [ "$DEBUG" = true ]; then
   #JAVA_DEBUG_OPT="$JAVA_DEBUG_OPT -XX:+TraceClassLoading"
 fi
 
+HADOOP_COMMAND="$HADOOP_BINARY jar $TEXTGROUNDER_DIR/target/textgrounder-assembly.jar"
 JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $TG_JAVA_OPT -classpath $CP"
 #Running Scala using Java currently works, and ensures that we will run
 #properly even if Scala isn't installed on the system or an older version
@@ -182,6 +184,8 @@ Commands for toponym resolution:
 Commands for the Geolocate module:
 
   geolocate-document ... do document-level geolocation
+  hadoop-geolocate-document ...
+                        do document-level geolocation using Hadoop
   geolocate-toponym ... do toponym-level geolocation
   generate-kml ...      create KML files showing the distribution over the
                         Earth of specific words
@@ -244,6 +248,7 @@ elif [ "$CMD" = 'build-all' ]; then
 else  
 
   CLASS=
+  HADOOP=
   TGPACK=opennlp.textgrounder
   TGAPP=$TGPACK.app
   TGBAYESAPP=$TGPACK.bayesian.apps
@@ -270,6 +275,7 @@ else
 
     # Geolocate commands
     geolocate-document) CLASS=$TGGEOLOCATE.GeolocateDocumentApp;;
+    hadoop-geolocate-document) HADOOP=yes CLASS=$TGGEOLOCATE.GeolocateDocumentHadoopApp;;
     geolocate-toponym) CLASS=$TGGEOLOCATE.toponym.GeolocateToponymApp;;
     generate-kml) CLASS=$TGGEOLOCATE.GenerateKMLApp;;
 
@@ -283,6 +289,10 @@ else
   # there are command-line arguments referring relatively to files, the
   # files won't be found because the lookup will be relative to the
   # wrong directory.
-  execute "$JAVA_COMMAND $CLASS" ${1+"$@"}
+  if [ -n "$HADOOP" ]; then
+    execute "$HADOOP_COMMAND $CLASS" ${1+"$@"}
+  else
+    execute "$JAVA_COMMAND $CLASS" ${1+"$@"}
+  fi
 
 fi

@@ -1,3 +1,5 @@
+import AssemblyKeys._ // put this at the top of the file
+
 name := "TextGrounder"
 
 version := "0.3.0"
@@ -27,13 +29,23 @@ libraryDependencies ++= Seq(
   "org.xerial" % "sqlite-jdbc" % "3.6.20",
   "org.apache.opennlp" % "opennlp-maxent" % "3.0.1-incubating",
   "org.apache.opennlp" % "opennlp-tools" % "1.5.1-incubating",
-  "org.clapper" %% "argot" % "0.3.5"
+  // The use of %% instead of % causes the Scala version to get appended,
+  // i.e. it's equivalent to the use of single % with "argot_2.9.1".
+  // This is for Scala-specific dependencies.
+  "org.clapper" %% "argot" % "0.3.5",
+  "org.apache.hadoop" % "hadoop-core" % "0.20.205.0"
 //  Find repository for trove-scala; currently stored unmanaged
 //  "com.codahale" % "trove-scala_2.9.1" % "0.0.1-SNAPSHOT"
   )
 
-// append several options to the list of options passed to the Java compiler
+// turn on all warnings in Java code
 javacOptions ++= Seq("-Xlint")
 
-// append -deprecation to the options passed to the Scala compiler
+// turn on all Scala warnings; also turn on deprecation warnings
 scalacOptions ++= Seq("-deprecation", "-Xlint")
+
+seq(assemblySettings: _*)
+
+test in assembly := {}
+
+jarName in assembly := "textgrounder-assembly.jar"
