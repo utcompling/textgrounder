@@ -1,27 +1,57 @@
 #!/bin/sh
 
-# Environment variables required/optional on input:
+# This script computes the paths of all files needed by any of the
+# preprocessing or experiment-running apps in TextGrounder -- in particular
+# in the Geolocate portion.  Note that there are multiple corpora
+# (and possibly multiple corpora, e.g. different dumps of Wikipedia at
+# different times), and typically multiple files per corpus.
 
-# TEXTGROUNDER_DIR: required: top level of TextGrounder distribution
-# TG_GROUPS_DIR: optional: use this if you have the extra data stored under
-#                the same directory structure as on the Comp Ling machines,
-#                i.e. similar to /groups/corpora and /groups/projects,
-#                possibly with a different directory in place of /groups.
-# TG_ON_COMP_LING_MACHINES: optional: if set, indicates that we are running on
-#                                     the UTexas comp ling machines, in which
-#                                     case the following TG_*_DIR variables
-#                                     will automatically be set correctly.
-# TG_ON_LONGHORN: optional: if set, indicates we are running on the UTexas
-#                           Longhorn cluster, in which case the following
-#                           TG_*_DIR variables will automatically be set
-#                           correctly.
-# TG_WIKIPEDIA_DIR: required: location of Wikipedia data files
-# TG_TWITTER_DIR: optional: location of Twitter data files
-# TG_AUX_DIR: optional: location of auxiliary files (currently only the World
-#                       Gazetteer, needed only when --mode=geotag-toponyms)
-# PCL_TRAVEL_DIR: optional: location of PCL travel corpus and related files
-# NO_USE_PERMUTED: optional: if non-blank, don't use permuted version of
-#                            Wikipedia data files
+# You need to set the following environment variables on input:
+
+# 1. TEXTGROUNDER_DIR: Always required, points to top level of TextGrounder
+#                      distribution.
+# 2. Files pointing to the corpora and auxiliary files.  There are various
+#    ways to get these files located:
+#
+#    a. At the lowest level, you can directly set the relevant environment
+#       variables.  There are three of them:
+#
+#       TG_WIKIPEDIA_DIR: location of Wikipedia data files
+#       TG_TWITTER_DIR: location of Twitter data files
+#       TG_AUX_DIR: location of auxiliary files (currently only the World
+#                   Gazetteer, needed only when running the `geotag-toponym`
+#                   app)
+#
+#    b. If you have these files in a directory structure like the one on
+#       the UTexas comp ling machines, you can set TG_GROUPS_DIR to the
+#       root of that directory structure.  This assumes that the Wikipedia
+#       data is in `corpora/wikipedia`, the Twitter data is in
+#       `corpora/geotext` (i.e. the GeoText Twitter corpus specifically),
+#       and the aux data is in `projects/textgrounder/data`.
+#
+#    c. If you're actually on the UTexas comp ling machines, which put the
+#       above directories under `/groups`, or you have exactly the same
+#       structure on another machine, just set TG_ON_COMP_LING_MACHINES to
+#       a non-empty value, and the variables will all get set properly.
+#
+#    d. If you're on the UTexas Longhorn cluster, you can use the data
+#       stored under `/scratch/01683/benwing` by setting TG_ON_LONGHORN to
+#       a non-empty value, and the variables will all get set properly.
+#
+# 3. PCL_TRAVEL_DIR: Optional; location of PCL travel corpus and related files
+#
+# 4. NO_USE_PERMUTED: Optional; if non-blank, don't use permuted version of
+#                     Wikipedia data files.
+#
+# 5. DUMP_PREFIX: Optional; if set, should specify the prefix of a dump file,
+#                 which will be used for the dump file and all files computed
+#                 from the dump file.  An example prefix is 'enwiki-20111007',
+#                 which indicates the English Wikipedia dump of Oct 7, 2011.
+#                 (This format comes from the naming of dump files on the
+#                 Wikipedia servers; we didn't make it up.) If not set, will
+#                 use one of the current dumps that have been completely
+#                 preprocessed -- currently 'enwiki-20100905', the version
+#                 used in Wing and Baldridge 2011.
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
   echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
@@ -42,7 +72,7 @@ if [ -n "$TG_GROUPS_DIR" ]; then
     TG_TWITTER_DIR=$TG_GROUPS_DIR/corpora/geotext
   fi
   if [ -z "$TG_AUX_DIR" ]; then
-    TG_AUX_DIR=$TG_GROUPS_DIR/projects/wikigrounder/data
+    TG_AUX_DIR=$TG_GROUPS_DIR/projects/textgrounder/data
   fi
 fi
 
@@ -88,53 +118,55 @@ PAGES_ARTICLES_PREFIX="$DUMP_PREFIX-pages-articles"
 
 WDIR="$TG_WIKIPEDIA_DIR"
 
+# The partial names of the various files we generate or read from -- i.e.
+# minus any dump prefix or path.
 ORIG_ARTICLE_DATA_SUFFIX="article-data.txt"
 COMBINED_ARTICLE_DATA_SUFFIX="combined-article-data.txt"
 COORDS_SUFFIX="coords.txt"
-COUNTS_SUFFIX="counts-only-coord-articles.txt"
-WORDS_SUFFIX="text.txt"
+COORD_COUNTS_SUFFIX="counts-only-coord-articles.txt"
+ALL_COUNTS_SUFFIX="counts-all-articles.txt"
 COORD_WORDS_SUFFIX="text-only-coord-articles.txt"
 COORD_WORDS_UNTOK_SUFFIX="text-untok-only-coord-articles.txt"
-LINKS_SUFFIX="links-only-coord-articles.txt"
+ALL_WORDS_SUFFIX="text-all-articles.txt"
+ALL_WORDS_UNTOK_SUFFIX="text-untok-all-articles.txt"
+COORD_LINKS_SUFFIX="links-only-coord-articles.txt"
+ALL_LINKS_SUFFIX="links-all-articles.txt"
 TOPONYM_EVAL_SUFFIX="toponym-eval.txt"
 DISAMBIG_ID_SUFFIX="disambig.id.txt"
 TITLE2ID_SUFFIX="title2id.txt"
 DUMP_SUFFIX="xml.bz2"
 
+# The full names of the various files we generate or read from during
+# preprocessing, including the dump prefix, but without any path info.
 OUT_GAZETTEER_FILE="world-dataen-fixed.txt"
 OUT_ORIG_ARTICLE_DATA_FILE="$DUMP_PREFIX-$ORIG_ARTICLE_DATA_SUFFIX"
 OUT_COMBINED_ARTICLE_DATA_FILE="$DUMP_PREFIX-$COMBINED_ARTICLE_DATA_SUFFIX"
 OUT_COORDS_FILE="$DUMP_PREFIX-$COORDS_SUFFIX"
-OUT_COUNTS_FILE="$DUMP_PREFIX-$COUNTS_SUFFIX"
-OUT_WORDS_FILE="$DUMP_PREFIX-$WORDS_SUFFIX"
+OUT_COORD_COUNTS_FILE="$DUMP_PREFIX-$COORD_COUNTS_SUFFIX"
+OUT_ALL_COUNTS_FILE="$DUMP_PREFIX-$ALL_COUNTS_SUFFIX"
 OUT_COORD_WORDS_FILE="$DUMP_PREFIX-$COORD_WORDS_SUFFIX"
 OUT_COORD_WORDS_UNTOK_FILE="$DUMP_PREFIX-$COORD_WORDS_UNTOK_SUFFIX"
-OUT_LINKS_FILE="$DUMP_PREFIX-$LINKS_SUFFIX"
+OUT_ALL_WORDS_FILE="$DUMP_PREFIX-$ALL_WORDS_SUFFIX"
+OUT_ALL_WORDS_UNTOK_FILE="$DUMP_PREFIX-$ALL_WORDS_UNTOK_SUFFIX"
+OUT_COORD_LINKS_FILE="$DUMP_PREFIX-$COORD_LINKS_SUFFIX"
+OUT_ALL_LINKS_FILE="$DUMP_PREFIX-$ALL_LINKS_SUFFIX"
 OUT_TOPONYM_EVAL_FILE="$DUMP_PREFIX-$TOPONYM_EVAL_SUFFIX"
 OUT_DISAMBIG_ID_FILE="$PAGES_ARTICLES_PREFIX.$DISAMBIG_ID_SUFFIX"
 OUT_TITLE2ID_FILE="$PAGES_ARTICLES_PREFIX.$TITLE2ID_SUFFIX"
 OUT_DUMP_FILE="$PAGES_ARTICLES_PREFIX.$DUMP_SUFFIX"
 
+# The full pathnames of the various files we read from during experiment-
+# running, including full path info.
 IN_GAZETTEER_FILE="$TG_AUX_DIR/$OUT_GAZETTEER_FILE"
 IN_ORIG_ARTICLE_DATA_FILE="$WDIR/$OUT_ORIG_ARTICLE_DATA_FILE"
 IN_COMBINED_ARTICLE_DATA_FILE="$WDIR/$OUT_COMBINED_ARTICLE_DATA_FILE"
 IN_COORDS_FILE="$WDIR/$OUT_COORDS_FILE"
-IN_COUNTS_FILE="$WDIR/$OUT_COUNTS_FILE"
-IN_LINKS_FILE="$WDIR/$OUT_LINKS_FILE"
+IN_COORD_COUNTS_FILE="$WDIR/$OUT_COORD_COUNTS_FILE"
+IN_COORD_LINKS_FILE="$WDIR/$OUT_COORD_LINKS_FILE"
 IN_TOPONYM_EVAL_FILE="$WDIR/$OUT_TOPONYM_EVAL_FILE"
 IN_DISAMBIG_ID_FILE="$WDIR/$OUT_DISAMBIG_ID_FILE"
 IN_TITLE2ID_FILE="$WDIR/$OUT_TITLE2ID_FILE"
 IN_DUMP_FILE="$WDIR/$OUT_DUMP_FILE"
-
-GAZETTEER_ARG="--gazetteer-file $IN_GAZETTEER_FILE"
-ORIG_ARTICLE_DATA_ARG="--article-data-file $IN_ORIG_ARTICLE_DATA_FILE"
-COMBINED_ARTICLE_DATA_ARG="--article-data-file $IN_COMBINED_ARTICLE_DATA_FILE"
-COORDS_ARG="--coords-file $IN_COORDS_FILE"
-COUNTS_ARG="--counts-file $IN_COUNTS_FILE"
-LINKS_ARG="--links-file $IN_LINKS_FILE"
-#No TOPONYM_EVAL_ARG; used in --eval-file
-DISAMBIG_ID_ARG="--disambig-id-file $IN_DISAMBIG_ID_FILE"
-TITLE2ID_ARG="--title2id-file $IN_TITLE2ID_FILE"
 
 # Include local configuration if it exists
 
