@@ -328,21 +328,39 @@ package object tgutil {
   def uniout(text: String, outfile: PrintStream=System.out) {
     outfile.print(text)
   }
-  
-  def errprint(format: String, args: Any*) {
+
+  var errout_prefix = ""
+
+  def set_errout_prefix(prefix: String) {
+    errout_prefix = prefix
+  }
+ 
+  var need_prefix = true
+
+  protected def format_outtext(format: String, args: Any*) = {
     // If no arguments, assume that we've been passed a raw string to print,
     // so print it directly rather than passing it to 'format', which might
     // munge % signs
-    if (args.length == 0)
-      System.err.println(format)
+    val outtext =
+      if (args.length == 0) format
+      else format format (args: _*)
+    if (need_prefix)
+      errout_prefix + outtext
     else
-      System.err.println(format format (args: _*))
+      outtext
   }
+
+  def errprint(format: String, args: Any*) {
+    System.err.println(format_outtext(format, args: _*))
+    need_prefix = true
+    System.err.flush()
+  }
+
   def errout(format: String, args: Any*) {
-    if (args.length == 0)
-      System.err.print(format)
-    else
-      System.err.print(format format (args: _*))
+    val text = format_outtext(format, args: _*)
+    System.err.print(text)
+    need_prefix = text.last == '\n'
+    System.err.flush()
   }
 
   /**
