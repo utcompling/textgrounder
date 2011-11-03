@@ -15,6 +15,22 @@ Technologies, Portland, Oregon, USA, June 2011.
 
 (See http://www.jasonbaldridge.com/papers/wing-baldridge-acl2011.pdf.)
 
+If you use this system in academic research with published results,
+please cite this paper, or use this Bibtex:
+
+{{{
+@InProceedings{wing-baldridge:2011:ACL,
+  author    = {Wing, Benjamin and Baldridge, Jason},
+  title     = {Simple Supervised Document Geolocation with Geodesic Grids},
+  booktitle = {Proceedings of the 49th Annual Meeting of the Association for Com
+putational Linguistics: Human Language Technologies},
+  month     = {June},
+  year      = {2011},
+  address   = {Portland, Oregon, USA},
+  publisher = {Association for Computational Linguistics}
+}
+}}}
+
 === Quick start ===
 
 The following describes how to quickly get up and running, to test that
@@ -23,9 +39,11 @@ everything is in place and working.
 1. Download TextGrounder.  Probably the easiest way is through Mercurial
    (http://mercurial.selenic.com), an application for source-code management.
    If you don't have Mercurial, you can download it from the Mercurial web
-   site, or (on Mac OS X) install it using MacPorts.  It should also be
-   available as a package in all the standard Linux distributions.  Once
-   you have Mercurial, get TextGrounder like this:
+   site, or (on Mac OS X) install it using MacPorts (http://www.macports.org);
+   you might need to install the Mac OS X Developer Tools, aka Xcode
+   (http://developer.apple.com/mac/), in order to install MacPorts.
+   Mercurial should also be available as a package in all the standard Linux
+   distributions.  Once you have Mercurial, get TextGrounder like this:
 
    hg clone https://bitbucket.org/utcompling/textgrounder/
 
@@ -470,211 +488,3 @@ Similarly, to generate Twitter data, use `python/run-process-twitter`, which
 is a front end for `python/twitter_geotext_process.py`.
 
 FIXME: Document more.
-
-
-
-
-
-==============================================================================
-
-The rest is an older version of the above document.  Salvage what can be
-salvaged and delete the rest.
-
-
-
-
-
-
-README.txt for WikiGrounder
-April 25, 2011
-Version 1.0, Release 0
-Copyright (c) 2011 Ben Wing <ben@benwing.com>
-
-#summary Documentation for replicating experiments in Wing and Baldridge (2011), "Simple Supervised Document Geolocation with Geodesic Grids"
-
-= Introduction = 
-
-This page describes !WikiGrounder, software for automatically "geolocating" a document -- i.e. assigning a location somewhere on the Earth, as determined by a pair of latitude/longitude coordinates, to a document -- using a statistical model derived from a large corpus of already geolocated documents, such as Wikipedia.
-
-This software implements the experiments described in the following paper:
-
-Benjamin Wing and Jason Baldridge (2011), "Simple Supervised Document Geolocation with Geodesic Grids" in Proceedings of the 49th Annual Meeting of the Association for Computational Linguistics: Human Language Technologies, Portland, Oregon, USA, June 2011.
-
-If you use this system in academic research with published results,
-please cite this paper, or use this Bibtex:
-
-{{{
-@InProceedings{wing-baldridge:2011:ACL,
-  author    = {Wing, Benjamin and Baldridge, Jason},
-  title     = {Simple Supervised Document Geolocation with Geodesic Grids},
-  booktitle = {Proceedings of the 49th Annual Meeting of the Association for Computational Linguistics: Human Language Technologies},
-  month     = {June},
-  year      = {2011},
-  address   = {Portland, Oregon, USA},
-  publisher = {Association for Computational Linguistics}
-}
-}}}
-
-Note that !WikiGrounder is currently part of the !TextGrounder project and sits in the `python` directory.  Eventually we may break it out into its own project.
-
-= Installation =
-
-Quick start:
-
-1. You can get !WikiGrounder on its own from the Downloads tab at [http://code.google.com/p/textgrounder/downloads/list the TextGrounder page on Google Code].
-
-Or get !TextGrounder.  If you don't already have it, you can obtain it from Google Code using [http://mercurial.selenic.com Mercurial]:
-
-hg clone http://textgrounder.googlecode.com/hg/ textgrounder  
-
-2. Make sure Python, gcc (or similar C compiler), make and sh are installed.  Under Windows, install [http://www.cygwin.com Cygwin] to get this. Under Mac OS X, Python comes built-in at least to Snow Leopard (10.6); for a C compiler, install the [http://developer.apple.com/mac/ Mac OS X Developer Tools (Xcode)].  You need an Apple Developer Connection login, which you can get for free.  You might also want to install [http://www.macports.org MacPorts] (which requires Xcode), which will get you Python if you didn't already have it, and will also get Cython (see below).
-
-3. Install [http://www.cython.org Cython], either from a distribution that already includes it (e.g. Ubuntu or MacPorts) or by downloading from the link just given.
-
-4. Build the Cython (`.pyx`) files by running `make` in the !TextGrounder `python` subdirectory, where all the code for !WikiGrounder resides.
-
-5. Set the environment variables to indicate where !TextGrounder is.  You can either set `TEXTGROUNDER_DIR` to point to the top-level directory where you installed !TextGrounder, or set `WIKIGROUNDER_DIR` to directly point to the `python` subdirectory of this directory, where !WikiGrounder lives (useful e.g. if you maintain different versions of !WikiGrounder).
-
-If you need more information, see the `README.wikigrounder` file in the !WikiGrounder directory (i.e. the `python` directory in !TextGrounder).
-
-= Obtaining the Data =
-
-Download and unzip the [http://wing.best.vwh.net/wikigrounder processed Wikipedia/Twitter data and aux files].
-
-There are three sets of data to download:
-  * The processed Wikipedia data, in `wikipedia/`.  The files are listed separately here and bzipped, in case you don't want them all.  If you're not sure, get them all; or read down below to see which ones you need.
-  * Auxiliary files for !WikiGrounder, in `wikigrounder-aux-1.0.tar.bz2`.
-  * The processed Twitter data, in `wikigrounder-twitter-1.0.tar.bz2`.
-
-Untar these files somewhere.  Then set the following environment variables:
-  * `WG_WIKIPEDIA_DIR` points to the directory containing the Wikipedia data.
-  * `WG_TWITTER_DIR` points to the directory containing the Twitter data.
-  * `WG_AUX_DIR` points to the directory containing the auxiliary data.
-
-The Wikipedia data was generated from [http://download.wikimedia.org/enwiki/20100904/enwiki-20100904-pages-articles.xml.bz2 the original English-language Wikipedia dump of September 4, 2010].
-
-The Twitter data was generated from [http://www.ark.cs.cmu.edu/GeoText/ The Geo-tagged Microblog corpus] created by [http://aclweb.org/anthology-new/D/D10/D10-1124.pdf Eisenstein et al (2010)].
-
-= Replicating the experiments =
-
-The program disambig.py does the actual geolocating.  It can be invoked directly, but the normal route is to go through a front-end script.  The following is a list of the front-end scripts available:
-  * `run-disambig` is the most basic script, which reads parameters from the script `config-wikigrounder` (which in turn can read from a script `local-config` that you create in the !TextGrounder Python directory, if you want to add local configuration info; see the `sample.local-config` file for an example).  This takes care of specifying the auxiliary data files (see above).
-  * `run-wikipedia` is a similar script, but specifically runs on the downloaded Wikipedia data.
-  * `run-twitter` is a similar script, but specifically runs on the downloaded Twitter data.
-  * `run-run-disambig` is a higher-level front-end to `run-disambig`, which runs `run-disambig using `nohup` (so that a long-running experiment will not get terminated if your shell session ends), and saves the output to a file.  The output file is named in such a way that it contains the current date and time, as well as any optional ID specified using the `-i` or `--id` argument.  It will refuse to overwrite an existing file.
-  * `run-run-wikipedia` is the same, but calls `run-wikipedia`.
-  * `run-run-twitter` is the same, but calls `run-twitter`.
-  * `run-disambig-exper.py` is a framework for running a series of experiments on similar arguments.  It was used extensively in running the experiments for the paper.
-
-You can invoke `run-wikipedia` with no parameters, and it will do something reasonable: It will attempt to geolocate the entire dev set of the Wikipedia corpus, using KL divergence as a strategy, with a grid size of 100 miles on the equator.  Options you may find useful (which also apply to `disambig.py` and all front ends):
-
-`--degrees-per-region NUM`
-`--dpr NUM`
-
-Set the size of a region in degrees, which can be a fractional value.
-
-`--eval-set SET`
-
-Set the split to evaluate on, either "dev" or "test".
-
-`--strategy STRAT ...` 
-
-Set the strategy to use for geolocating.  Sample strategies are `partial-kl-divergence` ("KL Divergence" in the paper), `average-cell-probability` ("ACP" in the paper), `naive-bayes-with-baseline` ("Naive Bayes" in the paper), and `baseline` (any of the baselines).  You can specify multiple `--strategy` options on the command line, and the specified strategies will be tried one after the other.
-
-`--baseline-strategy STRAT ...`
-
-Set the baseline strategy to use for geolocating. (It's a separate argument because some strategies use a baseline strategy as a fallback, and in those cases, both the strategy and baseline strategy need to be given.) Sample strategies are `link-most-common-toponym` ("??" in the paper), `num-articles`  ("??" in the paper), and `random` ("Random" in the paper).  You can specify multiple `--baseline-strategy` options, just like for `--strategy`.
-
-`--num-training-docs, --num-test-docs`
-
-One way of controlling how much work is done.  These specify the maximum number of documents (training and testing, respectively) to load/evaluate.
-
-`--max-time-per-stage SECS`
-`--mts SECS`
-
-Another way of controlling how much work is done.  Set the maximum amount of time to spend in each "stage" of processing.  A value of 300 will load enough to give you fairly reasonable results but not take too much time running.
-
-`--skip-initial N, --skip-n N`
-
-A final way of controlling how much work is done.  `--skip-initial` specifies a number of test documents to skip at the beginning before stating to evaluate.  `--skip-n` skips that many documents after each test document has been evaluated.  Used judiciously, they can be used to split up a long run.
-
-An additional argument specific to the Twitter front ends is `--doc-thresh`, which specifies the threshold (in number of documents) below which vocabulary is ignored.  See the paper for more details.
-
-= Extracting results =
-
-A few scripts are provided to extract the results (i.e. mean and median errors) from a series of runs with different parameters, and output the results either directly or sorted by error distance:
-  * `extract-raw-results.sh` extracts results from a number of runs of a `run-*` front end.  It extracts the mean and median errors from each specified file, computes the avg mean/median error, and outputs a line giving the errors along with relevant parameters for that particular run.
-  * `extract-results.sh` is similar but also sorts by distance (both median and mean, as well as avg mean/median), to see which parameter combinations gave the best results.
-
-= Specifying data =
-
-Data is specified in two main files, given with the options `--article-data-file` and `--counts-file`.  The article data file lists all of the articles to be processed and includes various pieces of data for each article, e.g. title, latitude/longitude coordinates, split (training, dev, test), number of incoming links (i.e. how many times is there a link to this article), etc.  The counts file gives word counts for each article, i.e. which word types occur in the article and how many times. (Note, the term "article" is used because of the focus on Wikipedia; but it should be seen as equivalent to "document".)
-
-Additional data files (which are automatically handled by the `run-disambig` script) are specified using `--stopwords-file` and `--gazetteer-file`.  The stopwords file is a list of stopwords (one per line), i.e. words to be ignored when generating a distribution from the word counts in the counts file.  The optional gazetteer file is barely used when doing document geotagging.  In fact, it is only used at all when using the baseline strategy `link-most-common-toponym`, and there only marginally.  It is a holdover from code, still present, that implements toponym geotagging, where it is heavily used.  Because the gazetteer file was specified during the experiments for the paper, it should be retained when attempting to duplicate those results; otherwise, there is no need for it.
-
-The article data file is formatted as a simple database.  Each line is an entry (i.e. an article) and consists of a fixed number of fields, each separated by a tab character.  The first line gives the names of the fields.  Fields are accessed by name; hence, rearranging fields, and in most cases, omitting fields, is not a problem as long as the field names are correct.  The following is a list of the defined fields:
-
-  * `id`: The numeric ID of the article.  Can be arbitrary and currently used only when printing out articles.  For Wikipedia articles, this corresponds to the internally-assigned ID.
-  * `title`: Title of the article.  Must be unique, and must be given since it used to look up articles in the counts file.
-  * `split`: One of the strings "training", "dev", "test".  Must be given.
-  * `redir`: If this article is a Wikipedia redirect article, this specifies the title of the article redirected to; otherwise, blank.  This field is not much used by the document-geotagging code (it is more important during toponym geotagging).  Its main use in document geotagging is in computing the incoming link count of an article (see below).
-  * `namespace`: The Wikipedia namespace of the article.  Articles not in the `Main` namespace have the namespace attached to the beginning of the article name, followed by a colon (but not all articles with a colon in them have a namespace prefix).  The main significance of this field is that articles not in the `Main` namespace are ignored.  However, this field can be omitted entirely, in which case all articles are assumed to be in `Main`.
-  * `is_list_of`, `is_disambig`, `is_list`: These fields should either have  the value of "yes" or "no".  These are Wikipedia-specific fields (identifying, respectively, whether the article title is "List of ..."; whether the article is a Wikipedia "disambiguation" page; and whether the article is a list of any type, which includes the previous two categories as well as some others).  None of these fields are currently used.
-  * `coord`: Coordinates of an article, or blank.  If specified, the format is two floats separated by a comma, giving latitude and longitude, respectively (positive for north and east, negative for south and west).
-  * `incoming_links`: Number of incoming links, or blank if unknown.  This specifies the number of links pointing to the article from anywhere within Wikipedia.  This is primarily used as part of certain baselines (`internal-link` and `link-most-common-toponym`).  Note that the actual incoming link count of an article includes the incoming link counts of any redirects to that article.
-
-The format of the counts file is like this:
-
-{{{
-Article title: Ampasimboraka
-Article ID: 17242049
-population = 16
-area = 15
-of = 10
-mi = 10
-sq = 10
-leader = 9
-density = 8
-km2 = 8
-image = 8
-blank1 = 8
-metro = 5
-blank = 5
-urban = 5
-Madagascar = 5
-}}}
-
-Multiple articles should follow one directly after the other, with no blank lines.  The article ID is currently ignored entirely.  There is no need for the words to be sorted by count (or in any other way); this is simply done here for ease in debugging.  Note also that, although the code that generates word counts currently ensures that no word has a space in it, spaces in general are not a problem, as the code that parses the word counts specifically looks for an equal sign surrounded by spaces and followed by a number (hence a "word" containing such a sequence would be problematic).
-
-= Generating KML files =
-
-It is possible to use `disambig.py` to generate KML files showing the distribution of particular words over the Earth's surface, which can be viewed using [http://earth.google.com Google Earth].  The basic argument to invoke this is `--mode=generate-kml`.  `--kml-words` is a comma-separated list of the words to generate distributions for.  Each word is saved in a file named by appending the word to whatever is specified using `--kml-prefix`.  Another argument is `--kml-transform`, which is used to specify a function to apply to transform the probabilities in order to make the distinctions among them more visible.  It can be one of `none`, `log` and `logsquared` (actually computes the negative of the squared log).  It is also possible to modify the colors and heights of the bars in the graph by modifying constants given in `disambig.py, near the beginning.
-
-For example: For the Twitter corpus, running on different levels of the document threshold for discarding words, and for the four words "cool", "coo", "kool" and "kewl", the following code plots the distribution of each of the words across a region of degree size 1x1. `--mts=300` is more for debugging and stops loading further data for generating the distribution after 300 seconds (5 minutes) has passed.  It's unnecessary here but may be useful if you have an enormous amount of data (e.g. all of Wikipedia).
-
-{{{
-for x in 0 5 40; do run-twitter --doc-thresh $x --mts=300 --degrees-per-region=1 --mode=generate-kml --kml-words='cool,coo,kool,kewl' --kml-prefix=kml-dist.$x.none. --kml-transform=none; done 
-}}}
-
-Another example, just for the words "cool" and "coo", but with different kinds of transformation of the probabilities.
-
-{{{
-for x in none log logsquared; do run-twitter --doc-thresh 5 --mts=300 --degrees-per-region=1 --mode=generate-kml --kml-words='cool,coo' --kml-prefix=kml-dist.5.$x. --kml-transform=$x; done 
-}}}
-
-= Generating data =
-
-Scripts were written to extract data from the raw Wikipedia dump files and from the Twitter corpus and output in the format required above for `disambig.py`.
-
-*NOTE*: Parsing raw Wikipedia dump files is not easy.  Perhaps better would have been to download and run the MediaWiki software that generates the HTML that is actually output.  As it is, there may be occasional errors in processing.  For example, the code that locates the geotagged coordinate from an article uses various heuristics to locate the coordinate from various templates which might specify it, and other heuristics to fetch the correct coordinate if there is more than one.  In some cases, this will fetch the correct coordinate even if the MediaWiki software fails to find it (due to slightly incorrect formatting in the article); but in other cases, it may find a spurious coordinate. (This happens particularly for articles that mention a coordinate but don't happen to be themselves tagged with a coordinate, or when two coordinates are mentioned in an article. FIXME: We make things worse here by picking the first coordinate and ignoring `display=title`.  See comments in `get_coord()` about how to fix this.)
-
-The main script to extract data from a Wikipedia dump is `processwiki.py`.  It takes the (unzipped) dump file as stdin and processes it according to command-line arguments.  Normally the front end `run-processwiki` is
-run instead.
-
-To run `run-processwiki`, specify steps to do.  Each step generates one file.  As a shorthand, `all` does all the necessary steps to generate
-the Wikipedia data files (but does not generate every possible file that can be generated).  If you have your own dump file, change the name in `config-wikigrounder`.
-
-Similarly, to generate Twitter data, use `run-process-twitter`, which is a front end for `twitter_geotext_process.py`.
-
-FIXME: Document more.
-
