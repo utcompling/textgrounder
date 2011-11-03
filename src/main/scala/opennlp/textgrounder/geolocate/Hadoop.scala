@@ -150,7 +150,7 @@ object GeolocateHadoopConfiguration {
    */
   def convert_parameters_to_jobconf(prefix: String, parser: ArgParser,
       conf: Configuration) {
-    for (name <- parser.argNames) {
+    for (name <- parser.argNames if parser.specified(name)) {
       val confname = prefix + name
       parser(name) match {
         case e:Int => conf.setInt(confname, e)
@@ -188,7 +188,9 @@ object GeolocateHadoopConfiguration {
    */
   def convert_parameters_from_jobconf(prefix: String, parser: ArgParser,
       conf: Configuration) {
-    for (name <- parser.argNames) {
+    for {name <- parser.argNames
+         confname = prefix + name
+         if conf.getRaw(confname) != null} {
       val confname = prefix + name
       val ty = parser.getType(name)
       if (ty == classOf[Int])
