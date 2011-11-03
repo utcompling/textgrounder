@@ -176,7 +176,7 @@ DUMP_PREFIX=enwiki-20111007 run-nohup --id do-coord-bigram-counts run-processwik
    consider using the "divide-and-conquer" mode.  The first thing is to
    split the dump file, like this:
 
-DUMP_PREFIX=enwiki-20111007 split-dump
+DUMP_PREFIX=enwiki-20111007 run-processwiki split-dump
 
    This takes maybe 45 mins and splits the whole dump file into 8 pieces.
    (Controllable through NUM_SPLITS.)
