@@ -11,11 +11,6 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
   exit 1
 fi
 
-JARS="`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`"
-SCALA_LIB="$HOME/.sbt/boot/scala-2.9.1/lib/scala-library.jar"
-
-CP="$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
-
 JAVA="$JAVA_HOME/bin/java"
 HADOOP_BINARY="${HADOOP_BINARY-hadoop}"
 
@@ -103,12 +98,27 @@ if [ "$DEBUG" = true ]; then
   #JAVA_DEBUG_OPT="$JAVA_DEBUG_OPT -XX:+TraceClassLoading"
 fi
 
-HADOOP_COMMAND="$HADOOP_BINARY jar $TEXTGROUNDER_DIR/target/textgrounder-assembly.jar"
-JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $TG_JAVA_OPT -classpath $CP"
-#Running Scala using Java currently works, and ensures that we will run
-#properly even if Scala isn't installed on the system or an older version
-#is installed. (Since we download our own Scala libraries.)
-#SCALA_COMMAND="scala -classpath $CP"
+set_commands()
+{
+  JARS="`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`"
+  if [ -n "$HADOOP_NONDIST" ]; then
+    if [ -z "$HADOOP_HOME" ]; then
+      echo "Must set HADOOP_HOME to top level of Hadoop distribution"
+      exit 1
+    fi
+    HADOOP_JARS="`echo $HADOOP_HOME/*.jar $HADOOP_HOME/lib/*.jar | tr ' ' ':'`"
+    JARS="$JARS:$HADOOP_JARS"
+  fi
+  SCALA_LIB="$HOME/.sbt/boot/scala-2.9.1/lib/scala-library.jar"
+  CP="$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
+
+  HADOOP_COMMAND="$HADOOP_BINARY jar $TEXTGROUNDER_DIR/target/textgrounder-assembly.jar"
+  JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $TG_JAVA_OPT -classpath $CP"
+  #Running Scala using Java currently works, and ensures that we will run
+  #properly even if Scala isn't installed on the system or an older version
+  #is installed. (Since we download our own Scala libraries.)
+  #SCALA_COMMAND="scala -classpath $CP"
+}
 
 CMD="$1"
 shift
@@ -249,6 +259,7 @@ else
 
   CLASS=
   HADOOP=
+  HADOOP_NONDIST=
   TGPACK=opennlp.textgrounder
   TGAPP=$TGPACK.app
   TGBAYESAPP=$TGPACK.bayesian.apps
@@ -275,7 +286,7 @@ else
 
     # Geolocate commands
     geolocate-document) CLASS=$TGGEOLOCATE.GeolocateDocumentApp;;
-    hadoop-nondist-geolocate-document) CLASS=$TGGEOLOCATE.GeolocateDocumentHadoopApp;;
+    hadoop-nondist-geolocate-document) HADOOP_NONDIST=yes CLASS=$TGGEOLOCATE.GeolocateDocumentHadoopApp;;
     hadoop-geolocate-document) HADOOP=yes CLASS=$TGGEOLOCATE.GeolocateDocumentHadoopApp;;
     geolocate-toponym) CLASS=$TGGEOLOCATE.toponym.GeolocateToponymApp;;
     generate-kml) CLASS=$TGGEOLOCATE.GenerateKMLApp;;
@@ -286,10 +297,17 @@ else
     *) echo "Unrecognized command: $CMD"; help; exit 1;;
   esac
 
+  # Set values of JAVA_COMMAND, HADOOP_COMMAND now, after we have set
+  # HADOOP_NONDIST appropriately (if set, we need Hadoop libs, which depends
+  # on HADOOP_HOME, and we want to complain if not set, but not complain
+  # if unneeded).
+  set_commands
+
   # We need to *not* cd to the top-level TextGrounder dir, otherwise if
   # there are command-line arguments referring relatively to files, the
   # files won't be found because the lookup will be relative to the
   # wrong directory.
+
   if [ -n "$HADOOP" ]; then
     execute "$HADOOP_COMMAND $CLASS" ${1+"$@"}
   else

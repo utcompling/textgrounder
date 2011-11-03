@@ -33,7 +33,11 @@ libraryDependencies ++= Seq(
   // i.e. it's equivalent to the use of single % with "argot_2.9.1".
   // This is for Scala-specific dependencies.
   "org.clapper" %% "argot" % "0.3.5",
-  "org.apache.hadoop" % "hadoop-core" % "0.20.205.0"
+  "org.apache.hadoop" % "hadoop-core" % "0.20.205.0",
+  // Necessary because of a stupid bug in the Maven POM for Hadoop, which
+  // leaves this out.  NOTE: Supposedly Hadoop originally used version 1.5.2.
+  // If we get failures, set the version back to that.
+  "org.codehaus.jackson" % "jackson-mapper-asl" % "1.9.1"
 //  Find repository for trove-scala; currently stored unmanaged
 //  "com.codahale" % "trove-scala_2.9.1" % "0.0.1-SNAPSHOT"
   )

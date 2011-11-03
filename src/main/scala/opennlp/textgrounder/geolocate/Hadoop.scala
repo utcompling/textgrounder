@@ -161,9 +161,9 @@ object GeolocateHadoopConfiguration {
         case e:Boolean => conf.setBoolean(confname, e)
         case e:Seq[_] => {
           val multitype = parser.getMultiType(name)
-          if (multitype == classOf[String])
+          if (multitype == classOf[String]) {
             conf.setStrings(confname, parser.get[Seq[String]](name): _*)
-          else
+          } else
             throw new UnsupportedOperationException(
               "Don't know how to store sequence of type %s of parameter %s into a Hadoop Configuration"
               format (multitype, name))
@@ -188,6 +188,7 @@ object GeolocateHadoopConfiguration {
    */
   def convert_parameters_from_jobconf(prefix: String, parser: ArgParser,
       conf: Configuration) {
+    // Configuration.dumpConfiguration(conf, new PrintWriter(System.err))
     for {name <- parser.argNames
          confname = prefix + name
          if conf.getRaw(confname) != null} {
@@ -246,7 +247,8 @@ class ArticleEvaluationMapper extends Mapper[Object, Text, Text, IntWritable] {
   }
 
   override def map (key: Object, value: Text, context: ContextType) {
-    value.toString.split("\\s").foreach { token => word.set(token); context.write(word, one) }
+    word.set("Saw input: " + value.toString)
+    context.write(word, one)
   }
 }
 
@@ -263,8 +265,8 @@ class ArticleResultReducer extends Reducer[Text,IntWritable,Text,IntWritable] {
 }
 
 abstract class GeolocateHadoopApp(
-  appname: String
-) extends GeolocateApp(appname) {
+  progname: String
+) extends GeolocateApp(progname) {
   var hadoop_conf: Configuration = _
 
   /* Set by subclass -- Prefix used for storing parameters in a
@@ -286,12 +288,12 @@ abstract class GeolocateHadoopApp(
    */
   override def run_program() = {
     import GeolocateHadoopConfiguration._
-    val job = new Job(hadoop_conf, progname)
     convert_parameters_to_jobconf(hadoop_conf_prefix, arg_parser, hadoop_conf)
+    val job = new Job(hadoop_conf, progname)
     initialize_hadoop_classes(job)
     val params = arg_holder.asInstanceOf[ParamType]
     // FIXME! Here we only set one file as input.
-    FileInputFormat.addInputPath(job, new Path(params.counts_file(0)))
+    FileInputFormat.addInputPath(job, new Path(params.article_data_file(0)))
     // FIXME!!
     FileOutputFormat.setOutputPath(job, new Path("geolocate-results"))
     if (job.waitForCompletion(true)) 0 else 1
@@ -305,6 +307,7 @@ abstract class GeolocateHadoopApp(
          and canonicalize them, and then pass control back to us by
          calling run_program(), which we override. */
       hadoop_conf = getConf()
+      set_errout_prefix(progname + ": ")
       implement_main(args)
     }
   }
