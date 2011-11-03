@@ -275,6 +275,7 @@ else
 
     # Geolocate commands
     geolocate-document) CLASS=$TGGEOLOCATE.GeolocateDocumentApp;;
+    hadoop-nondist-geolocate-document) CLASS=$TGGEOLOCATE.GeolocateDocumentHadoopApp;;
     hadoop-geolocate-document) HADOOP=yes CLASS=$TGGEOLOCATE.GeolocateDocumentHadoopApp;;
     geolocate-toponym) CLASS=$TGGEOLOCATE.toponym.GeolocateToponymApp;;
     generate-kml) CLASS=$TGGEOLOCATE.GenerateKMLApp;;
