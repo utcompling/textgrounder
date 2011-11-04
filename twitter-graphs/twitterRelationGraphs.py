@@ -21,6 +21,7 @@ from operator import itemgetter
 import codecs
 import time
 import argparse
+import httplib
 
 #===============================================================================
 # Globals
@@ -120,10 +121,10 @@ def checkApiLimit():
                 time.sleep(limit_sleep)
 
             return
-        except twitter.TwitterError:
+
+        except (twitter.TwitterError, httplib.BadStatusLine):
             print "Error checking for Rate Limit, Sleeping for 60 seconds..."
             time.sleep(60)
-
 
 #===============================================================================
 # Get the last 'numTweetsPerTimeline' tweets for a given user
@@ -253,7 +254,10 @@ def relationshipGraph(user, gType, bTweets):
                     print "Unsupported Relationship Graph Processing: " + gType
                     return []
 
-            except twitter.TwitterError:
+            except (KeyboardInterrupt, SystemExit):
+                raise
+
+            except (twitter.TwitterError, httplib.BadStatusLine):
                 print ("\t\tAttempt %d: Failed retrieval for User: " + str(user.GetId())) % attempts
                 failGetTweets = failGetTweets + 1
 
@@ -261,9 +265,6 @@ def relationshipGraph(user, gType, bTweets):
                     print "\nDue to high API call failure, sleeping script for %d seconds\n" % failDelaySeconds
                     time.sleep(failDelaySeconds)
                     failGetTweets = 0
-
-            except (KeyboardInterrupt, SystemExit):
-                raise
 
         if others == []:
             return []
@@ -317,12 +318,12 @@ def processUser(userID):
 
         processedUsers.add(str(user.GetId()))
 
-    except twitter.TwitterError:
-        print "\tUnprocessable User: ", userID
-        unprocessableUsers.add(userID)
-
     except (KeyboardInterrupt, SystemExit):
         raise
+
+    except (twitter.TwitterError, httplib.BadStatusLine):
+        print "\tUnprocessable User: ", userID
+        unprocessableUsers.add(userID)
 
 #===============================================================================
 # Closes output files
@@ -342,12 +343,12 @@ def cleanup():
     if outFriendsTweets:
         outFollowersTweets.close()
 
-    flog = open(args.u + 'unprocessedUsers.log', 'w')
+    flog = open(args.u + '.unprocessedUsers.log', 'w')
     for user in unprocessableUsers:
         flog.write(user + "\n")
     flog.close()
 
-    flog = open(args.u + 'processedUsers.log', 'w')
+    flog = open(args.u + '.processedUsers.log', 'w')
     for user in processedUsers:
         flog.write(user + "\n")
     flog.close()
