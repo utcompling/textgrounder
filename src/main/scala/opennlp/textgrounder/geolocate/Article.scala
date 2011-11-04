@@ -76,12 +76,12 @@ object ArticleData {
    * processing time (real time, not CPU time) used for reading in the
    * file, for testing purposes.
    */
-  def read_article_data_file(filename: String,
+  def read_article_data_file(filehand: FileHandler, filename: String,
       process: Map[String,String] => Unit, maxtime: Double=0.0) = {
     errprint("Reading article data from %s...", filename)
     val task = new MeteredTask("article", "reading")
 
-    val fi = openr(filename)
+    val fi = filehand.openr(filename)
 
     val fields = splittext(fi.next(), '\t')
     val reader = new ArticleReader(fields)

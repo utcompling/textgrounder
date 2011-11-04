@@ -1,6 +1,7 @@
 package opennlp.textgrounder.geolocate
 
 import tgutil._
+import hadooputil._
 import argparser._
 
 import org.apache.hadoop.io._
@@ -9,11 +10,11 @@ import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.hadoop.conf.{Configuration, Configured}
-import org.apache.hadoop.fs.Path
-import scala.collection.JavaConversions._
+import org.apache.hadoop.fs._
 
+import java.io.{FileSystem=>_,_}
+import collection.JavaConversions._
 import util.control.Breaks._
-import java.io._
 
 /* Basic idea for hooking up Geolocate with Hadoop.  Hadoop works in terms
    of key-value pairs, as follows:
@@ -367,10 +368,18 @@ variable (e.g. in Hadoop).""")
 
 }
 
+class GeolocateDocumentHadoopDriver extends GeolocateDocumentDriver {
+  /**
+   * FileHandler object for this driver.
+   */
+  override val file_handler = new HadoopFileHandler
+}
+
+
 object GeolocateDocumentHadoopApp extends
     GeolocateHadoopApp("hadoop-geolocate-documents") {
   type ParamType = GeolocateDocumentHadoopParameters
-  type DriverType = GeolocateDocumentDriver
+  type DriverType = GeolocateDocumentHadoopDriver
   // FUCKING TYPE ERASURE
   def create_arg_class(ap: ArgParser) = new ParamType(ap)
   def create_driver() = new DriverType()

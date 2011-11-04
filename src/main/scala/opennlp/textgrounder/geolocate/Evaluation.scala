@@ -359,7 +359,8 @@ abstract class TestFileEvaluator(val stratname: String) {
    * Return an Iterable listing the documents retrievable from the given
    * filename.
    */
-  def iter_documents(filename: String): Iterable[Document]
+  def iter_documents(filehand: FileHandler,
+    filename: String): Iterable[Document]
 
   /**
    * Return true if document would be skipped; false if processed and
@@ -420,7 +421,7 @@ class ArticleGeotagDocumentEvaluator(
   type Document = GeoArticle
   type DocumentResult = ArticleEvaluationResult
 
-  def iter_documents(filename: String) = {
+  def iter_documents(filehand: FileHandler, filename: String) = {
     assert(filename == null)
     for (art <- driver.article_table.articles_by_split(driver.params.eval_set))
       yield art
@@ -557,11 +558,12 @@ class PCLTravelGeotagDocumentEvaluator(
   type Document = TitledDocument
   type DocumentResult = TitledDocumentResult
 
-  def iter_documents(filename: String) = {
+  def iter_documents(filehand: FileHandler, filename: String) = {
 
     val dom = try {
       // On error, just return, so that we don't have problems when called
       // on the whole PCL corpus dir (which includes non-XML files).
+      // FIXME!! Needs to use the FileHandler somehow for Hadoop access.
       xml.XML.loadFile(filename)
     } catch {
       case _ => {
@@ -610,7 +612,8 @@ class PCLTravelGeotagDocumentEvaluator(
 }
 
 abstract class EvaluationOutputter {
-  def evaluate_and_output_results(files: Iterable[String]): Unit
+  def evaluate_and_output_results(filehand: FileHandler,
+    files: Iterable[String]): Unit
 }
 
 class DefaultEvaluationOutputter(
@@ -627,7 +630,8 @@ class DefaultEvaluationOutputter(
 
     Also returns an object containing the results.
    */
-  def evaluate_and_output_results(files: Iterable[String]) {
+  def evaluate_and_output_results(filehand: FileHandler,
+      files: Iterable[String]) {
     val task = new MeteredTask("document", "evaluating")
     var last_elapsed = 0.0
     var last_processed = 0
@@ -635,17 +639,18 @@ class DefaultEvaluationOutputter(
     var skip_n = 0
 
     class EvaluationFileProcessor extends FileProcessor {
-      override def begin_process_directory(dir: File) {
+      override def begin_process_directory(filehand: FileHandler,
+          dir: String) {
         errprint("Processing evaluation directory %s...", dir)
       }
 
       /* Process all documents in a given file.  If return value is false,
          processing was interrupted due to a limit being reached, and
          no more files should be processed. */
-      def process_file(filename: String): Boolean = {
+      def process_file(filehand: FileHandler, filename: String): Boolean = {
         if (filename != null)
           errprint("Processing evaluation file %s...", filename)
-        for (doc <- evalobj.iter_documents(filename)) {
+        for (doc <- evalobj.iter_documents(filehand, filename)) {
           // errprint("Processing document: %s", doc)
           val num_processed = task.num_processed
           val doctag = "#%d" format (1 + num_processed)
@@ -701,7 +706,7 @@ class DefaultEvaluationOutputter(
       }
     }
 
-    new EvaluationFileProcessor().process_files(files)
+    new EvaluationFileProcessor().process_files(filehand, files)
 
     task.finish()
 

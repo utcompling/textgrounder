@@ -858,14 +858,14 @@ abstract class GeotagToponymEvaluator(
   // Given an evaluation file, read in the words specified, including the
   // toponyms.  Mark each word with the "document" (e.g. article) that it's
   // within.
-  def iter_geogwords(filename: String): GeogWordDocument
+  def iter_geogwords(filehand: FileHandler, filename: String): GeogWordDocument
 
-  // Retrieve the words yielded by iter_geowords() and separate by "document"
+  // Retrieve the words yielded by iter_geogwords() and separate by "document"
   // (e.g. article); yield each "document" as a list of such GeogWord objects.
   // If compute_context, also generate the set of "context" words used for
   // disambiguation (some window, e.g. size 20, of words around each
   // toponym).
-  def iter_documents(filename: String) = {
+  def iter_documents(filehand: FileHandler, filename: String) = {
     def return_word(word: GeogWord) = {
       if (word.is_toponym) {
         if (debug("lots")) {
@@ -879,7 +879,8 @@ abstract class GeotagToponymEvaluator(
       word
     }
 
-    for ((k, g) <- iter_geogwords(filename).words.groupBy(_.document)) yield {
+    for ((k, g) <- iter_geogwords(filehand, filename).words.groupBy(_.document))
+      yield {
       if (k != null)
         errprint("Processing document %s...", k)
       val results = (for (word <- g) yield return_word(word)).toArray
@@ -1061,10 +1062,10 @@ class TRCoNLLGeotagToponymEvaluator(
   //...
   //
   // Yield GeogWord objects, one per word.
-  def iter_geogwords(filename: String) = {
+  def iter_geogwords(filehand: FileHandler, filename: String) = {
     var in_loc = false
     var wordstruct: GeogWord = null
-    val lines = openr(filename, errors = "replace")
+    val lines = filehand.openr(filename, errors = "replace")
     def iter_1(): Stream[GeogWord] = {
       if (lines.hasNext) {
         val line = lines.next
@@ -1117,11 +1118,11 @@ class ArticleGeotagToponymEvaluator(
   stratname: String,
   driver: GeolocateToponymDriver
 ) extends GeotagToponymEvaluator(strategy, stratname, driver) {
-  def iter_geogwords(filename: String) = {
+  def iter_geogwords(filehand: FileHandler, filename: String) = {
     var title: String = null
     val titlere = """Article title: (.*)$""".r
     val linkre = """Link: (.*)$""".r
-    val lines = openr(filename, errors = "replace")
+    val lines = filehand.openr(filename, errors = "replace")
     def iter_1(): Stream[GeogWord] = {
       if (lines.hasNext) {
         val line = lines.next
@@ -1204,6 +1205,7 @@ class Gazetteer {
  *   Fix so we don't need it, or it's created internally!
  */
 class WorldGazetteer(
+  filehand: FileHandler,
   filename: String,
   cellgrid: MultiRegularCellGrid
 ) extends Gazetteer {
@@ -1319,14 +1321,14 @@ class WorldGazetteer(
   // Wikipedia article matching each entry in the gazetteer.  (Unimplemented:
   // For localities, add them to the cell-map that covers the earth if
   // ADD_TO_CELL_MAP is true.)
-  protected def read_world_gazetteer_and_match(filename: String) {
+  protected def read_world_gazetteer_and_match() {
     val status = new MeteredTask("gazetteer entry", "matching")
     errprint("Matching gazetteer entries in %s...", filename)
     errprint("")
 
     // Match each entry in the gazetteer
     breakable {
-      for (line <- openr(filename)) {
+      for (line <- filehand.openr(filename)) {
         if (debug("lots"))
           errprint("Processing line: %s", line)
         match_world_gazetteer_entry(line)
@@ -1341,7 +1343,7 @@ class WorldGazetteer(
   }
 
   // Upon creation, populate gazetteer from file
-  read_world_gazetteer_and_match(filename)
+  read_world_gazetteer_and_match()
 }
 
 class GeolocateToponymParameters(
@@ -1532,7 +1534,7 @@ class GeolocateToponymDriver extends GeolocateDriver {
       /* FIXME!!! */
       assert(cellgrid.isInstanceOf[MultiRegularCellGrid])
       val gazetteer =
-        new WorldGazetteer(args.gazetteer_file,
+        new WorldGazetteer(file_handler, args.gazetteer_file,
           cellgrid.asInstanceOf[MultiRegularCellGrid])
       // Bootstrapping issue: Creating the gazetteer requires that the
       // TopoArticleTable already exist, but the TopoArticleTable wants

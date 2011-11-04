@@ -1723,7 +1723,8 @@ class GeoArticleTable {
     else art.coord != null
   }
 
-  def read_article_data(filename: String, cellgrid: CellGrid) {
+  def read_article_data(filehand: FileHandler, filename: String,
+      cellgrid: CellGrid) {
     val redirects = mutable.Buffer[GeoArticle]()
 
     def process(params: Map[String, String]) {
@@ -1738,7 +1739,7 @@ class GeoArticleTable {
       }
     }
 
-    ArticleData.read_article_data_file(filename, process,
+    ArticleData.read_article_data_file(filehand, filename, process,
       maxtime = Args.max_time_per_stage)
 
     for (x <- redirects) {
@@ -1779,7 +1780,8 @@ class GeoArticleTable {
    * words equal to the probability mass of all words seen once, and rescale
    * the remaining probabilities accordingly.
    */ 
-  def read_word_counts(filename: String, stopwords: Set[String]) {
+  def read_word_counts(filehand: FileHandler, filename: String,
+      stopwords: Set[String]) {
     val initial_dynarr_size = 1000
     val keys_dynarr =
       new DynamicArray[Word](initial_alloc = initial_dynarr_size)
@@ -1798,7 +1800,7 @@ class GeoArticleTable {
     if (debug("wordcountarts")) {
       // Change this if you want a different file name
       val wordcountarts_filename = "wordcountarts-combined-article-data.txt"
-      stream = openw(wordcountarts_filename)
+      stream = filehand.openw(wordcountarts_filename)
       // See write_article_data_file() in ArticleData.scala
       writer =
         new ArticleWriter(stream, ArticleData.combined_article_data_outfields)
@@ -1835,7 +1837,7 @@ class GeoArticleTable {
     // Written this way because there's another line after the for loop,
     // corresponding to the else clause of the Python for loop
     breakable {
-      for (line <- openr(filename)) {
+      for (line <- filehand.openr(filename)) {
         if (line.startsWith("Article title: ")) {
           if (title != null)
             one_article_probs()
@@ -2330,18 +2332,18 @@ object Stopwords {
   val stopwords_file_in_tg = "data/lists/stopwords.english"
 
   // Read in the list of stopwords from the given filename.
-  def read_stopwords(stopwords_filename: String) = {
+  def read_stopwords(filehand: FileHandler, stopwords_filename: String) = {
     def compute_stopwords_filename(filename: String) = {
       if (filename != null) filename
       else {
         val tgdir = TextGrounderInfo.get_textgrounder_dir
         // Concatenate directory and rest in most robust way
-        new File(tgdir, stopwords_file_in_tg).toString
+        filehand.join_filename(tgdir, stopwords_file_in_tg)
       }
     }
     val filename = compute_stopwords_filename(stopwords_filename)
     errprint("Reading stopwords from %s...", filename)
-    openr(filename).toSet
+    filehand.openr(filename).toSet
   }
 }
 
@@ -2642,6 +2644,11 @@ abstract class GeolocateDriver {
   var stopwords: Set[String] = _
   var article_table: GeoArticleTable = _
 
+  /**
+   * FileHandler object for this driver.
+   */
+  val file_handler: FileHandler = new LocalFileHandler
+
   protected var argerror = default_error_handler _
 
   /**
@@ -2741,12 +2748,12 @@ abstract class GeolocateDriver {
 
   protected def read_articles(table: GeoArticleTable, stopwords: Set[String]) {
     for (fn <- Args.article_data_file)
-      table.read_article_data(fn, cellgrid)
+      table.read_article_data(file_handler, fn, cellgrid)
 
     // Read in the words-counts file
     if (Args.counts_file.length > 0) {
       for (fn <- Args.counts_file)
-        table.read_word_counts(fn, stopwords)
+        table.read_word_counts(file_handler, fn, stopwords)
       table.finish_word_counts()
     }
   }
@@ -2767,13 +2774,13 @@ abstract class GeolocateDriver {
       val iterfiles =
         if (Args.eval_file.length > 0) Args.eval_file
         else Seq[String](null)
-      evalobj.evaluate_and_output_results(iterfiles)
+      evalobj.evaluate_and_output_results(file_handler, iterfiles)
       (stratname, strategy, evalobj)
     }
   }
 
   def read_stopwords() {
-    stopwords = Stopwords.read_stopwords(Args.stopwords_file)
+    stopwords = Stopwords.read_stopwords(file_handler, params.stopwords_file)
   }
 
   def run() = {

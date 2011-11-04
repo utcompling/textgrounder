@@ -1,6 +1,12 @@
 #!/bin/sh
 
-hadoop="echo hadoop"
+hadoop="echo_and_hadoop"
+echo_and_hadoop()
+{
+  echo hadoop ${1+"$@"}
+  hadoop ${1+"$@"}
+}
+
 help()
 {
   cat <<FOO
