@@ -256,7 +256,7 @@ class ArticleEvaluationMapper extends
     def process(params: Map[String, String]) {
       val table = driver.article_table
       val in_article = table.create_article(params)
-      if (in_article.split == "training" &&
+      if (in_article.split == driver.params.eval_set &&
           table.would_add_article_to_list(in_article)) {
         val art = table.lookup_article(in_article.title)
         if (art == null)
