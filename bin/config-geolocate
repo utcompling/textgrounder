@@ -58,7 +58,11 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
   exit 1
 fi
 
-if [ -n "$TG_ON_COMP_LING_MACHINES" ]; then
+TG_HADOOP_DIR=textgrounder-data
+
+if [ -n "$TG_USE_HDFS" ]; then
+  TG_GROUPS_DIR=$TG_HADOOP_DIR
+elif [ -n "$TG_ON_COMP_LING_MACHINES" ]; then
   TG_GROUPS_DIR=/groups
 elif [ -n "$TG_ON_LONGHORN" ]; then
   TG_GROUPS_DIR=/scratch/01683/benwing
