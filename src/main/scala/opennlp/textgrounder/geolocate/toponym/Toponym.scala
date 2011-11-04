@@ -682,7 +682,7 @@ class EvalStatsWithCandidateList(
   }
 }
 
-object GeotagToponymResults {
+object GeolocateToponymResults {
   val incorrect_geotag_toponym_reasons = Map(
     "incorrect_with_no_candidates" ->
       "Incorrect, with no candidates",
@@ -697,8 +697,8 @@ object GeotagToponymResults {
 }
 
 //////// Results for geotagging toponyms
-class GeotagToponymResults {
-  import GeotagToponymResults._
+class GeolocateToponymResults {
+  import GeolocateToponymResults._
 
   // Overall statistics
   val all_toponym = new EvalStatsWithCandidateList(incorrect_geotag_toponym_reasons)
@@ -753,7 +753,7 @@ class GeogWord(val word: String) {
   var document: String = null
 }
 
-abstract class GeotagToponymStrategy {
+abstract class GeolocateToponymStrategy {
   def need_context(): Boolean
   def compute_score(geogword: GeogWord, art: TopoArticle): Double
 }
@@ -761,9 +761,9 @@ abstract class GeotagToponymStrategy {
 // Find each toponym explicitly mentioned as such and disambiguate it
 // (find the correct geographic location) using the "link baseline", i.e.
 // use the location with the highest number of incoming links.
-class BaselineGeotagToponymStrategy(
+class BaselineGeolocateToponymStrategy(
   cellgrid: CellGrid,
-  val baseline_strategy: String) extends GeotagToponymStrategy {
+  val baseline_strategy: String) extends GeolocateToponymStrategy {
   def need_context() = false
 
   def compute_score(geogword: GeogWord, art: TopoArticle) = {
@@ -791,7 +791,7 @@ class BaselineGeotagToponymStrategy(
 // in conjunction with the baseline.
 class NaiveBayesToponymStrategy(
   cellgrid: CellGrid,
-  val use_baseline: Boolean) extends GeotagToponymStrategy {
+  val use_baseline: Boolean) extends GeolocateToponymStrategy {
   def need_context() = true
 
   def compute_score(geogword: GeogWord, art: TopoArticle) = {
@@ -843,12 +843,12 @@ class NaiveBayesToponymStrategy(
 class ToponymEvaluationResult extends EvaluationResult {
 }
 
-abstract class GeotagToponymEvaluator(
-  strategy: GeotagToponymStrategy,
+abstract class GeolocateToponymEvaluator(
+  strategy: GeolocateToponymStrategy,
   stratname: String,
   driver: GeolocateToponymDriver
 ) extends TestFileEvaluator(stratname) {
-  val results = new GeotagToponymResults()
+  val results = new GeolocateToponymResults()
 
   case class GeogWordDocument(
     words: Iterable[GeogWord]) extends EvaluationDocument
@@ -1022,11 +1022,11 @@ abstract class GeotagToponymEvaluator(
   }
 }
 
-class TRCoNLLGeotagToponymEvaluator(
-  strategy: GeotagToponymStrategy,
+class TRCoNLLGeolocateToponymEvaluator(
+  strategy: GeolocateToponymStrategy,
   stratname: String,
   driver: GeolocateToponymDriver
-) extends GeotagToponymEvaluator(strategy, stratname, driver) {
+) extends GeolocateToponymEvaluator(strategy, stratname, driver) {
   // Read a file formatted in TR-CONLL text format (.tr files).  An example of
   // how such files are fomatted is:
   //
@@ -1113,11 +1113,11 @@ class TRCoNLLGeotagToponymEvaluator(
   }
 }
 
-class ArticleGeotagToponymEvaluator(
-  strategy: GeotagToponymStrategy,
+class ArticleGeolocateToponymEvaluator(
+  strategy: GeolocateToponymStrategy,
   stratname: String,
   driver: GeolocateToponymDriver
-) extends GeotagToponymEvaluator(strategy, stratname, driver) {
+) extends GeolocateToponymEvaluator(strategy, stratname, driver) {
   def iter_geogwords(filehand: FileHandler, filename: String) = {
     var title: String = null
     val titlere = """Article title: (.*)$""".r
@@ -1480,7 +1480,7 @@ considered.  Default '%default'.""")
 
 class GeolocateToponymDriver extends GeolocateDriver {
   type ParamType = GeolocateToponymParameters
-  type StrategyType = GeotagToponymStrategy
+  type StrategyType = GeolocateToponymStrategy
   var Args: ParamType = _
 
   def canonicalize_verify_args(args: ParamType) {
@@ -1547,7 +1547,7 @@ class GeolocateToponymDriver extends GeolocateDriver {
         // Generate strategy object
         if (stratname == "baseline") {
           for (basestratname <- args.baseline_strategy) yield ("baseline " + basestratname,
-            new BaselineGeotagToponymStrategy(cellgrid, basestratname))
+            new BaselineGeolocateToponymStrategy(cellgrid, basestratname))
         } else {
           val strategy = new NaiveBayesToponymStrategy(cellgrid,
             use_baseline = (stratname == "naive-bayes-with-baseline"))
@@ -1559,9 +1559,9 @@ class GeolocateToponymDriver extends GeolocateDriver {
       val evaluator =
         // Generate reader object
         if (args.eval_format == "tr-conll")
-          new TRCoNLLGeotagToponymEvaluator(strategy, stratname, this)
+          new TRCoNLLGeolocateToponymEvaluator(strategy, stratname, this)
         else
-          new ArticleGeotagToponymEvaluator(strategy, stratname, this)
+          new ArticleGeolocateToponymEvaluator(strategy, stratname, this)
       new DefaultEvaluationOutputter(stratname, evaluator)
     })
   }

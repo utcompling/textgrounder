@@ -1991,7 +1991,7 @@ class GeoArticle(params: Map[String, String]) extends Article(params)
  * Abstract class for reading documents from a test file and doing
  * document geolocation on them (as opposed e.g. to toponym resolution).
  */
-abstract class GeotagDocumentStrategy(val cellgrid: CellGrid) {
+abstract class GeolocateDocumentStrategy(val cellgrid: CellGrid) {
   /**
    * For a given word distribution (describing a test document), return
    * an Iterable of tuples, each listing a particular cell on the Earth
@@ -2008,9 +2008,9 @@ abstract class GeotagDocumentStrategy(val cellgrid: CellGrid) {
  * Class that implements the baseline strategies for document geolocation.
  * 'baseline_strategy' specifies the particular strategy to use.
  */
-class RandomGeotagDocumentStrategy(
+class RandomGeolocateDocumentStrategy(
   cellgrid: CellGrid
-) extends GeotagDocumentStrategy(cellgrid) {
+) extends GeolocateDocumentStrategy(cellgrid) {
   def return_ranked_cells(worddist: WordDist) = {
     val cells = cellgrid.iter_nonempty_cells()
     val shuffled = (new Random()).shuffle(cells)
@@ -2018,10 +2018,10 @@ class RandomGeotagDocumentStrategy(
   }
 }
 
-class MostPopularCellGeotagDocumentStrategy(
+class MostPopularCellGeolocateDocumentStrategy(
   cellgrid: CellGrid,
   internal_link: Boolean
-) extends GeotagDocumentStrategy(cellgrid) {
+) extends GeolocateDocumentStrategy(cellgrid) {
   var cached_ranked_mps: Iterable[(GeoCell, Double)] = null
   def return_ranked_cells(worddist: WordDist) = {
     if (cached_ranked_mps == null) {
@@ -2038,9 +2038,9 @@ class MostPopularCellGeotagDocumentStrategy(
   }
 }
 
-class CellDistMostCommonToponymGeotagDocumentStrategy(
+class CellDistMostCommonToponymGeolocateDocumentStrategy(
   cellgrid: CellGrid
-) extends GeotagDocumentStrategy(cellgrid) {
+) extends GeolocateDocumentStrategy(cellgrid) {
   val cdist_factory = new CellDistFactory(Args.lru_cache_size)
 
   def return_ranked_cells(worddist: WordDist) = {
@@ -2061,9 +2061,9 @@ class CellDistMostCommonToponymGeotagDocumentStrategy(
   }
 }
 
-class LinkMostCommonToponymGeotagDocumentStrategy(
+class LinkMostCommonToponymGeolocateDocumentStrategy(
   cellgrid: CellGrid
-) extends GeotagDocumentStrategy(cellgrid) {
+) extends GeolocateDocumentStrategy(cellgrid) {
   def return_ranked_cells(worddist: WordDist) = {
     var maxword = worddist.find_most_common_word(
       word => word(0).isUpper && cellgrid.table.word_is_toponym(word))
@@ -2109,7 +2109,7 @@ class LinkMostCommonToponymGeotagDocumentStrategy(
 
     // Append random cells and remove duplicates
     merge_numbered_sequences_uniquely(candcells,
-      new RandomGeotagDocumentStrategy(cellgrid).return_ranked_cells(worddist))
+      new RandomGeolocateDocumentStrategy(cellgrid).return_ranked_cells(worddist))
   }
 }
 
@@ -2124,7 +2124,7 @@ class LinkMostCommonToponymGeotagDocumentStrategy(
 abstract class MinMaxScoreStrategy(
   cellgrid: CellGrid,
   prefer_minimum: Boolean
-) extends GeotagDocumentStrategy(cellgrid) {
+) extends GeolocateDocumentStrategy(cellgrid) {
   /**
    * Function to return the score of an article distribution against a
    * cell.
@@ -2293,7 +2293,7 @@ class NaiveBayesDocumentStrategy(
 
 class AverageCellProbabilityStrategy(
   cellgrid: CellGrid
-) extends GeotagDocumentStrategy(cellgrid) {
+) extends GeolocateDocumentStrategy(cellgrid) {
   val cdist_factory = new CellDistFactory(Args.lru_cache_size)
 
   def return_ranked_cells(worddist: WordDist) = {
@@ -2798,7 +2798,7 @@ object GeolocateDriver {
   var Args: GeolocateParameters = _
   val Debug: DebugSettings = new DebugSettings
 
-  // Debug flags (from ArticleGeotagDocumentEvaluator) -- need to set them
+  // Debug flags (from ArticleGeolocateDocumentEvaluator) -- need to set them
   // here before we parse the command-line debug settings. (FIXME, should
   // be a better way that introduces fewer long-range dependencies like
   // this)
@@ -3018,7 +3018,7 @@ strategies, since they require that --preserve-case-words be set internally.""")
 
 class GeolocateDocumentDriver extends GeolocateDriver {
   type ParamType = GeolocateDocumentParameters
-  type StrategyType = GeotagDocumentStrategy
+  type StrategyType = GeolocateDocumentStrategy
 
   def canonicalize_verify_args(args: ParamType) {
     if (args.strategy contains "baseline") {
@@ -3071,15 +3071,15 @@ class GeolocateDocumentDriver extends GeolocateDriver {
           for (basestratname <- args.baseline_strategy) yield {
             val strategy = basestratname match {
               case "link-most-common-toponym" =>
-                new LinkMostCommonToponymGeotagDocumentStrategy(cellgrid)
+                new LinkMostCommonToponymGeolocateDocumentStrategy(cellgrid)
               case "celldist-most-common-toponym" =>
-                new CellDistMostCommonToponymGeotagDocumentStrategy(cellgrid)
+                new CellDistMostCommonToponymGeolocateDocumentStrategy(cellgrid)
               case "random" =>
-                new RandomGeotagDocumentStrategy(cellgrid)
+                new RandomGeolocateDocumentStrategy(cellgrid)
               case "internal-link" =>
-                new MostPopularCellGeotagDocumentStrategy(cellgrid, true)
+                new MostPopularCellGeolocateDocumentStrategy(cellgrid, true)
               case "num-articles" =>
-                new MostPopularCellGeotagDocumentStrategy(cellgrid, false)
+                new MostPopularCellGeolocateDocumentStrategy(cellgrid, false)
               case _ => {
                 assert(false,
                   "Internal error: Unhandled strategy " + basestratname);
@@ -3130,7 +3130,7 @@ class GeolocateDocumentDriver extends GeolocateDriver {
    *
    * The current return type is as follows:
    *
-   * Seq[(java.lang.String, GeotagDocumentStrategy, scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.TestFileEvaluator
+   * Seq[(java.lang.String, GeolocateDocumentStrategy, scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.TestFileEvaluator
    *
    * This means you get a sequence of tuples of
    * (strategyname, strategy, results)
@@ -3149,9 +3149,9 @@ class GeolocateDocumentDriver extends GeolocateDriver {
       val evaluator =
         // Generate reader object
         if (args.eval_format == "pcl-travel")
-          new PCLTravelGeotagDocumentEvaluator(strategy, stratname, this)
+          new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
         else
-          new ArticleGeotagDocumentEvaluator(strategy, stratname, this)
+          new ArticleGeolocateDocumentEvaluator(strategy, stratname, this)
       new DefaultEvaluationOutputter(stratname, evaluator)
     })
   }

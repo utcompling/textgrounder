@@ -131,7 +131,7 @@ class EvalStatsWithRank(
 
 //////// Statistics for geotagging documents/articles
 
-class GeotagDocumentEvalStats(
+class GeolocateDocumentEvalStats(
   max_rank_for_credit: Int = 10
 ) extends EvalStatsWithRank(max_rank_for_credit) {
   // "True dist" means actual distance in km's or whatever.
@@ -180,9 +180,9 @@ class GeotagDocumentEvalStats(
  * number of articles in true cell.
  */
 
-class GroupedGeotagDocumentEvalStats(cellgrid: CellGrid) {
+class GroupedGeolocateDocumentEvalStats(cellgrid: CellGrid) {
 
-  def create_doc() = new GeotagDocumentEvalStats()
+  def create_doc() = new GeolocateDocumentEvalStats()
   val all_document = create_doc()
 
   // naitr = "num articles in true cell"
@@ -197,7 +197,7 @@ class GroupedGeotagDocumentEvalStats(cellgrid: CellGrid) {
   // distance", as if degrees were a constant length both latitudinally
   // and longitudinally.
   val dist_fraction_increment = 0.25
-  def docmap() = defaultmap[Double, GeotagDocumentEvalStats](create_doc())
+  def docmap() = defaultmap[Double, GeolocateDocumentEvalStats](create_doc())
   val docs_by_degree_dist_to_true_center = docmap()
   val docs_by_true_dist_to_true_center = docmap()
 
@@ -382,11 +382,11 @@ abstract class TestFileEvaluator(val stratname: String) {
   def output_results(isfinal: Boolean = false): Unit
 }
 
-abstract class GeotagDocumentEvaluator(
-  val strategy: GeotagDocumentStrategy,
+abstract class GeolocateDocumentEvaluator(
+  val strategy: GeolocateDocumentStrategy,
   stratname: String
 ) extends TestFileEvaluator(stratname) {
-  val evalstats = new GroupedGeotagDocumentEvalStats(strategy.cellgrid)
+  val evalstats = new GroupedGeolocateDocumentEvalStats(strategy.cellgrid)
 
   def output_results(isfinal: Boolean = false) {
     evalstats.output_results(all_results = isfinal)
@@ -412,11 +412,11 @@ case class ArticleEvaluationResult(
   Class to do document geotagging on articles from the article data, in
   the dev or test set.
  */
-class ArticleGeotagDocumentEvaluator(
-  strategy: GeotagDocumentStrategy,
+class ArticleGeolocateDocumentEvaluator(
+  strategy: GeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentDriver
-) extends GeotagDocumentEvaluator(strategy, stratname) {
+) extends GeolocateDocumentEvaluator(strategy, stratname) {
 
   type Document = GeoArticle
   type DocumentResult = ArticleEvaluationResult
@@ -548,11 +548,11 @@ class ArticleGeotagDocumentEvaluator(
 class TitledDocumentResult extends EvaluationResult {
 }
 
-class PCLTravelGeotagDocumentEvaluator(
-  strategy: GeotagDocumentStrategy,
+class PCLTravelGeolocateDocumentEvaluator(
+  strategy: GeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentDriver
-) extends GeotagDocumentEvaluator(strategy, stratname) {
+) extends GeolocateDocumentEvaluator(strategy, stratname) {
   case class TitledDocument(
     title: String, text: String) extends EvaluationDocument 
   type Document = TitledDocument

@@ -227,7 +227,7 @@ object GeolocateHadoopConfiguration {
 class ArticleEvaluationMapper extends
     Mapper[Object, Text, Text, DoubleWritable] {
   val reader = new ArticleReader(ArticleData.combined_article_data_outfields)
-  var evaluators: Iterable[ArticleGeotagDocumentEvaluator] = null
+  var evaluators: Iterable[ArticleGeolocateDocumentEvaluator] = null
   val task = new MeteredTask("document", "evaluating")
   import GeolocateDocumentHadoopApp._
 
@@ -250,7 +250,7 @@ class ArticleEvaluationMapper extends
     driver.read_stopwords()
     evaluators =
       for ((stratname, strategy) <- driver.setup_for_run(params))
-        yield new ArticleGeotagDocumentEvaluator(strategy, stratname, driver)
+        yield new ArticleGeolocateDocumentEvaluator(strategy, stratname, driver)
   }
 
   override def map(key: Object, value: Text, context: ContextType) {
