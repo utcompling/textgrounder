@@ -37,5 +37,6 @@ object TextGrounderInfo {
 Textgrounder is installed.""")
       require(textgrounder_dir != null)
     }
+    textgrounder_dir
   }
 }

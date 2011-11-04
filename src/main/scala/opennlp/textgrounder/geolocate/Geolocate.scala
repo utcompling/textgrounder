@@ -3177,16 +3177,12 @@ abstract class GeolocateApp(appname: String) extends ExperimentApp(appname) {
   }
 }
 
-trait GeolocateDocumentTypes {
+object GeolocateDocumentApp extends GeolocateApp("geolocate-document") {
   type ParamType = GeolocateDocumentParameters
   type DriverType = GeolocateDocumentDriver
   // FUCKING TYPE ERASURE
   def create_arg_class(ap: ArgParser) = new ParamType(ap)
   def create_driver() = new DriverType()
-}
-
-object GeolocateDocumentApp extends
-  GeolocateApp("geolocate-document") with GeolocateDocumentTypes {
 }
 
 object GenerateKMLApp extends GeolocateApp("generate-kml") {

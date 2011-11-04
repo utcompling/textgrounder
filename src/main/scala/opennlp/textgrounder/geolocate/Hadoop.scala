@@ -368,8 +368,13 @@ variable (e.g. in Hadoop).""")
 }
 
 object GeolocateDocumentHadoopApp extends
-    GeolocateHadoopApp("hadoop-geolocate-documents") with
-    GeolocateDocumentTypes {
+    GeolocateHadoopApp("hadoop-geolocate-documents") {
+  type ParamType = GeolocateDocumentHadoopParameters
+  type DriverType = GeolocateDocumentDriver
+  // FUCKING TYPE ERASURE
+  def create_arg_class(ap: ArgParser) = new ParamType(ap)
+  def create_driver() = new DriverType()
+
   val hadoop_conf_prefix = "textgrounder.geolocate_documents."
   def initialize_hadoop_classes(job: Job) {
     job.setJarByClass(classOf[ArticleEvaluationMapper])

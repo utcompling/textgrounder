@@ -314,9 +314,9 @@ else
   # wrong directory.
 
   if [ -n "$HADOOP" ]; then
-    execute "$HADOOP_COMMAND $CLASS" ${1+"$@"}
+    execute "$HADOOP_COMMAND $CLASS" $HADOOP_ARGS ${1+"$@"}
   else
-    execute "$JAVA_COMMAND $CLASS" ${1+"$@"}
+    execute "$JAVA_COMMAND $CLASS" $HADOOP_ARGS ${1+"$@"}
   fi
 
 fi
