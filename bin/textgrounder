@@ -12,7 +12,7 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
 fi
 
 JAVA="$JAVA_HOME/bin/java"
-HADOOP_BINARY="${HADOOP_BINARY-hadoop}"
+HADOOP_BINARY="${HADOOP_BINARY:-hadoop}"
 
 # NOTE: If environment var TG_JAVA_OPT is set on entry, it will be used.
 
@@ -101,14 +101,14 @@ fi
 set_commands()
 {
   JARS="`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`"
-  if [ -n "$HADOOP_NONDIST" ]; then
-    if [ -z "$HADOOP_HOME" ]; then
-      echo "Must set HADOOP_HOME to top level of Hadoop distribution"
-      exit 1
-    fi
-    HADOOP_JARS="`echo $HADOOP_HOME/*.jar $HADOOP_HOME/lib/*.jar | tr ' ' ':'`"
-    JARS="$JARS:$HADOOP_JARS"
-  fi
+  #if [ -n "$HADOOP_NONDIST" ]; then
+  #  if [ -z "$HADOOP_HOME" ]; then
+  #    echo "Must set HADOOP_HOME to top level of Hadoop distribution"
+  #    exit 1
+  #  fi
+  #  HADOOP_JARS="`echo $HADOOP_HOME/*.jar $HADOOP_HOME/lib/*.jar | tr ' ' ':'`"
+  #  JARS="$JARS:$HADOOP_JARS"
+  #fi
   SCALA_LIB="$HOME/.sbt/boot/scala-2.9.1/lib/scala-library.jar"
   CP="$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
 
@@ -196,6 +196,10 @@ Commands for the Geolocate module:
   geolocate-document ... do document-level geolocation
   hadoop-geolocate-document ...
                         do document-level geolocation using Hadoop
+  hadoop-nondist-geolocate-document ...
+                        do document-level geolocation using Hadoop, but run
+                        in non-distributed mode (aka standalone mode), for
+                        testing
   geolocate-toponym ... do toponym-level geolocation
   generate-kml ...      create KML files showing the distribution over the
                         Earth of specific words
@@ -260,6 +264,7 @@ else
   CLASS=
   HADOOP=
   HADOOP_NONDIST=
+  HADOOP_ARGS=
   TGPACK=opennlp.textgrounder
   TGAPP=$TGPACK.app
   TGBAYESAPP=$TGPACK.bayesian.apps
@@ -286,8 +291,8 @@ else
 
     # Geolocate commands
     geolocate-document) CLASS=$TGGEOLOCATE.GeolocateDocumentApp;;
-    hadoop-nondist-geolocate-document) HADOOP_NONDIST=yes CLASS=$TGGEOLOCATE.GeolocateDocumentHadoopApp;;
-    hadoop-geolocate-document) HADOOP=yes CLASS=$TGGEOLOCATE.GeolocateDocumentHadoopApp;;
+    hadoop-nondist-geolocate-document) HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_DIR" HADOOP_NONDIST=yes CLASS=$TGGEOLOCATE.GeolocateDocumentHadoopApp;;
+    hadoop-geolocate-document) HADOOP_ARGS="--textgrounder-dir $TG_HADOOP_DIR" HADOOP=yes CLASS=$TGGEOLOCATE.GeolocateDocumentHadoopApp;;
     geolocate-toponym) CLASS=$TGGEOLOCATE.toponym.GeolocateToponymApp;;
     generate-kml) CLASS=$TGGEOLOCATE.GenerateKMLApp;;
 

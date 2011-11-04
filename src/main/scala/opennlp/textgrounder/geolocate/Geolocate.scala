@@ -2334,7 +2334,7 @@ object Stopwords {
     def compute_stopwords_filename(filename: String) = {
       if (filename != null) filename
       else {
-        val tgdir = TextGrounderInfo.textgrounder_dir
+        val tgdir = TextGrounderInfo.get_textgrounder_dir
         // Concatenate directory and rest in most robust way
         new File(tgdir, stopwords_file_in_tg).toString
       }

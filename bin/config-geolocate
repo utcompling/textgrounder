@@ -38,7 +38,14 @@
 #       stored under `/scratch/01683/benwing` by setting TG_ON_LONGHORN to
 #       a non-empty value, and the variables will all get set properly.
 #
-# 3. PCL_TRAVEL_DIR: Optional; location of PCL travel corpus and related files
+#    e. If you're running under Hadoop, set TG_USE_HDFS to a non-blank
+#       value; then, TG_GROUPS_DIR will be set to the value of TG_HADOOP_DIR
+#       (see below; actually refers to a directory in the Hadoop File System),
+#       and the above data-file variables will be set appropriately.  Use
+#       the script 'tg-copy-data-to-hadoop' to copy data files to the
+#       Hadoop File System underneath TG_HADOOP_DIR.
+#
+# 3. PCL_TRAVEL_DIR: Optional; location of PCL travel corpus and related files.
 #
 # 4. NO_USE_PERMUTED: Optional; if non-blank, don't use permuted version of
 #                     Wikipedia data files.
@@ -52,13 +59,20 @@
 #                 use one of the current dumps that have been completely
 #                 preprocessed -- currently 'enwiki-20100905', the version
 #                 used in Wing and Baldridge 2011.
+#
+# 6. TG_HADOOP_DIR: Optional; location of corpus and TextGrounder data files
+#                   in the Hadoop File System (HDFS).  By default, set to the
+#                   relative directory 'textgrounder-data', which means it
+#                   is relative to your home directory in HDFS, which is
+#                   normally /user/$USER.  See also the variable TG_USE_HDFS,
+#                   described above.
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
   echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
-TG_HADOOP_DIR=textgrounder-data
+TG_HADOOP_DIR=${TG_HADOOP_DIR:-textgrounder-data}
 
 if [ -n "$TG_USE_HDFS" ]; then
   TG_GROUPS_DIR=$TG_HADOOP_DIR
@@ -69,15 +83,9 @@ elif [ -n "$TG_ON_LONGHORN" ]; then
 fi
 
 if [ -n "$TG_GROUPS_DIR" ]; then
-  if [ -z "$TG_WIKIPEDIA_DIR" ]; then
-    TG_WIKIPEDIA_DIR=$TG_GROUPS_DIR/corpora/wikipedia
-  fi
-  if [ -z "$TG_TWITTER_DIR" ]; then
-    TG_TWITTER_DIR=$TG_GROUPS_DIR/corpora/geotext
-  fi
-  if [ -z "$TG_AUX_DIR" ]; then
-    TG_AUX_DIR=$TG_GROUPS_DIR/projects/textgrounder/data
-  fi
+  TG_WIKIPEDIA_DIR=${TG_WIKIPEDIA_DIR:-$TG_GROUPS_DIR/corpora/wikipedia}
+  TG_TWITTER_DIR=${TG_TWITTER_DIR:-$TG_GROUPS_DIR/corpora/geotext}
+  TG_AUX_DIR=${TG_AUX_DIR:-$TG_GROUPS_DIR/projects/textgrounder/data}
 fi
 
 if [ -z "$TG_WIKIPEDIA_DIR" ]; then

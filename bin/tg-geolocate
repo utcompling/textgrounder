@@ -3,7 +3,7 @@
 help()
 {
   cat <<FOO
-Usage: $0 [--app APP] [--doc-thresh THRESH] [TEXTGROUNDER-OPTIONS ...] CORPUS [APP-OPTIONS ...]
+Usage: $0 [--hadoop | --hadoop-nondist] [--app APP] [--doc-thresh THRESH] [TEXTGROUNDER-OPTIONS ...] CORPUS [APP-OPTIONS ...]
 
 Run 'textgrounder geolocate-document' (or another related app), passing it
 the appropriate arguments for running on the specific corpus specified by
@@ -20,8 +20,21 @@ wikipedia         Run on Wikipedia.
 twitter           Run on the GeoText twitter corpus.
 twitter-wiki      Run on a combination of both of the above corpora.
 
-The option '--app' specifies the application to run; by default it is
-'geolocate-document', to do document-level geotagging.  
+The option '--hadoop' causes the application to be run using Hadoop
+(a package for large-scale parallel processing).  Before doing this,
+TextGrounder needs to be built in a special way and data needs to be
+copied into the Hadoop File System.  See the README.txt file for more
+info.  An alternative for testing purposes is '--hadoop-nondist'.
+This uses the same Hadoop-specific code in TextGrounder but runs
+Hadoop in "non-distributed" mode, which simulates all of the various
+file-system and compute servers on one machine and doesn't require
+any special building or data copying.
+
+The option '--app' specifies the application to run; by default it does
+document-level geotagging. (Normally, the default application is
+'geolocate-document', but it may be 'hadoop-geolocate-document' or
+'hadoop-nondist-geolocate-document' depending on the above Hadoop-related
+settings.)
 
 For the Twitter corpora, '--doc-thresh' specifies the document threshold
 controlling which vocabulary items are discarded (items occurring in
@@ -52,13 +65,20 @@ fi
 
 docthresh=5
 tgopts=
-tgapp=geolocate-document
+default_tgapp=geolocate-document
+tgapp=
+hadoop_arg=
 
 while true ; do
   case "$1" in
     --doc-thresh ) docthresh="$2"; shift 2 ;;
     --help ) help; exit 1 ;;
     --app ) tgapp="$2"; shift 2 ;;
+    --hadoop )
+      hadoop_arg="--hadoop"
+      default_tgapp="hadoop-geolocate-document"; shift ;;
+    --hadoop-nondist )
+      default_tgapp="hadoop-nondist-geolocate-document"; shift ;;
     -minheap | --minheap ) tgopts="$tgopts --minheap $2"; shift 2 ;;
     -maxheap | --maxheap ) tgopts="$tgopts --maxheap $2"; shift 2 ;;
     -memory | --memory ) tgopts="$tgopts --memory $2"; shift 2 ;;
@@ -77,7 +97,8 @@ if [ -z "$1" -o "$1" = "help" ]; then
   help; exit 1
 fi
 
-corpusargs=`tg-get-corpus-args --doc-thresh $docthresh $1`
+tgapp=${tgapp:-$default_tgapp}
+corpusargs=`tg-get-corpus-args $hadoop_arg --doc-thresh $docthresh $1`
 shift
 
 # __TG_EXTRA_ARGS is for other scripts calling us; see above.

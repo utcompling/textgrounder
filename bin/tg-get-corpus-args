@@ -3,7 +3,7 @@
 help()
 {
   cat <<FOO
-Usage: $0 [--doc-thresh THRESH] CORPUS
+Usage: $0 [--hadoop] [--doc-thresh THRESH] CORPUS
 
 Return arguments to use for running on CORPUS, a text corpus.
 
@@ -19,6 +19,8 @@ threshold number of documents are discarded, or more accurately substituted
 with a generic out-of-vocabulary token).  This in turn controls which
 version of the GeoText corpus is used.  Default is 5.
 
+If --hadoop is given, different directories are used, since data is being
+read from the Hadoop File System rather than locally.
 FOO
 }
 
@@ -27,12 +29,12 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
   exit 1
 fi
 
-. $TEXTGROUNDER_DIR/bin/config-geolocate
-
 docthresh=5
+hadoop=
 
 while true ; do
   case "$1" in
+    --hadoop) hadoop=yes; shift ;;
     --doc-thresh) docthresh="$2"; shift 2 ;;
     --help) help; exit 1 ;;
     --) shift ; break ;;
@@ -43,6 +45,14 @@ done
 if [ -z "$1" -o "$1" = help ]; then
   help; exit 1
 fi
+
+if [ -n "$hadoop" ]; then
+  # If we're running under Hadoop, use a hierarchy in HDFS, by setting
+  # the following variable.
+  TG_USE_HDFS=yes
+fi
+
+. $TEXTGROUNDER_DIR/bin/config-geolocate
 
 geotext_output_dir="$TG_TWITTER_DIR/output-$docthresh-docthresh"
 geotext_prefix="$geotext_output_dir/geotext-twitter"

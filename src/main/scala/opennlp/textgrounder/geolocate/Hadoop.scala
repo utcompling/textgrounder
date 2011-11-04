@@ -238,12 +238,14 @@ class ArticleEvaluationMapper extends
     val conf = context.getConfiguration()
     val ap = new ArgParser(progname)
     // Initialize set of parameters in `ap`
-    new GeolocateDocumentParameters(ap)
+    new GeolocateDocumentHadoopParameters(ap)
     // Retrieve configuration values and store in `ap`
     convert_parameters_from_jobconf(hadoop_conf_prefix, ap, conf)
     // Now create a class containing the stored configuration values
-    val params = new GeolocateDocumentParameters(ap)
+    val params = new GeolocateDocumentHadoopParameters(ap)
     driver.set_parameters(params)
+    driver.need(params.textgrounder_dir, "textgrounder-dir")
+    TextGrounderInfo.set_textgrounder_dir(params.textgrounder_dir)
     driver.read_stopwords()
     evaluators =
       for ((stratname, strategy) <- driver.setup_for_run(params))
@@ -353,10 +355,16 @@ abstract class GeolocateHadoopApp(
 
 class GeolocateDocumentHadoopParameters(
   parser: ArgParser = null
-) extends GeolocateParameters(parser) {
+) extends GeolocateDocumentParameters(parser) {
+  var textgrounder_dir =
+    ap.option[String]("textgrounder-dir",
+      help = """Directory to use in place of TEXTGROUNDER_DIR environment
+variable (e.g. in Hadoop).""")
+
   var outfile =
     ap.parameter[String]("outfile",
       help = """File to store evaluation results in.""")
+
 }
 
 object GeolocateDocumentHadoopApp extends
