@@ -176,7 +176,10 @@ abstract class WordDistFactory {
   /**
    * Read word counts from a file containing the counts for a set of
    * articles, create WordDists for each such article and set the
-   * article's distribution to the newly-created WordDist.
+   * article's distribution to the newly-created WordDist.  Note that
+   * the word-counts file is created by 'processwiki.py' in the
+   * 'python' directory.  Generally, the format of the file is dependent
+   * on the particular WordDist implementation.
    *
    * @param table Table holding all of the articles.
    * @param filehand File-handler object, which knows how to read data

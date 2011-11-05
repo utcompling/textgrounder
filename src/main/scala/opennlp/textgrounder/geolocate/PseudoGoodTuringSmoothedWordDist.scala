@@ -28,8 +28,20 @@ import util.control.Breaks._
 import java.io._
 
 /**
- * Extract out the behavior related to the pseudo Good-Turing smoother.
- */
+ * This class implements a simple version of Good-Turing smoothing where we
+ * assign probability mass to unseen words equal to the probability mass of
+ * all words seen once, and rescale the remaining probabilities accordingly.
+ * ("Proper" Good-Turing is more general and adjusts the probabilities of
+ * words seen N times according to the number of words seen N-1 times.
+ * FIXME: I haven't thought carefully enough to make sure that this
+ * simplified version actually makes theoretical sense, although I assume it
+ * does because it can be seen as a better version of add-one or
+ * add-some-value smoothing, where instead of just adding some arbitrary
+ * value to unseen words, we determine the amount to add in a way that makes
+ * theoretical sense (and in particular ensures that we don't assign 99%
+ * of the mass or whatever to unseen words, as can happen to add-one smoothing
+ * especially for bigrams or trigrams).
+ */ 
 class PseudoGoodTuringSmoothedWordDistFactory extends
     WordDistFactory {
   // Total number of types seen once
@@ -89,13 +101,6 @@ class PseudoGoodTuringSmoothedWordDistFactory extends
     new PseudoGoodTuringSmoothedWordDist(this, Array[Word](), Array[Int](), 0,
       note_globally=false)
 
-  /**
-   * Parse the result of a previous run of --output-counts and generate
-   * a unigram distribution for Naive Bayes matching.  We do a simple version
-   * of Good-Turing smoothing where we assign probability mass to unseen
-   * words equal to the probability mass of all words seen once, and rescale
-   * the remaining probabilities accordingly.
-   */ 
   def read_word_counts(table: GeoArticleTable,
       filehand: FileHandler, filename: String, stopwords: Set[String]) {
     val initial_dynarr_size = 1000
