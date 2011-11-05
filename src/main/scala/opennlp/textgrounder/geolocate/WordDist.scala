@@ -30,7 +30,49 @@ import com.codahale.trove.{mutable => trovescala}
 //                             Word distributions                           //
 //////////////////////////////////////////////////////////////////////////////
 
-object IntStringMemoizer {
+/**
+ * A class for "memoizing" words, i.e. mapping them to some other type
+ * (e.g. Int) that should be faster to compare and potentially require
+ * less space.
+ */
+abstract class Memoizer {
+  /**
+   * The type of a memoized word.
+   */
+  type Word
+  /**
+   * Map a word as a string to its memoized form.
+   */
+  def memoize_word(word: String): Word
+  /**
+   * Map a word from its memoized form back to a string.
+   */
+  def unmemoize_word(word: Word): String
+
+  /**
+   * The type of a mutable map from memoized words to Ints.
+   */
+  type WordIntMap
+  /**
+   * Create a mutable map from memoized words to Ints.
+   */
+  def create_word_int_map(): WordIntMap
+  /**
+   * The type of a mutable map from memoized words to Doubles.
+   */
+  type WordDoubleMap
+  /**
+   * Create a mutable map from memoized words to Doubles.
+   */
+  def create_word_double_map(): WordDoubleMap
+}
+
+/**
+ * The memoizer we actually use.  Maps word strings to Ints.  Uses Trove
+ * for extremely fast and memory-efficient hash tables, making use of the
+ * Trove-Scala interface for easy access to the Trove hash tables.
+ */
+object IntStringMemoizer extends Memoizer {
   type Word = Int
   val invalid_word: Word = 0
 
@@ -74,43 +116,101 @@ object IntStringMemoizer {
   type WordDoubleMap = trovescala.IntDoubleMap
 }
 
-object IdentityMemoizer {
+/**
+ * A memoizer for testing that doesn't actually do anything -- the memoized
+ * words are also strings.  This tests that we don't make any assumptions
+ * about memoized words being Ints.
+ */
+object IdentityMemoizer extends Memoizer {
   type Word = String
   val invalid_word: Word = null
   def memoize_word(word: String): Word = word
   def unmemoize_word(word: Word): String = word
 
+  type WordIntMap = mutable.Map[Word, Int]
   def create_word_int_map() = intmap[Word]()
+  type WordDoubleMap = mutable.Map[Word, Double]
   def create_word_double_map() = doublemap[Word]()
 }
 
-object TrivialIntMemoizer {
+/**
+ * A trivial version of a memoizer to Ints that always returns the same Int.
+ * Not useful as an implementation but useful for testing that code using
+ * the memoizer compiles correctly, even if the normal IntStringMemoizer
+ * is broken (e.g. being modified?).
+ */
+object TrivialIntMemoizer extends Memoizer {
   type Word = Int
   val invalid_word: Word = 0
   def memoize_word(word: String): Word = 1
   def unmemoize_word(word: Word): String = "foo"
 
+  type WordIntMap = IntStringMemoizer.WordIntMap
   def create_word_int_map() = IntStringMemoizer.create_word_int_map()
+  type WordDoubleMap = IntStringMemoizer.WordDoubleMap
   def create_word_double_map() = IntStringMemoizer.create_word_double_map()
 }
 
-object WordDist {
-  val memoizer = IntStringMemoizer
-
-  // Total number of word types seen (size of vocabulary)
-  var total_num_word_types = 0
-
-  // Total number of word tokens seen
-  var total_num_word_tokens = 0
-}
-
+/**
+ * A factory object for WordDists (word distributions).  Currently, there is
+ * only one factory object (i.e. it's a singleton), but the particular
+ * factory used depends on a command-line parameter.
+ */
 abstract class WordDistFactory {
+  /**
+   * Create an empty word distribution.  Distributions created this way
+   * are not meant to be added to the global word-distribution statistics
+   * (see below).
+   */
   def create_word_dist(): WordDist
+
+  /**
+   * Compute any global word-distribution statistics, e.g. tables for
+   * doing back-off.  This is called after all of the relevant WordDists
+   * have been created.  In practice, the "relevant" distributions are those
+   * associated with training documents/articles, which are read in
+   * during `read_word_counts`.
+   */
   def finish_global_distribution()
+
+  /**
+   * Read word counts from a file containing the counts for a set of
+   * articles, create WordDists for each such article and set the
+   * article's distribution to the newly-created WordDist.
+   *
+   * @param table Table holding all of the articles.
+   * @param filehand File-handler object, which knows how to read data
+   *   from files.
+   * @param filename Name of file holding word counts.
+   * @param stopwords List of stopwords (words to be ignored when creating
+   *   a distribution).
+   */
   def read_word_counts(table: GeoArticleTable,
     filehand: FileHandler, filename: String, stopwords: Set[String])
 }
 
+object WordDist {
+  /**
+   * Object describing how we memoize words (i.e. convert them to Int
+   * indices, for faster operations on them).
+   */
+  val memoizer = IntStringMemoizer
+
+  /**
+   * Total number of word types seen (size of vocabulary)
+   */
+  var total_num_word_types = 0
+
+  /**
+   * Total number of word tokens seen
+   */
+  var total_num_word_tokens = 0
+}
+
+/**
+ * A word distribution, i.e. a statistical distribution over words in
+ * a document, cell, etc.
+ */
 abstract class WordDist {
   /** Number of word tokens seen in the distribution. */
   var num_word_tokens: Int
@@ -139,9 +239,16 @@ abstract class WordDist {
   def add_word_distribution(worddist: WordDist)
 
   /**
-   * Finish computation of distribution.  This does any additional changes
-   * needed when no more words or distributions will be added to this one,
-   * but which do not rely on other distributions also being finished.
+   * Partly finish computation of distribution.  This is called when the
+   * distribution has been completely populated with words, and no more
+   * modifications (e.g. incorporation of words or other distributions) will
+   * be made to the distribution.  It should do any additional changes that
+   * depend on the distribution being complete, but which do not depend on
+   * the global word-distribution statistics having been computed. (These
+   * statistics can be computed only after *all* word distributions that
+   * are used to create these global statistics have been completely
+   * populated.)
+   *
    * @seealso #finish_after_global()
    * 
    * @param minimum_word_count If greater than zero, eliminate words seen
@@ -152,18 +259,25 @@ abstract class WordDist {
   /**
    * Completely finish computation of the word distribution.  This is called
    * after finish_global_distribution() on the factory method, and can be
-   * used to compute values for the distribution that depend on global values
-   * computed from all word distributions.
+   * used to compute values for the distribution that depend on the
+   * global word-distribution statistics.
    */
   def finish_after_global()
 
+  /**
+   * Finish computation of distribution.  This is intended for word
+   * distributions that do not contribute to the global word-distribution
+   * statistics, and which have been created after those statistics have
+   * already been completed. (Examples of such distributions are the
+   * distributions of grid cells and of test documents.)
+   */
   def finish(minimum_word_count: Int = 0) {
     finish_before_global(minimum_word_count)
     finish_after_global()
   }
 
   /**
-   * Check fast and slow versions against each other.
+   * Check fast and slow KL-divergence versions against each other.
    */
   def test_kl_divergence(other: WordDist, partial: Boolean=false) = {
     assert(finished)
@@ -350,35 +464,35 @@ abstract class UnigramWordDist(
     }
   }
 
-    /**
-     * This is a basic unigram implementation of the computation of the
-     * KL-divergence between this distribution and another distribution.
-     * Useful for checking against other, faster implementations.
-     * 
-     * Computing the KL divergence is a bit tricky, especially in the
-     * presence of smoothing, which assigns probabilities even to words not
-     * seen in either distribution.  We have to take into account:
-     * 
-     * 1. Words in this distribution (may or may not be in the other).
-     * 2. Words in the other distribution that are not in this one.
-     * 3. Words in neither distribution but seen globally.
-     * 4. Words never seen at all.
-     * 
-     * The computation of steps 3 and 4 depends heavily on the particular
-     * smoothing algorithm; in the absence of smoothing, these steps
-     * contribute nothing to the overall KL-divergence.
-     * 
-     * @param xother The other distribution to compute against.
-     * @param partial If true, only do step 1 above.
-     * @param return_contributing_words If true, return a map listing
-     *   the words in both distributions and the amount of total
-     *   KL-divergence they compute, useful for debugging.
-     *   
-     * @returns A tuple of (divergence, word_contribs) where the first
-     *   value is the actual KL-divergence and the second is the map
-     *   of word contributions as described above; will be null if
-     *   not requested.
-     */
+  /**
+   * This is a basic unigram implementation of the computation of the
+   * KL-divergence between this distribution and another distribution.
+   * Useful for checking against other, faster implementations.
+   * 
+   * Computing the KL divergence is a bit tricky, especially in the
+   * presence of smoothing, which assigns probabilities even to words not
+   * seen in either distribution.  We have to take into account:
+   * 
+   * 1. Words in this distribution (may or may not be in the other).
+   * 2. Words in the other distribution that are not in this one.
+   * 3. Words in neither distribution but seen globally.
+   * 4. Words never seen at all.
+   * 
+   * The computation of steps 3 and 4 depends heavily on the particular
+   * smoothing algorithm; in the absence of smoothing, these steps
+   * contribute nothing to the overall KL-divergence.
+   * 
+   * @param xother The other distribution to compute against.
+   * @param partial If true, only do step 1 above.
+   * @param return_contributing_words If true, return a map listing
+   *   the words in both distributions and the amount of total
+   *   KL-divergence they compute, useful for debugging.
+   *   
+   * @returns A tuple of (divergence, word_contribs) where the first
+   *   value is the actual KL-divergence and the second is the map
+   *   of word contributions as described above; will be null if
+   *   not requested.
+   */
   def slow_kl_divergence_debug(xother: WordDist, partial: Boolean=false,
       return_contributing_words: Boolean=false) = {
     val other = xother.asInstanceOf[UnigramWordDist]
