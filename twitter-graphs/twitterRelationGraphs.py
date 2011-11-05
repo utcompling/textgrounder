@@ -44,6 +44,8 @@ outFollowersGraph = None
 outFollowersTweets = None
 outFriendsGraph = None
 outFriendsTweets = None
+outProcessedUsers = None
+outUnProcessedUsers = None
 
 #===============================================================================
 # Parameters
@@ -317,6 +319,7 @@ def processUser(userID):
             outputGraphsAndTweets(user, friends, outFriendsGraph, outFriendsTweets)
 
         processedUsers.add(str(user.GetId()))
+        outProcessedUsers.write(userID + "\n")
 
     except (KeyboardInterrupt, SystemExit):
         raise
@@ -324,6 +327,8 @@ def processUser(userID):
     except (twitter.TwitterError, httplib.BadStatusLine):
         print "\tUnprocessable User: ", userID
         unprocessableUsers.add(userID)
+        outUnProcessedUsers.write(userID + "\n")
+
 
 #===============================================================================
 # Closes output files
@@ -343,15 +348,11 @@ def cleanup():
     if outFriendsTweets:
         outFollowersTweets.close()
 
-    flog = open(args.u + '.unprocessedUsers.log', 'w')
-    for user in unprocessableUsers:
-        flog.write(user + "\n")
-    flog.close()
+    if outUnProcessedUsers:
+        outUnProcessedUsers.close()
 
-    flog = open(args.u + '.processedUsers.log', 'w')
-    for user in processedUsers:
-        flog.write(user + "\n")
-    flog.close()
+    if outProcessedUsers:
+        outProcessedUsers.close()
 
 #===============================================================================
 # Reads in the file with a list of users and attempts to process each user
@@ -474,6 +475,11 @@ def main():
         outFriendsGraph = codecs.open(args.g[0], encoding = 'utf-8', mode = 'w')
         if  len(args.g) >= 2:
             outFriendsTweets = codecs.open(args.g[1], encoding = 'utf-8', mode = 'w')
+
+    global outUnProcessedUsers, outProcessedUsers
+    outUnProcessedUsers = codecs.open(args.u + '.unprocessedUsers.log', encoding = 'utf-8', mode = 'w')
+    outProcessedUsers = codecs.open(args.u + '.processedUsers.log', encoding = 'utf-8', mode = 'w')
+
 
     #Set Parameters
     global minNumTweets, minNumFollowers, maxNumFollowers, numUsersToProcess, numTweetsPerTimeline
