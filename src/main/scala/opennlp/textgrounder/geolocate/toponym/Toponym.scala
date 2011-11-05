@@ -181,7 +181,7 @@ case class Division(
   var boundary: Boundary = null
   // For cell-based Naive Bayes disambiguation, a distribution
   // over the division's article and all locations within the cell.
-  var worddist: CellWordDist = null
+  var word_dist_wrapper: CellWordDist = null
 
   def toString(no_article: Boolean = false) = {
     val artmatchstr =
@@ -258,11 +258,11 @@ case class Division(
     boundary = new Boundary(topleft, botright)
   }
 
-  def generate_worddist() {
-    worddist = new CellWordDist()
+  def generate_worddist(word_dist_factory: WordDistFactory) {
+    word_dist_wrapper = new CellWordDist(word_dist_factory.create_word_dist())
     for (loc <- Seq(this) ++ goodlocs if loc.artmatch != null)
-      yield worddist.add_article(loc.artmatch)
-    worddist.finish(minimum_word_count = Args.minimum_word_count)
+      yield word_dist_wrapper.add_article(loc.artmatch)
+    word_dist_wrapper.word_dist.finish(minimum_word_count = Args.minimum_word_count)
   }
 
   def contains(coord: Coord) = boundary contains coord
@@ -363,7 +363,7 @@ class TopoArticle(
     table: TopoArticleTable
 ) extends GeoArticle(params) {
   // Cell-based distribution corresponding to this article.
-  var worddist: CellWordDist = null
+  var word_dist_wrapper: CellWordDist = null
   // Corresponding location for this article.
   var location: Location = null
 
@@ -429,22 +429,23 @@ class TopoArticle(
     val loc = location
     if (loc != null && loc.isInstanceOf[Division]) {
       val div = loc.asInstanceOf[Division]
-      if (div.worddist == null)
-        div.generate_worddist()
-      div.worddist
+      if (div.word_dist_wrapper == null)
+        div.generate_worddist(cellgrid.table.word_dist_factory)
+      div.word_dist_wrapper
     } else {
-      if (worddist == null) {
+      if (word_dist_wrapper == null) {
         val stat_cell = cellgrid.find_best_cell_for_coord(coord)
         if (stat_cell != null)
-          worddist = stat_cell.worddist
+          word_dist_wrapper = stat_cell.word_dist_wrapper
         else {
           warning("Couldn't find existing cell distribution for article %s",
             this)
-          worddist = new CellWordDist()
-          worddist.finish()
+          word_dist_wrapper =
+            new CellWordDist(table.word_dist_factory.create_word_dist())
+          word_dist_wrapper.word_dist.finish()
         }
       }
-      worddist
+      word_dist_wrapper
     }
   }
 
@@ -461,7 +462,8 @@ class TopoArticle(
 
 // Static class maintaining additional tables listing mapping between
 // names, ID's and articles.  See comments at GeoArticleTable.
-class TopoArticleTable extends GeoArticleTable {
+class TopoArticleTable(word_dist_factory: WordDistFactory) extends
+    GeoArticleTable(word_dist_factory) {
   override def create_article(params: Map[String, String]) =
     new TopoArticle(params, this)
 
@@ -802,7 +804,7 @@ class NaiveBayesToponymStrategy(
 
     var distobj =
       if (Args.context_type == "article") art.dist
-      else art.find_cellworddist(cellgrid)
+      else art.find_cellworddist(cellgrid).word_dist
     var totalprob = 0.0
     var total_word_weight = 0.0
     val (word_weight, baseline_weight) =
@@ -1514,7 +1516,7 @@ class GeolocateToponymDriver extends GeolocateDriver {
    */
 
   def implement_run(args: ParamType) = {
-    val topo_article_table = new TopoArticleTable()
+    val topo_article_table = new TopoArticleTable(word_dist_factory)
     article_table = topo_article_table
     initialize_cellgrid(article_table)
     read_articles(article_table, stopwords)

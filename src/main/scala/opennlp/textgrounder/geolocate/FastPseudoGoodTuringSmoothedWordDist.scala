@@ -21,7 +21,6 @@ import math.{log, sqrt}
 
 import tgutil.DynamicArray
 import WordDist.memoizer.Word
-import WordDist.SmoothedWordDist
 
 /**
   Fast implementation of KL-divergence and cosine-similarity algorithms
@@ -62,10 +61,13 @@ object FastPseudoGoodTuringSmoothedWordDist {
     static_key_array.ensure_at_least(size)
     static_value_array.ensure_at_least(size)
   }
-  protected var cached_worddist: SmoothedWordDist = null
+
+  type DistType = PseudoGoodTuringSmoothedWordDist
+  val DistType = PseudoGoodTuringSmoothedWordDist
+  protected var cached_worddist: DistType = null
   protected var cached_size: Int = 0
 
-  def setup_static_arrays(self: SmoothedWordDist) {
+  def setup_static_arrays(self: DistType) {
     if (self eq cached_worddist) {
       assert(self.counts.size == cached_size)
       return
@@ -85,15 +87,15 @@ object FastPseudoGoodTuringSmoothedWordDist {
    A fast implementation of KL-divergence that uses inline lookups as much
    as possible.
    */
-  def fast_kl_divergence(self: SmoothedWordDist, other: SmoothedWordDist,
+  def fast_kl_divergence(self: DistType, other: DistType,
     partial: Boolean=false): Double = {
     val pfact = (1.0 - self.unseen_mass)/self.num_word_tokens
     val qfact = (1.0 - other.unseen_mass)/other.num_word_tokens
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
     val qfact_globally_unseen_prob = (other.unseen_mass*
-        SmoothedWordDist.globally_unseen_word_prob /
-        SmoothedWordDist.total_num_unseen_word_types)
-    val owprobs = SmoothedWordDist.overall_word_probs
+        self.factory.globally_unseen_word_prob /
+        self.factory.total_num_unseen_word_types)
+    val owprobs = self.factory.overall_word_probs
     val pcounts = self.counts
     val qcounts = other.counts
 
@@ -185,15 +187,15 @@ object FastPseudoGoodTuringSmoothedWordDist {
   probability due to smoothing.  But with parameter "partial" to true we
   proceed as with KL-divergence and ignore words not in P.
    */
-  def fast_smoothed_cosine_similarity(self: SmoothedWordDist, other: SmoothedWordDist,
+  def fast_smoothed_cosine_similarity(self: DistType, other: DistType,
     partial: Boolean=false): Double = {
     val pfact = (1.0 - self.unseen_mass)/self.num_word_tokens
     val qfact = (1.0 - other.unseen_mass)/other.num_word_tokens
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
     val qfact_globally_unseen_prob = (other.unseen_mass*
-        SmoothedWordDist.globally_unseen_word_prob /
-        SmoothedWordDist.total_num_unseen_word_types)
-    val owprobs = SmoothedWordDist.overall_word_probs
+        self.factory.globally_unseen_word_prob /
+        self.factory.total_num_unseen_word_types)
+    val owprobs = self.factory.overall_word_probs
     // 1.
     val pcounts = self.counts
     val qcounts = other.counts
@@ -264,7 +266,7 @@ object FastPseudoGoodTuringSmoothedWordDist {
   probability due to smoothing.  But with parameter "partial" to true we
   proceed as with KL-divergence and ignore words not in P.
    */
-  def fast_cosine_similarity(self: SmoothedWordDist, other: SmoothedWordDist,
+  def fast_cosine_similarity(self: DistType, other: DistType,
     partial: Boolean=false) = {
     val pfact = 1.0/self.num_word_tokens
     val qfact = 1.0/other.num_word_tokens

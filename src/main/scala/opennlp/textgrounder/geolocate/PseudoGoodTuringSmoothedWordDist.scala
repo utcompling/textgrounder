@@ -17,17 +17,21 @@
 package opennlp.textgrounder.geolocate
 
 import tgutil._
+import GeolocateDriver.Args
 import GeolocateDriver.Debug._
 import WordDist.memoizer._
-import WordDist.SmoothedWordDist
 
 import math._
 import collection.mutable
+import util.control.Breaks._
+
+import java.io._
 
 /**
  * Extract out the behavior related to the pseudo Good-Turing smoother.
  */
-object PseudoGoodTuringSmoothedWordDist {
+class PseudoGoodTuringSmoothedWordDistFactory extends
+    WordDistFactory {
   // Total number of types seen once
   var total_num_types_seen_once = 0
 
@@ -80,6 +84,133 @@ object PseudoGoodTuringSmoothedWordDist {
                globally_unseen_word_prob,
                globally_unseen_word_prob + (overall_word_probs.values sum))
   }
+
+  def create_word_dist() =
+    new PseudoGoodTuringSmoothedWordDist(this, Array[Word](), Array[Int](), 0,
+      note_globally=false)
+
+  /**
+   * Parse the result of a previous run of --output-counts and generate
+   * a unigram distribution for Naive Bayes matching.  We do a simple version
+   * of Good-Turing smoothing where we assign probability mass to unseen
+   * words equal to the probability mass of all words seen once, and rescale
+   * the remaining probabilities accordingly.
+   */ 
+  def read_word_counts(table: GeoArticleTable,
+      filehand: FileHandler, filename: String, stopwords: Set[String]) {
+    val initial_dynarr_size = 1000
+    val keys_dynarr =
+      new DynamicArray[Word](initial_alloc = initial_dynarr_size)
+    val values_dynarr =
+      new DynamicArray[Int](initial_alloc = initial_dynarr_size)
+
+    // This is basically a one-off debug statement because of the fact that
+    // the experiments published in the paper used a word-count file generated
+    // using an older algorithm for determining the geotagged coordinate of
+    // an article.  We didn't record the corresponding article-data
+    // file, so we need a way of regenerating it using the intersection of
+    // articles in the article-data file we actually used for the experiments
+    // and the word-count file we used.
+    var stream: PrintStream = null
+    var writer: ArticleWriter = null
+    if (debug("wordcountarts")) {
+      // Change this if you want a different file name
+      val wordcountarts_filename = "wordcountarts-combined-article-data.txt"
+      stream = filehand.openw(wordcountarts_filename)
+      // See write_article_data_file() in ArticleData.scala
+      writer =
+        new ArticleWriter(stream, ArticleData.combined_article_data_outfields)
+      writer.output_header()
+    }
+
+    var num_word_tokens = 0
+    var title = null: String
+
+    def one_article_probs() {
+      if (num_word_tokens == 0) return
+      val art = table.lookup_article(title)
+      if (art == null) {
+        warning("Skipping article %s, not in table", title)
+        table.num_articles_with_word_counts_but_not_in_table += 1
+        return
+      }
+      if (debug("wordcountarts"))
+        writer.output_row(art)
+      table.num_word_count_articles_by_split(art.split) += 1
+      // If we are evaluating on the dev set, skip the test set and vice
+      // versa, to save memory and avoid contaminating the results.
+      if (art.split != "training" && art.split != Args.eval_set)
+        return
+      // Don't train on test set
+      art.dist =
+        new PseudoGoodTuringSmoothedWordDist(this, keys_dynarr.array,
+          values_dynarr.array, keys_dynarr.length,
+          note_globally = (art.split == "training"))
+    }
+
+    val task = new MeteredTask("article", "reading distributions of")
+    errprint("Reading word counts from %s...", filename)
+    errprint("")
+
+    // Written this way because there's another line after the for loop,
+    // corresponding to the else clause of the Python for loop
+    breakable {
+      for (line <- filehand.openr(filename)) {
+        if (line.startsWith("Article title: ")) {
+          if (title != null)
+            one_article_probs()
+          // Stop if we've reached the maximum
+          if (task.item_processed(maxtime = Args.max_time_per_stage))
+            break
+          if ((Args.num_training_docs > 0 &&
+            task.num_processed >= Args.num_training_docs)) {
+            errprint("")
+            errprint("Stopping because limit of %s documents reached",
+              Args.num_training_docs)
+            break
+          }
+
+          // Extract title and set it
+          val titlere = "Article title: (.*)$".r
+          line match {
+            case titlere(ti) => title = ti
+            case _ => assert(false)
+          }
+          keys_dynarr.clear()
+          values_dynarr.clear()
+          num_word_tokens = 0
+        } else if (line.startsWith("Article coordinates) ") ||
+          line.startsWith("Article ID: "))
+          ()
+        else {
+          val linere = "(.*) = ([0-9]+)$".r
+          line match {
+            case linere(xword, xcount) => {
+              var word = xword
+              if (!Args.preserve_case_words) word = word.toLowerCase
+              val count = xcount.toInt
+              if (!(stopwords contains word) ||
+                Args.include_stopwords_in_article_dists) {
+                num_word_tokens += count
+                keys_dynarr += memoize_word(word)
+                values_dynarr += count
+              }
+            }
+            case _ =>
+              warning("Strange line, can't parse: title=%s: line=%s",
+                title, line)
+          }
+        }
+      }
+      one_article_probs()
+    }
+
+    if (debug("wordcountarts"))
+      stream.close()
+    task.finish()
+    table.num_articles_with_word_counts = task.num_processed
+    output_resource_usage()
+  }
 }
 
 /**
@@ -96,13 +227,14 @@ object PseudoGoodTuringSmoothedWordDist {
  */
 
 class PseudoGoodTuringSmoothedWordDist(
+  val factory: PseudoGoodTuringSmoothedWordDistFactory,
   keys: Array[Word],
   values: Array[Int],
   num_words: Int,
-  note_globally: Boolean=true
+  val note_globally: Boolean=true
 ) extends UnigramWordDist(keys, values, num_words) {
   val FastAlgorithms = FastPseudoGoodTuringSmoothedWordDist
-  val compobj = PseudoGoodTuringSmoothedWordDist
+  type ThisType = PseudoGoodTuringSmoothedWordDist
 
   /** Total probability mass to be assigned to all words not
       seen in the article, estimated (motivated by Good-Turing
@@ -135,12 +267,12 @@ class PseudoGoodTuringSmoothedWordDist(
   var overall_unseen_mass = 1.0
 
   if (note_globally) {
-    assert(!compobj.owp_adjusted)
+    assert(!factory.owp_adjusted)
     for ((word, count) <- counts) {
-      if (!(compobj.overall_word_probs contains word))
+      if (!(factory.overall_word_probs contains word))
         WordDist.total_num_word_types += 1
       // Record in overall_word_probs; note more tokens seen.
-      compobj.overall_word_probs(word) += count
+      factory.overall_word_probs(word) += count
       WordDist.total_num_word_tokens += count
     }
   }
@@ -155,7 +287,7 @@ class PseudoGoodTuringSmoothedWordDist(
 
   def finish_after_global() {
     // Make sure that overall_word_probs has been computed properly.
-    assert(compobj.owp_adjusted)
+    assert(factory.owp_adjusted)
 
     // Compute probabilities.  Use a very simple version of Good-Turing
     // smoothing where we assign to unseen words the probability mass of
@@ -174,33 +306,41 @@ class PseudoGoodTuringSmoothedWordDist(
       else 0.5
     overall_unseen_mass = 1.0 - (
       (for (ind <- counts.keys)
-        yield compobj.overall_word_probs(ind)) sum)
+        yield factory.overall_word_probs(ind)) sum)
     //if (use_sorted_list)
     //  counts = new SortedList(counts)
     finished = true
   }
 
+  override def finish(minimum_word_count: Int = 0) {
+    super.finish(minimum_word_count)
+    if (debug("lots")) {
+      errprint("""For word dist, total tokens = %s, unseen_mass = %s, overall unseen mass = %s""",
+        num_word_tokens, unseen_mass, overall_unseen_mass)
+    }
+  }
+
   def fast_kl_divergence(other: WordDist, partial: Boolean=false) =
-    FastAlgorithms.fast_kl_divergence(this.asInstanceOf[SmoothedWordDist],
-      other.asInstanceOf[SmoothedWordDist], partial = partial)
+    FastAlgorithms.fast_kl_divergence(this.asInstanceOf[ThisType],
+      other.asInstanceOf[ThisType], partial = partial)
 
   def fast_cosine_similarity(other: WordDist, partial: Boolean=false) =
-    FastAlgorithms.fast_cosine_similarity(this.asInstanceOf[SmoothedWordDist],
-      other.asInstanceOf[SmoothedWordDist], partial = partial)
+    FastAlgorithms.fast_cosine_similarity(this.asInstanceOf[ThisType],
+      other.asInstanceOf[ThisType], partial = partial)
 
   def fast_smoothed_cosine_similarity(other: WordDist, partial: Boolean=false) =
     FastAlgorithms.fast_smoothed_cosine_similarity(
-      this.asInstanceOf[SmoothedWordDist],
-      other.asInstanceOf[SmoothedWordDist], partial = partial)
+      this.asInstanceOf[ThisType],
+      other.asInstanceOf[ThisType], partial = partial)
 
   def kl_divergence_34(other: UnigramWordDist) = {      
     var overall_probs_diff_words = 0.0
     for (word <- other.counts.keys if !(counts contains word)) {
       overall_probs_diff_words +=
-        compobj.overall_word_probs(word)
+        factory.overall_word_probs(word)
     }
 
-    inner_kl_divergence_34(other.asInstanceOf[SmoothedWordDist],
+    inner_kl_divergence_34(other.asInstanceOf[ThisType],
       overall_probs_diff_words)
   }
       
@@ -208,7 +348,7 @@ class PseudoGoodTuringSmoothedWordDist(
    * Actual implementation of steps 3 and 4 of KL-divergence computation, given
    * a value that we may want to compute as part of step 2.
    */
-  def inner_kl_divergence_34(other: SmoothedWordDist,
+  def inner_kl_divergence_34(other: ThisType,
       overall_probs_diff_words: Double) = {
     var kldiv = 0.0
 
@@ -236,11 +376,11 @@ class PseudoGoodTuringSmoothedWordDist(
     kldiv += factor2 * the_sum
 
     // 4. For words never seen at all:
-    val p = (unseen_mass*compobj.globally_unseen_word_prob /
-          compobj.total_num_unseen_word_types)
-    val q = (other.unseen_mass*compobj.globally_unseen_word_prob /
-          compobj.total_num_unseen_word_types)
-    kldiv += compobj.total_num_unseen_word_types*(p*(log(p) - log(q)))
+    val p = (unseen_mass*factory.globally_unseen_word_prob /
+          factory.total_num_unseen_word_types)
+    val q = (other.unseen_mass*factory.globally_unseen_word_prob /
+          factory.total_num_unseen_word_types)
+    kldiv += factory.total_num_unseen_word_types*(p*(log(p) - log(q)))
     kldiv
   }
 
@@ -254,10 +394,10 @@ class PseudoGoodTuringSmoothedWordDist(
     // }
     val retval = counts.get(word) match {
       case None => {
-        compobj.overall_word_probs.get(word) match {
+        factory.overall_word_probs.get(word) match {
           case None => {
-            val wordprob = (unseen_mass*compobj.globally_unseen_word_prob
-                      / compobj.total_num_unseen_word_types)
+            val wordprob = (unseen_mass*factory.globally_unseen_word_prob
+                      / factory.total_num_unseen_word_types)
             if (debug("lots"))
               errprint("Word %s, never seen at all, wordprob = %s",
                        unmemoize_word(word), wordprob)
@@ -267,8 +407,8 @@ class PseudoGoodTuringSmoothedWordDist(
             val wordprob = unseen_mass * owprob / overall_unseen_mass
             //if (wordprob <= 0)
             //  warning("Bad values; unseen_mass = %s, overall_word_probs[word] = %s, overall_unseen_mass = %s",
-            //    unseen_mass, compobj.overall_word_probs[word],
-            //    compobj.overall_unseen_mass)
+            //    unseen_mass, factory.overall_word_probs[word],
+            //    factory.overall_unseen_mass)
             if (debug("lots"))
               errprint("Word %s, seen but not in article, wordprob = %s",
                        unmemoize_word(word), wordprob)

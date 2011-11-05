@@ -399,7 +399,7 @@ case class ArticleEvaluationResult(
   true_rank: Int
 ) extends EvaluationResult {
   val true_cell = pred_cell.cellgrid.find_best_cell_for_coord(article.coord)
-  val num_arts_in_true_cell = true_cell.worddist.num_arts_for_word_dist
+  val num_arts_in_true_cell = true_cell.word_dist_wrapper.num_arts_for_word_dist
   val true_center = true_cell.get_center_coord()
   val true_truedist = spheredist(article.coord, true_center)
   val true_degdist = degree_dist(article.coord, true_center)
@@ -466,7 +466,7 @@ class ArticleGeolocateDocumentEvaluator(
     val true_cell =
       strategy.cellgrid.find_best_cell_for_coord(article.coord)
     if (debug("lots") || debug("commontop")) {
-      val naitr = true_cell.worddist.num_arts_for_word_dist
+      val naitr = true_cell.word_dist_wrapper.num_arts_for_word_dist
       errprint("Evaluating article %s with %s word-dist articles in true cell",
         article, naitr)
     }
@@ -584,7 +584,7 @@ class PCLTravelGeolocateDocumentEvaluator(
   }
 
   def evaluate_document(doc: TitledDocument, doctag: String) = {
-    val dist = WordDist()
+    val dist = driver.word_dist_factory.create_word_dist()
     val the_stopwords =
       if (driver.params.include_stopwords_in_article_dists) Set[String]()
       else driver.stopwords

@@ -1,4 +1,4 @@
-///////////////////////////////////////////////////////////////////////////////
+
 //  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,7 +23,6 @@
 package opennlp.textgrounder.geolocate
 import tgutil._
 import WordDist.memoizer._
-import WordDist.SmoothedWordDist
 import argparser._
 import Distances._
 import GeolocateDriver.Args
@@ -507,8 +506,7 @@ class KMLParameters {
  * Distribution over words corresponding to a cell.
  */
 
-class CellWordDist extends SmoothedWordDist(
-  Array[Word](), Array[Int](), 0, note_globally = false) {
+class CellWordDist(val word_dist: WordDist) {
   /** Number of articles included in incoming-link computation. */
   var num_arts_for_links = 0
   /** Total number of incoming links. */
@@ -568,21 +566,9 @@ class CellWordDist extends SmoothedWordDist(
           warning("Saw article %s without distribution", art)
       } else {
         assert(art.dist.finished)
-        add_word_distribution(art.dist)
+        word_dist.add_word_distribution(art.dist)
         num_arts_for_word_dist += 1
       }
-    }
-  }
-
-  override def finish(minimum_word_count: Int = 0) {
-    super.finish(minimum_word_count = minimum_word_count)
-
-    if (debug("lots")) {
-      errprint("""For cell dist, num articles = %s, total tokens = %s,
-    unseen_mass = %s, incoming links = %s, overall unseen mass = %s""",
-        num_arts_for_word_dist, num_word_tokens,
-        unseen_mass, incoming_links,
-        overall_unseen_mass)
     }
   }
 }
@@ -624,7 +610,7 @@ class WordCellDist(
     var totalprob = 0.0
     // Compute and store un-normalized probabilities for all cells
     for (cell <- cellgrid.iter_nonempty_cells(nonempty_word_dist = true)) {
-      val prob = cell.worddist.lookup_word(word)
+      val prob = cell.word_dist.lookup_word(word)
       // Another way of handling zero probabilities.
       /// Zero probabilities are just a bad idea.  They lead to all sorts of
       /// pathologies when trying to do things like "normalize".
@@ -729,13 +715,13 @@ class CellDistFactory(val lru_cache_size: Int) {
    * by adding up the distributions of the individual words, weighting by
    * the count of the each word.
    */
-  def get_cell_dist_for_word_dist(cellgrid: CellGrid, xworddist: WordDist) = {
+  def get_cell_dist_for_word_dist(cellgrid: CellGrid, xword_dist: WordDist) = {
     // FIXME!!! Figure out what to do if distribution is not a unigram dist.
     // Can we break this up into smaller operations?  Or do we have to
     // make it an interface for WordDist?
-    val worddist = xworddist.asInstanceOf[UnigramWordDist]
+    val word_dist = xword_dist.asInstanceOf[UnigramWordDist]
     val cellprobs = doublemap[GeoCell]()
-    for ((word, count) <- worddist.counts) {
+    for ((word, count) <- word_dist.counts) {
       val dist = get_cell_dist(cellgrid, word)
       for ((cell, prob) <- dist.cellprobs)
         cellprobs(cell) += count * prob
@@ -757,9 +743,12 @@ class CellDistFactory(val lru_cache_size: Int) {
  * @param cellgrid The CellGrid object for the grid this cell is in.
  */
 abstract class GeoCell(val cellgrid: CellGrid) {
-  val worddist = new CellWordDist()
+  val word_dist_wrapper =
+    new CellWordDist(cellgrid.table.word_dist_factory.create_word_dist())
   var most_popular_article: GeoArticle = null
   var mostpopart_links = 0
+
+  def word_dist = word_dist_wrapper.word_dist
 
   /**
    * Return a string describing the location of the cell in its grid,
@@ -798,7 +787,7 @@ abstract class GeoCell(val cellgrid: CellGrid) {
    * to be overridden.
    */
   override def toString() = {
-    val unfinished = if (worddist.finished) "" else ", unfinished"
+    val unfinished = if (word_dist.finished) "" else ", unfinished"
     val contains =
       if (most_popular_article != null)
         ", most-pop-art %s(%d links)" format (
@@ -807,8 +796,9 @@ abstract class GeoCell(val cellgrid: CellGrid) {
 
     "GeoCell(%s%s%s, %d articles(dist), %d articles(links), %d links)" format (
       describe_location(), unfinished, contains,
-      worddist.num_arts_for_word_dist, worddist.num_arts_for_links,
-      worddist.incoming_links)
+      word_dist_wrapper.num_arts_for_word_dist,
+      word_dist_wrapper.num_arts_for_links,
+      word_dist_wrapper.incoming_links)
   }
 
   // def __repr__() = {
@@ -834,15 +824,15 @@ abstract class GeoCell(val cellgrid: CellGrid) {
   def struct() =
     <GeoCell>
       <bounds>{ describe_location() }</bounds>
-      <finished>{ worddist.finished }</finished>
+      <finished>{ word_dist.finished }</finished>
       {
         if (most_popular_article != null)
           (<mostPopularArticle>most_popular_article.struct()</mostPopularArticle>
            <mostPopularArticleLinks>mostpopart_links</mostPopularArticleLinks>)
       }
-      <numArticlesDist>{ worddist.num_arts_for_word_dist }</numArticlesDist>
-      <numArticlesLink>{ worddist.num_arts_for_links }</numArticlesLink>
-      <incomingLinks>{ worddist.incoming_links }</incomingLinks>
+      <numArticlesDist>{ word_dist_wrapper.num_arts_for_word_dist }</numArticlesDist>
+      <numArticlesLink>{ word_dist_wrapper.num_arts_for_links }</numArticlesLink>
+      <incomingLinks>{ word_dist_wrapper.incoming_links }</incomingLinks>
     </GeoCell>
 
   /**
@@ -850,14 +840,14 @@ abstract class GeoCell(val cellgrid: CellGrid) {
    */
   def generate_dist() {
     for (art <- iterate_articles()) {
-      worddist.add_article(art)
+      word_dist_wrapper.add_article(art)
       if (art.incoming_links != None &&
         art.incoming_links.get > mostpopart_links) {
         mostpopart_links = art.incoming_links.get
         most_popular_article = art
       }
     }
-    worddist.finish(minimum_word_count = Args.minimum_word_count)
+    word_dist.finish(minimum_word_count = Args.minimum_word_count)
   }
 }
 
@@ -1096,8 +1086,10 @@ abstract class CellGrid(val table: GeoArticleTable) {
     total_num_arts_for_links = 0
     total_num_arts_for_word_dist = 0
     for (cell <- iter_nonempty_cells()) {
-      total_num_arts_for_word_dist += cell.worddist.num_arts_for_word_dist
-      total_num_arts_for_links += cell.worddist.num_arts_for_links
+      total_num_arts_for_word_dist +=
+        cell.word_dist_wrapper.num_arts_for_word_dist
+      total_num_arts_for_links +=
+        cell.word_dist_wrapper.num_arts_for_links
     }
 
     errprint("Number of non-empty cells: %s", num_non_empty_cells)
@@ -1467,7 +1459,7 @@ class MultiRegularCellGrid(
     else {
       val newstat = new MultiRegularCell(this, index)
       newstat.generate_dist()
-      if (newstat.worddist.is_empty())
+      if (newstat.word_dist_wrapper.is_empty())
         null
       else {
         num_non_empty_cells += 1
@@ -1490,7 +1482,7 @@ class MultiRegularCellGrid(
         total_num_cells += 1
         val cell = find_cell_for_cell_index(RegularCellIndex(i, j),
           create = true)
-        if (debug("cell") && !cell.worddist.is_empty)
+        if (debug("cell") && !cell.word_dist_wrapper.is_empty)
           errprint("--> (%d,%d): %s", i, j, cell)
         task.item_processed()
       }
@@ -1506,8 +1498,8 @@ class MultiRegularCellGrid(
     for {
       v <- corner_to_multi_cell.values
       val empty = (
-        if (nonempty_word_dist) v.worddist.is_empty_for_word_dist()
-        else v.worddist.is_empty())
+        if (nonempty_word_dist) v.word_dist_wrapper.is_empty_for_word_dist()
+        else v.word_dist_wrapper.is_empty())
       if (!empty)
     } yield v
   }
@@ -1584,7 +1576,7 @@ class MultiRegularCellGrid(
  * redirect article should point to the article object for the article
  * pointed to by the redirect.
  */
-class GeoArticleTable {
+class GeoArticleTable(val word_dist_factory: WordDistFactory) {
   /**
    * Mapping from article names to GeoArticle objects, using the actual case of
    * the article.
@@ -1773,129 +1765,8 @@ class GeoArticleTable {
       art.dist = null
   }
 
-  /**
-   * Parse the result of a previous run of --output-counts and generate
-   * a unigram distribution for Naive Bayes matching.  We do a simple version
-   * of Good-Turing smoothing where we assign probability mass to unseen
-   * words equal to the probability mass of all words seen once, and rescale
-   * the remaining probabilities accordingly.
-   */ 
-  def read_word_counts(filehand: FileHandler, filename: String,
-      stopwords: Set[String]) {
-    val initial_dynarr_size = 1000
-    val keys_dynarr =
-      new DynamicArray[Word](initial_alloc = initial_dynarr_size)
-    val values_dynarr =
-      new DynamicArray[Int](initial_alloc = initial_dynarr_size)
-
-    // This is basically a one-off debug statement because of the fact that
-    // the experiments published in the paper used a word-count file generated
-    // using an older algorithm for determining the geotagged coordinate of
-    // an article.  We didn't record the corresponding article-data
-    // file, so we need a way of regenerating it using the intersection of
-    // articles in the article-data file we actually used for the experiments
-    // and the word-count file we used.
-    var stream: PrintStream = null
-    var writer: ArticleWriter = null
-    if (debug("wordcountarts")) {
-      // Change this if you want a different file name
-      val wordcountarts_filename = "wordcountarts-combined-article-data.txt"
-      stream = filehand.openw(wordcountarts_filename)
-      // See write_article_data_file() in ArticleData.scala
-      writer =
-        new ArticleWriter(stream, ArticleData.combined_article_data_outfields)
-      writer.output_header()
-    }
-
-    var num_word_tokens = 0
-    var title = null: String
-
-    def one_article_probs() {
-      if (num_word_tokens == 0) return
-      val art = lookup_article(title)
-      if (art == null) {
-        warning("Skipping article %s, not in table", title)
-        num_articles_with_word_counts_but_not_in_table += 1
-        return
-      }
-      if (debug("wordcountarts"))
-        writer.output_row(art)
-      num_word_count_articles_by_split(art.split) += 1
-      // If we are evaluating on the dev set, skip the test set and vice
-      // versa, to save memory and avoid contaminating the results.
-      if (art.split != "training" && art.split != Args.eval_set)
-        return
-      // Don't train on test set
-      art.dist = WordDist(keys_dynarr.array, values_dynarr.array,
-        keys_dynarr.length, note_globally = (art.split == "training"))
-    }
-
-    val task = new MeteredTask("article", "reading distributions of")
-    errprint("Reading word counts from %s...", filename)
-    errprint("")
-
-    // Written this way because there's another line after the for loop,
-    // corresponding to the else clause of the Python for loop
-    breakable {
-      for (line <- filehand.openr(filename)) {
-        if (line.startsWith("Article title: ")) {
-          if (title != null)
-            one_article_probs()
-          // Stop if we've reached the maximum
-          if (task.item_processed(maxtime = Args.max_time_per_stage))
-            break
-          if ((Args.num_training_docs > 0 &&
-            task.num_processed >= Args.num_training_docs)) {
-            errprint("")
-            errprint("Stopping because limit of %s documents reached",
-              Args.num_training_docs)
-            break
-          }
-
-          // Extract title and set it
-          val titlere = "Article title: (.*)$".r
-          line match {
-            case titlere(ti) => title = ti
-            case _ => assert(false)
-          }
-          keys_dynarr.clear()
-          values_dynarr.clear()
-          num_word_tokens = 0
-        } else if (line.startsWith("Article coordinates) ") ||
-          line.startsWith("Article ID: "))
-          ()
-        else {
-          val linere = "(.*) = ([0-9]+)$".r
-          line match {
-            case linere(xword, xcount) => {
-              var word = xword
-              if (!Args.preserve_case_words) word = word.toLowerCase
-              val count = xcount.toInt
-              if (!(stopwords contains word) ||
-                Args.include_stopwords_in_article_dists) {
-                num_word_tokens += count
-                keys_dynarr += memoize_word(word)
-                values_dynarr += count
-              }
-            }
-            case _ =>
-              warning("Strange line, can't parse: title=%s: line=%s",
-                title, line)
-          }
-        }
-      }
-      one_article_probs()
-    }
-
-    if (debug("wordcountarts"))
-      stream.close()
-    task.finish()
-    num_articles_with_word_counts = task.num_processed
-    output_resource_usage()
-  }
-
   def finish_word_counts() {
-    SmoothedWordDist.finish_global_distribution()
+    word_dist_factory.finish_global_distribution()
     finish_article_distributions()
     errprint("")
     errprint("-------------------------------------------------------------------------")
@@ -2001,7 +1872,7 @@ abstract class GeolocateDocumentStrategy(val cellgrid: CellGrid) {
    * are better, while for others, higher scores are better.  Currently,
    * the wrapper code outputs the score but doesn't otherwise use it.
    */
-  def return_ranked_cells(worddist: WordDist): Iterable[(GeoCell, Double)]
+  def return_ranked_cells(word_dist: WordDist): Iterable[(GeoCell, Double)]
 }
 
 /**
@@ -2011,7 +1882,7 @@ abstract class GeolocateDocumentStrategy(val cellgrid: CellGrid) {
 class RandomGeolocateDocumentStrategy(
   cellgrid: CellGrid
 ) extends GeolocateDocumentStrategy(cellgrid) {
-  def return_ranked_cells(worddist: WordDist) = {
+  def return_ranked_cells(word_dist: WordDist) = {
     val cells = cellgrid.iter_nonempty_cells()
     val shuffled = (new Random()).shuffle(cells)
     (for (cell <- shuffled) yield (cell, 0.0))
@@ -2023,15 +1894,15 @@ class MostPopularCellGeolocateDocumentStrategy(
   internal_link: Boolean
 ) extends GeolocateDocumentStrategy(cellgrid) {
   var cached_ranked_mps: Iterable[(GeoCell, Double)] = null
-  def return_ranked_cells(worddist: WordDist) = {
+  def return_ranked_cells(word_dist: WordDist) = {
     if (cached_ranked_mps == null) {
       cached_ranked_mps = (
         (for (cell <- cellgrid.iter_nonempty_cells())
           yield (cell,
             (if (internal_link)
-               cell.worddist.incoming_links
+               cell.word_dist_wrapper.incoming_links
              else
-               cell.worddist.num_arts_for_links).toDouble)).
+               cell.word_dist_wrapper.num_arts_for_links).toDouble)).
         toArray sortWith (_._2 > _._2))
     }
     cached_ranked_mps
@@ -2043,20 +1914,20 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
 ) extends GeolocateDocumentStrategy(cellgrid) {
   val cdist_factory = new CellDistFactory(Args.lru_cache_size)
 
-  def return_ranked_cells(worddist: WordDist) = {
+  def return_ranked_cells(word_dist: WordDist) = {
     // Look for a toponym, then a proper noun, then any word.
     // FIXME: How can 'word' be null?
     // FIXME: Use invalid_word
     // FIXME: Should predicate be passed an index and have to do its own
     // unmemoizing?
-    var maxword = worddist.find_most_common_word(
+    var maxword = word_dist.find_most_common_word(
       word => word(0).isUpper && cellgrid.table.word_is_toponym(word))
     if (maxword == None) {
-      maxword = worddist.find_most_common_word(
+      maxword = word_dist.find_most_common_word(
         word => word(0).isUpper)
     }
     if (maxword == None)
-      maxword = worddist.find_most_common_word(word => true)
+      maxword = word_dist.find_most_common_word(word => true)
     cdist_factory.get_cell_dist(cellgrid, maxword.get).get_ranked_cells()
   }
 }
@@ -2064,11 +1935,11 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
 class LinkMostCommonToponymGeolocateDocumentStrategy(
   cellgrid: CellGrid
 ) extends GeolocateDocumentStrategy(cellgrid) {
-  def return_ranked_cells(worddist: WordDist) = {
-    var maxword = worddist.find_most_common_word(
+  def return_ranked_cells(word_dist: WordDist) = {
+    var maxword = word_dist.find_most_common_word(
       word => word(0).isUpper && cellgrid.table.word_is_toponym(word))
     if (maxword == None) {
-      maxword = worddist.find_most_common_word(
+      maxword = word_dist.find_most_common_word(
         word => cellgrid.table.word_is_toponym(word))
     }
     if (debug("commontop"))
@@ -2109,7 +1980,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
 
     // Append random cells and remove duplicates
     merge_numbered_sequences_uniquely(candcells,
-      new RandomGeolocateDocumentStrategy(cellgrid).return_ranked_cells(worddist))
+      new RandomGeolocateDocumentStrategy(cellgrid).return_ranked_cells(word_dist))
   }
 }
 
@@ -2129,14 +2000,14 @@ abstract class MinMaxScoreStrategy(
    * Function to return the score of an article distribution against a
    * cell.
    */
-  def score_cell(worddist: WordDist, cell: GeoCell): Double
+  def score_cell(word_dist: WordDist, cell: GeoCell): Double
 
   /**
    * Compare a word distribution (for an article, typically) against all
    * cells. Return a sequence of tuples (cell, score) where 'cell'
    * indicates the cell and 'score' the score.
    */
-  def return_ranked_cells(worddist: WordDist) = {
+  def return_ranked_cells(word_dist: WordDist) = {
     val cell_buf = mutable.Buffer[(GeoCell, Double)]()
     for (
       cell <- cellgrid.iter_nonempty_cells(nonempty_word_dist = true)
@@ -2144,10 +2015,10 @@ abstract class MinMaxScoreStrategy(
       if (debug("lots")) {
         errprint("Nonempty cell at indices %s = location %s, num_articles = %s",
           cell.describe_indices(), cell.describe_location(),
-          cell.worddist.num_arts_for_word_dist)
+          cell.word_dist_wrapper.num_arts_for_word_dist)
       }
 
-      val score = score_cell(worddist, cell)
+      val score = score_cell(word_dist, cell)
       cell_buf += ((cell, score))
     }
 
@@ -2184,24 +2055,24 @@ class KLDivergenceStrategy(
   symmetric: Boolean = false
 ) extends MinMaxScoreStrategy(cellgrid, true) {
 
-  def score_cell(worddist: WordDist, cell: GeoCell) = {
-    var kldiv = worddist.fast_kl_divergence(cell.worddist,
+  def score_cell(word_dist: WordDist, cell: GeoCell) = {
+    var kldiv = word_dist.fast_kl_divergence(cell.word_dist,
       partial = partial)
-    //var kldiv = worddist.test_kl_divergence(cell.worddist,
+    //var kldiv = word_dist.test_kl_divergence(cell.word_dist,
     //  partial = partial)
     if (symmetric) {
-      val kldiv2 = cell.worddist.fast_kl_divergence(worddist,
+      val kldiv2 = cell.word_dist.fast_kl_divergence(word_dist,
         partial = partial)
       kldiv = (kldiv + kldiv2) / 2.0
     }
-    //kldiv = worddist.test_kl_divergence(cell.worddist,
+    //kldiv = word_dist.test_kl_divergence(cell.word_dist,
     //                           partial=partial)
     //errprint("For cell %s, KL divergence %.3f", cell, kldiv)
     kldiv
   }
 
-  override def return_ranked_cells(worddist: WordDist) = {
-    val cells = super.return_ranked_cells(worddist)
+  override def return_ranked_cells(word_dist: WordDist) = {
+    val cells = super.return_ranked_cells(word_dist)
 
     if (debug("kldiv")) {
       // Print out the words that contribute most to the KL divergence, for
@@ -2212,8 +2083,8 @@ class KLDivergenceStrategy(
       errprint("KL-divergence debugging info:")
       for (((cell, _), i) <- cells.take(num_contrib_cells) zipWithIndex) {
         val (_, contribs) =
-          worddist.slow_kl_divergence_debug(
-            cell.worddist, partial = partial,
+          word_dist.slow_kl_divergence_debug(
+            cell.word_dist, partial = partial,
             return_contributing_words = true)
         errprint("  At rank #%s, cell %s:", i + 1, cell)
         errprint("    %30s  %s", "Word", "KL-div contribution")
@@ -2249,13 +2120,13 @@ class CosineSimilarityStrategy(
   partial: Boolean = false
 ) extends MinMaxScoreStrategy(cellgrid, true) {
 
-  def score_cell(worddist: WordDist, cell: GeoCell) = {
+  def score_cell(word_dist: WordDist, cell: GeoCell) = {
     var cossim =
       if (smoothed)
-        worddist.fast_smoothed_cosine_similarity(cell.worddist,
+        word_dist.fast_smoothed_cosine_similarity(cell.word_dist,
           partial = partial)
       else
-        worddist.fast_cosine_similarity(cell.worddist,
+        word_dist.fast_cosine_similarity(cell.word_dist,
           partial = partial)
     assert(cossim >= 0.0)
     // Just in case of round-off problems
@@ -2271,20 +2142,21 @@ class NaiveBayesDocumentStrategy(
   use_baseline: Boolean = true
 ) extends MinMaxScoreStrategy(cellgrid, false) {
 
-  def score_cell(worddist: WordDist, cell: GeoCell) = {
+  def score_cell(word_dist: WordDist, cell: GeoCell) = {
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
       if (use_baseline) {
         if (Args.naive_bayes_weighting == "equal") (1.0, 1.0)
         else {
           val bw = Args.naive_bayes_baseline_weight.toDouble
-          ((1.0 - bw) / worddist.num_word_tokens, bw)
+          ((1.0 - bw) / word_dist.num_word_tokens, bw)
         }
       } else (1.0, 0.0))
 
-    val word_logprob = cell.worddist.get_nbayes_logprob(worddist)
-    val baseline_logprob = log(cell.worddist.num_arts_for_links.toDouble /
-      cellgrid.total_num_arts_for_links)
+    val word_logprob = cell.word_dist.get_nbayes_logprob(word_dist)
+    val baseline_logprob =
+      log(cell.word_dist_wrapper.num_arts_for_links.toDouble /
+          cellgrid.total_num_arts_for_links)
     val logprob = (word_weight * word_logprob +
       baseline_weight * baseline_logprob)
     logprob
@@ -2296,9 +2168,9 @@ class AverageCellProbabilityStrategy(
 ) extends GeolocateDocumentStrategy(cellgrid) {
   val cdist_factory = new CellDistFactory(Args.lru_cache_size)
 
-  def return_ranked_cells(worddist: WordDist) = {
+  def return_ranked_cells(word_dist: WordDist) = {
     val celldist =
-      cdist_factory.get_cell_dist_for_word_dist(cellgrid, worddist)
+      cdist_factory.get_cell_dist_for_word_dist(cellgrid, word_dist)
     celldist.get_ranked_cells()
   }
 }
@@ -2469,6 +2341,14 @@ tiling cell to compute each multi cell.  If the value is more than
 1, the multi cells overlap.""")
 
   //// Options used when creating word distributions
+  var word_dist =
+    ap.option[String]("word-dist", "wd",
+      default = "pseudo-good-turing",
+      choices = Seq("pseudo-good-turing", "bigram"),
+      help = """Type of word distribution to use.  Possibilities are
+'pseudo-good-turing' (a simplified version of Good-Turing over a unigram
+distribution) and 'bigram' (a non-smoothed bigram distribution).
+Default '%default'.""")
   var preserve_case_words =
     ap.flag("preserve-case-words", "pcw",
       help = """Don't fold the case of words used to compute and
@@ -2643,6 +2523,7 @@ abstract class GeolocateDriver {
   var params: ParamType = _
   var stopwords: Set[String] = _
   var article_table: GeoArticleTable = _
+  var word_dist_factory: WordDistFactory = _
 
   /**
    * FileHandler object for this driver.
@@ -2753,13 +2634,13 @@ abstract class GeolocateDriver {
     // Read in the words-counts file
     if (Args.counts_file.length > 0) {
       for (fn <- Args.counts_file)
-        table.read_word_counts(file_handler, fn, stopwords)
+        word_dist_factory.read_word_counts(table, file_handler, fn, stopwords)
       table.finish_word_counts()
     }
   }
 
   protected def read_data_for_geotag_documents() {
-    article_table = new GeoArticleTable()
+    article_table = new GeoArticleTable(word_dist_factory)
     initialize_cellgrid(article_table)
     read_articles(article_table, stopwords)
   }
@@ -2785,6 +2666,12 @@ abstract class GeolocateDriver {
 
   def run() = {
     read_stopwords()
+    word_dist_factory =
+      /* if (params.word_dist == "pseudo-good-turing") */
+      new PseudoGoodTuringSmoothedWordDistFactory
+      /* else
+        new BigramWordDistFactory
+       */
     implement_run(params)
   }
 
