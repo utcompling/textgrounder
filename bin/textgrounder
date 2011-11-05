@@ -11,12 +11,10 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
   exit 1
 fi
 
-JARS="`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`"
-SCALA_LIB="$HOME/.sbt/boot/scala-2.9.1/lib/scala-library.jar"
-
-CP="$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
+. config-geolocate
 
 JAVA="$JAVA_HOME/bin/java"
+HADOOP_BINARY="${HADOOP_BINARY:-hadoop}"
 
 # NOTE: If environment var TG_JAVA_OPT is set on entry, it will be used.
 
@@ -39,6 +37,7 @@ while true; do
       JAVA_MISC_OPT="$JAVA_MISC_OPT -XX:+DoEscapeAnalysis"; shift ;;
     -compressed-oops | --compressed-oops )
       JAVA_MISC_OPT="$JAVA_MISC_OPT -XX:+UseCompressedOops"; shift ;;
+    -- ) shift; break ;;
     * ) break ;;
   esac
 done
@@ -101,12 +100,16 @@ if [ "$DEBUG" = true ]; then
   #JAVA_DEBUG_OPT="$JAVA_DEBUG_OPT -XX:+TraceClassLoading"
 fi
 
+JARS="`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`"
+SCALA_LIB="$HOME/.sbt/boot/scala-2.9.1/lib/scala-library.jar"
+CP="$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
+
+HADOOP_COMMAND="$HADOOP_BINARY jar $TEXTGROUNDER_DIR/target/textgrounder-assembly.jar"
 JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $TG_JAVA_OPT -classpath $CP"
-#SCALA_COMMAND="scala -classpath $CP"
 #Running Scala using Java currently works, and ensures that we will run
 #properly even if Scala isn't installed on the system or an older version
 #is installed. (Since we download our own Scala libraries.)
-SCALA_COMMAND="$JAVA_COMMAND"
+#SCALA_COMMAND="scala -classpath $CP"
 
 CMD="$1"
 shift
@@ -179,11 +182,20 @@ Commands for toponym resolution:
   write-to-kml ...      write a resolved corpus to visualizable KML format
   eval ...              evaluated a resolved corpus against a gold corpus
 
-Commands for geolocation:
+Commands for the Geolocate module:
 
-  geolocate ...         run the geolocation module
+  geolocate-document ... do document-level geolocation
+  hadoop-geolocate-document ...
+                        do document-level geolocation using Hadoop
+  hadoop-nondist-geolocate-document ...
+                        do document-level geolocation using Hadoop, but run
+                        in non-distributed mode (aka standalone mode), for
+                        testing
+  geolocate-toponym ... do toponym-level geolocation
+  generate-kml ...      create KML files showing the distribution over the
+                        Earth of specific words
 
-Commands for the Bayesian code:
+Commands for the Bayesian module:
 
   rlda-run ...          train region model
   spher-run ...         train spherical model
@@ -223,7 +235,10 @@ execute()
   $RUNCMD ${1+"$@"}
 }
 
-if [ "$CMD" = 'build' ]; then
+if [ -z "$CMD" ]; then
+  help; exit 1
+
+elif [ "$CMD" = 'build' ]; then
 
   # We need to cd to the top-level TextGrounder dir when running SBT,
   # so the proper build.sbt file gets picked up, etc.
@@ -235,25 +250,15 @@ elif [ "$CMD" = 'build-all' ]; then
   # so the proper build.sbt file gets picked up, etc.
   execute --cd "$RUN_SBT update compile" ${1+"$@"}
 
-elif [ "$CMD" = 'geolocate' ]; then
-
-  CLASS=opennlp.textgrounder.geolocate.GeolocateApp
-  RUNCMD="$SCALA_COMMAND $CLASS"
-  # execute() doesn't handle setting JAVA_OPTS like we do, and they can't
-  # be included in a variable that is expanded and reparsed, the way that
-  # RUNCMD is (the reparsing seems to pretty much only involve breaking
-  # on white space).
-  if [ "$VERBOSE" = true ]; then
-    echo Executing: JAVA_OPTS="$JAVA_MEMORY_OPT" $RUNCMD ${1+"$@"}
-  fi
-  JAVA_OPTS="$JAVA_MEMORY_OPT" $RUNCMD ${1+"$@"}
-
 else  
 
   CLASS=
+  HADOOP=
+  HADOOP_ARGS=
   TGPACK=opennlp.textgrounder
   TGAPP=$TGPACK.app
   TGBAYESAPP=$TGPACK.bayesian.apps
+  TGGEOLOCATE=$TGPACK.geolocate
 
   case $CMD in
     # Various commands
@@ -274,6 +279,18 @@ else
     rlda-run) CLASS=$TGBAYESAPP.TrainRegionModel;;
     spher-run) CLASS=$TGBAYESAPP.TrainSphericalModel;;
 
+    # Geolocate commands
+    geolocate-document) CLASS=$TGGEOLOCATE.GeolocateDocumentApp;;
+    # Note that the only difference between running in distributed and
+    # non-distributed mode is how we run things (using 'hadoop jar' for
+    # distributed, 'java' for non-distributed) and the input paths we
+    # pass (through --textgrounder-dir here, and also through corpora
+    # paths in 'tg-geolocate').
+    hadoop-nondist-geolocate-document) HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_DIR" CLASS=$TGGEOLOCATE.GeolocateDocumentHadoopApp;;
+    hadoop-geolocate-document) HADOOP_ARGS="--textgrounder-dir $TG_HADOOP_DIR" HADOOP=yes CLASS=$TGGEOLOCATE.GeolocateDocumentHadoopApp;;
+    geolocate-toponym) CLASS=$TGGEOLOCATE.toponym.GeolocateToponymApp;;
+    generate-kml) CLASS=$TGGEOLOCATE.GenerateKMLApp;;
+
     # Misc
     run) CLASS="$1"; shift;;
     help) help; exit 1;;
@@ -284,6 +301,11 @@ else
   # there are command-line arguments referring relatively to files, the
   # files won't be found because the lookup will be relative to the
   # wrong directory.
-  execute "$JAVA_COMMAND $CLASS" ${1+"$@"}
+
+  if [ -n "$HADOOP" ]; then
+    execute "$HADOOP_COMMAND $CLASS" $HADOOP_ARGS ${1+"$@"}
+  else
+    execute "$JAVA_COMMAND $CLASS" $HADOOP_ARGS ${1+"$@"}
+  fi
 
 fi

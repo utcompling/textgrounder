@@ -17,9 +17,8 @@
 package opennlp.textgrounder.geolocate
 
 import tgutil._
-import Debug._
+import GeolocateDriver.Debug._
 import WordDist.memoizer._
-import WordDist.SmoothedWordDist
 
 import math._
 import collection.mutable
@@ -52,12 +51,22 @@ object IntStringMemoizer {
       val newind = next_word_count
       next_word_count += 1
       word_id_map(word) = newind
-      id_word_map(index) = word
+      id_word_map(newind) = word
+      // debprint("Memoizing word %s to ID %s", word, newind)
       newind
     }
   }
 
-  def unmemoize_word(word: Word) = id_word_map(word)
+  def unmemoize_word(word: Word) = {
+    if (!(id_word_map contains word)) {
+      debprint("Can't find ID %s in id_word_map", word)
+      debprint("Word map:")
+      var its = id_word_map.toList.sorted
+      for ((key, value) <- its)
+        debprint("%s = %s", key, value)
+    }
+    id_word_map(word)
+  }
 
   def create_word_int_map() = trovescala.IntIntMap()
   type WordIntMap = trovescala.IntIntMap
@@ -87,21 +96,19 @@ object TrivialIntMemoizer {
 
 object WordDist {
   val memoizer = IntStringMemoizer
-  type SmoothedWordDist = PseudoGoodTuringSmoothedWordDist
-  val SmoothedWordDist = PseudoGoodTuringSmoothedWordDist
 
   // Total number of word types seen (size of vocabulary)
   var total_num_word_types = 0
 
   // Total number of word tokens seen
   var total_num_word_tokens = 0
+}
 
-  def apply(keys: Array[Word], values: Array[Int], num_words: Int,
-            note_globally: Boolean) =
-    new SmoothedWordDist(keys, values, num_words, note_globally)
-
-  def apply():SmoothedWordDist =
-    apply(Array[Word](), Array[Int](), 0, note_globally=false)
+abstract class WordDistFactory {
+  def create_word_dist(): WordDist
+  def finish_global_distribution()
+  def read_word_counts(table: GeoArticleTable,
+    filehand: FileHandler, filename: String, stopwords: Set[String])
 }
 
 abstract class WordDist {

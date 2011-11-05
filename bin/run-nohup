@@ -1,0 +1,85 @@
+#!/bin/sh
+
+help()
+{
+cat <<EOF
+Usage:
+  $0 [-i ID | --id ID | -q | --quiet ...] PROGRAM [ARGS ...]
+
+Run an arbitrary program, sending its output to a unique file and using
+'nohup' so that exiting the session while this program is running in the
+background won't cause it to get terminated.
+
+PROGRAM is the name of the program, and ARGS are any arguments to send to it.
+These arguments are passed on to the program unchanged.  They may specify
+command-line options, positional parameters (e.g. files to read from or
+write to), or the like.  
+
+-i ID or --id ID, where ID is a string, can be specified to insert an
+identifying string into the name of the output file used to record output
+from the program.  In general, the output file is constructed from the
+base name of the program (i.e. the name after any directory components
+have been stripped out), the ID if given, and date and time that the
+program started, and any additional number needed to ensure that this
+output file is unique.
+
+Some debugging information is normally output to the screen and also to
+the beginning of the output file capturing output from the program run.
+This info includes the current time of day, the hostname the program
+was run on, the name of the output file, the arguments used to invoke
+the nohup wrapper program (i.e. this program), and the arguments passed
+down to the wrapped program.  All of this output, both to screen and
+output file, can be suppressed using the -q or --quiet option.
+
+EOF
+}
+
+if [ -z "$1" ]; then
+  help; exit 1
+fi
+
+shiftedcmds=""
+quiet=no
+
+# Handle command-line args for us.
+while true ; do
+  case "$1" in
+    -i | --id ) id=".$2"; shiftedcmds="$shiftedcmds $1 $2"; shift 2 ;;
+    -q | --quiet ) quiet=yes; shiftedcmds="$shiftedcmds $1"; shift 1 ;;
+    * ) break ;;
+  esac
+done
+
+runprog="$1"; shiftedcmds="$shiftedcmds $1"; shift 1
+shortprog=`basename $runprog`
+
+if [ "`uname`" = "Darwin" ]; then
+  # Darwin (BSD) is missing all sorts of stuff, naturally, including %P,
+  # which gets you lowercase am or pm. (%p gets you uppercase AM or PM --
+  # real logical, huh?)
+  outfile="$shortprog.out$id.`date '+%F.%H%M%p'`"
+else
+  outfile="$shortprog.out$id.`date '+%F.%H%M%P'`"
+fi
+if [ -e "$outfile" ]; then
+  num=1
+  outfile_base="$outfile"
+  while true ; do
+    outfile="$outfile_base.$num"
+    if [ ! -e "$outfile" ]; then
+      break
+    fi
+    num=`expr $num + 1`
+  done
+fi
+
+if [ "$quiet" != "yes" ]; then
+  (
+  echo "Nohup wrapper running on `hostname` at time `date`"
+  echo "Output file: $outfile"
+  echo "Nohup script invoked as: $0$shiftedcmds" ${1+"$@"}
+  echo "Invoking: $runprog" ${1+"$@"}
+  echo "(all above info also sent to output file)"
+  ) | tee "$outfile"
+fi
+nohup "$runprog" ${1+"$@"} >> "$outfile" 2>&1

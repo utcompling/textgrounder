@@ -2,8 +2,8 @@ package opennlp.textgrounder.geolocate
 
 import tgutil._
 import Distances._
-import Debug._
-import GeolocateDriver.Opts
+import GeolocateDriver.Args
+import GeolocateDriver.Debug._
 
 import math._
 import collection.mutable
@@ -131,7 +131,7 @@ class EvalStatsWithRank(
 
 //////// Statistics for geotagging documents/articles
 
-class GeotagDocumentEvalStats(
+class GeolocateDocumentEvalStats(
   max_rank_for_credit: Int = 10
 ) extends EvalStatsWithRank(max_rank_for_credit) {
   // "True dist" means actual distance in km's or whatever.
@@ -180,9 +180,9 @@ class GeotagDocumentEvalStats(
  * number of articles in true cell.
  */
 
-class GroupedGeotagDocumentEvalStats(cellgrid: CellGrid) {
+class GroupedGeolocateDocumentEvalStats(cellgrid: CellGrid) {
 
-  def create_doc() = new GeotagDocumentEvalStats()
+  def create_doc() = new GeolocateDocumentEvalStats()
   val all_document = create_doc()
 
   // naitr = "num articles in true cell"
@@ -197,7 +197,7 @@ class GroupedGeotagDocumentEvalStats(cellgrid: CellGrid) {
   // distance", as if degrees were a constant length both latitudinally
   // and longitudinally.
   val dist_fraction_increment = 0.25
-  def docmap() = defaultmap[Double, GeotagDocumentEvalStats](create_doc())
+  def docmap() = defaultmap[Double, GeolocateDocumentEvalStats](create_doc())
   val docs_by_degree_dist_to_true_center = docmap()
   val docs_by_true_dist_to_true_center = docmap()
 
@@ -350,7 +350,7 @@ trait EvaluationResult {
  * Abstract class for reading documents from a test file and evaluating
  * on them.
  */
-abstract class TestFileEvaluator(stratname: String) {
+abstract class TestFileEvaluator(val stratname: String) {
   var documents_processed = 0
 
   type Document <: EvaluationDocument
@@ -359,7 +359,8 @@ abstract class TestFileEvaluator(stratname: String) {
    * Return an Iterable listing the documents retrievable from the given
    * filename.
    */
-  def iter_documents(filename: String): Iterable[Document]
+  def iter_documents(filehand: FileHandler,
+    filename: String): Iterable[Document]
 
   /**
    * Return true if document would be skipped; false if processed and
@@ -381,11 +382,11 @@ abstract class TestFileEvaluator(stratname: String) {
   def output_results(isfinal: Boolean = false): Unit
 }
 
-abstract class GeotagDocumentEvaluator(
-  strategy: GeotagDocumentStrategy,
+abstract class GeolocateDocumentEvaluator(
+  val strategy: GeolocateDocumentStrategy,
   stratname: String
 ) extends TestFileEvaluator(stratname) {
-  val evalstats = new GroupedGeotagDocumentEvalStats(strategy.cellgrid)
+  val evalstats = new GroupedGeolocateDocumentEvalStats(strategy.cellgrid)
 
   def output_results(isfinal: Boolean = false) {
     evalstats.output_results(all_results = isfinal)
@@ -398,7 +399,7 @@ case class ArticleEvaluationResult(
   true_rank: Int
 ) extends EvaluationResult {
   val true_cell = pred_cell.cellgrid.find_best_cell_for_coord(article.coord)
-  val num_arts_in_true_cell = true_cell.worddist.num_arts_for_word_dist
+  val num_arts_in_true_cell = true_cell.word_dist_wrapper.num_arts_for_word_dist
   val true_center = true_cell.get_center_coord()
   val true_truedist = spheredist(article.coord, true_center)
   val true_degdist = degree_dist(article.coord, true_center)
@@ -411,33 +412,18 @@ case class ArticleEvaluationResult(
   Class to do document geotagging on articles from the article data, in
   the dev or test set.
  */
-class ArticleGeotagDocumentEvaluator(
-  strategy: GeotagDocumentStrategy,
-  stratname: String
-) extends GeotagDocumentEvaluator(strategy, stratname) {
+class ArticleGeolocateDocumentEvaluator(
+  strategy: GeolocateDocumentStrategy,
+  stratname: String,
+  driver: GeolocateDocumentDriver
+) extends GeolocateDocumentEvaluator(strategy, stratname) {
 
   type Document = GeoArticle
   type DocumentResult = ArticleEvaluationResult
 
-  // Debug flags:
-  //
-  //  gridrank: For the given test article number (starting at 1), output
-  //            a grid of the predicted rank for cells around the true
-  //            cell.  Multiple articles can have the rank output, e.g.
-  //
-  //            --debug 'gridrank=45,58'
-  //
-  //            (This will output info for articles 45 and 58.)
-  //
-  //  gridranksize: Size of the grid, in numbers of articles on a side.
-  //                This is a single number, and the grid will be a square
-  //                centered on the true cell.
-  register_list_debug_param("gridrank")
-  debugval("gridranksize") = "11"
-
-  def iter_documents(filename: String) = {
+  def iter_documents(filehand: FileHandler, filename: String) = {
     assert(filename == null)
-    for (art <- GeoArticleTable.table.articles_by_split(Opts.eval_set))
+    for (art <- driver.article_table.articles_by_split(driver.params.eval_set))
       yield art
   }
 
@@ -465,7 +451,7 @@ class ArticleGeotagDocumentEvaluator(
     if (article.dist == null) {
       // This can (and does) happen when --max-time-per-stage is set,
       // so that the counts for many articles don't get read in.
-      if (Opts.max_time_per_stage == 0.0 && Opts.num_training_docs == 0)
+      if (driver.params.max_time_per_stage == 0.0 && driver.params.num_training_docs == 0)
         warning("Can't evaluate article %s without distribution", article)
       evalstats.record_other_stat("Skipped articles")
       true
@@ -480,7 +466,7 @@ class ArticleGeotagDocumentEvaluator(
     val true_cell =
       strategy.cellgrid.find_best_cell_for_coord(article.coord)
     if (debug("lots") || debug("commontop")) {
-      val naitr = true_cell.worddist.num_arts_for_word_dist
+      val naitr = true_cell.word_dist_wrapper.num_arts_for_word_dist
       errprint("Evaluating article %s with %s word-dist articles in true cell",
         article, naitr)
     }
@@ -493,7 +479,7 @@ class ArticleGeotagDocumentEvaluator(
        true_rank = Rank of true cell among predicted cells
      */
     val (pred_cells, true_rank) =
-      if (Opts.oracle_results)
+      if (driver.params.oracle_results)
         (Array((true_cell, 0.0)), 1)
       else {
         def get_computed_results() = {
@@ -520,7 +506,7 @@ class ArticleGeotagDocumentEvaluator(
       new ArticleEvaluationResult(article, pred_cells(0)._1, true_rank)
 
     val want_indiv_results =
-      !Opts.oracle_results && !Opts.no_individual_results
+      !driver.params.oracle_results && !driver.params.no_individual_results
     evalstats.record_result(result)
     if (result.num_arts_in_true_cell == 0) {
       evalstats.record_other_stat(
@@ -562,20 +548,22 @@ class ArticleGeotagDocumentEvaluator(
 class TitledDocumentResult extends EvaluationResult {
 }
 
-class PCLTravelGeotagDocumentEvaluator(
-  strategy: GeotagDocumentStrategy,
-  stratname: String
-) extends GeotagDocumentEvaluator(strategy, stratname) {
+class PCLTravelGeolocateDocumentEvaluator(
+  strategy: GeolocateDocumentStrategy,
+  stratname: String,
+  driver: GeolocateDocumentDriver
+) extends GeolocateDocumentEvaluator(strategy, stratname) {
   case class TitledDocument(
     title: String, text: String) extends EvaluationDocument 
   type Document = TitledDocument
   type DocumentResult = TitledDocumentResult
 
-  def iter_documents(filename: String) = {
+  def iter_documents(filehand: FileHandler, filename: String) = {
 
     val dom = try {
       // On error, just return, so that we don't have problems when called
       // on the whole PCL corpus dir (which includes non-XML files).
+      // FIXME!! Needs to use the FileHandler somehow for Hadoop access.
       xml.XML.loadFile(filename)
     } catch {
       case _ => {
@@ -596,16 +584,16 @@ class PCLTravelGeotagDocumentEvaluator(
   }
 
   def evaluate_document(doc: TitledDocument, doctag: String) = {
-    val dist = WordDist()
+    val dist = driver.word_dist_factory.create_word_dist()
     val the_stopwords =
-      if (Opts.include_stopwords_in_article_dists) Set[String]()
-      else Stopwords.stopwords
+      if (driver.params.include_stopwords_in_article_dists) Set[String]()
+      else driver.stopwords
     for (text <- Seq(doc.title, doc.text)) {
       dist.add_document(split_text_into_words(text, ignore_punc = true),
-        ignore_case = !Opts.preserve_case_words,
+        ignore_case = !driver.params.preserve_case_words,
         stopwords = the_stopwords)
     }
-    dist.finish(minimum_word_count = Opts.minimum_word_count)
+    dist.finish(minimum_word_count = driver.params.minimum_word_count)
     val cells = strategy.return_ranked_cells(dist)
     errprint("")
     errprint("Article with title: %s", doc.title)
@@ -624,11 +612,14 @@ class PCLTravelGeotagDocumentEvaluator(
 }
 
 abstract class EvaluationOutputter {
-  def evaluate_and_output_results(files: Iterable[String]): Unit
+  def evaluate_and_output_results(filehand: FileHandler,
+    files: Iterable[String]): Unit
 }
 
-class DefaultEvaluationOutputter(stratname: String, evalobj: TestFileEvaluator
-    ) extends EvaluationOutputter {
+class DefaultEvaluationOutputter(
+  val stratname: String,
+  val evalobj: TestFileEvaluator
+) extends EvaluationOutputter {
   val results = mutable.Map[EvaluationDocument, EvaluationResult]()
   /**
     Evaluate on all of the given files, outputting periodic results and
@@ -639,25 +630,27 @@ class DefaultEvaluationOutputter(stratname: String, evalobj: TestFileEvaluator
 
     Also returns an object containing the results.
    */
-  def evaluate_and_output_results(files: Iterable[String]) {
+  def evaluate_and_output_results(filehand: FileHandler,
+      files: Iterable[String]) {
     val task = new MeteredTask("document", "evaluating")
     var last_elapsed = 0.0
     var last_processed = 0
-    var skip_initial = Opts.skip_initial_test_docs
+    var skip_initial = Args.skip_initial_test_docs
     var skip_n = 0
 
     class EvaluationFileProcessor extends FileProcessor {
-      override def begin_process_directory(dir: File) {
+      override def begin_process_directory(filehand: FileHandler,
+          dir: String) {
         errprint("Processing evaluation directory %s...", dir)
       }
 
       /* Process all documents in a given file.  If return value is false,
          processing was interrupted due to a limit being reached, and
          no more files should be processed. */
-      def process_file(filename: String): Boolean = {
+      def process_file(filehand: FileHandler, filename: String): Boolean = {
         if (filename != null)
           errprint("Processing evaluation file %s...", filename)
-        for (doc <- evalobj.iter_documents(filename)) {
+        for (doc <- evalobj.iter_documents(filehand, filename)) {
           // errprint("Processing document: %s", doc)
           val num_processed = task.num_processed
           val doctag = "#%d" format (1 + num_processed)
@@ -672,7 +665,7 @@ class DefaultEvaluationOutputter(stratname: String, evalobj: TestFileEvaluator
               skip_n -= 1
               do_skip = true
             } else
-              skip_n = Opts.every_nth_test_doc - 1
+              skip_n = Args.every_nth_test_doc - 1
             if (do_skip)
               errprint("Passed over document %s", doctag)
             else {
@@ -686,11 +679,11 @@ class DefaultEvaluationOutputter(stratname: String, evalobj: TestFileEvaluator
             val new_processed = task.num_processed
 
             // If max # of docs reached, stop
-            if ((Opts.num_test_docs > 0 &&
-              new_processed >= Opts.num_test_docs)) {
+            if ((Args.num_test_docs > 0 &&
+              new_processed >= Args.num_test_docs)) {
               errprint("")
               errprint("Stopping because limit of %s documents reached",
-                Opts.num_test_docs)
+                Args.num_test_docs)
               task.finish()
               return false
             }
@@ -713,7 +706,7 @@ class DefaultEvaluationOutputter(stratname: String, evalobj: TestFileEvaluator
       }
     }
 
-    new EvaluationFileProcessor().process_files(files)
+    new EvaluationFileProcessor().process_files(filehand, files)
 
     task.finish()
 

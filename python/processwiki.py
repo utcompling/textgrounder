@@ -1381,7 +1381,7 @@ class ArticleHandlerForUsefulText(ArticleHandler):
 # process_text_for_data(), uses ExtractCoordinatesFromSource() to extract
 # coordinates, and outputs all the coordinates seen.  Always returns True.
 
-class OutputWords(ArticleHandlerForUsefulText):
+class OutputAllWords(ArticleHandlerForUsefulText):
   def process_text_for_words(self, word_generator):
     splitprint("Article title: %s" % self.title)
     splitprint("Article ID: %s" % self.id)
@@ -1410,7 +1410,7 @@ class OutputWords(ArticleHandlerForUsefulText):
       print "Notice: ending processing"
 
 
-class OutputCoordWords(OutputWords):
+class OutputCoordWords(OutputAllWords):
   def process_text_for_data(self, text):
     if extract_coordinates_from_article(text):
       return True
@@ -1496,7 +1496,7 @@ def extract_location_type(text):
 # text, after filtering text for "actual text" (as opposed to directives
 # etc.), and outputs the counts.
 
-class OutputCounts(ArticleHandlerForUsefulText):
+class OutputCoordCounts(ArticleHandlerForUsefulText):
   def process_text_for_words(self, word_generator):
     wordhash = intdict()
     for word in word_generator:
@@ -1509,6 +1509,13 @@ class OutputCounts(ArticleHandlerForUsefulText):
       return True
     return False
 
+# Same as above but output counts for all articles, not just those with
+# coordinates in them.
+
+class OutputAllCounts(OutputCoordCounts):
+  def process_text_for_data(self, text):
+    output_title(self.title, self.id)
+    return True
 
 # Handler to output just coordinate information.
 class OutputCoords(ArticleHandler):
@@ -1653,7 +1660,7 @@ class GenerateArticleData(ArticleHandler):
 # links to an article (can be used for computing prior probabilities of
 # an article).
 
-class ProcessSourceForLinks(RecursiveSourceTextHandler):
+class ProcessSourceForCoordLinks(RecursiveSourceTextHandler):
   useful_text_handler = ExtractUsefulText()
   def process_internal_link(self, text):
     tempargs = get_macro_args(text)
@@ -1682,9 +1689,9 @@ class ProcessSourceForLinks(RecursiveSourceTextHandler):
     # Also recursively process all the arguments for links, etc.
     return self.process_source_text(text[2:-2])
 
-class FindLinks(ArticleHandler):
+class FindCoordLinks(ArticleHandler):
   def process_text_for_data(self, text):
-    handler = ProcessSourceForLinks()
+    handler = ProcessSourceForCoordLinks()
     for foo in handler.process_source_text(text): pass
     return False
 
@@ -1803,8 +1810,8 @@ def main_process_input(wiki_handler):
 def main():
 
   op = OptionParser(usage="%prog [options] < file")
-  op.add_option("-w", "--output-words",
-                help="Output words of text.",
+  op.add_option("--output-all-words",
+                help="Output words of text, for all articles.",
                 action="store_true")
   op.add_option("--output-coord-words",
                 help="Output text, but only for articles with coordinates.",
@@ -1817,24 +1824,28 @@ when different.""", action="store_true")
   op.add_option("--no-tokenize", help="""When outputting words, don't tokenize.
 This causes words to only be split on whitespace, rather than also on
 punctuation.""", action="store_true")
-  op.add_option("-l", "--find-links",
-                help="""Find all links and print info about them.
-Includes count of incoming links, and, for each anchor-text form, counts of
-all articles it maps to.""",
+  op.add_option("--find-coord-links",
+                help="""Find all links and print info about them, for
+articles with coordinates or redirects to such articles.  Includes count of
+incoming links, and, for each anchor-text form, counts of all articles it
+maps to.""",
                 action="store_true")
-  op.add_option("-c", "--output-counts",
-                help="Print info about counts of words for all articles with coodinates.",
+  op.add_option("--output-all-counts",
+                help="Print info about counts of words, for all articles.",
                 action="store_true")
-  op.add_option("-o", "--output-coords",
+  op.add_option("--output-coord-counts",
+                help="Print info about counts of words, but only for articles with coodinates.",
+                action="store_true")
+  op.add_option("--output-coords",
                 help="Print info about coordinates of articles with coordinates.",
                 action="store_true")
   op.add_option("--output-location-type",
                 help="Print info about type of articles with coordinates.",
                 action="store_true")
-  op.add_option("-r", "--find-redirects",
+  op.add_option("--find-redirects",
                 help="Output all redirects.",
                 action="store_true")
-  op.add_option("-t", "--generate-toponym-eval",
+  op.add_option("--generate-toponym-eval",
                 help="Generate data files for use in toponym evaluation.",
                 action="store_true")
   op.add_option("--generate-article-data",
@@ -1879,7 +1890,7 @@ LIST = 'yes' if article is a list of some sort, else no.  This includes
        'List of' articles, disambiguation pages, and articles in the 'Category'
        and 'Book' namespaces.""",
                 action="store_true")
-  op.add_option("-s", "--split-training-dev-test",
+  op.add_option("--split-training-dev-test",
                 help="""Split output into training, dev and test files.
 Use the specified value as the file prefix, suffixed with '.train', '.dev'
 and '.test' respectively.""",
@@ -1899,20 +1910,21 @@ and test fractions, as the values are normalized.  Default %default.""",
 The absolute amount doesn't matter, only the value relative to the training
 and dev fractions, as the values are normalized.  Default %default.""",
                 metavar="FRACTION")
-  op.add_option("-f", "--coords-file",
+  op.add_option("--coords-file",
                 help="""File containing output from a prior run of
 --coords-counts, listing all the articles with associated coordinates.
-This is used to limit the operation of --find-links to only consider links
-to articles with coordinates.  Currently, if this is not done, then using
---coords-file requires at least 10GB, perhaps more, of memory in order to
-store the entire table of anchor->article mappings in memory. (If this
+This is used to limit the operation of --find-coord-links to only consider
+links to articles with coordinates.  Currently, if this is not done, then
+using --coords-file requires at least 10GB, perhaps more, of memory in order
+to store the entire table of anchor->article mappings in memory. (If this
 entire table is needed, it may be necessary to implement a MapReduce-style
 process where smaller chunks are processed separately and then the results
 combined.)""",
                 metavar="FILE")
   op.add_option("--article-data-file",
-                help="""File containing article data.  Used by --find-links
-to find the redirects pointing to articles with coordinates.""",
+                help="""File containing article data.  Used by
+--find-coord-links to find the redirects pointing to articles with
+coordinates.""",
                 metavar="FILE")
   op.add_option("--disambig-id-file",
                 help="""File containing list of article ID's that are
@@ -1921,7 +1933,7 @@ disambiguation pages.""",
   op.add_option("--max-time-per-stage", "--mts", type='int', default=0,
                 help="""Maximum time per stage in seconds.  If 0, no limit.
 Used for testing purposes.  Default %default.""")
-  op.add_option("-d", "--debug", metavar="FLAGS",
+  op.add_option("--debug", metavar="FLAGS",
                 help="Output debug info of the given types (separated by spaces or commas)")
 
   errprint("Arguments: %s" % ' '.join(sys.argv))
@@ -1949,18 +1961,20 @@ Used for testing purposes.  Default %default.""")
     read_redirects_from_article_data(opts.article_data_file)
   if opts.disambig_id_file:
     read_disambig_id_file(opts.disambig_id_file)
-  if opts.output_words:
-    main_process_input(OutputWords())
-  if opts.output_coord_words:
+  if opts.output_all_words:
+    main_process_input(OutputAllWords())
+  elif opts.output_coord_words:
     main_process_input(OutputCoordWords())
-  elif opts.find_links:
-    main_process_input(FindLinks())
+  elif opts.find_coord_links:
+    main_process_input(FindCoordLinks())
   elif opts.find_redirects:
     main_process_input(FindRedirects())
   elif opts.output_coords:
     main_process_input(OutputCoords())
-  elif opts.output_counts:
-    main_process_input(OutputCounts())
+  elif opts.output_all_counts:
+    main_process_input(OutputAllCounts())
+  elif opts.output_coord_counts:
+    main_process_input(OutputCoordCounts())
   elif opts.output_location_type:
     main_process_input(OutputLocationType())
   elif opts.generate_toponym_eval:

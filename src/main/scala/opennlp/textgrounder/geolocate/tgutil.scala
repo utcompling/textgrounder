@@ -52,64 +52,115 @@ package object tgutil {
   //                            File reading functions                        //
   //////////////////////////////////////////////////////////////////////////////
   
-  // Open a filename with the given encoding (by default, UTF-8) and
+  // Iterator that yields lines in a given encoding from an input stream
+  // inwith the given encoding (by default, UTF-8) and
   // yield lines, but with any terminating newline removed if chomp is
   // true (the default).  Buffer size and conversion error-handling
-  // can be set (FIXME: The latter has no effect currently.)
-  def openr(filename: String, encoding: String= "UTF-8", chomp: Boolean= true,
-        errors: String= "strict", bufsize: Int= 0) = {
-    class FileIterator extends Iterator[String] {
-      val ireader =
-        new InputStreamReader(new FileInputStream(filename), encoding)
-      var reader =
-        if (bufsize <= 0) new BufferedReader(ireader)
-        else new BufferedReader(ireader, bufsize)
-      var nextline: String = null
-      protected def getNextLine() = {
-        nextline = reader.readLine()
-        if (nextline == null) {
+  // can be set. (FIXME: The latter has no effect currently.) By default,
+  // automatically closes the stream when EOF is reached.
+  class FileIterator(stream: InputStream, encoding: String = "UTF-8",
+      chomp: Boolean = true, errors: String = "strict", bufsize: Int = 0,
+      close: Boolean = true) extends Iterator[String] {
+    val ireader =
+      new InputStreamReader(stream, encoding)
+    var reader =
+      if (bufsize <= 0) new BufferedReader(ireader)
+      else new BufferedReader(ireader, bufsize)
+    var nextline: String = null
+    protected def getNextLine() = {
+      nextline = reader.readLine()
+      if (nextline == null) {
+        if (close)
           reader.close()
-          reader = null
-          false
-        } else {
-          if (chomp) {
-            if (nextline.endsWith("\r\n"))
-              nextline = nextline.dropRight(2)
-            else if (nextline.endsWith("\r"))
-              nextline = nextline.dropRight(1)
-            else if (nextline.endsWith("\n"))
-              nextline = nextline.dropRight(1)
-          }
-          true
+        reader = null
+        false
+      } else {
+        if (chomp) {
+          if (nextline.endsWith("\r\n"))
+            nextline = nextline.dropRight(2)
+          else if (nextline.endsWith("\r"))
+            nextline = nextline.dropRight(1)
+          else if (nextline.endsWith("\n"))
+            nextline = nextline.dropRight(1)
         }
-      }
-
-      def hasNext = {
-        if (nextline != null) true
-        else if (reader == null) false
-        else getNextLine()
-      }
-
-      def next() = {
-        if (!hasNext) null
-        else {
-          val ret = nextline
-          nextline = null
-          ret
-        }
+        true
       }
     }
 
-    new FileIterator
+    def hasNext = {
+      if (nextline != null) true
+      else if (reader == null) false
+      else getNextLine()
+    }
+
+    def next() = {
+      if (!hasNext) null
+      else {
+        val ret = nextline
+        nextline = null
+        ret
+      }
+    }
   }
-  
-  /** Open a file for writing and return a PrintStream that will write to
-   *  this file in UTF-8.
-   */
-  def openw(filename: String, autoflush: Boolean=false) = new PrintStream(
-      new BufferedOutputStream(new FileOutputStream(filename)),
-      autoflush,
-      "UTF-8")
+
+  abstract class FileHandler {
+    /**
+     * Return an InputStream that reads from the given file.
+     */
+    def get_input_stream(filename: String): InputStream
+    /**
+     * Return an OutputStream that writes to the given file, overwriting
+     * an existing file.
+     */
+    def get_output_stream(filename: String): OutputStream
+    /**
+     * Join a string naming a directory to a string naming a file.  If the
+     * file is relative, it is to be interpreted relative to the directory.
+     */
+    def join_filename(dir: String, file: String): String
+    /**
+     * Is this file a directory?
+     */
+    def is_directory(filename: String): Boolean
+    /**
+     * List the files in the given directory.
+     */
+    def list_files(dir: String): Iterable[String]
+
+    /**
+     * Open a filename with the given encoding (by default, UTF-8) and
+     * yield lines, but with any terminating newline removed if chomp is
+     * true (the default).  Buffer size and conversion error-handling
+     * can be set. (FIXME: The latter has no effect currently.)
+     */
+    def openr(filename: String, encoding: String = "UTF-8",
+          chomp: Boolean = true, errors: String = "strict",
+          bufsize: Int = 0) = {
+      new FileIterator(get_input_stream(filename), encoding=encoding,
+        chomp=chomp, errors=errors, bufsize=bufsize)
+    }
+    
+    /** Open a file for writing and return a PrintStream that will write to
+     *  this file in UTF-8.
+     */
+    def openw(filename: String, autoflush: Boolean=false) =
+      new PrintStream(new BufferedOutputStream(get_output_stream(filename)),
+        autoflush, "UTF-8")
+  }
+
+  class LocalFileHandler extends FileHandler {
+    def get_input_stream(filename: String) = new FileInputStream(filename)
+    def get_output_stream(filename: String) = new FileOutputStream(filename)
+    def join_filename(dir: String, file: String) =
+      new File(dir, file).toString
+    def is_directory(filename: String) =
+      new File(filename).isDirectory
+    def list_files(dir: String) =
+      for (file <- new File(dir).listFiles)
+        yield file.toString
+  }
+
+  val local_file_handler = new LocalFileHandler
 
   /* NOTE: Following is the original Python code, which worked slightly
      differently and had a few additional features:
@@ -243,19 +294,21 @@ package object tgutil {
     /**
      * Process a given file.
      *
+     * @param filehand The FileHandler for working with the file.
      * @param file The file to process (possibly null, see above).
      * @returns True if file processing should continue; false to
      *   abort any further processing.
      */
-    def process_file(file: String): Boolean
+    def process_file(filehand: FileHandler, file: String): Boolean
 
     /**
      * Called when about to begin processing all files in a directory.
      * Must be overridden, since it has an (empty) definition by default.
      *
-     * @param dir File object for the directory.
+     * @param filehand The FileHandler for working with the file.
+     * @param dir Directory being processed.
      */
-    def begin_process_directory(dir: File) {
+    def begin_process_directory(filehand: FileHandler, dir: String) {
     }
 
     /**
@@ -269,11 +322,11 @@ package object tgutil {
      *   false if interrupted because an invocation of `process_file`
      *   returns false.
      */
-    def process_files(files: Iterable[String]) = {
+    def process_files(filehand: FileHandler, files: Iterable[String]) = {
       var broken = false
       breakable {
         def process_one_file(filename: String) {
-          if (!process_file(filename)) {
+          if (!process_file(filehand, filename)) {
             // This works because of the way 'breakable' is implemented
             // (dynamically-scoped).  Might "break" (stop working) if break
             // is made totally lexically-scoped.
@@ -285,11 +338,10 @@ package object tgutil {
           if (dir == null)
             process_one_file(dir)
           else {
-            val dirfile = new File(dir)
-            if (dirfile.isDirectory) {
-              for (file <- dirfile.listFiles().toSeq) {
-                val filename = file.toString
-                process_one_file(filename)
+            if (filehand.is_directory(dir)) {
+              begin_process_directory(filehand, dir)
+              for (file <- filehand.list_files(dir)) {
+                process_one_file(file)
               }
             } else process_one_file(dir)
           }
@@ -328,21 +380,39 @@ package object tgutil {
   def uniout(text: String, outfile: PrintStream=System.out) {
     outfile.print(text)
   }
-  
-  def errprint(format: String, args: Any*) {
+
+  var errout_prefix = ""
+
+  def set_errout_prefix(prefix: String) {
+    errout_prefix = prefix
+  }
+ 
+  var need_prefix = true
+
+  protected def format_outtext(format: String, args: Any*) = {
     // If no arguments, assume that we've been passed a raw string to print,
     // so print it directly rather than passing it to 'format', which might
     // munge % signs
-    if (args.length == 0)
-      System.err.println(format)
+    val outtext =
+      if (args.length == 0) format
+      else format format (args: _*)
+    if (need_prefix)
+      errout_prefix + outtext
     else
-      System.err.println(format format (args: _*))
+      outtext
   }
+
+  def errprint(format: String, args: Any*) {
+    System.err.println(format_outtext(format, args: _*))
+    need_prefix = true
+    System.err.flush()
+  }
+
   def errout(format: String, args: Any*) {
-    if (args.length == 0)
-      System.err.print(format)
-    else
-      System.err.print(format format (args: _*))
+    val text = format_outtext(format, args: _*)
+    System.err.print(text)
+    need_prefix = text.last == '\n'
+    System.err.flush()
   }
 
   /**
@@ -417,15 +487,19 @@ package object tgutil {
     formatstr format x
   }
 
-  def format_minutes_seconds(seconds: Double) = {
+  def format_minutes_seconds(seconds: Double, hours: Boolean = true) = {
     var secs = seconds
     var mins = (secs / 60).toInt
     secs = secs % 60
-    val hours = (mins / 60).toInt
-    mins = mins % 60
-    var hourstr = (
-      if (hours > 0) "%s hour%s " format (hours, if (hours == 1) "" else "s")
-      else "")
+    val hourstr = {
+      if (!hours) ""
+      else {
+        val hours = (mins / 60).toInt
+        mins = mins % 60
+        if (hours > 0) "%s hour%s " format (hours, if (hours == 1) "" else "s")
+        else ""
+      }
+    }
     val secstr = (if (secs.toInt == secs) "%s" else "%1.1f") format secs
     "%s%s minute%s %s second%s" format (
         hourstr,
@@ -442,7 +516,6 @@ package object tgutil {
   // delimiters.  Return a list of tuples (TEXT, DELIM).  The last tuple
   // with have an empty delim.
   def re_split_with_delimiter(regex: util.matching.Regex, text: String) = {
-    val splits = regex.split(text)
     val delim_intervals =
       for (m <- regex.findAllIn(text).matchData) yield List(m.start, m.end)
     val flattened = List(0) ++ (delim_intervals reduce (_ ++ _)) ++
@@ -886,10 +959,9 @@ package object tgutil {
       val total_elapsed_secs = curtime - first_time
       val attime =
         if (nohuman) "" else "At %s: " format humandate_time(curtime) 
-      errprint("%sElapsed time: %s minutes %s seconds, %s %s processed",
+      errprint("%sElapsed time: %s, %s %s processed",
                attime,
-               (total_elapsed_secs / 60).toInt,
-               (total_elapsed_secs % 60).toInt,
+               format_minutes_seconds(total_elapsed_secs, hours=false),
                items_processed, item_unit())
       val items_per_second = items_processed.toDouble / total_elapsed_secs
       val seconds_per_item = total_elapsed_secs / items_processed
@@ -1115,7 +1187,7 @@ package object tgutil {
   /**
     * Return floating-point value, number of seconds since the Epoch
     **/
-  def curtimesecs() = System.currentTimeMillis()/1000.0
+  def curtimesecs() = System.currentTimeMillis/1000.0
 
   def curtimehuman() = (new Date()) toString
 
@@ -1204,7 +1276,7 @@ package object tgutil {
     val header = if (virtual) "VmSize:" else "VmRSS:"
     if (!((new File("/proc/self/status")).exists))
       return -1L
-    for (line <- openr("/proc/self/status")) {
+    for (line <- local_file_handler.openr("/proc/self/status")) {
         val trimline = line.trim
         if (trimline.startsWith(header)) {
           val size = ("""\s+""".r.split(trimline))(1).toLong

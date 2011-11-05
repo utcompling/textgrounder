@@ -16,23 +16,31 @@ from process_article_data import *
 
 """
 We want to randomly permute the articles and then reorder the articles
-in the dump file accordingly.
+in the dump file accordingly.  A simple algorithm would be to load the
+entire dump file into memory as huge list, permute the list randomly,
+then write the results.  However, this might easily exceed the memory
+of the computer.  So instead, we split the task into chunks, proceeding
+as follows, keeping in mind that we have the list of article names
+available in a separate file:
 
-1. Take the full list of articles, permute randomly and output again.
-2. The dump consists of a prologue, a bunch of articles, and an epilogue.
-   The article boundaries can be identified by regexps.
-3. Split the dump into pieces, of size 8GB or so each.  Find the exact
-   boundary by seeking forward to the 8GB or so boundary and then looking
-   forward till we find an article boundary; this then becomes a boundary
-   between splits.  Also split off the prologue and epilogue into separate
-   files.
-4. For each split, read the entire split into memory and make a table
-   mapping article ID to a tuple of (offset, length).  Also read the entire
-   permuted article list in memory (only the ID's are needed).
-5. Go through the article list in order; for each ID present in the current
-   split, output that article.  The result will be an output file for
-   each split, with the articles in that split in order.
-6. Merge the separate splits.
+1. The dump consists of a prolog, a bunch of articles, and an epilog.
+2. (The 'permute' step:) Take the full list of articles, permute randomly
+   and output again.
+3. (The 'split' step:) Split the dump into pieces, of perhaps a few GB each,
+   the idea being that we can sort each piece separately and concatenate the
+   results. (This is the 'split' step.) The idea is that we first split the
+   permuted list of articles into some number of pieces (default 8), and
+   create a mapping listing which split each article goes in; then we create
+   a file for each split; then we read through the dump file, and each time we
+   find an article, we look up its split and write it to the corresponding
+   split file.  We also write the prolog and epilog into separate files.
+   Note that in this step we have effectively done a rough sort of the
+   articles by split, preserving the original order within each split.
+4. (The 'sort' step:) Sort each split.  For each split, we read the permuted
+   article list into memory to get the proper order, then we read the entire
+   split into memory and output the articles in the order indicated in the
+   article list.
+5. Concatenate the results.
 
 Note that this might be a perfect task for Hadoop; it automatically does
 the splitting, sorting and merging.

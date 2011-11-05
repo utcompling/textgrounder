@@ -18,7 +18,7 @@ package opennlp.textgrounder.geolocate
 
 import tgutil._
 import Distances._
-import Debug._
+import GeolocateDriver.Debug._
 
 import util.control.Breaks._
 import java.io._
@@ -37,6 +37,34 @@ class ArticleWriter(outfile: PrintStream, outfields: Seq[String]) {
   }
 }
 
+class ArticleReader(infields: Seq[String]) {
+  var num_processed = 0
+  def process_row(line: String, process: Map[String,String] => Unit,
+      line_number: Int = -1) {
+    val lineno = if (line_number < 0) num_processed + 1 else line_number
+    // println("[%s]" format line)
+    val fieldvals = splittext(line, '\t')
+    if (fieldvals.length != infields.length)
+      warning(
+      """Strange record at line #%s, expected %s fields, saw %s fields;
+      skipping line=%s""", lineno, infields.length, fieldvals.length, line)
+    else {
+      var good = true
+      for ((field, value) <- infields zip fieldvals) {
+        if (!Article.validate_field(field, value)) {
+          good = false
+          warning(
+      """Bad field value at line #%s, field=%s, value=%s,
+      skipping line=%s""", lineno, field, value, line)
+        }
+      }
+      if (good)
+        process((infields zip fieldvals).toMap)
+    }
+    num_processed += 1
+  }
+}
+
 object ArticleData {
   val combined_article_data_outfields = List("id", "title", "split", "redir",
       "namespace", "is_list_of", "is_disambig", "is_list", "coord",
@@ -48,36 +76,20 @@ object ArticleData {
    * processing time (real time, not CPU time) used for reading in the
    * file, for testing purposes.
    */
-  def read_article_data_file(filename: String,
+  def read_article_data_file(filehand: FileHandler, filename: String,
       process: Map[String,String] => Unit, maxtime: Double=0.0) = {
     errprint("Reading article data from %s...", filename)
     val task = new MeteredTask("article", "reading")
 
-    val fi = openr(filename)
+    val fi = filehand.openr(filename)
 
     val fields = splittext(fi.next(), '\t')
+    val reader = new ArticleReader(fields)
     breakable {
       for (line <- fi) {
-        // println("[%s]" format line)
-        val fieldvals = splittext(line, '\t')
-        if (fieldvals.length != fields.length)
-          warning(
-          """Strange record at line #%s, expected %s fields, saw %s fields;
-      skipping line=%s""", task.num_processed(), fields.length,
-                           fieldvals.length, line)
-        else {
-          var good = true
-          for ((field, value) <- fields zip fieldvals) {
-            if (!Article.validate_field(field, value)) {
-              good = false
-              warning(
-          """Bad field value at line #%s, field=%s, value=%s,
-      skipping line=%s""", task.num_processed(), field, value, line)
-            }
-          }
-          if (good)
-            process((fields zip fieldvals).toMap)
-        }
+        // If we've processed no articles so far, we're on line 2
+        // because line 1 is the header.
+        reader.process_row(line, process, task.num_processed + 2)
         if (task.item_processed(maxtime=maxtime))
           break
       }

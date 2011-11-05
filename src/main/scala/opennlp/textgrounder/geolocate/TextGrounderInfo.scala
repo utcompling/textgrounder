@@ -23,10 +23,20 @@ import tgutil._
  */
 
 object TextGrounderInfo {
-  val textgrounder_dir = System.getenv("TEXTGROUNDER_DIR")
-  if (textgrounder_dir == null) {
-    errprint("""TEXTGROUNDER_DIR must be set to the top-level directory where
+  var textgrounder_dir: String = null
+
+  def set_textgrounder_dir(dir: String) {
+    textgrounder_dir = dir
+  }
+
+  def get_textgrounder_dir() = {
+    if (textgrounder_dir == null)
+      textgrounder_dir = System.getenv("TEXTGROUNDER_DIR")
+    if (textgrounder_dir == null) {
+      errprint("""TEXTGROUNDER_DIR must be set to the top-level directory where
 Textgrounder is installed.""")
-    require(textgrounder_dir != null)
+      require(textgrounder_dir != null)
+    }
+    textgrounder_dir
   }
 }
