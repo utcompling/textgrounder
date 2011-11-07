@@ -19,7 +19,9 @@
  */
  
 package ags.utils;
- 
+
+import java.util.Arrays;
+import java.util.Collections; 
 import java.util.ArrayList;
 import java.util.List;
  
@@ -30,7 +32,7 @@ import java.util.List;
  */
 public class KdTree<T> {
     // Static variables
-    private static final int           bucketSize = 2;
+    private static final int           bucketSize = 840;
  
     // All types
     private final int                  dimensions;
@@ -122,8 +124,18 @@ public class KdTree<T> {
         while (cursor.locations == null || cursor.locationCount >= cursor.locations.length) {
             if (cursor.locations != null) {
                 cursor.splitDimension = cursor.findWidestAxis();
-                cursor.splitValue = (cursor.minLimit[cursor.splitDimension] + cursor.maxLimit[cursor.splitDimension]) * 0.5;
- 
+                //cursor.splitValue = (cursor.minLimit[cursor.splitDimension] + cursor.maxLimit[cursor.splitDimension]) * 0.5;
+
+								List<Double> list = new ArrayList<Double>();
+                for(int i=0;i<cursor.locations.length;i++)
+                	list.add(cursor.locations[i][cursor.splitDimension]);
+                Collections.sort(list);
+								if(list.size()%2 == 1)
+                	cursor.splitValue = list.get(list.size()/2);
+								else{
+                	cursor.splitValue = (list.get(list.size()/2) + list.get(list.size()/2 - 1))/2;
+								}
+
                 // Never split on infinity or NaN
                 if (cursor.splitValue == Double.POSITIVE_INFINITY) {
                     cursor.splitValue = Double.MAX_VALUE;
