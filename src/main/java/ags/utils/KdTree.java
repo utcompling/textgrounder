@@ -32,7 +32,7 @@ import java.util.List;
  */
 public class KdTree<T> {
     // Static variables
-    private static final int           bucketSize = 840;
+    private static final int           bucketSize = 935;
  
     // All types
     private final int                  dimensions;
