@@ -190,7 +190,7 @@ class CellDist(
  */
 
 class WordCellDist(
-  val cellgrid: CellGrid,
+  val cell_grid: CellGrid,
   val word: Word
 ) extends CellDist(mutable.Map[GeoCell, Double]()) {
   var normalized = false
@@ -200,7 +200,7 @@ class WordCellDist(
     // distributions.
     var totalprob = 0.0
     // Compute and store un-normalized probabilities for all cells
-    for (cell <- cellgrid.iter_nonempty_cells(nonempty_word_dist = true)) {
+    for (cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)) {
       val prob = cell.word_dist.lookup_word(word)
       // Another way of handling zero probabilities.
       /// Zero probabilities are just a bad idea.  They lead to all sorts of
@@ -288,13 +288,13 @@ class CellDistFactory(val lru_cache_size: Int) {
 
   // Return a cell distribution over a given word, using a least-recently-used
   // cache to optimize access.
-  def get_cell_dist(cellgrid: CellGrid, word: Word) = {
+  def get_cell_dist(cell_grid: CellGrid, word: Word) = {
     if (cached_dists == null)
       cached_dists = new LRUCache(maxsize = lru_cache_size)
     cached_dists.get(word) match {
       case Some(dist) => dist
       case None => {
-        val dist = new WordCellDist(cellgrid, word)
+        val dist = new WordCellDist(cell_grid, word)
         cached_dists(word) = dist
         dist
       }
@@ -306,14 +306,14 @@ class CellDistFactory(val lru_cache_size: Int) {
    * by adding up the distributions of the individual words, weighting by
    * the count of the each word.
    */
-  def get_cell_dist_for_word_dist(cellgrid: CellGrid, xword_dist: WordDist) = {
+  def get_cell_dist_for_word_dist(cell_grid: CellGrid, xword_dist: WordDist) = {
     // FIXME!!! Figure out what to do if distribution is not a unigram dist.
     // Can we break this up into smaller operations?  Or do we have to
     // make it an interface for WordDist?
     val word_dist = xword_dist.asInstanceOf[UnigramWordDist]
     val cellprobs = doublemap[GeoCell]()
     for ((word, count) <- word_dist.counts) {
-      val dist = get_cell_dist(cellgrid, word)
+      val dist = get_cell_dist(cell_grid, word)
       for ((cell, prob) <- dist.cellprobs)
         cellprobs(cell) += count * prob
     }
@@ -331,11 +331,11 @@ class CellDistFactory(val lru_cache_size: Int) {
 /**
  * Abstract class for a general cell in a cell grid.
  * 
- * @param cellgrid The CellGrid object for the grid this cell is in.
+ * @param cell_grid The CellGrid object for the grid this cell is in.
  */
-abstract class GeoCell(val cellgrid: CellGrid) {
+abstract class GeoCell(val cell_grid: CellGrid) {
   val word_dist_wrapper =
-    new CellWordDist(cellgrid.table.word_dist_factory.create_word_dist())
+    new CellWordDist(cell_grid.table.word_dist_factory.create_word_dist())
   var most_popular_article: GeoArticle = null
   var mostpopart_links = 0
 
@@ -445,10 +445,10 @@ abstract class GeoCell(val cellgrid: CellGrid) {
 /**
  * A cell in a polygonal shape.
  *
- * @param cellgrid The CellGrid object for the grid this cell is in.
+ * @param cell_grid The CellGrid object for the grid this cell is in.
  */
 abstract class PolygonalCell(
-  cellgrid: CellGrid) extends GeoCell(cellgrid) {
+  cell_grid: CellGrid) extends GeoCell(cell_grid) {
   /**
    * Return the boundary of the cell as an Iterable of coordinates, tracing
    * out the boundary vertex by vertex.  The last coordinate should be the
@@ -537,11 +537,11 @@ abstract class PolygonalCell(
 /**
  * A cell in a rectangular shape.
  *
- * @param cellgrid The CellGrid object for the grid this cell is in.
+ * @param cell_grid The CellGrid object for the grid this cell is in.
  */
 abstract class RectangularCell(
-  cellgrid: CellGrid
-) extends PolygonalCell(cellgrid) {
+  cell_grid: CellGrid
+) extends PolygonalCell(cell_grid) {
   /**
    * Return the coordinate of the southwest point of the rectangle.
    */
@@ -756,21 +756,21 @@ case class FractionalRegularCellIndex(latind: Double, longind: Double) {
 /**
  * A cell where the cell grid is a MultiRegularCellGrid. (See that class.)
  *
- * @param cellgrid The CellGrid object for the grid this cell is in,
+ * @param cell_grid The CellGrid object for the grid this cell is in,
  *   an instance of MultiRegularCellGrid.
  * @param index Index of this cell in the grid
  */
 
 class MultiRegularCell(
-  cellgrid: MultiRegularCellGrid,
+  cell_grid: MultiRegularCellGrid,
   val index: RegularCellIndex
-) extends RectangularCell(cellgrid) {
+) extends RectangularCell(cell_grid) {
 
   def get_southwest_coord() =
-    cellgrid.multi_cell_index_to_near_corner_coord(index)
+    cell_grid.multi_cell_index_to_near_corner_coord(index)
 
   def get_northeast_coord() =
-    cellgrid.multi_cell_index_to_far_corner_coord(index)
+    cell_grid.multi_cell_index_to_far_corner_coord(index)
 
   def describe_location() = {
     "%s-%s" format (get_southwest_coord(), get_northeast_coord())
@@ -780,12 +780,12 @@ class MultiRegularCell(
 
   def iterate_articles() = {
     val maxlatind = (
-      (cellgrid.maximum_latind + 1) min
-      (index.latind + cellgrid.width_of_multi_cell))
+      (cell_grid.maximum_latind + 1) min
+      (index.latind + cell_grid.width_of_multi_cell))
 
     if (debug("lots")) {
       errprint("Generating distribution for multi cell centered at %s",
-        cellgrid.cell_index_to_coord(index))
+        cell_grid.cell_index_to_coord(index))
     }
 
     // Process the tiling cells making up the multi cell;
@@ -797,14 +797,14 @@ class MultiRegularCell(
       // we actually process the articles in question.
       i <- (index.latind until maxlatind) view;
       rawj <- (index.longind until
-        (index.longind + cellgrid.width_of_multi_cell)) view;
-      val j = (if (rawj > cellgrid.maximum_longind) rawj - 360 else rawj)
+        (index.longind + cell_grid.width_of_multi_cell)) view;
+      val j = (if (rawj > cell_grid.maximum_longind) rawj - 360 else rawj)
       art <- {
         if (debug("lots")) {
           errprint("--> Processing tiling cell %s",
-            cellgrid.cell_index_to_coord(index))
+            cell_grid.cell_index_to_coord(index))
         }
-        cellgrid.tiling_cell_to_articles.getNoSet(RegularCellIndex(i, j))
+        cell_grid.tiling_cell_to_articles.getNoSet(RegularCellIndex(i, j))
       }
     } yield art
   }
@@ -1307,7 +1307,7 @@ class GeoArticleTable(val word_dist_factory: WordDistFactory) {
   }
 
   def read_article_data(filehand: FileHandler, filename: String,
-      cellgrid: CellGrid) {
+      cell_grid: CellGrid) {
     val redirects = mutable.Buffer[GeoArticle]()
 
     def process(params: Map[String, String]) {
@@ -1318,7 +1318,7 @@ class GeoArticleTable(val word_dist_factory: WordDistFactory) {
         redirects += art
       else if (art.coord != null) {
         record_article(art, art)
-        cellgrid.add_article_to_cell(art)
+        cell_grid.add_article_to_cell(art)
       }
     }
 
@@ -1453,7 +1453,7 @@ class GeoArticle(params: Map[String, String]) extends Article(params)
  * Abstract class for reading documents from a test file and doing
  * document geolocation on them (as opposed e.g. to toponym resolution).
  */
-abstract class GeolocateDocumentStrategy(val cellgrid: CellGrid) {
+abstract class GeolocateDocumentStrategy(val cell_grid: CellGrid) {
   /**
    * For a given word distribution (describing a test document), return
    * an Iterable of tuples, each listing a particular cell on the Earth
@@ -1471,24 +1471,24 @@ abstract class GeolocateDocumentStrategy(val cellgrid: CellGrid) {
  * 'baseline_strategy' specifies the particular strategy to use.
  */
 class RandomGeolocateDocumentStrategy(
-  cellgrid: CellGrid
-) extends GeolocateDocumentStrategy(cellgrid) {
+  cell_grid: CellGrid
+) extends GeolocateDocumentStrategy(cell_grid) {
   def return_ranked_cells(word_dist: WordDist) = {
-    val cells = cellgrid.iter_nonempty_cells()
+    val cells = cell_grid.iter_nonempty_cells()
     val shuffled = (new Random()).shuffle(cells)
     (for (cell <- shuffled) yield (cell, 0.0))
   }
 }
 
 class MostPopularCellGeolocateDocumentStrategy(
-  cellgrid: CellGrid,
+  cell_grid: CellGrid,
   internal_link: Boolean
-) extends GeolocateDocumentStrategy(cellgrid) {
+) extends GeolocateDocumentStrategy(cell_grid) {
   var cached_ranked_mps: Iterable[(GeoCell, Double)] = null
   def return_ranked_cells(word_dist: WordDist) = {
     if (cached_ranked_mps == null) {
       cached_ranked_mps = (
-        (for (cell <- cellgrid.iter_nonempty_cells())
+        (for (cell <- cell_grid.iter_nonempty_cells())
           yield (cell,
             (if (internal_link)
                cell.word_dist_wrapper.incoming_links
@@ -1501,8 +1501,8 @@ class MostPopularCellGeolocateDocumentStrategy(
 }
 
 class CellDistMostCommonToponymGeolocateDocumentStrategy(
-  cellgrid: CellGrid
-) extends GeolocateDocumentStrategy(cellgrid) {
+  cell_grid: CellGrid
+) extends GeolocateDocumentStrategy(cell_grid) {
   val cdist_factory = new CellDistFactory(Args.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
@@ -1512,32 +1512,32 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
     // FIXME: Should predicate be passed an index and have to do its own
     // unmemoizing?
     var maxword = word_dist.find_most_common_word(
-      word => word(0).isUpper && cellgrid.table.word_is_toponym(word))
+      word => word(0).isUpper && cell_grid.table.word_is_toponym(word))
     if (maxword == None) {
       maxword = word_dist.find_most_common_word(
         word => word(0).isUpper)
     }
     if (maxword == None)
       maxword = word_dist.find_most_common_word(word => true)
-    cdist_factory.get_cell_dist(cellgrid, maxword.get).get_ranked_cells()
+    cdist_factory.get_cell_dist(cell_grid, maxword.get).get_ranked_cells()
   }
 }
 
 class LinkMostCommonToponymGeolocateDocumentStrategy(
-  cellgrid: CellGrid
-) extends GeolocateDocumentStrategy(cellgrid) {
+  cell_grid: CellGrid
+) extends GeolocateDocumentStrategy(cell_grid) {
   def return_ranked_cells(word_dist: WordDist) = {
     var maxword = word_dist.find_most_common_word(
-      word => word(0).isUpper && cellgrid.table.word_is_toponym(word))
+      word => word(0).isUpper && cell_grid.table.word_is_toponym(word))
     if (maxword == None) {
       maxword = word_dist.find_most_common_word(
-        word => cellgrid.table.word_is_toponym(word))
+        word => cell_grid.table.word_is_toponym(word))
     }
     if (debug("commontop"))
       errprint("  maxword = %s", maxword)
     val cands =
       if (maxword != None)
-        cellgrid.table.construct_candidates(
+        cell_grid.table.construct_candidates(
           unmemoize_word(maxword.get))
       else Seq[GeoArticle]()
     if (debug("commontop"))
@@ -1554,7 +1554,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
       for {
         (cand, links) <- candlinks
         val cell = {
-          val retval = cellgrid.find_best_cell_for_coord(cand.coord)
+          val retval = cell_grid.find_best_cell_for_coord(cand.coord)
           if (retval == null)
             errprint("Strange, found no cell for candidate %s", cand)
           retval
@@ -1571,7 +1571,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
 
     // Append random cells and remove duplicates
     merge_numbered_sequences_uniquely(candcells,
-      new RandomGeolocateDocumentStrategy(cellgrid).return_ranked_cells(word_dist))
+      new RandomGeolocateDocumentStrategy(cell_grid).return_ranked_cells(word_dist))
   }
 }
 
@@ -1584,9 +1584,9 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
  *   scores are better.
  */
 abstract class MinMaxScoreStrategy(
-  cellgrid: CellGrid,
+  cell_grid: CellGrid,
   prefer_minimum: Boolean
-) extends GeolocateDocumentStrategy(cellgrid) {
+) extends GeolocateDocumentStrategy(cell_grid) {
   /**
    * Function to return the score of an article distribution against a
    * cell.
@@ -1601,7 +1601,7 @@ abstract class MinMaxScoreStrategy(
   def return_ranked_cells(word_dist: WordDist) = {
     val cell_buf = mutable.Buffer[(GeoCell, Double)]()
     for (
-      cell <- cellgrid.iter_nonempty_cells(nonempty_word_dist = true)
+      cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
     ) {
       if (debug("lots")) {
         errprint("Nonempty cell at indices %s = location %s, num_articles = %s",
@@ -1641,10 +1641,10 @@ abstract class MinMaxScoreStrategy(
  * any case since it's comparing articles against cells.)
  */
 class KLDivergenceStrategy(
-  cellgrid: CellGrid,
+  cell_grid: CellGrid,
   partial: Boolean = true,
   symmetric: Boolean = false
-) extends MinMaxScoreStrategy(cellgrid, true) {
+) extends MinMaxScoreStrategy(cell_grid, true) {
 
   def score_cell(word_dist: WordDist, cell: GeoCell) = {
     var kldiv = word_dist.fast_kl_divergence(cell.word_dist,
@@ -1706,10 +1706,10 @@ class KLDivergenceStrategy(
  * distribution, rather than considering all words in the vocabulary.
  */
 class CosineSimilarityStrategy(
-  cellgrid: CellGrid,
+  cell_grid: CellGrid,
   smoothed: Boolean = false,
   partial: Boolean = false
-) extends MinMaxScoreStrategy(cellgrid, true) {
+) extends MinMaxScoreStrategy(cell_grid, true) {
 
   def score_cell(word_dist: WordDist, cell: GeoCell) = {
     var cossim =
@@ -1729,9 +1729,9 @@ class CosineSimilarityStrategy(
 
 /** Use a Naive Bayes strategy for comparing document and cell. */
 class NaiveBayesDocumentStrategy(
-  cellgrid: CellGrid,
+  cell_grid: CellGrid,
   use_baseline: Boolean = true
-) extends MinMaxScoreStrategy(cellgrid, false) {
+) extends MinMaxScoreStrategy(cell_grid, false) {
 
   def score_cell(word_dist: WordDist, cell: GeoCell) = {
     // Determine respective weightings
@@ -1747,7 +1747,7 @@ class NaiveBayesDocumentStrategy(
     val word_logprob = cell.word_dist.get_nbayes_logprob(word_dist)
     val baseline_logprob =
       log(cell.word_dist_wrapper.num_arts_for_links.toDouble /
-          cellgrid.total_num_arts_for_links)
+          cell_grid.total_num_arts_for_links)
     val logprob = (word_weight * word_logprob +
       baseline_weight * baseline_logprob)
     logprob
@@ -1755,13 +1755,13 @@ class NaiveBayesDocumentStrategy(
 }
 
 class AverageCellProbabilityStrategy(
-  cellgrid: CellGrid
-) extends GeolocateDocumentStrategy(cellgrid) {
+  cell_grid: CellGrid
+) extends GeolocateDocumentStrategy(cell_grid) {
   val cdist_factory = new CellDistFactory(Args.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
     val celldist =
-      cdist_factory.get_cell_dist_for_word_dist(cellgrid, word_dist)
+      cdist_factory.get_cell_dist_for_word_dist(cell_grid, word_dist)
     celldist.get_ranked_cells()
   }
 }
@@ -2093,25 +2093,21 @@ class DebugSettings {
  * as is the default; that way, the parameters will get initialized to their
  * default values, and you only have to change the ones you want to be
  * non-default.
- * 2. Call set_parameters(), passing in the instance you just created.
- * 3. Call run().  The return value contains some evaluation results.
+ * 2. Call run(), passing in the instance you just created.
  *
- * NOTE: Currently, the GeolocateParameters-subclass instance is recorded
- * directly inside of this singleton object, without copying, and some of the
- * fields are changed to more canonical values.  If this is a problem, let me
+ * NOTE: Currently, some of the fields of the GeolocateParameters-subclass
+ * are changed to more canonical values.  If this is a problem, let me
  * know and I'll fix it.
  *
- * All evaluation output is currently written to standard error.
- * (There are some scripts to parse the output.) Some info is also returned
- * by the run() function.  See below.
+ * Evaluation output is currently written to standard error, and info is
+ * also returned by the run() function.  There are some scripts to parse the
+ * console output.  See below.
  */
 abstract class GeolocateDriver extends ExperimentDriver {
   override type ArgType <: GeolocateParameters
-  // NOTE: When different grids are allowed, we may set this to null here
-  // and initialize it later based on a command-line option or whatever.
-  var cellgrid = null: CellGrid
   var degrees_per_cell = 0.0
   var stopwords: Set[String] = _
+  var cell_grid: CellGrid = _
   var article_table: GeoArticleTable = _
   var word_dist_factory: WordDistFactory = _
 
@@ -2154,31 +2150,30 @@ abstract class GeolocateDriver extends ExperimentDriver {
     need_seq(args.article_data_file, "article-data-file")
   }
 
-  protected def initialize_article_table() {
-    article_table = new GeoArticleTable(word_dist_factory)
+  protected def initialize_article_table(word_dist_factory: WordDistFactory) = {
+    new GeoArticleTable(word_dist_factory)
   }
 
-  protected def initialize_cellgrid(table: GeoArticleTable) {
-    cellgrid = new MultiRegularCellGrid(degrees_per_cell,
-      Args.width_of_multi_cell, table)
+  protected def initialize_cell_grid(table: GeoArticleTable) = {
+    new MultiRegularCellGrid(degrees_per_cell,
+      params.width_of_multi_cell, table)
   }
 
-  protected def initialize_word_dist_factory() {
-    word_dist_factory =
-      /* if (params.word_dist == "pseudo-good-turing") */
-      new PseudoGoodTuringSmoothedWordDistFactory
-      /* else
-        new BigramWordDistFactory
-       */
+  protected def initialize_word_dist_factory() = {
+    /* if (params.word_dist == "pseudo-good-turing") */
+    new PseudoGoodTuringSmoothedWordDistFactory
+    /* else
+      new BigramWordDistFactory
+     */
   }
 
-  protected def read_stopwords() {
-    stopwords = Stopwords.read_stopwords(file_handler, params.stopwords_file)
+  protected def read_stopwords() = {
+    Stopwords.read_stopwords(file_handler, params.stopwords_file)
   }
 
   protected def read_articles(table: GeoArticleTable, stopwords: Set[String]) {
     for (fn <- Args.article_data_file)
-      table.read_article_data(file_handler, fn, cellgrid)
+      table.read_article_data(file_handler, fn, cell_grid)
 
     // Read in the words-counts file
     if (Args.counts_file.length > 0) {
@@ -2189,12 +2184,12 @@ abstract class GeolocateDriver extends ExperimentDriver {
   }
 
   def setup_for_run() {
-    initialize_word_dist_factory()
-    initialize_article_table()
-    initialize_cellgrid(article_table)
-    read_stopwords()
+    word_dist_factory = initialize_word_dist_factory()
+    article_table = initialize_article_table(word_dist_factory)
+    cell_grid = initialize_cell_grid(article_table)
+    stopwords = read_stopwords()
     read_articles(article_table, stopwords)
-    cellgrid.finish()
+    cell_grid.finish()
   }
 
   protected def process_strategies[T](strategies: Seq[(String, T)])(
@@ -2288,7 +2283,7 @@ class GenerateKMLDriver extends GeolocateDriver {
     val cdist_factory = new CellDistFactory(params.lru_cache_size)
     val words = params.kml_words.split(',')
     for (word <- words) {
-      val celldist = cdist_factory.get_cell_dist(cellgrid, memoize_word(word))
+      val celldist = cdist_factory.get_cell_dist(cell_grid, memoize_word(word))
       if (!celldist.normalized) {
         warning("""Non-normalized distribution, apparently word %s not seen anywhere.
 Not generating an empty KML file.""", word)
@@ -2436,7 +2431,9 @@ strategies cannot be mixed with other baseline strategies, or with non-baseline
 strategies, since they require that --preserve-case-words be set internally.""")
 }
 
-abstract class GeolocateDocumentDriver extends GeolocateDriver {
+// FUCK ME.  Have to make this abstract and GeolocateDocumentDriver a subclass
+// so that the ArgType can be overridden in HadoopGeolocateDocumentDriver.
+abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
   override type ArgType <: GeolocateDocumentParameters
   type RunReturnType =
     Seq[(String, GeolocateDocumentStrategy, EvaluationOutputter)]
@@ -2494,15 +2491,15 @@ abstract class GeolocateDocumentDriver extends GeolocateDriver {
           for (basestratname <- params.baseline_strategy) yield {
             val strategy = basestratname match {
               case "link-most-common-toponym" =>
-                new LinkMostCommonToponymGeolocateDocumentStrategy(cellgrid)
+                new LinkMostCommonToponymGeolocateDocumentStrategy(cell_grid)
               case "celldist-most-common-toponym" =>
-                new CellDistMostCommonToponymGeolocateDocumentStrategy(cellgrid)
+                new CellDistMostCommonToponymGeolocateDocumentStrategy(cell_grid)
               case "random" =>
-                new RandomGeolocateDocumentStrategy(cellgrid)
+                new RandomGeolocateDocumentStrategy(cell_grid)
               case "internal-link" =>
-                new MostPopularCellGeolocateDocumentStrategy(cellgrid, true)
+                new MostPopularCellGeolocateDocumentStrategy(cell_grid, true)
               case "num-articles" =>
-                new MostPopularCellGeolocateDocumentStrategy(cellgrid, false)
+                new MostPopularCellGeolocateDocumentStrategy(cell_grid, false)
               case _ => {
                 assert(false,
                   "Internal error: Unhandled strategy " + basestratname);
@@ -2514,27 +2511,35 @@ abstract class GeolocateDocumentDriver extends GeolocateDriver {
         } else {
           val strategy =
             if (stratname.startsWith("naive-bayes-"))
-              new NaiveBayesDocumentStrategy(cellgrid,
+              new NaiveBayesDocumentStrategy(cell_grid,
                 use_baseline = (stratname == "naive-bayes-with-baseline"))
             else stratname match {
               case "average-cell-probability" =>
-                new AverageCellProbabilityStrategy(cellgrid)
+                new AverageCellProbabilityStrategy(cell_grid)
               case "cosine-similarity" =>
-                new CosineSimilarityStrategy(cellgrid, smoothed = false, partial = false)
+                new CosineSimilarityStrategy(cell_grid, smoothed = false,
+                  partial = false)
               case "partial-cosine-similarity" =>
-                new CosineSimilarityStrategy(cellgrid, smoothed = false, partial = true)
+                new CosineSimilarityStrategy(cell_grid, smoothed = false,
+                  partial = true)
               case "smoothed-cosine-similarity" =>
-                new CosineSimilarityStrategy(cellgrid, smoothed = true, partial = false)
+                new CosineSimilarityStrategy(cell_grid, smoothed = true,
+                  partial = false)
               case "smoothed-partial-cosine-similarity" =>
-                new CosineSimilarityStrategy(cellgrid, smoothed = true, partial = true)
+                new CosineSimilarityStrategy(cell_grid, smoothed = true,
+                  partial = true)
               case "full-kl-divergence" =>
-                new KLDivergenceStrategy(cellgrid, symmetric = false, partial = false)
+                new KLDivergenceStrategy(cell_grid, symmetric = false,
+                  partial = false)
               case "partial-kl-divergence" =>
-                new KLDivergenceStrategy(cellgrid, symmetric = false, partial = true)
+                new KLDivergenceStrategy(cell_grid, symmetric = false,
+                  partial = true)
               case "symmetric-full-kl-divergence" =>
-                new KLDivergenceStrategy(cellgrid, symmetric = true, partial = false)
+                new KLDivergenceStrategy(cell_grid, symmetric = true,
+                  partial = false)
               case "symmetric-partial-kl-divergence" =>
-                new KLDivergenceStrategy(cellgrid, symmetric = true, partial = true)
+                new KLDivergenceStrategy(cell_grid, symmetric = true,
+                  partial = true)
               case "none" =>
                 null
             }
@@ -2579,26 +2584,23 @@ abstract class GeolocateDocumentDriver extends GeolocateDriver {
   }
 }
 
+class GeolocateDocumentDriver extends GeolocateDocumentTypeDriver {
+  override type ArgType = GeolocateDocumentParameters
+}
+
 abstract class GeolocateApp(appname: String) extends
     ExperimentDriverApp(appname) {
-  override type ArgType <: GeolocateParameters
   type DriverType <: GeolocateDriver
 }
 
 object GeolocateDocumentApp extends GeolocateApp("geolocate-document") {
-  // type ArgType = GeolocateDocumentParameters
-  class MyGeolocateDocumentDriver extends GeolocateDocumentDriver {
-    override type ArgType = GeolocateDocumentParameters
-  }
-  type DriverType = MyGeolocateDocumentDriver
+  type DriverType = GeolocateDocumentDriver
   // FUCKING TYPE ERASURE
   def create_arg_class(ap: ArgParser) = new ArgType(ap)
-  // def create_driver() = new DriverType() { override type ArgType = GeolocateDocumentParameters }
   def create_driver() = new DriverType()
 }
 
 object GenerateKMLApp extends GeolocateApp("generate-kml") {
-  // type ArgType = GenerateKMLParameters
   type DriverType = GenerateKMLDriver
   // FUCKING TYPE ERASURE
   def create_arg_class(ap: ArgParser) = new ArgType(ap)

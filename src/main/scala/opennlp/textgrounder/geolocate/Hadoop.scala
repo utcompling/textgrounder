@@ -328,10 +328,9 @@ abstract class GeolocateHadoopApp(
       hadoop_conf)
     val job = new Job(hadoop_conf, progname)
     initialize_hadoop_classes(job)
-    val params = arg_holder.asInstanceOf[ArgType]
-    for (file <- params.article_data_file)
+    for (file <- arg_holder.article_data_file)
       FileInputFormat.addInputPath(job, new Path(file))
-    FileOutputFormat.setOutputPath(job, new Path(params.outfile))
+    FileOutputFormat.setOutputPath(job, new Path(arg_holder.outfile))
     if (job.waitForCompletion(true)) 0 else 1
   }
 
@@ -387,14 +386,13 @@ trait GeolocateHadoopDriver extends GeolocateDriver {
 }
 
 class GeolocateDocumentHadoopDriver extends
-    GeolocateDocumentDriver with GeolocateHadoopDriver {
+    GeolocateDocumentTypeDriver with GeolocateHadoopDriver {
   override type ArgType = GeolocateDocumentHadoopParameters
 }
 
 
 object GeolocateDocumentHadoopApp extends
     GeolocateHadoopApp("hadoop-geolocate-documents") {
-  //type ArgType = GeolocateDocumentHadoopParameters
   type DriverType = GeolocateDocumentHadoopDriver
   // FUCKING TYPE ERASURE
   def create_arg_class(ap: ArgParser) = new ArgType(ap)

@@ -166,6 +166,23 @@ abstract class ExperimentApp(val progname: String) {
 /**
  * A general experiment driver class for programmatic access to a program
  * that runs experiments.
+ *
+ * Basic operation:
+ *
+ * 1. Create an instance of the appropriate subclass of GeolocateParameters
+ * (e.g. GeolocateDocumentParameters for document geolocation) and populate
+ * it with the appropriate parameters.  Don't pass in any ArgParser instance,
+ * as is the default; that way, the parameters will get initialized to their
+ * default values, and you only have to change the ones you want to be
+ * non-default.
+ * 2. Call set_parameters(), passing in the instance you just created.
+ * 3. Call run().  The return value contains some evaluation results.
+ *
+ * NOTE: Currently, the GeolocateParameters-subclass instance is recorded
+ * directly inside of this singleton object, without copying, and some of the
+ * fields are changed to more canonical values.  If this is a problem, let me
+ * know and I'll fix it.
+ *
  */
 
 abstract class ExperimentDriver {
@@ -289,7 +306,7 @@ abstract class ExperimentDriverApp(appname: String) extends
 
   def initialize_parameters() {
     driver.set_error_handler(arg_error _)
-    driver.handle_parameters(arg_holder.asInstanceOf[driver.ArgType])
+    driver.handle_parameters(arg_holder)
   }
 
   def run_program() = {
