@@ -163,3 +163,138 @@ abstract class ExperimentApp(val progname: String) {
   }
 }
 
+/**
+ * A general experiment driver class for programmatic access to a program
+ * that runs experiments.
+ */
+
+abstract class ExperimentDriver {
+  type ArgType
+  type RunReturnType
+  var params: ArgType = _
+
+  protected var argerror = default_error_handler _
+
+  /**
+   * Default error handler for signalling an argument error.
+   */
+  def default_error_handler(string: String) {
+    throw new IllegalArgumentException(string)
+  }
+
+  /**
+   * Change the error handler.  Return the old handler.
+   */
+  def set_error_handler(handler: String => Unit) = {
+    /* FUCK ME TO HELL.  Want to make this either a function to override
+       or a class parameter, but both get awkward because Java type erasure
+       means there's no easy way for a generic class to create a new object
+       of the generic type. */
+    val old_handler = argerror
+    argerror = handler
+    old_handler
+  }
+
+  protected def argument_needed(arg: String, arg_english: String = null) {
+    val marg_english =
+      if (arg_english == null)
+        arg.replace("-", " ")
+      else
+        arg_english
+    argerror("Must specify %s using --%s" format
+      (marg_english, arg.replace("_", "-")))
+  }
+
+  def need_seq(value: Seq[String], arg: String, arg_english: String = null) {
+    if (value.length == 0)
+      argument_needed(arg, arg_english)
+  }
+
+  def need(value: String, arg: String, arg_english: String = null) {
+    if (value == null || value.length == 0)
+      argument_needed(arg, arg_english)
+  }
+
+  def run(args: ArgType) = {
+    this.params = args
+    handle_parameters(this.params)
+    setup_for_run()
+    run_after_setup()
+  }
+
+  /********************************************************************/
+  /*                 Function to override below this line             */
+  /********************************************************************/
+
+  /**
+   * Output the values of some internal parameters.  Only needed
+   * for debugging.
+   */
+  def output_ancillary_parameters() {}
+
+  /**
+   * Verify and canonicalize the given command-line arguments.  Retrieve
+   * any other parameters from the environment.  NOTE: Currently, some of the
+   * fields in this structure will be changed (canonicalized).  See above.
+   * If options are illegal, an error will be signaled.
+   *
+   * @param options Object holding options to set
+   */
+
+  def handle_parameters(Args: ArgType)
+
+  /**
+   * Do any setup before actually implementing the experiment.  This
+   * typically means loading files and creating any needed structures.
+   */
+
+  def setup_for_run()
+
+  /**
+   * Actually run the experiment.  We have separated out the run process
+   * into the above three steps because we might want to replace one
+   * of the components in a sub-implementation of an experiment. (For example,
+   * if we implement a Hadoop version of an experiment, typically we need
+   * to replace the run_after_setup component but leave the others.)
+   */
+
+  def run_after_setup(): RunReturnType
+}
+
+/**
+ * A general implementation of the ExperimentApp class that uses an
+ * ExperimentDriver to do the actual work, so that both command-line and
+ * programmatic access to the experiment-running program is possible.
+ *
+ * Most concrete implementations will only need to implement DriverType,
+ * ArgType, create_driver and create_arg_class.
+ */
+
+abstract class ExperimentDriverApp(appname: String) extends
+    ExperimentApp(appname) {
+  type DriverType <: ExperimentDriver
+  
+  val driver = create_driver()
+  type ArgType = driver.ArgType
+
+  def create_driver(): DriverType
+
+  def arg_error(str: String) {
+    arg_parser.error(str)
+  }
+
+  override def output_ancillary_parameters() {
+    driver.output_ancillary_parameters()
+  }
+
+  def initialize_parameters() {
+    driver.set_error_handler(arg_error _)
+    driver.handle_parameters(arg_holder.asInstanceOf[driver.ArgType])
+  }
+
+  def run_program() = {
+    driver.run(arg_holder)
+    0
+  }
+}
+

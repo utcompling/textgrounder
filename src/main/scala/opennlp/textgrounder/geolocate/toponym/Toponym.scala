@@ -1481,12 +1481,13 @@ considered.  Default '%default'.""")
 }
 
 class GeolocateToponymDriver extends GeolocateDriver {
-  type ParamType = GeolocateToponymParameters
-  type StrategyType = GeolocateToponymStrategy
-  var Args: ParamType = _
+  type ArgType = GeolocateToponymParameters
+  type RunReturnType =
+    Seq[(String, GeolocateToponymStrategy, EvaluationOutputter)]
 
-  def canonicalize_verify_args(args: ParamType) {
-    Args = args
+  override def handle_parameters(args: ArgType) {
+    super.handle_parameters(args)
+
     GeolocateToponymApp.Args = args
     
     need(args.gazetteer_file, "gazetteer-file")
@@ -1507,6 +1508,11 @@ class GeolocateToponymDriver extends GeolocateDriver {
     need_seq(args.eval_file, "eval-file", "evaluation file(s)")
   }
 
+  override def initialize_article_table() {
+    val topo_article_table = new TopoArticleTable(word_dist_factory)
+    article_table = topo_article_table
+  }
+
   /**
    * Do the actual toponym geolocation.  Results to stderr (see above), and
    * also returned.
@@ -1515,12 +1521,7 @@ class GeolocateToponymDriver extends GeolocateDriver {
    * useful info may be returned for each document processed.
    */
 
-  def implement_run(args: ParamType) = {
-    val topo_article_table = new TopoArticleTable(word_dist_factory)
-    article_table = topo_article_table
-    initialize_cellgrid(article_table)
-    read_articles(article_table, stopwords)
-
+  def run_after_setup() = {
     // errprint("Processing evaluation file(s) %s for toponym counts...",
     //   args.eval_file)
     // process_dir_files(args.eval_file, count_toponyms_in_file)
@@ -1532,23 +1533,23 @@ class GeolocateToponymDriver extends GeolocateDriver {
     // output_reverse_sorted_table(toponyms_seen_in_eval_files,
     //                             outfile=sys.stderr)
 
-    if (args.gazetteer_file != null) {
+    if (params.gazetteer_file != null) {
       /* FIXME!!! */
       assert(cellgrid.isInstanceOf[MultiRegularCellGrid])
       val gazetteer =
-        new WorldGazetteer(file_handler, args.gazetteer_file,
+        new WorldGazetteer(file_handler, params.gazetteer_file,
           cellgrid.asInstanceOf[MultiRegularCellGrid])
       // Bootstrapping issue: Creating the gazetteer requires that the
       // TopoArticleTable already exist, but the TopoArticleTable wants
       // a pointer to a gazetter, so have to set it afterwards.
-      topo_article_table.set_gazetteer(gazetteer)
+      article_table.asInstanceOf[TopoArticleTable].set_gazetteer(gazetteer)
     }
 
     val strats_unflat = (
-      for (stratname <- args.strategy) yield {
+      for (stratname <- params.strategy) yield {
         // Generate strategy object
         if (stratname == "baseline") {
-          for (basestratname <- args.baseline_strategy) yield ("baseline " + basestratname,
+          for (basestratname <- params.baseline_strategy) yield ("baseline " + basestratname,
             new BaselineGeolocateToponymStrategy(cellgrid, basestratname))
         } else {
           val strategy = new NaiveBayesToponymStrategy(cellgrid,
@@ -1560,7 +1561,7 @@ class GeolocateToponymDriver extends GeolocateDriver {
     process_strategies(strats)((stratname, strategy) => {
       val evaluator =
         // Generate reader object
-        if (args.eval_format == "tr-conll")
+        if (params.eval_format == "tr-conll")
           new TRCoNLLGeolocateToponymEvaluator(strategy, stratname, this)
         else
           new ArticleGeolocateToponymEvaluator(strategy, stratname, this)
@@ -1570,10 +1571,10 @@ class GeolocateToponymDriver extends GeolocateDriver {
 }
 
 object GeolocateToponymApp extends GeolocateApp("geolocate-toponyms") {
-  type ParamType = GeolocateToponymParameters
+  // type ArgType = GeolocateToponymParameters
   type DriverType = GeolocateToponymDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class(ap: ArgParser) = new ParamType(ap)
+  def create_arg_class(ap: ArgParser) = new ArgType(ap)
   def create_driver() = new DriverType()
-  var Args: ParamType = _
+  var Args: ArgType = _
 }

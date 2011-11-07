@@ -2087,31 +2087,30 @@ class DebugSettings {
  *
  * Basic operation:
  *
- * 1. Create an instance of GeolocateParameters and populate it with the
- * appropriate parameters.  Don't pass in any ArgParser instance, as
- * is the default; that way, the parameters will get initialized to their
+ * 1. Create an instance of the appropriate subclass of GeolocateParameters
+ * (e.g. GeolocateDocumentParameters for document geolocation) and populate
+ * it with the appropriate parameters.  Don't pass in any ArgParser instance,
+ * as is the default; that way, the parameters will get initialized to their
  * default values, and you only have to change the ones you want to be
  * non-default.
  * 2. Call set_parameters(), passing in the instance you just created.
  * 3. Call run().  The return value contains some evaluation results.
  *
- * NOTE: Currently, the GeolocateParameters instance is recorded directly
- * inside of this singleton object, without copying, and some of the fields are
- * changed to more canonical values.  If this is a problem, let me know and
- * I'll fix it.
+ * NOTE: Currently, the GeolocateParameters-subclass instance is recorded
+ * directly inside of this singleton object, without copying, and some of the
+ * fields are changed to more canonical values.  If this is a problem, let me
+ * know and I'll fix it.
  *
  * All evaluation output is currently written to standard error.
  * (There are some scripts to parse the output.) Some info is also returned
  * by the run() function.  See below.
  */
-abstract class GeolocateDriver {
-  type ParamType <: GeolocateParameters
-  type StrategyType
+abstract class GeolocateDriver extends ExperimentDriver {
+  override type ArgType <: GeolocateParameters
   // NOTE: When different grids are allowed, we may set this to null here
   // and initialize it later based on a command-line option or whatever.
   var cellgrid = null: CellGrid
   var degrees_per_cell = 0.0
-  var params: ParamType = _
   var stopwords: Set[String] = _
   var article_table: GeoArticleTable = _
   var word_dist_factory: WordDistFactory = _
@@ -2121,54 +2120,6 @@ abstract class GeolocateDriver {
    */
   val file_handler: FileHandler = new LocalFileHandler
 
-  protected var argerror = default_error_handler _
-
-  /**
-   * Output the values of some internal parameters.  Only needed
-   * for debugging.
-   */
-  def output_ancillary_parameters() {}
-
-  /**
-   * Default error handler for signalling an argument error.
-   */
-  def default_error_handler(string: String) {
-    throw new IllegalArgumentException(string)
-  }
-
-  /**
-   * Change the error handler.  Return the old handler.
-   */
-  def set_error_handler(handler: String => Unit) = {
-    /* FUCK ME TO HELL.  Want to make this either a function to override
-       or a class parameter, but both get awkward because Java type erasure
-       means there's no easy way for a generic class to create a new object
-       of the generic type. */
-    val old_handler = argerror
-    argerror = handler
-    old_handler
-  }
-
-  protected def argument_needed(arg: String, arg_english: String = null) {
-    val marg_english =
-      if (arg_english == null)
-        arg.replace("-", " ")
-      else
-        arg_english
-    argerror("Must specify %s using --%s" format
-      (marg_english, arg.replace("_", "-")))
-  }
-
-  def need_seq(value: Seq[String], arg: String, arg_english: String = null) {
-    if (value.length == 0)
-      argument_needed(arg, arg_english)
-  }
-
-  def need(value: String, arg: String, arg_english: String = null) {
-    if (value == null || value.length == 0)
-      argument_needed(arg, arg_english)
-  }
-
   /**
    * Set the options to those as given.  NOTE: Currently, some of the
    * fields in this structure will be changed (canonicalized).  See above.
@@ -2176,17 +2127,9 @@ abstract class GeolocateDriver {
    *
    * @param options Object holding options to set
    */
-  def set_parameters(args: ParamType) {
+  def handle_parameters(args: ArgType) {
     GeolocateDriver.Args = args
-    this.params = args
 
-    /** Canonicalize/verify arguments **/
-
-    handle_common_args(args)
-    canonicalize_verify_args(args)
-  }
-
-  protected def handle_common_args(args: ParamType) {
     if (args.debug != null)
       parse_debug_spec(args.debug)
 
@@ -2211,11 +2154,26 @@ abstract class GeolocateDriver {
     need_seq(args.article_data_file, "article-data-file")
   }
 
-  def canonicalize_verify_args(Args: ParamType)
+  protected def initialize_article_table() {
+    article_table = new GeoArticleTable(word_dist_factory)
+  }
 
   protected def initialize_cellgrid(table: GeoArticleTable) {
     cellgrid = new MultiRegularCellGrid(degrees_per_cell,
       Args.width_of_multi_cell, table)
+  }
+
+  protected def initialize_word_dist_factory() {
+    word_dist_factory =
+      /* if (params.word_dist == "pseudo-good-turing") */
+      new PseudoGoodTuringSmoothedWordDistFactory
+      /* else
+        new BigramWordDistFactory
+       */
+  }
+
+  protected def read_stopwords() {
+    stopwords = Stopwords.read_stopwords(file_handler, params.stopwords_file)
   }
 
   protected def read_articles(table: GeoArticleTable, stopwords: Set[String]) {
@@ -2230,10 +2188,13 @@ abstract class GeolocateDriver {
     }
   }
 
-  protected def read_data_for_geotag_documents() {
-    article_table = new GeoArticleTable(word_dist_factory)
+  def setup_for_run() {
+    initialize_word_dist_factory()
+    initialize_article_table()
     initialize_cellgrid(article_table)
+    read_stopwords()
     read_articles(article_table, stopwords)
+    cellgrid.finish()
   }
 
   protected def process_strategies[T](strategies: Seq[(String, T)])(
@@ -2251,25 +2212,7 @@ abstract class GeolocateDriver {
     }
   }
 
-  def read_stopwords() {
-    stopwords = Stopwords.read_stopwords(file_handler, params.stopwords_file)
-  }
-
-  def run() = {
-    read_stopwords()
-    word_dist_factory =
-      /* if (params.word_dist == "pseudo-good-turing") */
-      new PseudoGoodTuringSmoothedWordDistFactory
-      /* else
-        new BigramWordDistFactory
-       */
-    implement_run(params)
-  }
-
-  /**
-   * Actually do the work.
-   */
-  def implement_run(args: ParamType): Seq[(String, StrategyType, EvaluationOutputter)]
+  //def implement_run(args: ArgType): Seq[(String, StrategyType, EvaluationOutputter)]
 }
 
 object GeolocateDriver {
@@ -2328,10 +2271,11 @@ low values more visible.  Possibilities are 'none' (no transformation),
 }
 
 class GenerateKMLDriver extends GeolocateDriver {
-  type ParamType = GenerateKMLParameters
-  type StrategyType = Nothing
+  type ArgType = GenerateKMLParameters
+  type RunReturnType = Null
 
-  def canonicalize_verify_args(args: ParamType) {
+  override def handle_parameters(args: ArgType) {
+    super.handle_parameters(args)
     need(args.kml_words, "kml-words")
   }
 
@@ -2340,11 +2284,9 @@ class GenerateKMLDriver extends GeolocateDriver {
    * KML files created and written on disk.
    */
 
-  def implement_run(args: ParamType) = {
-    read_data_for_geotag_documents()
-    cellgrid.finish()
-    val cdist_factory = new CellDistFactory(args.lru_cache_size)
-    val words = args.kml_words.split(',')
+  def run_after_setup() = {
+    val cdist_factory = new CellDistFactory(params.lru_cache_size)
+    val words = params.kml_words.split(',')
     for (word <- words) {
       val celldist = cdist_factory.get_cell_dist(cellgrid, memoize_word(word))
       if (!celldist.normalized) {
@@ -2352,9 +2294,9 @@ class GenerateKMLDriver extends GeolocateDriver {
 Not generating an empty KML file.""", word)
       } else {
         val kmlparams = new KMLParameters()
-        kmlparams.kml_max_height = args.kml_max_height
-        kmlparams.kml_transform = args.kml_transform
-        celldist.generate_kml_file("%s%s.kml" format (args.kml_prefix, word),
+        kmlparams.kml_max_height = params.kml_max_height
+        kmlparams.kml_transform = params.kml_transform
+        celldist.generate_kml_file("%s%s.kml" format (params.kml_prefix, word),
           kmlparams)
       }
     }
@@ -2494,11 +2436,16 @@ strategies cannot be mixed with other baseline strategies, or with non-baseline
 strategies, since they require that --preserve-case-words be set internally.""")
 }
 
-class GeolocateDocumentDriver extends GeolocateDriver {
-  type ParamType = GeolocateDocumentParameters
-  type StrategyType = GeolocateDocumentStrategy
+abstract class GeolocateDocumentDriver extends GeolocateDriver {
+  override type ArgType <: GeolocateDocumentParameters
+  type RunReturnType =
+    Seq[(String, GeolocateDocumentStrategy, EvaluationOutputter)]
 
-  def canonicalize_verify_args(args: ParamType) {
+  var strategies: Seq[(String, GeolocateDocumentStrategy)] = _
+
+  override def handle_parameters(args: ArgType) {
+    super.handle_parameters(args)
+
     if (args.strategy contains "baseline") {
       var need_case = false
       var need_no_case = false
@@ -2535,18 +2482,16 @@ class GeolocateDocumentDriver extends GeolocateDriver {
   }
 
   /**
-   * Set everything up for document geolocation.  Return a sequence of
-   * strategy objects.  Used by e.g. the Hadoop interface, which does
-   * its own iteration over articles.
+   * Set everything up for document geolocation.  Create and save a
+   * sequence of strategy objects, used by us and by the Hadoop interface,
+   * which does its own iteration over articles.
    */
-  def setup_for_run(args: ParamType) = {
-    read_data_for_geotag_documents()
-    cellgrid.finish()
-
+  override def setup_for_run() {
+    super.setup_for_run()
     val strats_unflat = (
-      for (stratname <- args.strategy) yield {
+      for (stratname <- params.strategy) yield {
         if (stratname == "baseline") {
-          for (basestratname <- args.baseline_strategy) yield {
+          for (basestratname <- params.baseline_strategy) yield {
             val strategy = basestratname match {
               case "link-most-common-toponym" =>
                 new LinkMostCommonToponymGeolocateDocumentStrategy(cellgrid)
@@ -2599,7 +2544,7 @@ class GeolocateDocumentDriver extends GeolocateDriver {
             Seq()
         }
       })
-    strats_unflat reduce (_ ++ _)
+    strategies = strats_unflat reduce (_ ++ _)
   }
 
   /**
@@ -2621,12 +2566,11 @@ class GeolocateDocumentDriver extends GeolocateDriver {
    * type in practice is ArticleEvaluationResult)
    */
 
-  def implement_run(args: ParamType) = {
-    val strategies = setup_for_run(args)
+  def run_after_setup() = {
     process_strategies(strategies)((stratname, strategy) => {
       val evaluator =
         // Generate reader object
-        if (args.eval_format == "pcl-travel")
+        if (params.eval_format == "pcl-travel")
           new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
         else
           new ArticleGeolocateDocumentEvaluator(strategy, stratname, this)
@@ -2635,46 +2579,29 @@ class GeolocateDocumentDriver extends GeolocateDriver {
   }
 }
 
-abstract class GeolocateApp(appname: String) extends ExperimentApp(appname) {
-  type ParamType <: GeolocateParameters
-  type ArgType = ParamType
+abstract class GeolocateApp(appname: String) extends
+    ExperimentDriverApp(appname) {
+  override type ArgType <: GeolocateParameters
   type DriverType <: GeolocateDriver
-  val driver = create_driver()
-
-  def create_driver(): DriverType
-
-  def arg_error(str: String) {
-    arg_parser.error(str)
-  }
-
-  override def output_ancillary_parameters() {
-    driver.output_ancillary_parameters()
-  }
-
-  def initialize_parameters() {
-    driver.set_error_handler(arg_error _)
-    driver.set_parameters(arg_holder.asInstanceOf[driver.ParamType])
-  }
-
-  def run_program() = {
-    driver.run()
-    0
-  }
 }
 
 object GeolocateDocumentApp extends GeolocateApp("geolocate-document") {
-  type ParamType = GeolocateDocumentParameters
-  type DriverType = GeolocateDocumentDriver
+  // type ArgType = GeolocateDocumentParameters
+  class MyGeolocateDocumentDriver extends GeolocateDocumentDriver {
+    override type ArgType = GeolocateDocumentParameters
+  }
+  type DriverType = MyGeolocateDocumentDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class(ap: ArgParser) = new ParamType(ap)
+  def create_arg_class(ap: ArgParser) = new ArgType(ap)
+  // def create_driver() = new DriverType() { override type ArgType = GeolocateDocumentParameters }
   def create_driver() = new DriverType()
 }
 
 object GenerateKMLApp extends GeolocateApp("generate-kml") {
-  type ParamType = GenerateKMLParameters
+  // type ArgType = GenerateKMLParameters
   type DriverType = GenerateKMLDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class(ap: ArgParser) = new ParamType(ap)
+  def create_arg_class(ap: ArgParser) = new ArgType(ap)
   def create_driver() = new DriverType()
 }
 

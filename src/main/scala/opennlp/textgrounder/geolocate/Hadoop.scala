@@ -149,7 +149,7 @@ object GeolocateHadoopConfiguration {
    * @param parser ArgParser object to retrieve parameters from.
    * @param conf Configuration object to store configuration settings into.
    */
-  def convert_parameters_to_jobconf(prefix: String, parser: ArgParser,
+  def convert_parameters_to_hadoop_conf(prefix: String, parser: ArgParser,
       conf: Configuration) {
     for (name <- parser.argNames if parser.specified(name)) {
       val confname = prefix + name
@@ -187,7 +187,7 @@ object GeolocateHadoopConfiguration {
    *   of parameters to fetch are taken from this object.
    * @param conf Configuration object to retrieve settings from.
    */
-  def convert_parameters_from_jobconf(prefix: String, parser: ArgParser,
+  def convert_parameters_from_hadoop_conf(prefix: String, parser: ArgParser,
       conf: Configuration) {
     // Configuration.dumpConfiguration(conf, new PrintWriter(System.err))
     for {name <- parser.argNames
@@ -241,15 +241,13 @@ class ArticleEvaluationMapper extends
     // Initialize set of parameters in `ap`
     new GeolocateDocumentHadoopParameters(ap)
     // Retrieve configuration values and store in `ap`
-    convert_parameters_from_jobconf(hadoop_conf_prefix, ap, conf)
+    convert_parameters_from_hadoop_conf(hadoop_conf_prefix, ap, conf)
     // Now create a class containing the stored configuration values
     val params = new GeolocateDocumentHadoopParameters(ap)
-    driver.set_parameters(params)
-    driver.need(params.textgrounder_dir, "textgrounder-dir")
-    TextGrounderInfo.set_textgrounder_dir(params.textgrounder_dir)
-    driver.read_stopwords()
+    driver.handle_parameters(params)
+    driver.setup_for_run()
     evaluators =
-      for ((stratname, strategy) <- driver.setup_for_run(params))
+      for ((stratname, strategy) <- driver.strategies)
         yield new ArticleGeolocateDocumentEvaluator(strategy, stratname, driver)
   }
 
@@ -305,6 +303,8 @@ abstract class GeolocateHadoopApp(
 ) extends GeolocateApp(progname) {
   var hadoop_conf: Configuration = _
 
+  override type DriverType <: GeolocateHadoopDriver
+
   /* Set by subclass -- Prefix used for storing parameters in a
      Hadoop configuration */
   val hadoop_conf_prefix: String
@@ -324,14 +324,14 @@ abstract class GeolocateHadoopApp(
    */
   override def run_program() = {
     import GeolocateHadoopConfiguration._
-    convert_parameters_to_jobconf(hadoop_conf_prefix, arg_parser, hadoop_conf)
+    convert_parameters_to_hadoop_conf(hadoop_conf_prefix, arg_parser,
+      hadoop_conf)
     val job = new Job(hadoop_conf, progname)
     initialize_hadoop_classes(job)
-    val params = arg_holder.asInstanceOf[ParamType]
-    // FIXME! Here we only set one file as input.
-    FileInputFormat.addInputPath(job, new Path(params.article_data_file(0)))
-    // FIXME!!
-    FileOutputFormat.setOutputPath(job, new Path("geolocate-results"))
+    val params = arg_holder.asInstanceOf[ArgType]
+    for (file <- params.article_data_file)
+      FileInputFormat.addInputPath(job, new Path(file))
+    FileOutputFormat.setOutputPath(job, new Path(params.outfile))
     if (job.waitForCompletion(true)) 0 else 1
   }
 
@@ -354,9 +354,7 @@ abstract class GeolocateHadoopApp(
   }
 }
 
-class GeolocateDocumentHadoopParameters(
-  parser: ArgParser = null
-) extends GeolocateDocumentParameters(parser) {
+trait GeolocateHadoopParameters extends GeolocateDocumentParameters {
   var textgrounder_dir =
     ap.option[String]("textgrounder-dir",
       help = """Directory to use in place of TEXTGROUNDER_DIR environment
@@ -368,20 +366,38 @@ variable (e.g. in Hadoop).""")
 
 }
 
-class GeolocateDocumentHadoopDriver extends GeolocateDocumentDriver {
+class GeolocateDocumentHadoopParameters(
+  parser: ArgParser = null
+) extends GeolocateDocumentParameters(parser) with GeolocateHadoopParameters {
+}
+
+trait GeolocateHadoopDriver extends GeolocateDriver {
   /**
    * FileHandler object for this driver.
    */
   override val file_handler = new HadoopFileHandler
+
+  override type ArgType <: GeolocateHadoopParameters
+
+  override def handle_parameters(args: ArgType) {
+    super.handle_parameters(args)
+    need(args.textgrounder_dir, "textgrounder-dir")
+    TextGrounderInfo.set_textgrounder_dir(args.textgrounder_dir)
+  }
+}
+
+class GeolocateDocumentHadoopDriver extends
+    GeolocateDocumentDriver with GeolocateHadoopDriver {
+  override type ArgType = GeolocateDocumentHadoopParameters
 }
 
 
 object GeolocateDocumentHadoopApp extends
     GeolocateHadoopApp("hadoop-geolocate-documents") {
-  type ParamType = GeolocateDocumentHadoopParameters
+  //type ArgType = GeolocateDocumentHadoopParameters
   type DriverType = GeolocateDocumentHadoopDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class(ap: ArgParser) = new ParamType(ap)
+  def create_arg_class(ap: ArgParser) = new ArgType(ap)
   def create_driver() = new DriverType()
 
   val hadoop_conf_prefix = "textgrounder.geolocate_documents."
@@ -394,22 +410,26 @@ object GeolocateDocumentHadoopApp extends
   }
 }
 
-/**
- * Hadoop has a standard Writable class but it isn't so good for us, since
- * it assumes its read method
- */
-trait GeolocateHadoopWritable[T] {
-  def write(out: DataOutput): Unit
-  def read(in: DataInput): T
-}
+// Old code.  Probably won't ever be needed.  If we feel the need to move
+// to more complex types when serializing, we should switch to Avro rather
+// than reinventing the wheel.
 
-/**
- * Class for writing out in a format suitable for Hadoop.  Implements
-   Hadoop's Writable interface.  Because the 
- */
-
-abstract class RecordWritable() extends WritableComparable[RecordWritable] {
-}
+// /**
+//  * Hadoop has a standard Writable class but it isn't so good for us, since
+//  * it assumes its read method
+//  */
+// trait GeolocateHadoopWritable[T] {
+//   def write(out: DataOutput): Unit
+//   def read(in: DataInput): T
+// }
+// 
+// /**
+//  * Class for writing out in a format suitable for Hadoop.  Implements
+//    Hadoop's Writable interface.  Because the 
+//  */
+// 
+// abstract class RecordWritable() extends WritableComparable[RecordWritable] {
+// }
 
 /*
 
