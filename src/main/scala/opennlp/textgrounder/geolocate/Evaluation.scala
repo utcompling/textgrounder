@@ -180,7 +180,7 @@ class GeolocateDocumentEvalStats(
  * number of articles in true cell.
  */
 
-class GroupedGeolocateDocumentEvalStats(cellgrid: CellGrid) {
+class GroupedGeolocateDocumentEvalStats(cell_grid: CellGrid) {
 
   def create_doc() = new GeolocateDocumentEvalStats()
   val all_document = create_doc()
@@ -225,8 +225,8 @@ class GroupedGeolocateDocumentEvalStats(cellgrid: CellGrid) {
        FIXME: Also note that we don't actually make use of the info we
        record here. See below.
      */
-    if (cellgrid.isInstanceOf[MultiRegularCellGrid]) {
-      val multigrid = cellgrid.asInstanceOf[MultiRegularCellGrid]
+    if (cell_grid.isInstanceOf[MultiRegularCellGrid]) {
+      val multigrid = cell_grid.asInstanceOf[MultiRegularCellGrid]
 
       /* For distance to center of true cell, which will be small (no more
          than width_of_multi_cell * size-of-tiling-cell); we convert to
@@ -290,8 +290,8 @@ class GroupedGeolocateDocumentEvalStats(cellgrid: CellGrid) {
       }
       errprint("")
 
-      if (cellgrid.isInstanceOf[MultiRegularCellGrid]) {
-        val multigrid = cellgrid.asInstanceOf[MultiRegularCellGrid]
+      if (cell_grid.isInstanceOf[MultiRegularCellGrid]) {
+        val multigrid = cell_grid.asInstanceOf[MultiRegularCellGrid]
 
         for (
           (frac_truedist, obj) <-
@@ -386,7 +386,7 @@ abstract class GeolocateDocumentEvaluator(
   val strategy: GeolocateDocumentStrategy,
   stratname: String
 ) extends TestFileEvaluator(stratname) {
-  val evalstats = new GroupedGeolocateDocumentEvalStats(strategy.cellgrid)
+  val evalstats = new GroupedGeolocateDocumentEvalStats(strategy.cell_grid)
 
   def output_results(isfinal: Boolean = false) {
     evalstats.output_results(all_results = isfinal)
@@ -398,7 +398,7 @@ case class ArticleEvaluationResult(
   pred_cell: GeoCell,
   true_rank: Int
 ) extends EvaluationResult {
-  val true_cell = pred_cell.cellgrid.find_best_cell_for_coord(article.coord)
+  val true_cell = pred_cell.cell_grid.find_best_cell_for_coord(article.coord)
   val num_arts_in_true_cell = true_cell.word_dist_wrapper.num_arts_for_word_dist
   val true_center = true_cell.get_center_coord()
   val true_truedist = spheredist(article.coord, true_center)
@@ -415,7 +415,7 @@ case class ArticleEvaluationResult(
 class ArticleGeolocateDocumentEvaluator(
   strategy: GeolocateDocumentStrategy,
   stratname: String,
-  driver: GeolocateDocumentDriver
+  driver: GeolocateDocumentTypeDriver
 ) extends GeolocateDocumentEvaluator(strategy, stratname) {
 
   type Document = GeoArticle
@@ -464,7 +464,7 @@ class ArticleGeolocateDocumentEvaluator(
       return null
     assert(article.dist.finished)
     val true_cell =
-      strategy.cellgrid.find_best_cell_for_coord(article.coord)
+      strategy.cell_grid.find_best_cell_for_coord(article.coord)
     if (debug("lots") || debug("commontop")) {
       val naitr = true_cell.word_dist_wrapper.num_arts_for_word_dist
       errprint("Evaluating article %s with %s word-dist articles in true cell",
@@ -533,7 +533,7 @@ class ArticleGeolocateDocumentEvaluator(
         if (!true_cell.isInstanceOf[MultiRegularCell])
           warning("Can't output ranking grid, cell not of right type")
         else {
-          strategy.cellgrid.asInstanceOf[MultiRegularCellGrid].
+          strategy.cell_grid.asInstanceOf[MultiRegularCellGrid].
             output_ranking_grid(
               pred_cells.asInstanceOf[Seq[(MultiRegularCell, Double)]],
               true_cell.asInstanceOf[MultiRegularCell], grsize)
@@ -551,7 +551,7 @@ class TitledDocumentResult extends EvaluationResult {
 class PCLTravelGeolocateDocumentEvaluator(
   strategy: GeolocateDocumentStrategy,
   stratname: String,
-  driver: GeolocateDocumentDriver
+  driver: GeolocateDocumentTypeDriver
 ) extends GeolocateDocumentEvaluator(strategy, stratname) {
   case class TitledDocument(
     title: String, text: String) extends EvaluationDocument 
