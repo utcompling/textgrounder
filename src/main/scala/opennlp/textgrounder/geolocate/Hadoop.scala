@@ -288,7 +288,7 @@ class ArticleResultReducer extends
 
   type ContextType = Reducer[Text, DoubleWritable, Text, DoubleWritable]#Context
 
-  override def reduce (key: Text, values: java.lang.Iterable[DoubleWritable],
+  override def reduce(key: Text, values: java.lang.Iterable[DoubleWritable],
       context: ContextType) {
     val errordists = (for (v <- values) yield v.get).toSeq
     val mean_dist = mean(errordists)
