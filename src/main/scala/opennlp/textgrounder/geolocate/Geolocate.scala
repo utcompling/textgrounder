@@ -1168,6 +1168,8 @@ class MultiRegularCellGrid(
  * pointed to by the redirect.
  */
 class GeoArticleTable(
+  /* FIXME: The point of this parameter is so that we can use the counter
+     mechanism instead of our own statistics.  Implement this. */
   val driver_stats: ExperimentDriverStats,
   val word_dist_factory: WordDistFactory
 ) {
