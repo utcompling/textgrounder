@@ -735,20 +735,49 @@ package object tgutil {
      value and want keys not yet seen to automatically spring into
      existence with the value of 0 (or empty string). */
   def intmap[T]() = defaultmap[T,Int](0)
+  def longmap[T]() = defaultmap[T,Long](0)
+  def shortmap[T]() = defaultmap[T,Short](0)
+  def bytemap[T]() = defaultmap[T,Byte](0)
   def doublemap[T]() = defaultmap[T,Double](0.0)
+  def floatmap[T]() = defaultmap[T,Float](0.0f)
   def booleanmap[T]() = defaultmap[T,Boolean](false)
   def stringmap[T]() = defaultmap[T,String]("")
-  /** A default map which maps from T to an (extendible) array of type U.
+  /** A default map which maps from T to an (extendable) array of type U.
       The default value is an empty Buffer of type U.  Calls of the sort
-      'map(key) += item' will add the item to the Buffer stored as the
+      `map(key) += item` will add the item to the Buffer stored as the
       value of the key rather than changing the value itself. (After doing
       this, the result of 'map(key)' will be the same collection, but the
       contents of the collection will be modified.  On the other hand, in
       the case of the above maps, the result of 'map(key)' will be
       different.)
+      
+      @see #setmap[T,U]
+      @see #mapmap[T,U,V]
     */
   def bufmap[T,U]() =
     defaultmap[T,mutable.Buffer[U]](mutable.Buffer[U](), setkey=true)
+  /** A default map which maps from T to a set of type U.  The default
+      value is an empty Set of type U.  Calls of the sort
+      `map(key) += item` will add the item to the Set stored as the
+      value of the key rather than changing the value itself, similar
+      to how `bufmap` works.
+      
+      @see #bufmap[T,U]
+      @see #mapmap[T,U,V]
+    */
+  def setmap[T,U]() =
+    defaultmap[T,mutable.Set[U]](mutable.Set[U](), setkey=true)
+  /** A default map which maps from T to a map from U to V.  The default
+      value is an empty Map of type U->V.  Calls of the sort
+      `map(key)(key2) = value2` will add the mapping `key2 -> value2`
+      to the Map stored as the value of the key rather than changing
+      the value itself, similar to how `bufmap` works.
+      
+      @see #bufmap[T,U]
+      @see #setmap[T,U]
+    */
+  def mapmap[T,U,V]() =
+    defaultmap[T,mutable.Map[U,V]](mutable.Map[U,V](), setkey=true)
   
   // Another way to do this, using subclassing.
   //

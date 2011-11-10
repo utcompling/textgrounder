@@ -1,4 +1,4 @@
-///////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 //  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +15,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 package opennlp.textgrounder.geolocate
+
+import collection.mutable
 
 import tgutil._
 import argparser._
@@ -164,6 +166,146 @@ abstract class ExperimentApp(val progname: String) {
 }
 
 /**
+ * A mix-in that adds to a driver the ability to record statistics about
+ * the experiment run.
+ */
+abstract trait ExperimentDriverStats {
+  /** Set of counters under the given group, using fully-qualified names. */
+  protected val counters_by_group = setmap[String,String]()
+  /** Set of counter groups under the given group, using fully-qualified
+   * names. */
+  protected val counter_groups_by_group = setmap[String,String]()
+  /** Set of all counters seen. */
+  protected val counters_by_name = mutable.Set[String]()
+
+  /**
+   * Note that a counter of the given name exists.  It's not necessary to
+   * do this before calling `increment_counter` or `get_counter` because
+   * unseen counters default to 0, but doing so ensures that the counter
+   * is seen when we enumerate counters even if it has never been incremented.
+   */
+  def note_counter(name: String) {
+    if (!(counters_by_name contains name)) {
+      counters_by_name += name
+      note_counter_by_group(name, true)
+    }
+  }
+
+  protected def split_counter(name: String) = {
+    val lastsep = name.lastIndexOf('.')
+    if (lastsep < 0)
+      ("", name)
+    else
+      (name.slice(0, lastsep), name.slice(lastsep + 1, name.length))
+  }
+
+  /**
+   * Note each part of the name in the next-higher group.  For example,
+   * for a name "io.sort.spill.percent", we note the counter "percent" in
+   * group "io.sort.spill", but also the group "spill" in the group "io.sort",
+   * the group "sort" in the group "io", and the group "io" in the group "".
+   *
+   * @param name Name of the counter
+   * @param is_counter Whether this is an actual counter, or a group.
+   */
+  private def note_counter_by_group(name: String, is_counter: Boolean) {
+    val (group, _) = split_counter(name)
+    if (is_counter)
+      counters_by_group(group) += name
+    else
+      counter_groups_by_group(group) += name
+    if (group != "")
+      note_counter_by_group(group, false)
+  }
+
+  /**
+   * Enumerate all the counters in the given group, for counters
+   * which have been either incremented or noted (using `note_counter`).
+   *
+   * @param group Group to list counters under.  Can be set to the
+   *   empty string ("") to list from the top level.
+   * @param recursive If true, search recursively under the group;
+   *   otherwise, only list those at the level immediately under the group.
+   * @param fully_qualified If true (the default), all counters returned
+   *   are fully-qualified, i.e. including the entire counter name.
+   *   Otherwise, only the portion after `group` is returned.
+   * @returns An iterator over counters
+   */
+  def list_counters(group: String, recursive: Boolean,
+      fully_qualified: Boolean = true) = {
+    val groups = Iterable(group)
+    val subgroups =
+      if (!recursive)
+        Iterable[String]()
+      else
+        list_counter_groups(group, true)
+    val fq = (groups.view ++ subgroups) flatMap (counters_by_group(_))
+    if (fully_qualified) fq
+    else fq map (_.stripPrefix(group + "."))
+  }
+
+  /**
+   * Enumerate all the counter groups in the given group, for counters
+   * which have been either incremented or noted (using `note_counter`).
+   *
+   * @param group Group to list counter groups under.  Can be set to the
+   *   empty string ("") to list from the top level.
+   * @param recursive If true, search recursively under the group;
+   *   otherwise, only list those at the level immediately under the group.
+   * @param fully_qualified If true (the default), all counter groups returned
+   *   are fully-qualified, i.e. including the entire counter name.
+   *   Otherwise, only the portion after `group` is returned.
+   * @returns An iterator over counter groups
+   */
+  def list_counter_groups(group: String, recursive: Boolean,
+      fully_qualified: Boolean = true): Iterable[String] = {
+    val groups = counter_groups_by_group(group).view
+    val fq =
+      if (!recursive)
+        groups
+      else
+        groups ++ (groups flatMap (list_counter_groups(_, true)))
+    if (fully_qualified) fq
+    else fq map (_.stripPrefix(group + "."))
+  }
+
+  /**
+   * Increment the given counter by 1.
+   */
+  def increment_counter(name: String) {
+    increment_counter(name, 1)
+  }
+
+  /**
+   * Increment the given counter by the given value.
+   */
+  def increment_counter(name: String, byvalue: Long) {
+    note_counter(name)
+    do_increment_counter(name, byvalue)
+  }
+
+  /******************* Override/implement below this line **************/
+
+  /**
+   * Underlying implementation to increment the given counter by the
+   * given value.
+   */
+  protected def do_increment_counter(name: String, byvalue: Long)
+
+  /**
+   * Return the value of the given counter.  Note: When operating in a
+   * multi-threaded or multi-process environment, it cannot be guaranteed
+   * that this value is up-to-date.  This is especially the case e.g. when
+   * operating in Hadoop, where counters are maintained globally across
+   * tasks which are running on different machines on the network.
+   */
+  def get_counter(name: String): Long
+}
+
+abstract class ExperimentParameters(val parser: ArgParser) {
+}
+
+/**
  * A general experiment driver class for programmatic access to a program
  * that runs experiments.
  *
@@ -186,30 +328,16 @@ abstract class ExperimentApp(val progname: String) {
  */
 
 abstract class ExperimentDriver {
-  type ArgType
+  type ArgType <: ExperimentParameters
   type RunReturnType
   var params: ArgType = _
 
-  protected var argerror = default_error_handler _
-
   /**
-   * Default error handler for signalling an argument error.
+   * Signal an argument error.
    */
-  def default_error_handler(string: String) {
-    throw new IllegalArgumentException(string)
-  }
-
-  /**
-   * Change the error handler.  Return the old handler.
-   */
-  def set_error_handler(handler: String => Unit) = {
-    /* FUCK ME TO HELL.  Want to make this either a function to override
-       or a class parameter, but both get awkward because Java type erasure
-       means there's no easy way for a generic class to create a new object
-       of the generic type. */
-    val old_handler = argerror
-    argerror = handler
-    old_handler
+  def argerror(string: String) {
+    // throw new IllegalArgumentException(string)
+    params.parser.error(string)
   }
 
   protected def argument_needed(arg: String, arg_english: String = null) {
@@ -253,8 +381,7 @@ abstract class ExperimentDriver {
    * Verify and canonicalize the given command-line arguments.  Retrieve
    * any other parameters from the environment.  NOTE: Currently, some of the
    * fields in this structure will be changed (canonicalized).  See above.
-   * If options are illegal, an error will be signaled.
-   *
+   * If options are illegal, an error will be signaled.-   *
    * @param options Object holding options to set
    */
 
@@ -296,16 +423,11 @@ abstract class ExperimentDriverApp(appname: String) extends
 
   def create_driver(): DriverType
 
-  def arg_error(str: String) {
-    arg_parser.error(str)
-  }
-
   override def output_ancillary_parameters() {
     driver.output_ancillary_parameters()
   }
 
   def initialize_parameters() {
-    driver.set_error_handler(arg_error _)
     driver.handle_parameters(arg_holder)
   }
 

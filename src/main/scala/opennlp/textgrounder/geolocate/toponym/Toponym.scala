@@ -639,33 +639,35 @@ class TopoArticleTable(word_dist_factory: WordDistFactory) extends
 }
 
 class EvalStatsWithCandidateList(
+  driver_stats: ExperimentDriverStats,
   incorrect_reasons: Map[String, String],
-  max_individual_candidates: Int = 5) extends EvalStats(incorrect_reasons) {
-  // Toponyms by number of candidates available
-  val total_instances_by_num_candidates = intmap[Int]()
-  val correct_instances_by_num_candidates = intmap[Int]()
-  val incorrect_instances_by_num_candidates = intmap[Int]()
+  max_individual_candidates: Int = 5
+) extends EvalStats(driver_stats, incorrect_reasons) {
 
   def record_result(correct: Boolean, reason: String, num_candidates: Int) {
     super.record_result(correct, reason)
-    total_instances_by_num_candidates(num_candidates) += 1
+    increment_counter("instances.total.by_candidate." + num_candidates)
     if (correct)
-      correct_instances_by_num_candidates(num_candidates) += 1
+      increment_counter("instances.correct.by_candidate." + num_candidates)
     else
-      incorrect_instances_by_num_candidates(num_candidates) += 1
+      increment_counter("instances.incorrect.by_candidate." + num_candidates)
   }
 
   // SCALABUG: The need to write collection.Map here rather than simply
   // Map seems clearly wrong.  It seems the height of obscurity that
   // "collection.Map" is the common supertype of plain "Map"; the use of
   // overloaded "Map" seems to be the root of the problem.
-  def output_table_by_num_candidates(table: collection.Map[Int, Int],
-    total: Int) {
+  def output_table_by_num_candidates(group: String, total: Long) {
     for (i <- 0 to max_individual_candidates)
-      output_fraction("  With %d  candidates" format i, table(i), total)
+      output_fraction("  With %d  candidates" format i,
+        get_counter(group + "." + i), total)
     val items = (
-      for ((key, value) <- table if key > max_individual_candidates)
-        yield value).sum
+      for {counter <- list_counters(group, false, false)
+           key = counter.toInt
+           if key > max_individual_candidates
+          }
+      yield get_counter(group + "." + counter)
+      ).sum
     output_fraction(
       "  With %d+ candidates" format (1 + max_individual_candidates),
       items, total)
@@ -673,14 +675,12 @@ class EvalStatsWithCandidateList(
 
   override def output_correct_results() {
     super.output_correct_results()
-    output_table_by_num_candidates(
-      correct_instances_by_num_candidates, correct_instances)
+    output_table_by_num_candidates("instances.correct", correct_instances)
   }
 
   override def output_incorrect_results() {
     super.output_incorrect_results()
-    output_table_by_num_candidates(
-      incorrect_instances_by_num_candidates, incorrect_instances)
+    output_table_by_num_candidates("instances.incorrect", incorrect_instances)
   }
 }
 
@@ -699,15 +699,18 @@ object GeolocateToponymResults {
 }
 
 //////// Results for geotagging toponyms
-class GeolocateToponymResults {
+class GeolocateToponymResults(driver_stats: ExperimentDriverStats) {
   import GeolocateToponymResults._
 
   // Overall statistics
-  val all_toponym = new EvalStatsWithCandidateList(incorrect_geotag_toponym_reasons)
+  val all_toponym = new EvalStatsWithCandidateList(
+    driver_stats, incorrect_geotag_toponym_reasons)
   // Statistics when toponym not same as true name of location
-  val diff_surface = new EvalStatsWithCandidateList(incorrect_geotag_toponym_reasons)
+  val diff_surface = new EvalStatsWithCandidateList(
+    driver_stats, incorrect_geotag_toponym_reasons)
   // Statistics when toponym not same as true name or short form of location
-  val diff_short = new EvalStatsWithCandidateList(incorrect_geotag_toponym_reasons)
+  val diff_short = new EvalStatsWithCandidateList(
+    driver_stats, incorrect_geotag_toponym_reasons)
 
   def record_geotag_toponym_result(correct: Boolean, toponym: String,
       trueloc: String, reason: String, num_candidates: Int) {
@@ -850,7 +853,7 @@ abstract class GeolocateToponymEvaluator(
   stratname: String,
   driver: GeolocateToponymDriver
 ) extends TestFileEvaluator(stratname) {
-  val results = new GeolocateToponymResults()
+  val results = new GeolocateToponymResults(driver)
 
   case class GeogWordDocument(
     words: Iterable[GeogWord]) extends EvaluationDocument
@@ -1480,7 +1483,8 @@ incoming internal links.  Note that this only applies when
 considered.  Default '%default'.""")
 }
 
-class GeolocateToponymDriver extends GeolocateDriver {
+class GeolocateToponymDriver extends
+    GeolocateDriver with StandaloneGeolocateDriverStats {
   type ArgType = GeolocateToponymParameters
   type RunReturnType =
     Seq[(String, GeolocateToponymStrategy, EvaluationOutputter)]

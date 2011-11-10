@@ -1828,7 +1828,8 @@ object Stopwords {
  *   Because they are vars, they can be freely set to other values.
  *
  */
-class GeolocateParameters(parser: ArgParser = null) {
+class GeolocateParameters(parser: ArgParser = null) extends
+    ExperimentParameters(parser) {
   protected val ap =
     if (parser == null) new ArgParser("unknown") else parser
 
@@ -2103,7 +2104,8 @@ class DebugSettings {
  * also returned by the run() function.  There are some scripts to parse the
  * console output.  See below.
  */
-abstract class GeolocateDriver extends ExperimentDriver {
+abstract class GeolocateDriver extends
+    ExperimentDriver with ExperimentDriverStats {
   override type ArgType <: GeolocateParameters
   var degrees_per_cell = 0.0
   var stopwords: Set[String] = _
@@ -2265,7 +2267,8 @@ low values more visible.  Possibilities are 'none' (no transformation),
       help = """Height of highest bar, in meters.  Default %default.""")
 }
 
-class GenerateKMLDriver extends GeolocateDriver {
+class GenerateKMLDriver extends
+    GeolocateDriver with StandaloneGeolocateDriverStats {
   type ArgType = GenerateKMLParameters
   type RunReturnType = Null
 
@@ -2584,7 +2587,21 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
   }
 }
 
-class GeolocateDocumentDriver extends GeolocateDocumentTypeDriver {
+/**
+ * Implementation of driver-statistics mix-in that simply stores the
+ * counters locally.
+ */
+trait StandaloneGeolocateDriverStats extends ExperimentDriverStats {
+  val counter_values = longmap[String]()
+  def do_increment_counter(name: String, incr: Long) {
+    counter_values(name) += incr
+  }
+
+  def get_counter(name: String) = counter_values(name)
+}
+
+class GeolocateDocumentDriver extends
+    GeolocateDocumentTypeDriver with StandaloneGeolocateDriverStats {
   override type ArgType = GeolocateDocumentParameters
 }
 

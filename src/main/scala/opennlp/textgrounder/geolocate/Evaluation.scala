@@ -16,34 +16,44 @@ import java.io._
 
 // incorrect_reasons is a map from ID's for reasons to strings describing
 // them.
-class EvalStats(incorrect_reasons: Map[String, String]) {
-  // Statistics on the types of instances processed
-  // Total number of instances
-  var total_instances = 0
-  var correct_instances = 0
-  var incorrect_instances = 0
-  val other_stats = intmap[String]()
+class EvalStats(
+  driver_stats: ExperimentDriverStats,
+  incorrect_reasons: Map[String, String]
+) {
   // Map from reason ID's to counts
-  var results = intmap[String]()
+  val stats_group = "textgrounder"
+
+  def increment_counter(name: String) {
+    driver_stats.increment_counter(stats_group + "." + name)
+  }
+
+  def get_counter(name: String) = {
+    driver_stats.get_counter(stats_group + "." + name)
+  }
+
+  def list_counters(group: String, recursive: Boolean,
+      fully_qualified: Boolean = true) =
+    driver_stats.list_counters(stats_group + "." + group, recursive,
+      fully_qualified)
 
   def record_result(correct: Boolean, reason: String = null) {
     if (reason != null)
       assert(incorrect_reasons.keySet contains reason)
-    total_instances += 1
+    increment_counter("instances.total")
     if (correct)
-      correct_instances += 1
+      increment_counter("instances.correct")
     else {
-      incorrect_instances += 1
+      increment_counter("instances.incorrect")
       if (reason != null)
-        results(reason) += 1
+        increment_counter("instances.incorrect." + reason)
     }
   }
 
-  def record_other_stat(othertype: String) {
-    other_stats(othertype) += 1
-  }
+  def total_instances = get_counter("instances.total")
+  def correct_instances = get_counter("instances.correct")
+  def incorrect_instances = get_counter("instances.incorrect")
 
-  def output_fraction(header: String, amount: Int, total: Int) {
+  def output_fraction(header: String, amount: Long, total: Long) {
     if (amount > total) {
       warning("Something wrong: Fractional quantity %s greater than total %s",
         amount, total)
@@ -55,21 +65,22 @@ class EvalStats(incorrect_reasons: Map[String, String]) {
   }
 
   def output_correct_results() {
-    output_fraction("Percent correct", correct_instances,
-      total_instances)
+    output_fraction("Percent correct", correct_instances, total_instances)
   }
 
   def output_incorrect_results() {
-    output_fraction("Percent incorrect", incorrect_instances,
-      total_instances)
+    output_fraction("Percent incorrect", incorrect_instances, total_instances)
     for ((reason, descr) <- incorrect_reasons) {
-      output_fraction("  %s" format descr, results(reason), total_instances)
+      output_fraction("  %s" format descr,
+        get_counter("instances.incorrect." + reason), total_instances)
     }
   }
 
   def output_other_stats() {
-    for ((ty, count) <- other_stats)
+    for (ty <- driver_stats.list_counters(stats_group, true)) {
+      val count = driver_stats.get_counter(ty)
       errprint("%s = %s", ty, count)
+    }
   }
 
   def output_results() {
@@ -85,8 +96,9 @@ class EvalStats(incorrect_reasons: Map[String, String]) {
 }
 
 class EvalStatsWithRank(
+  driver_stats: ExperimentDriverStats,
   max_rank_for_credit: Int = 10
-) extends EvalStats(Map[String, String]()) {
+) extends EvalStats(driver_stats, Map[String, String]()) {
   val incorrect_by_exact_rank = intmap[Int]()
   val correct_by_up_to_rank = intmap[Int]()
   var incorrect_past_max_rank = 0
@@ -132,8 +144,9 @@ class EvalStatsWithRank(
 //////// Statistics for geotagging documents/articles
 
 class GeolocateDocumentEvalStats(
+  driver_stats: ExperimentDriverStats,
   max_rank_for_credit: Int = 10
-) extends EvalStatsWithRank(max_rank_for_credit) {
+) extends EvalStatsWithRank(driver_stats, max_rank_for_credit) {
   // "True dist" means actual distance in km's or whatever.
   // "Degree dist" is the distance in degrees.
   val true_dists = mutable.Buffer[Double]()
@@ -180,9 +193,12 @@ class GeolocateDocumentEvalStats(
  * number of articles in true cell.
  */
 
-class GroupedGeolocateDocumentEvalStats(cell_grid: CellGrid) {
+class GroupedGeolocateDocumentEvalStats(
+  driver_stats: ExperimentDriverStats,
+  cell_grid: CellGrid
+) {
 
-  def create_doc() = new GeolocateDocumentEvalStats()
+  def create_doc() = new GeolocateDocumentEvalStats(driver_stats)
   val all_document = create_doc()
 
   // naitr = "num articles in true cell"
@@ -264,8 +280,8 @@ class GroupedGeolocateDocumentEvalStats(cell_grid: CellGrid) {
     }
   }
 
-  def record_other_stat(othertype: String) {
-    all_document.record_other_stat(othertype)
+  def increment_counter(name: String) {
+    all_document.increment_counter(name)
   }
 
   def output_results(all_results: Boolean = false) {
@@ -384,9 +400,11 @@ abstract class TestFileEvaluator(val stratname: String) {
 
 abstract class GeolocateDocumentEvaluator(
   val strategy: GeolocateDocumentStrategy,
-  stratname: String
+  stratname: String,
+  driver: GeolocateDocumentTypeDriver
 ) extends TestFileEvaluator(stratname) {
-  val evalstats = new GroupedGeolocateDocumentEvalStats(strategy.cell_grid)
+  val evalstats = new GroupedGeolocateDocumentEvalStats(driver,
+    strategy.cell_grid)
 
   def output_results(isfinal: Boolean = false) {
     evalstats.output_results(all_results = isfinal)
@@ -416,7 +434,7 @@ class ArticleGeolocateDocumentEvaluator(
   strategy: GeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends GeolocateDocumentEvaluator(strategy, stratname) {
+) extends GeolocateDocumentEvaluator(strategy, stratname, driver) {
 
   type Document = GeoArticle
   type DocumentResult = ArticleEvaluationResult
@@ -453,15 +471,16 @@ class ArticleGeolocateDocumentEvaluator(
       // so that the counts for many articles don't get read in.
       if (driver.params.max_time_per_stage == 0.0 && driver.params.num_training_docs == 0)
         warning("Can't evaluate article %s without distribution", article)
-      evalstats.record_other_stat("Skipped articles")
       true
     } else false
   }
 
   def evaluate_document(article: GeoArticle, doctag: String):
       EvaluationResult = {
-    if (would_skip_document(article, doctag))
+    if (would_skip_document(article, doctag)) {
+      evalstats.increment_counter("articles.skipped")
       return null
+    }
     assert(article.dist.finished)
     val true_cell =
       strategy.cell_grid.find_best_cell_for_coord(article.coord)
@@ -509,8 +528,7 @@ class ArticleGeolocateDocumentEvaluator(
       !driver.params.oracle_results && !driver.params.no_individual_results
     evalstats.record_result(result)
     if (result.num_arts_in_true_cell == 0) {
-      evalstats.record_other_stat(
-        "Articles with no training articles in cell")
+      evalstats.increment_counter("articles.no_training_articles_in_cell")
     }
     if (want_indiv_results) {
       errprint("%s:Article %s:", doctag, article)
@@ -552,7 +570,7 @@ class PCLTravelGeolocateDocumentEvaluator(
   strategy: GeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends GeolocateDocumentEvaluator(strategy, stratname) {
+) extends GeolocateDocumentEvaluator(strategy, stratname, driver) {
   case class TitledDocument(
     title: String, text: String) extends EvaluationDocument 
   type Document = TitledDocument
