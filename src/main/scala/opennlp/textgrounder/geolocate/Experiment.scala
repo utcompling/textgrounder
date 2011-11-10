@@ -357,7 +357,7 @@ abstract trait ExperimentDriverStats {
   val local_counter_group: String 
 
   /**
-   * Return ID of task.  This is used for Hadoop or similar, to handle
+   * Return ID of current task.  This is used for Hadoop or similar, to handle
    * operations that may be run multiple times per task in an overall job.
    * In a standalone environment, this should always return the same value.
    */

@@ -688,7 +688,7 @@ abstract class CellGrid(val table: GeoArticleTable) {
     errprint("Percent non-empty cells: %g",
       num_non_empty_cells.toDouble / total_num_cells)
     val training_arts_with_word_counts =
-      table.num_word_count_articles_by_split("training")
+      table.num_word_count_articles_by_split("training").value
     errprint("Training articles per non-empty cell: %g",
       training_arts_with_word_counts.toDouble / num_non_empty_cells)
     // Clear out the article distributions of the training set, since
@@ -1174,6 +1174,61 @@ class GeoArticleTable(
   val word_dist_factory: WordDistFactory
 ) {
   /**
+   * A mechanism for wrapping task counters so that they can be stored
+   * in variables and incremented simply using +=.  Note that access to
+   * them still needs to go through `value`, unfortunately. (Even marking
+   * `value` as implicit isn't enough as the function won't get invoked
+   * unless we're in an environment requiring an integral value.  This means
+   * it won't get invoked in print statements, variable assignments, etc.)
+   *
+   * It would be nice to move this elsewhere; we'd have to pass in
+   * `driver_stats`, though.
+   *
+   * NOTE: The counters are task-specific because currently each task
+   * reads the entire set of training articles into memory.  We could avoid
+   * this by splitting the tasks so that each task is commissioned to
+   * run over a specific portion of the Earth rather than a specific
+   * set of test articles.  Note that if we further split things so that
+   * each task handled both a portion of test articles and a portion of
+   * the Earth, it would be somewhat trickier, depending on exactly how
+   * we write the code -- for a given set of test articles, different
+   * portions of the Earth would be reading in different training articles,
+   * so we'd presumably want their counts to add; but we might not want
+   * all counts to add.
+   */
+
+  def construct_task_counter_name(name: String) =
+    "bytask." + driver_stats.get_task_id + "." + name
+
+  def increment_task_counter(name: String, byvalue: Long = 1) {
+    driver_stats.increment_local_counter(construct_task_counter_name(name),
+      byvalue)
+  }
+
+  def get_task_counter(name: String) = {
+    driver_stats.get_local_counter(construct_task_counter_name(name))
+  }
+
+  class TaskCounterWrapper(name: String) {
+    def value = get_task_counter(name)
+
+    def +=(incr: Long) {
+      increment_task_counter(name, incr)
+    }
+  }
+
+  def create_counter_wrapper(prefix: String, split: String) =
+    new TaskCounterWrapper(prefix + "." + split)
+
+  def countermap(prefix: String) =
+    new SettingDefaultHashMap[String, TaskCounterWrapper](
+      create_counter_wrapper(prefix, _))
+
+  /**********************************************************************/
+  /*                     Begin GeoArticleTable proper                   */
+  /**********************************************************************/
+
+  /**
    * Mapping from article names to GeoArticle objects, using the actual case of
    * the article.
    */
@@ -1187,46 +1242,40 @@ class GeoArticleTable(
   /**
    * Num of articles with word-count information but not in table.
    */
-  var num_articles_with_word_counts_but_not_in_table = 0
-
-  def record_article_with_word_count_but_not_in_table() {
-    num_articles_with_word_counts_but_not_in_table += 1
-  }
-
-  def record_word_count_article_by_split(split: String) {
-    num_word_count_articles_by_split(split) += 1
-  }
-
-  def record_num_articles_with_word_counts(num_arts: Int) {
-    num_articles_with_word_counts += num_arts
-  }
+  val num_articles_with_word_counts_but_not_in_table =
+    new TaskCounterWrapper("articles_with_word_counts_but_not_in_table")
 
   /**
    * Num of articles with word-count information (whether or not in table).
    */
-  var num_articles_with_word_counts = 0
+  val num_articles_with_word_counts =
+    new TaskCounterWrapper("articles_with_word_counts")
 
   /** 
    * Num of articles in each split with word-count information seen.
    */
-  val num_word_count_articles_by_split = intmap[String]()
+  val num_word_count_articles_by_split =
+    countermap("word_count_articles_by_split")
 
   /**
    * Num of articles in each split with a computed distribution.
    * (Not the same as the previous since we don't compute the distribution of
    * articles in either the test or dev set depending on which one is used.)
    */
-  val num_dist_articles_by_split = intmap[String]()
+  val num_dist_articles_by_split =
+    countermap("num_dist_articles_by_split")
 
   /**
    * Total # of word tokens for all articles in each split.
    */
-  val word_tokens_by_split = intmap[String]()
+  val word_tokens_by_split =
+    countermap("word_tokens_by_split")
 
   /**
    * Total # of incoming links for all articles in each split.
    */
-  val incoming_links_by_split = intmap[String]()
+  val incoming_links_by_split =
+    countermap("incoming_links_by_split")
 
   /**
    * Map from short name (lowercased) to list of articles.
@@ -1363,8 +1412,8 @@ class GeoArticleTable(
           numarts += 1
         }
       }
-      num_dist_articles_by_split(split) = numarts
-      word_tokens_by_split(split) = totaltoks
+      num_dist_articles_by_split(split) += numarts
+      word_tokens_by_split(split) += totaltoks
     }
   }
 
@@ -1379,29 +1428,29 @@ class GeoArticleTable(
     errprint("")
     errprint("-------------------------------------------------------------------------")
     errprint("Article count statistics:")
-    var total_arts_in_table = 0
-    var total_arts_with_word_counts = 0
-    var total_arts_with_dists = 0
+    var total_arts_in_table = 0L
+    var total_arts_with_word_counts = 0L
+    var total_arts_with_dists = 0L
     for ((split, totaltoks) <- word_tokens_by_split) {
       errprint("For split '%s':", split)
       val arts_in_table = articles_by_split(split).length
-      val arts_with_word_counts = num_word_count_articles_by_split(split)
-      val arts_with_dists = num_dist_articles_by_split(split)
+      val arts_with_word_counts = num_word_count_articles_by_split(split).value
+      val arts_with_dists = num_dist_articles_by_split(split).value
       total_arts_in_table += arts_in_table
       total_arts_with_word_counts += arts_with_word_counts
       total_arts_with_dists += arts_with_dists
       errprint("  %s articles in article table", arts_in_table)
       errprint("  %s articles with word counts seen (and in table)", arts_with_word_counts)
       errprint("  %s articles with distribution computed, %s total tokens, %.2f tokens/article",
-        arts_with_dists, totaltoks,
+        arts_with_dists, totaltoks.value,
         // Avoid division by zero
-        totaltoks.toDouble / (arts_in_table + 1e-100))
+        totaltoks.value.toDouble / (arts_in_table + 1e-100))
     }
     errprint("Total: %s articles with word counts seen",
-      num_articles_with_word_counts)
+      num_articles_with_word_counts.value)
     errprint("Total: %s articles in article table", total_arts_in_table)
     errprint("Total: %s articles with word counts seen but not in article table",
-      num_articles_with_word_counts_but_not_in_table)
+      num_articles_with_word_counts_but_not_in_table.value)
     errprint("Total: %s articles with word counts seen (and in table)",
       total_arts_with_word_counts)
     errprint("Total: %s articles with distribution computed",
