@@ -43,7 +43,7 @@ import java.io._
  * especially for bigrams or trigrams).
  */ 
 class PseudoGoodTuringSmoothedWordDistFactory extends
-    WordDistFactory {
+    UnigramWordDistFactory {
   // Total number of types seen once
   var total_num_types_seen_once = 0
 
@@ -101,121 +101,10 @@ class PseudoGoodTuringSmoothedWordDistFactory extends
     new PseudoGoodTuringSmoothedWordDist(this, Array[Word](), Array[Int](), 0,
       note_globally=false)
 
-  def read_word_counts(table: GeoArticleTable,
-      filehand: FileHandler, filename: String, stopwords: Set[String]) {
-    val initial_dynarr_size = 1000
-    val keys_dynarr =
-      new DynamicArray[Word](initial_alloc = initial_dynarr_size)
-    val values_dynarr =
-      new DynamicArray[Int](initial_alloc = initial_dynarr_size)
-
-    // This is basically a one-off debug statement because of the fact that
-    // the experiments published in the paper used a word-count file generated
-    // using an older algorithm for determining the geotagged coordinate of
-    // an article.  We didn't record the corresponding article-data
-    // file, so we need a way of regenerating it using the intersection of
-    // articles in the article-data file we actually used for the experiments
-    // and the word-count file we used.
-    var stream: PrintStream = null
-    var writer: ArticleWriter = null
-    if (debug("wordcountarts")) {
-      // Change this if you want a different file name
-      val wordcountarts_filename = "wordcountarts-combined-article-data.txt"
-      stream = filehand.openw(wordcountarts_filename)
-      // See write_article_data_file() in ArticleData.scala
-      writer =
-        new ArticleWriter(stream, ArticleData.combined_article_data_outfields)
-      writer.output_header()
-    }
-
-    var num_word_tokens = 0
-    var title = null: String
-
-    def one_article_probs() {
-      if (num_word_tokens == 0) return
-      val art = table.lookup_article(title)
-      if (art == null) {
-        warning("Skipping article %s, not in table", title)
-        table.num_articles_with_word_counts_but_not_in_table += 1
-        return
-      }
-      if (debug("wordcountarts"))
-        writer.output_row(art)
-      table.num_word_count_articles_by_split(art.split) += 1
-      // If we are evaluating on the dev set, skip the test set and vice
-      // versa, to save memory and avoid contaminating the results.
-      if (art.split != "training" && art.split != Args.eval_set)
-        return
-      // Don't train on test set
-      art.dist =
-        new PseudoGoodTuringSmoothedWordDist(this, keys_dynarr.array,
-          values_dynarr.array, keys_dynarr.length,
-          note_globally = (art.split == "training"))
-    }
-
-    val task = new MeteredTask("article", "reading distributions of")
-    errprint("Reading word counts from %s...", filename)
-    errprint("")
-
-    // Written this way because there's another line after the for loop,
-    // corresponding to the else clause of the Python for loop
-    breakable {
-      for (line <- filehand.openr(filename)) {
-        if (line.startsWith("Article title: ")) {
-          if (title != null)
-            one_article_probs()
-          // Stop if we've reached the maximum
-          if (task.item_processed(maxtime = Args.max_time_per_stage))
-            break
-          if ((Args.num_training_docs > 0 &&
-            task.num_processed >= Args.num_training_docs)) {
-            errprint("")
-            errprint("Stopping because limit of %s documents reached",
-              Args.num_training_docs)
-            break
-          }
-
-          // Extract title and set it
-          val titlere = "Article title: (.*)$".r
-          line match {
-            case titlere(ti) => title = ti
-            case _ => assert(false)
-          }
-          keys_dynarr.clear()
-          values_dynarr.clear()
-          num_word_tokens = 0
-        } else if (line.startsWith("Article coordinates) ") ||
-          line.startsWith("Article ID: "))
-          ()
-        else {
-          val linere = "(.*) = ([0-9]+)$".r
-          line match {
-            case linere(xword, xcount) => {
-              var word = xword
-              if (!Args.preserve_case_words) word = word.toLowerCase
-              val count = xcount.toInt
-              if (!(stopwords contains word) ||
-                Args.include_stopwords_in_article_dists) {
-                num_word_tokens += count
-                keys_dynarr += memoize_word(word)
-                values_dynarr += count
-              }
-            }
-            case _ =>
-              warning("Strange line, can't parse: title=%s: line=%s",
-                title, line)
-          }
-        }
-      }
-      one_article_probs()
-    }
-
-    if (debug("wordcountarts"))
-      stream.close()
-    task.finish()
-    table.num_articles_with_word_counts = task.num_processed
-    output_resource_usage()
-  }
+  def create_populated_word_dist(keys: Array[Word], values: Array[Int],
+      num_words: Int, note_globally: Boolean) =
+    new PseudoGoodTuringSmoothedWordDist(this, keys, values, num_words,
+       note_globally)
 }
 
 /**
