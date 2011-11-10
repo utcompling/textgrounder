@@ -144,7 +144,7 @@ import util.control.Breaks._
 /*                  General Hadoop code for Geolocate app               */
 /************************************************************************/
    
-object GeolocateHadoopConfiguration {
+object HadoopGeolocateConfiguration {
   /* Prefix used for storing parameters in a Hadoop configuration */
   val hadoop_conf_prefix = "textgrounder."
 
@@ -231,12 +231,12 @@ object GeolocateHadoopConfiguration {
   }
 }
 
-abstract class GeolocateHadoopApp(
+abstract class HadoopGeolocateApp(
   progname: String
 ) extends GeolocateApp(progname) {
   var hadoop_conf: Configuration = _
 
-  override type DriverType <: GeolocateHadoopDriver
+  override type DriverType <: HadoopGeolocateDriver
 
   /* Set by subclass -- Initialize the various classes for map and reduce */
   def initialize_hadoop_classes(job: Job)
@@ -252,13 +252,13 @@ abstract class GeolocateHadoopApp(
      actually run the job.
    */
   override def run_program() = {
-    import GeolocateHadoopConfiguration._
+    import HadoopGeolocateConfiguration._
     convert_parameters_to_hadoop_conf(hadoop_conf_prefix, arg_parser,
       hadoop_conf)
     val job = new Job(hadoop_conf, progname)
     /* We have to call set_job() here now, and not earlier.  This is the
        "bootstrapping issue" alluded to in the comments on
-       GeolocateHadoopDriver.  We can't set the Job until it's created,
+       HadoopGeolocateDriver.  We can't set the Job until it's created,
        and we can't create the Job until after we have set the appropriate
        TextGrounder configuration parameters from the command-line arguments --
        but, we need the driver already created in order to parse the
@@ -271,7 +271,7 @@ abstract class GeolocateHadoopApp(
     if (job.waitForCompletion(true)) 0 else 1
   }
 
-  class GeolocateHadoopTool extends Configured with Tool {
+  class HadoopGeolocateTool extends Configured with Tool {
     override def run(args: Array[String]) = {
       /* Set the Hadoop configuration object and then thread execution
          back to the ExperimentApp.  This will read command-line arguments,
@@ -285,12 +285,12 @@ abstract class GeolocateHadoopApp(
   }
 
   override def main(args: Array[String]) {
-    val exitCode = ToolRunner.run(new GeolocateHadoopTool(), args)
+    val exitCode = ToolRunner.run(new HadoopGeolocateTool(), args)
     System.exit(exitCode)
   }
 }
 
-trait GeolocateHadoopParameters extends GeolocateParameters {
+trait HadoopGeolocateParameters extends GeolocateParameters {
   var textgrounder_dir =
     ap.option[String]("textgrounder-dir",
       help = """Directory to use in place of TEXTGROUNDER_DIR environment
@@ -305,16 +305,16 @@ variable (e.g. in Hadoop).""")
 /**
  * Base mix-in for a Geolocate application using Hadoop.
  *
- * @see GeolocateHadoopDriver
+ * @see HadoopGeolocateDriver
  */
 
-trait BaseGeolocateHadoopDriver extends GeolocateDriver {
+trait BaseHadoopGeolocateDriver extends GeolocateDriver {
   /**
    * FileHandler object for this driver.
    */
   override val file_handler = new HadoopFileHandler
 
-  override type ArgType <: GeolocateHadoopParameters
+  override type ArgType <: HadoopGeolocateParameters
 
   override def handle_parameters(args: ArgType) {
     super.handle_parameters(args)
@@ -367,7 +367,7 @@ trait BaseGeolocateHadoopDriver extends GeolocateDriver {
  * two.
  */
 
-trait GeolocateHadoopDriver extends BaseGeolocateHadoopDriver {
+trait HadoopGeolocateDriver extends BaseHadoopGeolocateDriver {
   var job: Job = _
   var context: TaskInputOutputContext[_,_,_,_] = _
 
@@ -384,7 +384,7 @@ trait GeolocateHadoopDriver extends BaseGeolocateHadoopDriver {
    * Set the Job object, if we're running the job-running code on the
    * client. (Note that we have to set the job like this, rather than have
    * it passed in at creation time, e.g. through an abstract field,
-   * because of bootstrapping issues; explained in GeolocateHadoopApp.
+   * because of bootstrapping issues; explained in HadoopGeolocateApp.
    */
 
   def set_job(job: Job) {
@@ -409,23 +409,23 @@ class ArticleEvaluationMapper extends
   val reader = new ArticleReader(ArticleData.combined_article_data_outfields)
   var evaluators: Iterable[ArticleGeolocateDocumentEvaluator] = null
   val task = new MeteredTask("document", "evaluating")
-  var driver: GeolocateDocumentHadoopDriver = _
+  var driver: HadoopGeolocateDocumentDriver = _
 
   type ContextType = Mapper[Object, Text, Text, DoubleWritable]#Context
 
   override def setup(context: ContextType) {
-    import GeolocateHadoopConfiguration._
-    import GeolocateDocumentHadoopApp.progname
+    import HadoopGeolocateConfiguration._
+    import HadoopGeolocateDocumentApp.progname
 
     val conf = context.getConfiguration()
     val ap = new ArgParser(progname)
     // Initialize set of parameters in `ap`
-    new GeolocateDocumentHadoopParameters(ap)
+    new HadoopGeolocateDocumentParameters(ap)
     // Retrieve configuration values and store in `ap`
     convert_parameters_from_hadoop_conf(hadoop_conf_prefix, ap, conf)
     // Now create a class containing the stored configuration values
-    val params = new GeolocateDocumentHadoopParameters(ap)
-    driver = new GeolocateDocumentHadoopDriver
+    val params = new HadoopGeolocateDocumentParameters(ap)
+    driver = new HadoopGeolocateDocumentDriver
     driver.set_task_context(context)
     driver.handle_parameters(params)
     driver.setup_for_run()
@@ -471,10 +471,10 @@ class ArticleResultReducer extends
 
   type ContextType = Reducer[Text, DoubleWritable, Text, DoubleWritable]#Context
 
-  var driver: GeolocateDocumentHadoopDriver = _
+  var driver: HadoopGeolocateDocumentDriver = _
 
   override def setup(context: ContextType) {
-    driver = new GeolocateDocumentHadoopDriver
+    driver = new HadoopGeolocateDocumentDriver
     driver.set_task_context(context)
   }
 
@@ -488,23 +488,23 @@ class ArticleResultReducer extends
   }
 }
 
-class GeolocateDocumentHadoopParameters(
+class HadoopGeolocateDocumentParameters(
   parser: ArgParser = null
-) extends GeolocateDocumentParameters(parser) with GeolocateHadoopParameters {
+) extends GeolocateDocumentParameters(parser) with HadoopGeolocateParameters {
 }
 
 /**
  * Class for running the geolocate-document app using Hadoop.
  */
 
-class GeolocateDocumentHadoopDriver extends
-    GeolocateDocumentTypeDriver with GeolocateHadoopDriver {
-  override type ArgType = GeolocateDocumentHadoopParameters
+class HadoopGeolocateDocumentDriver extends
+    GeolocateDocumentTypeDriver with HadoopGeolocateDriver {
+  override type ArgType = HadoopGeolocateDocumentParameters
 }
 
-object GeolocateDocumentHadoopApp extends
-    GeolocateHadoopApp("TextGrounder geolocate-document") {
-  type DriverType = GeolocateDocumentHadoopDriver
+object HadoopGeolocateDocumentApp extends
+    HadoopGeolocateApp("TextGrounder geolocate-document") {
+  type DriverType = HadoopGeolocateDocumentDriver
   // FUCKING TYPE ERASURE
   def create_arg_class(ap: ArgParser) = new ArgType(ap)
   def create_driver() = new DriverType()
@@ -526,7 +526,7 @@ object GeolocateDocumentHadoopApp extends
 //  * Hadoop has a standard Writable class but it isn't so good for us, since
 //  * it assumes its read method
 //  */
-// trait GeolocateHadoopWritable[T] {
+// trait HadoopGeolocateWritable[T] {
 //   def write(out: DataOutput): Unit
 //   def read(in: DataInput): T
 // }
