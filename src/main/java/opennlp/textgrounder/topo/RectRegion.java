@@ -19,6 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class RectRegion extends Region {
+
+  private static final long serialVersionUID = 42L;
+
   private final double minLat;
   private final double maxLat;
   private final double minLng;

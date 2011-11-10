@@ -1,8 +1,24 @@
+///////////////////////////////////////////////////////////////////////////////
+//  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+///////////////////////////////////////////////////////////////////////////////
+
 package opennlp.textgrounder.geolocate
 
-import NlpUtil._
+import tgutil._
 import Distances._
-import Debug._
+import GeolocateDriver.Debug._
 
 import util.control.Breaks._
 import java.io._
@@ -21,51 +37,64 @@ class ArticleWriter(outfile: PrintStream, outfields: Seq[String]) {
   }
 }
 
+class ArticleReader(infields: Seq[String]) {
+  var num_processed = 0
+  def process_row(line: String, process: Map[String,String] => Unit,
+      line_number: Int = -1) {
+    val lineno = if (line_number < 0) num_processed + 1 else line_number
+    // println("[%s]" format line)
+    val fieldvals = splittext(line, '\t')
+    if (fieldvals.length != infields.length)
+      warning(
+      """Strange record at line #%s, expected %s fields, saw %s fields;
+      skipping line=%s""", lineno, infields.length, fieldvals.length, line)
+    else {
+      var good = true
+      for ((field, value) <- infields zip fieldvals) {
+        if (!Article.validate_field(field, value)) {
+          good = false
+          warning(
+      """Bad field value at line #%s, field=%s, value=%s,
+      skipping line=%s""", lineno, field, value, line)
+        }
+      }
+      if (good)
+        process((infields zip fieldvals).toMap)
+    }
+    num_processed += 1
+  }
+}
+
 object ArticleData {
   val combined_article_data_outfields = List("id", "title", "split", "redir",
       "namespace", "is_list_of", "is_disambig", "is_list", "coord",
       "incoming_links")
 
-  // Read in the article data file.  Call PROCESS on each article.
-  // The type of the article created is given by ARTICLE_TYPE, which defaults
-  // to Article.  MAXTIME is a value in seconds, which limits the total
-  // processing time (real time, not CPU time) used for reading in the
-  // file, for testing purposes.
-  def read_article_data_file(filename: String,
+  /** Read in the article data file.  Call PROCESS on each article.
+   * The type of the article created is given by ARTICLE_TYPE, which defaults
+   * to Article.  MAXTIME is a value in seconds, which limits the total
+   * processing time (real time, not CPU time) used for reading in the
+   * file, for testing purposes.
+   */
+  def read_article_data_file(filehand: FileHandler, filename: String,
       process: Map[String,String] => Unit, maxtime: Double=0.0) = {
     errprint("Reading article data from %s...", filename)
-    val status = new StatusMessage("article")
+    val task = new MeteredTask("article", "reading")
 
-    val fi = openr(filename)
+    val fi = filehand.openr(filename)
 
     val fields = splittext(fi.next(), '\t')
+    val reader = new ArticleReader(fields)
     breakable {
       for (line <- fi) {
-        // println("[%s]" format line)
-        val fieldvals = splittext(line, '\t')
-        if (fieldvals.length != fields.length)
-          warning(
-          """Strange record at line #%s, expected %s fields, saw %s fields;
-      skipping line=%s""", status.num_processed(), fields.length,
-                           fieldvals.length, line)
-        else {
-          var good = true
-          for ((field, value) <- fields zip fieldvals) {
-            if (!Article.validate_field(field, value)) {
-              good = false
-              warning(
-          """Bad field value at line #%s, field=%s, value=%s,
-      skipping line=%s""", status.num_processed(), field, value, line)
-            }
-          }
-          if (good)
-            process((fields zip fieldvals).toMap)
-        }
-        if (status.item_processed(maxtime=maxtime))
+        // If we've processed no articles so far, we're on line 2
+        // because line 1 is the header.
+        reader.process_row(line, process, task.num_processed + 2)
+        if (task.item_processed(maxtime=maxtime))
           break
       }
     }
-    errprint("Finished reading %s articles.", status.num_processed())
+    task.finish()
     output_resource_usage()
     fields
   }
@@ -80,20 +109,20 @@ object ArticleData {
   }
 }
 
-// A Wikipedia article.  Defined fields:
-//
-//   title: Title of article.
-//   id: ID of article, as an int.
-//   coord: Coordinates of article.
-//   incoming_links: Number of incoming links, or None if unknown.
-//   split: Split of article ("training", "dev", "test")
-//   redir: If this is a redirect, article title that it redirects to; else
-//          an empty string.
-//   namespace: Namespace of article (e.g. "Main", "Wikipedia", "File")
-//   is_list_of: Whether article title is "List of *"
-//   is_disambig: Whether article is a disambiguation page.
-//   is_list: Whether article is a list of any type ("List of *", disambig,
-//            or in Category or Book namespaces)
+/** A Wikipedia article.  Defined fields:
+ * title: Title of article.
+ * id: ID of article, as an int.
+ * coord: Coordinates of article.
+ * incoming_links: Number of incoming links, or None if unknown.
+ * split: Split of article ("training", "dev", "test")
+ * redir: If this is a redirect, article title that it redirects to; else
+ *          an empty string.
+ * namespace: Namespace of article (e.g. "Main", "Wikipedia", "File")
+ * is_list_of: Whether article title is "List of *"
+ * is_disambig: Whether article is a disambiguation page.
+ * is_list: Whether article is a list of any type ("List of *", disambig,
+ *          or in Category or Book namespaces)
+ */
 class Article(params: Map[String,String]) {
   var title="unknown"
   var id=0
@@ -150,10 +179,11 @@ class Article(params: Map[String,String]) {
 }
 
 object Article {
-  // Compute the short form of an article name.  If short form includes a
-  // division (e.g. "Tucson, Arizona"), return a tuple (SHORTFORM, DIVISION);
-  // else return a tuple (SHORTFORM, None).
-  
+  /**
+   * Compute the short form of an article name.  If short form includes a
+   * division (e.g. "Tucson, Arizona"), return a tuple (SHORTFORM, DIVISION);
+   * else return a tuple (SHORTFORM, None).
+   */
   def compute_short_form(name: String) = {
     val includes_div_re = """(.*?), (.*)$""".r
     val includes_parentag_re = """(.*) \(.*\)$""".r

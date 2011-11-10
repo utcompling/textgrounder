@@ -1,0 +1,68 @@
+#!/bin/sh
+
+help()
+{
+  cat <<FOO
+Usage: $0 [--hadoop] [--doc-thresh THRESH] CORPUS
+
+Return arguments to use for running on CORPUS, a text corpus.
+
+Currently recognized:
+
+wikipedia         Run on Wikipedia.
+twitter           Run on the GeoText twitter corpus.
+twitter-wiki      Run on a combination of both of the above corpora.
+
+For the Twitter corpora, THRESH specifies the document threshold controlling
+which vocabulary items are discarded (items occurring in fewer than the
+threshold number of documents are discarded, or more accurately substituted
+with a generic out-of-vocabulary token).  This in turn controls which
+version of the GeoText corpus is used.  Default is 5.
+
+If --hadoop is given, different directories are used, since data is being
+read from the Hadoop File System rather than locally.
+FOO
+}
+
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  exit 1
+fi
+
+docthresh=5
+hadoop=
+
+while true ; do
+  case "$1" in
+    --hadoop) hadoop=yes; shift ;;
+    --doc-thresh) docthresh="$2"; shift 2 ;;
+    --help) help; exit 1 ;;
+    --) shift ; break ;;
+    *) break ;;
+  esac
+done
+
+if [ -z "$1" -o "$1" = help ]; then
+  help; exit 1
+fi
+
+if [ -n "$hadoop" ]; then
+  # If we're running under Hadoop, use a hierarchy in HDFS, by setting
+  # the following variable.
+  TG_USE_HDFS=yes
+fi
+
+. $TEXTGROUNDER_DIR/bin/config-geolocate
+
+geotext_output_dir="$TG_TWITTER_DIR/output-$docthresh-docthresh"
+geotext_prefix="$geotext_output_dir/geotext-twitter"
+twitter_args="--article-data-file $geotext_prefix-combined-article-data.txt --counts-file $geotext_prefix-counts-only-coord-articles.txt"
+wikipedia_args="--article-data-file $IN_COMBINED_ARTICLE_DATA_FILE \
+  --counts-file $IN_COORD_COUNTS_FILE"
+
+case "$1" in
+  wikipedia ) echo $wikipedia_args ;;
+  twitter ) echo $twitter_args ;;
+  twitter-wiki ) echo $wikipedia_args $twitter_args ;;
+  * ) echo "Unrecognized corpus type: $1"; echo ""; help; exit 1 ;;
+esac

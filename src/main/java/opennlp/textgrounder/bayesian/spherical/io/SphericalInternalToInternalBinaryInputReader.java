@@ -51,8 +51,8 @@ public class SphericalInternalToInternalBinaryInputReader extends SphericalInter
         int docid = tokenArrayInputStream.readInt();
         int topstatus = (int) tokenArrayInputStream.readByte();
         int stopstatus = (int) tokenArrayInputStream.readByte();
-        int regid = (int) tokenArrayInputStream.readInt();
-        int coordid = (int) tokenArrayInputStream.readInt();
+        int regid = /*(int)*/ tokenArrayInputStream.readInt();
+        int coordid = /*(int)*/ tokenArrayInputStream.readInt();
         record[0] = wordid;
         record[1] = docid;
         record[2] = topstatus;
@@ -80,7 +80,7 @@ public class SphericalInternalToInternalBinaryInputReader extends SphericalInter
         int fieldsize = toponymCoordinateInputStream.readInt();
         double[] record = new double[fieldsize];
         for (int i = 0; i < fieldsize; i++) {
-            record[i] = (double) toponymCoordinateInputStream.readDouble();
+            record[i] = /*(double)*/ toponymCoordinateInputStream.readDouble();
 //            record[i + 1] = (double) toponymCoordinateInputStream.readDouble();
         }
         toprecord.add(record);

@@ -29,6 +29,9 @@ import opennlp.textgrounder.util.cluster.KMeans;
 import opennlp.textgrounder.util.*;
 
 public class GeoNamesGazetteerWithList implements Gazetteer, Serializable {
+
+  private static final long serialVersionUID = 42L;
+
   private final boolean expandRegions;
   private final double pointRatio;
   private final int minPoints;

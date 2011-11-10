@@ -26,6 +26,8 @@ import java.io.Serializable;
  */
 public class Lexicon implements Serializable {
 
+    private static final long serialVersionUID = 42L;
+
     /**
      * Map from token to integer (index). Tokens might not be unigrams. Placename
      * tokens may be one or more words.

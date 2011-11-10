@@ -18,6 +18,9 @@ package opennlp.textgrounder.text;
 import java.io.*;
 
 public class SimpleToken implements Token, Serializable {
+
+  private static final long serialVersionUID = 42L;
+
   private final String form;
 
   public SimpleToken(String form) {

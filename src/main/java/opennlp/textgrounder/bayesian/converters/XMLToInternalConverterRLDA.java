@@ -73,8 +73,8 @@ public class XMLToInternalConverterRLDA extends XMLToInternalConverter {
     public void initializeRegionArray() {
         activeRegions = 0;
 
-        int regionArrayWidth = 360 / (int) degreesPerRegion;
-        int regionArrayHeight = 180 / (int) degreesPerRegion;
+        int regionArrayWidth = 360 / /*(int)*/ degreesPerRegion;
+        int regionArrayHeight = 180 / /*(int)*/ degreesPerRegion;
 
         regionArray = new Region[regionArrayWidth][regionArrayHeight];
 

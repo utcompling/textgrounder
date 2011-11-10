@@ -71,6 +71,8 @@ public class RKRand {
 
     public static class BetaEdgeException extends Exception {
 
+        private static final long serialVersionUID = 42L;
+
         public BetaEdgeException() {
             super("The beta random number generator drew a one");
         }

@@ -6,18 +6,20 @@
 
 DEBUG="--debug 0"
 
-if [ -z "$WIKIGROUNDER_DIR" ]; then
-  if [ -z "$TEXTGROUNDER_DIR" ]; then
-    echo "With WIKIGROUNDER_DIR unset, must set TEXTGROUNDER_DIR to point"
-    echo "to top-level directory where TextGrounder is installed."
-    exit 1
-  fi
-  WIKIGROUNDER_DIR="$TEXTGROUNDER_DIR/python"
+### Standard boilerplate to get config ###
+
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  exit 1
 fi
 
-. $WIKIGROUNDER_DIR/config-wikigrounder
+. $TEXTGROUNDER_DIR/bin/config-geolocate
 
-TWITTER_LDA="$WIKIGROUNDER_DIR/twitter_to_lda.py"
+TG_PYTHON_DIR="$TEXTGROUNDER_DIR/python"
+
+### End boilerplate to get config ###
+
+TWITTER_LDA="$TG_PYTHON_DIR/twitter_to_lda.py"
 
 echo The input and output dir need to be set better, as this code is
 echo copied from run-twitter-process and GEOTEXT_INPUT_DIR and

@@ -65,6 +65,7 @@ public class PlainTextSource extends TextSource {
 
   public Document<Token> next() {
     return new Document<Token>(null) {
+      private static final long serialVersionUID = 42L;
       public Iterator<Sentence<Token>> iterator() {
         final List<List<Token>> sentences = new ArrayList<List<Token>>();
         while (PlainTextSource.this.current != null &&
@@ -96,6 +97,7 @@ public class PlainTextSource extends TextSource {
           public Sentence<Token> next() {
             final int idx = this.idx++;
             return new Sentence(null) {
+              private static final long serialVersionUID = 42L;
               public Iterator<Token> tokens() {
                 return sentences.get(idx).iterator();
               }

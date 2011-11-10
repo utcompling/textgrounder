@@ -66,7 +66,7 @@ public class BinaryInputReader extends InputReader {
         int docid = tokenArrayInputStream.readInt();
         int topstatus = (int) tokenArrayInputStream.readByte();
         int stopstatus = (int) tokenArrayInputStream.readByte();
-        int regid = (int) tokenArrayInputStream.readInt();
+        int regid = /*(int)*/ tokenArrayInputStream.readInt();
         record[0] = wordid;
         record[1] = docid;
         record[2] = topstatus;

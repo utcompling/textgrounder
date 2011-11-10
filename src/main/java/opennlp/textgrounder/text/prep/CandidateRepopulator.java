@@ -32,6 +32,7 @@ public class CandidateRepopulator extends DocumentSourceWrapper {
     final Iterator<Sentence<Token>> sentences = document.iterator();
 
     return new Document<Token>(document.getId()) {
+      private static final long serialVersionUID = 42L;
       public Iterator<Sentence<Token>> iterator() {
         return new SentenceIterator() {
           public boolean hasNext() {

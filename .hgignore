@@ -18,3 +18,12 @@ project/boot
 lib_managed
 data/models/*.bin
 data/gazetteers/*.zip
+
+# C code generation
+*.o
+*.so
+
+# Python
+*.pyc
+python/wikigrounder/build
+python/wikigrounder/kl_divergence.c

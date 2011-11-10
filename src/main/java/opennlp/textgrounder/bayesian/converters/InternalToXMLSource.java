@@ -41,6 +41,8 @@ import opennlp.textgrounder.text.Token;
  */
 public class InternalToXMLSource<T extends InternalToXMLConverterInterface> extends DocumentSource {
 
+    private static final long serialVersionUID = 42L;
+
     protected final XMLStreamReader in;
     protected final XMLStreamWriter out;
     private final BufferedWriter writer;
@@ -120,6 +122,8 @@ public class InternalToXMLSource<T extends InternalToXMLConverterInterface> exte
         }
 
         return new Document(id) {
+
+            private static final long serialVersionUID = 42L;
 
             @Override
             public Iterator<Sentence<Token>> iterator() {

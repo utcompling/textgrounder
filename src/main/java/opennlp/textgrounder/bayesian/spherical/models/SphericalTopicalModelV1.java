@@ -28,6 +28,8 @@ import opennlp.textgrounder.bayesian.spherical.annealers.*;
  */
 public class SphericalTopicalModelV1 extends SphericalModelBase {
 
+    private static final long serialVersionUID = 42L;
+
     public SphericalTopicalModelV1(ExperimentParameters _parameters) {
         super(_parameters);
     }

@@ -76,7 +76,7 @@ public class SphericalGlobalToInternalBinaryInputReader extends SphericalGlobalT
         int fieldsize = toponymCoordinateInputStream.readInt();
         double[] record = new double[fieldsize];
         for (int i = 0; i < fieldsize; i++) {
-            record[i] = (double) toponymCoordinateInputStream.readDouble();
+            record[i] = /*(double)*/ toponymCoordinateInputStream.readDouble();
 //            record[i + 1] = (double) toponymCoordinateInputStream.readDouble();
         }
         toprecord.add(record);

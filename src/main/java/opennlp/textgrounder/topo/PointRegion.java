@@ -19,6 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PointRegion extends Region {
+
+  private static final long serialVersionUID = 42L;
+
   private Coordinate coordinate;
 
   public PointRegion(Coordinate coordinate) {

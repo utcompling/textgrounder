@@ -19,6 +19,9 @@ import java.io.Serializable;
 import java.util.*;
 
 public class Location implements Serializable {
+
+  private static final long serialVersionUID = 42L;
+
   public enum Type {
     STATE, WATER, CITY, SITE, PARK, TRANSPORT, MOUNTAIN, UNDERSEA, FOREST, UNKNOWN
   }

@@ -18,6 +18,9 @@ package opennlp.textgrounder.topo;
 import java.util.List;
 
 public class PointSetRegion extends Region {
+
+  private static final long serialVersionUID = 42L;
+
   private List<Coordinate> coordinates;
   private Coordinate center;
   private final double minLat;

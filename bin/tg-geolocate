@@ -1,11 +1,58 @@
 #!/bin/sh
 
-# Run 'textgrounder geolocate', passing it various useful arguments.
-# Extra arguments can be specified on the command line, which will
-# override any existing arguments.
-#
-# See also 'nohup-tg-geolocate', which will run this script using 'nohup'
-# while saving the output to a file.
+help()
+{
+  cat <<FOO
+Usage: $0 [--hadoop | --hadoop-nondist] [--app APP] [--doc-thresh THRESH] [TEXTGROUNDER-OPTIONS ...] CORPUS [APP-OPTIONS ...]
+
+Run 'textgrounder geolocate-document' (or another related app), passing it
+the appropriate arguments for running on the specific corpus specified by
+CORPUS.  Additional app-specific options can be given after the corpus name,
+to control the operation of the application. (Try 'help' or '--help' in
+place of the app options to get a help message.) Additional options to the
+'textgrounder' driver script can be given before the corpus name; these
+usually control operation of the JVM. (Use 'textgrounder help' to see a
+description of these options.)
+
+Currently recognized values for CORPUS:
+
+wikipedia         Run on Wikipedia.
+twitter           Run on the GeoText twitter corpus.
+twitter-wiki      Run on a combination of both of the above corpora.
+
+The option '--hadoop' causes the application to be run using Hadoop
+(a package for large-scale parallel processing).  Before doing this,
+TextGrounder needs to be built in a special way and data needs to be
+copied into the Hadoop File System.  See the README.txt file for more
+info.  An alternative for testing purposes is '--hadoop-nondist'.
+This uses the same Hadoop-specific code in TextGrounder but runs
+Hadoop in "non-distributed" mode, which simulates all of the various
+file-system and compute servers on one machine and doesn't require
+any special building or data copying.
+
+The option '--app' specifies the application to run; by default it does
+document-level geotagging. (Normally, the default application is
+'geolocate-document', but it may be 'hadoop-geolocate-document' or
+'hadoop-nondist-geolocate-document' depending on the above Hadoop-related
+settings.)
+
+For the Twitter corpora, '--doc-thresh' specifies the document threshold
+controlling which vocabulary items are discarded (items occurring in
+fewer than the threshold number of documents are discarded, or more
+accurately substituted with a generic out-of-vocabulary token).  This
+in turn controls which version of the GeoText corpus is used.  Default
+is 5.
+
+See also 'run-nohup', which can be used to wrap an invocation of this script
+in a way that it will not be killed by session exit when run in the background,
+and output will get sent to a unique, time-stamped file.
+FOO
+}
+
+# NOTE: The environment variable __TG_EXTRA_ARGS can be used to specify
+# extra arguments to pass to the application being run.  This is meant
+# for usage by other scripts, and inserts these options before the
+# user-supplied options, so that the latter override the former.
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
   echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
@@ -14,28 +61,49 @@ fi
 
 . $TEXTGROUNDER_DIR/bin/config-geolocate
 
-GEOLOCATE="$TEXTGROUNDER_DIR/bin/textgrounder geolocate"
+# Option processing
 
-MODE=geotag-documents
-for x in ${1+"$@"}; do
-  if [ "$x" = "--mode=geotag-toponyms" ]; then
-    MODE=geotag-toponyms
-  elif [ "$x" = "--mode=geotag-documents" ]; then
-    MODE=geotag-documents
-  fi
+docthresh=5
+tgopts=
+default_tgapp=geolocate-document
+tgapp=
+hadoop_arg=
+
+while true ; do
+  case "$1" in
+    --doc-thresh ) docthresh="$2"; shift 2 ;;
+    --help ) help; exit 1 ;;
+    --app ) tgapp="$2"; shift 2 ;;
+    --hadoop )
+      hadoop_arg="--hadoop"
+      default_tgapp="hadoop-geolocate-document"; shift ;;
+    --hadoop-nondist )
+      default_tgapp="hadoop-nondist-geolocate-document"; shift ;;
+    -minheap | --minheap ) tgopts="$tgopts --minheap $2"; shift 2 ;;
+    -maxheap | --maxheap ) tgopts="$tgopts --maxheap $2"; shift 2 ;;
+    -memory | --memory ) tgopts="$tgopts --memory $2"; shift 2 ;;
+    -escape-analysis | --escape-analysis )
+      tgopts="$tgopts --escape-analysis"; shift ;;
+    -compressed-oops | --compressed-oops )
+      tgopts="$tgopts --compressed-oops"; shift ;;
+    -verbose | --verbose ) tgopts="$tgopts --verbose"; shift ;;
+    -debug-jvm | --debug-jvm ) tgopts="$tgopts --debug"; shift ;;
+    -- ) shift ; break ;;
+    * ) break ;;
+  esac
 done
 
-if [ "$MODE" = "geotag-toponyms" ]; then
-  STRATEGY="--strategy baseline"
-  #STRATEGY="--strategy naive-bayes-with-baseline"
-  #STRATEGY="--strategy naive-bayes-no-baseline"
-  #MISCOPTS="$MISCOPTS --naive-bayes-weighting distance-weighted"
-  EVALFILE="--eval-file $TRCONLL_DEV_DIR"
-  EVALTYPE="--eval-format tr-conll"
-  #EVALFILE="--eval-file $PREFIX-toponym-eval.txt"
-  MODE_ARG="$GAZETTEER_ARG $STRATEGY $EVALFILE $EVALTYPE"
-else
-  MODE_ARG=
+if [ -z "$1" -o "$1" = "help" ]; then
+  help; exit 1
 fi
 
-$GEOLOCATE $MODE_ARG $MISCOPTS $LOCAL_ARGS ${1+"$@"}
+tgapp=${tgapp:-$default_tgapp}
+corpusargs=`tg-get-corpus-args $hadoop_arg --doc-thresh $docthresh $1`
+shift
+
+# __TG_EXTRA_ARGS is for other scripts calling us; see above.
+# LOCAL_ARGS comes from config-geolocate and allows for system-supplied args.
+geolocate="$TEXTGROUNDER_DIR/bin/textgrounder $tgopts $tgapp $corpusargs $__TG_EXTRA_ARGS $LOCAL_ARGS"
+
+echo Executing: $geolocate ${1+"$@"}
+$geolocate ${1+"$@"}

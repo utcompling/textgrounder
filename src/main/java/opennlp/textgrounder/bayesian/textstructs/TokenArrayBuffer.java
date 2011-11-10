@@ -29,6 +29,8 @@ import java.util.ArrayList;
  */
 public class TokenArrayBuffer implements Serializable {
 
+    private static final long serialVersionUID = 42L;
+
     /**
      * Array of word indexes. The elements are integers which reference word
      * types maintained in Lexicon. The "word types" may not be unigrams.

@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# Run 'textgrounder geolocate-toponym', passing it extra arguments to load
+# up the gazetteer.  See also 'geolocate-toponym', which is similar also
+# specifies args to evaluate on the TR-CoNLL development set.
+#
+# This is equivalent to 'tg-geolocate --app generate-kml' with a few extra
+# args specified.  All arguments to 'tg-geolocate' can be given for this
+# script as well.
+
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  exit 1
+fi
+
+. $TEXTGROUNDER_DIR/bin/config-geolocate
+
+__TG_EXTRA_ARGS="--gazetteer-file $IN_GAZETTEER_FILE" $TEXTGROUNDER_DIR/bin/tg-geolocate --app geolocate-toponym ${1+"$@"}

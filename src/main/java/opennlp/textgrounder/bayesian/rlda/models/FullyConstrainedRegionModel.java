@@ -25,6 +25,8 @@ import opennlp.textgrounder.bayesian.apps.ExperimentParameters;
  */
 public class FullyConstrainedRegionModel extends RegionModel {
 
+    private static final long serialVersionUID = 42L;
+
     public FullyConstrainedRegionModel(ExperimentParameters _parameters) {
         super(_parameters);
     }

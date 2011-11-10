@@ -65,6 +65,7 @@ public class CorpusXMLSource extends DocumentSource {
     CorpusXMLSource.this.nextTag();
 
     return new Document(id, timestamp, goldCoord, systemCoord) {
+      private static final long serialVersionUID = 42L;
       public Iterator<Sentence<Token>> iterator() {
         return new SentenceIterator() {
           public boolean hasNext() {
