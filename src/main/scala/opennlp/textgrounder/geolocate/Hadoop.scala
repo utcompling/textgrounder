@@ -139,6 +139,10 @@ import util.control.Breaks._
    to all reducers using the trick of creating a custom partitioner
    that ensures the reducer gets this info first.
 */
+
+/************************************************************************/
+/*                  General Hadoop code for Geolocate app               */
+/************************************************************************/
    
 object GeolocateHadoopConfiguration {
   /* Prefix used for storing parameters in a Hadoop configuration */
@@ -227,88 +231,6 @@ object GeolocateHadoopConfiguration {
   }
 }
 
-class ArticleEvaluationMapper extends
-    Mapper[Object, Text, Text, DoubleWritable] {
-  val reader = new ArticleReader(ArticleData.combined_article_data_outfields)
-  var evaluators: Iterable[ArticleGeolocateDocumentEvaluator] = null
-  val task = new MeteredTask("document", "evaluating")
-  var driver: GeolocateDocumentHadoopTaskDriver = _
-
-  type ContextType = Mapper[Object, Text, Text, DoubleWritable]#Context
-
-  override def setup(context: ContextType) {
-    import GeolocateHadoopConfiguration._
-    import GeolocateDocumentHadoopApp.progname
-
-    val conf = context.getConfiguration()
-    val ap = new ArgParser(progname)
-    // Initialize set of parameters in `ap`
-    new GeolocateDocumentHadoopParameters(ap)
-    // Retrieve configuration values and store in `ap`
-    convert_parameters_from_hadoop_conf(hadoop_conf_prefix, ap, conf)
-    // Now create a class containing the stored configuration values
-    val params = new GeolocateDocumentHadoopParameters(ap)
-    driver = new GeolocateDocumentHadoopTaskDriver(context)
-    driver.handle_parameters(params)
-    driver.setup_for_run()
-    evaluators =
-      for ((stratname, strategy) <- driver.strategies)
-        yield new ArticleGeolocateDocumentEvaluator(strategy, stratname, driver)
-  }
-
-  override def map(key: Object, value: Text, context: ContextType) {
-    def process(params: Map[String, String]) {
-      val table = driver.article_table
-      val in_article = table.create_article(params)
-      if (in_article.split == driver.params.eval_set &&
-          table.would_add_article_to_list(in_article)) {
-        val art = table.lookup_article(in_article.title)
-        if (art == null)
-          warning("Couldn't find article %s in table", in_article.title)
-        else {
-          for (e <- evaluators) {
-            val num_processed = task.num_processed
-            val doctag = "#%d" format (1 + num_processed)
-            if (e.would_skip_document(art, doctag))
-              errprint("Skipped article %s", art)
-            else {
-              // Don't put side-effecting code inside of an assert!
-              val result =
-                e.evaluate_document(art, doctag)
-              assert(result != null)
-              context.write(new Text(e.stratname),
-                new DoubleWritable(result.asInstanceOf[ArticleEvaluationResult].pred_truedist))
-              task.item_processed()
-            }
-          }
-        }
-      }
-    }
-    reader.process_row(value.toString, process _)
-  }
-}
-
-class ArticleResultReducer extends
-    Reducer[Text, DoubleWritable, Text, DoubleWritable] {
-
-  type ContextType = Reducer[Text, DoubleWritable, Text, DoubleWritable]#Context
-
-  var driver: GeolocateDocumentHadoopTaskDriver = _
-
-  override def setup(context: ContextType) {
-    driver = new GeolocateDocumentHadoopTaskDriver(context)
-  }
-
-  override def reduce(key: Text, values: java.lang.Iterable[DoubleWritable],
-      context: ContextType) {
-    val errordists = (for (v <- values) yield v.get).toSeq
-    val mean_dist = mean(errordists)
-    val median_dist = median(errordists)
-    context.write(new Text(key.toString + " mean"), new DoubleWritable(mean_dist))
-    context.write(new Text(key.toString + " median"), new DoubleWritable(median_dist))
-  }
-}
-
 abstract class GeolocateHadoopApp(
   progname: String
 ) extends GeolocateApp(progname) {
@@ -368,7 +290,7 @@ abstract class GeolocateHadoopApp(
   }
 }
 
-trait GeolocateHadoopParameters extends GeolocateDocumentParameters {
+trait GeolocateHadoopParameters extends GeolocateParameters {
   var textgrounder_dir =
     ap.option[String]("textgrounder-dir",
       help = """Directory to use in place of TEXTGROUNDER_DIR environment
@@ -378,11 +300,6 @@ variable (e.g. in Hadoop).""")
     ap.parameter[String]("outfile",
       help = """File to store evaluation results in.""")
 
-}
-
-class GeolocateDocumentHadoopParameters(
-  parser: ArgParser = null
-) extends GeolocateDocumentParameters(parser) with GeolocateHadoopParameters {
 }
 
 /**
@@ -476,6 +393,97 @@ trait GeolocateHadoopJobDriver extends GeolocateHadoopDriver {
   def find_split_counter(group: String, counter: String) = {
     job.getCounters.findCounter(group, counter)
   }
+}
+
+/************************************************************************/
+/*                Hadoop implementation of geolocate-document           */
+/************************************************************************/
+   
+class ArticleEvaluationMapper extends
+    Mapper[Object, Text, Text, DoubleWritable] {
+  val reader = new ArticleReader(ArticleData.combined_article_data_outfields)
+  var evaluators: Iterable[ArticleGeolocateDocumentEvaluator] = null
+  val task = new MeteredTask("document", "evaluating")
+  var driver: GeolocateDocumentHadoopTaskDriver = _
+
+  type ContextType = Mapper[Object, Text, Text, DoubleWritable]#Context
+
+  override def setup(context: ContextType) {
+    import GeolocateHadoopConfiguration._
+    import GeolocateDocumentHadoopApp.progname
+
+    val conf = context.getConfiguration()
+    val ap = new ArgParser(progname)
+    // Initialize set of parameters in `ap`
+    new GeolocateDocumentHadoopParameters(ap)
+    // Retrieve configuration values and store in `ap`
+    convert_parameters_from_hadoop_conf(hadoop_conf_prefix, ap, conf)
+    // Now create a class containing the stored configuration values
+    val params = new GeolocateDocumentHadoopParameters(ap)
+    driver = new GeolocateDocumentHadoopTaskDriver(context)
+    driver.handle_parameters(params)
+    driver.setup_for_run()
+    evaluators =
+      for ((stratname, strategy) <- driver.strategies)
+        yield new ArticleGeolocateDocumentEvaluator(strategy, stratname, driver)
+  }
+
+  override def map(key: Object, value: Text, context: ContextType) {
+    def process(params: Map[String, String]) {
+      val table = driver.article_table
+      val in_article = table.create_article(params)
+      if (in_article.split == driver.params.eval_set &&
+          table.would_add_article_to_list(in_article)) {
+        val art = table.lookup_article(in_article.title)
+        if (art == null)
+          warning("Couldn't find article %s in table", in_article.title)
+        else {
+          for (e <- evaluators) {
+            val num_processed = task.num_processed
+            val doctag = "#%d" format (1 + num_processed)
+            if (e.would_skip_document(art, doctag))
+              errprint("Skipped article %s", art)
+            else {
+              // Don't put side-effecting code inside of an assert!
+              val result =
+                e.evaluate_document(art, doctag)
+              assert(result != null)
+              context.write(new Text(e.stratname),
+                new DoubleWritable(result.asInstanceOf[ArticleEvaluationResult].pred_truedist))
+              task.item_processed()
+            }
+          }
+        }
+      }
+    }
+    reader.process_row(value.toString, process _)
+  }
+}
+
+class ArticleResultReducer extends
+    Reducer[Text, DoubleWritable, Text, DoubleWritable] {
+
+  type ContextType = Reducer[Text, DoubleWritable, Text, DoubleWritable]#Context
+
+  var driver: GeolocateDocumentHadoopTaskDriver = _
+
+  override def setup(context: ContextType) {
+    driver = new GeolocateDocumentHadoopTaskDriver(context)
+  }
+
+  override def reduce(key: Text, values: java.lang.Iterable[DoubleWritable],
+      context: ContextType) {
+    val errordists = (for (v <- values) yield v.get).toSeq
+    val mean_dist = mean(errordists)
+    val median_dist = median(errordists)
+    context.write(new Text(key.toString + " mean"), new DoubleWritable(mean_dist))
+    context.write(new Text(key.toString + " median"), new DoubleWritable(median_dist))
+  }
+}
+
+class GeolocateDocumentHadoopParameters(
+  parser: ArgParser = null
+) extends GeolocateDocumentParameters(parser) with GeolocateHadoopParameters {
 }
 
 /**
