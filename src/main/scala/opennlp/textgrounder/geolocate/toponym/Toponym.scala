@@ -462,8 +462,10 @@ class TopoArticle(
 
 // Static class maintaining additional tables listing mapping between
 // names, ID's and articles.  See comments at GeoArticleTable.
-class TopoArticleTable(word_dist_factory: WordDistFactory) extends
-    GeoArticleTable(word_dist_factory) {
+class TopoArticleTable(
+  driver_stats: ExperimentDriverStats,
+  word_dist_factory: WordDistFactory
+) extends GeoArticleTable(driver_stats, word_dist_factory) {
   override def create_article(params: Map[String, String]) =
     new TopoArticle(params, this)
 
@@ -1514,7 +1516,7 @@ class GeolocateToponymDriver extends
   }
 
   override def initialize_article_table(word_dist_factory: WordDistFactory) = {
-    new TopoArticleTable(word_dist_factory)
+    new TopoArticleTable(this, word_dist_factory)
   }
 
   /**

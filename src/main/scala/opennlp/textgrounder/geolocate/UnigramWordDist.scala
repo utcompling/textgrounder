@@ -247,12 +247,12 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
       val art = table.lookup_article(title)
       if (art == null) {
         warning("Skipping article %s, not in table", title)
-        table.num_articles_with_word_counts_but_not_in_table += 1
+        table.record_article_with_word_count_but_not_in_table()
         return
       }
       if (debug("wordcountarts"))
         writer.output_row(art)
-      table.num_word_count_articles_by_split(art.split) += 1
+      table.record_word_count_article_by_split(art.split)
       // If we are evaluating on the dev set, skip the test set and vice
       // versa, to save memory and avoid contaminating the results.
       if (art.split != "training" && art.split != Args.eval_set)
@@ -323,7 +323,7 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
     if (debug("wordcountarts"))
       stream.close()
     task.finish()
-    table.num_articles_with_word_counts = task.num_processed
+    table.record_num_articles_with_word_counts(task.num_processed)
     output_resource_usage()
   }
 }

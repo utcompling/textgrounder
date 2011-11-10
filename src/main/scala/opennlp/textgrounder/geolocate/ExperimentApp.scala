@@ -166,8 +166,12 @@ abstract class ExperimentApp(val progname: String) {
 }
 
 /**
- * A mix-in that adds to a driver the ability to record statistics about
- * the experiment run.
+ * A mix-in that adds to a driver the ability to record statistics
+ * (specifically, counters that can be incremented and queried) about
+ * the experiment run.  These counters may be tracked globally across
+ * a set of separate tasks, e.g. in Hadoop where multiple separate tasks
+ * may be run in parallel of different machines to completely a global
+ * job.  Counters can be tracked both globally and per-task.
  */
 abstract trait ExperimentDriverStats {
   /** Set of counters under the given group, using fully-qualified names. */
@@ -177,6 +181,12 @@ abstract trait ExperimentDriverStats {
   protected val counter_groups_by_group = setmap[String,String]()
   /** Set of all counters seen. */
   protected val counters_by_name = mutable.Set[String]()
+
+  protected def local_to_full_name(name: String) =
+    if (name == "")
+      local_counter_group
+    else
+      local_counter_group + "." + name
 
   /**
    * Note that a counter of the given name exists.  It's not necessary to
@@ -244,6 +254,11 @@ abstract trait ExperimentDriverStats {
     else fq map (_.stripPrefix(group + "."))
   }
 
+  def list_local_counters(group: String, recursive: Boolean,
+      fully_qualified: Boolean = true) =
+    (list_counters(local_to_full_name(group), recursive, fully_qualified) map
+      (_.stripPrefix(local_counter_group + ".")))
+
   /**
    * Enumerate all the counter groups in the given group, for counters
    * which have been either incremented or noted (using `note_counter`).
@@ -269,22 +284,84 @@ abstract trait ExperimentDriverStats {
     else fq map (_.stripPrefix(group + "."))
   }
 
+  def list_local_counter_groups(group: String, recursive: Boolean,
+      fully_qualified: Boolean = true) =
+    (list_counter_groups(local_to_full_name(group), recursive,
+      fully_qualified) map (_.stripPrefix(local_counter_group + ".")))
+
   /**
-   * Increment the given counter by 1.
+   * Increment the given local counter by 1.  Local counters are those
+   * specific to this application rather than counters set by the overall
+   * framework. (The difference is that local counters are placed in their
+   * own group, as specified by `local_counter_group`.)
+   */
+  def increment_local_counter(name: String) {
+    increment_local_counter(name, 1)
+  }
+
+  /**
+   * Increment the given local counter by the given value.  Local counters
+   * are those specific to this application rather than counters set by the
+   * overall framework. (The difference is that local counters are placed in
+   * their own group, as specified by `local_counter_group`.)
+   */
+  def increment_local_counter(name: String, byvalue: Long) {
+    increment_counter(local_to_full_name(name), byvalue)
+  }
+
+  /**
+   * Increment the given fully-named counter by 1.  Global counters are those
+   * provided by the overall framework rather than specific to this
+   * application; hence there is rarely cause for changing them.
    */
   def increment_counter(name: String) {
     increment_counter(name, 1)
   }
 
   /**
-   * Increment the given counter by the given value.
+   * Increment the given fully-named counter by the given value.
+   *
+   * @see increment_local_counter
    */
   def increment_counter(name: String, byvalue: Long) {
     note_counter(name)
     do_increment_counter(name, byvalue)
   }
 
+  /**
+   * Return the value of the given local counter.
+   *
+   * See `increment_local_counter` for a discussion of local counters,
+   * and `get_counter` for a discussion of caveats in a multi-process
+   * environment.
+   */
+  def get_local_counter(name: String) =
+    get_counter(local_to_full_name(name))
+
+  /**
+   * Return the value of the given fully-named counter.  Note: When operating
+   * in a multi-threaded or multi-process environment, it cannot be guaranteed
+   * that this value is up-to-date.  This is especially the case e.g. when
+   * operating in Hadoop, where counters are maintained globally across
+   * tasks which are running on different machines on the network.
+   *
+   * @see get_local_counter
+   */
+  def get_counter(name: String) = do_get_counter(name)
+
   /******************* Override/implement below this line **************/
+
+  /**
+   * Group that local counters are placed in.
+   */
+  val local_counter_group: String 
+
+  /**
+   * Return ID of task.  This is used for Hadoop or similar, to handle
+   * operations that may be run multiple times per task in an overall job.
+   * In a standalone environment, this should always return the same value.
+   */
+  def get_task_id: Int
 
   /**
    * Underlying implementation to increment the given counter by the
@@ -293,13 +370,9 @@ abstract trait ExperimentDriverStats {
   protected def do_increment_counter(name: String, byvalue: Long)
 
   /**
-   * Return the value of the given counter.  Note: When operating in a
-   * multi-threaded or multi-process environment, it cannot be guaranteed
-   * that this value is up-to-date.  This is especially the case e.g. when
-   * operating in Hadoop, where counters are maintained globally across
-   * tasks which are running on different machines on the network.
+   * Underlying implementation to return the value of the given counter.
    */
-  def get_counter(name: String): Long
+  protected def do_get_counter(name: String): Long
 }
 
 abstract class ExperimentParameters(val parser: ArgParser) {

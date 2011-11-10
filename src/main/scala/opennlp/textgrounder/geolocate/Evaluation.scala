@@ -21,24 +21,17 @@ class EvalStats(
   prefix: String,
   incorrect_reasons: Map[String, String]
 ) {
-  // Map from reason ID's to counts
-  val stats_group = "textgrounder"
-
   def construct_counter_name(name: String) = {
-    val full_prefix =
-      if (prefix == "")
-        stats_group
-      else
-        stats_group + "." + prefix
-    full_prefix + "." + name
+    if (prefix == "") name
+    else prefix + "." + name
   }
 
   def increment_counter(name: String) {
-    driver_stats.increment_counter(construct_counter_name(name))
+    driver_stats.increment_local_counter(construct_counter_name(name))
   }
 
   def get_counter(name: String) = {
-    driver_stats.get_counter(construct_counter_name(name))
+    driver_stats.get_local_counter(construct_counter_name(name))
   }
 
   def list_counters(group: String, recursive: Boolean,
@@ -87,8 +80,8 @@ class EvalStats(
   }
 
   def output_other_stats() {
-    for (ty <- driver_stats.list_counters(stats_group, true)) {
-      val count = driver_stats.get_counter(ty)
+    for (ty <- driver_stats.list_local_counters("", true)) {
+      val count = driver_stats.get_local_counter(ty)
       errprint("%s = %s", ty, count)
     }
   }

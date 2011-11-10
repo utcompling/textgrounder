@@ -1167,7 +1167,10 @@ class MultiRegularCellGrid(
  * redirect article should point to the article object for the article
  * pointed to by the redirect.
  */
-class GeoArticleTable(val word_dist_factory: WordDistFactory) {
+class GeoArticleTable(
+  val driver_stats: ExperimentDriverStats,
+  val word_dist_factory: WordDistFactory
+) {
   /**
    * Mapping from article names to GeoArticle objects, using the actual case of
    * the article.
@@ -1183,6 +1186,18 @@ class GeoArticleTable(val word_dist_factory: WordDistFactory) {
    * Num of articles with word-count information but not in table.
    */
   var num_articles_with_word_counts_but_not_in_table = 0
+
+  def record_article_with_word_count_but_not_in_table() {
+    num_articles_with_word_counts_but_not_in_table += 1
+  }
+
+  def record_word_count_article_by_split(split: String) {
+    num_word_count_articles_by_split(split) += 1
+  }
+
+  def record_num_articles_with_word_counts(num_arts: Int) {
+    num_articles_with_word_counts += num_arts
+  }
 
   /**
    * Num of articles with word-count information (whether or not in table).
@@ -2153,7 +2168,7 @@ abstract class GeolocateDriver extends
   }
 
   protected def initialize_article_table(word_dist_factory: WordDistFactory) = {
-    new GeoArticleTable(word_dist_factory)
+    new GeoArticleTable(this, word_dist_factory)
   }
 
   protected def initialize_cell_grid(table: GeoArticleTable) = {
@@ -2593,11 +2608,16 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
  */
 trait StandaloneGeolocateDriverStats extends ExperimentDriverStats {
   val counter_values = longmap[String]()
-  def do_increment_counter(name: String, incr: Long) {
+
+  val local_counter_group = "textgrounder"
+
+  def get_task_id = 0
+
+  protected def do_increment_counter(name: String, incr: Long) {
     counter_values(name) += incr
   }
 
-  def get_counter(name: String) = counter_values(name)
+  protected def do_get_counter(name: String) = counter_values(name)
 }
 
 class GeolocateDocumentDriver extends

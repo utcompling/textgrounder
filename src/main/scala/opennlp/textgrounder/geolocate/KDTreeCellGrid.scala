@@ -82,7 +82,8 @@ class KdTreeCellGrid(table: GeoArticleTable) extends CellGrid(table) {
 object KdTreeTest {
   def main(args:Array[String]) {
     val factory = new PseudoGoodTuringSmoothedWordDistFactory
-    val table = new GeoArticleTable(factory)
+    // FIXME: Need a driver
+    val table = new GeoArticleTable(null, factory)
     val grid = new KdTreeCellGrid(table)
 
     val emptyParams = Map[String, String]()

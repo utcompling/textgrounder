@@ -334,6 +334,11 @@ trait BaseHadoopGeolocateDriver extends GeolocateDriver {
    */
   protected def find_split_counter(group: String, tail: String): Counter
 
+  val local_counter_group = "textgrounder"
+
+  def get_task_id_from_job_context(jobcont: JobContext) =
+    jobcont.getConfiguration.getInt("mapred.task.partition", -1)
+  
   /**
    * Find the Counter object for the given counter.
    */
@@ -347,7 +352,7 @@ trait BaseHadoopGeolocateDriver extends GeolocateDriver {
     counter.increment(incr)
   }
 
-  def get_counter(name: String) = {
+  protected def do_get_counter(name: String) = {
     val counter = find_counter(name)
     counter.getValue()
   }
@@ -391,13 +396,26 @@ trait HadoopGeolocateDriver extends BaseHadoopGeolocateDriver {
     this.job = job
   }
 
+  def get_task_id = {
+    if (context != null)
+      get_task_id_from_job_context(context)
+    else if (job != null)
+      get_task_id_from_job_context(job)
+    else
+      need_to_set_context()
+  }
+
   def find_split_counter(group: String, counter: String) = {
     if (context != null)
       context.getCounter(group, counter)
     else if (job != null)
       job.getCounters.findCounter(group, counter)
-    else throw new IllegalStateException("Either task context or job needs to be set before any counter operations")
+    else
+      need_to_set_context()
   }
+
+  def need_to_set_context() =
+    throw new IllegalStateException("Either task context or job needs to be set before any counter operations")
 }
 
 /************************************************************************/
