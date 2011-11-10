@@ -236,7 +236,7 @@ abstract class GeolocateHadoopApp(
 ) extends GeolocateApp(progname) {
   var hadoop_conf: Configuration = _
 
-  override type DriverType <: GeolocateHadoopJobDriver
+  override type DriverType <: GeolocateHadoopDriver
 
   /* Set by subclass -- Initialize the various classes for map and reduce */
   def initialize_hadoop_classes(job: Job)
@@ -258,7 +258,7 @@ abstract class GeolocateHadoopApp(
     val job = new Job(hadoop_conf, progname)
     /* We have to call set_job() here now, and not earlier.  This is the
        "bootstrapping issue" alluded to in the comments on
-       GeolocateHadoopJobDriver.  We can't set the Job until it's created,
+       GeolocateHadoopDriver.  We can't set the Job until it's created,
        and we can't create the Job until after we have set the appropriate
        TextGrounder configuration parameters from the command-line arguments --
        but, we need the driver already created in order to parse the
@@ -303,14 +303,12 @@ variable (e.g. in Hadoop).""")
 }
 
 /**
- * Base mix-in for a Geolocate application using Hadoop.  This is a trait
- * because one of its subtraits (either GeolocateHadoopTaskDriver or
- * GeolocateHadoopJobDriver) should be mixed into a class providing the
- * implementation of an application in a way that is indifferent to whether
- * it's being run stand-alone or in Hadoop.
+ * Base mix-in for a Geolocate application using Hadoop.
+ *
+ * @see GeolocateHadoopDriver
  */
 
-trait GeolocateHadoopDriver extends GeolocateDriver {
+trait BaseGeolocateHadoopDriver extends GeolocateDriver {
   /**
    * FileHandler object for this driver.
    */
@@ -356,42 +354,49 @@ trait GeolocateHadoopDriver extends GeolocateDriver {
 }
 
 /**
- * Mix-in for the "task" (map or reduce) portion of a Geolocate application
- * using Hadoop.
+ * Mix-in for a Geolocate application using Hadoop.  This is a trait
+ * because it should be mixed into a class providing the implementation of
+ * an application in a way that is indifferent to whether it's being run
+ * stand-alone or in Hadoop.
  *
- * @see GeolocateHadoopDriver
+ * This is used both in map/reduce task code and in the client job-running
+ * code.  In some ways it would be cleaner to have separate classes for
+ * task vs. client job code, but that would entail additional boilerplate
+ * for any individual apps as they'd have to create separate task and
+ * client job versions of each class along with a base superclass for the
+ * two.
  */
 
-trait GeolocateHadoopTaskDriver extends GeolocateHadoopDriver {
-  val context_object: TaskInputOutputContext[_,_,_,_]
-
-  def find_split_counter(group: String, counter: String) = {
-    context_object.getCounter(group, counter)
-  }
-}
-
-/**
- * Mix-in for the "job" (main job driver) portion of a Geolocate application
- * using Hadoop.
- *
- * @see GeolocateHadoopDriver
- */
-
-trait GeolocateHadoopJobDriver extends GeolocateHadoopDriver {
+trait GeolocateHadoopDriver extends BaseGeolocateHadoopDriver {
   var job: Job = _
+  var context: TaskInputOutputContext[_,_,_,_] = _
 
   /**
-   * Set the Job object for the driver.  Needed so we can access counters
-   * on the job (typically after the job has run).  We do it this way for
-   * bootstrapping reasons, rather than declaring the `job` field to be
-   * abstract -- see comments in `GeolocateHadoopApp`.
+   * Set the task context, if we're running in the map or reduce task
+   * code on a tasktracker. (Both Mapper.Context and Reducer.Context are
+   * subclasses of TaskInputOutputContext.)
    */
+  def set_task_context(context: TaskInputOutputContext[_,_,_,_]) {
+    this.context = context
+  }
+
+  /**
+   * Set the Job object, if we're running the job-running code on the
+   * client. (Note that we have to set the job like this, rather than have
+   * it passed in at creation time, e.g. through an abstract field,
+   * because of bootstrapping issues; explained in GeolocateHadoopApp.
+   */
+
   def set_job(job: Job) {
     this.job = job
   }
 
   def find_split_counter(group: String, counter: String) = {
-    job.getCounters.findCounter(group, counter)
+    if (context != null)
+      context.getCounter(group, counter)
+    else if (job != null)
+      job.getCounters.findCounter(group, counter)
+    else throw new IllegalStateException("Either task context or job needs to be set before any counter operations")
   }
 }
 
@@ -404,7 +409,7 @@ class ArticleEvaluationMapper extends
   val reader = new ArticleReader(ArticleData.combined_article_data_outfields)
   var evaluators: Iterable[ArticleGeolocateDocumentEvaluator] = null
   val task = new MeteredTask("document", "evaluating")
-  var driver: GeolocateDocumentHadoopTaskDriver = _
+  var driver: GeolocateDocumentHadoopDriver = _
 
   type ContextType = Mapper[Object, Text, Text, DoubleWritable]#Context
 
@@ -420,7 +425,8 @@ class ArticleEvaluationMapper extends
     convert_parameters_from_hadoop_conf(hadoop_conf_prefix, ap, conf)
     // Now create a class containing the stored configuration values
     val params = new GeolocateDocumentHadoopParameters(ap)
-    driver = new GeolocateDocumentHadoopTaskDriver(context)
+    driver = new GeolocateDocumentHadoopDriver
+    driver.set_task_context(context)
     driver.handle_parameters(params)
     driver.setup_for_run()
     evaluators =
@@ -465,10 +471,11 @@ class ArticleResultReducer extends
 
   type ContextType = Reducer[Text, DoubleWritable, Text, DoubleWritable]#Context
 
-  var driver: GeolocateDocumentHadoopTaskDriver = _
+  var driver: GeolocateDocumentHadoopDriver = _
 
   override def setup(context: ContextType) {
-    driver = new GeolocateDocumentHadoopTaskDriver(context)
+    driver = new GeolocateDocumentHadoopDriver
+    driver.set_task_context(context)
   }
 
   override def reduce(key: Text, values: java.lang.Iterable[DoubleWritable],
@@ -487,38 +494,17 @@ class GeolocateDocumentHadoopParameters(
 }
 
 /**
- * Base class for running the geolocate-document app using Hadoop.
+ * Class for running the geolocate-document app using Hadoop.
  */
 
-abstract class GeolocateDocumentHadoopDriver extends
+class GeolocateDocumentHadoopDriver extends
     GeolocateDocumentTypeDriver with GeolocateHadoopDriver {
   override type ArgType = GeolocateDocumentHadoopParameters
 }
 
-/**
- * Task driver class for running the geolocate-document app using Hadoop.
- */
-
-class GeolocateDocumentHadoopTaskDriver(
-  context: TaskInputOutputContext[_,_,_,_]
-) extends GeolocateDocumentHadoopDriver with GeolocateHadoopTaskDriver {
-  val context_object = context
-}
-
-/**
- * Job driver class for running the geolocate-document app using Hadoop.
- * The Job object must be set by calling `set_job`. (It's not passed in
- * as a parameter due to bootstrapping issues.  See comments in
- * `GeolocateHadoopApp`.)
- */
-
-class GeolocateDocumentHadoopJobDriver extends
-  GeolocateDocumentHadoopDriver with GeolocateHadoopJobDriver {
-}
-
 object GeolocateDocumentHadoopApp extends
     GeolocateHadoopApp("TextGrounder geolocate-document") {
-  type DriverType = GeolocateDocumentHadoopJobDriver
+  type DriverType = GeolocateDocumentHadoopDriver
   // FUCKING TYPE ERASURE
   def create_arg_class(ap: ArgParser) = new ArgType(ap)
   def create_driver() = new DriverType()
