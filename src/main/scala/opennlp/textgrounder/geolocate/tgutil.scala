@@ -636,12 +636,12 @@ package object tgutil {
    * collection; otherwise, use the nonsetting variant).
    */
   class SettingDefaultHashMap[F,T](
-    defaultval: => T
+    create_default: F => T
   ) extends DefaultHashMap[F,T] {
     var internal_setkey = true
 
     override def default(key: F) = {
-      val buf = defaultval
+      val buf = create_default(key)
       if (internal_setkey)
         this(key) = buf
       buf
@@ -670,10 +670,10 @@ package object tgutil {
    * See class SettingDefaultHashMap and function defaultmap().
    */
   class NonSettingDefaultHashMap[F,T](
-    defaultval: => T
+    create_default: F => T
   ) extends DefaultHashMap[F,T] {
     override def default(key: F) = {
-      val buf = defaultval
+      val buf = create_default(key)
       buf
     }
         
@@ -724,9 +724,17 @@ package object tgutil {
     foo("myfoods")             -> ArrayBuffer(spam, eggs, milk)    (Good)
    */
   def defaultmap[F,T](defaultval: => T, setkey: Boolean = false) = {
-    if (setkey) new SettingDefaultHashMap[F,T](defaultval)
-    else new NonSettingDefaultHashMap[F,T](defaultval)
+    def create_default(key: F) = defaultval
+    if (setkey) new SettingDefaultHashMap[F,T](create_default _)
+    else new NonSettingDefaultHashMap[F,T](create_default _)
   }
+  /**
+   * A defaultmap[] where the keys are collections; need to have `setkey`
+   * true for the underlying call to `defaultmap`.
+   */
+  def collection_defaultmap[F,T](defaultval: => T) =
+    defaultmap[F,T](defaultval, setkey = true)
+
   /* These next four are maps from T to Int, Double, Boolean or String,
      which automatically use a default value if the key isn't seen.
      They can be used in some cases where you simply want to be able to
@@ -755,7 +763,7 @@ package object tgutil {
       @see #mapmap[T,U,V]
     */
   def bufmap[T,U]() =
-    defaultmap[T,mutable.Buffer[U]](mutable.Buffer[U](), setkey=true)
+    collection_defaultmap[T,mutable.Buffer[U]](mutable.Buffer[U]())
   /** A default map which maps from T to a set of type U.  The default
       value is an empty Set of type U.  Calls of the sort
       `map(key) += item` will add the item to the Set stored as the
@@ -766,7 +774,7 @@ package object tgutil {
       @see #mapmap[T,U,V]
     */
   def setmap[T,U]() =
-    defaultmap[T,mutable.Set[U]](mutable.Set[U](), setkey=true)
+    collection_defaultmap[T,mutable.Set[U]](mutable.Set[U]())
   /** A default map which maps from T to a map from U to V.  The default
       value is an empty Map of type U->V.  Calls of the sort
       `map(key)(key2) = value2` will add the mapping `key2 -> value2`
@@ -777,7 +785,7 @@ package object tgutil {
       @see #setmap[T,U]
     */
   def mapmap[T,U,V]() =
-    defaultmap[T,mutable.Map[U,V]](mutable.Map[U,V](), setkey=true)
+    collection_defaultmap[T,mutable.Map[U,V]](mutable.Map[U,V]())
   
   // Another way to do this, using subclassing.
   //
@@ -1372,7 +1380,7 @@ package object tgutil {
   // etc.
   abstract class TableByRange[Coll,Numtype <% Ordered[Numtype]](
     ranges: Seq[Numtype],
-    create: ()=>Coll
+    create: (Numtype)=>Coll
   ) {
     val min_value: Numtype
     val max_value: Numtype
@@ -1400,7 +1408,7 @@ package object tgutil {
         }
       }
       if (!(items_by_range contains lower_range))
-        items_by_range(lower_range) = create()
+        items_by_range(lower_range) = create(lower_range)
       items_by_range(lower_range)
     }
   
@@ -1438,7 +1446,7 @@ package object tgutil {
            if (collector != null || unseen_all ||
                (unseen_between && seen_any &&
                 upper != max_value && upper <= highest_seen))
-           val col2 = if (collector != null) collector else create()
+           val col2 = if (collector != null) collector else create(lower)
           }
       yield {
         if (collector != null) seen_any = true
@@ -1449,7 +1457,7 @@ package object tgutil {
 
   class IntTableByRange[Coll](
     ranges: Seq[Int],
-    create: ()=>Coll
+    create: (Int)=>Coll
   ) extends TableByRange[Coll,Int](ranges, create) {
     val min_value = java.lang.Integer.MIN_VALUE
     val max_value = java.lang.Integer.MAX_VALUE
@@ -1457,7 +1465,7 @@ package object tgutil {
 
   class DoubleTableByRange[Coll](
     ranges: Seq[Double],
-    create: ()=>Coll
+    create: (Double)=>Coll
   ) extends TableByRange[Coll,Double](ranges, create) {
     val min_value = java.lang.Double.NEGATIVE_INFINITY
     val max_value = java.lang.Double.POSITIVE_INFINITY

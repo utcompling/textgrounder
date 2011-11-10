@@ -18,22 +18,32 @@ import java.io._
 // them.
 class EvalStats(
   driver_stats: ExperimentDriverStats,
+  prefix: String,
   incorrect_reasons: Map[String, String]
 ) {
   // Map from reason ID's to counts
   val stats_group = "textgrounder"
 
+  def construct_counter_name(name: String) = {
+    val full_prefix =
+      if (prefix == "")
+        stats_group
+      else
+        stats_group + "." + prefix
+    full_prefix + "." + name
+  }
+
   def increment_counter(name: String) {
-    driver_stats.increment_counter(stats_group + "." + name)
+    driver_stats.increment_counter(construct_counter_name(name))
   }
 
   def get_counter(name: String) = {
-    driver_stats.get_counter(stats_group + "." + name)
+    driver_stats.get_counter(construct_counter_name(name))
   }
 
   def list_counters(group: String, recursive: Boolean,
       fully_qualified: Boolean = true) =
-    driver_stats.list_counters(stats_group + "." + group, recursive,
+    driver_stats.list_counters(construct_counter_name(group), recursive,
       fully_qualified)
 
   def record_result(correct: Boolean, reason: String = null) {
@@ -97,8 +107,9 @@ class EvalStats(
 
 class EvalStatsWithRank(
   driver_stats: ExperimentDriverStats,
+  prefix: String,
   max_rank_for_credit: Int = 10
-) extends EvalStats(driver_stats, Map[String, String]()) {
+) extends EvalStats(driver_stats, prefix, Map[String, String]()) {
   val incorrect_by_exact_rank = intmap[Int]()
   val correct_by_up_to_rank = intmap[Int]()
   var incorrect_past_max_rank = 0
@@ -145,8 +156,9 @@ class EvalStatsWithRank(
 
 class GeolocateDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
+  prefix: String,
   max_rank_for_credit: Int = 10
-) extends EvalStatsWithRank(driver_stats, max_rank_for_credit) {
+) extends EvalStatsWithRank(driver_stats, prefix, max_rank_for_credit) {
   // "True dist" means actual distance in km's or whatever.
   // "Degree dist" is the distance in degrees.
   val true_dists = mutable.Buffer[Double]()
@@ -198,11 +210,16 @@ class GroupedGeolocateDocumentEvalStats(
   cell_grid: CellGrid
 ) {
 
-  def create_doc() = new GeolocateDocumentEvalStats(driver_stats)
-  val all_document = create_doc()
+  def create_stats(prefix: String) =
+    new GeolocateDocumentEvalStats(driver_stats, prefix)
+  def create_stats_for_range[T](prefix: String, range: T) =
+    create_stats(prefix + ".byrange." + range)
+
+  val all_document = create_stats("")
 
   // naitr = "num articles in true cell"
-  val docs_by_naitr = new IntTableByRange(Seq(1, 10, 25, 100), create_doc _)
+  val docs_by_naitr = new IntTableByRange(Seq(1, 10, 25, 100),
+    create_stats_for_range("num_articles_in_true_cell", _))
 
   // Results for documents where the location is at a certain distance
   // from the center of the true statistical cell.  The key is measured in
@@ -213,9 +230,13 @@ class GroupedGeolocateDocumentEvalStats(
   // distance", as if degrees were a constant length both latitudinally
   // and longitudinally.
   val dist_fraction_increment = 0.25
-  def docmap() = defaultmap[Double, GeolocateDocumentEvalStats](create_doc())
-  val docs_by_degree_dist_to_true_center = docmap()
-  val docs_by_true_dist_to_true_center = docmap()
+  def docmap(prefix: String) =
+    new SettingDefaultHashMap[Double, GeolocateDocumentEvalStats](
+      create_stats_for_range(prefix, _))
+  val docs_by_degree_dist_to_true_center =
+    docmap("degree_dist_to_true_center")
+  val docs_by_true_dist_to_true_center =
+    docmap("true_dist_to_true_center")
 
   // Similar, but distance between location and center of top predicted
   // cell.
@@ -225,9 +246,11 @@ class GroupedGeolocateDocumentEvalStats(
     // We're never going to see these
     384, 512, 768, 1024, 1536, 2048)
   val docs_by_degree_dist_to_pred_center =
-    new DoubleTableByRange(dist_fractions_for_error_dist, create_doc _)
+    new DoubleTableByRange(dist_fractions_for_error_dist,
+      create_stats_for_range("degree_dist_to_pred_center", _))
   val docs_by_true_dist_to_pred_center =
-    new DoubleTableByRange(dist_fractions_for_error_dist, create_doc _)
+    new DoubleTableByRange(dist_fractions_for_error_dist,
+      create_stats_for_range("true_dist_to_pred_center", _))
 
   def record_result(res: ArticleEvaluationResult) {
     all_document.record_result(res.true_rank,

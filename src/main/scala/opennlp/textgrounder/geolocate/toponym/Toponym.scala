@@ -640,9 +640,10 @@ class TopoArticleTable(word_dist_factory: WordDistFactory) extends
 
 class EvalStatsWithCandidateList(
   driver_stats: ExperimentDriverStats,
+  prefix: String,
   incorrect_reasons: Map[String, String],
   max_individual_candidates: Int = 5
-) extends EvalStats(driver_stats, incorrect_reasons) {
+) extends EvalStats(driver_stats, prefix, incorrect_reasons) {
 
   def record_result(correct: Boolean, reason: String, num_candidates: Int) {
     super.record_result(correct, reason)
@@ -704,13 +705,13 @@ class GeolocateToponymResults(driver_stats: ExperimentDriverStats) {
 
   // Overall statistics
   val all_toponym = new EvalStatsWithCandidateList(
-    driver_stats, incorrect_geotag_toponym_reasons)
+    driver_stats, "", incorrect_geotag_toponym_reasons)
   // Statistics when toponym not same as true name of location
   val diff_surface = new EvalStatsWithCandidateList(
-    driver_stats, incorrect_geotag_toponym_reasons)
+    driver_stats, "diff_surface", incorrect_geotag_toponym_reasons)
   // Statistics when toponym not same as true name or short form of location
   val diff_short = new EvalStatsWithCandidateList(
-    driver_stats, incorrect_geotag_toponym_reasons)
+    driver_stats, "diff_short", incorrect_geotag_toponym_reasons)
 
   def record_geotag_toponym_result(correct: Boolean, toponym: String,
       trueloc: String, reason: String, num_candidates: Int) {
