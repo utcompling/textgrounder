@@ -30,12 +30,13 @@ class KdTreeCell(
     }
 }
 
-class KdTreeCellGrid(table: GeoArticleTable) extends CellGrid(table) {
+class KdTreeCellGrid(table: GeoArticleTable, bucketSize: Int)
+    extends CellGrid(table) {
   /**
    * Total number of cells in the grid.
    */
   var total_num_cells: Int = 0
-  var kdtree : KdTree[GeoArticle] = new KdTree[GeoArticle](2);
+  var kdtree : KdTree[GeoArticle] = new KdTree[GeoArticle](2, bucketSize);
 
   /**
    * Find the correct cell for the given coordinates.  If no such cell
@@ -79,27 +80,3 @@ class KdTreeCellGrid(table: GeoArticleTable) extends CellGrid(table) {
   }
 }
 
-object KdTreeTest {
-  def main(args:Array[String]) {
-    val factory = new PseudoGoodTuringSmoothedWordDistFactory
-    // FIXME: Need a driver
-    val table = new GeoArticleTable(null, factory)
-    val grid = new KdTreeCellGrid(table)
-
-    val emptyParams = Map[String, String]()
-
-    val article1 = new GeoArticle(emptyParams)
-    article1.coord = new Coord(31, -96, false)
-    val article2 = new GeoArticle(emptyParams)
-    article2.coord = new Coord(40, -74, false)
-
-    grid.add_article_to_cell(article1)
-    grid.add_article_to_cell(article2)
-
-    grid.finish
-
-    println(grid.find_best_cell_for_coord(new Coord(35, -98)).kdleaf)
-    println(grid.find_best_cell_for_coord(new Coord(35, -98)))
-
-  }
-}
