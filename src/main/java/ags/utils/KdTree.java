@@ -31,12 +31,10 @@ import java.util.List;
  * @author Rednaxela
  */
 public class KdTree<T> {
-    // Static variables
-    private static final int           bucketSize = 935;
- 
     // All types
     private final int                  dimensions;
     private final KdTree<T>            parent;
+    private  int                       bucketSize;
  
     // Leaf only
     private double[][]                 locations;
@@ -56,7 +54,8 @@ public class KdTree<T> {
      * Construct a KdTree with a given number of dimensions and a limit on
      * maxiumum size (after which it throws away old points)
      */
-    public KdTree(int dimensions) {
+    public KdTree(int dimensions, int bucketSize) {
+        this.bucketSize = bucketSize;
         this.dimensions = dimensions;
  
         // Init as leaf
@@ -358,7 +357,7 @@ public class KdTree<T> {
     }
 
     public static void main(String[] args) {
-        KdTree<String> tree = new KdTree<String>(2);
+        KdTree<String> tree = new KdTree<String>(2, 2);
         tree.addPoint(new double[] { 1.0, 1.0 }, "hello1");
         tree.addPoint(new double[] { 10.0, 2.0 }, "world2");
         tree.addPoint(new double[] { 3.0, 4.0 }, "earth3");
