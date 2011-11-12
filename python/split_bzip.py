@@ -29,48 +29,55 @@ import traceback
 # file.
 
 #######################################################################
-###                        Utility functions                        ###
-#######################################################################
-
-def uniprint(text, file=sys.stdout):
-  '''Print Unicode text in UTF-8, so it can be output without errors'''
-  if type(text) is unicode:
-    print text.encode("utf-8")
-  else:
-    print text
-
-def errprint(text):
-  uniprint(text, sys.stderr)
-
-def warning(text):
-  '''Output a warning, formatting into UTF-8 as necessary'''
-  if show_warnings:
-    uniprint("Warning: %s" % text)
-
-#######################################################################
 #                            Process files                            #
 #######################################################################
-
-def finish_outproc(outproc):
-  outproc.stdin.close()
-  errprint("Waiting for termination ...")
-  outproc.wait()
-  errprint("Waiting for termination ... done.")
 
 def split_tweet_bzip_files(opts, args):
   status = StatusMessage("tweet")
   totalsize = 0
   outproc = None
-  lines_at_start = []
+  skip_tweets = False
+
+  def finish_outproc(outproc):
+    errprint("Total uncompressed size this split: %s" % totalsize)
+    errprint("Total number of tweets so far: %s" % status.num_processed())
+    outproc.stdin.close()
+    errprint("Waiting for termination of output process ...")
+    outproc.wait()
+    errprint("Waiting for termination of output process ... done.")
+
   for infile in args:
-    inproc = Popen("bzcat", stdin=open(infile, "rb"), stdout=PIPE)
+    errprint("Opening input %s..." % infile)
+    errprint("Total uncompressed size this split so far: %s" % totalsize)
+    errprint("Total number of tweets so far: %s" % status.num_processed())
+    # NOTE: close_fds=True turns out to be necessary to avoid a deadlock in
+    # the following circumstance:
+    #
+    # 1) Open input from bzcat.
+    # 2) Open output to bzip2.
+    # 3) bzcat ends partway through a split (possibly after multiple splits,
+    #    and hence multiple invocations of bzip2).
+    # 4) Wait for bzcat to finish, then start another bzcat for the next file.
+    # 5) End the split, close bzip2's stdin (our output pipe), and wait for
+    #    bzip2 to finish.
+    # 6) Blammo!  Deadlock while waiting for bzip2 to finish.
+    #
+    # When we opened the second bzcat, if we don't call close_fds, it
+    # inherits the file descriptor of the pipe to bzip2, and that screws
+    # things up.  Presumably, the file descriptor inheritance means that
+    # there's still a file descriptor to the pipe to bzip2, so closing the
+    # output doesn't actually cause the pipe to get closed -- hence bzip2
+    # waits indefinitely for more input.
+    inproc = Popen("bzcat", stdin=open(infile, "rb"), stdout=PIPE, close_fds=True)
     for full_line in inproc.stdout:
       line = full_line[:-1]
       status.item_processed()
       if not line.startswith('{"'):
         errprint("Unparsable line, not JSON?, #%s: %s" % (status.num_processed(), line))
       else:
-        if not outproc or totalsize >= opts.split_size:
+        if totalsize >= opts.split_size or (not outproc and not skip_tweets):
+          # We need to open a new file.  But keep writing the old file
+          # (if any) until we see a tweet with a time in it.
           json = None
           try:
             json = split_json(line)
@@ -95,39 +102,60 @@ def split_tweet_bzip_files(opts, args):
                   if not tweet_time:
                     errprint("Can't parse time in line #%s: %s" % (status.num_processed(), json_time))
                   else:
-                    timesuff = time.strftime("%Y-%M-%d.%H%M", tweet_time)
+                    # Now we're ready to create a new split.
+                    skip_tweets = False
+                    timesuff = time.strftime("%Y-%m-%d.%H%M-UTC", tweet_time)
                     def make_filename(suff):
                       return opts.output_prefix + suff + ".bz2"
                     outfile = make_filename(timesuff)
                     if os.path.exists(outfile):
-                      errprint("Warning, path %s exists, not overwriting" % outfile)
-                      for ind in itertools.count(1):
-                        # Use _ not - because - sorts before the . of .bz2 but
-                        # _ sorts after (as well as after all letters and numbers).
-                        outfile = make_filename(timesuff + ("_%03d" % ind))
-                        if not os.path.exists(outfile):
-                          break
+                      if opts.skip_existing:
+                        errprint("Skipping writing tweets to existing %s" % outfile)
+                        skip_tweets = True
+                      else:
+                        errprint("Warning, path %s exists, not overwriting" % outfile)
+                        for ind in itertools.count(1):
+                          # Use _ not - because - sorts before the . of .bz2 but
+                          # _ sorts after (as well as after all letters and numbers).
+                          outfile = make_filename(timesuff + ("_%03d" % ind))
+                          if not os.path.exists(outfile):
+                            break
                     if outproc:
                       finish_outproc(outproc)
-                    errprint("About to write to %s..." % outfile)
-                    outproc = Popen("bzip2", stdin=PIPE, stdout=open(outfile, "wb"))
+                      outproc = None
                     totalsize = 0
+                    if not skip_tweets:
+                      errprint("About to write to %s..." % outfile)
+                      outfd = open(outfile, "wb")
+                      outproc = Popen("bzip2", stdin=PIPE, stdout=outfd, close_fds=True)
+                      outfd.close()
                 break
-      if outproc:
-        starttext = ''.join(lines_at_start)
-        if lines_at_start:
-          outproc.stdin.write(starttext)
-          totalsize += len(starttext)
-          lines_at_start = None # So we can't add any more lines to catch bugs
+      totalsize += len(full_line)
+      if skip_tweets:
+        pass
+      elif outproc:
         outproc.stdin.write(full_line)
-        totalsize += len(full_line)
       else:
-        lines_at_start += [full_line]
+        errprint("Warning: Nowhere to write bad line #%s, skipping: %s" % (status.num_processed(), line))
+    errprint("Waiting for termination of input process ...")
+    inproc.stdout.close()
+    # This sleep probably isn't necessary.  I put it in while attempting to
+    # solve the deadlock when closing the pipe to bzip2 (see comments above
+    # about close_fds).
+    sleep_time = 5
+    errprint("Sleeping %s seconds ..." % sleep_time)
+    time.sleep(sleep_time)
+    inproc.wait()
+    errprint("Waiting for termination of input process ... done.")
   if outproc:
     finish_outproc(outproc)
+    outproc = None
 
-# A very simply JSON splitter.  Doesn't take the next step of assembling
+# A very simple JSON splitter.  Doesn't take the next step of assembling
 # into dictionaries, but easily could.
+#
+# FIXME: This is totally unnecessary, as Python has a built-in JSON parser.
+# (I didn't realize this when I wrote the function.)
 def split_json(line):
   split = re.split(r'("(?:\\.|[^"])*?"|[][:{},])', line)
   split = (x for x in split if x) # Filter out empty strings
@@ -165,6 +193,9 @@ tweets compress in bzip about 8 to 1, hence 1 GB is a good uncompressed size
 for Hadoop.  Default %default.""")
   op.add_option("-o", "--output-prefix", metavar="PREFIX",
                 help="""Prefix to use for all splits.""")
+  op.add_option("--skip-existing", action="store_true",
+                help="""If we would try and open an existing file,
+skip writing any of the corresponding tweets.""")
 
   opts, args = op.parse_args()
 
