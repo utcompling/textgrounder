@@ -102,9 +102,9 @@ class PGTSmoothedBigramWordDistFactory extends
       new DynamicArray[Word](initial_alloc = initial_dynarr_size)
     val values_dynarr =
       new DynamicArray[Int](initial_alloc = initial_dynarr_size)
-    val bigramKeys_dynarr =
+    val bigram_keys_dynarr =
       new DynamicArray[Word](initial_alloc = initial_dynarr_size)
-    val bigramValues_dynarr =
+    val bigram_values_dynarr =
       new DynamicArray[Int](initial_alloc = initial_dynarr_size)
 
     // This is basically a one-off debug statement because of the fact that
@@ -127,6 +127,7 @@ class PGTSmoothedBigramWordDistFactory extends
     }
 
     var num_word_tokens = 0
+    var num_bigram_tokens = 0
     var title = null: String
 
     def one_article_probs() {
@@ -148,7 +149,7 @@ class PGTSmoothedBigramWordDistFactory extends
       art.dist =
         new PGTSmoothedBigramWordDist(this, keys_dynarr.array,
           values_dynarr.array, keys_dynarr.length,
-          bigramKeys_dynarr.array, bigramValues_dynarr.array, bigramKeys_dynarr.length)
+          bigram_keys_dynarr.array, bigram_values_dynarr.array, bigram_keys_dynarr.length)
           //note_globally = (art.split == "training"))
     }
 
@@ -190,14 +191,26 @@ class PGTSmoothedBigramWordDistFactory extends
           val linere = "(.*) = ([0-9]+)$".r
           line match {
             case linere(xword, xcount) => {
-              var word = xword
-              if (!Args.preserve_case_words) word = word.toLowerCase
               val count = xcount.toInt
-              if (!(stopwords contains word) ||
-                Args.include_stopwords_in_article_dists) {
-                num_word_tokens += count
-                keys_dynarr += memoize_word(word)
-                values_dynarr += count
+              var words = xword
+
+              if (!Args.preserve_case_words) words = words.toLowerCase
+              
+              var tokens = words.split("\\s");
+
+              if(tokens.length == 1){
+
+                if (!(stopwords contains words) ||
+                  Args.include_stopwords_in_article_dists) {
+                  num_word_tokens += count
+                  keys_dynarr += memoize_word(words)
+                  values_dynarr += count
+	              }
+              }
+		          else if(tokens.length == 2) {
+                  num_bigram_tokens += count
+                  bigram_keys_dynarr += memoize_word(words)
+                  bigram_values_dynarr += count
               }
             }
             case _ =>
