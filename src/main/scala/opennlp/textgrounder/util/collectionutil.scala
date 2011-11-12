@@ -21,6 +21,25 @@ import scala.collection.mutable
 import scala.collection.mutable.{Builder, MapBuilder}
 import scala.collection.generic.CanBuildFrom
 
+/**
+ * A package containing various collection-related classes and functions.
+ *
+ * Provided:
+ *
+ * -- Default hash tables (which automatically provide a default value if
+ *    no key exists; these already exist in Scala but this package makes
+ *    them easier to use)
+ * -- Dynamic arrays (similar to ArrayBuilder but specialized to use
+ *    primitive arrays underlyingly, and allow direct access to that array)
+ * -- LRU (least-recently-used) caches
+ * -- Hash tables by range (which keep track of a subtable for each range
+ *    of numeric keys)
+ * -- A couple of miscellaneous functions:
+ *    -- 'fromto', which does a range that is insensitive to order of its
+ *       arguments
+ *    -- 'merge_numbered_sequences_uniquely'
+ */
+
 package object collectionutil {
 
   ////////////////////////////////////////////////////////////////////////////
