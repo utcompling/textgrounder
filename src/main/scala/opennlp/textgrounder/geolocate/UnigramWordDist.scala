@@ -16,16 +16,20 @@
 
 package opennlp.textgrounder.geolocate
 
-import tgutil._
-import GeolocateDriver.Args
-import GeolocateDriver.Debug._
-import WordDist.memoizer._
-
 import math._
 import collection.mutable
 import util.control.Breaks._
 
 import java.io._
+
+import opennlp.textgrounder.util.collectionutil.DynamicArray
+import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
+import opennlp.textgrounder.util.MeteredTask
+import opennlp.textgrounder.util.osutil.output_resource_usage
+
+import GeolocateDriver.Args
+import GeolocateDriver.Debug._
+import WordDist.memoizer._
 
 /**
  * Unigram word distribution with a table listing counts for each word,

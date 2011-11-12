@@ -22,9 +22,10 @@
 
 package opennlp.textgrounder.geolocate
 
-import tgutil._
+import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.ioutil.warning
+
 import WordDist.memoizer._
-import argparser._
 
 class KMLParameters {
   // Minimum and maximum colors

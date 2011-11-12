@@ -22,17 +22,21 @@
 
 package opennlp.textgrounder.geolocate
 
-import tgutil._
-import WordDist.memoizer._
-import argparser._
-import Distances._
-import GeolocateDriver.Args
-import GeolocateDriver.Debug._
-
 import util.matching.Regex
 import util.Random
 import math._
 import collection.mutable
+
+import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.distances._
+import opennlp.textgrounder.util.experiment._
+import opennlp.textgrounder.util.ioutil._
+import opennlp.textgrounder.util.textutil._
+
+import WordDist.memoizer._
+import GeolocateDriver.Args
+import GeolocateDriver.Debug._
 
 /*
 

@@ -16,12 +16,17 @@
 
 package opennlp.textgrounder.geolocate
 
-import tgutil._
-import Distances._
-import GeolocateDriver.Debug._
-
 import util.control.Breaks._
+
 import java.io._
+
+import opennlp.textgrounder.util.distances._
+import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
+import opennlp.textgrounder.util.MeteredTask
+import opennlp.textgrounder.util.osutil.output_resource_usage
+import opennlp.textgrounder.util.textutil.splittext
+
+import GeolocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                               //

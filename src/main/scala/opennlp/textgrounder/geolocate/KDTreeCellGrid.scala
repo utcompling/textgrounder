@@ -1,9 +1,11 @@
 package opennlp.textgrounder.geolocate
 
 import scala.collection.JavaConversions._
-import ags.utils.KdTree
-import opennlp.textgrounder.geolocate.Distances.Coord
 import scala.collection.immutable.Map
+
+import ags.utils.KdTree
+
+import opennlp.textgrounder.util.distances.Coord
 
 class KdTreeCell(
   cellgrid: KdTreeCellGrid,

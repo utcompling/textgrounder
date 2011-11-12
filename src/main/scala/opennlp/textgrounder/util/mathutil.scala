@@ -14,29 +14,27 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.util
 
-import opennlp.textgrounder.util.ioutil.errprint
-
-/**
- TextGrounder-specific information (e.g. env vars).
- */
-
-object TextGrounderInfo {
-  var textgrounder_dir: String = null
-
-  def set_textgrounder_dir(dir: String) {
-    textgrounder_dir = dir
-  }
-
-  def get_textgrounder_dir() = {
-    if (textgrounder_dir == null)
-      textgrounder_dir = System.getenv("TEXTGROUNDER_DIR")
-    if (textgrounder_dir == null) {
-      errprint("""TEXTGROUNDER_DIR must be set to the top-level directory where
-Textgrounder is installed.""")
-      require(textgrounder_dir != null)
+package object mathutil {
+  /**
+   *  Return the median value of a list.  List will be sorted, so this is O(n).
+   */
+  def median(list: Seq[Double]) = {
+    val sorted = list.sorted
+    val len = sorted.length
+    if (len % 2 == 1)
+      sorted(len / 2)
+    else {
+      val midp = len / 2
+      0.5*(sorted(midp-1) + sorted(midp))
     }
-    textgrounder_dir
   }
-}
+  
+  /**
+   *  Return the mean of a list.
+   */
+  def mean(list: Seq[Double]) = {
+    list.sum / list.length
+  }
+} 

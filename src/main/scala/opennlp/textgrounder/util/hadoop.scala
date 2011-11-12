@@ -14,9 +14,7 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
-
-import tgutil._
+package opennlp.textgrounder.util
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
@@ -28,7 +26,11 @@ import org.apache.hadoop.fs._
 import java.io.{FileSystem=>_,_}
 import java.net.URI
 
-package object hadooputil {
+import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.ioutil._
+
+package object hadoop {
   class HadoopFileHandler extends FileHandler {
     protected def get_file_system(filename: String) = {
       val conf = new Configuration()

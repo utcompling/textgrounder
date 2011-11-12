@@ -1,8 +1,24 @@
+///////////////////////////////////////////////////////////////////////////////
+//  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+///////////////////////////////////////////////////////////////////////////////
+
 package opennlp.textgrounder.geolocate
 
-import tgutil._
-import hadooputil._
-import argparser._
+import java.io.{FileSystem=>_,_}
+import collection.JavaConversions._
+import util.control.Breaks._
 
 import org.apache.hadoop.io._
 import org.apache.hadoop.util._
@@ -12,9 +28,11 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.hadoop.conf.{Configuration, Configured}
 import org.apache.hadoop.fs._
 
-import java.io.{FileSystem=>_,_}
-import collection.JavaConversions._
-import util.control.Breaks._
+import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.hadoop._
+import opennlp.textgrounder.util.ioutil._
+import opennlp.textgrounder.util.mathutil._
+import opennlp.textgrounder.util.MeteredTask
 
 /* Basic idea for hooking up Geolocate with Hadoop.  Hadoop works in terms
    of key-value pairs, as follows:

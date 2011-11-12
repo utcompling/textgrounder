@@ -16,13 +16,16 @@
 
 package opennlp.textgrounder.geolocate
 
-import tgutil._
-import GeolocateDriver.Debug._
-import WordDist.memoizer._
-
 import math._
 import collection.mutable
+
 import com.codahale.trove.{mutable => trovescala}
+
+import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.ioutil.{errprint, FileHandler}
+
+import GeolocateDriver.Debug._
+import WordDist.memoizer._
 
 // val use_sorted_list = false
 
@@ -100,13 +103,13 @@ object IntStringMemoizer extends Memoizer {
   }
 
   def unmemoize_word(word: Word) = {
-    if (!(id_word_map contains word)) {
-      debprint("Can't find ID %s in id_word_map", word)
-      debprint("Word map:")
-      var its = id_word_map.toList.sorted
-      for ((key, value) <- its)
-        debprint("%s = %s", key, value)
-    }
+//    if (!(id_word_map contains word)) {
+//      debprint("Can't find ID %s in id_word_map", word)
+//      debprint("Word map:")
+//      var its = id_word_map.toList.sorted
+//      for ((key, value) <- its)
+//        debprint("%s = %s", key, value)
+//    }
     id_word_map(word)
   }
 

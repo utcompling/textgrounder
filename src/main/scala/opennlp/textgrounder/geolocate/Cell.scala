@@ -22,14 +22,17 @@
 
 package opennlp.textgrounder.geolocate
 
-import tgutil._
-import WordDist.memoizer._
-import Distances._
-import GeolocateDriver.Args
-import GeolocateDriver.Debug._
-
 import math._
 import collection.mutable
+
+import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.distances._
+import opennlp.textgrounder.util.MeteredTask
+import opennlp.textgrounder.util.ioutil._
+
+import WordDist.memoizer._
+import GeolocateDriver.Args
+import GeolocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Word distributions                          //

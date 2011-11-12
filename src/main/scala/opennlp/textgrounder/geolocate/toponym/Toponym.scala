@@ -16,16 +16,23 @@
 
 package opennlp.textgrounder.geolocate.toponym
 
-import opennlp.textgrounder.geolocate._
-import tgutil._
-import argparser._
-import Distances._
-import GeolocateDriver.Debug._
-import GeolocateToponymApp.Args
-
 import collection.mutable
 import util.control.Breaks._
 import math._
+
+import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.distances
+import opennlp.textgrounder.util.distances.Coord
+import opennlp.textgrounder.util.distances.spheredist
+import opennlp.textgrounder.util.experiment._
+import opennlp.textgrounder.util.ioutil._
+import opennlp.textgrounder.util.MeteredTask
+import opennlp.textgrounder.util.osutil._
+
+import opennlp.textgrounder.geolocate._
+import GeolocateDriver.Debug._
+import GeolocateToponymApp.Args
 
 // A class holding the boundary of a geographic object.  Currently this is
 // just a bounding box, but eventually may be expanded to including a
@@ -56,7 +63,7 @@ class Boundary(botleft: Coord, topright: Coord) {
     }
   }
 
-  def square_area() = Distances.square_area(botleft, topright)
+  def square_area() = distances.square_area(botleft, topright)
 
   /**
    * Iterate over the cells that overlap the boundary.
