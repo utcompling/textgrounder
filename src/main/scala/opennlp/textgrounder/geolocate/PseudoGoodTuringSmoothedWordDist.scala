@@ -16,16 +16,18 @@
 
 package opennlp.textgrounder.geolocate
 
-import tgutil._
-import GeolocateDriver.Args
-import GeolocateDriver.Debug._
-import WordDist.memoizer._
-
 import math._
 import collection.mutable
 import util.control.Breaks._
 
 import java.io._
+
+import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.ioutil.errprint
+
+import GeolocateDriver.Args
+import GeolocateDriver.Debug._
+import WordDist.memoizer._
 
 /**
  * This class implements a simple version of Good-Turing smoothing where we

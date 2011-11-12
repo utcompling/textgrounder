@@ -14,10 +14,12 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.util
+
+import scala.util.control.Breaks._
+import scala.collection.mutable
+
 import org.clapper.argot._
-import util.control.Breaks._
-import collection.mutable
 
 /**
   This module implements an argument parser for Scala, which handles

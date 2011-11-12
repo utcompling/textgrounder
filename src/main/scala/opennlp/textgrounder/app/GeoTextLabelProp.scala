@@ -7,7 +7,7 @@ import opennlp.textgrounder.text.io._
 import opennlp.textgrounder.text.prep._
 import opennlp.textgrounder.topo._
 import opennlp.textgrounder.app._
-import opennlp.textgrounder.util._
+import opennlp.textgrounder.util.TopoUtil
 
 import upenn.junto.app._
 import upenn.junto.config._

@@ -14,10 +14,11 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.util
 
 import math._
-import tgutil.warning
+
+import ioutil.warning
 
 /*
   The coordinates of a point are spherical coordinates, indicating a
@@ -53,7 +54,7 @@ import tgutil.warning
      between two Coords; likewise degree_dist() to compute degree distance
      between two Coords
  */
-object Distances {
+package object distances {
  
   /***** Fixed values *****/
 
