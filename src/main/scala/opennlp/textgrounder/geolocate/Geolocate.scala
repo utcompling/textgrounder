@@ -1934,11 +1934,11 @@ tiling cell to compute each multi cell.  If the value is more than
   //// Options used when creating word distributions
   var word_dist =
     ap.option[String]("word-dist", "wd",
-      default = "pseudo-good-turing",
-      choices = Seq("pseudo-good-turing", "bigram"),
+      default = "pseudo-good-turing-unigram",
+      choices = Seq("pseudo-good-turing-unigram", "pseudo-good-turing-bigram"),
       help = """Type of word distribution to use.  Possibilities are
-'pseudo-good-turing' (a simplified version of Good-Turing over a unigram
-distribution) and 'bigram' (a non-smoothed bigram distribution).
+'pseudo-good-turing-unigram' (a simplified version of Good-Turing over a unigram
+distribution) and 'pseudo-good-turing-bigram' (a non-smoothed bigram distribution).
 Default '%default'.""")
   var preserve_case_words =
     ap.flag("preserve-case-words", "pcw",
@@ -2160,11 +2160,10 @@ abstract class GeolocateDriver extends ExperimentDriver {
   }
 
   protected def initialize_word_dist_factory() = {
-    /* if (params.word_dist == "pseudo-good-turing") */
-    new PseudoGoodTuringSmoothedWordDistFactory
-    /* else
-      new BigramWordDistFactory
-     */
+    if (params.word_dist == "pseudo-good-turing-bigram")
+     new PGTSmoothedBigramWordDistFactory
+    else //(params.word_dist == "pseudo-good-turing-unigram")
+      new PseudoGoodTuringSmoothedWordDistFactory 
   }
 
   protected def read_stopwords() = {
