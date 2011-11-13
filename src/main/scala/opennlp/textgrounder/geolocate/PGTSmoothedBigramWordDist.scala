@@ -48,44 +48,14 @@ class PGTSmoothedBigramWordDist(
   num_words: Int,
   bigramKeys: Array[Word],
   bigramValues: Array[Int],
-  num_bigrams: Int
+  num_bigrams: Int,
+  val note_globally: Boolean=true
 ) extends BigramWordDist(keys, values, num_words, bigramKeys, bigramValues, num_bigrams) {
   //val FastAlgorithms = FastPseudoGoodTuringSmoothedWordDist
   type ThisType = PGTSmoothedBigramWordDist
 
-  /** Total probability mass to be assigned to all words not
-      seen in the article, estimated (motivated by Good-Turing
-      smoothing) as the unadjusted empirical probability of
-      having seen a word once.
-   */
-  var unseen_mass = 0.5
-  /**
-     Probability mass assigned in 'overall_word_probs' to all words not seen
-     in the article.  This is 1 - (sum over W in A of overall_word_probs[W]).
-     The idea is that we compute the probability of seeing a word W in
-     article A as
-
-     -- if W has been seen before in A, use the following:
-          COUNTS[W]/TOTAL_TOKENS*(1 - UNSEEN_MASS)
-     -- else, if W seen in any articles (W in 'overall_word_probs'),
-        use UNSEEN_MASS * (overall_word_probs[W] / OVERALL_UNSEEN_MASS).
-        The idea is that overall_word_probs[W] / OVERALL_UNSEEN_MASS is
-        an estimate of p(W | W not in A).  We have to divide by
-        OVERALL_UNSEEN_MASS to make these probabilities be normalized
-        properly.  We scale p(W | W not in A) by the total probability mass
-        we have available for all words not seen in A.
-     -- else, use UNSEEN_MASS * globally_unseen_word_prob / NUM_UNSEEN_WORDS,
-        where NUM_UNSEEN_WORDS is an estimate of the total number of words
-        "exist" but haven't been seen in any articles.  One simple idea is
-        to use the number of words seen once in any article.  This certainly
-        underestimates this number if not too many articles have been seen
-        but might be OK if many articles seen.
-    */
-  var overall_unseen_mass = 1.0
-
-/*
   if (note_globally) {
-    assert(!factory.owp_adjusted)
+    //assert(!factory.owp_adjusted)
     for ((word, count) <- counts) {
       if (!(factory.overall_word_probs contains word))
         WordDist.total_num_word_types += 1
@@ -93,7 +63,7 @@ class PGTSmoothedBigramWordDist(
       factory.overall_word_probs(word) += count
       WordDist.total_num_word_tokens += count
     }
-  }*/
+  }
 
   def innerToString = ", %.2f unseen mass" format unseen_mass
 
@@ -139,9 +109,41 @@ class PGTSmoothedBigramWordDist(
   }
 
 
-  def fast_kl_divergence(other: WordDist, partial: Boolean=false) = {
+  def fast_kl_divergence(xother: WordDist, partial: Boolean=false) = {
+if(debug("bigram"))
+  errprint("fast_kl_divergence")
+    val other = xother.asInstanceOf[BigramWordDist]
+    assert(finished)
+    assert(other.finished)
     var kldiv = 0.0
-    kldiv
+    // 1.
+    for (word <- counts.keys) {
+      val p = lookup_word(word)
+      val q = other.lookup_word(word)
+      if (p <= 0.0 || q <= 0.0)
+        errprint("Warning: problematic values: p=%s, q=%s, word=%s", p, q, word)
+      else {
+        kldiv += p*(log(p) - log(q))
+if(debug("bigram"))
+  errprint("kldiv1: " + kldiv + " :p: " + p + " :q: " + q)
+      }
+    }
+
+    if(partial)
+      kldiv
+    else {
+      // Step 2.
+      for (word <- other.counts.keys if !(counts contains word)) {
+        val p = lookup_word(word)
+        val q = other.lookup_word(word)
+        kldiv += p*(log(p) - log(q))
+if(debug("bigram"))
+  errprint("kldiv2: " + kldiv + " :p: " + p + " :q: " + q)
+      }
+
+      val retval = kldiv + kl_divergence_34(other)
+      retval
+   }
  }
 
   def fast_cosine_similarity(other: WordDist, partial: Boolean=false) = {
@@ -154,7 +156,7 @@ class PGTSmoothedBigramWordDist(
     kldiv
  }
 
-  def kl_divergence_34(other: UnigramWordDist) = {
+  def kl_divergence_34(other: BigramWordDist) = {
     var kldiv = 0.0
     kldiv
  }
@@ -212,9 +214,11 @@ class PGTSmoothedBigramWordDist(
       case None => {
         factory.overall_word_probs.get(word) match {
           case None => {
+if(debug("bigram"))
+  errprint("unseen_mass: %s, globally_unseen_word_prob %s, total_num_unseen_word_types %s", unseen_mass, factory.globally_unseen_word_prob, factory.total_num_unseen_word_types)
             val wordprob = (unseen_mass*factory.globally_unseen_word_prob
                       / factory.total_num_unseen_word_types)
-            if (debug("lots"))
+            if (debug("bigram"))
               errprint("Word %s, never seen at all, wordprob = %s",
                        unmemoize_word(word), wordprob)
             wordprob
@@ -225,7 +229,7 @@ class PGTSmoothedBigramWordDist(
             //  warning("Bad values; unseen_mass = %s, overall_word_probs[word] = %s, overall_unseen_mass = %s",
             //    unseen_mass, factory.overall_word_probs[word],
             //    factory.overall_unseen_mass)
-            if (debug("lots"))
+            if (debug("bigram"))
               errprint("Word %s, seen but not in article, wordprob = %s",
                        unmemoize_word(word), wordprob)
             wordprob
@@ -239,7 +243,7 @@ class PGTSmoothedBigramWordDist(
         //  for ((word, count) <- self.counts)
         //    errprint("%s: %s", word, count)
         val wordprob = wordcount.toDouble/num_word_tokens*(1.0 - unseen_mass)
-        if (debug("lots"))
+        if (debug("bigram"))
           errprint("Word %s, seen in article, wordprob = %s",
                    unmemoize_word(word), wordprob)
         wordprob

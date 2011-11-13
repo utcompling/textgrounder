@@ -77,7 +77,7 @@ class PGTSmoothedBigramWordDistFactory extends
     // A very rough estimate, perhaps totally wrong
     total_num_unseen_word_types =
       total_num_types_seen_once max (WordDist.total_num_word_types/20)
-    if (debug("tons"))
+    if (debug("bigram"))
       errprint("Total num types = %s, total num tokens = %s, total num_seen_once = %s, globally unseen word prob = %s, total mass = %s",
                WordDist.total_num_word_types, WordDist.total_num_word_tokens,
                total_num_types_seen_once,
@@ -97,6 +97,7 @@ class PGTSmoothedBigramWordDistFactory extends
    */ 
   def read_word_counts(table: GeoArticleTable,
       filehand: FileHandler, filename: String, stopwords: Set[String]) {
+errprint("read_word_counts")
     val initial_dynarr_size = 1000
     val keys_dynarr =
       new DynamicArray[Word](initial_alloc = initial_dynarr_size)
@@ -154,7 +155,7 @@ class PGTSmoothedBigramWordDistFactory extends
     }
 
     val task = new MeteredTask("article", "reading distributions of")
-    errprint("Reading word counts from %s...", filename)
+    errprint("Reading word and bigram counts from %s...", filename)
     errprint("")
 
     // Written this way because there's another line after the for loop,

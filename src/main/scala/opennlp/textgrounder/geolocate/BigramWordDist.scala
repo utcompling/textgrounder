@@ -62,8 +62,39 @@ abstract class BigramWordDist(
 
   def num_bigram_types = bicounts.size
 
+  /** Total probability mass to be assigned to all words not
+      seen in the article, estimated (motivated by Good-Turing
+      smoothing) as the unadjusted empirical probability of
+      having seen a word once.
+   */
+  var unseen_mass = 0.5
+  /**
+     Probability mass assigned in 'overall_word_probs' to all words not seen
+     in the article.  This is 1 - (sum over W in A of overall_word_probs[W]).
+     The idea is that we compute the probability of seeing a word W in
+     article A as
+
+     -- if W has been seen before in A, use the following:
+          COUNTS[W]/TOTAL_TOKENS*(1 - UNSEEN_MASS)
+     -- else, if W seen in any articles (W in 'overall_word_probs'),
+        use UNSEEN_MASS * (overall_word_probs[W] / OVERALL_UNSEEN_MASS).
+        The idea is that overall_word_probs[W] / OVERALL_UNSEEN_MASS is
+        an estimate of p(W | W not in A).  We have to divide by
+        OVERALL_UNSEEN_MASS to make these probabilities be normalized
+        properly.  We scale p(W | W not in A) by the total probability mass
+        we have available for all words not seen in A.
+     -- else, use UNSEEN_MASS * globally_unseen_word_prob / NUM_UNSEEN_WORDS,
+        where NUM_UNSEEN_WORDS is an estimate of the total number of words
+        "exist" but haven't been seen in any articles.  One simple idea is
+        to use the number of words seen once in any article.  This certainly
+        underestimates this number if not too many articles have been seen
+        but might be OK if many articles seen.
+    */
+  var overall_unseen_mass = 1.0
+
   def add_document(words: Traversable[String], ignore_case: Boolean=true,
       stopwords: Set[String]=Set[String]()) {
+errprint("add_document")
     assert(!finished)
     var previous = "<START>";
     counts(memoize_word(previous)) += 1
@@ -86,6 +117,8 @@ abstract class BigramWordDist(
       bicounts(bigram) += count
     num_word_tokens += worddist.num_word_tokens
     num_bigram_tokens += worddist.num_bigram_tokens
+if(debug("bigram"))
+  errprint("add_word_distribution: "  + num_word_tokens + " " +  num_bigram_tokens)
   }
 
   def finish_before_global(minimum_word_count: Int = 0) {
@@ -136,7 +169,7 @@ abstract class BigramWordDist(
      */
   def slow_kl_divergence_debug(xother: WordDist, partial: Boolean=false,
       return_contributing_words: Boolean=false) = {
-    val other = xother.asInstanceOf[UnigramWordDist]
+    val other = xother.asInstanceOf[BigramWordDist]
     assert(finished)
     assert(other.finished)
     var kldiv = 0.0
@@ -176,7 +209,7 @@ abstract class BigramWordDist(
    * Steps 3 and 4 of KL-divergence computation.
    * @seealso #slow_kl_divergence_debug
    */
-  def kl_divergence_34(other: UnigramWordDist): Double
+  def kl_divergence_34(other: BigramWordDist): Double
   
   def get_nbayes_logprob(xworddist: WordDist) = {
     val worddist = xworddist.asInstanceOf[UnigramWordDist]
