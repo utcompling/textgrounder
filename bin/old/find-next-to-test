@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# Usage: find-next-to-test OFFSET FILES...
+#
+# Find the last article that was tested in each of FILES and add OFFSET to the number
+# of the article, so that we can restart the appropriate slice at the appropriate place.
+
+offset="$1"; shift
+prefix="$2"; shift
+nextval=0
+for x in ${1+"$@"}; do
+  echo $x
+  if [ ! tail -200 $x | grep -q '^Final results for ' ]; then
+    num=`tail -200 $x | tac | grep -m 1 'to predicted region center' | sed -e 's/:.*//' -e 's/^#//'`
+    echo -n $prefix
+    echo -n $nextval
+    echo -n "= iterate('--skip-initial', [')"
+    echo -n `expr "$num" + "$offset"`
+    echo "'])"
+    nextval=`expr $nextval + 1`
+  fi
+done
