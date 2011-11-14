@@ -130,10 +130,10 @@ def main():
     op.error("Must specify output dir using -i or --output-dir")
   
   prefix = "%s/%s" % (opts.output_dir, opts.prefix)
-  artdat_file = open("%scombined-article-data.txt" % prefix, "w")
+  artdat_file = open("%scombined-document-data.txt" % prefix, "w")
   print >>artdat_file, "id\ttitle\tsplit\tredir\tnamespace\tis_list_of\tis_disambig\tis_list\tcoord\tincoming_links"
 
-  counts_file = open("%scounts-only-coord-articles.txt" % prefix, "w")
+  counts_file = open("%scounts-only-coord-documents.txt" % prefix, "w")
 
   train_file = "%s/%s" % (opts.input_dir, "train.dat")
   dev_file = "%s/%s" % (opts.input_dir, "dev.dat")

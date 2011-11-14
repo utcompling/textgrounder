@@ -45,7 +45,7 @@ for step in $steps ; do
   if [ "$step" = textgrounder ]; then
     $hadoop fs -put "$TEXTGROUNDER_DIR/data" "$TG_HADOOP_DIR/data"
   elif [ "$step" = wikipedia ]; then
-    $hadoop fs -put "$TG_WIKIPEDIA_DIR/$OUT_COMBINED_ARTICLE_DATA_FILE" "$TG_HADOOP_DIR/corpora/wikipedia/$OUT_COMBINED_ARTICLE_DATA_FILE"
+    $hadoop fs -put "$TG_WIKIPEDIA_DIR/$OUT_COMBINED_DOCUMENT_DATA_FILE" "$TG_HADOOP_DIR/corpora/wikipedia/$OUT_COMBINED_DOCUMENT_DATA_FILE"
     $hadoop fs -put "$TG_WIKIPEDIA_DIR/$OUT_COORD_COUNTS_FILE" "$TG_HADOOP_DIR/corpora/wikipedia/$OUT_COORD_COUNTS_FILE"
   elif [ "$step" = twitter ]; then
     for x in $TG_TWITTER_DIR/output-*-docthresh; do
