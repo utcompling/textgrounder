@@ -37,8 +37,8 @@ class GeoDocumentWriter(outfile: PrintStream, outfields: Seq[String]) {
     outfile.println(outfields mkString "\t")
   }
   
-  def output_row(art: GeoDocument) {
-    outfile.println(art.get_fields(outfields) mkString "\t")    
+  def output_row(doc: GeoDocument) {
+    outfile.println(doc.get_fields(outfields) mkString "\t")    
   }
 }
 
@@ -75,11 +75,14 @@ object GeoDocumentData {
       "namespace", "is_list_of", "is_disambig", "is_list", "coord",
       "incoming_links")
 
-  /** Read in the document data file.  Call PROCESS on each document.
-   * The type of the document created is given by ARTICLE_TYPE, which defaults
-   * to GeoDocument.  MAXTIME is a value in seconds, which limits the total
-   * processing time (real time, not CPU time) used for reading in the
-   * file, for testing purposes.
+  /** Read in the document data file.  Call `process` on each document.
+   *
+   * @param filehand File handler for the file.
+   * @param filename Name of the file to read in.
+   * @param process Function to be called for each document.
+   * @param A value in seconds, which limits the total processing time
+   *   (real time, not CPU time) used for reading in the file, for
+   *   testing purposes.
    */
   def read_document_data_file(filehand: FileHandler, filename: String,
       process: Map[String,String] => Unit, maxtime: Double=0.0) = {
@@ -108,8 +111,8 @@ object GeoDocumentData {
       documents: Iterable[GeoDocument]) {
     val writer = new GeoDocumentWriter(outfile, outfields)
     writer.output_header()
-    for (art <- documents)
-      writer.output_row(art)
+    for (doc <- documents)
+      writer.output_row(doc)
     outfile.close()
   }
 }

@@ -44,20 +44,20 @@ import GeolocateDriver.Debug._
 
 class CellWordDist(val word_dist: WordDist) {
   /** Number of documents included in incoming-link computation. */
-  var num_arts_for_links = 0
+  var num_docs_for_links = 0
   /** Total number of incoming links. */
   var incoming_links = 0
   /** Number of documents included in word distribution. */
-  var num_arts_for_word_dist = 0
+  var num_docs_for_word_dist = 0
 
-  def is_empty_for_word_dist() = num_arts_for_word_dist == 0
+  def is_empty_for_word_dist() = num_docs_for_word_dist == 0
 
-  def is_empty() = num_arts_for_links == 0
+  def is_empty() = num_docs_for_links == 0
 
   /**
    *  Add the given document to the total distribution seen so far
    */
-  def add_document(art: DistDocument) {
+  def add_document(doc: DistDocument) {
     /* We are passed in all documents, regardless of the split.
        The decision was made to accumulate link counts from all documents,
        even in the evaluation set.  Strictly, this is a violation of the
@@ -87,23 +87,23 @@ class CellWordDist(val word_dist: WordDist) {
        (2) distributions are normalized in any case, so the exact number
        of documents in a cell does not affect the distribution. */
     /* Add link count of document to cell. */
-    art.incoming_links match {
+    doc.incoming_links match {
       // Might be None, for unknown link count
       case Some(x) => incoming_links += x
       case _ =>
     }
-    num_arts_for_links += 1
+    num_docs_for_links += 1
 
     /* Add word counts of document to cell, but only if in the
        training set. */
-    if (art.split == "training") {
-      if (art.dist == null) {
+    if (doc.split == "training") {
+      if (doc.dist == null) {
         if (Args.max_time_per_stage == 0.0 && Args.num_training_docs == 0)
-          warning("Saw document %s without distribution", art)
+          warning("Saw document %s without distribution", doc)
       } else {
-        assert(art.dist.finished)
-        word_dist.add_word_distribution(art.dist)
-        num_arts_for_word_dist += 1
+        assert(doc.dist.finished)
+        word_dist.add_word_distribution(doc.dist)
+        num_docs_for_word_dist += 1
       }
     }
   }
@@ -282,7 +282,7 @@ abstract class GeoCell(val cell_grid: CellGrid) {
   val word_dist_wrapper =
     new CellWordDist(cell_grid.table.word_dist_factory.create_word_dist())
   var most_popular_document: DistDocument = null
-  var mostpopart_links = 0
+  var mostpopdoc_links = 0
 
   def word_dist = word_dist_wrapper.word_dist
 
@@ -326,14 +326,14 @@ abstract class GeoCell(val cell_grid: CellGrid) {
     val unfinished = if (word_dist.finished) "" else ", unfinished"
     val contains =
       if (most_popular_document != null)
-        ", most-pop-art %s(%d links)" format (
-          most_popular_document, mostpopart_links)
+        ", most-pop-doc %s(%d links)" format (
+          most_popular_document, mostpopdoc_links)
       else ""
 
     "GeoCell(%s%s%s, %d documents(dist), %d documents(links), %d links)" format (
       describe_location(), unfinished, contains,
-      word_dist_wrapper.num_arts_for_word_dist,
-      word_dist_wrapper.num_arts_for_links,
+      word_dist_wrapper.num_docs_for_word_dist,
+      word_dist_wrapper.num_docs_for_links,
       word_dist_wrapper.incoming_links)
   }
 
@@ -364,10 +364,10 @@ abstract class GeoCell(val cell_grid: CellGrid) {
       {
         if (most_popular_document != null)
           (<mostPopularDocument>most_popular_document.struct()</mostPopularDocument>
-           <mostPopularDocumentLinks>mostpopart_links</mostPopularDocumentLinks>)
+           <mostPopularDocumentLinks>mostpopdoc_links</mostPopularDocumentLinks>)
       }
-      <numDocumentsDist>{ word_dist_wrapper.num_arts_for_word_dist }</numDocumentsDist>
-      <numDocumentsLink>{ word_dist_wrapper.num_arts_for_links }</numDocumentsLink>
+      <numDocumentsDist>{ word_dist_wrapper.num_docs_for_word_dist }</numDocumentsDist>
+      <numDocumentsLink>{ word_dist_wrapper.num_docs_for_links }</numDocumentsLink>
       <incomingLinks>{ word_dist_wrapper.incoming_links }</incomingLinks>
     </GeoCell>
 
@@ -375,12 +375,12 @@ abstract class GeoCell(val cell_grid: CellGrid) {
    * Generate the distribution for a cell from the documents in it.
    */
   def generate_dist() {
-    for (art <- iterate_documents()) {
-      word_dist_wrapper.add_document(art)
-      if (art.incoming_links != None &&
-        art.incoming_links.get > mostpopart_links) {
-        mostpopart_links = art.incoming_links.get
-        most_popular_document = art
+    for (doc <- iterate_documents()) {
+      word_dist_wrapper.add_document(doc)
+      if (doc.incoming_links != None &&
+        doc.incoming_links.get > mostpopdoc_links) {
+        mostpopdoc_links = doc.incoming_links.get
+        most_popular_document = doc
       }
     }
     word_dist.finish(minimum_word_count = Args.minimum_word_count)
@@ -598,10 +598,10 @@ abstract class CellGrid(val table: DistDocumentTable) {
   /*********************** Not meant to be overridden *********************/
   
   /* These are simply the sum of the corresponding counts
-     `num_arts_for_word_dist` and `num_arts_for_links` of each individual
+     `num_docs_for_word_dist` and `num_docs_for_links` of each individual
      cell. */
-  var total_num_arts_for_word_dist = 0
-  var total_num_arts_for_links = 0
+  var total_num_docs_for_word_dist = 0
+  var total_num_docs_for_links = 0
   /* Set once finish() is called. */
   var all_cells_computed = false
   /* Number of non-empty cells. */
@@ -619,23 +619,23 @@ abstract class CellGrid(val table: DistDocumentTable) {
 
     all_cells_computed = true
 
-    total_num_arts_for_links = 0
-    total_num_arts_for_word_dist = 0
+    total_num_docs_for_links = 0
+    total_num_docs_for_word_dist = 0
     for (cell <- iter_nonempty_cells()) {
-      total_num_arts_for_word_dist +=
-        cell.word_dist_wrapper.num_arts_for_word_dist
-      total_num_arts_for_links +=
-        cell.word_dist_wrapper.num_arts_for_links
+      total_num_docs_for_word_dist +=
+        cell.word_dist_wrapper.num_docs_for_word_dist
+      total_num_docs_for_links +=
+        cell.word_dist_wrapper.num_docs_for_links
     }
 
     errprint("Number of non-empty cells: %s", num_non_empty_cells)
     errprint("Total number of cells: %s", total_num_cells)
     errprint("Percent non-empty cells: %g",
       num_non_empty_cells.toDouble / total_num_cells)
-    val training_arts_with_word_counts =
+    val training_docs_with_word_counts =
       table.num_word_count_documents_by_split("training").value
     errprint("Training documents per non-empty cell: %g",
-      training_arts_with_word_counts.toDouble / num_non_empty_cells)
+      training_docs_with_word_counts.toDouble / num_non_empty_cells)
     // Clear out the document distributions of the training set, since
     // only needed when computing cells.
     //
@@ -744,14 +744,14 @@ class MultiRegularCell(
       rawj <- (index.longind until
         (index.longind + cell_grid.width_of_multi_cell)) view;
       val j = (if (rawj > cell_grid.maximum_longind) rawj - 360 else rawj)
-      art <- {
+      doc <- {
         if (debug("lots")) {
           errprint("--> Processing tiling cell %s",
             cell_grid.cell_index_to_coord(index))
         }
         cell_grid.tiling_cell_to_documents.getNoSet(RegularCellIndex(i, j))
       }
-    } yield art
+    } yield doc
   }
 }
 

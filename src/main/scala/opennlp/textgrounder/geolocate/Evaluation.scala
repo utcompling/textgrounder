@@ -272,7 +272,7 @@ class GroupedGeolocateDocumentEvalStats(
   def record_result(res: DocumentEvaluationResult) {
     all_document.record_result(res.true_rank,
       res.pred_truedist, res.pred_degdist)
-    val naitr = docs_by_naitr.get_collector(res.num_arts_in_true_cell)
+    val naitr = docs_by_naitr.get_collector(res.num_docs_in_true_cell)
     naitr.record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
 
     /* FIXME: This code specific to MultiRegularCellGrid is kind of ugly.
@@ -457,7 +457,7 @@ case class DocumentEvaluationResult(
   true_rank: Int
 ) extends EvaluationResult {
   val true_cell = pred_cell.cell_grid.find_best_cell_for_coord(document.coord)
-  val num_arts_in_true_cell = true_cell.word_dist_wrapper.num_arts_for_word_dist
+  val num_docs_in_true_cell = true_cell.word_dist_wrapper.num_docs_for_word_dist
   val true_center = true_cell.get_center_coord()
   val true_truedist = spheredist(document.coord, true_center)
   val true_degdist = degree_dist(document.coord, true_center)
@@ -481,8 +481,8 @@ class InternalGeolocateDocumentEvaluator(
 
   def iter_documents(filehand: FileHandler, filename: String) = {
     assert(filename == null)
-    for (art <- driver.document_table.documents_by_split(driver.params.eval_set))
-      yield art
+    for (doc <- driver.document_table.documents_by_split(driver.params.eval_set))
+      yield doc
   }
 
   //title = None
@@ -495,8 +495,8 @@ class InternalGeolocateDocumentEvaluator(
   //    words = []
   //  else if (rematch("Link: (.*)$", line))
   //    args = m_[1].split('|')
-  //    trueart = args[0]
-  //    linkword = trueart
+  //    truedoc = args[0]
+  //    linkword = truedoc
   //    if (len(args) > 1)
   //      linkword = args[1]
   //    words.append(linkword)
@@ -525,7 +525,7 @@ class InternalGeolocateDocumentEvaluator(
     val true_cell =
       strategy.cell_grid.find_best_cell_for_coord(document.coord)
     if (debug("lots") || debug("commontop")) {
-      val naitr = true_cell.word_dist_wrapper.num_arts_for_word_dist
+      val naitr = true_cell.word_dist_wrapper.num_docs_for_word_dist
       errprint("Evaluating document %s with %s word-dist documents in true cell",
         document, naitr)
     }
@@ -567,7 +567,7 @@ class InternalGeolocateDocumentEvaluator(
     val want_indiv_results =
       !driver.params.oracle_results && !driver.params.no_individual_results
     evalstats.record_result(result)
-    if (result.num_arts_in_true_cell == 0) {
+    if (result.num_docs_in_true_cell == 0) {
       evalstats.increment_counter("documents.no_training_documents_in_cell")
     }
     if (want_indiv_results) {

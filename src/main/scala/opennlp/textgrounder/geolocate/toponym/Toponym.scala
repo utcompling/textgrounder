@@ -98,14 +98,14 @@ class Boundary(botleft: Coord, topright: Coord) {
 //   altnames: List of alternative names of location.
 //   typ: Type of location (locality, agglomeration, country, state,
 //                           territory, province, etc.)
-//   artmatch: Document corresponding to this location.
+//   docmatch: Document corresponding to this location.
 //   div: Next higher-level division this location is within, or None.
 
 abstract class Location(
   val name: String,
   val altnames: Seq[String],
   val typ: String) {
-  var artmatch: DistDocument = null
+  var docmatch: DistDocument = null
   var div: Division = null
   def toString(no_document: Boolean = false): String
   def shortstr(): String
@@ -128,12 +128,12 @@ case class Locality(
   override val typ: String) extends Location(name, altnames, typ) {
 
   def toString(no_document: Boolean = false) = {
-    var artmatch = ""
+    var docmatch = ""
     if (!no_document)
-      artmatch = ", match=%s" format artmatch
+      docmatch = ", match=%s" format docmatch
     "Locality %s (%s) at %s%s" format (
       name, if (div != null) div.path.mkString("/") else "unknown",
-      coord, artmatch)
+      coord, docmatch)
   }
 
   // def __repr__() = {
@@ -152,7 +152,7 @@ case class Locality(
       <atCoordinate>{ coord }</atCoordinate>
       {
         if (!no_document)
-          <matching>{ if (artmatch != null) artmatch.struct() else "none" }</matching>
+          <matching>{ if (docmatch != null) docmatch.struct() else "none" }</matching>
       }
     </Locality>
 
@@ -191,10 +191,10 @@ case class Division(
   var word_dist_wrapper: CellWordDist = null
 
   def toString(no_document: Boolean = false) = {
-    val artmatchstr =
-      if (no_document) "" else ", match=%s" format artmatch
+    val docmatchstr =
+      if (no_document) "" else ", match=%s" format docmatch
     "Division %s (%s)%s, boundary=%s" format (
-      name, path.mkString("/"), artmatchstr, boundary)
+      name, path.mkString("/"), docmatchstr, boundary)
   }
 
   // def __repr__() = toString.encode("utf-8")
@@ -210,7 +210,7 @@ case class Division(
       <path>{ path.mkString("/") }</path>
       {
         if (!no_document)
-          <matching>{ if (artmatch != null) artmatch.struct() else "none" }</matching>
+          <matching>{ if (docmatch != null) docmatch.struct() else "none" }</matching>
       }
       <boundary>{ boundary.struct() }</boundary>
     </Division>
@@ -267,8 +267,8 @@ case class Division(
 
   def generate_worddist(word_dist_factory: WordDistFactory) {
     word_dist_wrapper = new CellWordDist(word_dist_factory.create_word_dist())
-    for (loc <- Seq(this) ++ goodlocs if loc.artmatch != null)
-      yield word_dist_wrapper.add_document(loc.artmatch)
+    for (loc <- Seq(this) ++ goodlocs if loc.docmatch != null)
+      yield word_dist_wrapper.add_document(loc.docmatch)
     word_dist_wrapper.word_dist.finish(minimum_word_count = Args.minimum_word_count)
   }
 
@@ -334,15 +334,15 @@ class DivisionFactory(gazetteer: Gazetteer) {
           division.name, division.path)
       }
       division.compute_boundary()
-      val artmatch = cell_grid.table.asInstanceOf[TopoDocumentTable].
+      val docmatch = cell_grid.table.asInstanceOf[TopoDocumentTable].
         find_match_for_division(division)
-      if (artmatch != null) {
+      if (docmatch != null) {
         if (debug("lots")) {
           errprint("Matched document %s for division %s, path %s",
-            artmatch, division.name, division.path)
+            docmatch, division.name, division.path)
         }
-        division.artmatch = artmatch
-        artmatch.location = division
+        division.docmatch = docmatch
+        docmatch.location = division
       } else {
         if (debug("lots")) {
           errprint("Couldn't find match for division %s, path %s",
@@ -495,8 +495,8 @@ class TopoDocumentTable(
     val documents = super.construct_candidates(toponym)
     documents ++ (
       for {loc <- locs
-           if (loc.artmatch != null && !(documents contains loc.artmatch))}
-        yield loc.artmatch
+           if (loc.docmatch != null && !(documents contains loc.docmatch))}
+        yield loc.docmatch
     )
   }
 
@@ -523,8 +523,8 @@ class TopoDocumentTable(
 
     // Look for any documents with same name (case-insensitive) as the
     // location, check for matches
-    for (art <- lower_name_to_documents(loname))
-      if (check_match(art)) return art
+    for (doc <- lower_name_to_documents(loname))
+      if (check_match(doc)) return doc
 
     // Check whether there is a match for a document whose name is
     // a combination of the location's name and one of the divisions that
@@ -533,25 +533,25 @@ class TopoDocumentTable(
     if (loc.div != null) {
       for {
         div <- loc.div.path
-        art <- lower_name_div_to_documents((loname, div.toLowerCase))
-      } if (check_match(art)) return art
+        doc <- lower_name_div_to_documents((loname, div.toLowerCase))
+      } if (check_match(doc)) return doc
     }
 
     // See if there is a match with any of the documents whose short name
     // is the same as the location's name
-    val arts = short_lower_name_to_documents(loname)
-    if (arts != null) {
-      val goodarts = (for (art <- arts if check_match(art)) yield art)
-      if (goodarts.length == 1)
-        return goodarts(0) // One match
-      else if (goodarts.length > 1) {
+    val docs = short_lower_name_to_documents(loname)
+    if (docs != null) {
+      val gooddocs = (for (doc <- docs if check_match(doc)) yield doc)
+      if (gooddocs.length == 1)
+        return gooddocs(0) // One match
+      else if (gooddocs.length > 1) {
         // Multiple matches: Sort by preference, return most preferred one
         if (debug("lots")) {
           errprint("Warning: Saw %s toponym matches: %s",
-            goodarts.length, goodarts)
+            gooddocs.length, gooddocs)
         }
-        val sortedarts = goodarts sortWith (prefer_match(_, _))
-        return sortedarts(0)
+        val sorteddocs = gooddocs sortWith (prefer_match(_, _))
+        return sorteddocs(0)
       }
     }
 
@@ -566,15 +566,15 @@ class TopoDocumentTable(
     check_match: (DistDocument) => Boolean,
     prefer_match: (DistDocument, DistDocument) => Boolean): DistDocument = {
     // Try to find a match for the canonical name of the location
-    val artmatch = find_one_document_match(loc, loc.name, check_match,
+    val docmatch = find_one_document_match(loc, loc.name, check_match,
       prefer_match)
-    if (artmatch != null) return artmatch
+    if (docmatch != null) return docmatch
 
     // No match; try each of the alternate names in turn.
     for (altname <- loc.altnames) {
-      val artmatch2 = find_one_document_match(loc, altname, check_match,
+      val docmatch2 = find_one_document_match(loc, altname, check_match,
         prefer_match)
-      if (artmatch2 != null) return artmatch2
+      if (docmatch2 != null) return docmatch2
     }
 
     // No match.
@@ -586,20 +586,20 @@ class TopoDocumentTable(
 
   def find_match_for_locality(loc: Locality, maxdist: Double) = {
 
-    def check_match(art: DistDocument) = {
-      val dist = spheredist(loc.coord, art.coord)
+    def check_match(doc: DistDocument) = {
+      val dist = spheredist(loc.coord, doc.coord)
       if (dist <= maxdist) true
       else {
         if (debug("lots")) {
           errprint("Found document %s but dist %s > %s",
-            art, dist, maxdist)
+            doc, dist, maxdist)
         }
         false
       }
     }
 
-    def prefer_match(art1: DistDocument, art2: DistDocument) = {
-      spheredist(loc.coord, art1.coord) < spheredist(loc.coord, art2.coord)
+    def prefer_match(doc1: DistDocument, doc2: DistDocument) = {
+      spheredist(loc.coord, doc1.coord) < spheredist(loc.coord, doc2.coord)
     }
 
     find_document_match(loc, check_match, prefer_match).
@@ -611,25 +611,25 @@ class TopoDocumentTable(
 
   def find_match_for_division(div: Division) = {
 
-    def check_match(art: DistDocument) = {
-      if (art.coord != null && (div contains art.coord)) true
+    def check_match(doc: DistDocument) = {
+      if (doc.coord != null && (div contains doc.coord)) true
       else {
         if (debug("lots")) {
-          if (art.coord == null) {
+          if (doc.coord == null) {
             errprint("Found document %s but no coordinate, so not in location named %s, path %s",
-              art, div.name, div.path)
+              doc, div.name, div.path)
           } else {
             errprint("Found document %s but not in location named %s, path %s",
-              art, div.name, div.path)
+              doc, div.name, div.path)
           }
         }
         false
       }
     }
 
-    def prefer_match(art1: DistDocument, art2: DistDocument) = {
-      val l1 = art1.incoming_links
-      val l2 = art2.incoming_links
+    def prefer_match(doc1: DistDocument, doc2: DistDocument) = {
+      val l1 = doc1.incoming_links
+      val l2 = doc2.incoming_links
       // Prefer according to incoming link counts, if that info is available
       if (l1 != None && l2 != None) l1.get > l2.get
       else {
@@ -768,7 +768,7 @@ class GeogWord(val word: String) {
 
 abstract class GeolocateToponymStrategy {
   def need_context(): Boolean
-  def compute_score(geogword: GeogWord, art: TopoDocument): Double
+  def compute_score(geogword: GeogWord, doc: TopoDocument): Double
 }
 
 // Find each toponym explicitly mentioned as such and disambiguate it
@@ -779,17 +779,17 @@ class BaselineGeolocateToponymStrategy(
   val baseline_strategy: String) extends GeolocateToponymStrategy {
   def need_context() = false
 
-  def compute_score(geogword: GeogWord, art: TopoDocument) = {
+  def compute_score(geogword: GeogWord, doc: TopoDocument) = {
     if (baseline_strategy == "internal-link") {
       if (Args.context_type == "cell")
-        art.find_cellworddist(cell_grid).incoming_links
+        doc.find_cellworddist(cell_grid).incoming_links
       else
-        art.adjusted_incoming_links
+        doc.adjusted_incoming_links
     } else if (baseline_strategy == "num-documents") {
       if (Args.context_type == "cell")
-        art.find_cellworddist(cell_grid).num_arts_for_links
+        doc.find_cellworddist(cell_grid).num_docs_for_links
       else {
-        val location = art.location
+        val location = doc.location
         location match {
           case x @ Division(_) => x.locs.length
           case _ => 1
@@ -807,15 +807,15 @@ class NaiveBayesToponymStrategy(
   val use_baseline: Boolean) extends GeolocateToponymStrategy {
   def need_context() = true
 
-  def compute_score(geogword: GeogWord, art: TopoDocument) = {
+  def compute_score(geogword: GeogWord, doc: TopoDocument) = {
     // FIXME FIXME!!! We are assuming that the baseline is "internal-link",
     // regardless of its actual settings.
     val thislinks = GeoDocument.log_adjust_incoming_links(
-      art.adjusted_incoming_links)
+      doc.adjusted_incoming_links)
 
     var distobj =
-      if (Args.context_type == "document") art.dist
-      else art.find_cellworddist(cell_grid).word_dist
+      if (Args.context_type == "document") doc.dist
+      else doc.find_cellworddist(cell_grid).word_dist
     var totalprob = 0.0
     var total_word_weight = 0.0
     val (word_weight, baseline_weight) =
@@ -952,7 +952,7 @@ abstract class GeolocateToponymEvaluator(
     if (coord == null) return // If no ground-truth, skip it
     val documents = driver.document_table.construct_candidates(toponym)
     var bestscore = Double.MinValue
-    var bestart: TopoDocument = null
+    var bestdoc: TopoDocument = null
     if (documents.length == 0) {
       if (debug("some"))
         errprint("Unable to find any possibilities for %s", toponym)
@@ -963,20 +963,20 @@ abstract class GeolocateToponymEvaluator(
         errprint("For toponym %s, %d possible documents",
           toponym, documents.length)
       }
-      for (iart <- documents) {
-        val art = iart.asInstanceOf[TopoDocument]
+      for (idoc <- documents) {
+        val doc = idoc.asInstanceOf[TopoDocument]
         if (debug("some"))
-          errprint("Considering document %s", art)
-        val thisscore = strategy.compute_score(geogword, art)
+          errprint("Considering document %s", doc)
+        val thisscore = strategy.compute_score(geogword, doc)
         if (thisscore > bestscore) {
           bestscore = thisscore
-          bestart = art
+          bestdoc = doc
         }
       }
     }
     val correct =
-      if (bestart != null)
-        bestart.matches_coord(coord)
+      if (bestdoc != null)
+        bestdoc.matches_coord(coord)
       else
         false
 
@@ -988,19 +988,19 @@ abstract class GeolocateToponymEvaluator(
         if (num_candidates == 0)
           "incorrect_with_no_candidates"
         else {
-          val good_arts =
-            (for { iart <- documents
-                   val art = iart.asInstanceOf[TopoDocument]
-                   if art.matches_coord(coord)
+          val good_docs =
+            (for { idoc <- documents
+                   val doc = idoc.asInstanceOf[TopoDocument]
+                   if doc.matches_coord(coord)
                  }
-             yield art)
-          if (good_arts == null)
+             yield doc)
+          if (good_docs == null)
             "incorrect_with_no_correct_candidates"
-          else if (good_arts.length > 1)
+          else if (good_docs.length > 1)
             "incorrect_with_multiple_correct_candidates"
           else {
-            val goodart = good_arts(0)
-            if (goodart.incoming_links == None)
+            val gooddoc = good_docs(0)
+            if (gooddoc.incoming_links == None)
               "incorrect_one_correct_candidate_missing_link_info"
             else
               "incorrect_one_correct_candidate"
@@ -1018,9 +1018,9 @@ abstract class GeolocateToponymEvaluator(
     results.record_geotag_toponym_result(correct, toponym,
       geogword.location, reason, num_candidates)
 
-    if (debug("some") && bestart != null) {
+    if (debug("some") && bestdoc != null) {
       errprint("Best document = %s, score = %s, dist = %s, correct %s",
-        bestart, bestscore, bestart.distance_to_coord(coord), correct)
+        bestdoc, bestscore, bestdoc.distance_to_coord(coord), correct)
     }
   }
 
@@ -1146,17 +1146,17 @@ class WikipediaGeolocateToponymEvaluator(
           }
           case linkre(mlink) => {
             val args = mlink.split('|')
-            val trueart = args(0)
-            var linkword = trueart
+            val truedoc = args(0)
+            var linkword = truedoc
             if (args.length > 1)
               linkword = args(1)
             val word = new GeogWord(linkword)
             word.is_toponym = true
-            word.location = trueart
+            word.location = truedoc
             word.document = title
-            val art = driver.document_table.lookup_document(trueart)
-            if (art != null)
-              word.coord = art.coord
+            val doc = driver.document_table.lookup_document(truedoc)
+            if (doc != null)
+              word.coord = doc.coord
             word #:: iter_1()
           }
           case _ => {
@@ -1303,30 +1303,30 @@ class WorldGazetteer(
     // We start out looking for documents whose distance is very close,
     // then widen until we reach Args.max_dist_for_close_match.
     var maxdist = 5
-    var artmatch: TopoDocument = null
+    var docmatch: TopoDocument = null
     breakable {
       while (maxdist <= Args.max_dist_for_close_match) {
-        artmatch =
+        docmatch =
           cell_grid.table.asInstanceOf[TopoDocumentTable].
             find_match_for_locality(loc, maxdist)
-        if (artmatch != null) break
+        if (docmatch != null) break
         maxdist *= 2
       }
     }
 
-    if (artmatch == null) {
+    if (docmatch == null) {
       if (debug("lots"))
         errprint("Unmatched name %s", loc.name)
       return
     }
 
     // Record the match.
-    loc.artmatch = artmatch
-    artmatch.location = loc
+    loc.docmatch = docmatch
+    docmatch.location = loc
     if (debug("lots"))
       errprint("Matched location %s (coord %s) with document %s, dist=%s",
-        (loc.name, loc.coord, artmatch,
-          spheredist(loc.coord, artmatch.coord)))
+        (loc.name, loc.coord, docmatch,
+          spheredist(loc.coord, docmatch.coord)))
   }
 
   // Read in the data from the World gazetteer in FILENAME and find the
@@ -1440,7 +1440,7 @@ be tried, one after the other.""")
         "num-documents"),
       aliases = Map(
         "internal-link" -> Seq("link"),
-        "num-documents" -> Seq("num-arts", "numarts")),
+        "num-documents" -> Seq("num-docs", "numdocs")),
       help = """Strategy to use to compute the baseline.
 
 'internal-link' (or 'link') means use number of internal links pointing to the
@@ -1448,7 +1448,7 @@ document or cell.
 
 'random' means choose randomly.
 
-'num-documents' (or 'num-arts' or 'numarts'; only in cell-type matching) means
+'num-documents' (or 'num-docs' or 'numdocs'; only in cell-type matching) means
 use number of documents in cell.
 
 Default '%default'.

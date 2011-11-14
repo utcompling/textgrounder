@@ -284,7 +284,7 @@ class PseudoGoodTuringSmoothedWordDist(
     assert(finished)
     // if (debug("some")) {
     //   errprint("Found counts for document %s, num word types = %s",
-    //            art, wordcounts(0).length)
+    //            doc, wordcounts(0).length)
     //   errprint("Unknown prob = %s, overall_unseen_mass = %s",
     //            unseen_mass, overall_unseen_mass)
     // }

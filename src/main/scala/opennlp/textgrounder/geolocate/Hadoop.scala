@@ -476,19 +476,19 @@ class DocumentEvaluationMapper extends
       val in_document = table.create_document(params)
       if (in_document.split == driver.params.eval_set &&
           table.would_add_document_to_list(in_document)) {
-        val art = table.lookup_document(in_document.title)
-        if (art == null)
+        val doc = table.lookup_document(in_document.title)
+        if (doc == null)
           warning("Couldn't find document %s in table", in_document.title)
         else {
           for (e <- evaluators) {
             val num_processed = task.num_processed
             val doctag = "#%d" format (1 + num_processed)
-            if (e.would_skip_document(art, doctag))
-              errprint("Skipped document %s", art)
+            if (e.would_skip_document(doc, doctag))
+              errprint("Skipped document %s", doc)
             else {
               // Don't put side-effecting code inside of an assert!
               val result =
-                e.evaluate_document(art, doctag)
+                e.evaluate_document(doc, doctag)
               assert(result != null)
               context.write(new Text(e.stratname),
                 new DoubleWritable(result.asInstanceOf[DocumentEvaluationResult].pred_truedist))
@@ -622,7 +622,7 @@ abstract class RecordWritable(
 object DistDocumentConverter extends RecordWriterConverter {
   type Type = DistDocument
 
-  def serialize(art: DistDocument) = art.title
+  def serialize(doc: DistDocument) = doc.title
   def deserialize(title: String) = FIXME
 
   def init() {
@@ -635,12 +635,12 @@ class DocumentEvaluationResultWritable extends RecordWritable {
   type Type = DocumentEvaluationResult
   def to_properties(obj: Type) =
     Seq(obj.document, obj.pred_cell, obj.true_rank,
-        obj.true_cell, obj.num_arts_in_true_cell,
+        obj.true_cell, obj.num_docs_in_true_cell,
         obj.true_center, obj.true_truedist, obj.true_degdist,
         obj.pred_center, obj.pred_truedist, obj.pred_degdist)
   def from_properties(props: Seq[Any]) = {
     val Seq(document, pred_cell, true_rank,
-        true_cell, num_arts_in_true_cell,
+        true_cell, num_docs_in_true_cell,
         true_center, true_truedist, true_degdist,
         pred_center, pred_truedist, pred_degdist) = props
     new HadoopDocumentEvaluationResult(
@@ -648,7 +648,7 @@ class DocumentEvaluationResultWritable extends RecordWritable {
       pred_cell.asInstanceOf[GeoCell],
       true_rank.asInstanceOf[Int],
       true_cell.asInstanceOf[GeoCell],
-      num_arts_in_true_cell.asInstanceOf[Int],
+      num_docs_in_true_cell.asInstanceOf[Int],
       true_center.asInstanceOf[Coord],
       true_truedist.asInstanceOf[Double],
       true_degdist.asInstanceOf[Double],

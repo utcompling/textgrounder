@@ -248,7 +248,7 @@ class DistDocumentTable(
    * multiple names, due to redirects).  Also add to related lists mapping
    * lowercased form, short form, etc.
    */ 
-  def record_document_name(name: String, art: DistDocument) {
+  def record_document_name(name: String, doc: DistDocument) {
     // Must pass in properly cased name
     // errprint("name=%s, capfirst=%s", name, capfirst(name))
     // println("length=%s" format name.length)
@@ -258,47 +258,47 @@ class DistDocumentTable(
     //   println("capfirst(0)=0x%x" format capfirst(name)(0).toInt)
     // }
     assert(name == capfirst(name))
-    name_to_document(name) = art
+    name_to_document(name) = doc
     val loname = name.toLowerCase
-    lower_name_to_documents(loname) += art
+    lower_name_to_documents(loname) += doc
     val (short, div) = GeoDocument.compute_short_form(loname)
     if (div != null)
-      lower_name_div_to_documents((short, div)) += art
-    short_lower_name_to_documents(short) += art
-    if (!(lower_toponym_to_document(loname) contains art))
-      lower_toponym_to_document(loname) += art
-    if (short != loname && !(lower_toponym_to_document(short) contains art))
-      lower_toponym_to_document(short) += art
+      lower_name_div_to_documents((short, div)) += doc
+    short_lower_name_to_documents(short) += doc
+    if (!(lower_toponym_to_document(loname) contains doc))
+      lower_toponym_to_document(loname) += doc
+    if (short != loname && !(lower_toponym_to_document(short) contains doc))
+      lower_toponym_to_document(short) += doc
   }
 
   /**
-   * Record either a normal document ('artfrom' same as 'artto') or a
-   * redirect ('artfrom' redirects to 'artto').
+   * Record either a normal document ('docfrom' same as 'docto') or a
+   * redirect ('docfrom' redirects to 'docto').
    */
-  def record_document(artfrom: DistDocument, artto: DistDocument) {
-    record_document_name(artfrom.title, artto)
-    val redir = !(artfrom eq artto)
-    val split = artto.split
-    val fromlinks = artfrom.adjusted_incoming_links
+  def record_document(docfrom: DistDocument, docto: DistDocument) {
+    record_document_name(docfrom.title, docto)
+    val redir = !(docfrom eq docto)
+    val split = docto.split
+    val fromlinks = docfrom.adjusted_incoming_links
     incoming_links_by_split(split) += fromlinks
     if (!redir) {
-      documents_by_split(split) += artto
+      documents_by_split(split) += docto
     } else if (fromlinks != 0) {
       // Add count of links pointing to a redirect to count of links
       // pointing to the document redirected to, so that the total incoming
       // link count of a document includes any redirects to that document.
-      artto.incoming_links = Some(artto.adjusted_incoming_links + fromlinks)
+      docto.incoming_links = Some(docto.adjusted_incoming_links + fromlinks)
     }
   }
 
   def create_document(params: Map[String, String]) = new DistDocument(params)
 
-  def would_add_document_to_list(art: DistDocument) = {
-    if (art.namespace != "Main")
+  def would_add_document_to_list(doc: DistDocument) = {
+    if (doc.namespace != "Main")
       false
-    else if (art.redir.length > 0)
+    else if (doc.redir.length > 0)
       false
-    else art.coord != null
+    else doc.coord != null
   }
 
   def read_document_data(filehand: FileHandler, filename: String,
@@ -306,14 +306,14 @@ class DistDocumentTable(
     val redirects = mutable.Buffer[DistDocument]()
 
     def process(params: Map[String, String]) {
-      val art = create_document(params)
-      if (art.namespace != "Main")
+      val doc = create_document(params)
+      if (doc.namespace != "Main")
         return
-      if (art.redir.length > 0)
-        redirects += art
-      else if (art.coord != null) {
-        record_document(art, art)
-        cell_grid.add_document_to_cell(art)
+      if (doc.redir.length > 0)
+        redirects += doc
+      else if (doc.coord != null) {
+        record_document(doc, doc)
+        cell_grid.add_document_to_cell(doc)
       }
     }
 
@@ -321,9 +321,9 @@ class DistDocumentTable(
       maxtime = Args.max_time_per_stage)
 
     for (x <- redirects) {
-      val redart = lookup_document(x.redir)
-      if (redart != null)
-        record_document(x, redart)
+      val reddoc = lookup_document(x.redir)
+      if (reddoc != null)
+        record_document(x, reddoc)
     }
   }
 
@@ -331,24 +331,24 @@ class DistDocumentTable(
     // Figure out the value of OVERALL_UNSEEN_MASS for each document.
     for ((split, table) <- documents_by_split) {
       var totaltoks = 0
-      var numarts = 0
-      for (art <- table) {
-        if (art.dist != null) {
+      var numdocs = 0
+      for (doc <- table) {
+        if (doc.dist != null) {
           /* FIXME: Move this finish() earlier, and split into
              before/after global. */
-          art.dist.finish(minimum_word_count = Args.minimum_word_count)
-          totaltoks += art.dist.num_word_tokens
-          numarts += 1
+          doc.dist.finish(minimum_word_count = Args.minimum_word_count)
+          totaltoks += doc.dist.num_word_tokens
+          numdocs += 1
         }
       }
-      num_dist_documents_by_split(split) += numarts
+      num_dist_documents_by_split(split) += numdocs
       word_tokens_by_split(split) += totaltoks
     }
   }
 
   def clear_training_document_distributions() {
-    for (art <- documents_by_split("training"))
-      art.dist = null
+    for (doc <- documents_by_split("training"))
+      doc.dist = null
   }
 
   def finish_word_counts() {
@@ -357,33 +357,33 @@ class DistDocumentTable(
     errprint("")
     errprint("-------------------------------------------------------------------------")
     errprint("Document count statistics:")
-    var total_arts_in_table = 0L
-    var total_arts_with_word_counts = 0L
-    var total_arts_with_dists = 0L
+    var total_docs_in_table = 0L
+    var total_docs_with_word_counts = 0L
+    var total_docs_with_dists = 0L
     for ((split, totaltoks) <- word_tokens_by_split) {
       errprint("For split '%s':", split)
-      val arts_in_table = documents_by_split(split).length
-      val arts_with_word_counts = num_word_count_documents_by_split(split).value
-      val arts_with_dists = num_dist_documents_by_split(split).value
-      total_arts_in_table += arts_in_table
-      total_arts_with_word_counts += arts_with_word_counts
-      total_arts_with_dists += arts_with_dists
-      errprint("  %s documents in document table", arts_in_table)
-      errprint("  %s documents with word counts seen (and in table)", arts_with_word_counts)
+      val docs_in_table = documents_by_split(split).length
+      val docs_with_word_counts = num_word_count_documents_by_split(split).value
+      val docs_with_dists = num_dist_documents_by_split(split).value
+      total_docs_in_table += docs_in_table
+      total_docs_with_word_counts += docs_with_word_counts
+      total_docs_with_dists += docs_with_dists
+      errprint("  %s documents in document table", docs_in_table)
+      errprint("  %s documents with word counts seen (and in table)", docs_with_word_counts)
       errprint("  %s documents with distribution computed, %s total tokens, %.2f tokens/document",
-        arts_with_dists, totaltoks.value,
+        docs_with_dists, totaltoks.value,
         // Avoid division by zero
-        totaltoks.value.toDouble / (arts_in_table + 1e-100))
+        totaltoks.value.toDouble / (docs_in_table + 1e-100))
     }
     errprint("Total: %s documents with word counts seen",
       num_documents_with_word_counts.value)
-    errprint("Total: %s documents in document table", total_arts_in_table)
+    errprint("Total: %s documents in document table", total_docs_in_table)
     errprint("Total: %s documents with word counts seen but not in document table",
       num_documents_with_word_counts_but_not_in_table.value)
     errprint("Total: %s documents with word counts seen (and in table)",
-      total_arts_with_word_counts)
+      total_docs_with_word_counts)
     errprint("Total: %s documents with distribution computed",
-      total_arts_with_dists)
+      total_docs_with_dists)
   }
 
   def construct_candidates(toponym: String) = {
@@ -487,7 +487,7 @@ class MostPopularCellGeolocateDocumentStrategy(
             (if (internal_link)
                cell.word_dist_wrapper.incoming_links
              else
-               cell.word_dist_wrapper.num_arts_for_links).toDouble)).
+               cell.word_dist_wrapper.num_docs_for_links).toDouble)).
         toArray sortWith (_._2 > _._2))
     }
     cached_ranked_mps
@@ -600,7 +600,7 @@ abstract class MinMaxScoreStrategy(
       if (debug("lots")) {
         errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
           cell.describe_indices(), cell.describe_location(),
-          cell.word_dist_wrapper.num_arts_for_word_dist)
+          cell.word_dist_wrapper.num_docs_for_word_dist)
       }
 
       val score = score_cell(word_dist, cell)
@@ -740,8 +740,8 @@ class NaiveBayesDocumentStrategy(
 
     val word_logprob = cell.word_dist.get_nbayes_logprob(word_dist)
     val baseline_logprob =
-      log(cell.word_dist_wrapper.num_arts_for_links.toDouble /
-          cell_grid.total_num_arts_for_links)
+      log(cell.word_dist_wrapper.num_docs_for_links.toDouble /
+          cell_grid.total_num_docs_for_links)
     val logprob = (word_weight * word_logprob +
       baseline_weight * baseline_logprob)
     logprob
@@ -839,7 +839,7 @@ is used.""")
     ap.multiOption[String]("a", "document-data-file",
       metavar = "FILE",
       help = """File containing info about documents.  Documents can be
-Wikipedi articles, individual tweets in Twitter, the set of all tweets for
+Wikipedia articles, individual tweets in Twitter, the set of all tweets for
 a given user, etc.  This file lists per-document information such as the
 document's title, the split (training, dev, or test) that the document is in,
 and the document's location.  It does not list the actual word-count
@@ -853,7 +853,7 @@ times.""")
       metavar = "FILE",
       help = """File containing word counts for documents.  There are scripts
 in the 'python' directory for generating counts in the proper format from
-Wikipedia documents, Twitter tweets, etc.  Multiple such files can be given
+Wikipedia articles, Twitter tweets, etc.  Multiple such files can be given
 by specifying the option multiple times.""")
   var eval_file =
     ap.multiOption[String]("e", "eval-file",
@@ -1015,7 +1015,7 @@ true cell. (Default currently 11.)
 
 kldiv: Print out words contributing most to KL divergence.
 
-wordcountarts: Regenerate document-data file, filtering out documents not
+wordcountdocs: Regenerate document-data file, filtering out documents not
 seen in any counts file.
 
 some, lots, tons: General info of various sorts. (Document me.)
@@ -1333,7 +1333,7 @@ be tried, one after the other.""")
         "cell-distribution-most-common-toponym"),
       aliases = Map(
         "internal-link" -> Seq("link"),
-        "num-documents" -> Seq("num-arts", "numarts"),
+        "num-documents" -> Seq("num-docs", "numdocs"),
         "cell-distribution-most-common-toponym" ->
           Seq("celldist-most-common-toponym")),
       help = """Strategy to use to compute the baseline.
@@ -1343,7 +1343,7 @@ document or cell.
 
 'random' means choose randomly.
 
-'num-documents' (or 'num-arts' or 'numarts'; only in cell-type matching) means
+'num-documents' (or 'num-docs' or 'numdocs'; only in cell-type matching) means
 use number of documents in cell.
 
 'link-most-common-toponym' (only in --mode=geotag-documents) means to look

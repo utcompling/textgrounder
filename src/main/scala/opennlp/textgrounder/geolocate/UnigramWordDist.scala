@@ -233,10 +233,10 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
     // and the word-count file we used.
     var stream: PrintStream = null
     var writer: GeoDocumentWriter = null
-    if (debug("wordcountarts")) {
+    if (debug("wordcountdocs")) {
       // Change this if you want a different file name
-      val wordcountarts_filename = "wordcountarts-combined-document-data.txt"
-      stream = filehand.openw(wordcountarts_filename)
+      val wordcountdocs_filename = "wordcountdocs-combined-document-data.txt"
+      stream = filehand.openw(wordcountdocs_filename)
       // See write_document_data_file() in GeoDocument.scala
       writer =
         new GeoDocumentWriter(stream, GeoDocumentData.combined_document_data_outfields)
@@ -248,23 +248,23 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
 
     def one_document_probs() {
       if (num_word_tokens == 0) return
-      val art = table.lookup_document(title)
-      if (art == null) {
+      val doc = table.lookup_document(title)
+      if (doc == null) {
         warning("Skipping document %s, not in table", title)
         table.num_documents_with_word_counts_but_not_in_table += 1
         return
       }
-      if (debug("wordcountarts"))
-        writer.output_row(art)
-      table.num_word_count_documents_by_split(art.split) += 1
+      if (debug("wordcountdocs"))
+        writer.output_row(doc)
+      table.num_word_count_documents_by_split(doc.split) += 1
       // If we are evaluating on the dev set, skip the test set and vice
       // versa, to save memory and avoid contaminating the results.
-      if (art.split != "training" && art.split != Args.eval_set)
+      if (doc.split != "training" && doc.split != Args.eval_set)
         return
       // Don't train on test set
-      art.dist = create_populated_word_dist(keys_dynarr.array,
+      doc.dist = create_populated_word_dist(keys_dynarr.array,
           values_dynarr.array, keys_dynarr.length,
-          note_globally = (art.split == "training"))
+          note_globally = (doc.split == "training"))
     }
 
     val task = new MeteredTask("document", "reading distributions of")
@@ -324,7 +324,7 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
       one_document_probs()
     }
 
-    if (debug("wordcountarts"))
+    if (debug("wordcountdocs"))
       stream.close()
     task.finish()
     table.num_documents_with_word_counts += task.num_processed
