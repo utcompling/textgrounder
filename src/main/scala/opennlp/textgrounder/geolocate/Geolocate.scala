@@ -835,7 +835,7 @@ a default list of English stopwords (stored in the TextGrounder distribution)
 is used.""")
 
   var document_data_file =
-    ap.multiOption[String]("a", "document-data-file",
+    ap.multiOption[String]("a", "document-file",
       metavar = "FILE",
       help = """File containing info about documents.  Documents can be
 Wikipedia articles, individual tweets in Twitter, the set of all tweets for
@@ -1013,7 +1013,7 @@ true cell. (Default currently 11.)
 
 kldiv: Print out words contributing most to KL divergence.
 
-wordcountdocs: Regenerate document-data file, filtering out documents not
+wordcountdocs: Regenerate document file, filtering out documents not
 seen in any counts file.
 
 some, lots, tons: General info of various sorts. (Document me.)
@@ -1140,7 +1140,7 @@ abstract class GeolocateDriver extends
     if (args.width_of_multi_cell <= 0)
       argerror("Width of multi cell must be positive")
 
-    need_seq(args.document_data_file, "document-data-file")
+    need_seq(args.document_data_file, "document-file")
   }
 
   protected def initialize_document_table(word_dist_factory: WordDistFactory) = {
@@ -1240,7 +1240,7 @@ recognized:
 
 'internal' is the normal format.  It means to consider documents to be
 documents to evaluate, and to use the development or test set specified
-in the document-data file as the set of documents to evaluate.  There is
+in the document file as the set of documents to evaluate.  There is
 no eval file for this format.
 
 'raw-text' assumes that the eval file is simply raw text.  (NOT YET
