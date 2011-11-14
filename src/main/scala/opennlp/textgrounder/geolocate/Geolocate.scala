@@ -1,4 +1,3 @@
-
 //  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
@@ -862,8 +861,8 @@ by specifying the option multiple times.""")
 Multiple such files/directories can be given by specifying the option multiple
 times.  If a directory is given, all files in the directory will be
 considered (but if an error occurs upon parsing a file, it will be ignored).
-Each file is read in and then disambiguation is performed.  Not used when
---eval-format=internal (which is the default with --mode=geotag-documents).""")
+Each file is read in and then disambiguation is performed.  Not used during
+document geolocation when --eval-format=internal (the default).""")
 
   //// Options indicating which documents to train on or evaluate
   var eval_set =
@@ -871,8 +870,8 @@ Each file is read in and then disambiguation is performed.  Not used when
       default = "dev",
       choices = Seq("dev", "test"),
       aliases = Map("dev" -> Seq("devel")),
-      help = """Set to use for evaluation when --eval-format=internal
-and --mode=geotag-documents ('dev' or 'devel' for the development set,
+      help = """Set to use for evaluation during document geolocation when
+when --eval-format=internal ('dev' or 'devel' for the development set,
 'test' for the test set).  Default '%default'.""")
   var num_training_docs =
     ap.option[Int]("num-training-docs", "ntrain", metavar = "NUM",
@@ -919,7 +918,7 @@ is used.""")
   var width_of_multi_cell =
     ap.option[Int]("width-of-multi-cell", metavar="CELLS", default = 1,
       help = """Width of the cell used to compute a statistical
-distribution for geotagging purposes, in terms of number of tiling cells.
+distribution for geolocation purposes, in terms of number of tiling cells.
 NOTE: It's unlikely you want to change this.  It may be removed entirely in
 later versions.  In normal circumstances, the value is 1, i.e. use a single
 tiling cell to compute each multi cell.  If the value is more than
@@ -937,10 +936,9 @@ Default '%default'.""")
   var preserve_case_words =
     ap.flag("preserve-case-words", "pcw",
       help = """Don't fold the case of words used to compute and
-match against document distributions.  Note that in toponym resolution
-(--mode=geotag-toponyms), this applies only to words in documents
-(currently used only in Naive Bayes matching), not to toponyms, which
-are always matched case-insensitively.""")
+match against document distributions.  Note that in toponym resolution,
+this applies only to words in documents (currently used only in Naive Bayes
+matching), not to toponyms, which are always matched case-insensitively.""")
   var include_stopwords_in_document_dists =
     ap.flag("include-stopwords-in-document-dists",
       help = """Include stopwords when computing word distributions.""")
@@ -950,7 +948,7 @@ are always matched case-insensitively.""")
       help = """Minimum count of words to consider in word
 distributions.  Words whose count is less than this value are ignored.""")
 
-  //// Options used when doing Naive Bayes geotagging
+  //// Options used when doing Naive Bayes geolocation
   var naive_bayes_weighting =
     ap.option[String]("naive-bayes-weighting", "nbw", metavar = "STRATEGY",
       default = "equal",
@@ -970,7 +968,7 @@ weight the words according to distance from the toponym.""")
       help = """Relative weight to assign to the baseline (prior
 probability) when doing weighted Naive Bayes.  Default %default.""")
 
-  //// Options used when doing ACP geotagging
+  //// Options used when doing ACP geolocation
   var lru_cache_size =
     ap.option[Int]("lru-cache-size", "lru", metavar = "SIZE",
       default = 400,
@@ -1021,7 +1019,7 @@ seen in any counts file.
 some, lots, tons: General info of various sorts. (Document me.)
 
 cell: Print out info on each cell of the Earth as it's generated.  Also
-triggers some additional info when --mode=geotag-toponyms. (Document me.)
+triggers some additional info during toponym resolution. (Document me.)
 
 commontop: Extra info for debugging
  --baseline-strategy=link-most-common-toponym.
@@ -1293,34 +1291,32 @@ file as a document to evaluate.""")
           Seq("nb-base"),
         "naive-bayes-no-baseline" ->
           Seq("nb-nobase")),
-      help = """Strategy/strategies to use for geotagging.
+      help = """Strategy/strategies to use for geolocation.
 'baseline' means just use the baseline strategy (see --baseline-strategy).
 
-'none' means don't do any geotagging.  Useful for testing the parts that
+'none' means don't do any geolocation.  Useful for testing the parts that
 read in data and generate internal structures.
-
-The other possible values depend on which mode is in use
-(--mode=geotag-toponyms or --mode=geotag-documents).
-
-For geotag-toponyms:
-
-'naive-bayes-with-baseline' (or 'nb-base') means also use the words around the
-toponym to be disambiguated, in a Naive-Bayes scheme, using the baseline as the
-prior probability; 'naive-bayes-no-baseline' (or 'nb-nobase') means use uniform
-prior probability.  Default is 'baseline'.
-
-For geotag-documents:
 
 'full-kl-divergence' (or 'full-kldiv') searches for the cell where the KL
 divergence between the document and cell is smallest.
+
 'partial-kl-divergence' (or 'partial-kldiv') is similar but uses an
 abbreviated KL divergence measure that only considers the words seen in the
 document; empirically, this appears to work just as well as the full KL
-divergence. 'average-cell-probability' (or
-'celldist') involves computing, for each word, a probability distribution over
-cells using the word distribution of each cell, and then combining the
-distributions over all words in a document, weighted by the count the word in
-the document.  Default is 'partial-kl-divergence'.
+divergence.
+
+'average-cell-probability' (or 'celldist') involves computing, for each word,
+a probability distribution over cells using the word distribution of each cell,
+and then combining the distributions over all words in a document, weighted by
+the count the word in the document.
+
+'naive-bayes-with-baseline' and 'naive-bayes-no-baseline' use the Naive
+Bayes algorithm to match a test document against a training document (e.g.
+by assuming that the words of the test document are independent of each
+other, if we are using a unigram word distribution).  The "baseline" is
+currently 
+
+Default is 'partial-kl-divergence'.
 
 NOTE: Multiple --strategy options can be given, and each strategy will
 be tried, one after the other.""")
@@ -1346,12 +1342,12 @@ document or cell.
 'num-documents' (or 'num-docs' or 'numdocs'; only in cell-type matching) means
 use number of documents in cell.
 
-'link-most-common-toponym' (only in --mode=geotag-documents) means to look
-for the toponym that occurs the most number of times in the document, and
-then use the internal-link baseline to match it to a location.
+'link-most-common-toponym' means to look for the toponym that occurs the
+most number of times in the document, and then use the internal-link
+baseline to match it to a location.
 
-'celldist-most-common-toponym' (only in --mode=geotag-documents) is similar,
-but uses the cell distribution of the most common toponym.
+'celldist-most-common-toponym' is similar, but uses the cell distribution
+of the most common toponym.
 
 Default '%default'.
 

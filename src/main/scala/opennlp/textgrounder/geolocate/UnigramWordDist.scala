@@ -226,7 +226,7 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
 
     // This is basically a one-off debug statement because of the fact that
     // the experiments published in the paper used a word-count file generated
-    // using an older algorithm for determining the geotagged coordinate of
+    // using an older algorithm for determining the geolocated coordinate of
     // a document.  We didn't record the corresponding document-data
     // file, so we need a way of regenerating it using the intersection of
     // documents in the document-data file we actually used for the experiments

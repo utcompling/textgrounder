@@ -693,7 +693,7 @@ class EvalStatsWithCandidateList(
 }
 
 object GeolocateToponymResults {
-  val incorrect_geotag_toponym_reasons = Map(
+  val incorrect_geolocate_toponym_reasons = Map(
     "incorrect_with_no_candidates" ->
       "Incorrect, with no candidates",
     "incorrect_with_no_correct_candidates" ->
@@ -706,21 +706,21 @@ object GeolocateToponymResults {
       "Incorrect, with one correct candidate")
 }
 
-//////// Results for geotagging toponyms
+//////// Results for geolocating toponyms
 class GeolocateToponymResults(driver_stats: ExperimentDriverStats) {
   import GeolocateToponymResults._
 
   // Overall statistics
   val all_toponym = new EvalStatsWithCandidateList(
-    driver_stats, "", incorrect_geotag_toponym_reasons)
+    driver_stats, "", incorrect_geolocate_toponym_reasons)
   // Statistics when toponym not same as true name of location
   val diff_surface = new EvalStatsWithCandidateList(
-    driver_stats, "diff_surface", incorrect_geotag_toponym_reasons)
+    driver_stats, "diff_surface", incorrect_geolocate_toponym_reasons)
   // Statistics when toponym not same as true name or short form of location
   val diff_short = new EvalStatsWithCandidateList(
-    driver_stats, "diff_short", incorrect_geotag_toponym_reasons)
+    driver_stats, "diff_short", incorrect_geolocate_toponym_reasons)
 
-  def record_geotag_toponym_result(correct: Boolean, toponym: String,
+  def record_geolocate_toponym_result(correct: Boolean, toponym: String,
       trueloc: String, reason: String, num_candidates: Int) {
     all_toponym.record_result(correct, reason, num_candidates)
     if (toponym != trueloc) {
@@ -731,7 +731,7 @@ class GeolocateToponymResults(driver_stats: ExperimentDriverStats) {
     }
   }
 
-  def output_geotag_toponym_results() {
+  def output_geolocate_toponym_results() {
     errprint("Results for all toponyms:")
     all_toponym.output_results()
     errprint("")
@@ -1015,7 +1015,7 @@ abstract class GeolocateToponymEvaluator(
     else
       errprint("incorrect, reason = %s", reason)
 
-    results.record_geotag_toponym_result(correct, toponym,
+    results.record_geolocate_toponym_result(correct, toponym,
       geogword.location, reason, num_candidates)
 
     if (debug("some") && bestdoc != null) {
@@ -1031,7 +1031,7 @@ abstract class GeolocateToponymEvaluator(
   }
 
   def output_results(isfinal: Boolean = false) {
-    results.output_geotag_toponym_results()
+    results.output_geolocate_toponym_results()
   }
 }
 
@@ -1390,18 +1390,16 @@ As with the 'document' format, the correct location is used only for
 evaluation, not for constructing training data; the other locations are
 ignored.""")
 
-  //// Input files, toponym resolution only
   var gazetteer_file =
     ap.option[String]("gazetteer-file", "gf",
-      help = """File containing gazetteer information to match.  Only used
-during toponym resolution (--mode=geotag-toponyms).""")
+      help = """File containing gazetteer information to match.""")
   var gazetteer_type =
     ap.option[String]("gazetteer-type", "gt",
       metavar = "FILE",
       default = "world", choices = Seq("world", "db"),
       help = """Type of gazetteer file specified using --gazetteer-file.
-Only used during toponym resolution (--mode=geotag-toponyms).  NOTE: type
-'world' is the only one currently implemented.  Default '%default'.""")
+NOTE: type 'world' is the only one currently implemented.  Default
+'%default'.""")
 
   var strategy =
     ap.multiOption[String]("s", "strategy",
@@ -1417,10 +1415,10 @@ Only used during toponym resolution (--mode=geotag-toponyms).  NOTE: type
           Seq("nb-base"),
         "naive-bayes-no-baseline" ->
           Seq("nb-nobase")),
-      help = """Strategy/strategies to use for geotagging.
+      help = """Strategy/strategies to use for geolocating.
 'baseline' means just use the baseline strategy (see --baseline-strategy).
 
-'none' means don't do any geotagging.  Useful for testing the parts that
+'none' means don't do any geolocating.  Useful for testing the parts that
 read in data and generate internal structures.
 
 'naive-bayes-with-baseline' (or 'nb-base') means also use the words around the
@@ -1456,25 +1454,21 @@ Default '%default'.
 NOTE: Multiple --baseline-strategy options can be given, and each strategy will
 be tried, one after the other.""")
 
-  //// Options used only in toponym resolution (--mode=geotag-toponyms)
-  //// (Note, gazetteer-file options also used only in toponym resolution,
-  //// see above)
   var naive_bayes_context_len =
     ap.option[Int]("naive-bayes-context-len", "nbcl",
       default = 10,
       help = """Number of words on either side of a toponym to use
-in Naive Bayes matching.  Only applicable to toponym resolution
-(--mode=geotag-toponyms).  Default %default.""")
+in Naive Bayes matching, during toponym resolution.  Default %default.""")
   var max_dist_for_close_match =
     ap.option[Double]("max-dist-for-close-match", "mdcm",
       default = 80.0,
       help = """Maximum number of km allowed when looking for a
-close match for a toponym (--mode=geotag-toponyms).  Default %default.""")
+close match for a toponym during toponym resolution.  Default %default.""")
   var max_dist_for_outliers =
     ap.option[Double]("max-dist-for-outliers", "mdo",
       default = 200.0,
       help = """Maximum number of km allowed between a point and
-any others in a division (--mode=geotag-toponyms).  Points farther away than
+any others in a division, during toponym resolution.  Points farther away than
 this are ignored as "outliers" (possible errors, etc.).  NOTE: Not
 currently implemented. Default %default.""")
   var context_type =
@@ -1487,9 +1481,9 @@ distribution, and when counting the number of incoming internal links.
 'document' means use the document itself for both.  'cell' means use the
 cell for both. 'cell-dist-document-links' means use the cell for
 computing a word distribution, but the document for counting the number of
-incoming internal links.  Note that this only applies when
---mode='geotag-toponyms'; in --mode='geotag-documents', only cells are
-considered.  Default '%default'.""")
+incoming internal links. (Note that this only applies when doing toponym
+resolution.  During document resolution, only cells are considered.)
+Default '%default'.""")
 }
 
 class GeolocateToponymDriver extends
@@ -1529,8 +1523,9 @@ class GeolocateToponymDriver extends
    * Do the actual toponym geolocation.  Results to stderr (see above), and
    * also returned.
    *
-   * Return value very much like for run_geotag_documents(), but less
-   * useful info may be returned for each document processed.
+   * Return value very much like for run_after_setup() for document
+   * geolocation, but less useful info may be returned for each document
+   * processed.
    */
 
   def run_after_setup() = {

@@ -169,7 +169,7 @@ class EvalStatsWithRank(
   }
 }
 
-//////// Statistics for geotagging documents
+//////// Statistics for geolocating documents
 
 class GeolocateDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
@@ -217,7 +217,7 @@ class GeolocateDocumentEvalStats(
 }
 
 /**
- * Class for statistics for geotagging documents, with separate
+ * Class for statistics for geolocating documents, with separate
  * sets of statistics for different intervals of error distances and
  * number of documents in true cell.
  */
@@ -467,7 +467,7 @@ case class DocumentEvaluationResult(
 }
 
 /**
-  Class to do document geotagging on documents from the document data, in
+  Class to do document geolocating on documents from the document data, in
   the dev or test set.
  */
 class InternalGeolocateDocumentEvaluator(
