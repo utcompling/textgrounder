@@ -9,7 +9,7 @@ import opennlp.textgrounder.util.distances.Coord
 
 class KdTreeCell(
   cellgrid: KdTreeCellGrid,
-  val kdleaf : KdTree[GeoArticle]) extends RectangularCell(cellgrid) {
+  val kdleaf : KdTree[DistDocument]) extends RectangularCell(cellgrid) {
 
     def get_northeast_coord () : Coord = {
         new Coord(kdleaf.minLimit(0), kdleaf.minLimit(1))
@@ -19,7 +19,7 @@ class KdTreeCell(
         new Coord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
     }
     
-    def iterate_articles () : Iterable[GeoArticle] = {
+    def iterate_documents () : Iterable[DistDocument] = {
         kdleaf.getData()
     }
     
@@ -32,13 +32,13 @@ class KdTreeCell(
     }
 }
 
-class KdTreeCellGrid(table: GeoArticleTable, bucketSize: Int)
+class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int)
     extends CellGrid(table) {
   /**
    * Total number of cells in the grid.
    */
   var total_num_cells: Int = 0
-  var kdtree : KdTree[GeoArticle] = new KdTree[GeoArticle](2, bucketSize);
+  var kdtree : KdTree[DistDocument] = new KdTree[DistDocument](2, bucketSize);
 
   /**
    * Find the correct cell for the given coordinates.  If no such cell
@@ -49,16 +49,16 @@ class KdTreeCellGrid(table: GeoArticleTable, bucketSize: Int)
   }
 
   /**
-   * Add the given article to the cell grid.
+   * Add the given document to the cell grid.
    */
-  def add_article_to_cell(article: GeoArticle): Unit = {
-      kdtree.addPoint(Array(article.coord.lat, article.coord.long), article)
+  def add_document_to_cell(document: DistDocument): Unit = {
+      kdtree.addPoint(Array(document.coord.lat, document.coord.long), document)
   }
 
   /**
    * Generate all non-empty cells.  This will be called once (and only once),
-   * after all articles have been added to the cell grid by calling
-   * `add_article_to_cell`.  The generation happens internally; but after
+   * after all documents have been added to the cell grid by calling
+   * `add_document_to_cell`.  The generation happens internally; but after
    * this, `iter_nonempty_cells` should work properly.
    */
   def initialize_cells: Unit = {
@@ -70,10 +70,10 @@ class KdTreeCellGrid(table: GeoArticleTable, bucketSize: Int)
    * 
    * @param nonempty_word_dist If given, returned cells must also have a
    *   non-empty word distribution; otherwise, they just need to have at least
-   *   one article in them. (Not all articles have word distributions, esp.
+   *   one document in them. (Not all documents have word distributions, esp.
    *   when --max-time-per-stage has been set to a non-zero value so that we
-   *   only load some subset of the word distributions for all articles.  But
-   *   even when not set, some articles may be listed in the article-data file
+   *   only load some subset of the word distributions for all documents.  But
+   *   even when not set, some documents may be listed in the document-data file
    *   but have no corresponding word counts given in the counts file.)
    */
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[GeoCell] = {

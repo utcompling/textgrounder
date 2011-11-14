@@ -94,7 +94,7 @@ abstract class UnigramWordDist(
   }
 
   def finish_before_global(minimum_word_count: Int = 0) {
-    // make sure counts not null (eg article in coords file but not counts file)
+    // make sure counts not null (eg document in coords file but not counts file)
     if (counts == null || finished) return
 
     // If 'minimum_word_count' was given, then eliminate words whose count
@@ -216,7 +216,7 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
   def create_populated_word_dist(keys: Array[Word], values: Array[Int],
     num_words: Int, note_globally: Boolean): UnigramWordDist
 
-  def read_word_counts(table: GeoArticleTable,
+  def read_word_counts(table: DistDocumentTable,
       filehand: FileHandler, filename: String, stopwords: Set[String]) {
     val initial_dynarr_size = 1000
     val keys_dynarr =
@@ -227,36 +227,36 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
     // This is basically a one-off debug statement because of the fact that
     // the experiments published in the paper used a word-count file generated
     // using an older algorithm for determining the geotagged coordinate of
-    // an article.  We didn't record the corresponding article-data
+    // a document.  We didn't record the corresponding document-data
     // file, so we need a way of regenerating it using the intersection of
-    // articles in the article-data file we actually used for the experiments
+    // documents in the document-data file we actually used for the experiments
     // and the word-count file we used.
     var stream: PrintStream = null
-    var writer: ArticleWriter = null
+    var writer: GeoDocumentWriter = null
     if (debug("wordcountarts")) {
       // Change this if you want a different file name
-      val wordcountarts_filename = "wordcountarts-combined-article-data.txt"
+      val wordcountarts_filename = "wordcountarts-combined-document-data.txt"
       stream = filehand.openw(wordcountarts_filename)
-      // See write_article_data_file() in ArticleData.scala
+      // See write_document_data_file() in GeoDocument.scala
       writer =
-        new ArticleWriter(stream, ArticleData.combined_article_data_outfields)
+        new GeoDocumentWriter(stream, GeoDocumentData.combined_document_data_outfields)
       writer.output_header()
     }
 
     var num_word_tokens = 0
     var title = null: String
 
-    def one_article_probs() {
+    def one_document_probs() {
       if (num_word_tokens == 0) return
-      val art = table.lookup_article(title)
+      val art = table.lookup_document(title)
       if (art == null) {
-        warning("Skipping article %s, not in table", title)
-        table.num_articles_with_word_counts_but_not_in_table += 1
+        warning("Skipping document %s, not in table", title)
+        table.num_documents_with_word_counts_but_not_in_table += 1
         return
       }
       if (debug("wordcountarts"))
         writer.output_row(art)
-      table.num_word_count_articles_by_split(art.split) += 1
+      table.num_word_count_documents_by_split(art.split) += 1
       // If we are evaluating on the dev set, skip the test set and vice
       // versa, to save memory and avoid contaminating the results.
       if (art.split != "training" && art.split != Args.eval_set)
@@ -267,7 +267,7 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
           note_globally = (art.split == "training"))
     }
 
-    val task = new MeteredTask("article", "reading distributions of")
+    val task = new MeteredTask("document", "reading distributions of")
     errprint("Reading word counts from %s...", filename)
     errprint("")
 
@@ -277,7 +277,7 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
       for (line <- filehand.openr(filename)) {
         if (line.startsWith("Article title: ")) {
           if (title != null)
-            one_article_probs()
+            one_document_probs()
           // Stop if we've reached the maximum
           if (task.item_processed(maxtime = Args.max_time_per_stage))
             break
@@ -309,7 +309,7 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
               if (!Args.preserve_case_words) word = word.toLowerCase
               val count = xcount.toInt
               if (!(stopwords contains word) ||
-                Args.include_stopwords_in_article_dists) {
+                Args.include_stopwords_in_document_dists) {
                 num_word_tokens += count
                 keys_dynarr += memoize_word(word)
                 values_dynarr += count
@@ -321,13 +321,13 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
           }
         }
       }
-      one_article_probs()
+      one_document_probs()
     }
 
     if (debug("wordcountarts"))
       stream.close()
     task.finish()
-    table.num_articles_with_word_counts += task.num_processed
+    table.num_documents_with_word_counts += task.num_processed
     output_resource_usage()
   }
 }

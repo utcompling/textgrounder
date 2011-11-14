@@ -49,13 +49,13 @@ class PseudoGoodTuringSmoothedWordDistFactory extends
   // Total number of types seen once
   var total_num_types_seen_once = 0
 
-  // Estimate of number of unseen word types for all articles
+  // Estimate of number of unseen word types for all documents
   var total_num_unseen_word_types = 0
 
   /**
-   * Overall probabilities over all articles of seeing a word in an article,
-   * for all words seen at least once in any article, computed using the
-   * empirical frequency of a word among all articles, adjusted by the mass
+   * Overall probabilities over all documents of seeing a word in a document,
+   * for all words seen at least once in any document, computed using the
+   * empirical frequency of a word among all documents, adjusted by the mass
    * to be assigned to globally unseen words (words never seen at all), i.e.
    * the value in 'globally_unseen_word_prob'.  We start out by storing raw
    * counts, then adjusting them.
@@ -64,13 +64,13 @@ class PseudoGoodTuringSmoothedWordDistFactory extends
   var owp_adjusted = false
 
   // The total probability mass to be assigned to words not seen at all in
-  // any article, estimated using Good-Turing smoothing as the unadjusted
+  // any document, estimated using Good-Turing smoothing as the unadjusted
   // empirical probability of having seen a word once.
   var globally_unseen_word_prob = 0.0
 
-  // For articles whose word counts are not known, use an empty list to
+  // For documents whose word counts are not known, use an empty list to
   // look up in.
-  // unknown_article_counts = ([], [])
+  // unknown_document_counts = ([], [])
 
   def finish_global_distribution() = {
     /* We do in-place conversion of counts to probabilities.  Make sure
@@ -133,20 +133,20 @@ class PseudoGoodTuringSmoothedWordDist(
   type ThisType = PseudoGoodTuringSmoothedWordDist
 
   /** Total probability mass to be assigned to all words not
-      seen in the article, estimated (motivated by Good-Turing
+      seen in the document, estimated (motivated by Good-Turing
       smoothing) as the unadjusted empirical probability of
       having seen a word once.
    */
   var unseen_mass = 0.5
   /**
      Probability mass assigned in 'overall_word_probs' to all words not seen
-     in the article.  This is 1 - (sum over W in A of overall_word_probs[W]).
+     in the document.  This is 1 - (sum over W in A of overall_word_probs[W]).
      The idea is that we compute the probability of seeing a word W in
-     article A as
+     document A as
 
      -- if W has been seen before in A, use the following:
           COUNTS[W]/TOTAL_TOKENS*(1 - UNSEEN_MASS)
-     -- else, if W seen in any articles (W in 'overall_word_probs'),
+     -- else, if W seen in any documents (W in 'overall_word_probs'),
         use UNSEEN_MASS * (overall_word_probs[W] / OVERALL_UNSEEN_MASS).
         The idea is that overall_word_probs[W] / OVERALL_UNSEEN_MASS is
         an estimate of p(W | W not in A).  We have to divide by
@@ -155,10 +155,10 @@ class PseudoGoodTuringSmoothedWordDist(
         we have available for all words not seen in A.
      -- else, use UNSEEN_MASS * globally_unseen_word_prob / NUM_UNSEEN_WORDS,
         where NUM_UNSEEN_WORDS is an estimate of the total number of words
-        "exist" but haven't been seen in any articles.  One simple idea is
-        to use the number of words seen once in any article.  This certainly
-        underestimates this number if not too many articles have been seen
-        but might be OK if many articles seen.
+        "exist" but haven't been seen in any documents.  One simple idea is
+        to use the number of words seen once in any document.  This certainly
+        underestimates this number if not too many documents have been seen
+        but might be OK if many documents seen.
     */
   var overall_unseen_mass = 1.0
 
@@ -283,7 +283,7 @@ class PseudoGoodTuringSmoothedWordDist(
   def lookup_word(word: Word) = {
     assert(finished)
     // if (debug("some")) {
-    //   errprint("Found counts for article %s, num word types = %s",
+    //   errprint("Found counts for document %s, num word types = %s",
     //            art, wordcounts(0).length)
     //   errprint("Unknown prob = %s, overall_unseen_mass = %s",
     //            unseen_mass, overall_unseen_mass)
@@ -306,7 +306,7 @@ class PseudoGoodTuringSmoothedWordDist(
             //    unseen_mass, factory.overall_word_probs[word],
             //    factory.overall_unseen_mass)
             if (debug("lots"))
-              errprint("Word %s, seen but not in article, wordprob = %s",
+              errprint("Word %s, seen but not in document, wordprob = %s",
                        unmemoize_word(word), wordprob)
             wordprob
           }
@@ -320,7 +320,7 @@ class PseudoGoodTuringSmoothedWordDist(
         //    errprint("%s: %s", word, count)
         val wordprob = wordcount.toDouble/num_word_tokens*(1.0 - unseen_mass)
         if (debug("lots"))
-          errprint("Word %s, seen in article, wordprob = %s",
+          errprint("Word %s, seen in document, wordprob = %s",
                    unmemoize_word(word), wordprob)
         wordprob
       }

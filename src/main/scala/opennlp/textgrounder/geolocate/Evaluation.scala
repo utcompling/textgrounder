@@ -169,7 +169,7 @@ class EvalStatsWithRank(
   }
 }
 
-//////// Statistics for geotagging documents/articles
+//////// Statistics for geotagging documents
 
 class GeolocateDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
@@ -217,9 +217,9 @@ class GeolocateDocumentEvalStats(
 }
 
 /**
- * Class for statistics for geotagging documents/articles, with separate
+ * Class for statistics for geotagging documents, with separate
  * sets of statistics for different intervals of error distances and
- * number of articles in true cell.
+ * number of documents in true cell.
  */
 
 class GroupedGeolocateDocumentEvalStats(
@@ -234,9 +234,9 @@ class GroupedGeolocateDocumentEvalStats(
 
   val all_document = create_stats("")
 
-  // naitr = "num articles in true cell"
+  // naitr = "num documents in true cell"
   val docs_by_naitr = new IntTableByRange(Seq(1, 10, 25, 100),
-    create_stats_for_range("num_articles_in_true_cell", _))
+    create_stats_for_range("num_documents_in_true_cell", _))
 
   // Results for documents where the location is at a certain distance
   // from the center of the true statistical cell.  The key is measured in
@@ -269,7 +269,7 @@ class GroupedGeolocateDocumentEvalStats(
     new DoubleTableByRange(dist_fractions_for_error_dist,
       create_stats_for_range("true_dist_to_pred_center", _))
 
-  def record_result(res: ArticleEvaluationResult) {
+  def record_result(res: DocumentEvaluationResult) {
     all_document.record_result(res.true_rank,
       res.pred_truedist, res.pred_degdist)
     val naitr = docs_by_naitr.get_collector(res.num_arts_in_true_cell)
@@ -326,7 +326,7 @@ class GroupedGeolocateDocumentEvalStats(
 
   def output_results(all_results: Boolean = false) {
     errprint("")
-    errprint("Results for all documents/articles:")
+    errprint("Results for all documents:")
     all_document.output_results()
     /* FIXME: This code specific to MultiRegularCellGrid is kind of ugly.
        Perhaps it should go elsewhere.
@@ -339,7 +339,7 @@ class GroupedGeolocateDocumentEvalStats(
       errprint("")
       for ((lower, upper, obj) <- docs_by_naitr.iter_ranges()) {
         errprint("")
-        errprint("Results for documents/articles where number of articles")
+        errprint("Results for documents where number of documents")
         errprint("  in true cell is in the range [%s,%s]:",
           lower, upper - 1)
         obj.output_results()
@@ -357,7 +357,7 @@ class GroupedGeolocateDocumentEvalStats(
           val highrange = ((frac_truedist + dist_fraction_increment) *
             multigrid.km_per_cell)
           errprint("")
-          errprint("Results for documents/articles where distance to center")
+          errprint("Results for documents where distance to center")
           errprint("  of true cell in km is in the range [%.2f,%.2f):",
             lowrange, highrange)
           obj.output_results()
@@ -371,7 +371,7 @@ class GroupedGeolocateDocumentEvalStats(
           val highrange = ((frac_degdist + dist_fraction_increment) *
             multigrid.degrees_per_cell)
           errprint("")
-          errprint("Results for documents/articles where distance to center")
+          errprint("Results for documents where distance to center")
           errprint("  of true cell in degrees is in the range [%.2f,%.2f):",
             lowrange, highrange)
           obj.output_results()
@@ -451,37 +451,37 @@ abstract class GeolocateDocumentEvaluator(
   }
 }
 
-case class ArticleEvaluationResult(
-  article: GeoArticle,
+case class DocumentEvaluationResult(
+  document: DistDocument,
   pred_cell: GeoCell,
   true_rank: Int
 ) extends EvaluationResult {
-  val true_cell = pred_cell.cell_grid.find_best_cell_for_coord(article.coord)
+  val true_cell = pred_cell.cell_grid.find_best_cell_for_coord(document.coord)
   val num_arts_in_true_cell = true_cell.word_dist_wrapper.num_arts_for_word_dist
   val true_center = true_cell.get_center_coord()
-  val true_truedist = spheredist(article.coord, true_center)
-  val true_degdist = degree_dist(article.coord, true_center)
+  val true_truedist = spheredist(document.coord, true_center)
+  val true_degdist = degree_dist(document.coord, true_center)
   val pred_center = pred_cell.get_center_coord()
-  val pred_truedist = spheredist(article.coord, pred_center)
-  val pred_degdist = degree_dist(article.coord, pred_center)
+  val pred_truedist = spheredist(document.coord, pred_center)
+  val pred_degdist = degree_dist(document.coord, pred_center)
 }
 
 /**
-  Class to do document geotagging on articles from the article data, in
+  Class to do document geotagging on documents from the document data, in
   the dev or test set.
  */
-class ArticleGeolocateDocumentEvaluator(
+class InternalGeolocateDocumentEvaluator(
   strategy: GeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentTypeDriver
 ) extends GeolocateDocumentEvaluator(strategy, stratname, driver) {
 
-  type Document = GeoArticle
-  type DocumentResult = ArticleEvaluationResult
+  type Document = DistDocument
+  type DocumentResult = DocumentEvaluationResult
 
   def iter_documents(filehand: FileHandler, filename: String) = {
     assert(filename == null)
-    for (art <- driver.article_table.articles_by_split(driver.params.eval_set))
+    for (art <- driver.document_table.documents_by_split(driver.params.eval_set))
       yield art
   }
 
@@ -505,29 +505,29 @@ class ArticleGeolocateDocumentEvaluator(
   //if (title != null)
   //  yield (title, words)
 
-  override def would_skip_document(article: GeoArticle, doctag: String) = {
-    if (article.dist == null) {
+  override def would_skip_document(document: DistDocument, doctag: String) = {
+    if (document.dist == null) {
       // This can (and does) happen when --max-time-per-stage is set,
-      // so that the counts for many articles don't get read in.
+      // so that the counts for many documents don't get read in.
       if (driver.params.max_time_per_stage == 0.0 && driver.params.num_training_docs == 0)
-        warning("Can't evaluate article %s without distribution", article)
+        warning("Can't evaluate document %s without distribution", document)
       true
     } else false
   }
 
-  def evaluate_document(article: GeoArticle, doctag: String):
+  def evaluate_document(document: DistDocument, doctag: String):
       EvaluationResult = {
-    if (would_skip_document(article, doctag)) {
-      evalstats.increment_counter("articles.skipped")
+    if (would_skip_document(document, doctag)) {
+      evalstats.increment_counter("documents.skipped")
       return null
     }
-    assert(article.dist.finished)
+    assert(document.dist.finished)
     val true_cell =
-      strategy.cell_grid.find_best_cell_for_coord(article.coord)
+      strategy.cell_grid.find_best_cell_for_coord(document.coord)
     if (debug("lots") || debug("commontop")) {
       val naitr = true_cell.word_dist_wrapper.num_arts_for_word_dist
-      errprint("Evaluating article %s with %s word-dist articles in true cell",
-        article, naitr)
+      errprint("Evaluating document %s with %s word-dist documents in true cell",
+        document, naitr)
     }
 
     /* That is:
@@ -542,7 +542,7 @@ class ArticleGeolocateDocumentEvaluator(
         (Array((true_cell, 0.0)), 1)
       else {
         def get_computed_results() = {
-          val cells = strategy.return_ranked_cells(article.dist).toArray
+          val cells = strategy.return_ranked_cells(document.dist).toArray
           var rank = 1
           var broken = false
           breakable {
@@ -562,18 +562,18 @@ class ArticleGeolocateDocumentEvaluator(
         get_computed_results()
       }
     val result =
-      new ArticleEvaluationResult(article, pred_cells(0)._1, true_rank)
+      new DocumentEvaluationResult(document, pred_cells(0)._1, true_rank)
 
     val want_indiv_results =
       !driver.params.oracle_results && !driver.params.no_individual_results
     evalstats.record_result(result)
     if (result.num_arts_in_true_cell == 0) {
-      evalstats.increment_counter("articles.no_training_articles_in_cell")
+      evalstats.increment_counter("documents.no_training_documents_in_cell")
     }
     if (want_indiv_results) {
-      errprint("%s:Article %s:", doctag, article)
+      errprint("%s:Document %s:", doctag, document)
       errprint("%s:  %d types, %d tokens",
-        doctag, article.dist.num_word_types, article.dist.num_word_tokens)
+        doctag, document.dist.num_word_types, document.dist.num_word_tokens)
       errprint("%s:  true cell at rank: %s", doctag, true_rank)
       errprint("%s:  true cell: %s", doctag, result.true_cell)
       for (i <- 0 until 5) {
@@ -606,6 +606,10 @@ class ArticleGeolocateDocumentEvaluator(
 class TitledDocumentResult extends EvaluationResult {
 }
 
+/**
+ * A class for geolocation where each test document is a chapter in a book
+ * in the PCL Travel corpus.
+ */
 class PCLTravelGeolocateDocumentEvaluator(
   strategy: GeolocateDocumentStrategy,
   stratname: String,
@@ -644,7 +648,7 @@ class PCLTravelGeolocateDocumentEvaluator(
   def evaluate_document(doc: TitledDocument, doctag: String) = {
     val dist = driver.word_dist_factory.create_word_dist()
     val the_stopwords =
-      if (driver.params.include_stopwords_in_article_dists) Set[String]()
+      if (driver.params.include_stopwords_in_document_dists) Set[String]()
       else driver.stopwords
     for (text <- Seq(doc.title, doc.text)) {
       dist.add_document(split_text_into_words(text, ignore_punc = true),
@@ -654,7 +658,7 @@ class PCLTravelGeolocateDocumentEvaluator(
     dist.finish(minimum_word_count = driver.params.minimum_word_count)
     val cells = strategy.return_ranked_cells(dist)
     errprint("")
-    errprint("Article with title: %s", doc.title)
+    errprint("Document with title: %s", doc.title)
     val num_cells_to_show = 5
     for ((rank, cellval) <- (1 to num_cells_to_show) zip cells) {
       val (cell, vall) = cellval
@@ -681,7 +685,7 @@ class DefaultEvaluationOutputter(
   val results = mutable.Map[EvaluationDocument, EvaluationResult]()
   /**
     Evaluate on all of the given files, outputting periodic results and
-    results after all files are done.  If the evaluator uses articles as
+    results after all files are done.  If the evaluator uses documents as
     documents (so that it doesn't need any external test files), the value
     of 'files' should be a sequence of one item, which is null. (If an
     empty sequence is passed in, no evaluation will happen.)

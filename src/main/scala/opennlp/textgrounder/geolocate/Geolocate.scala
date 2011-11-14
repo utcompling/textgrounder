@@ -84,19 +84,19 @@ This module is the main driver module for the Geolocate subproject.
 //  }
 
 /////////////////////////////////////////////////////////////////////////////
-//                         Wikipedia/Twitter articles                      //
+//                      Wikipedia/Twitter/etc. documents                   //
 /////////////////////////////////////////////////////////////////////////////
 
-//////////////////////  Article table
+//////////////////////  DistDocument table
 
 /**
- * Class maintaining tables listing all articles and mapping between
- * names, ID's and articles.  Objects corresponding to redirect articles
- * should not be present anywhere in this table; instead, the name of the
- * redirect article should point to the article object for the article
- * pointed to by the redirect.
+ * Class maintaining tables listing all documents and mapping between
+ * names, ID's and documents.  Objects corresponding to redirect articles
+ * in Wikipedia should not be present anywhere in this table; instead, the
+ * name of the redirect article should point to the document object for the
+ * article pointed to by the redirect.
  */
-class GeoArticleTable(
+class DistDocumentTable(
   /* FIXME: The point of this parameter is so that we can use the counter
      mechanism instead of our own statistics.  Implement this. */
   val driver_stats: ExperimentDriverStats,
@@ -114,14 +114,14 @@ class GeoArticleTable(
    * `driver_stats`, though.
    *
    * NOTE: The counters are task-specific because currently each task
-   * reads the entire set of training articles into memory.  We could avoid
+   * reads the entire set of training documents into memory.  We could avoid
    * this by splitting the tasks so that each task is commissioned to
    * run over a specific portion of the Earth rather than a specific
-   * set of test articles.  Note that if we further split things so that
-   * each task handled both a portion of test articles and a portion of
+   * set of test documents.  Note that if we further split things so that
+   * each task handled both a portion of test documents and a portion of
    * the Earth, it would be somewhat trickier, depending on exactly how
-   * we write the code -- for a given set of test articles, different
-   * portions of the Earth would be reading in different training articles,
+   * we write the code -- for a given set of test documents, different
+   * portions of the Earth would be reading in different training documents,
    * so we'd presumably want their counts to add; but we might not want
    * all counts to add.
    */
@@ -154,101 +154,101 @@ class GeoArticleTable(
       create_counter_wrapper(prefix, _))
 
   /**********************************************************************/
-  /*                     Begin GeoArticleTable proper                   */
+  /*                     Begin DistDocumentTable proper                   */
   /**********************************************************************/
 
   /**
-   * Mapping from article names to GeoArticle objects, using the actual case of
-   * the article.
+   * Mapping from document names to DistDocument objects, using the actual case of
+   * the document.
    */
-  val name_to_article = mutable.Map[String, GeoArticle]()
+  val name_to_document = mutable.Map[String, DistDocument]()
 
   /**
-   * List of articles in each split.
+   * List of documents in each split.
    */
-  val articles_by_split = bufmap[String, GeoArticle]()
+  val documents_by_split = bufmap[String, DistDocument]()
 
   /**
-   * Num of articles with word-count information but not in table.
+   * Num of documents with word-count information but not in table.
    */
-  val num_articles_with_word_counts_but_not_in_table =
-    new TaskCounterWrapper("articles_with_word_counts_but_not_in_table")
+  val num_documents_with_word_counts_but_not_in_table =
+    new TaskCounterWrapper("documents_with_word_counts_but_not_in_table")
 
   /**
-   * Num of articles with word-count information (whether or not in table).
+   * Num of documents with word-count information (whether or not in table).
    */
-  val num_articles_with_word_counts =
-    new TaskCounterWrapper("articles_with_word_counts")
+  val num_documents_with_word_counts =
+    new TaskCounterWrapper("documents_with_word_counts")
 
   /** 
-   * Num of articles in each split with word-count information seen.
+   * Num of documents in each split with word-count information seen.
    */
-  val num_word_count_articles_by_split =
-    countermap("word_count_articles_by_split")
+  val num_word_count_documents_by_split =
+    countermap("word_count_documents_by_split")
 
   /**
-   * Num of articles in each split with a computed distribution.
+   * Num of documents in each split with a computed distribution.
    * (Not the same as the previous since we don't compute the distribution of
-   * articles in either the test or dev set depending on which one is used.)
+   * documents in either the test or dev set depending on which one is used.)
    */
-  val num_dist_articles_by_split =
-    countermap("num_dist_articles_by_split")
+  val num_dist_documents_by_split =
+    countermap("num_dist_documents_by_split")
 
   /**
-   * Total # of word tokens for all articles in each split.
+   * Total # of word tokens for all documents in each split.
    */
   val word_tokens_by_split =
     countermap("word_tokens_by_split")
 
   /**
-   * Total # of incoming links for all articles in each split.
+   * Total # of incoming links for all documents in each split.
    */
   val incoming_links_by_split =
     countermap("incoming_links_by_split")
 
   /**
-   * Map from short name (lowercased) to list of articles.
-   * The short name for an article is computed from the article's name.  If
-   * the article name has a comma, the short name is the part before the
+   * Map from short name (lowercased) to list of documents.
+   * The short name for a document is computed from the document's name.  If
+   * the document name has a comma, the short name is the part before the
    * comma, e.g. the short name of "Springfield, Ohio" is "Springfield".
-   * If the name has no comma, the short name is the same as the article
+   * If the name has no comma, the short name is the same as the document
    * name.  The idea is that the short name should be the same as one of
-   * the toponyms used to refer to the article.
+   * the toponyms used to refer to the document.
    */
-  val short_lower_name_to_articles = bufmap[String, GeoArticle]()
+  val short_lower_name_to_documents = bufmap[String, DistDocument]()
 
   /**
-   * Map from tuple (NAME, DIV) for articles of the form "Springfield, Ohio",
+   * Map from tuple (NAME, DIV) for documents of the form "Springfield, Ohio",
    * lowercased.
    */
-  val lower_name_div_to_articles = bufmap[(String, String), GeoArticle]()
+  val lower_name_div_to_documents = bufmap[(String, String), DistDocument]()
 
   /**
-   * For each toponym, list of articles matching the name.
+   * For each toponym, list of documents matching the name.
    */
-  val lower_toponym_to_article = bufmap[String, GeoArticle]()
+  val lower_toponym_to_document = bufmap[String, DistDocument]()
 
   /**
-   * Mapping from lowercased article names to TopoArticle objects
+   * Mapping from lowercased document names to DistDocument objects
    */
-  val lower_name_to_articles = bufmap[String, GeoArticle]()
+  val lower_name_to_documents = bufmap[String, DistDocument]()
 
   /**
-   * Look up an article named NAME and return the associated article.
-   * Note that article names are case-sensitive but the first letter needs to
+   * Look up a document named NAME and return the associated document.
+   * Note that document names are case-sensitive but the first letter needs to
    * be capitalized.
    */
-  def lookup_article(name: String) = {
+  def lookup_document(name: String) = {
     assert(name != null)
-    name_to_article.getOrElse(capfirst(name), null)
+    name_to_document.getOrElse(capfirst(name), null)
   }
 
   /**
-   * Record the article as having NAME as one of its names (there may be
+   * Record the document as having NAME as one of its names (there may be
    * multiple names, due to redirects).  Also add to related lists mapping
    * lowercased form, short form, etc.
    */ 
-  def record_article_name(name: String, art: GeoArticle) {
+  def record_document_name(name: String, art: DistDocument) {
     // Must pass in properly cased name
     // errprint("name=%s, capfirst=%s", name, capfirst(name))
     // println("length=%s" format name.length)
@@ -258,42 +258,42 @@ class GeoArticleTable(
     //   println("capfirst(0)=0x%x" format capfirst(name)(0).toInt)
     // }
     assert(name == capfirst(name))
-    name_to_article(name) = art
+    name_to_document(name) = art
     val loname = name.toLowerCase
-    lower_name_to_articles(loname) += art
-    val (short, div) = Article.compute_short_form(loname)
+    lower_name_to_documents(loname) += art
+    val (short, div) = GeoDocument.compute_short_form(loname)
     if (div != null)
-      lower_name_div_to_articles((short, div)) += art
-    short_lower_name_to_articles(short) += art
-    if (!(lower_toponym_to_article(loname) contains art))
-      lower_toponym_to_article(loname) += art
-    if (short != loname && !(lower_toponym_to_article(short) contains art))
-      lower_toponym_to_article(short) += art
+      lower_name_div_to_documents((short, div)) += art
+    short_lower_name_to_documents(short) += art
+    if (!(lower_toponym_to_document(loname) contains art))
+      lower_toponym_to_document(loname) += art
+    if (short != loname && !(lower_toponym_to_document(short) contains art))
+      lower_toponym_to_document(short) += art
   }
 
   /**
-   * Record either a normal article ('artfrom' same as 'artto') or a
+   * Record either a normal document ('artfrom' same as 'artto') or a
    * redirect ('artfrom' redirects to 'artto').
    */
-  def record_article(artfrom: GeoArticle, artto: GeoArticle) {
-    record_article_name(artfrom.title, artto)
+  def record_document(artfrom: DistDocument, artto: DistDocument) {
+    record_document_name(artfrom.title, artto)
     val redir = !(artfrom eq artto)
     val split = artto.split
     val fromlinks = artfrom.adjusted_incoming_links
     incoming_links_by_split(split) += fromlinks
     if (!redir) {
-      articles_by_split(split) += artto
+      documents_by_split(split) += artto
     } else if (fromlinks != 0) {
       // Add count of links pointing to a redirect to count of links
-      // pointing to the article redirected to, so that the total incoming
-      // link count of an article includes any redirects to that article.
+      // pointing to the document redirected to, so that the total incoming
+      // link count of a document includes any redirects to that document.
       artto.incoming_links = Some(artto.adjusted_incoming_links + fromlinks)
     }
   }
 
-  def create_article(params: Map[String, String]) = new GeoArticle(params)
+  def create_document(params: Map[String, String]) = new DistDocument(params)
 
-  def would_add_article_to_list(art: GeoArticle) = {
+  def would_add_document_to_list(art: DistDocument) = {
     if (art.namespace != "Main")
       false
     else if (art.redir.length > 0)
@@ -301,35 +301,35 @@ class GeoArticleTable(
     else art.coord != null
   }
 
-  def read_article_data(filehand: FileHandler, filename: String,
+  def read_document_data(filehand: FileHandler, filename: String,
       cell_grid: CellGrid) {
-    val redirects = mutable.Buffer[GeoArticle]()
+    val redirects = mutable.Buffer[DistDocument]()
 
     def process(params: Map[String, String]) {
-      val art = create_article(params)
+      val art = create_document(params)
       if (art.namespace != "Main")
         return
       if (art.redir.length > 0)
         redirects += art
       else if (art.coord != null) {
-        record_article(art, art)
-        cell_grid.add_article_to_cell(art)
+        record_document(art, art)
+        cell_grid.add_document_to_cell(art)
       }
     }
 
-    ArticleData.read_article_data_file(filehand, filename, process,
+    GeoDocumentData.read_document_data_file(filehand, filename, process,
       maxtime = Args.max_time_per_stage)
 
     for (x <- redirects) {
-      val redart = lookup_article(x.redir)
+      val redart = lookup_document(x.redir)
       if (redart != null)
-        record_article(x, redart)
+        record_document(x, redart)
     }
   }
 
-  def finish_article_distributions() {
-    // Figure out the value of OVERALL_UNSEEN_MASS for each article.
-    for ((split, table) <- articles_by_split) {
+  def finish_document_distributions() {
+    // Figure out the value of OVERALL_UNSEEN_MASS for each document.
+    for ((split, table) <- documents_by_split) {
       var totaltoks = 0
       var numarts = 0
       for (art <- table) {
@@ -341,74 +341,73 @@ class GeoArticleTable(
           numarts += 1
         }
       }
-      num_dist_articles_by_split(split) += numarts
+      num_dist_documents_by_split(split) += numarts
       word_tokens_by_split(split) += totaltoks
     }
   }
 
-  def clear_training_article_distributions() {
-    for (art <- articles_by_split("training"))
+  def clear_training_document_distributions() {
+    for (art <- documents_by_split("training"))
       art.dist = null
   }
 
   def finish_word_counts() {
     word_dist_factory.finish_global_distribution()
-    finish_article_distributions()
+    finish_document_distributions()
     errprint("")
     errprint("-------------------------------------------------------------------------")
-    errprint("Article count statistics:")
+    errprint("Document count statistics:")
     var total_arts_in_table = 0L
     var total_arts_with_word_counts = 0L
     var total_arts_with_dists = 0L
     for ((split, totaltoks) <- word_tokens_by_split) {
       errprint("For split '%s':", split)
-      val arts_in_table = articles_by_split(split).length
-      val arts_with_word_counts = num_word_count_articles_by_split(split).value
-      val arts_with_dists = num_dist_articles_by_split(split).value
+      val arts_in_table = documents_by_split(split).length
+      val arts_with_word_counts = num_word_count_documents_by_split(split).value
+      val arts_with_dists = num_dist_documents_by_split(split).value
       total_arts_in_table += arts_in_table
       total_arts_with_word_counts += arts_with_word_counts
       total_arts_with_dists += arts_with_dists
-      errprint("  %s articles in article table", arts_in_table)
-      errprint("  %s articles with word counts seen (and in table)", arts_with_word_counts)
-      errprint("  %s articles with distribution computed, %s total tokens, %.2f tokens/article",
+      errprint("  %s documents in document table", arts_in_table)
+      errprint("  %s documents with word counts seen (and in table)", arts_with_word_counts)
+      errprint("  %s documents with distribution computed, %s total tokens, %.2f tokens/document",
         arts_with_dists, totaltoks.value,
         // Avoid division by zero
         totaltoks.value.toDouble / (arts_in_table + 1e-100))
     }
-    errprint("Total: %s articles with word counts seen",
-      num_articles_with_word_counts.value)
-    errprint("Total: %s articles in article table", total_arts_in_table)
-    errprint("Total: %s articles with word counts seen but not in article table",
-      num_articles_with_word_counts_but_not_in_table.value)
-    errprint("Total: %s articles with word counts seen (and in table)",
+    errprint("Total: %s documents with word counts seen",
+      num_documents_with_word_counts.value)
+    errprint("Total: %s documents in document table", total_arts_in_table)
+    errprint("Total: %s documents with word counts seen but not in document table",
+      num_documents_with_word_counts_but_not_in_table.value)
+    errprint("Total: %s documents with word counts seen (and in table)",
       total_arts_with_word_counts)
-    errprint("Total: %s articles with distribution computed",
+    errprint("Total: %s documents with distribution computed",
       total_arts_with_dists)
   }
 
   def construct_candidates(toponym: String) = {
     val lotop = toponym.toLowerCase
-    lower_toponym_to_article(lotop)
+    lower_toponym_to_document(lotop)
   }
 
   def word_is_toponym(word: String) = {
     val lw = word.toLowerCase
-    lower_toponym_to_article contains lw
+    lower_toponym_to_document contains lw
   }
 }
 
-///////////////////////// Articles
+///////////////////////// DistDocuments
 
 /**
- * An "article" for geotagging.  Articles can come from Wikipedia, but
- * also from Twitter, etc., provided that the data is in the same format.
- * (In Twitter, generally each "article" is the set of tweets from a given
- * user.)
+ * A document for geolocation, with a word distribution.  Documents can come
+ * from Wikipedia articles, individual tweets, Twitter feeds (all tweets from
+ * a user), etc.
  */ 
-class GeoArticle(params: Map[String, String]) extends Article(params)
+class DistDocument(params: Map[String, String]) extends GeoDocument(params)
   with EvaluationDocument {
   /**
-   * Object containing word distribution of this article.
+   * Object containing word distribution of this document.
    */
   var dist: WordDist = null
 
@@ -419,12 +418,12 @@ class GeoArticle(params: Map[String, String]) extends Article(params)
     "%s(%s)%s%s" format (title, id, coordstr, redirstr)
   }
 
-  // def __repr__() = "Article(%s)" format toString.encode("utf-8")
+  // def __repr__() = "DistDocument(%s)" format toString.encode("utf-8")
 
   def shortstr() = "%s" format title
 
   def struct() =
-    <GeoArticle>
+    <DistDocument>
       <title>{ title }</title>
       <id>{ id }</id>
       {
@@ -435,7 +434,7 @@ class GeoArticle(params: Map[String, String]) extends Article(params)
         if (redir.length > 0)
           <redirectTo>{ redir }</redirectTo>
       }
-    </GeoArticle>
+    </DistDocument>
 
   def distance_to_coord(coord2: Coord) = spheredist(coord, coord2)
 }
@@ -534,7 +533,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
       if (maxword != None)
         cell_grid.table.construct_candidates(
           unmemoize_word(maxword.get))
-      else Seq[GeoArticle]()
+      else Seq[DistDocument]()
     if (debug("commontop"))
       errprint("  candidates = %s", cands)
     // Sort candidate list by number of incoming links
@@ -545,7 +544,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
     if (debug("commontop"))
       errprint("  sorted candidates = %s", candlinks)
 
-    def find_good_cells_for_coord(cands: Iterable[(GeoArticle, Double)]) = {
+    def find_good_cells_for_coord(cands: Iterable[(DistDocument, Double)]) = {
       for {
         (cand, links) <- candlinks
         val cell = {
@@ -572,7 +571,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
 
 /**
  * Abstract class that implements a strategy for document geolocation that
- * involves directly comparing the article distribution against each cell
+ * involves directly comparing the document distribution against each cell
  * in turn and computing a score.
  *
  * @param prefer_minimum If true, lower scores are better; if false, higher
@@ -583,13 +582,13 @@ abstract class MinMaxScoreStrategy(
   prefer_minimum: Boolean
 ) extends GeolocateDocumentStrategy(cell_grid) {
   /**
-   * Function to return the score of an article distribution against a
+   * Function to return the score of a document distribution against a
    * cell.
    */
   def score_cell(word_dist: WordDist, cell: GeoCell): Double
 
   /**
-   * Compare a word distribution (for an article, typically) against all
+   * Compare a word distribution (for a document, typically) against all
    * cells. Return a sequence of tuples (cell, score) where 'cell'
    * indicates the cell and 'score' the score.
    */
@@ -599,7 +598,7 @@ abstract class MinMaxScoreStrategy(
       cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
     ) {
       if (debug("lots")) {
-        errprint("Nonempty cell at indices %s = location %s, num_articles = %s",
+        errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
           cell.describe_indices(), cell.describe_location(),
           cell.word_dist_wrapper.num_arts_for_word_dist)
       }
@@ -623,17 +622,17 @@ abstract class MinMaxScoreStrategy(
 
 /**
  * Class that implements a strategy for document geolocation by computing
- * the KL-divergence between article and cell (approximately, how much
+ * the KL-divergence between document and cell (approximately, how much
  * the word distributions differ).  Note that the KL-divergence as currently
  * implemented uses the smoothed word distributions.
  *
  * @param partial If true (the default), only do "partial" KL-divergence.
- * This only computes the divergence involving words in the article
+ * This only computes the divergence involving words in the document
  * distribution, rather than considering all words in the vocabulary.
  * @param symmetric If true, do a symmetric KL-divergence by computing
  * the divergence in both directions and averaging the two values.
  * (Not by default; the comparison is fundamentally asymmetric in
- * any case since it's comparing articles against cells.)
+ * any case since it's comparing documents against cells.)
  */
 class KLDivergenceStrategy(
   cell_grid: CellGrid,
@@ -690,14 +689,14 @@ class KLDivergenceStrategy(
 
 /**
  * Class that implements a strategy for document geolocation by computing
- * the cosine similarity between the distributions of article and cell.
+ * the cosine similarity between the distributions of document and cell.
  * FIXME: We really should transform the distributions by TF/IDF before
  * doing this.
  *
  * @param smoothed If true, use the smoothed word distributions. (By default,
  * use unsmoothed distributions.)
  * @param partial If true, only do "partial" cosine similarity.
- * This only computes the similarity involving words in the article
+ * This only computes the similarity involving words in the document
  * distribution, rather than considering all words in the vocabulary.
  */
 class CosineSimilarityStrategy(
@@ -836,27 +835,26 @@ class GeolocateParameters(parser: ArgParser = null) extends
 a default list of English stopwords (stored in the TextGrounder distribution)
 is used.""")
 
-  var article_data_file =
-    ap.multiOption[String]("a", "article-data-file",
+  var document_data_file =
+    ap.multiOption[String]("a", "document-data-file",
       metavar = "FILE",
-      help = """File containing info about Wikipedia or Twitter articles.
-(For Twitter, an "article" is typically the set of all tweets from a single
-user, and the name of the article is the user's name or some per-user
-handle.) This file lists per-article information such as the article's title,
-the split (training, dev, or test) that the article is in, and the article's
-location.  It does not list the actual word-count information for the
-articles; that is held in a separate counts file, specified using
---counts-file.
+      help = """File containing info about documents.  Documents can be
+Wikipedi articles, individual tweets in Twitter, the set of all tweets for
+a given user, etc.  This file lists per-document information such as the
+document's title, the split (training, dev, or test) that the document is in,
+and the document's location.  It does not list the actual word-count
+information for the documents; that is held in a separate counts file,
+specified using --counts-file.
 
 Multiple such files can be given by specifying the option multiple
 times.""")
   var counts_file =
     ap.multiOption[String]("counts-file", "cf",
       metavar = "FILE",
-      help = """File containing word counts for Wikipedia or Twitter articles.
-There are scripts in the 'python' directory for generating counts in the
-proper format.  Multiple such files can be given by specifying the
-option multiple times.""")
+      help = """File containing word counts for documents.  There are scripts
+in the 'python' directory for generating counts in the proper format from
+Wikipedia documents, Twitter tweets, etc.  Multiple such files can be given
+by specifying the option multiple times.""")
   var eval_file =
     ap.multiOption[String]("e", "eval-file",
       metavar = "FILE",
@@ -939,12 +937,12 @@ Default '%default'.""")
   var preserve_case_words =
     ap.flag("preserve-case-words", "pcw",
       help = """Don't fold the case of words used to compute and
-match against article distributions.  Note that in toponym resolution
-(--mode=geotag-toponyms), this applies only to words in articles
+match against document distributions.  Note that in toponym resolution
+(--mode=geotag-toponyms), this applies only to words in documents
 (currently used only in Naive Bayes matching), not to toponyms, which
 are always matched case-insensitively.""")
-  var include_stopwords_in_article_dists =
-    ap.flag("include-stopwords-in-article-dists",
+  var include_stopwords_in_document_dists =
+    ap.flag("include-stopwords-in-document-dists",
       help = """Include stopwords when computing word distributions.""")
   var minimum_word_count =
     ap.option[Int]("minimum-word-count", "mwc", metavar = "NUM",
@@ -1005,19 +1003,19 @@ source code. (Look for references to debug("foo") for boolean params,
 debugval("foo") for valueful params, or debuglist("foo") for list-valued
 params.) Some known debug flags:
 
-gridrank: For the given test article number (starting at 1), output
+gridrank: For the given test document number (starting at 1), output
 a grid of the predicted rank for cells around the true cell.
-Multiple articles can have the rank output, e.g. --debug 'gridrank=45,58'
-(This will output info for articles 45 and 58.) This output can be
+Multiple documents can have the rank output, e.g. --debug 'gridrank=45,58'
+(This will output info for documents 45 and 58.) This output can be
 postprocessed to generate nice graphs; this is used e.g. in Wing's thesis.
 
-gridranksize: Size of the grid, in numbers of articles on a side.
+gridranksize: Size of the grid, in numbers of documents on a side.
 This is a single number, and the grid will be a square centered on the
 true cell. (Default currently 11.)
 
 kldiv: Print out words contributing most to KL divergence.
 
-wordcountarts: Regenerate article-data file, filtering out articles not
+wordcountarts: Regenerate document-data file, filtering out documents not
 seen in any counts file.
 
 some, lots, tons: General info of various sorts. (Document me.)
@@ -1105,7 +1103,7 @@ abstract class GeolocateDriver extends
   var degrees_per_cell = 0.0
   var stopwords: Set[String] = _
   var cell_grid: CellGrid = _
-  var article_table: GeoArticleTable = _
+  var document_table: DistDocumentTable = _
   var word_dist_factory: WordDistFactory = _
 
   /**
@@ -1144,14 +1142,14 @@ abstract class GeolocateDriver extends
     if (args.width_of_multi_cell <= 0)
       argerror("Width of multi cell must be positive")
 
-    need_seq(args.article_data_file, "article-data-file")
+    need_seq(args.document_data_file, "document-data-file")
   }
 
-  protected def initialize_article_table(word_dist_factory: WordDistFactory) = {
-    new GeoArticleTable(this, word_dist_factory)
+  protected def initialize_document_table(word_dist_factory: WordDistFactory) = {
+    new DistDocumentTable(this, word_dist_factory)
   }
 
-  protected def initialize_cell_grid(table: GeoArticleTable) = {
+  protected def initialize_cell_grid(table: DistDocumentTable) = {
     new MultiRegularCellGrid(degrees_per_cell,
       params.width_of_multi_cell, table)
   }
@@ -1168,9 +1166,9 @@ abstract class GeolocateDriver extends
     Stopwords.read_stopwords(file_handler, params.stopwords_file)
   }
 
-  protected def read_articles(table: GeoArticleTable, stopwords: Set[String]) {
-    for (fn <- Args.article_data_file)
-      table.read_article_data(file_handler, fn, cell_grid)
+  protected def read_documents(table: DistDocumentTable, stopwords: Set[String]) {
+    for (fn <- Args.document_data_file)
+      table.read_document_data(file_handler, fn, cell_grid)
 
     // Read in the words-counts file
     if (Args.counts_file.length > 0) {
@@ -1182,10 +1180,10 @@ abstract class GeolocateDriver extends
 
   def setup_for_run() {
     word_dist_factory = initialize_word_dist_factory()
-    article_table = initialize_article_table(word_dist_factory)
-    cell_grid = initialize_cell_grid(article_table)
+    document_table = initialize_document_table(word_dist_factory)
+    cell_grid = initialize_cell_grid(document_table)
     stopwords = read_stopwords()
-    read_articles(article_table, stopwords)
+    read_documents(document_table, stopwords)
     cell_grid.finish()
   }
 
@@ -1211,20 +1209,20 @@ object GeolocateDriver {
   var Args: GeolocateParameters = _
   val Debug: DebugSettings = new DebugSettings
 
-  // Debug flags (from ArticleGeolocateDocumentEvaluator) -- need to set them
+  // Debug flags (from InternalGeolocateDocumentEvaluator) -- need to set them
   // here before we parse the command-line debug settings. (FIXME, should
   // be a better way that introduces fewer long-range dependencies like
   // this)
   //
-  //  gridrank: For the given test article number (starting at 1), output
+  //  gridrank: For the given test document number (starting at 1), output
   //            a grid of the predicted rank for cells around the true
-  //            cell.  Multiple articles can have the rank output, e.g.
+  //            cell.  Multiple documents can have the rank output, e.g.
   //
   //            --debug 'gridrank=45,58'
   //
-  //            (This will output info for articles 45 and 58.)
+  //            (This will output info for documents 45 and 58.)
   //
-  //  gridranksize: Size of the grid, in numbers of articles on a side.
+  //  gridranksize: Size of the grid, in numbers of documents on a side.
   //                This is a single number, and the grid will be a square
   //                centered on the true cell.
   register_list_debug_param("gridrank")
@@ -1242,9 +1240,9 @@ class GeolocateDocumentParameters(
 are specified using --eval-file.  The following formats are
 recognized:
 
-'internal' is the normal format.  It means to consider articles to be
+'internal' is the normal format.  It means to consider documents to be
 documents to evaluate, and to use the development or test set specified
-in the article-data file as the set of documents to evaluate.  There is
+in the document-data file as the set of documents to evaluate.  There is
 no eval file for this format.
 
 'raw-text' assumes that the eval file is simply raw text.  (NOT YET
@@ -1314,15 +1312,15 @@ prior probability.  Default is 'baseline'.
 For geotag-documents:
 
 'full-kl-divergence' (or 'full-kldiv') searches for the cell where the KL
-divergence between the article and cell is smallest.
+divergence between the document and cell is smallest.
 'partial-kl-divergence' (or 'partial-kldiv') is similar but uses an
 abbreviated KL divergence measure that only considers the words seen in the
-article; empirically, this appears to work just as well as the full KL
+document; empirically, this appears to work just as well as the full KL
 divergence. 'average-cell-probability' (or
 'celldist') involves computing, for each word, a probability distribution over
 cells using the word distribution of each cell, and then combining the
-distributions over all words in an article, weighted by the count the word in
-the article.  Default is 'partial-kl-divergence'.
+distributions over all words in a document, weighted by the count the word in
+the document.  Default is 'partial-kl-divergence'.
 
 NOTE: Multiple --strategy options can be given, and each strategy will
 be tried, one after the other.""")
@@ -1331,25 +1329,25 @@ be tried, one after the other.""")
     ap.multiOption[String]("baseline-strategy", "bs",
       default = Seq("internal-link"),
       choices = Seq("internal-link", "random",
-        "num-articles", "link-most-common-toponym",
+        "num-documents", "link-most-common-toponym",
         "cell-distribution-most-common-toponym"),
       aliases = Map(
         "internal-link" -> Seq("link"),
-        "num-articles" -> Seq("num-arts", "numarts"),
+        "num-documents" -> Seq("num-arts", "numarts"),
         "cell-distribution-most-common-toponym" ->
           Seq("celldist-most-common-toponym")),
       help = """Strategy to use to compute the baseline.
 
 'internal-link' (or 'link') means use number of internal links pointing to the
-article or cell.
+document or cell.
 
 'random' means choose randomly.
 
-'num-articles' (or 'num-arts' or 'numarts'; only in cell-type matching) means
-use number of articles in cell.
+'num-documents' (or 'num-arts' or 'numarts'; only in cell-type matching) means
+use number of documents in cell.
 
 'link-most-common-toponym' (only in --mode=geotag-documents) means to look
-for the toponym that occurs the most number of times in the article, and
+for the toponym that occurs the most number of times in the document, and
 then use the internal-link baseline to match it to a location.
 
 'celldist-most-common-toponym' (only in --mode=geotag-documents) is similar,
@@ -1413,7 +1411,7 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
   /**
    * Set everything up for document geolocation.  Create and save a
    * sequence of strategy objects, used by us and by the Hadoop interface,
-   * which does its own iteration over articles.
+   * which does its own iteration over documents.
    */
   override def setup_for_run() {
     super.setup_for_run()
@@ -1430,7 +1428,7 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
                 new RandomGeolocateDocumentStrategy(cell_grid)
               case "internal-link" =>
                 new MostPopularCellGeolocateDocumentStrategy(cell_grid, true)
-              case "num-articles" =>
+              case "num-documents" =>
                 new MostPopularCellGeolocateDocumentStrategy(cell_grid, false)
               case _ => {
                 assert(false,
@@ -1500,7 +1498,7 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
    * results = map listing results for each document (an abstract type
    * defined in TestFileEvaluator; the result type EvaluationResult
    * is practically an abstract type, too -- the most useful dynamic
-   * type in practice is ArticleEvaluationResult)
+   * type in practice is DocumentEvaluationResult)
    */
 
   def run_after_setup() = {
@@ -1510,7 +1508,7 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
         if (params.eval_format == "pcl-travel")
           new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
         else
-          new ArticleGeolocateDocumentEvaluator(strategy, stratname, this)
+          new InternalGeolocateDocumentEvaluator(strategy, stratname, this)
       new DefaultEvaluationOutputter(stratname, evaluator)
     })
   }

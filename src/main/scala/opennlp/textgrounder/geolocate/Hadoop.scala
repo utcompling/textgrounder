@@ -144,9 +144,9 @@ import opennlp.textgrounder.util.MeteredTask
 
    OUR IMPLEMENTATION:
 
-   Input values to map() are tuples (strategy, article).  Output items
+   Input values to map() are tuples (strategy, document).  Output items
    are have key = (cellgrid-details, strategy), value = result for
-   particular article (includes various items, including article,
+   particular document (includes various items, including document,
    predicted cell, true rank, various distances).  No combiner, since
    we have to compute a median, meaning we need all values.  Reducer
    computes mean/median for all values for a given cellgrid/strategy.
@@ -283,7 +283,7 @@ abstract class HadoopGeolocateApp(
        command-line arguments, because it participates in that process. */
     driver.set_job(job)
     initialize_hadoop_classes(job)
-    for (file <- arg_holder.article_data_file)
+    for (file <- arg_holder.document_data_file)
       FileInputFormat.addInputPath(job, new Path(file))
     FileOutputFormat.setOutputPath(job, new Path(arg_holder.outfile))
     if (job.waitForCompletion(true)) 0 else 1
@@ -440,10 +440,10 @@ trait HadoopGeolocateDriver extends BaseHadoopGeolocateDriver {
 /*                Hadoop implementation of geolocate-document           */
 /************************************************************************/
    
-class ArticleEvaluationMapper extends
+class DocumentEvaluationMapper extends
     Mapper[Object, Text, Text, DoubleWritable] {
-  val reader = new ArticleReader(ArticleData.combined_article_data_outfields)
-  var evaluators: Iterable[ArticleGeolocateDocumentEvaluator] = null
+  val reader = new GeoDocumentReader(GeoDocumentData.combined_document_data_outfields)
+  var evaluators: Iterable[InternalGeolocateDocumentEvaluator] = null
   val task = new MeteredTask("document", "evaluating")
   var driver: HadoopGeolocateDocumentDriver = _
 
@@ -467,31 +467,31 @@ class ArticleEvaluationMapper extends
     driver.setup_for_run()
     evaluators =
       for ((stratname, strategy) <- driver.strategies)
-        yield new ArticleGeolocateDocumentEvaluator(strategy, stratname, driver)
+        yield new InternalGeolocateDocumentEvaluator(strategy, stratname, driver)
   }
 
   override def map(key: Object, value: Text, context: ContextType) {
     def process(params: Map[String, String]) {
-      val table = driver.article_table
-      val in_article = table.create_article(params)
-      if (in_article.split == driver.params.eval_set &&
-          table.would_add_article_to_list(in_article)) {
-        val art = table.lookup_article(in_article.title)
+      val table = driver.document_table
+      val in_document = table.create_document(params)
+      if (in_document.split == driver.params.eval_set &&
+          table.would_add_document_to_list(in_document)) {
+        val art = table.lookup_document(in_document.title)
         if (art == null)
-          warning("Couldn't find article %s in table", in_article.title)
+          warning("Couldn't find document %s in table", in_document.title)
         else {
           for (e <- evaluators) {
             val num_processed = task.num_processed
             val doctag = "#%d" format (1 + num_processed)
             if (e.would_skip_document(art, doctag))
-              errprint("Skipped article %s", art)
+              errprint("Skipped document %s", art)
             else {
               // Don't put side-effecting code inside of an assert!
               val result =
                 e.evaluate_document(art, doctag)
               assert(result != null)
               context.write(new Text(e.stratname),
-                new DoubleWritable(result.asInstanceOf[ArticleEvaluationResult].pred_truedist))
+                new DoubleWritable(result.asInstanceOf[DocumentEvaluationResult].pred_truedist))
               task.item_processed()
             }
           }
@@ -502,7 +502,7 @@ class ArticleEvaluationMapper extends
   }
 }
 
-class ArticleResultReducer extends
+class DocumentResultReducer extends
     Reducer[Text, DoubleWritable, Text, DoubleWritable] {
 
   type ContextType = Reducer[Text, DoubleWritable, Text, DoubleWritable]#Context
@@ -546,9 +546,9 @@ object HadoopGeolocateDocumentApp extends
   def create_driver() = new DriverType()
 
   def initialize_hadoop_classes(job: Job) {
-    job.setJarByClass(classOf[ArticleEvaluationMapper])
-    job.setMapperClass(classOf[ArticleEvaluationMapper])
-    job.setReducerClass(classOf[ArticleResultReducer])
+    job.setJarByClass(classOf[DocumentEvaluationMapper])
+    job.setMapperClass(classOf[DocumentEvaluationMapper])
+    job.setReducerClass(classOf[DocumentResultReducer])
     job.setOutputKeyClass(classOf[Text])
     job.setOutputValueClass(classOf[DoubleWritable])
   }
@@ -619,32 +619,32 @@ abstract class RecordWritable(
 }
 
 
-object GeoArticleConverter extends RecordWriterConverter {
-  type Type = GeoArticle
+object DistDocumentConverter extends RecordWriterConverter {
+  type Type = DistDocument
 
-  def serialize(art: GeoArticle) = art.title
+  def serialize(art: DistDocument) = art.title
   def deserialize(title: String) = FIXME
 
   def init() {
-    RecordWriterConverter.register_converter(GeoArticle, this)
+    RecordWriterConverter.register_converter(DistDocument, this)
   }
 }
 
 
-class ArticleEvaluationResultWritable extends RecordWritable {
-  type Type = ArticleEvaluationResult
+class DocumentEvaluationResultWritable extends RecordWritable {
+  type Type = DocumentEvaluationResult
   def to_properties(obj: Type) =
-    Seq(obj.article, obj.pred_cell, obj.true_rank,
+    Seq(obj.document, obj.pred_cell, obj.true_rank,
         obj.true_cell, obj.num_arts_in_true_cell,
         obj.true_center, obj.true_truedist, obj.true_degdist,
         obj.pred_center, obj.pred_truedist, obj.pred_degdist)
   def from_properties(props: Seq[Any]) = {
-    val Seq(article, pred_cell, true_rank,
+    val Seq(document, pred_cell, true_rank,
         true_cell, num_arts_in_true_cell,
         true_center, true_truedist, true_degdist,
         pred_center, pred_truedist, pred_degdist) = props
-    new HadoopArticleEvaluationResult(
-      article.asInstanceOf[GeoArticle],
+    new HadoopDocumentEvaluationResult(
+      document.asInstanceOf[DistDocument],
       pred_cell.asInstanceOf[GeoCell],
       true_rank.asInstanceOf[Int],
       true_cell.asInstanceOf[GeoCell],

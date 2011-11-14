@@ -171,27 +171,27 @@ abstract class WordDistFactory {
    * Compute any global word-distribution statistics, e.g. tables for
    * doing back-off.  This is called after all of the relevant WordDists
    * have been created.  In practice, the "relevant" distributions are those
-   * associated with training documents/articles, which are read in
+   * associated with training documents, which are read in
    * during `read_word_counts`.
    */
   def finish_global_distribution()
 
   /**
    * Read word counts from a file containing the counts for a set of
-   * articles, create WordDists for each such article and set the
-   * article's distribution to the newly-created WordDist.  Note that
+   * documents, create WordDists for each such document and set the
+   * document's distribution to the newly-created WordDist.  Note that
    * the word-counts file is created by 'processwiki.py' in the
    * 'python' directory.  Generally, the format of the file is dependent
    * on the particular WordDist implementation.
    *
-   * @param table Table holding all of the articles.
+   * @param table Table holding all of the documents.
    * @param filehand File-handler object, which knows how to read data
    *   from files.
    * @param filename Name of file holding word counts.
    * @param stopwords List of stopwords (words to be ignored when creating
    *   a distribution).
    */
-  def read_word_counts(table: GeoArticleTable,
+  def read_word_counts(table: DistDocumentTable,
     filehand: FileHandler, filename: String, stopwords: Set[String])
 }
 

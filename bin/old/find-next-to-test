@@ -2,8 +2,8 @@
 
 # Usage: find-next-to-test OFFSET FILES...
 #
-# Find the last article that was tested in each of FILES and add OFFSET to the number
-# of the article, so that we can restart the appropriate slice at the appropriate place.
+# Find the last document that was tested in each of FILES and add OFFSET to the number
+# of the document, so that we can restart the appropriate slice at the appropriate place.
 
 offset="$1"; shift
 prefix="$2"; shift

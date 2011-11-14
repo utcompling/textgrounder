@@ -43,11 +43,11 @@ import GeolocateDriver.Debug._
  */
 
 class CellWordDist(val word_dist: WordDist) {
-  /** Number of articles included in incoming-link computation. */
+  /** Number of documents included in incoming-link computation. */
   var num_arts_for_links = 0
   /** Total number of incoming links. */
   var incoming_links = 0
-  /** Number of articles included in word distribution. */
+  /** Number of documents included in word distribution. */
   var num_arts_for_word_dist = 0
 
   def is_empty_for_word_dist() = num_arts_for_word_dist == 0
@@ -55,11 +55,11 @@ class CellWordDist(val word_dist: WordDist) {
   def is_empty() = num_arts_for_links == 0
 
   /**
-   *  Add the given article to the total distribution seen so far
+   *  Add the given document to the total distribution seen so far
    */
-  def add_article(art: GeoArticle) {
-    /* We are passed in all articles, regardless of the split.
-       The decision was made to accumulate link counts from all articles,
+  def add_document(art: DistDocument) {
+    /* We are passed in all documents, regardless of the split.
+       The decision was made to accumulate link counts from all documents,
        even in the evaluation set.  Strictly, this is a violation of the
        "don't train on your evaluation set" rule.  The reason we do this
        is that
@@ -67,26 +67,26 @@ class CellWordDist(val word_dist: WordDist) {
        (1) The links are used only in Naive Bayes, and only in establishing
        a prior probability.  Hence they aren't the main indicator.
        (2) Often, nearly all the link count for a given cell comes from
-       a particular article -- e.g. the Wikipedia article for the primary
-       city in the cell.  If we pull the link count for this article
+       a particular document -- e.g. the Wikipedia article for the primary
+       city in the cell.  If we pull the link count for this document
        out of the cell because it happens to be in the evaluation set,
        we will totally distort the link count for this cell.  In a "real"
-       usage case, we would be testing against an unknown article, not
-       against an article in our training set that we've artificially
+       usage case, we would be testing against an unknown document, not
+       against a document in our training set that we've artificially
        removed so as to construct an evaluation set, and this problem
        wouldn't arise, so by doing this we are doing a more realistic
        evaluation.
        
        Note that we do NOT include word counts from dev-set or test-set
-       articles in the word distribution for a cell.  This keeps to the
+       documents in the word distribution for a cell.  This keeps to the
        above rule about only training on your training set, and is OK
-       because (1) each article in a cell contributes a similar amount of
-       word counts (assuming the articles are somewhat similar in size),
-       hence in a cell with multiple articles, each individual article
+       because (1) each document in a cell contributes a similar amount of
+       word counts (assuming the documents are somewhat similar in size),
+       hence in a cell with multiple documents, each individual document
        only computes a fairly small fraction of the total word counts;
        (2) distributions are normalized in any case, so the exact number
-       of articles in a cell does not affect the distribution. */
-    /* Add link count of article to cell. */
+       of documents in a cell does not affect the distribution. */
+    /* Add link count of document to cell. */
     art.incoming_links match {
       // Might be None, for unknown link count
       case Some(x) => incoming_links += x
@@ -94,12 +94,12 @@ class CellWordDist(val word_dist: WordDist) {
     }
     num_arts_for_links += 1
 
-    /* Add word counts of article to cell, but only if in the
+    /* Add word counts of document to cell, but only if in the
        training set. */
     if (art.split == "training") {
       if (art.dist == null) {
         if (Args.max_time_per_stage == 0.0 && Args.num_training_docs == 0)
-          warning("Saw article %s without distribution", art)
+          warning("Saw document %s without distribution", art)
       } else {
         assert(art.dist.finished)
         word_dist.add_word_distribution(art.dist)
@@ -281,7 +281,7 @@ class CellDistFactory(val lru_cache_size: Int) {
 abstract class GeoCell(val cell_grid: CellGrid) {
   val word_dist_wrapper =
     new CellWordDist(cell_grid.table.word_dist_factory.create_word_dist())
-  var most_popular_article: GeoArticle = null
+  var most_popular_document: DistDocument = null
   var mostpopart_links = 0
 
   def word_dist = word_dist_wrapper.word_dist
@@ -299,9 +299,9 @@ abstract class GeoCell(val cell_grid: CellGrid) {
   def describe_indices(): String
 
   /**
-   * Return an Iterable over articles, listing the articles in the cell.
+   * Return an Iterable over documents, listing the documents in the cell.
    */
-  def iterate_articles(): Iterable[GeoArticle]
+  def iterate_documents(): Iterable[DistDocument]
 
   /**
    * Return the coordinate of the "center" of the cell.  This is the
@@ -325,12 +325,12 @@ abstract class GeoCell(val cell_grid: CellGrid) {
   override def toString() = {
     val unfinished = if (word_dist.finished) "" else ", unfinished"
     val contains =
-      if (most_popular_article != null)
+      if (most_popular_document != null)
         ", most-pop-art %s(%d links)" format (
-          most_popular_article, mostpopart_links)
+          most_popular_document, mostpopart_links)
       else ""
 
-    "GeoCell(%s%s%s, %d articles(dist), %d articles(links), %d links)" format (
+    "GeoCell(%s%s%s, %d documents(dist), %d documents(links), %d links)" format (
       describe_location(), unfinished, contains,
       word_dist_wrapper.num_arts_for_word_dist,
       word_dist_wrapper.num_arts_for_links,
@@ -347,7 +347,7 @@ abstract class GeoCell(val cell_grid: CellGrid) {
    */
   def shortstr() = {
     var str = "Cell %s" format describe_location()
-    val mostpop = most_popular_article
+    val mostpop = most_popular_document
     if (mostpop != null)
       str += ", most-popular %s" format mostpop.shortstr()
     str
@@ -362,25 +362,25 @@ abstract class GeoCell(val cell_grid: CellGrid) {
       <bounds>{ describe_location() }</bounds>
       <finished>{ word_dist.finished }</finished>
       {
-        if (most_popular_article != null)
-          (<mostPopularArticle>most_popular_article.struct()</mostPopularArticle>
-           <mostPopularArticleLinks>mostpopart_links</mostPopularArticleLinks>)
+        if (most_popular_document != null)
+          (<mostPopularDocument>most_popular_document.struct()</mostPopularDocument>
+           <mostPopularDocumentLinks>mostpopart_links</mostPopularDocumentLinks>)
       }
-      <numArticlesDist>{ word_dist_wrapper.num_arts_for_word_dist }</numArticlesDist>
-      <numArticlesLink>{ word_dist_wrapper.num_arts_for_links }</numArticlesLink>
+      <numDocumentsDist>{ word_dist_wrapper.num_arts_for_word_dist }</numDocumentsDist>
+      <numDocumentsLink>{ word_dist_wrapper.num_arts_for_links }</numDocumentsLink>
       <incomingLinks>{ word_dist_wrapper.incoming_links }</incomingLinks>
     </GeoCell>
 
   /**
-   * Generate the distribution for a cell from the articles in it.
+   * Generate the distribution for a cell from the documents in it.
    */
   def generate_dist() {
-    for (art <- iterate_articles()) {
-      word_dist_wrapper.add_article(art)
+    for (art <- iterate_documents()) {
+      word_dist_wrapper.add_document(art)
       if (art.incoming_links != None &&
         art.incoming_links.get > mostpopart_links) {
         mostpopart_links = art.incoming_links.get
-        most_popular_article = art
+        most_popular_document = art
       }
     }
     word_dist.finish(minimum_word_count = Args.minimum_word_count)
@@ -432,7 +432,7 @@ abstract class PolygonalCell(
         coord.long, coord.lat, fracprob * params.kml_max_height)
     }
     val name =
-      if (most_popular_article != null) most_popular_article.title
+      if (most_popular_document != null) most_popular_document.title
       else ""
 
     // Placemark indicating name
@@ -556,7 +556,7 @@ abstract class RectangularCell(
 /**
  * Abstract class for a grid of cells covering the earth.
  */
-abstract class CellGrid(val table: GeoArticleTable) {
+abstract class CellGrid(val table: DistDocumentTable) {
   /**
    * Total number of cells in the grid.
    */
@@ -569,14 +569,14 @@ abstract class CellGrid(val table: GeoArticleTable) {
   def find_best_cell_for_coord(coord: Coord): GeoCell
 
   /**
-   * Add the given article to the cell grid.
+   * Add the given document to the cell grid.
    */
-  def add_article_to_cell(article: GeoArticle): Unit
+  def add_document_to_cell(document: DistDocument): Unit
 
   /**
    * Generate all non-empty cells.  This will be called once (and only once),
-   * after all articles have been added to the cell grid by calling
-   * `add_article_to_cell`.  The generation happens internally; but after
+   * after all documents have been added to the cell grid by calling
+   * `add_document_to_cell`.  The generation happens internally; but after
    * this, `iter_nonempty_cells` should work properly.  This is not meant
    * to be called externally.
    */
@@ -587,10 +587,10 @@ abstract class CellGrid(val table: GeoArticleTable) {
    * 
    * @param nonempty_word_dist If given, returned cells must also have a
    *   non-empty word distribution; otherwise, they just need to have at least
-   *   one article in them. (Not all articles have word distributions, esp.
+   *   one document in them. (Not all documents have word distributions, esp.
    *   when --max-time-per-stage has been set to a non-zero value so that we
-   *   only load some subset of the word distributions for all articles.  But
-   *   even when not set, some articles may be listed in the article-data file
+   *   only load some subset of the word distributions for all documents.  But
+   *   even when not set, some documents may be listed in the document-data file
    *   but have no corresponding word counts given in the counts file.)
    */
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[GeoCell]
@@ -633,17 +633,17 @@ abstract class CellGrid(val table: GeoArticleTable) {
     errprint("Percent non-empty cells: %g",
       num_non_empty_cells.toDouble / total_num_cells)
     val training_arts_with_word_counts =
-      table.num_word_count_articles_by_split("training").value
-    errprint("Training articles per non-empty cell: %g",
+      table.num_word_count_documents_by_split("training").value
+    errprint("Training documents per non-empty cell: %g",
       training_arts_with_word_counts.toDouble / num_non_empty_cells)
-    // Clear out the article distributions of the training set, since
+    // Clear out the document distributions of the training set, since
     // only needed when computing cells.
     //
     // FIXME: Could perhaps save more memory, or at least total memory used,
     // by never creating these distributions at all, but directly adding
     // them to the cells.  Would require a bit of thinking when reading
     // in the counts.
-    table.clear_training_article_distributions()
+    table.clear_training_document_distributions()
   }
 }
 
@@ -723,7 +723,7 @@ class MultiRegularCell(
 
   def describe_indices() = "%s,%s" format (index.latind, index.longind)
 
-  def iterate_articles() = {
+  def iterate_documents() = {
     val maxlatind = (
       (cell_grid.maximum_latind + 1) min
       (index.latind + cell_grid.width_of_multi_cell))
@@ -739,7 +739,7 @@ class MultiRegularCell(
     for {
       // The use of view() here in both iterators causes this iterable to
       // be lazy; hence the print statement below doesn't get executed until
-      // we actually process the articles in question.
+      // we actually process the documents in question.
       i <- (index.latind until maxlatind) view;
       rawj <- (index.longind until
         (index.longind + cell_grid.width_of_multi_cell)) view;
@@ -749,7 +749,7 @@ class MultiRegularCell(
           errprint("--> Processing tiling cell %s",
             cell_grid.cell_index_to_coord(index))
         }
-        cell_grid.tiling_cell_to_articles.getNoSet(RegularCellIndex(i, j))
+        cell_grid.tiling_cell_to_documents.getNoSet(RegularCellIndex(i, j))
       }
     } yield art
   }
@@ -759,7 +759,7 @@ class MultiRegularCell(
  * Grid composed of possibly-overlapping multi cells, based on an underlying
  * grid of regularly-spaced square cells tiling the earth.  The multi cells,
  * over which word distributions are computed for comparison with the word
- * distribution of a given article, are composed of NxN tiles, where possibly
+ * distribution of a given document, are composed of NxN tiles, where possibly
  * N > 1.
  *
  * FIXME: We should abstract out the concept of a grid composed of tiles and
@@ -776,7 +776,7 @@ class MultiRegularCell(
 class MultiRegularCellGrid(
   val degrees_per_cell: Double,
   val width_of_multi_cell: Int,
-  table: GeoArticleTable
+  table: DistDocumentTable
 ) extends CellGrid(table) {
 
   /**
@@ -813,11 +813,11 @@ class MultiRegularCellGrid(
    * [index*degrees_per_cell, (index+1)*degrees_per_cell).
    *
    * We don't just create an array because we expect many cells to have no
-   * articles in them, esp. as we decrease the cell size.  The idea is that
+   * documents in them, esp. as we decrease the cell size.  The idea is that
    * the cells provide a first approximation to the cells used to create the
-   * article distributions.
+   * document distributions.
    */
-  var tiling_cell_to_articles = bufmap[RegularCellIndex, GeoArticle]()
+  var tiling_cell_to_documents = bufmap[RegularCellIndex, DistDocument]()
 
   /**
    * Mapping from index of southwest corner of multi cell to corresponding
@@ -1005,9 +1005,9 @@ class MultiRegularCellGrid(
     }
   }
 
-  def add_article_to_cell(article: GeoArticle) {
-    val index = coord_to_tiling_cell_index(article.coord)
-    tiling_cell_to_articles(index) += article
+  def add_document_to_cell(document: DistDocument) {
+    val index = coord_to_tiling_cell_index(document.coord)
+    tiling_cell_to_documents(index) += document
   }
 
   protected def initialize_cells() {
@@ -1026,7 +1026,7 @@ class MultiRegularCellGrid(
     task.finish()
 
     // Save some memory by clearing this after it's not needed
-    tiling_cell_to_articles = null
+    tiling_cell_to_documents = null
   }
 
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false) = {
