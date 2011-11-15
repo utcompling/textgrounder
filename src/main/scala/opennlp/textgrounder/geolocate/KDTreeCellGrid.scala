@@ -50,13 +50,23 @@ class KdTreeCell(
   }
 }
 
-class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int)
+object KdTreeCellGrid {
+  def apply(table: DistDocumentTable, bucketSize: Int, splitMethod: String) : KdTreeCellGrid = {
+    new KdTreeCellGrid(table, bucketSize, splitMethod match {
+      case "halfway" => KdTree.SplitMethod.HALFWAY
+      case "median" => KdTree.SplitMethod.MEDIAN
+      case "maxmargin" => KdTree.SplitMethod.MAX_MARGIN
+    })
+  }
+}
+
+class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int, splitMethod: KdTree.SplitMethod)
     extends CellGrid(table) {
   /**
    * Total number of cells in the grid.
    */
   var total_num_cells: Int = 0
-  var kdtree : KdTree[DistDocument] = new KdTree[DistDocument](2, bucketSize);
+  var kdtree : KdTree[DistDocument] = new KdTree[DistDocument](2, bucketSize, splitMethod);
   val leaves_to_cell : Map[KdTree[DistDocument], KdTreeCell] = Map();
 
   /**

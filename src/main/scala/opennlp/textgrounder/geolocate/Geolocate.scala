@@ -945,6 +945,17 @@ Default %default.""")
 center calculation. Options are either 'centroid' or 'center'.
 Default '%default'.""")
 
+  var kd_split_method =
+    ap.option[String]("kd-split-method", "kdsm", metavar = "SPLIT_METHOD",
+      default = "halfway",
+      choices = Seq("halfway", "median", "maxmargin"),
+      help = """Chooses which leaf-splitting method to use. Valid options are
+'halfway', which splits into two leaves of equal degrees, 'median', which
+splits leaves to have an equal number of documents, and 'maxmargin',
+which splits at the maximum margin between two points. All splits are always
+on the longest dimension. Default '%default'.""")
+
+
 
   //// Options used when creating word distributions
   var word_dist =
@@ -1171,7 +1182,7 @@ abstract class GeolocateDriver extends
 
   protected def initialize_cell_grid(table: DistDocumentTable) = {
     if (params.use_kd_tree)
-      new KdTreeCellGrid(table, params.kd_bucketsize)
+      KdTreeCellGrid(table, params.kd_bucketsize, params.kd_split_method)
     else
       new MultiRegularCellGrid(degrees_per_cell,
         params.width_of_multi_cell, table)
