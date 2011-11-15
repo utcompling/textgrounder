@@ -95,13 +95,13 @@ public class KdTree<T> {
     public ArrayList<T> getData() {
         ArrayList<T> outData = new ArrayList<T>();
         if (data == null)
-        	return outData;
+            return outData;
         for (int i = 0; i < locationCount; i++) {
             // No way around the warning other than either to suppress it,
             // or not use Object[] arrays.
             @SuppressWarnings("unchecked")
             T suppress_warning = (T) data[i];
-        	outData.add(suppress_warning);
+            outData.add(suppress_warning);
         }
         return outData;
     }
@@ -126,15 +126,16 @@ public class KdTree<T> {
                 cursor.splitDimension = cursor.findWidestAxis();
                 //cursor.splitValue = (cursor.minLimit[cursor.splitDimension] + cursor.maxLimit[cursor.splitDimension]) * 0.5;
 
-								List<Double> list = new ArrayList<Double>();
-                for(int i=0;i<cursor.locations.length;i++)
-                	list.add(cursor.locations[i][cursor.splitDimension]);
+                List<Double> list = new ArrayList<Double>();
+                for(int i=0;i<cursor.locations.length;i++) {
+                    list.add(cursor.locations[i][cursor.splitDimension]);
+                }
                 Collections.sort(list);
-								if(list.size()%2 == 1)
-                	cursor.splitValue = list.get(list.size()/2);
-								else{
-                	cursor.splitValue = (list.get(list.size()/2) + list.get(list.size()/2 - 1))/2;
-								}
+                if(list.size()%2 == 1) {
+                    cursor.splitValue = list.get(list.size()/2);
+                } else {
+                    cursor.splitValue = (list.get(list.size()/2) + list.get(list.size()/2 - 1))/2;
+                }
 
                 // Never split on infinity or NaN
                 if (cursor.splitValue == Double.POSITIVE_INFINITY) {
@@ -264,20 +265,20 @@ public class KdTree<T> {
     }
 
     public List<KdTree<T>> getLeaves(){
-    	List<KdTree<T>> list = new ArrayList<KdTree<T>>();
-    	this.helper(list);
-    	return list;
+        List<KdTree<T>> list = new ArrayList<KdTree<T>>();
+        this.helper(list);
+        return list;
     }
     
     private void helper(List<KdTree<T>> list ){
-    	if(this.left == null && this.right==null)
-    		list.add(this);
-    	else{
-    		if(this.left != null)
-    			this.left.helper(list);
-    		if(this.right != null)
-    			this.right.helper(list);
-    	}
+        if(this.left == null && this.right==null)
+            list.add(this);
+        else{
+            if(this.left != null)
+                this.left.helper(list);
+            if(this.right != null)
+                this.right.helper(list);
+        }
     }
     
     
@@ -319,12 +320,12 @@ public class KdTree<T> {
         if (data == null)
             return "";
 
-    	String ret="";
-    	for(int i=0; i<this.locationCount;i++)
+        String ret="";
+        for(int i=0; i<this.locationCount;i++)
         {
-    		ret += this.data[i] + " ";
+            ret += this.data[i] + " ";
         }
-    	return ret;
+        return ret;
     }
     
     protected double getAxisWeightHint(int i) {

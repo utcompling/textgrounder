@@ -13,41 +13,41 @@ class KdTreeCell(
   cellgrid: KdTreeCellGrid,
   val kdleaf : KdTree[DistDocument]) extends RectangularCell(cellgrid) {
 
-    def get_northeast_coord () : Coord = {
-        new Coord(kdleaf.minLimit(0), kdleaf.minLimit(1))
-    }
-    
-    def get_southwest_coord () : Coord = {
-        new Coord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
-    }
-    
-    def iterate_documents () : Iterable[DistDocument] = {
-        kdleaf.getData()
-    }
+  def get_northeast_coord () : Coord = {
+    new Coord(kdleaf.minLimit(0), kdleaf.minLimit(1))
+  }
+  
+  def get_southwest_coord () : Coord = {
+    new Coord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
+  }
+  
+  def iterate_documents () : Iterable[DistDocument] = {
+    kdleaf.getData()
+  }
 
-    override def get_center_coord () = {
-      if (Args.kd_center_or_centroid == "center") {
-        // center method
-        super.get_center_coord
-      } else {
-        // centroid method
-        var sum_lat = 0.0
-        var sum_long = 0.0
-        for (art <- kdleaf.getData) {
-          sum_lat += art.coord.lat
-          sum_long += art.coord.long
-        }
-        Coord(sum_lat / kdleaf.size, sum_long / kdleaf.size)
+  override def get_center_coord () = {
+    if (Args.kd_center_or_centroid == "center") {
+      // center method
+      super.get_center_coord
+    } else {
+      // centroid method
+      var sum_lat = 0.0
+      var sum_long = 0.0
+      for (art <- kdleaf.getData) {
+        sum_lat += art.coord.lat
+        sum_long += art.coord.long
       }
+      Coord(sum_lat / kdleaf.size, sum_long / kdleaf.size)
     }
-    
-    def describe_indices () : String = {
-        "Placeholder"
-    }
-    
-    def describe_location () : String = {
-        get_boundary.toString
-    }
+  }
+  
+  def describe_indices () : String = {
+    "Placeholder"
+  }
+  
+  def describe_location () : String = {
+    get_boundary.toString
+  }
 }
 
 class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int)
@@ -64,14 +64,14 @@ class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int)
    * exists, return null.
    */
   def find_best_cell_for_coord(coord: Coord): KdTreeCell = {
-      leaves_to_cell(kdtree.getLeaf(Array(coord.lat, coord.long)))
+    leaves_to_cell(kdtree.getLeaf(Array(coord.lat, coord.long)))
   }
 
   /**
    * Add the given document to the cell grid.
    */
   def add_document_to_cell(document: DistDocument): Unit = {
-      kdtree.addPoint(Array(document.coord.lat, document.coord.long), document)
+    kdtree.addPoint(Array(document.coord.lat, document.coord.long), document)
   }
 
   /**
@@ -81,14 +81,14 @@ class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int)
    * this, `iter_nonempty_cells` should work properly.
    */
   def initialize_cells: Unit = {
-      total_num_cells = kdtree.getLeaves.size
-      num_non_empty_cells = total_num_cells
+    total_num_cells = kdtree.getLeaves.size
+    num_non_empty_cells = total_num_cells
 
-      for (leaf <- kdtree.getLeaves) {
-        val c = new KdTreeCell(this, leaf)
-        c.generate_dist
-        leaves_to_cell.update(leaf, c)
-      }
+    for (leaf <- kdtree.getLeaves) {
+      val c = new KdTreeCell(this, leaf)
+      c.generate_dist
+      leaves_to_cell.update(leaf, c)
+    }
   }
 
   /**
@@ -103,9 +103,9 @@ class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int)
    *   but have no corresponding word counts given in the counts file.)
    */
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[GeoCell] = {
-      for (leaf <- kdtree.getLeaves
-        if (leaf.size() > 0 || !nonempty_word_dist))
-          yield leaves_to_cell(leaf)
+    for (leaf <- kdtree.getLeaves
+      if (leaf.size() > 0 || !nonempty_word_dist))
+        yield leaves_to_cell(leaf)
   }
 }
 
