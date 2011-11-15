@@ -34,7 +34,7 @@ public class KdTree<T> {
     // All types
     private final int                  dimensions;
     private final KdTree<T>            parent;
-    private  int                       bucketSize;
+    private int                        bucketSize;
  
     // Leaf only
     private double[][]                 locations;
@@ -73,6 +73,7 @@ public class KdTree<T> {
      */
     private KdTree(KdTree<T> parent, boolean right) {
         this.dimensions = parent.dimensions;
+        this.bucketSize = parent.bucketSize;
  
         // Init as leaf
         this.locations = new double[Math.max(bucketSize, parent.locationCount)][];

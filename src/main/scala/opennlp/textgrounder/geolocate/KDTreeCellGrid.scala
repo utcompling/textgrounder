@@ -1,11 +1,13 @@
 package opennlp.textgrounder.geolocate
 
 import scala.collection.JavaConversions._
-import scala.collection.immutable.Map
+import scala.collection.mutable.Map
 
 import ags.utils.KdTree
 
 import opennlp.textgrounder.util.distances.Coord
+
+import GeolocateDriver.Args
 
 class KdTreeCell(
   cellgrid: KdTreeCellGrid,
@@ -21,6 +23,22 @@ class KdTreeCell(
     
     def iterate_documents () : Iterable[DistDocument] = {
         kdleaf.getData()
+    }
+
+    override def get_center_coord () = {
+      if (Args.kd_center_or_centroid == "center") {
+        // center method
+        super.get_center_coord
+      } else {
+        // centroid method
+        var sum_lat = 0.0
+        var sum_long = 0.0
+        for (art <- kdleaf.getData) {
+          sum_lat += art.coord.lat
+          sum_long += art.coord.long
+        }
+        Coord(sum_lat / kdleaf.size, sum_long / kdleaf.size)
+      }
     }
     
     def describe_indices () : String = {
@@ -39,13 +57,14 @@ class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int)
    */
   var total_num_cells: Int = 0
   var kdtree : KdTree[DistDocument] = new KdTree[DistDocument](2, bucketSize);
+  val leaves_to_cell : Map[KdTree[DistDocument], KdTreeCell] = Map();
 
   /**
    * Find the correct cell for the given coordinates.  If no such cell
    * exists, return null.
    */
   def find_best_cell_for_coord(coord: Coord): KdTreeCell = {
-      new KdTreeCell(this, kdtree.getLeaf(Array(coord.lat, coord.long)))
+      leaves_to_cell(kdtree.getLeaf(Array(coord.lat, coord.long)))
   }
 
   /**
@@ -63,6 +82,13 @@ class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int)
    */
   def initialize_cells: Unit = {
       total_num_cells = kdtree.getLeaves.size
+      num_non_empty_cells = total_num_cells
+
+      for (leaf <- kdtree.getLeaves) {
+        val c = new KdTreeCell(this, leaf)
+        c.generate_dist
+        leaves_to_cell.update(leaf, c)
+      }
   }
 
   /**
@@ -77,8 +103,9 @@ class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int)
    *   but have no corresponding word counts given in the counts file.)
    */
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[GeoCell] = {
-      for (leaf <- kdtree.getLeaves)
-          yield new KdTreeCell(this, leaf)
+      for (leaf <- kdtree.getLeaves
+        if (leaf.size() > 0 || !nonempty_word_dist))
+          yield leaves_to_cell(leaf)
   }
 }
 

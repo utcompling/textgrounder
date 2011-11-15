@@ -924,6 +924,28 @@ later versions.  In normal circumstances, the value is 1, i.e. use a single
 tiling cell to compute each multi cell.  If the value is more than
 1, the multi cells overlap.""")
 
+  //// Options for using KD trees, and related parameters
+  var use_kd_tree = 
+    ap.option[Boolean]("kd-tree", "kd", "kdtree", metavar = "BOOL", 
+      default = false,
+      help = """Specifies we should use a KD tree rather than uniform
+grid cell. Default %default.""")
+
+  var kd_bucketsize =
+    ap.option[Int]("kd-bucket-size", "kdbs", "bucket-size", default=200,
+      metavar = "INT",
+      help = """Bucket size before splitting a leaf into two children.
+Default %default.""")
+
+  var kd_center_or_centroid =
+    ap.option[String]("center-method", "cm", metavar = "CENTER_METHOD",
+      default = "centroid",
+      choices = Seq("centroid", "center"),
+      help = """Chooses whether to use center or centroid for cell
+center calculation. Options are either 'centroid' or 'center'.
+Default '%default'.""")
+
+
   //// Options used when creating word distributions
   var word_dist =
     ap.option[String]("word-dist", "wd",
@@ -1148,8 +1170,11 @@ abstract class GeolocateDriver extends
   }
 
   protected def initialize_cell_grid(table: DistDocumentTable) = {
-    new MultiRegularCellGrid(degrees_per_cell,
-      params.width_of_multi_cell, table)
+    if (params.use_kd_tree)
+      new KdTreeCellGrid(table, params.kd_bucketsize)
+    else
+      new MultiRegularCellGrid(degrees_per_cell,
+        params.width_of_multi_cell, table)
   }
 
   protected def initialize_word_dist_factory() = {
