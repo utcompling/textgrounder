@@ -1107,7 +1107,9 @@ abstract class GeolocateDriver extends
   /**
    * FileHandler object for this driver.
    */
-  val file_handler: FileHandler = new LocalFileHandler
+  private val local_file_handler = new LocalFileHandler
+
+  def get_file_handler: FileHandler = local_file_handler
 
   /**
    * Set the options to those as given.  NOTE: Currently, some of the
@@ -1161,17 +1163,17 @@ abstract class GeolocateDriver extends
   }
 
   protected def read_stopwords() = {
-    Stopwords.read_stopwords(file_handler, params.stopwords_file)
+    Stopwords.read_stopwords(get_file_handler, params.stopwords_file)
   }
 
   protected def read_documents(table: DistDocumentTable, stopwords: Set[String]) {
     for (fn <- Args.document_data_file)
-      table.read_document_data(file_handler, fn, cell_grid)
+      table.read_document_data(get_file_handler, fn, cell_grid)
 
     // Read in the words-counts file
     if (Args.counts_file.length > 0) {
       for (fn <- Args.counts_file)
-        word_dist_factory.read_word_counts(table, file_handler, fn, stopwords)
+        word_dist_factory.read_word_counts(table, get_file_handler, fn, stopwords)
       table.finish_word_counts()
     }
   }
@@ -1195,7 +1197,7 @@ abstract class GeolocateDriver extends
       val iterfiles =
         if (Args.eval_file.length > 0) Args.eval_file
         else Seq[String](null)
-      evalobj.evaluate_and_output_results(file_handler, iterfiles)
+      evalobj.evaluate_and_output_results(get_file_handler, iterfiles)
       (stratname, strategy, evalobj)
     }
   }
