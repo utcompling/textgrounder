@@ -56,7 +56,7 @@ fi
 
 geotext_output_dir="$TG_TWITTER_DIR/output-$docthresh-docthresh"
 geotext_prefix="$geotext_output_dir/geotext-twitter"
-twitter_args="--document-file $geotext_prefix-combined-article-data.txt --counts-file $geotext_prefix-counts-only-coord-articles.txt"
+twitter_args="--document-file $geotext_prefix-combined-document-data.txt --counts-file $geotext_prefix-counts-only-coord-documents.txt"
 wikipedia_args="--document-file $IN_COMBINED_DOCUMENT_DATA_FILE \
   --counts-file $IN_COORD_COUNTS_FILE"
 
