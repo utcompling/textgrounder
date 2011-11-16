@@ -26,7 +26,7 @@ class KdTreeCell(
   }
 
   override def get_center_coord () = {
-    if (Params.kd_center_or_centroid == "center") {
+    if (Params.center_method == "center") {
       // center method
       super.get_center_coord
     } else {

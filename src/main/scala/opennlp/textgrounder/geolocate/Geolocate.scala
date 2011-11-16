@@ -316,7 +316,7 @@ class DistDocumentTable(
       }
     }
 
-    GeoDocumentData.read_document_data_file(filehand, filename, process,
+    GeoDocumentData.read_document_file(filehand, filename, process,
       maxtime = Params.max_time_per_stage)
 
     for (x <- redirects) {
@@ -834,7 +834,7 @@ class GeolocateParameters(parser: ArgParser = null) extends
 a default list of English stopwords (stored in the TextGrounder distribution)
 is used.""")
 
-  var document_data_file =
+  var document_file =
     ap.multiOption[String]("a", "document-file",
       metavar = "FILE",
       help = """File containing info about documents.  Documents can be
@@ -925,19 +925,18 @@ tiling cell to compute each multi cell.  If the value is more than
 1, the multi cells overlap.""")
 
   //// Options for using KD trees, and related parameters
-  var use_kd_tree = 
-    ap.option[Boolean]("kd-tree", "kd", "kdtree", metavar = "BOOL", 
-      default = false,
+  var kd_tree = 
+    ap.option[Boolean]("kd-tree", "kd", "kdtree",
       help = """Specifies we should use a KD tree rather than uniform
-grid cell. Default %default.""")
+grid cell.""")
 
-  var kd_bucketsize =
+  var kd_bucket_size =
     ap.option[Int]("kd-bucket-size", "kdbs", "bucket-size", default=200,
       metavar = "INT",
       help = """Bucket size before splitting a leaf into two children.
 Default %default.""")
 
-  var kd_center_or_centroid =
+  var center_method =
     ap.option[String]("center-method", "cm", metavar = "CENTER_METHOD",
       default = "centroid",
       choices = Seq("centroid", "center"),
@@ -1175,7 +1174,7 @@ abstract class GeolocateDriver extends
     if (params.width_of_multi_cell <= 0)
       param_error("Width of multi cell must be positive")
 
-    need_seq(params.document_data_file, "document-file")
+    need_seq(params.document_file, "document-file")
   }
 
   protected def initialize_document_table(word_dist_factory: WordDistFactory) = {
@@ -1183,8 +1182,8 @@ abstract class GeolocateDriver extends
   }
 
   protected def initialize_cell_grid(table: DistDocumentTable) = {
-    if (params.use_kd_tree)
-      KdTreeCellGrid(table, params.kd_bucketsize, params.kd_split_method)
+    if (params.kd_tree)
+      KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method)
     else
       new MultiRegularCellGrid(degrees_per_cell,
         params.width_of_multi_cell, table)
@@ -1203,7 +1202,7 @@ abstract class GeolocateDriver extends
   }
 
   protected def read_documents(table: DistDocumentTable, stopwords: Set[String]) {
-    for (fn <- Params.document_data_file)
+    for (fn <- Params.document_file)
       table.read_document_data(get_file_handler, fn, cell_grid)
 
     // Read in the words-counts file

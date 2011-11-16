@@ -283,7 +283,7 @@ abstract class HadoopGeolocateApp(
        command-line arguments, because it participates in that process. */
     driver.set_job(job)
     initialize_hadoop_classes(job)
-    for (file <- params.document_data_file)
+    for (file <- params.document_file)
       FileInputFormat.addInputPath(job, new Path(file))
     FileOutputFormat.setOutputPath(job, new Path(params.outfile))
     if (job.waitForCompletion(true)) 0 else 1

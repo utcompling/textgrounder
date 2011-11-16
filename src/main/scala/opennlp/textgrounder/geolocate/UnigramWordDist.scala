@@ -237,7 +237,7 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
       // Change this if you want a different file name
       val wordcountdocs_filename = "wordcountdocs-combined-document-data.txt"
       stream = filehand.openw(wordcountdocs_filename)
-      // See write_document_data_file() in GeoDocument.scala
+      // See write_document_file() in GeoDocument.scala
       writer =
         new GeoDocumentWriter(stream, GeoDocumentData.combined_document_data_outfields)
       writer.output_header()

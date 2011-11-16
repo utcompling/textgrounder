@@ -84,7 +84,7 @@ object GeoDocumentData {
    *   (real time, not CPU time) used for reading in the file, for
    *   testing purposes.
    */
-  def read_document_data_file(filehand: FileHandler, filename: String,
+  def read_document_file(filehand: FileHandler, filename: String,
       process: Map[String,String] => Unit, maxtime: Double=0.0) = {
     errprint("Reading document data from %s...", filename)
     val task = new MeteredTask("document", "reading")
@@ -107,7 +107,7 @@ object GeoDocumentData {
     fields
   }
 
-  def write_document_data_file(outfile: PrintStream, outfields: Seq[String],
+  def write_document_file(outfile: PrintStream, outfields: Seq[String],
       documents: Iterable[GeoDocument]) {
     val writer = new GeoDocumentWriter(outfile, outfields)
     writer.output_header()
