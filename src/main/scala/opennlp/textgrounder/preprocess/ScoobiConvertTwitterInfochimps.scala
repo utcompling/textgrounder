@@ -71,7 +71,7 @@ The fields are:
  * Convert files in the Infochimps Twitter corpus into files in our format.
  */
 
-object ConvertTwitterInfochimps {
+object ScoobiConvertTwitterInfochimps {
 
   def usage() {
     sys.error("""Usage: ConvertTwitterInfochimps INFILE OUTDIR
