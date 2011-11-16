@@ -37,7 +37,9 @@ libraryDependencies ++= Seq(
   // Necessary because of a stupid bug in the Maven POM for Hadoop, which
   // leaves this out.  NOTE: Supposedly Hadoop originally used version 1.5.2.
   // If we get failures, set the version back to that.
-  "org.codehaus.jackson" % "jackson-mapper-asl" % "1.9.1"
+  "org.codehaus.jackson" % "jackson-mapper-asl" % "1.9.1",
+  // The following needed for Scoobi
+  "javassist" % "javassist" % "3.12.1.GA"
 //  Find repository for trove-scala; currently stored unmanaged
 //  "com.codahale" % "trove-scala_2.9.1" % "0.0.1-SNAPSHOT"
   )

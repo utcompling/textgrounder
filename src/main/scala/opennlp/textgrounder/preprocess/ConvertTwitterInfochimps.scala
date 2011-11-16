@@ -82,7 +82,7 @@ OUTDIR is the directory to store the results in.
 """)
   }
 
-  def main(args: Array[String]) = withHadoopArgs(args) { _ =>
+  def main(orig_args: Array[String]) = withHadoopArgs(orig_args) { args =>
     if (args.length != 2)
       usage()
     val infile = args(0)
@@ -104,9 +104,9 @@ OUTDIR is the directory to store the results in.
     }
     DList.persist (
       TextOutput.toTextFile(tweets.map(_._1),
-        "%s/twitter-infochimps-combined-document-data.txt" format outdir),
+        "%s-twitter-infochimps-combined-document-data.txt" format outdir),
       TextOutput.toTextFile(tweets.map(_._2),
-        "%s/twitter-infochimps-text-data.txt" format outdir)
+        "%s-twitter-infochimps-text-data.txt" format outdir)
     )
   }
 }
