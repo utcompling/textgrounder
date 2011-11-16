@@ -315,7 +315,7 @@ trait HadoopGeolocateParameters extends GeolocateParameters {
 variable (e.g. in Hadoop).""")
 
   var outfile =
-    ap.parameter[String]("outfile",
+    ap.positional[String]("outfile",
       help = """File to store evaluation results in.""")
 
 }
