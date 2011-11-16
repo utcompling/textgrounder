@@ -25,7 +25,7 @@ import java.io._
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.ioutil.errprint
 
-import GeolocateDriver.Args
+import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 import WordDist.memoizer._
 

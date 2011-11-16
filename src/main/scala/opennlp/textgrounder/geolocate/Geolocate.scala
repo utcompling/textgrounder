@@ -34,7 +34,7 @@ import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.textutil._
 
 import WordDist.memoizer._
-import GeolocateDriver.Args
+import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 
 /*
@@ -317,7 +317,7 @@ class DistDocumentTable(
     }
 
     GeoDocumentData.read_document_data_file(filehand, filename, process,
-      maxtime = Args.max_time_per_stage)
+      maxtime = Params.max_time_per_stage)
 
     for (x <- redirects) {
       val reddoc = lookup_document(x.redir)
@@ -335,7 +335,7 @@ class DistDocumentTable(
         if (doc.dist != null) {
           /* FIXME: Move this finish() earlier, and split into
              before/after global. */
-          doc.dist.finish(minimum_word_count = Args.minimum_word_count)
+          doc.dist.finish(minimum_word_count = Params.minimum_word_count)
           totaltoks += doc.dist.num_word_tokens
           numdocs += 1
         }
@@ -496,7 +496,7 @@ class MostPopularCellGeolocateDocumentStrategy(
 class CellDistMostCommonToponymGeolocateDocumentStrategy(
   cell_grid: CellGrid
 ) extends GeolocateDocumentStrategy(cell_grid) {
-  val cdist_factory = new CellDistFactory(Args.lru_cache_size)
+  val cdist_factory = new CellDistFactory(Params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
     // Look for a toponym, then a proper noun, then any word.
@@ -730,9 +730,9 @@ class NaiveBayesDocumentStrategy(
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
       if (use_baseline) {
-        if (Args.naive_bayes_weighting == "equal") (1.0, 1.0)
+        if (Params.naive_bayes_weighting == "equal") (1.0, 1.0)
         else {
-          val bw = Args.naive_bayes_baseline_weight.toDouble
+          val bw = Params.naive_bayes_baseline_weight.toDouble
           ((1.0 - bw) / word_dist.num_word_tokens, bw)
         }
       } else (1.0, 0.0))
@@ -750,7 +750,7 @@ class NaiveBayesDocumentStrategy(
 class AverageCellProbabilityStrategy(
   cell_grid: CellGrid
 ) extends GeolocateDocumentStrategy(cell_grid) {
-  val cdist_factory = new CellDistFactory(Args.lru_cache_size)
+  val cdist_factory = new CellDistFactory(Params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
     val celldist =
@@ -822,7 +822,7 @@ object Stopwords {
  *
  */
 class GeolocateParameters(parser: ArgParser = null) extends
-    ExperimentParameters(parser) {
+    ArgParserParameters(parser) {
   protected val ap =
     if (parser == null) new ArgParser("unknown") else parser
 
@@ -1129,8 +1129,8 @@ class DebugSettings {
  * console output.  See below.
  */
 abstract class GeolocateDriver extends
-    ExperimentDriver with ExperimentDriverStats {
-  override type ArgType <: GeolocateParameters
+    ArgParserExperimentDriver with ExperimentDriverStats {
+  override type ParamType <: GeolocateParameters
   var degrees_per_cell = 0.0
   var stopwords: Set[String] = _
   var cell_grid: CellGrid = _
@@ -1151,31 +1151,31 @@ abstract class GeolocateDriver extends
    *
    * @param options Object holding options to set
    */
-  def handle_parameters(args: ArgType) {
-    GeolocateDriver.Args = args
+  def handle_parameters() {
+    GeolocateDriver.Params = params
 
-    if (args.debug != null)
-      parse_debug_spec(args.debug)
+    if (params.debug != null)
+      parse_debug_spec(params.debug)
 
-    if (args.miles_per_cell < 0)
-      argerror("Miles per cell must be positive if specified")
-    if (args.km_per_cell < 0)
-      argerror("Kilometers per cell must be positive if specified")
-    if (args.degrees_per_cell < 0)
-      argerror("Degrees per cell must be positive if specified")
-    if (args.miles_per_cell > 0 && args.km_per_cell > 0)
-      argerror("Only one of --miles-per-cell and --km-per-cell can be given")
+    if (params.miles_per_cell < 0)
+      param_error("Miles per cell must be positive if specified")
+    if (params.km_per_cell < 0)
+      param_error("Kilometers per cell must be positive if specified")
+    if (params.degrees_per_cell < 0)
+      param_error("Degrees per cell must be positive if specified")
+    if (params.miles_per_cell > 0 && params.km_per_cell > 0)
+      param_error("Only one of --miles-per-cell and --km-per-cell can be given")
     degrees_per_cell =
-      if (args.miles_per_cell > 0)
-        args.miles_per_cell / miles_per_degree
-      else if (args.km_per_cell > 0)
-        args.km_per_cell / km_per_degree
+      if (params.miles_per_cell > 0)
+        params.miles_per_cell / miles_per_degree
+      else if (params.km_per_cell > 0)
+        params.km_per_cell / km_per_degree
       else
-        args.degrees_per_cell
-    if (args.width_of_multi_cell <= 0)
-      argerror("Width of multi cell must be positive")
+        params.degrees_per_cell
+    if (params.width_of_multi_cell <= 0)
+      param_error("Width of multi cell must be positive")
 
-    need_seq(args.document_data_file, "document-file")
+    need_seq(params.document_data_file, "document-file")
   }
 
   protected def initialize_document_table(word_dist_factory: WordDistFactory) = {
@@ -1203,12 +1203,12 @@ abstract class GeolocateDriver extends
   }
 
   protected def read_documents(table: DistDocumentTable, stopwords: Set[String]) {
-    for (fn <- Args.document_data_file)
+    for (fn <- Params.document_data_file)
       table.read_document_data(get_file_handler, fn, cell_grid)
 
     // Read in the words-counts file
-    if (Args.counts_file.length > 0) {
-      for (fn <- Args.counts_file)
+    if (Params.counts_file.length > 0) {
+      for (fn <- Params.counts_file)
         word_dist_factory.read_word_counts(table, get_file_handler, fn, stopwords)
       table.finish_word_counts()
     }
@@ -1231,18 +1231,16 @@ abstract class GeolocateDriver extends
       // evaluation loop work properly, we pretend like there's a single
       // eval file whose value is null.
       val iterfiles =
-        if (Args.eval_file.length > 0) Args.eval_file
+        if (Params.eval_file.length > 0) Params.eval_file
         else Seq[String](null)
       evalobj.evaluate_and_output_results(get_file_handler, iterfiles)
       (stratname, strategy, evalobj)
     }
   }
-
-  //def implement_run(args: ArgType): Seq[(String, StrategyType, EvaluationOutputter)]
 }
 
 object GeolocateDriver {
-  var Args: GeolocateParameters = _
+  var Params: GeolocateParameters = _
   val Debug: DebugSettings = new DebugSettings
 
   // Debug flags (from InternalGeolocateDocumentEvaluator) -- need to set them
@@ -1396,50 +1394,50 @@ strategies, since they require that --preserve-case-words be set internally.""")
 }
 
 // FUCK ME.  Have to make this abstract and GeolocateDocumentDriver a subclass
-// so that the ArgType can be overridden in HadoopGeolocateDocumentDriver.
+// so that the ParamType can be overridden in HadoopGeolocateDocumentDriver.
 abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
-  override type ArgType <: GeolocateDocumentParameters
+  override type ParamType <: GeolocateDocumentParameters
   type RunReturnType =
     Seq[(String, GeolocateDocumentStrategy, EvaluationOutputter)]
 
   var strategies: Seq[(String, GeolocateDocumentStrategy)] = _
 
-  override def handle_parameters(args: ArgType) {
-    super.handle_parameters(args)
+  override def handle_parameters() {
+    super.handle_parameters()
 
-    if (args.strategy contains "baseline") {
+    if (params.strategy contains "baseline") {
       var need_case = false
       var need_no_case = false
-      for (bstrat <- args.baseline_strategy) {
+      for (bstrat <- params.baseline_strategy) {
         if (bstrat.endsWith("most-common-toponym"))
           need_case = true
         else
           need_no_case = true
       }
       if (need_case) {
-        if (args.strategy.length > 1 || need_no_case) {
+        if (params.strategy.length > 1 || need_no_case) {
           // That's because we have to set --preserve-case-words, which we
           // generally don't want set for other strategies and which affects
           // the way we construct the training-document distributions.
-          argerror("Can't currently mix *-most-common-toponym baseline strategy with other strategies")
+          param_error("Can't currently mix *-most-common-toponym baseline strategy with other strategies")
         }
-        args.preserve_case_words = true
+        params.preserve_case_words = true
       }
     }
 
-    if (args.counts_file.length == 0)
-      argerror("Must specify counts file")
+    if (params.counts_file.length == 0)
+      param_error("Must specify counts file")
 
-    if (args.eval_format == "raw-text") {
+    if (params.eval_format == "raw-text") {
       // FIXME!!!!
-      argerror("Raw-text reading not implemented yet")
+      param_error("Raw-text reading not implemented yet")
     }
 
-    if (args.eval_format == "internal") {
-      if (args.eval_file.length > 0)
-        argerror("--eval-file should not be given when --eval-format=internal")
+    if (params.eval_format == "internal") {
+      if (params.eval_file.length > 0)
+        param_error("--eval-file should not be given when --eval-format=internal")
     } else
-      need_seq(args.eval_file, "eval-file", "evaluation file(s)")
+      need_seq(params.eval_file, "eval-file", "evaluation file(s)")
   }
 
   /**
@@ -1568,7 +1566,7 @@ trait StandaloneGeolocateDriverStats extends ExperimentDriverStats {
 
 class GeolocateDocumentDriver extends
     GeolocateDocumentTypeDriver with StandaloneGeolocateDriverStats {
-  override type ArgType = GeolocateDocumentParameters
+  override type ParamType = GeolocateDocumentParameters
 }
 
 abstract class GeolocateApp(appname: String) extends
@@ -1579,7 +1577,7 @@ abstract class GeolocateApp(appname: String) extends
 object GeolocateDocumentApp extends GeolocateApp("geolocate-document") {
   type DriverType = GeolocateDocumentDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class(ap: ArgParser) = new ArgType(ap)
+  def create_param_object(ap: ArgParser) = new ParamType(ap)
   def create_driver() = new DriverType()
 }
 

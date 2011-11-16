@@ -7,7 +7,7 @@ import ags.utils.KdTree
 
 import opennlp.textgrounder.util.distances.Coord
 
-import GeolocateDriver.Args
+import GeolocateDriver.Params
 
 class KdTreeCell(
   cellgrid: KdTreeCellGrid,
@@ -26,7 +26,7 @@ class KdTreeCell(
   }
 
   override def get_center_coord () = {
-    if (Args.kd_center_or_centroid == "center") {
+    if (Params.kd_center_or_centroid == "center") {
       // center method
       super.get_center_coord
     } else {

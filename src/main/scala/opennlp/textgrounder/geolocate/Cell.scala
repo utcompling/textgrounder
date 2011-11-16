@@ -31,7 +31,7 @@ import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.ioutil._
 
 import WordDist.memoizer._
-import GeolocateDriver.Args
+import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
@@ -98,7 +98,7 @@ class CellWordDist(val word_dist: WordDist) {
        training set. */
     if (doc.split == "training") {
       if (doc.dist == null) {
-        if (Args.max_time_per_stage == 0.0 && Args.num_training_docs == 0)
+        if (Params.max_time_per_stage == 0.0 && Params.num_training_docs == 0)
           warning("Saw document %s without distribution", doc)
       } else {
         assert(doc.dist.finished)
@@ -383,7 +383,7 @@ abstract class GeoCell(val cell_grid: CellGrid) {
         most_popular_document = doc
       }
     }
-    word_dist.finish(minimum_word_count = Args.minimum_word_count)
+    word_dist.finish(minimum_word_count = Params.minimum_word_count)
   }
 }
 

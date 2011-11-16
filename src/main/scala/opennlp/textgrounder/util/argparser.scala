@@ -105,10 +105,10 @@ import org.clapper.argot._
      the command line (or the default if no value was specified). (If called
      again *before* parsing, they simply return the default value, as before.)
 
-  2) A class, e.g. ProgArgs, is created to hold the values returned from
+  2) A class, e.g. ProgParams, is created to hold the values returned from
      the command line.  This class typically looks like this:
      
-     class ProgArgs(ap: ArgParser) {
+     class ProgParams(ap: ArgParser) {
        var outfile = ap.option[String]("outfile", "o", ...)
        var verbose = ap.flag("verbose", "v", ...)
        ...
@@ -117,15 +117,15 @@ import org.clapper.argot._
   3) To parse a command line, we proceed as follows:
 
      a) Create an ArgParser object.
-     b) Create an instance of ProgArgs, passing in the ArgParser object.
+     b) Create an instance of ProgParams, passing in the ArgParser object.
      c) Call `parse()` on the ArgParser object, to parse a command line.
-     d) Create *another* instance of ProgArgs, passing in the *same*
+     d) Create *another* instance of ProgParams, passing in the *same*
         ArgParser object.
      e) Now, the argument values specified on the command line can be
-        retrieved from this new instance of ProgArgs simply using field
+        retrieved from this new instance of ProgParams simply using field
         accesses, and new values can likewise be set using field accesses.
 
-  Note how this actually works.  When the first instance of ProgArgs is
+  Note how this actually works.  When the first instance of ProgParams is
   created, the initialization of the variables causes the arguments to be
   specified on the ArgParser -- and the variables have the default values
   of the arguments.  When the second instance is created, after parsing, and
@@ -133,7 +133,7 @@ import org.clapper.argot._
   the arguments have no effect, but now return the values specified on the
   command line.  Because these are declared as `var`, they can be freely
   re-assigned.  Furthermore, because no actual reflection or any such thing
-  is done, the above scheme will work completely fine if e.g. ProgArgs
+  is done, the above scheme will work completely fine if e.g. ProgParams
   subclasses another class that also declares some arguments (e.g. to
   abstract out common arguments for multiple applications).  In addition,
   there is no problem mixing and matching the scheme described here with the
@@ -242,11 +242,11 @@ package object argparser {
 
       val files =
         if (use_val)
-          Args.files
+          Params.files
         else
           Seq[String]()
 
-      This unifies to AnyRef, not Seq[String], even if Args.files wraps
+      This unifies to AnyRef, not Seq[String], even if Params.files wraps
       a Seq[String].
 
   (2) Calls to methods on the wrapped values (e.g. strings) can fail in
@@ -1161,9 +1161,9 @@ package object argparser {
   }
 }
 
-object TestArgs extends App {
+object TestArgParser extends App {
   import argparser._
-  class MyArgs(ap: ArgParser) {
+  class MyParams(ap: ArgParser) {
     /* An integer option named --foo, with a default value of 5.  Can also
        be specified using --spam or -f. */
     var foo = ap.option[Int]("foo", "spam", "f", default = 5,
@@ -1244,21 +1244,21 @@ of choices, including all aliases, is %allchoices.""")
   // This first call is necessary, even though it doesn't appear to do
   // anything.  In particular, this ensures that all arguments have been
   // defined on `ap` prior to parsing.
-  new MyArgs(ap)
+  new MyParams(ap)
   // ap.parse(List("--foo", "7"))
   ap.parse(args)
-  val Args = new MyArgs(ap)
+  val Params = new MyParams(ap)
   // Print out values of all arguments, whether options or positional.
   // Also print out types and default values.
   for (name <- ap.argNames)
     println("%30s: %s (%s) (default=%s)" format (
       name, ap(name), ap.getType(name), ap.defaultValue[Any](name)))
   // Examples of how to retrieve individual arguments
-  for (file <- Args.files)
+  for (file <- Params.files)
     println("Process file: %s" format file)
-  println("Maximum tick mark seen: %s" format (Args.tick max))
+  println("Maximum tick mark seen: %s" format (Params.tick max))
   // We can freely change the value of arguments if we want, since they're
   // just vars.
-  if (Args.daniel contains "upharsin")
-    Args.bar = "chingamos"
+  if (Params.daniel contains "upharsin")
+    Params.bar = "chingamos"
 }

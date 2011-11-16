@@ -27,7 +27,7 @@ import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.output_resource_usage
 
-import GeolocateDriver.Args
+import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 import WordDist.memoizer._
 
@@ -259,7 +259,7 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
       table.num_word_count_documents_by_split(doc.split) += 1
       // If we are evaluating on the dev set, skip the test set and vice
       // versa, to save memory and avoid contaminating the results.
-      if (doc.split != "training" && doc.split != Args.eval_set)
+      if (doc.split != "training" && doc.split != Params.eval_set)
         return
       // Don't train on test set
       doc.dist = create_populated_word_dist(keys_dynarr.array,
@@ -279,13 +279,13 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
           if (title != null)
             one_document_probs()
           // Stop if we've reached the maximum
-          if (task.item_processed(maxtime = Args.max_time_per_stage))
+          if (task.item_processed(maxtime = Params.max_time_per_stage))
             break
-          if ((Args.num_training_docs > 0 &&
-            task.num_processed >= Args.num_training_docs)) {
+          if ((Params.num_training_docs > 0 &&
+            task.num_processed >= Params.num_training_docs)) {
             errprint("")
             errprint("Stopping because limit of %s documents reached",
-              Args.num_training_docs)
+              Params.num_training_docs)
             break
           }
 
@@ -306,10 +306,10 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
           line match {
             case linere(xword, xcount) => {
               var word = xword
-              if (!Args.preserve_case_words) word = word.toLowerCase
+              if (!Params.preserve_case_words) word = word.toLowerCase
               val count = xcount.toInt
               if (!(stopwords contains word) ||
-                Args.include_stopwords_in_document_dists) {
+                Params.include_stopwords_in_document_dists) {
                 num_word_tokens += count
                 keys_dynarr += memoize_word(word)
                 values_dynarr += count
