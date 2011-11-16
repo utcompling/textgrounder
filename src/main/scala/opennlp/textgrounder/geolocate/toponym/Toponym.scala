@@ -1544,7 +1544,7 @@ class GeolocateToponymDriver extends
       /* FIXME!!! */
       assert(cell_grid.isInstanceOf[MultiRegularCellGrid])
       val gazetteer =
-        new WorldGazetteer(file_handler, params.gazetteer_file,
+        new WorldGazetteer(get_file_handler, params.gazetteer_file,
           cell_grid.asInstanceOf[MultiRegularCellGrid])
       // Bootstrapping issue: Creating the gazetteer requires that the
       // TopoDocumentTable already exist, but the TopoDocumentTable wants

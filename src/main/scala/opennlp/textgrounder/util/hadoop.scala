@@ -31,9 +31,8 @@ import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.ioutil._
 
 package object hadoop {
-  class HadoopFileHandler extends FileHandler {
+  class HadoopFileHandler(conf: Configuration) extends FileHandler {
     protected def get_file_system(filename: String) = {
-      val conf = new Configuration()
       FileSystem.get(URI.create(filename), conf)
     }
 

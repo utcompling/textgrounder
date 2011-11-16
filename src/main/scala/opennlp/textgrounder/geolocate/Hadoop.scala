@@ -330,7 +330,10 @@ trait BaseHadoopGeolocateDriver extends GeolocateDriver {
   /**
    * FileHandler object for this driver.
    */
-  override val file_handler = new HadoopFileHandler
+  private lazy val hadoop_file_handler =
+    new HadoopFileHandler(get_configuration)
+
+  override def get_file_handler: FileHandler = hadoop_file_handler
 
   override type ArgType <: HadoopGeolocateParameters
 
@@ -354,8 +357,11 @@ trait BaseHadoopGeolocateDriver extends GeolocateDriver {
 
   val local_counter_group = "textgrounder"
 
-  def get_task_id_from_job_context(jobcont: JobContext) =
-    jobcont.getConfiguration.getInt("mapred.task.partition", -1)
+  def get_job_context: JobContext
+
+  def get_configuration = get_job_context.getConfiguration
+
+  def get_task_id = get_configuration.getInt("mapred.task.partition", -1)
   
   /**
    * Find the Counter object for the given counter.
@@ -414,13 +420,10 @@ trait HadoopGeolocateDriver extends BaseHadoopGeolocateDriver {
     this.job = job
   }
 
-  def get_task_id = {
-    if (context != null)
-      get_task_id_from_job_context(context)
-    else if (job != null)
-      get_task_id_from_job_context(job)
-    else
-      need_to_set_context()
+  def get_job_context = {
+    if (context != null) context
+    else if (job != null) job
+    else need_to_set_context()
   }
 
   def find_split_counter(group: String, counter: String) = {
@@ -453,7 +456,7 @@ class DocumentEvaluationMapper extends
     import HadoopGeolocateConfiguration._
     import HadoopGeolocateDocumentApp.progname
 
-    val conf = context.getConfiguration()
+    val conf = context.getConfiguration
     val ap = new ArgParser(progname)
     // Initialize set of parameters in `ap`
     new HadoopGeolocateDocumentParameters(ap)
