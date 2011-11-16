@@ -283,9 +283,9 @@ abstract class HadoopGeolocateApp(
        command-line arguments, because it participates in that process. */
     driver.set_job(job)
     initialize_hadoop_classes(job)
-    for (file <- arg_holder.document_data_file)
+    for (file <- params.document_data_file)
       FileInputFormat.addInputPath(job, new Path(file))
-    FileOutputFormat.setOutputPath(job, new Path(arg_holder.outfile))
+    FileOutputFormat.setOutputPath(job, new Path(params.outfile))
     if (job.waitForCompletion(true)) 0 else 1
   }
 
@@ -335,12 +335,12 @@ trait BaseHadoopGeolocateDriver extends GeolocateDriver {
 
   override def get_file_handler: FileHandler = hadoop_file_handler
 
-  override type ArgType <: HadoopGeolocateParameters
+  override type ParamType <: HadoopGeolocateParameters
 
-  override def handle_parameters(args: ArgType) {
-    super.handle_parameters(args)
-    need(args.textgrounder_dir, "textgrounder-dir")
-    TextGrounderInfo.set_textgrounder_dir(args.textgrounder_dir)
+  override def handle_parameters() {
+    super.handle_parameters()
+    need(params.textgrounder_dir, "textgrounder-dir")
+    TextGrounderInfo.set_textgrounder_dir(params.textgrounder_dir)
   }
 
   /* Implementation of the driver statistics mix-in (ExperimentDriverStats)
@@ -466,8 +466,7 @@ class DocumentEvaluationMapper extends
     val params = new HadoopGeolocateDocumentParameters(ap)
     driver = new HadoopGeolocateDocumentDriver
     driver.set_task_context(context)
-    driver.params = params
-    driver.handle_parameters(params)
+    driver.set_parameters(params)
     driver.setup_for_run()
     evaluators =
       for ((stratname, strategy) <- driver.strategies)
@@ -539,14 +538,14 @@ class HadoopGeolocateDocumentParameters(
 
 class HadoopGeolocateDocumentDriver extends
     GeolocateDocumentTypeDriver with HadoopGeolocateDriver {
-  override type ArgType = HadoopGeolocateDocumentParameters
+  override type ParamType = HadoopGeolocateDocumentParameters
 }
 
 object HadoopGeolocateDocumentApp extends
     HadoopGeolocateApp("TextGrounder geolocate-document") {
   type DriverType = HadoopGeolocateDocumentDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class(ap: ArgParser) = new ArgType(ap)
+  def create_param_object(ap: ArgParser) = new ParamType(ap)
   def create_driver() = new DriverType()
 
   def initialize_hadoop_classes(job: Job) {

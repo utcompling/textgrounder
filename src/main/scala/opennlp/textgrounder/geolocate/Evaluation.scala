@@ -31,7 +31,7 @@ import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.textutil._
 
-import GeolocateDriver.Args
+import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
@@ -705,7 +705,7 @@ class DefaultEvaluationOutputter(
     val task = new MeteredTask("document", "evaluating")
     var last_elapsed = 0.0
     var last_processed = 0
-    var skip_initial = Args.skip_initial_test_docs
+    var skip_initial = Params.skip_initial_test_docs
     var skip_n = 0
 
     class EvaluationFileProcessor extends FileProcessor {
@@ -735,7 +735,7 @@ class DefaultEvaluationOutputter(
               skip_n -= 1
               do_skip = true
             } else
-              skip_n = Args.every_nth_test_doc - 1
+              skip_n = Params.every_nth_test_doc - 1
             if (do_skip)
               errprint("Passed over document %s", doctag)
             else {
@@ -749,11 +749,11 @@ class DefaultEvaluationOutputter(
             val new_processed = task.num_processed
 
             // If max # of docs reached, stop
-            if ((Args.num_test_docs > 0 &&
-              new_processed >= Args.num_test_docs)) {
+            if ((Params.num_test_docs > 0 &&
+              new_processed >= Params.num_test_docs)) {
               errprint("")
               errprint("Stopping because limit of %s documents reached",
-                Args.num_test_docs)
+                Params.num_test_docs)
               task.finish()
               return false
             }

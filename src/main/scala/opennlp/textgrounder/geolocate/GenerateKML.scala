@@ -71,12 +71,12 @@ low values more visible.  Possibilities are 'none' (no transformation),
 
 class GenerateKMLDriver extends
     GeolocateDriver with StandaloneGeolocateDriverStats {
-  type ArgType = GenerateKMLParameters
+  type ParamType = GenerateKMLParameters
   type RunReturnType = Null
 
-  override def handle_parameters(args: ArgType) {
-    super.handle_parameters(args)
-    need(args.kml_words, "kml-words")
+  override def handle_parameters() {
+    super.handle_parameters()
+    need(params.kml_words, "kml-words")
   }
 
   /**
@@ -107,7 +107,7 @@ Not generating an empty KML file.""", word)
 object GenerateKMLApp extends GeolocateApp("generate-kml") {
   type DriverType = GenerateKMLDriver
   // FUCKING TYPE ERASURE
-  def create_arg_class(ap: ArgParser) = new ArgType(ap)
+  def create_param_object(ap: ArgParser) = new ParamType(ap)
   def create_driver() = new DriverType()
 }
 
