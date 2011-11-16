@@ -466,6 +466,7 @@ class DocumentEvaluationMapper extends
     val params = new HadoopGeolocateDocumentParameters(ap)
     driver = new HadoopGeolocateDocumentDriver
     driver.set_task_context(context)
+    driver.params = params
     driver.handle_parameters(params)
     driver.setup_for_run()
     evaluators =
