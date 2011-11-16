@@ -62,22 +62,22 @@ putational Linguistics: Human Language Technologies},
 There are three main apps, each of which does a different task:
 
 1. Document geolocation.  This identifies the location of a document.
-   Training comes from "articles", which currently are described simply
-   by (smoothed) unigram distributions, i.e. counts of the words seen
-   in the article.  In addition, each article optionally can be tagged
-   with a location (specified as a pair of latitude/longitude values),
-   used for training and evaluation; some other per-article data exists
-   as well, much of it currently underused or not used at all.  The
-   articles themselves are often Wikipedia articles, but the source data
+   Training documents are currently described simply by (smoothed) unigram
+   or bigram distributions, i.e. counts of the words, or combinations of
+   two words, seen in the document.  In addition, each document optionally
+   can be tagged with a location (specified as a pair of latitude/longitude
+   values), used for training and evaluation; some other per-document data
+   exists as well, much of it currently underused or not used at all.  The
+   documents themselves are often Wikipedia articles, but the source data
    can come from anywhere (e.g. Twitter feeds, i.e. concatenation of all
-   tweets from a given user).  Evaluation is either on other articles
-   (with each article treated as a document) or on documents from some
-   other source, e.g. chapters from books stored in PCL-Travel format.
+   tweets from a given user).  Evaluation is either on documents from the
+   same source as the training documents, or from some other source, e.g.
+   chapters from books stored in PCL-Travel format.
 
 2. Toponym geolocation.  This disambiguates each toponym in a document,
    where a toponym is a word such as "London" or "Georgia" that refers
    to a geographic entity such as a city, state, province or country.
-   A statistical model is created from article data, as above, but a
+   A statistical model is created from document data, as above, but a
    gazetteer can also be used as an additional source of data listing
    valid toponyms.  Evaluation is either on the geographic names in a
    TR-CONLL corpus or links extracted from a Wikipedia article.
@@ -451,7 +451,7 @@ Set the baseline strategy to use for geolocating. (It's a separate
 argument because some strategies use a baseline strategy as a fallback,
 and in those cases, both the strategy and baseline strategy need to be
 given.) Sample strategies are `link-most-common-toponym` ("??" in the
-paper), `num-articles`  ("??" in the paper), and `random` ("Random" in
+paper), `num-documents`  ("??" in the paper), and `random` ("Random" in
 the paper).  You can specify multiple `--baseline-strategy` options,
 just like for `--strategy`.
 
@@ -499,14 +499,13 @@ results either directly or sorted by error distance:
 === Specifying data ===
 
 Data is specified in two main files, given with the options
-`--article-data-file` and `--counts-file`.  The article data file lists
-all of the articles to be processed and includes various pieces of data
-for each article, e.g. title, latitude/longitude coordinates, split
+`--document-file` and `--counts-file`.  The document file lists
+all of the documents to be processed and includes various pieces of data
+for each document, e.g. title, latitude/longitude coordinates, split
 (training, dev, test), number of incoming links (i.e. how many times is
-there a link to this article), etc.  The counts file gives word counts
-for each article, i.e. which word types occur in the article and how
-many times. (Note, the term "article" is used because of the focus on
-Wikipedia; but it should be seen as equivalent to "document".)
+there a link to this document, esp. in the case of Wikipedia articles), etc.
+The counts file gives word counts for each document, i.e. which word types
+occur in the document and how many times.
 
 Additional data files (which are automatically handled by the
 `tg-geolocate` script) are specified using `--stopwords-file` and
@@ -519,37 +518,37 @@ when doing toponym resolution (--mode=geotag-toponyms), and doesn't
 apply at all when doing the normal document resolution, as was done in
 the paper.
 
-The article data file is formatted as a simple database.  Each line is
-an entry (i.e. an article) and consists of a fixed number of fields,
+The document file is formatted as a simple database.  Each line is
+an entry (i.e. a document) and consists of a fixed number of fields,
 each separated by a tab character.  The first line gives the names of
 the fields.  Fields are accessed by name; hence, rearranging fields, and
 in most cases, omitting fields, is not a problem as long as the field
 names are correct.  The following is a list of the defined fields:
 
-  * `id`: The numeric ID of the article.  Can be arbitrary and currently
-  used only when printing out articles.  For Wikipedia articles, this
+  * `id`: The numeric ID of the document.  Can be arbitrary and currently
+  used only when printing out documents.  For Wikipedia articles, this
   corresponds to the internally-assigned ID.
 
-  * `title`: Title of the article.  Must be unique, and must be given
-  since it used to look up articles in the counts file.
+  * `title`: Title of the document.  Must be unique, and must be given
+  since it used to look up documents in the counts file.
 
   * `split`: One of the strings "training", "dev", "test".  Must be
   given.
 
-  * `redir`: If this article is a Wikipedia redirect article, this
-  specifies the title of the article redirected to; otherwise, blank.
+  * `redir`: If this document is a Wikipedia redirect article, this
+  specifies the title of the document redirected to; otherwise, blank.
   This field is not much used by the document-geotagging code (it is
   more important during toponym geotagging).  Its main use in document
-  geotagging is in computing the incoming link count of an article (see
+  geotagging is in computing the incoming link count of a document (see
   below).
 
-  * `namespace`: The Wikipedia namespace of the article.  Articles not
-  in the `Main` namespace have the namespace attached to the beginning
-  of the article name, followed by a colon (but not all articles with a
-  colon in them have a namespace prefix).  The main significance of this
-  field is that articles not in the `Main` namespace are ignored.  However,
-  this field can be omitted entirely, in which case all articles are
-  assumed to be in `Main`.
+  * `namespace`: For Wikipedia articles, the namespace of the article.
+  Articles not in the `Main` namespace have the namespace attached to
+  the beginning of the article name, followed by a colon (but not all
+  articles with a colon in them have a namespace prefix).  The main
+  significance of this field is that articles not in the `Main` namespace
+  are ignored.  For documents not from Wikipedia, this field should be
+  blank.
 
   * `is_list_of`, `is_disambig`, `is_list`: These fields should either
   have  the value of "yes" or "no".  These are Wikipedia-specific fields
@@ -559,17 +558,17 @@ names are correct.  The following is a list of the defined fields:
   categories as well as some others).  None of these fields are currently
   used.
 
-  * `coord`: Coordinates of an article, or blank.  If specified, the
+  * `coord`: Coordinates of a document, or blank.  If specified, the
   format is two floats separated by a comma, giving latitude and longitude,
   respectively (positive for north and east, negative for south and
   west).
 
   * `incoming_links`: Number of incoming links, or blank if unknown.
-  This specifies the number of links pointing to the article from anywhere
-  within Wikipedia.  This is primarily used as part of certain baselines
-  (`internal-link` and `link-most-common-toponym`).  Note that the actual
-  incoming link count of an article includes the incoming link counts
-  of any redirects to that article.
+  This specifies the number of links pointing to the document from anywhere
+  else.  This is primarily used as part of certain baselines (`internal-link`
+  and `link-most-common-toponym`).  Note that the actual incoming link count
+  of a Wikipedia article includes the incoming link counts of any redirects
+  to that article.
 
 The format of the counts file is like this:
 
@@ -592,8 +591,8 @@ urban = 5
 Madagascar = 5
 }}}
 
-Multiple articles should follow one directly after the other, with no
-blank lines.  The article ID is currently ignored entirely.  There is
+Multiple documents should follow one directly after the other, with no
+blank lines.  The document ID is currently ignored entirely.  There is
 no need for the words to be sorted by count (or in any other way); this
 is simply done here for ease in debugging.  Note also that, although the
 code that generates word counts currently ensures that no word has a
