@@ -26,163 +26,114 @@ import textutil._
 
 package object experiment {
   /**
-   * A general main application class for use in an application that performs
-   * experiments (currently used mostly for experiments in NLP -- i.e. natural
-   * language processing -- but not limited to this).  The program is assumed
-   * to have various parameters controlling its operation, some of which come
-   * from command-line arguments, some from constants hard-coded into the source
-   * code, some from environment variables or configuration files, some computed
-   * from other parameters, etc.  We divide them into two types: command-line
-   * (those coming from the command line) and ancillary (from any other source).
-   * Both types of parameters are output at the beginning of execution so that
-   * the researcher can see exactly which parameters this particular experiment
-   * was run with.
+   * A general experiment driver class for programmatic access to a program
+   * that runs experiments.
    *
-   * NOTE: Although in common parlance the terms "argument" and "parameter"
-   * are often synonymous, we make a clear distinction between the two.
-   * We speak of "parameters" in general when referring to general settings
-   * that control the operation of a program, and "command-line arguments"
-   * when referring specifically to parameter setting controlled by arguments
-   * specified in the command-line invocation of a program.  The latter can
-   * be either "options" (specified as e.g. '--outfile myfile.txt') or
-   * "positional arguments" (e.g. the arguments 'somefile.txt' and 'myfile.txt'
-   * in the command 'cp somefile.txt myfile.txt').  Although command-line
-   * arguments are one way of specifying parameters, parameters could also
-   * come from environment variables, from a file containing program settings,
-   * from the arguments to a function if the program is invoked through a
-   * function call, etc.
+   * Basic operation:
    *
-   * The general operation of this class is as follows:
+   * 1. Create an instance of a class of type ParamType (which is determined
+   *    by the particular driver implementation) and populate it with the
+   *    appropriate parameters.
+   * 2. Call `run()`, passing in the parameter object created in the previous
+   *    step.  The return value (of type RunReturnType, again determined by
+   *    the particular implementation) contains the results.
    *
-   * (1) The command line is passed in, and we parse it.  Command-line parsing
-   *     uses the ArgParser class.  We use "field-style" access to the
-   *     arguments retrieved from the command line; this means that there is
-   *     a separate class taking the ArgParser as a construction parameter,
-   *     and containing vars, one per argument, each initialized using a
-   *     method call on the ArgParser that sets up all the features of that
-   *     particular argument.
-   * (2) Application verifies the parsed arguments passed in and initializes
-   *     its parameters based on the parsed arguments and possibly other
-   *     sources.
-   * (3) Application is run.
+   * NOTE: Some driver implementations may change the values of some of the
+   * parameters recorded in the parameter object (particularly to
+   * canonicalize them).
    *
-   * A particular application customizes things as follows:
+   * Note that `run()` is actually a convenience method that does three steps:
    *
-   * (1) Consistent with "field-style" access, it creates a class that will
-   *     hold the user-specified values of command-line arguments, and also
-   *     initializes the ArgParser with the list of allowable arguments,
-   *     types, default values, etc. `ParamType` is the type of this class,
-   *     and `create_param_object` must be implemented to create an instance
-   *     of this class.
-   * (2) `initialize_parameters` must be implemented to handle validation
-   *     of the command-line arguments and retrieval of any other parameters.
-   * (3) `run_program` must, of course, be implemented, to provide the
-   *     actual behavior of the application.
+   * 1. `set_parameters`, which notes the parameters passed in and verifies
+   *    that their values are good.
+   * 2. `setup_for_run`, which does any internal setup necessary for
+   *    running the experiment (e.g. reading files, creating internal
+   *    structures).
+   * 3. `run_after_setup`, which executes the experiment.
+   *
+   * These three steps have been split out because some applications may need
+   * to access each step separately, or override some but not others.  For
+   * example, to add Hadoop support to an application, `run_after_setup`
+   * might need to be replaced with a different implementation based on the
+   * MapReduce framework, while the other steps might stay more or less the
+   * same.
    */
 
-  /* SCALABUG: If this param isn't declared with a 'val', we get an error
-     below on the line creating ArgParser when trying to access progname,
-     saying "no such field". */
-  abstract class ExperimentApp(val progname: String) {
-    val beginning_time = curtimesecs()
-
-    // Things that must be implemented
-
-    /**
-     * Class holding the declarations and received values of the command-line
-     * arguments.  Needs to have an ArgParser object passed in to it, typically
-     * as a constructor parameter.
-     */
+  abstract class ExperimentDriver {
     type ParamType
-
-    /**
-     * Function to create an ParamType, passing in the value of `arg_parser`.
-     */
-    def create_param_object(ap: ArgParser): ParamType
-
-    /**
-     * Function to initialize and verify internal parameters from command-line
-     * arguments and other sources.
-     */
-    def initialize_parameters()
-
-    /**
-     * Function to run the actual app, after parameters have been set.
-     * @return Exit code of program (0 for successful completion, > 0 for
-     *  an error
-     */
-    def run_program(): Int
-
-    // Things that may be overridden
-
-    /**
-     * Output the values of "ancillary" parameters (see above)
-     */
-    def output_ancillary_parameters() {}
-
-    /**
-     * Output the values of "command-line" parameters (see above)
-     */
-    def output_command_line_parameters() {
-      errprint("Parameter values:")
-      for (name <- arg_parser.argNames) {
-        errprint("%30s: %s", name, arg_parser(name))
-        //errprint("%30s: %s", name, arg_parser.getType(name))
-      }
-      errprint("")
-    }
-
-    /**
-     * An instance of ArgParser, for parsing options
-     */
-    val arg_parser = new ArgParser(progname)
-
-    /**
-     * A class for holding the parameters retrieved from the command-line
-     * arguments and elsewhere ("ancillary parameters"; see above).  Note
-     * that the parameters that originate in command-line arguments are
-     * also stored in the ArgParser object; this class provides easy access
-     * to those parameters through the preferred "field-style" paradigm
-     * of the ArgParser, and also holds the ancillary parameters (if any).
-     */
+    type RunReturnType
     var params: ParamType = _
 
     /**
-     * Code to implement main entrance point.  We move this to a separate
-     * function because a subclass might want to wrap the program entrance/
-     * exit (e.g. a Hadoop driver).
-     *
-     * @param args Command-line arguments, as specified by user
-     * @return Exit code, typically 0 for successful completion,
-     *   positive for errorThis needs to be called explicitly from the
+     * Signal a parameter error.
      */
-    def implement_main(args: Array[String]) = {
-      set_stdout_stderr_utf_8()
-      errprint("Beginning operation at %s" format humandate_full(beginning_time))
-      errprint("Arguments: %s" format (args mkString " "))
-      val shadow_fields = create_param_object(arg_parser)
-      arg_parser.parse(args)
-      params = create_param_object(arg_parser)
-      initialize_parameters()
-      output_command_line_parameters()
-      output_ancillary_parameters()
-      val retval = run_program()
-      val ending_time = curtimesecs()
-      errprint("Ending operation at %s" format humandate_full(ending_time))
-      errprint("Program running time: %s",
-        format_minutes_seconds(ending_time - beginning_time))
-      retval
+    def param_error(string: String) {
+      throw new IllegalArgumentException(string)
     }
 
-    /**
-     * Actual entrance point from the JVM.  Does nothing but call
-     * `implement_main`, then call `System.exit()` with the returned exit code.
-     * @see #implement_main
-     */
-    def main(args: Array[String]) {
-      val retval = implement_main(args)
-      System.exit(retval)
+    protected def param_needed(param: String, param_english: String = null) {
+      val mparam_english =
+        if (param_english == null)
+          param.replace("-", " ")
+        else
+          param_english
+      param_error("Must specify %s using --%s" format
+        (mparam_english, param.replace("_", "-")))
     }
+
+    protected def need_seq(value: Seq[String], param: String,
+        param_english: String = null) {
+      if (value.length == 0)
+        param_needed(param, param_english)
+    }
+
+    protected def need(value: String, param: String,
+        param_english: String = null) {
+      if (value == null || value.length == 0)
+        param_needed(param, param_english)
+    }
+
+    def set_parameters(params: ParamType) {
+      this.params = params
+      handle_parameters()
+    }
+
+    def run(params: ParamType) = {
+      set_parameters(params)
+      setup_for_run()
+      run_after_setup()
+    }
+
+    /********************************************************************/
+    /*                 Function to override below this line             */
+    /********************************************************************/
+
+    /**
+     * Verify and canonicalize the parameters passed in.  Retrieve any other
+     * parameters from the environment.  NOTE: Currently, some of the
+     * fields in this structure will be changed (canonicalized).  See above.
+     * If parameter values are illegal, an error will be signaled.
+     */
+
+    protected def handle_parameters()
+
+    /**
+     * Do any setup before actually implementing the experiment.  This
+     * may mean, for example, loading files and creating any needed
+     * structures.
+     */
+
+    def setup_for_run()
+
+    /**
+     * Actually run the experiment.  We have separated out the run process
+     * into three steps because we might want to replace one of the
+     * components in a sub-implementation of an experiment. (For example,
+     * if we implement a Hadoop version of an experiment, typically we need
+     * to replace the run_after_setup component but leave the others.)
+     */
+
+    def run_after_setup(): RunReturnType
   }
 
   /**
@@ -396,114 +347,163 @@ package object experiment {
   }
 
   /**
-   * A general experiment driver class for programmatic access to a program
-   * that runs experiments.
+   * A general main application class for use in an application that performs
+   * experiments (currently used mostly for experiments in NLP -- i.e. natural
+   * language processing -- but not limited to this).  The program is assumed
+   * to have various parameters controlling its operation, some of which come
+   * from command-line arguments, some from constants hard-coded into the source
+   * code, some from environment variables or configuration files, some computed
+   * from other parameters, etc.  We divide them into two types: command-line
+   * (those coming from the command line) and ancillary (from any other source).
+   * Both types of parameters are output at the beginning of execution so that
+   * the researcher can see exactly which parameters this particular experiment
+   * was run with.
    *
-   * Basic operation:
+   * NOTE: Although in common parlance the terms "argument" and "parameter"
+   * are often synonymous, we make a clear distinction between the two.
+   * We speak of "parameters" in general when referring to general settings
+   * that control the operation of a program, and "command-line arguments"
+   * when referring specifically to parameter setting controlled by arguments
+   * specified in the command-line invocation of a program.  The latter can
+   * be either "options" (specified as e.g. '--outfile myfile.txt') or
+   * "positional arguments" (e.g. the arguments 'somefile.txt' and 'myfile.txt'
+   * in the command 'cp somefile.txt myfile.txt').  Although command-line
+   * arguments are one way of specifying parameters, parameters could also
+   * come from environment variables, from a file containing program settings,
+   * from the arguments to a function if the program is invoked through a
+   * function call, etc.
    *
-   * 1. Create an instance of a class of type ParamType (which is determined
-   *    by the particular driver implementation) and populate it with the
-   *    appropriate parameters.
-   * 2. Call `run()`, passing in the parameter object created in the previous
-   *    step.  The return value (of type RunReturnType, again determined by
-   *    the particular implementation) contains the results.
+   * The general operation of this class is as follows:
    *
-   * NOTE: Some driver implementations may change the values of some of the
-   * parameters recorded in the parameter object (particularly to
-   * canonicalize them).
+   * (1) The command line is passed in, and we parse it.  Command-line parsing
+   *     uses the ArgParser class.  We use "field-style" access to the
+   *     arguments retrieved from the command line; this means that there is
+   *     a separate class taking the ArgParser as a construction parameter,
+   *     and containing vars, one per argument, each initialized using a
+   *     method call on the ArgParser that sets up all the features of that
+   *     particular argument.
+   * (2) Application verifies the parsed arguments passed in and initializes
+   *     its parameters based on the parsed arguments and possibly other
+   *     sources.
+   * (3) Application is run.
    *
-   * Note that `run()` is actually a convenience method that does three steps:
+   * A particular application customizes things as follows:
    *
-   * 1. `set_parameters`, which notes the parameters passed in and verifies
-   *    that their values are good.
-   * 2. `setup_for_run`, which does any internal setup necessary for
-   *    running the experiment (e.g. reading files, creating internal
-   *    structures).
-   * 3. `run_after_setup`, which executes the experiment.
-   *
-   * These three steps have been split out because some applications may need
-   * to access each step separately, or override some but not others.  For
-   * example, to add Hadoop support to an application, `run_after_setup`
-   * might need to be replaced with a different implementation based on the
-   * MapReduce framework, while the other steps might stay more or less the
-   * same.
+   * (1) Consistent with "field-style" access, it creates a class that will
+   *     hold the user-specified values of command-line arguments, and also
+   *     initializes the ArgParser with the list of allowable arguments,
+   *     types, default values, etc. `ParamType` is the type of this class,
+   *     and `create_param_object` must be implemented to create an instance
+   *     of this class.
+   * (2) `initialize_parameters` must be implemented to handle validation
+   *     of the command-line arguments and retrieval of any other parameters.
+   * (3) `run_program` must, of course, be implemented, to provide the
+   *     actual behavior of the application.
    */
 
-  abstract class ExperimentDriver {
+  /* SCALABUG: If this param isn't declared with a 'val', we get an error
+     below on the line creating ArgParser when trying to access progname,
+     saying "no such field". */
+  abstract class ExperimentApp(val progname: String) {
+    val beginning_time = curtimesecs()
+
+    // Things that must be implemented
+
+    /**
+     * Class holding the declarations and received values of the command-line
+     * arguments.  Needs to have an ArgParser object passed in to it, typically
+     * as a constructor parameter.
+     */
     type ParamType
-    type RunReturnType
+
+    /**
+     * Function to create an ParamType, passing in the value of `arg_parser`.
+     */
+    def create_param_object(ap: ArgParser): ParamType
+
+    /**
+     * Function to initialize and verify internal parameters from command-line
+     * arguments and other sources.
+     */
+    def initialize_parameters()
+
+    /**
+     * Function to run the actual app, after parameters have been set.
+     * @return Exit code of program (0 for successful completion, > 0 for
+     *  an error
+     */
+    def run_program(): Int
+
+    // Things that may be overridden
+
+    /**
+     * Output the values of "ancillary" parameters (see above)
+     */
+    def output_ancillary_parameters() {}
+
+    /**
+     * Output the values of "command-line" parameters (see above)
+     */
+    def output_command_line_parameters() {
+      errprint("Parameter values:")
+      for (name <- arg_parser.argNames) {
+        errprint("%30s: %s", name, arg_parser(name))
+        //errprint("%30s: %s", name, arg_parser.getType(name))
+      }
+      errprint("")
+    }
+
+    /**
+     * An instance of ArgParser, for parsing options
+     */
+    val arg_parser = new ArgParser(progname)
+
+    /**
+     * A class for holding the parameters retrieved from the command-line
+     * arguments and elsewhere ("ancillary parameters"; see above).  Note
+     * that the parameters that originate in command-line arguments are
+     * also stored in the ArgParser object; this class provides easy access
+     * to those parameters through the preferred "field-style" paradigm
+     * of the ArgParser, and also holds the ancillary parameters (if any).
+     */
     var params: ParamType = _
 
     /**
-     * Signal a parameter error.
+     * Code to implement main entrance point.  We move this to a separate
+     * function because a subclass might want to wrap the program entrance/
+     * exit (e.g. a Hadoop driver).
+     *
+     * @param args Command-line arguments, as specified by user
+     * @return Exit code, typically 0 for successful completion,
+     *   positive for errorThis needs to be called explicitly from the
      */
-    def param_error(string: String) {
-      throw new IllegalArgumentException(string)
+    def implement_main(args: Array[String]) = {
+      set_stdout_stderr_utf_8()
+      errprint("Beginning operation at %s" format humandate_full(beginning_time))
+      errprint("Arguments: %s" format (args mkString " "))
+      val shadow_fields = create_param_object(arg_parser)
+      arg_parser.parse(args)
+      params = create_param_object(arg_parser)
+      initialize_parameters()
+      output_command_line_parameters()
+      output_ancillary_parameters()
+      val retval = run_program()
+      val ending_time = curtimesecs()
+      errprint("Ending operation at %s" format humandate_full(ending_time))
+      errprint("Program running time: %s",
+        format_minutes_seconds(ending_time - beginning_time))
+      retval
     }
-
-    protected def param_needed(param: String, param_english: String = null) {
-      val mparam_english =
-        if (param_english == null)
-          param.replace("-", " ")
-        else
-          param_english
-      param_error("Must specify %s using --%s" format
-        (mparam_english, param.replace("_", "-")))
-    }
-
-    protected def need_seq(value: Seq[String], param: String,
-        param_english: String = null) {
-      if (value.length == 0)
-        param_needed(param, param_english)
-    }
-
-    protected def need(value: String, param: String,
-        param_english: String = null) {
-      if (value == null || value.length == 0)
-        param_needed(param, param_english)
-    }
-
-    def set_parameters(params: ParamType) {
-      this.params = params
-      handle_parameters()
-    }
-
-    def run(params: ParamType) = {
-      set_parameters(params)
-      setup_for_run()
-      run_after_setup()
-    }
-
-    /********************************************************************/
-    /*                 Function to override below this line             */
-    /********************************************************************/
 
     /**
-     * Verify and canonicalize the parameters passed in.  Retrieve any other
-     * parameters from the environment.  NOTE: Currently, some of the
-     * fields in this structure will be changed (canonicalized).  See above.
-     * If parameter values are illegal, an error will be signaled.
+     * Actual entrance point from the JVM.  Does nothing but call
+     * `implement_main`, then call `System.exit()` with the returned exit code.
+     * @see #implement_main
      */
-
-    protected def handle_parameters()
-
-    /**
-     * Do any setup before actually implementing the experiment.  This
-     * may mean, for example, loading files and creating any needed
-     * structures.
-     */
-
-    def setup_for_run()
-
-    /**
-     * Actually run the experiment.  We have separated out the run process
-     * into three steps because we might want to replace one of the
-     * components in a sub-implementation of an experiment. (For example,
-     * if we implement a Hadoop version of an experiment, typically we need
-     * to replace the run_after_setup component but leave the others.)
-     */
-
-    def run_after_setup(): RunReturnType
+    def main(args: Array[String]) {
+      val retval = implement_main(args)
+      System.exit(retval)
+    }
   }
 
   /**
@@ -555,6 +555,9 @@ package object experiment {
    * `create_driver` and `create_param_object`. (The latter two functions will
    * be largely boilerplate, and are only needed at all because of type
    * erasure in Java.)
+   *
+   * FIXME: It's not clear that the separation between ExperimentApp and
+   * ExperimentDriverApp is really worthwhile.  If not, merge the two.
    */
 
   abstract class ExperimentDriverApp(appname: String) extends
