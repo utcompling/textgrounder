@@ -16,7 +16,7 @@
 
 package opennlp.textgrounder.preprocess
 
-import java.util.zip.GZIPInputStream
+import java.io.InputStream
 
 import org.apache.commons.lang3.StringEscapeUtils._
 
@@ -54,9 +54,12 @@ The fields are:
 15) Empty?
 16) Empty?
 17) Empty?
+18) Empty?
 
 
-3) We want to convert each to two files: (1) containing the article-data 
+3) We want to convert each to two files: one containing the article-data,
+   one containing the text.  We can later convert the text to unigram counts,
+   bigram counts, etc.
 
 */
 
@@ -64,139 +67,61 @@ The fields are:
 //                                  Main code                              //
 /////////////////////////////////////////////////////////////////////////////
 
-/**
- * Class retrieving command-line arguments or storing programmatic
- * configuration parameters.
- *
- * @param parser If specified, should be a parser for retrieving the
- *   value of command-line arguments from the command line.  Provided
- *   that the parser has been created and initialized by creating a
- *   previous instance of this same class with the same parser (a
- *   "shadow field" class), the variables below will be initialized with
- *   the values given by the user on the command line.  Otherwise, they
- *   will be initialized with the default values for the parameters.
- *   Because they are vars, they can be freely set to other values.
- *
- */
-class ConvertTwitterInfochimpsParameters(parser: ArgParser) extends
-    ArgParserParameters(parser) {
-  protected val ap = parser
-
-  var output_dir =
-    ap.option[String]("o", "output-dir",
-      metavar = "DIR",
-      help = """Directory to store output files in.""")
-
-  var files =
-    ap.multiPositional[String]("infile",
-      help = """File(s) to process for input.""")
-}
-
-/**
- * Base class for programmatic access to document/etc. geolocation.
- * Subclasses are for particular apps, e.g. GeolocateDocumentDriver for
- * document-level geolocation.
- *
- * NOTE: Currently the code has some values stored in singleton objects,
- * and no clear provided interface for resetting them.  This basically
- * means that there can be only one geolocation instance per JVM.
- * By now, most of the singleton objects have been removed, and it should
- * not be difficult to remove the final limitations so that multiple
- * drivers per JVM (possibly not at the same time) can be done.
- *
- * Basic operation:
- *
- * 1. Create an instance of the appropriate subclass of GeolocateParameters
- * (e.g. GeolocateDocumentParameters for document geolocation) and populate
- * it with the appropriate parameters.  Don't pass in any ArgParser instance,
- * as is the default; that way, the parameters will get initialized to their
- * default values, and you only have to change the ones you want to be
- * non-default.
- * 2. Call run(), passing in the instance you just created.
- *
- * NOTE: Currently, some of the fields of the GeolocateParameters-subclass
- * are changed to more canonical values.  If this is a problem, let me
- * know and I'll fix it.
- *
- * Evaluation output is currently written to standard error, and info is
- * also returned by the run() function.  There are some scripts to parse the
- * console output.  See below.
- */
-class ConvertTwitterInfochimpsDriver extends ArgParserExperimentDriver {
-  type ParamType = ConvertTwitterInfochimpsParameters
-  type RunReturnType = Unit
-
-  val filehand = new LocalFileHandler
+class ConvertTwitterInfochimpsDriver extends ProcessFilesDriver {
+  type ParamType = ProcessFilesParameters
   
   def usage() {
-    sys.error("""Usage: ConvertTwitterInfochimps INFILE OUTDIR
+    sys.error("""Usage: ConvertTwitterInfochimps [-o OUTDIR | --outfile OUTDIR] INFILE ...
 
 Convert input files in the Infochimps Twitter corpus into files in the
-format expected by TextGrounder.  INFILE is a single file or a glob.
-OUTDIR is the directory to store the results in.
+format expected by TextGrounder.  OUTDIR is the directory to store the
+results in, which must not exist already.
 """)
   }
 
-  def handle_parameters() {
-    need(params.output_dir, "output-dir")
-    if (!filehand.is_directory(params.output_dir))
-      param_error("Output dir %s need to name an existing directory" format
-        params.output_dir)
-  }
-
-  def setup_for_run() { }
-
-  def run_after_setup() {
-
+  override def run_after_setup() {
     val fields = List("id", "title", "split", "coord", "time",
       "username", "userid", "reply_username", "reply_userid", "anchor", "lang")
+    // FIXME: Output fields as a schema file
+    super.run_after_setup()
+  }
 
-    for (file <- params.files) {
-      val task = new MeteredTask("tweet", "parsing")
-      errprint("Processing %s..." format file)
-      var (_, outname) = filehand.split_filename(file)
-      val raw_instream = filehand.get_input_stream(file)
-      val instream = {
-        if (file.endsWith(".gz")) {
-          outname = outname.stripSuffix(".gz")
-          new GZIPInputStream(raw_instream)
-        } else
-          raw_instream
-      }
-      errprint("Processing %s..." format file)
-      val out_metadata_name =
-        "%s/%s-combined-document-data.txt" format (params.output_dir, outname)
-      val out_text_name = "%s/%s-text.txt" format (params.output_dir, outname)
-      errprint("Metadata output file is %s..." format out_metadata_name)
-      errprint("Text output file is %s..." format out_text_name)
-      val outstream_metadata = filehand.openw(out_metadata_name)
-      val outstream_text = filehand.openw(out_text_name)
-      var lineno = 0
-      for (line <- new FileIterator(instream)) {
-        lineno += 1
-        line.split("\t", -1).toList match {
-          case id :: time :: userid :: username :: _ ::
-              reply_username :: reply_userid :: _ :: text :: anchor :: lang ::
-              lat :: long :: _ :: _ :: _ :: _ => {
-            val metadata = List(id, id, "training", "%s,%s" format (lat, long),
-              time, username, userid, reply_username, reply_userid, anchor,
-              lang)
-            outstream_metadata.println(metadata mkString "\t")
-            val rawtext = unescapeHtml4(unescapeXml(text))
-            val splittext = Twokenize(rawtext)
-            val textdata = List(id, id, splittext mkString " ")
-            outstream_text.println(textdata mkString "\t")
-          }
-          case _ => {
-            errprint("Bad line #%d: %s" format (lineno, line))
-          }
+  def process_one_file(lines: Iterator[String], outname: String) {
+    val task = new MeteredTask("tweet", "parsing")
+    val out_metadata_name =
+      "%s/%s-combined-document-data.txt" format (params.output_dir, outname)
+    val out_text_name = "%s/%s-text.txt" format (params.output_dir, outname)
+    errprint("Metadata output file is %s..." format out_metadata_name)
+    errprint("Text output file is %s..." format out_text_name)
+    val outstream_metadata = filehand.openw(out_metadata_name)
+    val outstream_text = filehand.openw(out_text_name)
+    var lineno = 0
+    for (line <- lines) {
+      lineno += 1
+      line.split("\t", -1).toList match {
+        case id :: time :: userid :: username :: _ ::
+            reply_username :: reply_userid :: _ :: text :: anchor :: lang ::
+            lat :: long :: _ :: _ :: _ :: _ :: _ :: Nil => {
+          val title = "Twitter:" + id
+          val metadata = List(id, title, "training",
+            "%s,%s" format (lat, long), time, username, userid,
+            reply_username, reply_userid, anchor, lang)
+          outstream_metadata.println(metadata mkString "\t")
+          val rawtext = unescapeHtml4(unescapeXml(text))
+          val splittext = Twokenize(rawtext)
+          val textdata = List(title, splittext mkString " ")
+          outstream_text.println(textdata mkString "\t")
         }
-        task.item_processed()
+        case _ => {
+          errprint("Bad line #%d: %s" format (lineno, line))
+          errprint("Line length: %d" format line.split("\t", -1).length)
+        }
       }
-      outstream_text.close()
-      outstream_metadata.close()
-      task.finish()
+      task.item_processed()
     }
+    outstream_text.close()
+    outstream_metadata.close()
+    task.finish()
   }
 }
 
