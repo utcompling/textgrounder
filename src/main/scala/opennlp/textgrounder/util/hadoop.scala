@@ -53,6 +53,9 @@ package object hadoop {
     def is_directory(filename: String) =
       get_file_system(filename).getFileStatus(new Path(filename)).isDir
 
+    def make_directories(filename: String):Boolean =
+      get_file_system(filename).mkdirs(new Path(filename))
+
     def list_files(dir: String) = {
       for (file <- get_file_system(dir).listStatus(new Path(dir)))
         yield file.toString

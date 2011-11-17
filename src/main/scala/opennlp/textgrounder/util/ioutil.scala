@@ -126,6 +126,11 @@ package object ioutil {
      */
     def is_directory(filename: String): Boolean
     /**
+     * Create a directory, along with any missing parents.  Returns true
+     * if the directory was created, false if it already exists.
+     */
+    def make_directories(filename: String): Boolean
+    /**
      * List the files in the given directory.
      */
     def list_files(dir: String): Iterable[String]
@@ -162,6 +167,8 @@ package object ioutil {
       new File(dir, file).toString
     def is_directory(filename: String) =
       new File(filename).isDirectory
+    def make_directories(filename: String):Boolean =
+      new File(filename).mkdirs
     def list_files(dir: String) =
       for (file <- new File(dir).listFiles)
         yield file.toString
