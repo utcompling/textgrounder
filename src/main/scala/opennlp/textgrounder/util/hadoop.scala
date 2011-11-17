@@ -42,6 +42,11 @@ package object hadoop {
     def get_output_stream(filename: String) =
       get_file_system(filename).create(new Path(filename))
 
+    def split_filename(filename: String) = {
+      val path = new Path(filename)
+      (path.getParent.toString, path.getName)
+    }
+
     def join_filename(dir: String, file: String) =
       new Path(dir, file).toString
 

@@ -112,6 +112,11 @@ package object ioutil {
      */
     def get_output_stream(filename: String): OutputStream
     /**
+     * Split a string naming a file into the directory it's in and the
+     * final component.
+     */
+    def split_filename(filename: String): (String, String)
+    /**
      * Join a string naming a directory to a string naming a file.  If the
      * file is relative, it is to be interpreted relative to the directory.
      */
@@ -149,6 +154,10 @@ package object ioutil {
   class LocalFileHandler extends FileHandler {
     def get_input_stream(filename: String) = new FileInputStream(filename)
     def get_output_stream(filename: String) = new FileOutputStream(filename)
+    def split_filename(filename: String) = {
+      val file = new File(filename)
+      (file.getParent, file.getName)
+    }
     def join_filename(dir: String, file: String) =
       new File(dir, file).toString
     def is_directory(filename: String) =
