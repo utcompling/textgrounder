@@ -12,7 +12,7 @@ package opennlp.textgrounder.util
 
    FIXME: Make Twokenize be a package retrievable by Maven.
 
-   --ben
+   - Ben Wing (ben@benwing.com) November 2011
 */
 
 /*
