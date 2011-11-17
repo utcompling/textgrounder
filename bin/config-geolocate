@@ -26,8 +26,8 @@
 #       the UTexas comp ling machines, you can set TG_GROUPS_DIR to the
 #       root of that directory structure.  This assumes that the Wikipedia
 #       data is in `corpora/wikipedia`, the Twitter data is in
-#       `corpora/geotext` (i.e. the GeoText Twitter corpus specifically),
-#       and the aux data is in `projects/textgrounder/data`.
+#       `corpora/twitter-geotext` (i.e. the GeoText Twitter corpus
+#       specifically), and the aux data is in `projects/textgrounder/data`.
 #
 #    c. If you're actually on the UTexas comp ling machines, which put the
 #       above directories under `/groups`, or you have exactly the same
@@ -84,7 +84,7 @@ fi
 
 if [ -n "$TG_GROUPS_DIR" ]; then
   TG_WIKIPEDIA_DIR=${TG_WIKIPEDIA_DIR:-$TG_GROUPS_DIR/corpora/wikipedia}
-  TG_TWITTER_DIR=${TG_TWITTER_DIR:-$TG_GROUPS_DIR/corpora/geotext}
+  TG_TWITTER_DIR=${TG_TWITTER_DIR:-$TG_GROUPS_DIR/corpora/twitter-geotext}
   TG_AUX_DIR=${TG_AUX_DIR:-$TG_GROUPS_DIR/projects/textgrounder/data}
 fi
 
