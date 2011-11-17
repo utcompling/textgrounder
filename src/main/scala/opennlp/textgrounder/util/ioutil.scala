@@ -26,6 +26,9 @@ import scala.collection.mutable
 // various meanings.)
 import java.io.{Console=>_,_}
 
+import org.apache.commons.compress.compressors.bzip2._
+import org.apache.commons.compress.compressors.gzip._
+
 import textutil._
 import osutil._
 
@@ -50,20 +53,32 @@ package object ioutil {
   //                            File reading functions                        //
   //////////////////////////////////////////////////////////////////////////////
   
-  // Iterator that yields lines in a given encoding from an input stream
-  // inwith the given encoding (by default, UTF-8) and
-  // yield lines, but with any terminating newline removed if chomp is
-  // true (the default).  Buffer size and conversion error-handling
-  // can be set. (FIXME: The latter has no effect currently.) By default,
-  // automatically closes the stream when EOF is reached.
-  class FileIterator(stream: InputStream, encoding: String = "UTF-8",
-      chomp: Boolean = true, errors: String = "strict", bufsize: Int = 0,
-      close: Boolean = true) extends Iterator[String] {
-    val ireader =
-      new InputStreamReader(stream, encoding)
+  /**
+   * Iterator that yields lines in a given encoding (by default, UTF-8) from
+   * an input stream, usually with any terminating newline removed and usually
+   * with automatic closing of the stream when EOF is reached.
+   *
+   * @param stream Input stream to read from.
+   * @param encoding Encoding of the text; by default, UTF-8.
+   * @param chomp If true (the default), remove any terminating newline.
+   *   Any of LF, CRLF or CR will be removed at end of line.
+   * @param close If true (the default), automatically close the stream when
+   *   EOF is reached.
+   * @param errors How to handle conversion errors. (FIXME: Not implemented.)
+   */
+  class FileIterator(
+      stream: InputStream,
+      encoding: String = "UTF-8",
+      chomp: Boolean = true,
+      close: Boolean = true,
+      errors: String = "strict"
+  ) extends Iterator[String] {
+    var ireader = new InputStreamReader(stream, encoding)
     var reader =
-      if (bufsize <= 0) new BufferedReader(ireader)
-      else new BufferedReader(ireader, bufsize)
+      // Wrapping in a BufferedReader is necessary because readLine() doesn't
+      // exist on plain InputStreamReaders
+      /* if (bufsize > 0) new BufferedReader(ireader, bufsize) else */
+      new BufferedReader(ireader)
     var nextline: String = null
     protected def getNextLine() = {
       nextline = reader.readLine()
@@ -103,14 +118,244 @@ package object ioutil {
 
   abstract class FileHandler {
     /**
-     * Return an InputStream that reads from the given file.
+     * Return an InputStream that reads from the given file, usually with
+     * buffering.
+     *
+     * @param filename Name of the file.
+     * @param bufsize Buffering size.  If 0 (the default), the default
+     *   buffer size is used.  If &gt; 0, the specified size is used.  If
+     *   &lt; 0, there is no buffering.
      */
-    def get_input_stream(filename: String): InputStream
+    def get_input_stream(filename: String, bufsize: Int = 0) = {
+      val raw_in = get_raw_input_stream(filename)
+      if (bufsize < 0)
+        raw_in
+      else if (bufsize == 0)
+        new BufferedInputStream(raw_in)
+      else
+        new BufferedInputStream(raw_in, bufsize)
+    }
+
     /**
-     * Return an OutputStream that writes to the given file, overwriting
-     * an existing file.
+     * Return an OutputStream that writes to the given file, usually with
+     * buffering.
+     *
+     * @param filename Name of the file.
+     * @param bufsize Buffering size.  If 0 (the default), the default
+     *   buffer size is used.  If &gt; 0, the specified size is used.  If
+     *   &lt; 0, there is no buffering.
      */
-    def get_output_stream(filename: String): OutputStream
+    def get_output_stream(filename: String, bufsize: Int = 0) = {
+      val raw_out = get_raw_output_stream(filename)
+      if (bufsize < 0)
+        raw_out
+      else if (bufsize == 0)
+        new BufferedOutputStream(raw_out)
+      else
+        new BufferedOutputStream(raw_out, bufsize)
+    }
+
+    /**
+     * Open a filename with the given encoding (by default, UTF-8) and
+     * optional decompression (by default, based on the filename), and
+     * return an iterator that yields lines, usually with any terminating
+     * newline removed and usually with automatic closing of the stream
+     * when EOF is reached.
+     *
+     * @param filename Name of file to read from.
+     * @param encoding Encoding of the text; by default, UTF-8.
+     * @param compression Compression of the file (by default, "byname").
+     *   Valid values are "none" (no compression), "byname" (use the
+     *   extension of the filename to determine the compression), "gzip"
+     *   and "bzip2".
+     * @param chomp If true (the default), remove any terminating newline.
+     *   Any of LF, CRLF or CR will be removed at end of line.
+     * @param close If true (the default), automatically close the stream when
+     *   EOF is reached.
+     * @param errors How to handle conversion errors. (FIXME: Not implemented.)
+     * @param bufsize Buffering size.  If 0 (the default), the default
+     *   buffer size is used.  If &gt; 0, the specified size is used.  If
+     *   &lt; 0, there is no buffering.
+     *
+     * @return A tuple `(iterator, compression_type, uncompressed_filename)`
+     *   where `iterator` is the iterator over lines, `compression_type` is
+     *   a string indicating the actual compression of the file ("none",
+     *   "gzip" or "bzip2") and `uncompressed_filename` is the name the
+     *   uncompressed file would have (typically by removing the extension
+     *   that indicates compression).
+     *
+     * @see `FileIterator`, `get_input_stream`,
+     *   `get_input_stream_handling_compression`
+     */
+    def openr_with_compression_info(filename: String,
+        encoding: String = "UTF-8", compression: String = "byname",
+        chomp: Boolean = true, close: Boolean = true,
+        errors: String = "strict", bufsize: Int = 0) = {
+      val (stream, comtype, realname) =
+        get_input_stream_handling_compression(filename,
+          compression=compression, bufsize=bufsize)
+      (new FileIterator(stream, encoding=encoding, chomp=chomp, close=close,
+         errors=errors), comtype, realname)
+    }
+    
+    /**
+     * Open a filename with the given encoding (by default, UTF-8) and
+     * optional decompression (by default, based on the filename), and
+     * return an iterator that yields lines, usually with any terminating
+     * newline removed and usually with automatic closing of the stream
+     * when EOF is reached.
+     *
+     * @param filename Name of file to read from.
+     * @param encoding Encoding of the text; by default, UTF-8.
+     * @param compression Compression of the file (by default, "byname").
+     *   Valid values are "none" (no compression), "byname" (use the
+     *   extension of the filename to determine the compression), "gzip"
+     *   and "bzip2".
+     * @param chomp If true (the default), remove any terminating newline.
+     *   Any of LF, CRLF or CR will be removed at end of line.
+     * @param close If true (the default), automatically close the stream when
+     *   EOF is reached.
+     * @param errors How to handle conversion errors. (FIXME: Not implemented.)
+     * @param bufsize Buffering size.  If 0 (the default), the default
+     *   buffer size is used.  If &gt; 0, the specified size is used.  If
+     *   &lt; 0, there is no buffering.
+     *
+     * @return An iterator over lines.  Use `openr_with_compression_info` to
+     *   also get the actual type of compression and the uncompressed name
+     *   of the file (minus any extension like .gz or .bzip2).
+     *
+     * @see `FileIterator`, `openr_with_compression_info`, `get_input_stream`,
+     *   `get_input_stream_handling_compression`
+     */
+    def openr(filename: String, encoding: String = "UTF-8",
+        compression: String = "byname", chomp: Boolean = true,
+        close: Boolean = true, errors: String = "strict", bufsize: Int = 0) = {
+      val (iterator, _, _) = openr_with_compression_info(filename,
+        encoding=encoding, compression=compression, chomp=chomp, close=close,
+        errors=errors, bufsize=bufsize)
+      iterator
+    }
+    
+    /**
+     * Wrap an InputStream with optional decompression.  It is strongly
+     * recommended that the InputStream be buffered.
+     *
+     * @param stream Input stream.
+     * @param compression Compression type.  Valid values are "none" (no
+     *   compression), "gzip", and "bzip2".
+     */
+    def wrap_input_stream_with_compression(stream: InputStream,
+        compression: String) = {
+      if (compression == "none") stream
+      else if (compression == "gzip") new GzipCompressorInputStream(stream)
+      else if (compression == "bzip2") new BZip2CompressorInputStream(stream)
+      else throw new IllegalArgumentException(
+        "Invalid compression argument: %s" format compression)
+    }
+
+    /**
+     * Wrap an OutputStream with optional compression.  It is strongly
+     * recommended that the OutputStream be buffered.
+     *
+     * @param stream Output stream.
+     * @param compression Compression type.  Valid values are "none" (no
+     *   compression), "gzip", and "bzip2".
+     */
+    def wrap_output_stream_with_compression(stream: OutputStream,
+        compression: String) = {
+      if (compression == "none") stream
+      else if (compression == "gzip") new GzipCompressorOutputStream(stream)
+      else if (compression == "bzip2") new BZip2CompressorOutputStream(stream)
+      else throw new IllegalArgumentException(
+        "Invalid compression argument: %s" format compression)
+    }
+
+    /**
+     * Create an InputStream that reads from the given file, usually with
+     * buffering and automatic decompression.  Either the decompression
+     * format can be given explicitly (including "none"), or the function can
+     * be instructed to use the extension of the filename to determine the
+     * compression format (e.g. ".gz" for gzip).
+     *
+     * @param filename Name of the file.
+     * @param compression Compression of the file (by default, "byname").
+     *   Valid values are "none" (no compression), "byname" (use the
+     *   extension of the filename to determine the compression), "gzip"
+     *   and "bzip2".
+     * @param bufsize Buffering size.  If 0 (the default), the default
+     *   buffer size is used.  If &gt; 0, the specified size is used.  If
+     *   &lt; 0, there is no buffering.
+     *
+     * @return A tuple `(stream, compression_type, uncompressed_filename)`
+     *   where `stream` is the stream to read from, `compression_type` is
+     *   a string indicating the actual compression of the file ("none",
+     *   "gzip" or "bzip2") and `uncompressed_filename` is the name the
+     *   uncompressed file would have (typically by removing the extension
+     *   that indicates compression).
+     */
+    def get_input_stream_handling_compression(filename: String,
+        compression: String = "byname", bufsize: Int = 0) = {
+      val raw_in = get_input_stream(filename, bufsize)
+      val comtype =
+        if (compression == "byname") {
+          if (BZip2Utils.isCompressedFilename(filename)) "bzip2"
+          else if (GzipUtils.isCompressedFilename(filename)) "gzip"
+          else "none"
+        } else compression
+      val in = wrap_input_stream_with_compression(raw_in, comtype)
+      val realname = comtype match {
+        case "gzip" => GzipUtils.getUncompressedFilename(filename)
+        case "bzip2" => BZip2Utils.getUncompressedFilename(filename)
+        case _ => {
+          assert(comtype == "none",
+            "wrap_input_stream_with_compression should have verified value")
+          filename
+        }
+      }
+      (in, comtype, realname)
+    }
+
+    /**
+     * Open a file for writing, with optional compression (by default, no
+     * compression), and encoding (by default, UTF-8) and return a
+     * PrintStream that will write to the file.
+     *
+     * @param filename Name of file to write to.
+     * @param encoding Encoding of the text; by default, UTF-8.
+     * @param compression Compression type.  Valid values are "none" (no
+     *   compression), "gzip", and "bzip2".
+     * @param bufsize Buffering size.  If 0 (the default), the default
+     *   buffer size is used.  If &gt; 0, the specified size is used.  If
+     *   &lt; 0, there is no buffering.
+     * @param autoflush If true, automatically flush the PrintStream after
+     *   every output call. (Note that if compression is in effect, the
+     *   flush may not actually cause anything to get written.)
+     */
+    def openw(filename: String, encoding: String = "UTF-8",
+        compression: String = "none", bufsize: Int = 0,
+        autoflush: Boolean = false) =
+      new PrintStream(
+        wrap_output_stream_with_compression(
+          get_output_stream(filename, bufsize), compression),
+        autoflush, encoding)
+
+    /* ----------- Abstract functions below this line ----------- */
+
+    /**
+     * Return an unbuffered InputStream that reads from the given file.
+     */
+    def get_raw_input_stream(filename: String): InputStream
+
+    /**
+     * Return an unbuffered OutputStream that writes to the given file,
+     * overwriting an existing file.
+     */
+    def get_raw_output_stream(filename: String): OutputStream
+    /**
+     * Split a string naming a file into the directory it's in and the
+     * final component.
+     */
+    def split_filename(filename: String): (String, String)
     /**
      * Join a string naming a directory to a string naming a file.  If the
      * file is relative, it is to be interpreted relative to the directory.
@@ -121,38 +366,30 @@ package object ioutil {
      */
     def is_directory(filename: String): Boolean
     /**
+     * Create a directory, along with any missing parents.  Returns true
+     * if the directory was created, false if it already exists.
+     */
+    def make_directories(filename: String): Boolean
+    /**
      * List the files in the given directory.
      */
     def list_files(dir: String): Iterable[String]
 
-    /**
-     * Open a filename with the given encoding (by default, UTF-8) and
-     * yield lines, but with any terminating newline removed if chomp is
-     * true (the default).  Buffer size and conversion error-handling
-     * can be set. (FIXME: The latter has no effect currently.)
-     */
-    def openr(filename: String, encoding: String = "UTF-8",
-          chomp: Boolean = true, errors: String = "strict",
-          bufsize: Int = 0) = {
-      new FileIterator(get_input_stream(filename), encoding=encoding,
-        chomp=chomp, errors=errors, bufsize=bufsize)
-    }
-    
-    /** Open a file for writing and return a PrintStream that will write to
-     *  this file in UTF-8.
-     */
-    def openw(filename: String, autoflush: Boolean=false) =
-      new PrintStream(new BufferedOutputStream(get_output_stream(filename)),
-        autoflush, "UTF-8")
   }
 
   class LocalFileHandler extends FileHandler {
-    def get_input_stream(filename: String) = new FileInputStream(filename)
-    def get_output_stream(filename: String) = new FileOutputStream(filename)
+    def get_raw_input_stream(filename: String) = new FileInputStream(filename)
+    def get_raw_output_stream(filename: String) = new FileOutputStream(filename)
+    def split_filename(filename: String) = {
+      val file = new File(filename)
+      (file.getParent, file.getName)
+    }
     def join_filename(dir: String, file: String) =
       new File(dir, file).toString
     def is_directory(filename: String) =
       new File(filename).isDirectory
+    def make_directories(filename: String):Boolean =
+      new File(filename).mkdirs
     def list_files(dir: String) =
       for (file <- new File(dir).listFiles)
         yield file.toString
@@ -465,10 +702,11 @@ package object ioutil {
   // all rows by this string (usually some number of spaces).  If 'maxrows'
   // is specified, output at most this many rows.
   def output_reverse_sorted_table[T <% Ordered[T],U <% Ordered[U]](
-    table: Map[T,U],
-    outfile: PrintStream=System.out, indent: String="",
-    keep_secondary_order: Boolean=false, maxrows: Int = -1) {
-    output_reverse_sorted_list(table toList)
+      table: collection.Map[T,U],
+      outfile: PrintStream=System.out, indent: String="",
+      keep_secondary_order: Boolean=false, maxrows: Int = -1) {
+    output_reverse_sorted_list(table toList, outfile, indent,
+      keep_secondary_order, maxrows)
   }
 
   ////////////////////////////////////////////////////////////////////////////

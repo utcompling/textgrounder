@@ -22,12 +22,15 @@ resolvers ++= Seq(
 
 
 libraryDependencies ++= Seq(
-  "com.google.inject" % "guice" % "2.0",
-  "com.google.guava" % "guava" % "r06",
-  "commons-cli" % "commons-cli" % "1.2",
+  "com.google.guava" % "guava" % "10.0.1",
   "org.jdom" % "jdom" % "1.1",
-  "org.xerial" % "sqlite-jdbc" % "3.6.20",
-  "org.apache.opennlp" % "opennlp-maxent" % "3.0.1-incubating",
+  "org.apache.commons" % "commons-lang3" % "3.1",
+  "org.apache.commons" % "commons-compress" % "1.3",
+  // The following don't appear to be used currently.
+  // "com.google.inject" % "guice" % "2.0",
+  // "commons-cli" % "commons-cli" % "1.2",
+  // "org.xerial" % "sqlite-jdbc" % "3.6.20",
+  // "org.apache.opennlp" % "opennlp-maxent" % "3.0.1-incubating",
   "org.apache.opennlp" % "opennlp-tools" % "1.5.1-incubating",
   // The use of %% instead of % causes the Scala version to get appended,
   // i.e. it's equivalent to the use of single % with "argot_2.9.1".

@@ -213,8 +213,8 @@ abstract class UnigramWordDist(
  * General factory for UnigramWordDist distributions.
  */ 
 abstract class UnigramWordDistFactory extends WordDistFactory {
-  def create_populated_word_dist(keys: Array[Word], values: Array[Int],
-    num_words: Int, note_globally: Boolean): UnigramWordDist
+  def set_word_dist(doc: DistDocument, keys: Array[Word], values: Array[Int],
+    num_words: Int, note_globally: Boolean)
 
   def read_word_counts(table: DistDocumentTable,
       filehand: FileHandler, filename: String, stopwords: Set[String]) {
@@ -261,10 +261,10 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
       // versa, to save memory and avoid contaminating the results.
       if (doc.split != "training" && doc.split != Params.eval_set)
         return
-      // Don't train on test set
-      doc.dist = create_populated_word_dist(keys_dynarr.array,
-          values_dynarr.array, keys_dynarr.length,
-          note_globally = (doc.split == "training"))
+      // Now set the distribution on the document; but don't use the test set's
+      // distributions in computing global smoothing values and such.
+      set_word_dist(doc, keys_dynarr.array, values_dynarr.array,
+        keys_dynarr.length, note_globally = (doc.split == "training"))
     }
 
     val task = new MeteredTask("document", "reading distributions of")

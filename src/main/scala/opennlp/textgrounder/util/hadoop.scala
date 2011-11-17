@@ -36,17 +36,25 @@ package object hadoop {
       FileSystem.get(URI.create(filename), conf)
     }
 
-    def get_input_stream(filename: String) =
+    def get_raw_input_stream(filename: String) =
       get_file_system(filename).open(new Path(filename))
   
-    def get_output_stream(filename: String) =
+    def get_raw_output_stream(filename: String) =
       get_file_system(filename).create(new Path(filename))
+
+    def split_filename(filename: String) = {
+      val path = new Path(filename)
+      (path.getParent.toString, path.getName)
+    }
 
     def join_filename(dir: String, file: String) =
       new Path(dir, file).toString
 
     def is_directory(filename: String) =
       get_file_system(filename).getFileStatus(new Path(filename)).isDir
+
+    def make_directories(filename: String):Boolean =
+      get_file_system(filename).mkdirs(new Path(filename))
 
     def list_files(dir: String) = {
       for (file <- get_file_system(dir).listStatus(new Path(dir)))

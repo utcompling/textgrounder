@@ -16,22 +16,15 @@
 
 package opennlp.textgrounder.preprocess
 
-import java.io._
-import java.io.{FileSystem=>_,_}
-import util.control.Breaks._
+import java.io.InputStream
 
-import org.apache.hadoop.io._
-import org.apache.hadoop.util._
-import org.apache.hadoop.mapreduce._
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat
-import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
-import org.apache.hadoop.conf.{Configuration, Configured}
-import org.apache.hadoop.fs._
+import org.apache.commons.lang3.StringEscapeUtils._
 
-import com.nicta.scoobi._
-import com.nicta.scoobi.Scoobi._
-import com.nicta.scoobi.io.text._
-import com.nicta.scoobi.io.text.TextInput._
+import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.experiment._
+import opennlp.textgrounder.util.ioutil._
+import opennlp.textgrounder.util.MeteredTask
+import opennlp.textgrounder.util.Twokenize
 
 /*
 
@@ -61,52 +54,80 @@ The fields are:
 15) Empty?
 16) Empty?
 17) Empty?
+18) Empty?
 
 
-3) We want to convert each to two files: (1) containing the article-data 
+3) We want to convert each to two files: one containing the article-data,
+   one containing the text.  We can later convert the text to unigram counts,
+   bigram counts, etc.
 
 */
 
-/**
- * Convert files in the Infochimps Twitter corpus into files in our format.
- */
+/////////////////////////////////////////////////////////////////////////////
+//                                  Main code                              //
+/////////////////////////////////////////////////////////////////////////////
 
-object ConvertTwitterInfochimps {
-
+class ConvertTwitterInfochimpsDriver extends ProcessFilesDriver {
+  type ParamType = ProcessFilesParameters
+  
   def usage() {
-    sys.error("""Usage: ConvertTwitterInfochimps INFILE OUTDIR
+    sys.error("""Usage: ConvertTwitterInfochimps [-o OUTDIR | --outfile OUTDIR] INFILE ...
 
 Convert input files in the Infochimps Twitter corpus into files in the
-format expected by TextGrounder.  INFILE is a single file or a glob.
-OUTDIR is the directory to store the results in.
+format expected by TextGrounder.  OUTDIR is the directory to store the
+results in, which must not exist already.
 """)
   }
 
-  def main(orig_args: Array[String]) = withHadoopArgs(orig_args) { args =>
-    if (args.length != 2)
-      usage()
-    val infile = args(0)
-    val outdir = args(1)
-
+  override def run_after_setup() {
     val fields = List("id", "title", "split", "coord", "time",
       "username", "userid", "reply_username", "reply_userid", "anchor", "lang")
-
-    val tweets = extractFromDelimitedTextFile("\t", infile) {
-      case id :: time :: userid :: username :: _ ::
-          reply_username :: reply_userid :: _ :: text :: anchor :: lang ::
-          lat :: long :: _ :: _ :: _ :: _ => {
-        val metadata = List(id, id, "training", "%s,%s" format (lat, long),
-          time, username, userid, reply_username, reply_userid, anchor, lang)
-        val splittext = text.split(" ")
-        val textdata = List(id, id, splittext)
-        (metadata mkString "\t", textdata mkString "\t")
-      }
-    }
-    DList.persist (
-      TextOutput.toTextFile(tweets.map(_._1),
-        "%s-twitter-infochimps-combined-document-data.txt" format outdir),
-      TextOutput.toTextFile(tweets.map(_._2),
-        "%s-twitter-infochimps-text-data.txt" format outdir)
-    )
+    // FIXME: Output fields as a schema file
+    super.run_after_setup()
   }
+
+  def process_one_file(lines: Iterator[String], outname: String) {
+    val task = new MeteredTask("tweet", "parsing")
+    val out_metadata_name =
+      "%s/%s-combined-document-data.txt" format (params.output_dir, outname)
+    val out_text_name = "%s/%s-text.txt" format (params.output_dir, outname)
+    errprint("Metadata output file is %s..." format out_metadata_name)
+    errprint("Text output file is %s..." format out_text_name)
+    val outstream_metadata = filehand.openw(out_metadata_name)
+    val outstream_text = filehand.openw(out_text_name)
+    var lineno = 0
+    for (line <- lines) {
+      lineno += 1
+      line.split("\t", -1).toList match {
+        case id :: time :: userid :: username :: _ ::
+            reply_username :: reply_userid :: _ :: text :: anchor :: lang ::
+            lat :: long :: _ :: _ :: _ :: _ :: _ :: Nil => {
+          val title = "Twitter:" + id
+          val metadata = List(id, title, "training",
+            "%s,%s" format (lat, long), time, username, userid,
+            reply_username, reply_userid, anchor, lang)
+          outstream_metadata.println(metadata mkString "\t")
+          val rawtext = unescapeHtml4(unescapeXml(text))
+          val splittext = Twokenize(rawtext)
+          val textdata = List(title, splittext mkString " ")
+          outstream_text.println(textdata mkString "\t")
+        }
+        case _ => {
+          errprint("Bad line #%d: %s" format (lineno, line))
+          errprint("Line length: %d" format line.split("\t", -1).length)
+        }
+      }
+      task.item_processed()
+    }
+    outstream_text.close()
+    outstream_metadata.close()
+    task.finish()
+  }
+}
+
+object ConvertTwitterInfochimps extends
+    ExperimentDriverApp("Convert Twitter Infochimps") {
+  type DriverType = ConvertTwitterInfochimpsDriver
+  def create_param_object(ap: ArgParser) = new ParamType(ap)
+  def create_driver() = new DriverType
 }
