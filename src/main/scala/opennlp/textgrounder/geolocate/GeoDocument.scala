@@ -16,28 +16,33 @@
 
 package opennlp.textgrounder.geolocate
 
-import tgutil._
-import Distances._
-import GeolocateDriver.Debug._
-
 import util.control.Breaks._
+
 import java.io._
+
+import opennlp.textgrounder.util.distances._
+import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
+import opennlp.textgrounder.util.MeteredTask
+import opennlp.textgrounder.util.osutil.output_resource_usage
+import opennlp.textgrounder.util.textutil.splittext
+
+import GeolocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                               //
 /////////////////////////////////////////////////////////////////////////////
 
-class ArticleWriter(outfile: PrintStream, outfields: Seq[String]) {
+class GeoDocumentWriter(outfile: PrintStream, outfields: Seq[String]) {
   def output_header() {
     outfile.println(outfields mkString "\t")
   }
   
-  def output_row(art: Article) {
-    outfile.println(art.get_fields(outfields) mkString "\t")    
+  def output_row(doc: GeoDocument) {
+    outfile.println(doc.get_fields(outfields) mkString "\t")    
   }
 }
 
-class ArticleReader(infields: Seq[String]) {
+class GeoDocumentReader(infields: Seq[String]) {
   var num_processed = 0
   def process_row(line: String, process: Map[String,String] => Unit,
       line_number: Int = -1) {
@@ -51,7 +56,7 @@ class ArticleReader(infields: Seq[String]) {
     else {
       var good = true
       for ((field, value) <- infields zip fieldvals) {
-        if (!Article.validate_field(field, value)) {
+        if (!GeoDocument.validate_field(field, value)) {
           good = false
           warning(
       """Bad field value at line #%s, field=%s, value=%s,
@@ -65,29 +70,32 @@ class ArticleReader(infields: Seq[String]) {
   }
 }
 
-object ArticleData {
-  val combined_article_data_outfields = List("id", "title", "split", "redir",
+object GeoDocumentData {
+  val combined_document_data_outfields = List("id", "title", "split", "redir",
       "namespace", "is_list_of", "is_disambig", "is_list", "coord",
       "incoming_links")
 
-  /** Read in the article data file.  Call PROCESS on each article.
-   * The type of the article created is given by ARTICLE_TYPE, which defaults
-   * to Article.  MAXTIME is a value in seconds, which limits the total
-   * processing time (real time, not CPU time) used for reading in the
-   * file, for testing purposes.
+  /** Read in the document data file.  Call `process` on each document.
+   *
+   * @param filehand File handler for the file.
+   * @param filename Name of the file to read in.
+   * @param process Function to be called for each document.
+   * @param A value in seconds, which limits the total processing time
+   *   (real time, not CPU time) used for reading in the file, for
+   *   testing purposes.
    */
-  def read_article_data_file(filehand: FileHandler, filename: String,
+  def read_document_file(filehand: FileHandler, filename: String,
       process: Map[String,String] => Unit, maxtime: Double=0.0) = {
-    errprint("Reading article data from %s...", filename)
-    val task = new MeteredTask("article", "reading")
+    errprint("Reading document data from %s...", filename)
+    val task = new MeteredTask("document", "reading")
 
     val fi = filehand.openr(filename)
 
     val fields = splittext(fi.next(), '\t')
-    val reader = new ArticleReader(fields)
+    val reader = new GeoDocumentReader(fields)
     breakable {
       for (line <- fi) {
-        // If we've processed no articles so far, we're on line 2
+        // If we've processed no documents so far, we're on line 2
         // because line 1 is the header.
         reader.process_row(line, process, task.num_processed + 2)
         if (task.item_processed(maxtime=maxtime))
@@ -99,31 +107,35 @@ object ArticleData {
     fields
   }
 
-  def write_article_data_file(outfile: PrintStream, outfields: Seq[String],
-      articles: Iterable[Article]) {
-    val writer = new ArticleWriter(outfile, outfields)
+  def write_document_file(outfile: PrintStream, outfields: Seq[String],
+      documents: Iterable[GeoDocument]) {
+    val writer = new GeoDocumentWriter(outfile, outfields)
     writer.output_header()
-    for (art <- articles)
-      writer.output_row(art)
+    for (doc <- documents)
+      writer.output_row(doc)
     outfile.close()
   }
 }
 
-/** A Wikipedia article.  Defined fields:
- * title: Title of article.
- * id: ID of article, as an int.
- * coord: Coordinates of article.
+/** A document for the purpose of geolocation.  The fields available
+ * depend on the source of the document (e.g. Wikipedia, etc.).
+ *
+ * Defined fields:
+ *
+ * title: Title of document.
+ * id: ID of document, as an int.
+ * coord: Coordinates of document.
  * incoming_links: Number of incoming links, or None if unknown.
- * split: Split of article ("training", "dev", "test")
- * redir: If this is a redirect, article title that it redirects to; else
+ * split: Split of document ("training", "dev", "test")
+ * redir: If this is a redirect, document title that it redirects to; else
  *          an empty string.
- * namespace: Namespace of article (e.g. "Main", "Wikipedia", "File")
- * is_list_of: Whether article title is "List of *"
- * is_disambig: Whether article is a disambiguation page.
- * is_list: Whether article is a list of any type ("List of *", disambig,
+ * namespace: Namespace of document (e.g. "Main", "Wikipedia", "File")
+ * is_list_of: Whether document title is "List of *"
+ * is_disambig: Whether document is a disambiguation page.
+ * is_list: Whether document is a list of any type ("List of *", disambig,
  *          or in Category or Book namespaces)
  */
-class Article(params: Map[String,String]) {
+class GeoDocument(params: Map[String,String]) {
   var title="unknown"
   var id=0
   var coord: Coord=null
@@ -134,7 +146,7 @@ class Article(params: Map[String,String]) {
   var is_list_of=false
   var is_disambig=false
   var is_list=false
-  import Article._, ArticleConverters._
+  import GeoDocument._, GeoDocumentConverters._
 
   for ((name, v) <- params) {
     name match {
@@ -178,9 +190,9 @@ class Article(params: Map[String,String]) {
  def adjusted_incoming_links = adjust_incoming_links(incoming_links)
 }
 
-object Article {
+object GeoDocument {
   /**
-   * Compute the short form of an article name.  If short form includes a
+   * Compute the short form of a document name.  If short form includes a
    * division (e.g. "Tucson, Arizona"), return a tuple (SHORTFORM, DIVISION);
    * else return a tuple (SHORTFORM, None).
    */
@@ -218,7 +230,7 @@ object Article {
   }
 
   def validate_field(field: String, value: String) = {
-    import ArticleConverters._
+    import GeoDocumentConverters._
     field match {
       case "id" => validate_int(value)
       case "title" => true
@@ -236,7 +248,7 @@ object Article {
 }
 
 /************************ Conversion functions ************************/
-object ArticleConverters {
+object GeoDocumentConverters {
   def yesno_to_boolean(foo: String)  = {
     foo match {
       case "yes" => true

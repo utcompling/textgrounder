@@ -7,7 +7,8 @@ import opennlp.textgrounder.text._
 import opennlp.textgrounder.text.io._
 import opennlp.textgrounder.text.prep._
 import opennlp.textgrounder.app._
-import opennlp.textgrounder.util._
+import opennlp.textgrounder.util.StopwordUtil
+import opennlp.textgrounder.util.TopoUtil
 
 import scala.collection.JavaConversions._
 
@@ -36,7 +37,7 @@ object GeoTextLabelPropPreproc extends BaseApp {
     checkExists(getSerializedCorpusInputPath)
 
     val stoplist:Set[String] =
-      if(getStoplistInputPath != null) TextUtil.populateStoplist(getStoplistInputPath)
+      if(getStoplistInputPath != null) StopwordUtil.populateStoplist(getStoplistInputPath)
       else collection.immutable.Set[String]()
 
     val corpus = TopoUtil.readStoredCorpusFromSerialized(getSerializedCorpusInputPath)

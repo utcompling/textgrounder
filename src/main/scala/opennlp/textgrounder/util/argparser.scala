@@ -14,14 +14,16 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.util
+
+import scala.util.control.Breaks._
+import scala.collection.mutable
+
 import org.clapper.argot._
-import util.control.Breaks._
-import collection.mutable
 
 /**
   This module implements an argument parser for Scala, which handles
-  both options (e.g. --output-file foo.txt) and positional parameters.
+  both options (e.g. --output-file foo.txt) and positional arguments.
   It is built on top of Argot and has an interface that is designed to
   be quite similar to the argument-parsing mechanisms in Python.
 
@@ -72,9 +74,9 @@ import collection.mutable
        can be specified multiple times on the command line, and all such
        values will be accumulated into a List)
   -- ap.flag() for a boolean flag
-  -- ap.parameter[T]() for a positional parameter (coming after all options)
-  -- ap.multiParameter[T]() for a multi-valued positional parameter (i.e.
-     eating up any remaining positional parameters given)
+  -- ap.positional[T]() for a positional argument (coming after all options)
+  -- ap.multiPositional[T]() for a multi-valued positional argument (i.e.
+     eating up any remaining positional argument given)
 
   There are two styles for accessing the values of arguments specified on the
   command line.  One possibility is to simply declare arguments by calling the
@@ -103,10 +105,10 @@ import collection.mutable
      the command line (or the default if no value was specified). (If called
      again *before* parsing, they simply return the default value, as before.)
 
-  2) A class, e.g. ProgArgs, is created to hold the values returned from
+  2) A class, e.g. ProgParams, is created to hold the values returned from
      the command line.  This class typically looks like this:
      
-     class ProgArgs(ap: ArgParser) {
+     class ProgParams(ap: ArgParser) {
        var outfile = ap.option[String]("outfile", "o", ...)
        var verbose = ap.flag("verbose", "v", ...)
        ...
@@ -115,15 +117,15 @@ import collection.mutable
   3) To parse a command line, we proceed as follows:
 
      a) Create an ArgParser object.
-     b) Create an instance of ProgArgs, passing in the ArgParser object.
+     b) Create an instance of ProgParams, passing in the ArgParser object.
      c) Call `parse()` on the ArgParser object, to parse a command line.
-     d) Create *another* instance of ProgArgs, passing in the *same*
+     d) Create *another* instance of ProgParams, passing in the *same*
         ArgParser object.
      e) Now, the argument values specified on the command line can be
-        retrieved from this new instance of ProgArgs simply using field
+        retrieved from this new instance of ProgParams simply using field
         accesses, and new values can likewise be set using field accesses.
 
-  Note how this actually works.  When the first instance of ProgArgs is
+  Note how this actually works.  When the first instance of ProgParams is
   created, the initialization of the variables causes the arguments to be
   specified on the ArgParser -- and the variables have the default values
   of the arguments.  When the second instance is created, after parsing, and
@@ -131,7 +133,7 @@ import collection.mutable
   the arguments have no effect, but now return the values specified on the
   command line.  Because these are declared as `var`, they can be freely
   re-assigned.  Furthermore, because no actual reflection or any such thing
-  is done, the above scheme will work completely fine if e.g. ProgArgs
+  is done, the above scheme will work completely fine if e.g. ProgParams
   subclasses another class that also declares some arguments (e.g. to
   abstract out common arguments for multiple applications).  In addition,
   there is no problem mixing and matching the scheme described here with the
@@ -240,11 +242,11 @@ package object argparser {
 
       val files =
         if (use_val)
-          Args.files
+          Params.files
         else
           Seq[String]()
 
-      This unifies to AnyRef, not Seq[String], even if Args.files wraps
+      This unifies to AnyRef, not Seq[String], even if Params.files wraps
       a Seq[String].
 
   (2) Calls to methods on the wrapped values (e.g. strings) can fail in
@@ -373,7 +375,7 @@ package object argparser {
 
   /**
    * Thrown to indicate that ArgParser could not convert a command line
-   * parameter to the desired type.
+   * argument to the desired type.
    *
    * @param message exception message
    * @param cause exception, if propagating an exception
@@ -628,7 +630,7 @@ package object argparser {
    * @param name Name of the argument.
    * @param default Default value of the argument, used when the argument
    *   wasn't specified on the command line.
-   * @param is_param Whether this is a positional parameter rather than
+   * @param is_positional Whether this is a positional argument rather than
    *   option (default false).
    * @tparam T Type of the argument (e.g. Int, Double, String, Boolean).
    */
@@ -637,7 +639,7 @@ package object argparser {
     parser: ArgParser,
     name: String,
     default: T,
-    val is_param: Boolean = false
+    val is_positional: Boolean = false
   ) extends ArgAny[T](parser, name, default) {
     var wrap: SingleValueArg[T] = null
     def wrappedValue = wrap.value.get
@@ -652,7 +654,7 @@ package object argparser {
    * @param name Name of the argument.
    * @param default Default value of the argument, used when the argument
    *   wasn't specified on the command line even once.
-   * @param is_param Whether this is a positional parameter rather than
+   * @param is_positional Whether this is a positional argument rather than
    *   option (default false).
    * @tparam T Type of the argument (e.g. Int, Double, String, Boolean).
    */
@@ -661,7 +663,7 @@ package object argparser {
     parser: ArgParser,
     name: String,
     default: Seq[T],
-    val is_param: Boolean = false
+    val is_positional: Boolean = false
   ) extends ArgAny[Seq[T]](parser, name, default) {
     var wrap: MultiValueArg[T] = null
     val wrapSingle = new ArgSingle[T](parser, name, null.asInstanceOf[T])
@@ -682,20 +684,20 @@ package object argparser {
     import ArgotConverters._
     /* The underlying ArgotParser object. */
     protected val argot = new ArgotParser(prog)
-    /* A map from the parameter's canonical name to the subclass of ArgAny
-       describing the parameter and holding its value.  The canonical name
+    /* A map from the argument's canonical name to the subclass of ArgAny
+       describing the argument and holding its value.  The canonical name
        of options comes from the first non-single-letter name.  The
-       canonical name of positional parameters is simply the name of the
-       parameter.  Iteration over the map yields keys in the order they
+       canonical name of positional arguments is simply the name of the
+       argument.  Iteration over the map yields keys in the order they
        were added rather than random. */
     protected val argmap = mutable.LinkedHashMap[String, ArgAny[_]]()
-    /* The type of each argument.  For multi options and parameters this will
-       be of type Seq.  Because of type erasure, the type of sequence must
-       be stored separately, using argtype_multi. */
+    /* The type of each argument.  For multi options and multi positional
+       arguments this will be of type Seq.  Because of type erasure, the
+       type of sequence must be stored separately, using argtype_multi. */
     protected val argtype = mutable.Map[String, Class[_]]()
     /* For multi arguments, the type of each individual argument. */
     protected val argtype_multi = mutable.Map[String, Class[_]]()
-    /* Set specifying arguments that are positional parameters. */
+    /* Set specifying arguments that are positional arguments. */
     protected val argpositional = mutable.Set[String]()
     /* Set specifying arguments that are flag options. */
     protected val argflag = mutable.Set[String]()
@@ -756,7 +758,7 @@ package object argparser {
       argmap(arg).asInstanceOf[ArgAny[T]].default
 
     /**
-     * Return whether an argument (either option or positional parameter)
+     * Return whether an argument (either option or positional argument)
      * exists with the given canonical name.
      */
     def exists(arg: String) = argmap contains arg
@@ -767,7 +769,7 @@ package object argparser {
     def isOption(arg: String) = exists(arg) && !isPositional(arg)
 
     /**
-     * Return whether a positional parameter exists with the given name.
+     * Return whether a positional argument exists with the given name.
      */
     def isPositional(arg: String) = argpositional contains arg
 
@@ -777,7 +779,7 @@ package object argparser {
     def isFlag(arg: String) = argflag contains arg
 
     /**
-     * Return whether a multi argument (either option or positional parameter)
+     * Return whether a multi argument (either option or positional argument)
      * exists with the given canonical name.
      */
     def isMulti(arg: String) = argtype_multi contains arg
@@ -1045,16 +1047,16 @@ package object argparser {
     }
 
     /**
-     * Specify a positional parameter.  Positional parameters are processed
-     * in order.  Optional parameters must occur after all non-optional
-     * parameters.  The name of the parameter is only used in the usage file
+     * Specify a positional argument.  Positional argument are processed
+     * in order.  Optional argument must occur after all non-optional
+     * argument.  The name of the argument is only used in the usage file
      * and as the "name" parameter of the ArgSingle[T] object passed to
      * the (implicit) conversion routine.  Usually the name should be in
      * all caps.
      *
-     * @see #multiParameter[T]
+     * @see #multiPositional[T]
      */
-    def parameter[T](name: String,
+    def positional[T](name: String,
       default: T = null.asInstanceOf[T],
       choices: Seq[T] = null,
       aliases: Map[T, Iterable[T]] = null,
@@ -1063,7 +1065,7 @@ package object argparser {
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
           canon_help: String) = {
-        val arg = new ArgSingle(this, canon_name, default, is_param = true)
+        val arg = new ArgSingle(this, canon_name, default, is_positional = true)
         arg.wrap =
           (argot.parameter[T](canon_name, canon_help, optional)
            (argot_converter(convert, canon_name, choices, aliases)))
@@ -1074,12 +1076,12 @@ package object argparser {
     }
 
     /**
-     * Specify any number of positional parameters.  These must come after
-     * all other parameters.
+     * Specify any number of positional arguments.  These must come after
+     * all other arguments.
      *
-     * @see #parameter[T].
+     * @see #positional[T].
      */
-    def multiParameter[T](name: String,
+    def multiPositional[T](name: String,
       default: Seq[T] = Seq[T](),
       choices: Seq[T] = null,
       aliases: Map[T, Iterable[T]] = null,
@@ -1088,7 +1090,7 @@ package object argparser {
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
           canon_help: String) = {
-        val arg = new ArgMulti[T](this, canon_name, default, is_param = true)
+        val arg = new ArgMulti[T](this, canon_name, default, is_positional = true)
         arg.wrap =
           (argot.multiParameter[T](canon_name, canon_help, optional)
            (argot_converter(convert, canon_name, choices, aliases)))
@@ -1159,9 +1161,9 @@ package object argparser {
   }
 }
 
-object TestArgs extends App {
+object TestArgParser extends App {
   import argparser._
-  class MyArgs(ap: ArgParser) {
+  class MyParams(ap: ArgParser) {
     /* An integer option named --foo, with a default value of 5.  Can also
        be specified using --spam or -f. */
     var foo = ap.option[Int]("foo", "spam", "f", default = 5,
@@ -1232,31 +1234,31 @@ possible choices are %choices.""")
         help = """A multi-string option.  This is an actual option in
 one of my research programs.  Possible choices are %choices; the full list
 of choices, including all aliases, is %allchoices.""")
-    /* A required positional parameter. */
-    var destfile = ap.parameter[String]("DESTFILE",
+    /* A required positional argument. */
+    var destfile = ap.positional[String]("DESTFILE",
       help = "Destination file to store output in")
-    /* A multi-positional parameter that sucks up all remaining arguments. */
-    var files = ap.multiParameter[String]("FILES", help = "Files to process")
+    /* A multi-positional argument that sucks up all remaining arguments. */
+    var files = ap.multiPositional[String]("FILES", help = "Files to process")
   }
   val ap = new ArgParser("test")
   // This first call is necessary, even though it doesn't appear to do
   // anything.  In particular, this ensures that all arguments have been
   // defined on `ap` prior to parsing.
-  new MyArgs(ap)
+  new MyParams(ap)
   // ap.parse(List("--foo", "7"))
   ap.parse(args)
-  val Args = new MyArgs(ap)
+  val Params = new MyParams(ap)
   // Print out values of all arguments, whether options or positional.
   // Also print out types and default values.
   for (name <- ap.argNames)
     println("%30s: %s (%s) (default=%s)" format (
       name, ap(name), ap.getType(name), ap.defaultValue[Any](name)))
   // Examples of how to retrieve individual arguments
-  for (file <- Args.files)
+  for (file <- Params.files)
     println("Process file: %s" format file)
-  println("Maximum tick mark seen: %s" format (Args.tick max))
+  println("Maximum tick mark seen: %s" format (Params.tick max))
   // We can freely change the value of arguments if we want, since they're
   // just vars.
-  if (Args.daniel contains "upharsin")
-    Args.bar = "chingamos"
+  if (Params.daniel contains "upharsin")
+    Params.bar = "chingamos"
 }

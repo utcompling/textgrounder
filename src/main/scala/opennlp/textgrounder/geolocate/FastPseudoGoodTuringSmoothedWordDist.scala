@@ -19,7 +19,8 @@ package opennlp.textgrounder.geolocate
 import scala.collection.mutable
 import math.{log, sqrt}
 
-import tgutil.DynamicArray
+import opennlp.textgrounder.util.collectionutil.DynamicArray
+
 import WordDist.memoizer.Word
 
 /**
@@ -39,7 +40,7 @@ object FastPseudoGoodTuringSmoothedWordDist {
   /*
    In normal operation of fast_kl_divergence(), we are passed the same
    'self' distribution repeatedly with different 'other' distributions,
-   as we compare a given document/article against all the different
+   as we compare a given document against all the different
    non-empty cells of the Earth.  In each call, we have to iterate
    over all elements in the hash table, so we cache the elements and
    only retrieve again next time we're passed a different 'self'

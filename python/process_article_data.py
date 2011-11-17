@@ -135,9 +135,9 @@ known_fields_output = {'id':tostr, 'title':tostr, 'split':tostr,
                        'is_list':boolean_to_yesno, 'coord':coord_to_commaval,
                        'incoming_links':put_int_or_blank}
 
-combined_article_data_outfields = ['id', 'title', 'split', 'redir',
-    'namespace', 'is_list_of', 'is_disambig', 'is_list', 'coord',
-    'incoming_links']
+combined_article_data_outfields = ['id', 'title', 'split', 'coord',
+    'incoming_links', 'redir', 'namespace', 'is_list_of', 'is_disambig',
+    'is_list']
 
 def get_field_types(field_table, field_list):
   for f in field_list:

@@ -16,17 +16,18 @@
 
 package opennlp.textgrounder.geolocate
 
-import tgutil._
-import GeolocateDriver.Args
-import GeolocateDriver.Debug._
-import WordDist.memoizer._
-
 import math._
 import collection.mutable
 import util.control.Breaks._
 
 import java.io._
 
+import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.ioutil.errprint
+
+import GeolocateDriver.Params
+import GeolocateDriver.Debug._
+import WordDist.memoizer._
 
 /**
  * Create a pseudo-Good-Turing smoothed word distribution given a table
@@ -205,8 +206,8 @@ if(debug("bigram"))
   def lookup_word(word: Word) = {
     assert(finished)
     // if (debug("some")) {
-    //   errprint("Found counts for article %s, num word types = %s",
-    //            art, wordcounts(0).length)
+    //   errprint("Found counts for document %s, num word types = %s",
+    //            doc, wordcounts(0).length)
     //   errprint("Unknown prob = %s, overall_unseen_mass = %s",
     //            unseen_mass, overall_unseen_mass)
     // }
@@ -230,7 +231,7 @@ if(debug("bigram"))
             //    unseen_mass, factory.overall_word_probs[word],
             //    factory.overall_unseen_mass)
             if (debug("bigram"))
-              errprint("Word %s, seen but not in article, wordprob = %s",
+              errprint("Word %s, seen but not in document, wordprob = %s",
                        unmemoize_word(word), wordprob)
             wordprob
           }
@@ -244,7 +245,7 @@ if(debug("bigram"))
         //    errprint("%s: %s", word, count)
         val wordprob = wordcount.toDouble/num_word_tokens*(1.0 - unseen_mass)
         if (debug("bigram"))
-          errprint("Word %s, seen in article, wordprob = %s",
+          errprint("Word %s, seen in document, wordprob = %s",
                    unmemoize_word(word), wordprob)
         wordprob
       }

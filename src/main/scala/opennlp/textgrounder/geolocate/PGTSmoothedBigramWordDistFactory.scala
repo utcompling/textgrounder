@@ -16,16 +16,20 @@
 
 package opennlp.textgrounder.geolocate
 
-import tgutil._
-import GeolocateDriver.Args
-import GeolocateDriver.Debug._
-import WordDist.memoizer._
-
 import math._
 import collection.mutable
 import util.control.Breaks._
 
 import java.io._
+
+import opennlp.textgrounder.util.collectionutil.DynamicArray
+import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
+import opennlp.textgrounder.util.MeteredTask
+import opennlp.textgrounder.util.osutil.output_resource_usage
+
+import GeolocateDriver.Params
+import GeolocateDriver.Debug._
+import WordDist.memoizer._
 
 /**
  * Extract out the behavior related to the pseudo Good-Turing smoother.
@@ -95,7 +99,7 @@ class PGTSmoothedBigramWordDistFactory extends
    * words equal to the probability mass of all words seen once, and rescale
    * the remaining probabilities accordingly.
    */ 
-  def read_word_counts(table: GeoArticleTable,
+  def read_word_counts(table: DistDocumentTable,
       filehand: FileHandler, filename: String, stopwords: Set[String]) {
 errprint("read_word_counts")
     val initial_dynarr_size = 1000
@@ -116,14 +120,14 @@ errprint("read_word_counts")
     // articles in the article-data file we actually used for the experiments
     // and the word-count file we used.
     var stream: PrintStream = null
-    var writer: ArticleWriter = null
-    if (debug("wordcountarts")) {
+    var writer: GeoDocumentWriter = null
+    if (debug("wordcountdocs")) {
       // Change this if you want a different file name
-      val wordcountarts_filename = "wordcountarts-combined-article-data.txt"
-      stream = filehand.openw(wordcountarts_filename)
-      // See write_article_data_file() in ArticleData.scala
+      val wordcountdocs_filename = "wordcountdocs-combined-document-data.txt"
+      stream = filehand.openw(wordcountdocs_filename)
+      // See write_document_file() in GeoDocument.scala
       writer =
-        new ArticleWriter(stream, ArticleData.combined_article_data_outfields)
+        new GeoDocumentWriter(stream, GeoDocumentData.combined_document_data_outfields)
       writer.output_header()
     }
 
@@ -131,30 +135,30 @@ errprint("read_word_counts")
     var num_bigram_tokens = 0
     var title = null: String
 
-    def one_article_probs() {
+    def one_document_probs() {
       if (num_word_tokens == 0) return
-      val art = table.lookup_article(title)
-      if (art == null) {
-        warning("Skipping article %s, not in table", title)
-        table.num_articles_with_word_counts_but_not_in_table += 1
+      val doc = table.lookup_document(title)
+      if (doc == null) {
+        warning("Skipping document %s, not in table", title)
+        table.num_documents_with_word_counts_but_not_in_table += 1
         return
       }
-      if (debug("wordcountarts"))
-        writer.output_row(art)
-      table.num_word_count_articles_by_split(art.split) += 1
+      if (debug("wordcountdocs"))
+        writer.output_row(doc)
+      table.num_word_count_documents_by_split(doc.split) += 1
       // If we are evaluating on the dev set, skip the test set and vice
       // versa, to save memory and avoid contaminating the results.
-      if (art.split != "training" && art.split != Args.eval_set)
+      if (doc.split != "training" && doc.split != Params.eval_set)
         return
       // Don't train on test set
-      art.dist =
+      doc.dist =
         new PGTSmoothedBigramWordDist(this, keys_dynarr.array,
           values_dynarr.array, keys_dynarr.length,
           bigram_keys_dynarr.array, bigram_values_dynarr.array, bigram_keys_dynarr.length)
           //note_globally = (art.split == "training"))
     }
 
-    val task = new MeteredTask("article", "reading distributions of")
+    val task = new MeteredTask("document", "reading distributions of")
     errprint("Reading word and bigram counts from %s...", filename)
     errprint("")
 
@@ -164,15 +168,15 @@ errprint("read_word_counts")
       for (line <- filehand.openr(filename)) {
         if (line.startsWith("Article title: ")) {
           if (title != null)
-            one_article_probs()
+            one_document_probs()
           // Stop if we've reached the maximum
-          if (task.item_processed(maxtime = Args.max_time_per_stage))
+          if (task.item_processed(maxtime = Params.max_time_per_stage))
             break
-          if ((Args.num_training_docs > 0 &&
-            task.num_processed >= Args.num_training_docs)) {
+          if ((Params.num_training_docs > 0 &&
+            task.num_processed >= Params.num_training_docs)) {
             errprint("")
             errprint("Stopping because limit of %s documents reached",
-              Args.num_training_docs)
+              Params.num_training_docs)
             break
           }
 
@@ -195,14 +199,14 @@ errprint("read_word_counts")
               val count = xcount.toInt
               var words = xword
 
-              if (!Args.preserve_case_words) words = words.toLowerCase
+              if (!Params.preserve_case_words) words = words.toLowerCase
               
               var tokens = words.split("\\s");
 
               if(tokens.length == 1){
 
                 if (!(stopwords contains words) ||
-                  Args.include_stopwords_in_article_dists) {
+                  Params.include_stopwords_in_document_dists) {
                   num_word_tokens += count
                   keys_dynarr += memoize_word(words)
                   values_dynarr += count
@@ -220,13 +224,13 @@ errprint("read_word_counts")
           }
         }
       }
-      one_article_probs()
+      one_document_probs()
     }
 
-    if (debug("wordcountarts"))
+    if (debug("wordcountdocs"))
       stream.close()
     task.finish()
-    table.num_articles_with_word_counts = task.num_processed
+    table.num_documents_with_word_counts += task.num_processed
     output_resource_usage()
   }
 }

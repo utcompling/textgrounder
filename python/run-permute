@@ -90,7 +90,7 @@ SPLIT_PREFIX="$DUMP_PREFIX-split"
 PERMUTE_WIKI="$TG_PYTHON_DIR/permute_wiki.py"
 
 PERMUTED_DUMP_FILE="$DUMP_PREFIX-permuted-pages-articles.xml.bz2"
-PERMUTED_OUT_ORIG_ARTICLE_DATA_FILE="$DUMP_PREFIX-permuted-$ORIG_ARTICLE_DATA_SUFFIX"
+PERMUTED_OUT_ORIG_DOCUMENT_DATA_FILE="$DUMP_PREFIX-permuted-$ORIG_DOCUMENT_DATA_SUFFIX"
 
 if [ -z "$NUM_SPLITS" ]; then
   NUM_SPLITS=8
@@ -121,14 +121,14 @@ echo "Executing step '$step' ..."
 
 if [ "$step" = permute ]; then
 echo "Permuting articles ..."
-$PERMUTE_WIKI --article-data-file $OUT_ORIG_ARTICLE_DATA_FILE \
-  --mode=permute $OTHEROPTS > $PERMUTED_OUT_ORIG_ARTICLE_DATA_FILE
+$PERMUTE_WIKI --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
+  --mode=permute $OTHEROPTS > $PERMUTED_OUT_ORIG_DOCUMENT_DATA_FILE
 
 elif [ "$step" = split ]; then
 echo "Splitting dump file ..."
 
 bzcat $OUT_DUMP_FILE | $PERMUTE_WIKI --mode=split \
-  --article-data-file $PERMUTED_OUT_ORIG_ARTICLE_DATA_FILE \
+  --article-data-file $PERMUTED_OUT_ORIG_DOCUMENT_DATA_FILE \
   --split-prefix $SPLIT_PREFIX \
   --number-of-splits $NUM_SPLITS \
   $OTHEROPTS

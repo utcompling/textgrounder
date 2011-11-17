@@ -31,12 +31,14 @@ import java.util.List;
  * @author Rednaxela
  */
 public class KdTree<T> {
-    // Static variables
-    private static final int           bucketSize = 935;
- 
+    // split method enum
+    public enum SplitMethod { HALFWAY, MEDIAN, MAX_MARGIN }
+
     // All types
     private final int                  dimensions;
     private final KdTree<T>            parent;
+    private int                        bucketSize;
+    private SplitMethod                splitMethod;
  
     // Leaf only
     private double[][]                 locations;
@@ -56,8 +58,10 @@ public class KdTree<T> {
      * Construct a KdTree with a given number of dimensions and a limit on
      * maxiumum size (after which it throws away old points)
      */
-    public KdTree(int dimensions) {
+    public KdTree(int dimensions, int bucketSize, SplitMethod splitMethod) {
+        this.bucketSize = bucketSize;
         this.dimensions = dimensions;
+        this.splitMethod = splitMethod;
  
         // Init as leaf
         this.locations = new double[bucketSize][];
@@ -74,6 +78,8 @@ public class KdTree<T> {
      */
     private KdTree(KdTree<T> parent, boolean right) {
         this.dimensions = parent.dimensions;
+        this.bucketSize = parent.bucketSize;
+        this.splitMethod = parent.splitMethod;
  
         // Init as leaf
         this.locations = new double[Math.max(bucketSize, parent.locationCount)][];
@@ -95,13 +101,13 @@ public class KdTree<T> {
     public ArrayList<T> getData() {
         ArrayList<T> outData = new ArrayList<T>();
         if (data == null)
-        	return outData;
+            return outData;
         for (int i = 0; i < locationCount; i++) {
             // No way around the warning other than either to suppress it,
             // or not use Object[] arrays.
             @SuppressWarnings("unchecked")
             T suppress_warning = (T) data[i];
-        	outData.add(suppress_warning);
+            outData.add(suppress_warning);
         }
         return outData;
     }
@@ -124,17 +130,39 @@ public class KdTree<T> {
         while (cursor.locations == null || cursor.locationCount >= cursor.locations.length) {
             if (cursor.locations != null) {
                 cursor.splitDimension = cursor.findWidestAxis();
-                //cursor.splitValue = (cursor.minLimit[cursor.splitDimension] + cursor.maxLimit[cursor.splitDimension]) * 0.5;
 
-								List<Double> list = new ArrayList<Double>();
-                for(int i=0;i<cursor.locations.length;i++)
-                	list.add(cursor.locations[i][cursor.splitDimension]);
-                Collections.sort(list);
-								if(list.size()%2 == 1)
-                	cursor.splitValue = list.get(list.size()/2);
-								else{
-                	cursor.splitValue = (list.get(list.size()/2) + list.get(list.size()/2 - 1))/2;
-								}
+                if (splitMethod == SplitMethod.HALFWAY) {
+                    cursor.splitValue = (cursor.minLimit[cursor.splitDimension] + 
+                                         cursor.maxLimit[cursor.splitDimension]) * 0.5;
+                } else if (splitMethod == SplitMethod.MEDIAN) {
+                    // split on the median of the elements
+                    List<Double> list = new ArrayList<Double>();
+                    for(int i = 0; i < cursor.locations.length; i++) {
+                        list.add(cursor.locations[i][cursor.splitDimension]);
+                    }
+                    Collections.sort(list);
+                    if(list.size() % 2 == 1) {
+                        cursor.splitValue = list.get(list.size() / 2);
+                    } else {
+                        cursor.splitValue = (list.get(list.size() / 2) + list.get(list.size() / 2 - 1))/2;
+                    }
+                } else if (splitMethod == SplitMethod.MAX_MARGIN) {
+                    List<Double> list = new ArrayList<Double>();
+                    for(int i = 0; i < cursor.locations.length; i++) {
+                        list.add(cursor.locations[i][cursor.splitDimension]);
+                    }
+                    Collections.sort(list);
+                    double maxMargin = 0.0;
+                    double splitValue = Double.NaN;
+                    for (int i = 0; i < list.size() - 1; i++) {
+                        double delta = list.get(i+1) - list.get(i);
+                        if (delta > maxMargin) {
+                            maxMargin = delta;
+                            splitValue = list.get(i) + 0.5 * delta;
+                        }
+                    }
+                    cursor.splitValue = splitValue;
+                }
 
                 // Never split on infinity or NaN
                 if (cursor.splitValue == Double.POSITIVE_INFINITY) {
@@ -264,20 +292,20 @@ public class KdTree<T> {
     }
 
     public List<KdTree<T>> getLeaves(){
-    	List<KdTree<T>> list = new ArrayList<KdTree<T>>();
-    	this.helper(list);
-    	return list;
+        List<KdTree<T>> list = new ArrayList<KdTree<T>>();
+        this.helper(list);
+        return list;
     }
     
     private void helper(List<KdTree<T>> list ){
-    	if(this.left == null && this.right==null)
-    		list.add(this);
-    	else{
-    		if(this.left != null)
-    			this.left.helper(list);
-    		if(this.right != null)
-    			this.right.helper(list);
-    	}
+        if(this.left == null && this.right==null)
+            list.add(this);
+        else{
+            if(this.left != null)
+                this.left.helper(list);
+            if(this.right != null)
+                this.right.helper(list);
+        }
     }
     
     
@@ -319,12 +347,12 @@ public class KdTree<T> {
         if (data == null)
             return "";
 
-    	String ret="";
-    	for(int i=0; i<this.locationCount;i++)
+        String ret="";
+        for(int i=0; i<this.locationCount;i++)
         {
-    		ret += this.data[i] + " ";
+            ret += this.data[i] + " ";
         }
-    	return ret;
+        return ret;
     }
     
     protected double getAxisWeightHint(int i) {
@@ -358,7 +386,7 @@ public class KdTree<T> {
     }
 
     public static void main(String[] args) {
-        KdTree<String> tree = new KdTree<String>(2);
+        KdTree<String> tree = new KdTree<String>(2, 2, SplitMethod.HALFWAY);
         tree.addPoint(new double[] { 1.0, 1.0 }, "hello1");
         tree.addPoint(new double[] { 10.0, 2.0 }, "world2");
         tree.addPoint(new double[] { 3.0, 4.0 }, "earth3");

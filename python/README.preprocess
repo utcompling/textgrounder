@@ -123,13 +123,13 @@ run it to generate the bigram counts, you might do this:
 2. Modify 'config-geolocate' so that it has additional sets of environment
    variables for bigram counts.  For example, after these lines:
 
-COORD_COUNTS_SUFFIX="counts-only-coord-articles.txt"
-ALL_COUNTS_SUFFIX="counts-all-articles.txt"
+COORD_COUNTS_SUFFIX="counts-only-coord-documents.txt"
+ALL_COUNTS_SUFFIX="counts-all-documents.txt"
 
    you'd add
 
-COORD_BIGRAM_COUNTS_SUFFIX="bigram-counts-only-coord-articles.txt"
-ALL_BIGRAM_COUNTS_SUFFIX="bigram-counts-all-articles.txt"
+COORD_BIGRAM_COUNTS_SUFFIX="bigram-counts-only-coord-documents.txt"
+ALL_BIGRAM_COUNTS_SUFFIX="bigram-counts-all-documents.txt"
 
    Similarly, after these lines:
 

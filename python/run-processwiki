@@ -189,7 +189,7 @@ fi
 
 action="Generating article data"
 args="$disambig_arg --split-training-dev-test foobar --generate-article-data"
-outfile="$OUT_ORIG_ARTICLE_DATA_FILE"
+outfile="$OUT_ORIG_DOCUMENT_DATA_FILE"
 # Don't split because there is a prolog line.
 cansplit=no
 
@@ -211,7 +211,7 @@ elif [ "$step" = coord-links ]; then
 
 action="Generating link data"
 args="--coords-file $OUT_COORDS_FILE \
-  --article-data-file $OUT_ORIG_ARTICLE_DATA_FILE \
+  --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
   --find-coord-links"
 outfile="$OUT_COORD_LINKS_FILE"
 # Don't split because we output link info at the very end.
@@ -224,8 +224,8 @@ echo "Combining article data ..."
 $GENERATE_COMBINED \
   --links-file $OUT_COORD_LINKS_FILE \
   --coords-file $OUT_COORDS_FILE \
-  --article-data-file $OUT_ORIG_ARTICLE_DATA_FILE \
-  > $OUT_COMBINED_ARTICLE_DATA_FILE
+  --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
+  > $OUT_COMBINED_DOCUMENT_DATA_FILE
 
 elif [ "$step" = split-dump ]; then
 
@@ -234,7 +234,7 @@ PERMUTE_WIKI="$TG_PYTHON_DIR/permute_wiki.py"
 # Uses a different program, not processwiki.
 echo "Splitting dump file ..."
 bzcat $OUT_DUMP_FILE | $PERMUTE_WIKI --mode=split \
-  --article-data-file $OUT_ORIG_ARTICLE_DATA_FILE \
+  --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
   --split-prefix $SPLIT_PREFIX \
   --number-of-splits $NUM_SPLITS $OTHEROPTS
 
@@ -254,7 +254,7 @@ elif [ "$step" = toponym-eval ]; then
 
 action="Generating toponym eval data"
 args="--coords-file $OUT_COORDS_FILE \
-  --article-data-file $OUT_ORIG_ARTICLE_DATA_FILE \
+  --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
   --generate-toponym-eval"
 outfile="$OUT_TOPONYM_EVAL_FILE"
 

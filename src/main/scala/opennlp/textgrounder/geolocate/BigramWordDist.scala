@@ -16,14 +16,14 @@
 
 package opennlp.textgrounder.geolocate
 
-import tgutil._
-import GeolocateDriver.Debug._
-import WordDist.memoizer._
-
 import math._
 import collection.mutable
-import com.codahale.trove.{mutable => trovescala}
 
+import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.ioutil.errprint
+
+import GeolocateDriver.Debug._
+import WordDist.memoizer._
 
 /**
  * Bigram word distribution with a table listing counts for each word,

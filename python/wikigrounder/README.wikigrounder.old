@@ -1,0 +1,432 @@
+README.txt for WikiGrounder
+April 23, 2011
+Copyright (c) 2011 Ben Wing <ben@benwing.com>
+
+WikiGrounder is software for automatically "grounding" a document -- i.e.
+assining a location somewhere on the Earth, as determined by a pair of
+latitude/longitude coordinates, to a document.
+
+This software implements the experiments described in the following paper:
+
+Benjamin Wing and Jason Baldridge (2011), "Simple Supervised Document
+    Geolocation with Geodesic Grids" in Proceedings of the 49th Annual
+    Meeting of the Association for Computational Linguistics: Human Language
+    Technologies, Portland, Oregon, USA, June 2011.
+
+If you use this system in academic research with published results,
+please cite this paper, or use this Bibtex:
+
+@InProceedings{wing-baldridge:2011:ACL,
+  author    = {Wing, Benjamin and Baldridge, Jason},
+  title     = {Simple Supervised Document Geolocation with Geodesic Grids},
+  booktitle = {Proceedings of the 49th Annual Meeting of the Association for Computational Linguistics: Human Language Technologies},
+  month     = {June},
+  year      = {2011},
+  address   = {Portland, Oregon, USA},
+  publisher = {Association for Computational Linguistics}
+}
+
+I. INSTALLATION
+
+===Quick Start===
+
+For those familiar with Unix environments who do not need detailed
+installation instructions:
+
+1. Obtain the data files from FIXME: where.
+2. Install Cython (www.cython.org), and build the Cython (.pyx) files using
+   'make'.
+3. Set the environment variables FIXME:
+4. FIXME:
+
+===Introduction===
+
+This system is mostly implemented in Python 2.6.  Python (www.python.org)
+is a high-level dynamic programming language that is platform-independent
+and available on all major platforms (Windows, Mac OS X, and all other
+versions of Unix/Linux).  A portion of the code is implemented in Cython
+(0.13 or later; see www.cython.org).  Cython is an extension to Python that
+allows the code to be translated into C and compiled directly to machine
+code, to speed up compute-intensive tasks.  Some small front-end wrapper
+programs whose purpose is to simplify preprocessing and experiment-running
+are written in Bourne Shell, a standard shell-scripting language available
+on all versions of Unix (including Mac OS X).
+
+This code should run on all major platforms, although it has only been
+tested on Linux and Mac OS X.  The code is intended to be run from the
+command line, in a Unix-type shell environment.  To run on Mac OS X,
+use the Terminal application to access the version of BSD Unix that
+underlies Mac OS X.  To run on Windows, download and install Cygwin
+(www.cygwin.com), a robust open-source Unix-emulation environment for
+Windows.
+
+In order to reproduce all of the experiments, you will need the following
+data, available from (FIXME: where):
+-- A preprocessed version of the English-language Wikipedia dump of
+   October 4, 2010
+-- A preprocessed version of the Twitter data, which originally comes from
+   the GeoText corpus provided by Jacob Eisenstein, Brendan O'Connor et al.
+-- A stopwords file
+-- A gazetteer, specificaly the "World Gazetteer" (FIXME: we should
+   remove this requirement; I don't think it is used much if at all)
+
+It is also possible to supply your own training and/or test data.  The
+program comes with the scripts used to generate the above prepreprocessed
+data files, and the script can be rerun to use a different Wikipedia
+data dump.  Data from other sources can be supplied without too much
+difficulty; see below.
+
+===Obtaining the software needed to build the system===
+
+(1) Overall
+
+The following pieces of software are needed in order to build and run
+the software in the system.
+
+1. Python 2.6 or later (www.python.org), but not Python 3.0 or later
+2. Cython 0.13 or later (www.cython.org)
+3. A C compiler (e.g. gcc)
+4. The Make utility (only very marginally needed)
+5. The Bourne Shell, aka 'sh'
+
+All of the above, except possibly Cython, are a standard part of nearly all
+distributions of Linux and most other Unix-type operating systems.
+
+Under Linux, it is highly likely that all of the above except for Cython
+are already installed on your system; for Cython, see below.
+
+For Mac OS X, Python 2.6 is distributed part of Snow Leopard (OS X 10.6),
+as is the Bourne Shell.  gcc and Make can be obtained by installing
+the Mac OS X Developer Tools (Xcode) available at
+http://developer.apple.com/mac/.  You need an Apple Developer Connection
+login, which you can get for free.  You may also want to install MacPorts
+(www.macports.org), which provides up-to-date versions of most of the
+well-known free-software/open-source packages, including Cython.  Note
+that Xcode must be installed in order for MacPorts to work.
+
+For Windows the recommended course is to download Cygwin (www.cygwin.com),
+as mentioned above.  A large number of pre-compiled open source applications
+are included in Cygwin.  By choosing appropriate installation options,
+you can have Python, sh, gcc and make installed -- all of the above
+dependencies except for Cython.
+
+(2) Python
+
+See above for how to install Python.  If you already have Python installed,
+and it is version 2.5, the code may still work; if not, it may be possible
+to get it working with some minor changes.  However, the code will
+definitely not work in Python 2.4 or earlier without major rewriting.
+In such case, it would be simpler to just download and install the latest
+version of Python 2.x from www.python.org.  Installation of Python is
+not difficult; if you do not have root access, you can install a private
+copy of Python by configuring it as follows:
+
+./configure --prefix="$HOME"
+
+After doing this, you need to place "$HOME/bin" in your PATH.
+
+(3) Cython
+
+Cython is part of many Linux distributions.  For example, if you have
+root access, you can install Cython under Ubuntu as follows:
+
+sudo aptitude install cython
+
+On Mac OS X, MacPorts (see above) includes Cython, which can be installed
+as follows:
+
+sudo port install py26-cython
+
+To install Cython on your own, download it from www.cython.org, and unpack
+it.  Since Cython is written in Python, it does not need compilation;
+however, it still needs installation.  If you have root access, you can
+install it by running the command 'sudo python setup.py install' from the
+top-level Cython source directory.  Otherwise, you need to set appropriate
+environment variables.  If you are using Bash as your shell, the following
+is an example of what to put in your .bashrc file:
+
+export CYTHON_DIR="$HOME/src/Cython-0.14.1"
+export PATH="$CYTHON_DIR/bin:$PATH"
+export PYTHONPATH="$CYTHON_DIR:$PYTHONPATH"
+
+If all else fails, you can avoid the use of Cython (at the expense of
+slower running time) by converting the Cython code into pure Python;
+see below.
+
+===Building the system===
+
+The only part of the system that needs compilation is the part written in
+Cython.  This can be built by typing 'make' in the source directory,
+and generates a dynamic library (e.g. 'kl_divergence.so') in the same
+directory, which will be loaded appropriately by an 'import' statement
+in the Python code.
+
+If you find it impossible to get Cython working, you can simply convert
+the Cython file 'kl_divergence.pyx' into normal Python by renaming it
+to end with '.py' and following the instructions found in the comments
+at the top of the file (which mostly just involve removing the added
+'cdef' declarations).  The resulting code will run somewhat slower, but
+should still work.
+
+===Installing the system===
+
+Set the environment variables to indicate where TextGrounder is.  You
+can either set TEXTGROUNDER_DIR to point to the top-level directory where
+you installed TextGrounder, or set WIKIGROUNDER_DIR to directly point
+to the 'python' subdirectory of this directory, where WikiGrounder lives.
+
+A potential reason for the latter would be if you had different copies
+of WikiGrounder (e.g. the original and a modified one, or copies built
+on machines of different architecture but shared on the same filesystem).
+
+
+FIXME: Currently this sits in the Python directory of TextGrounder, but soon
+it will be moved elsewhere -- at least to a wikigrounder part of
+TextGrounder.
+
+I. GETTING STARTED
+
+DEPENDENCIES:
+
+1. Cython
+2. A Wikipedia dump
+3. A gazetteer -- specifically, the "World" Gazetteer ('word-dataen-fixed.txt')
+   NOTE: We should get rid of this requirement and eliminate the gazetteer
+   dependency, if possible.
+4. A stopwords file (e.g. 'stopwords.english')
+5. For Twitter, the GeoText Twitter corpus.
+
+INSTALLATION: 
+
+1. Environment variables:
+
+TEXTGROUNDER_DIR needs to be set to the 
+
+2. Compilation:
+
+Most everything here is written in Python.  However, some of the code, for
+speed reasons, was created using Cython, which allows annotating Python code
+so it can be compiled into C code.  Cython must be obtained and installed,
+then run 'make', which will build the Cython code into .so libraries.
+
+II. RUNNING
+
+There are two main programs, disambig.py and processwiki.py.  processwiki.py
+is a pre-processing script which processes a raw Wikipedia dump file and
+generates various data files for further use.  disambig.py then reads those
+data files 
+
+Options:
+  -h, --help            show this help message and exit
+  --max-time-per-stage=MAX_TIME_PER_STAGE, --mts=MAX_TIME_PER_STAGE
+                        Maximum time per stage in seconds.  If 0, no limit.
+                        Used for testing purposes.  Default 0.
+  -d FLAGS, --debug=FLAGS
+                        Output debug info of the given types (separated by
+                        spaces or commas)
+  --stopwords-file=FILE
+                        File containing list of stopwords.
+  -a FILE, --article-data-file=FILE, --a=FILE
+                        File containing info about Wikipedia articles.
+  --gazetteer-file=FILE, --gf=FILE
+                        File containing gazetteer information to match.
+  --gazetteer-type=GAZETTEER_TYPE, --gt=GAZETTEER_TYPE
+                        Type of gazetteer file specified using --gazetteer;
+                        default 'world'.
+  --counts-file=FILE, --cf=FILE
+                        File containing output from a prior run of --output-
+                        counts, listing for each article the words in the
+                        article and associated counts.
+  -e FILE, --eval-file=FILE, --e=FILE
+                        File or directory containing files to evaluate on.
+                        Each file is read in and then disambiguation is
+                        performed.
+  -f EVAL_FORMAT, --eval-format=EVAL_FORMAT, --f=EVAL_FORMAT
+                        Format of evaluation file(s).  Default 'wiki'.
+  --eval-set=EVAL_SET, --es=EVAL_SET
+                        Set to use for evaluation when --eval-format=wiki and
+                        --mode=geotag-documents ('dev' or 'devel' for the
+                        development set, 'test' for the test set).  Default
+                        'dev'.
+  --preserve-case-words, --pcw
+                        Don't fold the case of words used to compute and match
+                        against article distributions.  Note that this does
+                        not apply to toponyms; currently, toponyms are always
+                        matched case-insensitively.
+  --include-stopwords-in-article-dists
+                        Include stopwords when computing word distributions.
+  --naive-bayes-context-len=NAIVE_BAYES_CONTEXT_LEN, --nbcl=NAIVE_BAYES_CONTEXT_LEN
+                        Number of words on either side of a toponym to use in
+                        Naive Bayes matching.  Default 10.
+  --minimum-word-count=MINIMUM_WORD_COUNT, --mwc=MINIMUM_WORD_COUNT
+                        Minimum count of words to consider in word
+                        distributions.  Words whose count is less than this
+                        value are ignored.
+  --max-dist-for-close-match=MAX_DIST_FOR_CLOSE_MATCH, --mdcm=MAX_DIST_FOR_CLOSE_MATCH
+                        Maximum number of miles allowed when looking for a
+                        close match.  Default 80.
+  --max-dist-for-outliers=MAX_DIST_FOR_OUTLIERS, --mdo=MAX_DIST_FOR_OUTLIERS
+                        Maximum number of miles allowed between a point and
+                        any others in a division.  Points farther away than
+                        this are ignored as "outliers" (possible errors,
+                        etc.).  Default 200.
+  -m MODE, --mode=MODE, --m=MODE
+                        Action to perform.  'geotag-documents' finds the
+                        proper location for each document (or article) in the
+                        test set.  'geotag-toponyms' finds the proper location
+                        for each toponym in the test set. The test set is
+                        specified by --eval-file.  Default 'geotag-documents'.
+                        'segment-geotag-documents' simultaneously segments a
+                        document into sections covering a specific location
+                        and determines that location. (Not yet implemented.)
+                        'generate-kml' generates KML files for some set of
+                        words, showing the distribution over regions that the
+                        word determines.  Use '--kml-words' to specify the
+                        words whose distributions should be outputted.  See
+                        also '--kml-prefix' to specify the prefix of the files
+                        outputted, and '--kml-transform' to specify the
+                        function to use (if any) to transform the
+                        probabilities to make the distinctions among them more
+                        visible.
+  -s STRATEGY, --strategy=STRATEGY, --s=STRATEGY
+                        Strategy/strategies to use for geotagging. 'baseline'
+                        means just use the baseline strategy (see --baseline-
+                        strategy).  The other possible values depend on which
+                        mode is in use (--mode=geotag-toponyms or --mode
+                        =geotag-documents).  For geotag-toponyms:  'naive-
+                        bayes-with-baseline' (or 'nb-base') means also use the
+                        words around the toponym to be disambiguated, in a
+                        Naive-Bayes scheme, using the baseline as the prior
+                        probability; 'naive-bayes-no-baseline' (or 'nb-
+                        nobase') means use uniform prior probability.  Default
+                        is 'baseline'.  For geotag-documents:  'kl-divergence'
+                        (or 'kldiv') searches for the region where the KL
+                        divergence between the article and region is smallest.
+                        'partial-kl-divergence' (or 'partial-kldiv') is
+                        similar but uses an abbreviated KL divergence measure
+                        that only considers the words seen in the article;
+                        empirically, this appears to work just as well as the
+                        full KL divergence. 'average-cell-probability' (or
+                        'regdist') involves computing, for each word, a
+                        probability distribution over regions using the word
+                        distribution of each region, and then combining the
+                        distributions over all words in an article, weighted
+                        by the count the word in the article.  Default is
+                        'partial-kl-divergence'.  NOTE: Multiple --strategy
+                        options can be given, and each strategy will be tried,
+                        one after the other.
+  --baseline-strategy=BASELINE_STRATEGY, --bs=BASELINE_STRATEGY
+                        Strategy to use to compute the baseline.  'internal-
+                        link' (or 'link') means use number of internal links
+                        pointing to the article or region.  'random' means
+                        choose randomly.  'num-articles' (or 'num-arts' or
+                        'numarts'; only in region-type matching) means use
+                        number of articles in region.  'link-most-common-
+                        toponym' (only in --mode=geotag-documents) means to
+                        look for the toponym that occurs the most number of
+                        times in the article, and then use the internal-link
+                        baseline to match it to a location.  'regdist-most-
+                        common-toponym' (only in --mode=geotag-documents) is
+                        similar, but uses the region distribution of the most
+                        common toponym.  Default 'none'.  NOTE: Multiple
+                        --baseline-strategy options can be given, and each
+                        strategy will be tried, one after the other.
+                        Currently, however, the *-most-common-toponym
+                        strategies cannot be mixed with other baseline
+                        strategies, or with non-baseline strategies, since
+                        they require that --preserve-case-words be set
+                        internally.
+  --baseline-weight=WEIGHT, --bw=WEIGHT
+                        Relative weight to assign to the baseline (prior
+                        probability) when doing weighted Naive Bayes.  Default
+                        0.5.
+  --naive-bayes-weighting=NAIVE_BAYES_WEIGHTING, --nbw=NAIVE_BAYES_WEIGHTING
+                        Strategy for weighting the different probabilities
+                        that go into Naive Bayes.  If 'equal', do pure Naive
+                        Bayes, weighting the prior probability (baseline) and
+                        all word probabilities the same.  If 'equal-words',
+                        weight all the words the same but collectively weight
+                        all words against the baseline, giving the baseline
+                        weight according to --baseline-weight and assigning
+                        the remainder to the words.  If 'distance-weighted',
+                        similar to 'equal-words' but don't weight each word
+                        the same as each other word; instead, weight the words
+                        according to distance from the toponym.
+  --width-of-stat-region=WIDTH_OF_STAT_REGION
+                        Width of the region used to compute a statistical
+                        distribution for geotagging purposes, in terms of
+                        number of tiling regions. Default 1.
+  --degrees-per-region=DEGREES_PER_REGION, --dpr=DEGREES_PER_REGION
+                        Size (in degrees) of the tiling regions that cover the
+                        earth.  Some number of tiling regions are put together
+                        to form the region used to construct a statistical
+                        distribution.  No default; the default of '--miles-
+                        per-region' is used instead.
+  --miles-per-region=MILES_PER_REGION, --mpr=MILES_PER_REGION
+                        Size (in miles) of the tiling regions that cover the
+                        earth.  Some number of tiling regions are put together
+                        to form the region used to construct a statistical
+                        distribution.  Default 100.0.
+  --context-type=CONTEXT_TYPE, --ct=CONTEXT_TYPE
+                        Type of context used when doing disambiguation. There
+                        are two cases where this choice applies: When
+                        computing a word distribution, and when counting the
+                        number of incoming internal links. 'article' means use
+                        the article itself for both.  'region' means use the
+                        region for both. 'region-dist-article-links' means use
+                        the region for computing a word distribution, but the
+                        article for counting the number of incoming internal
+                        links.  Note that this only applies when --mode
+                        ='geotag-toponyms'; in --mode='geotag-documents', only
+                        regions are considered.  Default 'region-dist-article-
+                        links'.
+  -k KML_WORDS, --kml-words=KML_WORDS, --kw=KML_WORDS
+                        Words to generate KML distributions for, when --mode
+                        ='generate-kml'.  Each word should be separated by a
+                        comma.  A separate file is generated for each word,
+                        using '--kml-prefix' and adding '.kml'.
+  --kml-prefix=KML_PREFIX, --kp=KML_PREFIX
+                        Prefix to use for KML files outputted. Default 'kml-
+                        dist.',
+  --kml-transform=KML_TRANSFORM, --kt=KML_TRANSFORM, --kx=KML_TRANSFORM
+                        Type of transformation to apply to the probabilities
+                        when generating KML, possibly to try and make the low
+                        values more visible. Possibilities are 'none' (no
+                        transformation), 'log' (take the log), and
+                        'logsquared' (negative of squared log).  Default
+                        'none'.
+  --num-training-docs=NUM_TRAINING_DOCS, --ntrain=NUM_TRAINING_DOCS
+                        Maximum number of training documents to use. 0 means
+                        no limit.  Default 0.
+  --num-test-docs=NUM_TEST_DOCS, --ntest=NUM_TEST_DOCS
+                        Maximum number of test documents to use. 0 means no
+                        limit.  Default 0.
+  --skip-initial-test-docs=SKIP_INITIAL_TEST_DOCS, --skip-initial=SKIP_INITIAL_TEST_DOCS
+                        Skip this many test docs at beginning.  Default 0.
+  --skip-every-n-test-docs=SKIP_EVERY_N_TEST_DOCS, --skip-n=SKIP_EVERY_N_TEST_DOCS
+                        Skip this many after each one processed.  Default 0.
+  --no-individual-results, --no-results
+                        Don't show individual results for each test document.
+  --lru-cache-size=LRU_CACHE_SIZE, --lru=LRU_CACHE_SIZE
+                        Number of entries in the LRU cache.
+
+
+
+FIXME: Fill this in with examples of how to run
+
+Example of how to generate KML graphs for use with Google Earth, showing
+the region-specific distribution of various words in a corpus.
+
+For example: For different levels of the document threshold for discarding
+words, and for the four words "cool, coo, kool and kewl", plot the distribution
+of each of the words across a region of degree size 1x1.  --mts=300 is more
+for debugging and stops loading further data for generating the distribution
+after 300 seconds (5 minutes) has passed.  It's unnecessary here but may be
+useful if you have an enormous amount of data (e.g. all of Wikipedia).
+
+for x in 0 5 40; do $TGP/run-twitter --doc-thresh $x --mts=300 --degrees-per-region=1 --mode=generate-kml --kml-words='cool,coo,kool,kewl' --kml-prefix=kml-dist.$x.none. --kml-transform=none; done 
+
+Another example, just for the words "cool" and "coo", but with different kinds
+of transformation of the probabilities.
+
+for x in none log logsquared; do $TGP/run-twitter --doc-thresh 5 --mts=300 --degrees-per-region=1 --mode=generate-kml --kml-words='cool,coo' --kml-prefix=kml-dist.5.$x. --kml-transform=$x; done 

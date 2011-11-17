@@ -5,6 +5,7 @@ output
 netbeans
 *.kml
 *.gz
+*.class
 **/*.orig
 data/pcl_travel
 data/trdev
