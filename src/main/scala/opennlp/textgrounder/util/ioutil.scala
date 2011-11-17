@@ -474,10 +474,11 @@ package object ioutil {
   // all rows by this string (usually some number of spaces).  If 'maxrows'
   // is specified, output at most this many rows.
   def output_reverse_sorted_table[T <% Ordered[T],U <% Ordered[U]](
-    table: Map[T,U],
-    outfile: PrintStream=System.out, indent: String="",
-    keep_secondary_order: Boolean=false, maxrows: Int = -1) {
-    output_reverse_sorted_list(table toList)
+      table: collection.Map[T,U],
+      outfile: PrintStream=System.out, indent: String="",
+      keep_secondary_order: Boolean=false, maxrows: Int = -1) {
+    output_reverse_sorted_list(table toList, outfile, indent,
+      keep_secondary_order, maxrows)
   }
 
   ////////////////////////////////////////////////////////////////////////////
