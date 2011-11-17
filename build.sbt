@@ -25,6 +25,7 @@ libraryDependencies ++= Seq(
   "com.google.guava" % "guava" % "10.0.1",
   "org.jdom" % "jdom" % "1.1",
   "org.apache.commons" % "commons-lang3" % "3.1",
+  "org.apache.commons" % "commons-compress" % "1.3",
   // The following don't appear to be used currently.
   // "com.google.inject" % "guice" % "2.0",
   // "commons-cli" % "commons-cli" % "1.2",
