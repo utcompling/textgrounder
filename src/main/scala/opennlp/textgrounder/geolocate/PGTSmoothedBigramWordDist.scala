@@ -44,20 +44,21 @@ import WordDist.memoizer._
 
 class PGTSmoothedBigramWordDist(
   val factory: PGTSmoothedBigramWordDistFactory,
-  keys: Array[Word],
-  values: Array[Int],
-  num_words: Int,
+  unigramKeys: Array[Word],
+  unigramValues: Array[Int],
+  num_unigrams: Int,
   bigramKeys: Array[Word],
   bigramValues: Array[Int],
   num_bigrams: Int,
-  val note_globally: Boolean=true
-) extends BigramWordDist(keys, values, num_words, bigramKeys, bigramValues, num_bigrams) {
+  val note_globally: Boolean = true
+) extends BigramWordDist(unigramKeys, unigramValues, num_unigrams,
+    bigramKeys, bigramValues, num_bigrams) {
   //val FastAlgorithms = FastPseudoGoodTuringSmoothedWordDist
   type ThisType = PGTSmoothedBigramWordDist
 
   if (note_globally) {
     //assert(!factory.owp_adjusted)
-    for ((word, count) <- counts) {
+    for ((word, count) <- unicounts) {
       if (!(factory.overall_word_probs contains word))
         WordDist.total_num_word_types += 1
       // Record in overall_word_probs; note more tokens seen.
@@ -81,7 +82,7 @@ class PGTSmoothedBigramWordDist(
     // Compute probabilities.  Use a very simple version of Good-Turing
     // smoothing where we assign to unseen words the probability mass of
     // words seen once, and adjust all other probs accordingly.
-    val num_types_seen_once = counts.values count (_ == 1)
+    val num_types_seen_once = unicounts.values count (_ == 1)
     unseen_mass =
       if (num_word_tokens > 0)
         // If no words seen only once, we will have a problem if we assign 0
@@ -94,7 +95,7 @@ class PGTSmoothedBigramWordDist(
         0.5 min ((1.0 max num_types_seen_once)/num_word_tokens)
       else 0.5
     overall_unseen_mass = 1.0 - (
-      (for (ind <- counts.keys)
+      (for (ind <- unicounts.keys)
         yield factory.overall_word_probs(ind)) sum)
     //if (use_sorted_list)
     //  counts = new SortedList(counts)
@@ -109,100 +110,15 @@ class PGTSmoothedBigramWordDist(
     }
   }
 
-
-  def fast_kl_divergence(xother: WordDist, partial: Boolean=false) = {
-if(debug("bigram"))
-  errprint("fast_kl_divergence")
-    val other = xother.asInstanceOf[BigramWordDist]
-    assert(finished)
-    assert(other.finished)
-    var kldiv = 0.0
-    // 1.
-    for (word <- counts.keys) {
-      val p = lookup_word(word)
-      val q = other.lookup_word(word)
-      if (p <= 0.0 || q <= 0.0)
-        errprint("Warning: problematic values: p=%s, q=%s, word=%s", p, q, word)
-      else {
-        kldiv += p*(log(p) - log(q))
-if(debug("bigram"))
-  errprint("kldiv1: " + kldiv + " :p: " + p + " :q: " + q)
-      }
-    }
-
-    if(partial)
-      kldiv
-    else {
-      // Step 2.
-      for (word <- other.counts.keys if !(counts contains word)) {
-        val p = lookup_word(word)
-        val q = other.lookup_word(word)
-        kldiv += p*(log(p) - log(q))
-if(debug("bigram"))
-  errprint("kldiv2: " + kldiv + " :p: " + p + " :q: " + q)
-      }
-
-      val retval = kldiv + kl_divergence_34(other)
-      retval
-   }
- }
-
-  def fast_cosine_similarity(other: WordDist, partial: Boolean=false) = {
-    var kldiv = 0.0
-    kldiv
- }
-
-  def fast_smoothed_cosine_similarity(other: WordDist, partial: Boolean=false) = {
-    var kldiv = 0.0
-    kldiv
- }
-
-  def kl_divergence_34(other: BigramWordDist) = {
-    var kldiv = 0.0
-    kldiv
- }
-   
-  
-  /**
-   * Actual implementation of steps 3 and 4 of KL-divergence computation, given
-   * a value that we may want to compute as part of step 2.
-   */
-  def inner_kl_divergence_34(other: ThisType,
-      overall_probs_diff_words: Double) = {
-    var kldiv = 0.0
-
-    // 3. For words seen in neither dist but seen globally:
-    // You can show that this is
-    //
-    // factor1 = (log(self.unseen_mass) - log(self.overall_unseen_mass)) -
-    //           (log(other.unseen_mass) - log(other.overall_unseen_mass))
-    // factor2 = self.unseen_mass / self.overall_unseen_mass * factor1
-    // kldiv = factor2 * (sum(words seen globally but not in either dist)
-    //                    of overall_word_probs[word]) 
-    //
-    // The final sum
-    //   = 1 - sum(words in self) overall_word_probs[word]
-    //       - sum(words in other, not self) overall_word_probs[word]
-    //   = self.overall_unseen_mass
-    //       - sum(words in other, not self) overall_word_probs[word]
-    //
-    // So we just need the sum over the words in other, not self.
-
-    val factor1 = ((log(unseen_mass) - log(overall_unseen_mass)) -
-               (log(other.unseen_mass) - log(other.overall_unseen_mass)))
-    val factor2 = unseen_mass / overall_unseen_mass * factor1
-    val the_sum = overall_unseen_mass - overall_probs_diff_words
-    kldiv += factor2 * the_sum
-
-    // 4. For words never seen at all:
-    val p = (unseen_mass*factory.globally_unseen_word_prob /
-          factory.total_num_unseen_word_types)
-    val q = (other.unseen_mass*factory.globally_unseen_word_prob /
-          factory.total_num_unseen_word_types)
-    kldiv += factory.total_num_unseen_word_types*(p*(log(p) - log(q)))
-    kldiv
+  def cosine_similarity(other: WordDist, partial: Boolean = false,
+      smoothed: Boolean = false) = {
+    throw new UnsupportedOperationException("Not implemented yet")
   }
 
+  def kl_divergence_34(other: BigramWordDist): Double = {
+    throw new UnsupportedOperationException("Not implemented yet")
+  }
+  
   def lookup_word(word: Word) = {
     assert(finished)
     // if (debug("some")) {
@@ -211,7 +127,7 @@ if(debug("bigram"))
     //   errprint("Unknown prob = %s, overall_unseen_mass = %s",
     //            unseen_mass, overall_unseen_mass)
     // }
-    val retval = counts.get(word) match {
+    val retval = unicounts.get(word) match {
       case None => {
         factory.overall_word_probs.get(word) match {
           case None => {
@@ -251,6 +167,10 @@ if(debug("bigram"))
       }
     }
     retval
+  }
+
+  def lookup_bigram(word: Word) = {
+    throw new UnsupportedOperationException("Not implemented yet")
   }
 }
 

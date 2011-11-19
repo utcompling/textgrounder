@@ -158,6 +158,83 @@ object TrivialIntMemoizer extends Memoizer {
 }
 
 /**
+ * A trait that adds an implementation of `#kl_divergence` in terms of
+ * a slow version with debugging info and a fast version, and optionally
+ * compares the two.
+ */
+trait FastSlowKLDivergence {
+  /**
+   * This is a basic implementation of the computation of the KL-divergence
+   * between this distribution and another distribution, including possible
+   * debug information.  Useful for checking against the other, faster
+   * implementation in `fast_kl_divergence'.
+   * 
+   * @param xother The other distribution to compute against.
+   * @param partial If true, only compute the contribution involving words
+   *   that exist in our distribution; otherwise we also have to take into
+   *   account words in the other distribution even if we haven't seen them,
+   *   and often also (esp. in the presence of smoothing) the contribution
+   *   of all other words in the vocabulary.
+   * @param return_contributing_words If true, return a map listing
+   *   the words in both distributions (or, for a partial KL-divergence,
+   *   the words in our distribution) and the amount of total KL-divergence
+   *   they compute, useful for debugging.
+   *   
+   * @returns A tuple of (divergence, word_contribs) where the first
+   *   value is the actual KL-divergence and the second is the map
+   *   of word contributions as described above; will be null if
+   *   not requested.
+   */
+  def slow_kl_divergence_debug(xother: WordDist, partial: Boolean = false,
+      return_contributing_words: Boolean = false):
+      (Double, collection.Map[Word, Double])
+
+  /**
+   * Compute the KL-divergence using the "slow" algorithm of
+   * `slow_kl_divergence_debug`, but without requesting or returning debug
+   * info.
+   */
+  def slow_kl_divergence(other: WordDist, partial: Boolean = false) = {
+    val (kldiv, contribs) = slow_kl_divergence_debug(other, partial, false)
+    kldiv
+  }
+
+  /**
+   * A fast, optimized implementation of KL-divergence.  See the discussion in
+   * `slow_kl_divergence_debug`.
+   */
+  def fast_kl_divergence(other: WordDist, partial: Boolean = false): Double
+
+  /**
+   * Check fast and slow KL-divergence versions against each other.
+   */
+  def test_kl_divergence(other: WordDist, partial: Boolean = false) = {
+    val slow_kldiv = slow_kl_divergence(other, partial)
+    val fast_kldiv = fast_kl_divergence(other, partial)
+    if (abs(fast_kldiv - slow_kldiv) > 1e-8) {
+      errprint("Fast KL-div=%s but slow KL-div=%s", fast_kldiv, slow_kldiv)
+      assert(fast_kldiv == slow_kldiv)
+    }
+    fast_kldiv
+  }
+
+  /**
+   * The actual kl_divergence implementation.  The value `test_kldiv`
+   * below can be set to true to compare fast and slow against either
+   * other, throwing an assertion failure if they are more than a very
+   * small amount different (the small amount rather than 0 to account for
+   * possible rounding error).
+   */
+  def kl_divergence(other: WordDist, partial: Boolean = false) = {
+    val test_kldiv = false
+    if (test_kldiv)
+      test_kl_divergence(other, partial)
+    else
+      fast_kl_divergence(other, partial)
+  }
+}
+
+/**
  * A factory object for WordDists (word distributions).  Currently, there is
  * only one factory object (i.e. it's a singleton), but the particular
  * factory used depends on a command-line parameter.
@@ -383,92 +460,46 @@ abstract class WordDist {
   }
 
   /**
-   * Check fast and slow KL-divergence versions against each other.
-   */
-  def test_kl_divergence(other: WordDist, partial: Boolean=false) = {
-    assert(finished)
-    assert(other.finished)
-    val fast_kldiv = fast_kl_divergence(other, partial)
-    val slow_kldiv = slow_kl_divergence(other, partial)
-    if (abs(fast_kldiv - slow_kldiv) > 1e-8) {
-      errprint("Fast KL-div=%s but slow KL-div=%s", fast_kldiv, slow_kldiv)
-      assert(fast_kldiv == slow_kldiv)
-    }
-    fast_kldiv
-  }
-
-  /**
-   * Do a basic implementation of the computation of the KL-divergence
-   * between this distribution and another distribution, including possible
-   * debug information.  Useful for checking against other, faster
-   * implementations, e.g. `fast_kl_divergence`.
+   * Compute the KL-divergence between this distribution and another
+   * distribution.
    * 
    * @param other The other distribution to compute against.
    * @param partial If true, only compute the contribution involving words
-   *   that exist in our distribution; otherwise we also have to take into
-   *   account words in the other distribution even if we haven't seen them,
-   *   and often also (esp. in the presence of smoothing) the contribution
-   *   of all other words in the vocabulary.
-   * @param return_contributing_words If true, return a map listing
-   *   the words in both distributions (or, for a partial KL-divergence,
-   *   the words in our distribution) and the amount of total KL-divergence
-   *   they compute, useful for debugging.
+   *   that exist in our distribution; otherwise we also have to take
+   *   into account words in the other distribution even if we haven't
+   *   seen them, and often also (esp. in the presence of smoothing) the
+   *   contribution of all other words in the vocabulary.
    *   
-   * @returns A tuple of (divergence, word_contribs) where the first
-   *   value is the actual KL-divergence and the second is the map
-   *   of word contributions as described above; will be null if
-   *   not requested.
+   * @return The KL-divergence value.
    */
-  def slow_kl_divergence_debug(other: WordDist, partial: Boolean=false,
-      return_contributing_words: Boolean=false):
-    (Double, collection.Map[Word, Double])
-
-  /**
-   * Compute the KL-divergence using the "slow" algorithm of
-   * `slow_kl_divergence_debug`, but without requesting or returning debug
-   * info.
-   */
-  def slow_kl_divergence(other: WordDist, partial: Boolean=false) = {
-    val (kldiv, contribs) = slow_kl_divergence_debug(other, partial, false)
-    kldiv
-  }
-
-  /**
-   * A fast, optimized implementation of KL-divergence.  See the discussion in
-   * `slow_kl_divergence_debug`.
-   */
-  def fast_kl_divergence(other: WordDist, partial: Boolean=false): Double
-
-  /**
-   * Implementation of the cosine similarity between this and another
-   * distribution, using unsmoothed probabilities.
-   * 
-   * @partial Same as in `slow_kl_divergence_debug`.
-   */
-  def fast_cosine_similarity(other: WordDist, partial: Boolean=false): Double
-
-  /**
-   * Implementation of the cosine similarity between this and another
-   * distribution, using smoothed probabilities.
-   * 
-   * @partial Same as in `slow_kl_divergence_debug`.
-   */
-  def fast_smoothed_cosine_similarity(other: WordDist, partial: Boolean=false): Double
+  def kl_divergence(other: WordDist, partial: Boolean = false): Double
 
   /**
    * Compute the symmetric KL-divergence between two distributions by averaging
    * the respective one-way KL-divergences in each direction.
    * 
-   * @partial Same as in `slow_kl_divergence_debug`.
+   * @partial Same as in `kl_divergence`.
    */
-  def symmetric_kldiv(other: WordDist, partial: Boolean=false) = {
-    0.5*this.fast_kl_divergence(other, partial) +
-    0.5*this.fast_kl_divergence(other, partial)
+  def symmetric_kldiv(other: WordDist, partial: Boolean = false) = {
+    0.5*this.kl_divergence(other, partial) +
+    0.5*this.kl_divergence(other, partial)
   }
 
   /**
+   * Implementation of the cosine similarity between this and another
+   * distribution, using either unsmoothed or smoothed probabilities.
+   *
+   * @param partial Same as in `kl_divergence`.
+   * @param smoothed If true, use smoothed probabilities, if smoothing exists;
+   *   otherwise, do unsmoothed.
+   */
+  def cosine_similarity(other: WordDist, partial: Boolean = false,
+    smoothed: Boolean = false): Double
+
+  /**
    * For a document described by its distribution 'worddist', return the
-   * log probability log p(worddist|cell) using a Naive Bayes algorithm.
+   * log probability log p(worddist|other worddist) using a Naive Bayes
+   * algorithm.
    *
    * @param worddist Distribution of document.
    */

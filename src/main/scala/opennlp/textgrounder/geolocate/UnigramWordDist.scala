@@ -45,7 +45,7 @@ abstract class UnigramWordDist(
   keys: Array[Word],
   values: Array[Int],
   num_words: Int
-) extends WordDist {
+) extends WordDist with FastSlowKLDivergence {
   /** A map (or possibly a "sorted list" of tuples, to save memory?) of
       (word, count) items, specifying the counts of all words seen
       at least once.
@@ -107,8 +107,8 @@ abstract class UnigramWordDist(
 
   /**
    * This is a basic unigram implementation of the computation of the
-   * KL-divergence between this distribution and another distribution.
-   * Useful for checking against other, faster implementations.
+   * KL-divergence between this distribution and another distribution,
+   * including possible debug information.
    * 
    * Computing the KL divergence is a bit tricky, especially in the
    * presence of smoothing, which assigns probabilities even to words not
@@ -122,17 +122,7 @@ abstract class UnigramWordDist(
    * The computation of steps 3 and 4 depends heavily on the particular
    * smoothing algorithm; in the absence of smoothing, these steps
    * contribute nothing to the overall KL-divergence.
-   * 
-   * @param xother The other distribution to compute against.
-   * @param partial If true, only do step 1 above.
-   * @param return_contributing_words If true, return a map listing
-   *   the words in both distributions and the amount of total
-   *   KL-divergence they compute, useful for debugging.
-   *   
-   * @returns A tuple of (divergence, word_contribs) where the first
-   *   value is the actual KL-divergence and the second is the map
-   *   of word contributions as described above; will be null if
-   *   not requested.
+   *
    */
   def slow_kl_divergence_debug(xother: WordDist, partial: Boolean=false,
       return_contributing_words: Boolean=false) = {
@@ -174,7 +164,7 @@ abstract class UnigramWordDist(
 
   /**
    * Steps 3 and 4 of KL-divergence computation.
-   * @seealso #slow_kl_divergence_debug
+   * @see #slow_kl_divergence_debug
    */
   def kl_divergence_34(other: UnigramWordDist): Double
   

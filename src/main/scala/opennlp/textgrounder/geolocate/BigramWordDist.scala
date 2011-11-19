@@ -38,20 +38,20 @@ import WordDist.memoizer._
  */
 
 abstract class BigramWordDist(
-  keys: Array[Word],
-  values: Array[Int],
-  num_words: Int,
+  unigramKeys: Array[Word],
+  unigramValues: Array[Int],
+  num_unigrams: Int,
   bigramKeys: Array[Word],
   bigramValues: Array[Int],
   num_bigrams: Int
 ) extends WordDist {
 
-  val counts = create_word_int_map()
-  for (i <- 0 until num_words)
-    counts(keys(i)) = values(i)
-  var num_word_tokens = counts.values.sum
+  val unicounts = create_word_int_map()
+  for (i <- 0 until num_unigrams)
+    unicounts(unigramKeys(i)) = unigramValues(i)
+  var num_word_tokens = unicounts.values.sum
   
-  def num_word_types = counts.size
+  def num_word_types = unicounts.size
 
   def innerToString: String
 
@@ -97,11 +97,11 @@ abstract class BigramWordDist(
 errprint("add_document")
     assert(!finished)
     var previous = "<START>";
-    counts(memoize_word(previous)) += 1
+    unicounts(memoize_word(previous)) += 1
     for {word <- words
          val wlower = if (ignore_case) word.toLowerCase() else word
          if !stopwords(wlower) } {
-      counts(memoize_word(wlower)) += 1
+      unicounts(memoize_word(wlower)) += 1
       num_word_tokens += 1
       bicounts(memoize_word(previous + "_" + wlower)) += 1
       previous = wlower
@@ -111,8 +111,8 @@ errprint("add_document")
   def add_word_distribution(xworddist: WordDist) {
     assert(!finished)
     val worddist = xworddist.asInstanceOf[BigramWordDist]
-    for ((word, count) <- worddist.counts)
-      counts(word) += count
+    for ((word, count) <- worddist.unicounts)
+      unicounts(word) += count
     for ((bigram, count) <- worddist.bicounts)
       bicounts(bigram) += count
     num_word_tokens += worddist.num_word_tokens
@@ -123,14 +123,14 @@ if(debug("bigram"))
 
   def finish_before_global(minimum_word_count: Int = 0) {
     // make sure counts not null (eg article in coords file but not counts file)
-    if (counts == null || bicounts == null || finished) return
+    if (unicounts == null || bicounts == null || finished) return
 
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.
     if (minimum_word_count > 1) {
-      for ((word, count) <- counts if count < minimum_word_count) {
+      for ((word, count) <- unicounts if count < minimum_word_count) {
         num_word_tokens -= count
-        counts -= word
+        unicounts -= word
       }
       for ((bigram, count) <- bicounts if count < minimum_word_count) {
         num_bigram_tokens -= count
@@ -158,64 +158,65 @@ if(debug("bigram"))
      * 
      * @param xother The other distribution to compute against.
      * @param partial If true, only do step 1 above.
-     * @param return_contributing_words If true, return a map listing
-     *   the words in both distributions and the amount of total
-     *   KL-divergence they compute, useful for debugging.
      *   
      * @returns A tuple of (divergence, word_contribs) where the first
      *   value is the actual KL-divergence and the second is the map
      *   of word contributions as described above; will be null if
      *   not requested.
      */
-  def slow_kl_divergence_debug(xother: WordDist, partial: Boolean=false,
-      return_contributing_words: Boolean=false) = {
+  def kl_divergence(xother: WordDist, partial: Boolean = false) = {
     val other = xother.asInstanceOf[BigramWordDist]
     assert(finished)
     assert(other.finished)
     var kldiv = 0.0
-    val contribs =
-      if (return_contributing_words) mutable.Map[Word, Double]() else null
+    //val contribs =
+    //  if (return_contributing_words) mutable.Map[Word, Double]() else null
     // 1.
-    for (word <- counts.keys) {
+    for (word <- bicounts.keys) {
       val p = lookup_word(word)
       val q = other.lookup_word(word)
       if (p <= 0.0 || q <= 0.0)
         errprint("Warning: problematic values: p=%s, q=%s, word=%s", p, q, word)
       else {
         kldiv += p*(log(p) - log(q))
-        if (return_contributing_words)
-          contribs(word) = p*(log(p) - log(q))
+        if (debug("bigram"))
+          errprint("kldiv1: " + kldiv + " :p: " + p + " :q: " + q)
+        //if (return_contributing_words)
+        //  contribs(word) = p*(log(p) - log(q))
       }
     }
 
     if (partial)
-      (kldiv, contribs)
+      kldiv
     else {
       // Step 2.
-      for (word <- other.counts.keys if !(counts contains word)) {
-        val p = lookup_word(word)
-        val q = other.lookup_word(word)
+      for (word <- other.bicounts.keys if !(bicounts contains word)) {
+        val p = lookup_bigram(word)
+        val q = other.lookup_bigram(word)
         kldiv += p*(log(p) - log(q))
-        if (return_contributing_words)
-          contribs(word) = p*(log(p) - log(q))
+        if (debug("bigram"))
+          errprint("kldiv2: " + kldiv + " :p: " + p + " :q: " + q)
+        //if (return_contributing_words)
+        //  contribs(word) = p*(log(p) - log(q))
       }
 
       val retval = kldiv + kl_divergence_34(other)
-      (retval, contribs)
+      //(retval, contribs)
+      retval
     }
   }
 
   /**
    * Steps 3 and 4 of KL-divergence computation.
-   * @seealso #slow_kl_divergence_debug
+   * @seeo #kl_divergence
    */
   def kl_divergence_34(other: BigramWordDist): Double
   
   def get_nbayes_logprob(xworddist: WordDist) = {
-    val worddist = xworddist.asInstanceOf[UnigramWordDist]
+    val worddist = xworddist.asInstanceOf[BigramWordDist]
     var logprob = 0.0
-    for ((word, count) <- worddist.counts) {
-      val value = lookup_word(word)
+    for ((word, count) <- worddist.bicounts) {
+      val value = lookup_bigram(word)
       if (value <= 0) {
         // FIXME: Need to figure out why this happens (perhaps the word was
         // never seen anywhere in the training data? But I thought we have
@@ -228,9 +229,11 @@ if(debug("bigram"))
     logprob
   }
 
+  def lookup_bigram(word: Word): Double
+
   def find_most_common_word(pred: String => Boolean) = {
     val filtered =
-      (for ((word, count) <- counts if pred(unmemoize_word(word)))
+      (for ((word, count) <- unicounts if pred(unmemoize_word(word)))
         yield (word, count)).toSeq
     if (filtered.length == 0) None
     else {

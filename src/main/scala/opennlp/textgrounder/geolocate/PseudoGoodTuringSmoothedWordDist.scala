@@ -221,14 +221,15 @@ class PseudoGoodTuringSmoothedWordDist(
     FastAlgorithms.fast_kl_divergence(this.asInstanceOf[ThisType],
       other.asInstanceOf[ThisType], partial = partial)
 
-  def fast_cosine_similarity(other: WordDist, partial: Boolean=false) =
-    FastAlgorithms.fast_cosine_similarity(this.asInstanceOf[ThisType],
-      other.asInstanceOf[ThisType], partial = partial)
-
-  def fast_smoothed_cosine_similarity(other: WordDist, partial: Boolean=false) =
-    FastAlgorithms.fast_smoothed_cosine_similarity(
-      this.asInstanceOf[ThisType],
-      other.asInstanceOf[ThisType], partial = partial)
+  def cosine_similarity(other: WordDist, partial: Boolean = false,
+      smoothed: Boolean = false) =
+    if (smoothed)
+      FastAlgorithms.fast_smoothed_cosine_similarity(
+        this.asInstanceOf[ThisType],
+        other.asInstanceOf[ThisType], partial = partial)
+    else
+      FastAlgorithms.fast_cosine_similarity(this.asInstanceOf[ThisType],
+        other.asInstanceOf[ThisType], partial = partial)
 
   def kl_divergence_34(other: UnigramWordDist) = {      
     var overall_probs_diff_words = 0.0

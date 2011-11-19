@@ -640,25 +640,19 @@ class KLDivergenceStrategy(
 ) extends MinMaxScoreStrategy(cell_grid, true) {
 
   def score_cell(word_dist: WordDist, cell: GeoCell) = {
-    var kldiv = word_dist.fast_kl_divergence(cell.word_dist,
-      partial = partial)
-    //var kldiv = word_dist.test_kl_divergence(cell.word_dist,
-    //  partial = partial)
+    var kldiv = word_dist.kl_divergence(cell.word_dist, partial = partial)
     if (symmetric) {
-      val kldiv2 = cell.word_dist.fast_kl_divergence(word_dist,
-        partial = partial)
+      val kldiv2 = cell.word_dist.kl_divergence(word_dist, partial = partial)
       kldiv = (kldiv + kldiv2) / 2.0
     }
-    //kldiv = word_dist.test_kl_divergence(cell.word_dist,
-    //                           partial=partial)
-    //errprint("For cell %s, KL divergence %.3f", cell, kldiv)
     kldiv
   }
 
   override def return_ranked_cells(word_dist: WordDist) = {
     val cells = super.return_ranked_cells(word_dist)
 
-    if (debug("kldiv")) {
+    if (debug("kldiv") && word_dist.isInstanceOf[FastSlowKLDivergence]) {
+      val fast_slow_dist = word_dist.asInstanceOf[FastSlowKLDivergence]
       // Print out the words that contribute most to the KL divergence, for
       // the top-ranked cells
       val num_contrib_cells = 5
@@ -667,7 +661,7 @@ class KLDivergenceStrategy(
       errprint("KL-divergence debugging info:")
       for (((cell, _), i) <- cells.take(num_contrib_cells) zipWithIndex) {
         val (_, contribs) =
-          word_dist.slow_kl_divergence_debug(
+          fast_slow_dist.slow_kl_divergence_debug(
             cell.word_dist, partial = partial,
             return_contributing_words = true)
         errprint("  At rank #%s, cell %s:", i + 1, cell)
@@ -706,12 +700,8 @@ class CosineSimilarityStrategy(
 
   def score_cell(word_dist: WordDist, cell: GeoCell) = {
     var cossim =
-      if (smoothed)
-        word_dist.fast_smoothed_cosine_similarity(cell.word_dist,
-          partial = partial)
-      else
-        word_dist.fast_cosine_similarity(cell.word_dist,
-          partial = partial)
+      word_dist.cosine_similarity(cell.word_dist, partial = partial,
+        smoothed = smoothed)
     assert(cossim >= 0.0)
     // Just in case of round-off problems
     assert(cossim <= 1.002)
