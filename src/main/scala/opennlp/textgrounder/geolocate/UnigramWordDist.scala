@@ -24,8 +24,6 @@ import java.io._
 
 import opennlp.textgrounder.util.collectionutil.DynamicArray
 import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
-import opennlp.textgrounder.util.MeteredTask
-import opennlp.textgrounder.util.osutil.output_resource_usage
 
 import GeolocateDriver.Params
 import GeolocateDriver.Debug._
@@ -209,21 +207,22 @@ abstract class UnigramWordDist(
   }
 }  
 
-/**
- * General factory for UnigramWordDist distributions.
- */ 
-abstract class UnigramWordDistFactory extends WordDistFactory {
-  def set_word_dist(doc: DistDocument, keys: Array[Word], values: Array[Int],
-    num_words: Int, note_globally: Boolean)
+trait UnigramWordDistReader extends WordDistReader {
+  val initial_dynarr_size = 1000
+  val keys_dynarr =
+    new DynamicArray[Word](initial_alloc = initial_dynarr_size)
+  val values_dynarr =
+    new DynamicArray[Int](initial_alloc = initial_dynarr_size)
 
-  def read_word_counts(table: DistDocumentTable,
+  var num_word_tokens = 0
+  var title: String = _
+
+  // Used for debugging, see below.
+  var stream: PrintStream = _
+  var writer: GeoDocumentWriter = _
+
+  def do_read_word_counts(table: DistDocumentTable,
       filehand: FileHandler, filename: String, stopwords: Set[String]) {
-    val initial_dynarr_size = 1000
-    val keys_dynarr =
-      new DynamicArray[Word](initial_alloc = initial_dynarr_size)
-    val values_dynarr =
-      new DynamicArray[Int](initial_alloc = initial_dynarr_size)
-
     // This is basically a one-off debug statement because of the fact that
     // the experiments published in the paper used a word-count file generated
     // using an older algorithm for determining the geolocated coordinate of
@@ -231,64 +230,26 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
     // file, so we need a way of regenerating it using the intersection of
     // documents in the document-data file we actually used for the experiments
     // and the word-count file we used.
-    var stream: PrintStream = null
-    var writer: GeoDocumentWriter = null
     if (debug("wordcountdocs")) {
       // Change this if you want a different file name
       val wordcountdocs_filename = "wordcountdocs-combined-document-data.txt"
       stream = filehand.openw(wordcountdocs_filename)
       // See write_document_file() in GeoDocument.scala
       writer =
-        new GeoDocumentWriter(stream, GeoDocumentData.combined_document_data_outfields)
+        new GeoDocumentWriter(stream,
+          GeoDocumentData.combined_document_data_outfields)
       writer.output_header()
     }
-
-    var num_word_tokens = 0
-    var title = null: String
-
-    def one_document_probs() {
-      if (num_word_tokens == 0) return
-      val doc = table.lookup_document(title)
-      if (doc == null) {
-        warning("Skipping document %s, not in table", title)
-        table.num_documents_with_word_counts_but_not_in_table += 1
-        return
-      }
-      if (debug("wordcountdocs"))
-        writer.output_row(doc)
-      table.num_word_count_documents_by_split(doc.split) += 1
-      // If we are evaluating on the dev set, skip the test set and vice
-      // versa, to save memory and avoid contaminating the results.
-      if (doc.split != "training" && doc.split != Params.eval_set)
-        return
-      // Now set the distribution on the document; but don't use the test set's
-      // distributions in computing global smoothing values and such.
-      set_word_dist(doc, keys_dynarr.array, values_dynarr.array,
-        keys_dynarr.length, note_globally = (doc.split == "training"))
-    }
-
-    val task = new MeteredTask("document", "reading distributions of")
-    errprint("Reading word counts from %s...", filename)
-    errprint("")
 
     // Written this way because there's another line after the for loop,
     // corresponding to the else clause of the Python for loop
     breakable {
       for (line <- filehand.openr(filename)) {
         if (line.startsWith("Article title: ")) {
-          if (title != null)
-            one_document_probs()
-          // Stop if we've reached the maximum
-          if (task.item_processed(maxtime = Params.max_time_per_stage))
-            break
-          if ((Params.num_training_docs > 0 &&
-            task.num_processed >= Params.num_training_docs)) {
-            errprint("")
-            errprint("Stopping because limit of %s documents reached",
-              Params.num_training_docs)
-            break
+          if (title != null && num_word_tokens > 0) {
+            if (!handle_one_document(table, title))
+              break
           }
-
           // Extract title and set it
           val titlere = "Article title: (.*)$".r
           line match {
@@ -321,14 +282,41 @@ abstract class UnigramWordDistFactory extends WordDistFactory {
           }
         }
       }
-      one_document_probs()
+      handle_one_document(table, title)
     }
 
     if (debug("wordcountdocs"))
       stream.close()
-    task.finish()
-    table.num_documents_with_word_counts += task.num_processed
-    output_resource_usage()
   }
+
+  def set_word_dist(doc: DistDocument, is_training_set: Boolean,
+      is_eval_set: Boolean) = {
+    if (num_word_tokens == 0)
+      false
+    else {
+      if (debug("wordcountdocs"))
+        writer.output_row(doc)
+      // If we are evaluating on the dev set, skip the test set and vice
+      // versa, to save memory and avoid contaminating the results.
+      if (is_training_set || is_eval_set) {
+        // Now set the distribution on the document; but don't use the test
+        // set's distributions in computing global smoothing values and such.
+        set_unigram_word_dist(doc, keys_dynarr.array, values_dynarr.array,
+          keys_dynarr.length, note_globally = is_training_set)
+        true
+      }
+      else false
+    }
+  }
+
+  def set_unigram_word_dist(doc: DistDocument, keys: Array[Word],
+    values: Array[Int], num_words: Int, note_globally: Boolean)
+}
+
+/**
+ * General factory for UnigramWordDist distributions.
+ */ 
+abstract class UnigramWordDistFactory extends
+    WordDistFactory with UnigramWordDistReader {
 }
 

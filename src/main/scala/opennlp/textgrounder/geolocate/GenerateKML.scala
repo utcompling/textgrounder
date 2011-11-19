@@ -81,7 +81,7 @@ low values more visible.  Possibilities are 'none' (no transformation),
 class FilterPseudoGoodTuringSmoothedWordDistFactory(
     filter_words: Seq[String]
   ) extends PseudoGoodTuringSmoothedWordDistFactory {
-  override def set_word_dist(doc: DistDocument, keys: Array[Word],
+  override def set_unigram_word_dist(doc: DistDocument, keys: Array[Word],
       values: Array[Int], num_words: Int, note_globally: Boolean) {
     val (newkeys, newvalues) =
       (for ((k, v) <- (keys zip values).take(num_words)
