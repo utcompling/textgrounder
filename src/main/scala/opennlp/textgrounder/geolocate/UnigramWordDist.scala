@@ -213,6 +213,9 @@ trait UnigramWordDistReader extends WordDistReader {
 
   def do_read_word_counts(table: DistDocumentTable,
       filehand: FileHandler, filename: String, stopwords: Set[String]) {
+    errprint("Reading word counts from %s...", filename)
+    errprint("")
+
     // This is basically a one-off debug statement because of the fact that
     // the experiments published in the paper used a word-count file generated
     // using an older algorithm for determining the geolocated coordinate of

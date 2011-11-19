@@ -361,8 +361,6 @@ trait WordDistReader {
       filehand: FileHandler, filename: String, stopwords: Set[String]) {
 
     task = new MeteredTask("document", "reading distributions of")
-    errprint("Reading word counts from %s...", filename)
-    errprint("")
 
     do_read_word_counts(table, filehand, filename, stopwords)
 

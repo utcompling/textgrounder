@@ -18,10 +18,12 @@ package opennlp.textgrounder.geolocate
 
 import math._
 import collection.mutable
+import util.control.Breaks._
 
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.ioutil.errprint
+import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
 
+import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 import WordDist.memoizer._
 
@@ -242,3 +244,113 @@ if(debug("bigram"))
     }
   }
 }
+
+trait BigramWordDistReader extends WordDistReader {
+  val initial_dynarr_size = 1000
+  val keys_dynarr =
+    new DynamicArray[Word](initial_alloc = initial_dynarr_size)
+  val values_dynarr =
+    new DynamicArray[Int](initial_alloc = initial_dynarr_size)
+  val bigram_keys_dynarr =
+    new DynamicArray[Word](initial_alloc = initial_dynarr_size)
+  val bigram_values_dynarr =
+    new DynamicArray[Int](initial_alloc = initial_dynarr_size)
+
+
+  var num_word_tokens = 0
+  var num_bigram_tokens = 0
+  var title: String = _
+
+  def do_read_word_counts(table: DistDocumentTable,
+      filehand: FileHandler, filename: String, stopwords: Set[String]) {
+    errprint("Reading word and bigram counts from %s...", filename)
+    errprint("")
+    // Written this way because there's another line after the for loop,
+    // corresponding to the else clause of the Python for loop
+    breakable {
+      for (line <- filehand.openr(filename)) {
+        if (line.startsWith("Article title: ")) {
+          if (title != null && num_word_tokens > 0) {
+            if (!handle_one_document(table, title))
+              break
+          }
+          // Extract title and set it
+          val titlere = "Article title: (.*)$".r
+          line match {
+            case titlere(ti) => title = ti
+            case _ => assert(false)
+          }
+          keys_dynarr.clear()
+          values_dynarr.clear()
+          num_word_tokens = 0
+          bigram_keys_dynarr.clear()
+          bigram_values_dynarr.clear()
+          num_bigram_tokens = 0
+        } else if (line.startsWith("Article coordinates) ") ||
+          line.startsWith("Article ID: "))
+          ()
+        else {
+          val linere = "(.*) = ([0-9]+)$".r
+          line match {
+            case linere(xword, xcount) => {
+              var words = xword
+              if (!Params.preserve_case_words) words = words.toLowerCase
+              val count = xcount.toInt
+              
+              var tokens = words.split("\\s")
+              if (tokens.length == 1) {
+                if (!(stopwords contains words) ||
+                    Params.include_stopwords_in_document_dists) {
+                  num_word_tokens += count
+                  keys_dynarr += memoize_word(words)
+                  values_dynarr += count
+	            }
+              }
+              else if (tokens.length == 2) {
+                num_bigram_tokens += count
+                bigram_keys_dynarr += memoize_word(words)
+                bigram_values_dynarr += count
+              }
+            }
+            case _ =>
+              warning("Strange line, can't parse: title=%s: line=%s",
+                title, line)
+          }
+        }
+      }
+      handle_one_document(table, title)
+    }
+  }
+
+  def set_word_dist(doc: DistDocument, is_training_set: Boolean,
+      is_eval_set: Boolean) = {
+    if (num_word_tokens == 0)
+      false
+    else {
+      // If we are evaluating on the dev set, skip the test set and vice
+      // versa, to save memory and avoid contaminating the results.
+      if (is_training_set || is_eval_set) {
+        // Now set the distribution on the document; but don't use the test
+        // set's distributions in computing global smoothing values and such.
+        set_bigram_word_dist(doc, keys_dynarr.array, values_dynarr.array,
+          keys_dynarr.length, bigram_keys_dynarr.array,
+          bigram_values_dynarr.array, bigram_keys_dynarr.length,
+          note_globally = is_training_set)
+        true
+      }
+      else false
+    }
+  }
+
+  def set_bigram_word_dist(doc: DistDocument, keys: Array[Word],
+    values: Array[Int], num_words: Int, bigram_keys: Array[Word],
+    bigram_values: Array[Int], num_bigrams: Int, note_globally: Boolean)
+}
+
+/**
+ * General factory for BigramWordDist distributions.
+ */ 
+abstract class BigramWordDistFactory extends
+    WordDistFactory with BigramWordDistReader {
+}
+

@@ -35,7 +35,7 @@ import WordDist.memoizer._
  * Extract out the behavior related to the pseudo Good-Turing smoother.
  */
 class PGTSmoothedBigramWordDistFactory extends
-    WordDistFactory {
+    BigramWordDistFactory {
   // Total number of types seen once
   var total_num_types_seen_once = 0
 
@@ -89,148 +89,14 @@ class PGTSmoothedBigramWordDistFactory extends
                globally_unseen_word_prob + (overall_word_probs.values sum))
   }
 
+  def set_bigram_word_dist(doc: DistDocument, keys: Array[Word],
+    values: Array[Int], num_words: Int, bigram_keys: Array[Word],
+    bigram_values: Array[Int], num_bigrams: Int, note_globally: Boolean) {
+    doc.dist =
+      new PGTSmoothedBigramWordDist(this, keys, values, num_words,
+        bigram_keys, bigram_values, num_bigrams, note_globally = note_globally)
+  }
+  
   def create_word_dist() =
     new PGTSmoothedBigramWordDist(this, Array[Word](), Array[Int](), 0, Array[Word](), Array[Int](), 0)
-
-  /**
-   * Parse the result of a previous run of --output-counts and generate
-   * a unigram distribution for Naive Bayes matching.  We do a simple version
-   * of Good-Turing smoothing where we assign probability mass to unseen
-   * words equal to the probability mass of all words seen once, and rescale
-   * the remaining probabilities accordingly.
-   */ 
-  def read_word_counts(table: DistDocumentTable,
-      filehand: FileHandler, filename: String, stopwords: Set[String]) {
-errprint("read_word_counts")
-    val initial_dynarr_size = 1000
-    val keys_dynarr =
-      new DynamicArray[Word](initial_alloc = initial_dynarr_size)
-    val values_dynarr =
-      new DynamicArray[Int](initial_alloc = initial_dynarr_size)
-    val bigram_keys_dynarr =
-      new DynamicArray[Word](initial_alloc = initial_dynarr_size)
-    val bigram_values_dynarr =
-      new DynamicArray[Int](initial_alloc = initial_dynarr_size)
-
-    // This is basically a one-off debug statement because of the fact that
-    // the experiments published in the paper used a word-count file generated
-    // using an older algorithm for determining the geotagged coordinate of
-    // an article.  We didn't record the corresponding article-data
-    // file, so we need a way of regenerating it using the intersection of
-    // articles in the article-data file we actually used for the experiments
-    // and the word-count file we used.
-    var stream: PrintStream = null
-    var writer: GeoDocumentWriter = null
-    if (debug("wordcountdocs")) {
-      // Change this if you want a different file name
-      val wordcountdocs_filename = "wordcountdocs-combined-document-data.txt"
-      stream = filehand.openw(wordcountdocs_filename)
-      // See write_document_file() in GeoDocument.scala
-      writer =
-        new GeoDocumentWriter(stream, GeoDocumentData.combined_document_data_outfields)
-      writer.output_header()
-    }
-
-    var num_word_tokens = 0
-    var num_bigram_tokens = 0
-    var title = null: String
-
-    def one_document_probs() {
-      if (num_word_tokens == 0) return
-      val doc = table.lookup_document(title)
-      if (doc == null) {
-        warning("Skipping document %s, not in table", title)
-        table.num_documents_with_word_counts_but_not_in_table += 1
-        return
-      }
-      if (debug("wordcountdocs"))
-        writer.output_row(doc)
-      table.num_word_count_documents_by_split(doc.split) += 1
-      // If we are evaluating on the dev set, skip the test set and vice
-      // versa, to save memory and avoid contaminating the results.
-      if (doc.split != "training" && doc.split != Params.eval_set)
-        return
-      // Don't train on test set
-      doc.dist =
-        new PGTSmoothedBigramWordDist(this, keys_dynarr.array,
-          values_dynarr.array, keys_dynarr.length,
-          bigram_keys_dynarr.array, bigram_values_dynarr.array, bigram_keys_dynarr.length)
-          //note_globally = (art.split == "training"))
-    }
-
-    val task = new MeteredTask("document", "reading distributions of")
-    errprint("Reading word and bigram counts from %s...", filename)
-    errprint("")
-
-    // Written this way because there's another line after the for loop,
-    // corresponding to the else clause of the Python for loop
-    breakable {
-      for (line <- filehand.openr(filename)) {
-        if (line.startsWith("Article title: ")) {
-          if (title != null)
-            one_document_probs()
-          // Stop if we've reached the maximum
-          if (task.item_processed(maxtime = Params.max_time_per_stage))
-            break
-          if ((Params.num_training_docs > 0 &&
-            task.num_processed >= Params.num_training_docs)) {
-            errprint("")
-            errprint("Stopping because limit of %s documents reached",
-              Params.num_training_docs)
-            break
-          }
-
-          // Extract title and set it
-          val titlere = "Article title: (.*)$".r
-          line match {
-            case titlere(ti) => title = ti
-            case _ => assert(false)
-          }
-          keys_dynarr.clear()
-          values_dynarr.clear()
-          num_word_tokens = 0
-        } else if (line.startsWith("Article coordinates) ") ||
-          line.startsWith("Article ID: "))
-          ()
-        else {
-          val linere = "(.*) = ([0-9]+)$".r
-          line match {
-            case linere(xword, xcount) => {
-              val count = xcount.toInt
-              var words = xword
-
-              if (!Params.preserve_case_words) words = words.toLowerCase
-              
-              var tokens = words.split("\\s");
-
-              if(tokens.length == 1){
-
-                if (!(stopwords contains words) ||
-                  Params.include_stopwords_in_document_dists) {
-                  num_word_tokens += count
-                  keys_dynarr += memoize_word(words)
-                  values_dynarr += count
-	              }
-              }
-		          else if(tokens.length == 2) {
-                  num_bigram_tokens += count
-                  bigram_keys_dynarr += memoize_word(words)
-                  bigram_values_dynarr += count
-              }
-            }
-            case _ =>
-              warning("Strange line, can't parse: title=%s: line=%s",
-                title, line)
-          }
-        }
-      }
-      one_document_probs()
-    }
-
-    if (debug("wordcountdocs"))
-      stream.close()
-    task.finish()
-    table.num_documents_with_word_counts += task.num_processed
-    output_resource_usage()
-  }
 }
