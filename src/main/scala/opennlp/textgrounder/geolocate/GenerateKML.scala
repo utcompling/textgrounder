@@ -22,6 +22,10 @@
 
 package opennlp.textgrounder.geolocate
 
+import java.io.{FileSystem=>_,_}
+
+import org.apache.hadoop.io._
+
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.ioutil.warning
 
@@ -48,6 +52,8 @@ class GenerateKMLParameters(
 --mode=generate-kml.  Each word should be separated by a comma.  A separate
 file is generated for each word, using the value of '--kml-prefix' and adding
 '.kml' to it.""")
+  // Same as above but a sequence
+  var split_kml_words:Seq[String] = _
   var kml_prefix =
     ap.option[String]("kml-prefix", "kp",
       default = "kml-dist.",
@@ -69,6 +75,51 @@ low values more visible.  Possibilities are 'none' (no transformation),
       help = """Height of highest bar, in meters.  Default %default.""")
 }
 
+
+/* A factory that filters the distributions to contain only the words we
+   care about, to save memory and time. */
+class FilterPseudoGoodTuringSmoothedWordDistFactory(
+    filter_words: Seq[String]
+  ) extends PseudoGoodTuringSmoothedWordDistFactory {
+  override def set_word_dist(doc: DistDocument, keys: Array[Word],
+      values: Array[Int], num_words: Int, note_globally: Boolean) {
+    val (newkeys, newvalues) =
+      (for ((k, v) <- (keys zip values).take(num_words)
+           if filter_words contains k)
+        yield (k, v)).unzip
+    doc.dist = new PseudoGoodTuringSmoothedWordDist(this,
+        newkeys.toArray, newvalues.toArray, newkeys.length, note_globally)
+  }
+}
+
+class WordCellTupleWritable extends
+    WritableComparable[WordCellTupleWritable] {
+  var word: String = _
+  var index: RegularCellIndex = _
+
+  def set(word: String, index: RegularCellIndex) {
+    this.word = word
+    this.index = index
+  }
+
+  def write(out: DataOutput) {
+    out.writeUTF(word)
+    out.writeInt(index.latind)
+    out.writeInt(index.longind)
+  }
+
+  def readFields(in: DataInput) {
+    word = in.readUTF()
+    val latind = in.readInt()
+    val longind = in.readInt()
+    index = RegularCellIndex(latind, longind)
+  }
+
+  // It hardly matters how we compare the cell indices.
+  def compareTo(other: WordCellTupleWritable) =
+    word.compareTo(other.word)
+}
+
 class GenerateKMLDriver extends
     GeolocateDriver with StandaloneGeolocateDriverStats {
   type ParamType = GenerateKMLParameters
@@ -79,6 +130,10 @@ class GenerateKMLDriver extends
     need(params.kml_words, "kml-words")
   }
 
+  override def initialize_word_dist_factory() = {
+    new FilterPseudoGoodTuringSmoothedWordDistFactory(params.split_kml_words)
+  }
+
   /**
    * Do the actual KML generation.  Some tracking info written to stderr.
    * KML files created and written on disk.
@@ -86,8 +141,8 @@ class GenerateKMLDriver extends
 
   def run_after_setup() = {
     val cdist_factory = new CellDistFactory(params.lru_cache_size)
-    val words = params.kml_words.split(',')
-    for (word <- words) {
+    params.split_kml_words = params.kml_words.split(',')
+    for (word <- params.split_kml_words) {
       val celldist = cdist_factory.get_cell_dist(cell_grid, memoize_word(word))
       if (!celldist.normalized) {
         warning("""Non-normalized distribution, apparently word %s not seen anywhere.
