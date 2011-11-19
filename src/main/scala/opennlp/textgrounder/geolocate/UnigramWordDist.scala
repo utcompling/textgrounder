@@ -72,8 +72,8 @@ abstract class UnigramWordDist(
         num_word_tokens, innerToString, finished_str, words)
   }
 
-  def add_document(words: Traversable[String], ignore_case: Boolean=true,
-      stopwords: Set[String]=Set[String]()) {
+  def add_document(words: Traversable[String], ignore_case: Boolean = true,
+      stopwords: Set[String] = Set[String]()) {
     assert(!finished)
     for {word <- words
          val wlower = if (ignore_case) word.toLowerCase() else word
@@ -124,8 +124,8 @@ abstract class UnigramWordDist(
    * contribute nothing to the overall KL-divergence.
    *
    */
-  def slow_kl_divergence_debug(xother: WordDist, partial: Boolean=false,
-      return_contributing_words: Boolean=false) = {
+  def slow_kl_divergence_debug(xother: WordDist, partial: Boolean = false,
+      return_contributing_words: Boolean = false) = {
     val other = xother.asInstanceOf[UnigramWordDist]
     assert(finished)
     assert(other.finished)

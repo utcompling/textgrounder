@@ -1203,8 +1203,8 @@ class Gazetteer {
   //    def count_toponyms(geogword: GeogWord) {
   //      toponyms_seen_in_eval_files(geogword.word.toLowerCase) += 1
   //    }
-  //    process_eval_file(fname, count_toponyms, compute_context=false,
-  //                      only_toponyms=true)
+  //    process_eval_file(fname, count_toponyms, compute_context = false,
+  //                      only_toponyms = true)
   //  }
 }
 
@@ -1404,7 +1404,7 @@ NOTE: type 'world' is the only one currently implemented.  Default
   var strategy =
     ap.multiOption[String]("s", "strategy",
       default = Seq("baseline"),
-      //      choices=Seq(
+      //      choices = Seq(
       //        "baseline", "none",
       //        "naive-bayes-with-baseline",
       //        "naive-bayes-no-baseline",
@@ -1538,7 +1538,7 @@ class GeolocateToponymDriver extends
     //   (for {(foo,count) <- toponyms_seen_in_eval_files
     //             if (count > 1)} yield foo).length)
     // output_reverse_sorted_table(toponyms_seen_in_eval_files,
-    //                             outfile=sys.stderr)
+    //                             outfile = sys.stderr)
 
     if (params.gazetteer_file != null) {
       /* FIXME!!! */

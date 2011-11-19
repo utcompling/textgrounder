@@ -89,7 +89,7 @@ object FastPseudoGoodTuringSmoothedWordDist {
    as possible.
    */
   def fast_kl_divergence(self: DistType, other: DistType,
-    partial: Boolean=false): Double = {
+    partial: Boolean = false): Double = {
     val pfact = (1.0 - self.unseen_mass)/self.num_word_tokens
     val qfact = (1.0 - other.unseen_mass)/other.num_word_tokens
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
@@ -189,7 +189,7 @@ object FastPseudoGoodTuringSmoothedWordDist {
   proceed as with KL-divergence and ignore words not in P.
    */
   def fast_smoothed_cosine_similarity(self: DistType, other: DistType,
-    partial: Boolean=false): Double = {
+    partial: Boolean = false): Double = {
     val pfact = (1.0 - self.unseen_mass)/self.num_word_tokens
     val qfact = (1.0 - other.unseen_mass)/other.num_word_tokens
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
@@ -268,7 +268,7 @@ object FastPseudoGoodTuringSmoothedWordDist {
   proceed as with KL-divergence and ignore words not in P.
    */
   def fast_cosine_similarity(self: DistType, other: DistType,
-    partial: Boolean=false) = {
+    partial: Boolean = false) = {
     val pfact = 1.0/self.num_word_tokens
     val qfact = 1.0/other.num_word_tokens
     // 1.

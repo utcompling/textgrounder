@@ -413,8 +413,8 @@ abstract class WordDist {
   /**
    * Incorporate a document into the distribution.
    */
-  def add_document(words: Traversable[String], ignore_case: Boolean=true,
-      stopwords: Set[String]=Set[String]())
+  def add_document(words: Traversable[String], ignore_case: Boolean = true,
+      stopwords: Set[String] = Set[String]())
 
   /**
    * Incorporate the given distribution into our distribution.

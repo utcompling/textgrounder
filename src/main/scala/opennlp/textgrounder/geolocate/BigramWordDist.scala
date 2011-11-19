@@ -92,8 +92,8 @@ abstract class BigramWordDist(
     */
   var overall_unseen_mass = 1.0
 
-  def add_document(words: Traversable[String], ignore_case: Boolean=true,
-      stopwords: Set[String]=Set[String]()) {
+  def add_document(words: Traversable[String], ignore_case: Boolean = true,
+      stopwords: Set[String] = Set[String]()) {
 errprint("add_document")
     assert(!finished)
     var previous = "<START>";

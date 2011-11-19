@@ -101,7 +101,7 @@ class PseudoGoodTuringSmoothedWordDistFactory extends
 
   def create_word_dist() =
     new PseudoGoodTuringSmoothedWordDist(this, Array[Word](), Array[Int](), 0,
-      note_globally=false)
+      note_globally = false)
 
   def set_unigram_word_dist(doc: DistDocument, keys: Array[Word],
       values: Array[Int], num_words: Int, note_globally: Boolean) {
@@ -128,7 +128,7 @@ class PseudoGoodTuringSmoothedWordDist(
   keys: Array[Word],
   values: Array[Int],
   num_words: Int,
-  val note_globally: Boolean=true
+  val note_globally: Boolean = true
 ) extends UnigramWordDist(keys, values, num_words) {
   val FastAlgorithms = FastPseudoGoodTuringSmoothedWordDist
   type ThisType = PseudoGoodTuringSmoothedWordDist
@@ -217,7 +217,7 @@ class PseudoGoodTuringSmoothedWordDist(
     }
   }
 
-  def fast_kl_divergence(other: WordDist, partial: Boolean=false) =
+  def fast_kl_divergence(other: WordDist, partial: Boolean = false) =
     FastAlgorithms.fast_kl_divergence(this.asInstanceOf[ThisType],
       other.asInstanceOf[ThisType], partial = partial)
 

@@ -85,7 +85,7 @@ object GeoDocumentData {
    *   testing purposes.
    */
   def read_document_file(filehand: FileHandler, filename: String,
-      process: Map[String,String] => Unit, maxtime: Double=0.0) = {
+      process: Map[String,String] => Unit, maxtime: Double = 0.0) = {
     errprint("Reading document data from %s...", filename)
     val task = new MeteredTask("document", "reading")
 
@@ -98,7 +98,7 @@ object GeoDocumentData {
         // If we've processed no documents so far, we're on line 2
         // because line 1 is the header.
         reader.process_row(line, process, task.num_processed + 2)
-        if (task.item_processed(maxtime=maxtime))
+        if (task.item_processed(maxtime = maxtime))
           break
       }
     }
@@ -136,16 +136,16 @@ object GeoDocumentData {
  *          or in Category or Book namespaces)
  */
 class GeoDocument(params: Map[String,String]) {
-  var title="unknown"
-  var id=0
-  var coord: Coord=null
-  var incoming_links: Option[Int]=None
-  var split="unknown"
-  var redir=""
-  var namespace="Main"
-  var is_list_of=false
-  var is_disambig=false
-  var is_list=false
+  var title = "unknown"
+  var id = 0
+  var coord: Coord = null
+  var incoming_links: Option[Int] = None
+  var split = "unknown"
+  var redir = ""
+  var namespace = "Main"
+  var is_list_of = false
+  var is_disambig = false
+  var is_list = false
   import GeoDocument._, GeoDocumentConverters._
 
   for ((name, v) <- params) {

@@ -47,7 +47,7 @@ This module is the main driver module for the Geolocate subproject.
 //                               Structures                                //
 /////////////////////////////////////////////////////////////////////////////
 
-//  def print_structure(struct: Any, indent: Int=0) {
+//  def print_structure(struct: Any, indent: Int = 0) {
 //    val indstr = " "*indent
 //    if (struct == null)
 //      errprint("%snull", indstr)
@@ -884,29 +884,29 @@ don't skip any documents.""")
       help = """Only process every Nth test doc.  Default 1, i.e.
 process all.""")
   //  def skip_every_n_test_docs =
-  //    ap.option[Int]("skip-every-n-test-docs", "skip-n", default=0,
-  //      help="""Skip this many after each one processed.  Default 0.""")
+  //    ap.option[Int]("skip-every-n-test-docs", "skip-n", default = 0,
+  //      help = """Skip this many after each one processed.  Default 0.""")
 
   //// Options indicating how to generate the cells we compare against
   var degrees_per_cell =
-    ap.option[Double]("degrees-per-cell", "dpc", metavar="DEGREES",
+    ap.option[Double]("degrees-per-cell", "dpc", metavar = "DEGREES",
       default = 1.0,
       help = """Size (in degrees, a floating-point number) of the tiling
 cells that cover the Earth.  Default %default. """)
   var miles_per_cell =
-    ap.option[Double]("miles-per-cell", "mpc", metavar="MILES",
+    ap.option[Double]("miles-per-cell", "mpc", metavar = "MILES",
       help = """Size (in miles, a floating-point number) of the tiling
 cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
   var km_per_cell =
-    ap.option[Double]("km-per-cell", "kpc", metavar="KM",
+    ap.option[Double]("km-per-cell", "kpc", metavar = "KM",
       help = """Size (in kilometers, a floating-point number) of the tiling
 cells that cover the Earth.  If given, it overrides the value of
 --degrees-per-cell.  No default, as the default of --degrees-per-cell
 is used.""")
   var width_of_multi_cell =
-    ap.option[Int]("width-of-multi-cell", metavar="CELLS", default = 1,
+    ap.option[Int]("width-of-multi-cell", metavar = "CELLS", default = 1,
       help = """Width of the cell used to compute a statistical
 distribution for geolocation purposes, in terms of number of tiling cells.
 NOTE: It's unlikely you want to change this.  It may be removed entirely in
@@ -921,7 +921,7 @@ tiling cell to compute each multi cell.  If the value is more than
 grid cell.""")
 
   var kd_bucket_size =
-    ap.option[Int]("kd-bucket-size", "kdbs", "bucket-size", default=200,
+    ap.option[Int]("kd-bucket-size", "kdbs", "bucket-size", default = 200,
       metavar = "INT",
       help = """Bucket size before splitting a leaf into two children.
 Default %default.""")
@@ -1277,7 +1277,7 @@ file as a document to evaluate.""")
   var strategy =
     ap.multiOption[String]("s", "strategy",
       default = Seq("partial-kl-divergence"),
-      //      choices=Seq(
+      //      choices = Seq(
       //        "baseline", "none",
       //        "full-kl-divergence",
       //        "partial-kl-divergence",
