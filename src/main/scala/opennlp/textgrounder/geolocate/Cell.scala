@@ -113,8 +113,18 @@ class CellWordDist(val word_dist: WordDist) {
 
 /** A simple distribution associating a probability with each cell. */
 
-class CellDist(
-  val cellprobs: mutable.Map[GeoCell, Double]) {
+class CellDist[CoordType, CellType <: GeoCell[CoordType]](
+  val cell_grid: CellGrid[CoordType, CellType]
+) {
+  val cellprobs: mutable.Map[CellType, Double] =
+    mutable.Map[CellType, Double]()
+
+  def set_cell_probabilities(
+      probs: collection.Map[CellType, Double]) {
+    cellprobs.clear()
+    cellprobs ++= probs
+  }
+
   def get_ranked_cells() = {
     // sort by second element of tuple, in reverse order
     cellprobs.toSeq sortWith (_._2 > _._2)
@@ -132,10 +142,10 @@ class CellDist(
  *  @param cellprobs Hash table listing probabilities associated with cells
  */
 
-class WordCellDist(
-  val cell_grid: CellGrid,
+class WordCellDist[CoordType, CellType <: GeoCell[CoordType]](
+  cell_grid: CellGrid[CoordType, CellType],
   val word: Word
-) extends CellDist(mutable.Map[GeoCell, Double]()) {
+) extends CellDist[CoordType, CellType](cell_grid) {
   var normalized = false
 
   protected def init() {
@@ -167,7 +177,12 @@ class WordCellDist(
   }
 
   init()
+}
 
+class SphereSurfWordCellDist(
+  cell_grid: SphereSurfCellGrid,
+  word: Word
+) extends WordCellDist[SphereSurfCoord, SphereSurfCell](cell_grid, word) {
   // Convert cell to a KML file showing the distribution
   def generate_kml_file(filename: String, params: KMLParameters) {
     val xform = if (params.kml_transform == "log") (x: Double) => log(x)
@@ -226,18 +241,24 @@ class WordCellDist(
   }
 }
 
-class CellDistFactory(val lru_cache_size: Int) {
-  var cached_dists: LRUCache[Word, WordCellDist] = null
+abstract class CellDistFactory[CoordType, CellType <: GeoCell[CoordType]](
+    val lru_cache_size: Int
+) {
+  type WordCellDistType <: WordCellDist[CoordType, CellType]
+  type GridType <: CellGrid[CoordType, CellType]
+  def create_word_cell_dist(cell_grid: GridType, word: Word): WordCellDistType
+
+  var cached_dists: LRUCache[Word, WordCellDistType] = null
 
   // Return a cell distribution over a given word, using a least-recently-used
   // cache to optimize access.
-  def get_cell_dist(cell_grid: CellGrid, word: Word) = {
+  def get_cell_dist(cell_grid: GridType, word: Word) = {
     if (cached_dists == null)
       cached_dists = new LRUCache(maxsize = lru_cache_size)
     cached_dists.get(word) match {
       case Some(dist) => dist
       case None => {
-        val dist = new WordCellDist(cell_grid, word)
+        val dist = create_word_cell_dist(cell_grid, word)
         cached_dists(word) = dist
         dist
       }
@@ -249,12 +270,12 @@ class CellDistFactory(val lru_cache_size: Int) {
    * by adding up the distributions of the individual words, weighting by
    * the count of the each word.
    */
-  def get_cell_dist_for_word_dist(cell_grid: CellGrid, xword_dist: WordDist) = {
+  def get_cell_dist_for_word_dist(cell_grid: GridType, xword_dist: WordDist) = {
     // FIXME!!! Figure out what to do if distribution is not a unigram dist.
     // Can we break this up into smaller operations?  Or do we have to
     // make it an interface for WordDist?
     val word_dist = xword_dist.asInstanceOf[UnigramWordDist]
-    val cellprobs = doublemap[GeoCell]()
+    val cellprobs = doublemap[CellType]()
     for ((word, count) <- word_dist.counts) {
       val dist = get_cell_dist(cell_grid, word)
       for ((cell, prob) <- dist.cellprobs)
@@ -263,8 +284,19 @@ class CellDistFactory(val lru_cache_size: Int) {
     val totalprob = (cellprobs.values sum)
     for ((cell, prob) <- cellprobs)
       cellprobs(cell) /= totalprob
-    new CellDist(cellprobs)
+    val retval = new CellDist[CoordType, CellType](cell_grid)
+    retval.set_cell_probabilities(cellprobs)
+    retval
   }
+}
+
+class SphereSurfCellDistFactory(
+    lru_cache_size: Int
+) extends CellDistFactory[SphereSurfCoord, SphereSurfCell](lru_cache_size) {
+  type WordCellDistType = SphereSurfWordCellDist
+  type GridType = SphereSurfCellGrid
+  def create_word_cell_dist(cell_grid: GridType, word: Word) =
+    new WordCellDistType(cell_grid, word)
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -275,8 +307,12 @@ class CellDistFactory(val lru_cache_size: Int) {
  * Abstract class for a general cell in a cell grid.
  * 
  * @param cell_grid The CellGrid object for the grid this cell is in.
+ * @tparam CoordType The type of the coordinate object used to specify a
+ *   a point somewhere in the grid.
  */
-abstract class GeoCell(val cell_grid: CellGrid) {
+abstract class GeoCell[CoordType](
+    val cell_grid: CellGrid[CoordType, _ <: GeoCell[CoordType]]
+) {
   val word_dist_wrapper =
     new CellWordDist(cell_grid.table.word_dist_factory.create_word_dist())
   var most_popular_document: DistDocument = null
@@ -308,13 +344,7 @@ abstract class GeoCell(val cell_grid: CellGrid) {
    * center can be more or less arbitrarily placed as long as it's somewhere
    * central.
    */
-  def get_center_coord(): SphereSurfCoord
-
-  /**
-   * Generate KML for a single cell.
-   */
-  def generate_kml(xfprob: Double, xf_minprob: Double, xf_maxprob: Double,
-    params: KMLParameters): Iterable[xml.Elem]
+  def get_center_coord(): CoordType
 
   /**
    * Return a string representation of the cell.  Generally does not need
@@ -385,13 +415,24 @@ abstract class GeoCell(val cell_grid: CellGrid) {
   }
 }
 
+abstract class SphereSurfCell(
+  cell_grid: SphereSurfCellGrid
+) extends GeoCell[SphereSurfCoord](cell_grid) {
+  /**
+   * Generate KML for a single cell.
+   */
+  def generate_kml(xfprob: Double, xf_minprob: Double, xf_maxprob: Double,
+    params: KMLParameters): Iterable[xml.Elem]
+}
+
 /**
  * A cell in a polygonal shape.
  *
  * @param cell_grid The CellGrid object for the grid this cell is in.
  */
 abstract class PolygonalCell(
-  cell_grid: CellGrid) extends GeoCell(cell_grid) {
+  cell_grid: SphereSurfCellGrid
+) extends SphereSurfCell(cell_grid) {
   /**
    * Return the boundary of the cell as an Iterable of coordinates, tracing
    * out the boundary vertex by vertex.  The last coordinate should be the
@@ -483,7 +524,7 @@ abstract class PolygonalCell(
  * @param cell_grid The CellGrid object for the grid this cell is in.
  */
 abstract class RectangularCell(
-  cell_grid: CellGrid
+  cell_grid: SphereSurfCellGrid
 ) extends PolygonalCell(cell_grid) {
   /**
    * Return the coordinate of the southwest point of the rectangle.
@@ -554,7 +595,10 @@ abstract class RectangularCell(
 /**
  * Abstract class for a grid of cells covering the earth.
  */
-abstract class CellGrid(val table: DistDocumentTable) {
+abstract class CellGrid[CoordType, CellType <: GeoCell[CoordType]](
+    val table: DistDocumentTable
+) {
+
   /**
    * Total number of cells in the grid.
    */
@@ -564,7 +608,7 @@ abstract class CellGrid(val table: DistDocumentTable) {
    * Find the correct cell for the given coordinates.  If no such cell
    * exists, return null.
    */
-  def find_best_cell_for_coord(coord: SphereSurfCoord): GeoCell
+  def find_best_cell_for_coord(coord: CoordType): CellType
 
   /**
    * Add the given document to the cell grid.
@@ -591,7 +635,8 @@ abstract class CellGrid(val table: DistDocumentTable) {
    *   even when not set, some documents may be listed in the document-data file
    *   but have no corresponding word counts given in the counts file.)
    */
-  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[GeoCell]
+  def iter_nonempty_cells(nonempty_word_dist: Boolean = false):
+    Iterable[CellType]
   
   /*********************** Not meant to be overridden *********************/
   
@@ -644,3 +689,12 @@ abstract class CellGrid(val table: DistDocumentTable) {
     table.clear_training_document_distributions()
   }
 }
+
+/**
+ * Abstract class for a grid of cells covering the earth.
+ */
+abstract class SphereSurfCellGrid(
+  table: DistDocumentTable
+) extends CellGrid[SphereSurfCoord, SphereSurfCell](table) {
+}
+

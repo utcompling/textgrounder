@@ -61,7 +61,7 @@ object KdTreeCellGrid {
 }
 
 class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int, splitMethod: KdTree.SplitMethod)
-    extends CellGrid(table) {
+    extends SphereSurfCellGrid(table) {
   /**
    * Total number of cells in the grid.
    */
@@ -112,7 +112,7 @@ class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int, splitMethod: KdT
    *   even when not set, some documents may be listed in the document-data file
    *   but have no corresponding word counts given in the counts file.)
    */
-  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[GeoCell] = {
+  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[SphereSurfCell] = {
     for (leaf <- kdtree.getLeaves
       if (leaf.size() > 0 || !nonempty_word_dist))
         yield leaves_to_cell(leaf)

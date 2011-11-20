@@ -224,7 +224,7 @@ class GeolocateDocumentEvalStats(
 
 class GroupedGeolocateDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
-  cell_grid: CellGrid,
+  cell_grid: SphereSurfCellGrid,
   results_by_range: Boolean
 ) {
 
@@ -469,7 +469,7 @@ abstract class GeolocateDocumentEvaluator(
 
 case class DocumentEvaluationResult(
   document: DistDocument,
-  pred_cell: GeoCell,
+  pred_cell: SphereSurfCell,
   true_rank: Int
 ) extends EvaluationResult {
   val true_cell = pred_cell.cell_grid.find_best_cell_for_coord(document.coord)

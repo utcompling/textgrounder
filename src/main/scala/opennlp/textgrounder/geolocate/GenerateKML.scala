@@ -140,7 +140,7 @@ class GenerateKMLDriver extends
    */
 
   def run_after_setup() = {
-    val cdist_factory = new CellDistFactory(params.lru_cache_size)
+    val cdist_factory = new SphereSurfCellDistFactory(params.lru_cache_size)
     params.split_kml_words = params.kml_words.split(',')
     for (word <- params.split_kml_words) {
       val celldist = cdist_factory.get_cell_dist(cell_grid, memoize_word(word))

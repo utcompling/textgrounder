@@ -432,7 +432,7 @@ class TopoDocument(
 
   // Determine the cell word-distribution object for a given document:
   // Create and populate one if necessary.
-  def find_cellworddist(cell_grid: CellGrid) = {
+  def find_cellworddist(cell_grid: SphereSurfCellGrid) = {
     val loc = location
     if (loc != null && loc.isInstanceOf[Division]) {
       val div = loc.asInstanceOf[Division]
@@ -775,7 +775,7 @@ abstract class GeolocateToponymStrategy {
 // (find the correct geographic location) using the "link baseline", i.e.
 // use the location with the highest number of incoming links.
 class BaselineGeolocateToponymStrategy(
-  cell_grid: CellGrid,
+  cell_grid: SphereSurfCellGrid,
   val baseline_strategy: String) extends GeolocateToponymStrategy {
   def need_context() = false
 
@@ -803,7 +803,7 @@ class BaselineGeolocateToponymStrategy(
 // (find the correct geographic location) using Naive Bayes, possibly
 // in conjunction with the baseline.
 class NaiveBayesToponymStrategy(
-  cell_grid: CellGrid,
+  cell_grid: SphereSurfCellGrid,
   val use_baseline: Boolean) extends GeolocateToponymStrategy {
   def need_context() = true
 

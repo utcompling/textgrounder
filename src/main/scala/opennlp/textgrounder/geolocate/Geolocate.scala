@@ -301,7 +301,7 @@ class DistDocumentTable(
   }
 
   def read_document_data(filehand: FileHandler, filename: String,
-      cell_grid: CellGrid) {
+      cell_grid: SphereSurfCellGrid) {
     val redirects = mutable.Buffer[DistDocument]()
 
     def process(params: Map[String, String]) {
@@ -446,7 +446,7 @@ class DistDocument(params: Map[String, String]) extends GeoDocument(params)
  * Abstract class for reading documents from a test file and doing
  * document geolocation on them (as opposed e.g. to toponym resolution).
  */
-abstract class GeolocateDocumentStrategy(val cell_grid: CellGrid) {
+abstract class GeolocateDocumentStrategy(val cell_grid: SphereSurfCellGrid) {
   /**
    * For a given word distribution (describing a test document), return
    * an Iterable of tuples, each listing a particular cell on the Earth
@@ -456,7 +456,7 @@ abstract class GeolocateDocumentStrategy(val cell_grid: CellGrid) {
    * are better, while for others, higher scores are better.  Currently,
    * the wrapper code outputs the score but doesn't otherwise use it.
    */
-  def return_ranked_cells(word_dist: WordDist): Iterable[(GeoCell, Double)]
+  def return_ranked_cells(word_dist: WordDist): Iterable[(SphereSurfCell, Double)]
 }
 
 /**
@@ -464,7 +464,7 @@ abstract class GeolocateDocumentStrategy(val cell_grid: CellGrid) {
  * 'baseline_strategy' specifies the particular strategy to use.
  */
 class RandomGeolocateDocumentStrategy(
-  cell_grid: CellGrid
+  cell_grid: SphereSurfCellGrid
 ) extends GeolocateDocumentStrategy(cell_grid) {
   def return_ranked_cells(word_dist: WordDist) = {
     val cells = cell_grid.iter_nonempty_cells()
@@ -474,10 +474,10 @@ class RandomGeolocateDocumentStrategy(
 }
 
 class MostPopularCellGeolocateDocumentStrategy(
-  cell_grid: CellGrid,
+  cell_grid: SphereSurfCellGrid,
   internal_link: Boolean
 ) extends GeolocateDocumentStrategy(cell_grid) {
-  var cached_ranked_mps: Iterable[(GeoCell, Double)] = null
+  var cached_ranked_mps: Iterable[(SphereSurfCell, Double)] = null
   def return_ranked_cells(word_dist: WordDist) = {
     if (cached_ranked_mps == null) {
       cached_ranked_mps = (
@@ -494,9 +494,9 @@ class MostPopularCellGeolocateDocumentStrategy(
 }
 
 class CellDistMostCommonToponymGeolocateDocumentStrategy(
-  cell_grid: CellGrid
+  cell_grid: SphereSurfCellGrid
 ) extends GeolocateDocumentStrategy(cell_grid) {
-  val cdist_factory = new CellDistFactory(Params.lru_cache_size)
+  val cdist_factory = new SphereSurfCellDistFactory(Params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
     // Look for a toponym, then a proper noun, then any word.
@@ -517,7 +517,7 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
 }
 
 class LinkMostCommonToponymGeolocateDocumentStrategy(
-  cell_grid: CellGrid
+  cell_grid: SphereSurfCellGrid
 ) extends GeolocateDocumentStrategy(cell_grid) {
   def return_ranked_cells(word_dist: WordDist) = {
     var maxword = word_dist.find_most_common_word(
@@ -577,14 +577,14 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
  *   scores are better.
  */
 abstract class MinMaxScoreStrategy(
-  cell_grid: CellGrid,
+  cell_grid: SphereSurfCellGrid,
   prefer_minimum: Boolean
 ) extends GeolocateDocumentStrategy(cell_grid) {
   /**
    * Function to return the score of a document distribution against a
    * cell.
    */
-  def score_cell(word_dist: WordDist, cell: GeoCell): Double
+  def score_cell(word_dist: WordDist, cell: SphereSurfCell): Double
 
   /**
    * Compare a word distribution (for a document, typically) against all
@@ -592,7 +592,7 @@ abstract class MinMaxScoreStrategy(
    * indicates the cell and 'score' the score.
    */
   def return_ranked_cells(word_dist: WordDist) = {
-    val cell_buf = mutable.Buffer[(GeoCell, Double)]()
+    val cell_buf = mutable.Buffer[(SphereSurfCell, Double)]()
     for (
       cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
     ) {
@@ -634,12 +634,12 @@ abstract class MinMaxScoreStrategy(
  * any case since it's comparing documents against cells.)
  */
 class KLDivergenceStrategy(
-  cell_grid: CellGrid,
+  cell_grid: SphereSurfCellGrid,
   partial: Boolean = true,
   symmetric: Boolean = false
 ) extends MinMaxScoreStrategy(cell_grid, true) {
 
-  def score_cell(word_dist: WordDist, cell: GeoCell) = {
+  def score_cell(word_dist: WordDist, cell: SphereSurfCell) = {
     var kldiv = word_dist.kl_divergence(cell.word_dist, partial = partial)
     if (symmetric) {
       val kldiv2 = cell.word_dist.kl_divergence(word_dist, partial = partial)
@@ -693,12 +693,12 @@ class KLDivergenceStrategy(
  * distribution, rather than considering all words in the vocabulary.
  */
 class CosineSimilarityStrategy(
-  cell_grid: CellGrid,
+  cell_grid: SphereSurfCellGrid,
   smoothed: Boolean = false,
   partial: Boolean = false
 ) extends MinMaxScoreStrategy(cell_grid, true) {
 
-  def score_cell(word_dist: WordDist, cell: GeoCell) = {
+  def score_cell(word_dist: WordDist, cell: SphereSurfCell) = {
     var cossim =
       word_dist.cosine_similarity(cell.word_dist, partial = partial,
         smoothed = smoothed)
@@ -712,11 +712,11 @@ class CosineSimilarityStrategy(
 
 /** Use a Naive Bayes strategy for comparing document and cell. */
 class NaiveBayesDocumentStrategy(
-  cell_grid: CellGrid,
+  cell_grid: SphereSurfCellGrid,
   use_baseline: Boolean = true
 ) extends MinMaxScoreStrategy(cell_grid, false) {
 
-  def score_cell(word_dist: WordDist, cell: GeoCell) = {
+  def score_cell(word_dist: WordDist, cell: SphereSurfCell) = {
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
       if (use_baseline) {
@@ -738,9 +738,9 @@ class NaiveBayesDocumentStrategy(
 }
 
 class AverageCellProbabilityStrategy(
-  cell_grid: CellGrid
+  cell_grid: SphereSurfCellGrid
 ) extends GeolocateDocumentStrategy(cell_grid) {
-  val cdist_factory = new CellDistFactory(Params.lru_cache_size)
+  val cdist_factory = new SphereSurfCellDistFactory(Params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
     val celldist =
@@ -1127,7 +1127,7 @@ abstract class GeolocateDriver extends
   override type ParamType <: GeolocateParameters
   var degrees_per_cell = 0.0
   var stopwords: Set[String] = _
-  var cell_grid: CellGrid = _
+  var cell_grid: SphereSurfCellGrid = _
   var document_table: DistDocumentTable = _
   var word_dist_factory: WordDistFactory = _
 

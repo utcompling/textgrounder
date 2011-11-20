@@ -162,7 +162,7 @@ class MultiRegularCellGrid(
   val degrees_per_cell: Double,
   val width_of_multi_cell: Int,
   table: DistDocumentTable
-) extends CellGrid(table) {
+) extends SphereSurfCellGrid(table) {
 
   /**
    * Size of each cell (vertical dimension; horizontal dimension only near
@@ -444,7 +444,7 @@ class MultiRegularCellGrid(
     val max_latind = min_latind + grsize - 1
     val min_longind = true_longind - grsize / 2
     val max_longind = min_longind + grsize - 1
-    val grid = mutable.Map[RegularCellIndex, (GeoCell, Double, Int)]()
+    val grid = mutable.Map[RegularCellIndex, (MultiRegularCell, Double, Int)]()
     for (((cell, value), rank) <- pred_cells zip (1 to pred_cells.length)) {
       val (la, lo) = (cell.index.latind, cell.index.longind)
       if (la >= min_latind && la <= max_latind &&
