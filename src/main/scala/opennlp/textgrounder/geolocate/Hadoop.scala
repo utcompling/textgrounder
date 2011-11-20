@@ -442,35 +442,56 @@ trait HadoopGeolocateDriver extends BaseHadoopGeolocateDriver {
 /************************************************************************/
 /*                Hadoop implementation of geolocate-document           */
 /************************************************************************/
-   
-class DocumentEvaluationMapper extends
-    Mapper[Object, Text, Text, DoubleWritable] {
-  val reader = new GeoDocumentReader(GeoDocumentData.combined_document_data_outfields)
-  var evaluators: Iterable[InternalGeolocateDocumentEvaluator] = null
-  val task = new MeteredTask("document", "evaluating")
-  var driver: HadoopGeolocateDocumentDriver = _
 
-  type ContextType = Mapper[Object, Text, Text, DoubleWritable]#Context
+trait HadoopGeolocateMapper {
+  type ContextType <: TaskInputOutputContext[_,_,_,_]
+  type DriverType <: HadoopGeolocateDriver
+  val driver = create_driver()
+  type ParamType = driver.ParamType
 
-  override def setup(context: ContextType) {
+  def progname: String
+
+  def create_param_object(ap: ArgParser): ParamType
+  def create_driver(): DriverType
+
+  def setup(context: ContextType) {
     import HadoopGeolocateConfiguration._
-    import HadoopGeolocateDocumentApp.progname
 
     val conf = context.getConfiguration
     val ap = new ArgParser(progname)
     // Initialize set of parameters in `ap`
-    new HadoopGeolocateDocumentParameters(ap)
+    create_param_object(ap)
     // Retrieve configuration values and store in `ap`
     convert_parameters_from_hadoop_conf(hadoop_conf_prefix, ap, conf)
     // Now create a class containing the stored configuration values
-    val params = new HadoopGeolocateDocumentParameters(ap)
-    driver = new HadoopGeolocateDocumentDriver
+    val params = create_param_object(ap)
     driver.set_task_context(context)
     driver.set_parameters(params)
     driver.setup_for_run()
+  }
+}
+   
+class DocumentEvaluationMapper extends
+    Mapper[Object, Text, Text, DoubleWritable] with
+    HadoopGeolocateMapper {
+  def progname = HadoopGeolocateDocumentApp.progname
+  type ContextType = Mapper[Object, Text, Text, DoubleWritable]#Context
+  type DriverType = HadoopGeolocateDocumentDriver
+  // more type erasure crap
+  def create_param_object(ap: ArgParser) = new ParamType(ap)
+  def create_driver() = new DriverType
+
+  val reader =
+    new GeoDocumentReader(GeoDocumentData.combined_document_data_outfields)
+  var evaluators: Iterable[InternalGeolocateDocumentEvaluator] = null
+  val task = new MeteredTask("document", "evaluating")
+
+  override def setup(context: ContextType) {
+    super.setup(context)
     evaluators =
       for ((stratname, strategy) <- driver.strategies)
-        yield new InternalGeolocateDocumentEvaluator(strategy, stratname, driver)
+        yield new InternalGeolocateDocumentEvaluator(strategy, stratname,
+          driver)
   }
 
   override def map(key: Object, value: Text, context: ContextType) {
