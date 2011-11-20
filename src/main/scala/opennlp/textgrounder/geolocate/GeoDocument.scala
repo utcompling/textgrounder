@@ -285,6 +285,21 @@ object GeoDocumentConverters {
     else validate_int(foo)
   }
 
+  /**
+   * Convert a blank string into None, or a valid string that converts into
+   * type T into Some(value), where value is of type T.  Throw an error if
+   * a non-blank, invalid string was seen.  Note that the construction
+   * `T : Serializer` means essentially "T must have a Serializer".
+   * More technically, it adds an extra implicit parameter list with a
+   * single parameter of type Serializer[T].  When the compiler sees a
+   * call to get_x_or_blank[X] for some type X, it looks in the lexical
+   * environment to see if there is an object in scope of type Serializer[X]
+   * that is marked `implicit`, and if so, it gives the implicit parameter
+   * the value of that object; otherwise, you get a compile error.  The
+   * function can then retrieve the implicit parameter's value using the
+   * construction `implicitly[Serializer[T]]`.  The `T : Serializer`
+   * construction is technically known as a *context bound*.
+   */
   def get_x_or_blank[T : Serializer](foo: String) =
     if (foo == "") None
     else Option[T](implicitly[Serializer[T]].deserialize(foo))
