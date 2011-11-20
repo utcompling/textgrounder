@@ -138,7 +138,7 @@ object GeoDocumentData {
 class GeoDocument(params: Map[String,String]) {
   var title = "unknown"
   var id = 0
-  var coord: Coord = null
+  var coord: SphereSurfCoord = null
   var incoming_links: Option[Int] = None
   var split = "unknown"
   var redir = ""
@@ -267,11 +267,11 @@ object GeoDocumentConverters {
   def commaval_to_coord(foo: String) = {
     if (foo != "") {
       val Array(lat, long) = foo.split(',')
-      Coord(lat.toDouble, long.toDouble)
+      SphereSurfCoord(lat.toDouble, long.toDouble)
     } else null
   }
   
-  def coord_to_commaval(foo: Coord) =
+  def coord_to_commaval(foo: SphereSurfCoord) =
     if (foo != null) "%s,%s".format(foo.lat, foo.long) else ""
 
   def validate_coord(foo: String): Boolean = {
@@ -280,7 +280,7 @@ object GeoDocumentConverters {
     if (split.length != 2) return false
     val Array(lat, long) = split
     try {
-      Coord(lat.toDouble, long.toDouble)
+      SphereSurfCoord(lat.toDouble, long.toDouble)
     } catch {
       case _ => return false
     }

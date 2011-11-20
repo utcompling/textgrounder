@@ -310,7 +310,7 @@ abstract class GeoCell(val cell_grid: CellGrid) {
    * center can be more or less arbitrarily placed as long as it's somewhere
    * central.
    */
-  def get_center_coord(): Coord
+  def get_center_coord(): SphereSurfCoord
 
   /**
    * Generate KML for a single cell.
@@ -399,7 +399,7 @@ abstract class PolygonalCell(
    * out the boundary vertex by vertex.  The last coordinate should be the
    * same as the first, as befits a closed shape.
    */
-  def get_boundary(): Iterable[Coord]
+  def get_boundary(): Iterable[SphereSurfCoord]
 
   /**
    * Return the "inner boundary" -- something echoing the actual boundary of the
@@ -409,7 +409,7 @@ abstract class PolygonalCell(
   def get_inner_boundary() = {
     val center = get_center_coord()
     for (coord <- get_boundary())
-      yield Coord((center.lat + coord.lat) / 2.0,
+      yield SphereSurfCoord((center.lat + coord.lat) / 2.0,
                   average_longitudes(center.long, coord.long))
   }
 
@@ -490,18 +490,18 @@ abstract class RectangularCell(
   /**
    * Return the coordinate of the southwest point of the rectangle.
    */
-  def get_southwest_coord(): Coord
+  def get_southwest_coord(): SphereSurfCoord
   /**
    * Return the coordinate of the northeast point of the rectangle.
    */
-  def get_northeast_coord(): Coord
+  def get_northeast_coord(): SphereSurfCoord
   /**
    * Define the center based on the southwest and northeast points.
    */
   def get_center_coord() = {
     val sw = get_southwest_coord()
     val ne = get_northeast_coord()
-    Coord((sw.lat + ne.lat) / 2.0, (sw.long + ne.long) / 2.0)
+    SphereSurfCoord((sw.lat + ne.lat) / 2.0, (sw.long + ne.long) / 2.0)
   }
 
   /**
@@ -512,8 +512,8 @@ abstract class RectangularCell(
     val sw = get_southwest_coord()
     val ne = get_northeast_coord()
     val center = get_center_coord()
-    val nw = Coord(ne.lat, sw.long)
-    val se = Coord(sw.lat, ne.long)
+    val nw = SphereSurfCoord(ne.lat, sw.long)
+    val se = SphereSurfCoord(sw.lat, ne.long)
     Seq(sw, nw, ne, se, sw)
   }
 
@@ -566,7 +566,7 @@ abstract class CellGrid(val table: DistDocumentTable) {
    * Find the correct cell for the given coordinates.  If no such cell
    * exists, return null.
    */
-  def find_best_cell_for_coord(coord: Coord): GeoCell
+  def find_best_cell_for_coord(coord: SphereSurfCoord): GeoCell
 
   /**
    * Add the given document to the cell grid.
@@ -674,7 +674,7 @@ abstract class CellGrid(val table: DistDocumentTable) {
   of the corners of a cell (tiling or multi) will be integers.  Normally,
   we use the southwest corner to specify a cell.
 
-  Correspondingly, to convert a cell index to a Coord, we multiply
+  Correspondingly, to convert a cell index to a SphereSurfCoord, we multiply
   latitude and longitude by degrees_per_cell.
 
   Near the edges, tiling cells may be truncated.  Multi cells will
@@ -794,12 +794,12 @@ class MultiRegularCellGrid(
      don't want.
    */
   val maximum_index =
-    coord_to_tiling_cell_index(Coord(maximum_latitude - 1e-10,
+    coord_to_tiling_cell_index(SphereSurfCoord(maximum_latitude - 1e-10,
       maximum_longitude))
   val maximum_latind = maximum_index.latind
   val maximum_longind = maximum_index.longind
   val minimum_index =
-    coord_to_tiling_cell_index(Coord(minimum_latitude, minimum_longitude))
+    coord_to_tiling_cell_index(SphereSurfCoord(minimum_latitude, minimum_longitude))
   val minimum_latind = minimum_index.latind
   val minimum_longind = minimum_index.longind
 
@@ -832,13 +832,13 @@ class MultiRegularCellGrid(
   /*************** Conversion between Cell indices and Coords *************/
 
   /* The different functions vary depending on where in the particular cell
-     the Coord is wanted, e.g. one of the corners or the center. */
+     the SphereSurfCoord is wanted, e.g. one of the corners or the center. */
 
   /**
    * Convert a coordinate to the indices of the southwest corner of the
    * corresponding tiling cell.
    */
-  def coord_to_tiling_cell_index(coord: Coord) = {
+  def coord_to_tiling_cell_index(coord: SphereSurfCoord) = {
     val latind = floor(coord.lat / degrees_per_cell).toInt
     val longind = floor(coord.long / degrees_per_cell).toInt
     RegularCellIndex(latind, longind)
@@ -848,7 +848,7 @@ class MultiRegularCellGrid(
    * Convert a coordinate to the indices of the southwest corner of the
    * corresponding multi cell.
    */
-  def coord_to_multi_cell_index(coord: Coord) = {
+  def coord_to_multi_cell_index(coord: SphereSurfCoord) = {
     // When width_of_multi_cell = 1, don't subtract anything.
     // When width_of_multi_cell = 2, subtract 0.5*degrees_per_cell.
     // When width_of_multi_cell = 3, subtract degrees_per_cell.
@@ -858,7 +858,7 @@ class MultiRegularCellGrid(
     // Compute the indices of the southwest cell
     val subval = (width_of_multi_cell - 1) / 2.0 * degrees_per_cell
     coord_to_tiling_cell_index(
-      Coord(coord.lat - subval, coord.long - subval))
+      SphereSurfCoord(coord.lat - subval, coord.long - subval))
   }
 
   /**
@@ -869,7 +869,7 @@ class MultiRegularCellGrid(
    */
   def fractional_cell_index_to_coord(index: FractionalRegularCellIndex,
     method: String = "coerce-warn") = {
-    Coord(index.latind * degrees_per_cell, index.longind * degrees_per_cell,
+    SphereSurfCoord(index.latind * degrees_per_cell, index.longind * degrees_per_cell,
       method)
   }
 
@@ -979,7 +979,7 @@ class MultiRegularCellGrid(
 
   /*************** End conversion functions *************/
 
-  def find_best_cell_for_coord(coord: Coord) = {
+  def find_best_cell_for_coord(coord: SphereSurfCoord) = {
     val index = coord_to_multi_cell_index(coord)
     find_cell_for_cell_index(index)
   }

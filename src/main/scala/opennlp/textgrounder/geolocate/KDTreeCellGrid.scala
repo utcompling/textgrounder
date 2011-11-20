@@ -5,7 +5,7 @@ import scala.collection.mutable.Map
 
 import ags.utils.KdTree
 
-import opennlp.textgrounder.util.distances.Coord
+import opennlp.textgrounder.util.distances.SphereSurfCoord
 
 import GeolocateDriver.Params
 
@@ -13,12 +13,12 @@ class KdTreeCell(
   cellgrid: KdTreeCellGrid,
   val kdleaf : KdTree[DistDocument]) extends RectangularCell(cellgrid) {
 
-  def get_northeast_coord () : Coord = {
-    new Coord(kdleaf.minLimit(0), kdleaf.minLimit(1))
+  def get_northeast_coord () : SphereSurfCoord = {
+    new SphereSurfCoord(kdleaf.minLimit(0), kdleaf.minLimit(1))
   }
   
-  def get_southwest_coord () : Coord = {
-    new Coord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
+  def get_southwest_coord () : SphereSurfCoord = {
+    new SphereSurfCoord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
   }
   
   def iterate_documents () : Iterable[DistDocument] = {
@@ -37,7 +37,7 @@ class KdTreeCell(
         sum_lat += art.coord.lat
         sum_long += art.coord.long
       }
-      Coord(sum_lat / kdleaf.size, sum_long / kdleaf.size)
+      SphereSurfCoord(sum_lat / kdleaf.size, sum_long / kdleaf.size)
     }
   }
   
@@ -73,7 +73,7 @@ class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int, splitMethod: KdT
    * Find the correct cell for the given coordinates.  If no such cell
    * exists, return null.
    */
-  def find_best_cell_for_coord(coord: Coord): KdTreeCell = {
+  def find_best_cell_for_coord(coord: SphereSurfCoord): KdTreeCell = {
     leaves_to_cell(kdtree.getLeaf(Array(coord.lat, coord.long)))
   }
 

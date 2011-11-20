@@ -435,7 +435,7 @@ class DistDocument(params: Map[String, String]) extends GeoDocument(params)
       }
     </DistDocument>
 
-  def distance_to_coord(coord2: Coord) = spheredist(coord, coord2)
+  def distance_to_coord(coord2: SphereSurfCoord) = spheredist(coord, coord2)
 }
 
 /////////////////////////////////////////////////////////////////////////////

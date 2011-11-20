@@ -673,10 +673,10 @@ class DocumentEvaluationResultWritable extends RecordWritable {
       true_rank.asInstanceOf[Int],
       true_cell.asInstanceOf[GeoCell],
       num_docs_in_true_cell.asInstanceOf[Int],
-      true_center.asInstanceOf[Coord],
+      true_center.asInstanceOf[SphereSurfCoord],
       true_truedist.asInstanceOf[Double],
       true_degdist.asInstanceOf[Double],
-      pred_center.asInstanceOf[Coord],
+      pred_center.asInstanceOf[SphereSurfCoord],
       pred_truedist.asInstanceOf[Double],
       pred_degdist.asInstanceOf[Double]
     )
