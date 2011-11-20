@@ -316,11 +316,44 @@ package object ioutil {
     }
 
     /**
+     * Create an OutputStream that writes ito the given file, usually with
+     * buffering and automatic decompression.
+     *
+     * @param filename Name of the file.  The filename will automatically
+     *   have a suffix added to it to indicate compression, if compression
+     *   is called for.
+     * @param compression Compression of the file (by default, "none").
+     *   Valid values are "none" (no compression), "gzip" and "bzip2".
+     * @param bufsize Buffering size.  If 0 (the default), the default
+     *   buffer size is used.  If &gt; 0, the specified size is used.  If
+     *   &lt; 0, there is no buffering.
+     *
+     * @return A tuple `(stream, compressed_filename)`, `stream` is the
+     *   stream to write to and `compressed_filename` is the actual name
+     *   assigned to the file, including the compression suffix, if any.
+     */
+    def get_output_stream_handling_compression(filename: String,
+        compression: String = "none", bufsize: Int = 0) = {
+      val realname = compression match {
+        case "gzip" => GzipUtils.getCompressedFilename(filename)
+        case "bzip2" => BZip2Utils.getCompressedFilename(filename)
+        case "none" => filename
+        case _ => throw new IllegalArgumentException(
+          "Invalid compression argument: %s" format compression)
+        }
+      val raw_out = get_output_stream(realname, bufsize)
+      val out = wrap_output_stream_with_compression(raw_out, compression)
+      (out, realname)
+    }
+
+    /**
      * Open a file for writing, with optional compression (by default, no
      * compression), and encoding (by default, UTF-8) and return a
      * PrintStream that will write to the file.
      *
-     * @param filename Name of file to write to.
+     * @param filename Name of file to write to.  The filename will
+     *   automatically have a suffix added to it to indicate compression,
+     *   if compression is called for.
      * @param encoding Encoding of the text; by default, UTF-8.
      * @param compression Compression type.  Valid values are "none" (no
      *   compression), "gzip", and "bzip2".
@@ -333,11 +366,12 @@ package object ioutil {
      */
     def openw(filename: String, encoding: String = "UTF-8",
         compression: String = "none", bufsize: Int = 0,
-        autoflush: Boolean = false) =
-      new PrintStream(
-        wrap_output_stream_with_compression(
-          get_output_stream(filename, bufsize), compression),
-        autoflush, encoding)
+        autoflush: Boolean = false) = {
+      val (out, _) =
+        get_output_stream_handling_compression(filename, compression,
+          bufsize)
+      new PrintStream(out, autoflush, encoding)
+    }
 
     /* ----------- Abstract functions below this line ----------- */
 
