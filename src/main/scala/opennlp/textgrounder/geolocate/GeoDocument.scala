@@ -24,6 +24,7 @@ import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.output_resource_usage
+import opennlp.textgrounder.util.Serializer
 
 import GeolocateDriver.Debug._
 
@@ -241,8 +242,7 @@ object GeoDocument {
       case "is_list_of" => validate_boolean(value)
       case "is_disambig" => validate_boolean(value)
       case "is_list" => validate_boolean(value)
-      case "coord" => implicitly[Serializer[CoordType]].
-        validate_serialized_form(value)
+      case "coord" => validate_x_or_blank[CoordType](value)
       case "incoming_links" => validate_int_or_blank(value)
       case _ => false
     }
@@ -261,32 +261,17 @@ object GeoDocumentConverters {
       }
     }
   }
-  
   def boolean_to_yesno(foo: Boolean) = if (foo) "yes" else "no"
-
   def validate_boolean(foo: String) = foo == "yes" || foo == "no"
   
   def get_int_or_blank(foo: String) =
     if (foo == "") None else Option[Int](foo.toInt)
- 
   def put_int_or_blank(foo: Option[Int]) = {
     foo match {
       case None => ""
       case Some(x) => x.toString
     }
   }
-
-  def get_x_or_blank[T : Serializer](foo: String) =
-    if (foo == "") None
-    else Option[T](implicitly[Serializer[T]].deserialize(foo))
-
-  def put_x_or_blank[T : Serializer](foo: Option[T]) = {
-    foo match {
-      case None => ""
-      case Some(x) => implicitly[Serializer[T]].serialize(x)
-    }
-  }
-
   def validate_int(foo: String) = {
     try {
       foo.toInt
@@ -295,9 +280,22 @@ object GeoDocumentConverters {
       case _ => false
     }
   }
-
   def validate_int_or_blank(foo: String) = {
     if (foo == "") true
     else validate_int(foo)
+  }
+
+  def get_x_or_blank[T : Serializer](foo: String) =
+    if (foo == "") None
+    else Option[T](implicitly[Serializer[T]].deserialize(foo))
+  def put_x_or_blank[T : Serializer](foo: Option[T]) = {
+    foo match {
+      case None => ""
+      case Some(x) => implicitly[Serializer[T]].serialize(x)
+    }
+  }
+  def validate_x_or_blank[T : Serializer](foo: String) = {
+    if (foo == "") true
+    else implicitly[Serializer[T]].validate_serialized_form(foo)
   }
 }

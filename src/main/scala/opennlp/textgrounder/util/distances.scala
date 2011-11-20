@@ -79,14 +79,6 @@ package object distances {
   // Number of miles per degree, at the equator.
   val miles_per_degree = km_per_degree / km_per_mile
 
-  /** A type class for converting to and from values in serialized form. */
-  @annotation.implicitNotFound(msg = "No implicit Serializer defined for ${T}.")
-  trait Serializer[T] {
-    def deserialize(foo: String): T
-    def serialize(foo: T): String
-    def validate_serialized_form(foo: String): Boolean
-  }
-
   // A 2-dimensional coordinate.
   //
   // The following fields are defined:
@@ -149,49 +141,26 @@ package object distances {
     }
 
     def deserialize(foo: String) = {
-      val Array(lat, long) = foo.split(',')
+      val Array(lat, long) = foo.split(",", -1)
       SphereCoord(lat.toDouble, long.toDouble)
     }
     
     def serialize(foo: SphereCoord) = "%s,%s".format(foo.lat, foo.long)
-
-    def validate_serialized_form(foo: String): Boolean = {
-      if (foo == "") return true
-      val split = foo.split(",", -1)
-      if (split.length != 2) return false
-      val Array(lat, long) = split
-      try {
-        SphereCoord(lat.toDouble, long.toDouble)
-      } catch {
-        case _ => return false
-      }
-      return true
-    }
   }
 
-  // A 1-dimensional coordinate.
-  //
-  // The following fields are defined:
-  //
-  //   lat, long: Latitude and longitude of coordinate.
+  // A 1-dimensional coordinate (year value, expressed as floating point).
+  // Note that having this here is an important check on the correctness
+  // of the code elsewhere -- if by mistake you leave off the type
+  // parameters when calling a function, and the function asks for a type
+  // with a serializer and there's only one such type available, Scala
+  // automatically uses that one type.  Hence code may work fine until you
+  // add a second serializable type, and then lots of compile errors.
 
   case class Year(year: Double) { }
 
   implicit object YearSerializer extends Serializer[Year] {
-    def deserialize(foo: String) = {
-      Year(foo.toDouble)
-    }
-    
+    def deserialize(foo: String) = Year(foo.toDouble)
     def serialize(foo: Year) = "%s".format(foo.year)
-
-    def validate_serialized_form(foo: String): Boolean = {
-      try {
-        Year(foo.toDouble)
-      } catch {
-        case _ => return false
-      }
-      return true
-    }
   }
 
   // Compute spherical distance in km (along a great circle) between two
