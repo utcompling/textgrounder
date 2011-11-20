@@ -29,6 +29,7 @@ import org.apache.hadoop.conf.{Configuration, Configured}
 import org.apache.hadoop.fs._
 
 import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.hadoop._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.mathutil._
@@ -482,7 +483,7 @@ class DocumentEvaluationMapper extends
   def create_driver() = new DriverType
 
   val reader =
-    new GeoDocumentReader(GeoDocumentData.combined_document_data_outfields)
+    new GeoDocumentReader[SphereCoord](GeoDocumentData.combined_document_data_outfields)
   var evaluators: Iterable[InternalGeolocateDocumentEvaluator] = null
   val task = new MeteredTask("document", "evaluating")
 
@@ -643,14 +644,14 @@ abstract class RecordWritable(
 }
 
 
-object DistDocumentConverter extends RecordWriterConverter {
-  type Type = DistDocument
+object SphereDocumentConverter extends RecordWriterConverter {
+  type Type = SphereDocument
 
-  def serialize(doc: DistDocument) = doc.title
+  def serialize(doc: SphereDocument) = doc.title
   def deserialize(title: String) = FIXME
 
   def init() {
-    RecordWriterConverter.register_converter(DistDocument, this)
+    RecordWriterConverter.register_converter(SphereDocument, this)
   }
 }
 
@@ -668,15 +669,15 @@ class DocumentEvaluationResultWritable extends RecordWritable {
         true_center, true_truedist, true_degdist,
         pred_center, pred_truedist, pred_degdist) = props
     new HadoopDocumentEvaluationResult(
-      document.asInstanceOf[DistDocument],
+      document.asInstanceOf[SphereDocument],
       pred_cell.asInstanceOf[GeoCell],
       true_rank.asInstanceOf[Int],
       true_cell.asInstanceOf[GeoCell],
       num_docs_in_true_cell.asInstanceOf[Int],
-      true_center.asInstanceOf[SphereSurfCoord],
+      true_center.asInstanceOf[SphereCoord],
       true_truedist.asInstanceOf[Double],
       true_degdist.asInstanceOf[Double],
-      pred_center.asInstanceOf[SphereSurfCoord],
+      pred_center.asInstanceOf[SphereCoord],
       pred_truedist.asInstanceOf[Double],
       pred_degdist.asInstanceOf[Double]
     )

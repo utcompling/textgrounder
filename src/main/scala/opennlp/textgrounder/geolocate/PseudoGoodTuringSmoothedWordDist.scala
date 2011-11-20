@@ -28,6 +28,7 @@ import opennlp.textgrounder.util.ioutil.errprint
 import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 import WordDist.memoizer._
+import GenericTypes._
 
 /**
  * This class implements a simple version of Good-Turing smoothing where we
@@ -103,7 +104,7 @@ class PseudoGoodTuringSmoothedWordDistFactory extends
     new PseudoGoodTuringSmoothedWordDist(this, Array[Word](), Array[Int](), 0,
       note_globally = false)
 
-  def set_unigram_word_dist(doc: DistDocument, keys: Array[Word],
+  def set_unigram_word_dist(doc: GenericDistDocument, keys: Array[Word],
       values: Array[Int], num_words: Int, note_globally: Boolean) {
     doc.dist = new PseudoGoodTuringSmoothedWordDist(this, keys, values,
       num_words, note_globally)

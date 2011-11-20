@@ -23,11 +23,13 @@ import util.control.Breaks._
 import java.io._
 
 import opennlp.textgrounder.util.collectionutil.DynamicArray
+import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
 
 import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 import WordDist.memoizer._
+import GenericTypes._
 
 /**
  * Unigram word distribution with a table listing counts for each word,
@@ -209,9 +211,9 @@ trait UnigramWordDistReader extends WordDistReader {
 
   // Used for debugging, see below.
   var stream: PrintStream = _
-  var writer: GeoDocumentWriter = _
+  var writer: GeoDocumentWriter[SphereCoord] = _
 
-  def do_read_word_counts(table: DistDocumentTable,
+  def do_read_word_counts(table: GenericDistDocumentTable,
       filehand: FileHandler, filename: String, stopwords: Set[String]) {
     errprint("Reading word counts from %s...", filename)
     errprint("")
@@ -229,7 +231,7 @@ trait UnigramWordDistReader extends WordDistReader {
       stream = filehand.openw(wordcountdocs_filename)
       // See write_document_file() in GeoDocument.scala
       writer =
-        new GeoDocumentWriter(stream,
+        new GeoDocumentWriter[SphereCoord](stream,
           GeoDocumentData.combined_document_data_outfields)
       writer.output_header()
     }
@@ -282,13 +284,13 @@ trait UnigramWordDistReader extends WordDistReader {
       stream.close()
   }
 
-  def set_word_dist(doc: DistDocument, is_training_set: Boolean,
+  def set_word_dist(doc: GenericDistDocument, is_training_set: Boolean,
       is_eval_set: Boolean) = {
     if (num_word_tokens == 0)
       false
     else {
       if (debug("wordcountdocs"))
-        writer.output_row(doc)
+        writer.output_row(doc.asInstanceOf[SphereDocument])
       // If we are evaluating on the dev set, skip the test set and vice
       // versa, to save memory and avoid contaminating the results.
       if (is_training_set || is_eval_set) {
@@ -302,7 +304,7 @@ trait UnigramWordDistReader extends WordDistReader {
     }
   }
 
-  def set_unigram_word_dist(doc: DistDocument, keys: Array[Word],
+  def set_unigram_word_dist(doc: GenericDistDocument, keys: Array[Word],
     values: Array[Int], num_words: Int, note_globally: Boolean)
 }
 

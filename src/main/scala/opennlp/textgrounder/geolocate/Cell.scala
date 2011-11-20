@@ -55,7 +55,7 @@ class CellWordDist(val word_dist: WordDist) {
   /**
    *  Add the given document to the total distribution seen so far
    */
-  def add_document(doc: DistDocument) {
+  def add_document(doc: DistDocument[_]) {
     /* We are passed in all documents, regardless of the split.
        The decision was made to accumulate link counts from all documents,
        even in the evaluation set.  Strictly, this is a violation of the
@@ -113,8 +113,9 @@ class CellWordDist(val word_dist: WordDist) {
 
 /** A simple distribution associating a probability with each cell. */
 
-class CellDist[CoordType, CellType <: GeoCell[CoordType]](
-  val cell_grid: CellGrid[CoordType, CellType]
+class CellDist[CoordType, DocumentType <: DistDocument[CoordType],
+  CellType <: GeoCell[CoordType, DocumentType]](
+  val cell_grid: CellGrid[CoordType, DocumentType, CellType]
 ) {
   val cellprobs: mutable.Map[CellType, Double] =
     mutable.Map[CellType, Double]()
@@ -142,10 +143,11 @@ class CellDist[CoordType, CellType <: GeoCell[CoordType]](
  *  @param cellprobs Hash table listing probabilities associated with cells
  */
 
-class WordCellDist[CoordType, CellType <: GeoCell[CoordType]](
-  cell_grid: CellGrid[CoordType, CellType],
+class WordCellDist[CoordType, DocumentType <: DistDocument[CoordType],
+  CellType <: GeoCell[CoordType, DocumentType]](
+  cell_grid: CellGrid[CoordType, DocumentType, CellType],
   val word: Word
-) extends CellDist[CoordType, CellType](cell_grid) {
+) extends CellDist[CoordType, DocumentType, CellType](cell_grid) {
   var normalized = false
 
   protected def init() {
@@ -179,10 +181,11 @@ class WordCellDist[CoordType, CellType <: GeoCell[CoordType]](
   init()
 }
 
-class SphereSurfWordCellDist(
-  cell_grid: SphereSurfCellGrid,
+class SphereWordCellDist(
+  cell_grid: SphereCellGrid,
   word: Word
-) extends WordCellDist[SphereSurfCoord, SphereSurfCell](cell_grid, word) {
+) extends WordCellDist[SphereCoord, SphereDocument, SphereCell](
+  cell_grid, word) {
   // Convert cell to a KML file showing the distribution
   def generate_kml_file(filename: String, params: KMLParameters) {
     val xform = if (params.kml_transform == "log") (x: Double) => log(x)
@@ -241,11 +244,13 @@ class SphereSurfWordCellDist(
   }
 }
 
-abstract class CellDistFactory[CoordType, CellType <: GeoCell[CoordType]](
-    val lru_cache_size: Int
+abstract class CellDistFactory[
+  CoordType, DocumentType <: DistDocument[CoordType],
+  CellType <: GeoCell[CoordType, DocumentType]](
+  val lru_cache_size: Int
 ) {
-  type WordCellDistType <: WordCellDist[CoordType, CellType]
-  type GridType <: CellGrid[CoordType, CellType]
+  type WordCellDistType <: WordCellDist[CoordType, DocumentType, CellType]
+  type GridType <: CellGrid[CoordType, DocumentType, CellType]
   def create_word_cell_dist(cell_grid: GridType, word: Word): WordCellDistType
 
   var cached_dists: LRUCache[Word, WordCellDistType] = null
@@ -284,17 +289,18 @@ abstract class CellDistFactory[CoordType, CellType <: GeoCell[CoordType]](
     val totalprob = (cellprobs.values sum)
     for ((cell, prob) <- cellprobs)
       cellprobs(cell) /= totalprob
-    val retval = new CellDist[CoordType, CellType](cell_grid)
+    val retval = new CellDist[CoordType, DocumentType, CellType](cell_grid)
     retval.set_cell_probabilities(cellprobs)
     retval
   }
 }
 
-class SphereSurfCellDistFactory(
+class SphereCellDistFactory(
     lru_cache_size: Int
-) extends CellDistFactory[SphereSurfCoord, SphereSurfCell](lru_cache_size) {
-  type WordCellDistType = SphereSurfWordCellDist
-  type GridType = SphereSurfCellGrid
+) extends CellDistFactory[SphereCoord, SphereDocument, SphereCell](
+    lru_cache_size) {
+  type WordCellDistType = SphereWordCellDist
+  type GridType = SphereCellGrid
   def create_word_cell_dist(cell_grid: GridType, word: Word) =
     new WordCellDistType(cell_grid, word)
 }
@@ -309,13 +315,15 @@ class SphereSurfCellDistFactory(
  * @param cell_grid The CellGrid object for the grid this cell is in.
  * @tparam CoordType The type of the coordinate object used to specify a
  *   a point somewhere in the grid.
+ * @tparam DocumentType The type of documents stored in a cell in the grid.
  */
-abstract class GeoCell[CoordType](
-    val cell_grid: CellGrid[CoordType, _ <: GeoCell[CoordType]]
+abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
+    val cell_grid: CellGrid[CoordType, DocumentType,
+      _ <: GeoCell[CoordType, DocumentType]]
 ) {
   val word_dist_wrapper =
     new CellWordDist(cell_grid.table.word_dist_factory.create_word_dist())
-  var most_popular_document: DistDocument = null
+  var most_popular_document: DocumentType = _
   var mostpopdoc_links = 0
 
   def word_dist = word_dist_wrapper.word_dist
@@ -335,7 +343,7 @@ abstract class GeoCell[CoordType](
   /**
    * Return an Iterable over documents, listing the documents in the cell.
    */
-  def iterate_documents(): Iterable[DistDocument]
+  def iterate_documents(): Iterable[DocumentType]
 
   /**
    * Return the coordinate of the "center" of the cell.  This is the
@@ -415,9 +423,9 @@ abstract class GeoCell[CoordType](
   }
 }
 
-abstract class SphereSurfCell(
-  cell_grid: SphereSurfCellGrid
-) extends GeoCell[SphereSurfCoord](cell_grid) {
+abstract class SphereCell(
+  cell_grid: SphereCellGrid
+) extends GeoCell[SphereCoord, SphereDocument](cell_grid) {
   /**
    * Generate KML for a single cell.
    */
@@ -431,14 +439,14 @@ abstract class SphereSurfCell(
  * @param cell_grid The CellGrid object for the grid this cell is in.
  */
 abstract class PolygonalCell(
-  cell_grid: SphereSurfCellGrid
-) extends SphereSurfCell(cell_grid) {
+  cell_grid: SphereCellGrid
+) extends SphereCell(cell_grid) {
   /**
    * Return the boundary of the cell as an Iterable of coordinates, tracing
    * out the boundary vertex by vertex.  The last coordinate should be the
    * same as the first, as befits a closed shape.
    */
-  def get_boundary(): Iterable[SphereSurfCoord]
+  def get_boundary(): Iterable[SphereCoord]
 
   /**
    * Return the "inner boundary" -- something echoing the actual boundary of the
@@ -448,7 +456,7 @@ abstract class PolygonalCell(
   def get_inner_boundary() = {
     val center = get_center_coord()
     for (coord <- get_boundary())
-      yield SphereSurfCoord((center.lat + coord.lat) / 2.0,
+      yield SphereCoord((center.lat + coord.lat) / 2.0,
                   average_longitudes(center.long, coord.long))
   }
 
@@ -524,23 +532,23 @@ abstract class PolygonalCell(
  * @param cell_grid The CellGrid object for the grid this cell is in.
  */
 abstract class RectangularCell(
-  cell_grid: SphereSurfCellGrid
+  cell_grid: SphereCellGrid
 ) extends PolygonalCell(cell_grid) {
   /**
    * Return the coordinate of the southwest point of the rectangle.
    */
-  def get_southwest_coord(): SphereSurfCoord
+  def get_southwest_coord(): SphereCoord
   /**
    * Return the coordinate of the northeast point of the rectangle.
    */
-  def get_northeast_coord(): SphereSurfCoord
+  def get_northeast_coord(): SphereCoord
   /**
    * Define the center based on the southwest and northeast points.
    */
   def get_center_coord() = {
     val sw = get_southwest_coord()
     val ne = get_northeast_coord()
-    SphereSurfCoord((sw.lat + ne.lat) / 2.0, (sw.long + ne.long) / 2.0)
+    SphereCoord((sw.lat + ne.lat) / 2.0, (sw.long + ne.long) / 2.0)
   }
 
   /**
@@ -551,8 +559,8 @@ abstract class RectangularCell(
     val sw = get_southwest_coord()
     val ne = get_northeast_coord()
     val center = get_center_coord()
-    val nw = SphereSurfCoord(ne.lat, sw.long)
-    val se = SphereSurfCoord(sw.lat, ne.long)
+    val nw = SphereCoord(ne.lat, sw.long)
+    val se = SphereCoord(sw.lat, ne.long)
     Seq(sw, nw, ne, se, sw)
   }
 
@@ -593,10 +601,13 @@ abstract class RectangularCell(
 }
 
 /**
- * Abstract class for a grid of cells covering the earth.
+ * Abstract class for a general grid of cells.  No assumptions are
+ * made about the shapes of cells in the grid, the number of dimensions in
+ * the grid, or whether the cells are overlapping.
  */
-abstract class CellGrid[CoordType, CellType <: GeoCell[CoordType]](
-    val table: DistDocumentTable
+abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
+    CellType <: GeoCell[CoordType, DocumentType]](
+    val table: DistDocumentTable[CoordType, DocumentType]
 ) {
 
   /**
@@ -613,7 +624,7 @@ abstract class CellGrid[CoordType, CellType <: GeoCell[CoordType]](
   /**
    * Add the given document to the cell grid.
    */
-  def add_document_to_cell(document: DistDocument): Unit
+  def add_document_to_cell(document: DocumentType): Unit
 
   /**
    * Generate all non-empty cells.  This will be called once (and only once),
@@ -693,8 +704,8 @@ abstract class CellGrid[CoordType, CellType <: GeoCell[CoordType]](
 /**
  * Abstract class for a grid of cells covering the earth.
  */
-abstract class SphereSurfCellGrid(
-  table: DistDocumentTable
-) extends CellGrid[SphereSurfCoord, SphereSurfCell](table) {
+abstract class SphereCellGrid(
+  override val table: SphereDocumentTable
+) extends CellGrid[SphereCoord, SphereDocument, SphereCell](table) {
 }
 

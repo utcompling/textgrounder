@@ -28,6 +28,7 @@ import opennlp.textgrounder.util.ioutil.errprint
 import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 import WordDist.memoizer._
+import GenericTypes._
 
 /**
  * This class implements a bigram version of the abstract factory for the
@@ -88,7 +89,7 @@ class PGTSmoothedBigramWordDistFactory extends
                globally_unseen_word_prob + (overall_word_probs.values sum))
   }
 
-  def set_bigram_word_dist(doc: DistDocument, keys: Array[Word],
+  def set_bigram_word_dist(doc: GenericDistDocument, keys: Array[Word],
     values: Array[Int], num_words: Int, bigram_keys: Array[Word],
     bigram_values: Array[Int], num_bigrams: Int, note_globally: Boolean) {
     doc.dist =

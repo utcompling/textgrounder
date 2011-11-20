@@ -82,6 +82,12 @@ This module is the main driver module for the Geolocate subproject.
 //    }
 //  }
 
+object GenericTypes {
+  type GenericDistDocumentTable =
+    DistDocumentTable[_, _ <: DistDocument[_]]
+  type GenericDistDocument = DistDocument[_]
+}
+
 /////////////////////////////////////////////////////////////////////////////
 //                      Wikipedia/Twitter/etc. documents                   //
 /////////////////////////////////////////////////////////////////////////////
@@ -95,7 +101,8 @@ This module is the main driver module for the Geolocate subproject.
  * name of the redirect article should point to the document object for the
  * article pointed to by the redirect.
  */
-class DistDocumentTable(
+abstract class DistDocumentTable[CoordType : Serializer,
+  DocumentType <: DistDocument[CoordType]](
   /* FIXME: The point of this parameter is so that we can use the counter
      mechanism instead of our own statistics.  Implement this. */
   val driver_stats: ExperimentDriverStats,
@@ -153,19 +160,19 @@ class DistDocumentTable(
       create_counter_wrapper(prefix, _))
 
   /**********************************************************************/
-  /*                     Begin DistDocumentTable proper                   */
+  /*                   Begin DistDocumentTable proper                   */
   /**********************************************************************/
 
   /**
-   * Mapping from document names to DistDocument objects, using the actual case of
+   * Mapping from document names to DocumentType objects, using the actual case of
    * the document.
    */
-  val name_to_document = mutable.Map[String, DistDocument]()
+  val name_to_document = mutable.Map[String, DocumentType]()
 
   /**
    * List of documents in each split.
    */
-  val documents_by_split = bufmap[String, DistDocument]()
+  val documents_by_split = bufmap[String, DocumentType]()
 
   /**
    * Num of documents with word-count information but not in table.
@@ -214,23 +221,23 @@ class DistDocumentTable(
    * name.  The idea is that the short name should be the same as one of
    * the toponyms used to refer to the document.
    */
-  val short_lower_name_to_documents = bufmap[String, DistDocument]()
+  val short_lower_name_to_documents = bufmap[String, DocumentType]()
 
   /**
    * Map from tuple (NAME, DIV) for documents of the form "Springfield, Ohio",
    * lowercased.
    */
-  val lower_name_div_to_documents = bufmap[(String, String), DistDocument]()
+  val lower_name_div_to_documents = bufmap[(String, String), DocumentType]()
 
   /**
    * For each toponym, list of documents matching the name.
    */
-  val lower_toponym_to_document = bufmap[String, DistDocument]()
+  val lower_toponym_to_document = bufmap[String, DocumentType]()
 
   /**
-   * Mapping from lowercased document names to DistDocument objects
+   * Mapping from lowercased document names to DocumentType objects
    */
-  val lower_name_to_documents = bufmap[String, DistDocument]()
+  val lower_name_to_documents = bufmap[String, DocumentType]()
 
   /**
    * Look up a document named NAME and return the associated document.
@@ -239,7 +246,7 @@ class DistDocumentTable(
    */
   def lookup_document(name: String) = {
     assert(name != null)
-    name_to_document.getOrElse(capfirst(name), null)
+    name_to_document.getOrElse(capfirst(name), null.asInstanceOf[DocumentType])
   }
 
   /**
@@ -247,7 +254,7 @@ class DistDocumentTable(
    * multiple names, due to redirects).  Also add to related lists mapping
    * lowercased form, short form, etc.
    */ 
-  def record_document_name(name: String, doc: DistDocument) {
+  def record_document_name(name: String, doc: DocumentType) {
     // Must pass in properly cased name
     // errprint("name=%s, capfirst=%s", name, capfirst(name))
     // println("length=%s" format name.length)
@@ -274,7 +281,7 @@ class DistDocumentTable(
    * Record either a normal document ('docfrom' same as 'docto') or a
    * redirect ('docfrom' redirects to 'docto').
    */
-  def record_document(docfrom: DistDocument, docto: DistDocument) {
+  def record_document(docfrom: DocumentType, docto: DocumentType) {
     record_document_name(docfrom.title, docto)
     val redir = !(docfrom eq docto)
     val split = docto.split
@@ -290,19 +297,19 @@ class DistDocumentTable(
     }
   }
 
-  def create_document(params: Map[String, String]) = new DistDocument(params)
+  def create_document(params: Map[String, String]): DocumentType
 
-  def would_add_document_to_list(doc: DistDocument) = {
+  def would_add_document_to_list(doc: DocumentType) = {
     if (doc.namespace != "Main")
       false
     else if (doc.redir.length > 0)
       false
-    else doc.coord != null
+    else doc.optcoord != None
   }
 
   def read_document_data(filehand: FileHandler, filename: String,
-      cell_grid: SphereSurfCellGrid) {
-    val redirects = mutable.Buffer[DistDocument]()
+      cell_grid: CellGrid[CoordType,DocumentType,_]) {
+    val redirects = mutable.Buffer[DocumentType]()
 
     def process(params: Map[String, String]) {
       val doc = create_document(params)
@@ -310,13 +317,13 @@ class DistDocumentTable(
         return
       if (doc.redir.length > 0)
         redirects += doc
-      else if (doc.coord != null) {
+      else if (doc.optcoord != None) {
         record_document(doc, doc)
         cell_grid.add_document_to_cell(doc)
       }
     }
 
-    GeoDocumentData.read_document_file(filehand, filename, process,
+    GeoDocumentData.read_document_file[CoordType](filehand, filename, process,
       maxtime = Params.max_time_per_stage)
 
     for (x <- redirects) {
@@ -403,15 +410,16 @@ class DistDocumentTable(
  * from Wikipedia articles, individual tweets, Twitter feeds (all tweets from
  * a user), etc.
  */ 
-class DistDocument(params: Map[String, String]) extends GeoDocument(params)
-  with EvaluationDocument {
+abstract class DistDocument[CoordType : Serializer](
+  params: Map[String, String]
+) extends GeoDocument[CoordType](params) with EvaluationDocument {
   /**
    * Object containing word distribution of this document.
    */
   var dist: WordDist = null
 
   override def toString() = {
-    var coordstr = if (coord != null) " at %s" format coord else ""
+    var coordstr = if (optcoord != None) " at %s" format coord else ""
     val redirstr =
       if (redir.length > 0) ", redirect to %s" format redir else ""
     "%s(%s)%s%s" format (title, id, coordstr, redirstr)
@@ -426,7 +434,7 @@ class DistDocument(params: Map[String, String]) extends GeoDocument(params)
       <title>{ title }</title>
       <id>{ id }</id>
       {
-        if (coord != null)
+        if (optcoord != None)
           <location>{ coord }</location>
       }
       {
@@ -435,7 +443,22 @@ class DistDocument(params: Map[String, String]) extends GeoDocument(params)
       }
     </DistDocument>
 
-  def distance_to_coord(coord2: SphereSurfCoord) = spheredist(coord, coord2)
+  def distance_to_coord(coord2: CoordType): Double
+}
+
+class SphereDocument(params: Map[String, String]) extends
+    DistDocument[SphereCoord](params) {
+  def distance_to_coord(coord2: SphereCoord) = spheredist(coord, coord2)
+}
+
+class SphereDocumentTable(
+  driver_stats: ExperimentDriverStats,
+  word_dist_factory: WordDistFactory
+) extends DistDocumentTable[SphereCoord, SphereDocument](
+  driver_stats, word_dist_factory
+) {
+  def create_document(params: Map[String, String]) =
+    new SphereDocument(params)
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -446,7 +469,7 @@ class DistDocument(params: Map[String, String]) extends GeoDocument(params)
  * Abstract class for reading documents from a test file and doing
  * document geolocation on them (as opposed e.g. to toponym resolution).
  */
-abstract class GeolocateDocumentStrategy(val cell_grid: SphereSurfCellGrid) {
+abstract class GeolocateDocumentStrategy(val cell_grid: SphereCellGrid) {
   /**
    * For a given word distribution (describing a test document), return
    * an Iterable of tuples, each listing a particular cell on the Earth
@@ -456,7 +479,7 @@ abstract class GeolocateDocumentStrategy(val cell_grid: SphereSurfCellGrid) {
    * are better, while for others, higher scores are better.  Currently,
    * the wrapper code outputs the score but doesn't otherwise use it.
    */
-  def return_ranked_cells(word_dist: WordDist): Iterable[(SphereSurfCell, Double)]
+  def return_ranked_cells(word_dist: WordDist): Iterable[(SphereCell, Double)]
 }
 
 /**
@@ -464,7 +487,7 @@ abstract class GeolocateDocumentStrategy(val cell_grid: SphereSurfCellGrid) {
  * 'baseline_strategy' specifies the particular strategy to use.
  */
 class RandomGeolocateDocumentStrategy(
-  cell_grid: SphereSurfCellGrid
+  cell_grid: SphereCellGrid
 ) extends GeolocateDocumentStrategy(cell_grid) {
   def return_ranked_cells(word_dist: WordDist) = {
     val cells = cell_grid.iter_nonempty_cells()
@@ -474,10 +497,10 @@ class RandomGeolocateDocumentStrategy(
 }
 
 class MostPopularCellGeolocateDocumentStrategy(
-  cell_grid: SphereSurfCellGrid,
+  cell_grid: SphereCellGrid,
   internal_link: Boolean
 ) extends GeolocateDocumentStrategy(cell_grid) {
-  var cached_ranked_mps: Iterable[(SphereSurfCell, Double)] = null
+  var cached_ranked_mps: Iterable[(SphereCell, Double)] = null
   def return_ranked_cells(word_dist: WordDist) = {
     if (cached_ranked_mps == null) {
       cached_ranked_mps = (
@@ -494,9 +517,9 @@ class MostPopularCellGeolocateDocumentStrategy(
 }
 
 class CellDistMostCommonToponymGeolocateDocumentStrategy(
-  cell_grid: SphereSurfCellGrid
+  cell_grid: SphereCellGrid
 ) extends GeolocateDocumentStrategy(cell_grid) {
-  val cdist_factory = new SphereSurfCellDistFactory(Params.lru_cache_size)
+  val cdist_factory = new SphereCellDistFactory(Params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
     // Look for a toponym, then a proper noun, then any word.
@@ -517,7 +540,7 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
 }
 
 class LinkMostCommonToponymGeolocateDocumentStrategy(
-  cell_grid: SphereSurfCellGrid
+  cell_grid: SphereCellGrid
 ) extends GeolocateDocumentStrategy(cell_grid) {
   def return_ranked_cells(word_dist: WordDist) = {
     var maxword = word_dist.find_most_common_word(
@@ -532,7 +555,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
       if (maxword != None)
         cell_grid.table.construct_candidates(
           unmemoize_word(maxword.get))
-      else Seq[DistDocument]()
+      else Seq[SphereDocument]()
     if (debug("commontop"))
       errprint("  candidates = %s", cands)
     // Sort candidate list by number of incoming links
@@ -543,7 +566,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
     if (debug("commontop"))
       errprint("  sorted candidates = %s", candlinks)
 
-    def find_good_cells_for_coord(cands: Iterable[(DistDocument, Double)]) = {
+    def find_good_cells_for_coord(cands: Iterable[(SphereDocument, Double)]) = {
       for {
         (cand, links) <- candlinks
         val cell = {
@@ -577,14 +600,14 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
  *   scores are better.
  */
 abstract class MinMaxScoreStrategy(
-  cell_grid: SphereSurfCellGrid,
+  cell_grid: SphereCellGrid,
   prefer_minimum: Boolean
 ) extends GeolocateDocumentStrategy(cell_grid) {
   /**
    * Function to return the score of a document distribution against a
    * cell.
    */
-  def score_cell(word_dist: WordDist, cell: SphereSurfCell): Double
+  def score_cell(word_dist: WordDist, cell: SphereCell): Double
 
   /**
    * Compare a word distribution (for a document, typically) against all
@@ -592,7 +615,7 @@ abstract class MinMaxScoreStrategy(
    * indicates the cell and 'score' the score.
    */
   def return_ranked_cells(word_dist: WordDist) = {
-    val cell_buf = mutable.Buffer[(SphereSurfCell, Double)]()
+    val cell_buf = mutable.Buffer[(SphereCell, Double)]()
     for (
       cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
     ) {
@@ -634,12 +657,12 @@ abstract class MinMaxScoreStrategy(
  * any case since it's comparing documents against cells.)
  */
 class KLDivergenceStrategy(
-  cell_grid: SphereSurfCellGrid,
+  cell_grid: SphereCellGrid,
   partial: Boolean = true,
   symmetric: Boolean = false
 ) extends MinMaxScoreStrategy(cell_grid, true) {
 
-  def score_cell(word_dist: WordDist, cell: SphereSurfCell) = {
+  def score_cell(word_dist: WordDist, cell: SphereCell) = {
     var kldiv = word_dist.kl_divergence(cell.word_dist, partial = partial)
     if (symmetric) {
       val kldiv2 = cell.word_dist.kl_divergence(word_dist, partial = partial)
@@ -693,12 +716,12 @@ class KLDivergenceStrategy(
  * distribution, rather than considering all words in the vocabulary.
  */
 class CosineSimilarityStrategy(
-  cell_grid: SphereSurfCellGrid,
+  cell_grid: SphereCellGrid,
   smoothed: Boolean = false,
   partial: Boolean = false
 ) extends MinMaxScoreStrategy(cell_grid, true) {
 
-  def score_cell(word_dist: WordDist, cell: SphereSurfCell) = {
+  def score_cell(word_dist: WordDist, cell: SphereCell) = {
     var cossim =
       word_dist.cosine_similarity(cell.word_dist, partial = partial,
         smoothed = smoothed)
@@ -712,11 +735,11 @@ class CosineSimilarityStrategy(
 
 /** Use a Naive Bayes strategy for comparing document and cell. */
 class NaiveBayesDocumentStrategy(
-  cell_grid: SphereSurfCellGrid,
+  cell_grid: SphereCellGrid,
   use_baseline: Boolean = true
 ) extends MinMaxScoreStrategy(cell_grid, false) {
 
-  def score_cell(word_dist: WordDist, cell: SphereSurfCell) = {
+  def score_cell(word_dist: WordDist, cell: SphereCell) = {
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
       if (use_baseline) {
@@ -738,9 +761,9 @@ class NaiveBayesDocumentStrategy(
 }
 
 class AverageCellProbabilityStrategy(
-  cell_grid: SphereSurfCellGrid
+  cell_grid: SphereCellGrid
 ) extends GeolocateDocumentStrategy(cell_grid) {
-  val cdist_factory = new SphereSurfCellDistFactory(Params.lru_cache_size)
+  val cdist_factory = new SphereCellDistFactory(Params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
     val celldist =
@@ -1127,8 +1150,8 @@ abstract class GeolocateDriver extends
   override type ParamType <: GeolocateParameters
   var degrees_per_cell = 0.0
   var stopwords: Set[String] = _
-  var cell_grid: SphereSurfCellGrid = _
-  var document_table: DistDocumentTable = _
+  var cell_grid: SphereCellGrid = _
+  var document_table: SphereDocumentTable = _
   var word_dist_factory: WordDistFactory = _
 
   /**
@@ -1173,10 +1196,10 @@ abstract class GeolocateDriver extends
   }
 
   protected def initialize_document_table(word_dist_factory: WordDistFactory) = {
-    new DistDocumentTable(this, word_dist_factory)
+    new SphereDocumentTable(this, word_dist_factory)
   }
 
-  protected def initialize_cell_grid(table: DistDocumentTable) = {
+  protected def initialize_cell_grid(table: SphereDocumentTable) = {
     if (params.kd_tree)
       KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method)
     else
@@ -1195,7 +1218,7 @@ abstract class GeolocateDriver extends
     Stopwords.read_stopwords(get_file_handler, params.stopwords_file)
   }
 
-  protected def read_documents(table: DistDocumentTable, stopwords: Set[String]) {
+  protected def read_documents(table: SphereDocumentTable, stopwords: Set[String]) {
     for (fn <- Params.document_file)
       table.read_document_data(get_file_handler, fn, cell_grid)
 

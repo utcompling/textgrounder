@@ -29,6 +29,7 @@ import opennlp.textgrounder.util.osutil.output_resource_usage
 import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 import WordDist.memoizer._
+import GenericTypes._
 
 // val use_sorted_list = false
 
@@ -271,7 +272,7 @@ abstract class WordDistFactory {
    * @param stopwords List of stopwords (words to be ignored when creating
    *   a distribution).
    */
-  def read_word_counts(table: DistDocumentTable,
+  def read_word_counts(table: GenericDistDocumentTable,
     filehand: FileHandler, filename: String, stopwords: Set[String])
 }
 
@@ -295,7 +296,7 @@ trait WordDistReader {
    *   to any global (e.g. back-off) statistics of the word distribution.
    * @return Whether a word distribution was actually created/set.
    */
-  def set_word_dist(doc: DistDocument, is_training_set: Boolean,
+  def set_word_dist(doc: GenericDistDocument, is_training_set: Boolean,
       is_eval_set: Boolean): Boolean
 
   /**
@@ -315,7 +316,7 @@ trait WordDistReader {
    * @param stopwords List of stopwords (words to be ignored when creating
    *   a distribution).
    */
-  def do_read_word_counts(table: DistDocumentTable,
+  def do_read_word_counts(table: GenericDistDocumentTable,
       filehand: FileHandler, filename: String, stopwords: Set[String])
 
   /**
@@ -328,7 +329,7 @@ trait WordDistReader {
    * @param table Document table, as passed into `do_read_word_counts`.
    * @param title Title of document.
    */
-  def handle_one_document(table: DistDocumentTable, title: String) = {
+  def handle_one_document(table: GenericDistDocumentTable, title: String) = {
     val doc = table.lookup_document(title)
     if (doc == null) {
       warning("Skipping document %s, not in table", title)
@@ -357,7 +358,7 @@ trait WordDistReader {
     !should_stop
   }
 
-  def read_word_counts(table: DistDocumentTable,
+  def read_word_counts(table: GenericDistDocumentTable,
       filehand: FileHandler, filename: String, stopwords: Set[String]) {
 
     task = new MeteredTask("document", "reading distributions of")

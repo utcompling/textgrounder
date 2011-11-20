@@ -30,6 +30,7 @@ import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.ioutil.warning
 
 import WordDist.memoizer._
+import GenericTypes._
 
 class KMLParameters {
   // Minimum and maximum colors
@@ -81,7 +82,7 @@ low values more visible.  Possibilities are 'none' (no transformation),
 class FilterPseudoGoodTuringSmoothedWordDistFactory(
     filter_words: Seq[String]
   ) extends PseudoGoodTuringSmoothedWordDistFactory {
-  override def set_unigram_word_dist(doc: DistDocument, keys: Array[Word],
+  override def set_unigram_word_dist(doc: GenericDistDocument, keys: Array[Word],
       values: Array[Int], num_words: Int, note_globally: Boolean) {
     val (newkeys, newvalues) =
       (for ((k, v) <- (keys zip values).take(num_words)
@@ -140,7 +141,7 @@ class GenerateKMLDriver extends
    */
 
   def run_after_setup() = {
-    val cdist_factory = new SphereSurfCellDistFactory(params.lru_cache_size)
+    val cdist_factory = new SphereCellDistFactory(params.lru_cache_size)
     params.split_kml_words = params.kml_words.split(',')
     for (word <- params.split_kml_words) {
       val celldist = cdist_factory.get_cell_dist(cell_grid, memoize_word(word))

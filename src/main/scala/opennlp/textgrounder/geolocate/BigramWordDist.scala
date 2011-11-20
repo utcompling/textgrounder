@@ -26,6 +26,7 @@ import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
 import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 import WordDist.memoizer._
+import GenericTypes._
 
 /**
  * Bigram word distribution with a table listing counts for each word,
@@ -261,7 +262,7 @@ trait BigramWordDistReader extends WordDistReader {
   var num_bigram_tokens = 0
   var title: String = _
 
-  def do_read_word_counts(table: DistDocumentTable,
+  def do_read_word_counts(table: GenericDistDocumentTable,
       filehand: FileHandler, filename: String, stopwords: Set[String]) {
     errprint("Reading word and bigram counts from %s...", filename)
     errprint("")
@@ -322,7 +323,7 @@ trait BigramWordDistReader extends WordDistReader {
     }
   }
 
-  def set_word_dist(doc: DistDocument, is_training_set: Boolean,
+  def set_word_dist(doc: GenericDistDocument, is_training_set: Boolean,
       is_eval_set: Boolean) = {
     if (num_word_tokens == 0)
       false
@@ -342,7 +343,7 @@ trait BigramWordDistReader extends WordDistReader {
     }
   }
 
-  def set_bigram_word_dist(doc: DistDocument, keys: Array[Word],
+  def set_bigram_word_dist(doc: GenericDistDocument, keys: Array[Word],
     values: Array[Int], num_words: Int, bigram_keys: Array[Word],
     bigram_values: Array[Int], num_bigrams: Int, note_globally: Boolean)
 }

@@ -5,23 +5,23 @@ import scala.collection.mutable.Map
 
 import ags.utils.KdTree
 
-import opennlp.textgrounder.util.distances.SphereSurfCoord
+import opennlp.textgrounder.util.distances.SphereCoord
 
 import GeolocateDriver.Params
 
 class KdTreeCell(
   cellgrid: KdTreeCellGrid,
-  val kdleaf : KdTree[DistDocument]) extends RectangularCell(cellgrid) {
+  val kdleaf : KdTree[SphereDocument]) extends RectangularCell(cellgrid) {
 
-  def get_northeast_coord () : SphereSurfCoord = {
-    new SphereSurfCoord(kdleaf.minLimit(0), kdleaf.minLimit(1))
+  def get_northeast_coord () : SphereCoord = {
+    new SphereCoord(kdleaf.minLimit(0), kdleaf.minLimit(1))
   }
   
-  def get_southwest_coord () : SphereSurfCoord = {
-    new SphereSurfCoord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
+  def get_southwest_coord () : SphereCoord = {
+    new SphereCoord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
   }
   
-  def iterate_documents () : Iterable[DistDocument] = {
+  def iterate_documents () : Iterable[SphereDocument] = {
     kdleaf.getData()
   }
 
@@ -37,7 +37,7 @@ class KdTreeCell(
         sum_lat += art.coord.lat
         sum_long += art.coord.long
       }
-      SphereSurfCoord(sum_lat / kdleaf.size, sum_long / kdleaf.size)
+      SphereCoord(sum_lat / kdleaf.size, sum_long / kdleaf.size)
     }
   }
   
@@ -51,7 +51,7 @@ class KdTreeCell(
 }
 
 object KdTreeCellGrid {
-  def apply(table: DistDocumentTable, bucketSize: Int, splitMethod: String) : KdTreeCellGrid = {
+  def apply(table: SphereDocumentTable, bucketSize: Int, splitMethod: String) : KdTreeCellGrid = {
     new KdTreeCellGrid(table, bucketSize, splitMethod match {
       case "halfway" => KdTree.SplitMethod.HALFWAY
       case "median" => KdTree.SplitMethod.MEDIAN
@@ -60,27 +60,27 @@ object KdTreeCellGrid {
   }
 }
 
-class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int, splitMethod: KdTree.SplitMethod)
-    extends SphereSurfCellGrid(table) {
+class KdTreeCellGrid(table: SphereDocumentTable, bucketSize: Int, splitMethod: KdTree.SplitMethod)
+    extends SphereCellGrid(table) {
   /**
    * Total number of cells in the grid.
    */
   var total_num_cells: Int = 0
-  var kdtree : KdTree[DistDocument] = new KdTree[DistDocument](2, bucketSize, splitMethod);
-  val leaves_to_cell : Map[KdTree[DistDocument], KdTreeCell] = Map();
+  var kdtree : KdTree[SphereDocument] = new KdTree[SphereDocument](2, bucketSize, splitMethod);
+  val leaves_to_cell : Map[KdTree[SphereDocument], KdTreeCell] = Map();
 
   /**
    * Find the correct cell for the given coordinates.  If no such cell
    * exists, return null.
    */
-  def find_best_cell_for_coord(coord: SphereSurfCoord): KdTreeCell = {
+  def find_best_cell_for_coord(coord: SphereCoord): KdTreeCell = {
     leaves_to_cell(kdtree.getLeaf(Array(coord.lat, coord.long)))
   }
 
   /**
    * Add the given document to the cell grid.
    */
-  def add_document_to_cell(document: DistDocument): Unit = {
+  def add_document_to_cell(document: SphereDocument): Unit = {
     kdtree.addPoint(Array(document.coord.lat, document.coord.long), document)
   }
 
@@ -112,7 +112,7 @@ class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int, splitMethod: KdT
    *   even when not set, some documents may be listed in the document-data file
    *   but have no corresponding word counts given in the counts file.)
    */
-  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[SphereSurfCell] = {
+  def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[SphereCell] = {
     for (leaf <- kdtree.getLeaves
       if (leaf.size() > 0 || !nonempty_word_dist))
         yield leaves_to_cell(leaf)

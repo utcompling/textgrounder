@@ -24,7 +24,6 @@ import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.output_resource_usage
-import opennlp.textgrounder.util.textutil.splittext
 
 import GeolocateDriver.Debug._
 
@@ -32,23 +31,24 @@ import GeolocateDriver.Debug._
 //                                  Main code                               //
 /////////////////////////////////////////////////////////////////////////////
 
-class GeoDocumentWriter(outfile: PrintStream, outfields: Seq[String]) {
+class GeoDocumentWriter[CoordType : Serializer](outfile: PrintStream,
+    outfields: Seq[String]) {
   def output_header() {
     outfile.println(outfields mkString "\t")
   }
   
-  def output_row(doc: GeoDocument) {
+  def output_row(doc: GeoDocument[CoordType]) {
     outfile.println(doc.get_fields(outfields) mkString "\t")    
   }
 }
 
-class GeoDocumentReader(infields: Seq[String]) {
+class GeoDocumentReader[CoordType : Serializer](infields: Seq[String]) {
   var num_processed = 0
   def process_row(line: String, process: Map[String,String] => Unit,
       line_number: Int = -1) {
     val lineno = if (line_number < 0) num_processed + 1 else line_number
     // println("[%s]" format line)
-    val fieldvals = splittext(line, '\t')
+    val fieldvals = line.split("\t", -1)
     if (fieldvals.length != infields.length)
       warning(
       """Strange record at line #%s, expected %s fields, saw %s fields;
@@ -56,7 +56,7 @@ class GeoDocumentReader(infields: Seq[String]) {
     else {
       var good = true
       for ((field, value) <- infields zip fieldvals) {
-        if (!GeoDocument.validate_field(field, value)) {
+        if (!GeoDocument.validate_field[CoordType](field, value)) {
           good = false
           warning(
       """Bad field value at line #%s, field=%s, value=%s,
@@ -84,15 +84,15 @@ object GeoDocumentData {
    *   (real time, not CPU time) used for reading in the file, for
    *   testing purposes.
    */
-  def read_document_file(filehand: FileHandler, filename: String,
+  def read_document_file[CoordType : Serializer](filehand: FileHandler, filename: String,
       process: Map[String,String] => Unit, maxtime: Double = 0.0) = {
     errprint("Reading document data from %s...", filename)
     val task = new MeteredTask("document", "reading")
 
     val fi = filehand.openr(filename)
 
-    val fields = splittext(fi.next(), '\t')
-    val reader = new GeoDocumentReader(fields)
+    val fields = fi.next().split("\t", -1)
+    val reader = new GeoDocumentReader[CoordType](fields)
     breakable {
       for (line <- fi) {
         // If we've processed no documents so far, we're on line 2
@@ -107,9 +107,9 @@ object GeoDocumentData {
     fields
   }
 
-  def write_document_file(outfile: PrintStream, outfields: Seq[String],
-      documents: Iterable[GeoDocument]) {
-    val writer = new GeoDocumentWriter(outfile, outfields)
+  def write_document_file[CoordType : Serializer](outfile: PrintStream, outfields: Seq[String],
+      documents: Iterable[GeoDocument[CoordType]]) {
+    val writer = new GeoDocumentWriter[CoordType](outfile, outfields)
     writer.output_header()
     for (doc <- documents)
       writer.output_row(doc)
@@ -135,10 +135,11 @@ object GeoDocumentData {
  * is_list: Whether document is a list of any type ("List of *", disambig,
  *          or in Category or Book namespaces)
  */
-class GeoDocument(params: Map[String,String]) {
+abstract class GeoDocument[CoordType : Serializer](params: Map[String,String]) {
   var title = "unknown"
   var id = 0
-  var coord: SphereSurfCoord = null
+  var optcoord: Option[CoordType] = None
+  def coord = optcoord.get
   var incoming_links: Option[Int] = None
   var split = "unknown"
   var redir = ""
@@ -158,7 +159,7 @@ class GeoDocument(params: Map[String,String]) {
       case "is_list_of" => is_list_of = yesno_to_boolean(v)
       case "is_disambig" => is_disambig = yesno_to_boolean(v)
       case "is_list" => is_list = yesno_to_boolean(v)
-      case "coord" => coord = commaval_to_coord(v)
+      case "coord" => optcoord = get_x_or_blank[CoordType](v)
       case "incoming_links" => incoming_links = get_int_or_blank(v)
       }
   }
@@ -174,14 +175,14 @@ class GeoDocument(params: Map[String,String]) {
         case "is_list_of" => boolean_to_yesno(is_list_of)
         case "is_disambig" => boolean_to_yesno(is_disambig)
         case "is_list" => boolean_to_yesno(is_list)
-        case "coord" => coord_to_commaval(coord)
+        case "coord" => put_x_or_blank[CoordType](optcoord)
         case "incoming_links" => put_int_or_blank(incoming_links)
       }
     }
   }
 
   override def toString() = {
-    val coordstr = if (coord != null) " at %s".format(coord) else ""
+    val coordstr = if (optcoord != None) " at %s".format(coord) else ""
     val redirstr =
       if (redir.length > 0) ", redirect to %s".format(redir) else ""
     "%s(%s)%s%s".format(title, id, coordstr, redirstr)
@@ -229,7 +230,7 @@ object GeoDocument {
     ail
   }
 
-  def validate_field(field: String, value: String) = {
+  def validate_field[CoordType : Serializer](field: String, value: String) = {
     import GeoDocumentConverters._
     field match {
       case "id" => validate_int(value)
@@ -240,7 +241,8 @@ object GeoDocument {
       case "is_list_of" => validate_boolean(value)
       case "is_disambig" => validate_boolean(value)
       case "is_list" => validate_boolean(value)
-      case "coord" => validate_coord(value)
+      case "coord" => implicitly[Serializer[CoordType]].
+        validate_serialized_form(value)
       case "incoming_links" => validate_int_or_blank(value)
       case _ => false
     }
@@ -264,29 +266,6 @@ object GeoDocumentConverters {
 
   def validate_boolean(foo: String) = foo == "yes" || foo == "no"
   
-  def commaval_to_coord(foo: String) = {
-    if (foo != "") {
-      val Array(lat, long) = foo.split(',')
-      SphereSurfCoord(lat.toDouble, long.toDouble)
-    } else null
-  }
-  
-  def coord_to_commaval(foo: SphereSurfCoord) =
-    if (foo != null) "%s,%s".format(foo.lat, foo.long) else ""
-
-  def validate_coord(foo: String): Boolean = {
-    if (foo == "") return true
-    val split = splittext(foo, ',')
-    if (split.length != 2) return false
-    val Array(lat, long) = split
-    try {
-      SphereSurfCoord(lat.toDouble, long.toDouble)
-    } catch {
-      case _ => return false
-    }
-    return true
-  }
-  
   def get_int_or_blank(foo: String) =
     if (foo == "") None else Option[Int](foo.toInt)
  
@@ -294,6 +273,17 @@ object GeoDocumentConverters {
     foo match {
       case None => ""
       case Some(x) => x.toString
+    }
+  }
+
+  def get_x_or_blank[T : Serializer](foo: String) =
+    if (foo == "") None
+    else Option[T](implicitly[Serializer[T]].deserialize(foo))
+
+  def put_x_or_blank[T : Serializer](foo: Option[T]) = {
+    foo match {
+      case None => ""
+      case Some(x) => implicitly[Serializer[T]].serialize(x)
     }
   }
 

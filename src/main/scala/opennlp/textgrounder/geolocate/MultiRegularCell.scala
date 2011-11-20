@@ -59,7 +59,7 @@ import GeolocateDriver.Debug._
   of the corners of a cell (tiling or multi) will be integers.  Normally,
   we use the southwest corner to specify a cell.
 
-  Correspondingly, to convert a cell index to a SphereSurfCoord, we multiply
+  Correspondingly, to convert a cell index to a SphereCoord, we multiply
   latitude and longitude by degrees_per_cell.
 
   Near the edges, tiling cells may be truncated.  Multi cells will
@@ -161,8 +161,8 @@ class MultiRegularCell(
 class MultiRegularCellGrid(
   val degrees_per_cell: Double,
   val width_of_multi_cell: Int,
-  table: DistDocumentTable
-) extends SphereSurfCellGrid(table) {
+  table: SphereDocumentTable
+) extends SphereCellGrid(table) {
 
   /**
    * Size of each cell (vertical dimension; horizontal dimension only near
@@ -179,12 +179,12 @@ class MultiRegularCellGrid(
      don't want.
    */
   val maximum_index =
-    coord_to_tiling_cell_index(SphereSurfCoord(maximum_latitude - 1e-10,
+    coord_to_tiling_cell_index(SphereCoord(maximum_latitude - 1e-10,
       maximum_longitude))
   val maximum_latind = maximum_index.latind
   val maximum_longind = maximum_index.longind
   val minimum_index =
-    coord_to_tiling_cell_index(SphereSurfCoord(minimum_latitude, minimum_longitude))
+    coord_to_tiling_cell_index(SphereCoord(minimum_latitude, minimum_longitude))
   val minimum_latind = minimum_index.latind
   val minimum_longind = minimum_index.longind
 
@@ -202,7 +202,7 @@ class MultiRegularCellGrid(
    * the cells provide a first approximation to the cells used to create the
    * document distributions.
    */
-  var tiling_cell_to_documents = bufmap[RegularCellIndex, DistDocument]()
+  var tiling_cell_to_documents = bufmap[RegularCellIndex, SphereDocument]()
 
   /**
    * Mapping from index of southwest corner of multi cell to corresponding
@@ -214,16 +214,16 @@ class MultiRegularCellGrid(
 
   var total_num_cells = 0
 
-  /********** Conversion between Cell indices and SphereSurfCoords **********/
+  /********** Conversion between Cell indices and SphereCoords **********/
 
   /* The different functions vary depending on where in the particular cell
-     the SphereSurfCoord is wanted, e.g. one of the corners or the center. */
+     the SphereCoord is wanted, e.g. one of the corners or the center. */
 
   /**
    * Convert a coordinate to the indices of the southwest corner of the
    * corresponding tiling cell.
    */
-  def coord_to_tiling_cell_index(coord: SphereSurfCoord) = {
+  def coord_to_tiling_cell_index(coord: SphereCoord) = {
     val latind = floor(coord.lat / degrees_per_cell).toInt
     val longind = floor(coord.long / degrees_per_cell).toInt
     RegularCellIndex(latind, longind)
@@ -233,7 +233,7 @@ class MultiRegularCellGrid(
    * Convert a coordinate to the indices of the southwest corner of the
    * corresponding multi cell.
    */
-  def coord_to_multi_cell_index(coord: SphereSurfCoord) = {
+  def coord_to_multi_cell_index(coord: SphereCoord) = {
     // When width_of_multi_cell = 1, don't subtract anything.
     // When width_of_multi_cell = 2, subtract 0.5*degrees_per_cell.
     // When width_of_multi_cell = 3, subtract degrees_per_cell.
@@ -243,7 +243,7 @@ class MultiRegularCellGrid(
     // Compute the indices of the southwest cell
     val subval = (width_of_multi_cell - 1) / 2.0 * degrees_per_cell
     coord_to_tiling_cell_index(
-      SphereSurfCoord(coord.lat - subval, coord.long - subval))
+      SphereCoord(coord.lat - subval, coord.long - subval))
   }
 
   /**
@@ -254,7 +254,7 @@ class MultiRegularCellGrid(
    */
   def fractional_cell_index_to_coord(index: FractionalRegularCellIndex,
     method: String = "coerce-warn") = {
-    SphereSurfCoord(index.latind * degrees_per_cell, index.longind * degrees_per_cell,
+    SphereCoord(index.latind * degrees_per_cell, index.longind * degrees_per_cell,
       method)
   }
 
@@ -364,7 +364,7 @@ class MultiRegularCellGrid(
 
   /*************** End conversion functions *************/
 
-  def find_best_cell_for_coord(coord: SphereSurfCoord) = {
+  def find_best_cell_for_coord(coord: SphereCoord) = {
     val index = coord_to_multi_cell_index(coord)
     find_cell_for_cell_index(index)
   }
@@ -390,7 +390,7 @@ class MultiRegularCellGrid(
     }
   }
 
-  def add_document_to_cell(document: DistDocument) {
+  def add_document_to_cell(document: SphereDocument) {
     val index = coord_to_tiling_cell_index(document.coord)
     tiling_cell_to_documents(index) += document
   }

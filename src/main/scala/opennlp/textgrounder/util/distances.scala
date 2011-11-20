@@ -48,11 +48,11 @@ import ioutil.warning
      km per degree at the Equator, number of km per mile, minimum/maximum
      latitude/longitude.
 
-  2. The SphereSurfCoord class (holding a latitude/longitude pair)
+  2. The SphereCoord class (holding a latitude/longitude pair)
   
   3. Function spheredist() to compute spherical (great-circle) distance
-     between two SphereSurfCoords; likewise degree_dist() to compute degree
-     distance between two SphereSurfCoords
+     between two SphereCoords; likewise degree_dist() to compute degree
+     distance between two SphereCoords
  */
 package object distances {
  
@@ -79,13 +79,21 @@ package object distances {
   // Number of miles per degree, at the equator.
   val miles_per_degree = km_per_degree / km_per_mile
 
+  /** A type class for converting to and from values in serialized form. */
+  @annotation.implicitNotFound(msg = "No implicit Serializer defined for ${T}.")
+  trait Serializer[T] {
+    def deserialize(foo: String): T
+    def serialize(foo: T): String
+    def validate_serialized_form(foo: String): Boolean
+  }
+
   // A 2-dimensional coordinate.
   //
   // The following fields are defined:
   //
   //   lat, long: Latitude and longitude of coordinate.
 
-  case class SphereSurfCoord(lat: Double, long: Double,
+  case class SphereCoord(lat: Double, long: Double,
       validate: Boolean = true) {
     if (validate) {
       // Not sure why this code was implemented with coerce_within_bounds,
@@ -98,7 +106,7 @@ package object distances {
     override def toString() = "(%.2f,%.2f)".format(lat, long)
   }
 
-  object SphereSurfCoord {
+  implicit object SphereCoord extends Serializer[SphereCoord] {
     // Create a coord, with METHOD defining how to handle coordinates
     // out of bounds.  If METHOD = "accept", just accept them; if
     // "validate", check within bounds, and abort if not.  If "coerce",
@@ -117,10 +125,10 @@ package object distances {
           case "validate" => { validate = true; (lat, long) }
           case "accept" => { (lat, long) }
           case _ => { require(false,
-                              "Invalid method to SphereSurfCoord(): %s" format method)
+                              "Invalid method to SphereCoord(): %s" format method)
                       (0.0, 0.0) }
         }
-      new SphereSurfCoord(newlat, newlong, validate = validate)
+      new SphereCoord(newlat, newlong, validate = validate)
     }
 
     def valid(lat: Double, long: Double) = (
@@ -139,12 +147,57 @@ package object distances {
       while (newlong < minimum_longitude) newlong += 360.
       (newlat, newlong)
     }
+
+    def deserialize(foo: String) = {
+      val Array(lat, long) = foo.split(',')
+      SphereCoord(lat.toDouble, long.toDouble)
+    }
+    
+    def serialize(foo: SphereCoord) = "%s,%s".format(foo.lat, foo.long)
+
+    def validate_serialized_form(foo: String): Boolean = {
+      if (foo == "") return true
+      val split = foo.split(",", -1)
+      if (split.length != 2) return false
+      val Array(lat, long) = split
+      try {
+        SphereCoord(lat.toDouble, long.toDouble)
+      } catch {
+        case _ => return false
+      }
+      return true
+    }
+  }
+
+  // A 1-dimensional coordinate.
+  //
+  // The following fields are defined:
+  //
+  //   lat, long: Latitude and longitude of coordinate.
+
+  case class Year(year: Double) { }
+
+  implicit object YearSerializer extends Serializer[Year] {
+    def deserialize(foo: String) = {
+      Year(foo.toDouble)
+    }
+    
+    def serialize(foo: Year) = "%s".format(foo.year)
+
+    def validate_serialized_form(foo: String): Boolean = {
+      try {
+        Year(foo.toDouble)
+      } catch {
+        case _ => return false
+      }
+      return true
+    }
   }
 
   // Compute spherical distance in km (along a great circle) between two
   // coordinates.
   
-  def spheredist(p1: SphereSurfCoord, p2: SphereSurfCoord): Double = {
+  def spheredist(p1: SphereCoord, p2: SphereCoord): Double = {
     if (p1 == null || p2 == null) return 1000000.
     val thisRadLat = (p1.lat / 180.) * Pi
     val thisRadLong = (p1.long / 180.) * Pi
@@ -169,7 +222,7 @@ package object distances {
     return earth_radius_in_km * acos(anglecos)
   }
   
-  def degree_dist(c1: SphereSurfCoord, c2: SphereSurfCoord) = {
+  def degree_dist(c1: SphereCoord, c2: SphereCoord) = {
     sqrt((c1.lat - c2.lat) * (c1.lat - c2.lat) +
       (c1.long - c2.long) * (c1.long - c2.long))
   }
@@ -186,7 +239,7 @@ package object distances {
    * @param botleft Coordinate of bottom left of rectangle
    * @param topright Coordinate of top right of rectangle
    */
-  def square_area(botleft: SphereSurfCoord, topright: SphereSurfCoord) = {
+  def square_area(botleft: SphereCoord, topright: SphereCoord) = {
     var (lat1, lon1) = (botleft.lat, botleft.long)
     var (lat2, lon2) = (topright.lat, topright.long)
     lat1 = (lat1 / 180.) * Pi

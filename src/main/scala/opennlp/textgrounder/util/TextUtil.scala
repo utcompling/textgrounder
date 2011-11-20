@@ -119,18 +119,19 @@ package object textutil {
     interval_texts grouped 2
   }
 
-  /* A function to make up for a bug in Scala.  The normal split() is broken
-     in that if the delimiter occurs at the end of the line, it gets ignored;
-     in fact, multiple such delimiters at end of line get ignored.  We hack
-     around that by adding an extra char at the end and then removing it
-     later. */
-  def splittext(str: String, ch: Char) = {
-    val ch2 = if (ch == 'x') 'y' else 'x'
-    val stradd = str + ch2
-    val ret = stradd.split(ch)
-    ret(ret.length - 1) = ret(ret.length - 1).dropRight(1)
-    ret
-  }
+  // In fact, split(..., -1) works exactly like this function.
+  // /* A function to make up for a bug in Scala.  The normal split() is broken
+  //    in that if the delimiter occurs at the end of the line, it gets ignored;
+  //    in fact, multiple such delimiters at end of line get ignored.  We hack
+  //    around that by adding an extra char at the end and then removing it
+  //    later. */
+  // def splittext(str: String, ch: Char) = {
+  //   val ch2 = if (ch == 'x') 'y' else 'x'
+  //   val stradd = str + ch2
+  //   val ret = stradd.split(ch)
+  //   ret(ret.length - 1) = ret(ret.length - 1).dropRight(1)
+  //   ret
+  // }
 
   // A worse implementation -- it will fail if there are any NUL bytes
   // in the input.

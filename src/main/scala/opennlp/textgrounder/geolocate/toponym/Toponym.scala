@@ -23,7 +23,7 @@ import math._
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances
-import opennlp.textgrounder.util.distances.SphereSurfCoord
+import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.distances.spheredist
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
@@ -38,7 +38,7 @@ import GeolocateToponymApp.Params
 // just a bounding box, but eventually may be expanded to including a
 // convex hull or more complex model.
 
-class Boundary(botleft: SphereSurfCoord, topright: SphereSurfCoord) {
+class Boundary(botleft: SphereCoord, topright: SphereCoord) {
   override def toString() = {
     "%s-%s" format (botleft, topright)
   }
@@ -49,7 +49,7 @@ class Boundary(botleft: SphereSurfCoord, topright: SphereSurfCoord) {
 
   def struct() = <Boundary boundary={ "%s-%s" format (botleft, topright) }/>
 
-  def contains(coord: SphereSurfCoord) = {
+  def contains(coord: SphereCoord) = {
     if (!(coord.lat >= botleft.lat && coord.lat <= topright.lat))
       false
     else if (botleft.long <= topright.long)
@@ -105,13 +105,13 @@ abstract class Location(
   val name: String,
   val altnames: Seq[String],
   val typ: String) {
-  var docmatch: DistDocument = null
+  var docmatch: SphereDocument = null
   var div: Division = null
   def toString(no_document: Boolean = false): String
   def shortstr(): String
   def struct(no_document: Boolean = false): xml.Elem
-  def distance_to_coord(coord: SphereSurfCoord): Double
-  def matches_coord(coord: SphereSurfCoord): Boolean
+  def distance_to_coord(coord: SphereCoord): Double
+  def matches_coord(coord: SphereCoord): Boolean
 }
 
 // A location corresponding to an entry in a gazetteer, with a single
@@ -119,11 +119,11 @@ abstract class Location(
 //
 // The following fields are defined, in addition to those for Location:
 //
-//   coord: Coordinates of the location, as a SphereSurfCoord object.
+//   coord: Coordinates of the location, as a SphereCoord object.
 
 case class Locality(
   override val name: String,
-  val coord: SphereSurfCoord,
+  val coord: SphereCoord,
   override val altnames: Seq[String],
   override val typ: String) extends Location(name, altnames, typ) {
 
@@ -156,9 +156,9 @@ case class Locality(
       }
     </Locality>
 
-  def distance_to_coord(coord: SphereSurfCoord) = spheredist(coord, coord)
+  def distance_to_coord(coord: SphereCoord) = spheredist(coord, coord)
 
-  def matches_coord(coord: SphereSurfCoord) = {
+  def matches_coord(coord: SphereCoord) = {
     distance_to_coord(coord) <= Params.max_dist_for_close_match
   }
 }
@@ -215,9 +215,9 @@ case class Division(
       <boundary>{ boundary.struct() }</boundary>
     </Division>
 
-  def distance_to_coord(coord: SphereSurfCoord) = java.lang.Double.NaN
+  def distance_to_coord(coord: SphereCoord) = java.lang.Double.NaN
 
-  def matches_coord(coord: SphereSurfCoord) = this contains coord
+  def matches_coord(coord: SphereCoord) = this contains coord
 
   // Compute the boundary of the geographic cell of this division, based
   // on the points in the cell.
@@ -258,9 +258,9 @@ case class Division(
     }
     // FIXME! This will fail for a division that crosses the International
     // Date Line.
-    val topleft = SphereSurfCoord((for (x <- goodlocs) yield x.coord.lat) min,
+    val topleft = SphereCoord((for (x <- goodlocs) yield x.coord.lat) min,
       (for (x <- goodlocs) yield x.coord.long) min)
-    val botright = SphereSurfCoord((for (x <- goodlocs) yield x.coord.lat) max,
+    val botright = SphereCoord((for (x <- goodlocs) yield x.coord.lat) max,
       (for (x <- goodlocs) yield x.coord.long) max)
     boundary = new Boundary(topleft, botright)
   }
@@ -272,7 +272,7 @@ case class Division(
     word_dist_wrapper.word_dist.finish(minimum_word_count = Params.minimum_word_count)
   }
 
-  def contains(coord: SphereSurfCoord) = boundary contains coord
+  def contains(coord: SphereCoord) = boundary contains coord
 }
 
 class DivisionFactory(gazetteer: Gazetteer) {
@@ -368,7 +368,7 @@ class DivisionFactory(gazetteer: Gazetteer) {
 class TopoDocument(
     params: Map[String, String],
     table: TopoDocumentTable
-) extends DistDocument(params) {
+) extends SphereDocument(params) {
   // Cell-based distribution corresponding to this document.
   var word_dist_wrapper: CellWordDist = null
   // Corresponding location for this document.
@@ -423,7 +423,7 @@ class TopoDocument(
     </TopoDocument>
   }
 
-  def matches_coord(coord: SphereSurfCoord) = {
+  def matches_coord(coord: SphereCoord) = {
     if (distance_to_coord(coord) <= Params.max_dist_for_close_match) true
     else if (location != null && location.isInstanceOf[Division] &&
       location.matches_coord(coord)) true
@@ -432,7 +432,7 @@ class TopoDocument(
 
   // Determine the cell word-distribution object for a given document:
   // Create and populate one if necessary.
-  def find_cellworddist(cell_grid: SphereSurfCellGrid) = {
+  def find_cellworddist(cell_grid: SphereCellGrid) = {
     val loc = location
     if (loc != null && loc.isInstanceOf[Division]) {
       val div = loc.asInstanceOf[Division]
@@ -468,11 +468,11 @@ class TopoDocument(
 }
 
 // Static class maintaining additional tables listing mapping between
-// names, ID's and documents.  See comments at DistDocumentTable.
+// names, ID's and documents.  See comments at SphereDocumentTable.
 class TopoDocumentTable(
   driver_stats: ExperimentDriverStats,
   word_dist_factory: WordDistFactory
-) extends DistDocumentTable(driver_stats, word_dist_factory) {
+) extends SphereDocumentTable(driver_stats, word_dist_factory) {
   override def create_document(params: Map[String, String]) =
     new TopoDocument(params, this)
 
@@ -516,8 +516,8 @@ class TopoDocumentTable(
   // to be preferred to the second.  Return the document matched, or None.
 
   def find_one_document_match(loc: Location, name: String,
-    check_match: (DistDocument) => Boolean,
-    prefer_match: (DistDocument, DistDocument) => Boolean): DistDocument = {
+    check_match: (SphereDocument) => Boolean,
+    prefer_match: (SphereDocument, SphereDocument) => Boolean): SphereDocument = {
 
     val loname = name.toLowerCase
 
@@ -563,8 +563,8 @@ class TopoDocumentTable(
   // as above.  Return the document matched, or None.
 
   def find_document_match(loc: Location,
-    check_match: (DistDocument) => Boolean,
-    prefer_match: (DistDocument, DistDocument) => Boolean): DistDocument = {
+    check_match: (SphereDocument) => Boolean,
+    prefer_match: (SphereDocument, SphereDocument) => Boolean): SphereDocument = {
     // Try to find a match for the canonical name of the location
     val docmatch = find_one_document_match(loc, loc.name, check_match,
       prefer_match)
@@ -586,7 +586,7 @@ class TopoDocumentTable(
 
   def find_match_for_locality(loc: Locality, maxdist: Double) = {
 
-    def check_match(doc: DistDocument) = {
+    def check_match(doc: SphereDocument) = {
       val dist = spheredist(loc.coord, doc.coord)
       if (dist <= maxdist) true
       else {
@@ -598,7 +598,7 @@ class TopoDocumentTable(
       }
     }
 
-    def prefer_match(doc1: DistDocument, doc2: DistDocument) = {
+    def prefer_match(doc1: SphereDocument, doc2: SphereDocument) = {
       spheredist(loc.coord, doc1.coord) < spheredist(loc.coord, doc2.coord)
     }
 
@@ -611,11 +611,11 @@ class TopoDocumentTable(
 
   def find_match_for_division(div: Division) = {
 
-    def check_match(doc: DistDocument) = {
-      if (doc.coord != null && (div contains doc.coord)) true
+    def check_match(doc: SphereDocument) = {
+      if (doc.optcoord != None && (div contains doc.coord)) true
       else {
         if (debug("lots")) {
-          if (doc.coord == null) {
+          if (doc.optcoord == None) {
             errprint("Found document %s but no coordinate, so not in location named %s, path %s",
               doc, div.name, div.path)
           } else {
@@ -627,7 +627,7 @@ class TopoDocumentTable(
       }
     }
 
-    def prefer_match(doc1: DistDocument, doc2: DistDocument) = {
+    def prefer_match(doc1: SphereDocument, doc2: SphereDocument) = {
       val l1 = doc1.incoming_links
       val l2 = doc2.incoming_links
       // Prefer according to incoming link counts, if that info is available
@@ -760,7 +760,7 @@ class GeolocateToponymResults(driver_stats: ExperimentDriverStats) {
 class GeogWord(val word: String) {
   var is_stop = false
   var is_toponym = false
-  var coord: SphereSurfCoord = null
+  var coord: SphereCoord = null
   var location: String = null
   var context: Array[(Int, String)] = null
   var document: String = null
@@ -775,7 +775,7 @@ abstract class GeolocateToponymStrategy {
 // (find the correct geographic location) using the "link baseline", i.e.
 // use the location with the highest number of incoming links.
 class BaselineGeolocateToponymStrategy(
-  cell_grid: SphereSurfCellGrid,
+  cell_grid: SphereCellGrid,
   val baseline_strategy: String) extends GeolocateToponymStrategy {
   def need_context() = false
 
@@ -803,7 +803,7 @@ class BaselineGeolocateToponymStrategy(
 // (find the correct geographic location) using Naive Bayes, possibly
 // in conjunction with the baseline.
 class NaiveBayesToponymStrategy(
-  cell_grid: SphereSurfCellGrid,
+  cell_grid: SphereCellGrid,
   val use_baseline: Boolean) extends GeolocateToponymStrategy {
   def need_context() = true
 
@@ -1105,7 +1105,7 @@ class TRCoNLLGeolocateToponymEvaluator(
             val ss = """\t""".r.split(ty)
             require(ss.length == 5)
             val Array(_, lat, long, fulltop, _) = ss
-            wordstruct.coord = SphereSurfCoord(lat.toDouble, long.toDouble)
+            wordstruct.coord = SphereCoord(lat.toDouble, long.toDouble)
             wordstruct.location = fulltop
           }
         } catch {
@@ -1281,7 +1281,7 @@ class WorldGazetteer(
     }
 
     // Create and populate a Locality object
-    val loc = new Locality(name, SphereSurfCoord(lat.toInt / 100., long.toInt / 100.),
+    val loc = new Locality(name, SphereCoord(lat.toInt / 100., long.toInt / 100.),
       typ = typ, altnames = if (altnames != null) ", ".r.split(altnames) else null)
     loc.div = divfactory.find_division_note_point(loc, Seq(div1, div2, div3))
     if (debug("lots"))
