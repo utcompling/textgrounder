@@ -1006,6 +1006,11 @@ Used for testing purposes.  Default 0, i.e. no limit.""")
   var no_individual_results =
     ap.flag("no-individual-results", "no-results",
       help = """Don't show individual results for each test document.""")
+  var results_by_range =
+    ap.flag("results-by-range",
+      help = """Show results by range (of error distances and number of
+documents in true cell).  Not on by default as counters are used for this,
+and setting so many counters breaks some Hadoop installations.""")
   var oracle_results =
     ap.flag("oracle-results",
       help = """Only compute oracle results (much faster).""")

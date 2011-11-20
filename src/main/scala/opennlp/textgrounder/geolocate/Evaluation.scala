@@ -224,7 +224,8 @@ class GeolocateDocumentEvalStats(
 
 class GroupedGeolocateDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
-  cell_grid: CellGrid
+  cell_grid: CellGrid,
+  results_by_range: Boolean
 ) {
 
   def create_stats(prefix: String) =
@@ -272,6 +273,14 @@ class GroupedGeolocateDocumentEvalStats(
   def record_result(res: DocumentEvaluationResult) {
     all_document.record_result(res.true_rank,
       res.pred_truedist, res.pred_degdist)
+    all_document.record_oracle_result(res.true_truedist, res.true_degdist)
+    // Stephen says recording so many counters leads to crashes (at the 51st
+    // counter or something), so don't do it unless called for.
+    if (results_by_range)
+      record_result_by_range(res)
+  }
+
+  def record_result_by_range(res: DocumentEvaluationResult) {
     val naitr = docs_by_naitr.get_collector(res.num_docs_in_true_cell)
     naitr.record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
 
@@ -299,7 +308,6 @@ class GroupedGeolocateDocumentEvalStats(
         fracinc * floor(frac_true_degdist / fracinc)
       val rounded_frac_true_degdist =
         fracinc * floor(frac_true_degdist / fracinc)
-      all_document.record_oracle_result(res.true_truedist, res.true_degdist)
       docs_by_true_dist_to_true_center(rounded_frac_true_truedist).
         record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
       docs_by_degree_dist_to_true_center(rounded_frac_true_degdist).
@@ -452,7 +460,7 @@ abstract class GeolocateDocumentEvaluator(
   driver: GeolocateDocumentTypeDriver
 ) extends TestFileEvaluator(stratname) {
   val evalstats = new GroupedGeolocateDocumentEvalStats(driver,
-    strategy.cell_grid)
+    strategy.cell_grid, results_by_range = driver.params.results_by_range)
 
   def output_results(isfinal: Boolean = false) {
     evalstats.output_results(all_results = isfinal)
