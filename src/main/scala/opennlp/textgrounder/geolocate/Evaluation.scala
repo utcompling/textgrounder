@@ -177,40 +177,62 @@ class GeolocateDocumentEvalStats(
   max_rank_for_credit: Int = 10
 ) extends EvalStatsWithRank(driver_stats, prefix, max_rank_for_credit) {
   // "True dist" means actual distance in km's or whatever.
-  // "Degree dist" is the distance in degrees.
   val true_dists = mutable.Buffer[Double]()
-  val degree_dists = mutable.Buffer[Double]()
   val oracle_true_dists = mutable.Buffer[Double]()
+
+  def record_result(rank: Int, pred_true_dist: Double) {
+    super.record_result(rank)
+    true_dists += pred_true_dist
+  }
+
+  def record_oracle_result(oracle_true_dist: Double) {
+    oracle_true_dists += oracle_true_dist
+  }
+
+  protected def km_and_miles(kmdist: Double) = {
+    "%.2f km (%.2f miles)" format (kmdist, kmdist / km_per_mile)
+  }
+
+  override def output_incorrect_results() {
+    super.output_incorrect_results()
+    errprint("  Mean true error distance = %s",
+      km_and_miles(mean(true_dists)))
+    errprint("  Median true error distance = %s",
+      km_and_miles(median(true_dists)))
+    errprint("  Mean oracle true error distance = %s",
+      km_and_miles(mean(oracle_true_dists)))
+  }
+}
+
+class SphereGeolocateDocumentEvalStats(
+  driver_stats: ExperimentDriverStats,
+  prefix: String,
+  max_rank_for_credit: Int = 10
+) extends GeolocateDocumentEvalStats(
+  driver_stats, prefix, max_rank_for_credit) {
+  // "True dist" means actual distance in km's or whatever.
+  // "Degree dist" is the distance in degrees.
+  val degree_dists = mutable.Buffer[Double]()
   val oracle_degree_dists = mutable.Buffer[Double]()
 
   def record_result(rank: Int, pred_true_dist: Double,
       pred_degree_dist: Double) {
-    super.record_result(rank)
-    true_dists += pred_true_dist
+    super.record_result(rank, pred_true_dist)
     degree_dists += pred_degree_dist
   }
 
   def record_oracle_result(oracle_true_dist: Double,
       oracle_degree_dist: Double) {
-    oracle_true_dists += oracle_true_dist
+    super.record_oracle_result(oracle_true_dist)
     oracle_degree_dists += oracle_degree_dist
   }
 
   override def output_incorrect_results() {
     super.output_incorrect_results()
-    def km_and_miles(kmdist: Double) = {
-      "%.2f km (%.2f miles)" format (kmdist, kmdist / km_per_mile)
-    }
-    errprint("  Mean true error distance = %s",
-      km_and_miles(mean(true_dists)))
-    errprint("  Median true error distance = %s",
-      km_and_miles(median(true_dists)))
     errprint("  Mean degree error distance = %.2f degrees",
       mean(degree_dists))
     errprint("  Median degree error distance = %.2f degrees",
       median(degree_dists))
-    errprint("  Mean oracle true error distance = %s",
-      km_and_miles(mean(oracle_true_dists)))
     errprint("  Median oracle true error distance = %s",
       km_and_miles(median(oracle_true_dists)))
   }
@@ -222,14 +244,18 @@ class GeolocateDocumentEvalStats(
  * number of documents in true cell.
  */
 
-class GroupedGeolocateDocumentEvalStats(
+abstract class GroupedGeolocateDocumentEvalStats[CoordType,
+  DocumentType <: DistDocument[CoordType],
+  CellType <: GeoCell[CoordType, DocumentType]](
   driver_stats: ExperimentDriverStats,
-  cell_grid: SphereCellGrid,
+  cell_grid: CellGrid[CoordType,DocumentType,CellType],
   results_by_range: Boolean
 ) {
+  type BasicEvalStatsType <: GeolocateDocumentEvalStats
+  type DocumentEvaluationResultType <:
+    DocumentEvaluationResult[CoordType, DocumentType, CellType]
 
-  def create_stats(prefix: String) =
-    new GeolocateDocumentEvalStats(driver_stats, prefix)
+  def create_stats(prefix: String): BasicEvalStatsType
   def create_stats_for_range[T](prefix: String, range: T) =
     create_stats(prefix + ".byrange." + range)
 
@@ -249,10 +275,8 @@ class GroupedGeolocateDocumentEvalStats(
   // and longitudinally.
   val dist_fraction_increment = 0.25
   def docmap(prefix: String) =
-    new SettingDefaultHashMap[Double, GeolocateDocumentEvalStats](
+    new SettingDefaultHashMap[Double, BasicEvalStatsType](
       create_stats_for_range(prefix, _))
-  val docs_by_degree_dist_to_true_center =
-    docmap("degree_dist_to_true_center")
   val docs_by_true_dist_to_true_center =
     docmap("true_dist_to_true_center")
 
@@ -263,26 +287,99 @@ class GroupedGeolocateDocumentEvalStats(
     12, 16, 24, 32, 48, 64, 96, 128, 192, 256,
     // We're never going to see these
     384, 512, 768, 1024, 1536, 2048)
-  val docs_by_degree_dist_to_pred_center =
-    new DoubleTableByRange(dist_fractions_for_error_dist,
-      create_stats_for_range("degree_dist_to_pred_center", _))
   val docs_by_true_dist_to_pred_center =
     new DoubleTableByRange(dist_fractions_for_error_dist,
       create_stats_for_range("true_dist_to_pred_center", _))
 
-  def record_result(res: DocumentEvaluationResult) {
-    all_document.record_result(res.true_rank,
-      res.pred_truedist, res.pred_degdist)
-    all_document.record_oracle_result(res.true_truedist, res.true_degdist)
+  def record_one_result(stats: BasicEvalStatsType, res: DocumentEvaluationResultType) {
+    stats.record_result(res.true_rank, res.pred_truedist)
+  }
+
+  def record_one_oracle_result(stats: BasicEvalStatsType, res: DocumentEvaluationResultType) {
+    stats.record_oracle_result(res.pred_truedist)
+  }
+
+  def record_result(res: DocumentEvaluationResultType) {
+    record_one_result(all_document, res)
+    record_one_oracle_result(all_document, res)
     // Stephen says recording so many counters leads to crashes (at the 51st
     // counter or something), so don't do it unless called for.
     if (results_by_range)
       record_result_by_range(res)
   }
 
-  def record_result_by_range(res: DocumentEvaluationResult) {
+  def record_result_by_range(res: DocumentEvaluationResultType) {
     val naitr = docs_by_naitr.get_collector(res.num_docs_in_true_cell)
-    naitr.record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
+    record_one_result(naitr, res)
+  }
+
+  def increment_counter(name: String) {
+    all_document.increment_counter(name)
+  }
+
+  def output_results(all_results: Boolean = false) {
+    errprint("")
+    errprint("Results for all documents:")
+    all_document.output_results()
+    /* FIXME: This code specific to MultiRegularCellGrid is kind of ugly.
+       Perhaps it should go elsewhere.
+
+       FIXME: Also note that we don't actually do anything here, because of
+       the 'if (false)'.  See above.
+     */
+    //if (all_results)
+    if (false)
+      output_results_by_range()
+    // FIXME: Output median and mean of true and degree error dists; also
+    // maybe move this info info EvalByRank so that we can output the values
+    // for each category
+    errprint("")
+    output_resource_usage()
+  }
+
+  def output_results_by_range() { 
+    errprint("")
+    for ((lower, upper, obj) <- docs_by_naitr.iter_ranges()) {
+      errprint("")
+      errprint("Results for documents where number of documents")
+      errprint("  in true cell is in the range [%s,%s]:",
+        lower, upper - 1)
+      obj.output_results()
+    }
+  }
+}
+
+class SphereGroupedGeolocateDocumentEvalStats(
+  driver_stats: ExperimentDriverStats,
+  cell_grid: SphereCellGrid,
+  results_by_range: Boolean
+) extends GroupedGeolocateDocumentEvalStats[
+  SphereCoord, SphereDocument, SphereCell](
+  driver_stats, cell_grid, results_by_range) {
+  type BasicEvalStatsType = SphereGeolocateDocumentEvalStats
+  type DocumentEvaluationResultType = SphereDocumentEvaluationResult
+  override def create_stats(prefix: String) =
+    new SphereGeolocateDocumentEvalStats(driver_stats, prefix)
+
+  val docs_by_degree_dist_to_true_center =
+    docmap("degree_dist_to_true_center")
+
+  val docs_by_degree_dist_to_pred_center =
+    new DoubleTableByRange(dist_fractions_for_error_dist,
+      create_stats_for_range("degree_dist_to_pred_center", _))
+
+  override def record_one_result(stats: BasicEvalStatsType,
+      res: DocumentEvaluationResultType) {
+    stats.record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
+  }
+
+  override def record_one_oracle_result(stats: BasicEvalStatsType,
+      res: DocumentEvaluationResultType) {
+    stats.record_oracle_result(res.pred_truedist, res.pred_degdist)
+  }
+
+  override def record_result_by_range(res: DocumentEvaluationResultType) {
+    super.record_result_by_range(res)
 
     /* FIXME: This code specific to MultiRegularCellGrid is kind of ugly.
        Perhaps it should go elsewhere.
@@ -336,69 +433,41 @@ class GroupedGeolocateDocumentEvalStats(
     }
   }
 
-  def increment_counter(name: String) {
-    all_document.increment_counter(name)
-  }
-
-  def output_results(all_results: Boolean = false) {
+  override def output_results_by_range() {
+    super.output_results_by_range()
     errprint("")
-    errprint("Results for all documents:")
-    all_document.output_results()
-    /* FIXME: This code specific to MultiRegularCellGrid is kind of ugly.
-       Perhaps it should go elsewhere.
 
-       FIXME: Also note that we don't actually do anything here, because of
-       the 'if (false)'.  See above.
-     */
-    //if (all_results)
-    if (false) {
-      errprint("")
-      for ((lower, upper, obj) <- docs_by_naitr.iter_ranges()) {
+    if (cell_grid.isInstanceOf[MultiRegularCellGrid]) {
+      val multigrid = cell_grid.asInstanceOf[MultiRegularCellGrid]
+
+      for (
+        (frac_truedist, obj) <-
+          docs_by_true_dist_to_true_center.toSeq sortBy (_._1)
+      ) {
+        val lowrange = frac_truedist * multigrid.km_per_cell
+        val highrange = ((frac_truedist + dist_fraction_increment) *
+          multigrid.km_per_cell)
         errprint("")
-        errprint("Results for documents where number of documents")
-        errprint("  in true cell is in the range [%s,%s]:",
-          lower, upper - 1)
+        errprint("Results for documents where distance to center")
+        errprint("  of true cell in km is in the range [%.2f,%.2f):",
+          lowrange, highrange)
         obj.output_results()
       }
       errprint("")
-
-      if (cell_grid.isInstanceOf[MultiRegularCellGrid]) {
-        val multigrid = cell_grid.asInstanceOf[MultiRegularCellGrid]
-
-        for (
-          (frac_truedist, obj) <-
-            docs_by_true_dist_to_true_center.toSeq sortBy (_._1)
-        ) {
-          val lowrange = frac_truedist * multigrid.km_per_cell
-          val highrange = ((frac_truedist + dist_fraction_increment) *
-            multigrid.km_per_cell)
-          errprint("")
-          errprint("Results for documents where distance to center")
-          errprint("  of true cell in km is in the range [%.2f,%.2f):",
-            lowrange, highrange)
-          obj.output_results()
-        }
+      for (
+        (frac_degdist, obj) <-
+          docs_by_degree_dist_to_true_center.toSeq sortBy (_._1)
+      ) {
+        val lowrange = frac_degdist * multigrid.degrees_per_cell
+        val highrange = ((frac_degdist + dist_fraction_increment) *
+          multigrid.degrees_per_cell)
         errprint("")
-        for (
-          (frac_degdist, obj) <-
-            docs_by_degree_dist_to_true_center.toSeq sortBy (_._1)
-        ) {
-          val lowrange = frac_degdist * multigrid.degrees_per_cell
-          val highrange = ((frac_degdist + dist_fraction_increment) *
-            multigrid.degrees_per_cell)
-          errprint("")
-          errprint("Results for documents where distance to center")
-          errprint("  of true cell in degrees is in the range [%.2f,%.2f):",
-            lowrange, highrange)
-          obj.output_results()
-        }
+        errprint("Results for documents where distance to center")
+        errprint("  of true cell in degrees is in the range [%.2f,%.2f):",
+          lowrange, highrange)
+        obj.output_results()
       }
     }
-    // FIXME: Output median and mean of true and degree error dists; also
-    // maybe move this info info EvalByRank so that we can output the values
-    // for each category
-    errprint("")
-    output_resource_usage()
   }
 }
 
@@ -425,27 +494,28 @@ trait EvaluationResult {
 abstract class TestFileEvaluator(val stratname: String) {
   var documents_processed = 0
 
-  type Document <: EvaluationDocument
+  type EvalDocumentType <: EvaluationDocument
+  type EvalResultType <: EvaluationResult
 
   /**
    * Return an Iterable listing the documents retrievable from the given
    * filename.
    */
   def iter_documents(filehand: FileHandler,
-    filename: String): Iterable[Document]
+    filename: String): Iterable[EvalDocumentType]
 
   /**
    * Return true if document would be skipped; false if processed and
    * evaluated.
    */
-  def would_skip_document(doc: Document, doctag: String) = false
+  def would_skip_document(doc: EvalDocumentType, doctag: String) = false
 
   /**
    * Return true if document was actually processed and evaluated; false
    * if skipped.
    */
-  def evaluate_document(doc: Document, doctag: String):
-    EvaluationResult
+  def evaluate_document(doc: EvalDocumentType, doctag: String):
+    EvalResultType
 
   /**
    * Output results so far.  If 'isfinal', this is the last call, so
@@ -454,12 +524,21 @@ abstract class TestFileEvaluator(val stratname: String) {
   def output_results(isfinal: Boolean = false): Unit
 }
 
-abstract class GeolocateDocumentEvaluator(
-  val strategy: GeolocateDocumentStrategy,
+abstract class GeolocateDocumentEvaluator[CoordType,
+    DocumentType <: DistDocument[CoordType],
+    CellType <: GeoCell[CoordType, DocumentType],
+    CellGridType <: CellGrid[CoordType, DocumentType, CellType]](
+  val strategy: GeolocateDocumentStrategy[CoordType, DocumentType, CellType,
+    CellGridType],
   stratname: String,
   driver: GeolocateDocumentTypeDriver
 ) extends TestFileEvaluator(stratname) {
-  val evalstats = new GroupedGeolocateDocumentEvalStats(driver,
+  type GroupedEvalStatsType <:
+    GroupedGeolocateDocumentEvalStats[CoordType,DocumentType,CellType]
+  def create_grouped_eval_stats(driver: GeolocateDocumentTypeDriver,
+    cell_grid: CellGridType, results_by_range: Boolean):
+    GroupedEvalStatsType
+  val evalstats = create_grouped_eval_stats(driver,
     strategy.cell_grid, results_by_range = driver.params.results_by_range)
 
   def output_results(isfinal: Boolean = false) {
@@ -467,33 +546,58 @@ abstract class GeolocateDocumentEvaluator(
   }
 }
 
-case class DocumentEvaluationResult(
-  document: SphereDocument,
-  pred_cell: SphereCell,
+abstract class SphereGeolocateDocumentEvaluator(
+  override val strategy: SphereGeolocateDocumentStrategy,
+  stratname: String,
+  driver: GeolocateDocumentTypeDriver
+) extends GeolocateDocumentEvaluator[SphereCoord, SphereDocument, SphereCell,
+  SphereCellGrid](strategy, stratname, driver) {
+  type GroupedEvalStatsType = SphereGroupedGeolocateDocumentEvalStats
+  def create_grouped_eval_stats(driver: GeolocateDocumentTypeDriver,
+    cell_grid: SphereCellGrid, results_by_range: Boolean) =
+    new GroupedEvalStatsType(driver, cell_grid.asInstanceOf[SphereCellGrid],
+      results_by_range)
+}
+
+case class DocumentEvaluationResult[CoordType,
+    DocumentType <: DistDocument[CoordType],
+    CellType <: GeoCell[CoordType, DocumentType]](
+  document: DocumentType,
+  pred_cell: CellType,
   true_rank: Int
 ) extends EvaluationResult {
   val true_cell = pred_cell.cell_grid.find_best_cell_for_coord(document.coord)
   val num_docs_in_true_cell = true_cell.word_dist_wrapper.num_docs_for_word_dist
   val true_center = true_cell.get_center_coord()
-  val true_truedist = spheredist(document.coord, true_center)
-  val true_degdist = degree_dist(document.coord, true_center)
+  val true_truedist = document.distance_to_coord(true_center)
   val pred_center = pred_cell.get_center_coord()
-  val pred_truedist = spheredist(document.coord, pred_center)
-  val pred_degdist = degree_dist(document.coord, pred_center)
+  val pred_truedist = document.distance_to_coord(pred_center)
 }
+
+class SphereDocumentEvaluationResult(
+  document: SphereDocument,
+  pred_cell: SphereCell,
+  true_rank: Int
+) extends DocumentEvaluationResult[SphereCoord, SphereDocument, SphereCell](
+  document, pred_cell, true_rank
+) {
+  val true_degdist = document.degree_distance_to_coord(true_center)
+  val pred_degdist = document.degree_distance_to_coord(pred_center)
+}
+
 
 /**
   Class to do document geolocating on documents from the document data, in
   the dev or test set.
  */
 class InternalGeolocateDocumentEvaluator(
-  strategy: GeolocateDocumentStrategy,
+  strategy: SphereGeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends GeolocateDocumentEvaluator(strategy, stratname, driver) {
+) extends SphereGeolocateDocumentEvaluator(strategy, stratname, driver) {
 
-  type Document = SphereDocument
-  type DocumentResult = DocumentEvaluationResult
+  type EvalDocumentType = SphereDocument
+  type EvalResultType = SphereDocumentEvaluationResult
 
   def iter_documents(filehand: FileHandler, filename: String) = {
     assert(filename == null)
@@ -521,7 +625,7 @@ class InternalGeolocateDocumentEvaluator(
   //if (title != null)
   //  yield (title, words)
 
-  override def would_skip_document(document: SphereDocument, doctag: String) = {
+  override def would_skip_document(document: EvalDocumentType, doctag: String) = {
     if (document.dist == null) {
       // This can (and does) happen when --max-time-per-stage is set,
       // so that the counts for many documents don't get read in.
@@ -531,8 +635,8 @@ class InternalGeolocateDocumentEvaluator(
     } else false
   }
 
-  def evaluate_document(document: SphereDocument, doctag: String):
-      EvaluationResult = {
+  def evaluate_document(document: EvalDocumentType, doctag: String):
+      EvalResultType = {
     if (would_skip_document(document, doctag)) {
       evalstats.increment_counter("documents.skipped")
       return null
@@ -578,7 +682,7 @@ class InternalGeolocateDocumentEvaluator(
         get_computed_results()
       }
     val result =
-      new DocumentEvaluationResult(document, pred_cells(0)._1, true_rank)
+      new SphereDocumentEvaluationResult(document, pred_cells(0)._1, true_rank)
 
     val want_indiv_results =
       !driver.params.oracle_results && !driver.params.no_individual_results
@@ -627,14 +731,14 @@ class TitledDocumentResult extends EvaluationResult {
  * in the PCL Travel corpus.
  */
 class PCLTravelGeolocateDocumentEvaluator(
-  strategy: GeolocateDocumentStrategy,
+  strategy: SphereGeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends GeolocateDocumentEvaluator(strategy, stratname, driver) {
+) extends SphereGeolocateDocumentEvaluator(strategy, stratname, driver) {
   case class TitledDocument(
     title: String, text: String) extends EvaluationDocument 
-  type Document = TitledDocument
-  type DocumentResult = TitledDocumentResult
+  type EvalDocumentType = TitledDocument
+  type EvalResultType = TitledDocumentResult
 
   def iter_documents(filehand: FileHandler, filename: String) = {
 

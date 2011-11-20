@@ -392,6 +392,7 @@ abstract class DistDocument[CoordType : Serializer](
 class SphereDocument(params: Map[String, String]) extends
     DistDocument[SphereCoord](params) {
   def distance_to_coord(coord2: SphereCoord) = spheredist(coord, coord2)
+  def degree_distance_to_coord(coord2: SphereCoord) = degree_dist(coord, coord2)
 }
 
 class SphereDocumentTable(

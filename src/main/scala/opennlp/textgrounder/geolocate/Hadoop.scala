@@ -516,7 +516,7 @@ class DocumentEvaluationMapper extends
                 e.evaluate_document(doc, doctag)
               assert(result != null)
               context.write(new Text(e.stratname),
-                new DoubleWritable(result.asInstanceOf[DocumentEvaluationResult].pred_truedist))
+                new DoubleWritable(result.asInstanceOf[SphereDocumentEvaluationResult].pred_truedist))
               task.item_processed()
             }
           }

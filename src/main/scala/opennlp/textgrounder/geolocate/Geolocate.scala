@@ -28,7 +28,7 @@ import collection.mutable
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.distances.{miles_per_degree, km_per_degree}
+import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil.{errprint, FileHandler, LocalFileHandler}
 
@@ -82,9 +82,12 @@ This module is the main driver module for the Geolocate subproject.
 //  }
 
 object GenericTypes {
-  type GenericDistDocumentTable =
-    DistDocumentTable[_, _ <: DistDocument[_]]
   type GenericDistDocument = DistDocument[_]
+  type GenericDistDocumentTable =
+    DistDocumentTable[_, _ <: GenericDistDocument]
+  type GenericGeoCell = GeoCell[_, _ <: GenericDistDocument]
+  type GenericCellGrid = CellGrid[_, _ <: GenericDistDocument,
+    _ <: GenericGeoCell]
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -95,7 +98,12 @@ object GenericTypes {
  * Abstract class for reading documents from a test file and doing
  * document geolocation on them (as opposed e.g. to toponym resolution).
  */
-abstract class GeolocateDocumentStrategy(val cell_grid: SphereCellGrid) {
+abstract class GeolocateDocumentStrategy[CoordType,
+    DocumentType <: DistDocument[CoordType],
+    CellType <: GeoCell[CoordType, DocumentType],
+    CellGridType <: CellGrid[CoordType, DocumentType, CellType]](
+  val cell_grid: CellGridType
+) {
   /**
    * For a given word distribution (describing a test document), return
    * an Iterable of tuples, each listing a particular cell on the Earth
@@ -105,8 +113,13 @@ abstract class GeolocateDocumentStrategy(val cell_grid: SphereCellGrid) {
    * are better, while for others, higher scores are better.  Currently,
    * the wrapper code outputs the score but doesn't otherwise use it.
    */
-  def return_ranked_cells(word_dist: WordDist): Iterable[(SphereCell, Double)]
+  def return_ranked_cells(word_dist: WordDist): Iterable[(CellType, Double)]
 }
+
+abstract class SphereGeolocateDocumentStrategy(
+  cell_grid: SphereCellGrid
+) extends GeolocateDocumentStrategy[SphereCoord, SphereDocument, SphereCell,
+  SphereCellGrid](cell_grid) { }
 
 /**
  * Class that implements the baseline strategies for document geolocation.
@@ -114,7 +127,7 @@ abstract class GeolocateDocumentStrategy(val cell_grid: SphereCellGrid) {
  */
 class RandomGeolocateDocumentStrategy(
   cell_grid: SphereCellGrid
-) extends GeolocateDocumentStrategy(cell_grid) {
+) extends SphereGeolocateDocumentStrategy(cell_grid) {
   def return_ranked_cells(word_dist: WordDist) = {
     val cells = cell_grid.iter_nonempty_cells()
     val shuffled = (new Random()).shuffle(cells)
@@ -125,7 +138,7 @@ class RandomGeolocateDocumentStrategy(
 class MostPopularCellGeolocateDocumentStrategy(
   cell_grid: SphereCellGrid,
   internal_link: Boolean
-) extends GeolocateDocumentStrategy(cell_grid) {
+) extends SphereGeolocateDocumentStrategy(cell_grid) {
   var cached_ranked_mps: Iterable[(SphereCell, Double)] = null
   def return_ranked_cells(word_dist: WordDist) = {
     if (cached_ranked_mps == null) {
@@ -144,7 +157,7 @@ class MostPopularCellGeolocateDocumentStrategy(
 
 class CellDistMostCommonToponymGeolocateDocumentStrategy(
   cell_grid: SphereCellGrid
-) extends GeolocateDocumentStrategy(cell_grid) {
+) extends SphereGeolocateDocumentStrategy(cell_grid) {
   val cdist_factory = new SphereCellDistFactory(Params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
@@ -167,7 +180,7 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
 
 class LinkMostCommonToponymGeolocateDocumentStrategy(
   cell_grid: SphereCellGrid
-) extends GeolocateDocumentStrategy(cell_grid) {
+) extends SphereGeolocateDocumentStrategy(cell_grid) {
   def return_ranked_cells(word_dist: WordDist) = {
     var maxword = word_dist.find_most_common_word(
       word => word(0).isUpper && cell_grid.table.word_is_toponym(word))
@@ -228,7 +241,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
 abstract class MinMaxScoreStrategy(
   cell_grid: SphereCellGrid,
   prefer_minimum: Boolean
-) extends GeolocateDocumentStrategy(cell_grid) {
+) extends SphereGeolocateDocumentStrategy(cell_grid) {
   /**
    * Function to return the score of a document distribution against a
    * cell.
@@ -388,7 +401,7 @@ class NaiveBayesDocumentStrategy(
 
 class AverageCellProbabilityStrategy(
   cell_grid: SphereCellGrid
-) extends GeolocateDocumentStrategy(cell_grid) {
+) extends SphereGeolocateDocumentStrategy(cell_grid) {
   val cdist_factory = new SphereCellDistFactory(Params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
@@ -1040,9 +1053,9 @@ strategies, since they require that --preserve-case-words be set internally.""")
 abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
   override type ParamType <: GeolocateDocumentParameters
   type RunReturnType =
-    Seq[(String, GeolocateDocumentStrategy, EvaluationOutputter)]
+    Seq[(String, SphereGeolocateDocumentStrategy, EvaluationOutputter)]
 
-  var strategies: Seq[(String, GeolocateDocumentStrategy)] = _
+  var strategies: Seq[(String, SphereGeolocateDocumentStrategy)] = _
 
   override def handle_parameters() {
     super.handle_parameters()

@@ -865,8 +865,8 @@ abstract class GeolocateToponymEvaluator(
 
   case class GeogWordDocument(
     words: Iterable[GeogWord]) extends EvaluationDocument
-  type Document = GeogWordDocument
-  type DocumentResult = ToponymEvaluationResult
+  type EvalDocumentType = GeogWordDocument
+  type EvalResultType = ToponymEvaluationResult
 
   // Given an evaluation file, read in the words specified, including the
   // toponyms.  Mark each word with the "document" (e.g. document) that it's
