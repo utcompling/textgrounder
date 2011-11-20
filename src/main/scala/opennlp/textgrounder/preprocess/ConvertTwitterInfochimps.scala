@@ -67,15 +67,24 @@ The fields are:
 //                                  Main code                              //
 /////////////////////////////////////////////////////////////////////////////
 
+class ConvertTwitterInfochimpsParameters(parser: ArgParser) extends
+    ProcessFilesParameters(parser) {
+  var group_by_user =
+    ap.flag("group-by-user",
+      help = """If true, prepare for grouping tweets into a single per-user document.""")
+}
+
 class ConvertTwitterInfochimpsDriver extends ProcessFilesDriver {
-  type ParamType = ProcessFilesParameters
+  type ParamType = ConvertTwitterInfochimpsParameters
   
   def usage() {
-    sys.error("""Usage: ConvertTwitterInfochimps [-o OUTDIR | --outfile OUTDIR] INFILE ...
+    sys.error("""Usage: ConvertTwitterInfochimps [-o OUTDIR | --outfile OUTDIR] [--group-by-user] INFILE ...
 
 Convert input files in the Infochimps Twitter corpus into files in the
 format expected by TextGrounder.  OUTDIR is the directory to store the
-results in, which must not exist already.
+results in, which must not exist already.  If --group-by-user is given,
+output an extra field in the text file containing the user, to make it
+easier to group tweets by user.
 """)
   }
 
@@ -87,14 +96,17 @@ results in, which must not exist already.
   }
 
   def process_one_file(lines: Iterator[String], outname: String) {
+    val compression_type = "bzip2"
     val task = new MeteredTask("tweet", "parsing")
     val out_metadata_name =
       "%s/%s-combined-document-data.txt" format (params.output_dir, outname)
     val out_text_name = "%s/%s-text.txt" format (params.output_dir, outname)
     errprint("Metadata output file is %s..." format out_metadata_name)
     errprint("Text output file is %s..." format out_text_name)
-    val outstream_metadata = filehand.openw(out_metadata_name)
-    val outstream_text = filehand.openw(out_text_name)
+    val outstream_metadata = filehand.openw(out_metadata_name,
+      compression = compression_type)
+    val outstream_text = filehand.openw(out_text_name,
+      compression = compression_type)
     var lineno = 0
     for (line <- lines) {
       lineno += 1
@@ -109,7 +121,11 @@ results in, which must not exist already.
           outstream_metadata.println(metadata mkString "\t")
           val rawtext = unescapeHtml4(unescapeXml(text))
           val splittext = Twokenize(rawtext)
-          val textdata = List(title, splittext mkString " ")
+          val textdata =
+            if (params.group_by_user)
+              List(username, title, splittext mkString " ")
+            else
+              List(title, splittext mkString " ")
           outstream_text.println(textdata mkString "\t")
         }
         case _ => {

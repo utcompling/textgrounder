@@ -28,23 +28,38 @@ import opennlp.textgrounder.util.MeteredTask
 //                                  Main code                              //
 /////////////////////////////////////////////////////////////////////////////
 
+class ConvertTextToUnigramCountsParameters(parser: ArgParser) extends
+    ProcessFilesParameters(parser) {
+  var group_by_user =
+    ap.flag("group-by-user",
+      help = """If true, group tweets into a single per-user document.""")
+}
+
 class ConvertTextToUnigramCountsDriver extends ProcessFilesDriver {
-  type ParamType = ProcessFilesParameters
-  
+  type ParamType = ConvertTextToUnigramCountsParameters
+
+  val tweets_per_user = primmapmap[String, String, Int]()
+
   def usage() {
-    sys.error("""Usage: ConvertTextToUnigramCounts [-o OUTDIR | --outfile OUTDIR] INFILE ...
+    sys.error("""Usage: ConvertTextToUnigramCounts [-o OUTDIR | --outfile OUTDIR] [--group-by-user] INFILE ...
 
 Convert input files from raw-text format (one document per line) into unigram
 counts, in the format expected by TextGrounder.  OUTDIR is the directory to
-store the results in, which must not exist already.
+store the results in, which must not exist already.  If --group-by-user is
+given, a document is the concatenation of all tweets for a given user.
+Else, each individual tweet is a document.
 """)
   }
 
+  override def run_after_setup() {
+    // iterate_input_files(group_by_user _)
+    iterate_input_files(process_one_file _)
+  }
   def process_one_file(lines: Iterator[String], outname: String) {
     val task = new MeteredTask("document", "processing")
     val out_counts_name = "%s/%s-counts-only-coord-documents.txt" format (params.output_dir, outname)
     errprint("Counts output file is %s..." format out_counts_name)
-    val outstream = filehand.openw(out_counts_name)
+    val outstream = filehand.openw(out_counts_name, compression = "bzip2")
     var lineno = 0
     for (line <- lines) {
       val counts = intmap[String]()
