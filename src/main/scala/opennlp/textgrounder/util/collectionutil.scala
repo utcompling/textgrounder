@@ -154,26 +154,27 @@ package object collectionutil {
     else new NonSettingDefaultHashMap[F,T](create_default _)
   }
   /**
-   * A defaultmap[] where the keys are collections; need to have `setkey`
+   * A default map where the values are collections; need to have `setkey`
    * true for the underlying call to `defaultmap`.
    */
   def collection_defaultmap[F,T](defaultval: => T) =
     defaultmap[F,T](defaultval, setkey = true)
 
-  /* These next four are maps from T to Int, Double, Boolean or String,
-     which automatically use a default value if the key isn't seen.
-     They can be used in some cases where you simply want to be able to
-     look anything up, whether set or not; but especially useful when
-     accumulating counts and such, where you want to add to the existing
-     value and want keys not yet seen to automatically spring into
-     existence with the value of 0 (or empty string). */
-  def intmap[T]() = defaultmap[T,Int](0)
-  def longmap[T]() = defaultmap[T,Long](0)
-  def shortmap[T]() = defaultmap[T,Short](0)
-  def bytemap[T]() = defaultmap[T,Byte](0)
-  def doublemap[T]() = defaultmap[T,Double](0.0)
-  def floatmap[T]() = defaultmap[T,Float](0.0f)
-  def booleanmap[T]() = defaultmap[T,Boolean](false)
+  /**
+   * A default map where the values are primitive types, and the default
+   * value is the "zero" value for the primitive (0, 0L, 0.0 or false).
+   * Note that this will "work", at least syntactically, for non-primitive
+   * types, but will set the default value to null, which is probably not
+   * what is wanted.
+   */
+  def primmap[T,U]() = defaultmap[T,U](null.asInstanceOf[U])
+  def intmap[T]() = primmap[T,Int]()
+  def longmap[T]() = primmap[T,Long]()
+  def shortmap[T]() = primmap[T,Short]()
+  def bytemap[T]() = primmap[T,Byte]()
+  def doublemap[T]() = primmap[T,Double]()
+  def floatmap[T]() = primmap[T,Float]()
+  def booleanmap[T]() = primmap[T,Boolean]()
   def stringmap[T]() = defaultmap[T,String]("")
   /** A default map which maps from T to an (extendable) array of type U.
       The default value is an empty Buffer of type U.  Calls of the sort
@@ -200,17 +201,30 @@ package object collectionutil {
     */
   def setmap[T,U]() =
     collection_defaultmap[T,mutable.Set[U]](mutable.Set[U]())
-  /** A default map which maps from T to a map from U to V.  The default
-      value is an empty Map of type U->V.  Calls of the sort
-      `map(key)(key2) = value2` will add the mapping `key2 -> value2`
-      to the Map stored as the value of the key rather than changing
-      the value itself, similar to how `bufmap` works.
-      
-      @see #bufmap[T,U]
-      @see #setmap[T,U]
-    */
+  /**
+   * A default map which maps from T to a map from U to V.  The default
+   * value is an empty Map of type U->V.  Calls of the sort
+   * `map(key)(key2) = value2` will add the mapping `key2 -> value2`
+   * to the Map stored as the value of the key rather than changing
+   * the value itself, similar to how `bufmap` works.
+   *   
+   * @see #bufmap[T,U]
+   * @see #setmap[T,U]
+   */
   def mapmap[T,U,V]() =
     collection_defaultmap[T,mutable.Map[U,V]](mutable.Map[U,V]())
+  /**
+   * A default map which maps from T to a `primmap` from U to V, i.e.
+   * another default map.  The default value is a `primmap` of type
+   * U->V.  Calls of the sort `map(key)(key2) += value2` will add to
+   * the value of the mapping `key2 -> value2` stored for `key` in the
+   * main map.  If `key` hasn't been seen before, a new `primmap` is
+   * created, and if `key2` hasn't been seen before in the `primmap`
+   * associated with `key`, it will be initialized to the zero value
+   * for type V.
+   */
+  def primmapmap[T,U,V]() =
+    collection_defaultmap[T,mutable.Map[U,V]](primmap[U,V]())
   
   // Another way to do this, using subclassing.
   //
