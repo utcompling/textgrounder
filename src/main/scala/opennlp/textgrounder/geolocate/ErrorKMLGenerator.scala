@@ -79,18 +79,27 @@ object ErrorKMLGenerator {
       sys.exit(0)
     }
 
+    val rand = new scala.util.Random
+
     val outFile = new File(kmlOutFile.value.get)
     val stream = new BufferedOutputStream(new FileOutputStream(outFile))
     val out = factory.createXMLStreamWriter(stream, "UTF-8")
 
     KMLUtil.writeHeader(out, "errors-at-"+(if(usePred.value == None) "true" else "pred"))
 
-    for((docName, trueCoord, predCoord) <- parseLogFile(logFile.value.get)) {
-      val dist = trueCoord.distanceInKm(predCoord)
+    for((docName, trueCoord, predCoordOrig) <- parseLogFile(logFile.value.get)) {
+      val predCoord = Coordinate.fromDegrees(predCoordOrig.getLatDegrees() + (rand.nextDouble() - 0.5) * .1,
+                                             predCoordOrig.getLngDegrees() + (rand.nextDouble() - 0.5) * .1);
 
-      val coord = if(usePred.value == None) trueCoord else predCoord
+      //val dist = trueCoord.distanceInKm(predCoord)
 
-      KMLUtil.writePolygon(out, docName, coord, KMLUtil.SIDES, KMLUtil.RADIUS, math.log(dist) * KMLUtil.BARSCALE/2)
+      val coord1 = if(usePred.value == None) trueCoord else predCoord
+      val coord2 = if(usePred.value == None) predCoord else trueCoord
+
+      KMLUtil.writeLinePlacemark(out, coord1, coord2);
+      KMLUtil.writePinPlacemark(out, docName, coord1, "yellow");
+      KMLUtil.writePinPlacemark(out, docName, coord2, "blue");
+      //KMLUtil.writePolygon(out, docName, coord, KMLUtil.SIDES, KMLUtil.RADIUS, math.log(dist) * KMLUtil.BARSCALE/2)
     }
 
     KMLUtil.writeFooter(out)

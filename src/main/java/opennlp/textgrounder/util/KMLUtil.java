@@ -62,8 +62,34 @@ public class KMLUtil {
     w.writeStartElement("PolyStyle");
     KMLUtil.writeWithCharacters(w, "outline", "0");
     w.writeEndElement(); // PolyStyle
+    w.writeStartElement("LineStyle");
+    KMLUtil.writeWithCharacters(w, "color", "ff0000ff");
+    KMLUtil.writeWithCharacters(w, "with", "3");
+    w.writeEndElement(); // LineStyle
     w.writeStartElement("IconStyle");
     w.writeEmptyElement("Icon");
+    w.writeEndElement(); // IconStyle
+    w.writeEndElement(); // Style
+
+    w.writeStartElement("Style");
+    w.writeAttribute("id", "blue");
+    w.writeStartElement("IconStyle");
+    //KMLUtil.writeWithCharacters(w, "color", "ffff0000");
+    w.writeStartElement("Icon");
+    KMLUtil.writeWithCharacters(w, "href", "http://maps.google.com/mapfiles/kml/paddle/blu-blank-lv.png");
+    //KMLUtil.writeWithCharacters(w, "scale", "0.5);
+    w.writeEndElement(); // Icon
+    w.writeEndElement(); // IconStyle
+    w.writeEndElement(); // Style
+
+    w.writeStartElement("Style");
+    w.writeAttribute("id", "yellow");
+    w.writeStartElement("IconStyle");
+    //KMLUtil.writeWithCharacters(w, "color", "ffff0000");
+    w.writeStartElement("Icon");
+    KMLUtil.writeWithCharacters(w, "href", "http://maps.google.com/mapfiles/kml/paddle/ylw-blank-lv.png");
+    //KMLUtil.writeWithCharacters(w, "scale", "10.0");
+    w.writeEndElement(); // Icon
     w.writeEndElement(); // IconStyle
     w.writeEndElement(); // Style
 
@@ -172,10 +198,46 @@ public class KMLUtil {
         w.writeEndElement(); // Placemark
     }
 
+    public static void writePinPlacemark(XMLStreamWriter w, String name,
+                                         Coordinate coord) throws XMLStreamException {
+        writePinPlacemark(w, name, coord, null);
+    }
+
+    public static void writePinPlacemark(XMLStreamWriter w, String name,
+                                         Coordinate coord, String styleUrl) throws XMLStreamException {
+        w.writeStartElement("Placemark");
+        //KMLUtil.writeWithCharacters(w, "name", name);
+        //KMLUtil.writeRegion(w, coord, radius);
+        if(styleUrl != null && styleUrl.length() > 0)
+            KMLUtil.writeWithCharacters(w, "styleUrl", "#"+styleUrl);
+        w.writeStartElement("Point");
+        KMLUtil.writeWithCharacters(w, "coordinates", df.format(coord.getLngDegrees()) + "," + df.format(coord.getLatDegrees()));
+        w.writeEndElement(); // Point
+        w.writeEndElement(); // Placemark
+    }
+
+    public static void writeLinePlacemark(XMLStreamWriter w, Coordinate coord1, Coordinate coord2)
+                                          throws XMLStreamException {
+        w.writeStartElement("Placemark");
+        KMLUtil.writeWithCharacters(w, "styleUrl", "#bar");
+        w.writeStartElement("LineString");
+        KMLUtil.writeWithCharacters(w, "gx:altitudeOffset", "0");
+        KMLUtil.writeWithCharacters(w, "extrude", "0");
+        KMLUtil.writeWithCharacters(w, "tessellate", "1");
+        KMLUtil.writeWithCharacters(w, "altitudeMode", "clampToGround");
+        KMLUtil.writeWithCharacters(w, "gx:drawOrder", "0");
+        w.writeStartElement("coordinates");
+        w.writeCharacters(df.format(coord1.getLngDegrees())+","+df.format(coord1.getLatDegrees())+"\n");
+        w.writeCharacters(df.format(coord2.getLngDegrees())+","+df.format(coord2.getLatDegrees()));
+        w.writeEndElement(); // coordinates
+        w.writeEndElement(); // LineString
+        w.writeEndElement(); // Placemark
+    }
+
   public static void writePolygon(XMLStreamWriter w, String name,
                                   Coordinate coord, int sides, double radius, double height)
     throws XMLStreamException {
-      /*w.writeStartElement("Placemark");
+    /*w.writeStartElement("Placemark");
     KMLUtil.writeWithCharacters(w, "name", name);
     KMLUtil.writeRegion(w, coord, radius);
     KMLUtil.writeWithCharacters(w, "styleUrl", "#bar");
