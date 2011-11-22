@@ -11,6 +11,7 @@ import org.clapper.argot._
 object ErrorKMLGenerator {
 
   val DOC_PREFIX = "Document "
+  //val DOC_PREFIX = "Article "
   val TRUE_COORD_PREFIX = ") at ("
   val PRED_COORD_PREFIX = " predicted cell center at ("
   
@@ -98,6 +99,7 @@ object ErrorKMLGenerator {
 
       KMLUtil.writeLinePlacemark(out, coord1, coord2);
       KMLUtil.writePinPlacemark(out, docName, coord1, "yellow");
+      //KMLUtil.writePlacemark(out, docName, coord1, KMLUtil.RADIUS);
       KMLUtil.writePinPlacemark(out, docName, coord2, "blue");
       //KMLUtil.writePolygon(out, docName, coord, KMLUtil.SIDES, KMLUtil.RADIUS, math.log(dist) * KMLUtil.BARSCALE/2)
     }

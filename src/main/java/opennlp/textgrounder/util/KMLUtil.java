@@ -224,11 +224,21 @@ public class KMLUtil {
         KMLUtil.writeWithCharacters(w, "gx:altitudeOffset", "0");
         KMLUtil.writeWithCharacters(w, "extrude", "0");
         KMLUtil.writeWithCharacters(w, "tessellate", "1");
-        KMLUtil.writeWithCharacters(w, "altitudeMode", "clampToGround");
+        KMLUtil.writeWithCharacters(w, "altitudeMode", "relativeToGround");
         KMLUtil.writeWithCharacters(w, "gx:drawOrder", "0");
         w.writeStartElement("coordinates");
-        w.writeCharacters(df.format(coord1.getLngDegrees())+","+df.format(coord1.getLatDegrees())+"\n");
-        w.writeCharacters(df.format(coord2.getLngDegrees())+","+df.format(coord2.getLatDegrees()));
+        double dist = coord1.distanceInKm(coord2);
+        double lngDiff = coord2.getLngDegrees() - coord1.getLngDegrees();
+        double latDiff = coord2.getLatDegrees() - coord1.getLatDegrees();
+        w.writeCharacters(df.format(coord1.getLngDegrees())+","+df.format(coord1.getLatDegrees())+",0\n");
+        for(double i = .1; i <= .9; i += .1) {
+            w.writeCharacters(df.format(coord1.getLngDegrees()+lngDiff*i)+","
+                              +df.format(coord1.getLatDegrees()+latDiff*i)+","
+                              +(dist*dist)*.05/**(.5-Math.abs(.5-i))*/+"\n");
+        }
+        //w.writeCharacters(df.format(coord1.getLngDegrees()+lngDiff*.9)+","
+        //                  +df.format(coord1.getLatDegrees()+latDiff*.9)+","+(dist*20)+"\n");
+        w.writeCharacters(df.format(coord2.getLngDegrees())+","+df.format(coord2.getLatDegrees())+",0");
         w.writeEndElement(); // coordinates
         w.writeEndElement(); // LineString
         w.writeEndElement(); // Placemark
