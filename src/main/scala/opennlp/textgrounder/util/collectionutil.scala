@@ -43,11 +43,11 @@ import scala.collection.generic.CanBuildFrom
 package object collectionutil {
 
   ////////////////////////////////////////////////////////////////////////////
-  //                          Default dictionaries                          //
+  //                               Default maps                             //
   ////////////////////////////////////////////////////////////////////////////
   
-  abstract class DefaultHashMap[F,T] extends mutable.HashMap[F,T] {
-    def getNoSet(key: F): T
+  abstract class DefaultHashMap[T,U] extends mutable.HashMap[T,U] {
+    def getNoSet(key: T): U
   }
 
   /**
@@ -60,12 +60,12 @@ package object collectionutil {
    * (in a nutshell, use the setting variant when type T is a mutable
    * collection; otherwise, use the nonsetting variant).
    */
-  class SettingDefaultHashMap[F,T](
-    create_default: F => T
-  ) extends DefaultHashMap[F,T] {
+  class SettingDefaultHashMap[T,U](
+    create_default: T => U
+  ) extends DefaultHashMap[T,U] {
     var internal_setkey = true
 
-    override def default(key: F) = {
+    override def default(key: T) = {
       val buf = create_default(key)
       if (internal_setkey)
         this(key) = buf
@@ -81,7 +81,7 @@ package object collectionutil {
      * synchronized(internal_setkey) around it so that it will work
      * in a multi-threaded environment.
      */
-    def getNoSet(key: F) = {
+    def getNoSet(key: T) = {
       val oi_setkey = internal_setkey
       try {
         internal_setkey = false
@@ -94,20 +94,20 @@ package object collectionutil {
    * Non-setting variant class for creating a default hash table.
    * See class SettingDefaultHashMap and function defaultmap().
    */
-  class NonSettingDefaultHashMap[F,T](
-    create_default: F => T
-  ) extends DefaultHashMap[F,T] {
-    override def default(key: F) = {
+  class NonSettingDefaultHashMap[T,U](
+    create_default: T => U
+  ) extends DefaultHashMap[T,U] {
+    override def default(key: T) = {
       val buf = create_default(key)
       buf
     }
         
-    def getNoSet(key: F) = this(key)
+    def getNoSet(key: T) = this(key)
   }
 
   /**
-   * Create a default hash map that maps keys of type F to values of type
-   * T, automatically returning 'defaultval' rather than throwing an exception
+   * Create a default hash map that maps keys of type T to values of type
+   * U, automatically returning 'defaultval' rather than throwing an exception
    * if the key is undefined.
    *
    * @param defaultval The default value to return.  Note the delayed
@@ -117,7 +117,8 @@ package object collectionutil {
    *   default(), so that different keys get different empty vectors.
    *   Otherwise, adding an element to the buffer associated with one key
    *   will also add it to the buffers for other keys, which is not what
-   *   we want.
+   *   we want. (Note, when mutable objects are used as values, you need to
+   *   set the `setkey` parameter to true.)
    * 
    * @param setkey indicates whether we set the key to the default upon
    *   access.  This is necessary when the value is something mutable, but
@@ -148,17 +149,19 @@ package object collectionutil {
     foo("myfoods") += "milk"
     foo("myfoods")             -> ArrayBuffer(spam, eggs, milk)    (Good)
    */
-  def defaultmap[F,T](defaultval: => T, setkey: Boolean = false) = {
-    def create_default(key: F) = defaultval
-    if (setkey) new SettingDefaultHashMap[F,T](create_default _)
-    else new NonSettingDefaultHashMap[F,T](create_default _)
+  def defaultmap[T,U](defaultval: => U, setkey: Boolean = false) = {
+    def create_default(key: T) = defaultval
+    if (setkey) new SettingDefaultHashMap[T,U](create_default _)
+    else new NonSettingDefaultHashMap[T,U](create_default _)
   }
   /**
-   * A default map where the values are collections; need to have `setkey`
-   * true for the underlying call to `defaultmap`.
+   * A default map where the values are mutable collections; need to have
+   * `setkey` true for the underlying call to `defaultmap`.
+   *
+   * @see #defaultmap[T,U]
    */
-  def collection_defaultmap[F,T](defaultval: => T) =
-    defaultmap[F,T](defaultval, setkey = true)
+  def collection_defaultmap[T,U](defaultval: => U) =
+    defaultmap[T,U](defaultval, setkey = true)
 
   /**
    * A default map where the values are primitive types, and the default
@@ -166,8 +169,17 @@ package object collectionutil {
    * Note that this will "work", at least syntactically, for non-primitive
    * types, but will set the default value to null, which is probably not
    * what is wanted.
+   *
+   * @see #defaultmap[T,U]
    */
   def primmap[T,U]() = defaultmap[T,U](null.asInstanceOf[U])
+
+  /**
+   * A default map from type T to an Int, with 0 as the default value.
+   *
+   * @see #defaultmap[T,U]
+   * @see #primmap[T,U]
+   */
   def intmap[T]() = primmap[T,Int]()
   def longmap[T]() = primmap[T,Long]()
   def shortmap[T]() = primmap[T,Short]()
@@ -175,30 +187,40 @@ package object collectionutil {
   def doublemap[T]() = primmap[T,Double]()
   def floatmap[T]() = primmap[T,Float]()
   def booleanmap[T]() = primmap[T,Boolean]()
+
+  /**
+   * A default map from type T to a string, with an empty string as the
+   * default value.
+   *
+   * @see #defaultmap[T,U]
+   */
   def stringmap[T]() = defaultmap[T,String]("")
-  /** A default map which maps from T to an (extendable) array of type U.
-      The default value is an empty Buffer of type U.  Calls of the sort
-      `map(key) += item` will add the item to the Buffer stored as the
-      value of the key rather than changing the value itself. (After doing
-      this, the result of 'map(key)' will be the same collection, but the
-      contents of the collection will be modified.  On the other hand, in
-      the case of the above maps, the result of 'map(key)' will be
-      different.)
-      
-      @see #setmap[T,U]
-      @see #mapmap[T,U,V]
-    */
+
+  /**
+   * A default map which maps from T to an (extendable) array of type U.
+   * The default value is an empty Buffer of type U.  Calls of the sort
+   * `map(key) += item` will add the item to the Buffer stored as the
+   * value of the key rather than changing the value itself. (After doing
+   * this, the result of 'map(key)' will be the same collection, but the
+   * contents of the collection will be modified.  On the other hand, in
+   * the case of the above maps, the result of 'map(key)' will be
+   * different.)
+   * 
+   * @see #setmap[T,U]
+   * @see #mapmap[T,U,V]
+   */
   def bufmap[T,U]() =
     collection_defaultmap[T,mutable.Buffer[U]](mutable.Buffer[U]())
-  /** A default map which maps from T to a set of type U.  The default
-      value is an empty Set of type U.  Calls of the sort
-      `map(key) += item` will add the item to the Set stored as the
-      value of the key rather than changing the value itself, similar
-      to how `bufmap` works.
-      
-      @see #bufmap[T,U]
-      @see #mapmap[T,U,V]
-    */
+  /**
+   * A default map which maps from T to a set of type U.  The default
+   * value is an empty Set of type U.  Calls of the sort
+   * `map(key) += item` will add the item to the Set stored as the
+   * value of the key rather than changing the value itself, similar
+   * to how `bufmap` works.
+   * 
+   * @see #bufmap[T,U]
+   * @see #mapmap[T,U,V]
+   */
   def setmap[T,U]() =
     collection_defaultmap[T,mutable.Set[U]](mutable.Set[U]())
   /**
@@ -222,6 +244,8 @@ package object collectionutil {
    * created, and if `key2` hasn't been seen before in the `primmap`
    * associated with `key`, it will be initialized to the zero value
    * for type V.
+   *
+   * @see #mapmap[T,U,V]
    */
   def primmapmap[T,U,V]() =
     collection_defaultmap[T,mutable.Map[U,V]](primmap[U,V]())
