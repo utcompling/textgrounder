@@ -23,6 +23,7 @@ import java.text.DateFormat
 import java.io._
 
 import ioutil._
+import printutil._
 import textutil._
 
 package object osutil {

@@ -30,7 +30,8 @@ import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil.{errprint, FileHandler, LocalFileHandler}
+import opennlp.textgrounder.util.ioutil.{FileHandler, LocalFileHandler}
+import opennlp.textgrounder.util.printutil.errprint
 
 import WordDist.memoizer._
 import GeolocateDriver.Params

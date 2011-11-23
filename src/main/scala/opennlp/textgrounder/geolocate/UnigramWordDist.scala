@@ -24,7 +24,8 @@ import java.io._
 
 import opennlp.textgrounder.util.collectionutil.DynamicArray
 import opennlp.textgrounder.util.distances.SphereCoord
-import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
+import opennlp.textgrounder.util.ioutil.FileHandler
+import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 import GeolocateDriver.Params
 import GeolocateDriver.Debug._

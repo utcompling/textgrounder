@@ -26,8 +26,9 @@ import com.nicta.scoobi.io.text.TextInput._
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil._
+import opennlp.textgrounder.util.ioutil.{FileHandler, LocalFileHandler, TextFileProcessor}
 import opennlp.textgrounder.util.MeteredTask
+import opennlp.textgrounder.util.printutil.{errprint, output_reverse_sorted_table, set_errout_prefix}
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                              //

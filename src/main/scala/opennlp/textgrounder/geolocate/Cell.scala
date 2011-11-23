@@ -27,7 +27,7 @@ import collection.mutable
 
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances._
-import opennlp.textgrounder.util.ioutil._
+import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 import WordDist.memoizer._
 import GeolocateDriver.Params

@@ -23,7 +23,7 @@ import util.control.Breaks._
 import java.io._
 
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.ioutil.errprint
+import opennlp.textgrounder.util.printutil.errprint
 
 import GeolocateDriver.Params
 import GeolocateDriver.Debug._

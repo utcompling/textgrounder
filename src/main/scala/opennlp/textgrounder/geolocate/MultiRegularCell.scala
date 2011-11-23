@@ -28,7 +28,7 @@ import collection.mutable
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.MeteredTask
-import opennlp.textgrounder.util.ioutil._
+import opennlp.textgrounder.util.printutil.{errout, errprint}
 
 import GeolocateDriver.Debug._
 

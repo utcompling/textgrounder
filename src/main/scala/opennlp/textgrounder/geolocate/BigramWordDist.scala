@@ -21,7 +21,8 @@ import collection.mutable
 import util.control.Breaks._
 
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
+import opennlp.textgrounder.util.ioutil.FileHandler
+import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 import GeolocateDriver.Params
 import GeolocateDriver.Debug._

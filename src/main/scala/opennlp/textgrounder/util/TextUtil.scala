@@ -20,7 +20,7 @@ import scala.util.control.Breaks._
 import scala.util.matching.Regex
 import math._
 
-import ioutil._
+import printutil.warning
 
 package object textutil {
 

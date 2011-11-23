@@ -25,10 +25,11 @@ import java.io._
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.mathutil._
+import opennlp.textgrounder.util.ioutil.{FileHandler, FileProcessor}
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil._
+import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.textutil._
 
 import GeolocateDriver.Params

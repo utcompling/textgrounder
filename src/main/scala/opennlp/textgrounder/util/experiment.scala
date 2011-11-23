@@ -20,8 +20,8 @@ import scala.collection.mutable
 
 import argparser._
 import collectionutil._
-import ioutil._
 import osutil._
+import printutil.{errprint, set_stdout_stderr_utf_8}
 import textutil._
 
 package object experiment {
