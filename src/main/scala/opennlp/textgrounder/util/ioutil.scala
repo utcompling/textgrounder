@@ -29,6 +29,7 @@ import java.io.{Console=>_,_}
 import org.apache.commons.compress.compressors.bzip2._
 import org.apache.commons.compress.compressors.gzip._
 
+import printutil.errprint
 import textutil._
 import osutil._
 
@@ -581,20 +582,56 @@ package object ioutil {
     }
 
     /**
+     * Called when finished processing all files in a directory.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param dir Directory being processed.
+     */
+    def end_process_directory(filehand: FileHandler, dir: String) {
+    }
+
+    /**
+     * Called when about to begin processing files.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param dir Directory being processed.
+     */
+    def begin_processing(filehand: FileHandler, files: Iterable[String]) {
+    }
+
+    /**
+     * Called when finished processing all files.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param dir Directory being processed.
+     */
+    def end_processing(filehand: FileHandler, files: Iterable[String]) {
+    }
+
+    /**
      * Process all files, calling `process_file` on each.
      *
      * @param files Files to process.  If any file names a directory,
      *   all files in the directory will be processed.  If any file
      *   is null, it will be passed on unchanged (see above; useful
      *   e.g. for specifying input from an internal source).
-     * @returns True if file processing continued to completion,
+     * @param output_messages If true, output messages indicating the
+    *    files being processed.
+     * @return True if file processing continued to completion,
      *   false if interrupted because an invocation of `process_file`
      *   returns false.
      */
-    def process_files(filehand: FileHandler, files: Iterable[String]) = {
+    def process_files(filehand: FileHandler, files: Iterable[String],
+        output_messages: Boolean = true) = {
       var broken = false
+      begin_processing(filehand, files)
       breakable {
         def process_one_file(filename: String) {
+          if (output_messages && filename != null)
+            errprint("Processing file %s..." format filename)
           if (!process_file(filehand, filename)) {
             // This works because of the way 'breakable' is implemented
             // (dynamically-scoped).  Might "break" (stop working) if break
@@ -608,139 +645,57 @@ package object ioutil {
             process_one_file(dir)
           else {
             if (filehand.is_directory(dir)) {
+              if (output_messages)
+                errprint("Processing directory %s..." format dir)
               begin_process_directory(filehand, dir)
               for (file <- filehand.list_files(dir)) {
                 process_one_file(file)
               }
+              end_process_directory(filehand, dir)
             } else process_one_file(dir)
           }
         }
       }
+      end_processing(filehand, files)
       !broken
     }
   }
 
-  ////////////////////////////////////////////////////////////////////////////
-  //                            Text output functions                       //
-  ////////////////////////////////////////////////////////////////////////////
-
-  // This stuff sucks.  Need to create new Print streams to get the expected
-  // UTF-8 output, since the existing System.out/System.err streams don't do it!
-  val stdout_stream = new PrintStream(System.out, true, "UTF-8") 
-  val stderr_stream = new PrintStream(System.err, true, "UTF-8") 
-
   /**
-    Set Java System.out and System.err, and Scala Console.out and Console.err,
-    so that they convert text to UTF-8 upon output (rather than e.g. MacRoman,
-    the default on Mac OS X).
+   * Class that lets you process a series of text files in turn, using
+   * the same mechanism for processing the files themselves as in
+   * `FileProcessor`.
    */
-  def set_stdout_stderr_utf_8() {
-    // Fuck me to hell, have to fix things up in a non-obvious way to
-    // get UTF-8 output on the Mac (default is MacRoman???).
-    System.setOut(stdout_stream)
-    System.setErr(stderr_stream)
-    Console.setOut(System.out)
-    Console.setErr(System.err)
-  }
+  abstract class TextFileProcessor extends FileProcessor {
+    /**
+     * Called when about to begin processing a file.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param lines Iterator over the lines in the file.
+     * @param filehand The FileHandler for working with the file.
+     * @param file The name of the file being processed.
+     * @param compression The compression of the file ("none" for no
+     *   compression).
+     * @param realname The "real" name of the file, after any compression
+     *   suffix (e.g. .gz, .bzip2) is removed.
+     */
+    def process_lines(lines: Iterator[String],
+        filehand: FileHandler, file: String,
+        compression: String, realname: String): Boolean
 
-  def uniprint(text: String, outfile: PrintStream=System.out) {
-    outfile.println(text)
-  }
-  def uniout(text: String, outfile: PrintStream=System.out) {
-    outfile.print(text)
-  }
-
-  var errout_prefix = ""
-
-  def set_errout_prefix(prefix: String) {
-    errout_prefix = prefix
-  }
- 
-  var need_prefix = true
-
-  protected def format_outtext(format: String, args: Any*) = {
-    // If no arguments, assume that we've been passed a raw string to print,
-    // so print it directly rather than passing it to 'format', which might
-    // munge % signs
-    val outtext =
-      if (args.length == 0) format
-      else format format (args: _*)
-    if (need_prefix)
-      errout_prefix + outtext
-    else
-      outtext
-  }
-
-  def errprint(format: String, args: Any*) {
-    System.err.println(format_outtext(format, args: _*))
-    need_prefix = true
-    System.err.flush()
-  }
-
-  def errout(format: String, args: Any*) {
-    val text = format_outtext(format, args: _*)
-    System.err.print(text)
-    need_prefix = text.last == '\n'
-    System.err.flush()
-  }
-
-  /**
-    Output a warning, formatting into UTF-8 as necessary.
-    */
-  def warning(format: String, args: Any*) {
-    errprint("Warning: " + format, args: _*)
-  }
-  
-  /**
-    Output a value, for debugging through print statements.
-    Basically same as just caling errprint() or println() or whatever,
-    but useful because the call to debprint() more clearly identifies a
-    temporary piece of debugging code that should be removed when the
-    bug has been identified.
-   */
-  def debprint(format: String, args: Any*) {
-    errprint("Debug: " + format, args: _*)
-  }
-  
-  ////////////////////////////////////////////////////////////////////////////
-  //                              Table Output                              //
-  ////////////////////////////////////////////////////////////////////////////
-
-  // Given a list of tuples, where the second element of the tuple is a number and
-  // the first a key, output the list, sorted on the numbers from bigger to
-  // smaller.  Within a given number, sort the items alphabetically, unless
-  // keep_secondary_order is true, in which case the original order of items is
-  // left.  If 'outfile' is specified, send output to this stream instead of
-  // stdout.  If 'indent' is specified, indent all rows by this string (usually
-  // some number of spaces).  If 'maxrows' is specified, output at most this many
-  // rows.
-  def output_reverse_sorted_list[T <% Ordered[T],U <% Ordered[U]](
-      items: Seq[(T,U)],
-      outfile: PrintStream=System.out, indent: String="",
-      keep_secondary_order: Boolean=false, maxrows: Int = -1) {
-    var its = items
-    if (!keep_secondary_order)
-      its = its sortBy (_._1)
-    its = its sortWith (_._2 > _._2)
-    if (maxrows >= 0)
-      its = its.slice(0, maxrows)
-    for ((key, value) <- its)
-      outfile.println("%s%s = %s" format (indent, key, value))
-  }
-  
-  // Given a table with values that are numbers, output the table, sorted
-  // on the numbers from bigger to smaller.  Within a given number, sort the
-  // items alphabetically, unless keep_secondary_order is true, in which case
-  // the original order of items is left.  If 'outfile' is specified, send
-  // output to this stream instead of stdout.  If 'indent' is specified, indent
-  // all rows by this string (usually some number of spaces).  If 'maxrows'
-  // is specified, output at most this many rows.
-  def output_reverse_sorted_table[T <% Ordered[T],U <% Ordered[U]](
-      table: collection.Map[T,U],
-      outfile: PrintStream=System.out, indent: String="",
-      keep_secondary_order: Boolean=false, maxrows: Int = -1) {
-    output_reverse_sorted_list(table toList, outfile, indent,
-      keep_secondary_order, maxrows)
+    /**
+     * Process a given file.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param file The file to process (possibly null, see above).
+     * @returns True if file processing should continue; false to
+     *   abort any further processing.
+     */
+    def process_file(filehand: FileHandler, file: String) = {
+      val (lines, compression, realname) =
+        filehand.openr_with_compression_info(file)
+      process_lines(lines, filehand, file, compression, realname)
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////

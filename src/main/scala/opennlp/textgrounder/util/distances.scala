@@ -18,7 +18,7 @@ package opennlp.textgrounder.util
 
 import math._
 
-import ioutil.warning
+import printutil.warning
 
 /*
   The coordinates of a point are spherical coordinates, indicating a

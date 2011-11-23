@@ -26,9 +26,10 @@ import opennlp.textgrounder.util.distances
 import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.distances.spheredist
 import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil._
+import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil._
+import opennlp.textgrounder.util.printutil.{errout, errprint, warning}
 
 import opennlp.textgrounder.geolocate._
 import GeolocateDriver.Debug._

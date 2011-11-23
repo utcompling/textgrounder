@@ -16,15 +16,15 @@
 
 package opennlp.textgrounder.preprocess
 
-import java.io.InputStream
-import java.util.zip.GZIPInputStream
-
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
 
 /*
-Common code for doing basic file-processing operations.
+   Common code for doing basic file-processing operations.
+
+   FIXME: It's unclear there's enough code to justify factoring it out
+   like this.
 */
 
 /////////////////////////////////////////////////////////////////////////////
@@ -32,30 +32,23 @@ Common code for doing basic file-processing operations.
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * Class retrieving command-line arguments or storing programmatic
- * configuration parameters.
+ * Class for defining and retrieving command-line arguments.  Consistent
+ * with "field-style" access to an ArgParser, this class needs to be
+ * instantiated twice with the same ArgParser object, before and after parsing
+ * the command line.  The first instance defines the allowed arguments in the
+ * ArgParser, while the second one retrieves the values stored into the
+ * ArgParser as a result of parsing.
  *
- * @param parser If specified, should be a parser for retrieving the
- *   value of command-line arguments from the command line.  Provided
- *   that the parser has been created and initialized by creating a
- *   previous instance of this same class with the same parser (a
- *   "shadow field" class), the variables below will be initialized with
- *   the values given by the user on the command line.  Otherwise, they
- *   will be initialized with the default values for the parameters.
- *   Because they are vars, they can be freely set to other values.
- *
+ * @param ap ArgParser object.
  */
-class ProcessFilesParameters(parser: ArgParser) extends
-    ArgParserParameters(parser) {
-  protected val ap = parser
-
-  var output_dir =
+class ProcessFilesParameters(ap: ArgParser) extends
+    ArgParserParameters(ap) {
+  val output_dir =
     ap.option[String]("o", "output-dir",
       metavar = "DIR",
       help = """Directory to store output files in.""")
-
-  var files =
-    ap.multiPositional[String]("infile",
+  val files =
+    ap.multiPositional[String]("files",
       help = """File(s) to process for input.""")
 }
 
@@ -64,30 +57,22 @@ abstract class ProcessFilesDriver extends ArgParserExperimentDriver {
   type RunReturnType = Unit
 
   val filehand = new LocalFileHandler
-  
+
   def usage()
 
   def handle_parameters() {
     need(params.output_dir, "output-dir")
-    if (!filehand.make_directories(params.output_dir))
-      param_error("Output dir %s must not already exist" format
-        params.output_dir)
   }
 
   def setup_for_run() { }
 
-  def process_one_file(lines: Iterator[String], outname: String)
-
-  def iterate_input_files(process: (Iterator[String], String) => Unit) {
-    for (file <- params.files) {
-      errprint("Processing %s..." format file)
-      val (lines, _, realname) = filehand.openr_with_compression_info(file)
-      var (_, outname) = filehand.split_filename(realname)
-      process(lines, outname)
-    }
-  }
-
   def run_after_setup() {
-    iterate_input_files(process_one_file _)
+    if (!filehand.make_directories(params.output_dir))
+      param_error("Output dir %s must not already exist" format
+        params.output_dir)
+
+    process_files(filehand, params.files)
   }
+
+  def process_files(filehand: FileHandler, files: Seq[String])
 }

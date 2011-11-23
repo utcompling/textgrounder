@@ -26,7 +26,8 @@ import collection.mutable
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil.{errprint, FileHandler}
+import opennlp.textgrounder.util.ioutil.FileHandler
+import opennlp.textgrounder.util.printutil.errprint
 import opennlp.textgrounder.util.Serializer
 import opennlp.textgrounder.util.textutil.capfirst
 

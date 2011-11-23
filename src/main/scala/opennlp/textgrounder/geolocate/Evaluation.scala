@@ -25,10 +25,11 @@ import java.io._
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.mathutil._
+import opennlp.textgrounder.util.ioutil.{FileHandler, FileProcessor}
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil._
+import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.textutil._
 
 import GeolocateDriver.Params
@@ -821,17 +822,10 @@ class DefaultEvaluationOutputter(
     var skip_n = 0
 
     class EvaluationFileProcessor extends FileProcessor {
-      override def begin_process_directory(filehand: FileHandler,
-          dir: String) {
-        errprint("Processing evaluation directory %s...", dir)
-      }
-
       /* Process all documents in a given file.  If return value is false,
          processing was interrupted due to a limit being reached, and
          no more files should be processed. */
       def process_file(filehand: FileHandler, filename: String): Boolean = {
-        if (filename != null)
-          errprint("Processing evaluation file %s...", filename)
         for (doc <- evalobj.iter_documents(filehand, filename)) {
           // errprint("Processing document: %s", doc)
           val num_processed = task.num_processed

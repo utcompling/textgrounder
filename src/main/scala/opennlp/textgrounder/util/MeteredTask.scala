@@ -1,7 +1,7 @@
 package opennlp.textgrounder.util
 
-import ioutil.errprint
 import osutil._
+import printutil.errprint
 import textutil._
 
 /////////////////////////////////////////////////////////////////////////////

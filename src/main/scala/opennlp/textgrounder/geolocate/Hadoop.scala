@@ -31,9 +31,10 @@ import org.apache.hadoop.fs._
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.hadoop._
-import opennlp.textgrounder.util.ioutil._
+import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.mathutil._
 import opennlp.textgrounder.util.MeteredTask
+import opennlp.textgrounder.util.printutil.{errprint, set_errout_prefix, warning}
 
 /* Basic idea for hooking up Geolocate with Hadoop.  Hadoop works in terms
    of key-value pairs, as follows:

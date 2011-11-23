@@ -22,9 +22,10 @@ import collection.mutable
 import com.codahale.trove.{mutable => trovescala}
 
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.ioutil.{errprint, warning, FileHandler}
+import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.output_resource_usage
+import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 import GeolocateDriver.Params
 import GeolocateDriver.Debug._

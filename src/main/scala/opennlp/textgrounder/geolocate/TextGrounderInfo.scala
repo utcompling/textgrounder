@@ -16,7 +16,7 @@
 
 package opennlp.textgrounder.geolocate
 
-import opennlp.textgrounder.util.ioutil.errprint
+import opennlp.textgrounder.util.printutil.errprint
 
 /**
  TextGrounder-specific information (e.g. env vars).

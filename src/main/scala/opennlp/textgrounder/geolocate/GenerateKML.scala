@@ -27,7 +27,7 @@ import java.io.{FileSystem=>_,_}
 import org.apache.hadoop.io._
 
 import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.ioutil.warning
+import opennlp.textgrounder.util.printutil.warning
 
 import WordDist.memoizer._
 import GenericTypes._
