@@ -581,20 +581,56 @@ package object ioutil {
     }
 
     /**
+     * Called when finished processing all files in a directory.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param dir Directory being processed.
+     */
+    def end_process_directory(filehand: FileHandler, dir: String) {
+    }
+
+    /**
+     * Called when about to begin processing files.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param dir Directory being processed.
+     */
+    def begin_processing(filehand: FileHandler, files: Iterable[String]) {
+    }
+
+    /**
+     * Called when finished processing all files.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param dir Directory being processed.
+     */
+    def end_processing(filehand: FileHandler, files: Iterable[String]) {
+    }
+
+    /**
      * Process all files, calling `process_file` on each.
      *
      * @param files Files to process.  If any file names a directory,
      *   all files in the directory will be processed.  If any file
      *   is null, it will be passed on unchanged (see above; useful
      *   e.g. for specifying input from an internal source).
-     * @returns True if file processing continued to completion,
+     * @param output_messages If true, output messages indicating the
+    *    files being processed.
+     * @return True if file processing continued to completion,
      *   false if interrupted because an invocation of `process_file`
      *   returns false.
      */
-    def process_files(filehand: FileHandler, files: Iterable[String]) = {
+    def process_files(filehand: FileHandler, files: Iterable[String],
+        output_messages: Boolean = true) = {
       var broken = false
+      begin_processing(filehand, files)
       breakable {
         def process_one_file(filename: String) {
+          if (output_messages && filename != null)
+            errprint("Processing file %s..." format filename)
           if (!process_file(filehand, filename)) {
             // This works because of the way 'breakable' is implemented
             // (dynamically-scoped).  Might "break" (stop working) if break
@@ -608,15 +644,56 @@ package object ioutil {
             process_one_file(dir)
           else {
             if (filehand.is_directory(dir)) {
+              if (output_messages)
+                errprint("Processing directory %s..." format dir)
               begin_process_directory(filehand, dir)
               for (file <- filehand.list_files(dir)) {
                 process_one_file(file)
               }
+              end_process_directory(filehand, dir)
             } else process_one_file(dir)
           }
         }
       }
+      end_processing(filehand, files)
       !broken
+    }
+  }
+
+  /**
+   * Class that lets you process a series of text files in turn, using
+   * the same mechanism for processing the files themselves as in
+   * `FileProcessor`.
+   */
+  abstract class TextFileProcessor extends FileProcessor {
+    /**
+     * Called when about to begin processing a file.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param lines Iterator over the lines in the file.
+     * @param filehand The FileHandler for working with the file.
+     * @param file The name of the file being processed.
+     * @param compression The compression of the file ("none" for no
+     *   compression).
+     * @param realname The "real" name of the file, after any compression
+     *   suffix (e.g. .gz, .bzip2) is removed.
+     */
+    def process_lines(lines: Iterator[String],
+        filehand: FileHandler, file: String,
+        compression: String, realname: String): Boolean
+
+    /**
+     * Process a given file.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param file The file to process (possibly null, see above).
+     * @returns True if file processing should continue; false to
+     *   abort any further processing.
+     */
+    def process_file(filehand: FileHandler, file: String) = {
+      val (lines, compression, realname) =
+        filehand.openr_with_compression_info(file)
+      process_lines(lines, filehand, file, compression, realname)
     }
   }
 
@@ -643,10 +720,10 @@ package object ioutil {
     Console.setErr(System.err)
   }
 
-  def uniprint(text: String, outfile: PrintStream=System.out) {
+  def uniprint(text: String, outfile: PrintStream = System.out) {
     outfile.println(text)
   }
-  def uniout(text: String, outfile: PrintStream=System.out) {
+  def uniout(text: String, outfile: PrintStream = System.out) {
     outfile.print(text)
   }
 
