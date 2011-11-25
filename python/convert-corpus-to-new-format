@@ -1,0 +1,68 @@
+#!/bin/sh
+
+openfile() {
+  if [ -z "$compression" ]; then
+    cat ${1+"$@"}
+  elif [ "$compression" = ".bz2" -o "$compression" = ".bzip2" ]; then
+    bunzip2 < ${1+"$@"}
+  elif [ "$compression" = ".gz" -o "$compression" = ".gzip" ]; then
+    gunzip < ${1+"$@"}
+  else
+    echo "Unrecognized compression: $compression" >&2
+    exit 1
+  fi
+}
+
+compressfile() {
+  if [ -z "$compression" ]; then
+    cat ${1+"$@"}
+  elif [ "$compression" = ".bz2" -o "$compression" = ".bzip2" ]; then
+    bzip2 < ${1+"$@"}
+  elif [ "$compression" = ".gz" -o "$compression" = ".gzip" ]; then
+    gzip < ${1+"$@"}
+  else
+    echo "Unrecognized compression: $compression" >&2
+    exit 1
+  fi
+}
+
+do_dir() {
+  base=`basename $1`
+  compression="unknown"
+  for ext in .bz2 .bzip2 .gz .gzip ""; do
+    echo "Considering extension $ext"
+    file=`echo $1/*-combined-document-data.txt$ext`
+    echo "file=$file"
+    numfiles=`echo $file | wc -w`
+    echo "numfiles=$numfiles"
+    if [ "$numfiles" -gt 1 ]; then
+      cat >&2 <<EOF
+More than one possible input file.  Possibilities are:
+$files
+EOF
+      exit 1
+    fi
+    if [ "$numfiles" -eq 1 -a -e "$file" ]; then
+      echo "Input file is $file"
+      compression=$ext
+      break
+    fi
+  done
+  if [ "$compression" = "unknown" ]; then
+    echo "Can't find a suitable input file." >&2
+    exit 1
+  fi
+  
+  schema_file=$1/$base-schema.txt
+  echo "Generating schema file $schema_file from $file ..."
+  openfile $file | head -1 > $schema_file
+  metadata_file=$1/$base-combined-document-metadata.txt.bz2
+  echo "Generating metadata file $metadata_file from $file ..."
+  openfile $file | tail +2 | compressfile > $metadata_file
+  echo "Done."
+}
+
+for x in ${1+"$@"}; do
+  echo $x
+  do_dir $x
+done

@@ -89,7 +89,6 @@ abstract class TwitterInfochimpsFileProcessor extends TextFileProcessor {
       filehand: FileHandler, file: String,
       compression: String, realname: String) = {
     val task = new MeteredTask("tweet", "parsing")
-    begin_process_file(filehand, file, compression, realname)
     var lineno = 0
     for (line <- lines) {
       lineno += 1
@@ -110,19 +109,13 @@ abstract class TwitterInfochimpsFileProcessor extends TextFileProcessor {
       }
       task.item_processed()
     }
-    end_process_file(filehand, file)
     task.finish()
     true
   }
 
   // To be implemented
 
-  def begin_process_file(filehand: FileHandler, file: String,
-      compression: String, realname: String)
-
   def process_line(metadata: Seq[String], text: String)
-
-  def end_process_file(filehand: FileHandler, file: String)
 }
 
 class ConvertTwitterInfochimpsFileProcessor(
@@ -131,12 +124,14 @@ class ConvertTwitterInfochimpsFileProcessor(
   var outstream: PrintStream = _
   val compression_type = "bzip2"
 
-  def begin_process_file(filehand: FileHandler, file: String,
+  override def begin_process_lines(lines: Iterator[String],
+      filehand: FileHandler, file: String,
       compression: String, realname: String) {
     val (_, outname) = filehand.split_filename(realname)
     val out_text_name = "%s/%s-text.txt" format (params.output_dir, outname)
     errprint("Text output file is %s..." format out_text_name)
     outstream = filehand.openw(out_text_name, compression = compression_type)
+    super.begin_process_lines(lines, filehand, file, compression, realname)
   }
 
   def process_line(metadata: Seq[String], text: String) {
@@ -146,8 +141,9 @@ class ConvertTwitterInfochimpsFileProcessor(
     outstream.println(outdata mkString "\t")
   }
 
-  def end_process_file(filehand: FileHandler, file: String) {
+  override def end_process_file(filehand: FileHandler, file: String) {
     outstream.close()
+    super.end_process_file(filehand, file)
   }
 }
 
@@ -234,11 +230,13 @@ class TwitterInfochimpsStatsFileProcessor extends
   var curfile_stats: TwitterStatistics = _
   val global_stats = new TwitterStatistics
 
-  def begin_process_file(filehand: FileHandler, file: String,
+  override def begin_process_lines(lines: Iterator[String],
+      filehand: FileHandler, file: String,
       compression: String, realname: String) {
     val (_, outname) = filehand.split_filename(realname)
     curfile = outname
     curfile_stats = new TwitterStatistics
+    super.begin_process_lines(lines, filehand, file, compression, realname)
   }
 
   def process_line(metadata: Seq[String], text: String) {
@@ -246,9 +244,10 @@ class TwitterInfochimpsStatsFileProcessor extends
     global_stats.record_tweet(metadata, text)
   }
 
-  def end_process_file(filehand: FileHandler, file: String) {
+  override def end_process_file(filehand: FileHandler, file: String) {
     errprint("Statistics for file %s:" format curfile)
     curfile_stats.print_statistics()
+    super.end_process_file(filehand, file)
   }
 
   override def end_processing(filehand: FileHandler, files: Iterable[String]) {

@@ -13,7 +13,7 @@ fi
 dumppref="$1"
 
 # This needs to be set for all subprocesses we call
-export DUMP_PREFIX="$dumppref"
+export WP_VERSION="$dumppref"
 
 # Generate article-data file from orginal dump
 NO_USE_PERMUTED=t run-processwiki article-data

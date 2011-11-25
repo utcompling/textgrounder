@@ -367,9 +367,10 @@ class DivisionFactory(gazetteer: Gazetteer) {
 // A document for toponym resolution.
 
 class TopoDocument(
-    params: Map[String, String],
+    fieldvals: Map[String, String],
+    schema: Seq[String],
     table: TopoDocumentTable
-) extends SphereDocument(params) {
+) extends SphereDocument(fieldvals, schema) {
   // Cell-based distribution corresponding to this document.
   var word_dist_wrapper: CellWordDist = null
   // Corresponding location for this document.
@@ -474,8 +475,9 @@ class TopoDocumentTable(
   driver_stats: ExperimentDriverStats,
   word_dist_factory: WordDistFactory
 ) extends SphereDocumentTable(driver_stats, word_dist_factory) {
-  override def create_document(params: Map[String, String]) =
-    new TopoDocument(params, this)
+  override def create_document(fieldvals: Map[String, String],
+      schema: Seq[String]) =
+    new TopoDocument(fieldvals, schema, this)
 
   var gazetteer: Gazetteer = null
 

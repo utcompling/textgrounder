@@ -29,7 +29,7 @@ import java.io.{Console=>_,_}
 import org.apache.commons.compress.compressors.bzip2._
 import org.apache.commons.compress.compressors.gzip._
 
-import printutil.errprint
+import printutil.{errprint, warning}
 import textutil._
 import osutil._
 
@@ -561,6 +561,62 @@ package object ioutil {
    * (Useful to signal input taken from an internal source.)
    */
   abstract class FileProcessor {
+
+    /**
+     * Process all files, calling `process_file` on each.
+     *
+     * @param files Files to process.  If any file names a directory,
+     *   all files in the directory will be processed.  If any file
+     *   is null, it will be passed on unchanged (see above; useful
+     *   e.g. for specifying input from an internal source).
+     * @param output_messages If true, output messages indicating the
+     *   files being processed.
+     * @return True if file processing continued to completion,
+     *   false if interrupted because an invocation of `process_file`
+     *   returns false.
+     */
+    def process_files(filehand: FileHandler, files: Iterable[String],
+        output_messages: Boolean = true) = {
+      var broken = false
+      begin_processing(filehand, files)
+      breakable {
+        def process_one_file(filename: String) {
+          if (output_messages && filename != null)
+            errprint("Processing file %s..." format filename)
+          begin_process_file(filehand, filename)
+          if (!process_file(filehand, filename)) {
+            // This works because of the way 'breakable' is implemented
+            // (dynamically-scoped).  Might "break" (stop working) if break
+            // is made totally lexically-scoped.
+            broken = true
+          }
+          end_process_file(filehand, filename)
+          if (broken)
+            break
+        }
+        for (dir <- files) {
+          if (dir == null)
+            process_one_file(dir)
+          else {
+            if (filehand.is_directory(dir)) {
+              if (output_messages)
+                errprint("Processing directory %s..." format dir)
+              begin_process_directory(filehand, dir)
+              val files = filehand.list_files(dir)
+              for (file <- filter_dir_files(filehand, dir, files)) {
+                process_one_file(file)
+              }
+              end_process_directory(filehand, dir)
+            } else process_one_file(dir)
+          }
+        }
+      }
+      end_processing(filehand, files)
+      !broken
+    }
+
+    /*********************** MUST BE IMPLEMENTED *************************/
+
     /**
      * Process a given file.
      *
@@ -570,6 +626,8 @@ package object ioutil {
      *   abort any further processing.
      */
     def process_file(filehand: FileHandler, file: String): Boolean
+
+    /***************** MAY BE IMPLEMENTED (THROUGH OVERRIDING) ***************/
 
     /**
      * Called when about to begin processing all files in a directory.
@@ -589,6 +647,26 @@ package object ioutil {
      * @param dir Directory being processed.
      */
     def end_process_directory(filehand: FileHandler, dir: String) {
+    }
+
+    /**
+     * Called when about to begin processing a file.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param file File being processed.
+     */
+    def begin_process_file(filehand: FileHandler, file: String) {
+    }
+
+    /**
+     * Called when finished processing a file.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param file File being processed.
+     */
+    def end_process_file(filehand: FileHandler, file: String) {
     }
 
     /**
@@ -612,53 +690,19 @@ package object ioutil {
     }
 
     /**
-     * Process all files, calling `process_file` on each.
+     * Called when opening a directory to filter out unwanted files.
+     * Takes a list of files, returns the filtered list of files.
+     * Must be overridden, since its default definition is simply to
+     * return all files in the directory.
      *
-     * @param files Files to process.  If any file names a directory,
-     *   all files in the directory will be processed.  If any file
-     *   is null, it will be passed on unchanged (see above; useful
-     *   e.g. for specifying input from an internal source).
-     * @param output_messages If true, output messages indicating the
-    *    files being processed.
-     * @return True if file processing continued to completion,
-     *   false if interrupted because an invocation of `process_file`
-     *   returns false.
+     * @param filehand The FileHandler for working with the files.
+     * @param dir Directory being processed.
+     * @param files The list of files in the directory.
+     *
+     * @return The filtered list.
      */
-    def process_files(filehand: FileHandler, files: Iterable[String],
-        output_messages: Boolean = true) = {
-      var broken = false
-      begin_processing(filehand, files)
-      breakable {
-        def process_one_file(filename: String) {
-          if (output_messages && filename != null)
-            errprint("Processing file %s..." format filename)
-          if (!process_file(filehand, filename)) {
-            // This works because of the way 'breakable' is implemented
-            // (dynamically-scoped).  Might "break" (stop working) if break
-            // is made totally lexically-scoped.
-            broken = true
-            break
-          }
-        }
-        for (dir <- files) {
-          if (dir == null)
-            process_one_file(dir)
-          else {
-            if (filehand.is_directory(dir)) {
-              if (output_messages)
-                errprint("Processing directory %s..." format dir)
-              begin_process_directory(filehand, dir)
-              for (file <- filehand.list_files(dir)) {
-                process_one_file(file)
-              }
-              end_process_directory(filehand, dir)
-            } else process_one_file(dir)
-          }
-        }
-      }
-      end_processing(filehand, files)
-      !broken
-    }
+    def filter_dir_files(filehand: FileHandler, dir: String,
+        files: Iterable[String]) = files
   }
 
   /**
@@ -668,7 +712,24 @@ package object ioutil {
    */
   abstract class TextFileProcessor extends FileProcessor {
     /**
-     * Called when about to begin processing a file.
+     * Process a given file.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param file The file to process (possibly null, see above).
+     * @returns True if file processing should continue; false to
+     *   abort any further processing.
+     */
+    def process_file(filehand: FileHandler, file: String) = {
+      val (lines, compression, realname) =
+        filehand.openr_with_compression_info(file)
+      begin_process_lines(lines, filehand, file, compression, realname)
+      process_lines(lines, filehand, file, compression, realname)
+    }
+
+    /*********************** MUST BE IMPLEMENTED *************************/
+
+    /**
+     * Called to process the lines of a file.
      * Must be overridden, since it has an (empty) definition by default.
      *
      * @param lines Iterator over the lines in the file.
@@ -683,19 +744,136 @@ package object ioutil {
         filehand: FileHandler, file: String,
         compression: String, realname: String): Boolean
 
+    /***************** MAY BE IMPLEMENTED (THROUGH OVERRIDING) ***************/
+
     /**
-     * Process a given file.
+     * Called when about to begin processing the lines from a file.
+     * Must be overridden, since it has an (empty) definition by default.
+     * Note that this is generally called just once per file, just like
+     * `begin_process_file`; but this function has compression info and
+     * the line iterator available to it.
      *
      * @param filehand The FileHandler for working with the file.
-     * @param file The file to process (possibly null, see above).
-     * @returns True if file processing should continue; false to
-     *   abort any further processing.
+     * @param file File being processed.
      */
-    def process_file(filehand: FileHandler, file: String) = {
-      val (lines, compression, realname) =
-        filehand.openr_with_compression_info(file)
-      process_lines(lines, filehand, file, compression, realname)
+    def begin_process_lines(lines: Iterator[String],
+        filehand: FileHandler, file: String,
+        compression: String, realname: String) { }
+
+    /*
+       The following may be implemented, but have default, mostly empty,
+       definitions.  These are the same as for the base FileProcessor.
+
+    def begin_process_directory(filehand: FileHandler, dir: String) {
     }
+    def end_process_directory(filehand: FileHandler, dir: String) {
+    }
+    def begin_processing(filehand: FileHandler, files: Iterable[String]) {
+    }
+    def end_processing(filehand: FileHandler, files: Iterable[String]) {
+    }
+    def filter_dir_files(filehand: FileHandler, dir: String,
+        files:Seq[String]) = files
+    */
+  }
+
+  /**
+   * A text-file processor where each line is made up of a fixed number
+   * of fields, separated by some sort of separator (by default a tab
+   * character).  No implementation is provided for `process_lines`,
+   * the driver function.  This function in general should loop over the
+   * lines, calling `parse_row` on each one.
+   *
+   * @param schema List of field names for each field in the file.
+   *   Each row should have the same number of fields as there are names
+   *   in this list.
+   * @param split_re Regular expression used to split one field from another.
+   *   By default a tab character.
+   */
+
+  abstract class FieldTextFileProcessor(
+    schema: Seq[String],
+    split_re: String = "\t"
+  ) extends TextFileProcessor {
+    var all_num_processed = 0
+    var all_num_bad = 0
+    var num_processed = 0
+    var num_bad = 0
+
+    override def begin_process_file(filehand: FileHandler, file: String) {
+      num_processed = 0
+      num_bad = 0
+      super.begin_process_file(filehand, file)
+    }
+
+    override def end_process_file(filehand: FileHandler, file: String) {
+      all_num_processed += num_processed
+      all_num_bad += num_bad
+      super.end_process_file(filehand, file)
+    }
+
+    /**
+     * Parse a given row into fields.  Call either #process_row or
+     * #handle_bad_row.
+     */
+    def parse_row(line: String) {
+      // println("[%s]" format line)
+      val fieldvals = line.split(split_re, -1)
+      if (fieldvals.length != schema.length)
+        handle_bad_row(line, fieldvals)
+      else {
+        val good = process_row((schema zip fieldvals).toMap)
+        if (!good)
+          handle_bad_row(line, fieldvals)
+      }
+      num_processed += 1
+    }
+
+    /*********************** MUST BE IMPLEMENTED *************************/
+
+    /**
+     * Called when a "good" row is seen (good solely in that it has the
+     * correct number of fields).
+     *
+     * @param fieldvals: Map listing the string values for each field.
+     *
+     * @return True if the line is truly "good"; false, otherwise. (In the
+     *   latter case, `handle_bad_row` will be called.)
+     */
+    def process_row(fieldvals: Map[String,String]): Boolean
+
+    /* Also,
+
+    def process_lines(lines: Iterator[String],
+        filehand: FileHandler, file: String,
+        compression: String, realname: String): Boolean
+
+       A simple implementation simply loops over all the lines and calls
+       parse_row() on each one.
+    */
+
+    /******************* MAY BE IMPLEMENTED (OVERRIDDEN) *******************/
+
+    /**
+     * Called when a bad row is seen.  By default, output a warning.
+     *
+     * @param line Text of the row.
+     * @param fieldvals Field values parsed from the row.
+     */
+    def handle_bad_row(line: String, fieldvals: Seq[String]) {
+      val lineno = num_processed + 1
+      if (schema.length != fieldvals.length) {
+        warning(
+          """Line %s: Bad record, expected %s fields, saw %s fields;
+          skipping line=%s""", lineno, schema.length, fieldvals.length, line)
+      } else {
+        warning("""Line %s: Bad record; skipping line=%s""", lineno, line)
+      }
+      num_bad += 1
+    }
+
+    /* Also, the same "may-be-implemented" functions from the superclass
+       TextFileProcessor. */
   }
 
   ////////////////////////////////////////////////////////////////////////////

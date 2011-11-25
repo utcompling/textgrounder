@@ -30,7 +30,7 @@ else
   echo "Setting number of simultaneous processes to $NUM_SIMULTANEOUS, taken from env. var. NUM_SIMULTANEOUS"
 fi
 
-SPLIT_PREFIX="$DUMP_PREFIX-split-processwiki"
+SPLIT_PREFIX="$WP_VERSION-split-processwiki"
 
 if [ -z "$*" ]; then
   cat <<FOO
@@ -98,7 +98,7 @@ through 'chmod a-w'.
 Other important environment variables (with default settings in
 'config-geolocate', but which you might want to override):
 
-DUMP_PREFIX      Specifies which dump file to use, e.g. "enwiki-20100905".
+WP_VERSION       Specifies which dump file to use, e.g. "enwiki-20100905".
 NO_USE_PERMUTED  If set, uses the non-permuted version of the dump file.
 
 Output files are in the current directory.
@@ -124,27 +124,27 @@ ln -s ../../somewhere/else/enwiki-20111007-pages-articles.xml.bz2 .
 
 2. Generate the basic and combined article data files for the non-permuted dump
 
-DUMP_PREFIX=enwiki-20111007 NO_USE_PERMUTED=t run-processwiki combined-article-data
+WP_VERSION=enwiki-20111007 NO_USE_PERMUTED=t run-processwiki combined-article-data
 
 3. Generate a permuted dump file; all future commands will operate on the
    permuted dump file, because we won't use NO_USE_PERMUTED.
 
-DUMP_PREFIX=enwiki-20111007 run-permute all
+WP_VERSION=enwiki-20111007 run-permute all
 
 4. Generate the basic and combined article data files for the permuted dump
 
-DUMP_PREFIX=enwiki-20111007 run-processwiki combined-article-data
+WP_VERSION=enwiki-20111007 run-processwiki combined-article-data
 
 5. Generate the counts file for articles with coordinates -- this is the info
    needed by most of the Geolocate experiments.
 
-DUMP_PREFIX=enwiki-20111007 run-processwiki coord-counts
+WP_VERSION=enwiki-20111007 run-processwiki coord-counts
 
 6. Generate the counts and words files for all articles, splitting the dump
    file so we can run in parallel.
 
-DUMP_PREFIX=enwiki-20111007 split-dump
-DUMP_PREFIX=enwiki-20111007 NUM_SIMULTANEOUS=8 run-processwiki all-counts all-words
+WP_VERSION=enwiki-20111007 split-dump
+WP_VERSION=enwiki-20111007 NUM_SIMULTANEOUS=8 run-processwiki all-counts all-words
 
 7. Move all final generated files (i.e. not including intermediate files) into
    some final directory, e.g. $TG_WIKIPEDIA_DIR.

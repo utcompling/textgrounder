@@ -210,33 +210,36 @@ trait UnigramWordDistReader extends WordDistReader {
   var num_word_tokens = 0
   var title: String = _
 
-  // Used for debugging, see below.
-  var stream: PrintStream = _
-  var writer: GeoDocumentWriter[SphereCoord] = _
+  // This is basically one-off debug code (used when debug("wordcountdocs"))
+  // because of the fact that the experiments published in the paper used a
+  // word-count file generated using an older algorithm for determining the
+  // geolocated coordinate of a document.  We didn't record the corresponding
+  // document-data file, so we need a way of regenerating it using the
+  // intersection of documents in the document-data file we actually used for
+  // the experiments and the word-count file we used. (NOTE: It appears we
+  // no longer need this code, but I'm maintaining it because it leads to
+  // the maintenance of code used to write out a schema and document file,
+  // which is generally useful. --ben)
+  var wordcountdocs_stream: PrintStream = _
+  var wordcountdocs_writer: GeoDocumentWriter[SphereCoord] = _
+  var wordcountdocs_schema: Seq[String] = _
+  var wordcountdocs_schema_stream: PrintStream = _
 
   def do_read_word_counts(table: GenericDistDocumentTable,
       filehand: FileHandler, filename: String, stopwords: Set[String]) {
     errprint("Reading word counts from %s...", filename)
     errprint("")
 
-    // This is basically a one-off debug statement because of the fact that
-    // the experiments published in the paper used a word-count file generated
-    // using an older algorithm for determining the geolocated coordinate of
-    // a document.  We didn't record the corresponding document-data
-    // file, so we need a way of regenerating it using the intersection of
-    // documents in the document-data file we actually used for the experiments
-    // and the word-count file we used.
     if (debug("wordcountdocs")) {
       // Change this if you want a different file name
-      val wordcountdocs_filename = "wordcountdocs-combined-document-data.txt"
-      stream = filehand.openw(wordcountdocs_filename)
-      // See write_document_file() in GeoDocument.scala
-      writer =
-        new GeoDocumentWriter[SphereCoord](stream,
-          GeoDocumentData.combined_document_data_outfields)
-      writer.output_header()
+      val wordcountdocs_filename = "wordcountdocs-combined-document-metadata.txt"
+      val wordcountdocs_schema_filename = "wordcountdocs-combined-schema.txt"
+      // We can't actually write the schema until we see the first document,
+      // since schemas are stored per-document.
+      wordcountdocs_schema_stream =
+        filehand.openw(wordcountdocs_schema_filename)
+      wordcountdocs_stream = filehand.openw(wordcountdocs_filename)
     }
-
     // Written this way because there's another line after the for loop,
     // corresponding to the else clause of the Python for loop
     breakable {
@@ -282,7 +285,7 @@ trait UnigramWordDistReader extends WordDistReader {
     }
 
     if (debug("wordcountdocs"))
-      stream.close()
+      wordcountdocs_stream.close()
   }
 
   def set_word_dist(doc: GenericDistDocument, is_training_set: Boolean,
@@ -290,8 +293,21 @@ trait UnigramWordDistReader extends WordDistReader {
     if (num_word_tokens == 0)
       false
     else {
-      if (debug("wordcountdocs"))
-        writer.output_row(doc.asInstanceOf[SphereDocument])
+      if (debug("wordcountdocs")) {
+        // First time through.
+        if (wordcountdocs_schema == null) {
+          wordcountdocs_schema_stream.println(doc.schema mkString "\t")
+          wordcountdocs_schema_stream.close()
+          wordcountdocs_schema = doc.schema
+          wordcountdocs_writer =
+            new GeoDocumentWriter[SphereCoord](wordcountdocs_stream,
+              doc.schema)
+        }
+        if (doc.schema != wordcountdocs_schema)
+          throw new IllegalStateException("Currently unable to handle documents with different schemas: Original schema %s, new schema %s".
+          format(wordcountdocs_schema, doc.schema))
+        wordcountdocs_writer.output_row(doc.asInstanceOf[SphereDocument])
+      }
       // If we are evaluating on the dev set, skip the test set and vice
       // versa, to save memory and avoid contaminating the results.
       if (is_training_set || is_eval_set) {

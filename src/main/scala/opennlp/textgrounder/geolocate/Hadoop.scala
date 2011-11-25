@@ -285,8 +285,11 @@ abstract class HadoopGeolocateApp(
        command-line arguments, because it participates in that process. */
     driver.set_job(job)
     initialize_hadoop_classes(job)
-    for (file <- params.document_file)
-      FileInputFormat.addInputPath(job, new Path(file))
+    // FIXME: Big hack here.
+    for (file <- params.document_file) {
+      val hadoop_path = file + "/*-document-metadata.txt*"
+      FileInputFormat.addInputPath(job, new Path(hadoop_path))
+    }
     FileOutputFormat.setOutputPath(job, new Path(params.outfile))
     if (job.waitForCompletion(true)) 0 else 1
   }
@@ -483,35 +486,38 @@ class DocumentEvaluationMapper extends
   def create_param_object(ap: ArgParser) = new ParamType(ap)
   def create_driver() = new DriverType
 
-  val reader =
-    new GeoDocumentReader[SphereCoord](GeoDocumentData.combined_document_data_outfields)
   var evaluators: Iterable[InternalGeolocateDocumentEvaluator] = null
   val task = new MeteredTask("document", "evaluating")
 
-  override def setup(context: ContextType) {
-    super.setup(context)
-    evaluators =
-      for ((stratname, strategy) <- driver.strategies)
-        yield new InternalGeolocateDocumentEvaluator(strategy, stratname,
-          driver)
-  }
+  class HadoopDocumentFileProcessor(
+    schema: Seq[String],
+    context: ContextType
+  ) extends GeoDocumentFileProcessor(schema, driver) {
+    override def get_shortfile =
+      filename_to_counter_name(driver.get_file_handler,
+        driver.get_configuration.get("map.input.file"))
 
-  override def map(key: Object, value: Text, context: ContextType) {
-    def process(params: Map[String, String]) {
+    def handle_document(fieldvals: Map[String, String]) = {
       val table = driver.document_table
-      val in_document = table.create_document(params)
+      val in_document = table.create_document(fieldvals, schema)
       if (in_document.split == driver.params.eval_set &&
           table.would_add_document_to_list(in_document)) {
         val doc = table.lookup_document(in_document.title)
-        if (doc == null)
+        if (doc == null) {
           warning("Couldn't find document %s in table", in_document.title)
-        else {
+          false
+        } else {
+          var skipped = 0
+          var not_skipped = 0
           for (e <- evaluators) {
             val num_processed = task.num_processed
             val doctag = "#%d" format (1 + num_processed)
-            if (e.would_skip_document(doc, doctag))
-              errprint("Skipped document %s", doc)
-            else {
+            if (e.would_skip_document(doc, doctag)) {
+              skipped += 1
+              errprint("Skipped document %s because evaluator would skip it",
+                doc)
+            } else {
+              not_skipped += 1
               // Don't put side-effecting code inside of an assert!
               val result =
                 e.evaluate_document(doc, doctag)
@@ -521,10 +527,41 @@ class DocumentEvaluationMapper extends
               task.item_processed()
             }
           }
+          if (skipped > 0 && not_skipped > 0)
+            warning("""Something strange: %s evaluator(s) skipped document, but %s evaluator(s)
+didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
+          (not_skipped > 0)
         }
-      }
+      } else false
     }
-    reader.process_row(value.toString, process _)
+
+    def process_lines(lines: Iterator[String],
+        filehand: FileHandler, file: String,
+        compression: String, realname: String) =
+      throw new IllegalStateException(
+        "process_lines should never be called here")
+  }
+
+  var processor: HadoopDocumentFileProcessor = _
+  override def setup(context: ContextType) {
+    super.setup(context)
+    evaluators =
+      for ((stratname, strategy) <- driver.strategies)
+        yield new InternalGeolocateDocumentEvaluator(strategy, stratname,
+          driver)
+    if (driver.params.document_file.length != 1) {
+      driver.params.parser.error(
+        "FIXME: For Hadoop, currently need exactly one corpus")
+    } else {
+      val schema =
+        GeoDocument.read_schema_from_corpus(driver.get_file_handler,
+          driver.params.document_file(0))
+      processor = new HadoopDocumentFileProcessor(schema, context)
+    }
+  }
+
+  override def map(key: Object, value: Text, context: ContextType) {
+    processor.parse_row(value.toString)
   }
 }
 

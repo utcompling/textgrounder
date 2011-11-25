@@ -33,7 +33,7 @@ A sample run, assuming you recently downloaded the 20111007 (October 7, 2011)
 English-language Wikipedia dump into the current directory and used
 'run-processwiki' to generate the article-data file:
 
-TG_WIKIPEDIA_DIR=. DUMP_PREFIX=enwiki-20111007 run-permute all
+TG_WIKIPEDIA_DIR=. WP_VERSION=enwiki-20111007 run-permute all
 
 (See 'run-processwiki'.)
 
@@ -65,7 +65,7 @@ TG_WIKIPEDIA_DIR  If you recently downloaded the dump file and generate the
                   article data file, both of these will be in the current
                   dir, not in the final resting place for corpora; so you
                   want to set this to ".".
-DUMP_PREFIX       Specifies which dump file to use, e.g. "enwiki-20100905".
+WP_VERSION        Specifies which dump file to use, e.g. "enwiki-20100905".
 NUM_SPLITS        Number of parts in which the permuted dump file is
                   constructed separately, before being put together.  Useful
                   because otherwise too much memory might be used.
@@ -85,12 +85,12 @@ FOO
   exit 1
 fi
 
-SPLIT_PREFIX="$DUMP_PREFIX-split"
+SPLIT_PREFIX="$WP_VERSION-split"
 
 PERMUTE_WIKI="$TG_PYTHON_DIR/permute_wiki.py"
 
-PERMUTED_DUMP_FILE="$DUMP_PREFIX-permuted-pages-articles.xml.bz2"
-PERMUTED_OUT_ORIG_DOCUMENT_DATA_FILE="$DUMP_PREFIX-permuted-$ORIG_DOCUMENT_DATA_SUFFIX"
+PERMUTED_DUMP_FILE="$WP_VERSION-permuted-pages-articles.xml.bz2"
+PERMUTED_OUT_ORIG_DOCUMENT_DATA_FILE="$WP_VERSION-permuted-$ORIG_DOCUMENT_DATA_SUFFIX"
 
 if [ -z "$NUM_SPLITS" ]; then
   NUM_SPLITS=8

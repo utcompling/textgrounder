@@ -58,7 +58,7 @@ package object hadoop {
 
     def list_files(dir: String) = {
       for (file <- get_file_system(dir).listStatus(new Path(dir)))
-        yield file.toString
+        yield file.getPath.toString
     }
   }
 }

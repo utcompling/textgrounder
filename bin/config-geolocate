@@ -50,15 +50,15 @@
 # 4. NO_USE_PERMUTED: Optional; if non-blank, don't use permuted version of
 #                     Wikipedia data files.
 #
-# 5. DUMP_PREFIX: Optional; if set, should specify the prefix of a dump file,
-#                 which will be used for the dump file and all files computed
-#                 from the dump file.  An example prefix is 'enwiki-20111007',
-#                 which indicates the English Wikipedia dump of Oct 7, 2011.
-#                 (This format comes from the naming of dump files on the
-#                 Wikipedia servers; we didn't make it up.) If not set, will
-#                 use one of the current dumps that have been completely
-#                 preprocessed -- currently 'enwiki-20100905', the version
-#                 used in Wing and Baldridge 2011.
+# 5. WP_VERSION: Optional; if set, should specify the prefix of a dump file,
+#                which will be used for the dump file and all files computed
+#                from the dump file.  An example prefix is 'enwiki-20111007',
+#                which indicates the English Wikipedia dump of Oct 7, 2011.
+#                (This format comes from the naming of dump files on the
+#                Wikipedia servers; we didn't make it up.) If not set, will
+#                use one of the current dumps that have been completely
+#                preprocessed -- currently 'enwiki-20100905', the version
+#                used in Wing and Baldridge 2011.
 #
 # 6. TG_HADOOP_DIR: Optional; location of corpus and TextGrounder data files
 #                   in the Hadoop File System (HDFS).  By default, set to the
@@ -116,20 +116,6 @@ GEOTEXT_CORPUS_TOP="$TG_TWITTER_DIR/GeoText.2010-10-12"
 #GEOTEXT_INPUT_DIR="$GEOTEXT_CORPUS_TOP/processed_data"
 GEOTEXT_OUTPUT_DIR="$TG_TWITTER_DIR/output-40-docthresh"
 
-if [ -z "$DUMP_PREFIX" ]; then
-  DUMP_PREFIX="enwiki-20100905"
-fi
-
-if [ -z "$NO_USE_PERMUTED" ]; then
-  if [ -e "$TG_WIKIPEDIA_DIR/$DUMP_PREFIX-permuted-pages-articles.xml.bz2" ]; then
-    DUMP_PREFIX="$DUMP_PREFIX-permuted"
-  fi
-fi
-
-PAGES_ARTICLES_PREFIX="$DUMP_PREFIX-pages-articles"
-
-WDIR="$TG_WIKIPEDIA_DIR"
-
 # The partial names of the various files we generate or read from -- i.e.
 # minus any dump prefix or path.
 ORIG_DOCUMENT_DATA_SUFFIX="document-data.txt"
@@ -148,37 +134,61 @@ DISAMBIG_ID_SUFFIX="disambig.id.txt"
 TITLE2ID_SUFFIX="title2id.txt"
 DUMP_SUFFIX="xml.bz2"
 
-# The full names of the various files we generate or read from during
-# preprocessing, including the dump prefix, but without any path info.
-OUT_GAZETTEER_FILE="world-dataen-fixed.txt"
-OUT_ORIG_DOCUMENT_DATA_FILE="$DUMP_PREFIX-$ORIG_DOCUMENT_DATA_SUFFIX"
-OUT_COMBINED_DOCUMENT_DATA_FILE="$DUMP_PREFIX-$COMBINED_DOCUMENT_DATA_SUFFIX"
-OUT_COORDS_FILE="$DUMP_PREFIX-$COORDS_SUFFIX"
-OUT_COORD_COUNTS_FILE="$DUMP_PREFIX-$COORD_COUNTS_SUFFIX"
-OUT_ALL_COUNTS_FILE="$DUMP_PREFIX-$ALL_COUNTS_SUFFIX"
-OUT_COORD_WORDS_FILE="$DUMP_PREFIX-$COORD_WORDS_SUFFIX"
-OUT_COORD_WORDS_UNTOK_FILE="$DUMP_PREFIX-$COORD_WORDS_UNTOK_SUFFIX"
-OUT_ALL_WORDS_FILE="$DUMP_PREFIX-$ALL_WORDS_SUFFIX"
-OUT_ALL_WORDS_UNTOK_FILE="$DUMP_PREFIX-$ALL_WORDS_UNTOK_SUFFIX"
-OUT_COORD_LINKS_FILE="$DUMP_PREFIX-$COORD_LINKS_SUFFIX"
-OUT_ALL_LINKS_FILE="$DUMP_PREFIX-$ALL_LINKS_SUFFIX"
-OUT_TOPONYM_EVAL_FILE="$DUMP_PREFIX-$TOPONYM_EVAL_SUFFIX"
-OUT_DISAMBIG_ID_FILE="$PAGES_ARTICLES_PREFIX.$DISAMBIG_ID_SUFFIX"
-OUT_TITLE2ID_FILE="$PAGES_ARTICLES_PREFIX.$TITLE2ID_SUFFIX"
-OUT_DUMP_FILE="$PAGES_ARTICLES_PREFIX.$DUMP_SUFFIX"
+if [ -z "$WP_VERSION" ]; then
+  WP_VERSION="enwiki-20100905"
+fi
 
-# The full pathnames of the various files we read from during experiment-
-# running, including full path info.
-IN_GAZETTEER_FILE="$TG_AUX_DIR/$OUT_GAZETTEER_FILE"
-IN_ORIG_DOCUMENT_DATA_FILE="$WDIR/$OUT_ORIG_DOCUMENT_DATA_FILE"
-IN_COMBINED_DOCUMENT_DATA_FILE="$WDIR/$OUT_COMBINED_DOCUMENT_DATA_FILE"
-IN_COORDS_FILE="$WDIR/$OUT_COORDS_FILE"
-IN_COORD_COUNTS_FILE="$WDIR/$OUT_COORD_COUNTS_FILE"
-IN_COORD_LINKS_FILE="$WDIR/$OUT_COORD_LINKS_FILE"
-IN_TOPONYM_EVAL_FILE="$WDIR/$OUT_TOPONYM_EVAL_FILE"
-IN_DISAMBIG_ID_FILE="$WDIR/$OUT_DISAMBIG_ID_FILE"
-IN_TITLE2ID_FILE="$WDIR/$OUT_TITLE2ID_FILE"
-IN_DUMP_FILE="$WDIR/$OUT_DUMP_FILE"
+set_wp_version() {
+  WP_VERSION="$1"
+  DUMP_PREFIX="$1"
+  if [ -z "$NO_USE_PERMUTED" ]; then
+    if [ -e "$TG_WIKIPEDIA_DIR/$WP_VERSION/$WP_VERSION-permuted-pages-articles.xml.bz2" ]; then
+      DUMP_PREFIX="$1-permuted"
+    fi
+  fi
+
+  WP_VERSION_DIR="$TG_WIKIPEDIA_DIR/$WP_VERSION"
+
+  set_wp_version_specific_vars
+}
+
+set_wp_version_specific_vars() {
+  PAGES_ARTICLES_PREFIX="$DUMP_PREFIX-pages-articles"
+
+  # The full names of the various files we generate or read from during
+  # preprocessing, including the dump prefix, but without any path info.
+  OUT_GAZETTEER_FILE="world-dataen-fixed.txt"
+  OUT_ORIG_DOCUMENT_DATA_FILE="$DUMP_PREFIX-$ORIG_DOCUMENT_DATA_SUFFIX"
+  OUT_COMBINED_DOCUMENT_DATA_FILE="$DUMP_PREFIX-$COMBINED_DOCUMENT_DATA_SUFFIX"
+  OUT_COORDS_FILE="$DUMP_PREFIX-$COORDS_SUFFIX"
+  OUT_COORD_COUNTS_FILE="$DUMP_PREFIX-$COORD_COUNTS_SUFFIX"
+  OUT_ALL_COUNTS_FILE="$DUMP_PREFIX-$ALL_COUNTS_SUFFIX"
+  OUT_COORD_WORDS_FILE="$DUMP_PREFIX-$COORD_WORDS_SUFFIX"
+  OUT_COORD_WORDS_UNTOK_FILE="$DUMP_PREFIX-$COORD_WORDS_UNTOK_SUFFIX"
+  OUT_ALL_WORDS_FILE="$DUMP_PREFIX-$ALL_WORDS_SUFFIX"
+  OUT_ALL_WORDS_UNTOK_FILE="$DUMP_PREFIX-$ALL_WORDS_UNTOK_SUFFIX"
+  OUT_COORD_LINKS_FILE="$DUMP_PREFIX-$COORD_LINKS_SUFFIX"
+  OUT_ALL_LINKS_FILE="$DUMP_PREFIX-$ALL_LINKS_SUFFIX"
+  OUT_TOPONYM_EVAL_FILE="$DUMP_PREFIX-$TOPONYM_EVAL_SUFFIX"
+  OUT_DISAMBIG_ID_FILE="$PAGES_ARTICLES_PREFIX.$DISAMBIG_ID_SUFFIX"
+  OUT_TITLE2ID_FILE="$PAGES_ARTICLES_PREFIX.$TITLE2ID_SUFFIX"
+  OUT_DUMP_FILE="$PAGES_ARTICLES_PREFIX.$DUMP_SUFFIX"
+
+  # The full pathnames of the various files we read from during experiment-
+  # running, including full path info.
+  IN_GAZETTEER_FILE="$TG_AUX_DIR/$OUT_GAZETTEER_FILE"
+  IN_ORIG_DOCUMENT_DATA_FILE="$WP_VERSION_DIR/$OUT_ORIG_DOCUMENT_DATA_FILE"
+  IN_COMBINED_DOCUMENT_DATA_FILE="$WP_VERSION_DIR/$OUT_COMBINED_DOCUMENT_DATA_FILE"
+  IN_COORDS_FILE="$WP_VERSION_DIR/$OUT_COORDS_FILE"
+  IN_COORD_COUNTS_FILE="$WP_VERSION_DIR/$OUT_COORD_COUNTS_FILE"
+  IN_COORD_LINKS_FILE="$WP_VERSION_DIR/$OUT_COORD_LINKS_FILE"
+  IN_TOPONYM_EVAL_FILE="$WP_VERSION_DIR/$OUT_TOPONYM_EVAL_FILE"
+  IN_DISAMBIG_ID_FILE="$WP_VERSION_DIR/$OUT_DISAMBIG_ID_FILE"
+  IN_TITLE2ID_FILE="$WP_VERSION_DIR/$OUT_TITLE2ID_FILE"
+  IN_DUMP_FILE="$WP_VERSION_DIR/$OUT_DUMP_FILE"
+}
+
+set_wp_version $WP_VERSION
 
 # Include local configuration if it exists
 

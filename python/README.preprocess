@@ -32,7 +32,7 @@ As just mentioned, no current experiment apps make use of this info.
 Other important environment variables (with default settings in
 'config-geolocate', but which you might want to override):
 
-DUMP_PREFIX      Specifies which dump file to use, e.g. "enwiki-20100905".
+WP_VERSION       Specifies which dump file to use, e.g. "enwiki-20100905".
 NO_USE_PERMUTED  If set, uses the non-permuted version of the dump file.
 
 
@@ -58,27 +58,27 @@ ln -s ../../somewhere/else/enwiki-20111007-pages-articles.xml.bz2 .
 
 2. Generate the basic and combined article data files for the non-permuted dump
 
-DUMP_PREFIX=enwiki-20111007 NO_USE_PERMUTED=t run-processwiki combined-article-data
+WP_VERSION=enwiki-20111007 NO_USE_PERMUTED=t run-processwiki combined-article-data
 
 3. Generate a permuted dump file; all future commands will operate on the
    permuted dump file, because we won't use NO_USE_PERMUTED.
 
-DUMP_PREFIX=enwiki-20111007 run-permute all
+WP_VERSION=enwiki-20111007 run-permute all
 
 4. Generate the basic and combined article data files for the permuted dump
 
-DUMP_PREFIX=enwiki-20111007 run-processwiki combined-article-data
+WP_VERSION=enwiki-20111007 run-processwiki combined-article-data
 
 5. Generate the counts file for articles with coordinates -- this is the info
    needed by most of the Geolocate experiments.
 
-DUMP_PREFIX=enwiki-20111007 run-processwiki coord-counts
+WP_VERSION=enwiki-20111007 run-processwiki coord-counts
 
 6. Generate the counts and words files for all articles, splitting the dump
    file so we can run in parallel.
 
-DUMP_PREFIX=enwiki-20111007 split-dump
-DUMP_PREFIX=enwiki-20111007 NUM_SIMULTANEOUS=8 run-processwiki all-counts all-words
+WP_VERSION=enwiki-20111007 split-dump
+WP_VERSION=enwiki-20111007 NUM_SIMULTANEOUS=8 run-processwiki all-counts all-words
 
 7. Move all final generated files (i.e. not including intermediate files) into
    some final directory, e.g. $TG_WIKIPEDIA_DIR.
@@ -151,7 +151,7 @@ OUT_ALL_BIGRAM_COUNTS_FILE="$DUMP_PREFIX-$ALL_BIGRAM_COUNTS_SUFFIX"
 
 4. Now finally you can run it:
 
-DUMP_PREFIX=enwiki-20111007 run-processwiki coord-bigram-counts
+WP_VERSION=enwiki-20111007 run-processwiki coord-bigram-counts
 
    This generates the bigram counts for geotagged articles -- the minimum
    necessary for document geotagging.
@@ -161,7 +161,7 @@ DUMP_PREFIX=enwiki-20111007 run-processwiki coord-bigram-counts
    under nohup, so that it won't die if your terminal connection suddenly
    dies.  One way to do that is to use the TextGrounder 'run-nohup' script:
 
-DUMP_PREFIX=enwiki-20111007 run-nohup --id do-coord-bigram-counts run-processwiki coord-bigram-counts
+WP_VERSION=enwiki-20111007 run-nohup --id do-coord-bigram-counts run-processwiki coord-bigram-counts
 
    Note that the '--id do-coord-bigram-counts' is optional; all it does is
    insert the text "do-coord-bigram-counts" into the file that it stores
@@ -176,7 +176,7 @@ DUMP_PREFIX=enwiki-20111007 run-nohup --id do-coord-bigram-counts run-processwik
    consider using the "divide-and-conquer" mode.  The first thing is to
    split the dump file, like this:
 
-DUMP_PREFIX=enwiki-20111007 run-processwiki split-dump
+WP_VERSION=enwiki-20111007 run-processwiki split-dump
 
    This takes maybe 45 mins and splits the whole dump file into 8 pieces.
    (Controllable through NUM_SPLITS.)
@@ -184,7 +184,7 @@ DUMP_PREFIX=enwiki-20111007 run-processwiki split-dump
    Then, each operation you want to do in divide-and-conquer mode, run it
    by setting NUM_SIMULTANEOUS to something more than 1, e.g.
 
-DUMP_PREFIX=enwiki-20111007 NUM_SIMULTANEOUS=8 run-processwiki all-bigram-counts
+WP_VERSION=enwiki-20111007 NUM_SIMULTANEOUS=8 run-processwiki all-bigram-counts
 
    (although you probably want to wrap it in 'run-nohup').  Essentially,
    this runs 8 simultaneous run-processwiki processes (which fits well with

@@ -22,11 +22,14 @@
 package opennlp.textgrounder.geolocate
 
 import collection.mutable
+import util.matching.Regex
 
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil.FileHandler
+import opennlp.textgrounder.util.MeteredTask
+import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.errprint
 import opennlp.textgrounder.util.Serializer
 import opennlp.textgrounder.util.textutil.capfirst
@@ -50,60 +53,9 @@ abstract class DistDocumentTable[CoordType : Serializer,
   DocumentType <: DistDocument[CoordType]](
   /* FIXME: The point of this parameter is so that we can use the counter
      mechanism instead of our own statistics.  Implement this. */
-  val driver_stats: ExperimentDriverStats,
+  val dstats: ExperimentDriverStats,
   val word_dist_factory: WordDistFactory
 ) {
-  /**
-   * A mechanism for wrapping task counters so that they can be stored
-   * in variables and incremented simply using +=.  Note that access to
-   * them still needs to go through `value`, unfortunately. (Even marking
-   * `value` as implicit isn't enough as the function won't get invoked
-   * unless we're in an environment requiring an integral value.  This means
-   * it won't get invoked in print statements, variable assignments, etc.)
-   *
-   * It would be nice to move this elsewhere; we'd have to pass in
-   * `driver_stats`, though.
-   *
-   * NOTE: The counters are task-specific because currently each task
-   * reads the entire set of training documents into memory.  We could avoid
-   * this by splitting the tasks so that each task is commissioned to
-   * run over a specific portion of the Earth rather than a specific
-   * set of test documents.  Note that if we further split things so that
-   * each task handled both a portion of test documents and a portion of
-   * the Earth, it would be somewhat trickier, depending on exactly how
-   * we write the code -- for a given set of test documents, different
-   * portions of the Earth would be reading in different training documents,
-   * so we'd presumably want their counts to add; but we might not want
-   * all counts to add.
-   */
-
-  def construct_task_counter_name(name: String) =
-    "bytask." + driver_stats.get_task_id + "." + name
-
-  def increment_task_counter(name: String, byvalue: Long = 1) {
-    driver_stats.increment_local_counter(construct_task_counter_name(name),
-      byvalue)
-  }
-
-  def get_task_counter(name: String) = {
-    driver_stats.get_local_counter(construct_task_counter_name(name))
-  }
-
-  class TaskCounterWrapper(name: String) {
-    def value = get_task_counter(name)
-
-    def +=(incr: Long) {
-      increment_task_counter(name, incr)
-    }
-  }
-
-  def create_counter_wrapper(prefix: String, split: String) =
-    new TaskCounterWrapper(prefix + "." + split)
-
-  def countermap(prefix: String) =
-    new SettingDefaultHashMap[String, TaskCounterWrapper](
-      create_counter_wrapper(prefix, _))
-
   /**********************************************************************/
   /*                   Begin DistDocumentTable proper                   */
   /**********************************************************************/
@@ -123,19 +75,19 @@ abstract class DistDocumentTable[CoordType : Serializer,
    * Num of documents with word-count information but not in table.
    */
   val num_documents_with_word_counts_but_not_in_table =
-    new TaskCounterWrapper("documents_with_word_counts_but_not_in_table")
+    new dstats.TaskCounterWrapper("documents_with_word_counts_but_not_in_table")
 
   /**
    * Num of documents with word-count information (whether or not in table).
    */
   val num_documents_with_word_counts =
-    new TaskCounterWrapper("documents_with_word_counts")
+    new dstats.TaskCounterWrapper("documents_with_word_counts")
 
   /** 
    * Num of documents in each split with word-count information seen.
    */
   val num_word_count_documents_by_split =
-    countermap("word_count_documents_by_split")
+    dstats.countermap("word_count_documents_by_split")
 
   /**
    * Num of documents in each split with a computed distribution.
@@ -143,19 +95,19 @@ abstract class DistDocumentTable[CoordType : Serializer,
    * documents in either the test or dev set depending on which one is used.)
    */
   val num_dist_documents_by_split =
-    countermap("num_dist_documents_by_split")
+    dstats.countermap("num_dist_documents_by_split")
 
   /**
    * Total # of word tokens for all documents in each split.
    */
   val word_tokens_by_split =
-    countermap("word_tokens_by_split")
+    dstats.countermap("word_tokens_by_split")
 
   /**
    * Total # of incoming links for all documents in each split.
    */
   val incoming_links_by_split =
-    countermap("incoming_links_by_split")
+    dstats.countermap("incoming_links_by_split")
 
   /**
    * Map from short name (lowercased) to list of documents.
@@ -184,6 +136,9 @@ abstract class DistDocumentTable[CoordType : Serializer,
    */
   val lower_name_to_documents = bufmap[String, DocumentType]()
 
+  /**
+   * Schema 
+   */
   /**
    * Look up a document named NAME and return the associated document.
    * Note that document names are case-sensitive but the first letter needs to
@@ -242,36 +197,88 @@ abstract class DistDocumentTable[CoordType : Serializer,
     }
   }
 
-  def create_document(params: Map[String, String]): DocumentType
+  def create_document(fieldvals: Map[String, String],
+    schema: Seq[String]): DocumentType
 
   def would_add_document_to_list(doc: DocumentType) = {
-    if (doc.namespace != "Main")
+    if ((doc.params contains "namespace") && doc.params("namespace") != "Main")
       false
     else if (doc.redir.length > 0)
       false
     else doc.optcoord != None
   }
 
-  def read_document_data(filehand: FileHandler, filename: String,
-      cell_grid: CellGrid[CoordType,DocumentType,_]) {
+  /**
+   * A file processor that reads corpora containing document metadata,
+   * creates a DistDocument for each document described, and adds it to
+   * this document table.
+   *
+   * @param schema fields of the document-data files, as determined from
+   *   a schema file
+   * @param filter Regular expression used to select document-data files in
+   *   a directory
+   * @param cell_grid Cell grid to add newly created DistDocuments to
+   */
+  class DistDocumentFileProcessor(
+    schema: Seq[String], filter: Regex,
+    cell_grid: CellGrid[CoordType,DocumentType,_]
+  ) extends GeoDocumentFileProcessor(schema, dstats) {
+    /**
+     * List of documents that are Wikipedia redirect articles.
+     */
     val redirects = mutable.Buffer[DocumentType]()
 
-    def process(params: Map[String, String]) {
-      val doc = create_document(params)
-      if (doc.namespace != "Main")
-        return
+    def handle_document(fieldvals: Map[String, String]) = {
+      val doc = create_document(fieldvals, schema)
       if (doc.redir.length > 0)
         redirects += doc
       else if (doc.optcoord != None) {
         record_document(doc, doc)
         cell_grid.add_document_to_cell(doc)
       }
+      true
     }
 
-    GeoDocumentData.read_document_file[CoordType](filehand, filename, process,
-      maxtime = Params.max_time_per_stage)
+    def process_lines(lines: Iterator[String],
+        filehand: FileHandler, file: String,
+        compression: String, realname: String) = {
+      val task = new MeteredTask("document", "reading")
+      var broken = false
+      for (line <- lines if !broken) {
+        parse_row(line)
+        if (task.item_processed(maxtime = Params.max_time_per_stage))
+          broken = true
+      }
+      task.finish()
+      output_resource_usage()
+      !broken
+    }
 
-    for (x <- redirects) {
+    override def filter_dir_files(filehand: FileHandler, dir: String,
+        files: Iterable[String]) = {
+      for (file <- files if filter.findFirstMatchIn(file) != None) yield file
+    }
+  }
+
+  /**
+   * Read the document data from the given corpus.  Documents listed in
+   * the document-data file(s) are created, listed in this table,
+   * and added to the cell grid corresponding to the table.
+   *
+   * @param filehand The FileHandler for working with the file.
+   * @param dir Directory containing the corpus.
+   * @param cell_grid Cell grid into which the documents are added.
+   */
+  def read_document_data(filehand: FileHandler, dir: String,
+      cell_grid: CellGrid[CoordType,DocumentType,_]) {
+
+    val schema = GeoDocument.read_schema_from_corpus(filehand, dir)
+
+    val distproc =
+      new DistDocumentFileProcessor(schema,
+        """-document-metadata\.txt(\.[a-zA-Z0-9]+)?$""".r, cell_grid)
+    distproc.process_files(filehand, Seq(dir))
+    for (x <- distproc.redirects) {
       val reddoc = lookup_document(x.redir)
       if (reddoc != null)
         record_document(x, reddoc)
@@ -356,8 +363,9 @@ abstract class DistDocumentTable[CoordType : Serializer,
  * a user), etc.
  */ 
 abstract class DistDocument[CoordType : Serializer](
-  params: Map[String, String]
-) extends GeoDocument[CoordType](params) with EvaluationDocument {
+  fieldvals: Map[String, String],
+  schema: Seq[String]
+) extends GeoDocument[CoordType](fieldvals, schema) with EvaluationDocument {
   /**
    * Object containing word distribution of this document.
    */
@@ -391,19 +399,21 @@ abstract class DistDocument[CoordType : Serializer](
   def distance_to_coord(coord2: CoordType): Double
 }
 
-class SphereDocument(params: Map[String, String]) extends
-    DistDocument[SphereCoord](params) {
+class SphereDocument(
+  fieldvals: Map[String, String],
+  schema: Seq[String]
+) extends DistDocument[SphereCoord](fieldvals, schema) {
   def distance_to_coord(coord2: SphereCoord) = spheredist(coord, coord2)
   def degree_distance_to_coord(coord2: SphereCoord) = degree_dist(coord, coord2)
 }
 
 class SphereDocumentTable(
-  driver_stats: ExperimentDriverStats,
+  dstats: ExperimentDriverStats,
   word_dist_factory: WordDistFactory
 ) extends DistDocumentTable[SphereCoord, SphereDocument](
-  driver_stats, word_dist_factory
+  dstats, word_dist_factory
 ) {
-  def create_document(params: Map[String, String]) =
-    new SphereDocument(params)
+  def create_document(fieldvals: Map[String, String], schema: Seq[String]) =
+    new SphereDocument(fieldvals, schema)
 }
 

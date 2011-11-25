@@ -320,6 +320,56 @@ package object experiment {
      */
     def get_counter(name: String) = do_get_counter(name)
 
+    def construct_task_counter_name(name: String) =
+      "bytask." + get_task_id + "." + name
+
+    def increment_task_counter(name: String, byvalue: Long = 1) {
+      increment_local_counter(construct_task_counter_name(name), byvalue)
+    }
+
+    def get_task_counter(name: String) = {
+      get_local_counter(construct_task_counter_name(name))
+    }
+
+    /**
+     * A mechanism for wrapping task counters so that they can be stored
+     * in variables and incremented simply using +=.  Note that access to
+     * them still needs to go through `value`, unfortunately. (Even marking
+     * `value` as implicit isn't enough as the function won't get invoked
+     * unless we're in an environment requiring an integral value.  This means
+     * it won't get invoked in print statements, variable assignments, etc.)
+     *
+     * It would be nice to move this elsewhere; we'd have to pass in
+     * `driver_stats`, though.
+     *
+     * NOTE: The counters are task-specific because currently each task
+     * reads the entire set of training documents into memory.  We could avoid
+     * this by splitting the tasks so that each task is commissioned to
+     * run over a specific portion of the Earth rather than a specific
+     * set of test documents.  Note that if we further split things so that
+     * each task handled both a portion of test documents and a portion of
+     * the Earth, it would be somewhat trickier, depending on exactly how
+     * we write the code -- for a given set of test documents, different
+     * portions of the Earth would be reading in different training documents,
+     * so we'd presumably want their counts to add; but we might not want
+     * all counts to add.
+     */
+
+    class TaskCounterWrapper(name: String) {
+      def value = get_task_counter(name)
+
+      def +=(incr: Long) {
+        increment_task_counter(name, incr)
+      }
+    }
+
+    def create_counter_wrapper(prefix: String, split: String) =
+      new TaskCounterWrapper(prefix + "." + split)
+
+    def countermap(prefix: String) =
+      new SettingDefaultHashMap[String, TaskCounterWrapper](
+        create_counter_wrapper(prefix, _))
+
     /******************* Override/implement below this line **************/
 
     /**

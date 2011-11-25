@@ -9,7 +9,10 @@ Return arguments to use for running on CORPUS, a text corpus.
 
 Currently recognized:
 
-wikipedia         Run on Wikipedia.
+wikipedia         Run on Wikipedia (same as enwiki-20100905).
+enwiki-20100905   Run on English Wikipedia dump from September 5, 2010.
+enwiki-20111007   Run on English Wikipedia dump from October 7, 2011.
+enwiki-*          Run on some other English Wikipedia dump.
 twitter           Run on the GeoText twitter corpus.
 twitter-wiki      Run on a combination of both of the above corpora.
 
@@ -56,13 +59,34 @@ fi
 
 geotext_output_dir="$TG_TWITTER_DIR/output-$docthresh-docthresh"
 geotext_prefix="$geotext_output_dir/geotext-twitter"
-twitter_args="--document-file $geotext_prefix-combined-document-data.txt.bz2 --counts-file $geotext_prefix-counts-only-coord-documents.txt.bz2"
-wikipedia_args="--document-file $IN_COMBINED_DOCUMENT_DATA_FILE \
-  --counts-file $IN_COORD_COUNTS_FILE"
+wikipedia_args="--document-file $IN_COMBINED_DOCUMENT_DATA_FILE --counts-file $IN_COORD_COUNTS_FILE"
 
-case "$1" in
-  wikipedia ) echo $wikipedia_args ;;
-  twitter ) echo $twitter_args ;;
-  twitter-wiki ) echo $wikipedia_args $twitter_args ;;
-  * ) echo "Unrecognized corpus type: $1"; echo ""; help; exit 1 ;;
-esac
+output_args() {
+  case "$1" in
+    #wikipedia )
+    #  echo --document-file $IN_COMBINED_DOCUMENT_DATA_FILE \
+    #       --counts-file $IN_COORD_COUNTS_FILE ;;
+    wikipedia )
+      # Use the default version (usually enwiki-20100905)
+      echo --document-file $WP_VERSION_DIR \
+           --counts-file $IN_COORD_COUNTS_FILE ;;
+    enwiki-* )
+      set_wp_version "$1"
+      echo --document-file $WP_VERSION_DIR \
+           --counts-file $IN_COORD_COUNTS_FILE ;;
+    #twitter )
+    #  echo --document-file $geotext_prefix-combined-document-data.txt.bz2 \
+    #       --counts-file $geotext_prefix-counts-only-coord-documents.txt.bz2 ;;
+    twitter )
+      echo --document-file $geotext_output_dir \
+           --counts-file $geotext_prefix-counts-only-coord-documents.txt.bz2 ;;
+    twitter-wiki )
+      output_args wikipedia; output_args twitter ;;
+    * )
+      echo "Unrecognized corpus type: $1"; echo ""; help; exit 1 ;;
+  esac
+}
+
+for x in ${1+"$@"}; do
+  output_args "$x"
+done

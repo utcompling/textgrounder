@@ -21,9 +21,8 @@ import util.control.Breaks._
 import java.io._
 
 import opennlp.textgrounder.util.distances._
-import opennlp.textgrounder.util.ioutil.FileHandler
-import opennlp.textgrounder.util.MeteredTask
-import opennlp.textgrounder.util.osutil.output_resource_usage
+import opennlp.textgrounder.util.experiment.ExperimentDriverStats
+import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.Serializer
 
@@ -33,88 +32,142 @@ import GeolocateDriver.Debug._
 //                                  Main code                               //
 /////////////////////////////////////////////////////////////////////////////
 
+case class DocumentValidationException(
+  message: String
+) extends Exception(message) { }
+
+/**
+ * A file processor that reads corpora containing document metadata,
+ * creates a DistDocument for each document described, and adds it to
+ * this document table.
+ *
+ * @param schema fields of the document-data files, as determined from
+ *   a schema file
+ * @param filter Regular expression used to select document-data files in
+ *   a directory
+ * @param cell_grid Cell grid to add newly created DistDocuments to
+ */
+abstract class GeoDocumentFileProcessor(
+  schema: Seq[String],
+  val dstats: ExperimentDriverStats
+) extends FieldTextFileProcessor(schema) {
+
+  /******** Counters to track what's going on ********/
+
+  var shortfile: String = _
+
+  def get_shortfile = shortfile
+
+  def filename_to_counter_name(filehand: FileHandler, file: String) = {
+    var (_, base) = filehand.split_filename(file)
+    breakable {
+      while (true) {
+        val newbase = """\.[a-z0-9]*$""".r.replaceAllIn(base, "")
+        if (newbase == base) break
+        base = newbase
+      }
+    }
+    """[^a-zA-Z0-9]""".r.replaceAllIn(base, "_") 
+  }
+
+  def get_file_counter_name(counter: String) =
+    "byfile." + get_shortfile + "." + counter
+
+  def increment_counter(counter: String, value: Long = 1) {
+    val file_counter = get_file_counter_name(counter)
+    dstats.increment_task_counter(file_counter, value)
+    dstats.increment_task_counter(counter, value)
+    dstats.increment_local_counter(file_counter, value)
+    dstats.increment_local_counter(counter, value)
+  }
+
+  def increment_document_counter(counter: String) {
+    increment_counter(counter)
+    increment_counter("documents.total")
+  }
+
+  /******** Main code ********/
+
+  /**
+   * Handle (e.g. create and record) a document based on the given `fieldvals`.
+   * Return true if a document was actually processed to completion (e.g.
+   * created and recorded), false if skipped.  If an error occurs due to
+   * invalid values, it should be caught and re-thrown as a
+   * DocumentValidationException, listing the field and value as well as the
+   * error.
+   */
+  def handle_document(fieldvals: Map[String,String]): Boolean
+
+  override def handle_bad_row(line: String, fieldvals: Seq[String]) {
+    increment_document_counter("documents.bad")
+    super.handle_bad_row(line, fieldvals)
+  }
+
+  def process_row(fieldvals: Map[String,String]): Boolean = {
+    // FIXME! This is ugly as hell.  This Wikipedia-specific stuff should
+    // either be moved elsewhere, or more likely, we should filter the
+    // document-data file when we generate it, to remove stuff not in the
+    // Main namespace.  Furthermore, the same logic here is duplicated in
+    // would_add_document_to_list() in DistDocumentTable, which also
+    // contains a special case for redirect documents.  It really seems that
+    // we should create a WikipediaDocument trait to encapsulate this stuff.
+    if ((fieldvals contains "namespace") &&
+        fieldvals("namespace") != "Main") {
+      errprint("Skipped document %s, namespace %s is not Main",
+        fieldvals.getOrElse("title", "unknown title??"), fieldvals("namespace"))
+      increment_document_counter("documents.skipped")
+      return true
+    } else {
+      val was_accepted =
+        try { handle_document(fieldvals) }
+        catch {
+          case DocumentValidationException(msg) => {
+            warning("Line %s: %s", num_processed + 1, msg)
+            return false
+          }
+        }
+      if (was_accepted)
+        increment_document_counter("documents.accepted")
+      else {
+        errprint("Skipped document %s",
+          fieldvals.getOrElse("title", "unknown title??"))
+        increment_document_counter("documents.skipped")
+      }
+      return true
+    }
+  }
+
+  override def begin_process_file(filehand: FileHandler, file: String) {
+    shortfile = filename_to_counter_name(filehand, file)
+    errprint("File: %s, shortfile: %s", file, shortfile)
+    super.begin_process_file(filehand, file)
+  }
+
+  override def end_process_file(filehand: FileHandler, file: String) {
+    def note(counter: String, english: String) {
+      val file_counter = get_file_counter_name(counter)
+      val value = dstats.get_task_counter(file_counter)
+      errprint("Number of %s for file %s: %s", english, file,
+        value)
+    }
+
+    note("documents.accepted", "documents accepted")
+    note("documents.skipped", "documents skipped")
+    note("documents.bad", "bad documents")
+    note("documents.total", "total documents")
+    super.end_process_file(filehand, file)
+  }
+}
+
 class GeoDocumentWriter[CoordType : Serializer](outfile: PrintStream,
     outfields: Seq[String]) {
-  def output_header() {
-    outfile.println(outfields mkString "\t")
-  }
-  
   def output_row(doc: GeoDocument[CoordType]) {
     outfile.println(doc.get_fields(outfields) mkString "\t")    
   }
-}
 
-class GeoDocumentReader[CoordType : Serializer](infields: Seq[String]) {
-  var num_processed = 0
-  def process_row(line: String, process: Map[String,String] => Unit,
-      line_number: Int = -1) {
-    val lineno = if (line_number < 0) num_processed + 1 else line_number
-    // println("[%s]" format line)
-    val fieldvals = line.split("\t", -1)
-    if (fieldvals.length != infields.length)
-      warning(
-      """Strange record at line #%s, expected %s fields, saw %s fields;
-      skipping line=%s""", lineno, infields.length, fieldvals.length, line)
-    else {
-      var good = true
-      for ((field, value) <- infields zip fieldvals) {
-        if (!GeoDocument.validate_field[CoordType](field, value)) {
-          good = false
-          warning(
-      """Bad field value at line #%s, field=%s, value=%s,
-      skipping line=%s""", lineno, field, value, line)
-        }
-      }
-      if (good)
-        process((infields zip fieldvals).toMap)
-    }
-    num_processed += 1
-  }
-}
-
-object GeoDocumentData {
-  val combined_document_data_outfields = List("id", "title", "split", "redir",
-      "namespace", "is_list_of", "is_disambig", "is_list", "coord",
-      "incoming_links")
-
-  /** Read in the document data file.  Call `process` on each document.
-   *
-   * @param filehand File handler for the file.
-   * @param filename Name of the file to read in.
-   * @param process Function to be called for each document.
-   * @param A value in seconds, which limits the total processing time
-   *   (real time, not CPU time) used for reading in the file, for
-   *   testing purposes.
-   */
-  def read_document_file[CoordType : Serializer](filehand: FileHandler, filename: String,
-      process: Map[String,String] => Unit, maxtime: Double = 0.0) = {
-    errprint("Reading document data from %s...", filename)
-    val task = new MeteredTask("document", "reading")
-
-    val fi = filehand.openr(filename)
-
-    val fields = fi.next().split("\t", -1)
-    val reader = new GeoDocumentReader[CoordType](fields)
-    breakable {
-      for (line <- fi) {
-        // If we've processed no documents so far, we're on line 2
-        // because line 1 is the header.
-        reader.process_row(line, process, task.num_processed + 2)
-        if (task.item_processed(maxtime = maxtime))
-          break
-      }
-    }
-    task.finish()
-    output_resource_usage()
-    fields
-  }
-
-  def write_document_file[CoordType : Serializer](outfile: PrintStream, outfields: Seq[String],
-      documents: Iterable[GeoDocument[CoordType]]) {
-    val writer = new GeoDocumentWriter[CoordType](outfile, outfields)
-    writer.output_header()
+  def output_documents(documents: Iterable[GeoDocument[CoordType]]) {
     for (doc <- documents)
-      writer.output_row(doc)
+      output_row(doc)
     outfile.close()
   }
 }
@@ -122,63 +175,83 @@ object GeoDocumentData {
 /** A document for the purpose of geolocation.  The fields available
  * depend on the source of the document (e.g. Wikipedia, etc.).
  *
- * Defined fields:
+ * Defined general fields:
  *
- * title: Title of document.
+ * corpus: Corpus of the document.
+ * title: Title of document.  The combination of (corpus, title) needs to
+ *   uniquely identify a document.
  * id: ID of document, as an int.
  * coord: Coordinates of document.
- * incoming_links: Number of incoming links, or None if unknown.
  * split: Split of document ("training", "dev", "test")
+ * 
+ * Defined fields for Wikipedia (FIXME, create a Wikipedia subclass for these):
+ *
+ * incoming_links: Number of incoming links, or None if unknown.
  * redir: If this is a redirect, document title that it redirects to; else
  *          an empty string.
+ *
+ * Other Wikipedia params (we pay attention to "namespace" if present):
+ *
  * namespace: Namespace of document (e.g. "Main", "Wikipedia", "File")
  * is_list_of: Whether document title is "List of *"
  * is_disambig: Whether document is a disambiguation page.
  * is_list: Whether document is a list of any type ("List of *", disambig,
  *          or in Category or Book namespaces)
  */
-abstract class GeoDocument[CoordType : Serializer](params: Map[String,String]) {
-  var title = "unknown"
-  var id = 0
+abstract class GeoDocument[CoordType : Serializer](
+  fieldvals: Map[String,String],
+  val schema: Seq[String]
+) {
+  // Fixed fields
+  var corpus = ""
+  var title = ""
+  var id = ""
   var optcoord: Option[CoordType] = None
   def coord = optcoord.get
+  var split = ""
+
+  // Wikipedia-specific fields that we reference commonly (FIXME, make a
+  // Wikipedia-specific subclass)
   var incoming_links: Option[Int] = None
-  var split = "unknown"
   var redir = ""
-  var namespace = "Main"
-  var is_list_of = false
-  var is_disambig = false
-  var is_list = false
+
   import GeoDocument._, GeoDocumentConverters._
 
-  for ((name, v) <- params) {
-    name match {
-      case "id" => id = v.toInt
-      case "title" => title = v
-      case "split" => split = v
-      case "redir" => redir = v
-      case "namespace" => namespace = v
-      case "is_list_of" => is_list_of = yesno_to_boolean(v)
-      case "is_disambig" => is_disambig = yesno_to_boolean(v)
-      case "is_list" => is_list = yesno_to_boolean(v)
-      case "coord" => optcoord = get_x_or_blank[CoordType](v)
-      case "incoming_links" => incoming_links = get_int_or_blank(v)
+  val params =
+    (for ((name, v) <- fieldvals) yield {
+      try {
+        name match {
+          case "corpus" => corpus = v; Nil
+          case "title" => title = v; Nil
+          case "id" => id = v; Nil
+          case "split" => split = v; Nil
+          case "coord" => optcoord = get_x_or_blank[CoordType](v); Nil
+          // Wikipedia-specific:
+          case "redir" => redir = v; Nil
+          case "incoming_links" => incoming_links = get_int_or_blank(v); Nil
+          case _ => List(name -> v)
+        }
+      } catch {
+        case e@_ => {
+          val msg =
+            "Bad value %s for field '%s': %s" format (v, name, e.toString)
+          throw DocumentValidationException(msg)
+        }
       }
-  }
+    }).flatten.toMap
 
   def get_fields(fields: Traversable[String]) = {
     for (field <- fields) yield {
       field match {
-        case "id" => id.toString
+        case "corpus" => corpus
         case "title" => title
+        case "id" => id
         case "split" => split
-        case "redir" => redir
-        case "namespace" => namespace
-        case "is_list_of" => boolean_to_yesno(is_list_of)
-        case "is_disambig" => boolean_to_yesno(is_disambig)
-        case "is_list" => boolean_to_yesno(is_list)
         case "coord" => put_x_or_blank[CoordType](optcoord)
+          // Wikipedia-specific:
+        case "redir" => redir
         case "incoming_links" => put_int_or_blank(incoming_links)
+        case _ => params(field)
       }
     }
   }
@@ -187,13 +260,53 @@ abstract class GeoDocument[CoordType : Serializer](params: Map[String,String]) {
     val coordstr = if (optcoord != None) " at %s".format(coord) else ""
     val redirstr =
       if (redir.length > 0) ", redirect to %s".format(redir) else ""
-    "%s(%s)%s%s".format(title, id, coordstr, redirstr)
+    var corpusstr = if (corpus.length > 0) "%s/".format(corpus) else ""
+    "%s%s(%s)%s%s, params=%s".format(corpusstr, title, id, coordstr,
+      redirstr, params)
   }
 
- def adjusted_incoming_links = adjust_incoming_links(incoming_links)
+  def adjusted_incoming_links = adjust_incoming_links(incoming_links)
 }
 
 object GeoDocument {
+  val fixed_fields = Seq("corpus", "title", "id", "split", "coord")
+  val wikipedia_fields = Seq("incoming_links", "redir")
+
+  def find_schema_file(filehand: FileHandler, dir: String) = {
+    val schema_regex = """-schema\.txt(\.[a-zA-Z0-9]+)?$""".r
+    val all_files = filehand.list_files(dir)
+    val files =
+      (for (file <- all_files
+        if schema_regex.findFirstMatchIn(file) != None) yield file).toSeq
+    if (files.length == 0)
+      throw new IllegalStateException(
+        "Found no schema files (*-schema.txt) in directory %s" format dir)
+    if (files.length > 1)
+      throw new IllegalStateException(
+        "Found multiple schema files (*-schema.txt) in directory %s: %s".
+        format(dir, files))
+    files(0)
+  }
+
+  def read_schema_file(filehand: FileHandler, schema_file: String) = {
+    val lines = filehand.openr(schema_file).toList
+    if (lines.length != 1)
+      throw new IllegalStateException(
+        "Schema file %s should have one line in it but actually has %s lines".
+        format(schema_file, lines.length))
+    val schema = lines(0).split("\t", -1)
+    for (field <- schema if field.length == 0)
+      throw new IllegalStateException(
+        "Blank field name in schema file %s: fields are %s".
+        format(schema_file, schema))
+    schema
+  }
+
+  def read_schema_from_corpus(filehand: FileHandler, dir: String) = {
+    val schema_file = find_schema_file(filehand, dir)
+    read_schema_file(filehand, schema_file)
+  }
+
   /**
    * Compute the short form of a document name.  If short form includes a
    * division (e.g. "Tucson, Arizona"), return a tuple (SHORTFORM, DIVISION);
@@ -231,23 +344,6 @@ object GeoDocument {
       }
     ail
   }
-
-  def validate_field[CoordType : Serializer](field: String, value: String) = {
-    import GeoDocumentConverters._
-    field match {
-      case "id" => validate_int(value)
-      case "title" => true
-      case "split" => true
-      case "redir" => true
-      case "namespace" => true
-      case "is_list_of" => validate_boolean(value)
-      case "is_disambig" => validate_boolean(value)
-      case "is_list" => validate_boolean(value)
-      case "coord" => validate_x_or_blank[CoordType](value)
-      case "incoming_links" => validate_int_or_blank(value)
-      case _ => false
-    }
-  }
 }
 
 /************************ Conversion functions ************************/
@@ -263,7 +359,6 @@ object GeoDocumentConverters {
     }
   }
   def boolean_to_yesno(foo: Boolean) = if (foo) "yes" else "no"
-  def validate_boolean(foo: String) = foo == "yes" || foo == "no"
   
   def get_int_or_blank(foo: String) =
     if (foo == "") None else Option[Int](foo.toInt)
@@ -272,18 +367,6 @@ object GeoDocumentConverters {
       case None => ""
       case Some(x) => x.toString
     }
-  }
-  def validate_int(foo: String) = {
-    try {
-      foo.toInt
-      true
-    } catch {
-      case _ => false
-    }
-  }
-  def validate_int_or_blank(foo: String) = {
-    if (foo == "") true
-    else validate_int(foo)
   }
 
   /**
@@ -309,9 +392,5 @@ object GeoDocumentConverters {
       case None => ""
       case Some(x) => implicitly[Serializer[T]].serialize(x)
     }
-  }
-  def validate_x_or_blank[T : Serializer](foo: String) = {
-    if (foo == "") true
-    else implicitly[Serializer[T]].validate_serialized_form(foo)
   }
 }
