@@ -278,7 +278,7 @@ package object collectionutil {
    can reuse a Dynamic Array multiple times without constantly creating
    new objects.  Also has specialization.
    */
-  class DynamicArray[@specialized T:ClassManifest](initial_alloc:Int = 8) {
+  class DynamicArray[@specialized T: ClassManifest](initial_alloc: Int = 8) {
     protected val multiply_factor = 1.5
     var array = new Array[T](initial_alloc)
     var length = 0
@@ -287,7 +287,9 @@ package object collectionutil {
         var newsize = array.length
         while (newsize < size)
           newsize = (newsize * multiply_factor).toInt
-        array = new Array[T](newsize)
+        val newarray = new Array[T](newsize)
+        System.arraycopy(array, 0, newarray, 0, length)
+        array = newarray
       }
     }
 
