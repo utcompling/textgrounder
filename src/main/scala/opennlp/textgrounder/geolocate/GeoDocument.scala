@@ -37,15 +37,11 @@ case class DocumentValidationException(
 ) extends Exception(message) { }
 
 /**
- * A file processor that reads corpora containing document metadata,
- * creates a DistDocument for each document described, and adds it to
- * this document table.
+ * A file processor that reads document files from a corpora.
  *
- * @param schema fields of the document-data files, as determined from
+ * @param schema list of fields in the document files, as determined from
  *   a schema file
- * @param filter Regular expression used to select document-data files in
- *   a directory
- * @param cell_grid Cell grid to add newly created DistDocuments to
+ * @param dstats ExperimentDriverStats used for 
  */
 abstract class GeoDocumentFileProcessor(
   schema: Seq[String],
@@ -159,16 +155,11 @@ abstract class GeoDocumentFileProcessor(
   }
 }
 
-class GeoDocumentWriter[CoordType : Serializer](outfile: PrintStream,
-    outfields: Seq[String]) {
-  def output_row(doc: GeoDocument[CoordType]) {
-    outfile.println(doc.get_fields(outfields) mkString "\t")    
-  }
-
-  def output_documents(documents: Iterable[GeoDocument[CoordType]]) {
-    for (doc <- documents)
-      output_row(doc)
-    outfile.close()
+class GeoDocumentWriter[CoordType : Serializer](
+  schema: Seq[String]
+) extends FieldTextWriter(schema) {
+  def output_document(outstream: PrintStream, doc: GeoDocument[CoordType]) {
+    output_row(outstream, doc.get_fields(schema))
   }
 }
 
@@ -240,7 +231,7 @@ abstract class GeoDocument[CoordType : Serializer](
       }
     }).flatten.toMap
 
-  def get_fields(fields: Traversable[String]) = {
+  def get_fields(fields: Iterable[String]) = {
     for (field <- fields) yield {
       field match {
         case "corpus" => corpus
@@ -269,11 +260,20 @@ abstract class GeoDocument[CoordType : Serializer](
 }
 
 object GeoDocument {
-  val fixed_fields = Seq("corpus", "title", "id", "split", "coord")
-  val wikipedia_fields = Seq("incoming_links", "redir")
+  val possible_compression_re = """(\.[a-zA-Z0-9]+)?$"""
+  def make_suffix_regex(suffix: String) = {
+    val re_quoted_suffix = suffix.replace(".", """\.""")
+    (re_quoted_suffix + possible_compression_re).r
+  }
+  val schema_regex = make_suffix_regex("-schema.txt")
+  val document_metadata_regex = make_suffix_regex("-document-metadata.txt")
+  val counts_regex = make_suffix_regex("-counts.txt")
+  val text_regex = make_suffix_regex("-text.txt")
+
+  // val fixed_fields = Seq("corpus", "title", "id", "split", "coord")
+  // val wikipedia_fields = Seq("incoming_links", "redir")
 
   def find_schema_file(filehand: FileHandler, dir: String) = {
-    val schema_regex = """-schema\.txt(\.[a-zA-Z0-9]+)?$""".r
     val all_files = filehand.list_files(dir)
     val files =
       (for (file <- all_files
@@ -288,23 +288,9 @@ object GeoDocument {
     files(0)
   }
 
-  def read_schema_file(filehand: FileHandler, schema_file: String) = {
-    val lines = filehand.openr(schema_file).toList
-    if (lines.length != 1)
-      throw new IllegalStateException(
-        "Schema file %s should have one line in it but actually has %s lines".
-        format(schema_file, lines.length))
-    val schema = lines(0).split("\t", -1)
-    for (field <- schema if field.length == 0)
-      throw new IllegalStateException(
-        "Blank field name in schema file %s: fields are %s".
-        format(schema_file, schema))
-    schema
-  }
-
   def read_schema_from_corpus(filehand: FileHandler, dir: String) = {
     val schema_file = find_schema_file(filehand, dir)
-    read_schema_file(filehand, schema_file)
+    FieldTextFileProcessor.read_schema_file(filehand, schema_file)
   }
 
   /**

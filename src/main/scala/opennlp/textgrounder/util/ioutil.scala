@@ -876,6 +876,43 @@ package object ioutil {
        TextFileProcessor. */
   }
 
+  object FieldTextFileProcessor {
+    def read_schema_file(filehand: FileHandler, schema_file: String,
+        split_re: String = "\t") = {
+      val lines = filehand.openr(schema_file).toList
+      if (lines.length != 1)
+        throw new IllegalStateException(
+          "Schema file %s should have one line in it but actually has %s lines".
+          format(schema_file, lines.length))
+      val schema = lines(0).split(split_re, -1)
+      for (field <- schema if field.length == 0)
+        throw new IllegalStateException(
+          "Blank field name in schema file %s: fields are %s".
+          format(schema_file, schema))
+      schema
+    }
+  }
+
+  class FieldTextWriter(
+    schema: Seq[String],
+    split_text: String = "\t"
+  ) {
+    def output_schema(outstream: PrintStream) {
+      outstream.println(schema mkString split_text)
+    }
+
+    def output_row(outstream: PrintStream, fieldvals: Iterable[String]) {
+      val seqvals = fieldvals.toSeq
+      assert(seqvals.length == schema.length)
+      outstream.println(seqvals mkString split_text)
+    }
+
+    def output_row(outstream: PrintStream, fieldvals: Map[String, String]) {
+      val values = for (field <- schema) yield fieldvals(field)
+      output_row(outstream, values)
+    }
+  }
+
   ////////////////////////////////////////////////////////////////////////////
   //                             File Splitting                             //
   ////////////////////////////////////////////////////////////////////////////

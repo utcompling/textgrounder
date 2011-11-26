@@ -276,7 +276,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
 
     val distproc =
       new DistDocumentFileProcessor(schema,
-        """-document-metadata\.txt(\.[a-zA-Z0-9]+)?$""".r, cell_grid)
+        GeoDocument.document_metadata_regex, cell_grid)
     distproc.process_files(filehand, Seq(dir))
     for (x <- distproc.redirects) {
       val reddoc = lookup_document(x.redir)
