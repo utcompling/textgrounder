@@ -207,7 +207,6 @@ trait UnigramWordDistReader extends WordDistReader {
   val values_dynarr =
     new DynamicArray[Int](initial_alloc = initial_dynarr_size)
 
-  var num_word_tokens = 0
   var title: String = _
 
   // This is basically one-off debug code (used when debug("wordcountdocs"))
@@ -245,7 +244,7 @@ trait UnigramWordDistReader extends WordDistReader {
     breakable {
       for (line <- filehand.openr(filename)) {
         if (line.startsWith("Article title: ")) {
-          if (title != null && num_word_tokens > 0) {
+          if (title != null) {
             if (!handle_one_document(table, title))
               break
           }
@@ -257,7 +256,6 @@ trait UnigramWordDistReader extends WordDistReader {
           }
           keys_dynarr.clear()
           values_dynarr.clear()
-          num_word_tokens = 0
         } else if (line.startsWith("Article coordinates) ") ||
           line.startsWith("Article ID: "))
           ()
@@ -270,7 +268,6 @@ trait UnigramWordDistReader extends WordDistReader {
               val count = xcount.toInt
               if (!(stopwords contains word) ||
                 Params.include_stopwords_in_document_dists) {
-                num_word_tokens += count
                 keys_dynarr += memoize_word(word)
                 values_dynarr += count
               }
@@ -290,35 +287,30 @@ trait UnigramWordDistReader extends WordDistReader {
 
   def set_word_dist(doc: GenericDistDocument, is_training_set: Boolean,
       is_eval_set: Boolean) = {
-    if (num_word_tokens == 0)
-      false
-    else {
-      if (debug("wordcountdocs")) {
-        // First time through.
-        if (wordcountdocs_schema == null) {
-          wordcountdocs_schema_stream.println(doc.schema mkString "\t")
-          wordcountdocs_schema_stream.close()
-          wordcountdocs_schema = doc.schema
-          wordcountdocs_writer =
-            new GeoDocumentWriter[SphereCoord](wordcountdocs_stream,
-              doc.schema)
-        }
-        if (doc.schema != wordcountdocs_schema)
-          throw new IllegalStateException("Currently unable to handle documents with different schemas: Original schema %s, new schema %s".
-          format(wordcountdocs_schema, doc.schema))
-        wordcountdocs_writer.output_row(doc.asInstanceOf[SphereDocument])
+    if (debug("wordcountdocs")) {
+      // First time through.
+      if (wordcountdocs_schema == null) {
+        wordcountdocs_schema_stream.println(doc.schema mkString "\t")
+        wordcountdocs_schema_stream.close()
+        wordcountdocs_schema = doc.schema
+        wordcountdocs_writer = new GeoDocumentWriter[SphereCoord](doc.schema)
       }
-      // If we are evaluating on the dev set, skip the test set and vice
-      // versa, to save memory and avoid contaminating the results.
-      if (is_training_set || is_eval_set) {
-        // Now set the distribution on the document; but don't use the test
-        // set's distributions in computing global smoothing values and such.
-        set_unigram_word_dist(doc, keys_dynarr.array, values_dynarr.array,
-          keys_dynarr.length, note_globally = is_training_set)
-        true
-      }
-      else false
+      if (doc.schema != wordcountdocs_schema)
+        throw new IllegalStateException("Currently unable to handle documents with different schemas: Original schema %s, new schema %s".
+        format(wordcountdocs_schema, doc.schema))
+      wordcountdocs_writer.output_document(wordcountdocs_stream,
+        doc.asInstanceOf[SphereDocument])
     }
+    // If we are evaluating on the dev set, skip the test set and vice
+    // versa, to save memory and avoid contaminating the results.
+    if (is_training_set || is_eval_set) {
+      // Now set the distribution on the document; but don't use the test
+      // set's distributions in computing global smoothing values and such.
+      set_unigram_word_dist(doc, keys_dynarr.array, values_dynarr.array,
+        keys_dynarr.length, note_globally = is_training_set)
+      true
+    }
+    else false
   }
 
   def set_unigram_word_dist(doc: GenericDistDocument, keys: Array[Word],
