@@ -192,8 +192,11 @@ class MMCDocumentFileProcessor(
       filehand: FileHandler, file: String,
       compression: String, realname: String) = {
     val task = new MeteredTask("document", "reading")
-    for (line <- lines)
+    for (line <- lines) {
+      task.item_processed()
       parse_row(line)
+    }
+    task.finish()
     true
   }
 
@@ -260,7 +263,7 @@ counts file also containing the metadata.
 }
 
 object MergeMetadataAndOldCounts extends
-    ExperimentDriverApp("Convert Twitter Infochimps") {
+    ExperimentDriverApp("Merge document metadata files and old counts file") {
   type DriverType = MMCDriver
   def create_param_object(ap: ArgParser) = new ParamType(ap)
   def create_driver() = new DriverType
