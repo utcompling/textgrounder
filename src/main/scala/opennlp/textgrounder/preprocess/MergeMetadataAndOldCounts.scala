@@ -126,7 +126,7 @@ trait SimpleUnigramWordDistReader {
  */
 class MMCUnigramWordDistHandler(
   schema: Seq[String],
-  document_params: mutable.Map[String, Map[String, String]],
+  document_fieldvals: mutable.Map[String, Seq[String]],
   filehand: FileHandler,
   output_dir: String,
   output_file_prefix: String
@@ -137,18 +137,16 @@ class MMCUnigramWordDistHandler(
     compression = "bzip2")
  
   def output_schema_file() {
-    val schema_outstream = filehand.openw("%s-schema.txt" format full_prefix)
+    val schema_outstream =
+      filehand.openw("%s-counts-schema.txt" format full_prefix)
     writer.output_schema(schema_outstream)
     schema_outstream.close()
   }
 
-  def minimal_url_encode(word: String) =
-    word.replace("%", "%25").replace(":", "%3A")
-
   def handle_document(title: String, keys: Array[Word], values: Array[Int],
       num_words: Int) = {
     errprint("Handling document: %s", title)
-    val params = document_params.getOrElse(title, null)
+    val params = document_fieldvals.getOrElse(title, null)
     if (params == null)
       warning("Strange, can't find document %s in document file", title)
     else {
@@ -156,12 +154,18 @@ class MMCUnigramWordDistHandler(
         (for (i <- 0 until num_words) yield {
           // errprint("Saw2 %s,%s", keys(i), values(i))
           ("%s:%s" format
-            (minimal_url_encode(unmemoize_word(keys(i))), values(i)))}).
+            (GeoDocument.encode_word_for_counts_field(unmemoize_word(keys(i))),
+              values(i)))
+          }).
           mkString(" ")
-      val new_params = params + ("counts" -> counts)
+      val new_params = params ++ Seq(counts)
       writer.output_row(outstream, new_params)
     }
     true
+  }
+
+  def finish() {
+    outstream.close()
   }
 }
 
@@ -169,18 +173,18 @@ class MMCUnigramWordDistHandler(
  * A simple field-text file processor that just records the documents read in,
  * by title.
  *
- * @param schema fields of the document-data files, as determined from
+ * @param schema fields of the document metadata files, as determined from
  *   a schema file
- * @param filter Regular expression used to select document-data files in
- *   a directory
+ * @param filter Suffix used to select document metadata files in a directory
  */
 class MMCDocumentFileProcessor(
-  schema: Seq[String], filter: Regex
+  schema: Seq[String], suffix: String
 ) extends FieldTextFileProcessor(schema) {
-  val document_params = mutable.Map[String, Map[String, String]]()
+  val document_fieldvals = mutable.Map[String, Seq[String]]()
 
-  def process_row(fieldvals: Map[String, String]): Boolean = {
-    document_params(fieldvals("title")) = fieldvals
+  def process_row(fieldvals: Seq[String]): Boolean = {
+    val params = (schema zip fieldvals).toMap
+    document_fieldvals(params("title")) = fieldvals
     true
   }
 
@@ -195,6 +199,7 @@ class MMCDocumentFileProcessor(
 
   override def filter_dir_files(filehand: FileHandler, dir: String,
       files: Iterable[String]) = {
+    val filter = GeoDocument.make_document_file_suffix_regex(suffix)
     for (file <- files if filter.findFirstMatchIn(file) != None) yield file
   }
 }
@@ -206,12 +211,10 @@ class MMCDriver extends ArgParserExperimentDriver {
   val filehand = new LocalFileHandler
   
   def usage() {
-    sys.error("""Usage: MMC [-o OUTDIR | --outfile OUTDIR] [--output-stats] INFILE ...
+    sys.error("""Usage: MergeMetadataAndOldCounts [-o OUTDIR | --outfile OUTDIR] [--output-stats] INFILE ...
 
-Convert input files in the Infochimps Twitter corpus into files in the
-format expected by TextGrounder.  If --output-stats is given,
-output statistics to stderr rather than converting text.  Otherwise,
-store results in OUTDIR, which must not exist already.  
+Merge document-metadata files and old-style counts files into a new-style
+counts file also containing the metadata.
 """)
   }
 
@@ -221,9 +224,11 @@ store results in OUTDIR, which must not exist already.
     need(params.counts_file, "counts-file")
     if (params.output_file_prefix == null) {
       val schema_file = GeoDocument.find_schema_file(filehand,
-        params.input_dir)
+        params.input_dir, GeoDocument.document_metadata_suffix)
       var (_, base) = filehand.split_filename(schema_file)
       params.output_file_prefix = base.replaceAll("-[^-]*$", "")
+      params.output_file_prefix =
+        params.output_file_prefix.stripSuffix("-document-metadata")
       errprint("Settings new output-file prefix to '%s'",
         params.output_file_prefix)
     }
@@ -237,17 +242,20 @@ store results in OUTDIR, which must not exist already.
         params.output_dir)
 
     val schema =
-      GeoDocument.read_schema_from_corpus(filehand, params.input_dir)
+      GeoDocument.read_schema_from_corpus(filehand, params.input_dir,
+        GeoDocument.document_metadata_suffix)
 
     val fileproc =
-      new MMCDocumentFileProcessor(schema, GeoDocument.document_metadata_regex)
+      new MMCDocumentFileProcessor(schema,
+        GeoDocument.document_metadata_suffix)
     fileproc.process_files(filehand, Seq(params.input_dir))
 
     val counts_handler =
-      new MMCUnigramWordDistHandler(schema, fileproc.document_params,
+      new MMCUnigramWordDistHandler(schema, fileproc.document_fieldvals,
         filehand, params.output_dir, params.output_file_prefix)
     counts_handler.output_schema_file()
     counts_handler.read_word_counts(filehand, params.counts_file)
+    counts_handler.finish()
   }
 }
 

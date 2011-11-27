@@ -34,8 +34,7 @@ import GenericTypes._
  * This class implements a bigram version of the abstract factory for the
  * simple Good-Turing code in PseudoGoodTuringSmoothedWordDist.scala.
  */ 
-class PGTSmoothedBigramWordDistFactory extends
-    BigramWordDistFactory {
+class PGTSmoothedBigramWordDistFactory extends BigramWordDistFactory {
   // Total number of types seen once
   var total_num_types_seen_once = 0
 
@@ -89,12 +88,15 @@ class PGTSmoothedBigramWordDistFactory extends
                globally_unseen_word_prob + (overall_word_probs.values sum))
   }
 
-  def set_bigram_word_dist(doc: GenericDistDocument, keys: Array[Word],
-    values: Array[Int], num_words: Int, bigram_keys: Array[Word],
-    bigram_values: Array[Int], num_bigrams: Int, note_globally: Boolean) {
+  def set_bigram_word_dist(doc: GenericDistDocument,
+      keys: Array[Word], values: Array[Int], num_words: Int,
+      bigram_keys: Array[Word], bigram_values: Array[Int], num_bigrams: Int,
+      is_training_set: Boolean) = {
     doc.dist =
       new PGTSmoothedBigramWordDist(this, keys, values, num_words,
-        bigram_keys, bigram_values, num_bigrams, note_globally = note_globally)
+        bigram_keys, bigram_values, num_bigrams,
+        note_globally = is_training_set)
+    true
   }
   
   def create_word_dist() =

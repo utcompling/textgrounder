@@ -105,9 +105,10 @@ class PseudoGoodTuringSmoothedWordDistFactory extends
       note_globally = false)
 
   def set_unigram_word_dist(doc: GenericDistDocument, keys: Array[Word],
-      values: Array[Int], num_words: Int, note_globally: Boolean) {
+      values: Array[Int], num_words: Int, is_training_set: Boolean) = {
     doc.dist = new PseudoGoodTuringSmoothedWordDist(this, keys, values,
-      num_words, note_globally)
+      num_words, note_globally = is_training_set)
+    true
   }
 }
 

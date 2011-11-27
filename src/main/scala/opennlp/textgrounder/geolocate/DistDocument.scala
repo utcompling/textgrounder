@@ -34,8 +34,6 @@ import opennlp.textgrounder.util.printutil.errprint
 import opennlp.textgrounder.util.Serializer
 import opennlp.textgrounder.util.textutil.capfirst
 
-import GeolocateDriver.Params
-
 /////////////////////////////////////////////////////////////////////////////
 //                      Wikipedia/Twitter/etc. documents                   //
 /////////////////////////////////////////////////////////////////////////////
@@ -51,9 +49,7 @@ import GeolocateDriver.Params
  */
 abstract class DistDocumentTable[CoordType : Serializer,
   DocumentType <: DistDocument[CoordType]](
-  /* FIXME: The point of this parameter is so that we can use the counter
-     mechanism instead of our own statistics.  Implement this. */
-  val dstats: ExperimentDriverStats,
+  val driver: GeolocateDriver,
   val word_dist_factory: WordDistFactory
 ) {
   /**********************************************************************/
@@ -75,19 +71,19 @@ abstract class DistDocumentTable[CoordType : Serializer,
    * Num of documents with word-count information but not in table.
    */
   val num_documents_with_word_counts_but_not_in_table =
-    new dstats.TaskCounterWrapper("documents_with_word_counts_but_not_in_table")
+    new driver.TaskCounterWrapper("documents_with_word_counts_but_not_in_table")
 
   /**
    * Num of documents with word-count information (whether or not in table).
    */
   val num_documents_with_word_counts =
-    new dstats.TaskCounterWrapper("documents_with_word_counts")
+    new driver.TaskCounterWrapper("documents_with_word_counts")
 
   /** 
    * Num of documents in each split with word-count information seen.
    */
   val num_word_count_documents_by_split =
-    dstats.countermap("word_count_documents_by_split")
+    driver.countermap("word_count_documents_by_split")
 
   /**
    * Num of documents in each split with a computed distribution.
@@ -95,19 +91,19 @@ abstract class DistDocumentTable[CoordType : Serializer,
    * documents in either the test or dev set depending on which one is used.)
    */
   val num_dist_documents_by_split =
-    dstats.countermap("num_dist_documents_by_split")
+    driver.countermap("num_dist_documents_by_split")
 
   /**
    * Total # of word tokens for all documents in each split.
    */
   val word_tokens_by_split =
-    dstats.countermap("word_tokens_by_split")
+    driver.countermap("word_tokens_by_split")
 
   /**
    * Total # of incoming links for all documents in each split.
    */
   val incoming_links_by_split =
-    dstats.countermap("incoming_links_by_split")
+    driver.countermap("incoming_links_by_split")
 
   /**
    * Map from short name (lowercased) to list of documents.
@@ -197,8 +193,8 @@ abstract class DistDocumentTable[CoordType : Serializer,
     }
   }
 
-  def create_document(fieldvals: Map[String, String],
-    schema: Seq[String]): DocumentType
+  def create_document(schema: Seq[String], fieldvals: Seq[String]):
+      DocumentType
 
   def would_add_document_to_list(doc: DocumentType) = {
     if ((doc.params contains "namespace") && doc.params("namespace") != "Main")
@@ -215,21 +211,22 @@ abstract class DistDocumentTable[CoordType : Serializer,
    *
    * @param schema fields of the document-data files, as determined from
    *   a schema file
-   * @param filter Regular expression used to select document-data files in
-   *   a directory
+   * @param suffix Suffix specifying the type of document file wanted
+   *   (e.g. "-counts" or "-document-metadata"
    * @param cell_grid Cell grid to add newly created DistDocuments to
    */
   class DistDocumentFileProcessor(
-    schema: Seq[String], filter: Regex,
+    schema: Seq[String], suffix: String,
     cell_grid: CellGrid[CoordType,DocumentType,_]
-  ) extends GeoDocumentFileProcessor(schema, dstats) {
+  ) extends GeoDocumentFileProcessor(schema, driver) {
     /**
      * List of documents that are Wikipedia redirect articles.
      */
     val redirects = mutable.Buffer[DocumentType]()
 
-    def handle_document(fieldvals: Map[String, String]) = {
-      val doc = create_document(fieldvals, schema)
+    def handle_document(fieldvals: Seq[String]) = {
+      val doc = create_document(schema, fieldvals)
+
       if (doc.redir.length > 0)
         redirects += doc
       else if (doc.optcoord != None) {
@@ -243,40 +240,50 @@ abstract class DistDocumentTable[CoordType : Serializer,
         filehand: FileHandler, file: String,
         compression: String, realname: String) = {
       val task = new MeteredTask("document", "reading")
-      var broken = false
-      for (line <- lines if !broken) {
+      // Stop if we've reached the maximum
+      var should_stop = false
+      for (line <- lines if !should_stop) {
         parse_row(line)
-        if (task.item_processed(maxtime = Params.max_time_per_stage))
-          broken = true
+        if (task.item_processed(maxtime = driver.params.max_time_per_stage))
+          should_stop = true
+        if ((driver.params.num_training_docs > 0 &&
+          task.num_processed >= driver.params.num_training_docs)) {
+          errprint("")
+          errprint("Stopping because limit of %s documents reached",
+            driver.params.num_training_docs)
+          should_stop = true
+        }
       }
       task.finish()
       output_resource_usage()
-      !broken
+      !should_stop
     }
 
     override def filter_dir_files(filehand: FileHandler, dir: String,
         files: Iterable[String]) = {
+      val filter = GeoDocument.make_document_file_suffix_regex(suffix)
       for (file <- files if filter.findFirstMatchIn(file) != None) yield file
     }
   }
 
   /**
-   * Read the document data from the given corpus.  Documents listed in
-   * the document-data file(s) are created, listed in this table,
+   * Read the documents from the given corpus.  Documents listed in
+   * the document file(s) are created, listed in this table,
    * and added to the cell grid corresponding to the table.
    *
    * @param filehand The FileHandler for working with the file.
    * @param dir Directory containing the corpus.
+   * @param suffix Suffix specifying the type of document file wanted
+   *   (e.g. "-counts" or "-document-metadata"
    * @param cell_grid Cell grid into which the documents are added.
    */
-  def read_document_data(filehand: FileHandler, dir: String,
+  def read_documents(filehand: FileHandler, dir: String, suffix: String,
       cell_grid: CellGrid[CoordType,DocumentType,_]) {
 
-    val schema = GeoDocument.read_schema_from_corpus(filehand, dir)
+    val schema = GeoDocument.read_schema_from_corpus(filehand, dir, suffix)
 
     val distproc =
-      new DistDocumentFileProcessor(schema,
-        GeoDocument.document_metadata_regex, cell_grid)
+      new DistDocumentFileProcessor(schema, suffix, cell_grid)
     distproc.process_files(filehand, Seq(dir))
     for (x <- distproc.redirects) {
       val reddoc = lookup_document(x.redir)
@@ -294,7 +301,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
         if (doc.dist != null) {
           /* FIXME: Move this finish() earlier, and split into
              before/after global. */
-          doc.dist.finish(minimum_word_count = Params.minimum_word_count)
+          doc.dist.finish(minimum_word_count = driver.params.minimum_word_count)
           totaltoks += doc.dist.num_word_tokens
           numdocs += 1
         }
@@ -363,13 +370,32 @@ abstract class DistDocumentTable[CoordType : Serializer,
  * a user), etc.
  */ 
 abstract class DistDocument[CoordType : Serializer](
-  fieldvals: Map[String, String],
-  schema: Seq[String]
-) extends GeoDocument[CoordType](fieldvals, schema) with EvaluationDocument {
+  schema: Seq[String],
+  fieldvals: Seq[String],
+  val table: DistDocumentTable[CoordType,_]
+) extends GeoDocument[CoordType](schema, fieldvals) with EvaluationDocument {
   /**
    * Object containing word distribution of this document.
    */
-  var dist: WordDist = null
+  var dist: WordDist = _
+
+  override def handle_parameter(name: String, v: String) = {
+    if (name == "counts") {
+      table.num_word_count_documents_by_split(this.split) += 1
+      table.num_documents_with_word_counts += 1
+      // Set the distribution on the document.  But, if we are evaluating on
+      // the dev set, skip the test set and vice versa to save memory,
+      // and don't use the eval set's distributions in computing global
+      // smoothing values and such, to avoid contaminating the results.
+      val is_training_set = (this.split == "training")
+      val is_eval_set = (this.split == table.driver.params.eval_set)
+      if (is_training_set || is_eval_set) {
+        table.word_dist_factory.initialize_distribution(this, v,
+          is_training_set)
+      }
+      true
+    } else super.handle_parameter(name, v)
+  }
 
   override def toString() = {
     var coordstr = if (optcoord != None) " at %s" format coord else ""
@@ -400,20 +426,21 @@ abstract class DistDocument[CoordType : Serializer](
 }
 
 class SphereDocument(
-  fieldvals: Map[String, String],
-  schema: Seq[String]
-) extends DistDocument[SphereCoord](fieldvals, schema) {
+  schema: Seq[String],
+  fieldvals: Seq[String],
+  table: SphereDocumentTable
+) extends DistDocument[SphereCoord](schema, fieldvals, table) {
   def distance_to_coord(coord2: SphereCoord) = spheredist(coord, coord2)
   def degree_distance_to_coord(coord2: SphereCoord) = degree_dist(coord, coord2)
 }
 
 class SphereDocumentTable(
-  dstats: ExperimentDriverStats,
+  driver: GeolocateDriver,
   word_dist_factory: WordDistFactory
 ) extends DistDocumentTable[SphereCoord, SphereDocument](
-  dstats, word_dist_factory
+  driver, word_dist_factory
 ) {
-  def create_document(fieldvals: Map[String, String], schema: Seq[String]) =
-    new SphereDocument(fieldvals, schema)
+  def create_document(schema: Seq[String], fieldvals: Seq[String]) =
+    new SphereDocument(schema, fieldvals, this)
 }
 

@@ -92,14 +92,14 @@ abstract class GeoDocumentFileProcessor(
    * DocumentValidationException, listing the field and value as well as the
    * error.
    */
-  def handle_document(fieldvals: Map[String,String]): Boolean
+  def handle_document(fieldvals: Seq[String]): Boolean
 
   override def handle_bad_row(line: String, fieldvals: Seq[String]) {
     increment_document_counter("documents.bad")
     super.handle_bad_row(line, fieldvals)
   }
 
-  def process_row(fieldvals: Map[String,String]): Boolean = {
+  def process_row(fieldvals: Seq[String]): Boolean = {
     // FIXME! This is ugly as hell.  This Wikipedia-specific stuff should
     // either be moved elsewhere, or more likely, we should filter the
     // document-data file when we generate it, to remove stuff not in the
@@ -107,17 +107,18 @@ abstract class GeoDocumentFileProcessor(
     // would_add_document_to_list() in DistDocumentTable, which also
     // contains a special case for redirect documents.  It really seems that
     // we should create a WikipediaDocument trait to encapsulate this stuff.
-    if ((fieldvals contains "namespace") &&
-        fieldvals("namespace") != "Main") {
+    val params = (schema zip fieldvals).toMap
+    if ((params contains "namespace") &&
+        params("namespace") != "Main") {
       errprint("Skipped document %s, namespace %s is not Main",
-        fieldvals.getOrElse("title", "unknown title??"), fieldvals("namespace"))
+        params.getOrElse("title", "unknown title??"), params("namespace"))
       increment_document_counter("documents.skipped")
       return true
     } else {
       val was_accepted =
         try { handle_document(fieldvals) }
         catch {
-          case DocumentValidationException(msg) => {
+          case e@DocumentValidationException(msg) => {
             warning("Line %s: %s", num_processed + 1, msg)
             return false
           }
@@ -126,7 +127,7 @@ abstract class GeoDocumentFileProcessor(
         increment_document_counter("documents.accepted")
       else {
         errprint("Skipped document %s",
-          fieldvals.getOrElse("title", "unknown title??"))
+          params.getOrElse("title", "unknown title??"))
         increment_document_counter("documents.skipped")
       }
       return true
@@ -135,7 +136,6 @@ abstract class GeoDocumentFileProcessor(
 
   override def begin_process_file(filehand: FileHandler, file: String) {
     shortfile = filename_to_counter_name(filehand, file)
-    errprint("File: %s, shortfile: %s", file, shortfile)
     super.begin_process_file(filehand, file)
   }
 
@@ -190,8 +190,8 @@ class GeoDocumentWriter[CoordType : Serializer](
  *          or in Category or Book namespaces)
  */
 abstract class GeoDocument[CoordType : Serializer](
-  fieldvals: Map[String,String],
-  val schema: Seq[String]
+  val schema: Seq[String],
+  fieldvals: Seq[String]
 ) {
   // Fixed fields
   var corpus = ""
@@ -209,27 +209,32 @@ abstract class GeoDocument[CoordType : Serializer](
   import GeoDocument._, GeoDocumentConverters._
 
   val params =
-    (for ((name, v) <- fieldvals) yield {
-      try {
-        name match {
-          case "corpus" => corpus = v; Nil
-          case "title" => title = v; Nil
-          case "id" => id = v; Nil
-          case "split" => split = v; Nil
-          case "coord" => optcoord = get_x_or_blank[CoordType](v); Nil
-          // Wikipedia-specific:
-          case "redir" => redir = v; Nil
-          case "incoming_links" => incoming_links = get_int_or_blank(v); Nil
-          case _ => List(name -> v)
+    (for ((name, v) <- (schema zip fieldvals)) yield {
+      val handled =
+        try { handle_parameter(name, v) }
+        catch {
+          case e@_ => {
+            val msg =
+              "Bad value %s for field '%s': %s" format (v, name, e.toString)
+            throw DocumentValidationException(msg)
+          }
         }
-      } catch {
-        case e@_ => {
-          val msg =
-            "Bad value %s for field '%s': %s" format (v, name, e.toString)
-          throw DocumentValidationException(msg)
-        }
-      }
+        if (handled) Nil else List(name -> v)
     }).flatten.toMap
+
+  def handle_parameter(name: String, v: String) = {
+    name match {
+      case "corpus" => corpus = v; true
+      case "title" => title = v; true
+      case "id" => id = v; true
+      case "split" => split = v; true
+      case "coord" => optcoord = get_x_or_blank[CoordType](v); true
+      // Wikipedia-specific:
+      case "redir" => redir = v; true
+      case "incoming_links" => incoming_links = get_int_or_blank(v); true
+      case _ => false
+    }
+  }
 
   def get_fields(fields: Iterable[String]) = {
     for (field <- fields) yield {
@@ -261,35 +266,66 @@ abstract class GeoDocument[CoordType : Serializer](
 
 object GeoDocument {
   val possible_compression_re = """(\.[a-zA-Z0-9]+)?$"""
-  def make_suffix_regex(suffix: String) = {
-    val re_quoted_suffix = suffix.replace(".", """\.""")
+  def make_document_file_suffix_regex(suffix: String) = {
+    val re_quoted_suffix = """%s\.txt""" format suffix
     (re_quoted_suffix + possible_compression_re).r
   }
-  val schema_regex = make_suffix_regex("-schema.txt")
-  val document_metadata_regex = make_suffix_regex("-document-metadata.txt")
-  val counts_regex = make_suffix_regex("-counts.txt")
-  val text_regex = make_suffix_regex("-text.txt")
+  def make_schema_file_suffix_regex(suffix: String) = {
+    val re_quoted_suffix = """%s-schema\.txt""" format suffix
+    (re_quoted_suffix + possible_compression_re).r
+  }
+  val document_metadata_suffix = "-document-metadata"
+  val counts_suffix = "-counts"
+  val text_suffix = "-text"
+
+  /**
+   * Encode a word for placement inside a "counts" field.  Colons and spaces
+   * are used for separation.  There should be no spaces because words are
+   * tokenized on spaces, but we have to escape colons.  We do this using
+   * URL-style-encoding, replacing : by %3A; hence we also have to escape %
+   * signs. (We could equally well use HTML-style encoding; then we'd have to
+   * escape &amp; instead of :.) Note that regardless of whether we use
+   * URL-style or HTML-style encoding, we probably want to do the encoding
+   * ourselves rather than use a predefined encoder.  We could in fact use
+   * the presupplied URL encoder, but it would encode all sorts of stuff,
+   * which is unnecessary and would make the raw files harder to read.
+   * In the case of HTML-style encoding, : isn't even escaped, so that
+   * wouldn't work at all.
+   */
+  def encode_word_for_counts_field(word: String) = {
+    assert(!(word contains ' '))
+    word.replace("%", "%25").replace(":", "%3A")
+  }
+
+  /**
+   * Decode a word encoded using `encode_word_for_counts_field`.
+   */
+  def decode_word_for_counts_field(word: String) = {
+    word.replace("%3A", ":").replace("%3a", ":").replace("%25", "%")
+  }
 
   // val fixed_fields = Seq("corpus", "title", "id", "split", "coord")
   // val wikipedia_fields = Seq("incoming_links", "redir")
 
-  def find_schema_file(filehand: FileHandler, dir: String) = {
+  def find_schema_file(filehand: FileHandler, dir: String, suffix: String) = {
+    val schema_regex = make_schema_file_suffix_regex(suffix)
     val all_files = filehand.list_files(dir)
     val files =
       (for (file <- all_files
         if schema_regex.findFirstMatchIn(file) != None) yield file).toSeq
     if (files.length == 0)
-      throw new IllegalStateException(
+      throw new FileFormatException(
         "Found no schema files (*-schema.txt) in directory %s" format dir)
     if (files.length > 1)
-      throw new IllegalStateException(
+      throw new FileFormatException(
         "Found multiple schema files (*-schema.txt) in directory %s: %s".
         format(dir, files))
     files(0)
   }
 
-  def read_schema_from_corpus(filehand: FileHandler, dir: String) = {
-    val schema_file = find_schema_file(filehand, dir)
+  def read_schema_from_corpus(filehand: FileHandler, dir: String,
+      suffix: String) = {
+    val schema_file = find_schema_file(filehand, dir, suffix)
     FieldTextFileProcessor.read_schema_file(filehand, schema_file)
   }
 

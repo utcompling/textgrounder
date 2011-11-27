@@ -237,11 +237,41 @@ trait FastSlowKLDivergence {
 }
 
 /**
+ * A handler for one common way of reading word distributions from a file.
+ */ 
+trait WordDistReader {
+  /**
+   * Set the word distribution of a document, given the value of the field
+   * describing the distribution (typically called "counts" or "text").
+   * Return whether a word distribution was actually created/set.
+   *
+   * @param doc Document to set the distribution of.
+   * @param diststr String from the document file, describing the distribution.
+   * @param is_training_set True if this document is in the training set.
+   *   Generally, global (e.g. back-off) statistics should be initialized
+   *   only from training-set documents.
+   * @return Whether a word distribution was actually created/set.
+   */
+  def initialize_distribution(doc: GenericDistDocument, diststr: String,
+      is_training_set: Boolean): Boolean
+
+  def is_stopword(doc: GenericDistDocument, word: String) = {
+    val driver = doc.table.driver
+    (!driver.params.include_stopwords_in_document_dists &&
+      (driver.stopwords contains word))
+  }
+
+  def maybe_lowercase(doc: GenericDistDocument, word: String) =
+    if (!doc.table.driver.params.preserve_case_words)
+      word.toLowerCase else word
+}
+
+/**
  * A factory object for WordDists (word distributions).  Currently, there is
  * only one factory object (i.e. it's a singleton), but the particular
  * factory used depends on a command-line parameter.
  */
-abstract class WordDistFactory {
+abstract class WordDistFactory extends WordDistReader {
   /**
    * Create an empty word distribution.  Distributions created this way
    * are not meant to be added to the global word-distribution statistics
@@ -257,119 +287,6 @@ abstract class WordDistFactory {
    * during `read_word_counts`.
    */
   def finish_global_distribution()
-
-  /**
-   * Read word counts from a file containing the counts for a set of
-   * documents, create WordDists for each such document and set the
-   * document's distribution to the newly-created WordDist.  Note that
-   * typically the word-counts file is created by 'processwiki.py' in the
-   * 'python' directory.  Generally, the format of the file is dependent
-   * on the particular WordDist implementation.
-   *
-   * @param table Table holding all of the documents.
-   * @param filehand File-handler object, which knows how to read data
-   *   from files.
-   * @param filename Name of file holding word counts.
-   * @param stopwords List of stopwords (words to be ignored when creating
-   *   a distribution).
-   */
-  def read_word_counts(table: GenericDistDocumentTable,
-    filehand: FileHandler, filename: String, stopwords: Set[String])
-}
-
-/**
- * A handler for one common way of reading word distributions from a file.
- */ 
-trait WordDistReader {
-  var task: MeteredTask = _
-
-  /**
-   * Set the word distribution of a document.  Return whether a word
-   * distribution was actually created/set.
-   *
-   * @param doc Document to set the distribution of.
-   * @param is_training_set True if this document is in the training set.
-   * @param is_eval_set True if this document is in the eval set (either
-   *   "dev" or "test", depending on user settings).  Generally, documents
-   *   in neither the training nor eval sets should not have their
-   *   word distributions set, since these distributions won't be used.
-   *   In addition, documents not in the training set should not contribute
-   *   to any global (e.g. back-off) statistics of the word distribution.
-   * @return Whether a word distribution was actually created/set.
-   */
-  def set_word_dist(doc: GenericDistDocument, is_training_set: Boolean,
-      is_eval_set: Boolean): Boolean
-
-  /**
-   * Actually do the word-count reading.  This should read each document
-   * in turn, set field variables appropriately to store the document's
-   * properties, and call handle_one_document().  This in turn will
-   * call set_word_dist() as necessary, in order to set the document's
-   * word distribution.  Note that handle_one_document() returns true
-   * if document reading should continue, false if it should stop.
-   * In the latter case, your document-parsing code should stop and not
-   * read any more documents.
-   *
-   * @param table Table holding all of the documents.
-   * @param filehand File-handler object, which knows how to read data
-   *   from files.
-   * @param filename Name of file holding word counts.
-   * @param stopwords List of stopwords (words to be ignored when creating
-   *   a distribution).
-   */
-  def do_read_word_counts(table: GenericDistDocumentTable,
-      filehand: FileHandler, filename: String, stopwords: Set[String])
-
-  /**
-   * Handle one document, after its word counts (or whatever similar values
-   * are needed to create its distribution) have been read in.  Return
-   * true if document reading should continue, false if it should stop.
-   * This is meant to be called from the implementation of
-   * `do_read_word_counts`.
-   *
-   * @param table Document table, as passed into `do_read_word_counts`.
-   * @param title Title of document.
-   */
-  def handle_one_document(table: GenericDistDocumentTable, title: String) = {
-    val doc = table.lookup_document(title)
-    if (doc == null) {
-      warning("Skipping document %s, not in table", title)
-      table.num_documents_with_word_counts_but_not_in_table += 1
-    } else {
-      // Now set the distribution on the document; but don't use the test set's
-      // distributions in computing global smoothing values and such.
-      val is_training_set = (doc.split == "training")
-      val is_eval_set = (doc.split == Params.eval_set)
-      val dist_set = set_word_dist(doc, is_training_set, is_eval_set)
-      if (dist_set)
-        table.num_word_count_documents_by_split(doc.split) += 1
-    }
-
-    // Stop if we've reached the maximum
-    var should_stop = false
-    if (task.item_processed(maxtime = Params.max_time_per_stage))
-      should_stop = true
-    if ((Params.num_training_docs > 0 &&
-      task.num_processed >= Params.num_training_docs)) {
-      errprint("")
-      errprint("Stopping because limit of %s documents reached",
-        Params.num_training_docs)
-      should_stop = true
-    }
-    !should_stop
-  }
-
-  def read_word_counts(table: GenericDistDocumentTable,
-      filehand: FileHandler, filename: String, stopwords: Set[String]) {
-
-    task = new MeteredTask("document", "reading distributions of")
-
-    do_read_word_counts(table, filehand, filename, stopwords)
-
-    task.finish()
-    table.num_documents_with_word_counts += task.num_processed
-    output_resource_usage()
-  }
 }
 
 object WordDist {

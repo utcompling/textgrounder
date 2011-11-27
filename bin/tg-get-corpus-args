@@ -59,7 +59,6 @@ fi
 
 geotext_output_dir="$TG_TWITTER_DIR/output-$docthresh-docthresh"
 geotext_prefix="$geotext_output_dir/geotext-twitter"
-wikipedia_args="--document-file $IN_COMBINED_DOCUMENT_DATA_FILE --counts-file $IN_COORD_COUNTS_FILE"
 
 output_args() {
   case "$1" in
@@ -68,18 +67,15 @@ output_args() {
     #       --counts-file $IN_COORD_COUNTS_FILE ;;
     wikipedia )
       # Use the default version (usually enwiki-20100905)
-      echo --document-file $WP_VERSION_DIR \
-           --counts-file $IN_COORD_COUNTS_FILE ;;
+      echo --document-file $WP_VERSION_DIR ;;
     enwiki-* )
       set_wp_version "$1"
-      echo --document-file $WP_VERSION_DIR \
-           --counts-file $IN_COORD_COUNTS_FILE ;;
+      echo --document-file $WP_VERSION_DIR ;;
     #twitter )
     #  echo --document-file $geotext_prefix-combined-document-data.txt.bz2 \
     #       --counts-file $geotext_prefix-counts-only-coord-documents.txt.bz2 ;;
     twitter )
-      echo --document-file $geotext_output_dir \
-           --counts-file $geotext_prefix-counts-only-coord-documents.txt.bz2 ;;
+      echo --document-file $geotext_output_dir ;;
     twitter-wiki )
       output_args wikipedia; output_args twitter ;;
     * )

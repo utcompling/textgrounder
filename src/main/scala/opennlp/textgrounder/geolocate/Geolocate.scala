@@ -500,13 +500,6 @@ specified using --counts-file.
 
 Multiple such files can be given by specifying the option multiple
 times.""")
-  var counts_file =
-    ap.multiOption[String]("counts-file", "cf",
-      metavar = "FILE",
-      help = """File containing word counts for documents.  There are scripts
-in the 'python' directory for generating counts in the proper format from
-Wikipedia articles, Twitter tweets, etc.  Multiple such files can be given
-by specifying the option multiple times.""")
   var eval_file =
     ap.multiOption[String]("e", "eval-file",
       metavar = "FILE",
@@ -858,16 +851,11 @@ abstract class GeolocateDriver extends
     Stopwords.read_stopwords(get_file_handler, params.stopwords_file)
   }
 
-  protected def read_documents(table: SphereDocumentTable, stopwords: Set[String]) {
+  protected def read_documents(table: SphereDocumentTable) {
     for (fn <- Params.document_file)
-      table.read_document_data(get_file_handler, fn, cell_grid)
-
-    // Read in the words-counts file
-    if (Params.counts_file.length > 0) {
-      for (fn <- Params.counts_file)
-        word_dist_factory.read_word_counts(table, get_file_handler, fn, stopwords)
-      table.finish_word_counts()
-    }
+      table.read_documents(get_file_handler, fn, GeoDocument.counts_suffix,
+        cell_grid)
+    table.finish_word_counts()
   }
 
   def setup_for_run() {
@@ -875,7 +863,9 @@ abstract class GeolocateDriver extends
     document_table = initialize_document_table(word_dist_factory)
     cell_grid = initialize_cell_grid(document_table)
     stopwords = read_stopwords()
-    read_documents(document_table, stopwords)
+    // This accesses the stopwords through the pointer to this in
+    // document_table.
+    read_documents(document_table)
     cell_grid.finish()
   }
 
@@ -1080,9 +1070,6 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
         params.preserve_case_words = true
       }
     }
-
-    if (params.counts_file.length == 0)
-      param_error("Must specify counts file")
 
     if (params.eval_format == "raw-text") {
       // FIXME!!!!

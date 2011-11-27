@@ -24,7 +24,7 @@ import java.io._
 
 import opennlp.textgrounder.util.collectionutil.DynamicArray
 import opennlp.textgrounder.util.distances.SphereCoord
-import opennlp.textgrounder.util.ioutil.FileHandler
+import opennlp.textgrounder.util.ioutil.{FileHandler, FileFormatException}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 import GeolocateDriver.Params
@@ -68,7 +68,7 @@ abstract class UnigramWordDist(
     val num_words_to_print = 15
     val need_dots = counts.size > num_words_to_print
     val items =
-      for ((word, count) <- counts.view(0, num_words_to_print))
+      for ((word, count) <- counts.toSeq.sortWith(_._2 > _._2).view(0, num_words_to_print))
       yield "%s=%s" format (unmemoize_word(word), count) 
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
     "WordDist(%d tokens%s%s, %s)" format (
@@ -200,127 +200,102 @@ abstract class UnigramWordDist(
   }
 }  
 
-trait UnigramWordDistReader extends WordDistReader {
-  val initial_dynarr_size = 1000
-  val keys_dynarr =
+trait SimpleUnigramWordDistReader extends WordDistReader {
+  /**
+   * Initial size of the internal DynamicArray objects; an optimization.
+   */
+  protected val initial_dynarr_size = 1000
+  /**
+   * Internal DynamicArray holding the keys (canonicalized words).
+   */
+  protected val keys_dynarr =
     new DynamicArray[Word](initial_alloc = initial_dynarr_size)
-  val values_dynarr =
+  /**
+   * Internal DynamicArray holding the values (word counts).
+   */
+  protected val values_dynarr =
     new DynamicArray[Int](initial_alloc = initial_dynarr_size)
+  /**
+   * Set of the raw, uncanonicalized words seen, to check that an
+   * uncanonicalized word isn't seen twice. (Canonicalized words may very
+   * well occur multiple times.)
+   */
+  protected val raw_keys_set = mutable.Set[String]()
 
-  var title: String = _
+  /**
+   * Called each time a word is seen.  This can accept or reject the word
+   * (e.g. based on whether the count is high enough or the word is in
+   * a stopwords list), and optionally change the word into something else
+   * (e.g. the lowercased version or a generic -OOV-).  It should also
+   * memoize the word appropriately.
+   *
+   * @param word Raw word seen
+   * @param count Raw count for the word
+   * @return A memoized version of a modified form of the word, or
+   *   None to reject the word.
+   */
+  def canonicalize_accept_word(doc: GenericDistDocument,
+    word: String, count: Int): Option[Word]
 
-  // This is basically one-off debug code (used when debug("wordcountdocs"))
-  // because of the fact that the experiments published in the paper used a
-  // word-count file generated using an older algorithm for determining the
-  // geolocated coordinate of a document.  We didn't record the corresponding
-  // document-data file, so we need a way of regenerating it using the
-  // intersection of documents in the document-data file we actually used for
-  // the experiments and the word-count file we used. (NOTE: It appears we
-  // no longer need this code, but I'm maintaining it because it leads to
-  // the maintenance of code used to write out a schema and document file,
-  // which is generally useful. --ben)
-  var wordcountdocs_stream: PrintStream = _
-  var wordcountdocs_writer: GeoDocumentWriter[SphereCoord] = _
-  var wordcountdocs_schema: Seq[String] = _
-  var wordcountdocs_schema_stream: PrintStream = _
-
-  def do_read_word_counts(table: GenericDistDocumentTable,
-      filehand: FileHandler, filename: String, stopwords: Set[String]) {
-    errprint("Reading word counts from %s...", filename)
-    errprint("")
-
-    if (debug("wordcountdocs")) {
-      // Change this if you want a different file name
-      val wordcountdocs_filename = "wordcountdocs-combined-document-metadata.txt"
-      val wordcountdocs_schema_filename = "wordcountdocs-combined-schema.txt"
-      // We can't actually write the schema until we see the first document,
-      // since schemas are stored per-document.
-      wordcountdocs_schema_stream =
-        filehand.openw(wordcountdocs_schema_filename)
-      wordcountdocs_stream = filehand.openw(wordcountdocs_filename)
-    }
-    // Written this way because there's another line after the for loop,
-    // corresponding to the else clause of the Python for loop
-    breakable {
-      for (line <- filehand.openr(filename)) {
-        if (line.startsWith("Article title: ")) {
-          if (title != null) {
-            if (!handle_one_document(table, title))
-              break
-          }
-          // Extract title and set it
-          val titlere = "Article title: (.*)$".r
-          line match {
-            case titlere(ti) => title = ti
-            case _ => assert(false)
-          }
-          keys_dynarr.clear()
-          values_dynarr.clear()
-        } else if (line.startsWith("Article coordinates) ") ||
-          line.startsWith("Article ID: "))
-          ()
-        else {
-          val linere = "(.*) = ([0-9]+)$".r
-          line match {
-            case linere(xword, xcount) => {
-              var word = xword
-              if (!Params.preserve_case_words) word = word.toLowerCase
-              val count = xcount.toInt
-              if (!(stopwords contains word) ||
-                Params.include_stopwords_in_document_dists) {
-                keys_dynarr += memoize_word(word)
-                values_dynarr += count
-              }
-            }
-            case _ =>
-              warning("Strange line, can't parse: title=%s: line=%s",
-                title, line)
-          }
-        }
+  def parse_counts(doc: GenericDistDocument, countstr: String) {
+    keys_dynarr.clear()
+    values_dynarr.clear()
+    raw_keys_set.clear()
+    val wordcounts = countstr.split(" ")
+    for (wordcount <- wordcounts) yield {
+      val split_wordcount = wordcount.split(":", -1)
+      if (split_wordcount.length != 2)
+        throw FileFormatException(
+          "For unigram counts, items must be of the form WORD:COUNT, but %s seen"
+          format wordcount)
+      val Array(word, strcount) = split_wordcount
+      if (word.length == 0)
+        throw FileFormatException(
+          "For unigram counts, WORD in WORD:COUNT must not be empty, but %s seen"
+          format wordcount)
+      val count = strcount.toInt
+      if (raw_keys_set contains word)
+        throw FileFormatException(
+          "Word %s seen twice in same counts list" format word)
+      raw_keys_set += word
+      val opt_canon_word =
+        canonicalize_accept_word(doc,
+          GeoDocument.decode_word_for_counts_field(word), count)
+      if (opt_canon_word != None) {
+        keys_dynarr += opt_canon_word.get
+        values_dynarr += count
       }
-      handle_one_document(table, title)
     }
-
-    if (debug("wordcountdocs"))
-      wordcountdocs_stream.close()
   }
 
-  def set_word_dist(doc: GenericDistDocument, is_training_set: Boolean,
-      is_eval_set: Boolean) = {
-    if (debug("wordcountdocs")) {
-      // First time through.
-      if (wordcountdocs_schema == null) {
-        wordcountdocs_schema_stream.println(doc.schema mkString "\t")
-        wordcountdocs_schema_stream.close()
-        wordcountdocs_schema = doc.schema
-        wordcountdocs_writer = new GeoDocumentWriter[SphereCoord](doc.schema)
-      }
-      if (doc.schema != wordcountdocs_schema)
-        throw new IllegalStateException("Currently unable to handle documents with different schemas: Original schema %s, new schema %s".
-        format(wordcountdocs_schema, doc.schema))
-      wordcountdocs_writer.output_document(wordcountdocs_stream,
-        doc.asInstanceOf[SphereDocument])
-    }
-    // If we are evaluating on the dev set, skip the test set and vice
-    // versa, to save memory and avoid contaminating the results.
-    if (is_training_set || is_eval_set) {
-      // Now set the distribution on the document; but don't use the test
-      // set's distributions in computing global smoothing values and such.
-      set_unigram_word_dist(doc, keys_dynarr.array, values_dynarr.array,
-        keys_dynarr.length, note_globally = is_training_set)
-      true
-    }
-    else false
+  def initialize_distribution(doc: GenericDistDocument, countstr: String,
+      is_training_set: Boolean) = {
+    parse_counts(doc, countstr)
+    // Now set the distribution on the document; but don't use the test
+    // set's distributions in computing global smoothing values and such.
+    set_unigram_word_dist(doc, keys_dynarr.array, values_dynarr.array,
+      keys_dynarr.length, is_training_set)
   }
 
-  def set_unigram_word_dist(doc: GenericDistDocument, keys: Array[Word],
-    values: Array[Int], num_words: Int, note_globally: Boolean)
+  def set_unigram_word_dist(doc: GenericDistDocument,
+      keys: Array[Word], values: Array[Int], num_words: Int,
+      is_training_set: Boolean): Boolean
 }
 
 /**
  * General factory for UnigramWordDist distributions.
  */ 
 abstract class UnigramWordDistFactory extends
-    WordDistFactory with UnigramWordDistReader {
+    WordDistFactory with SimpleUnigramWordDistReader {
+  def canonicalize_accept_word(doc: GenericDistDocument, raw_word: String,
+      count: Int) = {
+    val lword = maybe_lowercase(doc, raw_word)
+    /* minimum_word_count (--minimum-word-count) currently handled elsewhere.
+       FIXME: Perhaps should be handled here. */
+    if (!is_stopword(doc, lword))
+      Some(memoize_word(lword))
+    else
+      None
+  }
 }
 

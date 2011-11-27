@@ -367,10 +367,10 @@ class DivisionFactory(gazetteer: Gazetteer) {
 // A document for toponym resolution.
 
 class TopoDocument(
-    fieldvals: Map[String, String],
     schema: Seq[String],
+    fieldvals: Seq[String],
     table: TopoDocumentTable
-) extends SphereDocument(fieldvals, schema) {
+) extends SphereDocument(schema, fieldvals, table) {
   // Cell-based distribution corresponding to this document.
   var word_dist_wrapper: CellWordDist = null
   // Corresponding location for this document.
@@ -472,12 +472,11 @@ class TopoDocument(
 // Static class maintaining additional tables listing mapping between
 // names, ID's and documents.  See comments at SphereDocumentTable.
 class TopoDocumentTable(
-  driver_stats: ExperimentDriverStats,
+  driver: GeolocateDriver,
   word_dist_factory: WordDistFactory
-) extends SphereDocumentTable(driver_stats, word_dist_factory) {
-  override def create_document(fieldvals: Map[String, String],
-      schema: Seq[String]) =
-    new TopoDocument(fieldvals, schema, this)
+) extends SphereDocumentTable(driver, word_dist_factory) {
+  override def create_document(schema: Seq[String], fieldvals: Seq[String]) =
+    new TopoDocument(schema, fieldvals, this)
 
   var gazetteer: Gazetteer = null
 
@@ -1507,8 +1506,6 @@ class GeolocateToponymDriver extends
 
     if (params.strategy == Seq("baseline"))
       ()
-    else if (params.counts_file.length == 0)
-      param_error("Must specify counts file")
 
     if (params.eval_format == "raw-text") {
       // FIXME!!!!

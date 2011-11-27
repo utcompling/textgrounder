@@ -21,7 +21,7 @@ import collection.mutable
 import util.control.Breaks._
 
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.ioutil.FileHandler
+import opennlp.textgrounder.util.ioutil.{FileHandler, FileFormatException}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 import GeolocateDriver.Params
@@ -247,112 +247,177 @@ if(debug("bigram"))
   }
 }
 
-trait BigramWordDistReader extends WordDistReader {
-  val initial_dynarr_size = 1000
-  val keys_dynarr =
+trait SimpleBigramWordDistReader extends WordDistReader {
+  /**
+   * Initial size of the internal DynamicArray objects; an optimization.
+   */
+  protected val initial_dynarr_size = 1000
+  /**
+   * Internal DynamicArray holding the keys (canonicalized words).
+   */
+  protected val keys_dynarr =
     new DynamicArray[Word](initial_alloc = initial_dynarr_size)
-  val values_dynarr =
+  /**
+   * Internal DynamicArray holding the values (word counts).
+   */
+  protected val values_dynarr =
     new DynamicArray[Int](initial_alloc = initial_dynarr_size)
-  val bigram_keys_dynarr =
+  /**
+   * Set of the raw, uncanonicalized words seen, to check that an
+   * uncanonicalized word isn't seen twice. (Canonicalized words may very
+   * well occur multiple times.)
+   */
+  protected val raw_keys_set = mutable.Set[String]()
+  /** Same as `keys_dynarr`, for bigrams. */
+  protected val bigram_keys_dynarr =
     new DynamicArray[Word](initial_alloc = initial_dynarr_size)
-  val bigram_values_dynarr =
+  /** Same as `values_dynarr`, for bigrams. */
+  protected val bigram_values_dynarr =
     new DynamicArray[Int](initial_alloc = initial_dynarr_size)
+  /** Same as `raw_keys_set`, for bigrams. */
+  protected val raw_bigram_keys_set = mutable.Set[(String, String)]()
 
+  /**
+   * Called each time a unigram word count is seen.  This can accept or
+   * reject the word (e.g. based on whether the count is high enough or
+   * the word is in a stopwords list), and optionally change the word into
+   * something else (e.g. the lowercased version or a generic -OOV-).
+   * It should also memoize the word appropriately.
+   *
+   * @param doc Document whose distribution is being initialized.
+   * @param word Raw word seen.  NOTE: Unlike in the case of UnigramWordDist,
+   *   the word is still encoded in the way it's found in the document file.
+   *   (In particular, this means that colons are replaced with %3A, and
+   *   percent signs by %25.)
+   * @param count Raw count for the word
+   * @return A memoized version of a modified form of the word, or
+   *   None to reject the word.
+   */
+  def canonicalize_accept_unigram(doc: GenericDistDocument,
+      word: String, count: Int): Option[Word]
 
-  var num_word_tokens = 0
-  var num_bigram_tokens = 0
-  var title: String = _
+  /**
+   * Called each time a bigram word count is seen.  This can accept or
+   * reject the bigram, much like for `canonicalize_accept_unigram`.
+   * Bigrams can be memoized using `memoize_bigram`.
+   *
+   * @param doc Document whose distribution is being initialized.
+   * @param bigram Tuple of `(word1, word2)` describing bigram.
+   * @param count Raw count for the bigram
+   * @return A memoized version of a modified form of the bigram, or
+   *   None to reject the bigram.
+   */
+  def canonicalize_accept_bigram(doc: GenericDistDocument,
+      bigram: (String, String), count: Int): Option[Word]
 
-  def do_read_word_counts(table: GenericDistDocumentTable,
-      filehand: FileHandler, filename: String, stopwords: Set[String]) {
-    errprint("Reading word and bigram counts from %s...", filename)
-    errprint("")
-    // Written this way because there's another line after the for loop,
-    // corresponding to the else clause of the Python for loop
-    breakable {
-      for (line <- filehand.openr(filename)) {
-        if (line.startsWith("Article title: ")) {
-          if (title != null && num_word_tokens > 0) {
-            if (!handle_one_document(table, title))
-              break
-          }
-          // Extract title and set it
-          val titlere = "Article title: (.*)$".r
-          line match {
-            case titlere(ti) => title = ti
-            case _ => assert(false)
-          }
-          keys_dynarr.clear()
-          values_dynarr.clear()
-          num_word_tokens = 0
-          bigram_keys_dynarr.clear()
-          bigram_values_dynarr.clear()
-          num_bigram_tokens = 0
-        } else if (line.startsWith("Article coordinates) ") ||
-          line.startsWith("Article ID: "))
-          ()
-        else {
-          val linere = "(.*) = ([0-9]+)$".r
-          line match {
-            case linere(xword, xcount) => {
-              var words = xword
-              if (!Params.preserve_case_words) words = words.toLowerCase
-              val count = xcount.toInt
-              
-              var tokens = words.split("\\s")
-              if (tokens.length == 1) {
-                if (!(stopwords contains words) ||
-                    Params.include_stopwords_in_document_dists) {
-                  num_word_tokens += count
-                  keys_dynarr += memoize_word(words)
-                  values_dynarr += count
-	            }
-              }
-              else if (tokens.length == 2) {
-                num_bigram_tokens += count
-                bigram_keys_dynarr += memoize_word(words)
-                bigram_values_dynarr += count
-              }
-            }
-            case _ =>
-              warning("Strange line, can't parse: title=%s: line=%s",
-                title, line)
-          }
+  /**
+   * Memoize a bigram.  The words should be encoded to remove ':' signs,
+   * just as they are stored in the document file.
+   */
+  def memoize_bigram(bigram: (String, String)) = {
+    val word1 = bigram._1
+    val word2 = bigram._2
+    assert(!(word1 contains ':'))
+    assert(!(word2 contains ':'))
+    memoize_word(word1 + ":" + word2)
+  }
+
+  def parse_counts(doc: GenericDistDocument, countstr: String) {
+    keys_dynarr.clear()
+    values_dynarr.clear()
+    raw_keys_set.clear()
+    bigram_keys_dynarr.clear()
+    bigram_values_dynarr.clear()
+    raw_bigram_keys_set.clear()
+    val wordcounts = countstr.split(" ")
+    for (wordcount <- wordcounts) yield {
+      val split_wordcount = wordcount.split(":", -1)
+      def check_nonempty_word(word: String) {
+        if (word.length == 0)
+          throw FileFormatException(
+            "For unigram/bigram counts, WORD must not be empty, but %s seen"
+            format wordcount)
+      }
+      if (split_wordcount.length == 2) {
+        val Array(word, strcount) = split_wordcount
+        check_nonempty_word(word)
+        val count = strcount.toInt
+        if (raw_keys_set contains word)
+          throw FileFormatException(
+            "Word %s seen twice in same counts list" format word)
+        raw_keys_set += word
+        val opt_canon_word = canonicalize_accept_unigram(doc, word, count)
+        if (opt_canon_word != None) {
+          keys_dynarr += opt_canon_word.get
+          values_dynarr += count
         }
-      }
-      handle_one_document(table, title)
+      } else if (split_wordcount.length == 3) {
+        val Array(word1, word2, strcount) = split_wordcount
+        check_nonempty_word(word1)
+        check_nonempty_word(word2)
+        val word = (word1, word2)
+        val count = strcount.toInt
+        if (raw_bigram_keys_set contains word)
+          throw FileFormatException(
+            "Word %s seen twice in same counts list" format word)
+        raw_bigram_keys_set += word
+        val opt_canon_word = canonicalize_accept_bigram(doc, word, count)
+        if (opt_canon_word != None) {
+          keys_dynarr += opt_canon_word.get
+          values_dynarr += count
+        }
+      } else
+        throw FileFormatException(
+          "For bigram counts, items must be of the form WORD:COUNT or WORD:WORD:COUNT, but %s seen"
+          format wordcount)
     }
   }
 
-  def set_word_dist(doc: GenericDistDocument, is_training_set: Boolean,
-      is_eval_set: Boolean) = {
-    if (num_word_tokens == 0)
-      false
-    else {
-      // If we are evaluating on the dev set, skip the test set and vice
-      // versa, to save memory and avoid contaminating the results.
-      if (is_training_set || is_eval_set) {
-        // Now set the distribution on the document; but don't use the test
-        // set's distributions in computing global smoothing values and such.
-        set_bigram_word_dist(doc, keys_dynarr.array, values_dynarr.array,
-          keys_dynarr.length, bigram_keys_dynarr.array,
-          bigram_values_dynarr.array, bigram_keys_dynarr.length,
-          note_globally = is_training_set)
-        true
-      }
-      else false
-    }
+  def initialize_distribution(doc: GenericDistDocument, countstr: String,
+      is_training_set: Boolean) = {
+    parse_counts(doc, countstr)
+    // Now set the distribution on the document; but don't use the test
+    // set's distributions in computing global smoothing values and such.
+    set_bigram_word_dist(doc, keys_dynarr.array, values_dynarr.array,
+      keys_dynarr.length, bigram_keys_dynarr.array,
+      bigram_values_dynarr.array, bigram_keys_dynarr.length,
+      is_training_set)
   }
 
-  def set_bigram_word_dist(doc: GenericDistDocument, keys: Array[Word],
-    values: Array[Int], num_words: Int, bigram_keys: Array[Word],
-    bigram_values: Array[Int], num_bigrams: Int, note_globally: Boolean)
+  def set_bigram_word_dist(doc: GenericDistDocument,
+      keys: Array[Word], values: Array[Int], num_words: Int,
+      bigram_keys: Array[Word], bigram_values: Array[Int], num_bigrams: Int,
+      is_training_set: Boolean): Boolean
 }
 
 /**
  * General factory for BigramWordDist distributions.
  */ 
 abstract class BigramWordDistFactory extends
-    WordDistFactory with BigramWordDistReader {
+    WordDistFactory with SimpleBigramWordDistReader {
+  def canonicalize_word(doc: GenericDistDocument, word: String) = {
+    val lword = maybe_lowercase(doc, word)
+    if (!is_stopword(doc, lword)) lword else "-OOV-"
+  }
+
+  def canonicalize_accept_unigram(doc: GenericDistDocument, raw_word: String,
+      count: Int) = {
+    val lword = maybe_lowercase(doc, raw_word)
+    /* minimum_word_count (--minimum-word-count) currently handled elsewhere.
+       FIXME: Perhaps should be handled here. */
+    if (!is_stopword(doc, lword))
+      Some(memoize_word(lword))
+    else
+      None
+  }
+
+  def canonicalize_accept_bigram(doc: GenericDistDocument,
+      raw_bigram: (String, String), count: Int) = {
+    val cword1 = canonicalize_word(doc, raw_bigram._1)
+    val cword2 = canonicalize_word(doc, raw_bigram._2)
+    /* minimum_word_count (--minimum-word-count) currently handled elsewhere.
+       FIXME: Perhaps should be handled here. */
+    Some(memoize_bigram((cword1, cword1)))
+  }
 }
 

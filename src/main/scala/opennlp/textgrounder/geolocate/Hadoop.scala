@@ -497,9 +497,9 @@ class DocumentEvaluationMapper extends
       filename_to_counter_name(driver.get_file_handler,
         driver.get_configuration.get("map.input.file"))
 
-    def handle_document(fieldvals: Map[String, String]) = {
+    def handle_document(fieldvals: Seq[String]) = {
       val table = driver.document_table
-      val in_document = table.create_document(fieldvals, schema)
+      val in_document = table.create_document(schema, fieldvals)
       if (in_document.split == driver.params.eval_set &&
           table.would_add_document_to_list(in_document)) {
         val doc = table.lookup_document(in_document.title)
@@ -555,7 +555,8 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
     } else {
       val schema =
         GeoDocument.read_schema_from_corpus(driver.get_file_handler,
-          driver.params.document_file(0))
+          driver.params.document_file(0),
+          GeoDocument.counts_suffix)
       processor = new HadoopDocumentFileProcessor(schema, context)
     }
   }

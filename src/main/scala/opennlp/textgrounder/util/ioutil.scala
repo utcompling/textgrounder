@@ -54,6 +54,10 @@ package object ioutil {
   //                            File reading functions                        //
   //////////////////////////////////////////////////////////////////////////////
   
+  case class FileFormatException(
+    message: String
+  ) extends Exception(message) { }
+
   /**
    * Iterator that yields lines in a given encoding (by default, UTF-8) from
    * an input stream, usually with any terminating newline removed and usually
@@ -822,7 +826,7 @@ package object ioutil {
       if (fieldvals.length != schema.length)
         handle_bad_row(line, fieldvals)
       else {
-        val good = process_row((schema zip fieldvals).toMap)
+        val good = process_row(fieldvals)
         if (!good)
           handle_bad_row(line, fieldvals)
       }
@@ -835,12 +839,12 @@ package object ioutil {
      * Called when a "good" row is seen (good solely in that it has the
      * correct number of fields).
      *
-     * @param fieldvals: Map listing the string values for each field.
+     * @param fieldvals: List of the string values for each field.
      *
      * @return True if the line is truly "good"; false, otherwise. (In the
      *   latter case, `handle_bad_row` will be called.)
      */
-    def process_row(fieldvals: Map[String,String]): Boolean
+    def process_row(fieldvals: Seq[String]): Boolean
 
     /* Also,
 
@@ -881,12 +885,12 @@ package object ioutil {
         split_re: String = "\t") = {
       val lines = filehand.openr(schema_file).toList
       if (lines.length != 1)
-        throw new IllegalStateException(
+        throw new FileFormatException(
           "Schema file %s should have one line in it but actually has %s lines".
           format(schema_file, lines.length))
       val schema = lines(0).split(split_re, -1)
       for (field <- schema if field.length == 0)
-        throw new IllegalStateException(
+        throw new FileFormatException(
           "Blank field name in schema file %s: fields are %s".
           format(schema_file, schema))
       schema
@@ -905,11 +909,6 @@ package object ioutil {
       val seqvals = fieldvals.toSeq
       assert(seqvals.length == schema.length)
       outstream.println(seqvals mkString split_text)
-    }
-
-    def output_row(outstream: PrintStream, fieldvals: Map[String, String]) {
-      val values = for (field <- schema) yield fieldvals(field)
-      output_row(outstream, values)
     }
   }
 
