@@ -57,7 +57,7 @@ public class ToponymRemover extends DocumentSourceWrapper {
 
           public Sentence<Token> next() {
             Sentence<Token> sentence = sentences.next();
-            return new SimpleSentence(sentence.getId(), sentence.getTokens());
+            return new SimpleSentence<Token>(sentence.getId(), sentence.getTokens());
           }
         };
       }

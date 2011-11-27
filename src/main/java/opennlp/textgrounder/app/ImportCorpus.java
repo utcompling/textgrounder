@@ -32,12 +32,12 @@ public class ImportCorpus extends BaseApp {
     }
 
     public StoredCorpus doImport(String corpusInputPath, String serGazInputPath,
-                                        Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
+                                        Enum<BaseApp.CORPUS_FORMAT> corpusFormat) throws Exception {
         return doImport(corpusInputPath, serGazInputPath, corpusFormat, false);
     }
 
     public StoredCorpus doImport(String corpusInputPath, String serGazInputPath,
-                                        Enum<CORPUS_FORMAT> corpusFormat,
+                                        Enum<BaseApp.CORPUS_FORMAT> corpusFormat,
                                         boolean useGoldToponyms) throws Exception {
 
         checkExists(corpusInputPath);

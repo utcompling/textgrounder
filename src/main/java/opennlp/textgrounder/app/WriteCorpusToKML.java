@@ -33,7 +33,7 @@ public class WriteCorpusToKML extends BaseApp {
         currentRun.writeToKML(corpus, currentRun.getKMLOutputPath(), currentRun.getOutputGoldLocations(), currentRun.getOutputUserKML(), currentRun.getCorpusFormat());
     }
 
-    public void writeToKML(Corpus corpus, String kmlOutputPath, boolean outputGoldLocations, boolean outputUserKML, Enum<CORPUS_FORMAT> corpusFormat) throws Exception {
+    public void writeToKML(Corpus corpus, String kmlOutputPath, boolean outputGoldLocations, boolean outputUserKML, Enum<BaseApp.CORPUS_FORMAT> corpusFormat) throws Exception {
         System.out.print("Writing visualizable corpus in KML format to " + kmlOutputPath + " ...");
         CorpusKMLWriter kw;
         if(corpusFormat == CORPUS_FORMAT.GEOTEXT && outputUserKML)

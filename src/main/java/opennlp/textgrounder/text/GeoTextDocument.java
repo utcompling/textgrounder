@@ -5,7 +5,7 @@ import java.util.*;
 
 import opennlp.textgrounder.topo.*;
 
-public class GeoTextDocument extends Document {
+public class GeoTextDocument extends Document<Token> {
 
     private static final long serialVersionUID = 42L;
 
