@@ -92,13 +92,18 @@ abstract class TwitterInfochimpsFileProcessor extends TextFileProcessor {
         case id :: time :: userid :: username :: _ ::
             reply_username :: reply_userid :: _ :: text :: anchor :: lang ::
             lat :: long :: _ :: _ :: _ :: _ :: _ :: Nil => {
+          //val raw_anchor = unescapeXml(anchor)
+          // Go ahead and leave it encoded, just to make sure no TAB chars;
+          // we don't really use it much anyway.
+          val raw_anchor = anchor
+          assert(!(raw_anchor contains '\t'))
           val metadata =
             Seq("corpus"->"twitter-infochimps",
                 "id"->id, "title"->id, "split"->"training",
                 "coord"->("%s,%s" format (lat, long)),"time"->time,
                 "username"->username, "userid"->userid,
                 "reply_username"->reply_username, "reply_userid"->reply_userid,
-                "anchor"->anchor, "lang"->lang)
+                "anchor"->raw_anchor, "lang"->lang)
           process_line(metadata, text)
         }
         case _ => {
