@@ -1,64 +1,137 @@
 #!/bin/sh
 
-openfile() {
-  if [ -z "$compression" ]; then
+# Find compression by extension.  Output one of bzip2, gzip or none.
+find_compression_by_extension() {
+  local ext=`echo "$1" | sed 's/^.*\././'`
+  if [ "$ext" = ".bz2" -o "$ext" = ".bzip2" ]; then
+    echo bzip2
+  elif [ "$ext" = ".gz" -o "$ext" = ".gzip" ]; then
+    echo gzip
+  else
+    echo none
+  fi
+}
+
+remove_dir_and_compression_extension() {
+  base=`basename "$1"`
+  for x in .bz2 .bzip2 .gz .gzip ; do
+    realbase=`basename "$base" $x`
+    if [ "$realbase" != "$base" ]; then
+      echo "$realbase"
+      return 0
+    fi
+  done
+  echo "$base"
+  return 1
+}
+
+add_compression_extension() {
+  local comp=$1
+  local file=$2
+  if [ "$comp" = none ]; then
+    echo "$file"
+  elif [ "$comp" = "bzip2" ]; then
+    echo "$file.bz2"
+  elif [ "$comp" = "gzip" ]; then
+    echo "$file.gz"
+  else
+    echo "Unrecognized compression: $comp" >&2
+    exit 1
+  fi
+}
+
+# Open a file using 'cat' or some uncompression app.  $1 is the type of
+# compression: bzip2, gzip or none.  Remaining arguments, if any, are
+# passed to the program doing the decompression.
+uncompressfile() {
+  local comp=$1
+  shift
+  if [ "$comp" = none ]; then
     cat ${1+"$@"}
-  elif [ "$compression" = ".bz2" -o "$compression" = ".bzip2" ]; then
+  elif [ "$comp" = "bzip2" ]; then
     bunzip2 < ${1+"$@"}
-  elif [ "$compression" = ".gz" -o "$compression" = ".gzip" ]; then
+  elif [ "$comp" = "gzip" ]; then
     gunzip < ${1+"$@"}
   else
-    echo "Unrecognized compression: $compression" >&2
+    echo "Unrecognized compression: $comp" >&2
     exit 1
   fi
 }
 
+# Write to a file using 'cat' or some compression app.  $1 is the type of
+# compression: bzip2, gzip or none.  Remaining arguments, if any, are
+# passed to the program doing the decompression.
 compressfile() {
-  if [ -z "$compression" ]; then
+  local comp=$1
+  shift
+  if [ "$comp" = none ]; then
     cat ${1+"$@"}
-  elif [ "$compression" = ".bz2" -o "$compression" = ".bzip2" ]; then
-    bzip2 < ${1+"$@"}
-  elif [ "$compression" = ".gz" -o "$compression" = ".gzip" ]; then
-    gzip < ${1+"$@"}
+  elif [ "$comp" = "bzip2" ]; then
+    bzip2 ${1+"$@"}
+  elif [ "$comp" = "gzip" ]; then
+    gzip ${1+"$@"}
   else
-    echo "Unrecognized compression: $compression" >&2
+    echo "Unrecognized compression: $comp" >&2
     exit 1
   fi
 }
 
-do_dir() {
-  base=`basename $1`
-  compression="unknown"
-  for ext in .bz2 .bzip2 .gz .gzip ""; do
-    echo "Considering extension $ext"
-    file=`echo $1/*-combined-document-data.txt$ext`
-    echo "file=$file"
-    numfiles=`echo $file | wc -w`
-    echo "numfiles=$numfiles"
+# Find the given file or glob, or a version with a compression suffix added.
+# $1 is the file or glob.  Outputs the file found.
+find_maybe_compressed_file() {
+  local glob=$1
+  local foundgood=
+  for ext in "" .bz2 .bzip2 .gz .gzip; do
+    file=`echo $glob$ext`
+    #echo "file=$file" >&2
+    numfiles=`echo "$file" | wc -w`
+    #echo "numfiles=$numfiles" >&2
     if [ "$numfiles" -gt 1 ]; then
       cat >&2 <<EOF
-More than one possible input file.  Possibilities are:
+More than one possible input file for extension $ext.  Possibilities are:
 $files
 EOF
       exit 1
     fi
     if [ "$numfiles" -eq 1 -a -e "$file" ]; then
-      echo "Input file is $file"
-      compression=$ext
+      echo "Input file is $file" >&2
+      echo "$file"
+      foundgood=true
       break
     fi
   done
-  if [ "$compression" = "unknown" ]; then
-    echo "Can't find a suitable input file." >&2
+  if [ "$foundgood" != "true" ]; then
+    echo "Can't find a suitable input file for global '$glob'." >&2
     exit 1
   fi
   
-  schema_file=$1/$base-schema.txt
-  echo "Generating schema file $schema_file from $file ..."
-  openfile $file | head -1 > $schema_file
-  metadata_file=$1/$base-combined-document-metadata.txt.bz2
-  echo "Generating metadata file $metadata_file from $file ..."
-  openfile $file | tail +2 | compressfile > $metadata_file
+}
+# For a given dir, find the document-data file (possibly compressed), and
+# note its compression.  Generate a new document-metadata file by removing
+# the first line (which contains the schema), and output that first line to
+# a corresponding schema file.  Keep the compression of the original
+# document-data file.
+do_dir() {
+  suffix="-combined-document-data"
+  docsuffix="$suffix.txt"
+  infile=`find_maybe_compressed_file "$1/*$docsuffix"`
+  #echo "infile=$infile"
+  compression=`find_compression_by_extension $infile`
+  echo "Compression of input file is $compression"
+  realbase=`remove_dir_and_compression_extension $infile`
+  #echo "realbase=$realbase"
+  prefix=`basename $realbase $docsuffix`
+  echo "Prefix of input file is $prefix"
+  prefix="$prefix-$1"
+  echo "New prefix (incorporating directory name) is $prefix"
+
+  newsuffix="-document-data"
+  schema_file="$1/$prefix$newsuffix-schema.txt"
+  echo "Generating schema file $schema_file from $infile ..."
+  uncompressfile $compression $infile | head -1 > $schema_file
+  metadata_file=`add_compression_extension $compression "$1/$prefix$newsuffix.txt"`
+  echo "Generating metadata file $metadata_file from $infile ..."
+  uncompressfile $compression $infile | tail +2 | compressfile $compression > $metadata_file
   echo "Done."
 }
 
