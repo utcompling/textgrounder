@@ -693,7 +693,7 @@ class InternalGeolocateDocumentEvaluator(
     }
     if (want_indiv_results) {
       errprint("%s:Document %s:", doctag, document)
-      errprint("%s:Document distribution:", doctag, document.dist)
+      // errprint("%s:Document distribution: %s", doctag, document.dist)
       errprint("%s:  %d types, %d tokens",
         doctag, document.dist.num_word_types, document.dist.num_word_tokens)
       errprint("%s:  true cell at rank: %s", doctag, true_rank)
