@@ -711,7 +711,7 @@ package object argparser {
      *
      * @param arg The canonical name of the argument, i.e. the first
      *   non-single-letter alias given.
-     * @returns The value, of type Any.  It must be cast to the appropriate
+     * @return The value, of type Any.  It must be cast to the appropriate
      *   type.
      * @see #get[T]
      */
@@ -725,7 +725,7 @@ package object argparser {
      * @tparam T The type of the argument, which must match the type given
      *   in its definition
      *   
-     * @returns The value, of type T.
+     * @return The value, of type T.
      */
     def get[T](arg: String) = argmap(arg).asInstanceOf[ArgAny[T]].value
 
@@ -738,7 +738,7 @@ package object argparser {
      * @tparam T The type of the argument, which must match the type given
      *   in its definition
      *   
-     * @returns The value, of type T.
+     * @return The value, of type T.
      */
     def set[T](arg: String, value: T) {
       argmap(arg).asInstanceOf[ArgAny[T]].setValue(value)
@@ -752,7 +752,7 @@ package object argparser {
      * @tparam T The type of the argument, which must match the type given
      *   in its definition
      *   
-     * @returns The value, of type T.
+     * @return The value, of type T.
      */
     def defaultValue[T](arg: String) =
       argmap(arg).asInstanceOf[ArgAny[T]].default
@@ -942,7 +942,7 @@ package object argparser {
      *    converter must explicitly be given. (The standard types recognized
      *    are currently Int, Double, Boolean and String.)
      *
-     * @returns If class parameter `return_defaults` is true, the default
+     * @return If class parameter `return_defaults` is true, the default
      *    value.  Else, if the first time called, exits non-locally; this
      *    is used internally.  Otherwise, the value of the parameter.
      */

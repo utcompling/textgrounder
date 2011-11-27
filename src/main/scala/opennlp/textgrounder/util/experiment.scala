@@ -210,7 +210,7 @@ package object experiment {
      * @param fully_qualified If true (the default), all counters returned
      *   are fully-qualified, i.e. including the entire counter name.
      *   Otherwise, only the portion after `group` is returned.
-     * @returns An iterator over counters
+     * @return An iterator over counters
      */
     def list_counters(group: String, recursive: Boolean,
         fully_qualified: Boolean = true) = {
@@ -241,7 +241,7 @@ package object experiment {
      * @param fully_qualified If true (the default), all counter groups returned
      *   are fully-qualified, i.e. including the entire counter name.
      *   Otherwise, only the portion after `group` is returned.
-     * @returns An iterator over counter groups
+     * @return An iterator over counter groups
      */
     def list_counter_groups(group: String, recursive: Boolean,
         fully_qualified: Boolean = true): Iterable[String] = {

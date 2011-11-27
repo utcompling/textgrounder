@@ -626,7 +626,7 @@ package object ioutil {
      *
      * @param filehand The FileHandler for working with the file.
      * @param file The file to process (possibly null, see above).
-     * @returns True if file processing should continue; false to
+     * @return True if file processing should continue; false to
      *   abort any further processing.
      */
     def process_file(filehand: FileHandler, file: String): Boolean
@@ -720,7 +720,7 @@ package object ioutil {
      *
      * @param filehand The FileHandler for working with the file.
      * @param file The file to process (possibly null, see above).
-     * @returns True if file processing should continue; false to
+     * @return True if file processing should continue; false to
      *   abort any further processing.
      */
     def process_file(filehand: FileHandler, file: String) = {
