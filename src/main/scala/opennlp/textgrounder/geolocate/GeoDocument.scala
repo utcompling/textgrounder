@@ -275,7 +275,8 @@ object GeoDocument {
     (re_quoted_suffix + possible_compression_re).r
   }
   val document_metadata_suffix = "-document-metadata"
-  val counts_suffix = "-counts"
+  val unigram_counts_suffix = "-unigram-counts"
+  val bigram_counts_suffix = "-bigram-counts"
   val text_suffix = "-text"
 
   /**
@@ -315,11 +316,12 @@ object GeoDocument {
         if schema_regex.findFirstMatchIn(file) != None) yield file).toSeq
     if (files.length == 0)
       throw new FileFormatException(
-        "Found no schema files (*-schema.txt) in directory %s" format dir)
+        "Found no schema files (matching %s) in directory %s"
+        format (schema_regex, dir))
     if (files.length > 1)
       throw new FileFormatException(
-        "Found multiple schema files (*-schema.txt) in directory %s: %s".
-        format(dir, files))
+        "Found multiple schema files (matching %s) in directory %s: %s"
+        format (schema_regex, dir, files))
     files(0)
   }
 

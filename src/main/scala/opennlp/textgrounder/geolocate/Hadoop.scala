@@ -286,8 +286,8 @@ abstract class HadoopGeolocateApp(
     driver.set_job(job)
     initialize_hadoop_classes(job)
     // FIXME: Big hack here.
-    for (file <- params.document_file) {
-      val hadoop_path = file + "/*-document-metadata.txt*"
+    for (file <- params.input_corpus) {
+      val hadoop_path = file + "/*" + driver.document_file_suffix + ".txt*"
       FileInputFormat.addInputPath(job, new Path(hadoop_path))
     }
     FileOutputFormat.setOutputPath(job, new Path(params.outfile))
@@ -549,14 +549,14 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
       for ((stratname, strategy) <- driver.strategies)
         yield new InternalGeolocateDocumentEvaluator(strategy, stratname,
           driver)
-    if (driver.params.document_file.length != 1) {
+    if (driver.params.input_corpus.length != 1) {
       driver.params.parser.error(
         "FIXME: For Hadoop, currently need exactly one corpus")
     } else {
       val schema =
         GeoDocument.read_schema_from_corpus(driver.get_file_handler,
-          driver.params.document_file(0),
-          GeoDocument.counts_suffix)
+          driver.params.input_corpus(0),
+          driver.document_file_suffix)
       processor = new HadoopDocumentFileProcessor(schema, context)
     }
   }

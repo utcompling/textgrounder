@@ -498,14 +498,32 @@ results either directly or sorted by error distance:
 
 === Specifying data ===
 
-Data is specified in two main files, given with the options
-`--document-file` and `--counts-file`.  The document file lists
-all of the documents to be processed and includes various pieces of data
-for each document, e.g. title, latitude/longitude coordinates, split
-(training, dev, test), number of incoming links (i.e. how many times is
-there a link to this document, esp. in the case of Wikipedia articles), etc.
-The counts file gives word counts for each document, i.e. which word types
-occur in the document and how many times.
+Data is specified using the `--input-corpus` argument, which takes a
+directory.  The corpus generally contains one or more "views" on the raw
+data comprising the corpus, with different views corresponding to differing
+ways of representing the original text of the documents -- as raw,
+word-split text (i.e. a list, in order, of the "tokens" that occur in the
+text, where punctuation marks count as their own tokens and hyphenated words
+may be split into separate tokens); as unigram word counts (for each unique
+word -- or more properly, token -- the number of times that word occurred);
+as bigram word counts (similar to unigram counts but pairs of adjacent tokens
+rather than single tokens are counted); etc.  Each such view has a schema
+file and one or more document files.  The schema file is a short file
+describing the structure of the document files.  The document files
+contain all the data for describing each document, including title, split
+(training, dev or test) and other metadata, as well as the text or word
+counts that are used to create the textual distribution of the document.
+
+The document files are laid out in a very simple database format,
+consisting of one document per line, where each line is composed of a
+fixed number of fields, separated by TAB characters. (E.g. one field
+would list the title, another the split, another all the word counts,
+etc.) A separate schema file lists the name of each expected field.  Some
+of these names (e.g. "title", "split", "text", "coord") have pre-defined
+meanings, but arbitrary names are allowed, so that additional
+corpus-specific information can be provided (e.g. retweet info for tweets
+that were retweeted from some other tweet, redirect info when a Wikipedia
+article is a redirect to another article, etc.).
 
 Additional data files (which are automatically handled by the
 `tg-geolocate` script) are specified using `--stopwords-file` and
@@ -518,22 +536,30 @@ when doing toponym resolution (--mode=geotag-toponyms), and doesn't
 apply at all when doing the normal document resolution, as was done in
 the paper.
 
-The document file is formatted as a simple database.  Each line is
-an entry (i.e. a document) and consists of a fixed number of fields,
-each separated by a tab character.  The first line gives the names of
-the fields.  Fields are accessed by name; hence, rearranging fields, and
-in most cases, omitting fields, is not a problem as long as the field
-names are correct.  The following is a list of the defined fields:
+The following is a list of the generally-applicable defined fields:
 
-  * `id`: The numeric ID of the document.  Can be arbitrary and currently
-  used only when printing out documents.  For Wikipedia articles, this
-  corresponds to the internally-assigned ID.
+  * `title`: Title of the document.  Must be unique within a given corpus,
+  and must be present.  If no title exists (e.g. for a unique tweet), but
+  an ID exists, use the ID.  If neither exists, make up a unique number
+  or unique identifying string of some sort.
 
-  * `title`: Title of the document.  Must be unique, and must be given
-  since it used to look up documents in the counts file.
+  * `id`: The (usually) numeric ID of the document, if such a thing exists.
+  Currently used only when printing out documents.  For Wikipedia articles,
+  this corresponds to the internally-assigned ID.
 
-  * `split`: One of the strings "training", "dev", "test".  Must be
-  given.
+  * `split`: One of the strings "training", "dev", "test".  Must be present.
+
+  * `corpus`: Name of the corpus (e.g. "enwiki-20111007" for the English
+  Wikipedia of October 7, 2011.  Must be present.  The combination of
+  title and corpus uniquely identifies a document in the presence of
+  documents from multiple corpora.
+
+  * `coord`: Coordinates of a document, or blank.  If specified, the
+  format is two floats separated by a comma, giving latitude and longitude,
+  respectively (positive for north and east, negative for south and
+  west).
+
+The following is a list of fields specific to Wikipedia:
 
   * `redir`: If this document is a Wikipedia redirect article, this
   specifies the title of the document redirected to; otherwise, blank.
@@ -541,6 +567,13 @@ names are correct.  The following is a list of the defined fields:
   more important during toponym geotagging).  Its main use in document
   geotagging is in computing the incoming link count of a document (see
   below).
+
+  * `incoming_links`: Number of incoming links, or blank if unknown.
+  This specifies the number of links pointing to the document from anywhere
+  else.  This is primarily used as part of certain baselines (`internal-link`
+  and `link-most-common-toponym`).  Note that the actual incoming link count
+  of a Wikipedia article includes the incoming link counts of any redirects
+  to that article.
 
   * `namespace`: For Wikipedia articles, the namespace of the article.
   Articles not in the `Main` namespace have the namespace attached to
@@ -557,49 +590,6 @@ names are correct.  The following is a list of the defined fields:
   the article is a list of any type, which includes the previous two
   categories as well as some others).  None of these fields are currently
   used.
-
-  * `coord`: Coordinates of a document, or blank.  If specified, the
-  format is two floats separated by a comma, giving latitude and longitude,
-  respectively (positive for north and east, negative for south and
-  west).
-
-  * `incoming_links`: Number of incoming links, or blank if unknown.
-  This specifies the number of links pointing to the document from anywhere
-  else.  This is primarily used as part of certain baselines (`internal-link`
-  and `link-most-common-toponym`).  Note that the actual incoming link count
-  of a Wikipedia article includes the incoming link counts of any redirects
-  to that article.
-
-The format of the counts file is like this:
-
-{{{
-Article title: Ampasimboraka
-Article ID: 17242049
-population = 16
-area = 15
-of = 10
-mi = 10
-sq = 10
-leader = 9
-density = 8
-km2 = 8
-image = 8
-blank1 = 8
-metro = 5
-blank = 5
-urban = 5
-Madagascar = 5
-}}}
-
-Multiple documents should follow one directly after the other, with no
-blank lines.  The document ID is currently ignored entirely.  There is
-no need for the words to be sorted by count (or in any other way); this
-is simply done here for ease in debugging.  Note also that, although the
-code that generates word counts currently ensures that no word has a
-space in it, spaces in general are not a problem, as the code that parses
-the word counts specifically looks for an equal sign surrounded by spaces
-and followed by a number (hence a "word" containing such a sequence would
-be problematic).
 
 === Generating KML files ===
 

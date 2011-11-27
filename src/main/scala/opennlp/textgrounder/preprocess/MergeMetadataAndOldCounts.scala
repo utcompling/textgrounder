@@ -133,12 +133,12 @@ class MMCUnigramWordDistHandler(
 ) extends SimpleUnigramWordDistReader {
   val writer = new FieldTextWriter(schema ++ Seq("counts"))
   val full_prefix = "%s/%s" format (output_dir, output_file_prefix)
-  val outstream = filehand.openw("%s-counts.txt" format full_prefix,
+  val outstream = filehand.openw("%s-unigram-counts.txt" format full_prefix,
     compression = "bzip2")
  
   def output_schema_file() {
     val schema_outstream =
-      filehand.openw("%s-counts-schema.txt" format full_prefix)
+      filehand.openw("%s-unigram-counts-schema.txt" format full_prefix)
     writer.output_schema(schema_outstream)
     schema_outstream.close()
   }

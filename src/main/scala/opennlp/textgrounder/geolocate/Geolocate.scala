@@ -487,16 +487,29 @@ class GeolocateParameters(parser: ArgParser = null) extends
 a default list of English stopwords (stored in the TextGrounder distribution)
 is used.""")
 
-  var document_file =
-    ap.multiOption[String]("a", "document-file",
-      metavar = "FILE",
-      help = """File containing info about documents.  Documents can be
-Wikipedia articles, individual tweets in Twitter, the set of all tweets for
-a given user, etc.  This file lists per-document information such as the
-document's title, the split (training, dev, or test) that the document is in,
-and the document's location.  It does not list the actual word-count
-information for the documents; that is held in a separate counts file,
-specified using --counts-file.
+  var input_corpus =
+    ap.multiOption[String]("i", "input-corpus",
+      metavar = "DIR",
+      help = """Directory containing an input corpus.  Documents in the
+corpus can be Wikipedia articles, individual tweets in Twitter, the set of all
+tweets for a given user, etc.  The corpus generally contains one or more
+"views" on the raw data comprising the corpus, with different views
+corresponding to differing ways of representing the original text of the
+documents -- as raw, word-split text; as unigram word counts; as bigram word
+counts; etc.  Each such view has a schema file and one or more document files.
+The latter contains all the data for describing each document, including
+title, split (training, dev or test) and other metadata, as well as the text
+or word counts that are used to create the textual distribution of the
+document.  The document files are laid out in a very simple database format,
+consisting of one document per line, where each line is composed of a fixed
+number of fields, separated by TAB characters. (E.g. one field would list
+the title, another the split, another all the word counts, etc.) A separate
+schema file lists the name of each expected field.  Some of these names
+(e.g. "title", "split", "text", "coord") have pre-defined meanings, but
+arbitrary names are allowed, so that additional corpus-specific information
+can be provided (e.g. retweet info for tweets that were retweeted from some
+other tweet, redirect info when a Wikipedia article is a redirect to another
+article, etc.).
 
 Multiple such files can be given by specifying the option multiple
 times.""")
@@ -786,6 +799,7 @@ abstract class GeolocateDriver extends
   var cell_grid: SphereCellGrid = _
   var document_table: SphereDocumentTable = _
   var word_dist_factory: WordDistFactory = _
+  var document_file_suffix: String = _
 
   /**
    * FileHandler object for this driver.
@@ -825,7 +839,7 @@ abstract class GeolocateDriver extends
     if (params.width_of_multi_cell <= 0)
       param_error("Width of multi cell must be positive")
 
-    need_seq(params.document_file, "document-file")
+    need_seq(params.input_corpus, "input-corpus")
   }
 
   protected def initialize_document_table(word_dist_factory: WordDistFactory) = {
@@ -840,11 +854,13 @@ abstract class GeolocateDriver extends
         params.width_of_multi_cell, table)
   }
 
-  protected def initialize_word_dist_factory() = {
+  protected def initialize_word_dist_factory_and_suffix() = {
     if (params.word_dist == "pseudo-good-turing-bigram")
-     new PGTSmoothedBigramWordDistFactory
+      (new PGTSmoothedBigramWordDistFactory,
+        GeoDocument.bigram_counts_suffix)
     else //(params.word_dist == "pseudo-good-turing-unigram")
-      new PseudoGoodTuringSmoothedWordDistFactory 
+      (new PseudoGoodTuringSmoothedWordDistFactory,
+        GeoDocument.unigram_counts_suffix)
   }
 
   protected def read_stopwords() = {
@@ -852,14 +868,16 @@ abstract class GeolocateDriver extends
   }
 
   protected def read_documents(table: SphereDocumentTable) {
-    for (fn <- Params.document_file)
-      table.read_documents(get_file_handler, fn, GeoDocument.counts_suffix,
-        cell_grid)
+    for (fn <- Params.input_corpus)
+      table.read_documents(get_file_handler, fn,
+        document_file_suffix, cell_grid)
     table.finish_word_counts()
   }
 
   def setup_for_run() {
-    word_dist_factory = initialize_word_dist_factory()
+    val (factory, suffix) = initialize_word_dist_factory_and_suffix()
+    word_dist_factory = factory
+    document_file_suffix = suffix
     document_table = initialize_document_table(word_dist_factory)
     cell_grid = initialize_cell_grid(document_table)
     stopwords = read_stopwords()

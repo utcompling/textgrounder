@@ -58,7 +58,6 @@ fi
 . $TEXTGROUNDER_DIR/bin/config-geolocate
 
 geotext_output_dir="$TG_TWITTER_DIR/output-$docthresh-docthresh"
-geotext_prefix="$geotext_output_dir/geotext-twitter"
 
 output_args() {
   case "$1" in
@@ -67,15 +66,12 @@ output_args() {
     #       --counts-file $IN_COORD_COUNTS_FILE ;;
     wikipedia )
       # Use the default version (usually enwiki-20100905)
-      echo --document-file $WP_VERSION_DIR ;;
+      echo --input-corpus $WP_VERSION_DIR ;;
     enwiki-* )
       set_wp_version "$1"
-      echo --document-file $WP_VERSION_DIR ;;
-    #twitter )
-    #  echo --document-file $geotext_prefix-combined-document-data.txt.bz2 \
-    #       --counts-file $geotext_prefix-counts-only-coord-documents.txt.bz2 ;;
+      echo --input-corpus $WP_VERSION_DIR ;;
     twitter )
-      echo --document-file $geotext_output_dir ;;
+      echo --input-corpus $geotext_output_dir ;;
     twitter-wiki )
       output_args wikipedia; output_args twitter ;;
     * )

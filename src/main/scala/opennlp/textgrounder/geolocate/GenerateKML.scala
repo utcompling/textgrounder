@@ -134,8 +134,9 @@ class GenerateKMLDriver extends
     need(params.kml_words, "kml-words")
   }
 
-  override def initialize_word_dist_factory() = {
-    new FilterPseudoGoodTuringSmoothedWordDistFactory(params.split_kml_words)
+  override def initialize_word_dist_factory_and_suffix() = {
+    (new FilterPseudoGoodTuringSmoothedWordDistFactory(params.split_kml_words),
+      GeoDocument.unigram_counts_suffix)
   }
 
   /**
