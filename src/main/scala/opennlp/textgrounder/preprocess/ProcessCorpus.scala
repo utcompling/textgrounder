@@ -18,11 +18,11 @@ package opennlp.textgrounder.preprocess
 
 import java.io.PrintStream
 
-import opennlp.textgrounder.geolocate.GeoDocument
-
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.MeteredTask
+
+import opennlp.textgrounder.geolocate.GeoDocument
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                              //
