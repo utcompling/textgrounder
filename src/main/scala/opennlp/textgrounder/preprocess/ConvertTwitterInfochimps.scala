@@ -70,11 +70,7 @@ The fields are:
 /////////////////////////////////////////////////////////////////////////////
 
 class ConvertTwitterInfochimpsParameters(ap: ArgParser) extends
-    ArgParserParameters(ap) {
-  val output_dir =
-    ap.option[String]("o", "output-dir",
-      metavar = "DIR",
-      help = """Directory to store output files in.""")
+    ProcessFilesParameters(ap) {
   val output_stats =
     ap.flag("output-stats",
       help = """If true, output statistics on the tweets in the input,
@@ -96,10 +92,13 @@ abstract class TwitterInfochimpsFileProcessor extends TextFileProcessor {
         case id :: time :: userid :: username :: _ ::
             reply_username :: reply_userid :: _ :: text :: anchor :: lang ::
             lat :: long :: _ :: _ :: _ :: _ :: _ :: Nil => {
-          val title = id
-          val metadata = Seq(id, title, "training",
-            "%s,%s" format (lat, long), time, username, userid,
-            reply_username, reply_userid, anchor, lang)
+          val metadata =
+            Seq("corpus"->"twitter-infochimps",
+                "id"->id, "title"->id, "split"->"training",
+                "coord"->("%s,%s" format (lat, long)),"time"->time,
+                "username"->username, "userid"->userid,
+                "reply_username"->reply_username, "reply_userid"->reply_userid,
+                "anchor"->anchor, "lang"->lang)
           process_line(metadata, text)
         }
         case _ => {
@@ -115,30 +114,46 @@ abstract class TwitterInfochimpsFileProcessor extends TextFileProcessor {
 
   // To be implemented
 
-  def process_line(metadata: Seq[String], text: String)
+  def process_line(metadata: Seq[(String, String)], text: String)
 }
 
 class ConvertTwitterInfochimpsFileProcessor(
-  params: ConvertTwitterInfochimpsParameters
+  params: ConvertTwitterInfochimpsParameters,
+  suffix: String
 ) extends TwitterInfochimpsFileProcessor {
   var outstream: PrintStream = _
   val compression_type = "bzip2"
+  var schema: Seq[String] = null
+  var schema_stream: PrintStream = _
 
   override def begin_process_lines(lines: Iterator[String],
       filehand: FileHandler, file: String,
       compression: String, realname: String) {
     val (_, outname) = filehand.split_filename(realname)
-    val out_text_name = "%s/%s-text.txt" format (params.output_dir, outname)
-    errprint("Text output file is %s..." format out_text_name)
+    val out_text_name = "%s/twitter-infochimps-%s%s.txt" format (
+      params.output_dir, outname, suffix)
+    errprint("Text document file is %s..." format out_text_name)
     outstream = filehand.openw(out_text_name, compression = compression_type)
+    val schema_file_name =
+      "%s/twitter-infochimps%s-schema.txt" format (params.output_dir, suffix)
+    schema_stream = filehand.openw(schema_file_name)
+    errprint("Schema file is %s..." format schema_file_name)
     super.begin_process_lines(lines, filehand, file, compression, realname)
   }
 
-  def process_line(metadata: Seq[String], text: String) {
+  def process_line(metadata: Seq[(String, String)], text: String) {
     val rawtext = unescapeHtml4(unescapeXml(text))
     val splittext = Twokenize(rawtext)
-    val outdata = metadata ++ Seq(splittext mkString " ")
-    outstream.println(outdata mkString "\t")
+    val outdata = metadata ++ Seq("text"->(splittext mkString " "))
+    val (schema, fieldvals) = outdata.unzip
+    if (this.schema == null) {
+      // Output the schema file, first time we see a line
+      schema_stream.println(schema mkString "\t")
+      schema_stream.close()
+      this.schema = schema
+    } else
+      assert (this.schema == schema)
+    outstream.println(fieldvals mkString "\t")
   }
 
   override def end_process_file(filehand: FileHandler, file: String) {
@@ -179,10 +194,14 @@ class TwitterInfochimpsStatsFileProcessor extends
     val reply_userid_by_reply_user = setmap[String, String]()
     val reply_user_by_user = setmap[String, String]()
 
-    def record_tweet(metadata: Seq[String], text: String) {
-      assert(metadata.length == 11)
-      val Seq(id, title, split, coords, time, username, userid, reply_username,
-        reply_userid, anchor, lang) = metadata
+    def record_tweet(metadata: Seq[(String, String)], text: String) {
+      val params = metadata.toMap
+      val time = params("time")
+      val id = params("id")
+      val username = params("username")
+      val userid = params("userid")
+      val reply_username = params("reply_username")
+      val reply_userid = params("reply_userid")
 
       num_tweets += 1
 
@@ -239,7 +258,7 @@ class TwitterInfochimpsStatsFileProcessor extends
     super.begin_process_lines(lines, filehand, file, compression, realname)
   }
 
-  def process_line(metadata: Seq[String], text: String) {
+  def process_line(metadata: Seq[(String, String)], text: String) {
     curfile_stats.record_tweet(metadata, text)
     global_stats.record_tweet(metadata, text)
   }
@@ -256,11 +275,8 @@ class TwitterInfochimpsStatsFileProcessor extends
   }
 }
 
-class ConvertTwitterInfochimpsDriver extends ArgParserExperimentDriver {
+class ConvertTwitterInfochimpsDriver extends ProcessFilesDriver {
   type ParamType = ConvertTwitterInfochimpsParameters
-  type RunReturnType = Unit
-  
-  val filehand = new LocalFileHandler
   
   def usage() {
     sys.error("""Usage: ConvertTwitterInfochimps [-o OUTDIR | --outfile OUTDIR] [--output-stats] INFILE ...
@@ -272,32 +288,18 @@ store results in OUTDIR, which must not exist already.
 """)
   }
 
-  def handle_parameters() {
+  override def handle_parameters() {
     if (!params.output_stats)
-      need(params.output_dir, "output-dir")
+      super.handle_parameters()
   }
 
-  def setup_for_run() { }
-
-  def run_after_setup() {
+  override def run_after_setup() {
     if (params.output_stats)
       new TwitterInfochimpsStatsFileProcessor().
         process_files(filehand, params.files)
     else {
-      if (!filehand.make_directories(params.output_dir))
-        param_error("Output dir %s must not already exist" format
-          params.output_dir)
-      // First output the schema file
-      val fields = List("corpus", "title", "id", "group", "split", "coord",
-        "time", "username", "userid", "reply_username", "reply_userid",
-        "anchor", "lang", "text")
-      val schema_file_name =
-        "%s/twitter-infochimps-schema.txt" format params.output_dir
-      val schema_stream = filehand.openw(schema_file_name)
-      schema_stream.println(fields mkString "\t")
-      schema_stream.close()
-
-      new ConvertTwitterInfochimpsFileProcessor(params).
+      super.run_after_setup()
+      new ConvertTwitterInfochimpsFileProcessor(params, "-text").
         process_files(filehand, params.files)
     }
   }

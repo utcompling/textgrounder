@@ -47,9 +47,6 @@ class ProcessFilesParameters(ap: ArgParser) extends
     ap.option[String]("o", "output-dir",
       metavar = "DIR",
       help = """Directory to store output files in.""")
-  val files =
-    ap.multiPositional[String]("files",
-      help = """File(s) to process for input.""")
 }
 
 abstract class ProcessFilesDriver extends ArgParserExperimentDriver {
@@ -70,9 +67,5 @@ abstract class ProcessFilesDriver extends ArgParserExperimentDriver {
     if (!filehand.make_directories(params.output_dir))
       param_error("Output dir %s must not already exist" format
         params.output_dir)
-
-    process_files(filehand, params.files)
   }
-
-  def process_files(filehand: FileHandler, files: Seq[String])
 }

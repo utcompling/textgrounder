@@ -22,22 +22,20 @@ import collection.mutable
 
 import java.io.{InputStream, PrintStream}
 
-import opennlp.textgrounder.geolocate.IdentityMemoizer._
 import opennlp.textgrounder.geolocate.GeoDocument
 
 import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.collectionutil.DynamicArray
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.MeteredTask
-import opennlp.textgrounder.util.printutil.{errprint, warning}
+import opennlp.textgrounder.util.printutil.{errprint}
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                              //
 /////////////////////////////////////////////////////////////////////////////
 
 class FrobCorpusParameters(ap: ArgParser) extends
-    ArgParserParameters(ap) {
+    ProcessFilesParameters(ap) {
   val add_field =
     ap.multiOption[String]("a", "add-field",
       help = """Field to add, of the form FIELD=VAL, e.g.
@@ -51,10 +49,6 @@ beginning.""")
     ap.option[String]("i", "input-dir",
       metavar = "DIR",
       help = """Directory containing input corpus.""")
-  val output_dir =
-    ap.option[String]("o", "output-dir",
-      metavar = "DIR",
-      help = """Directory to store output files in.""")
   val suffix =
     ap.option[String]("s", "suffix",
       default = "unigram-counts",
@@ -143,11 +137,8 @@ class FrobCorpusDocumentFileProcessor(
   }
 }
 
-class FrobCorpusDriver extends ArgParserExperimentDriver {
+class FrobCorpusDriver extends ProcessFilesDriver {
   type ParamType = FrobCorpusParameters
-  type RunReturnType = Unit
-  
-  val filehand = new LocalFileHandler
   
   def usage() {
     sys.error("""Usage: MergeMetadataAndOldCounts [-o OUTDIR | --outfile OUTDIR] [--output-stats] INFILE ...
@@ -157,17 +148,13 @@ counts file also containing the metadata.
 """)
   }
 
-  def handle_parameters() {
+  override def handle_parameters() {
     need(params.input_dir, "input-dir")
-    need(params.output_dir, "output-dir")
+    super.handle_parameters()
   }
 
-  def setup_for_run() { }
-
-  def run_after_setup() {
-    if (!filehand.make_directories(params.output_dir))
-      param_error("Output dir %s must not already exist" format
-        params.output_dir)
+  override def run_after_setup() {
+    super.run_after_setup()
 
     val schema_file =
       GeoDocument.find_schema_file(filehand, params.input_dir, params.suffix)
