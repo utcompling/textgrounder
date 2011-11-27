@@ -169,7 +169,7 @@ trait FastSlowKLDivergence {
    * This is a basic implementation of the computation of the KL-divergence
    * between this distribution and another distribution, including possible
    * debug information.  Useful for checking against the other, faster
-   * implementation in `fast_kl_divergence'.
+   * implementation in `fast_kl_divergence`.
    * 
    * @param xother The other distribution to compute against.
    * @param partial If true, only compute the contribution involving words
@@ -182,7 +182,7 @@ trait FastSlowKLDivergence {
    *   the words in our distribution) and the amount of total KL-divergence
    *   they compute, useful for debugging.
    *   
-   * @returns A tuple of (divergence, word_contribs) where the first
+   * @return A tuple of (divergence, word_contribs) where the first
    *   value is the actual KL-divergence and the second is the map
    *   of word contributions as described above; will be null if
    *   not requested.
@@ -193,7 +193,7 @@ trait FastSlowKLDivergence {
 
   /**
    * Compute the KL-divergence using the "slow" algorithm of
-   * `slow_kl_divergence_debug`, but without requesting or returning debug
+   * #slow_kl_divergence_debug, but without requesting or returning debug
    * info.
    */
   def slow_kl_divergence(other: WordDist, partial: Boolean = false) = {
@@ -349,7 +349,7 @@ abstract class WordDist {
    * are used to create these global statistics have been completely
    * populated.)
    *
-   * @seealso #finish_after_global()
+   * @see #finish_after_global
    * 
    * @param minimum_word_count If greater than zero, eliminate words seen
    * less than this number of times.
@@ -395,7 +395,7 @@ abstract class WordDist {
    * Compute the symmetric KL-divergence between two distributions by averaging
    * the respective one-way KL-divergences in each direction.
    * 
-   * @partial Same as in `kl_divergence`.
+   * @param partial Same as in `kl_divergence`.
    */
   def symmetric_kldiv(other: WordDist, partial: Boolean = false) = {
     0.5*this.kl_divergence(other, partial) +
@@ -434,7 +434,7 @@ abstract class WordDist {
    * Look for the most common word matching a given predicate.
    * @param pred Predicate, passed the raw (unmemoized) form of a word.
    *   Should return true if a word matches.
-   * @returns Most common word matching the predicate (wrapped with
+   * @return Most common word matching the predicate (wrapped with
    *   Some()), or None if no match.
    * 
    * FIXME: Probably should be moved similar to `lookup_word`.

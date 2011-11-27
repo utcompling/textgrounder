@@ -250,7 +250,7 @@ class MultiRegularCellGrid(
    * Convert a fractional cell index to the corresponding coordinate.  Useful
    * for indices not referring to the corner of a cell.
    * 
-   * @seealso #cell_index_to_coord
+   * @see #cell_index_to_coord
    */
   def fractional_cell_index_to_coord(index: FractionalRegularCellIndex,
     method: String = "coerce-warn") = {

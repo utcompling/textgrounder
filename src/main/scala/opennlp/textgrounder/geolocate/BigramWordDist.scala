@@ -163,7 +163,7 @@ if(debug("bigram"))
      * @param xother The other distribution to compute against.
      * @param partial If true, only do step 1 above.
      *   
-     * @returns A tuple of (divergence, word_contribs) where the first
+     * @return A tuple of (divergence, word_contribs) where the first
      *   value is the actual KL-divergence and the second is the map
      *   of word contributions as described above; will be null if
      *   not requested.
@@ -212,7 +212,7 @@ if(debug("bigram"))
 
   /**
    * Steps 3 and 4 of KL-divergence computation.
-   * @seeo #kl_divergence
+   * @see #kl_divergence
    */
   def kl_divergence_34(other: BigramWordDist): Double
   
