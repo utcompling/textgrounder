@@ -1,5 +1,16 @@
 #!/bin/sh
 
+# Usage: convert-old-docfile-to-metadata-schema-and-file DIR ...
+
+# For a given dir, split the old document-data file into a document metadata
+# file and associated schema.  Specifically:
+#
+# -- Find the document-data file (possibly compressed); note its compression.
+# -- Generate a new document-metadata file by removing the first line (which
+#    contains the schema).
+# -- Output that first line to a corresponding schema file.
+# -- In the process, keep the compression of the original document-data file.
+
 # Find compression by extension.  Output one of bzip2, gzip or none.
 find_compression_by_extension() {
   local ext=`echo "$1" | sed 's/^.*\././'`
@@ -106,11 +117,7 @@ EOF
   fi
   
 }
-# For a given dir, find the document-data file (possibly compressed), and
-# note its compression.  Generate a new document-metadata file by removing
-# the first line (which contains the schema), and output that first line to
-# a corresponding schema file.  Keep the compression of the original
-# document-data file.
+
 do_dir() {
   suffix="-combined-document-data"
   docsuffix="$suffix.txt"
@@ -125,7 +132,7 @@ do_dir() {
   prefix="$prefix-$1"
   echo "New prefix (incorporating directory name) is $prefix"
 
-  newsuffix="-document-data"
+  newsuffix="-document-metadata"
   schema_file="$1/$prefix$newsuffix-schema.txt"
   echo "Generating schema file $schema_file from $infile ..."
   uncompressfile $compression $infile | head -1 > $schema_file
