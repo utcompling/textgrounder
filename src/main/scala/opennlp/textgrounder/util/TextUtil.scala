@@ -49,14 +49,16 @@ package object textutil {
   def long_with_commas(x: Long): String = {
     var mx = x
     if (mx < 0)
-      return "-" + long_with_commas(-mx)
-    var result = ""
-    while (mx >= 1000) {
-      val r = mx % 1000
-      mx /= 1000
-      result = ",%03d%s" format (r, result)
+      "-" + long_with_commas(-mx)
+    else {
+      var result = ""
+      while (mx >= 1000) {
+        val r = mx % 1000
+        mx /= 1000
+        result = ",%03d%s" format (r, result)
+      }
+      "%d%s" format (mx, result)
     }
-    return "%d%s" format (mx, result)
   }
   
   // My own version
