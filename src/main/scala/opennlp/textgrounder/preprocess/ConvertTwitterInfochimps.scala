@@ -75,10 +75,32 @@ The fields are:
 
 class ConvertTwitterInfochimpsParameters(ap: ArgParser) extends
     ProcessFilesParameters(ap) {
-  val output_stats =
+  var output_stats =
     ap.flag("output-stats",
-      help = """If true, output statistics on the tweets in the input,
+      help = """If true, output time-based and user-based statistics on the
+tweets in the input, rather than converting the files.  Other flags may be
+given to request additional statistics.""")
+  var output_min_stats =
+    ap.flag("output-min-stats",
+      help = """If true, output time-based statistics on the
+tweets in the input, rather than converting the files.  Other flags may be
+given to request additional statistics.""")
+  var output_all_stats =
+    ap.flag("output-all-stats",
+      help = """If true, output all statistics on the tweets in the input,
 rather than converting the files.""")
+  var user_stats =
+    ap.flag("user-stats",
+      help = """If true, extra statistics involving number of tweets per user
+are computed.""")
+  var user_to_userid_stats =
+    ap.flag("user-to-userid-stats",
+      help = """If true, extra statistics involving user-to-userid matches
+are computed.""")
+  var reply_user_stats =
+    ap.flag("reply-user-stats",
+      help = """If true, extra statistics involving who replies to whom
+are computed.""")
   val files =
     ap.multiPositional[String]("files",
       help = """File(s) to process for input.""")
@@ -118,7 +140,8 @@ abstract class TwitterInfochimpsFileProcessor extends TextFileProcessor {
       task.item_processed()
     }
     task.finish()
-    output_resource_usage()
+    print_msg_heading("Memory/time usage:", blank_lines_before = 3)
+    output_resource_usage(dojava = false)
     true
   }
 
@@ -173,7 +196,7 @@ class ConvertTwitterInfochimpsFileProcessor(
   }
 }
 
-class TwitterStatistics {
+class TwitterStatistics(params: ConvertTwitterInfochimpsParameters) {
   // Over-all statistics
   var num_tweets = 0
 
@@ -183,6 +206,9 @@ class TwitterStatistics {
   val tweets_by_day = intmap[String]()
   val tweets_by_hour = intmap[String]()
   val tweets_by_minute = intmap[String]()
+  // For percentages between 0 and 100, what's the earliest time such that
+  // this many percent of tweets are before it?
+  val quantile_times = stringmap[Int]()
   // In general, when finding the minimum, we want the default to be greater
   // than any possible value, and when finding the maximum, we want the
   // default to be less than any possible value.  For string comparison,
@@ -210,7 +236,6 @@ class TwitterStatistics {
 
   // User-based statistics
   val tweets_by_user = intmap[String]()
-  val reply_tweets_by_user = intmap[String]()
   val num_users_by_num_tweets = intmap[Int]()
   val userid_by_user = intmapmap[String, String]()
   val userid_by_user_min_time = stringmapmap[String, String](max_string_val)
@@ -229,13 +254,13 @@ class TwitterStatistics {
   val user_by_reply_user = intmapmap[String, String]()
 
   def record_tweet(metadata: Seq[(String, String)], text: String) {
-    val params = metadata.toMap
-    val time = params("time")
-    val id = params("id")
-    val username = params("username")
-    val userid = params("userid")
-    val reply_username = params("reply_username")
-    val reply_userid = params("reply_userid")
+    val tparams = metadata.toMap
+    val time = tparams("time")
+    val id = tparams("id")
+    val username = tparams("username")
+    val userid = tparams("userid")
+    val reply_username = tparams("reply_username")
+    val reply_userid = tparams("reply_userid")
 
     num_tweets += 1
 
@@ -282,22 +307,27 @@ class TwitterStatistics {
       if (table(key) > newval)
         table(key) = newval
     }
-    tweets_by_user(username) += 1
-    userid_by_user(username)(userid) += 1
-    set_max_with_cur(userid_by_user_max_time(username), userid, time)
-    set_min_with_cur(userid_by_user_min_time(username), userid, time)
-    user_by_userid(userid)(username) += 1
-    set_max_with_cur(user_by_userid_max_time(userid), username, time)
-    set_min_with_cur(user_by_userid_min_time(userid), username, time)
-    if (reply_username != "") {
-      reply_tweets_by_user(username) += 1
+    if (params.user_stats) {
+      tweets_by_user(username) += 1
       tweets_by_reply_user(reply_username) += 1
-      reply_userid_by_reply_user(reply_username)(reply_userid) += 1
-      reply_user_by_reply_userid(reply_userid)(reply_username) += 1
-      set_max_with_cur(reply_userid_by_reply_user_max_time(reply_username), reply_userid, time)
-      set_min_with_cur(reply_userid_by_reply_user_min_time(reply_username), reply_userid, time)
-      set_max_with_cur(reply_user_by_reply_userid_max_time(reply_userid), reply_username, time)
-      set_min_with_cur(reply_user_by_reply_userid_min_time(reply_userid), reply_username, time)
+    }
+    if (params.user_to_userid_stats) {
+      userid_by_user(username)(userid) += 1
+      set_max_with_cur(userid_by_user_max_time(username), userid, time)
+      set_min_with_cur(userid_by_user_min_time(username), userid, time)
+      user_by_userid(userid)(username) += 1
+      set_max_with_cur(user_by_userid_max_time(userid), username, time)
+      set_min_with_cur(user_by_userid_min_time(userid), username, time)
+    }
+    if (params.reply_user_stats && reply_username != "") {
+      if (params.user_to_userid_stats) {
+        reply_userid_by_reply_user(reply_username)(reply_userid) += 1
+        set_max_with_cur(reply_userid_by_reply_user_max_time(reply_username), reply_userid, time)
+        set_min_with_cur(reply_userid_by_reply_user_min_time(reply_username), reply_userid, time)
+        reply_user_by_reply_userid(reply_userid)(reply_username) += 1
+        set_max_with_cur(reply_user_by_reply_userid_max_time(reply_userid), reply_username, time)
+        set_min_with_cur(reply_user_by_reply_userid_min_time(reply_userid), reply_username, time)
+      }
       reply_user_by_user(username)(reply_username) += 1
       user_by_reply_user(reply_username)(username) += 1
     }
@@ -307,6 +337,17 @@ class TwitterStatistics {
     num_users_by_num_tweets.clear()
     for ((user, count) <- tweets_by_user)
       num_users_by_num_tweets(count) += 1
+    quantile_times.clear()
+    var tweets_so_far = 0
+    var next_quantile_to_set = 0
+    for ((time, count) <- tweets_by_hour.toSeq.sorted) {
+      tweets_so_far += count
+      val percent_seen = 100*(tweets_so_far.toDouble / num_tweets)
+      while (next_quantile_to_set <= percent_seen) {
+        quantile_times(next_quantile_to_set) = time
+        next_quantile_to_set += 1
+      }
+    }
   }
 
   def print_statistics() {
@@ -333,77 +374,15 @@ class TwitterStatistics {
       (lex_highest_tweet_id, lex_highest_tweet_time))
     errprint("")
     errprint("Number of tweets: %s" format num_tweets)
-    errprint("Number of users: %s" format tweets_by_user.size)
-
-    print_msg_heading(
-      "Top %s users by number of tweets:" format how_many_summary_str)
-    output_reverse_sorted_table(tweets_by_user, maxrows = how_many_summary)
-
-    print_msg_heading(
-      "Frequency of frequencies (number of users with given number of tweets):")
-    output_key_sorted_table(num_users_by_num_tweets)
-
-
-    def reply_to_details(sending: String, _from: String, _to: String,
-        tweets_by_user_map: mutable.Map[String, Int],
-        tweets_by_reply_user_map: mutable.Map[String, Int]) {
-      print_msg_heading("Reply-to, for top %s %s users:" format
-        (how_many_detail_str, sending))
-      for (((user, count), index0) <-
-          tweets_by_user_map.toSeq.sortWith(_._2 > _._2).
-          slice(0, how_many_detail).
-          zipWithIndex) {
-        val index = index0 + 1
-        errprint("#%d: User %s (%d tweets %s, %d tweets %s):",
-          index, user, count, _from, tweets_by_reply_user_map(user), _to)
-        errprint("#%d: Corresponding user ID's by tweet count:" format (index))
-        output_reverse_sorted_table(userid_by_user(user), indent = "   ")
-        errprint("#%d: Users that this user replied to:" format (index))
-        output_reverse_sorted_table(reply_user_by_user(user), indent = "   ")
-        errprint("#%d: Users that relied to this user:" format (index))
-        output_reverse_sorted_table(user_by_reply_user(user), indent = "   ")
-      }
+    if (tweets_by_user.size > 0) {
+      errprint("Number of users: %s" format tweets_by_user.size)
+      print_msg_heading(
+        "Top %s users by number of tweets:" format how_many_summary_str)
+      output_reverse_sorted_table(tweets_by_user, maxrows = how_many_summary)
+      print_msg_heading(
+        "Frequency of frequencies (number of users with given number of tweets):")
+      output_key_sorted_table(num_users_by_num_tweets)
     }
-
-    reply_to_details("sending", "from", "to", tweets_by_user,
-      tweets_by_reply_user)
-    reply_to_details("receiving", "to", "from", tweets_by_reply_user,
-      tweets_by_user)
-
-    def output_x_with_multi_y(xdesc: String, ydesc: String,
-        x_to_y: mutable.Map[String, mutable.Map[String, Int]],
-        x_to_y_min_time: mutable.Map[String, mutable.Map[String, String]],
-        x_to_y_max_time: mutable.Map[String, mutable.Map[String, String]]
-      ) {
-      val x_with_multi_y =
-        (for ((x, ys) <- x_to_y; if ys.size > 1)
-          yield (x, ys.size))
-      for (((x, count), index) <-
-           x_with_multi_y.toSeq.sortWith(_._2 > _._2).zipWithIndex) {
-        errprint("#%d: %s %s (%d different %s's): (listed by num tweets)",
-          index + 1, xdesc, x, count, ydesc)
-        for ((y, count) <- x_to_y(x).toSeq.sortWith(_._2 > _._2)) {
-          errprint("%s%s = %s (from %s to %s)" format
-            ("   ", y, count, x_to_y_min_time(x)(y), x_to_y_max_time(x)(y)))
-        }
-      }
-    }
-
-    print_msg_heading("Users with multiple user ID's:")
-    output_x_with_multi_y("user", "ID", userid_by_user,
-      userid_by_user_min_time, userid_by_user_max_time)
-
-    print_msg_heading("User ID's with multiple users:")
-    output_x_with_multi_y("ID", "user", user_by_userid,
-      user_by_userid_min_time, user_by_userid_max_time)
-
-    print_msg_heading("Reply users with multiple reply user ID's:")
-    output_x_with_multi_y("reply user", "reply ID", reply_userid_by_reply_user,
-      reply_userid_by_reply_user_min_time, reply_userid_by_reply_user_max_time)
-
-    print_msg_heading("Reply ID's with multiple reply users:")
-    output_x_with_multi_y("reply ID", "reply user", reply_user_by_reply_userid,
-      reply_user_by_reply_userid_min_time, reply_user_by_reply_userid_max_time)
 
     print_msg_heading("Tweets by day:")
     output_key_sorted_table(tweets_by_day)
@@ -413,22 +392,99 @@ class TwitterStatistics {
       print_msg_heading("Tweets by minute:")
       output_key_sorted_table(tweets_by_minute)
     }
+    print_msg_heading("Tweet quantiles by time (minimum time for given percent of tweets):")
+    output_key_sorted_table(quantile_times)
+
+    def reply_to_details(sending: String, _from: String, _to: String,
+        tweets_by_user_map: mutable.Map[String, Int],
+        tweets_by_reply_user_map: mutable.Map[String, Int]) {
+      if (tweets_by_user_map.size == 0)
+        return
+      print_msg_heading("Reply-to, for top %s %s users:" format
+        (how_many_detail_str, sending))
+      for (((user, count), index0) <-
+          tweets_by_user_map.toSeq.sortWith(_._2 > _._2).
+          slice(0, how_many_detail).
+          zipWithIndex) {
+        val index = index0 + 1
+        errprint("#%d: User %s (%d tweets %s, %d tweets %s):",
+          index, user, count, _from, tweets_by_reply_user_map(user), _to)
+        def output_table_for_user(header: String,
+          table: mutable.Map[String, mutable.Map[String, Int]]) {
+          if (table.size > 0) {
+            errprint("#%d: %s:" format (index, header))
+            output_reverse_sorted_table(table(user), indent = "   ")
+          }
+        }
+        output_table_for_user("Corresponding user ID's by tweet count:",
+          userid_by_user)
+        output_table_for_user("Users that this user replied to:",
+          reply_user_by_user)
+        output_table_for_user("Users that relied to this user:",
+          user_by_reply_user)
+      }
+    }
+
+    reply_to_details("sending", "from", "to", tweets_by_user,
+      tweets_by_reply_user)
+    reply_to_details("receiving", "to", "from", tweets_by_reply_user,
+      tweets_by_user)
+
+    def output_x_with_multi_y(header: String, xdesc: String, ydesc: String,
+        x_to_y: mutable.Map[String, mutable.Map[String, Int]],
+        x_to_y_min_time: mutable.Map[String, mutable.Map[String, String]],
+        x_to_y_max_time: mutable.Map[String, mutable.Map[String, String]]
+      ) {
+      if (x_to_y.size > 0) {
+        print_msg_heading(header)
+        val x_with_multi_y =
+          (for ((x, ys) <- x_to_y; if ys.size > 1)
+            yield (x, ys.size))
+        for (((x, count), index) <-
+             x_with_multi_y.toSeq.sortWith(_._2 > _._2).zipWithIndex) {
+          errprint("#%d: %s %s (%d different %s's): (listed by num tweets)",
+            index + 1, xdesc, x, count, ydesc)
+          for ((y, count) <- x_to_y(x).toSeq.sortWith(_._2 > _._2)) {
+            errprint("%s%s = %s (from %s to %s)" format
+              ("   ", y, count, x_to_y_min_time(x)(y), x_to_y_max_time(x)(y)))
+          }
+        }
+      }
+    }
+
+    output_x_with_multi_y("Users with multiple user ID's:",
+      "user", "ID", userid_by_user,
+      userid_by_user_min_time, userid_by_user_max_time)
+
+    output_x_with_multi_y("User ID's with multiple users:",
+      "ID", "user", user_by_userid,
+      user_by_userid_min_time, user_by_userid_max_time)
+
+    output_x_with_multi_y("Reply users with multiple reply user ID's:",
+      "reply user", "reply ID", reply_userid_by_reply_user,
+      reply_userid_by_reply_user_min_time, reply_userid_by_reply_user_max_time)
+
+    output_x_with_multi_y("Reply ID's with multiple reply users:",
+      "reply ID", "reply user", reply_user_by_reply_userid,
+      reply_user_by_reply_userid_min_time, reply_user_by_reply_userid_max_time)
 
     print_msg_heading("Memory/time usage:", blank_lines_before = 3)
-    output_resource_usage()
+    output_resource_usage(dojava = false)
   }
 }
 
-class TwitterInfochimpsStatsFileProcessor extends
+class TwitterInfochimpsStatsFileProcessor(
+  params: ConvertTwitterInfochimpsParameters
+) extends
     TwitterInfochimpsFileProcessor {
   var curfile: String = _
   var curfile_stats: TwitterStatistics = _
-  val global_stats = new TwitterStatistics
+  val global_stats = new TwitterStatistics(params)
 
   override def begin_process_file(filehand: FileHandler, file: String) {
     val (_, outname) = filehand.split_filename(file)
     curfile = outname
-    curfile_stats = new TwitterStatistics
+    curfile_stats = new TwitterStatistics(params)
     super.begin_process_file(filehand, file)
   }
 
@@ -457,7 +513,7 @@ class TwitterInfochimpsStatsFileProcessor extends
   }
 
   override def end_processing(filehand: FileHandler, files: Iterable[String]) {
-    print_global_stats()
+    print_global_stats(is_final = true)
     super.end_processing(filehand, files)
   }
 }
@@ -476,13 +532,26 @@ store results in OUTDIR, which must not exist already.
   }
 
   override def handle_parameters() {
-    if (!params.output_stats)
+    if (params.output_all_stats) {
+      params.output_stats = true
+      params.user_stats = true
+      params.user_to_userid_stats = true
+      params.reply_user_stats = true
+    }
+    if (params.reply_user_stats) {
+      params.user_stats = true
+    }
+    if (params.output_stats) {
+      params.user_stats = true
+      params.output_min_stats = true
+    }
+    if (!params.output_min_stats)
       super.handle_parameters()
   }
 
   override def run_after_setup() {
-    if (params.output_stats)
-      new TwitterInfochimpsStatsFileProcessor().
+    if (params.output_min_stats)
+      new TwitterInfochimpsStatsFileProcessor(params).
         process_files(filehand, params.files)
     else {
       super.run_after_setup()
