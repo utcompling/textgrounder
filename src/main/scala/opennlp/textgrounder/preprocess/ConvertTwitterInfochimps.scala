@@ -129,7 +129,7 @@ class ConvertTwitterInfochimpsFileProcessor(
   var outstream: PrintStream = _
   val compression_type = "bzip2"
   var schema: Seq[String] = null
-  var schema_stream: PrintStream = _
+  var current_filehand: FileHandler = _
 
   override def begin_process_lines(lines: Iterator[String],
       filehand: FileHandler, file: String,
@@ -138,11 +138,8 @@ class ConvertTwitterInfochimpsFileProcessor(
     val out_text_name = "%s/twitter-infochimps-%s%s.txt" format (
       params.output_dir, outname, suffix)
     errprint("Text document file is %s..." format out_text_name)
+    current_filehand = filehand
     outstream = filehand.openw(out_text_name, compression = compression_type)
-    val schema_file_name =
-      "%s/twitter-infochimps%s-schema.txt" format (params.output_dir, suffix)
-    schema_stream = filehand.openw(schema_file_name)
-    errprint("Schema file is %s..." format schema_file_name)
     super.begin_process_lines(lines, filehand, file, compression, realname)
   }
 
@@ -153,6 +150,10 @@ class ConvertTwitterInfochimpsFileProcessor(
     val (schema, fieldvals) = outdata.unzip
     if (this.schema == null) {
       // Output the schema file, first time we see a line
+      val schema_file_name =
+        "%s/twitter-infochimps%s-schema.txt" format (params.output_dir, suffix)
+      val schema_stream = current_filehand.openw(schema_file_name)
+      errprint("Schema file is %s..." format schema_file_name)
       schema_stream.println(schema mkString "\t")
       schema_stream.close()
       this.schema = schema
