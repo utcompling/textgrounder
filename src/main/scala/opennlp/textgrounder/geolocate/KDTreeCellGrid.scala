@@ -51,16 +51,20 @@ class KdTreeCell(
 }
 
 object KdTreeCellGrid {
-  def apply(table: DistDocumentTable, bucketSize: Int, splitMethod: String) : KdTreeCellGrid = {
+  def apply(table: DistDocumentTable, bucketSize: Int, splitMethod: String,
+            useBackoff: Boolean) : KdTreeCellGrid = {
     new KdTreeCellGrid(table, bucketSize, splitMethod match {
       case "halfway" => KdTree.SplitMethod.HALFWAY
       case "median" => KdTree.SplitMethod.MEDIAN
       case "maxmargin" => KdTree.SplitMethod.MAX_MARGIN
-    })
+    }, useBackoff)
   }
 }
 
-class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int, splitMethod: KdTree.SplitMethod)
+class KdTreeCellGrid(table: DistDocumentTable, 
+                     bucketSize: Int,
+                     splitMethod: KdTree.SplitMethod,
+                     useBackoff: Boolean)
     extends CellGrid(table) {
   /**
    * Total number of cells in the grid.
@@ -94,7 +98,8 @@ class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int, splitMethod: KdT
     total_num_cells = kdtree.getLeaves.size
     num_non_empty_cells = total_num_cells
 
-    for (leaf <- kdtree.getLeaves) {
+    val nodes = if (useBackoff) kdtree.getNodes else kdtree.getLeaves
+    for (leaf <- nodes) {
       val c = new KdTreeCell(this, leaf)
       c.generate_dist
       leaves_to_cell.update(leaf, c)
@@ -113,7 +118,8 @@ class KdTreeCellGrid(table: DistDocumentTable, bucketSize: Int, splitMethod: KdT
    *   but have no corresponding word counts given in the counts file.)
    */
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false): Iterable[GeoCell] = {
-    for (leaf <- kdtree.getLeaves
+    val nodes = if (useBackoff) kdtree.getNodes else kdtree.getLeaves
+    for (leaf <- nodes
       if (leaf.size() > 0 || !nonempty_word_dist))
         yield leaves_to_cell(leaf)
   }
