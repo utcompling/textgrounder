@@ -40,19 +40,16 @@ class ProcessCorpusParameters(ap: ArgParser) extends
  * A file processor for reading in a corpus, processing it in some ways, and
  * writing a modified version.
  *
- * @param schema fields of the document metadata files, as determined from
- *   a schema file
- * @param filehand file handler of files to be read/written
- * @param schema_file name of file from which schema was read
  * @param suffix file suffix used in reading schema and document files
  * @param new_suffix file suffix used when writing modified schema and
  *   document files
+ * @param output_filehand file handler of output directory
  * @param output_dir output directory in which to store modified corpus
  */
 abstract class ProcessCorpusFileProcessor(
-  schema: Seq[String], filehand: FileHandler, schema_file: String,
-  suffix: String, new_suffix: String, output_dir: String
-) extends FieldTextFileProcessor(schema) {
+  suffix: String, new_suffix: String,
+  output_filehand: FileHandler, output_dir: String
+) extends DocumentCorpusFileProcessor(suffix) {
    var writer: FieldTextWriter = _
    var cur_outstream: PrintStream = _
 
@@ -63,10 +60,10 @@ abstract class ProcessCorpusFileProcessor(
   }
 
   def construct_modified_output_file(orig_file: String, file_ending: String) = {
-    val (_, base) = filehand.split_filename(orig_file)
+    val (_, base) = schema_file_filehand.split_filename(orig_file)
     val prefix = base.stripSuffix(suffix + file_ending)
     val new_base = prefix + new_suffix + file_ending
-    val new_file = filehand.join_filename(output_dir, new_base)
+    val new_file = output_filehand.join_filename(output_dir, new_base)
     new_file
   }
 
@@ -74,7 +71,7 @@ abstract class ProcessCorpusFileProcessor(
     val new_schema = compute_new_schema()
     val new_schema_file = construct_modified_output_file(schema_file,
       "-schema.txt")
-    val schema_outstream = filehand.openw(new_schema_file)
+    val schema_outstream = output_filehand.openw(new_schema_file)
     writer = new FieldTextWriter(new_schema)
     writer.output_schema(schema_outstream)
     schema_outstream.close()
@@ -100,17 +97,11 @@ abstract class ProcessCorpusFileProcessor(
     true
   }
 
-  override def filter_dir_files(filehand: FileHandler, dir: String,
-      files: Iterable[String]) = {
-    val filter = GeoDocument.make_document_file_suffix_regex(suffix)
-    for (file <- files if filter.findFirstMatchIn(file) != None) yield file
-  }
-
   override def begin_process_lines(lines: Iterator[String],
       filehand: FileHandler, file: String,
       compression: String, realname: String) {
     val new_file = construct_modified_output_file(realname, ".txt")
-    cur_outstream = filehand.openw(new_file, compression = compression)
+    cur_outstream = output_filehand.openw(new_file, compression = compression)
     super.begin_process_lines(lines, filehand, file, compression, realname)
   }
 
@@ -131,18 +122,13 @@ abstract class ProcessCorpusDriver extends ProcessFilesDriver {
   override def run_after_setup() {
     super.run_after_setup()
 
-    val schema_file =
-      GeoDocument.find_schema_file(filehand, params.input_dir,
-        get_input_corpus_suffix)
-    val schema =
-      FieldTextFileProcessor.read_schema_file(filehand, schema_file)
-    val fileproc = create_file_processor(schema, filehand, schema_file)
+    val fileproc = create_file_processor(get_input_corpus_suffix)
+    fileproc.read_schema_from_corpus(filehand, params.input_dir)
     fileproc.output_schema_file()
     fileproc.process_files(filehand, Seq(params.input_dir))
   }
 
   def get_input_corpus_suffix: String
-  def create_file_processor(schema: Seq[String], filehand: FileHandler,
-      schema_file: String): ProcessCorpusFileProcessor
+  def create_file_processor(input_suffix: String): ProcessCorpusFileProcessor
 }
 

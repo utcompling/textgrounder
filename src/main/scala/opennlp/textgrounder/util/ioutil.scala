@@ -788,21 +788,26 @@ package object ioutil {
    * the driver function.  This function in general should loop over the
    * lines, calling `parse_row` on each one.
    *
-   * @param schema List of field names for each field in the file.
-   *   Each row should have the same number of fields as there are names
-   *   in this list.
    * @param split_re Regular expression used to split one field from another.
    *   By default a tab character.
    */
 
   abstract class FieldTextFileProcessor(
-    schema: Seq[String],
     split_re: String = "\t"
   ) extends TextFileProcessor {
     var all_num_processed = 0
     var all_num_bad = 0
     var num_processed = 0
     var num_bad = 0
+
+    var schema: Seq[String] = _
+
+    /**
+     * Set the schema used for processing rows.
+     */
+    def set_schema(schema: Seq[String]) {
+      this.schema = schema
+    }
 
     override def begin_process_file(filehand: FileHandler, file: String) {
       num_processed = 0
@@ -880,7 +885,132 @@ package object ioutil {
        TextFileProcessor. */
   }
 
-  object FieldTextFileProcessor {
+  class FieldTextWriter(
+    schema: Seq[String],
+    split_text: String = "\t"
+  ) {
+    def output_schema(outstream: PrintStream) {
+      outstream.println(schema mkString split_text)
+    }
+
+    def output_row(outstream: PrintStream, fieldvals: Iterable[String]) {
+      val seqvals = fieldvals.toSeq
+      assert(seqvals.length == schema.length)
+      outstream.println(seqvals mkString split_text)
+    }
+  }
+
+  /**
+   * File processor for reading in a "corpus" of documents.  The corpus
+   * has the following format:
+   *
+   * (1) The documents are stored as field-text files, separated by a TAB
+   *     character.
+   * (2) There is a corresponding schema file, which lists the names of
+   *     each field, separated by a TAB character.
+   * (3) The document and schema files are identified by a SUFFIX.
+   *     The document files are named `*SUFFIX.txt` (or `*SUFFIX.txt.bz2` or
+   *     similar), while the schema file is named `*SUFFIX-schema.txt`.
+   *
+   * It's generally assumed that the document and schema files are placed
+   * in a single directory, and that only one corpus with a given suffix
+   * is placed in that directory (although corpora with different suffixes
+   * can coexist in the same directory).  This makes it possible to locate
+   * the schema and document files by looking for appropriately-named
+   * files in a given directory, while the files themselves can have
+   * arbitrary descriptive prefixes identifying the particular corpus
+   * involved.
+   *
+   * Generally, after creating a file processor of this sort, the schema
+   * file needs to be read using `read_schema_from_corpus`; then the document
+   * files can be processed using `process_files` (which typically takes the
+   * directory name as its argument).
+   *
+   * @param suffix the suffix of the corpus files, as described above
+   *     
+   */
+  abstract class DocumentCorpusFileProcessor(
+    suffix: String
+  ) extends FieldTextFileProcessor {
+    import DocumentCorpusFileProcessor._
+
+    var schema_file: String = _
+    var schema_file_filehand: FileHandler = _
+
+    /**
+     * Locate the schema file of the appropriate suffix in the given directory.
+     */
+    def find_schema_file(filehand: FileHandler, dir: String) = {
+      val schema_regex = make_schema_file_suffix_regex(suffix)
+      val all_files = filehand.list_files(dir)
+      val files =
+        (for (file <- all_files
+          if schema_regex.findFirstMatchIn(file) != None) yield file).toSeq
+      if (files.length == 0)
+        throw new FileFormatException(
+          "Found no schema files (matching %s) in directory %s"
+          format (schema_regex, dir))
+      if (files.length > 1)
+        throw new FileFormatException(
+          "Found multiple schema files (matching %s) in directory %s: %s"
+          format (schema_regex, dir, files))
+      files(0)
+    }
+
+    /**
+     * Locate and read the schema file of the appropriate suffix in the
+     * given directory.  Set internal variables containing the schema file
+     * and schema.
+     */
+    def read_schema_from_corpus(filehand: FileHandler, dir: String) {
+      schema_file = find_schema_file(filehand, dir)
+      schema_file_filehand = filehand
+      val schema = read_schema_file(filehand, schema_file)
+      set_schema(schema)
+    }
+
+    /**
+     * Filter function to restrict the files processed to only the
+     * document files of the appropriate suffix.
+     */
+    override def filter_dir_files(filehand: FileHandler, dir: String,
+        files: Iterable[String]) = {
+      val filter = make_document_file_suffix_regex(suffix)
+      for (file <- files if filter.findFirstMatchIn(file) != None) yield file
+    }
+  }
+
+  object DocumentCorpusFileProcessor {
+    val possible_compression_re = """(\.[a-zA-Z0-9]+)?$"""
+    /**
+     * For a given suffix, create a regular expression
+     * ([[scala.util.matching.Regex]]) that matches document files of the
+     * suffix.
+     */
+    def make_document_file_suffix_regex(suffix: String) = {
+      val re_quoted_suffix = """%s\.txt""" format suffix
+      (re_quoted_suffix + possible_compression_re).r
+    }
+    /**
+     * For a given suffix, create a regular expression
+     * ([[scala.util.matching.Regex]]) that matches schema files of the
+     * suffix.
+     */
+    def make_schema_file_suffix_regex(suffix: String) = {
+      val re_quoted_suffix = """%s-schema\.txt""" format suffix
+      (re_quoted_suffix + possible_compression_re).r
+    }
+
+    /**
+     * Read the given schema file.
+     *
+     * @param filehand File handler of schema file name.
+     * @param schema_file Name of the schema file.
+     * @param split_re Regular expression used to split the fields of the
+     *   schema file, usually TAB. (There's only one row, and each field in
+     *   the row gives the name of the corresponding field in the document
+     *   file.)
+     */
     def read_schema_file(filehand: FileHandler, schema_file: String,
         split_re: String = "\t") = {
       val lines = filehand.openr(schema_file).toList
@@ -894,21 +1024,6 @@ package object ioutil {
           "Blank field name in schema file %s: fields are %s".
           format(schema_file, schema))
       schema
-    }
-  }
-
-  class FieldTextWriter(
-    schema: Seq[String],
-    split_text: String = "\t"
-  ) {
-    def output_schema(outstream: PrintStream) {
-      outstream.println(schema mkString split_text)
-    }
-
-    def output_row(outstream: PrintStream, fieldvals: Iterable[String]) {
-      val seqvals = fieldvals.toSeq
-      assert(seqvals.length == schema.length)
-      outstream.println(seqvals mkString split_text)
     }
   }
 

@@ -39,11 +39,11 @@ class ConvertTextToUnigramCountsParameters(ap: ArgParser) extends
 }
 
 class ConvertTextToUnigramCountsFileProcessor(
-  schema: Seq[String], filehand: FileHandler, schema_file: String,
+  input_suffix: String, output_filehand: FileHandler,
   params: ConvertTextToUnigramCountsParameters
 ) extends ProcessCorpusFileProcessor(
-  schema, filehand, schema_file, "-text", "-unigram-counts",
-  params.output_dir
+  input_suffix, "-unigram-counts",
+  output_filehand, params.output_dir
 ) {
   def frob_row(fieldvals: Seq[String]) = {
     val docparams = mutable.LinkedHashMap[String, String]()
@@ -75,10 +75,8 @@ INDIR is the directory of the input corpus.
 """)
   }
 
-  def create_file_processor(schema: Seq[String], filehand: FileHandler,
-      schema_file: String) =
-    new ConvertTextToUnigramCountsFileProcessor(schema, filehand, schema_file,
-      params)
+  def create_file_processor(input_suffix: String) =
+    new ConvertTextToUnigramCountsFileProcessor(input_suffix, filehand, params)
 
   def get_input_corpus_suffix = "-text"
 }

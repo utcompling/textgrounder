@@ -173,13 +173,11 @@ class MMCUnigramWordDistHandler(
  * A simple field-text file processor that just records the documents read in,
  * by title.
  *
- * @param schema fields of the document metadata files, as determined from
- *   a schema file
- * @param filter Suffix used to select document metadata files in a directory
+ * @param suffix Suffix used to select document metadata files in a directory
  */
 class MMCDocumentFileProcessor(
-  schema: Seq[String], suffix: String
-) extends FieldTextFileProcessor(schema) {
+  suffix: String
+) extends DocumentCorpusFileProcessor(suffix) {
   val document_fieldvals = mutable.Map[String, Seq[String]]()
 
   def process_row(fieldvals: Seq[String]): Boolean = {
@@ -198,12 +196,6 @@ class MMCDocumentFileProcessor(
     }
     task.finish()
     true
-  }
-
-  override def filter_dir_files(filehand: FileHandler, dir: String,
-      files: Iterable[String]) = {
-    val filter = GeoDocument.make_document_file_suffix_regex(suffix)
-    for (file <- files if filter.findFirstMatchIn(file) != None) yield file
   }
 }
 
@@ -225,16 +217,6 @@ counts file also containing the metadata.
     need(params.output_dir, "output-dir")
     need(params.input_dir, "input-dir")
     need(params.counts_file, "counts-file")
-    if (params.output_file_prefix == null) {
-      val schema_file = GeoDocument.find_schema_file(filehand,
-        params.input_dir, GeoDocument.document_metadata_suffix)
-      var (_, base) = filehand.split_filename(schema_file)
-      params.output_file_prefix = base.replaceAll("-[^-]*$", "")
-      params.output_file_prefix =
-        params.output_file_prefix.stripSuffix("-document-metadata")
-      errprint("Settings new output-file prefix to '%s'",
-        params.output_file_prefix)
-    }
   }
 
   def setup_for_run() { }
@@ -244,18 +226,25 @@ counts file also containing the metadata.
       param_error("Output dir %s must not already exist" format
         params.output_dir)
 
-    val schema =
-      GeoDocument.read_schema_from_corpus(filehand, params.input_dir,
-        GeoDocument.document_metadata_suffix)
-
     val fileproc =
-      new MMCDocumentFileProcessor(schema,
-        GeoDocument.document_metadata_suffix)
+      new MMCDocumentFileProcessor(GeoDocument.document_metadata_suffix)
+    fileproc.read_schema_from_corpus(filehand, params.input_dir)
+
+    if (params.output_file_prefix == null) {
+      var (_, base) = filehand.split_filename(fileproc.schema_file)
+      params.output_file_prefix = base.replaceAll("-[^-]*$", "")
+      params.output_file_prefix =
+        params.output_file_prefix.stripSuffix("-document-metadata")
+      errprint("Settings new output-file prefix to '%s'",
+        params.output_file_prefix)
+    }
+
     fileproc.process_files(filehand, Seq(params.input_dir))
 
     val counts_handler =
-      new MMCUnigramWordDistHandler(schema, fileproc.document_fieldvals,
-        filehand, params.output_dir, params.output_file_prefix)
+      new MMCUnigramWordDistHandler(fileproc.schema,
+        fileproc.document_fieldvals, filehand, params.output_dir,
+        params.output_file_prefix)
     counts_handler.output_schema_file()
     counts_handler.read_word_counts(filehand, params.counts_file)
     counts_handler.finish()

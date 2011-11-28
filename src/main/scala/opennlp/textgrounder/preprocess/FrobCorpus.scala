@@ -49,16 +49,17 @@ Default '%default'.""")
  * A field-text file processor that outputs fields as the came in,
  * possibly modified in various ways.
  *
- * @param schema fields of the document metadata files, as determined from
- *   a schema file
+ * @param input_suffix suffix used to retrieve schema and document files in
+ *   in the input corpus
+ * @param output_filehand FileHandler of the output corpus (directory is
+ *   taken from parameters)
  * @param params Parameters retrieved from the command-line arguments
  */
 class FrobCorpusFileProcessor(
-  schema: Seq[String], filehand: FileHandler, schema_file: String,
+  input_suffix: String, output_filehand: FileHandler,
   params: FrobCorpusParameters
 ) extends ProcessCorpusFileProcessor(
-  schema, filehand, schema_file, params.suffix, params.suffix,
-  params.output_dir
+  input_suffix, params.suffix, output_filehand, params.output_dir
 ) {
   def frob_row(fieldvals: Seq[String]) = {
     val zipped_vals = (schema zip fieldvals)
@@ -87,10 +88,8 @@ Modify a corpus by adding and/or removing fields.  The --add-field and
 """)
   }
 
-  def create_file_processor(schema: Seq[String], filehand: FileHandler,
-      schema_file: String) =
-    new FrobCorpusFileProcessor(schema, filehand, schema_file,
-      params)
+  def create_file_processor(input_suffix: String) =
+    new FrobCorpusFileProcessor(input_suffix, filehand, params)
 
   def get_input_corpus_suffix = params.suffix
 }

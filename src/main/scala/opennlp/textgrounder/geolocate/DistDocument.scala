@@ -216,9 +216,8 @@ abstract class DistDocumentTable[CoordType : Serializer,
    * @param cell_grid Cell grid to add newly created DistDocuments to
    */
   class DistDocumentFileProcessor(
-    schema: Seq[String], suffix: String,
-    cell_grid: CellGrid[CoordType,DocumentType,_]
-  ) extends GeoDocumentFileProcessor(schema, driver) {
+    suffix: String, cell_grid: CellGrid[CoordType,DocumentType,_]
+  ) extends GeoDocumentFileProcessor(suffix, driver) {
     /**
      * List of documents that are Wikipedia redirect articles.
      */
@@ -258,12 +257,6 @@ abstract class DistDocumentTable[CoordType : Serializer,
       output_resource_usage()
       !should_stop
     }
-
-    override def filter_dir_files(filehand: FileHandler, dir: String,
-        files: Iterable[String]) = {
-      val filter = GeoDocument.make_document_file_suffix_regex(suffix)
-      for (file <- files if filter.findFirstMatchIn(file) != None) yield file
-    }
   }
 
   /**
@@ -280,11 +273,11 @@ abstract class DistDocumentTable[CoordType : Serializer,
   def read_documents(filehand: FileHandler, dir: String, suffix: String,
       cell_grid: CellGrid[CoordType,DocumentType,_]) {
 
-    val schema = GeoDocument.read_schema_from_corpus(filehand, dir, suffix)
+    val distproc = new DistDocumentFileProcessor(suffix, cell_grid)
 
-    val distproc =
-      new DistDocumentFileProcessor(schema, suffix, cell_grid)
+    distproc.read_schema_from_corpus(filehand, dir)
     distproc.process_files(filehand, Seq(dir))
+
     for (x <- distproc.redirects) {
       val reddoc = lookup_document(x.redir)
       if (reddoc != null)
@@ -395,13 +388,6 @@ abstract class DistDocument[CoordType : Serializer](
       }
       true
     } else super.handle_parameter(name, v)
-  }
-
-  override def toString() = {
-    var coordstr = if (optcoord != None) " at %s" format coord else ""
-    val redirstr =
-      if (redir.length > 0) ", redirect to %s" format redir else ""
-    "%s(%s)%s%s" format (title, id, coordstr, redirstr)
   }
 
   // def __repr__() = "DistDocument(%s)" format toString.encode("utf-8")

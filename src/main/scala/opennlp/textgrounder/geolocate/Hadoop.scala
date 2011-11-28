@@ -490,9 +490,8 @@ class DocumentEvaluationMapper extends
   val task = new MeteredTask("document", "evaluating")
 
   class HadoopDocumentFileProcessor(
-    schema: Seq[String],
     context: ContextType
-  ) extends GeoDocumentFileProcessor(schema, driver) {
+  ) extends GeoDocumentFileProcessor(driver.document_file_suffix, driver) {
     override def get_shortfile =
       filename_to_counter_name(driver.get_file_handler,
         driver.get_configuration.get("map.input.file"))
@@ -553,11 +552,9 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
       driver.params.parser.error(
         "FIXME: For Hadoop, currently need exactly one corpus")
     } else {
-      val schema =
-        GeoDocument.read_schema_from_corpus(driver.get_file_handler,
-          driver.params.input_corpus(0),
-          driver.document_file_suffix)
-      processor = new HadoopDocumentFileProcessor(schema, context)
+      processor = new HadoopDocumentFileProcessor(context)
+      processor.read_schema_from_corpus(driver.get_file_handler,
+          driver.params.input_corpus(0))
     }
   }
 

@@ -44,9 +44,9 @@ case class DocumentValidationException(
  * @param dstats ExperimentDriverStats used for 
  */
 abstract class GeoDocumentFileProcessor(
-  schema: Seq[String],
+  suffix: String,
   val dstats: ExperimentDriverStats
-) extends FieldTextFileProcessor(schema) {
+) extends DocumentCorpusFileProcessor(suffix) {
 
   /******** Counters to track what's going on ********/
 
@@ -265,15 +265,6 @@ abstract class GeoDocument[CoordType : Serializer](
 }
 
 object GeoDocument {
-  val possible_compression_re = """(\.[a-zA-Z0-9]+)?$"""
-  def make_document_file_suffix_regex(suffix: String) = {
-    val re_quoted_suffix = """%s\.txt""" format suffix
-    (re_quoted_suffix + possible_compression_re).r
-  }
-  def make_schema_file_suffix_regex(suffix: String) = {
-    val re_quoted_suffix = """%s-schema\.txt""" format suffix
-    (re_quoted_suffix + possible_compression_re).r
-  }
   val document_metadata_suffix = "-document-metadata"
   val unigram_counts_suffix = "-unigram-counts"
   val bigram_counts_suffix = "-bigram-counts"
@@ -307,29 +298,6 @@ object GeoDocument {
 
   // val fixed_fields = Seq("corpus", "title", "id", "split", "coord")
   // val wikipedia_fields = Seq("incoming_links", "redir")
-
-  def find_schema_file(filehand: FileHandler, dir: String, suffix: String) = {
-    val schema_regex = make_schema_file_suffix_regex(suffix)
-    val all_files = filehand.list_files(dir)
-    val files =
-      (for (file <- all_files
-        if schema_regex.findFirstMatchIn(file) != None) yield file).toSeq
-    if (files.length == 0)
-      throw new FileFormatException(
-        "Found no schema files (matching %s) in directory %s"
-        format (schema_regex, dir))
-    if (files.length > 1)
-      throw new FileFormatException(
-        "Found multiple schema files (matching %s) in directory %s: %s"
-        format (schema_regex, dir, files))
-    files(0)
-  }
-
-  def read_schema_from_corpus(filehand: FileHandler, dir: String,
-      suffix: String) = {
-    val schema_file = find_schema_file(filehand, dir, suffix)
-    FieldTextFileProcessor.read_schema_file(filehand, schema_file)
-  }
 
   /**
    * Compute the short form of a document name.  If short form includes a
