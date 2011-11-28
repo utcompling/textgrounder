@@ -168,25 +168,29 @@ package object collectionutil {
    * value is the "zero" value for the primitive (0, 0L, 0.0 or false).
    * Note that this will "work", at least syntactically, for non-primitive
    * types, but will set the default value to null, which is probably not
-   * what is wanted.
+   * what is wanted. (FIXME: Sort of.  It works but if you try to print
+   * a result -- or more generally, pass to a function that accepts Any --
+   * the boxed version shows up and you get null instead of 0.)
    *
    * @see #defaultmap[T,U]
    */
-  def primmap[T,U]() = defaultmap[T,U](null.asInstanceOf[U])
+  def primmap[T,@specialized U](default: U = null.asInstanceOf[U]) = {
+    defaultmap[T,U](default)
+  }
 
   /**
    * A default map from type T to an Int, with 0 as the default value.
    *
    * @see #defaultmap[T,U]
-   * @see #primmap[T,U]
    */
-  def intmap[T]() = primmap[T,Int]()
-  def longmap[T]() = primmap[T,Long]()
-  def shortmap[T]() = primmap[T,Short]()
-  def bytemap[T]() = primmap[T,Byte]()
-  def doublemap[T]() = primmap[T,Double]()
-  def floatmap[T]() = primmap[T,Float]()
-  def booleanmap[T]() = primmap[T,Boolean]()
+  def intmap[T](default: Int = 0) = defaultmap[T,Int](default)
+  //def intmap[T]() = primmap[T,Int]()
+  def longmap[T](default: Long = 0L) = defaultmap[T,Long](default)
+  def shortmap[T](default: Short = 0) = defaultmap[T,Short](default)
+  def bytemap[T](default: Byte = 0) = defaultmap[T,Byte](default)
+  def doublemap[T](default: Double = 0.0d) = defaultmap[T,Double](default)
+  def floatmap[T](default: Float = 0.0f) = defaultmap[T,Float](default)
+  def booleanmap[T](default: Boolean = false) = defaultmap[T,Boolean](default)
 
   /**
    * A default map from type T to a string, with an empty string as the
@@ -194,7 +198,7 @@ package object collectionutil {
    *
    * @see #defaultmap[T,U]
    */
-  def stringmap[T]() = defaultmap[T,String]("")
+  def stringmap[T](default: String = "") = defaultmap[T,String](default)
 
   /**
    * A default map which maps from T to an (extendable) array of type U.
@@ -245,11 +249,23 @@ package object collectionutil {
    * associated with `key`, it will be initialized to the zero value
    * for type V.
    *
+   * FIXME: Warning, doesn't always do what you want, whereas e.g.
+   * `intmapmap` always will.
+   *
    * @see #mapmap[T,U,V]
    */
-  def primmapmap[T,U,V]() =
-    collection_defaultmap[T,mutable.Map[U,V]](primmap[U,V]())
+   def primmapmap[T,U,V](default: V = null.asInstanceOf[V]) =
+    collection_defaultmap[T,mutable.Map[U,V]](primmap[U,V](default))
   
+  def intmapmap[T,U](default: Int = 0) =
+    collection_defaultmap[T,mutable.Map[U,Int]](intmap[U](default))
+  def longmapmap[T,U](default: Long = 0L) =
+    collection_defaultmap[T,mutable.Map[U,Long]](longmap[U](default))
+  def doublemapmap[T,U](default: Double = 0.0d) =
+    collection_defaultmap[T,mutable.Map[U,Double]](doublemap[U](default))
+  def stringmapmap[T,U](default: String = "") =
+    collection_defaultmap[T,mutable.Map[U,String]](stringmap[U](default))
+
   // Another way to do this, using subclassing.
   //
   // abstract class defaultmap[From,To] extends HashMap[From, To] {
