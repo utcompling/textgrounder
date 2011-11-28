@@ -613,6 +613,9 @@ splits leaves to have an equal number of documents, and 'maxmargin',
 which splits at the maximum margin between two points. All splits are always
 on the longest dimension. Default '%default'.""")
 
+  var kd_use_backoff = 
+    ap.option[Boolean]("kd-backoff", "kd-use-backoff", default=false,
+      help = """Specifies if we should back off to larger cell distributions.""")
 
 
   //// Options used when creating word distributions
@@ -848,7 +851,7 @@ abstract class GeolocateDriver extends
 
   protected def initialize_cell_grid(table: SphereDocumentTable) = {
     if (params.kd_tree)
-      KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method)
+      KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method, params.kd_use_backoff)
     else
       new MultiRegularCellGrid(degrees_per_cell,
         params.width_of_multi_cell, table)
