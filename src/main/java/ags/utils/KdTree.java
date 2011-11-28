@@ -100,16 +100,25 @@ public class KdTree<T> {
 
     public ArrayList<T> getData() {
         ArrayList<T> outData = new ArrayList<T>();
-        if (data == null)
-            return outData;
-        for (int i = 0; i < locationCount; i++) {
-            // No way around the warning other than either to suppress it,
-            // or not use Object[] arrays.
-            @SuppressWarnings("unchecked")
-            T suppress_warning = (T) data[i];
-            outData.add(suppress_warning);
-        }
+        getDataHelper(outData);
         return outData;
+    }
+
+    private void getDataHelper(ArrayList<T> lst) {
+        if (left == null || right == null) {
+            // found a leaf. add its data
+            if (data == null)
+                // make sure we *have* data
+                return;
+            for (int i=0; i<locationCount; i++) {
+                @SuppressWarnings("unchecked")
+                T suppress_warning = (T) data[i];
+                lst.add(suppress_warning);
+            }
+        } else {
+            left.getDataHelper(lst);
+            right.getDataHelper(lst);
+        }
     }
 
     public KdTree<T> getLeaf(double[] location) {
@@ -291,20 +300,32 @@ public class KdTree<T> {
         return widest;
     }
 
-    public List<KdTree<T>> getLeaves(){
+    public List<KdTree<T>> getNodes() {
         List<KdTree<T>> list = new ArrayList<KdTree<T>>();
-        this.helper(list);
+        this.getNodesHelper(list);
+        return list;
+    }
+
+    private void getNodesHelper(List<KdTree<T>> list) {
+        list.add(this);
+        if (left != null) left.getNodesHelper(list);
+        if (right != null) right.getNodesHelper(list);
+    }
+
+    public List<KdTree<T>> getLeaves() {
+        List<KdTree<T>> list = new ArrayList<KdTree<T>>();
+        this.getLeavesHelper(list);
         return list;
     }
     
-    private void helper(List<KdTree<T>> list ){
-        if(this.left == null && this.right==null)
+    private void getLeavesHelper(List<KdTree<T>> list) {
+        if (left == null && right == null)
             list.add(this);
         else{
-            if(this.left != null)
-                this.left.helper(list);
-            if(this.right != null)
-                this.right.helper(list);
+            if (left != null)
+                left.getLeavesHelper(list);
+            if (right != null)
+                right.getLeavesHelper(list);
         }
     }
     
