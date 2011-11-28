@@ -44,7 +44,7 @@ beginning.""")
       metavar = "FIELD",
       help = """Field to remove.""")
   val set_split_by_value =
-    ap.multiOption[String]("set-split-by-value",
+    ap.option[String]("set-split-by-value",
       metavar = "SPLIT-VALUE",
       help = """Set the training/dev/test splits by the value of another field
 (e.g. by time).  The argument should be of the form
@@ -54,7 +54,7 @@ into the dev split; and higher values go into the test split.  Comparison is
 lexicographically (i.e. string comparison, rather than numeric).""")
 
   var split_field: String = null
-  var max_train_val: String = null
+  var max_training_val: String = null
   var max_dev_val: String = null
 }
 
@@ -86,6 +86,14 @@ class FrobCorpusFileProcessor(
     docparams ++= zipped_vals
     for (field <- params.remove_field)
       docparams -= field
+    if (params.split_field != null) {
+      if (docparams(params.split_field) <= params.max_training_val)
+        docparams("split") = "training"
+      else if (docparams(params.split_field) <= params.max_dev_val)
+        docparams("split") = "dev"
+      else
+        docparams("split") = "test"
+    }
     docparams.toSeq
   }
 }
@@ -99,6 +107,17 @@ class FrobCorpusDriver extends ProcessCorpusDriver {
 Modify a corpus by adding and/or removing fields.  The --add-field and
 --remove-field arguments can be given multiple times.
 """)
+  }
+
+  override def handle_parameters() {
+    if (params.set_split_by_value != null) {
+      val Array(split_field, training_max, dev_max) =
+        params.set_split_by_value.split(",")
+      params.split_field = split_field
+      params.max_training_val = training_max
+      params.max_dev_val = dev_max
+    }
+    super.handle_parameters()
   }
 
   def create_file_processor(input_suffix: String) =
