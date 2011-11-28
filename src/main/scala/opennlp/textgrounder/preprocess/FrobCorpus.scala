@@ -28,6 +28,12 @@ import opennlp.textgrounder.util.ioutil.FileHandler
 
 class FrobCorpusParameters(ap: ArgParser) extends
     ProcessCorpusParameters(ap) {
+  val suffix =
+    ap.option[String]("s", "suffix",
+      default = "unigram-counts",
+      metavar = "DIR",
+      help = """Suffix used to select the appropriate files to operate on.
+Default '%default'.""")
   val add_field =
     ap.multiOption[String]("a", "add-field",
       help = """Field to add, of the form FIELD=VAL, e.g.
@@ -37,12 +43,19 @@ beginning.""")
     ap.multiOption[String]("r", "remove-field",
       metavar = "FIELD",
       help = """Field to remove.""")
-  val suffix =
-    ap.option[String]("s", "suffix",
-      default = "unigram-counts",
-      metavar = "DIR",
-      help = """Suffix used to select the appropriate files to operate on.
-Default '%default'.""")
+  val set_split_by_value =
+    ap.multiOption[String]("set-split-by-value",
+      metavar = "SPLIT-VALUE",
+      help = """Set the training/dev/test splits by the value of another field
+(e.g. by time).  The argument should be of the form
+SPLITFIELD,MAX-TRAIN-VAL,MAX-DEV-VAL.  For the field named SPLITFIELD,
+values <= MAX-TRAIN-VAL go into the training split; values <= MAX-DEV-VAL go
+into the dev split; and higher values go into the test split.  Comparison is
+lexicographically (i.e. string comparison, rather than numeric).""")
+
+  var split_field: String = null
+  var max_train_val: String = null
+  var max_dev_val: String = null
 }
 
 /**
