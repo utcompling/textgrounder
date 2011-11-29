@@ -132,6 +132,7 @@ class GenerateKMLDriver extends
   override def handle_parameters() {
     super.handle_parameters()
     need(params.kml_words, "kml-words")
+    params.split_kml_words = params.kml_words.split(',')
   }
 
   override def initialize_word_dist_factory_and_suffix() = {
@@ -146,7 +147,6 @@ class GenerateKMLDriver extends
 
   def run_after_setup() = {
     val cdist_factory = new SphereCellDistFactory(params.lru_cache_size)
-    params.split_kml_words = params.kml_words.split(',')
     for (word <- params.split_kml_words) {
       val celldist = cdist_factory.get_cell_dist(cell_grid, memoize_word(word))
       if (!celldist.normalized) {
