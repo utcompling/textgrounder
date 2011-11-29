@@ -426,7 +426,6 @@ class SphereGroupedGeolocateDocumentEvalStats(
      } else if (cell_grid.isInstanceOf[KdTreeCellGrid]) {
        // for kd trees, we do something similar to above, but round to the nearest km...
        val kdgrid = cell_grid.asInstanceOf[KdTreeCellGrid]
-       all_document.record_oracle_result(res.true_truedist, res.true_degdist)
        docs_by_true_dist_to_true_center(round(res.true_truedist)).
          record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
        docs_by_degree_dist_to_true_center(round(res.true_degdist)).
