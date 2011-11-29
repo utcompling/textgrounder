@@ -33,8 +33,27 @@ import GeolocateDriver.Debug._
 /////////////////////////////////////////////////////////////////////////////
 
 case class DocumentValidationException(
-  message: String
-) extends Exception(message) { }
+  message: String,
+  cause: Option[Throwable] = None
+) extends Exception(message) {
+  if (cause != None)
+    initCause(cause.get)
+
+  /**
+   * Alternate constructor.
+   *
+   * @param message  exception message
+   */
+  def this(msg: String) = this(msg, None)
+
+  /**
+   * Alternate constructor.
+   *
+   * @param message  exception message
+   * @param cause    wrapped, or nested, exception
+   */
+  def this(msg: String, cause: Throwable) = this(msg, Some(cause))
+}
 
 /**
  * A file processor that reads document files from a corpora.
@@ -118,8 +137,10 @@ abstract class GeoDocumentFileProcessor(
       val was_accepted =
         try { handle_document(fieldvals) }
         catch {
-          case e@DocumentValidationException(msg) => {
-            warning("Line %s: %s", num_processed + 1, msg)
+          case e:DocumentValidationException => {
+            warning("Line %s: %s", num_processed + 1, e.message)
+            if (debug("stack-trace") || debug("stacktrace"))
+              e.printStackTrace
             return false
           }
         }
@@ -211,15 +232,19 @@ abstract class GeoDocument[CoordType : Serializer](
   val params =
     (for ((name, v) <- (schema zip fieldvals)) yield {
       val handled =
-        try { handle_parameter(name, v) }
-        catch {
-          case e@_ => {
-            val msg =
-              "Bad value %s for field '%s': %s" format (v, name, e.toString)
-            throw DocumentValidationException(msg)
+        if (debug("rethrow"))
+          handle_parameter(name, v)
+        else {
+          try { handle_parameter(name, v) }
+          catch {
+            case e@_ => {
+              val msg =
+                "Bad value %s for field '%s': %s" format (v, name, e.toString)
+              throw new DocumentValidationException(msg, e)
+            }
           }
         }
-        if (handled) Nil else List(name -> v)
+      if (handled) Nil else List(name -> v)
     }).flatten.toMap
 
   def handle_parameter(name: String, v: String) = {
