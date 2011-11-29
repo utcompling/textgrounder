@@ -55,6 +55,7 @@ file is generated for each word, using the value of '--kml-prefix' and adding
 '.kml' to it.""")
   // Same as above but a sequence
   var split_kml_words:Seq[String] = _
+  var split_kml_words_memoized:Seq[Word] = _
   var kml_prefix =
     ap.option[String]("kml-prefix", "kp",
       default = "kml-dist.",
@@ -80,15 +81,16 @@ low values more visible.  Possibilities are 'none' (no transformation),
 /* A factory that filters the distributions to contain only the words we
    care about, to save memory and time. */
 class FilterPseudoGoodTuringSmoothedWordDistFactory(
-    filter_words: Seq[String]
+    filter_words: Seq[Word]
   ) extends PseudoGoodTuringSmoothedWordDistFactory {
+  val oov = memoize_word("-OOV-")
   override def set_unigram_word_dist(doc: GenericDistDocument,
       keys: Array[Word], values: Array[Int], num_words: Int,
       is_training_set: Boolean) = {
     val (newkeys, newvalues) =
-      (for ((k, v) <- (keys zip values).take(num_words)
-           if filter_words contains k)
-        yield (k, v)).unzip
+      (for ((k, v) <- (keys zip values).take(num_words);
+           newk = if (filter_words contains k) k else oov)
+         yield (k, v)).unzip
     doc.dist = new PseudoGoodTuringSmoothedWordDist(this,
         newkeys.toArray, newvalues.toArray, newkeys.length,
         note_globally = is_training_set)
@@ -133,10 +135,13 @@ class GenerateKMLDriver extends
     super.handle_parameters()
     need(params.kml_words, "kml-words")
     params.split_kml_words = params.kml_words.split(',')
+    params.split_kml_words_memoized =
+      for (w <- params.split_kml_words) yield memoize_word(w)
   }
 
   override def initialize_word_dist_factory_and_suffix() = {
-    (new FilterPseudoGoodTuringSmoothedWordDistFactory(params.split_kml_words),
+    (new FilterPseudoGoodTuringSmoothedWordDistFactory(
+      params.split_kml_words_memoized),
       GeoDocument.unigram_counts_suffix)
   }
 
