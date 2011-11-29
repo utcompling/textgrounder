@@ -929,10 +929,10 @@ package object ioutil {
    * @param suffix the suffix of the corpus files, as described above
    *     
    */
-  abstract class DocumentCorpusFileProcessor(
+  abstract class CorpusFileProcessor(
     suffix: String
   ) extends FieldTextFileProcessor {
-    import DocumentCorpusFileProcessor._
+    import CorpusFileProcessor._
 
     var schema_file: String = _
     var schema_file_filehand: FileHandler = _
@@ -980,7 +980,7 @@ package object ioutil {
     }
   }
 
-  object DocumentCorpusFileProcessor {
+  object CorpusFileProcessor {
     val possible_compression_re = """(\.[a-zA-Z0-9]+)?$"""
     /**
      * For a given suffix, create a regular expression

@@ -46,7 +46,7 @@ case class DocumentValidationException(
 abstract class GeoDocumentFileProcessor(
   suffix: String,
   val dstats: ExperimentDriverStats
-) extends DocumentCorpusFileProcessor(suffix) {
+) extends CorpusFileProcessor(suffix) {
 
   /******** Counters to track what's going on ********/
 
