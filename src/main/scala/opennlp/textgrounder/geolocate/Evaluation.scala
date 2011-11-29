@@ -685,6 +685,12 @@ class InternalGeolocateDocumentEvaluator(
     val result =
       new SphereDocumentEvaluationResult(document, pred_cells(0)._1, true_rank)
 
+    if (debug("all-scores")) {
+      for (((cell, value), index) <- pred_cells.zipWithIndex) {
+        errprint("%s: %6d: Cell at %s: score = %g", doctag, index + 1,
+          cell.describe_indices(), value)
+      }
+    }
     val want_indiv_results =
       !driver.params.oracle_results && !driver.params.no_individual_results
     evalstats.record_result(result)
