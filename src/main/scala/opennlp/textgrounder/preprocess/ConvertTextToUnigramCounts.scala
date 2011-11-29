@@ -42,7 +42,7 @@ class ConvertTextToUnigramCountsFileProcessor(
   input_suffix: String, output_filehand: FileHandler,
   params: ConvertTextToUnigramCountsParameters
 ) extends ProcessCorpusFileProcessor(
-  input_suffix, "-unigram-counts",
+  input_suffix, "unigram-counts",
   output_filehand, params.output_dir
 ) {
   def frob_row(fieldvals: Seq[String]) = {
@@ -69,7 +69,7 @@ class ConvertTextToUnigramCountsDriver extends
   def create_file_processor(input_suffix: String) =
     new ConvertTextToUnigramCountsFileProcessor(input_suffix, filehand, params)
 
-  def get_input_corpus_suffix = "-text"
+  def get_input_corpus_suffix = "text"
 }
 
 //class ScoobiConvertTextToUnigramCountsDriver extends

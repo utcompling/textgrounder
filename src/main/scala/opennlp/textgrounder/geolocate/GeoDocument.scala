@@ -265,10 +265,10 @@ abstract class GeoDocument[CoordType : Serializer](
 }
 
 object GeoDocument {
-  val document_metadata_suffix = "-document-metadata"
-  val unigram_counts_suffix = "-unigram-counts"
-  val bigram_counts_suffix = "-bigram-counts"
-  val text_suffix = "-text"
+  val document_metadata_suffix = "document-metadata"
+  val unigram_counts_suffix = "unigram-counts"
+  val bigram_counts_suffix = "bigram-counts"
+  val text_suffix = "text"
 
   /**
    * Encode a word for placement inside a "counts" field.  Colons and spaces

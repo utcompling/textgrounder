@@ -163,7 +163,7 @@ class ConvertTwitterInfochimpsFileProcessor(
       filehand: FileHandler, file: String,
       compression: String, realname: String) {
     val (_, outname) = filehand.split_filename(realname)
-    val out_text_name = "%s/twitter-infochimps-%s%s.txt" format (
+    val out_text_name = "%s/twitter-infochimps-%s-%s.txt" format (
       params.output_dir, outname, suffix)
     errprint("Text document file is %s..." format out_text_name)
     current_filehand = filehand
@@ -179,7 +179,7 @@ class ConvertTwitterInfochimpsFileProcessor(
     if (this.schema == null) {
       // Output the schema file, first time we see a line
       val schema_file_name =
-        "%s/twitter-infochimps%s-schema.txt" format (params.output_dir, suffix)
+        "%s/twitter-infochimps-%s-schema.txt" format (params.output_dir, suffix)
       val schema_stream = current_filehand.openw(schema_file_name)
       errprint("Schema file is %s..." format schema_file_name)
       schema_stream.println(schema mkString "\t")
@@ -545,7 +545,7 @@ class ConvertTwitterInfochimpsDriver extends ProcessFilesDriver {
         process_files(filehand, params.files)
     else {
       super.run_after_setup()
-      new ConvertTwitterInfochimpsFileProcessor(params, "-text").
+      new ConvertTwitterInfochimpsFileProcessor(params, "text").
         process_files(filehand, params.files)
     }
   }

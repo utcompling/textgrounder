@@ -287,7 +287,7 @@ abstract class HadoopGeolocateApp(
     initialize_hadoop_classes(job)
     // FIXME: Big hack here.
     for (file <- params.input_corpus) {
-      val hadoop_path = file + "/*" + driver.document_file_suffix + ".txt*"
+      val hadoop_path = file + "/*-" + driver.document_file_suffix + ".txt*"
       FileInputFormat.addInputPath(job, new Path(hadoop_path))
     }
     FileOutputFormat.setOutputPath(job, new Path(params.outfile))
