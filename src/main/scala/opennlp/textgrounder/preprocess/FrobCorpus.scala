@@ -36,22 +36,23 @@ class FrobCorpusParameters(ap: ArgParser) extends
 Default '%default'.""")
   val add_field =
     ap.multiOption[String]("a", "add-field",
-      help = """Field to add, of the form FIELD=VAL, e.g.
-'corpus=twitter-geotext-output-5-docthresh'.  Fields are added at the
-beginning.""")
+      metavar = "FIELD=VALUE",
+      help = """Add a field named FIELD, with the value VALUE, to all rows.
+Fields are added at the beginning.  If this argument is given multiple times,
+the fields are added in order.""")
   val remove_field =
     ap.multiOption[String]("r", "remove-field",
       metavar = "FIELD",
-      help = """Field to remove.""")
+      help = """Remove a field from all rows.""")
   val set_split_by_value =
     ap.option[String]("set-split-by-value",
-      metavar = "SPLIT-VALUE",
-      help = """Set the training/dev/test splits by the value of another field
-(e.g. by time).  The argument should be of the form
-SPLITFIELD,MAX-TRAIN-VAL,MAX-DEV-VAL.  For the field named SPLITFIELD,
-values <= MAX-TRAIN-VAL go into the training split; values <= MAX-DEV-VAL go
-into the dev split; and higher values go into the test split.  Comparison is
-lexicographically (i.e. string comparison, rather than numeric).""")
+      metavar = "SPLITFIELD,MAX-TRAIN-VAL,MAX-DEV-VAL",
+      help = """Set the "split" field to one of "training", "dev" or "test"
+according to the value of another field (e.g. by time).  For the field named
+SPLITFIELD, values <= MAX-TRAIN-VAL go into the training split;
+values <= MAX-DEV-VAL go into the dev split; and higher values go into the
+test split.  Comparison is lexicographically (i.e. string comparison,
+rather than numeric).""")
 
   var split_field: String = null
   var max_training_val: String = null
@@ -101,14 +102,6 @@ class FrobCorpusFileProcessor(
 class FrobCorpusDriver extends ProcessCorpusDriver {
   type ParamType = FrobCorpusParameters
   
-  def usage() {
-    sys.error("""Usage: FrobCorpus [-i INDIR | --input-dir INDIR] [-o OUTDIR | --output-dir OUTDIR] [-s SUFFIX | --suffix SUFFIX] [-a FIELD=VALUE | --add-field FIELD_VALUE] [-r FIELD | --remove-field FIELD] ...
-
-Modify a corpus by adding and/or removing fields.  The --add-field and
---remove-field arguments can be given multiple times.
-""")
-  }
-
   override def handle_parameters() {
     if (params.set_split_by_value != null) {
       val Array(split_field, training_max, dev_max) =
@@ -127,8 +120,15 @@ Modify a corpus by adding and/or removing fields.  The --add-field and
 }
 
 object FrobCorpus extends
-    ExperimentDriverApp("Frob a corpus, adding or removing fields") {
+    ExperimentDriverApp("FrobCorpus") {
   type DriverType = FrobCorpusDriver
+
+  override def description =
+"""Modify a corpus by changing particular fields.  Fields can be added
+(--add-field) or removed (--remove-field), and the "split" field can be
+set based on the value of another field.
+"""
+
   def create_param_object(ap: ArgParser) = new ParamType(ap)
   def create_driver() = new DriverType
 }

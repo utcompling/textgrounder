@@ -676,14 +676,28 @@ package object argparser {
    * Main class for parsing arguments from a command line.
    *
    * @param prog Name of program being run, for the usage mssage.
+   * @param description Text describing the operation of the program.  It is
+   *   placed between the line "Usage: ..." and the text describing the
+   *   options and positional arguments; hence, it should not include either
+   *   of these, just a description.
+   * @param preUsage Optional text placed before the usage message (e.g.
+   *   a copyright and/or version string).
+   * @param postUsage Optional text placed after the usage message.
    * @param return_defaults If true, field values in field-based value
    *  access always return the default value, even aft3r parsing.
    */
-  class ArgParser(prog: String, return_defaults: Boolean = false) {
+  class ArgParser(prog: String,
+      description: String = "",
+      preUsage: String = "",
+      postUsage: String = "",
+      return_defaults: Boolean = false) {
     import ArgParser._
     import ArgotConverters._
     /* The underlying ArgotParser object. */
-    protected val argot = new ArgotParser(prog)
+    protected val argot = new ArgotParser(prog,
+      description = if (description.length > 0) Some(description) else None,
+      preUsage = if (preUsage.length > 0) Some(preUsage) else None,
+      postUsage = if (postUsage.length > 0) Some(postUsage) else None)
     /* A map from the argument's canonical name to the subclass of ArgAny
        describing the argument and holding its value.  The canonical name
        of options comes from the first non-single-letter name.  The

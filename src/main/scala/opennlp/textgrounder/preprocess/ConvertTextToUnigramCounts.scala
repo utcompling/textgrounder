@@ -66,15 +66,6 @@ class ConvertTextToUnigramCountsDriver extends
     ProcessCorpusDriver {
   type ParamType = ConvertTextToUnigramCountsParameters
 
-  def usage() {
-    sys.error("""Usage: ConvertTextToUnigramCounts [-u INDIR | --input-dir INDIR] [-o OUTDIR | --output-dir OUTDIR]
-
-Convert a corpus from raw-text format to unigram-counts format.  OUTDIR is
-the directory to store the output corpus in, which must not exist already.
-INDIR is the directory of the input corpus.
-""")
-  }
-
   def create_file_processor(input_suffix: String) =
     new ConvertTextToUnigramCountsFileProcessor(input_suffix, filehand, params)
 
@@ -129,8 +120,15 @@ INDIR is the directory of the input corpus.
 //}
 
 object ConvertTextToUnigramCounts extends
-    ExperimentDriverApp("Convert raw text to unigram counts") {
+    ExperimentDriverApp("ConvertTextToUnigramCounts") {
   type DriverType = ConvertTextToUnigramCountsDriver
+
+  override def description =
+"""Convert a corpus from raw-text format to unigram-counts format.  OUTDIR is
+the directory to store the output corpus in, which must not exist already.
+INDIR is the directory of the input corpus.
+"""
+
   def create_param_object(ap: ArgParser) = new ParamType(ap)
   def create_driver() = new DriverType
 }

@@ -521,16 +521,6 @@ class TwitterInfochimpsStatsFileProcessor(
 class ConvertTwitterInfochimpsDriver extends ProcessFilesDriver {
   type ParamType = ConvertTwitterInfochimpsParameters
   
-  def usage() {
-    sys.error("""Usage: ConvertTwitterInfochimps [-o OUTDIR | --outfile OUTDIR] [--output-stats] INFILE ...
-
-Convert input files in the Infochimps Twitter corpus into files in the
-format expected by TextGrounder.  If --output-stats is given,
-output statistics to stderr rather than converting text.  Otherwise,
-store results in OUTDIR, which must not exist already.  
-""")
-  }
-
   override def handle_parameters() {
     if (params.output_all_stats) {
       params.output_stats = true
@@ -562,8 +552,15 @@ store results in OUTDIR, which must not exist already.
 }
 
 object ConvertTwitterInfochimps extends
-    ExperimentDriverApp("Convert Twitter Infochimps") {
+    ExperimentDriverApp("ConvertTwitterInfochimps") {
   type DriverType = ConvertTwitterInfochimpsDriver
+  
+  override def description =
+"""Convert input files in the Infochimps Twitter corpus into files in the
+format expected by TextGrounder.  If --output-stats or a related argument
+is given, output statistics to stderr rather than converting text.
+"""
+
   def create_param_object(ap: ArgParser) = new ParamType(ap)
   def create_driver() = new DriverType
 }
