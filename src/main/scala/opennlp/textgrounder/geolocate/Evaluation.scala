@@ -297,7 +297,7 @@ abstract class GroupedGeolocateDocumentEvalStats[CoordType,
   }
 
   def record_one_oracle_result(stats: BasicEvalStatsType, res: DocumentEvaluationResultType) {
-    stats.record_oracle_result(res.pred_truedist)
+    stats.record_oracle_result(res.true_truedist)
   }
 
   def record_result(res: DocumentEvaluationResultType) {
@@ -376,7 +376,7 @@ class SphereGroupedGeolocateDocumentEvalStats(
 
   override def record_one_oracle_result(stats: BasicEvalStatsType,
       res: DocumentEvaluationResultType) {
-    stats.record_oracle_result(res.pred_truedist, res.pred_degdist)
+    stats.record_oracle_result(res.true_truedist, res.true_degdist)
   }
 
   override def record_result_by_range(res: DocumentEvaluationResultType) {
