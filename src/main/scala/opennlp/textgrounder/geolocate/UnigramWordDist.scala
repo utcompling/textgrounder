@@ -44,19 +44,24 @@ import GenericTypes._
  *   statistics.
  */
 
-abstract class UnigramWordDist(
-  keys: Array[Word],
-  values: Array[Int],
-  num_words: Int
-) extends WordDist with FastSlowKLDivergence {
+abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
   /** A map (or possibly a "sorted list" of tuples, to save memory?) of
       (word, count) items, specifying the counts of all words seen
       at least once.
    */
   val counts = create_word_int_map()
-  for (i <- 0 until num_words)
-    counts(keys(i)) = values(i)
-  var num_word_tokens = counts.values.sum
+  var num_word_tokens = 0
+
+  /** Heap analysis revealed that Scala has holding the keys and values
+      (but not `num_words`) as local variables when they were constructors;
+      doesn't seem a good idea.  By redoing it this way, we avoid the
+      problem. */
+  def this(keys: Array[Word], values: Array[Int], num_words: Int) {
+    this()
+    for (i <- 0 until num_words)
+      counts(keys(i)) = values(i)
+    num_word_tokens = counts.values.sum
+  }
   
   def num_word_types = counts.size
 
