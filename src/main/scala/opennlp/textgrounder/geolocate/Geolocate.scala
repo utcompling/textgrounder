@@ -887,6 +887,10 @@ abstract class GeolocateDriver extends
     // This accesses the stopwords through the pointer to this in
     // document_table.
     read_documents(document_table)
+    if (debug("stop-after-reading-dists")) {
+      errprint("Stopping abruptly because debug flag stop-after-reading-dists set")
+      System.exit(0)
+    }
     cell_grid.finish()
   }
 
