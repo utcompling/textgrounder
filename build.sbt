@@ -35,7 +35,12 @@ libraryDependencies ++= Seq(
   // The use of %% instead of % causes the Scala version to get appended,
   // i.e. it's equivalent to the use of single % with "argot_2.9.1".
   // This is for Scala-specific dependencies.
-  "org.clapper" %% "argot" % "0.3.5",
+  // Remove this for the moment because there's a modified version (styled
+  // as version "0.3.5-benwing") in the unmanaged lib/. (Fuck me, our
+  // unmanaged junto.jar also includes a copy of Argot 0.3.5, so we will have
+  // class path problems with a newer managed version of Argot until we
+  // remove this!)
+  // "org.clapper" %% "argot" % "0.3.5",
   "org.apache.hadoop" % "hadoop-core" % "0.20.205.0",
   // Necessary because of a stupid bug in the Maven POM for Hadoop, which
   // leaves this out.  NOTE: Supposedly Hadoop originally used version 1.5.2.

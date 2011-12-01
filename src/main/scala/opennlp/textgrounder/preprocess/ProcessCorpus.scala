@@ -49,7 +49,7 @@ class ProcessCorpusParameters(ap: ArgParser) extends
 abstract class ProcessCorpusFileProcessor(
   suffix: String, new_suffix: String,
   output_filehand: FileHandler, output_dir: String
-) extends DocumentCorpusFileProcessor(suffix) {
+) extends CorpusFileProcessor(suffix) {
    var writer: FieldTextWriter = _
    var cur_outstream: PrintStream = _
 

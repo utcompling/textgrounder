@@ -486,6 +486,14 @@ package object experiment {
 
     // Things that may be overridden
 
+
+    /**
+     * Text describing the program, placed between the line beginning
+     * "Usage: ..." and the text describing the options and positional
+     * arguments.
+     */
+    def description = ""
+
     /**
      * Output the values of "ancillary" parameters (see above)
      */
@@ -506,7 +514,8 @@ package object experiment {
     /**
      * An instance of ArgParser, for parsing options
      */
-    val arg_parser = new ArgParser(progname)
+    val arg_parser =
+      new ArgParser(progname, description = description)
 
     /**
      * A class for holding the parameters retrieved from the command-line

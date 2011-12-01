@@ -46,7 +46,8 @@ class ProcessFilesParameters(ap: ArgParser) extends
   val output_dir =
     ap.option[String]("o", "output-dir",
       metavar = "DIR",
-      help = """Directory to store output files in.""")
+      help = """Directory to store output files in.  It must not already
+exist, and will be created (including any parent directories).""")
 }
 
 abstract class ProcessFilesDriver extends ArgParserExperimentDriver {
@@ -54,8 +55,6 @@ abstract class ProcessFilesDriver extends ArgParserExperimentDriver {
   type RunReturnType = Unit
 
   val filehand = new LocalFileHandler
-
-  def usage()
 
   def handle_parameters() {
     need(params.output_dir, "output-dir")

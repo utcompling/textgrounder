@@ -909,8 +909,8 @@ package object ioutil {
    * (2) There is a corresponding schema file, which lists the names of
    *     each field, separated by a TAB character.
    * (3) The document and schema files are identified by a SUFFIX.
-   *     The document files are named `*SUFFIX.txt` (or `*SUFFIX.txt.bz2` or
-   *     similar), while the schema file is named `*SUFFIX-schema.txt`.
+   *     The document files are named `*-SUFFIX.txt` (or `*-SUFFIX.txt.bz2` or
+   *     similar), while the schema file is named `*-SUFFIX-schema.txt`.
    *
    * It's generally assumed that the document and schema files are placed
    * in a single directory, and that only one corpus with a given suffix
@@ -929,10 +929,10 @@ package object ioutil {
    * @param suffix the suffix of the corpus files, as described above
    *     
    */
-  abstract class DocumentCorpusFileProcessor(
+  abstract class CorpusFileProcessor(
     suffix: String
   ) extends FieldTextFileProcessor {
-    import DocumentCorpusFileProcessor._
+    import CorpusFileProcessor._
 
     var schema_file: String = _
     var schema_file_filehand: FileHandler = _
@@ -980,7 +980,7 @@ package object ioutil {
     }
   }
 
-  object DocumentCorpusFileProcessor {
+  object CorpusFileProcessor {
     val possible_compression_re = """(\.[a-zA-Z0-9]+)?$"""
     /**
      * For a given suffix, create a regular expression
@@ -988,7 +988,7 @@ package object ioutil {
      * suffix.
      */
     def make_document_file_suffix_regex(suffix: String) = {
-      val re_quoted_suffix = """%s\.txt""" format suffix
+      val re_quoted_suffix = """-%s\.txt""" format suffix
       (re_quoted_suffix + possible_compression_re).r
     }
     /**
@@ -997,7 +997,7 @@ package object ioutil {
      * suffix.
      */
     def make_schema_file_suffix_regex(suffix: String) = {
-      val re_quoted_suffix = """%s-schema\.txt""" format suffix
+      val re_quoted_suffix = """-%s-schema\.txt""" format suffix
       (re_quoted_suffix + possible_compression_re).r
     }
 

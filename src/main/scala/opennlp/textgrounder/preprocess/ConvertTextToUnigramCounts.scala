@@ -42,7 +42,7 @@ class ConvertTextToUnigramCountsFileProcessor(
   input_suffix: String, output_filehand: FileHandler,
   params: ConvertTextToUnigramCountsParameters
 ) extends ProcessCorpusFileProcessor(
-  input_suffix, "-unigram-counts",
+  input_suffix, "unigram-counts",
   output_filehand, params.output_dir
 ) {
   def frob_row(fieldvals: Seq[String]) = {
@@ -66,19 +66,10 @@ class ConvertTextToUnigramCountsDriver extends
     ProcessCorpusDriver {
   type ParamType = ConvertTextToUnigramCountsParameters
 
-  def usage() {
-    sys.error("""Usage: ConvertTextToUnigramCounts [-u INDIR | --input-dir INDIR] [-o OUTDIR | --output-dir OUTDIR]
-
-Convert a corpus from raw-text format to unigram-counts format.  OUTDIR is
-the directory to store the output corpus in, which must not exist already.
-INDIR is the directory of the input corpus.
-""")
-  }
-
   def create_file_processor(input_suffix: String) =
     new ConvertTextToUnigramCountsFileProcessor(input_suffix, filehand, params)
 
-  def get_input_corpus_suffix = "-text"
+  def get_input_corpus_suffix = "text"
 }
 
 //class ScoobiConvertTextToUnigramCountsDriver extends
@@ -129,8 +120,15 @@ INDIR is the directory of the input corpus.
 //}
 
 object ConvertTextToUnigramCounts extends
-    ExperimentDriverApp("Convert raw text to unigram counts") {
+    ExperimentDriverApp("ConvertTextToUnigramCounts") {
   type DriverType = ConvertTextToUnigramCountsDriver
+
+  override def description =
+"""Convert a corpus from raw-text format to unigram-counts format.  OUTDIR is
+the directory to store the output corpus in, which must not exist already.
+INDIR is the directory of the input corpus.
+"""
+
   def create_param_object(ap: ArgParser) = new ParamType(ap)
   def create_driver() = new DriverType
 }
