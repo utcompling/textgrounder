@@ -50,7 +50,7 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
       at least once.
    */
   val counts = create_word_double_map()
-  var num_word_tokens = 0
+  var num_word_tokens = 0.0
 
   /** Heap analysis revealed that Scala has holding the keys and values
       (but not `num_words`) as local variables when they were constructors;
