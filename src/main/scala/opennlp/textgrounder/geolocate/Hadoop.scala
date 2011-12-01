@@ -287,6 +287,8 @@ abstract class HadoopGeolocateApp(
     initialize_hadoop_classes(job)
     // FIXME: Big hack here.
     for (file <- params.input_corpus) {
+      // FIXME HUGE HACK HERE!!!
+      driver.document_file_suffix = GeoDocument.unigram_counts_suffix
       val hadoop_path = file + "/*-" + driver.document_file_suffix + ".txt*"
       FileInputFormat.addInputPath(job, new Path(hadoop_path))
     }
