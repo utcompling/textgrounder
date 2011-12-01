@@ -52,26 +52,27 @@ class KdTreeCell(
 
 object KdTreeCellGrid {
   def apply(table: SphereDocumentTable, bucketSize: Int, splitMethod: String,
-            useBackoff: Boolean) : KdTreeCellGrid = {
+            useBackoff: Boolean, interpolateWeight: Double = 0.0) : KdTreeCellGrid = {
     new KdTreeCellGrid(table, bucketSize, splitMethod match {
       case "halfway" => KdTree.SplitMethod.HALFWAY
       case "median" => KdTree.SplitMethod.MEDIAN
       case "maxmargin" => KdTree.SplitMethod.MAX_MARGIN
-    }, useBackoff)
+    }, useBackoff, interpolateWeight)
   }
 }
 
 class KdTreeCellGrid(table: SphereDocumentTable, 
                      bucketSize: Int,
                      splitMethod: KdTree.SplitMethod,
-                     useBackoff: Boolean)
+                     useBackoff: Boolean,
+                     interpolateWeight: Double)
     extends SphereCellGrid(table) {
   /**
    * Total number of cells in the grid.
    */
   var total_num_cells: Int = 0
-  var kdtree : KdTree[SphereDocument] = new KdTree[SphereDocument](2, bucketSize, splitMethod);
-  val leaves_to_cell : Map[KdTree[SphereDocument], KdTreeCell] = Map();
+  var kdtree : KdTree[SphereDocument] = new KdTree[SphereDocument](2, bucketSize, splitMethod)
+  val leaves_to_cell : Map[KdTree[SphereDocument], KdTreeCell] = Map()
 
   /**
    * Find the correct cell for the given coordinates.  If no such cell
@@ -98,11 +99,55 @@ class KdTreeCellGrid(table: SphereDocumentTable,
     total_num_cells = kdtree.getLeaves.size
     num_non_empty_cells = total_num_cells
 
-    val nodes = if (useBackoff) kdtree.getNodes else kdtree.getLeaves
-    for (leaf <- nodes) {
-      val c = new KdTreeCell(this, leaf)
+    val nodes_to_cell : Map[KdTree[SphereDocument], KdTreeCell] = Map()
+
+    for (node <- kdtree.getNodes) {
+      val c = new KdTreeCell(this, node)
       c.generate_dist
-      leaves_to_cell.update(leaf, c)
+      nodes_to_cell.update(node, c)
+    }
+
+    if (interpolateWeight > 0) {
+      // this is really gross. we need to interpolate all the nodes
+      // by modifying their worddist.count map. We are breaking
+      // so many levels of abstraction by doing this AND preventing
+      // us from using interpolation with bigrams :(
+      //
+
+      // We'll do it top-down so dependencies are met.
+
+      val iwtopdown = true
+      val nodes = 
+        if (iwtopdown) kdtree.getNodes.toList
+        else kdtree.getNodes.reverse
+
+      for (node <- nodes if node.parent != null) {
+        val cell = nodes_to_cell(node)
+        val wd = cell.word_dist_wrapper.word_dist
+        val uwd = wd.asInstanceOf[UnigramWordDist]
+
+        for ((k,v) <- uwd.counts) {
+          uwd.counts.put(k, (1 - interpolateWeight) * v)
+        }
+
+        val pcell = nodes_to_cell(node.parent)
+        val pwd = pcell.word_dist_wrapper.word_dist
+        val puwd = pwd.asInstanceOf[UnigramWordDist]
+
+        for ((k,v) <- puwd.counts) {
+          val oldv = uwd.counts.getOrElse(k, 0.0)
+          val newv = oldv + interpolateWeight * v
+          uwd.counts.put(k, newv)
+        }
+
+        // gotta update these variables
+        uwd.num_word_tokens = uwd.counts.values.sum
+      }
+    }
+
+    val nodes = if (useBackoff) kdtree.getNodes else kdtree.getLeaves
+    for (node <- nodes) {
+      leaves_to_cell.update(node, nodes_to_cell(node))
     }
   }
 

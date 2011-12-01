@@ -304,7 +304,7 @@ object WordDist {
   /**
    * Total number of word tokens seen
    */
-  var total_num_word_tokens = 0
+  var total_num_word_tokens = 0.0
 }
 
 /**
@@ -313,7 +313,7 @@ object WordDist {
  */
 abstract class WordDist {
   /** Number of word tokens seen in the distribution. */
-  var num_word_tokens: Int
+  var num_word_tokens: Double
 
   /**
    * Number of word types seen in the distribution

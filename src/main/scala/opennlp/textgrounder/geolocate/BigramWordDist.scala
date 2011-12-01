@@ -53,7 +53,7 @@ abstract class BigramWordDist(
   val unicounts = create_word_int_map()
   for (i <- 0 until num_unigrams)
     unicounts(unigramKeys(i)) = unigramValues(i)
-  var num_word_tokens = unicounts.values.sum
+  var num_word_tokens : Double = unicounts.values.sum
   
   def num_word_types = unicounts.size
 

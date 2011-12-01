@@ -36,7 +36,7 @@ public class KdTree<T> {
 
     // All types
     private final int                  dimensions;
-    private final KdTree<T>            parent;
+    public final KdTree<T>            parent;
     private int                        bucketSize;
     private SplitMethod                splitMethod;
  

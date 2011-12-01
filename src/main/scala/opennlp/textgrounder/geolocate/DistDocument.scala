@@ -288,7 +288,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
   def finish_document_distributions() {
     // Figure out the value of OVERALL_UNSEEN_MASS for each document.
     for ((split, table) <- documents_by_split) {
-      var totaltoks = 0
+      var totaltoks : Double = 0
       var numdocs = 0
       for (doc <- table) {
         if (doc.dist != null) {
@@ -300,7 +300,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
         }
       }
       num_dist_documents_by_split(split) += numdocs
-      word_tokens_by_split(split) += totaltoks
+      word_tokens_by_split(split) += totaltoks.toInt
     }
   }
 

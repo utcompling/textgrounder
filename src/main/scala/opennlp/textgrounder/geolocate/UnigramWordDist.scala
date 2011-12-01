@@ -53,7 +53,7 @@ abstract class UnigramWordDist(
       (word, count) items, specifying the counts of all words seen
       at least once.
    */
-  val counts = create_word_int_map()
+  val counts = create_word_double_map()
   for (i <- 0 until num_words)
     counts(keys(i)) = values(i)
   var num_word_tokens = counts.values.sum

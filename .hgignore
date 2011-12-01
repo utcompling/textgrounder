@@ -28,3 +28,5 @@ data/gazetteers/*.zip
 *.pyc
 python/wikigrounder/build
 python/wikigrounder/kl_divergence.c
+logs
+alltrials-*.sh
