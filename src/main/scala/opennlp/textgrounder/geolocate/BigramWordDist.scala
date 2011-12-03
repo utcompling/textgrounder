@@ -101,13 +101,13 @@ abstract class BigramWordDist(
 errprint("add_document")
     assert(!finished)
     var previous = "<START>";
-    unicounts(memoize_word(previous)) += 1
+    unicounts(memoize_string(previous)) += 1
     for {word <- words
          val wlower = if (ignore_case) word.toLowerCase() else word
          if !stopwords(wlower) } {
-      unicounts(memoize_word(wlower)) += 1
+      unicounts(memoize_string(wlower)) += 1
       num_word_tokens += 1
-      bicounts(memoize_word(previous + "_" + wlower)) += 1
+      bicounts(memoize_string(previous + "_" + wlower)) += 1
       previous = wlower
     }
   }
@@ -237,7 +237,7 @@ if(debug("bigram"))
 
   def find_most_common_word(pred: String => Boolean) = {
     val filtered =
-      (for ((word, count) <- unicounts if pred(unmemoize_word(word)))
+      (for ((word, count) <- unicounts if pred(unmemoize_string(word)))
         yield (word, count)).toSeq
     if (filtered.length == 0) None
     else {
@@ -319,7 +319,7 @@ trait SimpleBigramWordDistReader extends WordDistReader {
     val word2 = bigram._2
     assert(!(word1 contains ':'))
     assert(!(word2 contains ':'))
-    memoize_word(word1 + ":" + word2)
+    memoize_string(word1 + ":" + word2)
   }
 
   def parse_counts(doc: GenericDistDocument, countstr: String) {
@@ -406,7 +406,7 @@ abstract class BigramWordDistFactory extends
     /* minimum_word_count (--minimum-word-count) currently handled elsewhere.
        FIXME: Perhaps should be handled here. */
     if (!is_stopword(doc, lword))
-      Some(memoize_word(lword))
+      Some(memoize_string(lword))
     else
       None
   }

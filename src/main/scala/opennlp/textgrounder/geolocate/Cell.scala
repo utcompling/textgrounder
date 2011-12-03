@@ -224,9 +224,9 @@ class SphereWordCellDist(
             </IconStyle>
           </Style>
           <Folder>
-            <name>{ unmemoize_word(word) }</name>
+            <name>{ unmemoize_string(word) }</name>
             <open>1</open>
-            <description>{ "Cell distribution for word '%s'" format unmemoize_word(word) }</description>
+            <description>{ "Cell distribution for word '%s'" format unmemoize_string(word) }</description>
             <LookAt>
               <latitude>42</latitude>
               <longitude>-102</longitude>
@@ -358,7 +358,7 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
    * Return a string representation of the cell.  Generally does not need
    * to be overridden.
    */
-  override def toString() = {
+  override def toString = {
     val unfinished = if (word_dist.finished) "" else ", unfinished"
     val contains =
       if (most_popular_document != null)
@@ -381,11 +381,11 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
    * Return a shorter string representation of the cell, for
    * logging purposes.
    */
-  def shortstr() = {
+  def shortstr = {
     var str = "Cell %s" format describe_location()
     val mostpop = most_popular_document
     if (mostpop != null)
-      str += ", most-popular %s" format mostpop.shortstr()
+      str += ", most-popular %s" format mostpop.shortstr
     str
   }
 
@@ -700,12 +700,3 @@ abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
     table.clear_training_document_distributions()
   }
 }
-
-/**
- * Abstract class for a grid of cells covering the earth.
- */
-abstract class SphereCellGrid(
-  override val table: SphereDocumentTable
-) extends CellGrid[SphereCoord, SphereDocument, SphereCell](table) {
-}
-

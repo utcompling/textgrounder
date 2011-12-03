@@ -586,7 +586,6 @@ class SphereDocumentEvaluationResult(
   val pred_degdist = document.degree_distance_to_coord(pred_center)
 }
 
-
 /**
   Class to do document geolocating on documents from the document data, in
   the dev or test set.
@@ -792,9 +791,9 @@ class PCLTravelGeolocateDocumentEvaluator(
       val (cell, vall) = cellval
       if (debug("pcl-travel")) {
         errprint("  Rank %d, goodness %g:", rank, vall)
-        errprint(cell.struct().toString) // indent=4
+        errprint(cell.struct.toString) // indent=4
       } else
-        errprint("  Rank %d, goodness %g: %s", rank, vall, cell.shortstr())
+        errprint("  Rank %d, goodness %g: %s", rank, vall, cell.shortstr)
     }
 
     new TitledDocumentResult()

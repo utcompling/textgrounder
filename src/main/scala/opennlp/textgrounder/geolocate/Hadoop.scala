@@ -496,41 +496,36 @@ class DocumentEvaluationMapper extends
       filename_to_counter_name(driver.get_file_handler,
         driver.get_configuration.get("map.input.file"))
 
+    /* #### FIXME!!! Need to redo things so that different splits are
+       separated into different files. */
     def handle_document(fieldvals: Seq[String]) = {
       val table = driver.document_table
-      val in_document = table.create_document(schema, fieldvals)
-      if (in_document.split == driver.params.eval_set &&
-          table.would_add_document_to_list(in_document)) {
-        val doc = table.lookup_document(in_document.title)
-        if (doc == null) {
-          warning("Couldn't find document %s in table", in_document.title)
-          false
-        } else {
-          var skipped = 0
-          var not_skipped = 0
-          for (e <- evaluators) {
-            val num_processed = task.num_processed
-            val doctag = "#%d" format (1 + num_processed)
-            if (e.would_skip_document(doc, doctag)) {
-              skipped += 1
-              errprint("Skipped document %s because evaluator would skip it",
-                doc)
-            } else {
-              not_skipped += 1
-              // Don't put side-effecting code inside of an assert!
-              val result =
-                e.evaluate_document(doc, doctag)
-              assert(result != null)
-              context.write(new Text(e.stratname),
-                new DoubleWritable(result.asInstanceOf[SphereDocumentEvaluationResult].pred_truedist))
-              task.item_processed()
-            }
+      val doc = table.create_and_init_document(schema, fieldvals)
+      if (doc != null) {
+        var skipped = 0
+        var not_skipped = 0
+        for (e <- evaluators) {
+          val num_processed = task.num_processed
+          val doctag = "#%d" format (1 + num_processed)
+          if (e.would_skip_document(doc, doctag)) {
+            skipped += 1
+            errprint("Skipped document %s because evaluator would skip it",
+              doc)
+          } else {
+            not_skipped += 1
+            // Don't put side-effecting code inside of an assert!
+            val result =
+              e.evaluate_document(doc, doctag)
+            assert(result != null)
+            context.write(new Text(e.stratname),
+              new DoubleWritable(result.asInstanceOf[SphereDocumentEvaluationResult].pred_truedist))
+            task.item_processed()
           }
-          if (skipped > 0 && not_skipped > 0)
-            warning("""Something strange: %s evaluator(s) skipped document, but %s evaluator(s)
-didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
-          (not_skipped > 0)
         }
+        if (skipped > 0 && not_skipped > 0)
+          warning("""Something strange: %s evaluator(s) skipped document, but %s evaluator(s)
+didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
+        (not_skipped > 0)
       } else false
     }
 

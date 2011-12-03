@@ -300,7 +300,7 @@ class PseudoGoodTuringSmoothedWordDist(
                       / factory.total_num_unseen_word_types)
             if (debug("lots"))
               errprint("Word %s, never seen at all, wordprob = %s",
-                       unmemoize_word(word), wordprob)
+                       unmemoize_string(word), wordprob)
             wordprob
           }
           case Some(owprob) => {
@@ -311,7 +311,7 @@ class PseudoGoodTuringSmoothedWordDist(
             //    factory.overall_unseen_mass)
             if (debug("lots"))
               errprint("Word %s, seen but not in document, wordprob = %s",
-                       unmemoize_word(word), wordprob)
+                       unmemoize_string(word), wordprob)
             wordprob
           }
         }
@@ -325,7 +325,7 @@ class PseudoGoodTuringSmoothedWordDist(
         val wordprob = wordcount.toDouble/num_word_tokens*(1.0 - unseen_mass)
         if (debug("lots"))
           errprint("Word %s, seen in document, wordprob = %s",
-                   unmemoize_word(word), wordprob)
+                   unmemoize_string(word), wordprob)
         wordprob
       }
     }

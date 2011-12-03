@@ -25,6 +25,7 @@ import scala.collection.mutable
 // has the effect of making it inaccessible. _ is special in Scala and has
 // various meanings.)
 import java.io.{Console=>_,_}
+import java.util.NoSuchElementException
 
 import org.apache.commons.compress.compressors.bzip2._
 import org.apache.commons.compress.compressors.gzip._
@@ -898,6 +899,33 @@ package object ioutil {
       assert(seqvals.length == schema.length)
       outstream.println(seqvals mkString split_text)
     }
+  }
+
+  def get_field_value(schema: Seq[String], fieldvals: Seq[String], key: String,
+      error_if_missing: Boolean = true): String = {
+    assert(fieldvals.length == schema.length)
+    var i = 0
+    while (i < schema.length) {
+      if (schema(i) == key) return fieldvals(i)
+      i += 1
+    }
+    if (error_if_missing) {
+      throw new NoSuchElementException("key not found: %s" format key)
+    } else
+      return null
+  }
+
+  def get_field_value_or_none(schema: Seq[String], fieldvals: Seq[String],
+      key: String) =
+    get_field_value(schema, fieldvals, key, error_if_missing = false)
+
+  def get_field_value_or_else(schema: Seq[String], fieldvals: Seq[String],
+      key: String, default: String) = {
+    val retval = get_field_value_or_none(schema, fieldvals, key)
+    if (retval == null)
+      default
+    else
+      retval
   }
 
   /**

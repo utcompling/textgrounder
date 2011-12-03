@@ -162,13 +162,15 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
   val cdist_factory = new SphereCellDistFactory(Params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
+    val wikipedia_table = cell_grid.table.wikipedia_subtable
+
     // Look for a toponym, then a proper noun, then any word.
     // FIXME: How can 'word' be null?
     // FIXME: Use invalid_word
     // FIXME: Should predicate be passed an index and have to do its own
     // unmemoizing?
     var maxword = word_dist.find_most_common_word(
-      word => word(0).isUpper && cell_grid.table.word_is_toponym(word))
+      word => word(0).isUpper && wikipedia_table.word_is_toponym(word))
     if (maxword == None) {
       maxword = word_dist.find_most_common_word(
         word => word(0).isUpper)
@@ -183,24 +185,27 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
   cell_grid: SphereCellGrid
 ) extends SphereGeolocateDocumentStrategy(cell_grid) {
   def return_ranked_cells(word_dist: WordDist) = {
+    val wikipedia_table = cell_grid.table.wikipedia_subtable
+
     var maxword = word_dist.find_most_common_word(
-      word => word(0).isUpper && cell_grid.table.word_is_toponym(word))
+      word => word(0).isUpper && wikipedia_table.word_is_toponym(word))
     if (maxword == None) {
       maxword = word_dist.find_most_common_word(
-        word => cell_grid.table.word_is_toponym(word))
+        word => wikipedia_table.word_is_toponym(word))
     }
     if (debug("commontop"))
       errprint("  maxword = %s", maxword)
     val cands =
       if (maxword != None)
-        cell_grid.table.construct_candidates(
-          unmemoize_word(maxword.get))
+        wikipedia_table.construct_candidates(
+          unmemoize_string(maxword.get))
       else Seq[SphereDocument]()
     if (debug("commontop"))
       errprint("  candidates = %s", cands)
     // Sort candidate list by number of incoming links
     val candlinks =
-      (for (cand <- cands) yield (cand, cand.adjusted_incoming_links.toDouble)).
+      (for (cand <- cands) yield (cand,
+        cand.asInstanceOf[WikipediaDocument].adjusted_incoming_links.toDouble)).
         // sort by second element of tuple, in reverse order
         sortWith(_._2 > _._2)
     if (debug("commontop"))
@@ -227,7 +232,8 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
 
     // Append random cells and remove duplicates
     merge_numbered_sequences_uniquely(candcells,
-      new RandomGeolocateDocumentStrategy(cell_grid).return_ranked_cells(word_dist))
+      new RandomGeolocateDocumentStrategy(cell_grid).
+        return_ranked_cells(word_dist))
   }
 }
 
@@ -874,7 +880,6 @@ abstract class GeolocateDriver extends
     for (fn <- Params.input_corpus)
       table.read_documents(get_file_handler, fn,
         document_file_suffix, cell_grid)
-    table.finish_word_counts()
   }
 
   def setup_for_run() {

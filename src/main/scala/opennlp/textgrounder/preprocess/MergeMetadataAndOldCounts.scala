@@ -104,7 +104,7 @@ trait SimpleUnigramWordDistReader {
           line match {
             case linere(word, count) => {
               // errprint("Saw1 %s,%s", word, count)
-              keys_dynarr += memoize_word(word)
+              keys_dynarr += memoize_string(word)
               values_dynarr += count.toInt
             }
             case _ =>
@@ -154,7 +154,7 @@ class MMCUnigramWordDistHandler(
         (for (i <- 0 until num_words) yield {
           // errprint("Saw2 %s,%s", keys(i), values(i))
           ("%s:%s" format
-            (GeoDocument.encode_word_for_counts_field(unmemoize_word(keys(i))),
+            (GeoDocument.encode_word_for_counts_field(unmemoize_string(keys(i))),
               values(i)))
           }).
           mkString(" ")
