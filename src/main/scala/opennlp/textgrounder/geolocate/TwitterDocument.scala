@@ -1,3 +1,4 @@
+///////////////////////////////////////////////////////////////////////////////
 //  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +17,7 @@
 ////////
 //////// TwitterDocument.scala
 ////////
-//////// Copyright (c) 2010, 2011 Ben Wing.
+//////// Copyright (c) 2011 Ben Wing.
 ////////
 
 package opennlp.textgrounder.geolocate

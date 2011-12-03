@@ -14,6 +14,12 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
+////////
+//////// TextGrounderInfo.scala
+////////
+//////// Copyright (c) 2011 Ben Wing.
+////////
+
 package opennlp.textgrounder.geolocate
 
 import opennlp.textgrounder.util.printutil.errprint

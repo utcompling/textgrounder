@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
+//  Copyright (C) 2010, 2011 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -14,6 +14,12 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
+////////
+//////// UnigramWordDist.scala
+////////
+//////// Copyright (c) 2010, 2011 Ben Wing.
+////////
+
 package opennlp.textgrounder.geolocate
 
 import math._
@@ -23,7 +29,6 @@ import util.control.Breaks._
 import java.io._
 
 import opennlp.textgrounder.util.collectionutil.DynamicArray
-import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.ioutil.{FileHandler, FileFormatException}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 

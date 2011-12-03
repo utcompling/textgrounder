@@ -1,3 +1,4 @@
+///////////////////////////////////////////////////////////////////////////////
 //  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");

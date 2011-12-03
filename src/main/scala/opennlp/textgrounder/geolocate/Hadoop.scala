@@ -14,6 +14,12 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
+////////
+//////// Hadoop.scala
+////////
+//////// Copyright (c) 2011 Ben Wing.
+////////
+
 package opennlp.textgrounder.geolocate
 
 import java.io.{FileSystem=>_,_}
