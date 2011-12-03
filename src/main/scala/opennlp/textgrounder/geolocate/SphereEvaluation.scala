@@ -15,7 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 ////////
-//////// Evaluation.scala
+//////// SphereEvaluation.scala
 ////////
 //////// Copyright (c) 2010, 2011 Ben Wing.
 ////////
@@ -239,8 +239,11 @@ class SphereDocumentEvaluationResult(
 }
 
 /**
-  Class to do document geolocating on documents from the document data, in
-  the dev or test set.
+ * Class to do document geolocating on documents from the document data, in
+ * the dev or test set.
+ *
+ * FIXME!! Should probably be generalized to work beyond simply SphereDocuments
+ * and such.
  */
 class InternalGeolocateDocumentEvaluator(
   strategy: SphereGeolocateDocumentStrategy,
