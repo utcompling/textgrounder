@@ -1336,23 +1336,28 @@ class WorldGazetteer(
   // For localities, add them to the cell-map that covers the earth if
   // ADD_TO_CELL_MAP is true.)
   protected def read_world_gazetteer_and_match() {
-    val status = new MeteredTask("gazetteer entry", "matching")
+    val task = new MeteredTask("gazetteer entry", "matching")
     errprint("Matching gazetteer entries in %s...", filename)
     errprint("")
 
     // Match each entry in the gazetteer
     breakable {
-      for (line <- filehand.openr(filename)) {
-        if (debug("lots"))
-          errprint("Processing line: %s", line)
-        match_world_gazetteer_entry(line)
-        if (status.item_processed(maxtime = Params.max_time_per_stage))
-          break
+      val lines = filehand.openr(filename)
+      try {
+        for (line <- lines) {
+          if (debug("lots"))
+            errprint("Processing line: %s", line)
+          match_world_gazetteer_entry(line)
+          if (task.item_processed(maxtime = Params.max_time_per_stage))
+            break
+        }
+      } finally {
+        lines.close()
       }
     }
 
     divfactory.finish_all(cell_grid)
-    status.finish()
+    task.finish()
     output_resource_usage()
   }
 

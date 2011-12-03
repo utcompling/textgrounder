@@ -85,23 +85,27 @@ package object ioutil {
       /* if (bufsize > 0) new BufferedReader(ireader, bufsize) else */
       new BufferedReader(ireader)
     var nextline: String = null
+    var hit_eof: Boolean = false
     protected def getNextLine() = {
-      nextline = reader.readLine()
-      if (nextline == null) {
-        if (close)
-          reader.close()
-        reader = null
-        false
-      } else {
-        if (chomp) {
-          if (nextline.endsWith("\r\n"))
-            nextline = nextline.dropRight(2)
-          else if (nextline.endsWith("\r"))
-            nextline = nextline.dropRight(1)
-          else if (nextline.endsWith("\n"))
-            nextline = nextline.dropRight(1)
+      if (hit_eof) false
+      else {
+        nextline = reader.readLine()
+        if (nextline == null) {
+          hit_eof = true
+          if (close)
+            close()
+          false
+        } else {
+          if (chomp) {
+            if (nextline.endsWith("\r\n"))
+              nextline = nextline.dropRight(2)
+            else if (nextline.endsWith("\r"))
+              nextline = nextline.dropRight(1)
+            else if (nextline.endsWith("\n"))
+              nextline = nextline.dropRight(1)
+          }
+          true
         }
-        true
       }
     }
 
@@ -117,6 +121,13 @@ package object ioutil {
         val ret = nextline
         nextline = null
         ret
+      }
+    }
+
+    def close() {
+      if (reader != null) {
+        reader.close()
+        reader = null
       }
     }
   }
@@ -726,8 +737,12 @@ package object ioutil {
     def process_file(filehand: FileHandler, file: String) = {
       val (lines, compression, realname) =
         filehand.openr_with_compression_info(file)
-      begin_process_lines(lines, filehand, file, compression, realname)
-      process_lines(lines, filehand, file, compression, realname)
+      try {
+        begin_process_lines(lines, filehand, file, compression, realname)
+        process_lines(lines, filehand, file, compression, realname)
+      } finally {
+        lines.close()
+      }
     }
 
     /*********************** MUST BE IMPLEMENTED *************************/

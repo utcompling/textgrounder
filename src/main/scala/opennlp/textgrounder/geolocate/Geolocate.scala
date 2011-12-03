@@ -31,6 +31,7 @@ import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil.{FileHandler, LocalFileHandler}
+import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.errprint
 
 import WordDist.memoizer._
@@ -887,6 +888,11 @@ abstract class GeolocateDriver extends
     // This accesses the stopwords through the pointer to this in
     // document_table.
     read_documents(document_table)
+    if (debug("stop-after-reading-dists")) {
+      errprint("Stopping abruptly because debug flag stop-after-reading-dists set")
+      output_resource_usage()
+      throw new GeolocateAbruptExit
+    }
     cell_grid.finish()
   }
 
@@ -1233,9 +1239,22 @@ class GeolocateDocumentDriver extends
   override type ParamType = GeolocateDocumentParameters
 }
 
+class GeolocateAbruptExit extends Throwable { }
+
 abstract class GeolocateApp(appname: String) extends
     ExperimentDriverApp(appname) {
   type DriverType <: GeolocateDriver
+
+  override def run_program() = {
+    try {
+      super.run_program()
+    } catch {
+      case e:GeolocateAbruptExit => {
+        errprint("Caught abrupt exit throw, exiting")
+        0
+      }
+    }
+  }
 }
 
 object GeolocateDocumentApp extends GeolocateApp("geolocate-document") {
