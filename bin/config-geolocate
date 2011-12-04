@@ -83,20 +83,13 @@ elif [ -n "$TG_ON_LONGHORN" ]; then
 fi
 
 if [ -n "$TG_GROUPS_DIR" ]; then
-  TG_WIKIPEDIA_DIR=${TG_WIKIPEDIA_DIR:-$TG_GROUPS_DIR/corpora/wikipedia}
-  TG_TWITTER_DIR=${TG_TWITTER_DIR:-$TG_GROUPS_DIR/corpora/twitter-geotext}
+  TG_CORPUS_DIR=${TG_CORPUS_DIR:-$TG_GROUPS_DIR/corpora}
   TG_AUX_DIR=${TG_AUX_DIR:-$TG_GROUPS_DIR/projects/textgrounder/data}
 fi
 
-if [ -z "$TG_WIKIPEDIA_DIR" ]; then
-  echo "Must set TG_WIKIPEDIA_DIR to location of Wikipedia data files"
+if [ -z "$TG_CORPUS_DIR" ]; then
+  echo "Must set TG_CORPUS_DIR to location of TextGrounder corpus files"
   exit 1
-fi
-
-if [ -z "$TG_TWITTER_DIR" ]; then
-  echo "TG_TWITTER_DIR should be set to the location of Twitter data files"
-  echo "Proceeding, because may not need to use these files"
-  TG_TWITTER_DIR="/nonexistent-location/download-textgrounder-twitter-files-please"
 fi
 
 if [ -z "$TG_AUX_DIR" ]; then
