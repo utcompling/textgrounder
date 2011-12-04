@@ -76,7 +76,7 @@ class FrobCorpusFileProcessor(
   input_suffix, params.suffix, output_filehand, params.output_dir
 ) {
   def frob_row(fieldvals: Seq[String]) = {
-    val zipped_vals = (schema zip fieldvals)
+    val zipped_vals = (schema.fieldnames zip fieldvals)
     val new_fields =
       for (addfield <- params.add_field) yield {
         val Array(field, value) = addfield.split("=", 2)

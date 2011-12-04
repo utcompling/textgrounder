@@ -54,9 +54,9 @@ abstract class ProcessCorpusFileProcessor(
    var cur_outstream: PrintStream = _
 
   def compute_new_schema() = {
-    val fake_fieldvals = Seq.fill(schema.length)("foo")
-    val (new_schema, _) = frob_row(fake_fieldvals).unzip
-    new_schema
+    val fake_fieldvals = Seq.fill(schema.fieldnames.length)("foo")
+    val (new_fieldnames, _) = frob_row(fake_fieldvals).unzip
+    new Schema(new_fieldnames, schema.fixed_values)
   }
 
   def construct_modified_output_file(orig_file: String, file_ending: String) = {

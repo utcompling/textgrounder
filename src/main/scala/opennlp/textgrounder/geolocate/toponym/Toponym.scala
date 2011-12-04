@@ -26,7 +26,7 @@ import opennlp.textgrounder.util.distances
 import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.distances.spheredist
 import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil.FileHandler
+import opennlp.textgrounder.util.ioutil.{FileHandler, Schema}
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil.{errout, errprint, warning}
@@ -363,7 +363,7 @@ class DivisionFactory(gazetteer: Gazetteer) {
 // A document for toponym resolution.
 
 class TopoDocument(
-  schema: Seq[String],
+  schema: Schema,
   subtable: TopoDocumentSubtable
 ) extends WikipediaDocument(schema, subtable) {
   // Cell-based distribution corresponding to this document.
@@ -466,7 +466,7 @@ class TopoDocument(
 class TopoDocumentSubtable(
   table: SphereDocumentTable
 ) extends WikipediaDocumentSubtable(table) {
-  override def create_document(schema: Seq[String]) =
+  override def create_document(schema: Schema) =
     new TopoDocument(schema, this)
 
   var gazetteer: Gazetteer = null

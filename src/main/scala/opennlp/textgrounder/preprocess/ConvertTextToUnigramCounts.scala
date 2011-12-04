@@ -47,7 +47,7 @@ class ConvertTextToUnigramCountsFileProcessor(
 ) {
   def frob_row(fieldvals: Seq[String]) = {
     val docparams = mutable.LinkedHashMap[String, String]()
-    docparams ++= (schema zip fieldvals)
+    docparams ++= (schema.fieldnames zip fieldvals)
     val text = docparams("text")
     docparams -= "text"
     val counts = intmap[String]()

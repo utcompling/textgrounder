@@ -28,7 +28,7 @@ import util.matching.Regex
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil.FileHandler
+import opennlp.textgrounder.util.ioutil.{FileHandler, Schema}
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.errprint
@@ -91,17 +91,16 @@ abstract class DistDocumentTable[CoordType : Serializer,
   val word_tokens_by_split =
     driver.countermap("word_tokens_by_split")
 
-  def create_document(schema: Seq[String]): DocumentType
+  def create_document(schema: Schema): DocumentType
 
-  def create_and_init_document(schema: Seq[String],
-      fieldvals: Seq[String]) = {
+  def create_and_init_document(schema: Schema, fieldvals: Seq[String]) = {
     val doc = create_document(schema)
     if (doc != null)
       doc.set_fields(fieldvals)
     doc
   }
 
-  def create_and_record_document(schema: Seq[String], fieldvals: Seq[String],
+  def create_and_record_document(schema: Schema, fieldvals: Seq[String],
       cell_grid: CellGrid[CoordType,DocumentType,_]) = {
     val doc = create_and_init_document(schema, fieldvals)
     if (doc != null && doc.has_coord) {
@@ -123,8 +122,8 @@ abstract class DistDocumentTable[CoordType : Serializer,
    * creates a DistDocument for each document described, and adds it to
    * this document table.
    *
-   * @param schema fields of the document-data files, as determined from
-   *   a schema file
+   * @param schema schema describing the fields in the document files, as
+   *   determined from a schema file
    * @param suffix Suffix specifying the type of document file wanted
    *   (e.g. "counts" or "document-metadata"
    * @param cell_grid Cell grid to add newly created DistDocuments to
@@ -255,7 +254,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
  * a user), etc.
  */ 
 abstract class DistDocument[CoordType : Serializer](
-  schema: Seq[String],
+  schema: Schema,
   val table: DistDocumentTable[CoordType,_]
 ) extends GeoDocument[CoordType](schema) with EvaluationDocument {
   /**

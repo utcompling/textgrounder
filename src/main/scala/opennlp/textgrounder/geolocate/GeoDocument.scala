@@ -65,9 +65,9 @@ case class DocumentValidationException(
 /**
  * A file processor that reads document files from a corpora.
  *
- * @param schema list of fields in the document files, as determined from
- *   a schema file
- * @param dstats ExperimentDriverStats used for 
+ * @param suffix Suffix used for selecting the particular corpus from a
+ *  directory
+ * @param dstats ExperimentDriverStats used for recording counters and such
  */
 abstract class GeoDocumentFileProcessor(
   suffix: String,
@@ -140,7 +140,7 @@ abstract class GeoDocumentFileProcessor(
       increment_document_counter("documents.accepted")
     else {
       errprint("Skipped document %s",
-        get_field_value_or_else(schema, fieldvals, "title", "unknown title??"))
+        schema.get_field_or_else(fieldvals, "title", "unknown title??"))
       increment_document_counter("documents.skipped")
     }
     return true
@@ -168,10 +168,10 @@ abstract class GeoDocumentFileProcessor(
 }
 
 class GeoDocumentWriter[CoordType : Serializer](
-  schema: Seq[String]
+  schema: Schema
 ) extends FieldTextWriter(schema) {
   def output_document(outstream: PrintStream, doc: GeoDocument[CoordType]) {
-    output_row(outstream, doc.get_fields(schema))
+    output_row(outstream, doc.get_fields(schema.fieldnames))
   }
 }
 
@@ -180,7 +180,8 @@ class GeoDocumentWriter[CoordType : Serializer](
  *
  * Defined general fields:
  *
- * corpus: Corpus of the document.
+ * corpus: Corpus of the document (stored as a fixed field in the schema).
+ * corpus-type: Corpus type of the corpus ('wikipedia', 'twitter').
  * title: Title of document.  The combination of (corpus, title) needs to
  *   uniquely identify a document.
  * coord: Coordinates of document.
@@ -189,10 +190,8 @@ class GeoDocumentWriter[CoordType : Serializer](
  * FIXME: It's unclear it makes sense to split GeoDocument from DistDocument.
  */
 abstract class GeoDocument[CoordType : Serializer](
-  val schema: Seq[String]
+  val schema: Schema
 ) {
-  var corpusind = blank_memoized_string
-  def corpus = unmemoize_string(corpusind)
   def title: String
   def has_coord: Boolean
   def coord: CoordType
@@ -218,7 +217,7 @@ abstract class GeoDocument[CoordType : Serializer](
    * *after* construction.
    */
   def set_fields(fieldvals: Seq[String]) {
-    for ((field, value) <- (schema zip fieldvals)) {
+    for ((field, value) <- (schema.fieldnames zip fieldvals)) {
       if (debug("rethrow"))
         set_field(field, value)
       else {
@@ -243,7 +242,6 @@ abstract class GeoDocument[CoordType : Serializer](
 
   def set_field(field: String, value: String) {
     field match {
-      case "corpus" => corpusind = memoize_string(value)
       case "split" => splitind = memoize_string(value)
       case _ => () // Just eat the extra parameters
     }
@@ -251,7 +249,6 @@ abstract class GeoDocument[CoordType : Serializer](
 
   def get_field(field: String) = {
     field match {
-      case "corpus" => unmemoize_string(corpusind)
       case "split" => unmemoize_string(splitind)
       case "title" => title
       case "coord" => if (has_coord) put_x(coord) else null
@@ -265,7 +262,8 @@ abstract class GeoDocument[CoordType : Serializer](
 
   override def toString = {
     val coordstr = if (has_coord) " at %s".format(coord) else ""
-    var corpusstr = if (corpus.length > 0) "%s/".format(corpus) else ""
+    val corpus = schema.get_fixed_field("corpus")
+    val corpusstr = if (corpus != null) "%s/".format(corpus) else ""
     "%s%s%s".format(corpusstr, title, coordstr)
   }
 

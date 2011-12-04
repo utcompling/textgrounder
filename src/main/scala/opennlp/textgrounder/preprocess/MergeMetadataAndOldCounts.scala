@@ -125,13 +125,15 @@ trait SimpleUnigramWordDistReader {
  * format.
  */
 class MMCUnigramWordDistHandler(
-  schema: Seq[String],
+  schema: Schema,
   document_fieldvals: mutable.Map[String, Seq[String]],
   filehand: FileHandler,
   output_dir: String,
   output_file_prefix: String
 ) extends SimpleUnigramWordDistReader {
-  val writer = new FieldTextWriter(schema ++ Seq("counts"))
+  val new_schema = new Schema(schema.fieldnames ++ Seq("counts"),
+    schema.fixed_values)
+  val writer = new FieldTextWriter(schema)
   val full_prefix = "%s/%s" format (output_dir, output_file_prefix)
   val outstream = filehand.openw("%s-unigram-counts.txt" format full_prefix,
     compression = "bzip2")
@@ -181,7 +183,7 @@ class MMCDocumentFileProcessor(
   val document_fieldvals = mutable.Map[String, Seq[String]]()
 
   def process_row(fieldvals: Seq[String]): Boolean = {
-    val params = (schema zip fieldvals).toMap
+    val params = (schema.fieldnames zip fieldvals).toMap
     document_fieldvals(params("title")) = fieldvals
     true
   }

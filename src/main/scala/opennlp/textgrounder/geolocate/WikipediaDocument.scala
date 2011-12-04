@@ -54,7 +54,7 @@ import GeoDocumentConverters._
  *          or in Category or Book namespaces)
  */
 class WikipediaDocument(
-  schema: Seq[String],
+  schema: Schema,
   subtable: WikipediaDocumentSubtable
 ) extends SphereDocument(schema, subtable.table) {
   var id = 0L
@@ -193,20 +193,20 @@ object WikipediaDocument {
 class WikipediaDocumentSubtable(
   override val table: SphereDocumentTable
 ) extends SphereDocumentSubtable[WikipediaDocument](table) {
-  def create_document(schema: Seq[String]) =
+  def create_document(schema: Schema) =
     new WikipediaDocument(schema, this)
 
-  override def create_and_init_document(schema: Seq[String],
+  override def create_and_init_document(schema: Schema,
       fieldvals: Seq[String]) = {
    /**
     * FIXME: Perhaps we should filter the document file when we generate it,
     * to remove stuff not in the Main namespace.  We also need to remove
     * the duplication between this function and would_add_document_to_list().
     */
-    val namespace = get_field_value_or_none(schema, fieldvals, "namepace")
+    val namespace = schema.get_field_or_else(fieldvals, "namepace")
     if (namespace != null && namespace != "Main") {
       errprint("Skipped document %s, namespace %s is not Main",
-        get_field_value_or_else(schema, fieldvals, "title", "unknown title??"),
+        schema.get_field_or_else(fieldvals, "title", "unknown title??"),
         namespace)
       null
     } else {

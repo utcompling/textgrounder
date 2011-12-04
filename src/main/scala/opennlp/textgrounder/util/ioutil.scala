@@ -113,7 +113,7 @@ package object ioutil {
     }
 
     def next() = {
-      if (!hasNext) null
+      if (!hasNext) Iterator.empty.next
       else {
         val ret = nextline
         nextline = null
@@ -801,13 +801,13 @@ package object ioutil {
     var num_processed = 0
     var num_bad = 0
 
-    var schema: Seq[String] = _
+    var fieldnames: Seq[String] = _
 
     /**
-     * Set the schema used for processing rows.
+     * Set the field names used for processing rows.
      */
-    def set_schema(schema: Seq[String]) {
-      this.schema = schema
+    def set_fieldnames(fieldnames: Seq[String]) {
+      this.fieldnames = fieldnames
     }
 
     override def begin_process_file(filehand: FileHandler, file: String) {
@@ -829,7 +829,7 @@ package object ioutil {
     def parse_row(line: String) {
       // println("[%s]" format line)
       val fieldvals = line.split(split_re, -1)
-      if (fieldvals.length != schema.length)
+      if (fieldvals.length != fieldnames.length)
         handle_bad_row(line, fieldvals)
       else {
         val good = process_row(fieldvals)
@@ -872,10 +872,11 @@ package object ioutil {
      */
     def handle_bad_row(line: String, fieldvals: Seq[String]) {
       val lineno = num_processed + 1
-      if (schema.length != fieldvals.length) {
+      if (fieldnames.length != fieldvals.length) {
         warning(
           """Line %s: Bad record, expected %s fields, saw %s fields;
-          skipping line=%s""", lineno, schema.length, fieldvals.length, line)
+          skipping line=%s""", lineno, fieldnames.length, fieldvals.length,
+          line)
       } else {
         warning("""Line %s: Bad record; skipping line=%s""", lineno, line)
       }
@@ -887,45 +888,87 @@ package object ioutil {
   }
 
   class FieldTextWriter(
-    schema: Seq[String],
+    schema: Schema,
     split_text: String = "\t"
   ) {
     def output_schema(outstream: PrintStream) {
-      outstream.println(schema mkString split_text)
+      outstream.println(schema.fieldnames mkString split_text)
+      for ((field, value) <- schema.fixed_values)
+        outstream.println(List(field, value) mkString split_text)
     }
 
     def output_row(outstream: PrintStream, fieldvals: Iterable[String]) {
       val seqvals = fieldvals.toSeq
-      assert(seqvals.length == schema.length)
+      assert(seqvals.length == schema.fieldnames.length)
       outstream.println(seqvals mkString split_text)
     }
   }
 
-  def get_field_value(schema: Seq[String], fieldvals: Seq[String], key: String,
-      error_if_missing: Boolean = true): String = {
-    assert(fieldvals.length == schema.length)
-    var i = 0
-    while (i < schema.length) {
-      if (schema(i) == key) return fieldvals(i)
-      i += 1
+  case class Schema(
+    fieldnames: Seq[String],
+    fixed_values: mutable.LinkedHashMap[String, String]
+  ) {
+    def get_field(fieldvals: Seq[String], key: String,
+        error_if_missing: Boolean = true) =
+      get_field_or_else(fieldvals, key, error_if_missing = error_if_missing)
+
+    def get_field_or_else(fieldvals: Seq[String], key: String,
+        default: String = null, error_if_missing: Boolean = false): String = {
+      assert(fieldvals.length == fieldnames.length)
+      var i = 0
+      while (i < fieldnames.length) {
+        if (fieldnames(i) == key) return fieldvals(i)
+        i += 1
+      }
+      return get_fixed_field(key, default, error_if_missing)
     }
-    if (error_if_missing) {
-      throw new NoSuchElementException("key not found: %s" format key)
-    } else
-      return null
+
+    def get_fixed_field(key: String, default: String = null,
+        error_if_missing: Boolean = false) = {
+      if (fixed_values contains key)
+        fixed_values(key)
+      else if (error_if_missing) {
+        throw new NoSuchElementException("key not found: %s" format key)
+      } else default
+    }
   }
 
-  def get_field_value_or_none(schema: Seq[String], fieldvals: Seq[String],
-      key: String) =
-    get_field_value(schema, fieldvals, key, error_if_missing = false)
-
-  def get_field_value_or_else(schema: Seq[String], fieldvals: Seq[String],
-      key: String, default: String) = {
-    val retval = get_field_value_or_none(schema, fieldvals, key)
-    if (retval == null)
-      default
-    else
-      retval
+  object Schema {
+    /**
+     * Read the given schema file.
+     *
+     * @param filehand File handler of schema file name.
+     * @param schema_file Name of the schema file.
+     * @param split_re Regular expression used to split the fields of the
+     *   schema file, usually TAB. (There's only one row, and each field in
+     *   the row gives the name of the corresponding field in the document
+     *   file.)
+     */
+    def read_schema_file(filehand: FileHandler, schema_file: String,
+        split_re: String = "\t") = {
+      val lines = filehand.openr(schema_file)
+      val fieldname_line = lines.next()
+      val fieldnames = fieldname_line.split(split_re, -1)
+      for (field <- fieldnames if field.length == 0)
+        throw new FileFormatException(
+          "Blank field name in schema file %s: fields are %s".
+          format(schema_file, fieldnames))
+      val fixed_fields = mutable.LinkedHashMap[String,String]()
+      for (line <- lines) {
+        val fixed = line.split(split_re, -1)
+        if (fixed.length != 2)
+          throw new FileFormatException(
+            "For fixed fields (i.e. lines other than first) in schema file %s, should have two values (FIELD and VALUE), instead of %s".
+            format(schema_file, line))
+        val Array(from, to) = fixed
+        if (from.length == 0)
+          throw new FileFormatException(
+            "Blank field name in fxed-value part of schema file %s: line is %s".
+              format(schema_file, line))
+        fixed_fields(from) = to
+      }
+      new Schema(fieldnames, fixed_fields)
+    }
   }
 
   /**
@@ -935,7 +978,9 @@ package object ioutil {
    * (1) The documents are stored as field-text files, separated by a TAB
    *     character.
    * (2) There is a corresponding schema file, which lists the names of
-   *     each field, separated by a TAB character.
+   *     each field, separated by a TAB character, as well as any
+   *     "fixed" fields that have the same value for all rows (one per
+   *     line, with the name, a TAB, and the value).
    * (3) The document and schema files are identified by a SUFFIX.
    *     The document files are named `*-SUFFIX.txt` (or `*-SUFFIX.txt.bz2` or
    *     similar), while the schema file is named `*-SUFFIX-schema.txt`.
@@ -964,6 +1009,12 @@ package object ioutil {
 
     var schema_file: String = _
     var schema_file_filehand: FileHandler = _
+    var schema: Schema = _
+
+    def set_schema(schema: Schema) {
+      this.schema = schema
+      set_fieldnames(schema.fieldnames)
+    }
 
     /**
      * Locate the schema file of the appropriate suffix in the given directory.
@@ -993,7 +1044,7 @@ package object ioutil {
     def read_schema_from_corpus(filehand: FileHandler, dir: String) {
       schema_file = find_schema_file(filehand, dir)
       schema_file_filehand = filehand
-      val schema = read_schema_file(filehand, schema_file)
+      val schema = Schema.read_schema_file(filehand, schema_file)
       set_schema(schema)
     }
 
@@ -1029,30 +1080,6 @@ package object ioutil {
       (re_quoted_suffix + possible_compression_re).r
     }
 
-    /**
-     * Read the given schema file.
-     *
-     * @param filehand File handler of schema file name.
-     * @param schema_file Name of the schema file.
-     * @param split_re Regular expression used to split the fields of the
-     *   schema file, usually TAB. (There's only one row, and each field in
-     *   the row gives the name of the corresponding field in the document
-     *   file.)
-     */
-    def read_schema_file(filehand: FileHandler, schema_file: String,
-        split_re: String = "\t") = {
-      val lines = filehand.openr(schema_file).toList
-      if (lines.length != 1)
-        throw new FileFormatException(
-          "Schema file %s should have one line in it but actually has %s lines".
-          format(schema_file, lines.length))
-      val schema = lines(0).split(split_re, -1)
-      for (field <- schema if field.length == 0)
-        throw new FileFormatException(
-          "Blank field name in schema file %s: fields are %s".
-          format(schema_file, schema))
-      schema
-    }
   }
 
   ////////////////////////////////////////////////////////////////////////////
