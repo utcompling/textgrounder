@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
+//  Copyright (C) 2010, 2011 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -14,6 +14,12 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
+////////
+//////// GeoDocument.scala
+////////
+//////// Copyright (c) 2010, 2011 Ben Wing.
+////////
+
 package opennlp.textgrounder.geolocate
 
 import util.control.Breaks._
@@ -26,6 +32,7 @@ import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.Serializer
 
+import WordDist.memoizer._
 import GeolocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
@@ -58,9 +65,9 @@ case class DocumentValidationException(
 /**
  * A file processor that reads document files from a corpora.
  *
- * @param schema list of fields in the document files, as determined from
- *   a schema file
- * @param dstats ExperimentDriverStats used for 
+ * @param suffix Suffix used for selecting the particular corpus from a
+ *  directory
+ * @param dstats ExperimentDriverStats used for recording counters and such
  */
 abstract class GeoDocumentFileProcessor(
   suffix: String,
@@ -119,40 +126,24 @@ abstract class GeoDocumentFileProcessor(
   }
 
   def process_row(fieldvals: Seq[String]): Boolean = {
-    // FIXME! This is ugly as hell.  This Wikipedia-specific stuff should
-    // either be moved elsewhere, or more likely, we should filter the
-    // document-data file when we generate it, to remove stuff not in the
-    // Main namespace.  Furthermore, the same logic here is duplicated in
-    // would_add_document_to_list() in DistDocumentTable, which also
-    // contains a special case for redirect documents.  It really seems that
-    // we should create a WikipediaDocument trait to encapsulate this stuff.
-    val params = (schema zip fieldvals).toMap
-    if ((params contains "namespace") &&
-        params("namespace") != "Main") {
-      errprint("Skipped document %s, namespace %s is not Main",
-        params.getOrElse("title", "unknown title??"), params("namespace"))
-      increment_document_counter("documents.skipped")
-      return true
-    } else {
-      val was_accepted =
-        try { handle_document(fieldvals) }
-        catch {
-          case e:DocumentValidationException => {
-            warning("Line %s: %s", num_processed + 1, e.message)
-            if (debug("stack-trace") || debug("stacktrace"))
-              e.printStackTrace
-            return false
-          }
+    val was_accepted =
+      try { handle_document(fieldvals) }
+      catch {
+        case e:DocumentValidationException => {
+          warning("Line %s: %s", num_processed + 1, e.message)
+          if (debug("stack-trace") || debug("stacktrace"))
+            e.printStackTrace
+          return false
         }
-      if (was_accepted)
-        increment_document_counter("documents.accepted")
-      else {
-        errprint("Skipped document %s",
-          params.getOrElse("title", "unknown title??"))
-        increment_document_counter("documents.skipped")
       }
-      return true
+    if (was_accepted)
+      increment_document_counter("documents.accepted")
+    else {
+      errprint("Skipped document %s",
+        schema.get_field_or_else(fieldvals, "title", "unknown title??"))
+      increment_document_counter("documents.skipped")
     }
+    return true
   }
 
   override def begin_process_file(filehand: FileHandler, file: String) {
@@ -177,10 +168,11 @@ abstract class GeoDocumentFileProcessor(
 }
 
 class GeoDocumentWriter[CoordType : Serializer](
-  schema: Seq[String]
-) extends FieldTextWriter(schema) {
+  schema: Schema,
+  suffix: String
+) extends CorpusWriter(schema, suffix) {
   def output_document(outstream: PrintStream, doc: GeoDocument[CoordType]) {
-    output_row(outstream, doc.get_fields(schema))
+    output_row(outstream, doc.get_fields(schema.fieldnames))
   }
 }
 
@@ -189,104 +181,94 @@ class GeoDocumentWriter[CoordType : Serializer](
  *
  * Defined general fields:
  *
- * corpus: Corpus of the document.
+ * corpus: Corpus of the document (stored as a fixed field in the schema).
+ * corpus-type: Corpus type of the corpus ('wikipedia', 'twitter').
  * title: Title of document.  The combination of (corpus, title) needs to
  *   uniquely identify a document.
- * id: ID of document, as an int.
  * coord: Coordinates of document.
  * split: Split of document ("training", "dev", "test")
- * 
- * Defined fields for Wikipedia (FIXME, create a Wikipedia subclass for these):
  *
- * incoming_links: Number of incoming links, or None if unknown.
- * redir: If this is a redirect, document title that it redirects to; else
- *          an empty string.
- *
- * Other Wikipedia params (we pay attention to "namespace" if present):
- *
- * namespace: Namespace of document (e.g. "Main", "Wikipedia", "File")
- * is_list_of: Whether document title is "List of *"
- * is_disambig: Whether document is a disambiguation page.
- * is_list: Whether document is a list of any type ("List of *", disambig,
- *          or in Category or Book namespaces)
+ * FIXME: It's unclear it makes sense to split GeoDocument from DistDocument.
  */
 abstract class GeoDocument[CoordType : Serializer](
-  val schema: Seq[String],
-  fieldvals: Seq[String]
+  val schema: Schema
 ) {
-  // Fixed fields
-  var corpus = ""
-  var title = ""
-  var id = ""
-  var optcoord: Option[CoordType] = None
-  def coord = optcoord.get
-  var split = ""
-
-  // Wikipedia-specific fields that we reference commonly (FIXME, make a
-  // Wikipedia-specific subclass)
-  var incoming_links: Option[Int] = None
-  var redir = ""
+  def title: String
+  def has_coord: Boolean
+  def coord: CoordType
+  def split = schema.get_fixed_field("split", error_if_missing = true)
+  def incoming_links: Option[Int] = None
 
   import GeoDocument._, GeoDocumentConverters._
 
-  val params =
-    (for ((name, v) <- (schema zip fieldvals)) yield {
-      val handled =
-        if (debug("rethrow"))
-          handle_parameter(name, v)
-        else {
-          try { handle_parameter(name, v) }
-          catch {
-            case e@_ => {
-              val msg =
-                "Bad value %s for field '%s': %s" format (v, name, e.toString)
-              throw new DocumentValidationException(msg, e)
-            }
+  /**
+   * Set the fields of the document to the given values.
+   *
+   * @param fieldvals A list of items, of the same length and in the same
+   *   order as the corresponding schema.
+   *
+   * Note that we don't include the field values as a constructor parameter
+   * and set them during construction, because we run into bootstrapping
+   * problems.  In particular, if subclasses declare and initialize
+   * additional fields, then those fields get initialized *after* the
+   * constructor runs, in which case the values determined from the field
+   * values get *overwritten* with their default values.  Subtle and bad.
+   * So instead we make it so that the call to `set_fields` has to happen
+   * *after* construction.
+   */
+  def set_fields(fieldvals: Seq[String]) {
+    for ((field, value) <- (schema.fieldnames zip fieldvals)) {
+      if (debug("rethrow"))
+        set_field(field, value)
+      else {
+        try { set_field(field, value) }
+        catch {
+          case e@_ => {
+            val msg = ("Bad value %s for field '%s': %s" format
+                       (value, field, e.toString))
+            throw new DocumentValidationException(msg, e)
           }
         }
-      if (handled) Nil else List(name -> v)
-    }).flatten.toMap
-
-  def handle_parameter(name: String, v: String) = {
-    name match {
-      case "corpus" => corpus = v; true
-      case "title" => title = v; true
-      case "id" => id = v; true
-      case "split" => split = v; true
-      case "coord" => optcoord = get_x_or_blank[CoordType](v); true
-      // Wikipedia-specific:
-      case "redir" => redir = v; true
-      case "incoming_links" => incoming_links = get_int_or_blank(v); true
-      case _ => false
-    }
-  }
-
-  def get_fields(fields: Iterable[String]) = {
-    for (field <- fields) yield {
-      field match {
-        case "corpus" => corpus
-        case "title" => title
-        case "id" => id
-        case "split" => split
-        case "coord" => put_x_or_blank[CoordType](optcoord)
-          // Wikipedia-specific:
-        case "redir" => redir
-        case "incoming_links" => put_int_or_blank(incoming_links)
-        case _ => params(field)
       }
     }
   }
 
-  override def toString() = {
-    val coordstr = if (optcoord != None) " at %s".format(coord) else ""
-    val redirstr =
-      if (redir.length > 0) ", redirect to %s".format(redir) else ""
-    var corpusstr = if (corpus.length > 0) "%s/".format(corpus) else ""
-    "%s%s(%s)%s%s, params=%s".format(corpusstr, title, id, coordstr,
-      redirstr, params)
+  def get_fields(fields: Iterable[String]) = {
+    for (field <- fields;
+         value = get_field(field);
+         if value != null)
+      yield value
   }
 
-  def adjusted_incoming_links = adjust_incoming_links(incoming_links)
+  def set_field(field: String, value: String) {
+    field match {
+      // Currently no general parameters to set.
+      case _ => () // Just eat the extra parameters
+    }
+  }
+
+  def get_field(field: String) = {
+    field match {
+      case "title" => title
+      case "coord" => if (has_coord) put_x(coord) else null
+      case _ => null
+    }
+  }
+
+  // def __repr__ = "DistDocument(%s)" format toString.encode("utf-8")
+
+  def shortstr = "%s" format title
+
+  override def toString = {
+    val coordstr = if (has_coord) " at %s".format(coord) else ""
+    val corpus = schema.get_fixed_field("corpus")
+    val corpusstr = if (corpus != null) "%s/".format(corpus) else ""
+    "%s%s%s".format(corpusstr, title, coordstr)
+  }
+
+  def struct: scala.xml.Elem
+
+  def distance_to_coord(coord2: CoordType): Double
 }
 
 object GeoDocument {
@@ -322,45 +304,6 @@ object GeoDocument {
   }
 
   // val fixed_fields = Seq("corpus", "title", "id", "split", "coord")
-  // val wikipedia_fields = Seq("incoming_links", "redir")
-
-  /**
-   * Compute the short form of a document name.  If short form includes a
-   * division (e.g. "Tucson, Arizona"), return a tuple (SHORTFORM, DIVISION);
-   * else return a tuple (SHORTFORM, None).
-   */
-  def compute_short_form(name: String) = {
-    val includes_div_re = """(.*?), (.*)$""".r
-    val includes_parentag_re = """(.*) \(.*\)$""".r
-    name match {
-      case includes_div_re(tucson, arizona) => (tucson, arizona)
-      case includes_parentag_re(tucson, city) => (tucson, null)
-      case _ => (name, null)
-    }
-  }
-
-  def log_adjust_incoming_links(links: Int) = {
-    if (links == 0) // Whether from unknown count or count is actually zero
-      0.01 // So we don't get errors from log(0)
-    else links
-  }
-
-  def adjust_incoming_links(incoming_links: Option[Int]) = {
-    val ail =
-      incoming_links match {
-        case None => {
-          if (debug("some"))
-            warning("Strange, object has no link count")
-          0
-        }
-        case Some(il) => {
-          if (debug("some"))
-            errprint("--> Link count is %s", il)
-          il
-        }
-      }
-    ail
-  }
 }
 
 /************************ Conversion functions ************************/
@@ -377,9 +320,9 @@ object GeoDocumentConverters {
   }
   def boolean_to_yesno(foo: Boolean) = if (foo) "yes" else "no"
   
-  def get_int_or_blank(foo: String) =
+  def get_int_or_none(foo: String) =
     if (foo == "") None else Option[Int](foo.toInt)
-  def put_int_or_blank(foo: Option[Int]) = {
+  def put_int_or_none(foo: Option[Int]) = {
     foo match {
       case None => ""
       case Some(x) => x.toString
@@ -387,27 +330,82 @@ object GeoDocumentConverters {
   }
 
   /**
-   * Convert a blank string into None, or a valid string that converts into
-   * type T into Some(value), where value is of type T.  Throw an error if
-   * a non-blank, invalid string was seen.  Note that the construction
+   * Convert an object of type `T` into a serialized (string) form, for
+   * storage purposes in a text file.  Note that the construction
    * `T : Serializer` means essentially "T must have a Serializer".
    * More technically, it adds an extra implicit parameter list with a
    * single parameter of type Serializer[T].  When the compiler sees a
-   * call to get_x_or_blank[X] for some type X, it looks in the lexical
-   * environment to see if there is an object in scope of type Serializer[X]
-   * that is marked `implicit`, and if so, it gives the implicit parameter
+   * call to put_x[X] for some type X, it looks in the lexical environment
+   * to see if there is an object in scope of type Serializer[X] that is
+   * marked `implicit`, and if so, it gives the implicit parameter
    * the value of that object; otherwise, you get a compile error.  The
    * function can then retrieve the implicit parameter's value using the
    * construction `implicitly[Serializer[T]]`.  The `T : Serializer`
    * construction is technically known as a *context bound*.
    */
-  def get_x_or_blank[T : Serializer](foo: String) =
-    if (foo == "") None
-    else Option[T](implicitly[Serializer[T]].deserialize(foo))
-  def put_x_or_blank[T : Serializer](foo: Option[T]) = {
+  def put_x[T : Serializer](foo: T) =
+    implicitly[Serializer[T]].serialize(foo)
+  /**
+   * Convert the serialized form of the value of an object of type `T`
+   * back into that type.  Throw an error if an invalid string was seen.
+   * See `put_x` for a description of the `Serializer` type and the *context
+   * bound* (denoted by a colon) that ties it to `T`.
+   *
+   * @see put_x
+   */
+  def get_x[T : Serializer](foo: String) =
+    implicitly[Serializer[T]].deserialize(foo)
+
+  /**
+   * Convert an object of type `Option[T]` into a serialized (string) form.
+   * See `put_x` for more information.  The only difference between that
+   * function is that if the value is None, a blank string is written out;
+   * else, for a value Some(x), where `x` is a value of type `T`, `x` is
+   * written out using `put_x`.
+   *
+   * @see put_x
+   */
+  def put_x_or_none[T : Serializer](foo: Option[T]) = {
     foo match {
       case None => ""
-      case Some(x) => implicitly[Serializer[T]].serialize(x)
+      case Some(x) => put_x[T](x)
     }
   }
+  /**
+   * Convert a blank string into None, or a valid string that converts into
+   * type T into Some(value), where value is of type T.  Throw an error if
+   * a non-blank, invalid string was seen.
+   *
+   * @see get_x
+   * @see put_x
+   */
+  def get_x_or_none[T : Serializer](foo: String) =
+    if (foo == "") None
+    else Option[T](get_x[T](foo))
+
+  /**
+   * Convert an object of type `T` into a serialized (string) form.
+   * If the object has the value `null`, write out a blank string.
+   * Note that T must be a reference type (i.e. not a primitive
+   * type such as Int or Double), so that `null` is a valid value.
+   * 
+   * @see put_x
+   * @see put_x
+   */
+  def put_x_or_null[T >: Null : Serializer](foo: T) = {
+    if (foo == null) ""
+    else put_x[T](foo)
+  }
+  /**
+   * Convert a blank string into null, or a valid string that converts into
+   * type T into that value.  Throw an error if a non-blank, invalid string
+   * was seen.  Note that T must be a reference type (i.e. not a primitive
+   * type such as Int or Double), so that `null` is a valid value.
+   *
+   * @see get_x
+   * @see put_x
+   */
+  def get_x_or_null[T >: Null : Serializer](foo: String) =
+    if (foo == "") null
+    else get_x[T](foo)
 }

@@ -3,7 +3,7 @@
 help()
 {
   cat <<FOO
-Usage: $0 [--hadoop] [--doc-thresh THRESH] CORPUS
+Usage: $0 [--hadoop] CORPUS
 
 Return arguments to use for running on CORPUS, a text corpus.
 
@@ -13,14 +13,19 @@ wikipedia         Run on Wikipedia (same as enwiki-20100905).
 enwiki-20100905   Run on English Wikipedia dump from September 5, 2010.
 enwiki-20111007   Run on English Wikipedia dump from October 7, 2011.
 enwiki-*          Run on some other English Wikipedia dump.
-twitter           Run on the GeoText twitter corpus.
-twitter-wiki      Run on a combination of both of the above corpora.
+docthresh-*       Run on the GeoText twitter corpus, with the given document
+                  threshold.
+twitter           Run on the GeoText twitter corpus, with document threshold 5.
+twitter-wiki      Run on a combination of the 'wikipedia' and 'twitter'
+                  corpora.
+*                 Run on some other corpus in the corpus dir (located
+                  at $TG_CORPUS_DIR).
 
-For the Twitter corpora, THRESH specifies the document threshold controlling
-which vocabulary items are discarded (items occurring in fewer than the
+The document threshold for the GeoText twitter corpus controls the threshold
+at which vocabulary items are discarded (items occurring in fewer than the
 threshold number of documents are discarded, or more accurately substituted
 with a generic out-of-vocabulary token).  This in turn controls which
-version of the GeoText corpus is used.  Default is 5.
+version of the GeoText corpus is used.
 
 If --hadoop is given, different directories are used, since data is being
 read from the Hadoop File System rather than locally.
@@ -32,13 +37,11 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
   exit 1
 fi
 
-docthresh=5
 hadoop=
 
 while true ; do
   case "$1" in
     --hadoop) hadoop=yes; shift ;;
-    --doc-thresh) docthresh="$2"; shift 2 ;;
     --help) help; exit 1 ;;
     --) shift ; break ;;
     *) break ;;
@@ -57,8 +60,6 @@ fi
 
 . $TEXTGROUNDER_DIR/bin/config-geolocate
 
-geotext_output_dir="$TG_TWITTER_DIR/output-$docthresh-docthresh"
-
 output_args() {
   case "$1" in
     #wikipedia )
@@ -66,16 +67,18 @@ output_args() {
     #       --counts-file $IN_COORD_COUNTS_FILE ;;
     wikipedia )
       # Use the default version (usually enwiki-20100905)
-      echo --input-corpus $WP_VERSION_DIR ;;
+      echo --input-corpus $TG_CORPUS_DIR/wikipedia/$WP_VERSION ;;
     enwiki-* )
       set_wp_version "$1"
-      echo --input-corpus $WP_VERSION_DIR ;;
+      echo --input-corpus $TG_CORPUS_DIR/wikipedia/$1 ;;
     twitter )
-      echo --input-corpus $geotext_output_dir ;;
+      echo --input-corpus $TG_CORPUS_DIR/twitter-geotext/docthresh-5 ;;
+    docthresh-* )
+      echo --input-corpus $TG_CORPUS_DIR/twitter-geotext/$1 ;;
     twitter-wiki )
       output_args wikipedia; output_args twitter ;;
     * )
-      echo "Unrecognized corpus type: $1"; echo ""; help; exit 1 ;;
+      echo --input-corpus $TG_CORPUS_DIR/$1 ;;
   esac
 }
 

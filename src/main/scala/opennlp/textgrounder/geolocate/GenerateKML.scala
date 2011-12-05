@@ -1,5 +1,5 @@
-
-//  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
+///////////////////////////////////////////////////////////////////////////////
+//  Copyright (C) 2010, 2011 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -83,7 +83,7 @@ low values more visible.  Possibilities are 'none' (no transformation),
 class FilterPseudoGoodTuringSmoothedWordDistFactory(
     filter_words: Seq[Word]
   ) extends PseudoGoodTuringSmoothedWordDistFactory {
-  val oov = memoize_word("-OOV-")
+  val oov = memoize_string("-OOV-")
   override def set_unigram_word_dist(doc: GenericDistDocument,
       keys: Array[Word], values: Array[Int], num_words: Int,
       is_training_set: Boolean) = {
@@ -129,14 +129,14 @@ class WordCellTupleWritable extends
 class GenerateKMLDriver extends
     GeolocateDriver with StandaloneGeolocateDriverStats {
   type ParamType = GenerateKMLParameters
-  type RunReturnType = Null
+  type RunReturnType = Unit
 
   override def handle_parameters() {
     super.handle_parameters()
     need(params.kml_words, "kml-words")
     params.split_kml_words = params.kml_words.split(',')
     params.split_kml_words_memoized =
-      for (w <- params.split_kml_words) yield memoize_word(w)
+      for (w <- params.split_kml_words) yield memoize_string(w)
   }
 
   override def initialize_word_dist_factory_and_suffix() = {
@@ -150,10 +150,10 @@ class GenerateKMLDriver extends
    * KML files created and written on disk.
    */
 
-  def run_after_setup() = {
+  def run_after_setup() {
     val cdist_factory = new SphereCellDistFactory(params.lru_cache_size)
     for (word <- params.split_kml_words) {
-      val celldist = cdist_factory.get_cell_dist(cell_grid, memoize_word(word))
+      val celldist = cdist_factory.get_cell_dist(cell_grid, memoize_string(word))
       if (!celldist.normalized) {
         warning("""Non-normalized distribution, apparently word %s not seen anywhere.
 Not generating an empty KML file.""", word)
@@ -165,7 +165,6 @@ Not generating an empty KML file.""", word)
           kmlparams)
       }
     }
-    null
   }
 }
 

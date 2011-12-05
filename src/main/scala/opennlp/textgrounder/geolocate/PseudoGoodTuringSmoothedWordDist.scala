@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
+//  Copyright (C) 2010, 2011 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -13,6 +13,12 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
+
+////////
+//////// PseudoGoodTuringSmoothedWordDist.scala
+////////
+//////// Copyright (c) 2010, 2011 Ben Wing.
+////////
 
 package opennlp.textgrounder.geolocate
 
@@ -300,7 +306,7 @@ class PseudoGoodTuringSmoothedWordDist(
                       / factory.total_num_unseen_word_types)
             if (debug("lots"))
               errprint("Word %s, never seen at all, wordprob = %s",
-                       unmemoize_word(word), wordprob)
+                       unmemoize_string(word), wordprob)
             wordprob
           }
           case Some(owprob) => {
@@ -311,7 +317,7 @@ class PseudoGoodTuringSmoothedWordDist(
             //    factory.overall_unseen_mass)
             if (debug("lots"))
               errprint("Word %s, seen but not in document, wordprob = %s",
-                       unmemoize_word(word), wordprob)
+                       unmemoize_string(word), wordprob)
             wordprob
           }
         }
@@ -325,7 +331,7 @@ class PseudoGoodTuringSmoothedWordDist(
         val wordprob = wordcount.toDouble/num_word_tokens*(1.0 - unseen_mass)
         if (debug("lots"))
           errprint("Word %s, seen in document, wordprob = %s",
-                   unmemoize_word(word), wordprob)
+                   unmemoize_string(word), wordprob)
         wordprob
       }
     }

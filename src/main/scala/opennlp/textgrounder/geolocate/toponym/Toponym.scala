@@ -26,7 +26,7 @@ import opennlp.textgrounder.util.distances
 import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.distances.spheredist
 import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil.FileHandler
+import opennlp.textgrounder.util.ioutil.{FileHandler, Schema}
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil.{errout, errprint, warning}
@@ -34,21 +34,22 @@ import opennlp.textgrounder.util.printutil.{errout, errprint, warning}
 import opennlp.textgrounder.geolocate._
 import GeolocateDriver.Debug._
 import GeolocateToponymApp.Params
+import WordDist.memoizer._
 
 // A class holding the boundary of a geographic object.  Currently this is
 // just a bounding box, but eventually may be expanded to including a
 // convex hull or more complex model.
 
 class Boundary(botleft: SphereCoord, topright: SphereCoord) {
-  override def toString() = {
+  override def toString = {
     "%s-%s" format (botleft, topright)
   }
 
   // def __repr__()  = {
-  //   "Boundary(%s)" format toString()
+  //   "Boundary(%s)" format toString
   // }
 
-  def struct() = <Boundary boundary={ "%s-%s" format (botleft, topright) }/>
+  def struct = <Boundary boundary={ "%s-%s" format (botleft, topright) }/>
 
   def contains(coord: SphereCoord) = {
     if (!(coord.lat >= botleft.lat && coord.lat <= topright.lat))
@@ -106,10 +107,10 @@ abstract class Location(
   val name: String,
   val altnames: Seq[String],
   val typ: String) {
-  var docmatch: SphereDocument = null
+  var docmatch: WikipediaDocument = null
   var div: Division = null
   def toString(no_document: Boolean = false): String
-  def shortstr(): String
+  def shortstr: String
   def struct(no_document: Boolean = false): xml.Elem
   def distance_to_coord(coord: SphereCoord): Double
   def matches_coord(coord: SphereCoord): Boolean
@@ -141,7 +142,7 @@ case class Locality(
   //   toString.encode("utf-8")
   // }
 
-  def shortstr() = {
+  def shortstr = {
     "Locality %s (%s)" format (
       name, if (div != null) div.path.mkString("/") else "unknown")
   }
@@ -153,7 +154,7 @@ case class Locality(
       <atCoordinate>{ coord }</atCoordinate>
       {
         if (!no_document)
-          <matching>{ if (docmatch != null) docmatch.struct() else "none" }</matching>
+          <matching>{ if (docmatch != null) docmatch.struct else "none" }</matching>
       }
     </Locality>
 
@@ -200,7 +201,7 @@ case class Division(
 
   // def __repr__() = toString.encode("utf-8")
 
-  def shortstr() = {
+  def shortstr = {
     ("Division %s" format name) + (
       if (level > 1) " (%s)" format (path.mkString("/")) else "")
   }
@@ -211,9 +212,9 @@ case class Division(
       <path>{ path.mkString("/") }</path>
       {
         if (!no_document)
-          <matching>{ if (docmatch != null) docmatch.struct() else "none" }</matching>
+          <matching>{ if (docmatch != null) docmatch.struct else "none" }</matching>
       }
-      <boundary>{ boundary.struct() }</boundary>
+      <boundary>{ boundary.struct }</boundary>
     </Division>
 
   def distance_to_coord(coord: SphereCoord) = java.lang.Double.NaN
@@ -283,9 +284,6 @@ class DivisionFactory(gazetteer: Gazetteer) {
   // For each tiling cell, list of divisions that have territory in it
   val tiling_cell_to_divisions = bufmap[RegularCellIndex, Division]()
 
-  // FIXME: For converting cell indices to coordinates
-  var tiling_cell_grid: MultiRegularCellGrid = null
-
   // Find the division for a point in the division with a given path,
   // add the point to the division.  Create the division if necessary.
   // Return the corresponding Division.
@@ -323,11 +321,8 @@ class DivisionFactory(gazetteer: Gazetteer) {
    * Finish all computations related to Divisions, after we've processed
    * all points (and hence all points have been added to the appropriate
    * Divisions).
-   *
-   * @param cell_grid FIXME: Currently required for certain internal reasons.
-   *   Fix so we don't need it, or it's created internally!
    */
-  def finish_all(cell_grid: MultiRegularCellGrid) {
+  def finish_all() {
     val divs_by_area = mutable.Buffer[(Division, Double)]()
     for (division <- path_to_division.values) {
       if (debug("lots")) {
@@ -335,7 +330,8 @@ class DivisionFactory(gazetteer: Gazetteer) {
           division.name, division.path)
       }
       division.compute_boundary()
-      val docmatch = cell_grid.table.asInstanceOf[TopoDocumentTable].
+      val docmatch = gazetteer.cell_grid.table.wikipedia_subtable.
+        asInstanceOf[TopoDocumentSubtable].
         find_match_for_division(division)
       if (docmatch != null) {
         if (debug("lots")) {
@@ -350,8 +346,8 @@ class DivisionFactory(gazetteer: Gazetteer) {
             division.name, division.path)
         }
       }
-      tiling_cell_grid = cell_grid
-      for (index <- division.boundary.iter_nonempty_tiling_cells(cell_grid))
+      for (index <-
+          division.boundary.iter_nonempty_tiling_cells(gazetteer.cell_grid))
         tiling_cell_to_divisions(index) += division
       if (debug("cell"))
         divs_by_area += ((division, division.boundary.square_area()))
@@ -367,17 +363,16 @@ class DivisionFactory(gazetteer: Gazetteer) {
 // A document for toponym resolution.
 
 class TopoDocument(
-    schema: Seq[String],
-    fieldvals: Seq[String],
-    table: TopoDocumentTable
-) extends SphereDocument(schema, fieldvals, table) {
+  schema: Schema,
+  subtable: TopoDocumentSubtable
+) extends WikipediaDocument(schema, subtable) {
   // Cell-based distribution corresponding to this document.
   var word_dist_wrapper: CellWordDist = null
   // Corresponding location for this document.
   var location: Location = null
 
-  override def toString() = {
-    var ret = super.toString()
+  override def toString = {
+    var ret = super.toString
     if (location != null) {
       ret += (", matching location %s" format
         location.toString(no_document = true))
@@ -394,10 +389,10 @@ class TopoDocument(
     ret + topdivstr
   }
 
-  override def shortstr() = {
-    var str = super.shortstr()
+  override def shortstr = {
+    var str = super.shortstr
     if (location != null)
-      str += ", matching %s" format location.shortstr()
+      str += ", matching %s" format location.shortstr
     val divs = find_covering_divisions()
     val top_divs = (for (div <- divs if div.level == 1) yield div.name)
     if (top_divs.length > 0)
@@ -405,8 +400,8 @@ class TopoDocument(
     str
   }
 
-  override def struct() = {
-    val xml = super.struct()
+  override def struct = {
+    val xml = super.struct
     <TopoDocument>
       { xml.child }
       {
@@ -460,23 +455,19 @@ class TopoDocument(
 
   // Find the divisions that cover the given document.
   def find_covering_divisions() = {
-    val inds = (
-      table.gazetteer.divfactory.tiling_cell_grid.
-      coord_to_tiling_cell_index(coord)
-    )
-    val divs = table.gazetteer.divfactory.tiling_cell_to_divisions(inds)
+    val inds = subtable.gazetteer.cell_grid.coord_to_tiling_cell_index(coord)
+    val divs = subtable.gazetteer.divfactory.tiling_cell_to_divisions(inds)
     (for (div <- divs if div contains coord) yield div)
   }
 }
 
 // Static class maintaining additional tables listing mapping between
-// names, ID's and documents.  See comments at SphereDocumentTable.
-class TopoDocumentTable(
-  driver: GeolocateDriver,
-  word_dist_factory: WordDistFactory
-) extends SphereDocumentTable(driver, word_dist_factory) {
-  override def create_document(schema: Seq[String], fieldvals: Seq[String]) =
-    new TopoDocument(schema, fieldvals, this)
+// names, ID's and documents.  See comments at WikipediaDocumentTable.
+class TopoDocumentSubtable(
+  table: SphereDocumentTable
+) extends WikipediaDocumentSubtable(table) {
+  override def create_document(schema: Schema) =
+    new TopoDocument(schema, this)
 
   var gazetteer: Gazetteer = null
 
@@ -518,10 +509,10 @@ class TopoDocumentTable(
   // to be preferred to the second.  Return the document matched, or None.
 
   def find_one_document_match(loc: Location, name: String,
-    check_match: (SphereDocument) => Boolean,
-    prefer_match: (SphereDocument, SphereDocument) => Boolean): SphereDocument = {
+    check_match: (WikipediaDocument) => Boolean,
+    prefer_match: (WikipediaDocument, WikipediaDocument) => Boolean): WikipediaDocument = {
 
-    val loname = name.toLowerCase
+    val loname = memoize_string(name.toLowerCase)
 
     // Look for any documents with same name (case-insensitive) as the
     // location, check for matches
@@ -535,7 +526,8 @@ class TopoDocumentTable(
     if (loc.div != null) {
       for {
         div <- loc.div.path
-        doc <- lower_name_div_to_documents((loname, div.toLowerCase))
+        lodiv = memoize_string(div.toLowerCase)
+        doc <- lower_name_div_to_documents((loname, lodiv))
       } if (check_match(doc)) return doc
     }
 
@@ -565,8 +557,8 @@ class TopoDocumentTable(
   // as above.  Return the document matched, or None.
 
   def find_document_match(loc: Location,
-    check_match: (SphereDocument) => Boolean,
-    prefer_match: (SphereDocument, SphereDocument) => Boolean): SphereDocument = {
+    check_match: (WikipediaDocument) => Boolean,
+    prefer_match: (WikipediaDocument, WikipediaDocument) => Boolean): WikipediaDocument = {
     // Try to find a match for the canonical name of the location
     val docmatch = find_one_document_match(loc, loc.name, check_match,
       prefer_match)
@@ -588,7 +580,7 @@ class TopoDocumentTable(
 
   def find_match_for_locality(loc: Locality, maxdist: Double) = {
 
-    def check_match(doc: SphereDocument) = {
+    def check_match(doc: WikipediaDocument) = {
       val dist = spheredist(loc.coord, doc.coord)
       if (dist <= maxdist) true
       else {
@@ -600,7 +592,7 @@ class TopoDocumentTable(
       }
     }
 
-    def prefer_match(doc1: SphereDocument, doc2: SphereDocument) = {
+    def prefer_match(doc1: WikipediaDocument, doc2: WikipediaDocument) = {
       spheredist(loc.coord, doc1.coord) < spheredist(loc.coord, doc2.coord)
     }
 
@@ -613,11 +605,11 @@ class TopoDocumentTable(
 
   def find_match_for_division(div: Division) = {
 
-    def check_match(doc: SphereDocument) = {
-      if (doc.optcoord != None && (div contains doc.coord)) true
+    def check_match(doc: WikipediaDocument) = {
+      if (doc.has_coord && (div contains doc.coord)) true
       else {
         if (debug("lots")) {
-          if (doc.optcoord == None) {
+          if (!doc.has_coord) {
             errprint("Found document %s but no coordinate, so not in location named %s, path %s",
               doc, div.name, div.path)
           } else {
@@ -629,7 +621,7 @@ class TopoDocumentTable(
       }
     }
 
-    def prefer_match(doc1: SphereDocument, doc2: SphereDocument) = {
+    def prefer_match(doc1: WikipediaDocument, doc2: WikipediaDocument) = {
       val l1 = doc1.incoming_links
       val l2 = doc2.incoming_links
       // Prefer according to incoming link counts, if that info is available
@@ -645,6 +637,19 @@ class TopoDocumentTable(
     find_document_match(div, check_match, prefer_match).
       asInstanceOf[TopoDocument]
   }
+}
+
+/**
+ * A version of SphereDocumentTable that substitutes a TopoDocumentSubtable
+ * for the Wikipedia subtable.
+ */
+class TopoDocumentTable(
+  driver: GeolocateDriver,
+  word_dist_factory: WordDistFactory
+) extends SphereDocumentTable(
+  driver, word_dist_factory
+) {
+  override val wikipedia_subtable = new TopoDocumentSubtable(this)
 }
 
 class EvalStatsWithCandidateList(
@@ -727,7 +732,7 @@ class GeolocateToponymResults(driver_stats: ExperimentDriverStats) {
     all_toponym.record_result(correct, reason, num_candidates)
     if (toponym != trueloc) {
       diff_surface.record_result(correct, reason, num_candidates)
-      val (short, div) = GeoDocument.compute_short_form(trueloc)
+      val (short, div) = WikipediaDocument.compute_short_form(trueloc)
       if (toponym != short)
         diff_short.record_result(correct, reason, num_candidates)
     }
@@ -806,13 +811,14 @@ class BaselineGeolocateToponymStrategy(
 // in conjunction with the baseline.
 class NaiveBayesToponymStrategy(
   cell_grid: SphereCellGrid,
-  val use_baseline: Boolean) extends GeolocateToponymStrategy {
+  val use_baseline: Boolean
+) extends GeolocateToponymStrategy {
   def need_context() = true
 
   def compute_score(geogword: GeogWord, doc: TopoDocument) = {
     // FIXME FIXME!!! We are assuming that the baseline is "internal-link",
     // regardless of its actual settings.
-    val thislinks = GeoDocument.log_adjust_incoming_links(
+    val thislinks = WikipediaDocument.log_adjust_incoming_links(
       doc.adjusted_incoming_links)
 
     var distobj =
@@ -829,7 +835,7 @@ class NaiveBayesToponymStrategy(
       val lword =
         if (Params.preserve_case_words) word else word.toLowerCase
       val wordprob =
-        distobj.lookup_word(WordDist.memoizer.memoize_word(lword))
+        distobj.lookup_word(WordDist.memoizer.memoize_string(lword))
 
       // Compute weight for each word, based on distance from toponym
       val thisweight =
@@ -952,7 +958,8 @@ abstract class GeolocateToponymEvaluator(
     val toponym = geogword.word
     val coord = geogword.coord
     if (coord == null) return // If no ground-truth, skip it
-    val documents = driver.document_table.construct_candidates(toponym)
+    val documents =
+      driver.document_table.wikipedia_subtable.construct_candidates(toponym)
     var bestscore = Double.MinValue
     var bestdoc: TopoDocument = null
     if (documents.length == 0) {
@@ -1156,7 +1163,9 @@ class WikipediaGeolocateToponymEvaluator(
             word.is_toponym = true
             word.location = truedoc
             word.document = title
-            val doc = driver.document_table.lookup_document(truedoc)
+            val doc =
+              driver.document_table.wikipedia_subtable.
+                lookup_document(truedoc)
             if (doc != null)
               word.coord = doc.coord
             word #:: iter_1()
@@ -1174,7 +1183,7 @@ class WikipediaGeolocateToponymEvaluator(
   }
 }
 
-class Gazetteer {
+class Gazetteer(val cell_grid: MultiRegularCellGrid) {
 
   // Factory object for creating new divisions relative to the gazetteer
   val divfactory = new DivisionFactory(this)
@@ -1222,7 +1231,7 @@ class WorldGazetteer(
   filehand: FileHandler,
   filename: String,
   cell_grid: MultiRegularCellGrid
-) extends Gazetteer {
+) extends Gazetteer(cell_grid) {
 
   // Find the document matching an entry in the gazetteer.
   // The format of an entry is
@@ -1309,8 +1318,9 @@ class WorldGazetteer(
     breakable {
       while (maxdist <= Params.max_dist_for_close_match) {
         docmatch =
-          cell_grid.table.asInstanceOf[TopoDocumentTable].
-            find_match_for_locality(loc, maxdist)
+          cell_grid.table.wikipedia_subtable.
+            asInstanceOf[TopoDocumentSubtable].find_match_for_locality(
+              loc, maxdist)
         if (docmatch != null) break
         maxdist *= 2
       }
@@ -1336,23 +1346,28 @@ class WorldGazetteer(
   // For localities, add them to the cell-map that covers the earth if
   // ADD_TO_CELL_MAP is true.)
   protected def read_world_gazetteer_and_match() {
-    val status = new MeteredTask("gazetteer entry", "matching")
+    val task = new MeteredTask("gazetteer entry", "matching")
     errprint("Matching gazetteer entries in %s...", filename)
     errprint("")
 
     // Match each entry in the gazetteer
     breakable {
-      for (line <- filehand.openr(filename)) {
-        if (debug("lots"))
-          errprint("Processing line: %s", line)
-        match_world_gazetteer_entry(line)
-        if (status.item_processed(maxtime = Params.max_time_per_stage))
-          break
+      val lines = filehand.openr(filename)
+      try {
+        for (line <- lines) {
+          if (debug("lots"))
+            errprint("Processing line: %s", line)
+          match_world_gazetteer_entry(line)
+          if (task.item_processed(maxtime = Params.max_time_per_stage))
+            break
+        }
+      } finally {
+        lines.close()
       }
     }
 
-    divfactory.finish_all(cell_grid)
-    status.finish()
+    divfactory.finish_all()
+    task.finish()
     output_resource_usage()
   }
 
@@ -1549,7 +1564,8 @@ class GeolocateToponymDriver extends
       // Bootstrapping issue: Creating the gazetteer requires that the
       // TopoDocumentTable already exist, but the TopoDocumentTable wants
       // a pointer to a gazetter, so have to set it afterwards.
-      document_table.asInstanceOf[TopoDocumentTable].set_gazetteer(gazetteer)
+      document_table.wikipedia_subtable.
+        asInstanceOf[TopoDocumentSubtable].set_gazetteer(gazetteer)
     }
 
     val strats_unflat = (

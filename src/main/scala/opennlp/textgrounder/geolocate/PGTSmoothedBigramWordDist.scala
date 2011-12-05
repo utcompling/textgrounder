@@ -14,6 +14,12 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
+////////
+//////// PGTSmoothedBigramWordDist.scala
+////////
+//////// Copyright (c) 2011 Ben Wing.
+////////
+
 package opennlp.textgrounder.geolocate
 
 import math._
@@ -210,7 +216,7 @@ if(debug("bigram"))
                       / factory.total_num_unseen_word_types)
             if (debug("bigram"))
               errprint("Word %s, never seen at all, wordprob = %s",
-                       unmemoize_word(word), wordprob)
+                       unmemoize_string(word), wordprob)
             wordprob
           }
           case Some(owprob) => {
@@ -221,7 +227,7 @@ if(debug("bigram"))
             //    factory.overall_unseen_mass)
             if (debug("bigram"))
               errprint("Word %s, seen but not in document, wordprob = %s",
-                       unmemoize_word(word), wordprob)
+                       unmemoize_string(word), wordprob)
             wordprob
           }
         }
@@ -235,7 +241,7 @@ if(debug("bigram"))
         val wordprob = wordcount.toDouble/num_word_tokens*(1.0 - unseen_mass)
         if (debug("bigram"))
           errprint("Word %s, seen in document, wordprob = %s",
-                   unmemoize_word(word), wordprob)
+                   unmemoize_string(word), wordprob)
         wordprob
       }
     }

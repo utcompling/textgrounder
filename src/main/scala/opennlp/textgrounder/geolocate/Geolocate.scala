@@ -1,4 +1,5 @@
-//  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
+///////////////////////////////////////////////////////////////////////////////
+//  Copyright (C) 2010, 2011 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -31,6 +32,7 @@ import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil.{FileHandler, LocalFileHandler}
+import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.errprint
 
 import WordDist.memoizer._
@@ -162,13 +164,15 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
   val cdist_factory = new SphereCellDistFactory(Params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
+    val wikipedia_table = cell_grid.table.wikipedia_subtable
+
     // Look for a toponym, then a proper noun, then any word.
     // FIXME: How can 'word' be null?
     // FIXME: Use invalid_word
     // FIXME: Should predicate be passed an index and have to do its own
     // unmemoizing?
     var maxword = word_dist.find_most_common_word(
-      word => word(0).isUpper && cell_grid.table.word_is_toponym(word))
+      word => word(0).isUpper && wikipedia_table.word_is_toponym(word))
     if (maxword == None) {
       maxword = word_dist.find_most_common_word(
         word => word(0).isUpper)
@@ -183,24 +187,27 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
   cell_grid: SphereCellGrid
 ) extends SphereGeolocateDocumentStrategy(cell_grid) {
   def return_ranked_cells(word_dist: WordDist) = {
+    val wikipedia_table = cell_grid.table.wikipedia_subtable
+
     var maxword = word_dist.find_most_common_word(
-      word => word(0).isUpper && cell_grid.table.word_is_toponym(word))
+      word => word(0).isUpper && wikipedia_table.word_is_toponym(word))
     if (maxword == None) {
       maxword = word_dist.find_most_common_word(
-        word => cell_grid.table.word_is_toponym(word))
+        word => wikipedia_table.word_is_toponym(word))
     }
     if (debug("commontop"))
       errprint("  maxword = %s", maxword)
     val cands =
       if (maxword != None)
-        cell_grid.table.construct_candidates(
-          unmemoize_word(maxword.get))
+        wikipedia_table.construct_candidates(
+          unmemoize_string(maxword.get))
       else Seq[SphereDocument]()
     if (debug("commontop"))
       errprint("  candidates = %s", cands)
     // Sort candidate list by number of incoming links
     val candlinks =
-      (for (cand <- cands) yield (cand, cand.adjusted_incoming_links.toDouble)).
+      (for (cand <- cands) yield (cand,
+        cand.asInstanceOf[WikipediaDocument].adjusted_incoming_links.toDouble)).
         // sort by second element of tuple, in reverse order
         sortWith(_._2 > _._2)
     if (debug("commontop"))
@@ -227,7 +234,8 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
 
     // Append random cells and remove duplicates
     merge_numbered_sequences_uniquely(candcells,
-      new RandomGeolocateDocumentStrategy(cell_grid).return_ranked_cells(word_dist))
+      new RandomGeolocateDocumentStrategy(cell_grid).
+        return_ranked_cells(word_dist))
   }
 }
 
@@ -880,7 +888,6 @@ abstract class GeolocateDriver extends
     for (fn <- Params.input_corpus)
       table.read_documents(get_file_handler, fn,
         document_file_suffix, cell_grid)
-    table.finish_word_counts()
   }
 
   def setup_for_run() {
@@ -895,7 +902,13 @@ abstract class GeolocateDriver extends
     read_documents(document_table)
     if (debug("stop-after-reading-dists")) {
       errprint("Stopping abruptly because debug flag stop-after-reading-dists set")
-      System.exit(0)
+      output_resource_usage()
+      // We throw to top level before exiting because hprof tends to report
+      // too much garbage as if it were live.  Unwinding the stack may fix
+      // some of that.  If you don't want this unwinding, comment out the
+      // throw and uncomment the call to System.exit().
+      throw new GeolocateAbruptExit
+      // System.exit(0)
     }
     cell_grid.finish(this)
   }
@@ -1243,9 +1256,22 @@ class GeolocateDocumentDriver extends
   override type ParamType = GeolocateDocumentParameters
 }
 
+class GeolocateAbruptExit extends Throwable { }
+
 abstract class GeolocateApp(appname: String) extends
     ExperimentDriverApp(appname) {
   type DriverType <: GeolocateDriver
+
+  override def run_program() = {
+    try {
+      super.run_program()
+    } catch {
+      case e:GeolocateAbruptExit => {
+        errprint("Caught abrupt exit throw, exiting")
+        0
+      }
+    }
+  }
 }
 
 object GeolocateDocumentApp extends GeolocateApp("geolocate-document") {

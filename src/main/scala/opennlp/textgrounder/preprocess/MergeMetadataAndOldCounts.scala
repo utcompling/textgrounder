@@ -104,7 +104,7 @@ trait SimpleUnigramWordDistReader {
           line match {
             case linere(word, count) => {
               // errprint("Saw1 %s,%s", word, count)
-              keys_dynarr += memoize_word(word)
+              keys_dynarr += memoize_string(word)
               values_dynarr += count.toInt
             }
             case _ =>
@@ -125,24 +125,19 @@ trait SimpleUnigramWordDistReader {
  * format.
  */
 class MMCUnigramWordDistHandler(
-  schema: Seq[String],
+  schema: Schema,
   document_fieldvals: mutable.Map[String, Seq[String]],
   filehand: FileHandler,
   output_dir: String,
   output_file_prefix: String
 ) extends SimpleUnigramWordDistReader {
-  val writer = new FieldTextWriter(schema ++ Seq("counts"))
-  val full_prefix = "%s/%s" format (output_dir, output_file_prefix)
-  val outstream = filehand.openw("%s-unigram-counts.txt" format full_prefix,
-    compression = "bzip2")
+  val new_schema = new Schema(schema.fieldnames ++ Seq("counts"),
+    schema.fixed_values)
+  val writer = new CorpusWriter(new_schema, "unigram-counts")
+  writer.output_schema_file(filehand, output_dir, output_file_prefix)
+  val outstream = writer.open_document_file(filehand, output_dir,
+    output_file_prefix, compression = "bzip2")
  
-  def output_schema_file() {
-    val schema_outstream =
-      filehand.openw("%s-unigram-counts-schema.txt" format full_prefix)
-    writer.output_schema(schema_outstream)
-    schema_outstream.close()
-  }
-
   def handle_document(title: String, keys: Array[Word], values: Array[Int],
       num_words: Int) = {
     errprint("Handling document: %s", title)
@@ -154,7 +149,7 @@ class MMCUnigramWordDistHandler(
         (for (i <- 0 until num_words) yield {
           // errprint("Saw2 %s,%s", keys(i), values(i))
           ("%s:%s" format
-            (GeoDocument.encode_word_for_counts_field(unmemoize_word(keys(i))),
+            (GeoDocument.encode_word_for_counts_field(unmemoize_string(keys(i))),
               values(i)))
           }).
           mkString(" ")
@@ -181,7 +176,7 @@ class MMCDocumentFileProcessor(
   val document_fieldvals = mutable.Map[String, Seq[String]]()
 
   def process_row(fieldvals: Seq[String]): Boolean = {
-    val params = (schema zip fieldvals).toMap
+    val params = (schema.fieldnames zip fieldvals).toMap
     document_fieldvals(params("title")) = fieldvals
     true
   }
@@ -235,7 +230,7 @@ counts file also containing the metadata.
       params.output_file_prefix = base.replaceAll("-[^-]*$", "")
       params.output_file_prefix =
         params.output_file_prefix.stripSuffix("-document-metadata")
-      errprint("Settings new output-file prefix to '%s'",
+      errprint("Setting new output-file prefix to '%s'",
         params.output_file_prefix)
     }
 
@@ -245,7 +240,6 @@ counts file also containing the metadata.
       new MMCUnigramWordDistHandler(fileproc.schema,
         fileproc.document_fieldvals, filehand, params.output_dir,
         params.output_file_prefix)
-    counts_handler.output_schema_file()
     counts_handler.read_word_counts(filehand, params.counts_file)
     counts_handler.finish()
   }

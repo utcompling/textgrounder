@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
+//  Copyright (C) 2010, 2011 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -14,6 +14,12 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
+////////
+//////// UnigramWordDist.scala
+////////
+//////// Copyright (c) 2010, 2011 Ben Wing.
+////////
+
 package opennlp.textgrounder.geolocate
 
 import math._
@@ -23,7 +29,6 @@ import util.control.Breaks._
 import java.io._
 
 import opennlp.textgrounder.util.collectionutil.DynamicArray
-import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.ioutil.{FileHandler, FileFormatException}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
@@ -74,7 +79,7 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
     val need_dots = counts.size > num_words_to_print
     val items =
       for ((word, count) <- counts.toSeq.sortWith(_._2 > _._2).view(0, num_words_to_print))
-      yield "%s=%s" format (unmemoize_word(word), count) 
+      yield "%s=%s" format (unmemoize_string(word), count) 
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
     "WordDist(%d types, %d tokens%s%s, %s)" format (
         num_word_types, num_word_tokens, innerToString, finished_str, words)
@@ -86,7 +91,7 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
     for {word <- words
          val wlower = if (ignore_case) word.toLowerCase() else word
          if !stopwords(wlower) } {
-      counts(memoize_word(wlower)) += 1
+      counts(memoize_string(wlower)) += 1
       num_word_tokens += 1
     }
   }
@@ -195,7 +200,7 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
 
   def find_most_common_word(pred: String => Boolean) = {
     val filtered =
-      (for ((word, count) <- counts if pred(unmemoize_word(word)))
+      (for ((word, count) <- counts if pred(unmemoize_string(word)))
         yield (word, count)).toSeq
     if (filtered.length == 0) None
     else {
@@ -298,7 +303,7 @@ abstract class UnigramWordDistFactory extends
     /* minimum_word_count (--minimum-word-count) currently handled elsewhere.
        FIXME: Perhaps should be handled here. */
     if (!is_stopword(doc, lword))
-      Some(memoize_word(lword))
+      Some(memoize_string(lword))
     else
       None
   }
