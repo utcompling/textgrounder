@@ -129,7 +129,7 @@ class WordCellTupleWritable extends
 class GenerateKMLDriver extends
     GeolocateDriver with StandaloneGeolocateDriverStats {
   type ParamType = GenerateKMLParameters
-  type RunReturnType = Null
+  type RunReturnType = Unit
 
   override def handle_parameters() {
     super.handle_parameters()
@@ -150,7 +150,7 @@ class GenerateKMLDriver extends
    * KML files created and written on disk.
    */
 
-  def run_after_setup() = {
+  def run_after_setup() {
     val cdist_factory = new SphereCellDistFactory(params.lru_cache_size)
     for (word <- params.split_kml_words) {
       val celldist = cdist_factory.get_cell_dist(cell_grid, memoize_string(word))
@@ -165,7 +165,6 @@ Not generating an empty KML file.""", word)
           kmlparams)
       }
     }
-    null
   }
 }
 
