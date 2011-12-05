@@ -133,18 +133,11 @@ class MMCUnigramWordDistHandler(
 ) extends SimpleUnigramWordDistReader {
   val new_schema = new Schema(schema.fieldnames ++ Seq("counts"),
     schema.fixed_values)
-  val writer = new FieldTextWriter(schema)
-  val full_prefix = "%s/%s" format (output_dir, output_file_prefix)
-  val outstream = filehand.openw("%s-unigram-counts.txt" format full_prefix,
-    compression = "bzip2")
+  val writer = new CorpusWriter(new_schema, "unigram-counts")
+  writer.output_schema_file(filehand, output_dir, output_file_prefix)
+  val outstream = writer.open_document_file(filehand, output_dir,
+    output_file_prefix, compression = "bzip2")
  
-  def output_schema_file() {
-    val schema_outstream =
-      filehand.openw("%s-unigram-counts-schema.txt" format full_prefix)
-    writer.output_schema(schema_outstream)
-    schema_outstream.close()
-  }
-
   def handle_document(title: String, keys: Array[Word], values: Array[Int],
       num_words: Int) = {
     errprint("Handling document: %s", title)
@@ -237,7 +230,7 @@ counts file also containing the metadata.
       params.output_file_prefix = base.replaceAll("-[^-]*$", "")
       params.output_file_prefix =
         params.output_file_prefix.stripSuffix("-document-metadata")
-      errprint("Settings new output-file prefix to '%s'",
+      errprint("Setting new output-file prefix to '%s'",
         params.output_file_prefix)
     }
 
@@ -247,7 +240,6 @@ counts file also containing the metadata.
       new MMCUnigramWordDistHandler(fileproc.schema,
         fileproc.document_fieldvals, filehand, params.output_dir,
         params.output_file_prefix)
-    counts_handler.output_schema_file()
     counts_handler.read_word_counts(filehand, params.counts_file)
     counts_handler.finish()
   }

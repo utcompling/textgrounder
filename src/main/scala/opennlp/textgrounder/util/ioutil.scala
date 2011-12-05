@@ -792,7 +792,6 @@ package object ioutil {
    * @param split_re Regular expression used to split one field from another.
    *   By default a tab character.
    */
-
   abstract class FieldTextFileProcessor(
     split_re: String = "\t"
   ) extends TextFileProcessor {
@@ -887,26 +886,9 @@ package object ioutil {
        TextFileProcessor. */
   }
 
-  class FieldTextWriter(
-    schema: Schema,
-    split_text: String = "\t"
-  ) {
-    def output_schema(outstream: PrintStream) {
-      outstream.println(schema.fieldnames mkString split_text)
-      for ((field, value) <- schema.fixed_values)
-        outstream.println(List(field, value) mkString split_text)
-    }
-
-    def output_row(outstream: PrintStream, fieldvals: Iterable[String]) {
-      val seqvals = fieldvals.toSeq
-      assert(seqvals.length == schema.fieldnames.length)
-      outstream.println(seqvals mkString split_text)
-    }
-  }
-
   case class Schema(
     fieldnames: Seq[String],
-    fixed_values: mutable.LinkedHashMap[String, String]
+    fixed_values: Map[String, String]
   ) {
     def get_field(fieldvals: Seq[String], key: String,
         error_if_missing: Boolean = true) =
@@ -927,9 +909,7 @@ package object ioutil {
         error_if_missing: Boolean = false) = {
       if (fixed_values contains key)
         fixed_values(key)
-      else if (error_if_missing) {
-        throw new NoSuchElementException("key not found: %s" format key)
-      } else default
+      else Schema.error_or_default(key, default, error_if_missing)
     }
   }
 
@@ -953,7 +933,7 @@ package object ioutil {
         throw new FileFormatException(
           "Blank field name in schema file %s: fields are %s".
           format(schema_file, fieldnames))
-      val fixed_fields = mutable.LinkedHashMap[String,String]()
+      var fixed_fields = Map[String,String]()
       for (line <- lines) {
         val fixed = line.split(split_re, -1)
         if (fixed.length != 2)
@@ -965,10 +945,52 @@ package object ioutil {
           throw new FileFormatException(
             "Blank field name in fxed-value part of schema file %s: line is %s".
               format(schema_file, line))
-        fixed_fields(from) = to
+        fixed_fields += (from -> to)
       }
       new Schema(fieldnames, fixed_fields)
     }
+
+    def get_field(fieldnames: Seq[String], fieldvals: Seq[String], key: String,
+        error_if_missing: Boolean = true) =
+      get_field_or_else(fieldnames, fieldvals, key,
+        error_if_missing = error_if_missing)
+
+    def get_field_or_else(fieldnames: Seq[String], fieldvals: Seq[String],
+        key: String, default: String = null,
+        error_if_missing: Boolean = false): String = {
+      assert(fieldvals.length == fieldnames.length)
+      var i = 0
+      while (i < fieldnames.length) {
+        if (fieldnames(i) == key) return fieldvals(i)
+        i += 1
+      }
+      return error_or_default(key, default, error_if_missing)
+    }
+
+    protected def error_or_default(key: String, default: String,
+        error_if_missing: Boolean) = {
+      if (error_if_missing) {
+        throw new NoSuchElementException("key not found: %s" format key)
+      } else default
+    }
+
+    /**
+     * Convert a set of field names and values to a map, to make it easier
+     * to work with them.  The result is a mutable order-preserving map,
+     * which is important so that when converted back to separate lists of
+     * names and values, the values are still written out correctly.
+     * (The immutable order-preserving ListMap isn't sufficient since changing
+     * a field value results in the field getting moved to the end.)
+     *
+     */
+    def to_map(fieldnames: Seq[String], fieldvals: Seq[String]) =
+      mutable.LinkedHashMap[String, String]() ++ (fieldnames zip fieldvals)
+
+    /**
+     * Convert from a map back to a tuple of lists of field names and values.
+     */
+    def from_map(map: mutable.Map[String, String]) =
+      map.toSeq.unzip
   }
 
   /**
@@ -981,23 +1003,46 @@ package object ioutil {
    *     each field, separated by a TAB character, as well as any
    *     "fixed" fields that have the same value for all rows (one per
    *     line, with the name, a TAB, and the value).
-   * (3) The document and schema files are identified by a SUFFIX.
-   *     The document files are named `*-SUFFIX.txt` (or `*-SUFFIX.txt.bz2` or
-   *     similar), while the schema file is named `*-SUFFIX-schema.txt`.
+   * (3) The document and schema files are identified by a suffix.
+   *     The document files are named `DIR/PREFIX-SUFFIX.txt`
+   *     (or `DIR/PREFIX-SUFFIX.txt.bz2` or similar, for compressed files),
+   *     while the schema file is named `DIR/PREFIX-SUFFIX-schema.txt`.
+   *     Note that the SUFFIX is set when the `CorpusFileProcessor` is
+   *     created, and typically specifies the category of corpus being
+   *     read (e.g. "text" for corpora containing text or "unigram-counts"
+   *     for a corpus containing unigram counts).  The directory is specified
+   *     in a particular call to `process_files` or `read_schema_from_corpus`.
+   *     The prefix is arbitrary and descriptive -- i.e. any files in the
+   *     appropriate directory and with the appropriate suffix, regardless
+   *     of prefix, will be loaded.  The prefix of the currently-loading
+   *     document file is available though the field `current_document_prefix`.
    *
-   * It's generally assumed that the document and schema files are placed
-   * in a single directory, and that only one corpus with a given suffix
-   * is placed in that directory (although corpora with different suffixes
-   * can coexist in the same directory).  This makes it possible to locate
-   * the schema and document files by looking for appropriately-named
-   * files in a given directory, while the files themselves can have
-   * arbitrary descriptive prefixes identifying the particular corpus
-   * involved.
+   * The most common setup is to have the schema file and any document files
+   * placed in the same directory, although it's possible to have them in
+   * different directories or to have document files scattered across multiple
+   * directories.  Note that the naming of the files allows for multiple
+   * document files in a single directory, as well as multiple corpora to
+   * coexist in the same directory, as long as they have different suffixes.
+   * This is often used to present different "views" onto the same corpus
+   * (e.g. one containing raw text, one containing unigram counts, etc.), or
+   * different splits (e.g. training vs. dev vs. test). (In fact, it is
+   * common to divide a corpus into sub-corpora according to the split.
+   * In such a case, document files will be named `DIR/PREFIX-SPLIT-SUFFIX.txt`
+   * or similar.  This allows all files for all splits to be located using a
+   * suffix consisting only of the final "SUFFIX" part, while a particular
+   * split can be located using a larger prefix of the form "SPLIT-SUFFIX".)
    *
    * Generally, after creating a file processor of this sort, the schema
    * file needs to be read using `read_schema_from_corpus`; then the document
-   * files can be processed using `process_files` (which typically takes the
-   * directory name as its argument).
+   * files can be processed using `process_files`.  Most commonly, the same
+   * directory is passed to both functions.  In more complicated setups,
+   * however, different directory names can be used; multiple calls to
+   * `process_files` can be made to process multiple directories; or
+   * individual file names can be given to `process_files` for maximum
+   * control.
+   *
+   * Various fields store things like the current directory and file prefix
+   * (the part before the suffix).
    *
    * @param suffix the suffix of the corpus files, as described above
    *     
@@ -1007,13 +1052,69 @@ package object ioutil {
   ) extends FieldTextFileProcessor {
     import CorpusFileProcessor._
 
+    /**
+     * Name of the schema file.
+     */
     var schema_file: String = _
-    var schema_file_filehand: FileHandler = _
+    /**
+     * File handler of the schema file.
+     */
+    var schema_filehand: FileHandler = _
+    /**
+     * Directory of the schema file.
+     */
+    var schema_dir: String = _
+    /**
+     * Prefix of the schema file (see above).
+     */
+    var schema_prefix: String = _
+    /**
+     * Schema read from the schema file.
+     */
     var schema: Schema = _
+
+    /**
+     * Current document file being read.
+     */
+    var current_document_file: String = _
+    /**
+     * File handler of the current document file.
+     */
+    var current_document_filehand: FileHandler = _
+    /**
+     * "Real name" of the current document file, after any compression suffix
+     * has been removed.
+     */
+    var current_document_realname: String = _
+    /**
+     * Type of compression of the current document file.
+     */
+    var current_document_compression: String = _
+    /**
+     * Directory of the current document file.
+     */
+    var current_document_dir: String = _
+    /**
+     * Prefix of the current document file (see above).
+     */
+    var current_document_prefix: String = _
 
     def set_schema(schema: Schema) {
       this.schema = schema
       set_fieldnames(schema.fieldnames)
+    }
+
+    override def begin_process_lines(lines: Iterator[String],
+        filehand: FileHandler, file: String,
+        compression: String, realname: String) {
+      current_document_compression = compression
+      current_document_filehand = filehand
+      current_document_file = file
+      current_document_realname = realname
+      val (dir, base) = filehand.split_filename(realname)
+      current_document_dir = dir
+      current_document_prefix = base.stripSuffix("-" + suffix + ".txt")
+      super.begin_process_lines(lines, filehand, file, compression, realname)
     }
 
     /**
@@ -1043,7 +1144,10 @@ package object ioutil {
      */
     def read_schema_from_corpus(filehand: FileHandler, dir: String) {
       schema_file = find_schema_file(filehand, dir)
-      schema_file_filehand = filehand
+      schema_filehand = filehand
+      val (_, base) = filehand.split_filename(schema_file)
+      schema_dir = dir
+      schema_prefix = base.stripSuffix("-" + suffix + "-schema.txt")
       val schema = Schema.read_schema_file(filehand, schema_file)
       set_schema(schema)
     }
@@ -1080,6 +1184,84 @@ package object ioutil {
       (re_quoted_suffix + possible_compression_re).r
     }
 
+  }
+
+  /**
+   * Class for writing a "corpus" of documents.  The corpus has the
+   * format described in `CorpusFileProcessor`.
+   *
+   * @param schema the schema describing the fields in the document file
+   * @param suffix the suffix of the corpus files, as described in
+   *   `CorpusFileProcessor`
+   *     
+   */
+  class CorpusWriter(
+    val schema: Schema,
+    val suffix: String
+  ) {
+    /**
+     * Text used to separate fields.  Currently this is always a tab
+     * character, and no provision is made for changing this.
+     */
+    val split_text = "\t"
+
+    /**
+     * Construct the name of a file (either schema or document file), based
+     * on the given file handler, directory, prefix, suffix and file ending.
+     * For example, if the file ending is "-schema.txt", the file will be
+     * named `DIR/PREFIX-SUFFIX-schema.txt`.
+     */
+    def construct_output_file(filehand: FileHandler, dir: String,
+        prefix: String, file_ending: String) = {
+      val new_base = prefix + "-" + suffix + file_ending
+      filehand.join_filename(dir, new_base)
+    }
+
+    /**
+     * Output the schema to a file.  The file will be named
+     * `DIR/PREFIX-SUFFIX-schema.txt`.
+     */
+    def output_schema_file(filehand: FileHandler, dir: String,
+        prefix: String) {
+      val schema_file = construct_output_file(filehand, dir, prefix,
+        "-schema.txt")
+      val schema_outstream = filehand.openw(schema_file)
+      schema_outstream.println(schema.fieldnames mkString split_text)
+      for ((field, value) <- schema.fixed_values)
+        schema_outstream.println(List(field, value) mkString split_text)
+      schema_outstream.close()
+    }
+
+    /**
+     * Open a document file and return an output stream.  The file will be
+     * named `DIR/PREFIX-SUFFIX.txt`, possibly with an additional suffix
+     * (e.g. `.bz2`), depending on the specified compression (which defaults
+     * to no compression).  Call `output_row` to output a row describing
+     * a document.
+     */
+    def open_document_file(filehand: FileHandler, dir: String,
+        prefix: String, compression: String = "none") = {
+      val file = construct_output_file(filehand, dir, prefix, ".txt")
+      filehand.openw(file, compression = compression)
+    }
+
+    /**
+     * Output a row describing a document.
+     *
+     * @param outstream The output stream to write to, as returned by
+     *   `open_document_file`.
+     * @param fieldvals Iterable describing the field values to be written.
+     *   There should be as many items as there are field names in the
+     *   `fieldnames` field of the schema.
+     */
+    def output_row(outstream: PrintStream, fieldvals: Iterable[String]) {
+      val seqvals = fieldvals.toSeq
+      assert(seqvals.length == schema.fieldnames.length,
+        "values %s (length %s) not same length as fields %s (length %s)" format
+          (seqvals, seqvals.length, schema.fieldnames,
+            schema.fieldnames.length))
+      outstream.println(seqvals mkString split_text)
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////

@@ -8,7 +8,8 @@ NEWCONVERTDIR=new-convert
 # Do it for one dir.
 do_dir() {
   dir=$1
-  textgrounder run opennlp.textgrounder.preprocess.MergeMetadataAndOldCounts -o $NEWCONVERTDIR/$dir -i $dir --counts-file $dir/*-counts-only-coord-documents.txt*
+  dirbase=`basename $dir`
+  textgrounder run opennlp.textgrounder.preprocess.MergeMetadataAndOldCounts -o $NEWCONVERTDIR/$dirbase -i $dir --counts-file $dir/*-counts-only-coord-documents.txt*
   mv -f $NEWCONVERTDIR/$dir/* $dir
   rmdir $NEWCONVERTDIR/$dir
 }

@@ -9,7 +9,7 @@ NEWCONVERTDIR=frobconv
 # Do it for one dir.
 do_dir() {
   dir=$1
-  textgrounder run opennlp.textgrounder.preprocess.FrobCorpus -a corpus=twitter-geotext-$dir -o $NEWCONVERTDIR/$dir -i $dir -r id -r redir -r namespace -r is_list_of -r is_disambig -r is_list -r incoming_links
+  textgrounder run opennlp.textgrounder.preprocess.FrobCorpus -a corpus=twitter-geotext-$dir -a corpus-type=twitter-user --rename-field title=user -o $NEWCONVERTDIR/$dir -i $dir -r id -r redir -r namespace -r is_list_of -r is_disambig -r is_list -r incoming_links
   mv -f $NEWCONVERTDIR/$dir/* $dir
   rmdir $NEWCONVERTDIR/$dir
   rmdir $NEWCONVERTDIR

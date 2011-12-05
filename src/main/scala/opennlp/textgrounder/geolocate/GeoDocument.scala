@@ -168,8 +168,9 @@ abstract class GeoDocumentFileProcessor(
 }
 
 class GeoDocumentWriter[CoordType : Serializer](
-  schema: Schema
-) extends FieldTextWriter(schema) {
+  schema: Schema,
+  suffix: String
+) extends CorpusWriter(schema, suffix) {
   def output_document(outstream: PrintStream, doc: GeoDocument[CoordType]) {
     output_row(outstream, doc.get_fields(schema.fieldnames))
   }
