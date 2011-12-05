@@ -6,6 +6,7 @@ import scala.collection.mutable.Map
 import ags.utils.KdTree
 
 import opennlp.textgrounder.util.distances.SphereCoord
+import opennlp.textgrounder.util.experiment._
 
 import GeolocateDriver.Params
 
@@ -95,7 +96,7 @@ class KdTreeCellGrid(table: SphereDocumentTable,
    * `add_document_to_cell`.  The generation happens internally; but after
    * this, `iter_nonempty_cells` should work properly.
    */
-  def initialize_cells: Unit = {
+  def initialize_cells(driver : ExperimentDriver): Unit = {
     total_num_cells = kdtree.getLeaves.size
     num_non_empty_cells = total_num_cells
 
@@ -105,6 +106,7 @@ class KdTreeCellGrid(table: SphereDocumentTable,
       val c = new KdTreeCell(this, node)
       c.generate_dist
       nodes_to_cell.update(node, c)
+      driver.heartbeat
     }
 
     if (interpolateWeight > 0) {

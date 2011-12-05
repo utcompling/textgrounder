@@ -897,7 +897,7 @@ abstract class GeolocateDriver extends
       errprint("Stopping abruptly because debug flag stop-after-reading-dists set")
       System.exit(0)
     }
-    cell_grid.finish()
+    cell_grid.finish(this)
   }
 
   protected def process_strategies[T](strategies: Seq[(String, T)])(
