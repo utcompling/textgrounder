@@ -157,12 +157,6 @@ abstract class DistDocumentTable[CoordType : Serializer,
       output_resource_usage()
       !should_stop
     }
-
-    override def end_processing(filehand: FileHandler,
-        files: Iterable[String]) {
-      finish_document_loading()
-      super.end_processing(filehand, files)
-    }
   }
 
   /**
@@ -179,10 +173,16 @@ abstract class DistDocumentTable[CoordType : Serializer,
   def read_documents(filehand: FileHandler, dir: String, suffix: String,
       cell_grid: CellGrid[CoordType,DocumentType,_]) {
 
-    val distproc = new DistDocumentFileProcessor(suffix, cell_grid)
-
-    distproc.read_schema_from_corpus(filehand, dir)
-    distproc.process_files(filehand, Seq(dir))
+    val training_distproc =
+      new DistDocumentFileProcessor("training-" + suffix, cell_grid)
+    training_distproc.read_schema_from_corpus(filehand, dir)
+    training_distproc.process_files(filehand, Seq(dir))
+    val eval_distproc =
+      new DistDocumentFileProcessor(driver.params.eval_set + "-" + suffix,
+        cell_grid)
+    eval_distproc.read_schema_from_corpus(filehand, dir)
+    eval_distproc.process_files(filehand, Seq(dir))
+    finish_document_loading()
   }
 
   def clear_training_document_distributions() {
