@@ -196,8 +196,7 @@ abstract class GeoDocument[CoordType : Serializer](
   def title: String
   def has_coord: Boolean
   def coord: CoordType
-  var splitind = blank_memoized_string
-  def split = unmemoize_string(splitind)
+  def split = schema.get_fixed_field("split", error_if_missing = true)
   def incoming_links: Option[Int] = None
 
   import GeoDocument._, GeoDocumentConverters._
@@ -243,14 +242,13 @@ abstract class GeoDocument[CoordType : Serializer](
 
   def set_field(field: String, value: String) {
     field match {
-      case "split" => splitind = memoize_string(value)
+      // Currently no general parameters to set.
       case _ => () // Just eat the extra parameters
     }
   }
 
   def get_field(field: String) = {
     field match {
-      case "split" => unmemoize_string(splitind)
       case "title" => title
       case "coord" => if (has_coord) put_x(coord) else null
       case _ => null

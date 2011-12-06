@@ -24,6 +24,7 @@ package opennlp.textgrounder.geolocate
 
 import collection.mutable
 import util.matching.Regex
+import util.control.Breaks._
 
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances._
@@ -34,6 +35,8 @@ import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.errprint
 import opennlp.textgrounder.util.Serializer
 import opennlp.textgrounder.util.textutil.capfirst
+
+import GeolocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
 //                      Wikipedia/Twitter/etc. documents                   //
@@ -141,27 +144,32 @@ abstract class DistDocumentTable[CoordType : Serializer,
       val task = new MeteredTask("document", "reading")
       // Stop if we've reached the maximum
       var should_stop = false
-      for (line <- lines if !should_stop) {
-        parse_row(line)
-        if (task.item_processed(maxtime = driver.params.max_time_per_stage))
-          should_stop = true
-        if ((driver.params.num_training_docs > 0 &&
-          task.num_processed >= driver.params.num_training_docs)) {
-          errprint("")
-          errprint("Stopping because limit of %s documents reached",
-            driver.params.num_training_docs)
-          should_stop = true
+      breakable {
+        for (line <- lines) {
+          parse_row(line)
+          if (task.item_processed(maxtime = driver.params.max_time_per_stage))
+            should_stop = true
+          if ((driver.params.num_training_docs > 0 &&
+            task.num_processed >= driver.params.num_training_docs)) {
+            errprint("")
+            errprint("Stopping because limit of %s documents reached",
+              driver.params.num_training_docs)
+            should_stop = true
+          }
+          val sleep_at = debugval("sleep-at-docs")
+          if (sleep_at != "") {
+            if (task.num_processed == sleep_at.toInt) {
+              errprint("Reached %d documents, sleeping ...")
+              Thread.sleep(5000)
+            }
+          }
+          if (should_stop)
+            break
         }
       }
       task.finish()
       output_resource_usage()
       !should_stop
-    }
-
-    override def end_processing(filehand: FileHandler,
-        files: Iterable[String]) {
-      finish_document_loading()
-      super.end_processing(filehand, files)
     }
   }
 
@@ -179,10 +187,16 @@ abstract class DistDocumentTable[CoordType : Serializer,
   def read_documents(filehand: FileHandler, dir: String, suffix: String,
       cell_grid: CellGrid[CoordType,DocumentType,_]) {
 
-    val distproc = new DistDocumentFileProcessor(suffix, cell_grid)
-
-    distproc.read_schema_from_corpus(filehand, dir)
-    distproc.process_files(filehand, Seq(dir))
+    val training_distproc =
+      new DistDocumentFileProcessor("training-" + suffix, cell_grid)
+    training_distproc.read_schema_from_corpus(filehand, dir)
+    training_distproc.process_files(filehand, Seq(dir))
+    val eval_distproc =
+      new DistDocumentFileProcessor(driver.params.eval_set + "-" + suffix,
+        cell_grid)
+    eval_distproc.read_schema_from_corpus(filehand, dir)
+    eval_distproc.process_files(filehand, Seq(dir))
+    finish_document_loading()
   }
 
   def clear_training_document_distributions() {
@@ -192,10 +206,12 @@ abstract class DistDocumentTable[CoordType : Serializer,
 
   def finish_document_loading() {
     // Compute overall distribution values (e.g. back-off statistics).
+    errprint("Finishing global dist...")
     word_dist_factory.finish_global_distribution()
 
     // Now compute per-document values dependent on the overall distribution
     // statistics just computed.
+    errprint("Finishing document dists...")
     for ((split, table) <- documents_by_split) {
       var totaltoks = 0
       var numdocs = 0
