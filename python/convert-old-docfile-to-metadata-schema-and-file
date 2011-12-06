@@ -13,14 +13,6 @@
 #
 # If --no-dir-prefix, don't include the directory as part of the prefix.
 
-dir_prefix=true
-while true; do
-  case "$1" in
-    --no-dir-prefix ) dir_prefix=false; shift 1 ;;
-    * ) break ;;
-  esac
-done
-
 # Find compression by extension.  Output one of bzip2, gzip or none.
 find_compression_by_extension() {
   local ext=`echo "$1" | sed 's/^.*\././'`
@@ -131,7 +123,9 @@ EOF
 do_dir() {
   suffix="-combined-document-data"
   docsuffix="$suffix.txt"
-  infile=`find_maybe_compressed_file "$1/*$docsuffix"`
+  dir="$1"
+  dirbase=`basename $dir`
+  infile=`find_maybe_compressed_file "$dir/*$docsuffix"`
   #echo "infile=$infile"
   compression=`find_compression_by_extension $infile`
   echo "Compression of input file is $compression"
@@ -140,19 +134,31 @@ do_dir() {
   prefix=`basename $realbase $docsuffix`
   echo "Prefix of input file is $prefix"
   if [ "$dir_prefix" = true ]; then
-    prefix="$prefix-$1"
+    prefix="$prefix-$dirbase"
     echo "New prefix (incorporating directory name) is $prefix"
   fi
 
+  mkdir -p "$output_dir"
+
   newsuffix="-document-metadata"
-  schema_file="$1/$prefix$newsuffix-schema.txt"
+  schema_file="$output_dir/$prefix$newsuffix-schema.txt"
   echo "Generating schema file $schema_file from $infile ..."
   uncompressfile $compression $infile | head -1 > $schema_file
-  metadata_file=`add_compression_extension $compression "$1/$prefix$newsuffix.txt"`
+  metadata_file=`add_compression_extension $compression "$output_dir/$prefix$newsuffix.txt"`
   echo "Generating metadata file $metadata_file from $infile ..."
   uncompressfile $compression $infile | tail -n +2 | compressfile $compression > $metadata_file
   echo "Done."
 }
+
+output_dir=new-convert-schema-and-file
+dir_prefix=true
+while true; do
+  case "$1" in
+    --no-dir-prefix ) dir_prefix=false; shift 1 ;;
+    --output-dir ) output_dir="$2"; shift 2 ;;
+    * ) break ;;
+  esac
+done
 
 for x in ${1+"$@"}; do
   echo $x

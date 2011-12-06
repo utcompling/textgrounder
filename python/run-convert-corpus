@@ -1,0 +1,125 @@
+#!/bin/sh
+
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  exit 1
+fi
+
+TG_PREPROC_DIR="$TEXTGROUNDER_DIR/python"
+
+# Sample run to convert the old Twitter GeoText corpus:
+#
+# cotg=/path/to/twitter-geotext
+# tge=/path/to/temporary-conversion
+# cd $cotg
+# ### Note the mmv is a zsh alias, specifically the following zsh commands:
+# ###   alias mmv='noglob zmv -W'
+# ###   autoload -U zmv
+# mmv output-*-docthresh docthresh-*
+# cd $tge
+# rm -rf convert-corpora-*
+# run-convert-corpus --steps all $cotg/docthresh-*
+# cd convert-corpora-4
+# for x in docthresh-*; do (echo $x; cd $x; mmv geotext-twitter-* twitter-geotext-*; bzip2 *-unigram-counts.txt); done
+# cd $cotg
+# mkdir orig-geotext-corpus
+# mv docthresh-* orig-geotext-corpus
+# cp -a $tge/convert-corpora-4/docthresh-* .
+
+help() {
+  cat <<FOO
+Usage: $0 --steps "STEPS ..." DIR ...
+
+Convert corpora using various steps (e.g. from old-style to new-style,
+removing unneeded GeoText fields, splitting by training/dev/test split).
+At least one step must be given.
+
+Possible steps:
+
+convert-to-schema-and-document = Split the old document-data file into a
+                                 document metadata file and associated schema.
+
+merge-metadata-and-old-counts = Merge metadata and old counts files into
+                                combined new-format corpus.
+
+frob-geotext = Modify various fields in a GeoText corpus to put it into
+               the new format.
+
+split-by-training = Split into sub-corpora based on the 'split' field
+                    (training vs. dev vs. test).
+
+Each step writes its output into a new directory, and the next step uses
+that directory and writes its output into another new directory.
+
+FOO
+  exit 1
+}
+
+steps=
+output_dir_prefix=convert-corpora
+while true; do
+  case "$1" in
+    --steps ) steps="$2"; shift 2 ;;
+    --output-dir-prefix ) output_dir_prefix="$2"; shift 2 ;;
+    * ) break ;;
+  esac
+done
+
+if [ -z "$*" -o -z "$steps" ]; then
+  help
+fi
+
+if [ "$steps" = all ]; then
+  steps="convert-to-schema-and-document merge-metadata-and-old-counts frob-geotext split-by-training"
+fi
+
+echo "Steps are $steps"
+
+for dir in ${1+"$@"}; do
+output_dir="$dir"
+dirbase=`basename $dir`
+stepnumber=0
+
+for step in $steps; do
+input_dir="$output_dir"
+stepnumber=`expr $stepnumber + 1`
+output_dir="$output_dir_prefix-$stepnumber/$dirbase"
+while [ -e "$output_dir" ]; do
+  echo "Prospective output dir '$output_dir' already exists, trying another."
+  stepnumber=`expr $stepnumber + 1`
+  output_dir="$output_dir_prefix-$stepnumber/$dirbase"
+done
+
+echo "Executing step '$step' on directory '$dir' ..."
+echo "Input dir is '$input_dir', output dir is '$output_dir' ..."
+
+if [ "$step" = convert-to-schema-and-document ]; then
+  $TG_PREPROC_DIR/convert-old-docfile-to-metadata-schema-and-file \
+    --output-dir "$output_dir" "$input_dir"
+
+elif [ "$step" = merge-metadata-and-old-counts ]; then
+  textgrounder run opennlp.textgrounder.preprocess.MergeMetadataAndOldCounts \
+    -o "$output_dir" -i "$input_dir" \
+    --counts-file $dir/*-counts-only-coord-documents.txt*
+
+elif [ "$step" = frob-geotext ]; then
+  textgrounder run opennlp.textgrounder.preprocess.FrobCorpus \
+    -o "$output_dir" -i "$input_dir" \
+    --rename-field title=user \
+    -a corpus=twitter-geotext-$dirbase -a corpus-type=twitter-user \
+    -r id -r redir -r namespace -r is_list_of -r is_disambig \
+    -r is_list -r incoming_links
+
+elif [ "$step" = split-by-training ]; then
+  textgrounder run opennlp.textgrounder.preprocess.FrobCorpus \
+    -o "$output_dir" -i "$input_dir" \
+    --split-by-field split
+
+else
+echo "Unrecognized step $step"
+
+fi
+
+done
+done
+
