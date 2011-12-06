@@ -32,6 +32,7 @@ import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.{curtimehuman, output_resource_usage}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
+/* FIXME: Eliminate this. */
 import GeolocateDriver.Params
 
 /////////////////////////////////////////////////////////////////////////////

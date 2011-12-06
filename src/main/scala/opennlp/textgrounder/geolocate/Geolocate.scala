@@ -829,6 +829,7 @@ abstract class GeolocateDriver extends
    * @param options Object holding options to set
    */
   def handle_parameters() {
+    /* FIXME: Eliminate this. */
     GeolocateDriver.Params = params
 
     if (params.debug != null)

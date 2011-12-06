@@ -28,6 +28,7 @@ import opennlp.textgrounder.util.collectionutil.{LRUCache, doublemap}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 import WordDist.memoizer._
+/* FIXME: Eliminate this. */
 import GeolocateDriver.Params
 
 /////////////////////////////////////////////////////////////////////////////
