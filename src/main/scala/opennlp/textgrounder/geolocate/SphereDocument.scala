@@ -27,7 +27,7 @@ import collection.mutable
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.printutil.warning
-import GeoDocumentConverters._
+import DistDocumentConverters._
 
 abstract class SphereDocument(
   schema: Schema,

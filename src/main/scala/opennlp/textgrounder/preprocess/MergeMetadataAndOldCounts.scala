@@ -23,7 +23,7 @@ import collection.mutable
 import java.io.{InputStream, PrintStream}
 
 import opennlp.textgrounder.geolocate.IdentityMemoizer._
-import opennlp.textgrounder.geolocate.GeoDocument
+import opennlp.textgrounder.geolocate.DistDocument
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil.DynamicArray
@@ -149,7 +149,7 @@ class MMCUnigramWordDistHandler(
         (for (i <- 0 until num_words) yield {
           // errprint("Saw2 %s,%s", keys(i), values(i))
           ("%s:%s" format
-            (GeoDocument.encode_word_for_counts_field(unmemoize_string(keys(i))),
+            (DistDocument.encode_word_for_counts_field(unmemoize_string(keys(i))),
               values(i)))
           }).
           mkString(" ")
@@ -222,7 +222,7 @@ counts file also containing the metadata.
         params.output_dir)
 
     val fileproc =
-      new MMCDocumentFileProcessor(GeoDocument.document_metadata_suffix)
+      new MMCDocumentFileProcessor(DistDocument.document_metadata_suffix)
     fileproc.read_schema_from_corpus(filehand, params.input_dir)
 
     if (params.output_file_prefix == null) {

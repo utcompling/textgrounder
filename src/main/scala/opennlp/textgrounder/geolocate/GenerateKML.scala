@@ -142,7 +142,7 @@ class GenerateKMLDriver extends
   override def initialize_word_dist_factory_and_suffix() = {
     (new FilterPseudoGoodTuringSmoothedWordDistFactory(
       params.split_kml_words_memoized),
-      GeoDocument.unigram_counts_suffix)
+      DistDocument.unigram_counts_suffix)
   }
 
   /**

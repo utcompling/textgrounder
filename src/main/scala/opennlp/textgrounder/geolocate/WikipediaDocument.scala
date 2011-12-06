@@ -31,7 +31,7 @@ import opennlp.textgrounder.util.textutil.capfirst
 
 import WordDist.memoizer._
 import GeolocateDriver.Debug._
-import GeoDocumentConverters._
+import DistDocumentConverters._
 
 /**
  * A document corresponding to a Wikipedia article.

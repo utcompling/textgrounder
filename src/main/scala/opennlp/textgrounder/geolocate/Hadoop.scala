@@ -296,7 +296,7 @@ abstract class HadoopGeolocateApp(
        seen, for Hadoop's benefit. */
     class RetrieveDocumentFilesFileProcessor(
       suffix: String
-    ) extends GeoDocumentFileProcessor(suffix, driver) {
+    ) extends DistDocumentFileProcessor(suffix, driver) {
       def handle_document(fieldvals: Seq[String]) = true
 
       def process_lines(lines: Iterator[String],
@@ -519,7 +519,7 @@ class DocumentEvaluationMapper extends
 
   class HadoopDocumentFileProcessor(
     context: ContextType
-  ) extends GeoDocumentFileProcessor(driver.document_file_suffix, driver) {
+  ) extends DistDocumentFileProcessor(driver.document_file_suffix, driver) {
     override def get_shortfile =
       filename_to_counter_name(driver.get_file_handler,
         driver.get_configuration.get("mapred.input.dir"))

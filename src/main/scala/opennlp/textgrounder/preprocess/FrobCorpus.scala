@@ -27,7 +27,7 @@ import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.printutil.warning
 
-import opennlp.textgrounder.geolocate.GeoDocument
+import opennlp.textgrounder.geolocate.DistDocument
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                              //
@@ -128,7 +128,7 @@ class FrobCorpusFileProcessor(
         counts(word) += 1
       val counts_text =
         (for ((word, count) <- counts.toSeq sortWith (_._2 > _._2)) yield
-          ("%s:%s" format (GeoDocument.encode_word_for_counts_field(word),
+          ("%s:%s" format (DistDocument.encode_word_for_counts_field(word),
             count))) mkString " "
       docparams += (("counts", counts_text))
     }

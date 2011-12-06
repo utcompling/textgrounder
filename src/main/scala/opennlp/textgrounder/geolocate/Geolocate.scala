@@ -877,10 +877,10 @@ abstract class GeolocateDriver extends
   protected def initialize_word_dist_factory_and_suffix() = {
     if (params.word_dist == "pseudo-good-turing-bigram")
       (new PGTSmoothedBigramWordDistFactory,
-        GeoDocument.bigram_counts_suffix)
+        DistDocument.bigram_counts_suffix)
     else //(params.word_dist == "pseudo-good-turing-unigram")
       (new PseudoGoodTuringSmoothedWordDistFactory,
-        GeoDocument.unigram_counts_suffix)
+        DistDocument.unigram_counts_suffix)
   }
 
   protected def read_stopwords() = {
