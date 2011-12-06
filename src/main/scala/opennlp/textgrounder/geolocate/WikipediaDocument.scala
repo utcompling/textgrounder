@@ -196,8 +196,8 @@ class WikipediaDocumentSubtable(
   def create_document(schema: Schema) =
     new WikipediaDocument(schema, this)
 
-  override def create_and_init_document(schema: Schema,
-      fieldvals: Seq[String]) = {
+  override def create_and_init_document(schema: Schema, fieldvals: Seq[String],
+      record_in_table: Boolean) = {
    /**
     * FIXME: Perhaps we should filter the document file when we generate it,
     * to remove stuff not in the Main namespace.  We also need to remove
@@ -213,10 +213,12 @@ class WikipediaDocumentSubtable(
       val doc = create_document(schema)
       doc.set_fields(fieldvals)
       if (doc.redir.length > 0) {
-        redirects += doc
+        if (record_in_table)
+          redirects += doc
         null
       } else {
-        record_document(doc, doc)
+        if (record_in_table)
+          record_document(doc, doc)
         doc
       }
     }
@@ -340,6 +342,8 @@ class WikipediaDocumentSubtable(
       if (reddoc != null)
         record_document(x, reddoc)
     }
+    /* FIXME: Consider setting the variable itself to null so that no
+       further additions can happen, to catch bad code. */
     redirects.clear()
     super.finish_document_loading()
   }

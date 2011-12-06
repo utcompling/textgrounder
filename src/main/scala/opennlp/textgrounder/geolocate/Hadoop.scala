@@ -528,8 +528,11 @@ class DocumentEvaluationMapper extends
        separated into different files. */
     def handle_document(fieldvals: Seq[String]) = {
       val table = driver.document_table
-      val doc = table.create_and_init_document(schema, fieldvals)
+      val doc = table.create_and_init_document(schema, fieldvals, false)
       val retval = if (doc != null) {
+        if (doc.dist != null)
+          doc.dist.finish(minimum_word_count =
+            driver.params.minimum_word_count)
         var skipped = 0
         var not_skipped = 0
         for (e <- evaluators) {

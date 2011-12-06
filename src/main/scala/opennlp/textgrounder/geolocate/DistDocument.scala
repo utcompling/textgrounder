@@ -115,7 +115,18 @@ abstract class DistDocumentTable[CoordType : Serializer,
 
   def create_document(schema: Schema): DocumentType
 
-  def create_and_init_document(schema: Schema, fieldvals: Seq[String]) = {
+  /**
+   * Create, initialize and return a document with the given fieldvals,
+   * loaded from a corpus with the given schema.  Return value may be
+   * null, meaning that the document needs to be skipped.
+   *
+   * @param record_in_table If true, record the document in any subsidiary
+   *   tables, subclasses, etc.  Note that the main recording in this table
+   *   happens independently and automatically (usually as a result of a
+   *   call to `create_and_record_document`).
+   */
+  def create_and_init_document(schema: Schema, fieldvals: Seq[String],
+      record_in_table: Boolean) = {
     val doc = create_document(schema)
     if (doc != null)
       doc.set_fields(fieldvals)
@@ -124,7 +135,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
 
   def create_and_record_document(schema: Schema, fieldvals: Seq[String],
       cell_grid: CellGrid[CoordType,DocumentType,_]) = {
-    val doc = create_and_init_document(schema, fieldvals)
+    val doc = create_and_init_document(schema, fieldvals, true)
     if (doc != null && doc.has_coord) {
       record_document(doc, cell_grid)
       true
