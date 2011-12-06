@@ -45,7 +45,8 @@ import GeolocateDriver.Debug._
 /**
  * A simple class holding properties referring to extra operations that
  * may be needed during document loading, depending on the particular
- * strategies and/or type of cell grids.
+ * strategies and/or type of cell grids.  All extra operations start
+ * out set to false.  If anyone requests extra, we do it.
  */
 class DocumentLoadingProperties {
   var need_training_docs_in_memory_during_testing: Boolean = false
@@ -66,9 +67,12 @@ abstract class DistDocumentTable[CoordType : Serializer,
   val driver: GeolocateDriver,
   val word_dist_factory: WordDistFactory
 ) {
-  /**********************************************************************/
-  /*                   Begin DistDocumentTable proper                   */
-  /**********************************************************************/
+  /**
+   * Properties indicating whether we need to do more than simply do a
+   * single pass through training and eval documents.  Set by individual
+   * strategies or cell grid types.
+   */
+  val loading_props = new DocumentLoadingProperties
 
   /**
    * List of documents in each split.
