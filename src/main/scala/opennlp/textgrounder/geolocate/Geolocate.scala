@@ -627,6 +627,11 @@ on the longest dimension. Default '%default'.""")
     ap.option[Boolean]("kd-backoff", "kd-use-backoff", default=false,
       help = """Specifies if we should back off to larger cell distributions.""")
 
+  var kd_interpolate_weight =
+    ap.option[Double]("kd-interpolate-weight", "kdiw", default=0.0,
+      help = """Specifies the weight given to parent distributions.
+Default value '%default' means no interpolation is used.""")
+
 
   //// Options used when creating word distributions
   var word_dist =
@@ -862,7 +867,8 @@ abstract class GeolocateDriver extends
 
   protected def initialize_cell_grid(table: SphereDocumentTable) = {
     if (params.kd_tree)
-      KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method, params.kd_use_backoff)
+      KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method, 
+        params.kd_use_backoff, params.kd_interpolate_weight)
     else
       new MultiRegularCellGrid(degrees_per_cell,
         params.width_of_multi_cell, table)
@@ -911,7 +917,7 @@ abstract class GeolocateDriver extends
       throw new GeolocateAbruptExit
       // System.exit(0)
     }
-    cell_grid.finish()
+    cell_grid.finish(this)
   }
 
   protected def process_strategies[T](strategies: Seq[(String, T)])(

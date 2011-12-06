@@ -63,7 +63,7 @@ object FastPseudoGoodTuringSmoothedWordDist {
   /* These arrays are specialized, so when we retrieve the underlying
      array we get a raw array. */
   protected val static_value_array =
-    new DynamicArray[Int](initial_alloc = initial_static_array_size)
+    new DynamicArray[Double](initial_alloc = initial_static_array_size)
   protected def size_static_arrays(size: Int) {
     static_key_array.ensure_at_least(size)
     static_value_array.ensure_at_least(size)

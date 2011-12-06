@@ -54,8 +54,8 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
    * (word, count) items, specifying the counts of all words seen
    * at least once.
    */
-  val counts = create_word_int_map()
-  var num_word_tokens = 0
+  val counts = create_word_double_map()
+  var num_word_tokens = 0.0
 
   /** SCALABUG:
       Heap analysis revealed that Scala has holding the keys and values

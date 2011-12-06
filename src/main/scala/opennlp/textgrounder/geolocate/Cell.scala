@@ -26,6 +26,8 @@ import collection.mutable
 
 import opennlp.textgrounder.util.collectionutil.{LRUCache, doublemap}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
+import opennlp.textgrounder.util._
+import opennlp.textgrounder.util.experiment._
 
 import WordDist.memoizer._
 /* FIXME: Eliminate this. */
@@ -382,7 +384,7 @@ abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
    * this, `iter_nonempty_cells` should work properly.  This is not meant
    * to be called externally.
    */
-  protected def initialize_cells(): Unit
+  protected def initialize_cells(driver: ExperimentDriver): Unit
 
   /**
    * Iterate over all non-empty cells.
@@ -415,10 +417,11 @@ abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
    * wrapper around `initialize_cells()`, which is not meant to be called
    * externally.  Normally this does not need to be overridden.
    */
-  def finish() {
+  def finish(driver : ExperimentDriver) {
     assert(!all_cells_computed)
 
-    initialize_cells()
+    initialize_cells(driver)
+    driver.heartbeat
 
     all_cells_computed = true
 
@@ -429,6 +432,7 @@ abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
         cell.word_dist_wrapper.num_docs_for_word_dist
       total_num_docs_for_links +=
         cell.word_dist_wrapper.num_docs_for_links
+      driver.heartbeat
     }
 
     errprint("Number of non-empty cells: %s", num_non_empty_cells)
@@ -446,6 +450,8 @@ abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
     // by never creating these distributions at all, but directly adding
     // them to the cells.  Would require a bit of thinking when reading
     // in the counts.
+    driver.heartbeat
     table.clear_training_document_distributions()
+    driver.heartbeat
   }
 }

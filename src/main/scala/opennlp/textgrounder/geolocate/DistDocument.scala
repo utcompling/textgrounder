@@ -245,7 +245,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
     // statistics just computed.
     errprint("Finishing document dists...")
     for ((split, table) <- documents_by_split) {
-      var totaltoks = 0
+      var totaltoks : Double = 0
       var numdocs = 0
       for (doc <- table) {
         if (doc.dist != null) {
@@ -257,7 +257,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
         }
       }
       num_dist_documents_by_split(split) += numdocs
-      word_tokens_by_split(split) += totaltoks
+      word_tokens_by_split(split) += totaltoks.toInt
     }
 
     // Now output statistics on number of documents seen, etc.

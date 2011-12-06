@@ -29,6 +29,7 @@ import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.printutil.{errout, errprint}
+import opennlp.textgrounder.util.experiment._
 
 import GeolocateDriver.Debug._
 
@@ -395,7 +396,7 @@ class MultiRegularCellGrid(
     tiling_cell_to_documents(index) += document
   }
 
-  protected def initialize_cells() {
+  protected def initialize_cells(driver: ExperimentDriver) {
     val task = new MeteredTask("Earth-tiling cell", "generating non-empty")
 
     for (i <- minimum_latind to maximum_latind view) {
@@ -406,6 +407,7 @@ class MultiRegularCellGrid(
         if (debug("cell") && !cell.word_dist_wrapper.is_empty)
           errprint("--> (%d,%d): %s", i, j, cell)
         task.item_processed()
+        driver.heartbeat
       }
     }
     task.finish()

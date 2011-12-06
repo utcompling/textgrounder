@@ -293,7 +293,12 @@ abstract class HadoopGeolocateApp(
     initialize_hadoop_classes(job)
     // FIXME: Big hack here.
     for (file <- params.input_corpus) {
-      val hadoop_path = file + "/*-" + driver.document_file_suffix + ".txt*"
+      // FIXME HUGE HACK HERE!!!
+      driver.document_file_suffix = GeoDocument.unigram_counts_suffix
+      //val hadoop_path = file + "/*-" + driver.document_file_suffix + ".txt*"
+
+      //val hadoop_path = file + "/enwiki" + driver.document_file_suffix + ".txt*"
+      val hadoop_path = file + "/enwiki-20100905-permuted-unigram-counts.txt"
       FileInputFormat.addInputPath(job, new Path(hadoop_path))
     }
     FileOutputFormat.setOutputPath(job, new Path(params.outfile))
@@ -448,6 +453,10 @@ trait HadoopGeolocateDriver extends BaseHadoopGeolocateDriver {
 
   def need_to_set_context() =
     throw new IllegalStateException("Either task context or job needs to be set before any counter operations")
+
+  override def heartbeat() {
+    context.progress
+  }
 }
 
 /************************************************************************/
@@ -477,8 +486,11 @@ trait HadoopGeolocateMapper {
     // Now create a class containing the stored configuration values
     val params = create_param_object(ap)
     driver.set_task_context(context)
+    context.progress
     driver.set_parameters(params)
+    context.progress
     driver.setup_for_run()
+    context.progress
   }
 }
    
@@ -500,14 +512,14 @@ class DocumentEvaluationMapper extends
   ) extends GeoDocumentFileProcessor(driver.document_file_suffix, driver) {
     override def get_shortfile =
       filename_to_counter_name(driver.get_file_handler,
-        driver.get_configuration.get("map.input.file"))
+        driver.get_configuration.get("mapred.input.dir"))
 
     /* #### FIXME!!! Need to redo things so that different splits are
        separated into different files. */
     def handle_document(fieldvals: Seq[String]) = {
       val table = driver.document_table
       val doc = table.create_and_init_document(schema, fieldvals)
-      if (doc != null) {
+      val retval = if (doc != null) {
         var skipped = 0
         var not_skipped = 0
         for (e <- evaluators) {
@@ -527,12 +539,15 @@ class DocumentEvaluationMapper extends
               new DoubleWritable(result.asInstanceOf[SphereDocumentEvaluationResult].pred_truedist))
             task.item_processed()
           }
+          context.progress
         }
         if (skipped > 0 && not_skipped > 0)
           warning("""Something strange: %s evaluator(s) skipped document, but %s evaluator(s)
 didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
         (not_skipped > 0)
       } else false
+      context.progress
+      retval
     }
 
     def process_lines(lines: Iterator[String],
@@ -556,11 +571,13 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
       processor = new HadoopDocumentFileProcessor(context)
       processor.read_schema_from_corpus(driver.get_file_handler,
           driver.params.input_corpus(0))
+      context.progress
     }
   }
 
   override def map(key: Object, value: Text, context: ContextType) {
     processor.parse_row(value.toString)
+    context.progress
   }
 }
 

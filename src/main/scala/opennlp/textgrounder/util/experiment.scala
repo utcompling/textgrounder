@@ -104,6 +104,9 @@ package object experiment {
       run_after_setup()
     }
 
+    def heartbeat() {
+    }
+
     /********************************************************************/
     /*                 Function to override below this line             */
     /********************************************************************/
