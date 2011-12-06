@@ -859,6 +859,15 @@ abstract class GeolocateDriver extends
       param_error("Width of multi cell must be positive")
 
     need_seq(params.input_corpus, "input-corpus")
+    
+    // FIXME!! Moved here from the beginning of setup_for_run() because
+    // of the need to have `document_file_suffix` set.  Maybe come up
+    // a clean way to set the suffix but not create the factory?
+    // (Although in reality it doesn't matter much, as creating the factory
+    // doesn't do much.)
+    val (factory, suffix) = initialize_word_dist_factory_and_suffix()
+    word_dist_factory = factory
+    document_file_suffix = suffix
   }
 
   protected def initialize_document_table(word_dist_factory: WordDistFactory) = {
@@ -898,9 +907,6 @@ abstract class GeolocateDriver extends
   }
 
   def setup_for_run() {
-    val (factory, suffix) = initialize_word_dist_factory_and_suffix()
-    word_dist_factory = factory
-    document_file_suffix = suffix
     document_table = initialize_document_table(word_dist_factory)
     cell_grid = initialize_cell_grid(document_table)
     stopwords = read_stopwords()

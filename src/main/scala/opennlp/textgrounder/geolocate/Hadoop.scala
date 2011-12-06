@@ -296,12 +296,14 @@ abstract class HadoopGeolocateApp(
        seen, for Hadoop's benefit. */
     class RetrieveDocumentFilesFileProcessor(
       suffix: String
-    ) extends DistDocumentFileProcessor(suffix, driver) {
+    ) extends DistDocumentFileProcessor(suffix, null) {
+      errprint("Suffix is %s", suffix)
       def handle_document(fieldvals: Seq[String]) = true
 
       def process_lines(lines: Iterator[String],
           filehand: FileHandler, file: String,
           compression: String, realname: String) = {
+        errprint("Called with %s", file)
         FileInputFormat.addInputPath(job, new Path(file))
         true
       }

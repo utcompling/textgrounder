@@ -657,7 +657,8 @@ object DistDocumentConverters {
  *
  * @param suffix Suffix used for selecting the particular corpus from a
  *  directory
- * @param dstats ExperimentDriverStats used for recording counters and such
+ * @param dstats ExperimentDriverStats used for recording counters and such.
+ *   Pass in null to not record counters.
  */
 abstract class DistDocumentFileProcessor(
   suffix: String,
@@ -686,11 +687,13 @@ abstract class DistDocumentFileProcessor(
     "byfile." + get_shortfile + "." + counter
 
   def increment_counter(counter: String, value: Long = 1) {
-    val file_counter = get_file_counter_name(counter)
-    dstats.increment_task_counter(file_counter, value)
-    dstats.increment_task_counter(counter, value)
-    dstats.increment_local_counter(file_counter, value)
-    dstats.increment_local_counter(counter, value)
+    if (dstats != null) {
+      val file_counter = get_file_counter_name(counter)
+      dstats.increment_task_counter(file_counter, value)
+      dstats.increment_task_counter(counter, value)
+      dstats.increment_local_counter(file_counter, value)
+      dstats.increment_local_counter(counter, value)
+    }
   }
 
   def increment_document_counter(counter: String) {
@@ -743,10 +746,12 @@ abstract class DistDocumentFileProcessor(
 
   override def end_process_file(filehand: FileHandler, file: String) {
     def note(counter: String, english: String) {
-      val file_counter = get_file_counter_name(counter)
-      val value = dstats.get_task_counter(file_counter)
-      errprint("Number of %s for file %s: %s", english, file,
-        value)
+      if (dstats != null) {
+        val file_counter = get_file_counter_name(counter)
+        val value = dstats.get_task_counter(file_counter)
+        errprint("Number of %s for file %s: %s", english, file,
+          value)
+      }
     }
 
     note("documents.accepted", "documents accepted")
