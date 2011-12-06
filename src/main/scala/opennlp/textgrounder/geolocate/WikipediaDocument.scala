@@ -68,6 +68,7 @@ class WikipediaDocument(
   override def set_field(field: String, value: String) {
     field match {
       case "id" => id = value.toLong
+      case "title" => titleind = memoize_string(value)
       case "redir" => redirind = memoize_string(value)
       case "incoming_links" => incoming_links_value = get_int_or_none(value)
       case _ => super.set_field(field, value)
@@ -277,6 +278,7 @@ class WikipediaDocumentSubtable(
    */
   def lookup_document(name: String) = {
     assert(name != null)
+    assert(name.length > 0)
     name_to_document.getOrElse(memoize_string(capfirst(name)),
       null.asInstanceOf[WikipediaDocument])
   }
@@ -295,6 +297,8 @@ class WikipediaDocumentSubtable(
     //   println("name(1)=0x%x" format name(1).toInt)
     //   println("capfirst(0)=0x%x" format capfirst(name)(0).toInt)
     // }
+    assert(name != null)
+    assert(name.length > 0)
     assert(name == capfirst(name))
     name_to_document(memoize_string(name)) = doc
     val loname = name.toLowerCase

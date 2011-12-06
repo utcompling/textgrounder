@@ -380,19 +380,22 @@ def set_next_split_file():
 ### necessary to handle such expressions.
 
 # Return braces and brackets separately from other text.
-simple_balanced_re = re.compile(r'[^{}\[\]]+|[{}\[\]]')
+simple_balanced_re = re.compile(r'<ref>|</ref>|[^{}\[\]<]+|[{}\[\]]|<')
+#simple_balanced_re = re.compile(r'[^{}\[\]]+|[{}\[\]]')
 
 # Return braces, brackets and pipe symbols separately from other text.
-balanced_pipe_re = re.compile(r'[^{}\[\]|]+|[{}\[\]|]')
+balanced_pipe_re = re.compile(r'<ref>|</ref>|[^{}\[\]|<]+|[{}\[\]|]|<')
+#balanced_pipe_re = re.compile(r'[^{}\[\]|]+|[{}\[\]|]')
 
 # Return braces, brackets, and newlines separately from other text.
 # Useful for handling Wikipedia tables, denoted with {| ... |}.
-balanced_table_re = re.compile(r'[^{}\[\]\n]+|[{}\[\]\n]')
+balanced_table_re = re.compile(r'<ref>|</ref>|[^{}\[\]\n<]+|[{}\[\]\n]|<')
+#balanced_table_re = re.compile(r'[^{}\[\]\n]+|[{}\[\]\n]')
 
-left_match_chars = {'{':'}', '[':']'}
-right_match_chars = {'}':'{', ']':'['}
+left_match_chars = {'{':'}', '[':']', '<ref>':'</ref>'}
+right_match_chars = {'}':'{', ']':'[', '</ref>':'<ref>'}
 
-def parse_balanced_text(textre, text):
+def parse_balanced_text(textre, text, throw_away = 0):
   '''Parse text in TEXT containing balanced expressions surrounded by single
 or double braces or brackets.  This is a generator; it successively yields
 chunks of text consisting either of sections without any braces or brackets,
@@ -401,10 +404,12 @@ unmatched single or double right braces or brackets.  TEXTRE is used to
 separate the text into chunks; it can be used to separate out additional
 top-level separators, such as vertical bar.'''
   strbuf = []
-  parenlevel = 0
   prevstring = "(at beginning)"
   leftmatches = []
+  parenlevel = 0
   for string in textre.findall(text):
+    if debug['debugparens']:
+      errprint("pbt: Saw %s, parenlevel=%s" % (string, parenlevel))
     if string in right_match_chars:
       if parenlevel == 0:
         wikiwarning("Nesting level would drop below 0; string = %s, prevstring = %s" % (string, prevstring.replace('\n','\\n')))
@@ -413,23 +418,54 @@ top-level separators, such as vertical bar.'''
         strbuf.append(string)
         assert len(leftmatches) == parenlevel
         should_left = right_match_chars[string]
-        the_left = leftmatches[-1]
+        should_pop_off = 1
+        the_left = leftmatches[-should_pop_off]
         if should_left != the_left:
-          wikiwarning("Non-matching brackets: Saw %s, expected %s; prevstring = %s" % (string, left_match_chars[the_left], prevstring.replace('\n','\\n')))
-        parenlevel -= 1
-        leftmatches = leftmatches[:-1]
+          if should_left == '<ref>':
+            while (len(leftmatches) - should_pop_off >= 0 and
+                should_left != leftmatches[len(leftmatches)-should_pop_off]):
+              should_pop_off += 1
+            if should_pop_off >= 0:
+              wikiwarning("%s non-matching brackets inside of <ref>...</ref>: %s ; prevstring = %s" % (should_pop_off - 1, ' '.join(left_match_chars[x] for x in leftmatches[len(leftmatches)-should_pop_off:]), prevstring.replace('\n','\\n')))
+            else:
+              wikiwarning("Stray </ref>??; prevstring = %s" % prevstring.replace('\n','\\n'))
+              should_pop_off = 0
+          elif the_left == '<ref>':
+            wikiwarning("Stray %s inside of <ref>...</ref>; prevstring = %s" % (string, prevstring.replace('\n','\\n')))
+            should_pop_off = 0
+          else:
+            wikiwarning("Non-matching brackets: Saw %s, expected %s; prevstring = %s" % (string, left_match_chars[the_left], prevstring.replace('\n','\\n')))
+        if should_pop_off > 0:
+          parenlevel -= should_pop_off
+          if debug['debugparens']:
+            errprint("pbt: Decreasing parenlevel by 1 to %s" % parenlevel)
+          leftmatches = leftmatches[:-should_pop_off]
         if parenlevel == 0:
           yield ''.join(strbuf)
           strbuf = []
     else:
       if string in left_match_chars:
-        parenlevel += 1
-        leftmatches.append(string)
+        if throw_away > 0:
+          wikiwarning("Throwing away left bracket %s as a reparse strategy"
+              % string)
+          throw_away -= 1
+        else:
+          parenlevel += 1
+          if debug['debugparens']:
+            errprint("pbt: Increasing parenlevel by 1 to %s" % parenlevel)
+          leftmatches.append(string)
       if parenlevel > 0:
         strbuf.append(string)
       else:
         yield string
     prevstring = string
+  leftover = ''.join(strbuf)
+  if leftover:
+    splitprint("Left with %s characters of text with unmatched left paren, brace or bracket: [%s]" % (len(leftover), leftover))
+    splitprint("Reparsing:")
+    for string in parse_balanced_text(textre, leftover, throw_away = parenlevel):
+      yield string
+
 
 def parse_simple_balanced_text(text):
   '''Parse text in TEXT containing balanced expressions surrounded by single
@@ -508,6 +544,9 @@ class SourceTextHandler(object):
   def process_external_link(self, text):
     yield text
     
+  def process_reference(self, text):
+    yield text
+    
   def process_text_chunk(self, text):
     yield text
 
@@ -538,6 +577,9 @@ class SourceTextHandler(object):
       elif foo.startswith('['):
         gen = self.process_external_link(foo)
   
+      elif foo.startswith('<ref>'):
+        gen = self.process_reference(foo)
+  
       else:
         gen = self.process_text_chunk(foo)
   
@@ -561,6 +603,9 @@ class RecursiveSourceTextHandler(SourceTextHandler):
     
   def process_external_link(self, text):
     return self.process_source_text(text[1:-1])
+    
+  def process_reference(self, text):
+    return self.process_source_text(" " + text[5:-6] + " ")
     
 #######################################################################
 #                     Process text for coordinates                    #
@@ -1107,6 +1152,7 @@ def yield_table_chunks(text):
 # yield the words.  Also ignore words with a colon in the middle, indicating
 # likely URL's and similar directives.
 def split_text_into_words(text):
+  (text, _) = re.subn(r'<ref>', r' ', text)
   if Opts.no_tokenize:
     # No tokenization requested.  Just split on whitespace.  But still try
     # to eliminate URL's.  Rather than just look for :, we look for :/, which
@@ -1182,6 +1228,9 @@ class ExtractUsefulText(SourceTextHandler):
       for chunk in self.process_source_text(linktext):
         yield chunk
   
+  def process_reference(self, text):
+    return self.process_source_text(" " + text[5:-6] + " ")
+    
 #######################################################################
 #               Formatting text to make processing easier             #
 #######################################################################
@@ -1209,6 +1258,8 @@ def format_text_first_pass(text):
   (text, _) = re.subn(r'&hellip;', '...', text)
   (text, _) = re.subn(r'&lt;', '<', text)
   (text, _) = re.subn(r'&gt;', '>', text)
+  #(text, _) = re.subn(r'&#91;', '[', text)
+  #(text, _) = re.subn(r'&#93;', ']', text)
 
   return text
 
@@ -1220,7 +1271,16 @@ def format_text_second_pass(text):
 
   # Remove references, but convert to whitespace to avoid concatenating
   # words outside and inside a reference together
-  (text, _) = re.subn(r'(?s)<ref.*?>', ' ', text)
+  #(text, _) = re.subn(r'(?s)<ref.*?>', ' ', text)
+
+  # An alternative approach.
+  # Convert references to simple tags.
+  (text, _) = re.subn(r'(?s)<ref[^<>]*?/>', ' ', text)
+  (text, _) = re.subn(r'(?s)<ref.*?>', '< ref>', text)
+  (text, _) = re.subn(r'(?s)</ref.*?>', '< /ref>', text)
+
+  # Similar for nowiki, which may have <'s, brackets and such inside.
+  (text, _) = re.subn(r'(?s)<nowiki>.*?</nowiki>', ' ', text)
 
   # Another hack: Inside of <gallery>...</gallery>, there are raw filenames.
   # Get rid of.
@@ -1244,7 +1304,9 @@ def format_text_second_pass(text):
   text = ''.join(process_gallery(text))
   
   # Remove remaining HTML codes from the text
-  (text, _) = re.subn(r'(?s)<.*?>', '', text)
+  (text, _) = re.subn(r'(?s)<[A-Za-z/].*?>', '', text)
+
+  (text, _) = re.subn(r'< (/?ref)>', r'<\1>', text)
 
   # Remove multiple sequences of quotes (indicating boldface or italics)
   (text, _) = re.subn(r"''+", '', text)
@@ -1294,7 +1356,7 @@ class ArticleHandler(object):
   
     ### Preliminary processing of text, removing stuff unuseful even for
     ### extracting data.
-  
+ 
     text = format_text_first_pass(text)
   
     ### Look to see if the article is a redirect
@@ -1738,7 +1800,7 @@ it to be dynamically manipulated).  Given the size of the XML dump file
     
   def startElement(self, name, attrs):
     '''Handler for beginning of XML element.'''
-    if debug['lots']: errprint("startElement() saw %s/%s" % (name, attrs))
+    if debug['sax']: errprint("startElement() saw %s/%s" % (name, attrs))
     # We should never see an element inside of the Wikipedia text.
     if self.curpath:
       assert self.curpath[-1] != 'text'
@@ -1755,7 +1817,7 @@ it to be dynamically manipulated).  Given the size of the XML dump file
     '''Handler for chunks of text.  Accumulate all adjacent chunks.  When
 the end element </text> is seen, process_article_text() will be called on the
 combined chunks.'''
-    if debug['lots']: errprint("characters() saw %s" % text)
+    if debug['sax']: errprint("characters() saw %s" % text)
     # None means the last directive we saw was an end tag; we don't track
     # text any more until the next begin tag.
     if self.curtext != None:
