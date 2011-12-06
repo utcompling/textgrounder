@@ -291,16 +291,28 @@ abstract class HadoopGeolocateApp(
        command-line arguments, because it participates in that process. */
     driver.set_job(job)
     initialize_hadoop_classes(job)
-    // FIXME: Big hack here.
-    for (file <- params.input_corpus) {
-      // FIXME HUGE HACK HERE!!!
-      driver.document_file_suffix = GeoDocument.unigram_counts_suffix
-      //val hadoop_path = file + "/*-" + driver.document_file_suffix + ".txt*"
 
-      //val hadoop_path = file + "/enwiki" + driver.document_file_suffix + ".txt*"
-      val hadoop_path = file + "/enwiki-20100905-permuted-unigram-counts.txt"
-      FileInputFormat.addInputPath(job, new Path(hadoop_path))
+    /* A very simple file processor that does nothing but note the files
+       seen, for Hadoop's benefit. */
+    class RetrieveDocumentFilesFileProcessor(
+      suffix: String
+    ) extends DistDocumentFileProcessor(suffix, null) {
+      errprint("Suffix is %s", suffix)
+      def handle_document(fieldvals: Seq[String]) = true
+
+      def process_lines(lines: Iterator[String],
+          filehand: FileHandler, file: String,
+          compression: String, realname: String) = {
+        errprint("Called with %s", file)
+        FileInputFormat.addInputPath(job, new Path(file))
+        true
+      }
     }
+
+    val fileproc = new RetrieveDocumentFilesFileProcessor(
+      driver.params.eval_set + "-" + driver.document_file_suffix
+    )
+    fileproc.process_files(driver.get_file_handler, params.input_corpus)
     FileOutputFormat.setOutputPath(job, new Path(params.outfile))
     if (job.waitForCompletion(true)) 0 else 1
   }
@@ -509,7 +521,7 @@ class DocumentEvaluationMapper extends
 
   class HadoopDocumentFileProcessor(
     context: ContextType
-  ) extends GeoDocumentFileProcessor(driver.document_file_suffix, driver) {
+  ) extends DistDocumentFileProcessor(driver.document_file_suffix, driver) {
     override def get_shortfile =
       filename_to_counter_name(driver.get_file_handler,
         driver.get_configuration.get("mapred.input.dir"))
@@ -518,8 +530,11 @@ class DocumentEvaluationMapper extends
        separated into different files. */
     def handle_document(fieldvals: Seq[String]) = {
       val table = driver.document_table
-      val doc = table.create_and_init_document(schema, fieldvals)
+      val doc = table.create_and_init_document(schema, fieldvals, false)
       val retval = if (doc != null) {
+        if (doc.dist != null)
+          doc.dist.finish(minimum_word_count =
+            driver.params.minimum_word_count)
         var skipped = 0
         var not_skipped = 0
         for (e <- evaluators) {

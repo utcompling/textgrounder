@@ -27,7 +27,7 @@ import collection.mutable
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.printutil.warning
-import GeoDocumentConverters._
+import DistDocumentConverters._
 
 abstract class SphereDocument(
   schema: Schema,
@@ -64,7 +64,8 @@ abstract class SphereDocumentSubtable[DocType <: SphereDocument](
    * and return a document.  Return value can be null if the document is
    * to be skipped; otherwise, it will be recorded in the appropriate split.
    */
-  def create_and_init_document(schema: Schema, fieldvals: Seq[String]) = {
+  def create_and_init_document(schema: Schema, fieldvals: Seq[String],
+      record_in_table: Boolean) = {
     val doc = create_document(schema)
     if (doc != null)
       doc.set_fields(fieldvals)
@@ -111,9 +112,9 @@ class SphereDocumentTable(
   }
 
   override def create_and_init_document(schema: Schema,
-      fieldvals: Seq[String]) = {
+      fieldvals: Seq[String], record_in_table: Boolean) = {
     find_subtable(schema, fieldvals).
-      create_and_init_document(schema, fieldvals)
+      create_and_init_document(schema, fieldvals, record_in_table)
   }
 
   /**

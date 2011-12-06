@@ -271,7 +271,7 @@ trait SimpleUnigramWordDistReader extends WordDistReader {
       raw_keys_set += word
       val opt_canon_word =
         canonicalize_accept_word(doc,
-          GeoDocument.decode_word_for_counts_field(word), count)
+          DistDocument.decode_word_for_counts_field(word), count)
       if (opt_canon_word != None) {
         keys_dynarr += opt_canon_word.get
         values_dynarr += count
