@@ -391,7 +391,7 @@ abstract class WordDist {
    * distributions that do not contribute to the global word-distribution
    * statistics, and which have been created after those statistics have
    * already been completed. (Examples of such distributions are the
-   * distributions of grid cells and of test documents.)
+   * distributions of grid cells and of eval documents.)
    */
   def finish(minimum_word_count: Int = 0) {
     finish_before_global(minimum_word_count)
