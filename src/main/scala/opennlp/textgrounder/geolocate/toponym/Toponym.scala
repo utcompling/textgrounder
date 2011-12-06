@@ -33,6 +33,7 @@ import opennlp.textgrounder.util.printutil.{errout, errprint, warning}
 
 import opennlp.textgrounder.geolocate._
 import GeolocateDriver.Debug._
+/* FIXME: Eliminate this. */
 import GeolocateToponymApp.Params
 import WordDist.memoizer._
 
@@ -106,8 +107,9 @@ class Boundary(botleft: SphereCoord, topright: SphereCoord) {
 abstract class Location(
   val name: String,
   val altnames: Seq[String],
-  val typ: String) {
-  var docmatch: WikipediaDocument = null
+  val typ: String
+) {
+  var docmatch: TopoDocument = null
   var div: Division = null
   def toString(no_document: Boolean = false): String
   def shortstr: String
@@ -123,11 +125,12 @@ abstract class Location(
 //
 //   coord: Coordinates of the location, as a SphereCoord object.
 
-case class Locality(
-  override val name: String,
+class Locality(
+  name: String,
   val coord: SphereCoord,
-  override val altnames: Seq[String],
-  override val typ: String) extends Location(name, altnames, typ) {
+  altnames: Seq[String],
+  typ: String
+) extends Location(name, altnames, typ) {
 
   def toString(no_document: Boolean = false) = {
     var docmatch = ""
@@ -169,11 +172,11 @@ case class Locality(
 // gazetteer, there are three levels of divisions.  For the U.S., this
 // corresponds to country, state, county.
 //
-case class Division(
+class Division(
   // Tuple of same size as the level #, listing the path of divisions
   // from highest to lowest, leading to this division.  The last
   // element is the same as the "name" of the division.
-  path: Seq[String]
+  val path: Seq[String]
 ) extends Location(path(path.length - 1), Seq[String](), "unknown") {
 
   // 1, 2, or 3 for first, second, or third-level division
@@ -271,7 +274,8 @@ case class Division(
     word_dist_wrapper = new CellWordDist(word_dist_factory.create_word_dist())
     for (loc <- Seq(this) ++ goodlocs if loc.docmatch != null)
       yield word_dist_wrapper.add_document(loc.docmatch)
-    word_dist_wrapper.word_dist.finish(minimum_word_count = Params.minimum_word_count)
+    word_dist_wrapper.word_dist.finish(minimum_word_count =
+      Params.minimum_word_count)
   }
 
   def contains(coord: SphereCoord) = boundary contains coord
@@ -330,9 +334,8 @@ class DivisionFactory(gazetteer: Gazetteer) {
           division.name, division.path)
       }
       division.compute_boundary()
-      val docmatch = gazetteer.cell_grid.table.wikipedia_subtable.
-        asInstanceOf[TopoDocumentSubtable].
-        find_match_for_division(division)
+      val docmatch = gazetteer.cell_grid.table.asInstanceOf[TopoDocumentTable].
+        topo_subtable.find_match_for_division(division)
       if (docmatch != null) {
         if (debug("lots")) {
           errprint("Matched document %s for division %s, path %s",
@@ -464,8 +467,8 @@ class TopoDocument(
 // Static class maintaining additional tables listing mapping between
 // names, ID's and documents.  See comments at WikipediaDocumentTable.
 class TopoDocumentSubtable(
-  table: SphereDocumentTable
-) extends WikipediaDocumentSubtable(table) {
+  val topo_table: TopoDocumentTable
+) extends WikipediaDocumentSubtable(topo_table) {
   override def create_document(schema: Schema) =
     new TopoDocument(schema, this)
 
@@ -509,14 +512,15 @@ class TopoDocumentSubtable(
   // to be preferred to the second.  Return the document matched, or None.
 
   def find_one_document_match(loc: Location, name: String,
-    check_match: (WikipediaDocument) => Boolean,
-    prefer_match: (WikipediaDocument, WikipediaDocument) => Boolean): WikipediaDocument = {
+    check_match: (TopoDocument) => Boolean,
+    prefer_match: (TopoDocument, TopoDocument) => Boolean): TopoDocument = {
 
     val loname = memoize_string(name.toLowerCase)
 
     // Look for any documents with same name (case-insensitive) as the
     // location, check for matches
-    for (doc <- lower_name_to_documents(loname))
+    for (wiki_doc <- lower_name_to_documents(loname);
+         doc = wiki_doc.asInstanceOf[TopoDocument])
       if (check_match(doc)) return doc
 
     // Check whether there is a match for a document whose name is
@@ -527,7 +531,8 @@ class TopoDocumentSubtable(
       for {
         div <- loc.div.path
         lodiv = memoize_string(div.toLowerCase)
-        doc <- lower_name_div_to_documents((loname, lodiv))
+        wiki_doc <- lower_name_div_to_documents((loname, lodiv))
+        doc = wiki_doc.asInstanceOf[TopoDocument]
       } if (check_match(doc)) return doc
     }
 
@@ -535,7 +540,11 @@ class TopoDocumentSubtable(
     // is the same as the location's name
     val docs = short_lower_name_to_documents(loname)
     if (docs != null) {
-      val gooddocs = (for (doc <- docs if check_match(doc)) yield doc)
+      val gooddocs =
+        (for (wiki_doc <- docs;
+              doc = wiki_doc.asInstanceOf[TopoDocument];
+              if check_match(doc))
+            yield doc)
       if (gooddocs.length == 1)
         return gooddocs(0) // One match
       else if (gooddocs.length > 1) {
@@ -557,8 +566,8 @@ class TopoDocumentSubtable(
   // as above.  Return the document matched, or None.
 
   def find_document_match(loc: Location,
-    check_match: (WikipediaDocument) => Boolean,
-    prefer_match: (WikipediaDocument, WikipediaDocument) => Boolean): WikipediaDocument = {
+    check_match: (TopoDocument) => Boolean,
+    prefer_match: (TopoDocument, TopoDocument) => Boolean): TopoDocument = {
     // Try to find a match for the canonical name of the location
     val docmatch = find_one_document_match(loc, loc.name, check_match,
       prefer_match)
@@ -580,7 +589,7 @@ class TopoDocumentSubtable(
 
   def find_match_for_locality(loc: Locality, maxdist: Double) = {
 
-    def check_match(doc: WikipediaDocument) = {
+    def check_match(doc: TopoDocument) = {
       val dist = spheredist(loc.coord, doc.coord)
       if (dist <= maxdist) true
       else {
@@ -592,12 +601,11 @@ class TopoDocumentSubtable(
       }
     }
 
-    def prefer_match(doc1: WikipediaDocument, doc2: WikipediaDocument) = {
+    def prefer_match(doc1: TopoDocument, doc2: TopoDocument) = {
       spheredist(loc.coord, doc1.coord) < spheredist(loc.coord, doc2.coord)
     }
 
-    find_document_match(loc, check_match, prefer_match).
-      asInstanceOf[TopoDocument]
+    find_document_match(loc, check_match, prefer_match)
   }
 
   // Find document matching division DIV; the document coordinate must be
@@ -605,7 +613,7 @@ class TopoDocumentSubtable(
 
   def find_match_for_division(div: Division) = {
 
-    def check_match(doc: WikipediaDocument) = {
+    def check_match(doc: TopoDocument) = {
       if (doc.has_coord && (div contains doc.coord)) true
       else {
         if (debug("lots")) {
@@ -621,7 +629,7 @@ class TopoDocumentSubtable(
       }
     }
 
-    def prefer_match(doc1: WikipediaDocument, doc2: WikipediaDocument) = {
+    def prefer_match(doc1: TopoDocument, doc2: TopoDocument) = {
       val l1 = doc1.incoming_links
       val l2 = doc2.incoming_links
       // Prefer according to incoming link counts, if that info is available
@@ -634,8 +642,7 @@ class TopoDocumentSubtable(
       }
     }
 
-    find_document_match(div, check_match, prefer_match).
-      asInstanceOf[TopoDocument]
+    find_document_match(div, check_match, prefer_match)
   }
 }
 
@@ -644,12 +651,13 @@ class TopoDocumentSubtable(
  * for the Wikipedia subtable.
  */
 class TopoDocumentTable(
-  driver: GeolocateDriver,
+  val topo_driver: GeolocateToponymDriver,
   word_dist_factory: WordDistFactory
 ) extends SphereDocumentTable(
-  driver, word_dist_factory
+  topo_driver, word_dist_factory
 ) {
-  override val wikipedia_subtable = new TopoDocumentSubtable(this)
+  val topo_subtable = new TopoDocumentSubtable(this)
+  override val wikipedia_subtable = topo_subtable
 }
 
 class EvalStatsWithCandidateList(
@@ -787,18 +795,20 @@ class BaselineGeolocateToponymStrategy(
   def need_context() = false
 
   def compute_score(geogword: GeogWord, doc: TopoDocument) = {
+    val topo_table = cell_grid.table.asInstanceOf[TopoDocumentTable]
+    val params = topo_table.topo_driver.params
     if (baseline_strategy == "internal-link") {
-      if (Params.context_type == "cell")
+      if (params.context_type == "cell")
         doc.find_cellworddist(cell_grid).incoming_links
       else
         doc.adjusted_incoming_links
     } else if (baseline_strategy == "num-documents") {
-      if (Params.context_type == "cell")
+      if (params.context_type == "cell")
         doc.find_cellworddist(cell_grid).num_docs_for_links
       else {
         val location = doc.location
         location match {
-          case x @ Division(_) => x.locs.length
+          case x:Division => x.locs.length
           case _ => 1
         }
       }
@@ -820,27 +830,29 @@ class NaiveBayesToponymStrategy(
     // regardless of its actual settings.
     val thislinks = WikipediaDocument.log_adjust_incoming_links(
       doc.adjusted_incoming_links)
+    val topo_table = cell_grid.table.asInstanceOf[TopoDocumentTable]
+    val params = topo_table.topo_driver.params
 
     var distobj =
-      if (Params.context_type == "document") doc.dist
+      if (params.context_type == "document") doc.dist
       else doc.find_cellworddist(cell_grid).word_dist
     var totalprob = 0.0
     var total_word_weight = 0.0
     val (word_weight, baseline_weight) =
       if (!use_baseline) (1.0, 0.0)
-      else if (Params.naive_bayes_weighting == "equal") (1.0, 1.0)
-      else (1 - Params.naive_bayes_baseline_weight,
-            Params.naive_bayes_baseline_weight)
+      else if (params.naive_bayes_weighting == "equal") (1.0, 1.0)
+      else (1 - params.naive_bayes_baseline_weight,
+            params.naive_bayes_baseline_weight)
     for ((dist, word) <- geogword.context) {
       val lword =
-        if (Params.preserve_case_words) word else word.toLowerCase
+        if (params.preserve_case_words) word else word.toLowerCase
       val wordprob =
         distobj.lookup_word(WordDist.memoizer.memoize_string(lword))
 
       // Compute weight for each word, based on distance from toponym
       val thisweight =
-        if (Params.naive_bayes_weighting == "equal" ||
-          Params.naive_bayes_weighting == "equal-words") 1.0
+        if (params.naive_bayes_weighting == "equal" ||
+          params.naive_bayes_weighting == "equal-words") 1.0
         else 1.0 / (1 + dist)
 
       total_word_weight += thisweight
@@ -907,7 +919,7 @@ abstract class GeolocateToponymEvaluator(
       val results = (for (word <- g) yield return_word(word)).toArray
 
       // Now compute context for words
-      val nbcl = Params.naive_bayes_context_len
+      val nbcl = driver.params.naive_bayes_context_len
       if (strategy.need_context()) {
         // First determine whether each word is a stopword
         for (i <- 0 until results.length) {
@@ -1312,15 +1324,16 @@ class WorldGazetteer(
     }
 
     // We start out looking for documents whose distance is very close,
-    // then widen until we reach Params.max_dist_for_close_match.
+    // then widen until we reach params.max_dist_for_close_match.
     var maxdist = 5
     var docmatch: TopoDocument = null
+    val topo_table = cell_grid.table.asInstanceOf[TopoDocumentTable]
+    val params = topo_table.topo_driver.params
+
     breakable {
-      while (maxdist <= Params.max_dist_for_close_match) {
+      while (maxdist <= params.max_dist_for_close_match) {
         docmatch =
-          cell_grid.table.wikipedia_subtable.
-            asInstanceOf[TopoDocumentSubtable].find_match_for_locality(
-              loc, maxdist)
+          topo_table.topo_subtable.find_match_for_locality(loc, maxdist)
         if (docmatch != null) break
         maxdist *= 2
       }
@@ -1351,6 +1364,8 @@ class WorldGazetteer(
     errprint("")
 
     // Match each entry in the gazetteer
+    val topo_table = cell_grid.table.asInstanceOf[TopoDocumentTable]
+    val params = topo_table.topo_driver.params
     breakable {
       val lines = filehand.openr(filename)
       try {
@@ -1358,7 +1373,7 @@ class WorldGazetteer(
           if (debug("lots"))
             errprint("Processing line: %s", line)
           match_world_gazetteer_entry(line)
-          if (task.item_processed(maxtime = Params.max_time_per_stage))
+          if (task.item_processed(maxtime = params.max_time_per_stage))
             break
         }
       } finally {
@@ -1512,6 +1527,7 @@ class GeolocateToponymDriver extends
   override def handle_parameters() {
     super.handle_parameters()
 
+    /* FIXME: Eliminate this. */
     GeolocateToponymApp.Params = params
     
     need(params.gazetteer_file, "gazetteer-file")
