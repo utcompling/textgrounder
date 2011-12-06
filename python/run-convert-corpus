@@ -24,7 +24,8 @@ TG_PREPROC_DIR="$TEXTGROUNDER_DIR/python"
 # cd $cotg
 # mkdir orig-geotext-corpus
 # mv docthresh-* orig-geotext-corpus
-# cp -a $tge/convert-corpora-4/docthresh-* .
+# mv $tge/convert-corpora-4/docthresh-* .
+# chmod -R go+rX .
 
 help() {
   cat <<FOO
