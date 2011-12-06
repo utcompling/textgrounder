@@ -49,14 +49,16 @@ import GenericTypes._
  */
 
 abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
-  /** A map (or possibly a "sorted list" of tuples, to save memory?) of
-      (word, count) items, specifying the counts of all words seen
-      at least once.
+  /**
+   * A map (or possibly a "sorted list" of tuples, to save memory?) of
+   * (word, count) items, specifying the counts of all words seen
+   * at least once.
    */
   val counts = create_word_int_map()
   var num_word_tokens = 0
 
-  /** Heap analysis revealed that Scala has holding the keys and values
+  /** SCALABUG:
+      Heap analysis revealed that Scala has holding the keys and values
       (but not `num_words`) as local variables when they were constructors;
       doesn't seem a good idea.  By redoing it this way, we avoid the
       problem. */

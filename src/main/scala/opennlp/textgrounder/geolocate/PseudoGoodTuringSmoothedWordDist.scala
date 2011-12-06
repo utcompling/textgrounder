@@ -135,9 +135,8 @@ class PseudoGoodTuringSmoothedWordDist(
   keys: Array[Word],
   values: Array[Int],
   num_words: Int,
-  val note_globally: Boolean = true
+  note_globally: Boolean
 ) extends UnigramWordDist(keys, values, num_words) {
-  val FastAlgorithms = FastPseudoGoodTuringSmoothedWordDist
   type ThisType = PseudoGoodTuringSmoothedWordDist
 
   /** Total probability mass to be assigned to all words not
@@ -224,18 +223,21 @@ class PseudoGoodTuringSmoothedWordDist(
     }
   }
 
+  val FastAlgorithms = FastPseudoGoodTuringSmoothedWordDist
   def fast_kl_divergence(other: WordDist, partial: Boolean = false) =
-    FastAlgorithms.fast_kl_divergence(this.asInstanceOf[ThisType],
+    FastPseudoGoodTuringSmoothedWordDist.fast_kl_divergence(
+      this.asInstanceOf[ThisType],
       other.asInstanceOf[ThisType], partial = partial)
 
   def cosine_similarity(other: WordDist, partial: Boolean = false,
       smoothed: Boolean = false) =
     if (smoothed)
-      FastAlgorithms.fast_smoothed_cosine_similarity(
+      FastPseudoGoodTuringSmoothedWordDist.fast_smoothed_cosine_similarity(
         this.asInstanceOf[ThisType],
         other.asInstanceOf[ThisType], partial = partial)
     else
-      FastAlgorithms.fast_cosine_similarity(this.asInstanceOf[ThisType],
+      FastPseudoGoodTuringSmoothedWordDist.fast_cosine_similarity(
+        this.asInstanceOf[ThisType],
         other.asInstanceOf[ThisType], partial = partial)
 
   def kl_divergence_34(other: UnigramWordDist) = {      

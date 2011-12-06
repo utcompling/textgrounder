@@ -70,7 +70,6 @@ object FastPseudoGoodTuringSmoothedWordDist {
   }
 
   type DistType = PseudoGoodTuringSmoothedWordDist
-  val DistType = PseudoGoodTuringSmoothedWordDist
   protected var cached_worddist: DistType = null
   protected var cached_size: Int = 0
 
