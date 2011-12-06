@@ -36,7 +36,6 @@ import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.errprint
 
 import WordDist.memoizer._
-import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 
 /*
@@ -161,7 +160,8 @@ class MostPopularCellGeolocateDocumentStrategy(
 class CellDistMostCommonToponymGeolocateDocumentStrategy(
   cell_grid: SphereCellGrid
 ) extends SphereGeolocateDocumentStrategy(cell_grid) {
-  val cdist_factory = new SphereCellDistFactory(Params.lru_cache_size)
+  val cdist_factory =
+    new SphereCellDistFactory(cell_grid.table.driver.params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
     val wikipedia_table = cell_grid.table.wikipedia_subtable
@@ -388,12 +388,13 @@ class NaiveBayesDocumentStrategy(
 ) extends MinMaxScoreStrategy(cell_grid, false) {
 
   def score_cell(word_dist: WordDist, cell: SphereCell) = {
+    val params = cell_grid.table.driver.params
     // Determine respective weightings
     val (word_weight, baseline_weight) = (
       if (use_baseline) {
-        if (Params.naive_bayes_weighting == "equal") (1.0, 1.0)
+        if (params.naive_bayes_weighting == "equal") (1.0, 1.0)
         else {
-          val bw = Params.naive_bayes_baseline_weight.toDouble
+          val bw = params.naive_bayes_baseline_weight.toDouble
           ((1.0 - bw) / word_dist.num_word_tokens, bw)
         }
       } else (1.0, 0.0))
@@ -411,7 +412,8 @@ class NaiveBayesDocumentStrategy(
 class AverageCellProbabilityStrategy(
   cell_grid: SphereCellGrid
 ) extends SphereGeolocateDocumentStrategy(cell_grid) {
-  val cdist_factory = new SphereCellDistFactory(Params.lru_cache_size)
+  val cdist_factory =
+    new SphereCellDistFactory(cell_grid.table.driver.params.lru_cache_size)
 
   def return_ranked_cells(word_dist: WordDist) = {
     val celldist =
@@ -919,7 +921,7 @@ abstract class GeolocateDriver extends
       // evaluation loop work properly, we pretend like there's a single
       // eval file whose value is null.
       val iterfiles =
-        if (Params.eval_file.length > 0) Params.eval_file
+        if (params.eval_file.length > 0) params.eval_file
         else Seq[String](null)
       evalobj.evaluate_and_output_results(get_file_handler, iterfiles)
       (stratname, strategy, evalobj)

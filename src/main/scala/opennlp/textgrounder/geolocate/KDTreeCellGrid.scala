@@ -29,8 +29,6 @@ import ags.utils.KdTree
 
 import opennlp.textgrounder.util.distances.SphereCoord
 
-import GeolocateDriver.Params
-
 class KdTreeCell(
   cellgrid: KdTreeCellGrid,
   val kdleaf : KdTree[SphereDocument]) extends RectangularCell(cellgrid) {
@@ -48,7 +46,7 @@ class KdTreeCell(
   }
 
   override def get_center_coord () = {
-    if (Params.center_method == "center") {
+    if (cellgrid.table.driver.params.center_method == "center") {
       // center method
       super.get_center_coord
     } else {

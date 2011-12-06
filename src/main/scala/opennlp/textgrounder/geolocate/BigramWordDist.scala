@@ -30,7 +30,6 @@ import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.ioutil.{FileHandler, FileFormatException}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
-import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 import WordDist.memoizer._
 import GenericTypes._

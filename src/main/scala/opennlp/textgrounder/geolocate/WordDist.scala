@@ -33,7 +33,6 @@ import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
-import GeolocateDriver.Params
 import GeolocateDriver.Debug._
 import WordDist.memoizer._
 import GenericTypes._
