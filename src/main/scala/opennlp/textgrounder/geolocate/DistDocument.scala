@@ -42,6 +42,19 @@ import GeolocateDriver.Debug._
 //                      Wikipedia/Twitter/etc. documents                   //
 /////////////////////////////////////////////////////////////////////////////
 
+/**
+ * A simple class holding properties referring to extra operations that
+ * may be needed during document loading, depending on the particular
+ * strategies and/or type of cell grids.
+ */
+class DocumentLoadingProperties {
+  var need_training_docs_in_memory_during_testing: Boolean = false
+  var need_two_passes_over_training_docs: Boolean = false
+  var need_dist_during_first_pass_over_training_docs: Boolean = false
+  var need_pass_over_eval_docs_during_training: Boolean = false
+  var need_dist_during_pass_over_eval_docs_during_training: Boolean = false
+}
+  
 //////////////////////  DistDocument table
 
 /**
@@ -174,7 +187,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
   }
 
   /**
-   * Read the documents from the given corpus.  Documents listed in
+   * Read the training documents from the given corpus.  Documents listed in
    * the document file(s) are created, listed in this table,
    * and added to the cell grid corresponding to the table.
    *
@@ -184,19 +197,34 @@ abstract class DistDocumentTable[CoordType : Serializer,
    *   (e.g. "counts" or "document-metadata"
    * @param cell_grid Cell grid into which the documents are added.
    */
-  def read_documents(filehand: FileHandler, dir: String, suffix: String,
-      cell_grid: CellGrid[CoordType,DocumentType,_]) {
+  def read_training_documents(filehand: FileHandler, dir: String,
+      suffix: String, cell_grid: CellGrid[CoordType,DocumentType,_]) {
 
     val training_distproc =
       new DistDocumentFileProcessor("training-" + suffix, cell_grid)
     training_distproc.read_schema_from_corpus(filehand, dir)
     training_distproc.process_files(filehand, Seq(dir))
+  }
+
+  /**
+   * Read the eval-set documents from the given corpus.  Documents listed in
+   * the document file(s) are created, listed in this table,
+   * and added to the cell grid corresponding to the table.
+   *
+   * @param filehand The FileHandler for working with the file.
+   * @param dir Directory containing the corpus.
+   * @param suffix Suffix specifying the type of document file wanted
+   *   (e.g. "counts" or "document-metadata"
+   * @param cell_grid Cell grid into which the documents are added.
+   */
+  def read_eval_documents(filehand: FileHandler, dir: String, suffix: String,
+      cell_grid: CellGrid[CoordType,DocumentType,_]) {
+
     val eval_distproc =
       new DistDocumentFileProcessor(driver.params.eval_set + "-" + suffix,
         cell_grid)
     eval_distproc.read_schema_from_corpus(filehand, dir)
     eval_distproc.process_files(filehand, Seq(dir))
-    finish_document_loading()
   }
 
   def clear_training_document_distributions() {

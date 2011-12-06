@@ -879,9 +879,13 @@ abstract class GeolocateDriver extends
   }
 
   protected def read_documents(table: SphereDocumentTable) {
-    for (fn <- Params.input_corpus)
-      table.read_documents(get_file_handler, fn,
+    for (fn <- params.input_corpus)
+      table.read_training_documents(get_file_handler, fn,
         document_file_suffix, cell_grid)
+    for (fn <- params.input_corpus)
+      table.read_eval_documents(get_file_handler, fn,
+        document_file_suffix, cell_grid)
+    table.finish_document_loading()
   }
 
   def setup_for_run() {
