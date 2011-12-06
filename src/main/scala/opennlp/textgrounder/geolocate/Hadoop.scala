@@ -521,7 +521,9 @@ class DocumentEvaluationMapper extends
 
   class HadoopDocumentFileProcessor(
     context: ContextType
-  ) extends DistDocumentFileProcessor(driver.document_file_suffix, driver) {
+  ) extends DistDocumentFileProcessor(
+    driver.params.eval_set + "-" + driver.document_file_suffix, driver
+  ) {
     override def get_shortfile =
       filename_to_counter_name(driver.get_file_handler,
         driver.get_configuration.get("mapred.input.dir"))
