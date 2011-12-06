@@ -318,6 +318,7 @@ object WordDist {
    * indices, for faster operations on them).
    */
   val memoizer = new IntStringMemoizer
+  //val memoizer = IdentityMemoizer
 
   /**
    * Total number of word types seen (size of vocabulary)
