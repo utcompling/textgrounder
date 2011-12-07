@@ -132,7 +132,7 @@ class PGTSmoothedBigramWordDist(
 ) extends BigramWordDist(unigramKeys, unigramValues, num_unigrams,
     bigramKeys, bigramValues, num_bigrams) {
   //val FastAlgorithms = FastPseudoGoodTuringSmoothedWordDist
-  type ThisType = PGTSmoothedBigramWordDist
+  type TThis = PGTSmoothedBigramWordDist
 
   if (note_globally) {
     //assert(!factory.owp_adjusted)

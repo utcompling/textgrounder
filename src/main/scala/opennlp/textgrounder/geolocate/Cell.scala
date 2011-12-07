@@ -139,15 +139,18 @@ class CombinedWordDist(factory: WordDistFactory) {
 
 /** A simple distribution associating a probability with each cell. */
 
-class CellDist[CoordType, DocType <: DistDocument[CoordType],
-  CellType <: GeoCell[CoordType, DocType]](
-  val cell_grid: CellGrid[CoordType, DocType, CellType]
+class CellDist[
+  TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc]
+](
+  val cell_grid: CellGrid[TCoord, TDoc, TCell]
 ) {
-  val cellprobs: mutable.Map[CellType, Double] =
-    mutable.Map[CellType, Double]()
+  val cellprobs: mutable.Map[TCell, Double] =
+    mutable.Map[TCell, Double]()
 
   def set_cell_probabilities(
-      probs: collection.Map[CellType, Double]) {
+      probs: collection.Map[TCell, Double]) {
     cellprobs.clear()
     cellprobs ++= probs
   }
@@ -169,11 +172,13 @@ class CellDist[CoordType, DocType <: DistDocument[CoordType],
  *  @param cellprobs Hash table listing probabilities associated with cells
  */
 
-class WordCellDist[CoordType, DocType <: DistDocument[CoordType],
-  CellType <: GeoCell[CoordType, DocType]](
-  cell_grid: CellGrid[CoordType, DocType, CellType],
+class WordCellDist[TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc]
+](
+  cell_grid: CellGrid[TCoord, TDoc, TCell],
   val word: Word
-) extends CellDist[CoordType, DocType, CellType](cell_grid) {
+) extends CellDist[TCoord, TDoc, TCell](cell_grid) {
   var normalized = false
 
   protected def init() {
@@ -208,19 +213,20 @@ class WordCellDist[CoordType, DocType <: DistDocument[CoordType],
 }
 
 abstract class CellDistFactory[
-  CoordType, DocType <: DistDocument[CoordType],
-  CellType <: GeoCell[CoordType, DocType]](
+  TCoord, TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc]
+](
   val lru_cache_size: Int
 ) {
-  type WordCellDistType <: WordCellDist[CoordType, DocType, CellType]
-  type GridType <: CellGrid[CoordType, DocType, CellType]
-  def create_word_cell_dist(cell_grid: GridType, word: Word): WordCellDistType
+  type TCellDist <: WordCellDist[TCoord, TDoc, TCell]
+  type TGrid <: CellGrid[TCoord, TDoc, TCell]
+  def create_word_cell_dist(cell_grid: TGrid, word: Word): TCellDist
 
-  var cached_dists: LRUCache[Word, WordCellDistType] = null
+  var cached_dists: LRUCache[Word, TCellDist] = null
 
   // Return a cell distribution over a given word, using a least-recently-used
   // cache to optimize access.
-  def get_cell_dist(cell_grid: GridType, word: Word) = {
+  def get_cell_dist(cell_grid: TGrid, word: Word) = {
     if (cached_dists == null)
       cached_dists = new LRUCache(maxsize = lru_cache_size)
     cached_dists.get(word) match {
@@ -238,12 +244,12 @@ abstract class CellDistFactory[
    * by adding up the distributions of the individual words, weighting by
    * the count of the each word.
    */
-  def get_cell_dist_for_word_dist(cell_grid: GridType, xword_dist: WordDist) = {
+  def get_cell_dist_for_word_dist(cell_grid: TGrid, xword_dist: WordDist) = {
     // FIXME!!! Figure out what to do if distribution is not a unigram dist.
     // Can we break this up into smaller operations?  Or do we have to
     // make it an interface for WordDist?
     val word_dist = xword_dist.asInstanceOf[UnigramWordDist]
-    val cellprobs = doublemap[CellType]()
+    val cellprobs = doublemap[TCell]()
     for ((word, count) <- word_dist.counts) {
       val dist = get_cell_dist(cell_grid, word)
       for ((cell, prob) <- dist.cellprobs)
@@ -252,7 +258,7 @@ abstract class CellDistFactory[
     val totalprob = (cellprobs.values sum)
     for ((cell, prob) <- cellprobs)
       cellprobs(cell) /= totalprob
-    val retval = new CellDist[CoordType, DocType, CellType](cell_grid)
+    val retval = new CellDist[TCoord, TDoc, TCell](cell_grid)
     retval.set_cell_probabilities(cellprobs)
     retval
   }
@@ -266,17 +272,17 @@ abstract class CellDistFactory[
  * Abstract class for a general cell in a cell grid.
  * 
  * @param cell_grid The CellGrid object for the grid this cell is in.
- * @tparam CoordType The type of the coordinate object used to specify a
+ * @tparam TCoord The type of the coordinate object used to specify a
  *   a point somewhere in the grid.
- * @tparam DocType The type of documents stored in a cell in the grid.
+ * @tparam TDoc The type of documents stored in a cell in the grid.
  */
-abstract class GeoCell[CoordType, DocType <: DistDocument[CoordType]](
-    val cell_grid: CellGrid[CoordType, DocType,
-      _ <: GeoCell[CoordType, DocType]]
+abstract class GeoCell[TCoord, TDoc <: DistDocument[TCoord]](
+    val cell_grid: CellGrid[TCoord, TDoc,
+      _ <: GeoCell[TCoord, TDoc]]
 ) {
   val combined_dist =
     new CombinedWordDist(cell_grid.table.word_dist_factory)
-  var most_popular_document: DocType = _
+  var most_popular_document: TDoc = _
   var mostpopdoc_links = 0
 
   /**
@@ -294,7 +300,7 @@ abstract class GeoCell[CoordType, DocType <: DistDocument[CoordType]](
   /**
    * Return an Iterable over documents, listing the documents in the cell.
    */
-  def iterate_documents(): Iterable[DocType]
+  def iterate_documents(): Iterable[TDoc]
 
   /**
    * Return the coordinate of the "center" of the cell.  This is the
@@ -303,7 +309,7 @@ abstract class GeoCell[CoordType, DocType <: DistDocument[CoordType]](
    * center can be more or less arbitrarily placed as long as it's somewhere
    * central.
    */
-  def get_center_coord(): CoordType
+  def get_center_coord(): TCoord
 
   /**
    * Return a string representation of the cell.  Generally does not need
@@ -362,7 +368,7 @@ abstract class GeoCell[CoordType, DocType <: DistDocument[CoordType]](
   /**
    * Add a document to the distribution for the cell.
    */
-  def add_document(doc: DocType) {
+  def add_document(doc: TDoc) {
     combined_dist.add_document(doc)
     if (doc.incoming_links != None &&
       doc.incoming_links.get > mostpopdoc_links) {
@@ -392,9 +398,9 @@ abstract class GeoCell[CoordType, DocType <: DistDocument[CoordType]](
 /**
  * Abstract class for a general grid of cells.  The grid is defined over
  * a continuous space (e.g. the surface of the Earth).  The space is indexed
- * by coordinates (of type CoordType).  Each cell (of type CellType) covers
+ * by coordinates (of type TCoord).  Each cell (of type TCell) covers
  * some portion of the space.  There is also a set of documents (of type
- * DocType), each of which is indexed by a coordinate and which has a
+ * TDoc), each of which is indexed by a coordinate and which has a
  * distribution describing the contents of the document.  The distributions
  * of all the documents in a cell (i.e. whose coordinate is within the cell)
  * are amalgamated to form the distribution of the cell.
@@ -428,9 +434,12 @@ abstract class GeoCell[CoordType, DocType <: DistDocument[CoordType]](
  * (3) After this, it should be possible to list the cells by calling
  *     `iter_nonempty_cells`.
  */
-abstract class CellGrid[CoordType, DocType <: DistDocument[CoordType],
-    CellType <: GeoCell[CoordType, DocType]](
-    val table: DistDocumentTable[CoordType, DocType]
+abstract class CellGrid[
+  TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc]
+](
+    val table: DistDocumentTable[TCoord, TDoc]
 ) {
 
   /**
@@ -442,12 +451,12 @@ abstract class CellGrid[CoordType, DocType <: DistDocument[CoordType],
    * Find the correct cell for the given coordinates.  If no such cell
    * exists, return null.
    */
-  def find_best_cell_for_coord(coord: CoordType): CellType
+  def find_best_cell_for_coord(coord: TCoord): TCell
 
   /**
    * Add the given document to the cell grid.
    */
-  def add_document_to_cell(document: DocType): Unit
+  def add_document_to_cell(document: TDoc): Unit
 
   /**
    * Generate all non-empty cells.  This will be called once (and only once),
@@ -470,7 +479,7 @@ abstract class CellGrid[CoordType, DocType <: DistDocument[CoordType],
    *   but have no corresponding word counts given in the counts file.)
    */
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false):
-    Iterable[CellType]
+    Iterable[TCell]
   
   /*********************** Not meant to be overridden *********************/
   

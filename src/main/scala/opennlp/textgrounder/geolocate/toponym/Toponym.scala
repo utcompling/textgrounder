@@ -884,8 +884,8 @@ abstract class GeolocateToponymEvaluator(
 
   case class GeogWordDocument(
     words: Iterable[GeogWord]) extends EvaluationDocument
-  type EvalDocumentType = GeogWordDocument
-  type EvalResultType = ToponymEvaluationResult
+  type TEvalDoc = GeogWordDocument
+  type TEvalRes = ToponymEvaluationResult
 
   // Given an evaluation file, read in the words specified, including the
   // toponyms.  Mark each word with the "document" (e.g. document) that it's
@@ -1519,8 +1519,8 @@ Default '%default'.""")
 
 class GeolocateToponymDriver extends
     GeolocateDriver with StandaloneGeolocateDriverStats {
-  type ParamType = GeolocateToponymParameters
-  type RunReturnType =
+  type TParam = GeolocateToponymParameters
+  type TRunRes =
     Seq[(String, GeolocateToponymStrategy, EvaluationOutputter)]
 
   override def handle_parameters() {
@@ -1610,9 +1610,9 @@ class GeolocateToponymDriver extends
 }
 
 object GeolocateToponymApp extends GeolocateApp("geolocate-toponyms") {
-  type DriverType = GeolocateToponymDriver
+  type TDriver = GeolocateToponymDriver
   // FUCKING TYPE ERASURE
-  def create_param_object(ap: ArgParser) = new ParamType(ap)
-  def create_driver() = new DriverType()
-  var Params: ParamType = _
+  def create_param_object(ap: ArgParser) = new TParam(ap)
+  def create_driver() = new TDriver()
+  var Params: TParam = _
 }

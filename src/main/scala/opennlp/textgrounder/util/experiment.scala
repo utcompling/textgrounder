@@ -31,11 +31,11 @@ package object experiment {
    *
    * Basic operation:
    *
-   * 1. Create an instance of a class of type ParamType (which is determined
+   * 1. Create an instance of a class of type TParam (which is determined
    *    by the particular driver implementation) and populate it with the
    *    appropriate parameters.
    * 2. Call `run()`, passing in the parameter object created in the previous
-   *    step.  The return value (of type RunReturnType, again determined by
+   *    step.  The return value (of type TRunRes, again determined by
    *    the particular implementation) contains the results.
    *
    * NOTE: Some driver implementations may change the values of some of the
@@ -60,9 +60,9 @@ package object experiment {
    */
 
   abstract class ExperimentDriver {
-    type ParamType
-    type RunReturnType
-    var params: ParamType = _
+    type TParam
+    type TRunRes
+    var params: TParam = _
 
     /**
      * Signal a parameter error.
@@ -93,12 +93,12 @@ package object experiment {
         param_needed(param, param_english)
     }
 
-    def set_parameters(params: ParamType) {
+    def set_parameters(params: TParam) {
       this.params = params
       handle_parameters()
     }
 
-    def run(params: ParamType) = {
+    def run(params: TParam) = {
       set_parameters(params)
       setup_for_run()
       run_after_setup()
@@ -136,7 +136,7 @@ package object experiment {
      * to replace the run_after_setup component but leave the others.)
      */
 
-    def run_after_setup(): RunReturnType
+    def run_after_setup(): TRunRes
   }
 
   /**
@@ -445,7 +445,7 @@ package object experiment {
    * (1) Consistent with "field-style" access, it creates a class that will
    *     hold the user-specified values of command-line arguments, and also
    *     initializes the ArgParser with the list of allowable arguments,
-   *     types, default values, etc. `ParamType` is the type of this class,
+   *     types, default values, etc. `TParam` is the type of this class,
    *     and `create_param_object` must be implemented to create an instance
    *     of this class.
    * (2) `initialize_parameters` must be implemented to handle validation
@@ -467,12 +467,12 @@ package object experiment {
      * arguments.  Needs to have an ArgParser object passed in to it, typically
      * as a constructor parameter.
      */
-    type ParamType
+    type TParam
 
     /**
-     * Function to create an ParamType, passing in the value of `arg_parser`.
+     * Function to create an TParam, passing in the value of `arg_parser`.
      */
-    def create_param_object(ap: ArgParser): ParamType
+    def create_param_object(ap: ArgParser): TParam
 
     /**
      * Function to initialize and verify internal parameters from command-line
@@ -528,7 +528,7 @@ package object experiment {
      * to those parameters through the preferred "field-style" paradigm
      * of the ArgParser, and also holds the ancillary parameters (if any).
      */
-    var params: ParamType = _
+    var params: TParam = _
 
     /**
      * Code to implement main entrance point.  We move this to a separate
@@ -594,7 +594,7 @@ package object experiment {
    */
 
   abstract class ArgParserExperimentDriver extends ExperimentDriver {
-    override type ParamType <: ArgParserParameters
+    override type TParam <: ArgParserParameters
     
     override def param_error(string: String) {
       params.parser.error(string)
@@ -613,7 +613,7 @@ package object experiment {
    * command-line and programmatic access to the experiment-running
    * program is possible.
    *
-   * Most concrete implementations will only need to implement `DriverType`,
+   * Most concrete implementations will only need to implement `TDriver`,
    * `create_driver` and `create_param_object`. (The latter two functions will
    * be largely boilerplate, and are only needed at all because of type
    * erasure in Java.)
@@ -624,12 +624,12 @@ package object experiment {
 
   abstract class ExperimentDriverApp(appname: String) extends
       ExperimentApp(appname) {
-    type DriverType <: ArgParserExperimentDriver
+    type TDriver <: ArgParserExperimentDriver
     
     val driver = create_driver()
-    type ParamType = driver.ParamType
+    type TParam = driver.TParam
 
-    def create_driver(): DriverType
+    def create_driver(): TDriver
 
     override def output_ancillary_parameters() {
       driver.output_ancillary_parameters()

@@ -64,8 +64,8 @@ class DocumentLoadingProperties {
  * Class maintaining tables listing all documents and mapping between
  * names, ID's and documents.
  */
-abstract class DistDocumentTable[CoordType : Serializer,
-  DocType <: DistDocument[CoordType]](
+abstract class DistDocumentTable[TCoord : Serializer,
+  TDoc <: DistDocument[TCoord]](
   val driver: GeolocateDriver,
   val word_dist_factory: WordDistFactory
 ) {
@@ -79,7 +79,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
   /**
    * List of documents in each split.
    */
-  val documents_by_split = bufmap[String, DocType]()
+  val documents_by_split = bufmap[String, TDoc]()
 
   /**
    * Num of documents with word-count information but not in table.
@@ -113,7 +113,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
   val word_tokens_by_split =
     driver.countermap("word_tokens_by_split")
 
-  def create_document(schema: Schema): DocType
+  def create_document(schema: Schema): TDoc
 
   /**
    * Create, initialize and return a document with the given fieldvals,
@@ -134,7 +134,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
   }
 
   def create_and_record_document(schema: Schema, fieldvals: Seq[String],
-      cell_grid: CellGrid[CoordType,DocType,_]) = {
+      cell_grid: CellGrid[TCoord,TDoc,_]) = {
     val doc = create_and_init_document(schema, fieldvals, true)
     if (doc != null && doc.has_coord) {
       record_document(doc, cell_grid)
@@ -144,8 +144,8 @@ abstract class DistDocumentTable[CoordType : Serializer,
       false
   }
 
-  def record_document(doc: DocType,
-    cell_grid: CellGrid[CoordType,DocType,_]) {
+  def record_document(doc: TDoc,
+    cell_grid: CellGrid[TCoord,TDoc,_]) {
     documents_by_split(doc.split) += doc
     cell_grid.add_document_to_cell(doc)
   }
@@ -162,7 +162,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
    * @param cell_grid Cell grid to add newly created DistDocuments to
    */
   class DistDocumentTableFileProcessor(
-    suffix: String, cell_grid: CellGrid[CoordType,DocType,_]
+    suffix: String, cell_grid: CellGrid[TCoord,TDoc,_]
   ) extends DistDocumentFileProcessor(suffix, driver) {
     def handle_document(fieldvals: Seq[String]) = {
       create_and_record_document(schema, fieldvals, cell_grid)
@@ -215,7 +215,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
    * @param cell_grid Cell grid into which the documents are added.
    */
   def read_training_documents(filehand: FileHandler, dir: String,
-      suffix: String, cell_grid: CellGrid[CoordType,DocType,_]) {
+      suffix: String, cell_grid: CellGrid[TCoord,TDoc,_]) {
 
     val training_distproc =
       new DistDocumentTableFileProcessor("training-" + suffix, cell_grid)
@@ -235,7 +235,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
    * @param cell_grid Cell grid into which the documents are added.
    */
   def read_eval_documents(filehand: FileHandler, dir: String, suffix: String,
-      cell_grid: CellGrid[CoordType,DocType,_]) {
+      cell_grid: CellGrid[TCoord,TDoc,_]) {
 
     val eval_distproc =
       new DistDocumentTableFileProcessor(driver.params.eval_set + "-" + suffix,
@@ -361,9 +361,9 @@ case class DocumentValidationException(
  * split: Evaluation split of document ("training", "dev", "test"), usually
  *   stored as a fixed field in the schema.
  */
-abstract class DistDocument[CoordType : Serializer](
+abstract class DistDocument[TCoord : Serializer](
   val schema: Schema,
-  val table: DistDocumentTable[CoordType,_]
+  val table: DistDocumentTable[TCoord,_]
 ) extends EvaluationDocument {
 
   import DistDocument._, DistDocumentConverters._
@@ -395,7 +395,7 @@ abstract class DistDocument[CoordType : Serializer](
    * undefined if the document has no coordinate (e.g. it might throw an
    * error or return a default value such as `null`).
    */
-  def coord: CoordType
+  def coord: TCoord
   /**
    * Return the evaluation split ("training", "dev" or "test") of the document.
    * This was created before corpora were sub-divided by the value of this
@@ -502,7 +502,7 @@ abstract class DistDocument[CoordType : Serializer](
 
   def struct: scala.xml.Elem
 
-  def distance_to_coord(coord2: CoordType): Double
+  def distance_to_coord(coord2: TCoord): Double
 }
 
 object DistDocument {
@@ -769,11 +769,11 @@ abstract class DistDocumentFileProcessor(
  * @param suffix suffix used for identifying the particular corpus in a
  *  directory
  */
-class DistDocumentWriter[CoordType : Serializer](
+class DistDocumentWriter[TCoord : Serializer](
   schema: Schema,
   suffix: String
 ) extends CorpusWriter(schema, suffix) {
-  def output_document(outstream: PrintStream, doc: DistDocument[CoordType]) {
+  def output_document(outstream: PrintStream, doc: DistDocument[TCoord]) {
     output_row(outstream, doc.get_fields(schema.fieldnames))
   }
 }
