@@ -95,8 +95,8 @@ class SphereGroupedGeolocateDocumentEvalStats(
 ) extends GroupedGeolocateDocumentEvalStats[
   SphereCoord, SphereDocument, SphereCell](
   driver_stats, cell_grid, results_by_range) {
-  type BasicEvalStatsType = SphereGeolocateDocumentEvalStats
-  type DocumentEvaluationResultType = SphereDocumentEvaluationResult
+  type TBasicEvalStats = SphereGeolocateDocumentEvalStats
+  type TDocEvalRes = SphereDocumentEvaluationResult
   override def create_stats(prefix: String) =
     new SphereGeolocateDocumentEvalStats(driver_stats, prefix)
 
@@ -107,17 +107,17 @@ class SphereGroupedGeolocateDocumentEvalStats(
     new DoubleTableByRange(dist_fractions_for_error_dist,
       create_stats_for_range("degree_dist_to_pred_center", _))
 
-  override def record_one_result(stats: BasicEvalStatsType,
-      res: DocumentEvaluationResultType) {
+  override def record_one_result(stats: TBasicEvalStats,
+      res: TDocEvalRes) {
     stats.record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
   }
 
-  override def record_one_oracle_result(stats: BasicEvalStatsType,
-      res: DocumentEvaluationResultType) {
+  override def record_one_oracle_result(stats: TBasicEvalStats,
+      res: TDocEvalRes) {
     stats.record_oracle_result(res.true_truedist, res.true_degdist)
   }
 
-  override def record_result_by_range(res: DocumentEvaluationResultType) {
+  override def record_result_by_range(res: TDocEvalRes) {
     super.record_result_by_range(res)
 
     /* FIXME: This code specific to MultiRegularCellGrid is kind of ugly.
@@ -219,10 +219,10 @@ abstract class SphereGeolocateDocumentEvaluator(
   driver: GeolocateDocumentTypeDriver
 ) extends GeolocateDocumentEvaluator[SphereCoord, SphereDocument, SphereCell,
   SphereCellGrid](strategy, stratname, driver) {
-  type GroupedEvalStatsType = SphereGroupedGeolocateDocumentEvalStats
+  type TGroupedEvalStats = SphereGroupedGeolocateDocumentEvalStats
   def create_grouped_eval_stats(driver: GeolocateDocumentTypeDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
-    new GroupedEvalStatsType(driver, cell_grid.asInstanceOf[SphereCellGrid],
+    new TGroupedEvalStats(driver, cell_grid.asInstanceOf[SphereCellGrid],
       results_by_range)
 }
 
@@ -250,8 +250,8 @@ class InternalGeolocateDocumentEvaluator(
   driver: GeolocateDocumentTypeDriver
 ) extends SphereGeolocateDocumentEvaluator(strategy, stratname, driver) {
 
-  type EvalDocumentType = SphereDocument
-  type EvalResultType = SphereDocumentEvaluationResult
+  type TEvalDoc = SphereDocument
+  type TEvalRes = SphereDocumentEvaluationResult
 
   def iter_documents(filehand: FileHandler, filename: String) = {
     assert(filename == null)
@@ -279,7 +279,7 @@ class InternalGeolocateDocumentEvaluator(
   //if (title != null)
   //  yield (title, words)
 
-  override def would_skip_document(document: EvalDocumentType, doctag: String) = {
+  override def would_skip_document(document: TEvalDoc, doctag: String) = {
     if (document.dist == null) {
       // This can (and does) happen when --max-time-per-stage is set,
       // so that the counts for many documents don't get read in.
@@ -289,8 +289,8 @@ class InternalGeolocateDocumentEvaluator(
     } else false
   }
 
-  def evaluate_document(document: EvalDocumentType, doctag: String):
-      EvalResultType = {
+  def evaluate_document(document: TEvalDoc, doctag: String):
+      TEvalRes = {
     if (would_skip_document(document, doctag)) {
       evalstats.increment_counter("documents.skipped")
       return null
@@ -398,8 +398,8 @@ class PCLTravelGeolocateDocumentEvaluator(
 ) extends SphereGeolocateDocumentEvaluator(strategy, stratname, driver) {
   case class TitledDocument(
     title: String, text: String) extends EvaluationDocument 
-  type EvalDocumentType = TitledDocument
-  type EvalResultType = TitledDocumentResult
+  type TEvalDoc = TitledDocument
+  type TEvalRes = TitledDocumentResult
 
   def iter_documents(filehand: FileHandler, filename: String) = {
 

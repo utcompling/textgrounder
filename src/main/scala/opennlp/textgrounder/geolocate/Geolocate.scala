@@ -100,11 +100,11 @@ object GenericTypes {
  * Abstract class for reading documents from a test file and doing
  * document geolocation on them (as opposed e.g. to toponym resolution).
  */
-abstract class GeolocateDocumentStrategy[CoordType,
-    DocType <: DistDocument[CoordType],
-    CellType <: GeoCell[CoordType, DocType],
-    CellGridType <: CellGrid[CoordType, DocType, CellType]](
-  val cell_grid: CellGridType
+abstract class GeolocateDocumentStrategy[TCoord,
+    TDoc <: DistDocument[TCoord],
+    TCell <: GeoCell[TCoord, TDoc],
+    TGrid <: CellGrid[TCoord, TDoc, TCell]](
+  val cell_grid: TGrid
 ) {
   /**
    * For a given word distribution (describing a test document), return
@@ -115,7 +115,7 @@ abstract class GeolocateDocumentStrategy[CoordType,
    * are better, while for others, higher scores are better.  Currently,
    * the wrapper code outputs the score but doesn't otherwise use it.
    */
-  def return_ranked_cells(word_dist: WordDist): Iterable[(CellType, Double)]
+  def return_ranked_cells(word_dist: WordDist): Iterable[(TCell, Double)]
 }
 
 abstract class SphereGeolocateDocumentStrategy(
@@ -814,7 +814,7 @@ class DebugSettings {
  */
 abstract class GeolocateDriver extends
     ArgParserExperimentDriver with ExperimentDriverStats {
-  override type ParamType <: GeolocateParameters
+  override type TParam <: GeolocateParameters
   var degrees_per_cell = 0.0
   var stopwords: Set[String] = _
   var cell_grid: SphereCellGrid = _
@@ -1100,10 +1100,10 @@ strategies, since they require that --preserve-case-words be set internally.""")
 }
 
 // FUCK ME.  Have to make this abstract and GeolocateDocumentDriver a subclass
-// so that the ParamType can be overridden in HadoopGeolocateDocumentDriver.
+// so that the TParam can be overridden in HadoopGeolocateDocumentDriver.
 abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
-  override type ParamType <: GeolocateDocumentParameters
-  type RunReturnType =
+  override type TParam <: GeolocateDocumentParameters
+  type TRunRes =
     Seq[(String, SphereGeolocateDocumentStrategy, EvaluationOutputter)]
 
   var strategies: Seq[(String, SphereGeolocateDocumentStrategy)] = _
@@ -1269,14 +1269,14 @@ trait StandaloneGeolocateDriverStats extends ExperimentDriverStats {
 
 class GeolocateDocumentDriver extends
     GeolocateDocumentTypeDriver with StandaloneGeolocateDriverStats {
-  override type ParamType = GeolocateDocumentParameters
+  override type TParam = GeolocateDocumentParameters
 }
 
 class GeolocateAbruptExit extends Throwable { }
 
 abstract class GeolocateApp(appname: String) extends
     ExperimentDriverApp(appname) {
-  type DriverType <: GeolocateDriver
+  type TDriver <: GeolocateDriver
 
   override def run_program() = {
     try {
@@ -1291,9 +1291,9 @@ abstract class GeolocateApp(appname: String) extends
 }
 
 object GeolocateDocumentApp extends GeolocateApp("geolocate-document") {
-  type DriverType = GeolocateDocumentDriver
+  type TDriver = GeolocateDocumentDriver
   // FUCKING TYPE ERASURE
-  def create_param_object(ap: ArgParser) = new ParamType(ap)
-  def create_driver() = new DriverType()
+  def create_param_object(ap: ArgParser) = new TParam(ap)
+  def create_driver() = new TDriver()
 }
 

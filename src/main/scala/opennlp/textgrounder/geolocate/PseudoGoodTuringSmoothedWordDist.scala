@@ -137,7 +137,7 @@ class PseudoGoodTuringSmoothedWordDist(
   num_words: Int,
   note_globally: Boolean
 ) extends UnigramWordDist(keys, values, num_words) {
-  type ThisType = PseudoGoodTuringSmoothedWordDist
+  type TThis = PseudoGoodTuringSmoothedWordDist
 
   /** Total probability mass to be assigned to all words not
       seen in the document, estimated (motivated by Good-Turing
@@ -224,7 +224,7 @@ class PseudoGoodTuringSmoothedWordDist(
 
   def fast_kl_divergence(other: WordDist, partial: Boolean = false) = {
     FastPseudoGoodTuringSmoothedWordDist.fast_kl_divergence(
-      this.asInstanceOf[ThisType], other.asInstanceOf[ThisType],
+      this.asInstanceOf[TThis], other.asInstanceOf[TThis],
       partial = partial)
   }
 
@@ -232,11 +232,11 @@ class PseudoGoodTuringSmoothedWordDist(
       smoothed: Boolean = false) = {
     if (smoothed)
       FastPseudoGoodTuringSmoothedWordDist.fast_smoothed_cosine_similarity(
-        this.asInstanceOf[ThisType], other.asInstanceOf[ThisType],
+        this.asInstanceOf[TThis], other.asInstanceOf[TThis],
         partial = partial)
     else
       FastPseudoGoodTuringSmoothedWordDist.fast_cosine_similarity(
-        this.asInstanceOf[ThisType], other.asInstanceOf[ThisType],
+        this.asInstanceOf[TThis], other.asInstanceOf[TThis],
         partial = partial)
   }
 
@@ -246,7 +246,7 @@ class PseudoGoodTuringSmoothedWordDist(
       overall_probs_diff_words += factory.overall_word_probs(word)
     }
 
-    inner_kl_divergence_34(other.asInstanceOf[ThisType],
+    inner_kl_divergence_34(other.asInstanceOf[TThis],
       overall_probs_diff_words)
   }
       
@@ -254,7 +254,7 @@ class PseudoGoodTuringSmoothedWordDist(
    * Actual implementation of steps 3 and 4 of KL-divergence computation, given
    * a value that we may want to compute as part of step 2.
    */
-  def inner_kl_divergence_34(other: ThisType,
+  def inner_kl_divergence_34(other: TThis,
       overall_probs_diff_words: Double) = {
     var kldiv = 0.0
 

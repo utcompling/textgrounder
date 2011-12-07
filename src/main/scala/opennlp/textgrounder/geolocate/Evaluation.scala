@@ -209,18 +209,18 @@ abstract class GeolocateDocumentEvalStats(
  * number of documents in true cell.
  */
 
-abstract class GroupedGeolocateDocumentEvalStats[CoordType,
-  DocType <: DistDocument[CoordType],
-  CellType <: GeoCell[CoordType, DocType]](
+abstract class GroupedGeolocateDocumentEvalStats[TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc]](
   driver_stats: ExperimentDriverStats,
-  cell_grid: CellGrid[CoordType,DocType,CellType],
+  cell_grid: CellGrid[TCoord,TDoc,TCell],
   results_by_range: Boolean
 ) {
-  type BasicEvalStatsType <: GeolocateDocumentEvalStats
-  type DocumentEvaluationResultType <:
-    DocumentEvaluationResult[CoordType, DocType, CellType]
+  type TBasicEvalStats <: GeolocateDocumentEvalStats
+  type TDocEvalRes <:
+    DocumentEvaluationResult[TCoord, TDoc, TCell]
 
-  def create_stats(prefix: String): BasicEvalStatsType
+  def create_stats(prefix: String): TBasicEvalStats
   def create_stats_for_range[T](prefix: String, range: T) =
     create_stats(prefix + ".byrange." + range)
 
@@ -240,7 +240,7 @@ abstract class GroupedGeolocateDocumentEvalStats[CoordType,
   // and longitudinally.
   val dist_fraction_increment = 0.25
   def docmap(prefix: String) =
-    new SettingDefaultHashMap[Double, BasicEvalStatsType](
+    new SettingDefaultHashMap[Double, TBasicEvalStats](
       create_stats_for_range(prefix, _))
   val docs_by_true_dist_to_true_center =
     docmap("true_dist_to_true_center")
@@ -256,15 +256,15 @@ abstract class GroupedGeolocateDocumentEvalStats[CoordType,
     new DoubleTableByRange(dist_fractions_for_error_dist,
       create_stats_for_range("true_dist_to_pred_center", _))
 
-  def record_one_result(stats: BasicEvalStatsType, res: DocumentEvaluationResultType) {
+  def record_one_result(stats: TBasicEvalStats, res: TDocEvalRes) {
     stats.record_result(res.true_rank, res.pred_truedist)
   }
 
-  def record_one_oracle_result(stats: BasicEvalStatsType, res: DocumentEvaluationResultType) {
+  def record_one_oracle_result(stats: TBasicEvalStats, res: TDocEvalRes) {
     stats.record_oracle_result(res.true_truedist)
   }
 
-  def record_result(res: DocumentEvaluationResultType) {
+  def record_result(res: TDocEvalRes) {
     record_one_result(all_document, res)
     record_one_oracle_result(all_document, res)
     // Stephen says recording so many counters leads to crashes (at the 51st
@@ -273,7 +273,7 @@ abstract class GroupedGeolocateDocumentEvalStats[CoordType,
       record_result_by_range(res)
   }
 
-  def record_result_by_range(res: DocumentEvaluationResultType) {
+  def record_result_by_range(res: TDocEvalRes) {
     val naitr = docs_by_naitr.get_collector(res.num_docs_in_true_cell)
     record_one_result(naitr, res)
   }
@@ -337,28 +337,28 @@ trait EvaluationResult {
 abstract class TestFileEvaluator(val stratname: String) {
   var documents_processed = 0
 
-  type EvalDocumentType <: EvaluationDocument
-  type EvalResultType <: EvaluationResult
+  type TEvalDoc <: EvaluationDocument
+  type TEvalRes <: EvaluationResult
 
   /**
    * Return an Iterable listing the documents retrievable from the given
    * filename.
    */
   def iter_documents(filehand: FileHandler,
-    filename: String): Iterable[EvalDocumentType]
+    filename: String): Iterable[TEvalDoc]
 
   /**
    * Return true if document would be skipped; false if processed and
    * evaluated.
    */
-  def would_skip_document(doc: EvalDocumentType, doctag: String) = false
+  def would_skip_document(doc: TEvalDoc, doctag: String) = false
 
   /**
    * Return true if document was actually processed and evaluated; false
    * if skipped.
    */
-  def evaluate_document(doc: EvalDocumentType, doctag: String):
-    EvalResultType
+  def evaluate_document(doc: TEvalDoc, doctag: String):
+    TEvalRes
 
   /**
    * Output results so far.  If 'isfinal', this is the last call, so
@@ -367,20 +367,21 @@ abstract class TestFileEvaluator(val stratname: String) {
   def output_results(isfinal: Boolean = false): Unit
 }
 
-abstract class GeolocateDocumentEvaluator[CoordType,
-    DocType <: DistDocument[CoordType],
-    CellType <: GeoCell[CoordType, DocType],
-    CellGridType <: CellGrid[CoordType, DocType, CellType]](
-  val strategy: GeolocateDocumentStrategy[CoordType, DocType, CellType,
-    CellGridType],
+abstract class GeolocateDocumentEvaluator[
+  TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc],
+  TGrid <: CellGrid[TCoord, TDoc, TCell]
+](
+  val strategy: GeolocateDocumentStrategy[TCoord, TDoc, TCell, TGrid],
   stratname: String,
   driver: GeolocateDocumentTypeDriver
 ) extends TestFileEvaluator(stratname) {
-  type GroupedEvalStatsType <:
-    GroupedGeolocateDocumentEvalStats[CoordType,DocType,CellType]
+  type TGroupedEvalStats <:
+    GroupedGeolocateDocumentEvalStats[TCoord,TDoc,TCell]
   def create_grouped_eval_stats(driver: GeolocateDocumentTypeDriver,
-    cell_grid: CellGridType, results_by_range: Boolean):
-    GroupedEvalStatsType
+    cell_grid: TGrid, results_by_range: Boolean):
+    TGroupedEvalStats
   val evalstats = create_grouped_eval_stats(driver,
     strategy.cell_grid, results_by_range = driver.params.results_by_range)
 
@@ -389,11 +390,13 @@ abstract class GeolocateDocumentEvaluator[CoordType,
   }
 }
 
-case class DocumentEvaluationResult[CoordType,
-    DocType <: DistDocument[CoordType],
-    CellType <: GeoCell[CoordType, DocType]](
-  document: DocType,
-  pred_cell: CellType,
+case class DocumentEvaluationResult[
+  TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc]
+](
+  document: TDoc,
+  pred_cell: TCell,
   true_rank: Int
 ) extends EvaluationResult {
   val true_cell = pred_cell.cell_grid.find_best_cell_for_coord(document.coord)
