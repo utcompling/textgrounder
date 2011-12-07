@@ -188,7 +188,7 @@ class PseudoGoodTuringSmoothedWordDist(
     * distributions.
     */
 
-  def finish_after_global() {
+  protected def imp_finish_after_global() {
     // Make sure that overall_word_probs has been computed properly.
     assert(factory.owp_adjusted)
 
@@ -212,7 +212,6 @@ class PseudoGoodTuringSmoothedWordDist(
         yield factory.overall_word_probs(ind)) sum)
     //if (use_sorted_list)
     //  counts = new SortedList(counts)
-    finished = true
   }
 
   override def finish(minimum_word_count: Int = 0) {
@@ -223,28 +222,28 @@ class PseudoGoodTuringSmoothedWordDist(
     }
   }
 
-  val FastAlgorithms = FastPseudoGoodTuringSmoothedWordDist
-  def fast_kl_divergence(other: WordDist, partial: Boolean = false) =
+  def fast_kl_divergence(other: WordDist, partial: Boolean = false) = {
     FastPseudoGoodTuringSmoothedWordDist.fast_kl_divergence(
-      this.asInstanceOf[ThisType],
-      other.asInstanceOf[ThisType], partial = partial)
+      this.asInstanceOf[ThisType], other.asInstanceOf[ThisType],
+      partial = partial)
+  }
 
   def cosine_similarity(other: WordDist, partial: Boolean = false,
-      smoothed: Boolean = false) =
+      smoothed: Boolean = false) = {
     if (smoothed)
       FastPseudoGoodTuringSmoothedWordDist.fast_smoothed_cosine_similarity(
-        this.asInstanceOf[ThisType],
-        other.asInstanceOf[ThisType], partial = partial)
+        this.asInstanceOf[ThisType], other.asInstanceOf[ThisType],
+        partial = partial)
     else
       FastPseudoGoodTuringSmoothedWordDist.fast_cosine_similarity(
-        this.asInstanceOf[ThisType],
-        other.asInstanceOf[ThisType], partial = partial)
+        this.asInstanceOf[ThisType], other.asInstanceOf[ThisType],
+        partial = partial)
+  }
 
   def kl_divergence_34(other: UnigramWordDist) = {      
     var overall_probs_diff_words = 0.0
     for (word <- other.counts.keys if !(counts contains word)) {
-      overall_probs_diff_words +=
-        factory.overall_word_probs(word)
+      overall_probs_diff_words += factory.overall_word_probs(word)
     }
 
     inner_kl_divergence_34(other.asInstanceOf[ThisType],

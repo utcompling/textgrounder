@@ -360,19 +360,32 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
     </GeoCell>
 
   /**
-   * Generate the distribution for a cell from the documents in it.
+   * Add a document to the distribution for the cell.
+   */
+  def add_document(doc: DocumentType) {
+    combined_dist.add_document(doc)
+    if (doc.incoming_links != None &&
+      doc.incoming_links.get > mostpopdoc_links) {
+      mostpopdoc_links = doc.incoming_links.get
+      most_popular_document = doc
+    }
+  }
+
+  /**
+   * Generate the distribution for the cell from the documents in it.
    */
   def generate_dist() {
-    for (doc <- iterate_documents()) {
-      combined_dist.add_document(doc)
-      if (doc.incoming_links != None &&
-        doc.incoming_links.get > mostpopdoc_links) {
-        mostpopdoc_links = doc.incoming_links.get
-        most_popular_document = doc
-      }
-    }
+    for (doc <- iterate_documents())
+      add_document(doc)
+    finish()
+  }
+
+  /**
+   * Finish any computations related to the cell's word distribution.
+   */
+  def finish() {
     combined_dist.word_dist.finish(
-      minimum_word_count = Params.minimum_word_count)
+      minimum_word_count = cell_grid.table.driver.params.minimum_word_count)
   }
 }
 

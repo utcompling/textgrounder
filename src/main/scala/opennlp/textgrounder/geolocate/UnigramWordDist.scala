@@ -82,32 +82,30 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
       for ((word, count) <- counts.toSeq.sortWith(_._2 > _._2).view(0, num_words_to_print))
       yield "%s=%s" format (unmemoize_string(word), count) 
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
-    "WordDist(%d types, %d tokens%s%s, %s)" format (
+    "UnigramWordDist(%d types, %d tokens%s%s, %s)" format (
         num_word_types, num_word_tokens, innerToString, finished_str, words)
   }
 
-  def add_document(words: Traversable[String], ignore_case: Boolean = true,
-      stopwords: Set[String] = Set[String]()) {
-    assert(!finished)
-    for {word <- words
-         val wlower = if (ignore_case) word.toLowerCase() else word
-         if !stopwords(wlower) } {
+  protected def imp_add_document(words: Traversable[String],
+      ignore_case: Boolean, stopwords: Set[String]) {
+    for (word <- words;
+         wlower = if (ignore_case) word.toLowerCase() else word;
+         if !stopwords(wlower)) {
       counts(memoize_string(wlower)) += 1
       num_word_tokens += 1
     }
   }
 
-  def add_word_distribution(xworddist: WordDist) {
-    assert(!finished)
+  protected def imp_add_word_distribution(xworddist: WordDist) {
     val worddist = xworddist.asInstanceOf[UnigramWordDist]
     for ((word, count) <- worddist.counts)
       counts(word) += count
     num_word_tokens += worddist.num_word_tokens
   }
 
-  def finish_before_global(minimum_word_count: Int = 0) {
+  protected def imp_finish_before_global(minimum_word_count: Int) {
     // make sure counts not null (eg document in coords file but not counts file)
-    if (counts == null || finished) return
+    if (counts == null) return
 
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.
@@ -141,8 +139,6 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
   def slow_kl_divergence_debug(xother: WordDist, partial: Boolean = false,
       return_contributing_words: Boolean = false) = {
     val other = xother.asInstanceOf[UnigramWordDist]
-    assert(finished)
-    assert(other.finished)
     var kldiv = 0.0
     val contribs =
       if (return_contributing_words) mutable.Map[Word, Double]() else null
