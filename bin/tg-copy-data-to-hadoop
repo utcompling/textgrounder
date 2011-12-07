@@ -46,15 +46,15 @@ for step in $steps ; do
     $hadoop fs -put "$TEXTGROUNDER_DIR/data" "$TG_HADOOP_DIR/data"
   elif [ "$step" = wikipedia ]; then
     WIKI_DATE="`echo $OUT_COMBINED_DOCUMENT_DATA_FILE | sed s/-combined-document-data.txt//`"
-    for item in $TG_WIKIPEDIA_DIR/$WIKI_DATE/*
+    for item in $TG_CORPUS_DIR/wikipedia/$WIKI_DATE/*
     do
         itembase=`basename $item`
         $hadoop fs -put $item "$TG_HADOOP_DIR/corpora/wikipedia/$WIKI_DATE/$itembase"
     done
   elif [ "$step" = twitter ]; then
-    for x in $TG_TWITTER_DIR/output-*-docthresh; do
+    for x in $TG_CORPUS_DIR/twitter-geotext/docthresh-*; do
       dir=`basename $x`
-      $hadoop fs -put "$TG_TWITTER_DIR/$dir" "$TG_HADOOP_DIR/corpora/geotext/$dir"
+      $hadoop fs -put $x "$TG_HADOOP_DIR/corpora/twitter-geotext/$dir"
     done
   else
     echo "Unrecognized corpus value: $step"

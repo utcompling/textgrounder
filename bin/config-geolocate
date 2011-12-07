@@ -135,7 +135,7 @@ set_wp_version() {
   WP_VERSION="$1"
   DUMP_PREFIX="$1"
   if [ -z "$NO_USE_PERMUTED" ]; then
-    if [ -e "$TG_WIKIPEDIA_DIR/$WP_VERSION/$WP_VERSION-permuted-pages-articles.xml.bz2" ]; then
+    if [ -e "$TG_CORPUS_DIR/wikipedia/$WP_VERSION/$WP_VERSION-permuted-pages-articles.xml.bz2" ]; then
       DUMP_PREFIX="$1-permuted"
     fi
   fi
