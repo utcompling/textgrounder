@@ -145,7 +145,7 @@ class KdTreeCellGrid(table: SphereDocumentTable,
 
       for (node <- nodes if node.parent != null) {
         val cell = nodes_to_cell(node)
-        val wd = cell.word_dist_wrapper.word_dist
+        val wd = cell.combined_dist.word_dist
         val uwd = wd.asInstanceOf[UnigramWordDist]
 
         for ((k,v) <- uwd.counts) {
@@ -153,7 +153,7 @@ class KdTreeCellGrid(table: SphereDocumentTable,
         }
 
         val pcell = nodes_to_cell(node.parent)
-        val pwd = pcell.word_dist_wrapper.word_dist
+        val pwd = pcell.combined_dist.word_dist
         val puwd = pwd.asInstanceOf[UnigramWordDist]
 
         for ((k,v) <- puwd.counts) {

@@ -38,19 +38,44 @@ import GeolocateDriver.Params
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * Distribution over words corresponding to a cell.
+ * Distribution over words resulting from combining the individual
+ * distributions of a number of documents.  We track the number of
+ * documents making up the distribution, as well as the total incoming link
+ * count for all of these documents.  Note that some documents contribute
+ * to the link count but not the word distribution; hence, there are two
+ * concepts of "empty", depending on whether all contributing documents or
+ * only those that contributed to the word distribution are counted.
+ * (The primary reason for documents not contributing to the distribution
+ * is that they're not in the training set; see comments below.  However,
+ * some documents simply don't have distributions defined for them in the
+ * document file -- e.g. if there was a problem extracting the document's
+ * words in the preprocessing stage.)
+ *
+ * Note that we embed the actual object describing the word distribution
+ * as a field in this object, rather than extending (subclassing) WordDist.
+ * The reason for this is that there are multiple types of WordDists, and
+ * so subclassing would require creating a different subclass for every
+ * such type, along with extra boilerplate functions to create objects of
+ * these subclasses.
  */
-
-class CellWordDist(val word_dist: WordDist) {
+class CombinedWordDist(factory: WordDistFactory) {
+  /** The combined word distribution itself. */
+  val word_dist = factory.create_word_dist()
   /** Number of documents included in incoming-link computation. */
   var num_docs_for_links = 0
   /** Total number of incoming links. */
   var incoming_links = 0
-  /** Number of documents included in word distribution. */
+  /** Number of documents included in word distribution.  All such
+   * documents also contribute to the incoming link count. */
   var num_docs_for_word_dist = 0
 
+  /** True if no documents have contributed to the word distribution.
+   * This should generally be the same as if the distribution is empty
+   * (unless documents with an empty distribution were added??). */
   def is_empty_for_word_dist() = num_docs_for_word_dist == 0
 
+  /** True if the object is completely empty.  This means no documents
+   * at all have been added using `add_document`. */
   def is_empty() = num_docs_for_links == 0
 
   /**
@@ -249,12 +274,12 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
     val cell_grid: CellGrid[CoordType, DocumentType,
       _ <: GeoCell[CoordType, DocumentType]]
 ) {
-  val word_dist_wrapper =
-    new CellWordDist(cell_grid.table.word_dist_factory.create_word_dist())
+  val combined_dist =
+    new CombinedWordDist(cell_grid.table.word_dist_factory)
   var most_popular_document: DocumentType = _
   var mostpopdoc_links = 0
 
-  def word_dist = word_dist_wrapper.word_dist
+  def word_dist = combined_dist.word_dist
 
   /**
    * Return a string describing the location of the cell in its grid,
@@ -296,9 +321,9 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
 
     "GeoCell(%s%s%s, %d documents(dist), %d documents(links), %d links)" format (
       describe_location(), unfinished, contains,
-      word_dist_wrapper.num_docs_for_word_dist,
-      word_dist_wrapper.num_docs_for_links,
-      word_dist_wrapper.incoming_links)
+      combined_dist.num_docs_for_word_dist,
+      combined_dist.num_docs_for_links,
+      combined_dist.incoming_links)
   }
 
   // def __repr__() = {
@@ -330,9 +355,9 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
           (<mostPopularDocument>most_popular_document.struct()</mostPopularDocument>
            <mostPopularDocumentLinks>mostpopdoc_links</mostPopularDocumentLinks>)
       }
-      <numDocumentsDist>{ word_dist_wrapper.num_docs_for_word_dist }</numDocumentsDist>
-      <numDocumentsLink>{ word_dist_wrapper.num_docs_for_links }</numDocumentsLink>
-      <incomingLinks>{ word_dist_wrapper.incoming_links }</incomingLinks>
+      <numDocumentsDist>{ combined_dist.num_docs_for_word_dist }</numDocumentsDist>
+      <numDocumentsLink>{ combined_dist.num_docs_for_links }</numDocumentsLink>
+      <incomingLinks>{ combined_dist.incoming_links }</incomingLinks>
     </GeoCell>
 
   /**
@@ -340,7 +365,7 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
    */
   def generate_dist() {
     for (doc <- iterate_documents()) {
-      word_dist_wrapper.add_document(doc)
+      combined_dist.add_document(doc)
       if (doc.incoming_links != None &&
         doc.incoming_links.get > mostpopdoc_links) {
         mostpopdoc_links = doc.incoming_links.get
@@ -463,9 +488,9 @@ abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
     total_num_docs_for_word_dist = 0
     for (cell <- iter_nonempty_cells()) {
       total_num_docs_for_word_dist +=
-        cell.word_dist_wrapper.num_docs_for_word_dist
+        cell.combined_dist.num_docs_for_word_dist
       total_num_docs_for_links +=
-        cell.word_dist_wrapper.num_docs_for_links
+        cell.combined_dist.num_docs_for_links
       driver.heartbeat
     }
 

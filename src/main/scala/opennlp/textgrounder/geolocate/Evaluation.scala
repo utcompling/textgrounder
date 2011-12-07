@@ -397,7 +397,7 @@ case class DocumentEvaluationResult[CoordType,
   true_rank: Int
 ) extends EvaluationResult {
   val true_cell = pred_cell.cell_grid.find_best_cell_for_coord(document.coord)
-  val num_docs_in_true_cell = true_cell.word_dist_wrapper.num_docs_for_word_dist
+  val num_docs_in_true_cell = true_cell.combined_dist.num_docs_for_word_dist
   val true_center = true_cell.get_center_coord()
   val true_truedist = document.distance_to_coord(true_center)
   val pred_center = pred_cell.get_center_coord()

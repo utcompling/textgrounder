@@ -148,9 +148,9 @@ class MostPopularCellGeolocateDocumentStrategy(
         (for (cell <- cell_grid.iter_nonempty_cells())
           yield (cell,
             (if (internal_link)
-               cell.word_dist_wrapper.incoming_links
+               cell.combined_dist.incoming_links
              else
-               cell.word_dist_wrapper.num_docs_for_links).toDouble)).
+               cell.combined_dist.num_docs_for_links).toDouble)).
         toArray sortWith (_._2 > _._2))
     }
     cached_ranked_mps
@@ -270,7 +270,7 @@ abstract class MinMaxScoreStrategy(
       if (debug("lots")) {
         errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
           cell.describe_indices(), cell.describe_location(),
-          cell.word_dist_wrapper.num_docs_for_word_dist)
+          cell.combined_dist.num_docs_for_word_dist)
       }
 
       val score = score_cell(word_dist, cell)
@@ -401,7 +401,7 @@ class NaiveBayesDocumentStrategy(
 
     val word_logprob = cell.word_dist.get_nbayes_logprob(word_dist)
     val baseline_logprob =
-      log(cell.word_dist_wrapper.num_docs_for_links.toDouble /
+      log(cell.combined_dist.num_docs_for_links.toDouble /
           cell_grid.total_num_docs_for_links)
     val logprob = (word_weight * word_logprob +
       baseline_weight * baseline_logprob)
