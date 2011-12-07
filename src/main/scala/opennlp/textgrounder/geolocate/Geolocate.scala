@@ -930,7 +930,7 @@ abstract class GeolocateDriver extends
   }
 
   protected def process_strategies[T](strategies: Seq[(String, T)])(
-      geneval: (String, T) => EvaluationOutputter) = {
+      geneval: (String, T) => EvaluationOutputter[_,_]) = {
     for ((stratname, strategy) <- strategies) yield {
       val evalobj = geneval(stratname, strategy)
       // For --eval-format=internal, there is no eval file.  To make the
@@ -1104,7 +1104,7 @@ strategies, since they require that --preserve-case-words be set internally.""")
 abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
   override type TParam <: GeolocateDocumentParameters
   type TRunRes =
-    Seq[(String, SphereGeolocateDocumentStrategy, EvaluationOutputter)]
+    Seq[(String, SphereGeolocateDocumentStrategy, EvaluationOutputter[_,_])]
 
   var strategies: Seq[(String, SphereGeolocateDocumentStrategy)] = _
 
@@ -1238,13 +1238,11 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
 
   def run_after_setup() = {
     process_strategies(strategies)((stratname, strategy) => {
-      val evaluator =
-        // Generate reader object
-        if (params.eval_format == "pcl-travel")
-          new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
-        else
-          new InternalGeolocateDocumentEvaluator(strategy, stratname, this)
-      new DefaultEvaluationOutputter(stratname, evaluator)
+      // Generate reader object
+      if (params.eval_format == "pcl-travel")
+        new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
+      else
+        new InternalGeolocateDocumentEvaluator(strategy, stratname, this)
     })
   }
 }

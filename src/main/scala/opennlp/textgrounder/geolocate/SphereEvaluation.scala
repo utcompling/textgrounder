@@ -213,12 +213,12 @@ class SphereGroupedGeolocateDocumentEvalStats(
 //                             Main evaluation code                        //
 /////////////////////////////////////////////////////////////////////////////
 
-abstract class SphereGeolocateDocumentEvaluator(
+abstract class SphereGeolocateDocumentEvaluator[TEvalDoc, TEvalRes](
   override val strategy: SphereGeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentTypeDriver
 ) extends GeolocateDocumentEvaluator[SphereCoord, SphereDocument, SphereCell,
-  SphereCellGrid](strategy, stratname, driver) {
+  SphereCellGrid, TEvalDoc, TEvalRes](strategy, stratname, driver) {
   type TGroupedEvalStats = SphereGroupedGeolocateDocumentEvalStats
   def create_grouped_eval_stats(driver: GeolocateDocumentTypeDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
@@ -248,10 +248,9 @@ class InternalGeolocateDocumentEvaluator(
   strategy: SphereGeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends SphereGeolocateDocumentEvaluator(strategy, stratname, driver) {
-
-  type TEvalDoc = SphereDocument
-  type TEvalRes = SphereDocumentEvaluationResult
+) extends SphereGeolocateDocumentEvaluator[
+  SphereDocument, SphereDocumentEvaluationResult
+](strategy, stratname, driver) {
 
   def iter_documents(filehand: FileHandler, filename: String) = {
     assert(filename == null)
@@ -279,7 +278,7 @@ class InternalGeolocateDocumentEvaluator(
   //if (title != null)
   //  yield (title, words)
 
-  override def would_skip_document(document: TEvalDoc, doctag: String) = {
+  override def would_skip_document(document: SphereDocument, doctag: String) = {
     if (document.dist == null) {
       // This can (and does) happen when --max-time-per-stage is set,
       // so that the counts for many documents don't get read in.
@@ -289,8 +288,8 @@ class InternalGeolocateDocumentEvaluator(
     } else false
   }
 
-  def evaluate_document(document: TEvalDoc, doctag: String):
-      TEvalRes = {
+  def evaluate_document(document: SphereDocument, doctag: String):
+      SphereDocumentEvaluationResult = {
     if (would_skip_document(document, doctag)) {
       evalstats.increment_counter("documents.skipped")
       return null
@@ -384,8 +383,8 @@ class InternalGeolocateDocumentEvaluator(
   }
 }
 
-class TitledDocumentResult extends EvaluationResult {
-}
+case class TitledDocument(title: String, text: String)
+class TitledDocumentResult { }
 
 /**
  * A class for geolocation where each test document is a chapter in a book
@@ -395,12 +394,9 @@ class PCLTravelGeolocateDocumentEvaluator(
   strategy: SphereGeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends SphereGeolocateDocumentEvaluator(strategy, stratname, driver) {
-  case class TitledDocument(
-    title: String, text: String) extends EvaluationDocument 
-  type TEvalDoc = TitledDocument
-  type TEvalRes = TitledDocumentResult
-
+) extends SphereGeolocateDocumentEvaluator[
+  TitledDocument, TitledDocumentResult
+](strategy, stratname, driver) {
   def iter_documents(filehand: FileHandler, filename: String) = {
 
     val dom = try {

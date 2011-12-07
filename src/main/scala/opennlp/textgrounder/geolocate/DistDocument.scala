@@ -364,7 +364,7 @@ case class DocumentValidationException(
 abstract class DistDocument[TCoord : Serializer](
   val schema: Schema,
   val table: DistDocumentTable[TCoord,_]
-) extends EvaluationDocument {
+) {
 
   import DistDocument._, DistDocumentConverters._
 
