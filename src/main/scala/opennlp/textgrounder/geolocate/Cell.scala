@@ -352,9 +352,43 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
 }
 
 /**
- * Abstract class for a general grid of cells.  No assumptions are
- * made about the shapes of cells in the grid, the number of dimensions in
- * the grid, or whether the cells are overlapping.
+ * Abstract class for a general grid of cells.  The grid is defined over
+ * a continuous space (e.g. the surface of the Earth).  The space is indexed
+ * by coordinates (of type CoordType).  Each cell (of type CellType) covers
+ * some portion of the space.  There is also a set of documents (of type
+ * DocumentType), each of which is indexed by a coordinate and which has a
+ * distribution describing the contents of the document.  The distributions
+ * of all the documents in a cell (i.e. whose coordinate is within the cell)
+ * are amalgamated to form the distribution of the cell.
+ *
+ * One example is the SphereCellGrid -- a grid of cells covering the Earth.
+ * ("Sphere" is used here in its mathematical meaning of the surface of a
+ * round ball.) Coordinates, of type SphereCoord, are pairs of latitude and
+ * longitude.  Documents are of type SphereDocument and have a SphereCoord
+ * as their coordinate.  Cells are of type SphereCell.  Subclasses of
+ * SphereCellGrid refer to particular grid cell shapes.  For example, the
+ * MultiRegularCellGrid consists of a regular tiling of the surface of the
+ * Earth into "rectangles" defined by minimum and maximum latitudes and
+ * longitudes.  Most commonly, each tile is a cell, but it is possible for
+ * a cell to consist of an NxN square of tiles, in which case the cells
+ * overlap.  Another subclass is KDTreeCellGrid, with rectangular cells of
+ * variable size so that the number of documents in a given cell stays more
+ * or less constant.
+ *
+ * Another possibility would be a grid indexed by years, where each cell
+ * corresponds to a particular range of years.
+ *
+ * In general, no assumptions are made about the shapes of cells in the grid,
+ * the number of dimensions in the grid, or whether the cells are overlapping.
+ *
+ * The following operations are used to populate a cell grid:
+ *
+ * (1) Documents are added one-by-one to a grid by calling
+ *     `add_document_to_cell`.
+ * (2) After all documents have been added, `initialize_cells` is called
+ *     to generate the cells and create their distribution.
+ * (3) After this, it should be possible to list the cells by calling
+ *     `iter_nonempty_cells`.
  */
 abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
     CellType <: GeoCell[CoordType, DocumentType]](
