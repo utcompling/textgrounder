@@ -872,20 +872,17 @@ class NaiveBayesToponymStrategy(
   }
 }
 
-class ToponymEvaluationResult extends EvaluationResult {
-}
+class ToponymEvaluationResult  { }
+case class GeogWordDocument(words: Iterable[GeogWord])
 
 abstract class GeolocateToponymEvaluator(
   strategy: GeolocateToponymStrategy,
   stratname: String,
   driver: GeolocateToponymDriver
-) extends TestFileEvaluator(stratname) {
+) extends TestFileEvaluator[GeogWordDocument, ToponymEvaluationResult](
+  stratname
+) with DefaultEvaluationOutputter[GeogWordDocument, ToponymEvaluationResult] {
   val results = new GeolocateToponymResults(driver)
-
-  case class GeogWordDocument(
-    words: Iterable[GeogWord]) extends EvaluationDocument
-  type TEvalDoc = GeogWordDocument
-  type TEvalRes = ToponymEvaluationResult
 
   // Given an evaluation file, read in the words specified, including the
   // toponyms.  Mark each word with the "document" (e.g. document) that it's
@@ -1521,7 +1518,7 @@ class GeolocateToponymDriver extends
     GeolocateDriver with StandaloneGeolocateDriverStats {
   type TParam = GeolocateToponymParameters
   type TRunRes =
-    Seq[(String, GeolocateToponymStrategy, EvaluationOutputter)]
+    Seq[(String, GeolocateToponymStrategy, EvaluationOutputter[_,_])]
 
   override def handle_parameters() {
     super.handle_parameters()
@@ -1598,13 +1595,11 @@ class GeolocateToponymDriver extends
       })
     val strats = strats_unflat reduce (_ ++ _)
     process_strategies(strats)((stratname, strategy) => {
-      val evaluator =
-        // Generate reader object
-        if (params.eval_format == "tr-conll")
-          new TRCoNLLGeolocateToponymEvaluator(strategy, stratname, this)
-        else
-          new WikipediaGeolocateToponymEvaluator(strategy, stratname, this)
-      new DefaultEvaluationOutputter(stratname, evaluator)
+      // Generate reader object
+      if (params.eval_format == "tr-conll")
+        new TRCoNLLGeolocateToponymEvaluator(strategy, stratname, this)
+      else
+        new WikipediaGeolocateToponymEvaluator(strategy, stratname, this)
     })
   }
 }
