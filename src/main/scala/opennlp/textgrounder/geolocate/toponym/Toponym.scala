@@ -193,7 +193,7 @@ class Division(
   var boundary: Boundary = null
   // For cell-based Naive Bayes disambiguation, a distribution
   // over the division's document and all locations within the cell.
-  var word_dist_wrapper: CellWordDist = null
+  var combined_dist: CombinedWordDist = null
 
   def toString(no_document: Boolean = false) = {
     val docmatchstr =
@@ -270,11 +270,11 @@ class Division(
     boundary = new Boundary(topleft, botright)
   }
 
-  def generate_worddist(word_dist_factory: WordDistFactory) {
-    word_dist_wrapper = new CellWordDist(word_dist_factory.create_word_dist())
+  def generate_word_dist(word_dist_factory: WordDistFactory) {
+    combined_dist = new CombinedWordDist(word_dist_factory)
     for (loc <- Seq(this) ++ goodlocs if loc.docmatch != null)
-      yield word_dist_wrapper.add_document(loc.docmatch)
-    word_dist_wrapper.word_dist.finish(minimum_word_count =
+      yield combined_dist.add_document(loc.docmatch)
+    combined_dist.word_dist.finish(minimum_word_count =
       Params.minimum_word_count)
   }
 
@@ -370,7 +370,7 @@ class TopoDocument(
   subtable: TopoDocumentSubtable
 ) extends WikipediaDocument(schema, subtable) {
   // Cell-based distribution corresponding to this document.
-  var word_dist_wrapper: CellWordDist = null
+  var combined_dist: CombinedWordDist = null
   // Corresponding location for this document.
   var location: Location = null
 
@@ -432,27 +432,26 @@ class TopoDocument(
 
   // Determine the cell word-distribution object for a given document:
   // Create and populate one if necessary.
-  def find_cellworddist(cell_grid: SphereCellGrid) = {
+  def find_combined_word_dist(cell_grid: SphereCellGrid) = {
     val loc = location
     if (loc != null && loc.isInstanceOf[Division]) {
       val div = loc.asInstanceOf[Division]
-      if (div.word_dist_wrapper == null)
-        div.generate_worddist(cell_grid.table.word_dist_factory)
-      div.word_dist_wrapper
+      if (div.combined_dist == null)
+        div.generate_word_dist(cell_grid.table.word_dist_factory)
+      div.combined_dist
     } else {
-      if (word_dist_wrapper == null) {
+      if (combined_dist == null) {
         val stat_cell = cell_grid.find_best_cell_for_coord(coord)
         if (stat_cell != null)
-          word_dist_wrapper = stat_cell.word_dist_wrapper
+          combined_dist = stat_cell.combined_dist
         else {
           warning("Couldn't find existing cell distribution for document %s",
             this)
-          word_dist_wrapper =
-            new CellWordDist(table.word_dist_factory.create_word_dist())
-          word_dist_wrapper.word_dist.finish()
+          combined_dist = new CombinedWordDist(table.word_dist_factory)
+          combined_dist.word_dist.finish()
         }
       }
-      word_dist_wrapper
+      combined_dist
     }
   }
 
@@ -799,12 +798,12 @@ class BaselineGeolocateToponymStrategy(
     val params = topo_table.topo_driver.params
     if (baseline_strategy == "internal-link") {
       if (params.context_type == "cell")
-        doc.find_cellworddist(cell_grid).incoming_links
+        doc.find_combined_word_dist(cell_grid).incoming_links
       else
         doc.adjusted_incoming_links
     } else if (baseline_strategy == "num-documents") {
       if (params.context_type == "cell")
-        doc.find_cellworddist(cell_grid).num_docs_for_links
+        doc.find_combined_word_dist(cell_grid).num_docs_for_links
       else {
         val location = doc.location
         location match {
@@ -835,7 +834,7 @@ class NaiveBayesToponymStrategy(
 
     var distobj =
       if (params.context_type == "document") doc.dist
-      else doc.find_cellworddist(cell_grid).word_dist
+      else doc.find_combined_word_dist(cell_grid).word_dist
     var totalprob = 0.0
     var total_word_weight = 0.0
     val (word_weight, baseline_weight) =

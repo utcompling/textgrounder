@@ -76,6 +76,50 @@ case class RegularCellIndex(latind: Int, longind: Int) {
   def toFractional() = FractionalRegularCellIndex(latind, longind)
 }
 
+object RegularCellIndex {
+  /* SCALABUG: Why do I need to specify RegularCellIndex as the return type
+     here?  And why is this not required in the almost identical construction
+     in SphereCoord?  I get this error (not here, but where the object is
+     created):
+     
+     [error] /Users/benwing/devel/textgrounder/src/main/scala/opennlp/textgrounder/geolocate/MultiRegularCell.scala:273: overloaded method apply needs result type
+     [error]     RegularCellIndex(latind, longind)
+     [error]     ^
+     */
+  def apply(cell_grid: MultiRegularCellGrid, latind: Int, longind: Int):
+      RegularCellIndex = {
+    require(valid(cell_grid, latind, longind))
+    new RegularCellIndex(latind, longind)
+  }
+
+  def valid(cell_grid: MultiRegularCellGrid, latind: Int, longind: Int) = (
+    latind >= cell_grid.minimum_latind &&
+    latind <= cell_grid.maximum_latind &&
+    longind >= cell_grid.minimum_longind &&
+    longind <= cell_grid.maximum_longind
+  )
+
+  def coerce_indices(cell_grid: MultiRegularCellGrid, latind: Int,
+      longind: Int) = {
+    var newlatind = latind
+    var newlongind = longind
+    if (newlatind > cell_grid.maximum_latind)
+      newlatind = cell_grid.maximum_latind
+    while (newlongind > cell_grid.maximum_longind)
+      newlongind -= (cell_grid.maximum_longind - cell_grid.minimum_longind + 1)
+    if (newlatind < cell_grid.minimum_latind)
+      newlatind = cell_grid.minimum_latind
+    while (newlongind < cell_grid.minimum_longind)
+      newlongind += (cell_grid.maximum_longind - cell_grid.minimum_longind + 1)
+    (newlatind, newlongind)
+  }
+
+  def coerce(cell_grid: MultiRegularCellGrid, latind: Int, longind: Int) = {
+    val (newlatind, newlongind) = coerce_indices(cell_grid, latind, longind)
+    apply(cell_grid, newlatind, newlongind)
+  }
+}
+
 /**
  * Similar to `RegularCellIndex`, but for the case where the indices are
  * fractional, representing a location other than at the corners of a
@@ -89,7 +133,7 @@ case class FractionalRegularCellIndex(latind: Double, longind: Double) {
  *
  * @param cell_grid The CellGrid object for the grid this cell is in,
  *   an instance of MultiRegularCellGrid.
- * @param index Index of this cell in the grid
+ * @param index Index of (the southwest corner of) this cell in the grid
  */
 
 class MultiRegularCell(
@@ -109,33 +153,42 @@ class MultiRegularCell(
 
   def describe_indices() = "%s,%s" format (index.latind, index.longind)
 
-  def iterate_documents() = {
-    val maxlatind = (
-      (cell_grid.maximum_latind + 1) min
-      (index.latind + cell_grid.width_of_multi_cell))
+  /**
+   * For a given multi cell, iterate over the tiling cells in the multi cell.
+   * The return values are the indices of the southwest corner of each
+   * tiling cell.
+   */
+  def iterate_tiling_cells() = {
+    // Be careful around the edges -- we need to truncate the latitude and
+    // wrap the longitude.  The call to `coerce()` will automatically
+    // wrap the longitude, but we need to truncate the latitude ourselves,
+    // or else we'll end up repeating cells.
+    val max_offset = cell_grid.width_of_multi_cell - 1
+    val maxlatind = cell_grid.maximum_latind min (index.latind + max_offset)
 
+    for (
+      i <- index.latind to maxlatind;
+      j <- index.longind to (index.longind + max_offset)
+    ) yield RegularCellIndex.coerce(cell_grid, i, j)
+  }
+
+  /**
+   * Iterate over the documents in the multi cell.
+   */
+  def iterate_documents() = {
     if (debug("lots")) {
       errprint("Generating distribution for multi cell centered at %s",
         cell_grid.cell_index_to_coord(index))
     }
 
-    // Process the tiling cells making up the multi cell;
-    // but be careful around the edges.  Truncate the latitude, wrap the
-    // longitude.
     for {
-      // The use of view() here in both iterators causes this iterable to
-      // be lazy; hence the print statement below doesn't get executed until
-      // we actually process the documents in question.
-      i <- (index.latind until maxlatind) view;
-      rawj <- (index.longind until
-        (index.longind + cell_grid.width_of_multi_cell)) view;
-      val j = (if (rawj > cell_grid.maximum_longind) rawj - 360 else rawj)
+      tiling_cell <- iterate_tiling_cells()
       doc <- {
         if (debug("lots")) {
           errprint("--> Processing tiling cell %s",
-            cell_grid.cell_index_to_coord(index))
+            cell_grid.cell_index_to_coord(tiling_cell))
         }
-        cell_grid.tiling_cell_to_documents.getNoSet(RegularCellIndex(i, j))
+        cell_grid.tiling_cell_to_documents.getNoSet(tiling_cell)
       }
     } yield doc
   }
@@ -232,7 +285,13 @@ class MultiRegularCellGrid(
 
   /**
    * Convert a coordinate to the indices of the southwest corner of the
-   * corresponding multi cell.
+   * corresponding multi cell.  Note that if `width_of_multi_cell` &gt; 1,
+   * there will be more than one multi cell containing the coordinate.
+   * In that case, we want the multi cell in which the coordinate is most
+   * centered. (For example, if `width_of_multi_cell` = 3, then each multi
+   * cell has 9 tiling cells in it, only one of which is in the center.
+   * A given coordinate will belong to only one tiling cell, and we want
+   * the multi cell which has that tiling cell in its center.)
    */
   def coord_to_multi_cell_index(coord: SphereCoord) = {
     // When width_of_multi_cell = 1, don't subtract anything.
@@ -254,9 +313,9 @@ class MultiRegularCellGrid(
    * @see #cell_index_to_coord
    */
   def fractional_cell_index_to_coord(index: FractionalRegularCellIndex,
-    method: String = "coerce-warn") = {
-    SphereCoord(index.latind * degrees_per_cell, index.longind * degrees_per_cell,
-      method)
+      method: String = "coerce-warn") = {
+    SphereCoord(index.latind * degrees_per_cell,
+      index.longind * degrees_per_cell, method)
   }
 
   /**
@@ -266,7 +325,7 @@ class MultiRegularCellGrid(
    * their southwest corner.
    */
   def cell_index_to_coord(index: RegularCellIndex,
-    method: String = "coerce-warn") =
+      method: String = "coerce-warn") =
     fractional_cell_index_to_coord(index.toFractional, method)
 
   /** 
@@ -274,7 +333,7 @@ class MultiRegularCellGrid(
    * coordinate.  Coerce the coordinate to be within bounds.
    */
   def offset_cell_index_to_coord(index: RegularCellIndex,
-    offset: Double) = {
+      offset: Double) = {
     fractional_cell_index_to_coord(
       FractionalRegularCellIndex(index.latind + offset, index.longind + offset),
       "coerce")
@@ -333,8 +392,8 @@ class MultiRegularCellGrid(
    */
   def multi_cell_index_to_nw_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(
-      RegularCellIndex(index.latind + width_of_multi_cell, index.longind),
-      "coerce")
+      RegularCellIndex.coerce(this, index.latind + width_of_multi_cell,
+        index.longind))
   }
 
   /**
@@ -343,8 +402,8 @@ class MultiRegularCellGrid(
    */
   def multi_cell_index_to_se_corner_coord(index: RegularCellIndex) = {
     cell_index_to_coord(
-      RegularCellIndex(index.latind, index.longind + width_of_multi_cell),
-      "coerce")
+      RegularCellIndex.coerce(this, index.latind,
+        index.longind + width_of_multi_cell))
   }
 
   /**
@@ -365,28 +424,56 @@ class MultiRegularCellGrid(
 
   /*************** End conversion functions *************/
 
-  def find_best_cell_for_coord(coord: SphereCoord) = {
-    val index = coord_to_multi_cell_index(coord)
-    find_cell_for_cell_index(index)
+  /**
+   * For a given coordinate, iterate over the multi cells containing the
+   * coordinate.  This first finds the tiling cell containing the
+   * coordinate and then finds the multi cells containing the tiling cell.
+   * The returned values are the indices of the (southwest corner of the)
+   * multi cells.
+   */
+  def iterate_overlapping_multi_cells(coord: SphereCoord) = {
+    // The logic is almost exactly the same as in iterate_tiling_cells()
+    // except that the offset is negative.
+    val index = coord_to_tiling_cell_index(coord)
+    // In order to handle coordinates near the edges of the grid, we need to
+    // truncate the latitude ourselves, but coerce() handles the longitude
+    // wrapping.  See iterate_tiling_cells().
+    val max_offset = width_of_multi_cell - 1
+    val minlatind = minimum_latind min (index.latind - max_offset)
+
+    for (
+      i <- minlatind to index.latind;
+      j <- (index.longind - max_offset) to index.longind
+    ) yield RegularCellIndex.coerce(this, i, j)
   }
 
+  def find_best_cell_for_coord(coord: SphereCoord) = {
+    val index = coord_to_multi_cell_index(coord)
+    find_cell_for_cell_index(index, create = false)
+  }
+
+  /**
+   * For a given multi cell index, find the corresponding cell.
+   * If no such cell exists, create one if `create` is true;
+   * else, return null.
+   */
   protected def find_cell_for_cell_index(index: RegularCellIndex,
-    create: Boolean = false) = {
+    create: Boolean) = {
     if (!create)
       assert(all_cells_computed)
-    val statcell = corner_to_multi_cell.getOrElse(index, null)
-    if (statcell != null)
-      statcell
+    val cell = corner_to_multi_cell.getOrElse(index, null)
+    if (cell != null)
+      cell
     else if (!create) null
     else {
-      val newstat = new MultiRegularCell(this, index)
-      newstat.generate_dist()
-      if (newstat.word_dist_wrapper.is_empty())
+      val newcell = new MultiRegularCell(this, index)
+      newcell.generate_dist()
+      if (newcell.combined_dist.is_empty())
         null
       else {
         num_non_empty_cells += 1
-        corner_to_multi_cell(index) = newstat
-        newstat
+        corner_to_multi_cell(index) = newcell
+        newcell
       }
     }
   }
@@ -404,7 +491,7 @@ class MultiRegularCellGrid(
         total_num_cells += 1
         val cell = find_cell_for_cell_index(RegularCellIndex(i, j),
           create = true)
-        if (debug("cell") && !cell.word_dist_wrapper.is_empty)
+        if (debug("cell") && !cell.combined_dist.is_empty)
           errprint("--> (%d,%d): %s", i, j, cell)
         task.item_processed()
         driver.heartbeat
@@ -421,8 +508,8 @@ class MultiRegularCellGrid(
     for {
       v <- corner_to_multi_cell.values
       val empty = (
-        if (nonempty_word_dist) v.word_dist_wrapper.is_empty_for_word_dist()
-        else v.word_dist_wrapper.is_empty())
+        if (nonempty_word_dist) v.combined_dist.is_empty_for_word_dist()
+        else v.combined_dist.is_empty())
       if (!empty)
     } yield v
   }
@@ -457,10 +544,10 @@ class MultiRegularCellGrid(
     errprint("Grid ranking, gridsize %dx%d", grsize, grsize)
     errprint("NW corner: %s",
       multi_cell_index_to_nw_corner_coord(
-        RegularCellIndex(max_latind, min_longind)))
+        RegularCellIndex.coerce(this, max_latind, min_longind)))
     errprint("SE corner: %s",
       multi_cell_index_to_se_corner_coord(
-        RegularCellIndex(min_latind, max_longind)))
+        RegularCellIndex.coerce(this, min_latind, max_longind)))
     for (doit <- Seq(0, 1)) {
       if (doit == 0)
         errprint("Grid for ranking:")
@@ -468,7 +555,8 @@ class MultiRegularCellGrid(
         errprint("Grid for goodness/distance:")
       for (lat <- max_latind to min_latind) {
         for (long <- fromto(min_longind, max_longind)) {
-          val cellvalrank = grid.getOrElse(RegularCellIndex(lat, long), null)
+          val cellvalrank =
+            grid.getOrElse(RegularCellIndex.coerce(this, lat, long), null)
           if (cellvalrank == null)
             errout(" %-8s", "empty")
           else {

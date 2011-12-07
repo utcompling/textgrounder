@@ -85,27 +85,21 @@ package object distances {
   //
   //   lat, long: Latitude and longitude of coordinate.
 
-  case class SphereCoord(lat: Double, long: Double,
-      validate: Boolean = true) {
-    if (validate) {
-      // Not sure why this code was implemented with coerce_within_bounds,
-      // but either always coerce, or check the bounds ...
-      require(lat >= minimum_latitude)
-      require(lat <= maximum_latitude)
-      require(long >= minimum_longitude)
-      require(long <= maximum_longitude)
-    }
+  case class SphereCoord(lat: Double, long: Double) {
+    // Not sure why this code was implemented with coerce_within_bounds,
+    // but either always coerce, or check the bounds ...
+    require(SphereCoord.valid(lat, long))
     override def toString() = "(%.2f,%.2f)".format(lat, long)
   }
 
   implicit object SphereCoord extends Serializer[SphereCoord] {
     // Create a coord, with METHOD defining how to handle coordinates
-    // out of bounds.  If METHOD = "accept", just accept them; if
-    // "validate", check within bounds, and abort if not.  If "coerce",
-    // coerce within bounds (latitudes are cropped, longitudes are taken
-    // mod 360).
+    // out of bounds.  If METHOD =  "validate", check within bounds,
+    // and abort if not.  If "coerce", coerce within bounds (latitudes
+    // are cropped, longitudes are taken mod 360).  If "coerce-warn",
+    // same as "coerce" but also issue a warning when coordinates are
+    // out of bounds.
     def apply(lat: Double, long: Double, method: String) = {
-      var validate = false
       val (newlat, newlong) =
         method match {
           case "coerce-warn" => {
@@ -114,13 +108,14 @@ package object distances {
             coerce(lat, long)
           }
           case "coerce" => coerce(lat, long)
-          case "validate" => { validate = true; (lat, long) }
-          case "accept" => { (lat, long) }
-          case _ => { require(false,
-                              "Invalid method to SphereCoord(): %s" format method)
-                      (0.0, 0.0) }
+          case "validate" => (lat, long)
+          case _ => {
+            require(false,
+                    "Invalid method to SphereCoord(): %s" format method)
+            (0.0, 0.0)
+          }
         }
-      new SphereCoord(newlat, newlong, validate = validate)
+      new SphereCoord(newlat, newlong)
     }
 
     def valid(lat: Double, long: Double) = (

@@ -299,7 +299,7 @@ class InternalGeolocateDocumentEvaluator(
     val true_cell =
       strategy.cell_grid.find_best_cell_for_coord(document.coord)
     if (debug("lots") || debug("commontop")) {
-      val naitr = true_cell.word_dist_wrapper.num_docs_for_word_dist
+      val naitr = true_cell.combined_dist.num_docs_for_word_dist
       errprint("Evaluating document %s with %s word-dist documents in true cell",
         document, naitr)
     }
