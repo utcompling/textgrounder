@@ -101,9 +101,9 @@ object GenericTypes {
  * document geolocation on them (as opposed e.g. to toponym resolution).
  */
 abstract class GeolocateDocumentStrategy[CoordType,
-    DocumentType <: DistDocument[CoordType],
-    CellType <: GeoCell[CoordType, DocumentType],
-    CellGridType <: CellGrid[CoordType, DocumentType, CellType]](
+    DocType <: DistDocument[CoordType],
+    CellType <: GeoCell[CoordType, DocType],
+    CellGridType <: CellGrid[CoordType, DocType, CellType]](
   val cell_grid: CellGridType
 ) {
   /**

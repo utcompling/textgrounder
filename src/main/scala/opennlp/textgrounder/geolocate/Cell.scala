@@ -139,9 +139,9 @@ class CombinedWordDist(factory: WordDistFactory) {
 
 /** A simple distribution associating a probability with each cell. */
 
-class CellDist[CoordType, DocumentType <: DistDocument[CoordType],
-  CellType <: GeoCell[CoordType, DocumentType]](
-  val cell_grid: CellGrid[CoordType, DocumentType, CellType]
+class CellDist[CoordType, DocType <: DistDocument[CoordType],
+  CellType <: GeoCell[CoordType, DocType]](
+  val cell_grid: CellGrid[CoordType, DocType, CellType]
 ) {
   val cellprobs: mutable.Map[CellType, Double] =
     mutable.Map[CellType, Double]()
@@ -169,11 +169,11 @@ class CellDist[CoordType, DocumentType <: DistDocument[CoordType],
  *  @param cellprobs Hash table listing probabilities associated with cells
  */
 
-class WordCellDist[CoordType, DocumentType <: DistDocument[CoordType],
-  CellType <: GeoCell[CoordType, DocumentType]](
-  cell_grid: CellGrid[CoordType, DocumentType, CellType],
+class WordCellDist[CoordType, DocType <: DistDocument[CoordType],
+  CellType <: GeoCell[CoordType, DocType]](
+  cell_grid: CellGrid[CoordType, DocType, CellType],
   val word: Word
-) extends CellDist[CoordType, DocumentType, CellType](cell_grid) {
+) extends CellDist[CoordType, DocType, CellType](cell_grid) {
   var normalized = false
 
   protected def init() {
@@ -208,12 +208,12 @@ class WordCellDist[CoordType, DocumentType <: DistDocument[CoordType],
 }
 
 abstract class CellDistFactory[
-  CoordType, DocumentType <: DistDocument[CoordType],
-  CellType <: GeoCell[CoordType, DocumentType]](
+  CoordType, DocType <: DistDocument[CoordType],
+  CellType <: GeoCell[CoordType, DocType]](
   val lru_cache_size: Int
 ) {
-  type WordCellDistType <: WordCellDist[CoordType, DocumentType, CellType]
-  type GridType <: CellGrid[CoordType, DocumentType, CellType]
+  type WordCellDistType <: WordCellDist[CoordType, DocType, CellType]
+  type GridType <: CellGrid[CoordType, DocType, CellType]
   def create_word_cell_dist(cell_grid: GridType, word: Word): WordCellDistType
 
   var cached_dists: LRUCache[Word, WordCellDistType] = null
@@ -252,7 +252,7 @@ abstract class CellDistFactory[
     val totalprob = (cellprobs.values sum)
     for ((cell, prob) <- cellprobs)
       cellprobs(cell) /= totalprob
-    val retval = new CellDist[CoordType, DocumentType, CellType](cell_grid)
+    val retval = new CellDist[CoordType, DocType, CellType](cell_grid)
     retval.set_cell_probabilities(cellprobs)
     retval
   }
@@ -268,15 +268,15 @@ abstract class CellDistFactory[
  * @param cell_grid The CellGrid object for the grid this cell is in.
  * @tparam CoordType The type of the coordinate object used to specify a
  *   a point somewhere in the grid.
- * @tparam DocumentType The type of documents stored in a cell in the grid.
+ * @tparam DocType The type of documents stored in a cell in the grid.
  */
-abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
-    val cell_grid: CellGrid[CoordType, DocumentType,
-      _ <: GeoCell[CoordType, DocumentType]]
+abstract class GeoCell[CoordType, DocType <: DistDocument[CoordType]](
+    val cell_grid: CellGrid[CoordType, DocType,
+      _ <: GeoCell[CoordType, DocType]]
 ) {
   val combined_dist =
     new CombinedWordDist(cell_grid.table.word_dist_factory)
-  var most_popular_document: DocumentType = _
+  var most_popular_document: DocType = _
   var mostpopdoc_links = 0
 
   /**
@@ -294,7 +294,7 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
   /**
    * Return an Iterable over documents, listing the documents in the cell.
    */
-  def iterate_documents(): Iterable[DocumentType]
+  def iterate_documents(): Iterable[DocType]
 
   /**
    * Return the coordinate of the "center" of the cell.  This is the
@@ -362,7 +362,7 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
   /**
    * Add a document to the distribution for the cell.
    */
-  def add_document(doc: DocumentType) {
+  def add_document(doc: DocType) {
     combined_dist.add_document(doc)
     if (doc.incoming_links != None &&
       doc.incoming_links.get > mostpopdoc_links) {
@@ -394,7 +394,7 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
  * a continuous space (e.g. the surface of the Earth).  The space is indexed
  * by coordinates (of type CoordType).  Each cell (of type CellType) covers
  * some portion of the space.  There is also a set of documents (of type
- * DocumentType), each of which is indexed by a coordinate and which has a
+ * DocType), each of which is indexed by a coordinate and which has a
  * distribution describing the contents of the document.  The distributions
  * of all the documents in a cell (i.e. whose coordinate is within the cell)
  * are amalgamated to form the distribution of the cell.
@@ -428,9 +428,9 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
  * (3) After this, it should be possible to list the cells by calling
  *     `iter_nonempty_cells`.
  */
-abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
-    CellType <: GeoCell[CoordType, DocumentType]](
-    val table: DistDocumentTable[CoordType, DocumentType]
+abstract class CellGrid[CoordType, DocType <: DistDocument[CoordType],
+    CellType <: GeoCell[CoordType, DocType]](
+    val table: DistDocumentTable[CoordType, DocType]
 ) {
 
   /**
@@ -447,7 +447,7 @@ abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
   /**
    * Add the given document to the cell grid.
    */
-  def add_document_to_cell(document: DocumentType): Unit
+  def add_document_to_cell(document: DocType): Unit
 
   /**
    * Generate all non-empty cells.  This will be called once (and only once),
