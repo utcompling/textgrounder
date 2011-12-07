@@ -182,7 +182,7 @@ class WordCellDist[CoordType, DocumentType <: DistDocument[CoordType],
     var totalprob = 0.0
     // Compute and store un-normalized probabilities for all cells
     for (cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)) {
-      val prob = cell.word_dist.lookup_word(word)
+      val prob = cell.combined_dist.word_dist.lookup_word(word)
       // Another way of handling zero probabilities.
       /// Zero probabilities are just a bad idea.  They lead to all sorts of
       /// pathologies when trying to do things like "normalize".
@@ -279,8 +279,6 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
   var most_popular_document: DocumentType = _
   var mostpopdoc_links = 0
 
-  def word_dist = combined_dist.word_dist
-
   /**
    * Return a string describing the location of the cell in its grid,
    * e.g. by its boundaries or similar.
@@ -312,7 +310,8 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
    * to be overridden.
    */
   override def toString = {
-    val unfinished = if (word_dist.finished) "" else ", unfinished"
+    val unfinished =
+      if (combined_dist.word_dist.finished) "" else ", unfinished"
     val contains =
       if (most_popular_document != null)
         ", most-pop-doc %s(%d links)" format (
@@ -349,7 +348,7 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
   def struct() =
     <GeoCell>
       <bounds>{ describe_location() }</bounds>
-      <finished>{ word_dist.finished }</finished>
+      <finished>{ combined_dist.word_dist.finished }</finished>
       {
         if (most_popular_document != null)
           (<mostPopularDocument>most_popular_document.struct()</mostPopularDocument>
@@ -372,7 +371,8 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
         most_popular_document = doc
       }
     }
-    word_dist.finish(minimum_word_count = Params.minimum_word_count)
+    combined_dist.word_dist.finish(
+      minimum_word_count = Params.minimum_word_count)
   }
 }
 
