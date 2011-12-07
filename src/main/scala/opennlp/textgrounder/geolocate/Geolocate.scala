@@ -1260,11 +1260,11 @@ trait StandaloneGeolocateDriverStats extends ExperimentDriverStats {
 
   def get_task_id = 0
 
-  protected def do_increment_counter(name: String, incr: Long) {
+  protected def imp_increment_counter(name: String, incr: Long) {
     counter_values(name) += incr
   }
 
-  protected def do_get_counter(name: String) = counter_values(name)
+  protected def imp_get_counter(name: String) = counter_values(name)
 }
 
 class GeolocateDocumentDriver extends

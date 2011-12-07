@@ -299,7 +299,7 @@ package object experiment {
      */
     def increment_counter(name: String, byvalue: Long) {
       note_counter(name)
-      do_increment_counter(name, byvalue)
+      imp_increment_counter(name, byvalue)
     }
 
     /**
@@ -321,7 +321,7 @@ package object experiment {
      *
      * @see get_local_counter
      */
-    def get_counter(name: String) = do_get_counter(name)
+    def get_counter(name: String) = imp_get_counter(name)
 
     def construct_task_counter_name(name: String) =
       "bytask." + get_task_id + "." + name
@@ -391,12 +391,12 @@ package object experiment {
      * Underlying implementation to increment the given counter by the
      * given value.
      */
-    protected def do_increment_counter(name: String, byvalue: Long)
+    protected def imp_increment_counter(name: String, byvalue: Long)
 
     /**
      * Underlying implementation to return the value of the given counter.
      */
-    protected def do_get_counter(name: String): Long
+    protected def imp_get_counter(name: String): Long
   }
 
   /**

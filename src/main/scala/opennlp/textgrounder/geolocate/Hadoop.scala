@@ -399,12 +399,12 @@ trait BaseHadoopGeolocateDriver extends GeolocateDriver {
       find_split_counter(group, counter)
   }
 
-  protected def do_increment_counter(name: String, incr: Long) {
+  protected def imp_increment_counter(name: String, incr: Long) {
     val counter = find_counter(name)
     counter.increment(incr)
   }
 
-  protected def do_get_counter(name: String) = {
+  protected def imp_get_counter(name: String) = {
     val counter = find_counter(name)
     counter.getValue()
   }
