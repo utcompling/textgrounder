@@ -210,15 +210,15 @@ abstract class GeolocateDocumentEvalStats(
  */
 
 abstract class GroupedGeolocateDocumentEvalStats[CoordType,
-  DocumentType <: DistDocument[CoordType],
-  CellType <: GeoCell[CoordType, DocumentType]](
+  DocType <: DistDocument[CoordType],
+  CellType <: GeoCell[CoordType, DocType]](
   driver_stats: ExperimentDriverStats,
-  cell_grid: CellGrid[CoordType,DocumentType,CellType],
+  cell_grid: CellGrid[CoordType,DocType,CellType],
   results_by_range: Boolean
 ) {
   type BasicEvalStatsType <: GeolocateDocumentEvalStats
   type DocumentEvaluationResultType <:
-    DocumentEvaluationResult[CoordType, DocumentType, CellType]
+    DocumentEvaluationResult[CoordType, DocType, CellType]
 
   def create_stats(prefix: String): BasicEvalStatsType
   def create_stats_for_range[T](prefix: String, range: T) =
@@ -368,16 +368,16 @@ abstract class TestFileEvaluator(val stratname: String) {
 }
 
 abstract class GeolocateDocumentEvaluator[CoordType,
-    DocumentType <: DistDocument[CoordType],
-    CellType <: GeoCell[CoordType, DocumentType],
-    CellGridType <: CellGrid[CoordType, DocumentType, CellType]](
-  val strategy: GeolocateDocumentStrategy[CoordType, DocumentType, CellType,
+    DocType <: DistDocument[CoordType],
+    CellType <: GeoCell[CoordType, DocType],
+    CellGridType <: CellGrid[CoordType, DocType, CellType]](
+  val strategy: GeolocateDocumentStrategy[CoordType, DocType, CellType,
     CellGridType],
   stratname: String,
   driver: GeolocateDocumentTypeDriver
 ) extends TestFileEvaluator(stratname) {
   type GroupedEvalStatsType <:
-    GroupedGeolocateDocumentEvalStats[CoordType,DocumentType,CellType]
+    GroupedGeolocateDocumentEvalStats[CoordType,DocType,CellType]
   def create_grouped_eval_stats(driver: GeolocateDocumentTypeDriver,
     cell_grid: CellGridType, results_by_range: Boolean):
     GroupedEvalStatsType
@@ -390,9 +390,9 @@ abstract class GeolocateDocumentEvaluator[CoordType,
 }
 
 case class DocumentEvaluationResult[CoordType,
-    DocumentType <: DistDocument[CoordType],
-    CellType <: GeoCell[CoordType, DocumentType]](
-  document: DocumentType,
+    DocType <: DistDocument[CoordType],
+    CellType <: GeoCell[CoordType, DocType]](
+  document: DocType,
   pred_cell: CellType,
   true_rank: Int
 ) extends EvaluationResult {

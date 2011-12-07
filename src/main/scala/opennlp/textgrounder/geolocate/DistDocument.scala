@@ -65,7 +65,7 @@ class DocumentLoadingProperties {
  * names, ID's and documents.
  */
 abstract class DistDocumentTable[CoordType : Serializer,
-  DocumentType <: DistDocument[CoordType]](
+  DocType <: DistDocument[CoordType]](
   val driver: GeolocateDriver,
   val word_dist_factory: WordDistFactory
 ) {
@@ -79,7 +79,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
   /**
    * List of documents in each split.
    */
-  val documents_by_split = bufmap[String, DocumentType]()
+  val documents_by_split = bufmap[String, DocType]()
 
   /**
    * Num of documents with word-count information but not in table.
@@ -113,7 +113,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
   val word_tokens_by_split =
     driver.countermap("word_tokens_by_split")
 
-  def create_document(schema: Schema): DocumentType
+  def create_document(schema: Schema): DocType
 
   /**
    * Create, initialize and return a document with the given fieldvals,
@@ -134,7 +134,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
   }
 
   def create_and_record_document(schema: Schema, fieldvals: Seq[String],
-      cell_grid: CellGrid[CoordType,DocumentType,_]) = {
+      cell_grid: CellGrid[CoordType,DocType,_]) = {
     val doc = create_and_init_document(schema, fieldvals, true)
     if (doc != null && doc.has_coord) {
       record_document(doc, cell_grid)
@@ -144,8 +144,8 @@ abstract class DistDocumentTable[CoordType : Serializer,
       false
   }
 
-  def record_document(doc: DocumentType,
-    cell_grid: CellGrid[CoordType,DocumentType,_]) {
+  def record_document(doc: DocType,
+    cell_grid: CellGrid[CoordType,DocType,_]) {
     documents_by_split(doc.split) += doc
     cell_grid.add_document_to_cell(doc)
   }
@@ -162,7 +162,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
    * @param cell_grid Cell grid to add newly created DistDocuments to
    */
   class DistDocumentTableFileProcessor(
-    suffix: String, cell_grid: CellGrid[CoordType,DocumentType,_]
+    suffix: String, cell_grid: CellGrid[CoordType,DocType,_]
   ) extends DistDocumentFileProcessor(suffix, driver) {
     def handle_document(fieldvals: Seq[String]) = {
       create_and_record_document(schema, fieldvals, cell_grid)
@@ -215,7 +215,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
    * @param cell_grid Cell grid into which the documents are added.
    */
   def read_training_documents(filehand: FileHandler, dir: String,
-      suffix: String, cell_grid: CellGrid[CoordType,DocumentType,_]) {
+      suffix: String, cell_grid: CellGrid[CoordType,DocType,_]) {
 
     val training_distproc =
       new DistDocumentTableFileProcessor("training-" + suffix, cell_grid)
@@ -235,7 +235,7 @@ abstract class DistDocumentTable[CoordType : Serializer,
    * @param cell_grid Cell grid into which the documents are added.
    */
   def read_eval_documents(filehand: FileHandler, dir: String, suffix: String,
-      cell_grid: CellGrid[CoordType,DocumentType,_]) {
+      cell_grid: CellGrid[CoordType,DocType,_]) {
 
     val eval_distproc =
       new DistDocumentTableFileProcessor(driver.params.eval_set + "-" + suffix,
