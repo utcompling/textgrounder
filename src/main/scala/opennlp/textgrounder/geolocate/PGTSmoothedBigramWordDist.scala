@@ -145,6 +145,36 @@ class PGTSmoothedBigramWordDist(
     }
   }
 
+  /** Total probability mass to be assigned to all words not
+      seen in the article, estimated (motivated by Good-Turing
+      smoothing) as the unadjusted empirical probability of
+      having seen a word once.
+   */
+  var unseen_mass = 0.5
+  /**
+     Probability mass assigned in 'overall_word_probs' to all words not seen
+     in the article.  This is 1 - (sum over W in A of overall_word_probs[W]).
+     The idea is that we compute the probability of seeing a word W in
+     article A as
+
+     -- if W has been seen before in A, use the following:
+          COUNTS[W]/TOTAL_TOKENS*(1 - UNSEEN_MASS)
+     -- else, if W seen in any articles (W in 'overall_word_probs'),
+        use UNSEEN_MASS * (overall_word_probs[W] / OVERALL_UNSEEN_MASS).
+        The idea is that overall_word_probs[W] / OVERALL_UNSEEN_MASS is
+        an estimate of p(W | W not in A).  We have to divide by
+        OVERALL_UNSEEN_MASS to make these probabilities be normalized
+        properly.  We scale p(W | W not in A) by the total probability mass
+        we have available for all words not seen in A.
+     -- else, use UNSEEN_MASS * globally_unseen_word_prob / NUM_UNSEEN_WORDS,
+        where NUM_UNSEEN_WORDS is an estimate of the total number of words
+        "exist" but haven't been seen in any articles.  One simple idea is
+        to use the number of words seen once in any article.  This certainly
+        underestimates this number if not too many articles have been seen
+        but might be OK if many articles seen.
+    */
+  var overall_unseen_mass = 1.0
+
   def innerToString = ", %.2f unseen mass" format unseen_mass
 
    /**
@@ -153,7 +183,7 @@ class PGTSmoothedBigramWordDist(
     * distributions.
     */
 
-  def finish_after_global() {
+  protected def imp_finish_after_global() {
     // Make sure that overall_word_probs has been computed properly.
     assert(factory.owp_adjusted)
 
@@ -177,7 +207,6 @@ class PGTSmoothedBigramWordDist(
         yield factory.overall_word_probs(ind)) sum)
     //if (use_sorted_list)
     //  counts = new SortedList(counts)
-    finished = true
   }
 
   override def finish(minimum_word_count: Int = 0) {

@@ -249,7 +249,7 @@ trait FastSlowKLDivergence {
    * small amount different (the small amount rather than 0 to account for
    * possible rounding error).
    */
-  def kl_divergence(other: WordDist, partial: Boolean = false) = {
+  protected def imp_kl_divergence(other: WordDist, partial: Boolean) = {
     val test_kldiv = false
     if (test_kldiv)
       test_kl_divergence(other, partial)
@@ -349,17 +349,49 @@ abstract class WordDist {
    * reliably do probability lookups.
    */
   var finished = false
+  /**
+   * Whether we have already called `finish_before_global`.  If so, this
+   * means we can't modify the distribution any more.
+   */
+  var finished_before_global = false
+
+  /**
+   * Actual implementation of `add_document` by subclasses.
+   * External callers should use `add_document`.
+   */
+  protected def imp_add_document(words: Traversable[String], 
+      ignore_case: Boolean, stopwords: Set[String])
 
   /**
    * Incorporate a document into the distribution.
    */
-  def add_document(words: Traversable[String], ignore_case: Boolean = true,
-      stopwords: Set[String] = Set[String]())
+  def add_document(words: Traversable[String], 
+      ignore_case: Boolean = true, stopwords: Set[String] = Set[String]()) {
+    assert(!finished)
+    assert(!finished_before_global)
+    imp_add_document(words, ignore_case, stopwords)
+  }
+
+  /**
+   * Actual implementation of `add_word_distribution` by subclasses.
+   * External callers should use `add_word_distribution`.
+   */
+  protected def imp_add_word_distribution(worddist: WordDist)
 
   /**
    * Incorporate the given distribution into our distribution.
    */
-  def add_word_distribution(worddist: WordDist)
+  def add_word_distribution(worddist: WordDist) {
+    assert(!finished)
+    assert(!finished_before_global)
+    imp_add_word_distribution(worddist)
+  }
+
+  /**
+   * Actual implementation of `finish_before_global` by subclasses.
+   * External callers should use `finish_before_global`.
+   */
+  protected def imp_finish_before_global(minimum_word_count: Int)
 
   /**
    * Partly finish computation of distribution.  This is called when the
@@ -377,7 +409,18 @@ abstract class WordDist {
    * @param minimum_word_count If greater than zero, eliminate words seen
    * less than this number of times.
    */
-  def finish_before_global(minimum_word_count: Int = 0)
+  def finish_before_global(minimum_word_count: Int = 0) {
+    assert(!finished)
+    assert(!finished_before_global)
+    imp_finish_before_global(minimum_word_count)
+    finished_before_global = true
+  }
+
+  /**
+   * Actual implementation of `finish_after_global` by subclasses.
+   * External callers should use `finish_after_global`.
+   */
+  protected def imp_finish_after_global()
 
   /**
    * Completely finish computation of the word distribution.  This is called
@@ -385,7 +428,12 @@ abstract class WordDist {
    * used to compute values for the distribution that depend on the
    * global word-distribution statistics.
    */
-  def finish_after_global()
+  def finish_after_global() {
+    assert(!finished)
+    assert(finished_before_global)
+    imp_finish_after_global()
+    finished = true
+  }
 
   /**
    * Finish computation of distribution.  This is intended for word
@@ -400,6 +448,12 @@ abstract class WordDist {
   }
 
   /**
+   * Actual implementation of `kl_divergence` by subclasses.
+   * External callers should use `kl_divergence`.
+   */
+  protected def imp_kl_divergence(other: WordDist, partial: Boolean): Double
+
+  /**
    * Compute the KL-divergence between this distribution and another
    * distribution.
    * 
@@ -412,7 +466,11 @@ abstract class WordDist {
    *   
    * @return The KL-divergence value.
    */
-  def kl_divergence(other: WordDist, partial: Boolean = false): Double
+  def kl_divergence(other: WordDist, partial: Boolean = false) = {
+    assert(finished)
+    assert(other.finished)
+    imp_kl_divergence(other, partial)
+  }
 
   /**
    * Compute the symmetric KL-divergence between two distributions by averaging
