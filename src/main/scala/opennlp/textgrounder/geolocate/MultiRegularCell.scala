@@ -171,27 +171,6 @@ class MultiRegularCell(
       j <- index.longind to (index.longind + max_offset)
     ) yield RegularCellIndex.coerce(cell_grid, i, j)
   }
-
-//  /**
-//   * Iterate over the documents in the multi cell.
-//   */
-//  def iterate_documents() = {
-//    if (debug("lots")) {
-//      errprint("Generating distribution for multi cell centered at %s",
-//        cell_grid.cell_index_to_coord(index))
-//    }
-//
-//    for {
-//      tiling_cell <- iterate_tiling_cells()
-//      doc <- {
-//        if (debug("lots")) {
-//          errprint("--> Processing tiling cell %s",
-//            cell_grid.cell_index_to_coord(tiling_cell))
-//        }
-//        cell_grid.tiling_cell_to_documents.getNoSet(tiling_cell)
-//      }
-//    } yield doc
-//  }
 }
 
 /**
