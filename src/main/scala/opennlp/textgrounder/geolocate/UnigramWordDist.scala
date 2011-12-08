@@ -205,8 +205,10 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
       Some(maxword)
     }
   }
-}  
+}
 
+/** FIXME: This stuff should be functions on the WordDist itself, not
+    on the factory. */
 trait SimpleUnigramWordDistReader extends WordDistReader {
   /**
    * Initial size of the internal DynamicArray objects; an optimization.

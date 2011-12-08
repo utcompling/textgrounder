@@ -89,19 +89,17 @@ class PseudoGoodTuringSmoothedWordDistFactory extends
     //// we never actually have to compute it.
     total_num_types_seen_once = overall_word_probs.values count (_ == 1.0)
     globally_unseen_word_prob =
-      total_num_types_seen_once.toDouble/WordDist.total_num_word_tokens
+      total_num_types_seen_once.toDouble/total_num_word_tokens
     for ((word, count) <- overall_word_probs)
       overall_word_probs(word) = (
-        count.toDouble/WordDist.total_num_word_tokens*
-        (1.0 - globally_unseen_word_prob))
+        count.toDouble/total_num_word_tokens*(1.0 - globally_unseen_word_prob))
     // A very rough estimate, perhaps totally wrong
     total_num_unseen_word_types =
-      total_num_types_seen_once max (WordDist.total_num_word_types/20)
+      total_num_types_seen_once max (total_num_word_types/20)
     if (debug("tons"))
       errprint("Total num types = %s, total num tokens = %s, total num_seen_once = %s, globally unseen word prob = %s, total mass = %s",
-               WordDist.total_num_word_types, WordDist.total_num_word_tokens,
-               total_num_types_seen_once,
-               globally_unseen_word_prob,
+               total_num_word_types, total_num_word_tokens,
+               total_num_types_seen_once, globally_unseen_word_prob,
                globally_unseen_word_prob + (overall_word_probs.values sum))
   }
 
@@ -173,10 +171,11 @@ class PseudoGoodTuringSmoothedWordDist(
     assert(!factory.owp_adjusted)
     for ((word, count) <- counts) {
       if (!(factory.overall_word_probs contains word))
-        WordDist.total_num_word_types += 1
+        factory.total_num_word_types += 1
       // Record in overall_word_probs; note more tokens seen.
       factory.overall_word_probs(word) += count
-      WordDist.total_num_word_tokens += count
+      assert (count == count.toInt)
+      factory.total_num_word_tokens += count.toInt
     }
   }
 

@@ -32,7 +32,9 @@ import opennlp.textgrounder.util.experiment._
 
 class KdTreeCell(
   cellgrid: KdTreeCellGrid,
-  val kdleaf : KdTree[SphereDocument]) extends RectangularCell(cellgrid) {
+  val kdleaf : KdTree[SphereDocument]
+) extends RectangularCell(cellgrid) with
+    DocumentRememberingCell[SphereCoord, SphereDocument] {
 
   def get_northeast_coord () : SphereCoord = {
     new SphereCoord(kdleaf.minLimit(0), kdleaf.minLimit(1))

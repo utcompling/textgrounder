@@ -172,26 +172,26 @@ class MultiRegularCell(
     ) yield RegularCellIndex.coerce(cell_grid, i, j)
   }
 
-  /**
-   * Iterate over the documents in the multi cell.
-   */
-  def iterate_documents() = {
-    if (debug("lots")) {
-      errprint("Generating distribution for multi cell centered at %s",
-        cell_grid.cell_index_to_coord(index))
-    }
-
-    for {
-      tiling_cell <- iterate_tiling_cells()
-      doc <- {
-        if (debug("lots")) {
-          errprint("--> Processing tiling cell %s",
-            cell_grid.cell_index_to_coord(tiling_cell))
-        }
-        cell_grid.tiling_cell_to_documents.getNoSet(tiling_cell)
-      }
-    } yield doc
-  }
+//  /**
+//   * Iterate over the documents in the multi cell.
+//   */
+//  def iterate_documents() = {
+//    if (debug("lots")) {
+//      errprint("Generating distribution for multi cell centered at %s",
+//        cell_grid.cell_index_to_coord(index))
+//    }
+//
+//    for {
+//      tiling_cell <- iterate_tiling_cells()
+//      doc <- {
+//        if (debug("lots")) {
+//          errprint("--> Processing tiling cell %s",
+//            cell_grid.cell_index_to_coord(tiling_cell))
+//        }
+//        cell_grid.tiling_cell_to_documents.getNoSet(tiling_cell)
+//      }
+//    } yield doc
+//  }
 }
 
 /**
@@ -439,7 +439,7 @@ class MultiRegularCellGrid(
     // truncate the latitude ourselves, but coerce() handles the longitude
     // wrapping.  See iterate_tiling_cells().
     val max_offset = width_of_multi_cell - 1
-    val minlatind = minimum_latind min (index.latind - max_offset)
+    val minlatind = minimum_latind max (index.latind - max_offset)
 
     for (
       i <- minlatind to index.latind;
@@ -448,6 +448,7 @@ class MultiRegularCellGrid(
   }
 
   def find_best_cell_for_coord(coord: SphereCoord) = {
+    assert(all_cells_computed)
     val index = coord_to_multi_cell_index(coord)
     find_cell_for_cell_index(index, create = false)
   }
@@ -458,29 +459,30 @@ class MultiRegularCellGrid(
    * else, return null.
    */
   protected def find_cell_for_cell_index(index: RegularCellIndex,
-    create: Boolean) = {
-    if (!create)
-      assert(all_cells_computed)
+      create: Boolean) = {
     val cell = corner_to_multi_cell.getOrElse(index, null)
     if (cell != null)
       cell
     else if (!create) null
     else {
       val newcell = new MultiRegularCell(this, index)
-      newcell.generate_dist()
-      if (newcell.combined_dist.is_empty())
-        null
-      else {
-        num_non_empty_cells += 1
-        corner_to_multi_cell(index) = newcell
-        newcell
-      }
+      num_non_empty_cells += 1
+      corner_to_multi_cell(index) = newcell
+      newcell
     }
   }
 
-  def add_document_to_cell(document: SphereDocument) {
-    val index = coord_to_tiling_cell_index(document.coord)
-    tiling_cell_to_documents(index) += document
+  /**
+   * Add the document to the cell(s) it belongs to.  This finds all the
+   * multi cells, creating them as necessary, and adds the document to each.
+   */
+  def add_document_to_cell(doc: SphereDocument) {
+    for (index <- iterate_overlapping_multi_cells(doc.coord)) {
+      val cell = find_cell_for_cell_index(index, create = true)
+      if (debug("cell"))
+        errprint("Adding document %s to cell %s", doc, cell)
+      cell.add_document(doc)
+    }
   }
 
   protected def initialize_cells(driver: ExperimentDriver) {
@@ -490,9 +492,12 @@ class MultiRegularCellGrid(
       for (j <- minimum_longind to maximum_longind view) {
         total_num_cells += 1
         val cell = find_cell_for_cell_index(RegularCellIndex(i, j),
-          create = true)
-        if (debug("cell") && !cell.combined_dist.is_empty)
-          errprint("--> (%d,%d): %s", i, j, cell)
+          create = false)
+        if (cell != null) {
+          cell.finish()
+          if (debug("cell"))
+            errprint("--> (%d,%d): %s", i, j, cell)
+        }
         task.item_processed()
         driver.heartbeat
       }

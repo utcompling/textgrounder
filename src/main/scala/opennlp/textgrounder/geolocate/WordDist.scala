@@ -277,6 +277,9 @@ trait WordDistReader {
   def initialize_distribution(doc: GenericDistDocument, diststr: String,
       is_training_set: Boolean): Boolean
 
+  /**
+   *
+   */
   def is_stopword(doc: GenericDistDocument, word: String) = {
     val driver = doc.table.driver
     (!driver.params.include_stopwords_in_document_dists &&
@@ -294,6 +297,16 @@ trait WordDistReader {
  * factory used depends on a command-line parameter.
  */
 abstract class WordDistFactory extends WordDistReader {
+  /**
+   * Total number of word types seen (size of vocabulary)
+   */
+  var total_num_word_types = 0
+
+  /**
+   * Total number of word tokens seen
+   */
+  var total_num_word_tokens = 0
+
   /**
    * Create an empty word distribution.  Distributions created this way
    * are not meant to be added to the global word-distribution statistics
@@ -315,19 +328,14 @@ object WordDist {
   /**
    * Object describing how we memoize words (i.e. convert them to Int
    * indices, for faster operations on them).
+   *
+   * FIXME: Should probably be stored globally or at least elsewhere, since
+   * memoization is more general than just for words in word distributions,
+   * and is used elsewhere in the code for other things.  We should probably
+   * move the memoization code into the `util` package.
    */
   val memoizer = new IntStringMemoizer
   //val memoizer = IdentityMemoizer
-
-  /**
-   * Total number of word types seen (size of vocabulary)
-   */
-  var total_num_word_types = 0
-
-  /**
-   * Total number of word tokens seen
-   */
-  var total_num_word_tokens = 0.0
 }
 
 /**
@@ -384,6 +392,7 @@ abstract class WordDist {
   def add_word_distribution(worddist: WordDist) {
     assert(!finished)
     assert(!finished_before_global)
+    assert(worddist.finished_before_global)
     imp_add_word_distribution(worddist)
   }
 
