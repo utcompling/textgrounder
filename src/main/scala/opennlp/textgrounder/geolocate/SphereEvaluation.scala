@@ -43,11 +43,11 @@ import GeolocateDriver.Debug._
 
 //////// Statistics for geolocating documents
 
-class SphereGeolocateDocumentEvalStats(
+class SphereDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
   prefix: String,
   max_rank_for_credit: Int = 10
-) extends GeolocateDocumentEvalStats(
+) extends DocumentEvalStats(
   driver_stats, prefix, max_rank_for_credit) {
   // "True dist" means actual distance in km's or whatever.
   // "Degree dist" is the distance in degrees.
@@ -89,17 +89,17 @@ class SphereGeolocateDocumentEvalStats(
  * number of documents in true cell.
  */
 
-class SphereGroupedGeolocateDocumentEvalStats(
+class SphereGroupedDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
   cell_grid: SphereCellGrid,
   results_by_range: Boolean
-) extends GroupedGeolocateDocumentEvalStats[
+) extends GroupedDocumentEvalStats[
   SphereCoord, SphereDocument, SphereCell](
   driver_stats, cell_grid, results_by_range) {
-  type TBasicEvalStats = SphereGeolocateDocumentEvalStats
+  type TBasicEvalStats = SphereDocumentEvalStats
   type TDocEvalRes = SphereDocumentEvaluationResult
   override def create_stats(prefix: String) =
-    new SphereGeolocateDocumentEvalStats(driver_stats, prefix)
+    new SphereDocumentEvalStats(driver_stats, prefix)
 
   val docs_by_degree_dist_to_true_center =
     docmap("degree_dist_to_true_center")
@@ -220,7 +220,7 @@ abstract class SphereGeolocateDocumentEvaluator[TEvalDoc, TEvalRes](
   driver: GeolocateDocumentTypeDriver
 ) extends GeolocateDocumentEvaluator[SphereCoord, SphereDocument, SphereCell,
   SphereCellGrid, TEvalDoc, TEvalRes](strategy, stratname, driver) {
-  type TGroupedEvalStats = SphereGroupedGeolocateDocumentEvalStats
+  type TGroupedEvalStats = SphereGroupedDocumentEvalStats
   def create_grouped_eval_stats(driver: GeolocateDocumentTypeDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
     new TGroupedEvalStats(driver, cell_grid.asInstanceOf[SphereCellGrid],

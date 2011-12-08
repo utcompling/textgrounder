@@ -1376,14 +1376,15 @@ class WorldGazetteer(
   // For localities, add them to the cell-map that covers the earth if
   // ADD_TO_CELL_MAP is true.)
   protected def read_world_gazetteer_and_match() {
+    val topo_table = cell_grid.table.asInstanceOf[TopoDocumentTable]
+    val params = topo_table.topo_driver.params
+
     val task = new ExperimentMeteredTask(cell_grid.table.driver,
-      "gazetteer entry", "matching")
+      "gazetteer entry", "matching", maxtime = params.max_time_per_stage)
     errprint("Matching gazetteer entries in %s...", filename)
     errprint("")
 
     // Match each entry in the gazetteer
-    val topo_table = cell_grid.table.asInstanceOf[TopoDocumentTable]
-    val params = topo_table.topo_driver.params
     breakable {
       val lines = filehand.openr(filename)
       try {
@@ -1391,7 +1392,7 @@ class WorldGazetteer(
           if (debug("lots"))
             errprint("Processing line: %s", line)
           match_world_gazetteer_entry(line)
-          if (task.item_processed(maxtime = params.max_time_per_stage))
+          if (task.item_processed())
             break
         }
       } finally {

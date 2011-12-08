@@ -32,9 +32,6 @@ import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.{curtimehuman, output_resource_usage}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
-/* FIXME: Eliminate this. */
-import GeolocateDriver.Params
-
 /////////////////////////////////////////////////////////////////////////////
 //                 General statistics on evaluation results                //
 /////////////////////////////////////////////////////////////////////////////
@@ -170,9 +167,27 @@ class EvalStatsWithRank(
   }
 }
 
-//////// Statistics for geolocating documents
+//////// Statistics for locating documents
 
-abstract class GeolocateDocumentEvalStats(
+case class DocumentEvaluationResult[
+  TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc]
+](
+  document: TDoc,
+  pred_cell: TCell,
+  true_rank: Int
+) {
+  val true_cell =
+    pred_cell.cell_grid.find_best_cell_for_coord(document.coord, true)
+  val num_docs_in_true_cell = true_cell.combined_dist.num_docs_for_word_dist
+  val true_center = true_cell.get_center_coord()
+  val true_truedist = document.distance_to_coord(true_center)
+  val pred_center = pred_cell.get_center_coord()
+  val pred_truedist = document.distance_to_coord(pred_center)
+}
+
+abstract class DocumentEvalStats(
   driver_stats: ExperimentDriverStats,
   prefix: String,
   max_rank_for_credit: Int = 10
@@ -204,19 +219,19 @@ abstract class GeolocateDocumentEvalStats(
 }
 
 /**
- * Class for statistics for geolocating documents, with separate
+ * Class for statistics for locating documents, with separate
  * sets of statistics for different intervals of error distances and
  * number of documents in true cell.
  */
 
-abstract class GroupedGeolocateDocumentEvalStats[TCoord,
+abstract class GroupedDocumentEvalStats[TCoord,
   TDoc <: DistDocument[TCoord],
   TCell <: GeoCell[TCoord, TDoc]](
   driver_stats: ExperimentDriverStats,
   cell_grid: CellGrid[TCoord,TDoc,TCell],
   results_by_range: Boolean
 ) {
-  type TBasicEvalStats <: GeolocateDocumentEvalStats
+  type TBasicEvalStats <: DocumentEvalStats
   type TDocEvalRes <:
     DocumentEvaluationResult[TCoord, TDoc, TCell]
 
@@ -325,14 +340,29 @@ abstract class GroupedGeolocateDocumentEvalStats[TCoord,
  * @tparam TEvalDoc Type of document to evaluate.
  * @tparam TEvalRes Type of result of evaluating a document.
  */
-abstract class TestFileEvaluator[TEvalDoc, TEvalRes] {
+abstract class TestFileEvaluator[TEvalDoc, TEvalRes](
+  val stratname: String
+) {
   var documents_processed = 0
+  val results = mutable.Map[TEvalDoc, TEvalRes]()
 
   /**
    * Return true if document would be skipped; false if processed and
    * evaluated.
    */
   def would_skip_document(doc: TEvalDoc, doctag: String) = false
+
+  /**
+   * Return true if we should skip the next document due to parameters
+   * calling for certain documents in a certain sequence to be skipped.
+   */
+  def would_skip_by_parameters() = false
+
+  /**
+   * Return true if we should stop processing, given that `new_processed`
+   * items have already been processed.
+   */
+  def would_stop_processing(new_processed: Int) = false
 
   /**
    * Return true if document was actually processed and evaluated; false
@@ -346,35 +376,15 @@ abstract class TestFileEvaluator[TEvalDoc, TEvalRes] {
    * output more results.
    */
   def output_results(isfinal: Boolean = false): Unit
-}
 
-/**
- * Abstract class for reading documents from a test file and evaluating
- * on them.
- *
- * @tparam TEvalDoc Type of document to evaluate.
- * @tparam TEvalRes Type of result of evaluating a document.
- *
- * Evaluates on all of the given files, outputting periodic results and
- * results after all files are done.  If the evaluator uses documents as
- * documents (so that it doesn't need any external test files), the value
- * of 'files' should be a sequence of one item, which is null. (If an
- * empty sequence is passed in, no evaluation will happen.)
-
- * Also returns an object containing the results.
- */
-abstract class GeolocateTestFileEvaluator[TEvalDoc, TEvalRes](
-  val stratname: String,
-  val driver: GeolocateDriver
-) extends TestFileEvaluator[TEvalDoc, TEvalRes] {
-  val results = mutable.Map[TEvalDoc, TEvalRes]()
   val task = new MeteredTask("document", "evaluating")
   var last_elapsed = 0.0
   var last_processed = 0
-  var skip_initial = Params.skip_initial_test_docs
-  var skip_n = 0
 
-  /** Process a document.
+  /** Process a document.  This checks to see whether we should evaluate
+   * the document (e.g. based on parameters indicating which documents
+   * to evaluate), and evaluates as necessary, storing the results into
+   * `results`.
    *
    * @param doc Document to be processed.
    * @return Tuple `(processed, keep_going)` where `processed` indicates
@@ -390,15 +400,7 @@ abstract class GeolocateTestFileEvaluator[TEvalDoc, TEvalRes](
       errprint("Skipped document %s", doc)
       (false, true)
     } else {
-      var do_skip = false
-      if (skip_initial != 0) {
-        skip_initial -= 1
-        do_skip = true
-      } else if (skip_n != 0) {
-        skip_n -= 1
-        do_skip = true
-      } else
-        skip_n = Params.every_nth_test_doc - 1
+      val do_skip = would_skip_by_parameters()
       if (do_skip)
         errprint("Passed over document %s", doctag)
       else {
@@ -408,18 +410,13 @@ abstract class GeolocateTestFileEvaluator[TEvalDoc, TEvalRes](
         results(doc) = result
       }
 
-      if (task.item_processed(maxtime = Params.max_time_per_stage))
+      if (task.item_processed())
         (!do_skip, false)
       else {
         val new_elapsed = task.elapsed_time
         val new_processed = task.num_processed
 
-        // If max # of docs reached, stop
-        if ((Params.num_test_docs > 0 &&
-          new_processed >= Params.num_test_docs)) {
-          errprint("")
-          errprint("Stopping because limit of %s documents reached",
-            Params.num_test_docs)
+        if (would_stop_processing(new_processed)) {
           task.finish()
           (!do_skip, false)
         } else {
@@ -451,11 +448,14 @@ abstract class GeolocateTestFileEvaluator[TEvalDoc, TEvalRes](
     errprint("Ending final results for strategy %s", stratname)
   }
 
+  /** Process a set of files, extracting the documents in each one and
+    * evaluating them using `process_document`.
+    */
   def process_files(filehand: FileHandler, files: Iterable[String]): Boolean
 }
 
 trait DocumentIteratingEvaluator[TEvalDoc, TEvalRes] extends
-  GeolocateTestFileEvaluator[TEvalDoc, TEvalRes] {
+  TestFileEvaluator[TEvalDoc, TEvalRes] {
   /**
    * Return an Iterable listing the documents retrievable from the given
    * filename.
@@ -483,45 +483,3 @@ trait DocumentIteratingEvaluator[TEvalDoc, TEvalRes] extends
   }
 }
 
-abstract class GeolocateDocumentEvaluator[
-  TCoord,
-  TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc],
-  TGrid <: CellGrid[TCoord, TDoc, TCell],
-  TEvalDoc,
-  TEvalRes
-](
-  val strategy: GeolocateDocumentStrategy[TCoord, TDoc, TCell, TGrid],
-  stratname: String,
-  driver: GeolocateDocumentTypeDriver
-) extends GeolocateTestFileEvaluator[TEvalDoc, TEvalRes](stratname, driver) {
-  type TGroupedEvalStats <:
-    GroupedGeolocateDocumentEvalStats[TCoord,TDoc,TCell]
-  def create_grouped_eval_stats(driver: GeolocateDocumentTypeDriver,
-    cell_grid: TGrid, results_by_range: Boolean):
-    TGroupedEvalStats
-  val evalstats = create_grouped_eval_stats(driver,
-    strategy.cell_grid, results_by_range = driver.params.results_by_range)
-
-  def output_results(isfinal: Boolean = false) {
-    evalstats.output_results(all_results = isfinal)
-  }
-}
-
-case class DocumentEvaluationResult[
-  TCoord,
-  TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc]
-](
-  document: TDoc,
-  pred_cell: TCell,
-  true_rank: Int
-) {
-  val true_cell =
-    pred_cell.cell_grid.find_best_cell_for_coord(document.coord, true)
-  val num_docs_in_true_cell = true_cell.combined_dist.num_docs_for_word_dist
-  val true_center = true_cell.get_center_coord()
-  val true_truedist = document.distance_to_coord(true_center)
-  val pred_center = pred_cell.get_center_coord()
-  val pred_truedist = document.distance_to_coord(pred_center)
-}

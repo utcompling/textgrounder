@@ -175,14 +175,16 @@ abstract class DistDocumentTable[TCoord : Serializer,
     def process_lines(lines: Iterator[String],
         filehand: FileHandler, file: String,
         compression: String, realname: String) = {
-      val task = new ExperimentMeteredTask(driver, "document", "reading")
+      val task =
+        new ExperimentMeteredTask(driver, "document", "reading",
+              maxtime = driver.params.max_time_per_stage)
       // Stop if we've reached the maximum
       var should_stop = false
       breakable {
         for (line <- lines) {
           if (!parse_row(line))
             should_stop = true
-          if (task.item_processed(maxtime = driver.params.max_time_per_stage))
+          if (task.item_processed())
             should_stop = true
           if ((driver.params.num_training_docs > 0 &&
             task.num_processed >= driver.params.num_training_docs)) {
