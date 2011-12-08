@@ -125,7 +125,6 @@ class CombinedWordDist(factory: WordDistFactory) {
         if (Params.max_time_per_stage == 0.0 && Params.num_training_docs == 0)
           warning("Saw document %s without distribution", doc)
       } else {
-        assert(doc.dist.finished)
         word_dist.add_word_distribution(doc.dist)
         num_docs_for_word_dist += 1
       }
@@ -298,11 +297,6 @@ abstract class GeoCell[TCoord, TDoc <: DistDocument[TCoord]](
   def describe_indices(): String
 
   /**
-   * Return an Iterable over documents, listing the documents in the cell.
-   */
-  def iterate_documents(): Iterable[TDoc]
-
-  /**
    * Return the coordinate of the "center" of the cell.  This is the
    * coordinate used in computing distances between arbitary points and
    * given cells, for evaluation and such.  For odd-shaped cells, the
@@ -312,12 +306,15 @@ abstract class GeoCell[TCoord, TDoc <: DistDocument[TCoord]](
   def get_center_coord(): TCoord
 
   /**
+   * Return true if we have finished creating and populating the cell.
+   */
+  protected def finished = combined_dist.word_dist.finished
+  /**
    * Return a string representation of the cell.  Generally does not need
    * to be overridden.
    */
   override def toString = {
-    val unfinished =
-      if (combined_dist.word_dist.finished) "" else ", unfinished"
+    val unfinished = if (finished) "" else ", unfinished"
     val contains =
       if (most_popular_document != null)
         ", most-pop-doc %s(%d links)" format (
@@ -354,7 +351,7 @@ abstract class GeoCell[TCoord, TDoc <: DistDocument[TCoord]](
   def struct() =
     <GeoCell>
       <bounds>{ describe_location() }</bounds>
-      <finished>{ combined_dist.word_dist.finished }</finished>
+      <finished>{ finished }</finished>
       {
         if (most_popular_document != null)
           (<mostPopularDocument>most_popular_document.struct()</mostPopularDocument>
@@ -369,6 +366,7 @@ abstract class GeoCell[TCoord, TDoc <: DistDocument[TCoord]](
    * Add a document to the distribution for the cell.
    */
   def add_document(doc: TDoc) {
+    assert(!finished)
     combined_dist.add_document(doc)
     if (doc.incoming_links != None &&
       doc.incoming_links.get > mostpopdoc_links) {
@@ -378,20 +376,46 @@ abstract class GeoCell[TCoord, TDoc <: DistDocument[TCoord]](
   }
 
   /**
-   * Generate the distribution for the cell from the documents in it.
-   */
-  def generate_dist() {
-    for (doc <- iterate_documents())
-      add_document(doc)
-    finish()
-  }
-
-  /**
    * Finish any computations related to the cell's word distribution.
    */
   def finish() {
+    assert(!finished)
     combined_dist.word_dist.finish(
       minimum_word_count = cell_grid.table.driver.params.minimum_word_count)
+  }
+}
+
+/**
+ * A mix-in trait for GeoCells that create their distribution by remembering
+ * all the documents that go into the distribution, and then generating
+ * the distribution from them at the end.
+ *
+ * NOTE: This is *not* the ideal way of doing things!  It can cause
+ * out-of-memory errors for large corpora.  It is better to create the
+ * distributions on the fly.  Note that for K-d cells this may require
+ * two passes over the input corpus: One to note the documents that go into
+ * the cells and create the cells appropriately, and another to add the
+ * document distributions to those cells.  If so, we should add a function
+ * to cell grids indicating whether they want the documents given to them
+ * in two passes, and modify the code in DistDocumentTable (DistDocument.scala)
+ * so that it does two passes over the documents if so requested.
+ */
+trait DocumentRememberingCell[TCoord, TDoc <: DistDocument[TCoord]] {
+  this: GeoCell[TCoord, TDoc] =>
+
+  /**
+   * Return an Iterable over documents, listing the documents in the cell.
+   */
+  def iterate_documents(): Iterable[TDoc]
+
+  /**
+   * Generate the distribution for the cell from the documents in it.
+   */
+  def generate_dist() {
+    assert(!finished)
+    for (doc <- iterate_documents())
+      add_document(doc)
+    finish()
   }
 }
 
@@ -498,7 +522,7 @@ abstract class CellGrid[
    * wrapper around `initialize_cells()`, which is not meant to be called
    * externally.  Normally this does not need to be overridden.
    */
-  def finish(driver : ExperimentDriver) {
+  def finish(driver: ExperimentDriver) {
     assert(!all_cells_computed)
 
     initialize_cells(driver)
