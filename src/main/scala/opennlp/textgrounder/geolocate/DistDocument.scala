@@ -32,7 +32,6 @@ import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
-import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.Serializer
@@ -171,7 +170,7 @@ abstract class DistDocumentTable[TCoord : Serializer,
     def process_lines(lines: Iterator[String],
         filehand: FileHandler, file: String,
         compression: String, realname: String) = {
-      val task = new MeteredTask("document", "reading")
+      val task = new ExperimentMeteredTask(driver, "document", "reading")
       // Stop if we've reached the maximum
       var should_stop = false
       breakable {

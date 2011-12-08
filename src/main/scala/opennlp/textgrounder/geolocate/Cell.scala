@@ -489,7 +489,7 @@ abstract class CellGrid[
    * this, `iter_nonempty_cells` should work properly.  This is not meant
    * to be called externally.
    */
-  protected def initialize_cells(driver: ExperimentDriver): Unit
+  protected def initialize_cells(): Unit
 
   /**
    * Iterate over all non-empty cells.
@@ -522,11 +522,11 @@ abstract class CellGrid[
    * wrapper around `initialize_cells()`, which is not meant to be called
    * externally.  Normally this does not need to be overridden.
    */
-  def finish(driver: ExperimentDriver) {
+  def finish() {
     assert(!all_cells_computed)
 
-    initialize_cells(driver)
-    driver.heartbeat
+    initialize_cells()
+    table.driver.heartbeat
 
     all_cells_computed = true
 
@@ -537,7 +537,7 @@ abstract class CellGrid[
         cell.combined_dist.num_docs_for_word_dist
       total_num_docs_for_links +=
         cell.combined_dist.num_docs_for_links
-      driver.heartbeat
+      table.driver.heartbeat
     }
 
     errprint("Number of non-empty cells: %s", num_non_empty_cells)
@@ -555,8 +555,8 @@ abstract class CellGrid[
     // by never creating these distributions at all, but directly adding
     // them to the cells.  Would require a bit of thinking when reading
     // in the counts.
-    driver.heartbeat
+    table.driver.heartbeat
     table.clear_training_document_distributions()
-    driver.heartbeat
+    table.driver.heartbeat
   }
 }
