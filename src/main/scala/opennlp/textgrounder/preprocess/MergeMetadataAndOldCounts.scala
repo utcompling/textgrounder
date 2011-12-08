@@ -175,10 +175,10 @@ class MMCDocumentFileProcessor(
 ) extends CorpusFileProcessor(suffix) {
   val document_fieldvals = mutable.Map[String, Seq[String]]()
 
-  def process_row(fieldvals: Seq[String]): Boolean = {
+  def process_row(fieldvals: Seq[String]) = {
     val params = (schema.fieldnames zip fieldvals).toMap
     document_fieldvals(params("title")) = fieldvals
-    true
+    (true, true)
   }
 
   def process_lines(lines: Iterator[String],

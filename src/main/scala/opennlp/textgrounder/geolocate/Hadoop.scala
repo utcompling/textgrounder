@@ -40,7 +40,6 @@ import opennlp.textgrounder.util.experiment.ExperimentMeteredTask
 import opennlp.textgrounder.util.hadoop._
 import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.mathutil._
-import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.printutil.{errprint, set_errout_prefix, warning}
 
 /* Basic idea for hooking up Geolocate with Hadoop.  Hadoop works in terms
@@ -299,7 +298,7 @@ abstract class HadoopGeolocateApp(
       suffix: String
     ) extends DistDocumentFileProcessor(suffix, null) {
       errprint("Suffix is %s", suffix)
-      def handle_document(fieldvals: Seq[String]) = true
+      def handle_document(fieldvals: Seq[String]) = (true, true)
 
       def process_lines(lines: Iterator[String],
           filehand: FileHandler, file: String,
@@ -517,8 +516,8 @@ class DocumentEvaluationMapper extends
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver() = new TDriver
 
-  var evaluators: Iterable[InternalGeolocateDocumentEvaluator] = null
-  val task = new MeteredTask("document", "evaluating")
+  var evaluators: Iterable[CorpusGeolocateDocumentEvaluator] = null
+  val task = new ExperimentMeteredTask(driver, "document", "evaluating")
 
   class HadoopDocumentFileProcessor(
     context: TContext
@@ -535,9 +534,7 @@ class DocumentEvaluationMapper extends
       val table = driver.document_table
       val doc = table.create_and_init_document(schema, fieldvals, false)
       val retval = if (doc != null) {
-        if (doc.dist != null)
-          doc.dist.finish(minimum_word_count =
-            driver.params.minimum_word_count)
+        doc.dist.finish_after_global()
         var skipped = 0
         var not_skipped = 0
         for (e <- evaluators) {
@@ -565,7 +562,7 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
         (not_skipped > 0)
       } else false
       context.progress
-      retval
+      (retval, true)
     }
 
     def process_lines(lines: Iterator[String],
@@ -580,7 +577,7 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
     super.setup(context)
     evaluators =
       for ((stratname, strategy) <- driver.strategies)
-        yield new InternalGeolocateDocumentEvaluator(strategy, stratname,
+        yield new CorpusGeolocateDocumentEvaluator(strategy, stratname,
           driver)
     if (driver.params.input_corpus.length != 1) {
       driver.params.parser.error(

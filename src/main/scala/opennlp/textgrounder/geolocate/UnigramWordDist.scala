@@ -278,7 +278,7 @@ trait SimpleUnigramWordDistReader extends WordDistReader {
   }
 
   def initialize_distribution(doc: GenericDistDocument, countstr: String,
-      is_training_set: Boolean) = {
+      is_training_set: Boolean) {
     parse_counts(doc, countstr)
     // Now set the distribution on the document; but don't use the test
     // set's distributions in computing global smoothing values and such.
@@ -288,7 +288,7 @@ trait SimpleUnigramWordDistReader extends WordDistReader {
 
   def set_unigram_word_dist(doc: GenericDistDocument,
       keys: Array[Word], values: Array[Int], num_words: Int,
-      is_training_set: Boolean): Boolean
+      is_training_set: Boolean)
 }
 
 /**

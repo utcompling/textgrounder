@@ -97,18 +97,16 @@ class KdTreeCellGrid(table: SphereDocumentTable,
   var kdtree : KdTree[SphereDocument] = new KdTree[SphereDocument](2, bucketSize, splitMethod)
   val leaves_to_cell : Map[KdTree[SphereDocument], KdTreeCell] = Map()
 
-  /**
-   * Find the correct cell for the given coordinates.  If no such cell
-   * exists, return null.
-   */
-  def find_best_cell_for_coord(coord: SphereCoord): KdTreeCell = {
+  // FIXME!!! What about when `create` = true (i.e. we need to create a
+  // non-recorded cell)? 
+  def find_best_cell_for_coord(coord: SphereCoord, create: Boolean) = {
     leaves_to_cell(kdtree.getLeaf(Array(coord.lat, coord.long)))
   }
 
   /**
    * Add the given document to the cell grid.
    */
-  def add_document_to_cell(document: SphereDocument): Unit = {
+  def add_document_to_cell(document: SphereDocument) {
     kdtree.addPoint(Array(document.coord.lat, document.coord.long), document)
   }
 

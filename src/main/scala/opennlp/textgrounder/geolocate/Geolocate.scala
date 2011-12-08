@@ -217,7 +217,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
       for {
         (cand, links) <- candlinks
         val cell = {
-          val retval = cell_grid.find_best_cell_for_coord(cand.coord)
+          val retval = cell_grid.find_best_cell_for_coord(cand.coord, false)
           if (retval == null)
             errprint("Strange, found no cell for candidate %s", cand)
           retval
@@ -903,9 +903,6 @@ abstract class GeolocateDriver extends
     for (fn <- params.input_corpus)
       table.read_training_documents(get_file_handler, fn,
         document_file_suffix, cell_grid)
-    for (fn <- params.input_corpus)
-      table.read_eval_documents(get_file_handler, fn,
-        document_file_suffix, cell_grid)
     table.finish_document_loading()
   }
 
@@ -930,7 +927,7 @@ abstract class GeolocateDriver extends
   }
 
   protected def process_strategies[T](strategies: Seq[(String, T)])(
-      geneval: (String, T) => EvaluationOutputter[_,_]) = {
+      geneval: (String, T) => GeolocateTestFileEvaluator[_,_]) = {
     for ((stratname, strategy) <- strategies) yield {
       val evalobj = geneval(stratname, strategy)
       // For --eval-format=internal, there is no eval file.  To make the
@@ -938,8 +935,9 @@ abstract class GeolocateDriver extends
       // eval file whose value is null.
       val iterfiles =
         if (params.eval_file.length > 0) params.eval_file
-        else Seq[String](null)
-      evalobj.evaluate_and_output_results(get_file_handler, iterfiles)
+        else params.input_corpus
+      evalobj.process_files(get_file_handler, iterfiles)
+      evalobj.finish()
       (stratname, strategy, evalobj)
     }
   }
@@ -949,7 +947,7 @@ object GeolocateDriver {
   var Params: GeolocateParameters = _
   val Debug: DebugSettings = new DebugSettings
 
-  // Debug flags (from InternalGeolocateDocumentEvaluator) -- need to set them
+  // Debug flags (from CorpusGeolocateDocumentEvaluator) -- need to set them
   // here before we parse the command-line debug settings. (FIXME, should
   // be a better way that introduces fewer long-range dependencies like
   // this)
@@ -1104,7 +1102,8 @@ strategies, since they require that --preserve-case-words be set internally.""")
 abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
   override type TParam <: GeolocateDocumentParameters
   type TRunRes =
-    Seq[(String, SphereGeolocateDocumentStrategy, EvaluationOutputter[_,_])]
+    Seq[(String, SphereGeolocateDocumentStrategy,
+         GeolocateTestFileEvaluator[_,_])]
 
   var strategies: Seq[(String, SphereGeolocateDocumentStrategy)] = _
 
@@ -1242,7 +1241,7 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
       if (params.eval_format == "pcl-travel")
         new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
       else
-        new InternalGeolocateDocumentEvaluator(strategy, stratname, this)
+        new CorpusGeolocateDocumentEvaluator(strategy, stratname, this)
     })
   }
 }

@@ -94,12 +94,11 @@ class PGTSmoothedBigramWordDistFactory extends BigramWordDistFactory {
   def set_bigram_word_dist(doc: GenericDistDocument,
       keys: Array[Word], values: Array[Int], num_words: Int,
       bigram_keys: Array[Word], bigram_values: Array[Int], num_bigrams: Int,
-      is_training_set: Boolean) = {
+      is_training_set: Boolean) {
     doc.dist =
       new PGTSmoothedBigramWordDist(this, keys, values, num_words,
         bigram_keys, bigram_values, num_bigrams,
         note_globally = is_training_set)
-    true
   }
   
   def create_word_dist() =

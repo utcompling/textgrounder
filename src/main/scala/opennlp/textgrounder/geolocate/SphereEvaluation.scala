@@ -31,6 +31,7 @@ import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment.ExperimentDriverStats
 import opennlp.textgrounder.util.mathutil.{mean, median}
 import opennlp.textgrounder.util.ioutil.{FileHandler}
+import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.textutil.split_text_into_words
 
@@ -244,7 +245,7 @@ class SphereDocumentEvaluationResult(
  * FIXME!! Should probably be generalized to work beyond simply SphereDocuments
  * and such.
  */
-class InternalGeolocateDocumentEvaluator(
+class CorpusGeolocateDocumentEvaluator(
   strategy: SphereGeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentTypeDriver
@@ -252,10 +253,55 @@ class InternalGeolocateDocumentEvaluator(
   SphereDocument, SphereDocumentEvaluationResult
 ](strategy, stratname, driver) {
 
-  def iter_documents(filehand: FileHandler, filename: String) = {
-    assert(filename == null)
-    for (doc <- driver.document_table.documents_by_split(driver.params.eval_set))
-      yield doc
+  /**
+   * A file processor that reads corpora containing document metadata and
+   * creates a DistDocument for each document described, and evaluates it.
+   *
+   * @param suffix Suffix specifying the type of document file wanted
+   *   (e.g. "counts" or "document-metadata"
+   * @param cell_grid Cell grid to add newly created DistDocuments to
+   */
+  class EvaluateCorpusFileProcessor(
+    suffix: String
+  ) extends DistDocumentFileProcessor(suffix, driver) {
+    def handle_document(fieldvals: Seq[String]) = {
+      val doc = driver.document_table.create_and_init_document(
+        schema, fieldvals, false)
+      if (doc == null) (false, true)
+      else {
+        doc.dist.finish_after_global()
+        process_document(doc)
+      }
+    }
+
+    def process_lines(lines: Iterator[String],
+        filehand: FileHandler, file: String,
+        compression: String, realname: String) = {
+      var should_stop = false
+      breakable {
+        for (line <- lines) {
+          if (!parse_row(line)) {
+            should_stop = true
+            break
+          }
+        }
+      }
+      output_resource_usage()
+      !should_stop
+    }
+  }
+
+  def process_files(filehand: FileHandler, files: Iterable[String]): Boolean = {
+    /* NOTE: `files` must actually be a list of directories, e.g. as
+       comes from the value of --input-corpus. */
+    for (dir <- files) {
+      val fileproc = new EvaluateCorpusFileProcessor(
+        driver.params.eval_set + "-" + driver.document_file_suffix)
+      fileproc.read_schema_from_corpus(filehand, dir)
+      if (!fileproc.process_files(filehand, Seq(dir)))
+        return false
+    }
+    return true
   }
 
   //title = None
@@ -296,7 +342,7 @@ class InternalGeolocateDocumentEvaluator(
     }
     assert(document.dist.finished)
     val true_cell =
-      strategy.cell_grid.find_best_cell_for_coord(document.coord)
+      strategy.cell_grid.find_best_cell_for_coord(document.coord, true)
     if (debug("lots") || debug("commontop")) {
       val naitr = true_cell.combined_dist.num_docs_for_word_dist
       errprint("Evaluating document %s with %s word-dist documents in true cell",
@@ -396,9 +442,10 @@ class PCLTravelGeolocateDocumentEvaluator(
   driver: GeolocateDocumentTypeDriver
 ) extends SphereGeolocateDocumentEvaluator[
   TitledDocument, TitledDocumentResult
-](strategy, stratname, driver) {
+](strategy, stratname, driver) with DocumentIteratingEvaluator[
+  TitledDocument, TitledDocumentResult
+] {
   def iter_documents(filehand: FileHandler, filename: String) = {
-
     val dom = try {
       // On error, just return, so that we don't have problems when called
       // on the whole PCL corpus dir (which includes non-XML files).

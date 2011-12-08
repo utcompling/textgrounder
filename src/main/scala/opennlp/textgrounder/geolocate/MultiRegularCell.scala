@@ -54,13 +54,21 @@ import GeolocateDriver.Debug._
   To specify a cell, we use cell indices, which are derived from
   coordinates by dividing by degrees_per_cell.  Hence, if for example
   degrees_per_cell is 2.0, then cell indices are in the range [-45,+45]
-  for latitude and [-90,+90) for longitude.  In general, an arbitrary
-  coordinate will have fractional cell indices; however, the cell indices
-  of the corners of a cell (tiling or multi) will be integers.  Normally,
-  we use the southwest corner to specify a cell.
+  for latitude and [-90,+90) for longitude.  Correspondingly, to convert
+  cell index to a SphereCoord, we multiply latitude and longitude by
+  degrees_per_cell.
 
-  Correspondingly, to convert a cell index to a SphereCoord, we multiply
-  latitude and longitude by degrees_per_cell.
+  In general, an arbitrary coordinate will have fractional cell indices;
+  however, the cell indices of the corners of a cell (tiling or multi)
+  will be integers.  Cells are canonically indexed and referred to by
+  the index of the southwest corner.  In other words, for a given index,
+  the latitude or longitude of the southwest corner of the corresponding
+  cell (tiling or multi) is index*degrees_per_cell.  For a tiling cell,
+  the cell includes all coordinates whose latitude or longitude is in
+  the half-open interval [index*degrees_per_cell,
+  (index+1)*degrees_per_cell).  For a multi cell, the cell includes all
+  coordinates whose latitude or longitude is in the half-open interval
+  [index*degrees_per_cell, (index+width_of_multi_cell)*degrees_per_cell).
 
   Near the edges, tiling cells may be truncated.  Multi cells will
   wrap around longitudinally, and will still have the same number of
@@ -221,26 +229,13 @@ class MultiRegularCellGrid(
   val minimum_longind = minimum_index.longind
 
   /**
-   * Mapping of cell->locations in cell, for cell-based Naive Bayes
-   * disambiguation.  The key is a tuple expressing the integer indices of the
-   * latitude and longitude of the southwest corner of the cell. (Basically,
-   * given an index, the latitude or longitude of the southwest corner is
-   * index*degrees_per_cell, and the cell includes all locations whose
-   * latitude or longitude is in the half-open interval
-   * [index*degrees_per_cell, (index+1)*degrees_per_cell).
-   *
-   * We don't just create an array because we expect many cells to have no
-   * documents in them, esp. as we decrease the cell size.  The idea is that
-   * the cells provide a first approximation to the cells used to create the
-   * document distributions.
-   */
-  var tiling_cell_to_documents = bufmap[RegularCellIndex, SphereDocument]()
-
-  /**
    * Mapping from index of southwest corner of multi cell to corresponding
    * cell object.  A "multi cell" is made up of a square of tiling cells,
    * with the number of cells on a side determined by `width_of_multi_cell'.
    * A word distribution is associated with each multi cell.
+   *
+   * We don't just create an array because we expect many cells to have no
+   * documents in them, esp. as we decrease the cell size.
    */
   val corner_to_multi_cell = mutable.Map[RegularCellIndex, MultiRegularCell]()
 
@@ -425,27 +420,31 @@ class MultiRegularCellGrid(
     ) yield RegularCellIndex.coerce(this, i, j)
   }
 
-  def find_best_cell_for_coord(coord: SphereCoord) = {
+  def find_best_cell_for_coord(coord: SphereCoord, create: Boolean) = {
     assert(all_cells_computed)
     val index = coord_to_multi_cell_index(coord)
-    find_cell_for_cell_index(index, create = false)
+    find_cell_for_cell_index(index, create = create,
+      record_created_cell = false)
   }
 
   /**
    * For a given multi cell index, find the corresponding cell.
    * If no such cell exists, create one if `create` is true;
-   * else, return null.
+   * else, return null.  If a cell is created, record it in the
+   * grid if `record_created_cell` is true.
    */
   protected def find_cell_for_cell_index(index: RegularCellIndex,
-      create: Boolean) = {
+      create: Boolean, record_created_cell: Boolean) = {
     val cell = corner_to_multi_cell.getOrElse(index, null)
     if (cell != null)
       cell
     else if (!create) null
     else {
       val newcell = new MultiRegularCell(this, index)
-      num_non_empty_cells += 1
-      corner_to_multi_cell(index) = newcell
+      if (record_created_cell) {
+        num_non_empty_cells += 1
+        corner_to_multi_cell(index) = newcell
+      }
       newcell
     }
   }
@@ -456,7 +455,8 @@ class MultiRegularCellGrid(
    */
   def add_document_to_cell(doc: SphereDocument) {
     for (index <- iterate_overlapping_multi_cells(doc.coord)) {
-      val cell = find_cell_for_cell_index(index, create = true)
+      val cell = find_cell_for_cell_index(index, create = true,
+        record_created_cell = true)
       if (debug("cell"))
         errprint("Adding document %s to cell %s", doc, cell)
       cell.add_document(doc)
@@ -472,7 +472,7 @@ class MultiRegularCellGrid(
       for (j <- minimum_longind to maximum_longind view) {
         total_num_cells += 1
         val cell = find_cell_for_cell_index(RegularCellIndex(i, j),
-          create = false)
+          create = false, record_created_cell = false)
         if (cell != null) {
           cell.finish()
           if (debug("cell"))
@@ -482,9 +482,6 @@ class MultiRegularCellGrid(
       }
     }
     task.finish()
-
-    // Save some memory by clearing this after it's not needed
-    tiling_cell_to_documents = null
   }
 
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false) = {

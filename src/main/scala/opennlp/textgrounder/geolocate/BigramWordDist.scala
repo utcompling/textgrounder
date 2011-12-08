@@ -364,7 +364,7 @@ trait SimpleBigramWordDistReader extends WordDistReader {
   }
 
   def initialize_distribution(doc: GenericDistDocument, countstr: String,
-      is_training_set: Boolean) = {
+      is_training_set: Boolean) {
     parse_counts(doc, countstr)
     // Now set the distribution on the document; but don't use the test
     // set's distributions in computing global smoothing values and such.
@@ -377,7 +377,7 @@ trait SimpleBigramWordDistReader extends WordDistReader {
   def set_bigram_word_dist(doc: GenericDistDocument,
       keys: Array[Word], values: Array[Int], num_words: Int,
       bigram_keys: Array[Word], bigram_values: Array[Int], num_bigrams: Int,
-      is_training_set: Boolean): Boolean
+      is_training_set: Boolean)
 }
 
 /**

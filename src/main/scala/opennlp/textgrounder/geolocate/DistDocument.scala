@@ -132,6 +132,11 @@ abstract class DistDocumentTable[TCoord : Serializer,
     doc
   }
 
+  /** Create and initialize a document.  If appropriate, record it using
+    * `record_document` (which puts it in the list of documents by split
+    * and adds it to the cell grid).  Return true if document recorded,
+    * false if skipped for any reason.
+    */
   def create_and_record_document(schema: Schema, fieldvals: Seq[String],
       cell_grid: CellGrid[TCoord,TDoc,_]) = {
     val doc = create_and_init_document(schema, fieldvals, true)
@@ -143,8 +148,10 @@ abstract class DistDocumentTable[TCoord : Serializer,
       false
   }
 
-  def record_document(doc: TDoc,
-    cell_grid: CellGrid[TCoord,TDoc,_]) {
+  /** Record a document in the list of documents by split, and add it to
+    * the cell grid.
+    */
+  def record_document(doc: TDoc, cell_grid: CellGrid[TCoord,TDoc,_]) {
     documents_by_split(doc.split) += doc
     cell_grid.add_document_to_cell(doc)
   }
@@ -154,8 +161,6 @@ abstract class DistDocumentTable[TCoord : Serializer,
    * creates a DistDocument for each document described, and adds it to
    * this document table.
    *
-   * @param schema schema describing the fields in the document files, as
-   *   determined from a schema file
    * @param suffix Suffix specifying the type of document file wanted
    *   (e.g. "counts" or "document-metadata"
    * @param cell_grid Cell grid to add newly created DistDocuments to
@@ -164,7 +169,7 @@ abstract class DistDocumentTable[TCoord : Serializer,
     suffix: String, cell_grid: CellGrid[TCoord,TDoc,_]
   ) extends DistDocumentFileProcessor(suffix, driver) {
     def handle_document(fieldvals: Seq[String]) = {
-      create_and_record_document(schema, fieldvals, cell_grid)
+      (create_and_record_document(schema, fieldvals, cell_grid), true)
     }
 
     def process_lines(lines: Iterator[String],
@@ -175,7 +180,8 @@ abstract class DistDocumentTable[TCoord : Serializer,
       var should_stop = false
       breakable {
         for (line <- lines) {
-          parse_row(line)
+          if (!parse_row(line))
+            should_stop = true
           if (task.item_processed(maxtime = driver.params.max_time_per_stage))
             should_stop = true
           if ((driver.params.num_training_docs > 0 &&
@@ -220,27 +226,6 @@ abstract class DistDocumentTable[TCoord : Serializer,
       new DistDocumentTableFileProcessor("training-" + suffix, cell_grid)
     training_distproc.read_schema_from_corpus(filehand, dir)
     training_distproc.process_files(filehand, Seq(dir))
-  }
-
-  /**
-   * Read the eval-set documents from the given corpus.  Documents listed in
-   * the document file(s) are created, listed in this table,
-   * and added to the cell grid corresponding to the table.
-   *
-   * @param filehand The FileHandler for working with the file.
-   * @param dir Directory containing the corpus.
-   * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "counts" or "document-metadata"
-   * @param cell_grid Cell grid into which the documents are added.
-   */
-  def read_eval_documents(filehand: FileHandler, dir: String, suffix: String,
-      cell_grid: CellGrid[TCoord,TDoc,_]) {
-
-    val eval_distproc =
-      new DistDocumentTableFileProcessor(driver.params.eval_set + "-" + suffix,
-        cell_grid)
-    eval_distproc.read_schema_from_corpus(filehand, dir)
-    eval_distproc.process_files(filehand, Seq(dir))
   }
 
   def clear_training_document_distributions() {
@@ -463,18 +448,18 @@ abstract class DistDocument[TCoord : Serializer](
       case "counts" => {
         table.num_word_count_documents_by_split(this.split) += 1
         table.num_documents_with_word_counts += 1
-        // Set the distribution on the document.  But, if we are evaluating on
-        // the dev set, skip the test set and vice versa to save memory,
-        // and don't use the eval set's distributions in computing global
-        // smoothing values and such, to avoid contaminating the results.
+        // Set the distribution on the document.  But don't use the eval
+        // set's distributions in computing global smoothing values and such,
+        // to avoid contaminating the results (training on your eval set).
+        // In addition, if this isn't the training or eval set, we shouldn't
+        // be loading at all.
         val is_training_set = (this.split == "training")
         val is_eval_set = (this.split == table.driver.params.eval_set)
-        if (is_training_set || is_eval_set) {
-          table.word_dist_factory.initialize_distribution(this, value,
-            is_training_set)
-          dist.finish_before_global(minimum_word_count =
-            table.driver.params.minimum_word_count)
-        }
+        assert (is_training_set || is_eval_set)
+        table.word_dist_factory.initialize_distribution(this, value,
+          is_training_set)
+        dist.finish_before_global(minimum_word_count =
+          table.driver.params.minimum_word_count)
       }
       case _ => () // Just eat the  other parameters
     }
@@ -703,39 +688,45 @@ abstract class DistDocumentFileProcessor(
   /******** Main code ********/
 
   /**
-   * Handle (e.g. create and record) a document based on the given `fieldvals`.
-   * Return true if a document was actually processed to completion (e.g.
-   * created and recorded), false if skipped.  If an error occurs due to
-   * invalid values, it should be caught and re-thrown as a
-   * DocumentValidationException, listing the field and value as well as the
-   * error.
+   * Handle (e.g. create and record) a document.
+   *
+   * @param fieldvals Field values of the document as read from the
+   *   document file.
+   * @return Tuple `(processed, keep_going)` where `processed` indicates
+   *   whether the document was processed to completion (rather than skipped)
+   *   and `keep_going` indicates whether processing of further documents
+   *   should continue or stop.  Note that the value of `processed` does
+   *   *NOT* indicate whether there is an error in the field values.  In
+   *   that case, the error should be caught and rethrown as a
+   *   DocumentValidationException, listing the field and value as well
+   *   as the error.
    */
-  def handle_document(fieldvals: Seq[String]): Boolean
+  def handle_document(fieldvals: Seq[String]): (Boolean, Boolean)
 
   override def handle_bad_row(line: String, fieldvals: Seq[String]) {
     increment_document_counter("documents.bad")
     super.handle_bad_row(line, fieldvals)
   }
 
-  def process_row(fieldvals: Seq[String]): Boolean = {
-    val was_accepted =
+  def process_row(fieldvals: Seq[String]): (Boolean, Boolean) = {
+    val (processed, keep_going) =
       try { handle_document(fieldvals) }
       catch {
         case e:DocumentValidationException => {
           warning("Line %s: %s", num_processed + 1, e.message)
           if (debug("stack-trace") || debug("stacktrace"))
             e.printStackTrace
-          return false
+          return (false, true)
         }
       }
-    if (was_accepted)
-      increment_document_counter("documents.accepted")
+    if (processed)
+      increment_document_counter("documents.processed")
     else {
       errprint("Skipped document %s",
         schema.get_field_or_else(fieldvals, "title", "unknown title??"))
       increment_document_counter("documents.skipped")
     }
-    return true
+    return (true, keep_going)
   }
 
   override def begin_process_file(filehand: FileHandler, file: String) {
@@ -753,7 +744,7 @@ abstract class DistDocumentFileProcessor(
       }
     }
 
-    note("documents.accepted", "documents accepted")
+    note("documents.processed", "documents processed")
     note("documents.skipped", "documents skipped")
     note("documents.bad", "bad documents")
     note("documents.total", "total documents")

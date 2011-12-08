@@ -839,18 +839,24 @@ package object ioutil {
     /**
      * Parse a given row into fields.  Call either #process_row or
      * #handle_bad_row.
+     *
+     * @param line Raw text of line describing the row
+     * @return True if processing should continue, false if it should stop.
      */
-    def parse_row(line: String) {
+    def parse_row(line: String) = {
       // println("[%s]" format line)
       val fieldvals = line.split(split_re, -1)
-      if (fieldvals.length != fieldnames.length)
+      if (fieldvals.length != fieldnames.length) {
         handle_bad_row(line, fieldvals)
-      else {
-        val good = process_row(fieldvals)
+        num_processed += 1
+        true
+      } else {
+        val (good, keep_going) = process_row(fieldvals)
         if (!good)
           handle_bad_row(line, fieldvals)
+        num_processed += 1
+        keep_going
       }
-      num_processed += 1
     }
 
     /*********************** MUST BE IMPLEMENTED *************************/
@@ -859,12 +865,15 @@ package object ioutil {
      * Called when a "good" row is seen (good solely in that it has the
      * correct number of fields).
      *
-     * @param fieldvals: List of the string values for each field.
+     * @param fieldvals List of the string values for each field.
      *
-     * @return True if the line is truly "good"; false, otherwise. (In the
-     *   latter case, `handle_bad_row` will be called.)
+     * @return Tuple `(good, keep_going)` where `good` indicates whether
+     *   the given row was truly "good" (and hence processed, rather than
+     *   skipped), and `keep_going` indicates whether processing of further
+     *   rows should continue or stop.  If the return value indicates that
+     *   the row isn't actually good, `handle_bad_row` will be called.
      */
-    def process_row(fieldvals: Seq[String]): Boolean
+    def process_row(fieldvals: Seq[String]): (Boolean, Boolean)
 
     /* Also,
 
