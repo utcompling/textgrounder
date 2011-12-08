@@ -926,7 +926,7 @@ abstract class GeolocateDriver extends
       throw new GeolocateAbruptExit
       // System.exit(0)
     }
-    cell_grid.finish(this)
+    cell_grid.finish()
   }
 
   protected def process_strategies[T](strategies: Seq[(String, T)])(

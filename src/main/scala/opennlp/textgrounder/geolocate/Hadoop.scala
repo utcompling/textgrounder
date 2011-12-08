@@ -36,6 +36,7 @@ import org.apache.hadoop.fs._
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.distances.SphereCoord
+import opennlp.textgrounder.util.experiment.ExperimentMeteredTask
 import opennlp.textgrounder.util.hadoop._
 import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.mathutil._
