@@ -651,11 +651,12 @@ package object experiment {
     driver: ExperimentDriver,
     item_name: String,
     verb: String,
-    secs_between_output: Double = 15
-  ) extends MeteredTask(item_name, verb, secs_between_output) {
-    override def item_processed(maxtime: Double = 0.0) = {
+    secs_between_output: Double = 15,
+    maxtime: Double = 0.0
+  ) extends MeteredTask(item_name, verb, secs_between_output, maxtime) {
+    override def item_processed() = {
       driver.heartbeat()
-      super.item_processed(maxtime)
+      super.item_processed()
     }
   }
 }
