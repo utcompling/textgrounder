@@ -27,7 +27,6 @@ import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.distances.spheredist
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil.{FileHandler, Schema}
-import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil.{errout, errprint, warning}
 
@@ -75,7 +74,7 @@ class Boundary(botleft: SphereCoord, topright: SphereCoord) {
    *    passed in so we can iterate over the cells.  Fix this so that
    *    the algorithm is done differently, or something.
    */
-  def iter_nonempty_tiling_cells(cell_grid: MultiRegularCellGrid) = {
+  def iter_nonempty_tiling_cells(cell_grid: TopoCellGrid) = {
     val botleft_index = cell_grid.coord_to_tiling_cell_index(botleft)
     val (latind1, longind1) = (botleft_index.latind, botleft_index.longind)
     val topright_index = cell_grid.coord_to_tiling_cell_index(topright)
@@ -363,7 +362,27 @@ class DivisionFactory(gazetteer: Gazetteer) {
   }
 }
 
-// A document for toponym resolution.
+class TopoCellGrid(
+  degrees_per_cell: Double,
+  width_of_multi_cell: Int,
+  table: TopoDocumentTable
+) extends MultiRegularCellGrid(degrees_per_cell, width_of_multi_cell, table) {
+
+  /**
+   * Mapping from tiling cell to documents in the cell.
+   */
+  var tiling_cell_to_documents = bufmap[RegularCellIndex, SphereDocument]()
+
+  /**
+   * Override so that we can keep a mapping of cell to documents in the cell.
+   * FIXME: Do we really need this?
+   */
+  override def add_document_to_cell(doc: SphereDocument) {
+    val index = coord_to_tiling_cell_index(doc.coord)
+    tiling_cell_to_documents(index) += doc
+    super.add_document_to_cell(doc)
+  }
+}
 
 class TopoDocument(
   schema: Schema,
@@ -441,9 +460,9 @@ class TopoDocument(
       div.combined_dist
     } else {
       if (combined_dist == null) {
-        val stat_cell = cell_grid.find_best_cell_for_coord(coord)
-        if (stat_cell != null)
-          combined_dist = stat_cell.combined_dist
+        val cell = cell_grid.find_best_cell_for_coord(coord, false)
+        if (cell != null)
+          combined_dist = cell.combined_dist
         else {
           warning("Couldn't find existing cell distribution for document %s",
             this)
@@ -879,10 +898,12 @@ abstract class GeolocateToponymEvaluator(
   strategy: GeolocateToponymStrategy,
   stratname: String,
   driver: GeolocateToponymDriver
-) extends TestFileEvaluator[GeogWordDocument, ToponymEvaluationResult](
-  stratname
-) with DefaultEvaluationOutputter[GeogWordDocument, ToponymEvaluationResult] {
-  val results = new GeolocateToponymResults(driver)
+) extends GeolocateTestFileEvaluator[
+  GeogWordDocument, ToponymEvaluationResult
+](stratname, driver) with DocumentIteratingEvaluator[
+  GeogWordDocument, ToponymEvaluationResult
+] {
+  val toponym_results = new GeolocateToponymResults(driver)
 
   // Given an evaluation file, read in the words specified, including the
   // toponyms.  Mark each word with the "document" (e.g. document) that it's
@@ -1032,7 +1053,7 @@ abstract class GeolocateToponymEvaluator(
     else
       errprint("incorrect, reason = %s", reason)
 
-    results.record_geolocate_toponym_result(correct, toponym,
+    toponym_results.record_geolocate_toponym_result(correct, toponym,
       geogword.location, reason, num_candidates)
 
     if (debug("some") && bestdoc != null) {
@@ -1048,7 +1069,7 @@ abstract class GeolocateToponymEvaluator(
   }
 
   def output_results(isfinal: Boolean = false) {
-    results.output_geolocate_toponym_results()
+    toponym_results.output_geolocate_toponym_results()
   }
 }
 
@@ -1191,7 +1212,7 @@ class WikipediaGeolocateToponymEvaluator(
   }
 }
 
-class Gazetteer(val cell_grid: MultiRegularCellGrid) {
+class Gazetteer(val cell_grid: TopoCellGrid) {
 
   // Factory object for creating new divisions relative to the gazetteer
   val divfactory = new DivisionFactory(this)
@@ -1238,7 +1259,7 @@ class Gazetteer(val cell_grid: MultiRegularCellGrid) {
 class WorldGazetteer(
   filehand: FileHandler,
   filename: String,
-  cell_grid: MultiRegularCellGrid
+  cell_grid: TopoCellGrid
 ) extends Gazetteer(cell_grid) {
 
   // Find the document matching an entry in the gazetteer.
@@ -1355,7 +1376,8 @@ class WorldGazetteer(
   // For localities, add them to the cell-map that covers the earth if
   // ADD_TO_CELL_MAP is true.)
   protected def read_world_gazetteer_and_match() {
-    val task = new MeteredTask("gazetteer entry", "matching")
+    val task = new ExperimentMeteredTask(cell_grid.table.driver,
+      "gazetteer entry", "matching")
     errprint("Matching gazetteer entries in %s...", filename)
     errprint("")
 
@@ -1518,7 +1540,7 @@ class GeolocateToponymDriver extends
     GeolocateDriver with StandaloneGeolocateDriverStats {
   type TParam = GeolocateToponymParameters
   type TRunRes =
-    Seq[(String, GeolocateToponymStrategy, EvaluationOutputter[_,_])]
+    Seq[(String, GeolocateToponymStrategy, GeolocateTestFileEvaluator[_,_])]
 
   override def handle_parameters() {
     super.handle_parameters()
@@ -1542,8 +1564,16 @@ class GeolocateToponymDriver extends
     need_seq(params.eval_file, "eval-file", "evaluation file(s)")
   }
 
-  override def initialize_document_table(word_dist_factory: WordDistFactory) = {
+  override protected def initialize_document_table(
+      word_dist_factory: WordDistFactory) = {
     new TopoDocumentTable(this, word_dist_factory)
+  }
+
+  override protected def initialize_cell_grid(table: SphereDocumentTable) = {
+    if (params.kd_tree)
+      param_error("Can't currently handle K-d trees")
+    new TopoCellGrid(degrees_per_cell, params.width_of_multi_cell,
+      table.asInstanceOf[TopoDocumentTable])
   }
 
   /**
@@ -1569,10 +1599,10 @@ class GeolocateToponymDriver extends
 
     if (params.gazetteer_file != null) {
       /* FIXME!!! */
-      assert(cell_grid.isInstanceOf[MultiRegularCellGrid])
+      assert(cell_grid.isInstanceOf[TopoCellGrid])
       val gazetteer =
         new WorldGazetteer(get_file_handler, params.gazetteer_file,
-          cell_grid.asInstanceOf[MultiRegularCellGrid])
+          cell_grid.asInstanceOf[TopoCellGrid])
       // Bootstrapping issue: Creating the gazetteer requires that the
       // TopoDocumentTable already exist, but the TopoDocumentTable wants
       // a pointer to a gazetter, so have to set it afterwards.

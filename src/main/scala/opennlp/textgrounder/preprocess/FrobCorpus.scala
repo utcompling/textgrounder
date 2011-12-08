@@ -253,7 +253,7 @@ class FrobCorpusFileProcessor(
     super.end_process_file(filehand, file)
   }
 
-  def process_row(fieldvals: Seq[String]): Boolean = {
+  def process_row(fieldvals: Seq[String]) = {
     val (new_fieldnames, new_fieldvals) = frob_row(fieldvals).unzip
     if (params.split_by_field != null) {
       val (writer, outstream) =
@@ -277,7 +277,7 @@ class FrobCorpusFileProcessor(
         get_unsplit_writer_and_outstream(new_fieldnames, new_fieldvals)
       writer.output_row(outstream, new_fieldvals)
     }
-    true
+    (true, true)
   }
 }
 

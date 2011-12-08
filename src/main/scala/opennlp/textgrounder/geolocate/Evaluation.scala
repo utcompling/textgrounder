@@ -325,15 +325,8 @@ abstract class GroupedGeolocateDocumentEvalStats[TCoord,
  * @tparam TEvalDoc Type of document to evaluate.
  * @tparam TEvalRes Type of result of evaluating a document.
  */
-abstract class TestFileEvaluator[TEvalDoc, TEvalRes](val stratname: String) {
+abstract class TestFileEvaluator[TEvalDoc, TEvalRes] {
   var documents_processed = 0
-
-  /**
-   * Return an Iterable listing the documents retrievable from the given
-   * filename.
-   */
-  def iter_documents(filehand: FileHandler,
-    filename: String): Iterable[TEvalDoc]
 
   /**
    * Return true if document would be skipped; false if processed and
@@ -355,6 +348,141 @@ abstract class TestFileEvaluator[TEvalDoc, TEvalRes](val stratname: String) {
   def output_results(isfinal: Boolean = false): Unit
 }
 
+/**
+ * Abstract class for reading documents from a test file and evaluating
+ * on them.
+ *
+ * @tparam TEvalDoc Type of document to evaluate.
+ * @tparam TEvalRes Type of result of evaluating a document.
+ *
+ * Evaluates on all of the given files, outputting periodic results and
+ * results after all files are done.  If the evaluator uses documents as
+ * documents (so that it doesn't need any external test files), the value
+ * of 'files' should be a sequence of one item, which is null. (If an
+ * empty sequence is passed in, no evaluation will happen.)
+
+ * Also returns an object containing the results.
+ */
+abstract class GeolocateTestFileEvaluator[TEvalDoc, TEvalRes](
+  val stratname: String,
+  val driver: GeolocateDriver
+) extends TestFileEvaluator[TEvalDoc, TEvalRes] {
+  val results = mutable.Map[TEvalDoc, TEvalRes]()
+  val task = new MeteredTask("document", "evaluating")
+  var last_elapsed = 0.0
+  var last_processed = 0
+  var skip_initial = Params.skip_initial_test_docs
+  var skip_n = 0
+
+  /** Process a document.
+   *
+   * @param doc Document to be processed.
+   * @return Tuple `(processed, keep_going)` where `processed` indicates
+   *   whether the document was processed or skipped, and `keep_going`
+   *   indicates whether processing of further documents should continue or
+   *   stop.
+   */
+  def process_document(doc: TEvalDoc): (Boolean, Boolean) = {
+    // errprint("Processing document: %s", doc)
+    val num_processed = task.num_processed
+    val doctag = "#%d" format (1 + num_processed)
+    if (would_skip_document(doc, doctag)) {
+      errprint("Skipped document %s", doc)
+      (false, true)
+    } else {
+      var do_skip = false
+      if (skip_initial != 0) {
+        skip_initial -= 1
+        do_skip = true
+      } else if (skip_n != 0) {
+        skip_n -= 1
+        do_skip = true
+      } else
+        skip_n = Params.every_nth_test_doc - 1
+      if (do_skip)
+        errprint("Passed over document %s", doctag)
+      else {
+        // Don't put side-effecting code inside of an assert!
+        val result = evaluate_document(doc, doctag)
+        assert(result != null)
+        results(doc) = result
+      }
+
+      if (task.item_processed(maxtime = Params.max_time_per_stage))
+        (!do_skip, false)
+      else {
+        val new_elapsed = task.elapsed_time
+        val new_processed = task.num_processed
+
+        // If max # of docs reached, stop
+        if ((Params.num_test_docs > 0 &&
+          new_processed >= Params.num_test_docs)) {
+          errprint("")
+          errprint("Stopping because limit of %s documents reached",
+            Params.num_test_docs)
+          task.finish()
+          (!do_skip, false)
+        } else {
+          // If five minutes and ten documents have gone by, print out results
+          if ((new_elapsed - last_elapsed >= 300 &&
+            new_processed - last_processed >= 10)) {
+            errprint("Results after %d documents (strategy %s):",
+              task.num_processed, stratname)
+            output_results(isfinal = false)
+            errprint("End of results after %d documents (strategy %s):",
+              task.num_processed, stratname)
+            last_elapsed = new_elapsed
+            last_processed = new_processed
+          }
+          (!do_skip, true)
+        }
+      }
+    }
+  }
+
+  def finish() {
+    task.finish()
+
+    errprint("")
+    errprint("Final results for strategy %s: All %d documents processed:",
+      stratname, task.num_processed)
+    errprint("Ending operation at %s", curtimehuman())
+    output_results(isfinal = true)
+    errprint("Ending final results for strategy %s", stratname)
+  }
+
+  def process_files(filehand: FileHandler, files: Iterable[String]): Boolean
+}
+
+trait DocumentIteratingEvaluator[TEvalDoc, TEvalRes] extends
+  GeolocateTestFileEvaluator[TEvalDoc, TEvalRes] {
+  /**
+   * Return an Iterable listing the documents retrievable from the given
+   * filename.
+   */
+  def iter_documents(filehand: FileHandler, filename: String):
+    Iterable[TEvalDoc]
+
+  class EvaluationFileProcessor extends FileProcessor {
+    /* Process all documents in a given file.  If return value is false,
+       processing was interrupted due to a limit being reached, and
+       no more files should be processed. */
+    def process_file(filehand: FileHandler, filename: String): Boolean = {
+      for (doc <- iter_documents(filehand, filename)) {
+        val (processed, keep_going) = process_document(doc)
+        if (!keep_going)
+          return false
+      }
+      return true
+    }
+  }
+
+  def process_files(filehand: FileHandler, files: Iterable[String]) = {
+    val fileproc = new EvaluationFileProcessor
+    fileproc.process_files(filehand, files)
+  }
+}
+
 abstract class GeolocateDocumentEvaluator[
   TCoord,
   TDoc <: DistDocument[TCoord],
@@ -366,8 +494,7 @@ abstract class GeolocateDocumentEvaluator[
   val strategy: GeolocateDocumentStrategy[TCoord, TDoc, TCell, TGrid],
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends TestFileEvaluator[TEvalDoc, TEvalRes](stratname) with
-  DefaultEvaluationOutputter[TEvalDoc, TEvalRes] {
+) extends GeolocateTestFileEvaluator[TEvalDoc, TEvalRes](stratname, driver) {
   type TGroupedEvalStats <:
     GroupedGeolocateDocumentEvalStats[TCoord,TDoc,TCell]
   def create_grouped_eval_stats(driver: GeolocateDocumentTypeDriver,
@@ -390,112 +517,11 @@ case class DocumentEvaluationResult[
   pred_cell: TCell,
   true_rank: Int
 ) {
-  val true_cell = pred_cell.cell_grid.find_best_cell_for_coord(document.coord)
+  val true_cell =
+    pred_cell.cell_grid.find_best_cell_for_coord(document.coord, true)
   val num_docs_in_true_cell = true_cell.combined_dist.num_docs_for_word_dist
   val true_center = true_cell.get_center_coord()
   val true_truedist = document.distance_to_coord(true_center)
   val pred_center = pred_cell.get_center_coord()
   val pred_truedist = document.distance_to_coord(pred_center)
 }
-
-trait EvaluationOutputter[TEvalDoc, TEvalRes] {
-  def evaluate_and_output_results(filehand: FileHandler,
-    files: Iterable[String]): mutable.Map[TEvalDoc, TEvalRes]
-}
-
-trait DefaultEvaluationOutputter[TEvalDoc, TEvalRes] extends
-    EvaluationOutputter[TEvalDoc, TEvalRes] {
-  this:TestFileEvaluator[TEvalDoc, TEvalRes] =>
-  /**
-    Evaluate on all of the given files, outputting periodic results and
-    results after all files are done.  If the evaluator uses documents as
-    documents (so that it doesn't need any external test files), the value
-    of 'files' should be a sequence of one item, which is null. (If an
-    empty sequence is passed in, no evaluation will happen.)
-
-    Also returns an object containing the results.
-   */
-  def evaluate_and_output_results(filehand: FileHandler,
-      files: Iterable[String]) = {
-    val results = mutable.Map[TEvalDoc, TEvalRes]()
-    val task = new MeteredTask("document", "evaluating")
-    var last_elapsed = 0.0
-    var last_processed = 0
-    var skip_initial = Params.skip_initial_test_docs
-    var skip_n = 0
-
-    class EvaluationFileProcessor extends FileProcessor {
-      /* Process all documents in a given file.  If return value is false,
-         processing was interrupted due to a limit being reached, and
-         no more files should be processed. */
-      def process_file(filehand: FileHandler, filename: String): Boolean = {
-        for (doc <- iter_documents(filehand, filename)) {
-          // errprint("Processing document: %s", doc)
-          val num_processed = task.num_processed
-          val doctag = "#%d" format (1 + num_processed)
-          if (would_skip_document(doc, doctag))
-            errprint("Skipped document %s", doc)
-          else {
-            var do_skip = false
-            if (skip_initial != 0) {
-              skip_initial -= 1
-              do_skip = true
-            } else if (skip_n != 0) {
-              skip_n -= 1
-              do_skip = true
-            } else
-              skip_n = Params.every_nth_test_doc - 1
-            if (do_skip)
-              errprint("Passed over document %s", doctag)
-            else {
-              // Don't put side-effecting code inside of an assert!
-              val result = evaluate_document(doc, doctag)
-              assert(result != null)
-              results(doc) = result
-            }
-            task.item_processed()
-            val new_elapsed = task.elapsed_time
-            val new_processed = task.num_processed
-
-            // If max # of docs reached, stop
-            if ((Params.num_test_docs > 0 &&
-              new_processed >= Params.num_test_docs)) {
-              errprint("")
-              errprint("Stopping because limit of %s documents reached",
-                Params.num_test_docs)
-              task.finish()
-              return false
-            }
-
-            // If five minutes and ten documents have gone by, print out results
-            if ((new_elapsed - last_elapsed >= 300 &&
-              new_processed - last_processed >= 10)) {
-              errprint("Results after %d documents (strategy %s):",
-                task.num_processed, stratname)
-              output_results(isfinal = false)
-              errprint("End of results after %d documents (strategy %s):",
-                task.num_processed, stratname)
-              last_elapsed = new_elapsed
-              last_processed = new_processed
-            }
-          }
-        }
-
-        return true
-      }
-    }
-
-    new EvaluationFileProcessor().process_files(filehand, files)
-
-    task.finish()
-
-    errprint("")
-    errprint("Final results for strategy %s: All %d documents processed:",
-      stratname, task.num_processed)
-    errprint("Ending operation at %s", curtimehuman())
-    output_results(isfinal = true)
-    errprint("Ending final results for strategy %s", stratname)
-    results
-  }
-}
-

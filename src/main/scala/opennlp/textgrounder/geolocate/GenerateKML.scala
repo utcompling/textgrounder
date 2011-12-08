@@ -86,7 +86,7 @@ class FilterPseudoGoodTuringSmoothedWordDistFactory(
   val oov = memoize_string("-OOV-")
   override def set_unigram_word_dist(doc: GenericDistDocument,
       keys: Array[Word], values: Array[Int], num_words: Int,
-      is_training_set: Boolean) = {
+      is_training_set: Boolean) {
     val (newkeys, newvalues) =
       (for ((k, v) <- (keys zip values).take(num_words);
            newk = if (filter_words contains k) k else oov)
@@ -94,7 +94,6 @@ class FilterPseudoGoodTuringSmoothedWordDistFactory(
     doc.dist = new PseudoGoodTuringSmoothedWordDist(this,
         newkeys.toArray, newvalues.toArray, newkeys.length,
         note_globally = is_training_set)
-    true
   }
 }
 

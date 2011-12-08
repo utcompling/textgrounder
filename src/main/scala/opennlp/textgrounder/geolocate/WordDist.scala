@@ -29,8 +29,6 @@ import com.codahale.trove.{mutable => trovescala}
 
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.ioutil.FileHandler
-import opennlp.textgrounder.util.MeteredTask
-import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 import GeolocateDriver.Debug._
@@ -272,10 +270,9 @@ trait WordDistReader {
    * @param is_training_set True if this document is in the training set.
    *   Generally, global (e.g. back-off) statistics should be initialized
    *   only from training-set documents.
-   * @return Whether a word distribution was actually created/set.
    */
   def initialize_distribution(doc: GenericDistDocument, diststr: String,
-      is_training_set: Boolean): Boolean
+      is_training_set: Boolean)
 
   /**
    *

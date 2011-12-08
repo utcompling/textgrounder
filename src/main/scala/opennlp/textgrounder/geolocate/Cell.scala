@@ -82,11 +82,13 @@ class CombinedWordDist(factory: WordDistFactory) {
    *  Add the given document to the total distribution seen so far
    */
   def add_document(doc: DistDocument[_]) {
-    /* We are passed in all documents, regardless of the split.
-       The decision was made to accumulate link counts from all documents,
-       even in the evaluation set.  Strictly, this is a violation of the
-       "don't train on your evaluation set" rule.  The reason we do this
-       is that
+    /* Formerly, we arranged things so that we were passed in all documents,
+       regardless of the split.  The reason for this was that the decision
+       was made to accumulate link counts from all documents, even in the
+       evaluation set.
+       
+       Strictly, this is a violation of the "don't train on your evaluation
+       set" rule.  The reason motivating this was that
 
        (1) The links are used only in Naive Bayes, and only in establishing
        a prior probability.  Hence they aren't the main indicator.
@@ -109,7 +111,17 @@ class CombinedWordDist(factory: WordDistFactory) {
        hence in a cell with multiple documents, each individual document
        only computes a fairly small fraction of the total word counts;
        (2) distributions are normalized in any case, so the exact number
-       of documents in a cell does not affect the distribution. */
+       of documents in a cell does not affect the distribution.
+       
+       However, once the corpora were separated into sub-corpora based on
+       the training/dev/test split, passing in all documents complicated
+       things, as it meant having to read all the sub-corpora.  Furthermore,
+       passing in non-training documents into the K-d cell grid changes the
+       grids in ways that are not easily predictable -- a significantly
+       greater effect than simply changing the link counts.  So (for the
+       moment at least) we don't do this any more. */
+    assert (doc.split == "training")
+
     /* Add link count of document to cell. */
     doc.incoming_links match {
       // Might be None, for unknown link count
@@ -118,16 +130,12 @@ class CombinedWordDist(factory: WordDistFactory) {
     }
     num_docs_for_links += 1
 
-    /* Add word counts of document to cell, but only if in the
-       training set. */
-    if (doc.split == "training") {
-      if (doc.dist == null) {
-        if (Params.max_time_per_stage == 0.0 && Params.num_training_docs == 0)
-          warning("Saw document %s without distribution", doc)
-      } else {
-        word_dist.add_word_distribution(doc.dist)
-        num_docs_for_word_dist += 1
-      }
+    if (doc.dist == null) {
+      if (Params.max_time_per_stage == 0.0 && Params.num_training_docs == 0)
+        warning("Saw document %s without distribution", doc)
+    } else {
+      word_dist.add_word_distribution(doc.dist)
+      num_docs_for_word_dist += 1
     }
   }
 }
@@ -473,9 +481,15 @@ abstract class CellGrid[
 
   /**
    * Find the correct cell for the given coordinates.  If no such cell
-   * exists, return null.
+   * exists, return null if `create` is false.  Else, create an empty
+   * cell to hold the coordinates -- but do *NOT* record the cell or
+   * otherwise alter the existing cell configuration.  This situation
+   * where such a cell is needed is during evaluation.  The cell is
+   * needed purely for comparing it against existing cells and determining
+   * its center.  The reason for not recording such cells is to make
+   * sure that future evaluation results aren't affected.
    */
-  def find_best_cell_for_coord(coord: TCoord): TCell
+  def find_best_cell_for_coord(coord: TCoord, create: Boolean): TCell
 
   /**
    * Add the given document to the cell grid.
