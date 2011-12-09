@@ -27,7 +27,6 @@ import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.distances.spheredist
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil.{FileHandler, Schema}
-import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil.{errout, errprint, warning}
 
@@ -75,7 +74,7 @@ class Boundary(botleft: SphereCoord, topright: SphereCoord) {
    *    passed in so we can iterate over the cells.  Fix this so that
    *    the algorithm is done differently, or something.
    */
-  def iter_nonempty_tiling_cells(cell_grid: MultiRegularCellGrid) = {
+  def iter_nonempty_tiling_cells(cell_grid: TopoCellGrid) = {
     val botleft_index = cell_grid.coord_to_tiling_cell_index(botleft)
     val (latind1, longind1) = (botleft_index.latind, botleft_index.longind)
     val topright_index = cell_grid.coord_to_tiling_cell_index(topright)
@@ -193,7 +192,7 @@ class Division(
   var boundary: Boundary = null
   // For cell-based Naive Bayes disambiguation, a distribution
   // over the division's document and all locations within the cell.
-  var word_dist_wrapper: CellWordDist = null
+  var combined_dist: CombinedWordDist = null
 
   def toString(no_document: Boolean = false) = {
     val docmatchstr =
@@ -270,11 +269,11 @@ class Division(
     boundary = new Boundary(topleft, botright)
   }
 
-  def generate_worddist(word_dist_factory: WordDistFactory) {
-    word_dist_wrapper = new CellWordDist(word_dist_factory.create_word_dist())
+  def generate_word_dist(word_dist_factory: WordDistFactory) {
+    combined_dist = new CombinedWordDist(word_dist_factory)
     for (loc <- Seq(this) ++ goodlocs if loc.docmatch != null)
-      yield word_dist_wrapper.add_document(loc.docmatch)
-    word_dist_wrapper.word_dist.finish(minimum_word_count =
+      yield combined_dist.add_document(loc.docmatch)
+    combined_dist.word_dist.finish(minimum_word_count =
       Params.minimum_word_count)
   }
 
@@ -363,14 +362,34 @@ class DivisionFactory(gazetteer: Gazetteer) {
   }
 }
 
-// A document for toponym resolution.
+class TopoCellGrid(
+  degrees_per_cell: Double,
+  width_of_multi_cell: Int,
+  table: TopoDocumentTable
+) extends MultiRegularCellGrid(degrees_per_cell, width_of_multi_cell, table) {
+
+  /**
+   * Mapping from tiling cell to documents in the cell.
+   */
+  var tiling_cell_to_documents = bufmap[RegularCellIndex, SphereDocument]()
+
+  /**
+   * Override so that we can keep a mapping of cell to documents in the cell.
+   * FIXME: Do we really need this?
+   */
+  override def add_document_to_cell(doc: SphereDocument) {
+    val index = coord_to_tiling_cell_index(doc.coord)
+    tiling_cell_to_documents(index) += doc
+    super.add_document_to_cell(doc)
+  }
+}
 
 class TopoDocument(
   schema: Schema,
   subtable: TopoDocumentSubtable
 ) extends WikipediaDocument(schema, subtable) {
   // Cell-based distribution corresponding to this document.
-  var word_dist_wrapper: CellWordDist = null
+  var combined_dist: CombinedWordDist = null
   // Corresponding location for this document.
   var location: Location = null
 
@@ -432,27 +451,26 @@ class TopoDocument(
 
   // Determine the cell word-distribution object for a given document:
   // Create and populate one if necessary.
-  def find_cellworddist(cell_grid: SphereCellGrid) = {
+  def find_combined_word_dist(cell_grid: SphereCellGrid) = {
     val loc = location
     if (loc != null && loc.isInstanceOf[Division]) {
       val div = loc.asInstanceOf[Division]
-      if (div.word_dist_wrapper == null)
-        div.generate_worddist(cell_grid.table.word_dist_factory)
-      div.word_dist_wrapper
+      if (div.combined_dist == null)
+        div.generate_word_dist(cell_grid.table.word_dist_factory)
+      div.combined_dist
     } else {
-      if (word_dist_wrapper == null) {
-        val stat_cell = cell_grid.find_best_cell_for_coord(coord)
-        if (stat_cell != null)
-          word_dist_wrapper = stat_cell.word_dist_wrapper
+      if (combined_dist == null) {
+        val cell = cell_grid.find_best_cell_for_coord(coord, false)
+        if (cell != null)
+          combined_dist = cell.combined_dist
         else {
           warning("Couldn't find existing cell distribution for document %s",
             this)
-          word_dist_wrapper =
-            new CellWordDist(table.word_dist_factory.create_word_dist())
-          word_dist_wrapper.word_dist.finish()
+          combined_dist = new CombinedWordDist(table.word_dist_factory)
+          combined_dist.word_dist.finish()
         }
       }
-      word_dist_wrapper
+      combined_dist
     }
   }
 
@@ -799,12 +817,12 @@ class BaselineGeolocateToponymStrategy(
     val params = topo_table.topo_driver.params
     if (baseline_strategy == "internal-link") {
       if (params.context_type == "cell")
-        doc.find_cellworddist(cell_grid).incoming_links
+        doc.find_combined_word_dist(cell_grid).incoming_links
       else
         doc.adjusted_incoming_links
     } else if (baseline_strategy == "num-documents") {
       if (params.context_type == "cell")
-        doc.find_cellworddist(cell_grid).num_docs_for_links
+        doc.find_combined_word_dist(cell_grid).num_docs_for_links
       else {
         val location = doc.location
         location match {
@@ -835,7 +853,7 @@ class NaiveBayesToponymStrategy(
 
     var distobj =
       if (params.context_type == "document") doc.dist
-      else doc.find_cellworddist(cell_grid).word_dist
+      else doc.find_combined_word_dist(cell_grid).word_dist
     var totalprob = 0.0
     var total_word_weight = 0.0
     val (word_weight, baseline_weight) =
@@ -873,20 +891,19 @@ class NaiveBayesToponymStrategy(
   }
 }
 
-class ToponymEvaluationResult extends EvaluationResult {
-}
+class ToponymEvaluationResult  { }
+case class GeogWordDocument(words: Iterable[GeogWord])
 
 abstract class GeolocateToponymEvaluator(
   strategy: GeolocateToponymStrategy,
   stratname: String,
   driver: GeolocateToponymDriver
-) extends TestFileEvaluator(stratname) {
-  val results = new GeolocateToponymResults(driver)
-
-  case class GeogWordDocument(
-    words: Iterable[GeogWord]) extends EvaluationDocument
-  type EvalDocumentType = GeogWordDocument
-  type EvalResultType = ToponymEvaluationResult
+) extends GeolocateTestFileEvaluator[
+  GeogWordDocument, ToponymEvaluationResult
+](stratname, driver) with DocumentIteratingEvaluator[
+  GeogWordDocument, ToponymEvaluationResult
+] {
+  val toponym_results = new GeolocateToponymResults(driver)
 
   // Given an evaluation file, read in the words specified, including the
   // toponyms.  Mark each word with the "document" (e.g. document) that it's
@@ -1036,7 +1053,7 @@ abstract class GeolocateToponymEvaluator(
     else
       errprint("incorrect, reason = %s", reason)
 
-    results.record_geolocate_toponym_result(correct, toponym,
+    toponym_results.record_geolocate_toponym_result(correct, toponym,
       geogword.location, reason, num_candidates)
 
     if (debug("some") && bestdoc != null) {
@@ -1052,7 +1069,7 @@ abstract class GeolocateToponymEvaluator(
   }
 
   def output_results(isfinal: Boolean = false) {
-    results.output_geolocate_toponym_results()
+    toponym_results.output_geolocate_toponym_results()
   }
 }
 
@@ -1195,7 +1212,7 @@ class WikipediaGeolocateToponymEvaluator(
   }
 }
 
-class Gazetteer(val cell_grid: MultiRegularCellGrid) {
+class Gazetteer(val cell_grid: TopoCellGrid) {
 
   // Factory object for creating new divisions relative to the gazetteer
   val divfactory = new DivisionFactory(this)
@@ -1242,7 +1259,7 @@ class Gazetteer(val cell_grid: MultiRegularCellGrid) {
 class WorldGazetteer(
   filehand: FileHandler,
   filename: String,
-  cell_grid: MultiRegularCellGrid
+  cell_grid: TopoCellGrid
 ) extends Gazetteer(cell_grid) {
 
   // Find the document matching an entry in the gazetteer.
@@ -1359,13 +1376,15 @@ class WorldGazetteer(
   // For localities, add them to the cell-map that covers the earth if
   // ADD_TO_CELL_MAP is true.)
   protected def read_world_gazetteer_and_match() {
-    val task = new MeteredTask("gazetteer entry", "matching")
+    val topo_table = cell_grid.table.asInstanceOf[TopoDocumentTable]
+    val params = topo_table.topo_driver.params
+
+    val task = new ExperimentMeteredTask(cell_grid.table.driver,
+      "gazetteer entry", "matching", maxtime = params.max_time_per_stage)
     errprint("Matching gazetteer entries in %s...", filename)
     errprint("")
 
     // Match each entry in the gazetteer
-    val topo_table = cell_grid.table.asInstanceOf[TopoDocumentTable]
-    val params = topo_table.topo_driver.params
     breakable {
       val lines = filehand.openr(filename)
       try {
@@ -1373,7 +1392,7 @@ class WorldGazetteer(
           if (debug("lots"))
             errprint("Processing line: %s", line)
           match_world_gazetteer_entry(line)
-          if (task.item_processed(maxtime = params.max_time_per_stage))
+          if (task.item_processed())
             break
         }
       } finally {
@@ -1520,9 +1539,9 @@ Default '%default'.""")
 
 class GeolocateToponymDriver extends
     GeolocateDriver with StandaloneGeolocateDriverStats {
-  type ParamType = GeolocateToponymParameters
-  type RunReturnType =
-    Seq[(String, GeolocateToponymStrategy, EvaluationOutputter)]
+  type TParam = GeolocateToponymParameters
+  type TRunRes =
+    Seq[(String, GeolocateToponymStrategy, GeolocateTestFileEvaluator[_,_])]
 
   override def handle_parameters() {
     super.handle_parameters()
@@ -1546,8 +1565,16 @@ class GeolocateToponymDriver extends
     need_seq(params.eval_file, "eval-file", "evaluation file(s)")
   }
 
-  override def initialize_document_table(word_dist_factory: WordDistFactory) = {
+  override protected def initialize_document_table(
+      word_dist_factory: WordDistFactory) = {
     new TopoDocumentTable(this, word_dist_factory)
+  }
+
+  override protected def initialize_cell_grid(table: SphereDocumentTable) = {
+    if (params.kd_tree)
+      param_error("Can't currently handle K-d trees")
+    new TopoCellGrid(degrees_per_cell, params.width_of_multi_cell,
+      table.asInstanceOf[TopoDocumentTable])
   }
 
   /**
@@ -1573,10 +1600,10 @@ class GeolocateToponymDriver extends
 
     if (params.gazetteer_file != null) {
       /* FIXME!!! */
-      assert(cell_grid.isInstanceOf[MultiRegularCellGrid])
+      assert(cell_grid.isInstanceOf[TopoCellGrid])
       val gazetteer =
         new WorldGazetteer(get_file_handler, params.gazetteer_file,
-          cell_grid.asInstanceOf[MultiRegularCellGrid])
+          cell_grid.asInstanceOf[TopoCellGrid])
       // Bootstrapping issue: Creating the gazetteer requires that the
       // TopoDocumentTable already exist, but the TopoDocumentTable wants
       // a pointer to a gazetter, so have to set it afterwards.
@@ -1599,21 +1626,19 @@ class GeolocateToponymDriver extends
       })
     val strats = strats_unflat reduce (_ ++ _)
     process_strategies(strats)((stratname, strategy) => {
-      val evaluator =
-        // Generate reader object
-        if (params.eval_format == "tr-conll")
-          new TRCoNLLGeolocateToponymEvaluator(strategy, stratname, this)
-        else
-          new WikipediaGeolocateToponymEvaluator(strategy, stratname, this)
-      new DefaultEvaluationOutputter(stratname, evaluator)
+      // Generate reader object
+      if (params.eval_format == "tr-conll")
+        new TRCoNLLGeolocateToponymEvaluator(strategy, stratname, this)
+      else
+        new WikipediaGeolocateToponymEvaluator(strategy, stratname, this)
     })
   }
 }
 
 object GeolocateToponymApp extends GeolocateApp("geolocate-toponyms") {
-  type DriverType = GeolocateToponymDriver
+  type TDriver = GeolocateToponymDriver
   // FUCKING TYPE ERASURE
-  def create_param_object(ap: ArgParser) = new ParamType(ap)
-  def create_driver() = new DriverType()
-  var Params: ParamType = _
+  def create_param_object(ap: ArgParser) = new TParam(ap)
+  def create_driver() = new TDriver()
+  var Params: TParam = _
 }

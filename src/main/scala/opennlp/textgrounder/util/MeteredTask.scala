@@ -22,7 +22,7 @@ import textutil._
  *    periodic status messages
  */
 class MeteredTask(item_name: String, verb: String,
-  secs_between_output: Double = 15) {
+  secs_between_output: Double = 15, maxtime: Double = 0.0) {
   val plural_item_name = pluralize(item_name)
   var items_processed = 0
   // Whether we've already printed stats after the most recent item
@@ -66,7 +66,7 @@ class MeteredTask(item_name: String, verb: String,
              format_float(seconds_per_item))
   }
 
-  def item_processed(maxtime: Double = 0.0) = {
+  def item_processed() = {
     val curtime = curtimesecs()
     items_processed += 1
     val total_elapsed_secs = curtime - first_time

@@ -38,30 +38,57 @@ import GeolocateDriver.Params
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * Distribution over words corresponding to a cell.
+ * Distribution over words resulting from combining the individual
+ * distributions of a number of documents.  We track the number of
+ * documents making up the distribution, as well as the total incoming link
+ * count for all of these documents.  Note that some documents contribute
+ * to the link count but not the word distribution; hence, there are two
+ * concepts of "empty", depending on whether all contributing documents or
+ * only those that contributed to the word distribution are counted.
+ * (The primary reason for documents not contributing to the distribution
+ * is that they're not in the training set; see comments below.  However,
+ * some documents simply don't have distributions defined for them in the
+ * document file -- e.g. if there was a problem extracting the document's
+ * words in the preprocessing stage.)
+ *
+ * Note that we embed the actual object describing the word distribution
+ * as a field in this object, rather than extending (subclassing) WordDist.
+ * The reason for this is that there are multiple types of WordDists, and
+ * so subclassing would require creating a different subclass for every
+ * such type, along with extra boilerplate functions to create objects of
+ * these subclasses.
  */
-
-class CellWordDist(val word_dist: WordDist) {
+class CombinedWordDist(factory: WordDistFactory) {
+  /** The combined word distribution itself. */
+  val word_dist = factory.create_word_dist()
   /** Number of documents included in incoming-link computation. */
   var num_docs_for_links = 0
   /** Total number of incoming links. */
   var incoming_links = 0
-  /** Number of documents included in word distribution. */
+  /** Number of documents included in word distribution.  All such
+   * documents also contribute to the incoming link count. */
   var num_docs_for_word_dist = 0
 
+  /** True if no documents have contributed to the word distribution.
+   * This should generally be the same as if the distribution is empty
+   * (unless documents with an empty distribution were added??). */
   def is_empty_for_word_dist() = num_docs_for_word_dist == 0
 
+  /** True if the object is completely empty.  This means no documents
+   * at all have been added using `add_document`. */
   def is_empty() = num_docs_for_links == 0
 
   /**
    *  Add the given document to the total distribution seen so far
    */
   def add_document(doc: DistDocument[_]) {
-    /* We are passed in all documents, regardless of the split.
-       The decision was made to accumulate link counts from all documents,
-       even in the evaluation set.  Strictly, this is a violation of the
-       "don't train on your evaluation set" rule.  The reason we do this
-       is that
+    /* Formerly, we arranged things so that we were passed in all documents,
+       regardless of the split.  The reason for this was that the decision
+       was made to accumulate link counts from all documents, even in the
+       evaluation set.
+       
+       Strictly, this is a violation of the "don't train on your evaluation
+       set" rule.  The reason motivating this was that
 
        (1) The links are used only in Naive Bayes, and only in establishing
        a prior probability.  Hence they aren't the main indicator.
@@ -84,7 +111,17 @@ class CellWordDist(val word_dist: WordDist) {
        hence in a cell with multiple documents, each individual document
        only computes a fairly small fraction of the total word counts;
        (2) distributions are normalized in any case, so the exact number
-       of documents in a cell does not affect the distribution. */
+       of documents in a cell does not affect the distribution.
+       
+       However, once the corpora were separated into sub-corpora based on
+       the training/dev/test split, passing in all documents complicated
+       things, as it meant having to read all the sub-corpora.  Furthermore,
+       passing in non-training documents into the K-d cell grid changes the
+       grids in ways that are not easily predictable -- a significantly
+       greater effect than simply changing the link counts.  So (for the
+       moment at least) we don't do this any more. */
+    assert (doc.split == "training")
+
     /* Add link count of document to cell. */
     doc.incoming_links match {
       // Might be None, for unknown link count
@@ -93,17 +130,12 @@ class CellWordDist(val word_dist: WordDist) {
     }
     num_docs_for_links += 1
 
-    /* Add word counts of document to cell, but only if in the
-       training set. */
-    if (doc.split == "training") {
-      if (doc.dist == null) {
-        if (Params.max_time_per_stage == 0.0 && Params.num_training_docs == 0)
-          warning("Saw document %s without distribution", doc)
-      } else {
-        assert(doc.dist.finished)
-        word_dist.add_word_distribution(doc.dist)
-        num_docs_for_word_dist += 1
-      }
+    if (doc.dist == null) {
+      if (Params.max_time_per_stage == 0.0 && Params.num_training_docs == 0)
+        warning("Saw document %s without distribution", doc)
+    } else {
+      word_dist.add_word_distribution(doc.dist)
+      num_docs_for_word_dist += 1
     }
   }
 }
@@ -114,15 +146,18 @@ class CellWordDist(val word_dist: WordDist) {
 
 /** A simple distribution associating a probability with each cell. */
 
-class CellDist[CoordType, DocumentType <: DistDocument[CoordType],
-  CellType <: GeoCell[CoordType, DocumentType]](
-  val cell_grid: CellGrid[CoordType, DocumentType, CellType]
+class CellDist[
+  TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc]
+](
+  val cell_grid: CellGrid[TCoord, TDoc, TCell]
 ) {
-  val cellprobs: mutable.Map[CellType, Double] =
-    mutable.Map[CellType, Double]()
+  val cellprobs: mutable.Map[TCell, Double] =
+    mutable.Map[TCell, Double]()
 
   def set_cell_probabilities(
-      probs: collection.Map[CellType, Double]) {
+      probs: collection.Map[TCell, Double]) {
     cellprobs.clear()
     cellprobs ++= probs
   }
@@ -144,11 +179,13 @@ class CellDist[CoordType, DocumentType <: DistDocument[CoordType],
  *  @param cellprobs Hash table listing probabilities associated with cells
  */
 
-class WordCellDist[CoordType, DocumentType <: DistDocument[CoordType],
-  CellType <: GeoCell[CoordType, DocumentType]](
-  cell_grid: CellGrid[CoordType, DocumentType, CellType],
+class WordCellDist[TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc]
+](
+  cell_grid: CellGrid[TCoord, TDoc, TCell],
   val word: Word
-) extends CellDist[CoordType, DocumentType, CellType](cell_grid) {
+) extends CellDist[TCoord, TDoc, TCell](cell_grid) {
   var normalized = false
 
   protected def init() {
@@ -157,7 +194,7 @@ class WordCellDist[CoordType, DocumentType <: DistDocument[CoordType],
     var totalprob = 0.0
     // Compute and store un-normalized probabilities for all cells
     for (cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)) {
-      val prob = cell.word_dist.lookup_word(word)
+      val prob = cell.combined_dist.word_dist.lookup_word(word)
       // Another way of handling zero probabilities.
       /// Zero probabilities are just a bad idea.  They lead to all sorts of
       /// pathologies when trying to do things like "normalize".
@@ -183,19 +220,20 @@ class WordCellDist[CoordType, DocumentType <: DistDocument[CoordType],
 }
 
 abstract class CellDistFactory[
-  CoordType, DocumentType <: DistDocument[CoordType],
-  CellType <: GeoCell[CoordType, DocumentType]](
+  TCoord, TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc]
+](
   val lru_cache_size: Int
 ) {
-  type WordCellDistType <: WordCellDist[CoordType, DocumentType, CellType]
-  type GridType <: CellGrid[CoordType, DocumentType, CellType]
-  def create_word_cell_dist(cell_grid: GridType, word: Word): WordCellDistType
+  type TCellDist <: WordCellDist[TCoord, TDoc, TCell]
+  type TGrid <: CellGrid[TCoord, TDoc, TCell]
+  def create_word_cell_dist(cell_grid: TGrid, word: Word): TCellDist
 
-  var cached_dists: LRUCache[Word, WordCellDistType] = null
+  var cached_dists: LRUCache[Word, TCellDist] = null
 
   // Return a cell distribution over a given word, using a least-recently-used
   // cache to optimize access.
-  def get_cell_dist(cell_grid: GridType, word: Word) = {
+  def get_cell_dist(cell_grid: TGrid, word: Word) = {
     if (cached_dists == null)
       cached_dists = new LRUCache(maxsize = lru_cache_size)
     cached_dists.get(word) match {
@@ -213,12 +251,12 @@ abstract class CellDistFactory[
    * by adding up the distributions of the individual words, weighting by
    * the count of the each word.
    */
-  def get_cell_dist_for_word_dist(cell_grid: GridType, xword_dist: WordDist) = {
+  def get_cell_dist_for_word_dist(cell_grid: TGrid, xword_dist: WordDist) = {
     // FIXME!!! Figure out what to do if distribution is not a unigram dist.
     // Can we break this up into smaller operations?  Or do we have to
     // make it an interface for WordDist?
     val word_dist = xword_dist.asInstanceOf[UnigramWordDist]
-    val cellprobs = doublemap[CellType]()
+    val cellprobs = doublemap[TCell]()
     for ((word, count) <- word_dist.counts) {
       val dist = get_cell_dist(cell_grid, word)
       for ((cell, prob) <- dist.cellprobs)
@@ -227,7 +265,7 @@ abstract class CellDistFactory[
     val totalprob = (cellprobs.values sum)
     for ((cell, prob) <- cellprobs)
       cellprobs(cell) /= totalprob
-    val retval = new CellDist[CoordType, DocumentType, CellType](cell_grid)
+    val retval = new CellDist[TCoord, TDoc, TCell](cell_grid)
     retval.set_cell_probabilities(cellprobs)
     retval
   }
@@ -241,20 +279,18 @@ abstract class CellDistFactory[
  * Abstract class for a general cell in a cell grid.
  * 
  * @param cell_grid The CellGrid object for the grid this cell is in.
- * @tparam CoordType The type of the coordinate object used to specify a
+ * @tparam TCoord The type of the coordinate object used to specify a
  *   a point somewhere in the grid.
- * @tparam DocumentType The type of documents stored in a cell in the grid.
+ * @tparam TDoc The type of documents stored in a cell in the grid.
  */
-abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
-    val cell_grid: CellGrid[CoordType, DocumentType,
-      _ <: GeoCell[CoordType, DocumentType]]
+abstract class GeoCell[TCoord, TDoc <: DistDocument[TCoord]](
+    val cell_grid: CellGrid[TCoord, TDoc,
+      _ <: GeoCell[TCoord, TDoc]]
 ) {
-  val word_dist_wrapper =
-    new CellWordDist(cell_grid.table.word_dist_factory.create_word_dist())
-  var most_popular_document: DocumentType = _
+  val combined_dist =
+    new CombinedWordDist(cell_grid.table.word_dist_factory)
+  var most_popular_document: TDoc = _
   var mostpopdoc_links = 0
-
-  def word_dist = word_dist_wrapper.word_dist
 
   /**
    * Return a string describing the location of the cell in its grid,
@@ -269,25 +305,24 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
   def describe_indices(): String
 
   /**
-   * Return an Iterable over documents, listing the documents in the cell.
-   */
-  def iterate_documents(): Iterable[DocumentType]
-
-  /**
    * Return the coordinate of the "center" of the cell.  This is the
    * coordinate used in computing distances between arbitary points and
    * given cells, for evaluation and such.  For odd-shaped cells, the
    * center can be more or less arbitrarily placed as long as it's somewhere
    * central.
    */
-  def get_center_coord(): CoordType
+  def get_center_coord(): TCoord
 
+  /**
+   * Return true if we have finished creating and populating the cell.
+   */
+  protected def finished = combined_dist.word_dist.finished
   /**
    * Return a string representation of the cell.  Generally does not need
    * to be overridden.
    */
   override def toString = {
-    val unfinished = if (word_dist.finished) "" else ", unfinished"
+    val unfinished = if (finished) "" else ", unfinished"
     val contains =
       if (most_popular_document != null)
         ", most-pop-doc %s(%d links)" format (
@@ -296,9 +331,9 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
 
     "GeoCell(%s%s%s, %d documents(dist), %d documents(links), %d links)" format (
       describe_location(), unfinished, contains,
-      word_dist_wrapper.num_docs_for_word_dist,
-      word_dist_wrapper.num_docs_for_links,
-      word_dist_wrapper.incoming_links)
+      combined_dist.num_docs_for_word_dist,
+      combined_dist.num_docs_for_links,
+      combined_dist.incoming_links)
   }
 
   // def __repr__() = {
@@ -324,41 +359,119 @@ abstract class GeoCell[CoordType, DocumentType <: DistDocument[CoordType]](
   def struct() =
     <GeoCell>
       <bounds>{ describe_location() }</bounds>
-      <finished>{ word_dist.finished }</finished>
+      <finished>{ finished }</finished>
       {
         if (most_popular_document != null)
           (<mostPopularDocument>most_popular_document.struct()</mostPopularDocument>
            <mostPopularDocumentLinks>mostpopdoc_links</mostPopularDocumentLinks>)
       }
-      <numDocumentsDist>{ word_dist_wrapper.num_docs_for_word_dist }</numDocumentsDist>
-      <numDocumentsLink>{ word_dist_wrapper.num_docs_for_links }</numDocumentsLink>
-      <incomingLinks>{ word_dist_wrapper.incoming_links }</incomingLinks>
+      <numDocumentsDist>{ combined_dist.num_docs_for_word_dist }</numDocumentsDist>
+      <numDocumentsLink>{ combined_dist.num_docs_for_links }</numDocumentsLink>
+      <incomingLinks>{ combined_dist.incoming_links }</incomingLinks>
     </GeoCell>
 
   /**
-   * Generate the distribution for a cell from the documents in it.
+   * Add a document to the distribution for the cell.
    */
-  def generate_dist() {
-    for (doc <- iterate_documents()) {
-      word_dist_wrapper.add_document(doc)
-      if (doc.incoming_links != None &&
-        doc.incoming_links.get > mostpopdoc_links) {
-        mostpopdoc_links = doc.incoming_links.get
-        most_popular_document = doc
-      }
+  def add_document(doc: TDoc) {
+    assert(!finished)
+    combined_dist.add_document(doc)
+    if (doc.incoming_links != None &&
+      doc.incoming_links.get > mostpopdoc_links) {
+      mostpopdoc_links = doc.incoming_links.get
+      most_popular_document = doc
     }
-    word_dist.finish(minimum_word_count = Params.minimum_word_count)
+  }
+
+  /**
+   * Finish any computations related to the cell's word distribution.
+   */
+  def finish() {
+    assert(!finished)
+    combined_dist.word_dist.finish(
+      minimum_word_count = cell_grid.table.driver.params.minimum_word_count)
   }
 }
 
 /**
- * Abstract class for a general grid of cells.  No assumptions are
- * made about the shapes of cells in the grid, the number of dimensions in
- * the grid, or whether the cells are overlapping.
+ * A mix-in trait for GeoCells that create their distribution by remembering
+ * all the documents that go into the distribution, and then generating
+ * the distribution from them at the end.
+ *
+ * NOTE: This is *not* the ideal way of doing things!  It can cause
+ * out-of-memory errors for large corpora.  It is better to create the
+ * distributions on the fly.  Note that for K-d cells this may require
+ * two passes over the input corpus: One to note the documents that go into
+ * the cells and create the cells appropriately, and another to add the
+ * document distributions to those cells.  If so, we should add a function
+ * to cell grids indicating whether they want the documents given to them
+ * in two passes, and modify the code in DistDocumentTable (DistDocument.scala)
+ * so that it does two passes over the documents if so requested.
  */
-abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
-    CellType <: GeoCell[CoordType, DocumentType]](
-    val table: DistDocumentTable[CoordType, DocumentType]
+trait DocumentRememberingCell[TCoord, TDoc <: DistDocument[TCoord]] {
+  this: GeoCell[TCoord, TDoc] =>
+
+  /**
+   * Return an Iterable over documents, listing the documents in the cell.
+   */
+  def iterate_documents(): Iterable[TDoc]
+
+  /**
+   * Generate the distribution for the cell from the documents in it.
+   */
+  def generate_dist() {
+    assert(!finished)
+    for (doc <- iterate_documents())
+      add_document(doc)
+    finish()
+  }
+}
+
+/**
+ * Abstract class for a general grid of cells.  The grid is defined over
+ * a continuous space (e.g. the surface of the Earth).  The space is indexed
+ * by coordinates (of type TCoord).  Each cell (of type TCell) covers
+ * some portion of the space.  There is also a set of documents (of type
+ * TDoc), each of which is indexed by a coordinate and which has a
+ * distribution describing the contents of the document.  The distributions
+ * of all the documents in a cell (i.e. whose coordinate is within the cell)
+ * are amalgamated to form the distribution of the cell.
+ *
+ * One example is the SphereCellGrid -- a grid of cells covering the Earth.
+ * ("Sphere" is used here in its mathematical meaning of the surface of a
+ * round ball.) Coordinates, of type SphereCoord, are pairs of latitude and
+ * longitude.  Documents are of type SphereDocument and have a SphereCoord
+ * as their coordinate.  Cells are of type SphereCell.  Subclasses of
+ * SphereCellGrid refer to particular grid cell shapes.  For example, the
+ * MultiRegularCellGrid consists of a regular tiling of the surface of the
+ * Earth into "rectangles" defined by minimum and maximum latitudes and
+ * longitudes.  Most commonly, each tile is a cell, but it is possible for
+ * a cell to consist of an NxN square of tiles, in which case the cells
+ * overlap.  Another subclass is KDTreeCellGrid, with rectangular cells of
+ * variable size so that the number of documents in a given cell stays more
+ * or less constant.
+ *
+ * Another possibility would be a grid indexed by years, where each cell
+ * corresponds to a particular range of years.
+ *
+ * In general, no assumptions are made about the shapes of cells in the grid,
+ * the number of dimensions in the grid, or whether the cells are overlapping.
+ *
+ * The following operations are used to populate a cell grid:
+ *
+ * (1) Documents are added one-by-one to a grid by calling
+ *     `add_document_to_cell`.
+ * (2) After all documents have been added, `initialize_cells` is called
+ *     to generate the cells and create their distribution.
+ * (3) After this, it should be possible to list the cells by calling
+ *     `iter_nonempty_cells`.
+ */
+abstract class CellGrid[
+  TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc]
+](
+    val table: DistDocumentTable[TCoord, TDoc]
 ) {
 
   /**
@@ -368,14 +481,20 @@ abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
 
   /**
    * Find the correct cell for the given coordinates.  If no such cell
-   * exists, return null.
+   * exists, return null if `create` is false.  Else, create an empty
+   * cell to hold the coordinates -- but do *NOT* record the cell or
+   * otherwise alter the existing cell configuration.  This situation
+   * where such a cell is needed is during evaluation.  The cell is
+   * needed purely for comparing it against existing cells and determining
+   * its center.  The reason for not recording such cells is to make
+   * sure that future evaluation results aren't affected.
    */
-  def find_best_cell_for_coord(coord: CoordType): CellType
+  def find_best_cell_for_coord(coord: TCoord, create: Boolean): TCell
 
   /**
    * Add the given document to the cell grid.
    */
-  def add_document_to_cell(document: DocumentType): Unit
+  def add_document_to_cell(document: TDoc): Unit
 
   /**
    * Generate all non-empty cells.  This will be called once (and only once),
@@ -384,7 +503,7 @@ abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
    * this, `iter_nonempty_cells` should work properly.  This is not meant
    * to be called externally.
    */
-  protected def initialize_cells(driver: ExperimentDriver): Unit
+  protected def initialize_cells(): Unit
 
   /**
    * Iterate over all non-empty cells.
@@ -398,7 +517,7 @@ abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
    *   but have no corresponding word counts given in the counts file.)
    */
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false):
-    Iterable[CellType]
+    Iterable[TCell]
   
   /*********************** Not meant to be overridden *********************/
   
@@ -417,11 +536,11 @@ abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
    * wrapper around `initialize_cells()`, which is not meant to be called
    * externally.  Normally this does not need to be overridden.
    */
-  def finish(driver : ExperimentDriver) {
+  def finish() {
     assert(!all_cells_computed)
 
-    initialize_cells(driver)
-    driver.heartbeat
+    initialize_cells()
+    table.driver.heartbeat
 
     all_cells_computed = true
 
@@ -429,20 +548,20 @@ abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
     total_num_docs_for_word_dist = 0
     for (cell <- iter_nonempty_cells()) {
       total_num_docs_for_word_dist +=
-        cell.word_dist_wrapper.num_docs_for_word_dist
+        cell.combined_dist.num_docs_for_word_dist
       total_num_docs_for_links +=
-        cell.word_dist_wrapper.num_docs_for_links
-      driver.heartbeat
+        cell.combined_dist.num_docs_for_links
+      table.driver.heartbeat
     }
 
     errprint("Number of non-empty cells: %s", num_non_empty_cells)
     errprint("Total number of cells: %s", total_num_cells)
     errprint("Percent non-empty cells: %g",
       num_non_empty_cells.toDouble / total_num_cells)
-    val training_docs_with_word_counts =
-      table.num_word_count_documents_by_split("training").value
+    val recorded_training_docs_with_coordinates =
+      table.num_recorded_documents_with_coordinates_by_split("training").value
     errprint("Training documents per non-empty cell: %g",
-      training_docs_with_word_counts.toDouble / num_non_empty_cells)
+      recorded_training_docs_with_coordinates.toDouble / num_non_empty_cells)
     // Clear out the document distributions of the training set, since
     // only needed when computing cells.
     //
@@ -450,8 +569,8 @@ abstract class CellGrid[CoordType, DocumentType <: DistDocument[CoordType],
     // by never creating these distributions at all, but directly adding
     // them to the cells.  Would require a bit of thinking when reading
     // in the counts.
-    driver.heartbeat
+    table.driver.heartbeat
     table.clear_training_document_distributions()
-    driver.heartbeat
+    table.driver.heartbeat
   }
 }

@@ -32,7 +32,9 @@ import opennlp.textgrounder.util.experiment._
 
 class KdTreeCell(
   cellgrid: KdTreeCellGrid,
-  val kdleaf : KdTree[SphereDocument]) extends RectangularCell(cellgrid) {
+  val kdleaf : KdTree[SphereDocument]
+) extends RectangularCell(cellgrid) with
+    DocumentRememberingCell[SphereCoord, SphereDocument] {
 
   def get_northeast_coord () : SphereCoord = {
     new SphereCoord(kdleaf.minLimit(0), kdleaf.minLimit(1))
@@ -95,18 +97,16 @@ class KdTreeCellGrid(table: SphereDocumentTable,
   var kdtree : KdTree[SphereDocument] = new KdTree[SphereDocument](2, bucketSize, splitMethod)
   val leaves_to_cell : Map[KdTree[SphereDocument], KdTreeCell] = Map()
 
-  /**
-   * Find the correct cell for the given coordinates.  If no such cell
-   * exists, return null.
-   */
-  def find_best_cell_for_coord(coord: SphereCoord): KdTreeCell = {
+  // FIXME!!! What about when `create` = true (i.e. we need to create a
+  // non-recorded cell)? 
+  def find_best_cell_for_coord(coord: SphereCoord, create: Boolean) = {
     leaves_to_cell(kdtree.getLeaf(Array(coord.lat, coord.long)))
   }
 
   /**
    * Add the given document to the cell grid.
    */
-  def add_document_to_cell(document: SphereDocument): Unit = {
+  def add_document_to_cell(document: SphereDocument) {
     kdtree.addPoint(Array(document.coord.lat, document.coord.long), document)
   }
 
@@ -116,7 +116,7 @@ class KdTreeCellGrid(table: SphereDocumentTable,
    * `add_document_to_cell`.  The generation happens internally; but after
    * this, `iter_nonempty_cells` should work properly.
    */
-  def initialize_cells(driver : ExperimentDriver): Unit = {
+  def initialize_cells() {
     total_num_cells = kdtree.getLeaves.size
     num_non_empty_cells = total_num_cells
 
@@ -126,7 +126,7 @@ class KdTreeCellGrid(table: SphereDocumentTable,
       val c = new KdTreeCell(this, node)
       c.generate_dist
       nodes_to_cell.update(node, c)
-      driver.heartbeat
+      table.driver.heartbeat
     }
 
     if (interpolateWeight > 0) {
@@ -145,7 +145,7 @@ class KdTreeCellGrid(table: SphereDocumentTable,
 
       for (node <- nodes if node.parent != null) {
         val cell = nodes_to_cell(node)
-        val wd = cell.word_dist_wrapper.word_dist
+        val wd = cell.combined_dist.word_dist
         val uwd = wd.asInstanceOf[UnigramWordDist]
 
         for ((k,v) <- uwd.counts) {
@@ -153,7 +153,7 @@ class KdTreeCellGrid(table: SphereDocumentTable,
         }
 
         val pcell = nodes_to_cell(node.parent)
-        val pwd = pcell.word_dist_wrapper.word_dist
+        val pwd = pcell.combined_dist.word_dist
         val puwd = pwd.asInstanceOf[UnigramWordDist]
 
         for ((k,v) <- puwd.counts) {

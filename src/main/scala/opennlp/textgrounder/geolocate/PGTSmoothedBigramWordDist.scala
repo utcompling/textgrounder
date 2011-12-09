@@ -77,31 +77,28 @@ class PGTSmoothedBigramWordDistFactory extends BigramWordDistFactory {
     //// we never actually have to compute it.
     total_num_types_seen_once = overall_word_probs.values count (_ == 1.0)
     globally_unseen_word_prob =
-      total_num_types_seen_once.toDouble/WordDist.total_num_word_tokens
+      total_num_types_seen_once.toDouble/total_num_word_tokens
     for ((word, count) <- overall_word_probs)
       overall_word_probs(word) = (
-        count.toDouble/WordDist.total_num_word_tokens*
-        (1.0 - globally_unseen_word_prob))
+        count.toDouble/total_num_word_tokens*(1.0 - globally_unseen_word_prob))
     // A very rough estimate, perhaps totally wrong
     total_num_unseen_word_types =
-      total_num_types_seen_once max (WordDist.total_num_word_types/20)
+      total_num_types_seen_once max (total_num_word_types/20)
     if (debug("bigram"))
       errprint("Total num types = %s, total num tokens = %s, total num_seen_once = %s, globally unseen word prob = %s, total mass = %s",
-               WordDist.total_num_word_types, WordDist.total_num_word_tokens,
-               total_num_types_seen_once,
-               globally_unseen_word_prob,
+               total_num_word_types, total_num_word_tokens,
+               total_num_types_seen_once, globally_unseen_word_prob,
                globally_unseen_word_prob + (overall_word_probs.values sum))
   }
 
   def set_bigram_word_dist(doc: GenericDistDocument,
       keys: Array[Word], values: Array[Int], num_words: Int,
       bigram_keys: Array[Word], bigram_values: Array[Int], num_bigrams: Int,
-      is_training_set: Boolean) = {
+      is_training_set: Boolean) {
     doc.dist =
       new PGTSmoothedBigramWordDist(this, keys, values, num_words,
         bigram_keys, bigram_values, num_bigrams,
         note_globally = is_training_set)
-    true
   }
   
   def create_word_dist() =
@@ -132,18 +129,48 @@ class PGTSmoothedBigramWordDist(
 ) extends BigramWordDist(unigramKeys, unigramValues, num_unigrams,
     bigramKeys, bigramValues, num_bigrams) {
   //val FastAlgorithms = FastPseudoGoodTuringSmoothedWordDist
-  type ThisType = PGTSmoothedBigramWordDist
+  type TThis = PGTSmoothedBigramWordDist
 
   if (note_globally) {
     //assert(!factory.owp_adjusted)
     for ((word, count) <- unicounts) {
       if (!(factory.overall_word_probs contains word))
-        WordDist.total_num_word_types += 1
+        factory.total_num_word_types += 1
       // Record in overall_word_probs; note more tokens seen.
       factory.overall_word_probs(word) += count
-      WordDist.total_num_word_tokens += count
+      factory.total_num_word_tokens += count
     }
   }
+
+  /** Total probability mass to be assigned to all words not
+      seen in the article, estimated (motivated by Good-Turing
+      smoothing) as the unadjusted empirical probability of
+      having seen a word once.
+   */
+  var unseen_mass = 0.5
+  /**
+     Probability mass assigned in 'overall_word_probs' to all words not seen
+     in the article.  This is 1 - (sum over W in A of overall_word_probs[W]).
+     The idea is that we compute the probability of seeing a word W in
+     article A as
+
+     -- if W has been seen before in A, use the following:
+          COUNTS[W]/TOTAL_TOKENS*(1 - UNSEEN_MASS)
+     -- else, if W seen in any articles (W in 'overall_word_probs'),
+        use UNSEEN_MASS * (overall_word_probs[W] / OVERALL_UNSEEN_MASS).
+        The idea is that overall_word_probs[W] / OVERALL_UNSEEN_MASS is
+        an estimate of p(W | W not in A).  We have to divide by
+        OVERALL_UNSEEN_MASS to make these probabilities be normalized
+        properly.  We scale p(W | W not in A) by the total probability mass
+        we have available for all words not seen in A.
+     -- else, use UNSEEN_MASS * globally_unseen_word_prob / NUM_UNSEEN_WORDS,
+        where NUM_UNSEEN_WORDS is an estimate of the total number of words
+        "exist" but haven't been seen in any articles.  One simple idea is
+        to use the number of words seen once in any article.  This certainly
+        underestimates this number if not too many articles have been seen
+        but might be OK if many articles seen.
+    */
+  var overall_unseen_mass = 1.0
 
   def innerToString = ", %.2f unseen mass" format unseen_mass
 
@@ -153,7 +180,7 @@ class PGTSmoothedBigramWordDist(
     * distributions.
     */
 
-  def finish_after_global() {
+  protected def imp_finish_after_global() {
     // Make sure that overall_word_probs has been computed properly.
     assert(factory.owp_adjusted)
 
@@ -177,7 +204,6 @@ class PGTSmoothedBigramWordDist(
         yield factory.overall_word_probs(ind)) sum)
     //if (use_sorted_list)
     //  counts = new SortedList(counts)
-    finished = true
   }
 
   override def finish(minimum_word_count: Int = 0) {

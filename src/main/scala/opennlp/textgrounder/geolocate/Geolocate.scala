@@ -100,11 +100,11 @@ object GenericTypes {
  * Abstract class for reading documents from a test file and doing
  * document geolocation on them (as opposed e.g. to toponym resolution).
  */
-abstract class GeolocateDocumentStrategy[CoordType,
-    DocumentType <: DistDocument[CoordType],
-    CellType <: GeoCell[CoordType, DocumentType],
-    CellGridType <: CellGrid[CoordType, DocumentType, CellType]](
-  val cell_grid: CellGridType
+abstract class GeolocateDocumentStrategy[TCoord,
+    TDoc <: DistDocument[TCoord],
+    TCell <: GeoCell[TCoord, TDoc],
+    TGrid <: CellGrid[TCoord, TDoc, TCell]](
+  val cell_grid: TGrid
 ) {
   /**
    * For a given word distribution (describing a test document), return
@@ -115,7 +115,7 @@ abstract class GeolocateDocumentStrategy[CoordType,
    * are better, while for others, higher scores are better.  Currently,
    * the wrapper code outputs the score but doesn't otherwise use it.
    */
-  def return_ranked_cells(word_dist: WordDist): Iterable[(CellType, Double)]
+  def return_ranked_cells(word_dist: WordDist): Iterable[(TCell, Double)]
 }
 
 abstract class SphereGeolocateDocumentStrategy(
@@ -148,9 +148,9 @@ class MostPopularCellGeolocateDocumentStrategy(
         (for (cell <- cell_grid.iter_nonempty_cells())
           yield (cell,
             (if (internal_link)
-               cell.word_dist_wrapper.incoming_links
+               cell.combined_dist.incoming_links
              else
-               cell.word_dist_wrapper.num_docs_for_links).toDouble)).
+               cell.combined_dist.num_docs_for_links).toDouble)).
         toArray sortWith (_._2 > _._2))
     }
     cached_ranked_mps
@@ -217,7 +217,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
       for {
         (cand, links) <- candlinks
         val cell = {
-          val retval = cell_grid.find_best_cell_for_coord(cand.coord)
+          val retval = cell_grid.find_best_cell_for_coord(cand.coord, false)
           if (retval == null)
             errprint("Strange, found no cell for candidate %s", cand)
           retval
@@ -270,7 +270,7 @@ abstract class MinMaxScoreStrategy(
       if (debug("lots")) {
         errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
           cell.describe_indices(), cell.describe_location(),
-          cell.word_dist_wrapper.num_docs_for_word_dist)
+          cell.combined_dist.num_docs_for_word_dist)
       }
 
       val score = score_cell(word_dist, cell)
@@ -311,9 +311,11 @@ class KLDivergenceStrategy(
 ) extends MinMaxScoreStrategy(cell_grid, true) {
 
   def score_cell(word_dist: WordDist, cell: SphereCell) = {
-    var kldiv = word_dist.kl_divergence(cell.word_dist, partial = partial)
+    val cell_word_dist = cell.combined_dist.word_dist
+    var kldiv =
+      word_dist.kl_divergence(cell_word_dist, partial = partial)
     if (symmetric) {
-      val kldiv2 = cell.word_dist.kl_divergence(word_dist, partial = partial)
+      val kldiv2 = cell_word_dist.kl_divergence(word_dist, partial = partial)
       kldiv = (kldiv + kldiv2) / 2.0
     }
     kldiv
@@ -333,7 +335,7 @@ class KLDivergenceStrategy(
       for (((cell, _), i) <- cells.take(num_contrib_cells) zipWithIndex) {
         val (_, contribs) =
           fast_slow_dist.slow_kl_divergence_debug(
-            cell.word_dist, partial = partial,
+            cell.combined_dist.word_dist, partial = partial,
             return_contributing_words = true)
         errprint("  At rank #%s, cell %s:", i + 1, cell)
         errprint("    %30s  %s", "Word", "KL-div contribution")
@@ -371,8 +373,8 @@ class CosineSimilarityStrategy(
 
   def score_cell(word_dist: WordDist, cell: SphereCell) = {
     var cossim =
-      word_dist.cosine_similarity(cell.word_dist, partial = partial,
-        smoothed = smoothed)
+      word_dist.cosine_similarity(cell.combined_dist.word_dist,
+        partial = partial, smoothed = smoothed)
     assert(cossim >= 0.0)
     // Just in case of round-off problems
     assert(cossim <= 1.002)
@@ -399,9 +401,10 @@ class NaiveBayesDocumentStrategy(
         }
       } else (1.0, 0.0))
 
-    val word_logprob = cell.word_dist.get_nbayes_logprob(word_dist)
+    val word_logprob =
+      cell.combined_dist.word_dist.get_nbayes_logprob(word_dist)
     val baseline_logprob =
-      log(cell.word_dist_wrapper.num_docs_for_links.toDouble /
+      log(cell.combined_dist.num_docs_for_links.toDouble /
           cell_grid.total_num_docs_for_links)
     val logprob = (word_weight * word_logprob +
       baseline_weight * baseline_logprob)
@@ -811,7 +814,7 @@ class DebugSettings {
  */
 abstract class GeolocateDriver extends
     ArgParserExperimentDriver with ExperimentDriverStats {
-  override type ParamType <: GeolocateParameters
+  override type TParam <: GeolocateParameters
   var degrees_per_cell = 0.0
   var stopwords: Set[String] = _
   var cell_grid: SphereCellGrid = _
@@ -860,14 +863,11 @@ abstract class GeolocateDriver extends
 
     need_seq(params.input_corpus, "input-corpus")
     
-    // FIXME!! Moved here from the beginning of setup_for_run() because
-    // of the need to have `document_file_suffix` set.  Maybe come up
-    // a clean way to set the suffix but not create the factory?
-    // (Although in reality it doesn't matter much, as creating the factory
-    // doesn't do much.)
-    val (factory, suffix) = initialize_word_dist_factory_and_suffix()
-    word_dist_factory = factory
-    document_file_suffix = suffix
+    // Need to have `document_file_suffix` set early on, but factory
+    // shouldn't be created till setup_for_run() because factory may
+    // depend on auxiliary parameters set during this stage (e.g. during
+    // GenerateKML).
+    document_file_suffix = initialize_word_dist_suffix()
   }
 
   protected def initialize_document_table(word_dist_factory: WordDistFactory) = {
@@ -883,13 +883,18 @@ abstract class GeolocateDriver extends
         params.width_of_multi_cell, table)
   }
 
-  protected def initialize_word_dist_factory_and_suffix() = {
+  protected def initialize_word_dist_suffix() = {
     if (params.word_dist == "pseudo-good-turing-bigram")
-      (new PGTSmoothedBigramWordDistFactory,
-        DistDocument.bigram_counts_suffix)
+      DistDocument.bigram_counts_suffix
     else //(params.word_dist == "pseudo-good-turing-unigram")
-      (new PseudoGoodTuringSmoothedWordDistFactory,
-        DistDocument.unigram_counts_suffix)
+      DistDocument.unigram_counts_suffix
+  }
+
+  protected def initialize_word_dist_factory() = {
+    if (params.word_dist == "pseudo-good-turing-bigram")
+      new PGTSmoothedBigramWordDistFactory
+    else //(params.word_dist == "pseudo-good-turing-unigram")
+      new PseudoGoodTuringSmoothedWordDistFactory
   }
 
   protected def read_stopwords() = {
@@ -900,13 +905,11 @@ abstract class GeolocateDriver extends
     for (fn <- params.input_corpus)
       table.read_training_documents(get_file_handler, fn,
         document_file_suffix, cell_grid)
-    for (fn <- params.input_corpus)
-      table.read_eval_documents(get_file_handler, fn,
-        document_file_suffix, cell_grid)
     table.finish_document_loading()
   }
 
   def setup_for_run() {
+    word_dist_factory = initialize_word_dist_factory()
     document_table = initialize_document_table(word_dist_factory)
     cell_grid = initialize_cell_grid(document_table)
     stopwords = read_stopwords()
@@ -923,11 +926,11 @@ abstract class GeolocateDriver extends
       throw new GeolocateAbruptExit
       // System.exit(0)
     }
-    cell_grid.finish(this)
+    cell_grid.finish()
   }
 
   protected def process_strategies[T](strategies: Seq[(String, T)])(
-      geneval: (String, T) => EvaluationOutputter) = {
+      geneval: (String, T) => GeolocateTestFileEvaluator[_,_]) = {
     for ((stratname, strategy) <- strategies) yield {
       val evalobj = geneval(stratname, strategy)
       // For --eval-format=internal, there is no eval file.  To make the
@@ -935,8 +938,9 @@ abstract class GeolocateDriver extends
       // eval file whose value is null.
       val iterfiles =
         if (params.eval_file.length > 0) params.eval_file
-        else Seq[String](null)
-      evalobj.evaluate_and_output_results(get_file_handler, iterfiles)
+        else params.input_corpus
+      evalobj.process_files(get_file_handler, iterfiles)
+      evalobj.finish()
       (stratname, strategy, evalobj)
     }
   }
@@ -946,7 +950,7 @@ object GeolocateDriver {
   var Params: GeolocateParameters = _
   val Debug: DebugSettings = new DebugSettings
 
-  // Debug flags (from InternalGeolocateDocumentEvaluator) -- need to set them
+  // Debug flags (from CorpusGeolocateDocumentEvaluator) -- need to set them
   // here before we parse the command-line debug settings. (FIXME, should
   // be a better way that introduces fewer long-range dependencies like
   // this)
@@ -1097,11 +1101,12 @@ strategies, since they require that --preserve-case-words be set internally.""")
 }
 
 // FUCK ME.  Have to make this abstract and GeolocateDocumentDriver a subclass
-// so that the ParamType can be overridden in HadoopGeolocateDocumentDriver.
+// so that the TParam can be overridden in HadoopGeolocateDocumentDriver.
 abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
-  override type ParamType <: GeolocateDocumentParameters
-  type RunReturnType =
-    Seq[(String, SphereGeolocateDocumentStrategy, EvaluationOutputter)]
+  override type TParam <: GeolocateDocumentParameters
+  type TRunRes =
+    Seq[(String, SphereGeolocateDocumentStrategy,
+         GeolocateTestFileEvaluator[_,_])]
 
   var strategies: Seq[(String, SphereGeolocateDocumentStrategy)] = _
 
@@ -1235,13 +1240,11 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
 
   def run_after_setup() = {
     process_strategies(strategies)((stratname, strategy) => {
-      val evaluator =
-        // Generate reader object
-        if (params.eval_format == "pcl-travel")
-          new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
-        else
-          new InternalGeolocateDocumentEvaluator(strategy, stratname, this)
-      new DefaultEvaluationOutputter(stratname, evaluator)
+      // Generate reader object
+      if (params.eval_format == "pcl-travel")
+        new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
+      else
+        new CorpusGeolocateDocumentEvaluator(strategy, stratname, this)
     })
   }
 }
@@ -1257,23 +1260,23 @@ trait StandaloneGeolocateDriverStats extends ExperimentDriverStats {
 
   def get_task_id = 0
 
-  protected def do_increment_counter(name: String, incr: Long) {
+  protected def imp_increment_counter(name: String, incr: Long) {
     counter_values(name) += incr
   }
 
-  protected def do_get_counter(name: String) = counter_values(name)
+  protected def imp_get_counter(name: String) = counter_values(name)
 }
 
 class GeolocateDocumentDriver extends
     GeolocateDocumentTypeDriver with StandaloneGeolocateDriverStats {
-  override type ParamType = GeolocateDocumentParameters
+  override type TParam = GeolocateDocumentParameters
 }
 
 class GeolocateAbruptExit extends Throwable { }
 
 abstract class GeolocateApp(appname: String) extends
     ExperimentDriverApp(appname) {
-  type DriverType <: GeolocateDriver
+  type TDriver <: GeolocateDriver
 
   override def run_program() = {
     try {
@@ -1288,9 +1291,9 @@ abstract class GeolocateApp(appname: String) extends
 }
 
 object GeolocateDocumentApp extends GeolocateApp("geolocate-document") {
-  type DriverType = GeolocateDocumentDriver
+  type TDriver = GeolocateDocumentDriver
   // FUCKING TYPE ERASURE
-  def create_param_object(ap: ArgParser) = new ParamType(ap)
-  def create_driver() = new DriverType()
+  def create_param_object(ap: ArgParser) = new TParam(ap)
+  def create_driver() = new TDriver()
 }
 

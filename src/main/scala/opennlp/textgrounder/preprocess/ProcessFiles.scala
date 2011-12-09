@@ -51,8 +51,8 @@ exist, and will be created (including any parent directories).""")
 }
 
 abstract class ProcessFilesDriver extends ArgParserExperimentDriver {
-  override type ParamType <: ProcessFilesParameters
-  type RunReturnType = Unit
+  override type TParam <: ProcessFilesParameters
+  type TRunRes = Unit
 
   val filehand = new LocalFileHandler
 

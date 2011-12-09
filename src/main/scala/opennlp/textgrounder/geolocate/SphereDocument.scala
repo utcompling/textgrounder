@@ -51,13 +51,13 @@ abstract class SphereDocument(
  * A subtable holding SphereDocuments corresponding to a specific corpus
  * type (e.g. Wikipedia or Twitter).
  */
-abstract class SphereDocumentSubtable[DocType <: SphereDocument](
+abstract class SphereDocumentSubtable[TDoc <: SphereDocument](
   val table: SphereDocumentTable
 ) {
   /**
    * Create and return a document of the current type.
    */
-  def create_document(schema: Schema): DocType
+  def create_document(schema: Schema): TDoc
 
   /**
    * Given the schema and field values read from a document file, create
@@ -111,7 +111,7 @@ class SphereDocumentTable(
     throw new UnsupportedOperationException("This shouldn't be called directly; instead, use create_and_init_document()")
   }
 
-  override def create_and_init_document(schema: Schema,
+  override def imp_create_and_init_document(schema: Schema,
       fieldvals: Seq[String], record_in_table: Boolean) = {
     find_subtable(schema, fieldvals).
       create_and_init_document(schema, fieldvals, record_in_table)

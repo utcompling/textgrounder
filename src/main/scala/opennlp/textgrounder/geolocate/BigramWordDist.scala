@@ -62,8 +62,6 @@ abstract class BigramWordDist(
   
   def num_word_types = unicounts.size
 
-  def innerToString: String
-
   val bicounts = create_word_int_map()
   for (i <- 0 until num_bigrams)
     bicounts(bigramKeys(i)) = bigramValues(i)
@@ -71,40 +69,28 @@ abstract class BigramWordDist(
 
   def num_bigram_types = bicounts.size
 
-  /** Total probability mass to be assigned to all words not
-      seen in the article, estimated (motivated by Good-Turing
-      smoothing) as the unadjusted empirical probability of
-      having seen a word once.
-   */
-  var unseen_mass = 0.5
-  /**
-     Probability mass assigned in 'overall_word_probs' to all words not seen
-     in the article.  This is 1 - (sum over W in A of overall_word_probs[W]).
-     The idea is that we compute the probability of seeing a word W in
-     article A as
+  def innerToString: String
 
-     -- if W has been seen before in A, use the following:
-          COUNTS[W]/TOTAL_TOKENS*(1 - UNSEEN_MASS)
-     -- else, if W seen in any articles (W in 'overall_word_probs'),
-        use UNSEEN_MASS * (overall_word_probs[W] / OVERALL_UNSEEN_MASS).
-        The idea is that overall_word_probs[W] / OVERALL_UNSEEN_MASS is
-        an estimate of p(W | W not in A).  We have to divide by
-        OVERALL_UNSEEN_MASS to make these probabilities be normalized
-        properly.  We scale p(W | W not in A) by the total probability mass
-        we have available for all words not seen in A.
-     -- else, use UNSEEN_MASS * globally_unseen_word_prob / NUM_UNSEEN_WORDS,
-        where NUM_UNSEEN_WORDS is an estimate of the total number of words
-        "exist" but haven't been seen in any articles.  One simple idea is
-        to use the number of words seen once in any article.  This certainly
-        underestimates this number if not too many articles have been seen
-        but might be OK if many articles seen.
-    */
-  var overall_unseen_mass = 1.0
+  override def toString = {
+    val finished_str =
+      if (!finished) ", unfinished" else ""
+    val num_words_to_print = 15
+    def get_words(counts: WordIntMap) = {
+      val need_dots = counts.size > num_words_to_print
+      val items =
+        for ((word, count) <-
+              counts.toSeq.sortWith(_._2 > _._2).view(0, num_words_to_print))
+        yield "%s=%s" format (unmemoize_string(word), count) 
+      (items mkString " ") + (if (need_dots) " ..." else "")
+    }
+    "BigramWordDist(%d unigram types, %d unigram tokens, %d bigram types, %d bigram tokens%s%s, %s, %s)" format (
+        num_word_types, num_word_tokens, num_bigram_types, num_bigram_tokens,
+        innerToString, finished_str, get_words(unicounts), get_words(bicounts))
+  }
 
-  def add_document(words: Traversable[String], ignore_case: Boolean = true,
-      stopwords: Set[String] = Set[String]()) {
-errprint("add_document")
-    assert(!finished)
+  protected def imp_add_document(words: Traversable[String],
+      ignore_case: Boolean, stopwords: Set[String]) {
+    errprint("add_document")
     var previous = "<START>";
     unicounts(memoize_string(previous)) += 1
     for {word <- words
@@ -117,8 +103,7 @@ errprint("add_document")
     }
   }
 
-  def add_word_distribution(xworddist: WordDist) {
-    assert(!finished)
+  protected def imp_add_word_distribution(xworddist: WordDist) {
     val worddist = xworddist.asInstanceOf[BigramWordDist]
     for ((word, count) <- worddist.unicounts)
       unicounts(word) += count
@@ -126,13 +111,14 @@ errprint("add_document")
       bicounts(bigram) += count
     num_word_tokens += worddist.num_word_tokens
     num_bigram_tokens += worddist.num_bigram_tokens
-if(debug("bigram"))
-  errprint("add_word_distribution: "  + num_word_tokens + " " +  num_bigram_tokens)
+    if (debug("bigram"))
+      errprint("add_word_distribution: " + num_word_tokens + " " +
+        num_bigram_tokens)
   }
 
-  def finish_before_global(minimum_word_count: Int = 0) {
+  protected def imp_finish_before_global(minimum_word_count: Int) {
     // make sure counts not null (eg article in coords file but not counts file)
-    if (unicounts == null || bicounts == null || finished) return
+    if (unicounts == null || bicounts == null) return
 
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.
@@ -147,36 +133,35 @@ if(debug("bigram"))
       }
     }
   }
-    /**
-     * This is a basic unigram implementation of the computation of the
-     * KL-divergence between this distribution and another distribution.
-     * Useful for checking against other, faster implementations.
-     * 
-     * Computing the KL divergence is a bit tricky, especially in the
-     * presence of smoothing, which assigns probabilities even to words not
-     * seen in either distribution.  We have to take into account:
-     * 
-     * 1. Words in this distribution (may or may not be in the other).
-     * 2. Words in the other distribution that are not in this one.
-     * 3. Words in neither distribution but seen globally.
-     * 4. Words never seen at all.
-     * 
-     * The computation of steps 3 and 4 depends heavily on the particular
-     * smoothing algorithm; in the absence of smoothing, these steps
-     * contribute nothing to the overall KL-divergence.
-     * 
-     * @param xother The other distribution to compute against.
-     * @param partial If true, only do step 1 above.
-     *   
-     * @return A tuple of (divergence, word_contribs) where the first
-     *   value is the actual KL-divergence and the second is the map
-     *   of word contributions as described above; will be null if
-     *   not requested.
-     */
-  def kl_divergence(xother: WordDist, partial: Boolean = false) = {
+
+  /**
+   * This is a basic unigram implementation of the computation of the
+   * KL-divergence between this distribution and another distribution.
+   * Useful for checking against other, faster implementations.
+   * 
+   * Computing the KL divergence is a bit tricky, especially in the
+   * presence of smoothing, which assigns probabilities even to words not
+   * seen in either distribution.  We have to take into account:
+   * 
+   * 1. Words in this distribution (may or may not be in the other).
+   * 2. Words in the other distribution that are not in this one.
+   * 3. Words in neither distribution but seen globally.
+   * 4. Words never seen at all.
+   * 
+   * The computation of steps 3 and 4 depends heavily on the particular
+   * smoothing algorithm; in the absence of smoothing, these steps
+   * contribute nothing to the overall KL-divergence.
+   * 
+   * @param xother The other distribution to compute against.
+   * @param partial If true, only do step 1 above.
+   *   
+   * @return A tuple of (divergence, word_contribs) where the first
+   *   value is the actual KL-divergence and the second is the map
+   *   of word contributions as described above; will be null if
+   *   not requested.
+   */
+  protected def imp_kl_divergence(xother: WordDist, partial: Boolean) = {
     val other = xother.asInstanceOf[BigramWordDist]
-    assert(finished)
-    assert(other.finished)
     var kldiv = 0.0
     //val contribs =
     //  if (return_contributing_words) mutable.Map[Word, Double]() else null
@@ -379,7 +364,7 @@ trait SimpleBigramWordDistReader extends WordDistReader {
   }
 
   def initialize_distribution(doc: GenericDistDocument, countstr: String,
-      is_training_set: Boolean) = {
+      is_training_set: Boolean) {
     parse_counts(doc, countstr)
     // Now set the distribution on the document; but don't use the test
     // set's distributions in computing global smoothing values and such.
@@ -392,7 +377,7 @@ trait SimpleBigramWordDistReader extends WordDistReader {
   def set_bigram_word_dist(doc: GenericDistDocument,
       keys: Array[Word], values: Array[Int], num_words: Int,
       bigram_keys: Array[Word], bigram_values: Array[Int], num_bigrams: Int,
-      is_training_set: Boolean): Boolean
+      is_training_set: Boolean)
 }
 
 /**

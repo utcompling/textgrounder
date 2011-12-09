@@ -89,19 +89,17 @@ class PseudoGoodTuringSmoothedWordDistFactory extends
     //// we never actually have to compute it.
     total_num_types_seen_once = overall_word_probs.values count (_ == 1.0)
     globally_unseen_word_prob =
-      total_num_types_seen_once.toDouble/WordDist.total_num_word_tokens
+      total_num_types_seen_once.toDouble/total_num_word_tokens
     for ((word, count) <- overall_word_probs)
       overall_word_probs(word) = (
-        count.toDouble/WordDist.total_num_word_tokens*
-        (1.0 - globally_unseen_word_prob))
+        count.toDouble/total_num_word_tokens*(1.0 - globally_unseen_word_prob))
     // A very rough estimate, perhaps totally wrong
     total_num_unseen_word_types =
-      total_num_types_seen_once max (WordDist.total_num_word_types/20)
+      total_num_types_seen_once max (total_num_word_types/20)
     if (debug("tons"))
       errprint("Total num types = %s, total num tokens = %s, total num_seen_once = %s, globally unseen word prob = %s, total mass = %s",
-               WordDist.total_num_word_types, WordDist.total_num_word_tokens,
-               total_num_types_seen_once,
-               globally_unseen_word_prob,
+               total_num_word_types, total_num_word_tokens,
+               total_num_types_seen_once, globally_unseen_word_prob,
                globally_unseen_word_prob + (overall_word_probs.values sum))
   }
 
@@ -110,10 +108,9 @@ class PseudoGoodTuringSmoothedWordDistFactory extends
       note_globally = false)
 
   def set_unigram_word_dist(doc: GenericDistDocument, keys: Array[Word],
-      values: Array[Int], num_words: Int, is_training_set: Boolean) = {
+      values: Array[Int], num_words: Int, is_training_set: Boolean) {
     doc.dist = new PseudoGoodTuringSmoothedWordDist(this, keys, values,
       num_words, note_globally = is_training_set)
-    true
   }
 }
 
@@ -137,7 +134,7 @@ class PseudoGoodTuringSmoothedWordDist(
   num_words: Int,
   note_globally: Boolean
 ) extends UnigramWordDist(keys, values, num_words) {
-  type ThisType = PseudoGoodTuringSmoothedWordDist
+  type TThis = PseudoGoodTuringSmoothedWordDist
 
   /** Total probability mass to be assigned to all words not
       seen in the document, estimated (motivated by Good-Turing
@@ -173,10 +170,12 @@ class PseudoGoodTuringSmoothedWordDist(
     assert(!factory.owp_adjusted)
     for ((word, count) <- counts) {
       if (!(factory.overall_word_probs contains word))
-        WordDist.total_num_word_types += 1
+        factory.total_num_word_types += 1
       // Record in overall_word_probs; note more tokens seen.
       factory.overall_word_probs(word) += count
-      WordDist.total_num_word_tokens += count
+      // Our training docs should never have partial (interpolated) counts.
+      assert (count == count.toInt)
+      factory.total_num_word_tokens += count.toInt
     }
   }
 
@@ -188,7 +187,7 @@ class PseudoGoodTuringSmoothedWordDist(
     * distributions.
     */
 
-  def finish_after_global() {
+  protected def imp_finish_after_global() {
     // Make sure that overall_word_probs has been computed properly.
     assert(factory.owp_adjusted)
 
@@ -212,7 +211,6 @@ class PseudoGoodTuringSmoothedWordDist(
         yield factory.overall_word_probs(ind)) sum)
     //if (use_sorted_list)
     //  counts = new SortedList(counts)
-    finished = true
   }
 
   override def finish(minimum_word_count: Int = 0) {
@@ -223,31 +221,31 @@ class PseudoGoodTuringSmoothedWordDist(
     }
   }
 
-  val FastAlgorithms = FastPseudoGoodTuringSmoothedWordDist
-  def fast_kl_divergence(other: WordDist, partial: Boolean = false) =
+  def fast_kl_divergence(other: WordDist, partial: Boolean = false) = {
     FastPseudoGoodTuringSmoothedWordDist.fast_kl_divergence(
-      this.asInstanceOf[ThisType],
-      other.asInstanceOf[ThisType], partial = partial)
+      this.asInstanceOf[TThis], other.asInstanceOf[TThis],
+      partial = partial)
+  }
 
   def cosine_similarity(other: WordDist, partial: Boolean = false,
-      smoothed: Boolean = false) =
+      smoothed: Boolean = false) = {
     if (smoothed)
       FastPseudoGoodTuringSmoothedWordDist.fast_smoothed_cosine_similarity(
-        this.asInstanceOf[ThisType],
-        other.asInstanceOf[ThisType], partial = partial)
+        this.asInstanceOf[TThis], other.asInstanceOf[TThis],
+        partial = partial)
     else
       FastPseudoGoodTuringSmoothedWordDist.fast_cosine_similarity(
-        this.asInstanceOf[ThisType],
-        other.asInstanceOf[ThisType], partial = partial)
+        this.asInstanceOf[TThis], other.asInstanceOf[TThis],
+        partial = partial)
+  }
 
   def kl_divergence_34(other: UnigramWordDist) = {      
     var overall_probs_diff_words = 0.0
     for (word <- other.counts.keys if !(counts contains word)) {
-      overall_probs_diff_words +=
-        factory.overall_word_probs(word)
+      overall_probs_diff_words += factory.overall_word_probs(word)
     }
 
-    inner_kl_divergence_34(other.asInstanceOf[ThisType],
+    inner_kl_divergence_34(other.asInstanceOf[TThis],
       overall_probs_diff_words)
   }
       
@@ -255,7 +253,7 @@ class PseudoGoodTuringSmoothedWordDist(
    * Actual implementation of steps 3 and 4 of KL-divergence computation, given
    * a value that we may want to compute as part of step 2.
    */
-  def inner_kl_divergence_34(other: ThisType,
+  def inner_kl_divergence_34(other: TThis,
       overall_probs_diff_words: Double) = {
     var kldiv = 0.0
 
