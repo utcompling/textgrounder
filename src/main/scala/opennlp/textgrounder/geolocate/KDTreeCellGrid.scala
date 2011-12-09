@@ -159,11 +159,13 @@ class KdTreeCellGrid(table: SphereDocumentTable,
         for ((k,v) <- puwd.counts) {
           val oldv = uwd.counts.getOrElse(k, 0.0)
           val newv = oldv + interpolateWeight * v
-          uwd.counts.put(k, newv)
+          if (newv > interpolateWeight)
+            uwd.counts.put(k, newv)
         }
 
         // gotta update these variables
         uwd.num_word_tokens = uwd.counts.values.sum
+        driver.heartbeat
       }
     }
 
