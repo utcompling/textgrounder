@@ -90,10 +90,13 @@ TDoc <: DistDocument[TCoord]](
   /** # of records seen in each split. */
   val num_records_by_split =
     driver.countermap("num_records_by_split")
-  /** # of records skipped in each split, due to errors or other issues
+  /** # of records skipped in each split due to errors */
+  val num_error_skipped_records_by_split =
+    driver.countermap("num_error_skipped_records_by_split")
+  /** # of records skipped in each split, due to issues other than errors
     * (e.g. for Wikipedia documents, not being in the Main namespace).  */
-  val num_skipped_records_by_split =
-    driver.countermap("num_skipped_records_by_split")
+  val num_non_error_skipped_records_by_split =
+    driver.countermap("num_non_error_skipped_records_by_split")
   /** # of documents seen in each split.  This does not include skipped
     * records (see above).  */
   val num_documents_by_split =
@@ -188,11 +191,18 @@ TDoc <: DistDocument[TCoord]](
    */
   def create_and_init_document(schema: Schema, fieldvals: Seq[String],
       record_in_table: Boolean, must_have_coord: Boolean = true) = {
-    val doc = imp_create_and_init_document(schema, fieldvals, record_in_table)
     val split = schema.get_field_or_else(fieldvals, "split", "unknown")
     num_records_by_split(split) += 1
+    val doc = try {
+      imp_create_and_init_document(schema, fieldvals, record_in_table)
+    } catch {
+      case e:Exception => {
+        num_error_skipped_records_by_split(split) += 1
+        throw e
+      }
+    }
     if (doc == null) {
-      num_skipped_records_by_split(split) += 1
+      num_non_error_skipped_records_by_split(split) += 1
       doc 
     } else {
       assert(doc.split == split)
@@ -337,7 +347,8 @@ TDoc <: DistDocument[TCoord]](
     errprint("Document/record/word token statistics:")
 
     var total_num_records = 0L
-    var total_num_skipped_records = 0L
+    var total_num_error_skipped_records = 0L
+    var total_num_non_error_skipped_records = 0L
     var total_num_documents = 0L
     var total_num_documents_skipped_because_lacking_coordinates = 0L
     var total_num_would_be_recorded_documents_skipped_because_lacking_coordinates = 0L
@@ -357,9 +368,17 @@ TDoc <: DistDocument[TCoord]](
       errprint("  %s records seen", num_records)
       total_num_records += num_records
 
-      val num_skipped_records = num_skipped_records_by_split(split).value
-      errprint("  %s skipped records seen", num_skipped_records)
-      total_num_skipped_records += num_skipped_records
+      val num_error_skipped_records =
+        num_error_skipped_records_by_split(split).value
+      errprint("  %s records skipped due to error seen",
+        num_error_skipped_records)
+      total_num_error_skipped_records += num_error_skipped_records
+
+      val num_non_error_skipped_records =
+        num_non_error_skipped_records_by_split(split).value
+      errprint("  %s records skipped due to other than error seen",
+        num_non_error_skipped_records)
+      total_num_non_error_skipped_records += num_non_error_skipped_records
 
       def print_line(documents: String, num_documents: Long,
           num_tokens: Long) {
@@ -437,8 +456,10 @@ TDoc <: DistDocument[TCoord]](
         word_tokens_of_recorded_documents_with_coordinates
     }
 
-    errprint("Total: %s records, %s skipped records",
-      total_num_records, total_num_skipped_records)
+    errprint("Total: %s records, %s skipped records (%s from error)",
+      total_num_records,
+      (total_num_error_skipped_records + total_num_non_error_skipped_records),
+      total_num_error_skipped_records)
     errprint("Total: %s documents with %s total word tokens",
       total_num_documents, total_word_tokens_of_documents)
     errprint("Total: %s documents skipped because lacking coordinates,\n       with %s total word tokens",
