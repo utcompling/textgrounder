@@ -194,8 +194,7 @@ object WikipediaDocument {
 class WikipediaDocumentSubtable(
   override val table: SphereDocumentTable
 ) extends SphereDocumentSubtable[WikipediaDocument](table) {
-  def create_document(schema: Schema) =
-    new WikipediaDocument(schema, this)
+  def create_document(schema: Schema) = new WikipediaDocument(schema, this)
 
   override def create_and_init_document(schema: Schema, fieldvals: Seq[String],
       record_in_table: Boolean) = {

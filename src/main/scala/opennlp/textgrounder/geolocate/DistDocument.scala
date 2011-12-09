@@ -64,7 +64,11 @@ class DocumentLoadingProperties {
  * names, ID's and documents.
  */
 abstract class DistDocumentTable[TCoord : Serializer,
-  TDoc <: DistDocument[TCoord]](
+TDoc <: DistDocument[TCoord]](
+  /* SCALABUG!!! Declaring TDoc <: DistDocument[TCoord] isn't sufficient
+     for Scala to believe that null is an OK value for TDoc, even though
+     DistDocument is a reference type and hence TDoc must be reference.
+   */
   val driver: GeolocateDriver,
   val word_dist_factory: WordDistFactory
 ) {
@@ -80,80 +84,151 @@ abstract class DistDocumentTable[TCoord : Serializer,
    */
   val documents_by_split = bufmap[String, TDoc]()
 
-  /**
-   * Num of documents with word-count information but not in table.
-   */
-  val num_documents_with_word_counts_but_not_in_table =
-    new driver.TaskCounterWrapper("documents_with_word_counts_but_not_in_table")
+  // Example of using TaskCounterWrapper directly for non-split values.
+  // val num_documents = new driver.TaskCounterWrapper("num_documents") 
 
-  /**
-   * Num of documents with word-count information (whether or not in table).
-   */
-  val num_documents_with_word_counts =
-    new driver.TaskCounterWrapper("documents_with_word_counts")
-
-  /** 
-   * Num of documents in each split with word-count information seen.
-   */
-  val num_word_count_documents_by_split =
-    driver.countermap("word_count_documents_by_split")
-
-  /**
-   * Num of documents in each split with a computed distribution.
-   * (Not the same as the previous since we don't compute the distribution of
-   * documents in either the test or dev set depending on which one is used.)
-   */
-  val num_dist_documents_by_split =
-    driver.countermap("num_dist_documents_by_split")
-
-  /**
-   * Total # of word tokens for all documents in each split.
-   */
-  val word_tokens_by_split =
-    driver.countermap("word_tokens_by_split")
+  /** # of records seen in each split. */
+  val num_records_by_split =
+    driver.countermap("num_records_by_split")
+  /** # of records skipped in each split, due to errors or other issues
+    * (e.g. for Wikipedia documents, not being in the Main namespace).  */
+  val num_skipped_records_by_split =
+    driver.countermap("num_skipped_records_by_split")
+  /** # of documents seen in each split.  This does not include skipped
+    * records (see above).  */
+  val num_documents_by_split =
+    driver.countermap("num_documents_by_split")
+  /** # of documents seen in each split skipped because lacking coordinates.
+    * Note that although most callers skip documents without coordinates,
+    * there are at least some cases where callers request to include such
+    * documents.  */
+  val num_documents_skipped_because_lacking_coordinates_by_split =
+    driver.countermap("num_documents_skipped_because_lacking_coordinates_by_split")
+  /** # of documents seen in each split skipped because lacking coordinates,
+    * but which otherwise would have been recorded.  Note that although most
+    * callers skip documents without coordinates, there are at least some
+    * cases where callers request to include such documents.  In addition,
+    * some callers do not ask for documents to be recorded (this happens
+    * particularly with eval-set documents). */
+  val num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split =
+    driver.countermap("num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split")
+  /** # of recorded documents seen in each split (i.e. those added to the
+    * cell grid).  Non-recorded documents are generally those in the eval set.
+    */
+  val num_recorded_documents_by_split =
+    driver.countermap("num_recorded_documents_by_split")
+  /** # of documents in each split with coordinates. */
+  val num_documents_with_coordinates_by_split =
+    driver.countermap("num_documents_with_coordinates_by_split")
+  /** # of recorded documents in each split with coordinates.  Non-recorded
+    * documents are generally those in the eval set. */
+  val num_recorded_documents_with_coordinates_by_split =
+    driver.countermap("num_recorded_documents_with_coordinates_by_split")
+  /** # of word tokens for documents seen in each split.  This does not
+    * include skipped records (see above). */
+  val word_tokens_of_documents_by_split =
+    driver.countermap("word_tokens_of_documents_by_split")
+  /** # of word tokens for documents seen in each split skipped because
+    * lacking coordinates (see above). */
+  val word_tokens_of_documents_skipped_because_lacking_coordinates_by_split =
+    driver.countermap("word_tokens_of_documents_skipped_because_lacking_coordinates_by_split")
+  /** # of word tokens for documents seen in each split skipped because
+    * lacking coordinates, but which otherwise would have been recorded
+    * (see above).  Non-recorded documents are generally those in the
+    * eval set. */
+  val word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split =
+    driver.countermap("word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split")
+  /** # of word tokens for recorded documents seen in each split (i.e.
+    * those added to the cell grid).  Non-recorded documents are generally
+    * those in the eval set. */
+  val word_tokens_of_recorded_documents_by_split =
+    driver.countermap("word_tokens_of_recorded_documents_by_split")
+  /** # of word tokens for documents in each split with coordinates. */
+  val word_tokens_of_documents_with_coordinates_by_split =
+    driver.countermap("word_tokens_of_documents_with_coordinates_by_split")
+  /** # of word tokens for recorded documents in each split with coordinates.
+    * Non-recorded documents are generally those in the eval set. */
+  val word_tokens_of_recorded_documents_with_coordinates_by_split =
+    driver.countermap("word_tokens_of_recorded_documents_with_coordinates_by_split")
 
   def create_document(schema: Schema): TDoc
 
   /**
-   * Create, initialize and return a document with the given fieldvals,
-   * loaded from a corpus with the given schema.  Return value may be
-   * null, meaning that the document needs to be skipped.
-   *
-   * @param record_in_table If true, record the document in any subsidiary
-   *   tables, subclasses, etc.  Note that the main recording in this table
-   *   happens independently and automatically (usually as a result of a
-   *   call to `create_and_record_document`).
+   * Implementation of `create_and_init_document`.  Subclasses should
+   * override this if needed.  External callers should call
+   * `create_and_init_document`, not this.  Note also that the
+   * parameter `record_in_table` has a different meaning here -- it only
+   * refers to recording in subsidiary tables, subclasses, etc.  The
+   * wrapping function `create_and_init_document` takes care of recording
+   * in the main table.
    */
-  def create_and_init_document(schema: Schema, fieldvals: Seq[String],
-      record_in_table: Boolean) = {
+  protected def imp_create_and_init_document(schema: Schema,
+      fieldvals: Seq[String], record_in_table: Boolean) = {
     val doc = create_document(schema)
     if (doc != null)
       doc.set_fields(fieldvals)
     doc
   }
 
-  /** Create and initialize a document.  If appropriate, record it using
-    * `record_document` (which puts it in the list of documents by split
-    * and adds it to the cell grid).  Return true if document recorded,
-    * false if skipped for any reason.
-    */
-  def create_and_record_document(schema: Schema, fieldvals: Seq[String],
-      cell_grid: CellGrid[TCoord,TDoc,_]) = {
-    val doc = create_and_init_document(schema, fieldvals, true)
-    if (doc != null && doc.has_coord) {
-      record_document(doc, cell_grid)
-      true
+  /**
+   * Create, initialize and return a document with the given fieldvals,
+   * loaded from a corpus with the given schema.  Return value may be
+   * null, meaning that the given record was skipped (e.g. due to erroneous
+   * field values or for some other reason -- e.g. Wikipedia records not
+   * in the Main namespace are skipped).
+   *
+   * @param schema Schema of the corpus from which the record was loaded
+   * @param fieldvals Field values, taken from the record
+   * @param record_in_table If true, record the document in the table and
+   *   in any subsidiary tables, subclasses, etc.  This does not record
+   *   the document in the cell grid; the caller needs to do that if
+   *   needed.
+   * @param must_have_coord If true, the document must have a coordinate;
+   *   if not, it will be skipped, and null will be returned.
+   */
+  def create_and_init_document(schema: Schema, fieldvals: Seq[String],
+      record_in_table: Boolean, must_have_coord: Boolean = true) = {
+    val doc = imp_create_and_init_document(schema, fieldvals, record_in_table)
+    val split = schema.get_field_or_else(fieldvals, "split", "unknown")
+    num_records_by_split(split) += 1
+    if (doc == null) {
+      num_skipped_records_by_split(split) += 1
+      doc 
+    } else {
+      assert(doc.split == split)
+      assert(doc.dist != null)
+      val double_tokens = doc.dist.num_word_tokens
+      val tokens = double_tokens.toInt
+      // Our training docs should not have partial counts.
+      assert(tokens == double_tokens)
+      num_documents_by_split(split) += 1
+      word_tokens_of_documents_by_split(split) += tokens
+      if (!doc.has_coord && must_have_coord) {
+        errprint("Document %s skipped because it has no coordinate", doc)
+        num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
+        word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
+        if (record_in_table) {
+          num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
+          word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
+        }
+        null.asInstanceOf[TDoc]
+      }
+      if (doc.has_coord) {
+        num_documents_with_coordinates_by_split(split) += 1
+        word_tokens_of_documents_with_coordinates_by_split(split) += tokens
+      }
+      if (record_in_table) {
+        // documents_by_split(split) += doc
+        num_recorded_documents_by_split(split) += 1
+        word_tokens_of_recorded_documents_by_split(split) += tokens
+      }
+      if (doc.has_coord && record_in_table) {
+        num_recorded_documents_with_coordinates_by_split(split) += 1
+        (word_tokens_of_recorded_documents_with_coordinates_by_split(split)
+          += tokens)
+      }
+      doc
     }
-    else
-      false
-  }
-
-  /** Record a document in the list of documents by split, and add it to
-    * the cell grid.
-    */
-  def record_document(doc: TDoc, cell_grid: CellGrid[TCoord,TDoc,_]) {
-    documents_by_split(doc.split) += doc
-    cell_grid.add_document_to_cell(doc)
   }
 
   /**
@@ -169,7 +244,13 @@ abstract class DistDocumentTable[TCoord : Serializer,
     suffix: String, cell_grid: CellGrid[TCoord,TDoc,_]
   ) extends DistDocumentFileProcessor(suffix, driver) {
     def handle_document(fieldvals: Seq[String]) = {
-      (create_and_record_document(schema, fieldvals, cell_grid), true)
+      val doc = create_and_init_document(schema, fieldvals, true)
+      if (doc != null) {
+        assert(doc.dist != null)
+        cell_grid.add_document_to_cell(doc)
+        (true, true)
+      }
+      else (false, true)
     }
 
     def process_lines(lines: Iterator[String],
@@ -244,50 +325,136 @@ abstract class DistDocumentTable[TCoord : Serializer,
     // statistics just computed.
     errprint("Finishing document dists...")
     for ((split, table) <- documents_by_split) {
-      var totaltoks : Double = 0
-      var numdocs = 0
       for (doc <- table) {
-        if (doc.dist != null) {
+        if (doc.dist != null)
           doc.dist.finish_after_global()
-          totaltoks += doc.dist.num_word_tokens
-          numdocs += 1
-        }
       }
-      num_dist_documents_by_split(split) += numdocs
-      word_tokens_by_split(split) += totaltoks.toInt
     }
 
     // Now output statistics on number of documents seen, etc.
     errprint("")
     errprint("-------------------------------------------------------------------------")
-    errprint("Document count statistics:")
-    var total_docs_in_table = 0L
-    var total_docs_with_word_counts = 0L
-    var total_docs_with_dists = 0L
-    for ((split, totaltoks) <- word_tokens_by_split) {
+    errprint("Document/record/word token statistics:")
+
+    var total_num_records = 0L
+    var total_num_skipped_records = 0L
+    var total_num_documents = 0L
+    var total_num_documents_skipped_because_lacking_coordinates = 0L
+    var total_num_would_be_recorded_documents_skipped_because_lacking_coordinates = 0L
+    var total_num_recorded_documents = 0L
+    var total_num_documents_with_coordinates = 0L
+    var total_num_recorded_documents_with_coordinates = 0L
+    var total_word_tokens_of_documents = 0L
+    var total_word_tokens_of_documents_skipped_because_lacking_coordinates = 0L
+    var total_word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates = 0L
+    var total_word_tokens_of_recorded_documents = 0L
+    var total_word_tokens_of_documents_with_coordinates = 0L
+    var total_word_tokens_of_recorded_documents_with_coordinates = 0L
+    for (split <- num_records_by_split.keys) {
       errprint("For split '%s':", split)
-      val docs_in_table = documents_by_split(split).length
-      val docs_with_word_counts = num_word_count_documents_by_split(split).value
-      val docs_with_dists = num_dist_documents_by_split(split).value
-      total_docs_in_table += docs_in_table
-      total_docs_with_word_counts += docs_with_word_counts
-      total_docs_with_dists += docs_with_dists
-      errprint("  %s documents in document table", docs_in_table)
-      errprint("  %s documents with word counts seen (and in table)", docs_with_word_counts)
-      errprint("  %s documents with distribution computed, %s total tokens, %.2f tokens/document",
-        docs_with_dists, totaltoks.value,
-        // Avoid division by zero
-        totaltoks.value.toDouble / (docs_in_table + 1e-100))
+
+      val num_records = num_records_by_split(split).value
+      errprint("  %s records seen", num_records)
+      total_num_records += num_records
+
+      val num_skipped_records = num_skipped_records_by_split(split).value
+      errprint("  %s skipped records seen", num_skipped_records)
+      total_num_skipped_records += num_skipped_records
+
+      def print_line(documents: String, num_documents: Long,
+          num_tokens: Long) {
+        errprint("  %s %s, %s total tokens, %.2f tokens/document",
+          num_documents, documents, num_tokens,
+          // Avoid division by zero
+          num_tokens.toDouble / (num_documents + 1e-100))
+      }
+
+      val num_documents = num_documents_by_split(split).value
+      val word_tokens_of_documents =
+        word_tokens_of_documents_by_split(split).value
+      print_line("documents seen", num_documents, word_tokens_of_documents)
+      total_num_documents += num_documents
+      total_word_tokens_of_documents += word_tokens_of_documents
+
+      val num_recorded_documents =
+        num_recorded_documents_by_split(split).value
+      val word_tokens_of_recorded_documents =
+        word_tokens_of_recorded_documents_by_split(split).value
+      print_line("documents recorded", num_recorded_documents,
+        word_tokens_of_recorded_documents)
+      total_num_recorded_documents += num_recorded_documents
+      total_word_tokens_of_recorded_documents +=
+        word_tokens_of_recorded_documents
+
+      val num_documents_skipped_because_lacking_coordinates =
+        num_documents_skipped_because_lacking_coordinates_by_split(split).value
+      val word_tokens_of_documents_skipped_because_lacking_coordinates =
+        word_tokens_of_documents_skipped_because_lacking_coordinates_by_split(
+          split).value
+      print_line("documents skipped because lacking coordinates",
+        num_documents_skipped_because_lacking_coordinates,
+        word_tokens_of_documents_skipped_because_lacking_coordinates)
+      total_num_documents_skipped_because_lacking_coordinates +=
+        num_documents_skipped_because_lacking_coordinates
+      total_word_tokens_of_documents_skipped_because_lacking_coordinates +=
+        word_tokens_of_documents_skipped_because_lacking_coordinates
+
+      val num_would_be_recorded_documents_skipped_because_lacking_coordinates =
+        num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(
+        split).value
+      val word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates =
+        word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(
+          split).value
+      print_line("would-be-recorded documents skipped because lacking coordinates",
+        num_would_be_recorded_documents_skipped_because_lacking_coordinates,
+        word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates)
+      total_num_would_be_recorded_documents_skipped_because_lacking_coordinates +=
+        num_would_be_recorded_documents_skipped_because_lacking_coordinates
+      total_word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates +=
+        word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates
+
+      val num_documents_with_coordinates =
+        num_documents_with_coordinates_by_split(split).value
+      val word_tokens_of_documents_with_coordinates =
+        word_tokens_of_documents_with_coordinates_by_split(split).value
+      print_line("documents having coordinates seen",
+        num_documents_with_coordinates,
+        word_tokens_of_documents_with_coordinates)
+      total_num_documents_with_coordinates += num_documents_with_coordinates
+      total_word_tokens_of_documents_with_coordinates +=
+        word_tokens_of_documents_with_coordinates
+
+      val num_recorded_documents_with_coordinates =
+        num_recorded_documents_with_coordinates_by_split(split).value
+      val word_tokens_of_recorded_documents_with_coordinates =
+        word_tokens_of_recorded_documents_with_coordinates_by_split(split).value
+      print_line("documents having coordinates recorded",
+        num_recorded_documents_with_coordinates,
+        word_tokens_of_recorded_documents_with_coordinates)
+      total_num_recorded_documents_with_coordinates +=
+        num_recorded_documents_with_coordinates
+      total_word_tokens_of_recorded_documents_with_coordinates +=
+        word_tokens_of_recorded_documents_with_coordinates
     }
-    errprint("Total: %s documents with word counts seen",
-      num_documents_with_word_counts.value)
-    errprint("Total: %s documents in document table", total_docs_in_table)
-    errprint("Total: %s documents with word counts seen but not in document table",
-      num_documents_with_word_counts_but_not_in_table.value)
-    errprint("Total: %s documents with word counts seen (and in table)",
-      total_docs_with_word_counts)
-    errprint("Total: %s documents with distribution computed",
-      total_docs_with_dists)
+
+    errprint("Total: %s records, %s skipped records",
+      total_num_records, total_num_skipped_records)
+    errprint("Total: %s documents with %s total word tokens",
+      total_num_documents, total_word_tokens_of_documents)
+    errprint("Total: %s documents skipped because lacking coordinates,\n       with %s total word tokens",
+      total_num_documents_skipped_because_lacking_coordinates,
+      total_word_tokens_of_documents_skipped_because_lacking_coordinates)
+    errprint("Total: %s would-be-recorded documents skipped because lacking coordinates,\n       with %s total word tokens",
+      total_num_would_be_recorded_documents_skipped_because_lacking_coordinates,
+      total_word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates)
+    errprint("Total: %s recorded documents with %s total word tokens",
+      total_num_recorded_documents, total_word_tokens_of_recorded_documents)
+    errprint("Total: %s documents having coordinates with %s total word tokens",
+      total_num_documents_with_coordinates,
+      total_word_tokens_of_documents_with_coordinates)
+    errprint("Total: %s recorded documents having coordinatess with %s total word tokens",
+      total_num_recorded_documents_with_coordinates,
+      total_word_tokens_of_recorded_documents_with_coordinates)
   }
 }
 
@@ -448,8 +615,6 @@ abstract class DistDocument[TCoord : Serializer](
   def set_field(field: String, value: String) {
     field match {
       case "counts" => {
-        table.num_word_count_documents_by_split(this.split) += 1
-        table.num_documents_with_word_counts += 1
         // Set the distribution on the document.  But don't use the eval
         // set's distributions in computing global smoothing values and such,
         // to avoid contaminating the results (training on your eval set).
