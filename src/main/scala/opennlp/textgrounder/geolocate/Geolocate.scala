@@ -598,7 +598,7 @@ tiling cell to compute each multi cell.  If the value is more than
 
   //// Options for using KD trees, and related parameters
   var kd_tree = 
-    ap.option[Boolean]("kd-tree", "kd", "kdtree",
+    ap.flag("kd-tree", "kd", "kdtree",
       help = """Specifies we should use a KD tree rather than uniform
 grid cell.""")
 
@@ -627,7 +627,7 @@ which splits at the maximum margin between two points. All splits are always
 on the longest dimension. Default '%default'.""")
 
   var kd_use_backoff = 
-    ap.option[Boolean]("kd-backoff", "kd-use-backoff", default=false,
+    ap.flag("kd-backoff", "kd-use-backoff",
       help = """Specifies if we should back off to larger cell distributions.""")
 
   var kd_interpolate_weight =
