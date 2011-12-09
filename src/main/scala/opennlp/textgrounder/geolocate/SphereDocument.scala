@@ -111,7 +111,7 @@ class SphereDocumentTable(
     throw new UnsupportedOperationException("This shouldn't be called directly; instead, use create_and_init_document()")
   }
 
-  override def create_and_init_document(schema: Schema,
+  override def imp_create_and_init_document(schema: Schema,
       fieldvals: Seq[String], record_in_table: Boolean) = {
     find_subtable(schema, fieldvals).
       create_and_init_document(schema, fieldvals, record_in_table)

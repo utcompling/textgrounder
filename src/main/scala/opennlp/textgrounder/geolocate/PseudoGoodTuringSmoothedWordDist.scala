@@ -173,6 +173,7 @@ class PseudoGoodTuringSmoothedWordDist(
         factory.total_num_word_types += 1
       // Record in overall_word_probs; note more tokens seen.
       factory.overall_word_probs(word) += count
+      // Our training docs should never have partial (interpolated) counts.
       assert (count == count.toInt)
       factory.total_num_word_tokens += count.toInt
     }

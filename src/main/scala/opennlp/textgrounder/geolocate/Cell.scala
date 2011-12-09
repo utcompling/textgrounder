@@ -558,10 +558,10 @@ abstract class CellGrid[
     errprint("Total number of cells: %s", total_num_cells)
     errprint("Percent non-empty cells: %g",
       num_non_empty_cells.toDouble / total_num_cells)
-    val training_docs_with_word_counts =
-      table.num_word_count_documents_by_split("training").value
+    val recorded_training_docs_with_coordinates =
+      table.num_recorded_documents_with_coordinates_by_split("training").value
     errprint("Training documents per non-empty cell: %g",
-      training_docs_with_word_counts.toDouble / num_non_empty_cells)
+      recorded_training_docs_with_coordinates.toDouble / num_non_empty_cells)
     // Clear out the document distributions of the training set, since
     // only needed when computing cells.
     //
