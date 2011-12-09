@@ -489,7 +489,8 @@ abstract class CellGrid[
    * its center.  The reason for not recording such cells is to make
    * sure that future evaluation results aren't affected.
    */
-  def find_best_cell_for_coord(coord: TCoord, create: Boolean): TCell
+  def find_best_cell_for_coord(coord: TCoord, create_non_recorded: Boolean):
+    TCell
 
   /**
    * Add the given document to the cell grid.
