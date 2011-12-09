@@ -27,7 +27,7 @@ import java.io.{FileSystem=>_,_}
 import org.apache.hadoop.io._
 
 import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.printutil.warning
+import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 import WordDist.memoizer._
 import GenericTypes._
@@ -138,10 +138,11 @@ class GenerateKMLDriver extends
       for (w <- params.split_kml_words) yield memoize_string(w)
   }
 
-  override def initialize_word_dist_factory_and_suffix() = {
-    (new FilterPseudoGoodTuringSmoothedWordDistFactory(
-      params.split_kml_words_memoized),
-      DistDocument.unigram_counts_suffix)
+  override def initialize_word_dist_suffix() = 
+    DistDocument.unigram_counts_suffix
+  override def initialize_word_dist_factory() = {
+    new FilterPseudoGoodTuringSmoothedWordDistFactory(
+      params.split_kml_words_memoized)
   }
 
   /**
