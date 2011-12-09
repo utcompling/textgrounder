@@ -122,13 +122,16 @@ class KdTreeCellGrid(table: SphereDocumentTable,
 
     val nodes_to_cell : Map[KdTree[SphereDocument], KdTreeCell] = Map()
 
-    val task = new ExperimentMeteredTask(table.driver, "K-d tree cell",
-      "generating")
-    for (node <- kdtree.getNodes) {
-      val c = new KdTreeCell(this, node)
-      c.generate_dist
-      nodes_to_cell.update(node, c)
-      task.item_processed()
+    { // Put in a block to control scope of 'task'
+      val task = new ExperimentMeteredTask(table.driver, "K-d tree cell",
+        "generating")
+      for (node <- kdtree.getNodes) {
+        val c = new KdTreeCell(this, node)
+        c.generate_dist
+        nodes_to_cell.update(node, c)
+        task.item_processed()
+      }
+      task.finish()
     }
 
     if (interpolateWeight > 0) {
@@ -174,9 +177,15 @@ class KdTreeCellGrid(table: SphereDocumentTable,
       task.finish()
     }
 
-    val nodes = if (useBackoff) kdtree.getNodes else kdtree.getLeaves
-    for (node <- nodes) {
-      leaves_to_cell.update(node, nodes_to_cell(node))
+    { // Put in a block to control scope of 'task' and such
+      val task = new ExperimentMeteredTask(table.driver, "K-d tree cell",
+        "updating")
+      val nodes = if (useBackoff) kdtree.getNodes else kdtree.getLeaves
+      for (node <- nodes) {
+        leaves_to_cell.update(node, nodes_to_cell(node))
+        task.item_processed()
+      }
+      task.finish()
     }
   }
 
