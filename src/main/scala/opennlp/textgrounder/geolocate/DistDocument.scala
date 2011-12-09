@@ -452,7 +452,7 @@ TDoc <: DistDocument[TCoord]](
     errprint("Total: %s documents having coordinates with %s total word tokens",
       total_num_documents_with_coordinates,
       total_word_tokens_of_documents_with_coordinates)
-    errprint("Total: %s recorded documents having coordinatess with %s total word tokens",
+    errprint("Total: %s recorded documents having coordinates with %s total word tokens",
       total_num_recorded_documents_with_coordinates,
       total_word_tokens_of_recorded_documents_with_coordinates)
   }
