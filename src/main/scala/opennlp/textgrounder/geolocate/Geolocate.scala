@@ -863,14 +863,11 @@ abstract class GeolocateDriver extends
 
     need_seq(params.input_corpus, "input-corpus")
     
-    // FIXME!! Moved here from the beginning of setup_for_run() because
-    // of the need to have `document_file_suffix` set.  Maybe come up
-    // a clean way to set the suffix but not create the factory?
-    // (Although in reality it doesn't matter much, as creating the factory
-    // doesn't do much.)
-    val (factory, suffix) = initialize_word_dist_factory_and_suffix()
-    word_dist_factory = factory
-    document_file_suffix = suffix
+    // Need to have `document_file_suffix` set early on, but factory
+    // shouldn't be created till setup_for_run() because factory may
+    // depend on auxiliary parameters set during this stage (e.g. during
+    // GenerateKML).
+    document_file_suffix = initialize_word_dist_suffix()
   }
 
   protected def initialize_document_table(word_dist_factory: WordDistFactory) = {
@@ -886,13 +883,18 @@ abstract class GeolocateDriver extends
         params.width_of_multi_cell, table)
   }
 
-  protected def initialize_word_dist_factory_and_suffix() = {
+  protected def initialize_word_dist_suffix() = {
     if (params.word_dist == "pseudo-good-turing-bigram")
-      (new PGTSmoothedBigramWordDistFactory,
-        DistDocument.bigram_counts_suffix)
+      DistDocument.bigram_counts_suffix
     else //(params.word_dist == "pseudo-good-turing-unigram")
-      (new PseudoGoodTuringSmoothedWordDistFactory,
-        DistDocument.unigram_counts_suffix)
+      DistDocument.unigram_counts_suffix
+  }
+
+  protected def initialize_word_dist_factory() = {
+    if (params.word_dist == "pseudo-good-turing-bigram")
+      new PGTSmoothedBigramWordDistFactory
+    else //(params.word_dist == "pseudo-good-turing-unigram")
+      new PseudoGoodTuringSmoothedWordDistFactory
   }
 
   protected def read_stopwords() = {
@@ -907,6 +909,7 @@ abstract class GeolocateDriver extends
   }
 
   def setup_for_run() {
+    word_dist_factory = initialize_word_dist_factory()
     document_table = initialize_document_table(word_dist_factory)
     cell_grid = initialize_cell_grid(document_table)
     stopwords = read_stopwords()
