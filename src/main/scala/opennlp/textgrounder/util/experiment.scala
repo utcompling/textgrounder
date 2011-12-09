@@ -646,7 +646,11 @@ package object experiment {
     }
   }
 
-
+  /**
+   * An extension of the MeteredTask class that calls `driver.heartbeat`
+   * every time an item is processed or we otherwise do something, to let
+   * Hadoop know that we're actually making progress.
+   */
   class ExperimentMeteredTask(
     driver: ExperimentDriver,
     item_name: String,
@@ -654,9 +658,15 @@ package object experiment {
     secs_between_output: Double = 15,
     maxtime: Double = 0.0
   ) extends MeteredTask(item_name, verb, secs_between_output, maxtime) {
+    driver.heartbeat() // Also overkill, again won't hurt.
     override def item_processed() = {
       driver.heartbeat()
       super.item_processed()
+    }
+    override def finish() = {
+      // This is kind of overkill, but shouldn't hurt.
+      driver.heartbeat()
+      super.finish()
     }
   }
 }

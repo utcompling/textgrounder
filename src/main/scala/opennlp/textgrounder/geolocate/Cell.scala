@@ -540,18 +540,23 @@ abstract class CellGrid[
     assert(!all_cells_computed)
 
     initialize_cells()
-    table.driver.heartbeat
 
     all_cells_computed = true
 
     total_num_docs_for_links = 0
     total_num_docs_for_word_dist = 0
-    for (cell <- iter_nonempty_cells()) {
-      total_num_docs_for_word_dist +=
-        cell.combined_dist.num_docs_for_word_dist
-      total_num_docs_for_links +=
-        cell.combined_dist.num_docs_for_links
-      table.driver.heartbeat
+
+    { // Put in a block to control scope of 'task'
+      val task = new ExperimentMeteredTask(table.driver, "non-empty cell",
+        "computing statistics of")
+      for (cell <- iter_nonempty_cells()) {
+        total_num_docs_for_word_dist +=
+          cell.combined_dist.num_docs_for_word_dist
+        total_num_docs_for_links +=
+          cell.combined_dist.num_docs_for_links
+        task.item_processed()
+      }
+      task.finish()
     }
 
     errprint("Number of non-empty cells: %s", num_non_empty_cells)
