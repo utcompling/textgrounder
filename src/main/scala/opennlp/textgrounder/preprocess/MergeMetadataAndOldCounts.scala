@@ -175,10 +175,10 @@ class MMCDocumentFileProcessor(
 ) extends CorpusFileProcessor(suffix) {
   val document_fieldvals = mutable.Map[String, Seq[String]]()
 
-  def process_row(fieldvals: Seq[String]): Boolean = {
+  def process_row(fieldvals: Seq[String]) = {
     val params = (schema.fieldnames zip fieldvals).toMap
     document_fieldvals(params("title")) = fieldvals
-    true
+    (true, true)
   }
 
   def process_lines(lines: Iterator[String],
@@ -195,8 +195,8 @@ class MMCDocumentFileProcessor(
 }
 
 class MMCDriver extends ArgParserExperimentDriver {
-  type ParamType = MMCParameters
-  type RunReturnType = Unit
+  type TParam = MMCParameters
+  type TRunRes = Unit
   
   val filehand = new LocalFileHandler
   
@@ -247,7 +247,7 @@ counts file also containing the metadata.
 
 object MergeMetadataAndOldCounts extends
     ExperimentDriverApp("Merge document metadata files and old counts file") {
-  type DriverType = MMCDriver
-  def create_param_object(ap: ArgParser) = new ParamType(ap)
-  def create_driver() = new DriverType
+  type TDriver = MMCDriver
+  def create_param_object(ap: ArgParser) = new TParam(ap)
+  def create_driver() = new TDriver
 }

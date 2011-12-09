@@ -519,7 +519,7 @@ class TwitterInfochimpsStatsFileProcessor(
 }
 
 class ConvertTwitterInfochimpsDriver extends ProcessFilesDriver {
-  type ParamType = ConvertTwitterInfochimpsParameters
+  type TParam = ConvertTwitterInfochimpsParameters
   
   override def handle_parameters() {
     if (params.output_all_stats) {
@@ -553,7 +553,7 @@ class ConvertTwitterInfochimpsDriver extends ProcessFilesDriver {
 
 object ConvertTwitterInfochimps extends
     ExperimentDriverApp("ConvertTwitterInfochimps") {
-  type DriverType = ConvertTwitterInfochimpsDriver
+  type TDriver = ConvertTwitterInfochimpsDriver
   
   override def description =
 """Convert input files in the Infochimps Twitter corpus into files in the
@@ -561,6 +561,6 @@ format expected by TextGrounder.  If --output-stats or a related argument
 is given, output statistics to stderr rather than converting text.
 """
 
-  def create_param_object(ap: ArgParser) = new ParamType(ap)
-  def create_driver() = new DriverType
+  def create_param_object(ap: ArgParser) = new TParam(ap)
+  def create_driver() = new TDriver
 }

@@ -32,9 +32,6 @@ import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.{curtimehuman, output_resource_usage}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
-/* FIXME: Eliminate this. */
-import GeolocateDriver.Params
-
 /////////////////////////////////////////////////////////////////////////////
 //                 General statistics on evaluation results                //
 /////////////////////////////////////////////////////////////////////////////
@@ -170,9 +167,27 @@ class EvalStatsWithRank(
   }
 }
 
-//////// Statistics for geolocating documents
+//////// Statistics for locating documents
 
-abstract class GeolocateDocumentEvalStats(
+case class DocumentEvaluationResult[
+  TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc]
+](
+  document: TDoc,
+  pred_cell: TCell,
+  true_rank: Int
+) {
+  val true_cell =
+    pred_cell.cell_grid.find_best_cell_for_coord(document.coord, true)
+  val num_docs_in_true_cell = true_cell.combined_dist.num_docs_for_word_dist
+  val true_center = true_cell.get_center_coord()
+  val true_truedist = document.distance_to_coord(true_center)
+  val pred_center = pred_cell.get_center_coord()
+  val pred_truedist = document.distance_to_coord(pred_center)
+}
+
+abstract class DocumentEvalStats(
   driver_stats: ExperimentDriverStats,
   prefix: String,
   max_rank_for_credit: Int = 10
@@ -204,23 +219,23 @@ abstract class GeolocateDocumentEvalStats(
 }
 
 /**
- * Class for statistics for geolocating documents, with separate
+ * Class for statistics for locating documents, with separate
  * sets of statistics for different intervals of error distances and
  * number of documents in true cell.
  */
 
-abstract class GroupedGeolocateDocumentEvalStats[CoordType,
-  DocumentType <: DistDocument[CoordType],
-  CellType <: GeoCell[CoordType, DocumentType]](
+abstract class GroupedDocumentEvalStats[TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc]](
   driver_stats: ExperimentDriverStats,
-  cell_grid: CellGrid[CoordType,DocumentType,CellType],
+  cell_grid: CellGrid[TCoord,TDoc,TCell],
   results_by_range: Boolean
 ) {
-  type BasicEvalStatsType <: GeolocateDocumentEvalStats
-  type DocumentEvaluationResultType <:
-    DocumentEvaluationResult[CoordType, DocumentType, CellType]
+  type TBasicEvalStats <: DocumentEvalStats
+  type TDocEvalRes <:
+    DocumentEvaluationResult[TCoord, TDoc, TCell]
 
-  def create_stats(prefix: String): BasicEvalStatsType
+  def create_stats(prefix: String): TBasicEvalStats
   def create_stats_for_range[T](prefix: String, range: T) =
     create_stats(prefix + ".byrange." + range)
 
@@ -240,7 +255,7 @@ abstract class GroupedGeolocateDocumentEvalStats[CoordType,
   // and longitudinally.
   val dist_fraction_increment = 0.25
   def docmap(prefix: String) =
-    new SettingDefaultHashMap[Double, BasicEvalStatsType](
+    new SettingDefaultHashMap[Double, TBasicEvalStats](
       create_stats_for_range(prefix, _))
   val docs_by_true_dist_to_true_center =
     docmap("true_dist_to_true_center")
@@ -256,15 +271,15 @@ abstract class GroupedGeolocateDocumentEvalStats[CoordType,
     new DoubleTableByRange(dist_fractions_for_error_dist,
       create_stats_for_range("true_dist_to_pred_center", _))
 
-  def record_one_result(stats: BasicEvalStatsType, res: DocumentEvaluationResultType) {
+  def record_one_result(stats: TBasicEvalStats, res: TDocEvalRes) {
     stats.record_result(res.true_rank, res.pred_truedist)
   }
 
-  def record_one_oracle_result(stats: BasicEvalStatsType, res: DocumentEvaluationResultType) {
+  def record_one_oracle_result(stats: TBasicEvalStats, res: TDocEvalRes) {
     stats.record_oracle_result(res.true_truedist)
   }
 
-  def record_result(res: DocumentEvaluationResultType) {
+  def record_result(res: TDocEvalRes) {
     record_one_result(all_document, res)
     record_one_oracle_result(all_document, res)
     // Stephen says recording so many counters leads to crashes (at the 51st
@@ -273,7 +288,7 @@ abstract class GroupedGeolocateDocumentEvalStats[CoordType,
       record_result_by_range(res)
   }
 
-  def record_result_by_range(res: DocumentEvaluationResultType) {
+  def record_result_by_range(res: TDocEvalRes) {
     val naitr = docs_by_naitr.get_collector(res.num_docs_in_true_cell)
     record_one_result(naitr, res)
   }
@@ -319,189 +334,152 @@ abstract class GroupedGeolocateDocumentEvalStats[CoordType,
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * General trait for classes representing documents to evaluate.
- */
-trait EvaluationDocument {
-}
-
-/**
- * General trait for classes representing result of evaluating a document.
- */
-trait EvaluationResult {
-}
-
-/**
  * Abstract class for reading documents from a test file and evaluating
  * on them.
+ *
+ * @tparam TEvalDoc Type of document to evaluate.
+ * @tparam TEvalRes Type of result of evaluating a document.
  */
-abstract class TestFileEvaluator(val stratname: String) {
+abstract class TestFileEvaluator[TEvalDoc, TEvalRes](
+  val stratname: String
+) {
   var documents_processed = 0
-
-  type EvalDocumentType <: EvaluationDocument
-  type EvalResultType <: EvaluationResult
-
-  /**
-   * Return an Iterable listing the documents retrievable from the given
-   * filename.
-   */
-  def iter_documents(filehand: FileHandler,
-    filename: String): Iterable[EvalDocumentType]
+  val results = mutable.Map[TEvalDoc, TEvalRes]()
 
   /**
    * Return true if document would be skipped; false if processed and
    * evaluated.
    */
-  def would_skip_document(doc: EvalDocumentType, doctag: String) = false
+  def would_skip_document(doc: TEvalDoc, doctag: String) = false
+
+  /**
+   * Return true if we should skip the next document due to parameters
+   * calling for certain documents in a certain sequence to be skipped.
+   */
+  def would_skip_by_parameters() = false
+
+  /**
+   * Return true if we should stop processing, given that `new_processed`
+   * items have already been processed.
+   */
+  def would_stop_processing(new_processed: Int) = false
 
   /**
    * Return true if document was actually processed and evaluated; false
    * if skipped.
    */
-  def evaluate_document(doc: EvalDocumentType, doctag: String):
-    EvalResultType
+  def evaluate_document(doc: TEvalDoc, doctag: String):
+    TEvalRes
 
   /**
    * Output results so far.  If 'isfinal', this is the last call, so
    * output more results.
    */
   def output_results(isfinal: Boolean = false): Unit
-}
 
-abstract class GeolocateDocumentEvaluator[CoordType,
-    DocumentType <: DistDocument[CoordType],
-    CellType <: GeoCell[CoordType, DocumentType],
-    CellGridType <: CellGrid[CoordType, DocumentType, CellType]](
-  val strategy: GeolocateDocumentStrategy[CoordType, DocumentType, CellType,
-    CellGridType],
-  stratname: String,
-  driver: GeolocateDocumentTypeDriver
-) extends TestFileEvaluator(stratname) {
-  type GroupedEvalStatsType <:
-    GroupedGeolocateDocumentEvalStats[CoordType,DocumentType,CellType]
-  def create_grouped_eval_stats(driver: GeolocateDocumentTypeDriver,
-    cell_grid: CellGridType, results_by_range: Boolean):
-    GroupedEvalStatsType
-  val evalstats = create_grouped_eval_stats(driver,
-    strategy.cell_grid, results_by_range = driver.params.results_by_range)
+  val task = new MeteredTask("document", "evaluating")
+  var last_elapsed = 0.0
+  var last_processed = 0
 
-  def output_results(isfinal: Boolean = false) {
-    evalstats.output_results(all_results = isfinal)
-  }
-}
-
-case class DocumentEvaluationResult[CoordType,
-    DocumentType <: DistDocument[CoordType],
-    CellType <: GeoCell[CoordType, DocumentType]](
-  document: DocumentType,
-  pred_cell: CellType,
-  true_rank: Int
-) extends EvaluationResult {
-  val true_cell = pred_cell.cell_grid.find_best_cell_for_coord(document.coord)
-  val num_docs_in_true_cell = true_cell.word_dist_wrapper.num_docs_for_word_dist
-  val true_center = true_cell.get_center_coord()
-  val true_truedist = document.distance_to_coord(true_center)
-  val pred_center = pred_cell.get_center_coord()
-  val pred_truedist = document.distance_to_coord(pred_center)
-}
-
-abstract class EvaluationOutputter {
-  def evaluate_and_output_results(filehand: FileHandler,
-    files: Iterable[String]): Unit
-}
-
-class DefaultEvaluationOutputter(
-  val stratname: String,
-  val evalobj: TestFileEvaluator
-) extends EvaluationOutputter {
-  val results = mutable.Map[EvaluationDocument, EvaluationResult]()
-  /**
-    Evaluate on all of the given files, outputting periodic results and
-    results after all files are done.  If the evaluator uses documents as
-    documents (so that it doesn't need any external test files), the value
-    of 'files' should be a sequence of one item, which is null. (If an
-    empty sequence is passed in, no evaluation will happen.)
-
-    Also returns an object containing the results.
+  /** Process a document.  This checks to see whether we should evaluate
+   * the document (e.g. based on parameters indicating which documents
+   * to evaluate), and evaluates as necessary, storing the results into
+   * `results`.
+   *
+   * @param doc Document to be processed.
+   * @return Tuple `(processed, keep_going)` where `processed` indicates
+   *   whether the document was processed or skipped, and `keep_going`
+   *   indicates whether processing of further documents should continue or
+   *   stop.
    */
-  def evaluate_and_output_results(filehand: FileHandler,
-      files: Iterable[String]) {
-    val task = new MeteredTask("document", "evaluating")
-    var last_elapsed = 0.0
-    var last_processed = 0
-    var skip_initial = Params.skip_initial_test_docs
-    var skip_n = 0
+  def process_document(doc: TEvalDoc): (Boolean, Boolean) = {
+    // errprint("Processing document: %s", doc)
+    val num_processed = task.num_processed
+    val doctag = "#%d" format (1 + num_processed)
+    if (would_skip_document(doc, doctag)) {
+      errprint("Skipped document %s", doc)
+      (false, true)
+    } else {
+      val do_skip = would_skip_by_parameters()
+      if (do_skip)
+        errprint("Passed over document %s", doctag)
+      else {
+        // Don't put side-effecting code inside of an assert!
+        val result = evaluate_document(doc, doctag)
+        assert(result != null)
+        results(doc) = result
+      }
 
-    class EvaluationFileProcessor extends FileProcessor {
-      /* Process all documents in a given file.  If return value is false,
-         processing was interrupted due to a limit being reached, and
-         no more files should be processed. */
-      def process_file(filehand: FileHandler, filename: String): Boolean = {
-        for (doc <- evalobj.iter_documents(filehand, filename)) {
-          // errprint("Processing document: %s", doc)
-          val num_processed = task.num_processed
-          val doctag = "#%d" format (1 + num_processed)
-          if (evalobj.would_skip_document(doc, doctag))
-            errprint("Skipped document %s", doc)
-          else {
-            var do_skip = false
-            if (skip_initial != 0) {
-              skip_initial -= 1
-              do_skip = true
-            } else if (skip_n != 0) {
-              skip_n -= 1
-              do_skip = true
-            } else
-              skip_n = Params.every_nth_test_doc - 1
-            if (do_skip)
-              errprint("Passed over document %s", doctag)
-            else {
-              // Don't put side-effecting code inside of an assert!
-              val result = evalobj.evaluate_document(doc, doctag)
-              assert(result != null)
-              results(doc) = result
-            }
-            task.item_processed()
-            val new_elapsed = task.elapsed_time
-            val new_processed = task.num_processed
+      if (task.item_processed())
+        (!do_skip, false)
+      else {
+        val new_elapsed = task.elapsed_time
+        val new_processed = task.num_processed
 
-            // If max # of docs reached, stop
-            if ((Params.num_test_docs > 0 &&
-              new_processed >= Params.num_test_docs)) {
-              errprint("")
-              errprint("Stopping because limit of %s documents reached",
-                Params.num_test_docs)
-              task.finish()
-              return false
-            }
-
-            // If five minutes and ten documents have gone by, print out results
-            if ((new_elapsed - last_elapsed >= 300 &&
-              new_processed - last_processed >= 10)) {
-              errprint("Results after %d documents (strategy %s):",
-                task.num_processed, stratname)
-              evalobj.output_results(isfinal = false)
-              errprint("End of results after %d documents (strategy %s):",
-                task.num_processed, stratname)
-              last_elapsed = new_elapsed
-              last_processed = new_processed
-            }
+        if (would_stop_processing(new_processed)) {
+          task.finish()
+          (!do_skip, false)
+        } else {
+          // If five minutes and ten documents have gone by, print out results
+          if ((new_elapsed - last_elapsed >= 300 &&
+            new_processed - last_processed >= 10)) {
+            errprint("Results after %d documents (strategy %s):",
+              task.num_processed, stratname)
+            output_results(isfinal = false)
+            errprint("End of results after %d documents (strategy %s):",
+              task.num_processed, stratname)
+            last_elapsed = new_elapsed
+            last_processed = new_processed
           }
+          (!do_skip, true)
         }
-
-        return true
       }
     }
+  }
 
-    new EvaluationFileProcessor().process_files(filehand, files)
-
+  def finish() {
     task.finish()
 
     errprint("")
     errprint("Final results for strategy %s: All %d documents processed:",
       stratname, task.num_processed)
     errprint("Ending operation at %s", curtimehuman())
-    evalobj.output_results(isfinal = true)
+    output_results(isfinal = true)
     errprint("Ending final results for strategy %s", stratname)
+  }
+
+  /** Process a set of files, extracting the documents in each one and
+    * evaluating them using `process_document`.
+    */
+  def process_files(filehand: FileHandler, files: Iterable[String]): Boolean
+}
+
+trait DocumentIteratingEvaluator[TEvalDoc, TEvalRes] extends
+  TestFileEvaluator[TEvalDoc, TEvalRes] {
+  /**
+   * Return an Iterable listing the documents retrievable from the given
+   * filename.
+   */
+  def iter_documents(filehand: FileHandler, filename: String):
+    Iterable[TEvalDoc]
+
+  class EvaluationFileProcessor extends FileProcessor {
+    /* Process all documents in a given file.  If return value is false,
+       processing was interrupted due to a limit being reached, and
+       no more files should be processed. */
+    def process_file(filehand: FileHandler, filename: String): Boolean = {
+      for (doc <- iter_documents(filehand, filename)) {
+        val (processed, keep_going) = process_document(doc)
+        if (!keep_going)
+          return false
+      }
+      return true
+    }
+  }
+
+  def process_files(filehand: FileHandler, files: Iterable[String]) = {
+    val fileproc = new EvaluationFileProcessor
+    fileproc.process_files(filehand, files)
   }
 }
 

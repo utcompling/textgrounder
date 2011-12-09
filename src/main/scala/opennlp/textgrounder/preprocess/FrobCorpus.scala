@@ -253,7 +253,7 @@ class FrobCorpusFileProcessor(
     super.end_process_file(filehand, file)
   }
 
-  def process_row(fieldvals: Seq[String]): Boolean = {
+  def process_row(fieldvals: Seq[String]) = {
     val (new_fieldnames, new_fieldvals) = frob_row(fieldvals).unzip
     if (params.split_by_field != null) {
       val (writer, outstream) =
@@ -277,12 +277,12 @@ class FrobCorpusFileProcessor(
         get_unsplit_writer_and_outstream(new_fieldnames, new_fieldvals)
       writer.output_row(outstream, new_fieldvals)
     }
-    true
+    (true, true)
   }
 }
 
 class FrobCorpusDriver extends ProcessFilesDriver {
-  type ParamType = FrobCorpusParameters
+  type TParam = FrobCorpusParameters
   
   override def handle_parameters() {
     need(params.input_dir, "input-dir")
@@ -316,7 +316,7 @@ class FrobCorpusDriver extends ProcessFilesDriver {
 
 object FrobCorpus extends
     ExperimentDriverApp("FrobCorpus") {
-  type DriverType = FrobCorpusDriver
+  type TDriver = FrobCorpusDriver
 
   override def description =
 """Modify a corpus by changing particular fields.  Fields can be added
@@ -327,8 +327,8 @@ the corpus can be changed from text to unigram counts
 based on the value of a field, e.g. "split" (--split-by-field).
 """
 
-  def create_param_object(ap: ArgParser) = new ParamType(ap)
-  def create_driver() = new DriverType
+  def create_param_object(ap: ArgParser) = new TParam(ap)
+  def create_driver() = new TDriver
 }
 
 //class ScoobiConvertTextToUnigramCountsDriver extends
@@ -395,8 +395,8 @@ based on the value of a field, e.g. "split" (--split-by-field).
 //
 //object ScoobiConvertTextToUnigramCounts extends
 //    ScoobiApp("Convert raw text to unigram counts") {
-//  type DriverType = ScoobiConvertTextToUnigramCountsDriver
-//  def create_param_object(ap: ArgParser) = new ParamType(ap)
-//  def create_driver() = new DriverType
+//  type TDriver = ScoobiConvertTextToUnigramCountsDriver
+//  def create_param_object(ap: ArgParser) = new TParam(ap)
+//  def create_driver() = new TDriver
 //}
 

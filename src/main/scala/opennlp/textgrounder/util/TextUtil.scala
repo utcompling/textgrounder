@@ -71,10 +71,12 @@ package object textutil {
   // Try to format something with reasonable precision.
   def format_float(x: Double) = {
     var precision = 2
-    var xx = x
-    while (xx < 0.1) {
-      xx *= 10
-      precision += 1
+    if (x != 0) {
+      var xx = abs(x)
+      while (xx < 0.1) {
+        xx *= 10
+        precision += 1
+      }
     }
     val formatstr = "%%.%sf" format precision
     formatstr format x

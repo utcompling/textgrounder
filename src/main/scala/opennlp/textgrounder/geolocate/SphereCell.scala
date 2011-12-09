@@ -99,10 +99,10 @@ class SphereCellDistFactory(
     lru_cache_size: Int
 ) extends CellDistFactory[SphereCoord, SphereDocument, SphereCell](
     lru_cache_size) {
-  type WordCellDistType = SphereWordCellDist
-  type GridType = SphereCellGrid
-  def create_word_cell_dist(cell_grid: GridType, word: Word) =
-    new WordCellDistType(cell_grid, word)
+  type TCellDist = SphereWordCellDist
+  type TGrid = SphereCellGrid
+  def create_word_cell_dist(cell_grid: TGrid, word: Word) =
+    new TCellDist(cell_grid, word)
 }
 
 /////////////////////////////////////////////////////////////////////////////

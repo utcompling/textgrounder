@@ -36,10 +36,10 @@ import org.apache.hadoop.fs._
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.distances.SphereCoord
+import opennlp.textgrounder.util.experiment.ExperimentMeteredTask
 import opennlp.textgrounder.util.hadoop._
 import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.mathutil._
-import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.printutil.{errprint, set_errout_prefix, warning}
 
 /* Basic idea for hooking up Geolocate with Hadoop.  Hadoop works in terms
@@ -262,7 +262,7 @@ abstract class HadoopGeolocateApp(
 ) extends GeolocateApp(progname) {
   var hadoop_conf: Configuration = _
 
-  override type DriverType <: HadoopGeolocateDriver
+  override type TDriver <: HadoopGeolocateDriver
 
   /* Set by subclass -- Initialize the various classes for map and reduce */
   def initialize_hadoop_classes(job: Job)
@@ -298,7 +298,7 @@ abstract class HadoopGeolocateApp(
       suffix: String
     ) extends DistDocumentFileProcessor(suffix, null) {
       errprint("Suffix is %s", suffix)
-      def handle_document(fieldvals: Seq[String]) = true
+      def handle_document(fieldvals: Seq[String]) = (true, true)
 
       def process_lines(lines: Iterator[String],
           filehand: FileHandler, file: String,
@@ -363,7 +363,7 @@ trait BaseHadoopGeolocateDriver extends GeolocateDriver {
 
   override def get_file_handler: FileHandler = hadoop_file_handler
 
-  override type ParamType <: HadoopGeolocateParameters
+  override type TParam <: HadoopGeolocateParameters
 
   override def handle_parameters() {
     super.handle_parameters()
@@ -399,12 +399,12 @@ trait BaseHadoopGeolocateDriver extends GeolocateDriver {
       find_split_counter(group, counter)
   }
 
-  protected def do_increment_counter(name: String, incr: Long) {
+  protected def imp_increment_counter(name: String, incr: Long) {
     val counter = find_counter(name)
     counter.increment(incr)
   }
 
-  protected def do_get_counter(name: String) = {
+  protected def imp_get_counter(name: String) = {
     val counter = find_counter(name)
     counter.getValue()
   }
@@ -476,17 +476,17 @@ trait HadoopGeolocateDriver extends BaseHadoopGeolocateDriver {
 /************************************************************************/
 
 trait HadoopGeolocateMapper {
-  type ContextType <: TaskInputOutputContext[_,_,_,_]
-  type DriverType <: HadoopGeolocateDriver
+  type TContext <: TaskInputOutputContext[_,_,_,_]
+  type TDriver <: HadoopGeolocateDriver
   val driver = create_driver()
-  type ParamType = driver.ParamType
+  type TParam = driver.TParam
 
   def progname: String
 
-  def create_param_object(ap: ArgParser): ParamType
-  def create_driver(): DriverType
+  def create_param_object(ap: ArgParser): TParam
+  def create_driver(): TDriver
 
-  def setup(context: ContextType) {
+  def setup(context: TContext) {
     import HadoopGeolocateConfiguration._
 
     val conf = context.getConfiguration
@@ -510,17 +510,17 @@ class DocumentEvaluationMapper extends
     Mapper[Object, Text, Text, DoubleWritable] with
     HadoopGeolocateMapper {
   def progname = HadoopGeolocateDocumentApp.progname
-  type ContextType = Mapper[Object, Text, Text, DoubleWritable]#Context
-  type DriverType = HadoopGeolocateDocumentDriver
+  type TContext = Mapper[Object, Text, Text, DoubleWritable]#Context
+  type TDriver = HadoopGeolocateDocumentDriver
   // more type erasure crap
-  def create_param_object(ap: ArgParser) = new ParamType(ap)
-  def create_driver() = new DriverType
+  def create_param_object(ap: ArgParser) = new TParam(ap)
+  def create_driver() = new TDriver
 
-  var evaluators: Iterable[InternalGeolocateDocumentEvaluator] = null
-  val task = new MeteredTask("document", "evaluating")
+  var evaluators: Iterable[CorpusGeolocateDocumentEvaluator] = null
+  val task = new ExperimentMeteredTask(driver, "document", "evaluating")
 
   class HadoopDocumentFileProcessor(
-    context: ContextType
+    context: TContext
   ) extends DistDocumentFileProcessor(
     driver.params.eval_set + "-" + driver.document_file_suffix, driver
   ) {
@@ -534,9 +534,7 @@ class DocumentEvaluationMapper extends
       val table = driver.document_table
       val doc = table.create_and_init_document(schema, fieldvals, false)
       val retval = if (doc != null) {
-        if (doc.dist != null)
-          doc.dist.finish(minimum_word_count =
-            driver.params.minimum_word_count)
+        doc.dist.finish_after_global()
         var skipped = 0
         var not_skipped = 0
         for (e <- evaluators) {
@@ -564,7 +562,7 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
         (not_skipped > 0)
       } else false
       context.progress
-      retval
+      (retval, true)
     }
 
     def process_lines(lines: Iterator[String],
@@ -575,11 +573,11 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
   }
 
   var processor: HadoopDocumentFileProcessor = _
-  override def setup(context: ContextType) {
+  override def setup(context: TContext) {
     super.setup(context)
     evaluators =
       for ((stratname, strategy) <- driver.strategies)
-        yield new InternalGeolocateDocumentEvaluator(strategy, stratname,
+        yield new CorpusGeolocateDocumentEvaluator(strategy, stratname,
           driver)
     if (driver.params.input_corpus.length != 1) {
       driver.params.parser.error(
@@ -592,7 +590,7 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
     }
   }
 
-  override def map(key: Object, value: Text, context: ContextType) {
+  override def map(key: Object, value: Text, context: TContext) {
     processor.parse_row(value.toString)
     context.progress
   }
@@ -601,17 +599,17 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
 class DocumentResultReducer extends
     Reducer[Text, DoubleWritable, Text, DoubleWritable] {
 
-  type ContextType = Reducer[Text, DoubleWritable, Text, DoubleWritable]#Context
+  type TContext = Reducer[Text, DoubleWritable, Text, DoubleWritable]#Context
 
   var driver: HadoopGeolocateDocumentDriver = _
 
-  override def setup(context: ContextType) {
+  override def setup(context: TContext) {
     driver = new HadoopGeolocateDocumentDriver
     driver.set_task_context(context)
   }
 
   override def reduce(key: Text, values: java.lang.Iterable[DoubleWritable],
-      context: ContextType) {
+      context: TContext) {
     val errordists = (for (v <- values) yield v.get).toSeq
     val mean_dist = mean(errordists)
     val median_dist = median(errordists)
@@ -631,15 +629,15 @@ class HadoopGeolocateDocumentParameters(
 
 class HadoopGeolocateDocumentDriver extends
     GeolocateDocumentTypeDriver with HadoopGeolocateDriver {
-  override type ParamType = HadoopGeolocateDocumentParameters
+  override type TParam = HadoopGeolocateDocumentParameters
 }
 
 object HadoopGeolocateDocumentApp extends
     HadoopGeolocateApp("TextGrounder geolocate-document") {
-  type DriverType = HadoopGeolocateDocumentDriver
+  type TDriver = HadoopGeolocateDocumentDriver
   // FUCKING TYPE ERASURE
-  def create_param_object(ap: ArgParser) = new ParamType(ap)
-  def create_driver() = new DriverType()
+  def create_param_object(ap: ArgParser) = new TParam(ap)
+  def create_driver() = new TDriver()
 
   def initialize_hadoop_classes(job: Job) {
     job.setJarByClass(classOf[DocumentEvaluationMapper])
@@ -675,19 +673,19 @@ object HadoopGeolocateDocumentApp extends
 
 abstract class ObjectConverter {
   type Type
-  type WritableType <: Writable
-  def makeWritable(): WritableType
-  def toWritable(obj: Type, w: WritableType)
-  def fromWritable(w: WritableType): obj
+  type TWritable <: Writable
+  def makeWritable(): TWritable
+  def toWritable(obj: Type, w: TWritable)
+  def fromWritable(w: TWritable): obj
 }
 
 object IntConverter {
   type Type = Int
-  type WritableType = IntWritable
+  type TWritable = IntWritable
  
   def makeWritable() = new IntWritable
   def toWritable(obj: Int, w: IntWritable) { w.set(obj) }
-  def fromWritable(w: WritableType) = w.get
+  def fromWritable(w: TWritable) = w.get
 }
 
 abstract class RecordWritable(

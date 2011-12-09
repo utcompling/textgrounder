@@ -29,8 +29,6 @@ import com.codahale.trove.{mutable => trovescala}
 
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.ioutil.FileHandler
-import opennlp.textgrounder.util.MeteredTask
-import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 import GeolocateDriver.Debug._
@@ -249,7 +247,7 @@ trait FastSlowKLDivergence {
    * small amount different (the small amount rather than 0 to account for
    * possible rounding error).
    */
-  def kl_divergence(other: WordDist, partial: Boolean = false) = {
+  protected def imp_kl_divergence(other: WordDist, partial: Boolean) = {
     val test_kldiv = false
     if (test_kldiv)
       test_kl_divergence(other, partial)
@@ -272,11 +270,13 @@ trait WordDistReader {
    * @param is_training_set True if this document is in the training set.
    *   Generally, global (e.g. back-off) statistics should be initialized
    *   only from training-set documents.
-   * @return Whether a word distribution was actually created/set.
    */
   def initialize_distribution(doc: GenericDistDocument, diststr: String,
-      is_training_set: Boolean): Boolean
+      is_training_set: Boolean)
 
+  /**
+   *
+   */
   def is_stopword(doc: GenericDistDocument, word: String) = {
     val driver = doc.table.driver
     (!driver.params.include_stopwords_in_document_dists &&
@@ -294,6 +294,16 @@ trait WordDistReader {
  * factory used depends on a command-line parameter.
  */
 abstract class WordDistFactory extends WordDistReader {
+  /**
+   * Total number of word types seen (size of vocabulary)
+   */
+  var total_num_word_types = 0
+
+  /**
+   * Total number of word tokens seen
+   */
+  var total_num_word_tokens = 0
+
   /**
    * Create an empty word distribution.  Distributions created this way
    * are not meant to be added to the global word-distribution statistics
@@ -315,19 +325,14 @@ object WordDist {
   /**
    * Object describing how we memoize words (i.e. convert them to Int
    * indices, for faster operations on them).
+   *
+   * FIXME: Should probably be stored globally or at least elsewhere, since
+   * memoization is more general than just for words in word distributions,
+   * and is used elsewhere in the code for other things.  We should probably
+   * move the memoization code into the `util` package.
    */
   val memoizer = new IntStringMemoizer
   //val memoizer = IdentityMemoizer
-
-  /**
-   * Total number of word types seen (size of vocabulary)
-   */
-  var total_num_word_types = 0
-
-  /**
-   * Total number of word tokens seen
-   */
-  var total_num_word_tokens = 0.0
 }
 
 /**
@@ -349,17 +354,50 @@ abstract class WordDist {
    * reliably do probability lookups.
    */
   var finished = false
+  /**
+   * Whether we have already called `finish_before_global`.  If so, this
+   * means we can't modify the distribution any more.
+   */
+  var finished_before_global = false
+
+  /**
+   * Actual implementation of `add_document` by subclasses.
+   * External callers should use `add_document`.
+   */
+  protected def imp_add_document(words: Traversable[String], 
+      ignore_case: Boolean, stopwords: Set[String])
 
   /**
    * Incorporate a document into the distribution.
    */
-  def add_document(words: Traversable[String], ignore_case: Boolean = true,
-      stopwords: Set[String] = Set[String]())
+  def add_document(words: Traversable[String], 
+      ignore_case: Boolean = true, stopwords: Set[String] = Set[String]()) {
+    assert(!finished)
+    assert(!finished_before_global)
+    imp_add_document(words, ignore_case, stopwords)
+  }
+
+  /**
+   * Actual implementation of `add_word_distribution` by subclasses.
+   * External callers should use `add_word_distribution`.
+   */
+  protected def imp_add_word_distribution(worddist: WordDist)
 
   /**
    * Incorporate the given distribution into our distribution.
    */
-  def add_word_distribution(worddist: WordDist)
+  def add_word_distribution(worddist: WordDist) {
+    assert(!finished)
+    assert(!finished_before_global)
+    assert(worddist.finished_before_global)
+    imp_add_word_distribution(worddist)
+  }
+
+  /**
+   * Actual implementation of `finish_before_global` by subclasses.
+   * External callers should use `finish_before_global`.
+   */
+  protected def imp_finish_before_global(minimum_word_count: Int)
 
   /**
    * Partly finish computation of distribution.  This is called when the
@@ -377,7 +415,18 @@ abstract class WordDist {
    * @param minimum_word_count If greater than zero, eliminate words seen
    * less than this number of times.
    */
-  def finish_before_global(minimum_word_count: Int = 0)
+  def finish_before_global(minimum_word_count: Int = 0) {
+    assert(!finished)
+    assert(!finished_before_global)
+    imp_finish_before_global(minimum_word_count)
+    finished_before_global = true
+  }
+
+  /**
+   * Actual implementation of `finish_after_global` by subclasses.
+   * External callers should use `finish_after_global`.
+   */
+  protected def imp_finish_after_global()
 
   /**
    * Completely finish computation of the word distribution.  This is called
@@ -385,7 +434,12 @@ abstract class WordDist {
    * used to compute values for the distribution that depend on the
    * global word-distribution statistics.
    */
-  def finish_after_global()
+  def finish_after_global() {
+    assert(!finished)
+    assert(finished_before_global)
+    imp_finish_after_global()
+    finished = true
+  }
 
   /**
    * Finish computation of distribution.  This is intended for word
@@ -400,6 +454,12 @@ abstract class WordDist {
   }
 
   /**
+   * Actual implementation of `kl_divergence` by subclasses.
+   * External callers should use `kl_divergence`.
+   */
+  protected def imp_kl_divergence(other: WordDist, partial: Boolean): Double
+
+  /**
    * Compute the KL-divergence between this distribution and another
    * distribution.
    * 
@@ -412,7 +472,11 @@ abstract class WordDist {
    *   
    * @return The KL-divergence value.
    */
-  def kl_divergence(other: WordDist, partial: Boolean = false): Double
+  def kl_divergence(other: WordDist, partial: Boolean = false) = {
+    assert(finished)
+    assert(other.finished)
+    imp_kl_divergence(other, partial)
+  }
 
   /**
    * Compute the symmetric KL-divergence between two distributions by averaging

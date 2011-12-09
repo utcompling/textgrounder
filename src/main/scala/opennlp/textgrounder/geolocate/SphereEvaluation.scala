@@ -31,6 +31,7 @@ import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment.ExperimentDriverStats
 import opennlp.textgrounder.util.mathutil.{mean, median}
 import opennlp.textgrounder.util.ioutil.{FileHandler}
+import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.textutil.split_text_into_words
 
@@ -42,11 +43,11 @@ import GeolocateDriver.Debug._
 
 //////// Statistics for geolocating documents
 
-class SphereGeolocateDocumentEvalStats(
+class SphereDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
   prefix: String,
   max_rank_for_credit: Int = 10
-) extends GeolocateDocumentEvalStats(
+) extends DocumentEvalStats(
   driver_stats, prefix, max_rank_for_credit) {
   // "True dist" means actual distance in km's or whatever.
   // "Degree dist" is the distance in degrees.
@@ -88,17 +89,17 @@ class SphereGeolocateDocumentEvalStats(
  * number of documents in true cell.
  */
 
-class SphereGroupedGeolocateDocumentEvalStats(
+class SphereGroupedDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
   cell_grid: SphereCellGrid,
   results_by_range: Boolean
-) extends GroupedGeolocateDocumentEvalStats[
+) extends GroupedDocumentEvalStats[
   SphereCoord, SphereDocument, SphereCell](
   driver_stats, cell_grid, results_by_range) {
-  type BasicEvalStatsType = SphereGeolocateDocumentEvalStats
-  type DocumentEvaluationResultType = SphereDocumentEvaluationResult
+  type TBasicEvalStats = SphereDocumentEvalStats
+  type TDocEvalRes = SphereDocumentEvaluationResult
   override def create_stats(prefix: String) =
-    new SphereGeolocateDocumentEvalStats(driver_stats, prefix)
+    new SphereDocumentEvalStats(driver_stats, prefix)
 
   val docs_by_degree_dist_to_true_center =
     docmap("degree_dist_to_true_center")
@@ -107,17 +108,17 @@ class SphereGroupedGeolocateDocumentEvalStats(
     new DoubleTableByRange(dist_fractions_for_error_dist,
       create_stats_for_range("degree_dist_to_pred_center", _))
 
-  override def record_one_result(stats: BasicEvalStatsType,
-      res: DocumentEvaluationResultType) {
+  override def record_one_result(stats: TBasicEvalStats,
+      res: TDocEvalRes) {
     stats.record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
   }
 
-  override def record_one_oracle_result(stats: BasicEvalStatsType,
-      res: DocumentEvaluationResultType) {
+  override def record_one_oracle_result(stats: TBasicEvalStats,
+      res: TDocEvalRes) {
     stats.record_oracle_result(res.true_truedist, res.true_degdist)
   }
 
-  override def record_result_by_range(res: DocumentEvaluationResultType) {
+  override def record_result_by_range(res: TDocEvalRes) {
     super.record_result_by_range(res)
 
     /* FIXME: This code specific to MultiRegularCellGrid is kind of ugly.
@@ -213,16 +214,16 @@ class SphereGroupedGeolocateDocumentEvalStats(
 //                             Main evaluation code                        //
 /////////////////////////////////////////////////////////////////////////////
 
-abstract class SphereGeolocateDocumentEvaluator(
+abstract class SphereGeolocateDocumentEvaluator[TEvalDoc, TEvalRes](
   override val strategy: SphereGeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentTypeDriver
 ) extends GeolocateDocumentEvaluator[SphereCoord, SphereDocument, SphereCell,
-  SphereCellGrid](strategy, stratname, driver) {
-  type GroupedEvalStatsType = SphereGroupedGeolocateDocumentEvalStats
+  SphereCellGrid, TEvalDoc, TEvalRes](strategy, stratname, driver) {
+  type TGroupedEvalStats = SphereGroupedDocumentEvalStats
   def create_grouped_eval_stats(driver: GeolocateDocumentTypeDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
-    new GroupedEvalStatsType(driver, cell_grid.asInstanceOf[SphereCellGrid],
+    new TGroupedEvalStats(driver, cell_grid.asInstanceOf[SphereCellGrid],
       results_by_range)
 }
 
@@ -244,19 +245,63 @@ class SphereDocumentEvaluationResult(
  * FIXME!! Should probably be generalized to work beyond simply SphereDocuments
  * and such.
  */
-class InternalGeolocateDocumentEvaluator(
+class CorpusGeolocateDocumentEvaluator(
   strategy: SphereGeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends SphereGeolocateDocumentEvaluator(strategy, stratname, driver) {
+) extends SphereGeolocateDocumentEvaluator[
+  SphereDocument, SphereDocumentEvaluationResult
+](strategy, stratname, driver) {
 
-  type EvalDocumentType = SphereDocument
-  type EvalResultType = SphereDocumentEvaluationResult
+  /**
+   * A file processor that reads corpora containing document metadata and
+   * creates a DistDocument for each document described, and evaluates it.
+   *
+   * @param suffix Suffix specifying the type of document file wanted
+   *   (e.g. "counts" or "document-metadata"
+   * @param cell_grid Cell grid to add newly created DistDocuments to
+   */
+  class EvaluateCorpusFileProcessor(
+    suffix: String
+  ) extends DistDocumentFileProcessor(suffix, driver) {
+    def handle_document(fieldvals: Seq[String]) = {
+      val doc = driver.document_table.create_and_init_document(
+        schema, fieldvals, false)
+      if (doc == null) (false, true)
+      else {
+        doc.dist.finish_after_global()
+        process_document(doc)
+      }
+    }
 
-  def iter_documents(filehand: FileHandler, filename: String) = {
-    assert(filename == null)
-    for (doc <- driver.document_table.documents_by_split(driver.params.eval_set))
-      yield doc
+    def process_lines(lines: Iterator[String],
+        filehand: FileHandler, file: String,
+        compression: String, realname: String) = {
+      var should_stop = false
+      breakable {
+        for (line <- lines) {
+          if (!parse_row(line)) {
+            should_stop = true
+            break
+          }
+        }
+      }
+      output_resource_usage()
+      !should_stop
+    }
+  }
+
+  def process_files(filehand: FileHandler, files: Iterable[String]): Boolean = {
+    /* NOTE: `files` must actually be a list of directories, e.g. as
+       comes from the value of --input-corpus. */
+    for (dir <- files) {
+      val fileproc = new EvaluateCorpusFileProcessor(
+        driver.params.eval_set + "-" + driver.document_file_suffix)
+      fileproc.read_schema_from_corpus(filehand, dir)
+      if (!fileproc.process_files(filehand, Seq(dir)))
+        return false
+    }
+    return true
   }
 
   //title = None
@@ -279,7 +324,7 @@ class InternalGeolocateDocumentEvaluator(
   //if (title != null)
   //  yield (title, words)
 
-  override def would_skip_document(document: EvalDocumentType, doctag: String) = {
+  override def would_skip_document(document: SphereDocument, doctag: String) = {
     if (document.dist == null) {
       // This can (and does) happen when --max-time-per-stage is set,
       // so that the counts for many documents don't get read in.
@@ -289,17 +334,17 @@ class InternalGeolocateDocumentEvaluator(
     } else false
   }
 
-  def evaluate_document(document: EvalDocumentType, doctag: String):
-      EvalResultType = {
+  def evaluate_document(document: SphereDocument, doctag: String):
+      SphereDocumentEvaluationResult = {
     if (would_skip_document(document, doctag)) {
       evalstats.increment_counter("documents.skipped")
       return null
     }
     assert(document.dist.finished)
     val true_cell =
-      strategy.cell_grid.find_best_cell_for_coord(document.coord)
+      strategy.cell_grid.find_best_cell_for_coord(document.coord, true)
     if (debug("lots") || debug("commontop")) {
-      val naitr = true_cell.word_dist_wrapper.num_docs_for_word_dist
+      val naitr = true_cell.combined_dist.num_docs_for_word_dist
       errprint("Evaluating document %s with %s word-dist documents in true cell",
         document, naitr)
     }
@@ -384,8 +429,8 @@ class InternalGeolocateDocumentEvaluator(
   }
 }
 
-class TitledDocumentResult extends EvaluationResult {
-}
+case class TitledDocument(title: String, text: String)
+class TitledDocumentResult { }
 
 /**
  * A class for geolocation where each test document is a chapter in a book
@@ -395,14 +440,12 @@ class PCLTravelGeolocateDocumentEvaluator(
   strategy: SphereGeolocateDocumentStrategy,
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends SphereGeolocateDocumentEvaluator(strategy, stratname, driver) {
-  case class TitledDocument(
-    title: String, text: String) extends EvaluationDocument 
-  type EvalDocumentType = TitledDocument
-  type EvalResultType = TitledDocumentResult
-
+) extends SphereGeolocateDocumentEvaluator[
+  TitledDocument, TitledDocumentResult
+](strategy, stratname, driver) with DocumentIteratingEvaluator[
+  TitledDocument, TitledDocumentResult
+] {
   def iter_documents(filehand: FileHandler, filename: String) = {
-
     val dom = try {
       // On error, just return, so that we don't have problems when called
       // on the whole PCL corpus dir (which includes non-XML files).

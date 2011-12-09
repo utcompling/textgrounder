@@ -86,7 +86,7 @@ class FilterPseudoGoodTuringSmoothedWordDistFactory(
   val oov = memoize_string("-OOV-")
   override def set_unigram_word_dist(doc: GenericDistDocument,
       keys: Array[Word], values: Array[Int], num_words: Int,
-      is_training_set: Boolean) = {
+      is_training_set: Boolean) {
     val (newkeys, newvalues) =
       (for ((k, v) <- (keys zip values).take(num_words);
            newk = if (filter_words contains k) k else oov)
@@ -94,7 +94,6 @@ class FilterPseudoGoodTuringSmoothedWordDistFactory(
     doc.dist = new PseudoGoodTuringSmoothedWordDist(this,
         newkeys.toArray, newvalues.toArray, newkeys.length,
         note_globally = is_training_set)
-    true
   }
 }
 
@@ -128,8 +127,8 @@ class WordCellTupleWritable extends
 
 class GenerateKMLDriver extends
     GeolocateDriver with StandaloneGeolocateDriverStats {
-  type ParamType = GenerateKMLParameters
-  type RunReturnType = Unit
+  type TParam = GenerateKMLParameters
+  type TRunRes = Unit
 
   override def handle_parameters() {
     super.handle_parameters()
@@ -169,9 +168,9 @@ Not generating an empty KML file.""", word)
 }
 
 object GenerateKMLApp extends GeolocateApp("generate-kml") {
-  type DriverType = GenerateKMLDriver
+  type TDriver = GenerateKMLDriver
   // FUCKING TYPE ERASURE
-  def create_param_object(ap: ArgParser) = new ParamType(ap)
-  def create_driver() = new DriverType()
+  def create_param_object(ap: ArgParser) = new TParam(ap)
+  def create_driver() = new TDriver()
 }
 
