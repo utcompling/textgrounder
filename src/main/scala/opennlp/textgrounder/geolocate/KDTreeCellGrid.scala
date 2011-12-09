@@ -122,11 +122,13 @@ class KdTreeCellGrid(table: SphereDocumentTable,
 
     val nodes_to_cell : Map[KdTree[SphereDocument], KdTreeCell] = Map()
 
+    val task = new ExperimentMeteredTask(table.driver, "K-d tree cell",
+      "generating")
     for (node <- kdtree.getNodes) {
       val c = new KdTreeCell(this, node)
       c.generate_dist
       nodes_to_cell.update(node, c)
-      table.driver.heartbeat
+      task.item_processed()
     }
 
     if (interpolateWeight > 0) {
@@ -143,6 +145,8 @@ class KdTreeCellGrid(table: SphereDocumentTable,
         if (iwtopdown) kdtree.getNodes.toList
         else kdtree.getNodes.reverse
 
+      val task = new ExperimentMeteredTask(table.driver, "K-d tree cell",
+        "interpolating")
       for (node <- nodes if node.parent != null) {
         val cell = nodes_to_cell(node)
         val wd = cell.combined_dist.word_dist
@@ -165,8 +169,9 @@ class KdTreeCellGrid(table: SphereDocumentTable,
 
         // gotta update these variables
         uwd.num_word_tokens = uwd.counts.values.sum
-        driver.heartbeat
+        task.item_processed()
       }
+      task.finish()
     }
 
     val nodes = if (useBackoff) kdtree.getNodes else kdtree.getLeaves

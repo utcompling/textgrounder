@@ -464,8 +464,7 @@ class MultiRegularCellGrid(
   }
 
   protected def initialize_cells() {
-    val task =
-      new ExperimentMeteredTask(table.driver, "Earth-tiling cell",
+    val task = new ExperimentMeteredTask(table.driver, "Earth-tiling cell",
       "generating non-empty")
 
     for (i <- minimum_latind to maximum_latind view) {
