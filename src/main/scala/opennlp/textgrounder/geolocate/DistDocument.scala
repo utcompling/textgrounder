@@ -598,6 +598,8 @@ abstract class DistDocument[TCoord : Serializer](
           case e@_ => {
             val msg = ("Bad value %s for field '%s': %s" format
                        (value, field, e.toString))
+            if (debug("stack-trace") || debug("stacktrace"))
+              e.printStackTrace
             throw new DocumentValidationException(msg, e)
           }
         }
@@ -881,8 +883,6 @@ abstract class DistDocumentFileProcessor(
       catch {
         case e:DocumentValidationException => {
           warning("Line %s: %s", num_processed + 1, e.message)
-          if (debug("stack-trace") || debug("stacktrace"))
-            e.printStackTrace
           return (false, true)
         }
       }
