@@ -150,14 +150,14 @@ class FrobCorpusFileProcessor(
   def modify_fixed_values(fixed_values: Map[String, String]) = {
     var (names, values) = fixed_values.toSeq.unzip
     var new_fixed_values = (rename_fields(names) zip values).toMap
+    for (field <- params.remove_field)
+      new_fixed_values -= field
     val new_fields =
       for (add_field <- params.add_field) yield {
         val Array(field, value) = add_field.split("=", 2)
         (field -> value)
       }
     new_fixed_values ++= new_fields
-    for (field <- params.remove_field)
-      new_fixed_values -= field
     new_fixed_values
   }
 
