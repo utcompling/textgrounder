@@ -31,7 +31,7 @@ import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil.{errout, errprint, warning}
 
 import opennlp.textgrounder.geolocate._
-import GeolocateDriver.Debug._
+import GridLocateDriver.Debug._
 /* FIXME: Eliminate this. */
 import GeolocateToponymApp.Params
 import WordDist.memoizer._
@@ -898,7 +898,7 @@ abstract class GeolocateToponymEvaluator(
   strategy: GeolocateToponymStrategy,
   stratname: String,
   driver: GeolocateToponymDriver
-) extends GeolocateTestFileEvaluator[
+) extends TestFileEvaluator[
   GeogWordDocument, ToponymEvaluationResult
 ](stratname, driver) with DocumentIteratingEvaluator[
   GeogWordDocument, ToponymEvaluationResult
@@ -1541,7 +1541,7 @@ class GeolocateToponymDriver extends
     GeolocateDriver with StandaloneGeolocateDriverStats {
   type TParam = GeolocateToponymParameters
   type TRunRes =
-    Seq[(String, GeolocateToponymStrategy, GeolocateTestFileEvaluator[_,_])]
+    Seq[(String, GeolocateToponymStrategy, TestFileEvaluator[_,_])]
 
   override def handle_parameters() {
     super.handle_parameters()

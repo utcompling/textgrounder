@@ -31,7 +31,7 @@ import java.io._
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.printutil.errprint
 
-import GeolocateDriver.Debug._
+import GridLocateDriver.Debug._
 import WordDist.memoizer._
 import GenericTypes._
 
