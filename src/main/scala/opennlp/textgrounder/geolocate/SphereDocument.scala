@@ -86,9 +86,9 @@ abstract class SphereDocumentSubtable[TDoc <: SphereDocument](
  * type of corpus (e.g. Wikipedia or Twitter).
  */
 class SphereDocumentTable(
-  driver: GeolocateDriver,
+  override val driver: GeolocateDriver,
   word_dist_factory: WordDistFactory
-) extends DistDocumentTable[SphereCoord, SphereDocument](
+) extends DistDocumentTable[SphereCoord, SphereDocument, SphereCellGrid](
   driver, word_dist_factory
 ) {
   val corpus_type_to_subtable =

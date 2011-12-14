@@ -22,6 +22,7 @@
 
 package opennlp.textgrounder.geolocate
 
+import util.control.Breaks._
 import collection.mutable
 
 import opennlp.textgrounder.util.collectionutil._
@@ -31,6 +32,8 @@ import opennlp.textgrounder.util.ioutil.{FileHandler, FileProcessor}
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.{curtimehuman, output_resource_usage}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
+
+import GridLocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
 //                 General statistics on evaluation results                //
@@ -334,13 +337,14 @@ abstract class GroupedDocumentEvalStats[TCoord,
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * Abstract class for reading documents from a test file and evaluating
- * on them.
+ * Basic abstract class for reading documents from a test file and evaluating
+ * on them.  Doesn't use any driver class. (FIXME, perhaps we should
+ * integrate this into TestFileEvaluator.)
  *
  * @tparam TEvalDoc Type of document to evaluate.
  * @tparam TEvalRes Type of result of evaluating a document.
  */
-abstract class TestFileEvaluator[TEvalDoc, TEvalRes](
+abstract class BasicTestFileEvaluator[TEvalDoc, TEvalRes](
   val stratname: String
 ) {
   var documents_processed = 0
@@ -452,6 +456,265 @@ abstract class TestFileEvaluator[TEvalDoc, TEvalRes](
     * evaluating them using `process_document`.
     */
   def process_files(filehand: FileHandler, files: Iterable[String]): Boolean
+}
+
+/**
+ * Abstract class for reading documents from a test file and evaluating
+ * on them.
+ *
+ * @tparam TEvalDoc Type of document to evaluate.
+ * @tparam TEvalRes Type of result of evaluating a document.
+ *
+ * Evaluates on all of the given files, outputting periodic results and
+ * results after all files are done.  If the evaluator uses documents as
+ * documents (so that it doesn't need any external test files), the value
+ * of 'files' should be a sequence of one item, which is null. (If an
+ * empty sequence is passed in, no evaluation will happen.)
+
+ * Also returns an object containing the results.
+ */
+abstract class TestFileEvaluator[TEvalDoc, TEvalRes](
+  stratname: String,
+  val driver: GridLocateDriver
+) extends BasicTestFileEvaluator[TEvalDoc, TEvalRes](stratname) {
+  override val task = new MeteredTask("document", "evaluating",
+    maxtime = driver.params.max_time_per_stage)
+  var skip_initial = driver.params.skip_initial_test_docs
+  var skip_n = 0
+
+  override def would_skip_by_parameters() = {
+    var do_skip = false
+    if (skip_initial != 0) {
+      skip_initial -= 1
+      do_skip = true
+    } else if (skip_n != 0) {
+      skip_n -= 1
+      do_skip = true
+    } else
+      skip_n = driver.params.every_nth_test_doc - 1
+    do_skip
+  }
+        
+  override def would_stop_processing(new_processed: Int) = {
+    // If max # of docs reached, stop
+    val stop = (driver.params.num_test_docs > 0 &&
+                 new_processed >= driver.params.num_test_docs)
+    if (stop) {
+      errprint("")
+      errprint("Stopping because limit of %s documents reached",
+        driver.params.num_test_docs)
+    }
+    stop
+  }
+}
+
+abstract class DocumentEvaluator[
+  TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc],
+  TGrid <: CellGrid[TCoord, TDoc, TCell],
+  TEvalDoc,
+  TEvalRes
+](
+  val strategy: GridLocateDocumentStrategy[TCell, TGrid],
+  stratname: String,
+  driver: GridLocateDriver // GridLocateDocumentTypeDriver
+) extends TestFileEvaluator[TEvalDoc, TEvalRes](stratname, driver) {
+  type TGroupedEvalStats <: GroupedDocumentEvalStats[TCoord,TDoc,TCell]
+  def create_grouped_eval_stats(driver: GridLocateDriver, // GridLocateDocumentTypeDriver
+    cell_grid: TGrid, results_by_range: Boolean):
+    TGroupedEvalStats
+  val evalstats = create_grouped_eval_stats(driver,
+    strategy.cell_grid, results_by_range = driver.params.results_by_range)
+
+  def output_results(isfinal: Boolean = false) {
+    evalstats.output_results(all_results = isfinal)
+  }
+}
+
+/**
+ * Class to do document grid-location on documents from the document data, in
+ * the dev or test set.
+ */
+abstract class CorpusDocumentEvaluator[
+  TCoord,
+  XTDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, XTDoc],
+  // SCALABUG: No way access something called 'TGrid' at this scope in the
+  // line below where it says 'type TGrid = XTGrid'
+  XTGrid <: CellGrid[TCoord, XTDoc, TCell],
+  TEvalRes <: DocumentEvaluationResult[_,_,_]
+](
+  strategy: GridLocateDocumentStrategy[TCell, XTGrid],
+  stratname: String,
+  driver: GridLocateDriver { type TGrid = XTGrid; type TDoc = XTDoc } // GridLocateDocumentTypeDriver
+) extends DocumentEvaluator[
+  TCoord, XTDoc, TCell, XTGrid, XTDoc, TEvalRes
+](strategy, stratname, driver) {
+  override type TGroupedEvalStats <:
+    GroupedDocumentEvalStats[TCoord,XTDoc,TCell] { type TDocEvalRes = TEvalRes }
+
+  /**
+   * A file processor that reads corpora containing document metadata and
+   * creates a DistDocument for each document described, and evaluates it.
+   *
+   * @param suffix Suffix specifying the type of document file wanted
+   *   (e.g. "counts" or "document-metadata"
+   * @param cell_grid Cell grid to add newly created DistDocuments to
+   */
+  class EvaluateCorpusFileProcessor(
+    suffix: String
+  ) extends DistDocumentFileProcessor(suffix, driver) {
+    def handle_document(fieldvals: Seq[String]) = {
+      val doc = driver.document_table.create_and_init_document(
+        schema, fieldvals, false)
+      if (doc == null) (false, true)
+      else {
+        doc.dist.finish_after_global()
+        process_document(doc)
+      }
+    }
+
+    def process_lines(lines: Iterator[String],
+        filehand: FileHandler, file: String,
+        compression: String, realname: String) = {
+      var should_stop = false
+      breakable {
+        for (line <- lines) {
+          if (!parse_row(line)) {
+            should_stop = true
+            break
+          }
+        }
+      }
+      output_resource_usage()
+      !should_stop
+    }
+  }
+
+  def process_files(filehand: FileHandler, files: Iterable[String]): Boolean = {
+    /* NOTE: `files` must actually be a list of directories, e.g. as
+       comes from the value of --input-corpus. */
+    for (dir <- files) {
+      val fileproc = new EvaluateCorpusFileProcessor(
+        driver.params.eval_set + "-" + driver.document_file_suffix)
+      fileproc.read_schema_from_corpus(filehand, dir)
+      if (!fileproc.process_files(filehand, Seq(dir)))
+        return false
+    }
+    return true
+  }
+
+  //title = None
+  //words = []
+  //for line in openr(filename, errors="replace"):
+  //  if (rematch("Article title: (.*)$", line))
+  //    if (title != null)
+  //      yield (title, words)
+  //    title = m_[1]
+  //    words = []
+  //  else if (rematch("Link: (.*)$", line))
+  //    args = m_[1].split('|')
+  //    truedoc = args[0]
+  //    linkword = truedoc
+  //    if (len(args) > 1)
+  //      linkword = args[1]
+  //    words.append(linkword)
+  //  else:
+  //    words.append(line)
+  //if (title != null)
+  //  yield (title, words)
+
+  override def would_skip_document(document: XTDoc, doctag: String) = {
+    if (document.dist == null) {
+      // This can (and does) happen when --max-time-per-stage is set,
+      // so that the counts for many documents don't get read in.
+      if (driver.params.max_time_per_stage == 0.0 && driver.params.num_training_docs == 0)
+        warning("Can't evaluate document %s without distribution", document)
+      true
+    } else false
+  }
+
+  def create_evaluation_result(document: XTDoc, pred_cell: TCell,
+    true_rank: Int): TEvalRes
+
+  def print_individual_result(doctag: String, document: XTDoc,
+    result: TEvalRes, pred_cells: Array[(TCell, Double)])
+
+  def evaluate_document(document: XTDoc, doctag: String): TEvalRes = {
+    if (would_skip_document(document, doctag)) {
+      evalstats.increment_counter("documents.skipped")
+      // SCALABUG: Doesn't automatically recognize TEvalRes as a reference
+      // type despite being a subclass of DocumentEvaluationResult
+      return null.asInstanceOf[TEvalRes]
+    }
+    assert(document.dist.finished)
+    val true_cell =
+      strategy.cell_grid.find_best_cell_for_coord(document.coord, true)
+    if (debug("lots") || debug("commontop")) {
+      val naitr = true_cell.combined_dist.num_docs_for_word_dist
+      errprint("Evaluating document %s with %s word-dist documents in true cell",
+        document, naitr)
+    }
+
+    /* That is:
+
+       pred_cells = List of predicted cells, from best to worst; each list
+          entry is actually a tuple of (cell, score) where lower scores
+          are better
+       true_rank = Rank of true cell among predicted cells
+     */
+    /* FIXME!! I get an unchecked warning here.  Never seen an unchecked
+       warning in pure Scala code.
+
+[warn] /Users/benwing/devel/textgrounder/src/main/scala/opennlp/textgrounder/geolocate/GridLocateEvaluation.scala:240: non variable type-argument TCell in type pattern Array[(TCell, Double)] is unchecked since it is eliminated by erasure
+[warn]     val (pred_cells: Array[(TCell, Double)], true_rank: Int) =
+[warn]                      ^
+    */
+    val (pred_cells: Array[(TCell, Double)], true_rank: Int) =
+      if (driver.params.oracle_results)
+        (Array((true_cell, 0.0)), 1)
+      else {
+        def get_computed_results() = {
+          val cells = strategy.return_ranked_cells(document.dist).toArray
+          var rank = 1
+          var broken = false
+          breakable {
+            for ((cell, value) <- cells) {
+              if (cell eq true_cell) {
+                broken = true
+                break
+              }
+              rank += 1
+            }
+          }
+          if (!broken)
+            rank = 1000000000
+          (cells, rank)
+        }
+
+        get_computed_results()
+      }
+
+    val result = create_evaluation_result(document, pred_cells(0)._1, true_rank)
+
+    if (debug("all-scores")) {
+      for (((cell, value), index) <- pred_cells.zipWithIndex) {
+        errprint("%s: %6d: Cell at %s: score = %g", doctag, index + 1,
+          cell.describe_indices(), value)
+      }
+    }
+    val want_indiv_results =
+      !driver.params.oracle_results && !driver.params.no_individual_results
+    evalstats.record_result(result)
+    if (result.num_docs_in_true_cell == 0) {
+      evalstats.increment_counter("documents.no_training_documents_in_cell")
+    }
+    if (want_indiv_results)
+      print_individual_result(doctag, document, result, pred_cells)
+
+    return result
+  }
 }
 
 trait DocumentIteratingEvaluator[TEvalDoc, TEvalRes] extends

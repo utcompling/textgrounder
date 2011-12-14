@@ -31,7 +31,7 @@ import opennlp.textgrounder.util.experiment._
 
 import WordDist.memoizer._
 /* FIXME: Eliminate this. */
-import GeolocateDriver.Params
+import GridLocateDriver.Params
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Word distributions                          //
@@ -220,7 +220,8 @@ class WordCellDist[TCoord,
 }
 
 abstract class CellDistFactory[
-  TCoord, TDoc <: DistDocument[TCoord],
+  TCoord,
+  TDoc <: DistDocument[TCoord],
   TCell <: GeoCell[TCoord, TDoc]
 ](
   val lru_cache_size: Int
@@ -471,7 +472,7 @@ abstract class CellGrid[
   TDoc <: DistDocument[TCoord],
   TCell <: GeoCell[TCoord, TDoc]
 ](
-    val table: DistDocumentTable[TCoord, TDoc]
+    val table: DistDocumentTable[TCoord, TDoc, _ <: CellGrid[TCoord, TDoc, TCell]]
 ) {
 
   /**
