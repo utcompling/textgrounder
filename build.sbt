@@ -56,7 +56,7 @@ libraryDependencies ++= Seq(
 javacOptions ++= Seq("-Xlint")
 
 // turn on all Scala warnings; also turn on deprecation warnings
-scalacOptions ++= Seq("-deprecation", "-Xlint")
+scalacOptions ++= Seq("-deprecation", "-Xlint", "-unchecked")
 
 seq(assemblySettings: _*)
 
