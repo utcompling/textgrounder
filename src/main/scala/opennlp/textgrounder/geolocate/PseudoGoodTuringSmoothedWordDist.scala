@@ -104,10 +104,10 @@ class PseudoGoodTuringSmoothedWordDistFactory extends
   }
 
   def create_word_dist() =
-    new PseudoGoodTuringSmoothedWordDist(this, Array[Word](), Array[Int](), 0,
+    new PseudoGoodTuringSmoothedWordDist(this, Array[String](), Array[Int](), 0,
       note_globally = false)
 
-  def set_unigram_word_dist(doc: GenericDistDocument, keys: Array[Word],
+  def set_unigram_word_dist(doc: GenericDistDocument, keys: Array[String],
       values: Array[Int], num_words: Int, is_training_set: Boolean) {
     doc.dist = new PseudoGoodTuringSmoothedWordDist(this, keys, values,
       num_words, note_globally = is_training_set)
@@ -129,7 +129,7 @@ class PseudoGoodTuringSmoothedWordDistFactory extends
 
 class PseudoGoodTuringSmoothedWordDist(
   val factory: PseudoGoodTuringSmoothedWordDistFactory,
-  keys: Array[Word],
+  keys: Array[String],
   values: Array[Int],
   num_words: Int,
   note_globally: Boolean
