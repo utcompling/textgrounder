@@ -664,14 +664,7 @@ abstract class CorpusDocumentEvaluator[
           are better
        true_rank = Rank of true cell among predicted cells
      */
-    /* FIXME!! I get an unchecked warning here.  Never seen an unchecked
-       warning in pure Scala code.
-
-[warn] /Users/benwing/devel/textgrounder/src/main/scala/opennlp/textgrounder/geolocate/GridLocateEvaluation.scala:240: non variable type-argument TCell in type pattern Array[(TCell, Double)] is unchecked since it is eliminated by erasure
-[warn]     val (pred_cells: Array[(TCell, Double)], true_rank: Int) =
-[warn]                      ^
-    */
-    val (pred_cells: Array[(TCell, Double)], true_rank: Int) =
+    val (pred_cells, true_rank) =
       if (driver.params.oracle_results)
         (Array((true_cell, 0.0)), 1)
       else {
