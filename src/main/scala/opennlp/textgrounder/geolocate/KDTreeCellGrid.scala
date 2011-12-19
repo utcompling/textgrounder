@@ -124,6 +124,7 @@ class KdTreeCellGrid(table: SphereDocumentTable,
     val nodes_to_cell : Map[KdTree[SphereDocument], KdTreeCell] = Map()
 
     { // Put in a block to control scope of 'task'
+      kdtree.balance
       val task = new ExperimentMeteredTask(table.driver, "K-d tree cell",
         "generating")
       for (node <- kdtree.getNodes) {
