@@ -251,7 +251,7 @@ TDoc <: DistDocument[TCoord]](
    * @param cell_grid Cell grid to add newly created DistDocuments to
    */
   class DistDocumentTableFileProcessor(
-    suffix: String, cell_grid: CellGrid[TCoord,TDoc,_]
+    suffix: String, cell_grid: CellGrid[TCoord,TDoc,_], pass: Int
   ) extends DistDocumentFileProcessor(suffix, driver) {
     def handle_document(fieldvals: Seq[String]) = {
       val doc = create_and_init_document(schema, fieldvals, true)
@@ -267,7 +267,7 @@ TDoc <: DistDocument[TCoord]](
         filehand: FileHandler, file: String,
         compression: String, realname: String) = {
       val task =
-        new ExperimentMeteredTask(driver, "document", "reading",
+        new ExperimentMeteredTask(driver, "document", "reading pass " + pass,
               maxtime = driver.params.max_time_per_stage)
       // Stop if we've reached the maximum
       var should_stop = false
@@ -315,10 +315,13 @@ TDoc <: DistDocument[TCoord]](
   def read_training_documents(filehand: FileHandler, dir: String,
       suffix: String, cell_grid: CellGrid[TCoord,TDoc,_]) {
 
-    val training_distproc =
-      new DistDocumentTableFileProcessor("training-" + suffix, cell_grid)
-    training_distproc.read_schema_from_corpus(filehand, dir)
-    training_distproc.process_files(filehand, Seq(dir))
+    for (pass <- 1 to cell_grid.num_training_passes) {
+      val training_distproc =
+        new DistDocumentTableFileProcessor("training-" + suffix, cell_grid, pass)
+      training_distproc.read_schema_from_corpus(filehand, dir)
+      cell_grid.begin_training_pass(pass)
+      training_distproc.process_files(filehand, Seq(dir))
+    }
   }
 
   def clear_training_document_distributions() {

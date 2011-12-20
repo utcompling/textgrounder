@@ -316,7 +316,7 @@ abstract class GeoCell[TCoord, TDoc <: DistDocument[TCoord]](
   /**
    * Return true if we have finished creating and populating the cell.
    */
-  protected def finished = combined_dist.word_dist.finished
+  def finished = combined_dist.word_dist.finished
   /**
    * Return a string representation of the cell.  Generally does not need
    * to be overridden.
@@ -478,6 +478,18 @@ abstract class CellGrid[
    * Total number of cells in the grid.
    */
   var total_num_cells: Int
+
+  /*
+   * Number of times to pass over the training corpus
+   * and call add_document()
+   */
+  val num_training_passes: Int = 1
+
+  /*
+   * Called before each new pass of the training. Usually not
+   * needed, but needed for KDCellGrid and possibly future CellGrids.
+   */
+  def begin_training_pass(pass: Int) = {}
 
   /**
    * Find the correct cell for the given coordinates.  If no such cell
