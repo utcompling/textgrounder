@@ -66,11 +66,13 @@ Counts-file format:
 The data file in the above format can be processed to produce a file with
 word counts instead of actual text.  The text field is replaced by a "counts"
 field.  The counts file contains a series of entries separated by spaces.
-Each entry contains one or more fields, separated by colons.  Text in such
-fields needs to be URL-encoded, meaning that characters to be escaped are
-replaced by a percent sign followed by the two-digit hex representation of the
-character.  At the very least, colon and percent need to be escaped, but
-other ASCII characters can optionally be as well.
+Each entry contains one or more fields, separated by colons.  Because the
+colon serves as a separator, it needs to be escaped when it occurs as a
+character in a word (e.g. in a URL or emoticon occurring as a word).  To
+make it easy to split accurately, the colon needs to be escaped into a
+format that does not have a colon character in it (i.e. simply preceding by
+a backslash won't work).  Instead, we URL-encode colons and percent signs,
+i.e. colon becomes %3A and percent sign becomes %25.
 
 Unigram files have entries of the form WORD:COUNT.  Bigram files will have
 entries either of the form WORD1:WORD2:COUNT or WORD:COUNT (the latter
