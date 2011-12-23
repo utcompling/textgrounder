@@ -235,9 +235,8 @@ package object hadoop {
           true
         }
 
-        def process_row(fieldvals: Seq[String]) = {
-          throw new UnsupportedOperationException("This shouldn't be called")
-        }
+        def process_row(fieldvals: Seq[String]) =
+          throw new IllegalStateException("This shouldn't be called")
       }
 
       val fileproc = new RetrieveDocumentFilesFileProcessor(
