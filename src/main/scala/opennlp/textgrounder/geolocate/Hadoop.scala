@@ -22,25 +22,19 @@
 
 package opennlp.textgrounder.geolocate
 
-import java.io.{FileSystem=>_,_}
 import collection.JavaConversions._
-import util.control.Breaks._
 
 import org.apache.hadoop.io._
-import org.apache.hadoop.util._
 import org.apache.hadoop.mapreduce._
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
-import org.apache.hadoop.conf.{Configuration, Configured}
-import org.apache.hadoop.fs._
+import org.apache.hadoop.fs.Path
 
 import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.experiment.ExperimentMeteredTask
 import opennlp.textgrounder.util.hadoop._
 import opennlp.textgrounder.util.ioutil.FileHandler
-import opennlp.textgrounder.util.mathutil._
-import opennlp.textgrounder.util.printutil.{errprint, set_errout_prefix, warning}
+import opennlp.textgrounder.util.mathutil.{mean, median}
+import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 /* Basic idea for hooking up Geolocate with Hadoop.  Hadoop works in terms
    of key-value pairs, as follows:
