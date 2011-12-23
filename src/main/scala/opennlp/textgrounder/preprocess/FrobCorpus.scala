@@ -22,7 +22,7 @@ import java.io._
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.experiment.ExperimentDriverApp
+import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.printutil.warning
@@ -281,7 +281,8 @@ class FrobCorpusFileProcessor(
   }
 }
 
-class FrobCorpusDriver extends ProcessFilesDriver {
+class FrobCorpusDriver extends
+    ProcessFilesDriver with StandaloneExperimentDriverStats {
   type TParam = FrobCorpusParameters
   
   override def handle_parameters() {
