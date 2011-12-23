@@ -27,6 +27,7 @@ import java.io.{FileSystem=>_,_}
 import org.apache.hadoop.io._
 
 import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 import WordDist.memoizer._
@@ -125,7 +126,7 @@ class WordCellTupleWritable extends
 }
 
 class GenerateKMLDriver extends
-    GeolocateDriver with StandaloneGeolocateDriverStats {
+    GeolocateDriver with StandaloneExperimentDriverStats {
   type TParam = GenerateKMLParameters
   type TRunRes = Unit
 

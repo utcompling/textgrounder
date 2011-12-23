@@ -170,93 +170,6 @@ import opennlp.textgrounder.util.printutil.{errprint, set_errout_prefix, warning
 /*                  General Hadoop code for Geolocate app               */
 /************************************************************************/
    
-object HadoopGeolocateConfiguration {
-  /* Prefix used for storing parameters in a Hadoop configuration */
-  val hadoop_conf_prefix = "textgrounder."
-
-  /**
-   * Convert the parameters in `parser` to Hadoop configuration settings in
-   * `conf`.
-   *
-   * @param prefix Prefix to prepend to the names of all parameters.
-   * @param parser ArgParser object to retrieve parameters from.
-   * @param conf Configuration object to store configuration settings into.
-   */
-  def convert_parameters_to_hadoop_conf(prefix: String, parser: ArgParser,
-      conf: Configuration) {
-    for (name <- parser.argNames if parser.specified(name)) {
-      val confname = prefix + name
-      parser(name) match {
-        case e:Int => conf.setInt(confname, e)
-        case e:Long => conf.setLong(confname, e)
-        case e:Float => conf.setFloat(confname, e)
-        case e:Double => conf.setFloat(confname, e.toFloat)
-        case e:String => conf.set(confname, e)
-        case e:Boolean => conf.setBoolean(confname, e)
-        case e:Seq[_] => {
-          val multitype = parser.getMultiType(name)
-          if (multitype == classOf[String]) {
-            conf.setStrings(confname, parser.get[Seq[String]](name): _*)
-          } else
-            throw new UnsupportedOperationException(
-              "Don't know how to store sequence of type %s of parameter %s into a Hadoop Configuration"
-              format (multitype, name))
-        }
-        case ty@_ => {
-          throw new UnsupportedOperationException(
-            "Don't know how to store type %s of parameter %s into a Hadoop Configuration"
-            format (ty, name))
-        }
-      }
-    }
-  }
-
-  /**
-   * Convert the relevant Hadoop configuration settings in `conf`
-   * into the given ArgParser.
-   *
-   * @param prefix Prefix to prepend to the names of all parameters.
-   * @param parser ArgParser object to store parameters into.  The names
-   *   of parameters to fetch are taken from this object.
-   * @param conf Configuration object to retrieve settings from.
-   */
-  def convert_parameters_from_hadoop_conf(prefix: String, parser: ArgParser,
-      conf: Configuration) {
-    // Configuration.dumpConfiguration(conf, new PrintWriter(System.err))
-    for {name <- parser.argNames
-         confname = prefix + name
-         if conf.getRaw(confname) != null} {
-      val confname = prefix + name
-      val ty = parser.getType(name)
-      if (ty == classOf[Int])
-        parser.set[Int](name, conf.getInt(confname, parser.defaultValue[Int](name)))
-      else if (ty == classOf[Long])
-        parser.set[Long](name, conf.getLong(confname, parser.defaultValue[Long](name)))
-      else if (ty == classOf[Float])
-        parser.set[Float](name, conf.getFloat(confname, parser.defaultValue[Float](name)))
-      else if (ty == classOf[Double])
-        parser.set[Double](name, conf.getFloat(confname, parser.defaultValue[Double](name).toFloat).toDouble)
-      else if (ty == classOf[String])
-        parser.set[String](name, conf.get(confname, parser.defaultValue[String](name)))
-      else if (ty == classOf[Boolean])
-        parser.set[Boolean](name, conf.getBoolean(confname, parser.defaultValue[Boolean](name)))
-      else if (ty == classOf[Seq[_]]) {
-        val multitype = parser.getMultiType(name)
-        if (multitype == classOf[String])
-          parser.set[Seq[String]](name, conf.getStrings(confname, parser.defaultValue[Seq[String]](name): _*).toSeq)
-        else
-          throw new UnsupportedOperationException(
-            "Don't know how to fetch sequence of type %s of parameter %s from a Hadoop Configuration"
-            format (multitype, name))
-      } else {
-        throw new UnsupportedOperationException(
-          "Don't know how to store fetch %s of parameter %s from a Hadoop Configuration"
-          format (ty, name))
-      }
-    }
-  }
-}
-
 abstract class HadoopGeolocateApp(
   progname: String
 ) extends GeolocateApp(progname) {
@@ -278,7 +191,7 @@ abstract class HadoopGeolocateApp(
      actually run the job.
    */
   override def run_program() = {
-    import HadoopGeolocateConfiguration._
+    import HadoopExperimentConfiguration._
     convert_parameters_to_hadoop_conf(hadoop_conf_prefix, arg_parser,
       hadoop_conf)
     val job = new Job(hadoop_conf, progname)
@@ -354,120 +267,14 @@ variable (e.g. in Hadoop).""")
  * @see HadoopGeolocateDriver
  */
 
-trait BaseHadoopGeolocateDriver extends GeolocateDriver {
-  /**
-   * FileHandler object for this driver.
-   */
-  private lazy val hadoop_file_handler =
-    new HadoopFileHandler(get_configuration)
-
-  override def get_file_handler: FileHandler = hadoop_file_handler
-
+trait HadoopGeolocateDriver extends
+    GeolocateDriver with HadoopExperimentDriver {
   override type TParam <: HadoopGeolocateParameters
 
   override def handle_parameters() {
     super.handle_parameters()
     need(params.textgrounder_dir, "textgrounder-dir")
     TextGrounderInfo.set_textgrounder_dir(params.textgrounder_dir)
-  }
-
-  /* Implementation of the driver statistics mix-in (ExperimentDriverStats)
-     that store counters in Hadoop. find_split_counter needs to be
-     implemented. */
-
-  /**
-   * Find the Counter object for the given counter, split into the
-   * group and tail components.  The way to do this depends on whether
-   * we're running the job driver on the client, or a map or reduce task
-   * on a tasktracker.
-   */
-  protected def find_split_counter(group: String, tail: String): Counter
-
-  val local_counter_group = "textgrounder"
-
-  def get_job_context: JobContext
-
-  def get_configuration = get_job_context.getConfiguration
-
-  def get_task_id = get_configuration.getInt("mapred.task.partition", -1)
-  
-  /**
-   * Find the Counter object for the given counter.
-   */
-  protected def find_counter(name: String) = {
-    val (group, counter) = split_counter(name)
-      find_split_counter(group, counter)
-  }
-
-  protected def imp_increment_counter(name: String, incr: Long) {
-    val counter = find_counter(name)
-    counter.increment(incr)
-  }
-
-  protected def imp_get_counter(name: String) = {
-    val counter = find_counter(name)
-    counter.getValue()
-  }
-}
-
-/**
- * Mix-in for a Geolocate application using Hadoop.  This is a trait
- * because it should be mixed into a class providing the implementation of
- * an application in a way that is indifferent to whether it's being run
- * stand-alone or in Hadoop.
- *
- * This is used both in map/reduce task code and in the client job-running
- * code.  In some ways it would be cleaner to have separate classes for
- * task vs. client job code, but that would entail additional boilerplate
- * for any individual apps as they'd have to create separate task and
- * client job versions of each class along with a base superclass for the
- * two.
- */
-
-trait HadoopGeolocateDriver extends BaseHadoopGeolocateDriver {
-  var job: Job = _
-  var context: TaskInputOutputContext[_,_,_,_] = _
-
-  /**
-   * Set the task context, if we're running in the map or reduce task
-   * code on a tasktracker. (Both Mapper.Context and Reducer.Context are
-   * subclasses of TaskInputOutputContext.)
-   */
-  def set_task_context(context: TaskInputOutputContext[_,_,_,_]) {
-    this.context = context
-  }
-
-  /**
-   * Set the Job object, if we're running the job-running code on the
-   * client. (Note that we have to set the job like this, rather than have
-   * it passed in at creation time, e.g. through an abstract field,
-   * because of bootstrapping issues; explained in HadoopGeolocateApp.
-   */
-
-  def set_job(job: Job) {
-    this.job = job
-  }
-
-  def get_job_context = {
-    if (context != null) context
-    else if (job != null) job
-    else need_to_set_context()
-  }
-
-  def find_split_counter(group: String, counter: String) = {
-    if (context != null)
-      context.getCounter(group, counter)
-    else if (job != null)
-      job.getCounters.findCounter(group, counter)
-    else
-      need_to_set_context()
-  }
-
-  def need_to_set_context() =
-    throw new IllegalStateException("Either task context or job needs to be set before any counter operations")
-
-  override def heartbeat() {
-    context.progress
   }
 }
 
@@ -487,7 +294,7 @@ trait HadoopGeolocateMapper {
   def create_driver(): TDriver
 
   def setup(context: TContext) {
-    import HadoopGeolocateConfiguration._
+    import HadoopExperimentConfiguration._
 
     val conf = context.getConfiguration
     val ap = new ArgParser(progname)

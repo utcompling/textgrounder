@@ -553,26 +553,8 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
   }
 }
 
-/**
- * Implementation of driver-statistics mix-in that simply stores the
- * counters locally.
- */
-trait StandaloneGeolocateDriverStats extends ExperimentDriverStats {
-  val counter_values = longmap[String]()
-
-  val local_counter_group = "textgrounder"
-
-  def get_task_id = 0
-
-  protected def imp_increment_counter(name: String, incr: Long) {
-    counter_values(name) += incr
-  }
-
-  protected def imp_get_counter(name: String) = counter_values(name)
-}
-
 class GeolocateDocumentDriver extends
-    GeolocateDocumentTypeDriver with StandaloneGeolocateDriverStats {
+    GeolocateDocumentTypeDriver with StandaloneExperimentDriverStats {
   override type TParam = GeolocateDocumentParameters
 }
 
