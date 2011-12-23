@@ -518,7 +518,8 @@ class TwitterInfochimpsStatsFileProcessor(
   }
 }
 
-class ConvertTwitterInfochimpsDriver extends ProcessFilesDriver {
+class ConvertTwitterInfochimpsDriver extends
+    ProcessFilesDriver with StandaloneExperimentDriverStats {
   type TParam = ConvertTwitterInfochimpsParameters
   
   override def handle_parameters() {

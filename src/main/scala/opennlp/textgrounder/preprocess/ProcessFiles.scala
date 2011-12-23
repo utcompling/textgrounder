@@ -50,7 +50,7 @@ class ProcessFilesParameters(ap: ArgParser) extends
 exist, and will be created (including any parent directories).""")
 }
 
-abstract class ProcessFilesDriver extends ArgParserExperimentDriver {
+abstract class ProcessFilesDriver extends HadoopableArgParserExperimentDriver {
   override type TParam <: ProcessFilesParameters
   type TRunRes = Unit
 
