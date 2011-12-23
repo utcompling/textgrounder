@@ -212,40 +212,9 @@ trait HadoopGeolocateDriver extends
 /*                Hadoop implementation of geolocate-document           */
 /************************************************************************/
 
-trait HadoopGeolocateMapper {
-  type TContext <: TaskInputOutputContext[_,_,_,_]
-  type TDriver <: HadoopGeolocateDriver
-  val driver = create_driver()
-  type TParam = driver.TParam
-
-  def progname: String
-
-  def create_param_object(ap: ArgParser): TParam
-  def create_driver(): TDriver
-
-  def setup(context: TContext) {
-    import HadoopExperimentConfiguration._
-
-    val conf = context.getConfiguration
-    val ap = new ArgParser(progname)
-    // Initialize set of parameters in `ap`
-    create_param_object(ap)
-    // Retrieve configuration values and store in `ap`
-    convert_parameters_from_hadoop_conf(hadoop_conf_prefix, ap, conf)
-    // Now create a class containing the stored configuration values
-    val params = create_param_object(ap)
-    driver.set_task_context(context)
-    context.progress
-    driver.set_parameters(params)
-    context.progress
-    driver.setup_for_run()
-    context.progress
-  }
-}
-   
 class DocumentEvaluationMapper extends
     Mapper[Object, Text, Text, DoubleWritable] with
-    HadoopGeolocateMapper {
+    HadoopExperimentMapper {
   def progname = HadoopGeolocateDocumentApp.progname
   type TContext = Mapper[Object, Text, Text, DoubleWritable]#Context
   type TDriver = HadoopGeolocateDocumentDriver
