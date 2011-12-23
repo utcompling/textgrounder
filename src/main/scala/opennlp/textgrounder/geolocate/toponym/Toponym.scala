@@ -1538,7 +1538,7 @@ Default '%default'.""")
 }
 
 class GeolocateToponymDriver extends
-    GeolocateDriver with StandaloneGeolocateDriverStats {
+    GeolocateDriver with StandaloneExperimentDriverStats {
   type TParam = GeolocateToponymParameters
   type TRunRes =
     Seq[(String, GeolocateToponymStrategy, TestFileEvaluator[_,_])]

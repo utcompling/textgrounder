@@ -687,8 +687,7 @@ class DebugSettings {
  * also returned by the run() function.  There are some scripts to parse the
  * console output.  See below.
  */
-abstract class GridLocateDriver extends
-    ArgParserExperimentDriver with ExperimentDriverStats {
+abstract class GridLocateDriver extends HadoopableArgParserExperimentDriver {
   type TDoc <: DistDocument[_]
   type TGrid <: CellGrid[_, TDoc, _ <: GeoCell[_, TDoc]]
   type TDocTable <: DistDocumentTable[_, TDoc, TGrid]
@@ -698,13 +697,6 @@ abstract class GridLocateDriver extends
   var document_table: TDocTable = _
   var word_dist_factory: WordDistFactory = _
   var document_file_suffix: String = _
-
-  /**
-   * FileHandler object for this driver.
-   */
-  private val local_file_handler = new LocalFileHandler
-
-  def get_file_handler: FileHandler = local_file_handler
 
   /**
    * Set the options to those as given.  NOTE: Currently, some of the
