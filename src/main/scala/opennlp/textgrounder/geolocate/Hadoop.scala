@@ -172,80 +172,16 @@ import opennlp.textgrounder.util.printutil.{errprint, set_errout_prefix, warning
    
 abstract class HadoopGeolocateApp(
   progname: String
-) extends GeolocateApp(progname) {
-  var hadoop_conf: Configuration = _
-
+) extends GeolocateApp(progname) with HadoopCorpusApp {
   override type TDriver <: HadoopGeolocateDriver
 
-  /* Set by subclass -- Initialize the various classes for map and reduce */
-  def initialize_hadoop_classes(job: Job)
+  def corpus_suffix =
+    driver.params.eval_set + "-" + driver.document_file_suffix
+  def corpus_dirs = params.input_corpus
 
-  /* Called after command-line arguments have been read, verified,
-     canonicalized and stored into `arg_parser`.  We convert the arguments
-     into configuration variables in the Hadoop configuration -- this is
-     one way to get "side data" passed into a mapper, and is designed
-     exactly for things like command-line arguments. (For big chunks of
-     side data, it's better to use the Hadoop file system.) Then we
-     tell Hadoop about the classes used to do map and reduce by calling
-     initialize_hadoop_classes(), set the input and output files, and
-     actually run the job.
-   */
-  override def run_program() = {
-    import HadoopExperimentConfiguration._
-    convert_parameters_to_hadoop_conf(hadoop_conf_prefix, arg_parser,
-      hadoop_conf)
-    val job = new Job(hadoop_conf, progname)
-    /* We have to call set_job() here now, and not earlier.  This is the
-       "bootstrapping issue" alluded to in the comments on
-       HadoopGeolocateDriver.  We can't set the Job until it's created,
-       and we can't create the Job until after we have set the appropriate
-       TextGrounder configuration parameters from the command-line arguments --
-       but, we need the driver already created in order to parse the
-       command-line arguments, because it participates in that process. */
-    driver.set_job(job)
-    initialize_hadoop_classes(job)
-
-    /* A very simple file processor that does nothing but note the files
-       seen, for Hadoop's benefit. */
-    class RetrieveDocumentFilesFileProcessor(
-      suffix: String
-    ) extends DistDocumentFileProcessor(suffix, null) {
-      errprint("Suffix is %s", suffix)
-      def handle_document(fieldvals: Seq[String]) = (true, true)
-
-      def process_lines(lines: Iterator[String],
-          filehand: FileHandler, file: String,
-          compression: String, realname: String) = {
-        errprint("Called with %s", file)
-        FileInputFormat.addInputPath(job, new Path(file))
-        true
-      }
-    }
-
-    val fileproc = new RetrieveDocumentFilesFileProcessor(
-      driver.params.eval_set + "-" + driver.document_file_suffix
-    )
-    fileproc.process_files(driver.get_file_handler, params.input_corpus)
+  override def initialize_hadoop_input(job: Job) {
+    super.initialize_hadoop_input(job)
     FileOutputFormat.setOutputPath(job, new Path(params.outfile))
-    if (job.waitForCompletion(true)) 0 else 1
-  }
-
-  class HadoopGeolocateTool extends Configured with Tool {
-    override def run(args: Array[String]) = {
-      /* Set the Hadoop configuration object and then thread execution
-         back to the ExperimentApp.  This will read command-line arguments,
-         call initialize_parameters() on GeolocateApp to verify
-         and canonicalize them, and then pass control back to us by
-         calling run_program(), which we override. */
-      hadoop_conf = getConf()
-      set_errout_prefix(progname + ": ")
-      implement_main(args)
-    }
-  }
-
-  override def main(args: Array[String]) {
-    val exitCode = ToolRunner.run(new HadoopGeolocateTool(), args)
-    System.exit(exitCode)
   }
 }
 
