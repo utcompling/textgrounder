@@ -22,6 +22,7 @@ HADOOP_BINARY="${HADOOP_BINARY:-hadoop}"
 
 VERBOSE=false
 DEBUG=false
+HADOOP=
 MEMORY=
 JAVA_MISC_OPT=
 while true; do
@@ -37,6 +38,7 @@ while true; do
       JAVA_MISC_OPT="$JAVA_MISC_OPT -XX:+DoEscapeAnalysis"; shift ;;
     -compressed-oops | --compressed-oops )
       JAVA_MISC_OPT="$JAVA_MISC_OPT -XX:+UseCompressedOops"; shift ;;
+    -hadoop | --hadoop) HADOOP=yes; shift ;;
     -- ) shift; break ;;
     * ) break ;;
   esac
@@ -253,7 +255,6 @@ elif [ "$CMD" = 'build-all' ]; then
 else  
 
   CLASS=
-  HADOOP=
   HADOOP_ARGS=
   TGPACK=opennlp.textgrounder
   TGAPP=$TGPACK.app

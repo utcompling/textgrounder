@@ -54,8 +54,6 @@ abstract class ProcessFilesDriver extends HadoopableArgParserExperimentDriver {
   override type TParam <: ProcessFilesParameters
   type TRunRes = Unit
 
-  val filehand = new LocalFileHandler
-
   def handle_parameters() {
     need(params.output_dir, "output-dir")
   }
@@ -63,7 +61,7 @@ abstract class ProcessFilesDriver extends HadoopableArgParserExperimentDriver {
   def setup_for_run() { }
 
   def run_after_setup() {
-    if (!filehand.make_directories(params.output_dir))
+    if (!get_file_handler.make_directories(params.output_dir))
       param_error("Output dir %s must not already exist" format
         params.output_dir)
   }

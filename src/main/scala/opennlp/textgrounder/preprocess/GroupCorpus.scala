@@ -31,7 +31,7 @@ import org.apache.hadoop.fs._
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.experiment.ExperimentDriverApp
+import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.hadoop._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.mathutil.mean
@@ -132,7 +132,7 @@ format away from text to some kind of binary format.
 */
 
 class GroupCorpusParameters(ap: ArgParser) extends
-    ProcessFilesParameters(ap) {
+    ArgParserParameters(ap) {
   val input_dir =
     ap.option[String]("i", "input-dir",
       metavar = "DIR",
@@ -148,70 +148,90 @@ Defaults to '%default'.""")
       metavar = "DIR",
       help = """Suffix used when generating the output files.  Defaults to
 the value of --input-suffix.""")
+  val output_dir =
+    ap.positional[String]("output-dir",
+      help = """Directory to store output files in.  It must not already
+exist, and will be created (including any parent directories).""")
   val field =
     ap.option[String]("f", "field",
-      default = "user",
+      default = "username",
       help = """Field to group on; default '%default'.""")
 }
 
-class GroupCorpusDriver extends ProcessFilesDriver with HadoopExperimentDriver {
+class GroupCorpusDriver extends
+    HadoopableArgParserExperimentDriver with HadoopExperimentDriver {
   type TParam = GroupCorpusParameters
+  type TRunRes = Unit
   
-  override def handle_parameters() {
-    super.handle_parameters()
+  def handle_parameters() {
     need(params.input_dir, "input-dir")
     if (params.output_suffix == null)
       params.output_suffix = params.input_suffix
   }
+  def setup_for_run() { }
+
+  def run_after_setup() { }
 }
 
-object GroupCorpus extends
-    ExperimentDriverApp("GroupCorpus") {
-  type TDriver = GroupCorpusDriver
+/**
+ * This file processor, the GroupCorpusMapReducer trait below and the
+ * subclass of this file processor together are a lot of work simply to read
+ * the schema from the input corpus in both the mapper and reducer.  Perhaps
+ * we could save the schema and pass it to the reducer as the first item?
+ * Perhaps that might not make the code any simpler.
+ */
+class GroupCorpusFileProcessor(
+  context: TaskInputOutputContext[_,_,_,_],
+  driver: GroupCorpusDriver
+) extends CorpusFileProcessor(driver.params.input_suffix) {
+  def process_row(fieldvals: Seq[String]): (Boolean, Boolean) =
+    throw new IllegalStateException("This shouldn't be called")
 
-  override def description =
-"""Group rows in a corpus according to the value of a field (e.g. the "user"
-field).  The "text" and "counts" fields are combined appropriately.
-"""
-
-  def create_param_object(ap: ArgParser) = new TParam(ap)
-  def create_driver() = new TDriver
+  def process_lines(lines: Iterator[String],
+      filehand: FileHandler, file: String,
+      compression: String, realname: String) =
+    throw new IllegalStateException("This shouldn't be called")
 }
 
-class GroupCorpusMapper extends
-    Mapper[Object, Text, Text, Text] with HadoopExperimentMapper {
+trait GroupCorpusMapReducer extends HadoopExperimentMapReducer {
   def progname = GroupCorpus.progname
-  type TContext = Mapper[Object, Text, Text, Text]#Context
   type TDriver = GroupCorpusDriver
   // more type erasure crap
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver() = new TDriver
-
-  class GroupCorpusFileProcessor(
-    context: TContext
-  ) extends CorpusFileProcessor(driver.params.input_suffix) {
-    def handle_document(fieldvals: Seq[String]) = {
-      context.write(new Text(schema.get_field(fieldvals, driver.params.field)),
-                    new Text(fieldvals.mkString("\t")))
-      (true, true)
-    }
-
-    def process_row(fieldvals: Seq[String]) =
-      throw new IllegalStateException("This shouldn't be called")
-    def process_lines(lines: Iterator[String],
-        filehand: FileHandler, file: String,
-        compression: String, realname: String) =
-      throw new IllegalStateException("This shouldn't be called")
-  }
+  def create_processor(context: TContext) =
+    new GroupCorpusFileProcessor(context, driver)
 
   var processor: GroupCorpusFileProcessor = _
-  override def setup(context: TContext) {
-    super.setup(context)
-    processor = new GroupCorpusFileProcessor(context)
+  override def init(context: TContext) {
+    super.init(context)
+    processor = create_processor(context)
     processor.read_schema_from_corpus(driver.get_file_handler,
         driver.params.input_dir)
     context.progress
   }
+}
+
+class GroupCorpusMapper extends
+    Mapper[Object, Text, Text, Text] with GroupCorpusMapReducer {
+  type TContext = Mapper[Object, Text, Text, Text]#Context
+
+  class GroupCorpusMapFileProcessor(
+    map_context: TContext,
+    driver: GroupCorpusDriver
+  ) extends GroupCorpusFileProcessor(map_context, driver) {
+    override def process_row(fieldvals: Seq[String]) = {
+      map_context.write(
+        new Text(schema.get_field(fieldvals, driver.params.field)),
+        new Text(fieldvals.mkString("\t")))
+      (true, true)
+    }
+  }
+
+  override def create_processor(context: TContext) =
+    new GroupCorpusMapFileProcessor(context, driver)
+
+  override def setup(context: TContext) { init(context) }
 
   override def map(key: Object, value: Text, context: TContext) {
     processor.parse_row(value.toString)
@@ -220,18 +240,8 @@ class GroupCorpusMapper extends
 }
 
 class GroupCorpusReducer extends
-    Reducer[Text, Text, Text, NullWritable] {
-
+    Reducer[Text, Text, Text, NullWritable] with GroupCorpusMapReducer {
   type TContext = Reducer[Text, Text, Text, NullWritable]#Context
-
-  var driver: GroupCorpusDriver = _
-
-  var schema: Schema = _
-
-  override def setup(context: TContext) {
-    driver = new GroupCorpusDriver
-    driver.set_task_context(context)
-  }
 
   def average_coords(coords: Iterable[(Double, Double)]) = {
     val (lats, longs) = coords.unzip
@@ -271,8 +281,11 @@ class GroupCorpusReducer extends
       mkString(" ")
   }
 
+  override def setup(context: TContext) { init(context) }
+
   override def reduce(key: Text, values: java.lang.Iterable[Text],
       context: TContext) {
+    var num_tweets = 0
     val coords = mutable.Buffer[(Double, Double)]()
     val times = mutable.Buffer[Long]()
     val userids = mutable.Buffer[String]()
@@ -283,8 +296,9 @@ class GroupCorpusReducer extends
     val countses = mutable.Buffer[String]()
     val texts = mutable.Buffer[String]()
     for (vv <- values) {
+      num_tweets += 1
       val fieldvals = vv.toString.split("\t")
-      for (v <- schema.fieldnames zip fieldvals) {
+      for (v <- processor.schema.fieldnames zip fieldvals) {
         v match {
           case ("coord", coord) => {
             val Array(lat, long) = coord.split(",")
@@ -300,11 +314,12 @@ class GroupCorpusReducer extends
           case ("lang", lang) => langs += lang
           case ("counts", counts) => countses += counts
           case ("text", text) => texts += text
+          case (_, _) => { }
         }
       }
     }
     val output = mutable.Buffer[(String, String)]()
-    for (field <- schema.fieldnames) {
+    for (field <- processor.schema.fieldnames) {
       field match {
         case "coord" => output += (("coord", average_coords(coords)))
         case "time" => {
@@ -322,16 +337,24 @@ class GroupCorpusReducer extends
         case "lang" => output += (("lang", compute_most_common(langs)))
         case "counts" => output += (("counts", combine_counts(countses)))
         case "text" => output += (("text", combine_text(texts)))
+        case _ => { }
       }
     }
     val (outkeys, outvalues) = output.unzip
-    context.write(new Text(outvalues.mkString("\t")), null)
+    context.write(new Text("%s\t%s\t%s" format (key.toString, num_tweets,
+      outvalues.mkString("\t"))), null)
   }
 }
 
-object GroupCorpusApp extends
+object GroupCorpus extends
     ExperimentDriverApp("GroupCorpus") with HadoopCorpusApp {
   type TDriver = GroupCorpusDriver
+
+  override def description =
+"""Group rows in a corpus according to the value of a field (e.g. the "user"
+field).  The "text" and "counts" fields are combined appropriately.
+"""
+
   // FUCKING TYPE ERASURE
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver() = new TDriver()
@@ -350,6 +373,7 @@ object GroupCorpusApp extends
     job.setReducerClass(classOf[GroupCorpusReducer])
     job.setOutputKeyClass(classOf[Text])
     job.setOutputValueClass(classOf[NullWritable])
+    job.setMapOutputValueClass(classOf[Text])
   }
 }
 
