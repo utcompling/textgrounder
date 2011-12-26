@@ -214,7 +214,7 @@ trait HadoopGeolocateDriver extends
 
 class DocumentEvaluationMapper extends
     Mapper[Object, Text, Text, DoubleWritable] with
-    HadoopExperimentMapper {
+    HadoopExperimentMapReducer {
   def progname = HadoopGeolocateDocumentApp.progname
   type TContext = Mapper[Object, Text, Text, DoubleWritable]#Context
   type TDriver = HadoopGeolocateDocumentDriver
@@ -279,8 +279,8 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
   }
 
   var processor: HadoopDocumentFileProcessor = _
-  override def setup(context: TContext) {
-    super.setup(context)
+  override def init(context: TContext) {
+    super.init(context)
     evaluators =
       for ((stratname, strategy) <- driver.strategies)
         yield new CorpusGeolocateDocumentEvaluator(strategy, stratname,
@@ -295,6 +295,8 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
       context.progress
     }
   }
+
+  override def setup(context: TContext) { init(context) }
 
   override def map(key: Object, value: Text, context: TContext) {
     processor.parse_row(value.toString)

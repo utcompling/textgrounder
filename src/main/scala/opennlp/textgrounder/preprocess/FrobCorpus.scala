@@ -308,6 +308,7 @@ class FrobCorpusDriver extends
   override def run_after_setup() {
     super.run_after_setup()
 
+    val filehand = get_file_handler
     val fileproc =
       new FrobCorpusFileProcessor(filehand, params)
     fileproc.read_schema_from_corpus(filehand, params.input_dir)

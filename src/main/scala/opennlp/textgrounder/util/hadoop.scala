@@ -365,7 +365,7 @@ package object hadoop {
     }
   }
 
-  trait HadoopExperimentMapper {
+  trait HadoopExperimentMapReducer {
     type TContext <: TaskInputOutputContext[_,_,_,_]
     type TDriver <: HadoopExperimentDriver
     val driver = create_driver()
@@ -376,7 +376,22 @@ package object hadoop {
     def create_param_object(ap: ArgParser): TParam
     def create_driver(): TDriver
 
-    def setup(context: TContext) {
+    /** Originally this was simply called 'setup', but used only for a
+     * trait that could be mixed into a mapper.  Expanding this to allow
+     * it to be mixed into both a mapper and a reducer didn't cause problems
+     * but creating a subtrait that override this function did cause problems,
+     * a complicated message like this:
+
+[error] /Users/benwing/devel/textgrounder/src/main/scala/opennlp/textgrounder/preprocess/GroupCorpus.scala:208: overriding method setup in class Mapper of type (x$1: org.apache.hadoop.mapreduce.Mapper[java.lang.Object,org.apache.hadoop.io.Text,org.apache.hadoop.io.Text,org.apache.hadoop.io.Text]#Context)Unit;
+[error]  method setup in trait GroupCorpusMapReducer of type (context: GroupCorpusMapper.this.TContext)Unit cannot override a concrete member without a third member that's overridden by both (this rule is designed to prevent ``accidental overrides'')
+[error] class GroupCorpusMapper extends
+[error]       ^
+
+     * so I got around it by defining the actual code in another method and
+     * making the setup() calls everywhere call this. (FIXME unfortunately this
+     * is error-prone.)
+     */
+    def init(context: TContext) {
       import HadoopExperimentConfiguration._
 
       val conf = context.getConfiguration
