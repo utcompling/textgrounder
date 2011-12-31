@@ -84,6 +84,12 @@ TDoc <: DistDocument[TCoord]](
    */
   val documents_by_split = bufmap[String, TDoc]()
 
+  /**
+   * The count of the current training pass. Used to make sure training
+   * counts aren't marked globally in subsequent passes.
+   */
+  var pass: Int = 0
+
   // Example of using TaskCounterWrapper directly for non-split values.
   // val num_documents = new driver.TaskCounterWrapper("num_documents") 
 
@@ -192,7 +198,8 @@ TDoc <: DistDocument[TCoord]](
   def create_and_init_document(schema: Schema, fieldvals: Seq[String],
       record_in_table: Boolean, must_have_coord: Boolean = true) = {
     val split = schema.get_field_or_else(fieldvals, "split", "unknown")
-    num_records_by_split(split) += 1
+    if (record_in_table)
+      num_records_by_split(split) += 1
     val doc = try {
       imp_create_and_init_document(schema, fieldvals, record_in_table)
     } catch {
@@ -211,8 +218,10 @@ TDoc <: DistDocument[TCoord]](
       val tokens = double_tokens.toInt
       // Our training docs should not have partial counts.
       assert(tokens == double_tokens)
-      num_documents_by_split(split) += 1
-      word_tokens_of_documents_by_split(split) += tokens
+      if (record_in_table) {
+        num_documents_by_split(split) += 1
+        word_tokens_of_documents_by_split(split) += tokens
+      }
       if (!doc.has_coord && must_have_coord) {
         errprint("Document %s skipped because it has no coordinate", doc)
         num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
@@ -254,7 +263,7 @@ TDoc <: DistDocument[TCoord]](
     suffix: String, cell_grid: CellGrid[TCoord,TDoc,_], pass: Int
   ) extends DistDocumentFileProcessor(suffix, driver) {
     def handle_document(fieldvals: Seq[String]) = {
-      val doc = create_and_init_document(schema, fieldvals, true)
+      val doc = create_and_init_document(schema, fieldvals, pass == 1)
       if (doc != null) {
         assert(doc.dist != null)
         cell_grid.add_document_to_cell(doc)
@@ -318,8 +327,9 @@ TDoc <: DistDocument[TCoord]](
     for (pass <- 1 to cell_grid.num_training_passes) {
       val training_distproc =
         new DistDocumentTableFileProcessor("training-" + suffix, cell_grid, pass)
-      training_distproc.read_schema_from_corpus(filehand, dir)
+      cell_grid.table.pass = pass
       cell_grid.begin_training_pass(pass)
+      training_distproc.read_schema_from_corpus(filehand, dir)
       training_distproc.process_files(filehand, Seq(dir))
     }
   }
@@ -650,7 +660,7 @@ abstract class DistDocument[TCoord : Serializer](
         val is_eval_set = (this.split == table.driver.params.eval_set)
         assert (is_training_set || is_eval_set)
         table.word_dist_factory.initialize_distribution(this, value,
-          is_training_set)
+          is_training_set && table.pass == 1)
         dist.finish_before_global(minimum_word_count =
           table.driver.params.minimum_word_count)
       }
