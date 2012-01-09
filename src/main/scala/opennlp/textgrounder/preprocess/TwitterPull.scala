@@ -7,6 +7,8 @@ import com.nicta.scoobi.io.text._
 import java.io._
 import java.lang.Double.isNaN
 
+import opennlp.textgrounder.util.Twokenize
+
 object TwitterPull {
   type Tweet = (Long, String, Double, Double)
   type Record = (String, Tweet)
@@ -75,14 +77,18 @@ object TwitterPull {
   }
 
   def tokenize(text: String): Iterable[String] = {
-    return text.replaceAll("\\s+", " ").split(" ")
+    return Twokenize(text)
   }
 
-  val MAX_WORD_SIZE = 32 * 1024 - 1
+  def filter_word(word: String): Boolean = {
+    word.contains("http://") ||
+      word.contains(":") ||
+      word.startsWith("@")
+  }
 
   def emit_words(r: Record): Iterable[(AuthorWord, Long)] = {
     val (author, (ts, text, lat, lng)) = r
-    for (word <- tokenize(text) if word.length < MAX_WORD_SIZE)
+    for (word <- tokenize(text) if !filter_word(word))
       yield (((author, ts, lat, lng), word), 1L)
   }
 
@@ -91,18 +97,18 @@ object TwitterPull {
     (author, (word, c))
   }
 
-  /*
   def record_to_string(awcs: (Author, Iterable[WordCount])): String = {
     val ((author, ts, lat, lng), wcs) = awcs
     val nice_text = wcs.map((w: WordCount) => w._1 + ":" + w._2).mkString(" ")
     author + "\t" + ts + "\t" + lat + "," + lng + "\t" + nice_text
   }
-  */
 
+  /*
   def record_to_string(awcs: (AuthorWord, Long)): String = {
     val (((author, ts, lat, lng), word), count) = awcs
     author + "\t" + ts + "\t" + lat + "," + lng + "\t" + word + "\t" + count
   }
+  */
 
   def main(args: Array[String]) = withHadoopArgs(args) { a =>
 
@@ -132,9 +138,10 @@ object TwitterPull {
     val word_counts = emitted_words.groupByKey.combine((a: Long, b: Long) => (a + b))
 
     // regroup with author as key, word pairs as values
-    //val regrouped_by_author = word_counts.map(reposition_word).groupByKey
+    val regrouped_by_author = word_counts.map(reposition_word).groupByKey
 
-    val nicely_formatted = word_counts.map(record_to_string)
+    //val nicely_formatted = word_counts.map(record_to_string)
+    val nicely_formatted = regrouped_by_author.map(record_to_string)
 
     // save to disk
     DList.persist(TextOutput.toTextFile(nicely_formatted, outputPath))
