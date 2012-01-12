@@ -635,6 +635,10 @@ on the longest dimension. Default '%default'.""")
       help = """Specifies the weight given to parent distributions.
 Default value '%default' means no interpolation is used.""")
 
+  //// Combining the kd-tree model with the cell-grid model
+  val combined_kd_grid =
+    ap.flag("combined-kd-grid", help = """Combine both the KD tree and
+uniform grid cell models?""")
 
   //// Options used when creating word distributions
   var word_dist =
@@ -875,12 +879,21 @@ abstract class GeolocateDriver extends
   }
 
   protected def initialize_cell_grid(table: SphereDocumentTable) = {
-    if (params.kd_tree)
+    if (params.combined_kd_grid) {
+      val kdcg = 
+          KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method, 
+            params.kd_use_backoff, params.kd_interpolate_weight)
+      val mrcg = 
+        new MultiRegularCellGrid(degrees_per_cell,
+          params.width_of_multi_cell, table)
+      new CombinedModelCellGrid(table, Seq(mrcg, kdcg))
+    } else if (params.kd_tree) {
       KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method, 
         params.kd_use_backoff, params.kd_interpolate_weight)
-    else
+    } else {
       new MultiRegularCellGrid(degrees_per_cell,
         params.width_of_multi_cell, table)
+    }
   }
 
   protected def initialize_word_dist_suffix() = {

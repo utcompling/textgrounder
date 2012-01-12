@@ -167,22 +167,6 @@ public class KdTree {
         }
     }
 
-    public double[] getCentroid() {
-        double[] sum = new double[dimensions];
-        int numLocations = 0;
-        for (double[] location : getLocations()) {
-            numLocations += 1;
-            for (int i=0; i<dimensions; i++) {
-                sum[i] += location[i];
-            }
-        }
-        for (int i=0; i<dimensions; i++) {
-            sum[i] /= numLocations;
-        }
-        return sum;
-    }
-
-
     public void annihilateData() {
         // assuming we are using a static KD tree, once we have
         // generated the entire tree and have the split locations,

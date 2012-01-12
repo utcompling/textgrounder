@@ -44,17 +44,6 @@ class KdTreeCell(
     new SphereCoord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
   }
 
-  var centroid : SphereCoord = null;
-
-  override def get_center_coord () = {
-    if (cellgrid.table.driver.params.center_method == "center") {
-      // center method
-      super.get_center_coord
-    } else {
-      centroid;
-    }
-  }
-
   def describe_indices () : String = {
     "Placeholder"
   }
@@ -111,8 +100,6 @@ class KdTreeCellGrid(table: SphereDocumentTable,
 
       for (node <- kdtree.getNodes) {
         val c = new KdTreeCell(this, node)
-        val centroid_a: Array[Double] = node.getCentroid
-        c.centroid = new SphereCoord(centroid_a(0), centroid_a(1))
         nodes_to_cell.update(node, c)
         task.item_processed()
       }

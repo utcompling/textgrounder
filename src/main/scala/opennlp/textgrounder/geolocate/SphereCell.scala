@@ -228,14 +228,36 @@ abstract class RectangularCell(
    * Return the coordinate of the northeast point of the rectangle.
    */
   def get_northeast_coord(): SphereCoord
+
   /**
-   * Define the center based on the southwest and northeast points.
+   * Define the center based on the southwest and northeast points,
+   * or based on the centroid of the cell.
    */
+  var centroid: Array[Double] = new Array[Double](2)
+  var num_docs: Int = 0
+
   def get_center_coord() = {
-    val sw = get_southwest_coord()
-    val ne = get_northeast_coord()
-    SphereCoord((sw.lat + ne.lat) / 2.0, (sw.long + ne.long) / 2.0)
+    if (num_docs == 0 || cell_grid.table.driver.params.center_method == "center") {
+      // use the actual cell center
+      // also, if we have an empty cell, there is no such thing as
+      // a centroid, so default to the center
+      val sw = get_southwest_coord()
+      val ne = get_northeast_coord()
+      SphereCoord((sw.lat + ne.lat) / 2.0, (sw.long + ne.long) / 2.0)
+    } else {
+      // use the centroid
+      SphereCoord(centroid(0) / num_docs, centroid(1) / num_docs);
+    }
   }
+
+  override def add_document(document: SphereDocument) {
+    num_docs += 1
+    centroid(0) += document.coord.lat
+    centroid(1) += document.coord.long
+    super.add_document(document)
+  }
+
+
 
   /**
    * Define the boundary given the specified southwest and northeast
