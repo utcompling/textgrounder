@@ -87,12 +87,6 @@ abstract class DistDocumentTable[
    */
   val documents_by_split = bufmap[String, TDoc]()
 
-  /**
-   * The count of the current training pass. Used to make sure training
-   * counts aren't marked globally in subsequent passes.
-   */
-  var pass: Int = 0
-
   // Example of using TaskCounterWrapper directly for non-split values.
   // val num_documents = new driver.TaskCounterWrapper("num_documents") 
 
@@ -268,7 +262,7 @@ abstract class DistDocumentTable[
     suffix: String, cell_grid: TGrid, pass: Int
   ) extends DistDocumentFileProcessor(suffix, driver) {
     def handle_document(fieldvals: Seq[String]) = {
-      val doc = create_and_init_document(schema, fieldvals, pass == 1)
+      val doc = create_and_init_document(schema, fieldvals, true)
       if (doc != null) {
         assert(doc.dist != null)
         cell_grid.add_document_to_cell(doc)
@@ -332,7 +326,6 @@ abstract class DistDocumentTable[
     for (pass <- 1 to cell_grid.num_training_passes) {
       val training_distproc =
         new DistDocumentTableFileProcessor("training-" + suffix, cell_grid, pass)
-      cell_grid.table.pass = pass
       cell_grid.begin_training_pass(pass)
       training_distproc.read_schema_from_corpus(filehand, dir)
       training_distproc.process_files(filehand, Seq(dir))
@@ -665,7 +658,7 @@ abstract class DistDocument[TCoord : Serializer](
         val is_eval_set = (this.split == table.driver.params.eval_set)
         assert (is_training_set || is_eval_set)
         table.word_dist_factory.initialize_distribution(this, value,
-          is_training_set && table.pass == 1)
+          is_training_set)
         dist.finish_before_global(minimum_word_count =
           table.driver.params.minimum_word_count)
       }
