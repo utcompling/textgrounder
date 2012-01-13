@@ -248,11 +248,14 @@ trait FastSlowKLDivergence {
    * possible rounding error).
    */
   protected def imp_kl_divergence(other: WordDist, partial: Boolean) = {
+    /*
     val test_kldiv = false
     if (test_kldiv)
       test_kl_divergence(other, partial)
     else
       fast_kl_divergence(other, partial)
+    */
+    slow_kl_divergence(other, partial)
   }
 }
 
