@@ -27,20 +27,21 @@ import javax.xml.datatype._
 import javax.xml.stream._
 import opennlp.textgrounder.topo._
 import opennlp.textgrounder.util.KMLUtil
+import opennlp.textgrounder.util.LogUtil
 import scala.collection.JavaConversions._
 import org.clapper.argot._
 
 object ErrorKMLGenerator {
 
-  val DOC_PREFIX = "Document "
+  /*val DOC_PREFIX = "Document "
   //val DOC_PREFIX = "Article "
   val TRUE_COORD_PREFIX = ") at ("
-  val PRED_COORD_PREFIX = " predicted cell center at ("
+  val PRED_COORD_PREFIX = " predicted cell center at ("*/
   
 
   val factory = XMLOutputFactory.newInstance
 
-  def parseLogFile(filename: String): List[(String, Coordinate, Coordinate)] = {
+  /*def parseLogFile(filename: String): List[(String, Coordinate, Coordinate)] = {
     val lines = scala.io.Source.fromFile(filename).getLines
 
     var docName:String = null
@@ -76,7 +77,7 @@ object ErrorKMLGenerator {
       else None
     }).flatten.toList
 
-  }
+  }*/
 
   import ArgotConverters._
 
@@ -110,7 +111,7 @@ object ErrorKMLGenerator {
 
     KMLUtil.writeHeader(out, "errors-at-"+(if(usePred.value == None) "true" else "pred"))
 
-    for((docName, trueCoord, predCoordOrig) <- parseLogFile(logFile.value.get)) {
+    for((docName, trueCoord, predCoordOrig) <- LogUtil.parseLogFile(logFile.value.get)) {
       val predCoord = Coordinate.fromDegrees(predCoordOrig.getLatDegrees() + (rand.nextDouble() - 0.5) * .1,
                                              predCoordOrig.getLngDegrees() + (rand.nextDouble() - 0.5) * .1);
 
