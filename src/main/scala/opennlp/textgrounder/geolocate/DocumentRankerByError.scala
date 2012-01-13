@@ -1,5 +1,7 @@
 package opennlp.textgrounder.geolocate
 
+// This program takes a log file and outputs the document names to standard out, ranked by prediction error.
+
 import org.clapper.argot._
 import opennlp.textgrounder.topo._
 import opennlp.textgrounder.util.LogUtil
