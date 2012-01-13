@@ -64,6 +64,20 @@ object TwitterPull {
       (numtw >= MIN_NUMBER_TWEETS && numtw <= MAX_NUMBER_TWEETS)
   }
 
+  // bounding box for north america
+  val MIN_LAT = 25.0
+  val MIN_LNG = -126.0
+  val MAX_LAT = 49.0
+  val MAX_LNG = -60.0
+  def northamerica_only(r: Record): Boolean = {
+    val (a, (ts, text, lat, lng, fers, fing, numtw)) = r
+
+    (lat >= MIN_LAT && lat <= MAX_LAT) &&
+      (lng >= MIN_LNG && lng <= MAX_LNG)
+  }
+
+
+
 
   val empty_tweet: Record = ("", (0, "", Double.NaN, Double.NaN, 0, 0, 0))
 
@@ -150,29 +164,10 @@ object TwitterPull {
     (author, (word, c))
   }
 
-  def condense_wordcounts(awcs: (Author, Iterable[WordCount])): (Author, String) = {
-    //val ((author, ts, lat, lng, fers, fing), wcs) = awcs
-    val (author, wcs) = awcs
+  def nicely_format_plain(awcs: (Author, Iterable[WordCount])): String = {
+    val ((author, ts, lat, lng, fers, fing, numtw), wcs) = awcs
     val nice_text = wcs.map((w: WordCount) => w._1 + ":" + w._2).mkString(" ")
-    //author + "\t" + ts + "\t" + lat + "," + lng + "\t" + fers + "\t" + fing + "\t" + nice_text
-    (author, nice_text)
-  }
-
-  def score_user(awcs_s: (Author, String)): (Double, (Author, String)) = {
-    val (author, wcs_s) = awcs_s
-    val (a, ts, lat, lng, fers, fing, numtw): Author = author
-    // we actually want to *reverse* sort by fers / fing, but we can't
-    // reverse sort, so we'll take the reciprocal to reverse.
-    val score = fing.toDouble / fers
-    (score, awcs_s)
-  }
-
-  def nicely_format(scored_awcs_ses: (Double, Iterable[(Author, String)])): Iterable[String] = {
-    val (score, awcs_ses) = scored_awcs_ses
-    for (awcs_s <- awcs_ses;
-          val (author, nice_text) = awcs_s;
-          val (a, ts, lat, lng, fers, fing, numtw) = author)
-        yield (a + "\t" + ts + "\t" + lat + "," + lng + "\t" + fers + "\t" + fing + "\t" + numtw + "\t" + nice_text)
+    author + "\t" + ts + "\t" + lat + "," + lng + "\t" + fers + "\t" + fing + "\t" + numtw + "\t" + nice_text
   }
 
   def main(args: Array[String]) = withHadoopArgs(args) { a =>
@@ -199,6 +194,7 @@ object TwitterPull {
     // filter every user that doesn't have a specific coordinate
     val with_coord = concatted.filter(has_latlng)
                               .filter(is_nonspammer)
+                              .filter(northamerica_only)
 
     // word count
     val emitted_words = with_coord.flatMap(emit_words)
@@ -207,12 +203,8 @@ object TwitterPull {
     // regroup with author as key, word pairs as values
     val regrouped_by_author = word_counts.map(reposition_word).groupByKey
 
-    // sort by the follower/following ratio
-    val sorted_by_ratio = regrouped_by_author.map(condense_wordcounts)
-                                             .map(score_user).groupByKey
-
-    //val nicely_formatted = word_counts.map(record_to_string)
-    val nicely_formatted = sorted_by_ratio.flatMap(nicely_format)
+    // nice string output
+    val nicely_formatted = regrouped_by_author.map(nicely_format_plain)
 
     // save to disk
     DList.persist(TextOutput.toTextFile(nicely_formatted, outputPath))
