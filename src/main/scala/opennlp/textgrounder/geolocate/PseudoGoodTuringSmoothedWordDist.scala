@@ -207,7 +207,11 @@ class PseudoGoodTuringSmoothedWordDist(
         0.5 min ((1.0 max num_types_seen_once)/num_word_tokens)
       else 0.5
     overall_unseen_mass = 1.0 - (
-      (for (ind <- counts.keys)
+      // NOTE NOTE NOTE! The toSeq needs to be added for some reason; if not,
+      // the computation yields different values, which cause a huge loss of
+      // accuracy (on the order of 10-15%).  I have no idea why; I suspect a
+      // Scala bug. (SCALABUG)
+      (for (ind <- counts.keys.toSeq)
         yield factory.overall_word_probs(ind)) sum)
     //if (use_sorted_list)
     //  counts = new SortedList(counts)
