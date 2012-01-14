@@ -10,9 +10,8 @@ object DocumentRankerByError {
 
   import ArgotConverters._
 
-  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.geolocate.ErrorKMLGenerator", preUsage = Some("TextGrounder"))
+  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.geolocate.DocumentRankerByError", preUsage = Some("TextGrounder"))
   val logFile = parser.option[String](List("l", "log"), "log", "log input file")
-  //val outFile = parser.option[String](List("o", "out"), "out", "output file")
   
   def main(args: Array[String]) {
     try {
