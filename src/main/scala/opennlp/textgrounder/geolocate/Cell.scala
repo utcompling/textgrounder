@@ -330,10 +330,12 @@ abstract class GeoCell[TCoord, TDoc <: DistDocument[TCoord]](
           most_popular_document, mostpopdoc_links)
       else ""
 
-    "GeoCell(%s%s%s, %d documents(dist), %d documents(links), %d links)" format (
+    "GeoCell(%s%s%s, %d documents(dist), %d documents(links), %s types, %s tokens, %d links)" format (
       describe_location(), unfinished, contains,
       combined_dist.num_docs_for_word_dist,
       combined_dist.num_docs_for_links,
+      combined_dist.word_dist.num_word_types,
+      combined_dist.word_dist.num_word_tokens,
       combined_dist.incoming_links)
   }
 

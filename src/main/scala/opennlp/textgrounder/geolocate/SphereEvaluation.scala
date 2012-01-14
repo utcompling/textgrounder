@@ -272,8 +272,8 @@ class CorpusGeolocateDocumentEvaluator(
     errprint("%s:  true cell at rank: %s", doctag, result.true_rank)
     errprint("%s:  true cell: %s", doctag, result.true_cell)
     for (i <- 0 until 5) {
-      errprint("%s:  Predicted cell (at rank %s): %s",
-        doctag, i + 1, pred_cells(i)._1)
+      errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
+        doctag, i + 1, pred_cells(i)._2, pred_cells(i)._1)
     }
     errprint("%s:  Distance %.2f km to true cell center at %s",
       doctag, result.true_truedist, result.true_center)
