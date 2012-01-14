@@ -59,7 +59,7 @@ object GroupTweetsIntoDocuments {
           //println(line)
           val docName = tokens(0)
           val filename = outDir+docName
-          if(docNames(docName)) {
+          //if(docNames(docName)) {
             val tweet = tokens(5)
             val file = new File(filename)
             val out = 
@@ -69,7 +69,7 @@ object GroupTweetsIntoDocuments {
             out.write(tweet+"\n")
             
             out.close
-          }
+          //}
         }
 
       line = in.readLine
