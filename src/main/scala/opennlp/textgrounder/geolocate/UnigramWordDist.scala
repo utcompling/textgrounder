@@ -85,7 +85,7 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
       for ((word, count) <- counts.toSeq.sortWith(_._2 > _._2).view(0, num_words_to_print))
       yield "%s=%s" format (unmemoize_string(word), count) 
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
-    "UnigramWordDist(%d types, %d tokens%s%s, %s)" format (
+    "UnigramWordDist(%d types, %s tokens%s%s, %s)" format (
         num_word_types, num_word_tokens, innerToString, finished_str, words)
   }
 
