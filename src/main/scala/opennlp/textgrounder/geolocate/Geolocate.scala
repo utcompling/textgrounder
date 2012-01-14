@@ -41,6 +41,7 @@ import GridLocateDriver.Debug._
 /*
 
 This module is the main driver module for the Geolocate subproject.
+See GridLocate.scala.
 
 */
 
