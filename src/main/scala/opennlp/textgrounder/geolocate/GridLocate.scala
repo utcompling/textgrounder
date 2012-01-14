@@ -40,7 +40,20 @@ import GridLocateDriver.Debug._
 
 /*
 
-This module is the main driver module for GridLocate projects.
+This file contains the main driver module and associated strategy classes
+for GridLocate projects.  "GridLocate" means applications that involve
+searching for the best value (in some space) for a given test document by
+dividing the space into a grid of some sort (not necessarily regular, and
+not necessarily even with non-overlapping grid cells), aggregating all
+the documents in a given cell, and finding the best value by searching for
+the best grid cell and then returning some representative point (e.g. the
+center) as the best value.  The original application was for geolocation,
+i.e. assigning a latitude/longitude coordinate to a document, and the grid
+was a regular tiling of the Earth's surface based on "squares" of a given
+amount of latitude and longitude on each side.  But other applications are
+possible, e.g. locating the date of a given biographical document, where
+the space ranges over dates in time (one-dimensional) rather than over the
+Earth's surface (two-dimensional).
 
 */
 
@@ -123,9 +136,10 @@ abstract class GridLocateDocumentStrategy[
 }
 
 /**
- * Class that implements the baseline strategies for document geolocation.
- * 'baseline_strategy' specifies the particular strategy to use.
+ * Class that implements a very simple baseline strategy -- pick a random
+ * cell.
  */
+
 class RandomGridLocateDocumentStrategy[
   TCell <: GenericGeoCell,
   TGrid <: CellGenericCellGrid[TCell]
@@ -138,6 +152,12 @@ class RandomGridLocateDocumentStrategy[
     (for (cell <- shuffled) yield (cell, 0.0))
   }
 }
+
+/**
+ * Class that implements a simple baseline strategy -- pick the "most
+ * popular" cell (the one either with the largest number of documents, or
+ * the most number of links pointing to it, if `internal_link` is true).
+ */
 
 class MostPopularCellGridLocateDocumentStrategy[
   TCell <: GenericGeoCell,
