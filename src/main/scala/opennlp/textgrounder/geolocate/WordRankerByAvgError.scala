@@ -11,6 +11,7 @@ object WordRankerByAvgError {
   val parser = new ArgotParser("textgrounder run opennlp.textgrounder.geolocate.WordRankerByAvgError", preUsage = Some("TextGrounder"))
   val corpusFile = parser.option[String](List("i", "input"), "list", "corpus input file")
   val listFile = parser.option[String](List("l", "list"), "list", "list input file")
+  val docThresholdOption = parser.option[Int](List("t", "threshold"), "threshold", "document frequency threshold")
   
   def main(args: Array[String]) {
     try {
@@ -29,6 +30,8 @@ object WordRankerByAvgError {
       sys.exit(0)
     }
 
+    val docThreshold = if(docThresholdOption.value == None) 10 else docThresholdOption.value.get
+
     val docNamesAndErrors:Map[String, Double] = scala.io.Source.fromFile(listFile.value.get).getLines.
       map(_.split("\t")).map(p => (p(0), p(1).toDouble)).toMap
 
@@ -37,6 +40,9 @@ object WordRankerByAvgError {
 
     val wordsToErrors = new scala.collection.mutable.HashMap[String, Double]
     val wordsToDocNames = new scala.collection.mutable.HashMap[String, scala.collection.immutable.HashSet[String]]
+    val wordDocToCount = new scala.collection.mutable.HashMap[(String, String), Int]
+    val docSizes = new scala.collection.mutable.HashMap[String, Int]
+    //val docNames = new scala.collection.mutable.HashSet[String]
 
     var line:String = in.readLine
 
@@ -45,17 +51,22 @@ object WordRankerByAvgError {
       if(tokens.length >= 6) {
         val docName = tokens(0)
         if(docNamesAndErrors.contains(docName)) {
+          //docNames += docName
           val error = docNamesAndErrors(docName)
           val tweet = tokens(5)
           
-          val words = Twokenize(tweet).map(_.toLowerCase).toSet
+          val words = Twokenize(tweet).map(_.toLowerCase)//.toSet
           
           for(word <- words) {
             if(!word.startsWith("@user_")) {
-              val prevError = wordsToErrors.getOrElse(word, 0.0)
-              wordsToErrors.put(word, prevError + error)
+              val prevDocSize = docSizes.getOrElse(docName, 0)
+              docSizes.put(docName, prevDocSize + 1)
+              val prevCount = wordDocToCount.getOrElse((word, docName), 0)
+              wordDocToCount.put((word, docName), prevCount + 1)
               val prevSet = wordsToDocNames.getOrElse(word, new scala.collection.immutable.HashSet())
               wordsToDocNames.put(word, prevSet + docName)
+              //val prevError = wordsToErrors.getOrElse(word, 0.0)
+              //wordsToErrors.put(word, prevError + error)
             }
           }
         }
@@ -64,7 +75,15 @@ object WordRankerByAvgError {
     }  
     in.close
 
-    wordsToErrors.foreach(p => if(wordsToDocNames(p._1).size < 50) wordsToErrors.remove(p._1))
+    for((word, docNames) <- wordsToDocNames) {
+      for(docName <- docNames) {
+        val count = wordDocToCount((word, docName))
+        val prevError = wordsToErrors.getOrElse(word, 0.0)
+        wordsToErrors.put(word, prevError + count.toDouble / docSizes(docName) * docNamesAndErrors(docName))
+      }
+    }
+
+    wordsToErrors.foreach(p => if(wordsToDocNames(p._1).size < docThreshold) wordsToErrors.remove(p._1))
 
     wordsToErrors.foreach(p => wordsToErrors.put(p._1, p._2 / wordsToDocNames(p._1).size))
 
