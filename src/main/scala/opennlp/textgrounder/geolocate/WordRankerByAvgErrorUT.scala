@@ -51,12 +51,13 @@ object WordRankerByAvgErrorUT {
           val error = docNamesAndErrors(docName)
           val text = tokens(2)
           
-          val words:Array[String] = text.split(" ").map(_.split(":")(0))
+          val wordsAndCounts:Map[String, Int] = text.split(" ").map(p => (p.split(":")(0), p.split(":")(1).toInt)).toMap
+          val docSize = text.split(" ").map(_.split(":")(1).toInt).sum
           
-          for(word <- words) {
+          for((word, count) <- wordsAndCounts) {
             //if(!word.startsWith("@user_")) {
               val prevError = wordsToErrors.getOrElse(word, 0.0)
-              wordsToErrors.put(word, prevError + error)
+              wordsToErrors.put(word, prevError + error * count.toDouble/docSize)
               val prevSet = wordsToDocNames.getOrElse(word, new scala.collection.immutable.HashSet())
               wordsToDocNames.put(word, prevSet + docName)
             //}
