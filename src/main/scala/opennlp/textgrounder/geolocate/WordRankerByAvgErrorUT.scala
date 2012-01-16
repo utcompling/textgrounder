@@ -11,6 +11,7 @@ object WordRankerByAvgErrorUT {
   val parser = new ArgotParser("textgrounder run opennlp.textgrounder.geolocate.WordRankerByAvgError", preUsage = Some("TextGrounder"))
   val corpusFile = parser.option[String](List("i", "input"), "list", "corpus input file")
   val listFile = parser.option[String](List("l", "list"), "list", "list input file")
+  val docThresholdOption = parser.option[Int](List("t", "threshold"), "threshold", "document frequency threshold")
   
   def main(args: Array[String]) {
     try {
@@ -28,6 +29,8 @@ object WordRankerByAvgErrorUT {
       println("You must specify a list input file via -l.")
       sys.exit(0)
     }
+
+    val docThreshold = if(docThresholdOption.value == None) 10 else docThresholdOption.value.get
 
     val docNamesAndErrors:Map[String, Double] = scala.io.Source.fromFile(listFile.value.get).getLines.
       map(_.split("\t")).map(p => (p(0), p(1).toDouble)).toMap
@@ -64,7 +67,7 @@ object WordRankerByAvgErrorUT {
     }  
     in.close
 
-    wordsToErrors.foreach(p => if(wordsToDocNames(p._1).size < 10) wordsToErrors.remove(p._1))
+    wordsToErrors.foreach(p => if(wordsToDocNames(p._1).size < docThreshold) wordsToErrors.remove(p._1))
 
     wordsToErrors.foreach(p => wordsToErrors.put(p._1, p._2 / wordsToDocNames(p._1).size))
 
