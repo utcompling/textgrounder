@@ -263,8 +263,23 @@ abstract class MinMaxScoreStrategy(
    * indicates the cell and 'score' the score.
    */
   def return_ranked_cells(word_dist: WordDist) = {
+    val cell_buf = mutable.Buffer[(SphereCell, Double)]()
+    for (
+      cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
+    ) {
+      if (debug("lots")) {
+        errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
+          cell.describe_indices(), cell.describe_location(),
+          cell.combined_dist.num_docs_for_word_dist)
+      }
+
+      val score = score_cell(word_dist, cell)
+      cell_buf += ((cell, score))
+    }
+    /*
     val cells = cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
     val cell_buf = cells.par.map(c => (c, score_cell(word_dist, c))).toBuffer
+    */
 
     /* SCALABUG:
        If written simply as 'cell_buf sortWith (_._2 < _._2)',
@@ -633,10 +648,11 @@ uniform grid cell models?""")
   var word_dist =
     ap.option[String]("word-dist", "wd",
       default = "pseudo-good-turing-unigram",
-      choices = Seq("pseudo-good-turing-unigram", "pseudo-good-turing-bigram"),
+      choices = Seq("pseudo-good-turing-unigram", "pseudo-good-turing-bigram", "dirichlet"),
       help = """Type of word distribution to use.  Possibilities are
 'pseudo-good-turing-unigram' (a simplified version of Good-Turing over a unigram
-distribution) and 'pseudo-good-turing-bigram' (a non-smoothed bigram distribution).
+distribution) 'pseudo-good-turing-bigram' (a non-smoothed bigram distribution),
+and 'dirichlet' (dirchlet smoothing over a unigram distribution)
 Default '%default'.""")
   var preserve_case_words =
     ap.flag("preserve-case-words", "pcw",
@@ -895,6 +911,8 @@ abstract class GeolocateDriver extends
   protected def initialize_word_dist_factory() = {
     if (params.word_dist == "pseudo-good-turing-bigram")
       new PGTSmoothedBigramWordDistFactory
+    else if (params.word_dist == "dirichlet")
+      new DirichletSmoothedWordDistFactory
     else //(params.word_dist == "pseudo-good-turing-unigram")
       new PseudoGoodTuringSmoothedWordDistFactory
   }
