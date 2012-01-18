@@ -359,15 +359,10 @@ class PCLTravelGeolocateDocumentEvaluator(
 
   def evaluate_document(doc: TitledDocument, doctag: String) = {
     val dist = driver.word_dist_factory.create_word_dist()
-    val the_stopwords =
-      if (driver.params.include_stopwords_in_document_dists) Set[String]()
-      else driver.stopwords
-    for (text <- Seq(doc.title, doc.text)) {
-      dist.add_document(split_text_into_words(text, ignore_punc = true),
-        ignore_case = !driver.params.preserve_case_words,
-        stopwords = the_stopwords)
-    }
-    dist.finish(minimum_word_count = driver.params.minimum_word_count)
+    for (text <- Seq(doc.title, doc.text))
+      dist.add_document(split_text_into_words(text, ignore_punc = true))
+    dist.finish_before_global()
+    dist.finish_after_global()
     val cells = strategy.return_ranked_cells(dist)
     errprint("")
     errprint("Document with title: %s", doc.title)

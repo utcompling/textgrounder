@@ -15,7 +15,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 ////////
-//////// FastPseudoGoodTuringSmoothedWordDist.scala
+//////// FastDiscountedUnigramWordDist.scala
 ////////
 //////// Copyright (c) 2010, 2011 Ben Wing.
 ////////
@@ -31,7 +31,10 @@ import WordDist.memoizer.Word
 
 /**
   Fast implementation of KL-divergence and cosine-similarity algorithms
-  for use with pseudo-Good-Turing smoothing.
+  for use with discounted smoothing.  This code was originally written
+  for Pseudo-Good-Turing, but it isn't specific to this algorithm --
+  it works for any algorithm that involves discounting of a distribution
+  in order to interpolate the global distribution.
 
   This code was originally broken out of WordDist (before the
   pseudo-Good-Turing code was separated out) so that it could be
@@ -42,7 +45,7 @@ import WordDist.memoizer.Word
   the moment in case we need to convert it to Java, C++, etc.
  */
 
-object FastPseudoGoodTuringSmoothedWordDist {
+object FastDiscountedUnigramWordDist {
   /*
    In normal operation of fast_kl_divergence(), we are passed the same
    'self' distribution repeatedly with different 'other' distributions,
@@ -69,7 +72,7 @@ object FastPseudoGoodTuringSmoothedWordDist {
     static_value_array.ensure_at_least(size)
   }
 
-  type TDist = PseudoGoodTuringSmoothedWordDist
+  type TDist = DiscountedUnigramWordDist
   protected var cached_worddist: TDist = null
   protected var cached_size: Int = 0
 
@@ -93,15 +96,19 @@ object FastPseudoGoodTuringSmoothedWordDist {
    A fast implementation of KL-divergence that uses inline lookups as much
    as possible.
    */
-  def fast_kl_divergence(self: TDist, other: TDist,
-    partial: Boolean = false): Double = {
+  def fast_kl_divergence(self: TDist, other: TDist, interpolate: Boolean,
+      partial: Boolean = false): Double = {
     val pfact = (1.0 - self.unseen_mass)/self.num_word_tokens
     val qfact = (1.0 - other.unseen_mass)/other.num_word_tokens
+    val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
+    val factory = self.dufactory
+    /* Not needed in the new way
     val qfact_globally_unseen_prob = (other.unseen_mass*
-        self.factory.globally_unseen_word_prob /
-        self.factory.total_num_unseen_word_types)
-    val owprobs = self.factory.overall_word_probs
+        factory.globally_unseen_word_prob /
+        factory.total_num_unseen_word_types)
+    */
+    val owprobs = factory.overall_word_probs
     val pcounts = self.counts
     val qcounts = other.counts
 
@@ -143,35 +150,63 @@ object FastPseudoGoodTuringSmoothedWordDist {
        but don't count on it.
      */
     var i = 0
-    while (i < psize) {
-      val word = pkeys(i)
-      val pcount = pvalues(i)
-      val p = pcount * pfact
-      val q = {
+    if (interpolate) {
+      while (i < psize) {
+        val word = pkeys(i)
+        val pcount = pvalues(i)
         val qcount = qcounts(word)
-        if (qcount != 0) qcount * qfact
-        else {
-          val owprob = owprobs(word)
-          if (owprob != 0.0) owprob * qfact_unseen
-          else qfact_globally_unseen_prob
+        val owprob = owprobs(word)
+        val p = pcount * pfact + owprob * pfact_unseen
+        val q = qcount * qfact + owprob * qfact_unseen
+        /* In the "new way" we have to notice when a word was never seen
+           at all, and ignore it. */
+        if (q > 0.0) {
+          //if (p == 0.0)
+          //  errprint("Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s",
+          //      p, q, word, pcount, qcount, qfact, qfact_unseen,
+          //      owprobs(word))
+          kldiv += p * (log(p) - log(q))
         }
+        i += 1
       }
-      //if (q == 0.0)
-      //  errprint("Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s",
-      //           word, qfact_globally_unseen_prob, qcount, qfact)
-      //if (p == 0.0 || q == 0.0)
-      //  errprint("Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s",
-      //      p, q, word, pcount, qcount, qfact, qfact_unseen,
-      //      owprobs(word))
-      kldiv += p * (log(p) - log(q))
-      i += 1
+    } else {
+      while (i < psize) {
+        val word = pkeys(i)
+        val pcount = pvalues(i)
+        val p = pcount * pfact
+        val q = {
+          val qcount = qcounts(word)
+          if (qcount != 0) qcount * qfact
+          else {
+            val owprob = owprobs(word)
+            /* The old way:
+            if (owprob != 0.0) owprob * qfact_unseen
+            else qfact_globally_unseen_prob
+            */
+            /* The new way: No need for a globally unseen probability. */
+            owprob * qfact_unseen
+          }
+        }
+        /* However, in the "new way" we have to notice when a word was never
+           seen at all, and ignore it. */
+        if (q > 0.0) {
+          //if (q == 0.0)
+          //  errprint("Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s",
+          //           word, qfact_globally_unseen_prob, qcount, qfact)
+          //if (p == 0.0 || q == 0.0)
+          //  errprint("Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s",
+          //      p, q, word, pcount, qcount, qfact, qfact_unseen,
+          //      owprobs(word))
+          kldiv += p * (log(p) - log(q))
+        }
+        i += 1
+      }
     }
   
     if (partial)
       return kldiv
 
     // 2.
-    val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     var overall_probs_diff_words = 0.0
     for ((word, qcount) <- qcounts if !(pcounts contains word)) {
       val word_overall_prob = owprobs(word)
@@ -198,13 +233,17 @@ object FastPseudoGoodTuringSmoothedWordDist {
     val pfact = (1.0 - self.unseen_mass)/self.num_word_tokens
     val qfact = (1.0 - other.unseen_mass)/other.num_word_tokens
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
+    val factory = self.dufactory
+    /* Not needed in the new way
     val qfact_globally_unseen_prob = (other.unseen_mass*
-        self.factory.globally_unseen_word_prob /
-        self.factory.total_num_unseen_word_types)
-    val owprobs = self.factory.overall_word_probs
-    // 1.
+        factory.globally_unseen_word_prob /
+        factory.total_num_unseen_word_types)
+    */
+    val owprobs = factory.overall_word_probs
     val pcounts = self.counts
     val qcounts = other.counts
+
+    // 1.
 
     // FIXME!! Length of p is the same for all calls of fast_cosine_similarity
     // on this item, so we could cache it.  Not clear it would save much
@@ -216,12 +255,8 @@ object FastPseudoGoodTuringSmoothedWordDist {
       val p = pcount * pfact
       val q = {
         val qcount = qcounts(word)
-        if (qcount != 0) qcount * qfact
-        else {
-          val owprob = owprobs(word)
-          if (owprob != 0.0) owprob * qfact_unseen
-          else qfact_globally_unseen_prob
-        }
+        val owprob = owprobs(word)
+        qcount * qfact + owprob * qfact_unseen
       }
       //if (q == 0.0)
       //  errprint("Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s",

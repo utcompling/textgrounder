@@ -50,7 +50,10 @@ import WordDist.memoizer._
  *   statistics.
  */
 
-abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
+abstract class UnigramWordDist(
+    factory: WordDistFactory,
+    note_globally: Boolean
+  ) extends WordDist(factory, note_globally) with FastSlowKLDivergence {
   /**
    * A map (or possibly a "sorted list" of tuples, to save memory?) of
    * (word, count) items, specifying the counts of all words seen
@@ -62,18 +65,6 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
   val counts = create_word_double_map()
   var num_word_tokens = 0.0
 
-  /** SCALABUG:
-      Heap analysis revealed that Scala has holding the keys and values
-      (but not `num_words`) as local variables when they were constructors;
-      doesn't seem a good idea.  By redoing it this way, we avoid the
-      problem. */
-  def this(keys: Array[String], values: Array[Int], num_words: Int) {
-    this()
-    for (i <- 0 until num_words)
-      counts(memoize_string(keys(i))) = values(i)
-    num_word_tokens = counts.values.sum
-  }
-  
   def num_word_types = counts.size
 
   def innerToString: String
@@ -89,37 +80,6 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
     "UnigramWordDist(%d types, %s tokens%s%s, %s)" format (
         num_word_types, num_word_tokens, innerToString, finished_str, words)
-  }
-
-  protected def imp_add_document(words: Traversable[String],
-      ignore_case: Boolean, stopwords: Set[String]) {
-    for (word <- words;
-         wlower = if (ignore_case) word.toLowerCase() else word;
-         if !stopwords(wlower)) {
-      counts(memoize_string(wlower)) += 1
-      num_word_tokens += 1
-    }
-  }
-
-  protected def imp_add_word_distribution(xworddist: WordDist) {
-    val worddist = xworddist.asInstanceOf[UnigramWordDist]
-    for ((word, count) <- worddist.counts)
-      counts(word) += count
-    num_word_tokens += worddist.num_word_tokens
-  }
-
-  protected def imp_finish_before_global(minimum_word_count: Int) {
-    // make sure counts not null (eg document in coords file but not counts file)
-    if (counts == null) return
-
-    // If 'minimum_word_count' was given, then eliminate words whose count
-    // is too small.
-    if (minimum_word_count > 1) {
-      for ((word, count) <- counts if count < minimum_word_count) {
-        num_word_tokens -= count
-        counts -= word
-      }
-    }
   }
 
   /**
@@ -151,7 +111,9 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
     for (word <- counts.keys) {
       val p = lookup_word(word)
       val q = other.lookup_word(word)
-      if (p <= 0.0 || q <= 0.0)
+      if (q == 0.0)
+        { } // This is OK, we just skip these words
+      else if (p <= 0.0 || q <= 0.0)
         errprint("Warning: problematic values: p=%s, q=%s, word=%s", p, q, word)
       else {
         kldiv += p*(log(p) - log(q))
@@ -212,9 +174,12 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
   }
 }
 
-/** FIXME: This stuff should be functions on the WordDist itself, not
-    on the factory. */
-trait SimpleUnigramWordDistReader extends WordDistReader {
+class DefaultUnigramWordDistConstructor(
+  factory: WordDistFactory,
+  ignore_case: Boolean,
+  stopwords: Set[String],
+  minimum_word_count: Int = 1
+) extends WordDistConstructor(factory: WordDistFactory) {
   /**
    * Initial size of the internal DynamicArray objects; an optimization.
    */
@@ -236,20 +201,7 @@ trait SimpleUnigramWordDistReader extends WordDistReader {
    */
   protected val raw_keys_set = mutable.Set[String]()
 
-  /**
-   * Called each time a word is seen.  This can accept or reject the word
-   * (e.g. based on whether the count is high enough or the word is in
-   * a stopwords list), and optionally change the word into something else
-   * (e.g. the lowercased version or a generic -OOV-).
-   *
-   * @param word Raw word seen
-   * @param count Raw count for the word
-   * @return A modified form of the word, or None to reject the word.
-   */
-  def canonicalize_accept_word(doc: GenericDistDocument,
-    word: String, count: Int): Option[String]
-
-  def parse_counts(doc: GenericDistDocument, countstr: String) {
+  def parse_counts(countstr: String) {
     keys_dynarr.clear()
     values_dynarr.clear()
     raw_keys_set.clear()
@@ -270,48 +222,86 @@ trait SimpleUnigramWordDistReader extends WordDistReader {
         throw FileFormatException(
           "Word %s seen twice in same counts list" format word)
       raw_keys_set += word
-      val opt_canon_word =
-        canonicalize_accept_word(doc,
-          DistDocument.decode_word_for_counts_field(word), count)
-      if (opt_canon_word != None) {
-        keys_dynarr += opt_canon_word.get
-        values_dynarr += count
-      }
+      val decoded_word = DistDocument.decode_word_for_counts_field(word)
+      keys_dynarr += decoded_word
+      values_dynarr += count
     }
   }
 
   var seen_documents = new scala.collection.mutable.HashSet[String]()
 
-  def initialize_distribution(doc: GenericDistDocument, countstr: String,
-      is_training_set: Boolean) {
-    parse_counts(doc, countstr)
-    // Now set the distribution on the document; but don't use the test
-    // set's distributions in computing global smoothing values and such.
-    var first_time_document_seen = !seen_documents.contains(doc.title)
-    set_unigram_word_dist(doc, keys_dynarr.array, values_dynarr.array,
-      keys_dynarr.length, is_training_set && first_time_document_seen)
-    seen_documents += doc.title
+  protected def add_word_with_count(counts: WordDoubleMap,
+      word: String, count: Int) {
+    val lword = maybe_lowercase(word)
+    if (!(stopwords contains lword))
+      counts(memoize_string(lword)) += count
   }
 
-  def set_unigram_word_dist(doc: GenericDistDocument,
-      keys: Array[String], values: Array[Int], num_words: Int,
-      is_training_set: Boolean)
+  protected def imp_add_document(dist: WordDist, words: Traversable[String]) {
+    val counts = dist.asInstanceOf[UnigramWordDist].counts
+    for (word <- words)
+      add_word_with_count(counts, word, 1)
+  }
+
+  protected def imp_add_word_distribution(dist: WordDist, other: WordDist,
+      partial: Double) {
+    // FIXME: Implement partial!
+    val counts = dist.asInstanceOf[UnigramWordDist].counts
+    val othercounts = other.asInstanceOf[UnigramWordDist].counts
+    for ((word, count) <- othercounts)
+      counts(word) += count
+  }
+
+  protected def imp_add_keys_values(dist: WordDist, keys: Array[String],
+      values: Array[Int], num_words: Int) {
+    val counts = dist.asInstanceOf[UnigramWordDist].counts
+    for (i <- 0 until num_words)
+      add_word_with_count(counts, keys(i), values(i))
+  } 
+
+  protected def imp_finish_before_global(dist: WordDist) {
+    val counts = dist.asInstanceOf[UnigramWordDist].counts
+    val oov = memoize_string("-OOV-")
+
+    /* Add the distribution to the global stats before eliminating
+       infrequent words. */
+    dist.num_word_tokens = counts.values.sum
+    factory.note_dist_globally(dist)
+
+    // If 'minimum_word_count' was given, then eliminate words whose count
+    // is too small.
+    if (minimum_word_count > 1) {
+      for ((word, count) <- counts if count < minimum_word_count) {
+        counts -= word
+        counts(oov) += count
+      }
+    }
+  }
+
+  def maybe_lowercase(word: String) =
+    if (ignore_case) word.toLowerCase else word
+
+  def initialize_distribution(doc: GenericDistDocument, countstr: String,
+      is_training_set: Boolean) {
+    parse_counts(countstr)
+    // Now set the distribution on the document; but don't use the test
+    // set's distributions in computing global smoothing values and such.
+    //
+    // FIXME: What is the purpose of first_time_document_seen??? When does
+    // it occur that we see a document multiple times?
+    var first_time_document_seen = !seen_documents.contains(doc.title)
+
+    val dist = factory.create_word_dist(note_globally =
+      is_training_set && first_time_document_seen)
+    add_keys_values(dist, keys_dynarr.array, values_dynarr.array,
+      keys_dynarr.length)
+    seen_documents += doc.title
+    doc.dist = dist
+  }
 }
 
 /**
  * General factory for UnigramWordDist distributions.
  */ 
-abstract class UnigramWordDistFactory extends
-    WordDistFactory with SimpleUnigramWordDistReader {
-  def canonicalize_accept_word(doc: GenericDistDocument, raw_word: String,
-      count: Int) = {
-    val lword = maybe_lowercase(doc, raw_word)
-    /* minimum_word_count (--minimum-word-count) currently handled elsewhere.
-       FIXME: Perhaps should be handled here. */
-    if (!is_stopword(doc, lword))
-      Some(lword)
-    else
-      None
-  }
-}
+abstract class UnigramWordDistFactory extends WordDistFactory { }
 

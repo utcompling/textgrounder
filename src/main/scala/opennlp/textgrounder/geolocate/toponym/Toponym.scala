@@ -277,8 +277,8 @@ class Division(
     combined_dist = new CombinedWordDist(word_dist_factory)
     for (loc <- Seq(this) ++ goodlocs if loc.docmatch != null)
       yield combined_dist.add_document(loc.docmatch)
-    combined_dist.word_dist.finish(minimum_word_count =
-      Params.minimum_word_count)
+    combined_dist.word_dist.finish_before_global()
+    combined_dist.word_dist.finish_after_global()
   }
 
   def contains(coord: SphereCoord) = boundary contains coord
@@ -471,7 +471,8 @@ class TopoDocument(
           warning("Couldn't find existing cell distribution for document %s",
             this)
           combined_dist = new CombinedWordDist(table.word_dist_factory)
-          combined_dist.word_dist.finish()
+          combined_dist.word_dist.finish_before_global()
+          combined_dist.word_dist.finish_after_global()
         }
       }
       combined_dist

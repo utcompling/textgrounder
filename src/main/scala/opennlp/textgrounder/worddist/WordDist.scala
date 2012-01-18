@@ -219,7 +219,8 @@ trait FastSlowKLDivergence {
    * info.
    */
   def slow_kl_divergence(other: WordDist, partial: Boolean = false) = {
-    val (kldiv, contribs) = slow_kl_divergence_debug(other, partial, false)
+    val (kldiv, contribs) =
+      slow_kl_divergence_debug(other, partial, false)
     kldiv
   }
 
@@ -250,25 +251,111 @@ trait FastSlowKLDivergence {
    * possible rounding error).
    */
   protected def imp_kl_divergence(other: WordDist, partial: Boolean) = {
-    /*
     val test_kldiv = false
     if (test_kldiv)
       test_kl_divergence(other, partial)
     else
       fast_kl_divergence(other, partial)
-    */
-    slow_kl_divergence(other, partial)
   }
 }
 
 /**
- * A handler for one common way of reading word distributions from a file.
- */ 
-trait WordDistReader {
+ * A class that controls how to construct a word distribution, whether the
+ * source comes from a data file, a document, another distribution, etc.
+ * The actual words added can be transformed in various ways, e.g.
+ * case-folding the words (typically by converting to all lowercase), ignoring
+ * words seen in a stoplist, converting some words to a generic -OOV-,
+ * eliminating words seen less than a minimum nmber of times, etc.
+ */
+abstract class WordDistConstructor(factory: WordDistFactory) {
   /**
-   * Set the word distribution of a document, given the value of the field
+   * Actual implementation of `add_document` by subclasses.
+   * External callers should use `add_document`.
+   */
+  protected def imp_add_document(dist: WordDist, words: Traversable[String])
+
+  /**
+   * Actual implementation of `add_word_distribution` by subclasses.
+   * External callers should use `add_word_distribution`.
+   */
+  protected def imp_add_word_distribution(dist: WordDist, other: WordDist,
+    partial: Double = 1.0)
+
+  /**
+   * Actual implementation of `add_keys_values` by subclasses.
+   * External callers should use `add_keys_values`.
+   */
+  protected def imp_add_keys_values(dist: WordDist,
+      keys: Array[String], values: Array[Int], num_words: Int)
+
+  /**
+   * Actual implementation of `finish_before_global` by subclasses.
+   * External callers should use `finish_before_global`.
+   */
+  protected def imp_finish_before_global(dist: WordDist)
+
+  /**
+   * Incorporate a document into the distribution.
+   */
+  def add_document(dist: WordDist, words: Traversable[String]) {
+    assert(!dist.finished)
+    assert(!dist.finished_before_global)
+    imp_add_document(dist, words)
+  }
+
+  /**
+   * Incorporate the given distribution into our distribution.
+   * `partial` is a scaling factor (between 0.0 and 1.0) used for
+   * interpolating multiple distributions.
+   */
+  def add_word_distribution(dist: WordDist, other: WordDist,
+      partial: Double = 1.0) {
+    assert(!dist.finished)
+    assert(!dist.finished_before_global)
+    assert(partial >= 0.0 && partial <= 1.0)
+    imp_add_word_distribution(dist, other, partial)
+  }
+
+  /**
+   * Incorporate a set of (key, value) pairs into the distribution.
+   * The number of pairs to add should be taken from `num_words`, not from
+   * the actual length of the arrays passed in.  The code should be able
+   * to handle the possibility that the same word appears multiple times,
+   * adding up the counts for each appearance of the word.
+   */
+  def add_keys_values(dist: WordDist,
+      keys: Array[String], values: Array[Int], num_words: Int) {
+    assert(!dist.finished)
+    assert(!dist.finished_before_global)
+    assert(keys.length >= num_words)
+    assert(values.length >= num_words)
+    imp_add_keys_values(dist, keys, values, num_words)
+  }
+
+  /**
+   * Partly finish computation of distribution.  This is called when the
+   * distribution has been completely populated with words, and no more
+   * modifications (e.g. incorporation of words or other distributions) will
+   * be made to the distribution.  It should do any additional changes that
+   * depend on the distribution being complete, but which do not depend on
+   * the global word-distribution statistics having been computed. (These
+   * statistics can be computed only after *all* word distributions that
+   * are used to create these global statistics have been completely
+   * populated.)
+   *
+   * @see #finish_after_global
+   * 
+   */
+  def finish_before_global(dist: WordDist) {
+    assert(!dist.finished)
+    assert(!dist.finished_before_global)
+    imp_finish_before_global(dist)
+    dist.finished_before_global = true
+  }
+
+  /**
+   * Create the word distribution of a document, given the value of the field
    * describing the distribution (typically called "counts" or "text").
-   * Return whether a word distribution was actually created/set.
    *
    * @param doc Document to set the distribution of.
    * @param diststr String from the document file, describing the distribution.
@@ -276,29 +363,17 @@ trait WordDistReader {
    *   Generally, global (e.g. back-off) statistics should be initialized
    *   only from training-set documents.
    */
-  def initialize_distribution(doc: GenericDistDocument, diststr: String,
+  def initialize_distribution(doc: GenericDistDocument, countstr: String,
       is_training_set: Boolean)
-
-  /**
-   *
-   */
-  def is_stopword(doc: GenericDistDocument, word: String) = {
-    val driver = doc.table.driver
-    (!driver.params.include_stopwords_in_document_dists &&
-      (driver.stopwords contains word))
-  }
-
-  def maybe_lowercase(doc: GenericDistDocument, word: String) =
-    if (!doc.table.driver.params.preserve_case_words)
-      word.toLowerCase else word
 }
 
 /**
  * A factory object for WordDists (word distributions).  Currently, there is
- * only one factory object (i.e. it's a singleton), but the particular
- * factory used depends on a command-line parameter.
+ * only one factory object in a particular instance of the application
+ * (i.e. it's a singleton), but the particular factory used depends on a
+ * command-line parameter.
  */
-abstract class WordDistFactory extends WordDistReader {
+abstract class WordDistFactory {
   /**
    * Total number of word types seen (size of vocabulary)
    */
@@ -310,14 +385,31 @@ abstract class WordDistFactory extends WordDistReader {
   var total_num_word_tokens = 0
 
   /**
-   * Create an empty word distribution.  Distributions created this way
-   * are not meant to be added to the global word-distribution statistics
-   * (see below).
+   * Corresponding constructor object for building up the word distribution
    */
-  def create_word_dist(): WordDist
+  var constructor: WordDistConstructor = _
+
+  def set_word_dist_constructor(constructor: WordDistConstructor) {
+    this.constructor = constructor
+  }
+
+  def create_word_dist(): WordDist = create_word_dist(note_globally = false)
 
   /**
-   * Compute any global word-distribution statistics, e.g. tables for
+   * Create an empty word distribution.  If `note_globally` is true,
+   * the distribution is meant to be added to the global word-distribution
+   * statistics (see below).
+   */
+  def create_word_dist(note_globally: Boolean): WordDist
+
+  /**
+   * Add the given distribution to the global word-distribution statistics,
+   * if any.
+   */
+  def note_dist_globally(dist: WordDist) { }
+
+  /**
+   * Finish computing any global word-distribution statistics, e.g. tables for
    * doing back-off.  This is called after all of the relevant WordDists
    * have been created.  In practice, the "relevant" distributions are those
    * associated with training documents, which are read in
@@ -344,7 +436,7 @@ object WordDist {
  * A word distribution, i.e. a statistical distribution over words in
  * a document, cell, etc.
  */
-abstract class WordDist {
+abstract class WordDist(factory: WordDistFactory, val note_globally: Boolean) {
   /** Number of word tokens seen in the distribution. */
   var num_word_tokens: Double
 
@@ -366,43 +458,32 @@ abstract class WordDist {
   var finished_before_global = false
 
   /**
-   * Actual implementation of `add_document` by subclasses.
-   * External callers should use `add_document`.
-   */
-  protected def imp_add_document(words: Traversable[String], 
-      ignore_case: Boolean, stopwords: Set[String])
-
-  /**
    * Incorporate a document into the distribution.
    */
-  def add_document(words: Traversable[String], 
-      ignore_case: Boolean = true, stopwords: Set[String] = Set[String]()) {
-    assert(!finished)
-    assert(!finished_before_global)
-    imp_add_document(words, ignore_case, stopwords)
+  def add_document(words: Traversable[String]) {
+    factory.constructor.add_document(this, words)
   }
-
-  /**
-   * Actual implementation of `add_word_distribution` by subclasses.
-   * External callers should use `add_word_distribution`.
-   */
-  protected def imp_add_word_distribution(worddist: WordDist)
 
   /**
    * Incorporate the given distribution into our distribution.
+   * `partial` is a scaling factor (between 0.0 and 1.0) used for
+   * interpolating multiple distributions.
    */
-  def add_word_distribution(worddist: WordDist) {
-    assert(!finished)
-    assert(!finished_before_global)
-    assert(worddist.finished_before_global)
-    imp_add_word_distribution(worddist)
+  def add_word_distribution(other: WordDist, partial: Double = 1.0) {
+    factory.constructor.add_word_distribution(this, other, partial)
   }
 
   /**
-   * Actual implementation of `finish_before_global` by subclasses.
-   * External callers should use `finish_before_global`.
+   * Incorporate a set of (key, value) pairs into the distribution.
+   * The number of pairs to add should be taken from `num_words`, not from
+   * the actual length of the arrays passed in.  The code should be able
+   * to handle the possibility that the same word appears multiple times,
+   * adding up the counts for each appearance of the word.
    */
-  protected def imp_finish_before_global(minimum_word_count: Int)
+  def add_keys_values(keys: Array[String], values: Array[Int],
+      num_words: Int) {
+    factory.constructor.add_keys_values(this, keys, values, num_words)
+  }
 
   /**
    * Partly finish computation of distribution.  This is called when the
@@ -417,14 +498,9 @@ abstract class WordDist {
    *
    * @see #finish_after_global
    * 
-   * @param minimum_word_count If greater than zero, eliminate words seen
-   * less than this number of times.
    */
-  def finish_before_global(minimum_word_count: Int = 0) {
-    assert(!finished)
-    assert(!finished_before_global)
-    imp_finish_before_global(minimum_word_count)
-    finished_before_global = true
+  def finish_before_global() {
+    factory.constructor.finish_before_global(this)
   }
 
   /**
@@ -444,18 +520,6 @@ abstract class WordDist {
     assert(finished_before_global)
     imp_finish_after_global()
     finished = true
-  }
-
-  /**
-   * Finish computation of distribution.  This is intended for word
-   * distributions that do not contribute to the global word-distribution
-   * statistics, and which have been created after those statistics have
-   * already been completed. (Examples of such distributions are the
-   * distributions of grid cells and of eval documents.)
-   */
-  def finish(minimum_word_count: Int = 0) {
-    finish_before_global(minimum_word_count)
-    finish_after_global()
   }
 
   /**

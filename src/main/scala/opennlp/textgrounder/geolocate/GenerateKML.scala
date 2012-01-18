@@ -81,22 +81,30 @@ low values more visible.  Possibilities are 'none' (no transformation),
 }
 
 
-/* A factory that filters the distributions to contain only the words we
+/* A constructor that filters the distributions to contain only the words we
    care about, to save memory and time. */
-class FilterPseudoGoodTuringSmoothedWordDistFactory(
-    filter_words: Seq[String]
-  ) extends PseudoGoodTuringSmoothedWordDistFactory {
-  val oov = "-OOV-"
-  override def set_unigram_word_dist(doc: GenericDistDocument,
-      keys: Array[String], values: Array[Int], num_words: Int,
-      is_training_set: Boolean) {
-    val (newkeys, newvalues) =
-      (for ((k, v) <- (keys zip values).take(num_words);
-           newk = if (filter_words contains k) k else oov)
-         yield (k, v)).unzip
-    doc.dist = new PseudoGoodTuringSmoothedWordDist(this,
-        newkeys.toArray, newvalues.toArray, newkeys.length,
-        note_globally = is_training_set)
+class FilterUnigramWordDistConstructor(
+    factory: WordDistFactory,
+    filter_words: Seq[String],
+    ignore_case: Boolean,
+    stopwords: Set[String],
+    minimum_word_count: Int = 1
+  ) extends DefaultUnigramWordDistConstructor(
+    factory, ignore_case, stopwords, minimum_word_count
+  ) {
+
+  override def finish_before_global(dist: WordDist) {
+    super.finish_before_global(dist)
+
+    val counts = dist.asInstanceOf[UnigramWordDist].counts
+    val oov = memoize_string("-OOV-")
+
+    // Filter the words we don't care about, to save memory and time.
+    for ((word, count) <- counts
+         if !(filter_words contains unmemoize_string(word))) {
+      counts -= word
+      counts(oov) += count
+    }
   }
 }
 
@@ -139,11 +147,20 @@ class GenerateKMLDriver extends
     params.split_kml_words = params.kml_words.split(',')
   }
 
-  override def initialize_word_dist_suffix() = 
-    DistDocument.unigram_counts_suffix
-  override def initialize_word_dist_factory() = {
-    new FilterPseudoGoodTuringSmoothedWordDistFactory(
-      params.split_kml_words)
+  override protected def initialize_word_dist_constructor(
+      factory: WordDistFactory) = {
+    if (num_ngrams > 1)
+      param_error("Only unigram word distribution words with GenerateKML")
+    val the_stopwords = get_stopwords()
+    /* if (num_ngrams == 2)
+      new FilterBigramWordDistConstructor(factory, ...)
+    else */
+      new FilterUnigramWordDistConstructor(
+        factory,
+        params.split_kml_words,
+        ignore_case = !params.preserve_case_words,
+        stopwords = the_stopwords,
+        minimum_word_count = params.minimum_word_count)
   }
 
   /**
