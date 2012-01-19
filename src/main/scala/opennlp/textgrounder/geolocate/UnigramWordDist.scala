@@ -278,13 +278,17 @@ trait SimpleUnigramWordDistReader extends WordDistReader {
     }
   }
 
+  var seen_documents = new scala.collection.mutable.HashSet[String]()
+
   def initialize_distribution(doc: GenericDistDocument, countstr: String,
       is_training_set: Boolean) {
     parse_counts(doc, countstr)
     // Now set the distribution on the document; but don't use the test
     // set's distributions in computing global smoothing values and such.
+    var first_time_document_seen = !seen_documents.contains(doc.title)
     set_unigram_word_dist(doc, keys_dynarr.array, values_dynarr.array,
-      keys_dynarr.length, is_training_set)
+      keys_dynarr.length, is_training_set && first_time_document_seen)
+    seen_documents += doc.title
   }
 
   def set_unigram_word_dist(doc: GenericDistDocument,

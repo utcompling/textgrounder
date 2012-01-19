@@ -1,55 +1,56 @@
 /**
  * Copyright 2009 Rednaxela
- * 
+ *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
  * arising from the use of this software.
- * 
+ *
  * Permission is granted to anyone to use this software for any purpose,
  * including commercial applications, and to alter it and redistribute it
  * freely, subject to the following restrictions:
- * 
+ *
  *    1. The origin of this software must not be misrepresented; you must not
  *    claim that you wrote the original software. If you use this software
  *    in a product, an acknowledgment in the product documentation would be
  *    appreciated but is not required.
- * 
+ *
  *    2. This notice may not be removed or altered from any source
  *    distribution.
  */
- 
+
 package ags.utils;
 
 import java.util.Arrays;
-import java.util.Collections; 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.List;
- 
+import java.util.LinkedList;
+
 /**
  * An efficient well-optimized kd-tree
- * 
+ *
  * @author Rednaxela
  */
-public class KdTree<T> {
+public class KdTree {
     // split method enum
     public enum SplitMethod { HALFWAY, MEDIAN, MAX_MARGIN }
 
     // All types
     private final int                  dimensions;
-    public final KdTree<T>            parent;
+    public final KdTree                parent;
     private int                        bucketSize;
     private SplitMethod                splitMethod;
- 
+
     // Leaf only
     private double[][]                 locations;
-    private Object[]                   data;
     private int                        locationCount;
- 
+
     // Stem only
-    private KdTree<T>                  left, right;
+    private KdTree                     left, right;
     private int                        splitDimension;
     private double                     splitValue;
- 
+
     // Bounds
     public double[]                    minLimit, maxLimit;
     private boolean                    singularity;
@@ -62,35 +63,33 @@ public class KdTree<T> {
         this.bucketSize = bucketSize;
         this.dimensions = dimensions;
         this.splitMethod = splitMethod;
- 
+
         // Init as leaf
         this.locations = new double[bucketSize][];
-        this.data = new Object[bucketSize];
         this.locationCount = 0;
         this.singularity = true;
- 
+
         // Init as root
         this.parent = null;
     }
- 
+
     /**
      * Constructor for child nodes. Internal use only.
      */
-    private KdTree(KdTree<T> parent, boolean right) {
+    private KdTree(KdTree parent, boolean right) {
         this.dimensions = parent.dimensions;
         this.bucketSize = parent.bucketSize;
         this.splitMethod = parent.splitMethod;
- 
+
         // Init as leaf
         this.locations = new double[Math.max(bucketSize, parent.locationCount)][];
-        this.data = new Object[Math.max(bucketSize, parent.locationCount)];
         this.locationCount = 0;
         this.singularity = true;
- 
+
         // Init as non-root
         this.parent = parent;
     }
- 
+
     /**
      * Get the number of points in the tree
      */
@@ -98,30 +97,7 @@ public class KdTree<T> {
         return locationCount;
     }
 
-    public ArrayList<T> getData() {
-        ArrayList<T> outData = new ArrayList<T>();
-        getDataHelper(outData);
-        return outData;
-    }
-
-    private void getDataHelper(ArrayList<T> lst) {
-        if (left == null || right == null) {
-            // found a leaf. add its data
-            if (data == null)
-                // make sure we *have* data
-                return;
-            for (int i=0; i<locationCount; i++) {
-                @SuppressWarnings("unchecked")
-                T suppress_warning = (T) data[i];
-                lst.add(suppress_warning);
-            }
-        } else {
-            left.getDataHelper(lst);
-            right.getDataHelper(lst);
-        }
-    }
-
-    public KdTree<T> getLeaf(double[] location) {
+    public KdTree getLeaf(double[] location) {
         if (left == null || right == null)
             return this;
         else if (location[splitDimension] <= splitValue)
@@ -133,126 +109,18 @@ public class KdTree<T> {
     /**
      * Add a point and associated value to the tree
      */
-    public void addPoint(double[] location, T value) {
-        KdTree<T> cursor = this;
- 
-        while (cursor.locations == null || cursor.locationCount >= cursor.locations.length) {
-            if (cursor.locations != null) {
-                cursor.splitDimension = cursor.findWidestAxis();
+    public void addPoint(double[] location) {
+        if (locationCount >= locations.length) {
+            double[][] newLocations = new double[locations.length * 2][];
+            System.arraycopy(locations, 0, newLocations, 0, locationCount);
+            locations = newLocations;
+        }
 
-                if (splitMethod == SplitMethod.HALFWAY) {
-                    cursor.splitValue = (cursor.minLimit[cursor.splitDimension] + 
-                                         cursor.maxLimit[cursor.splitDimension]) * 0.5;
-                } else if (splitMethod == SplitMethod.MEDIAN) {
-                    // split on the median of the elements
-                    List<Double> list = new ArrayList<Double>();
-                    for(int i = 0; i < cursor.locations.length; i++) {
-                        list.add(cursor.locations[i][cursor.splitDimension]);
-                    }
-                    Collections.sort(list);
-                    if(list.size() % 2 == 1) {
-                        cursor.splitValue = list.get(list.size() / 2);
-                    } else {
-                        cursor.splitValue = (list.get(list.size() / 2) + list.get(list.size() / 2 - 1))/2;
-                    }
-                } else if (splitMethod == SplitMethod.MAX_MARGIN) {
-                    List<Double> list = new ArrayList<Double>();
-                    for(int i = 0; i < cursor.locations.length; i++) {
-                        list.add(cursor.locations[i][cursor.splitDimension]);
-                    }
-                    Collections.sort(list);
-                    double maxMargin = 0.0;
-                    double splitValue = Double.NaN;
-                    for (int i = 0; i < list.size() - 1; i++) {
-                        double delta = list.get(i+1) - list.get(i);
-                        if (delta > maxMargin) {
-                            maxMargin = delta;
-                            splitValue = list.get(i) + 0.5 * delta;
-                        }
-                    }
-                    cursor.splitValue = splitValue;
-                }
-
-                // Never split on infinity or NaN
-                if (cursor.splitValue == Double.POSITIVE_INFINITY) {
-                    cursor.splitValue = Double.MAX_VALUE;
-                }
-                else if (cursor.splitValue == Double.NEGATIVE_INFINITY) {
-                    cursor.splitValue = -Double.MAX_VALUE;
-                }
-                else if (Double.isNaN(cursor.splitValue)) {
-                    cursor.splitValue = 0;
-                }
- 
-                // Don't split node if it has no width in any axis. Double the
-                // bucket size instead
-                if (cursor.minLimit[cursor.splitDimension] == cursor.maxLimit[cursor.splitDimension]) {
-                    double[][] newLocations = new double[cursor.locations.length * 2][];
-                    System.arraycopy(cursor.locations, 0, newLocations, 0, cursor.locationCount);
-                    cursor.locations = newLocations;
-                    Object[] newData = new Object[newLocations.length];
-                    System.arraycopy(cursor.data, 0, newData, 0, cursor.locationCount);
-                    cursor.data = newData;
-                    break;
-                }
- 
-                // Don't let the split value be the same as the upper value as
-                // can happen due to rounding errors!
-                if (cursor.splitValue == cursor.maxLimit[cursor.splitDimension]) {
-                    cursor.splitValue = cursor.minLimit[cursor.splitDimension];
-                }
- 
-                // Create child leaves
-                KdTree<T> left = new ChildNode(cursor, false);
-                KdTree<T> right = new ChildNode(cursor, true);
- 
-                // Move locations into children
-                for (int i = 0; i < cursor.locationCount; i++) {
-                    double[] oldLocation = cursor.locations[i];
-                    Object oldData = cursor.data[i];
-                    if (oldLocation[cursor.splitDimension] > cursor.splitValue) {
-                        // Right
-                        right.locations[right.locationCount] = oldLocation;
-                        right.data[right.locationCount] = oldData;
-                        right.locationCount++;
-                        right.extendBounds(oldLocation);
-                    }
-                    else
-                    {
-                        // Left
-                        left.locations[left.locationCount] = oldLocation;
-                        left.data[left.locationCount] = oldData;
-                        left.locationCount++;
-                        left.extendBounds(oldLocation);
-                    }
-                }
- 
-                // Make into stem
-                cursor.left = left;
-                cursor.right = right;
-                cursor.locations = null;
-                cursor.data = null;
-            } //end of if
- 
-            cursor.locationCount++;
-            cursor.extendBounds(location);
- 
-            if (location[cursor.splitDimension] > cursor.splitValue) {
-                cursor = cursor.right;
-            }
-            else
-            {
-                cursor = cursor.left;
-            }
-        } //end of while loop
- 
-        cursor.locations[cursor.locationCount] = location;
-        cursor.data[cursor.locationCount] = value;
-        cursor.locationCount++;
-        cursor.extendBounds(location);
- 
+        locations[locationCount] = location;
+        locationCount++;
+        extendBounds(location);
     }
- 
+
     /**
      * Extends the bounds of this node do include a new location
      */
@@ -264,7 +132,7 @@ public class KdTree<T> {
             System.arraycopy(location, 0, maxLimit, 0, dimensions);
             return;
         }
- 
+
         for (int i = 0; i < dimensions; i++) {
             if (Double.isNaN(location[i])) {
                 minLimit[i] = Double.NaN;
@@ -281,7 +149,34 @@ public class KdTree<T> {
             }
         }
     }
- 
+
+    private List<double[]> getLocations() {
+        LinkedList<double[]> l = new LinkedList<double[]>();
+        getLocationsHelper(l);
+        return l;
+    }
+
+    private void getLocationsHelper(List<double[]> l) {
+        if (left == null || right == null) {
+            for (int i=0; i<locationCount; i++) {
+                l.add(locations[i]);
+            }
+        } else {
+            left.getLocationsHelper(l);
+            right.getLocationsHelper(l);
+        }
+    }
+
+    public void annihilateData() {
+        // assuming we are using a static KD tree, once we have
+        // generated the entire tree and have the split locations,
+        // then we no longer need to store all the points. Use
+        // this to clean everything.
+        if (left != null) left.annihilateData();
+        if (right != null) right.annihilateData();
+        locations = null;
+    }
+
     /**
      * Find the widest axis of the bounds of this node
      */
@@ -300,25 +195,25 @@ public class KdTree<T> {
         return widest;
     }
 
-    public List<KdTree<T>> getNodes() {
-        List<KdTree<T>> list = new ArrayList<KdTree<T>>();
+    public List<KdTree> getNodes() {
+        List<KdTree> list = new ArrayList<KdTree>();
         this.getNodesHelper(list);
         return list;
     }
 
-    private void getNodesHelper(List<KdTree<T>> list) {
+    private void getNodesHelper(List<KdTree> list) {
         list.add(this);
         if (left != null) left.getNodesHelper(list);
         if (right != null) right.getNodesHelper(list);
     }
 
-    public List<KdTree<T>> getLeaves() {
-        List<KdTree<T>> list = new ArrayList<KdTree<T>>();
+    public List<KdTree> getLeaves() {
+        List<KdTree> list = new ArrayList<KdTree>();
         this.getLeavesHelper(list);
         return list;
     }
-    
-    private void getLeavesHelper(List<KdTree<T>> list) {
+
+    private void getLeavesHelper(List<KdTree> list) {
         if (left == null && right == null)
             list.add(this);
         else{
@@ -328,9 +223,105 @@ public class KdTree<T> {
                 right.getLeavesHelper(list);
         }
     }
-    
-    
- 
+
+    public void balance() {
+        nodeSplit(this);
+    }
+
+    private void nodeSplit(KdTree cursor) {
+        if (cursor.locationCount > cursor.bucketSize) {
+            cursor.splitDimension = cursor.findWidestAxis();
+
+            if (splitMethod == SplitMethod.HALFWAY) {
+                cursor.splitValue = (cursor.minLimit[cursor.splitDimension] +
+                                     cursor.maxLimit[cursor.splitDimension]) * 0.5;
+            } else if (splitMethod == SplitMethod.MEDIAN) {
+                // split on the median of the elements
+                List<Double> list = new ArrayList<Double>();
+                for(int i=0; i<cursor.locationCount ; i++) {
+                    list.add(cursor.locations[i][cursor.splitDimension]);
+                }
+                Collections.sort(list);
+                if(list.size() % 2 == 1) {
+                    cursor.splitValue = list.get(list.size() / 2);
+                } else {
+                    cursor.splitValue = (list.get(list.size() / 2) + list.get(list.size() / 2 - 1))/2;
+                }
+            } else if (splitMethod == SplitMethod.MAX_MARGIN) {
+                List<Double> list = new ArrayList<Double>();
+                for(int i = 0; i < cursor.locationCount; i++) {
+                    list.add(cursor.locations[i][cursor.splitDimension]);
+                }
+                Collections.sort(list);
+                double maxMargin = 0.0;
+                double splitValue = Double.NaN;
+                for (int i = 0; i < list.size() - 1; i++) {
+                    double delta = list.get(i+1) - list.get(i);
+                    if (delta > maxMargin) {
+                        maxMargin = delta;
+                        splitValue = list.get(i) + 0.5 * delta;
+                    }
+                }
+                cursor.splitValue = splitValue;
+            }
+
+            // Never split on infinity or NaN
+            if (cursor.splitValue == Double.POSITIVE_INFINITY) {
+                cursor.splitValue = Double.MAX_VALUE;
+            }
+            else if (cursor.splitValue == Double.NEGATIVE_INFINITY) {
+                cursor.splitValue = -Double.MAX_VALUE;
+            }
+            else if (Double.isNaN(cursor.splitValue)) {
+                cursor.splitValue = 0;
+            }
+
+            // Don't split node if it has no width in any axis. Double the
+            // bucket size instead
+            if (cursor.minLimit[cursor.splitDimension] == cursor.maxLimit[cursor.splitDimension]) {
+                double[][] newLocations = new double[cursor.locations.length * 2][];
+                System.arraycopy(cursor.locations, 0, newLocations, 0, cursor.locationCount);
+                cursor.locations = newLocations;
+                return;
+            }
+
+            // Don't let the split value be the same as the upper value as
+            // can happen due to rounding errors!
+            if (cursor.splitValue == cursor.maxLimit[cursor.splitDimension]) {
+                cursor.splitValue = cursor.minLimit[cursor.splitDimension];
+            }
+
+            // Create child leaves
+            KdTree left = new ChildNode(cursor, false);
+            KdTree right = new ChildNode(cursor, true);
+
+            // Move locations into children
+            for (int i = 0; i < cursor.locationCount; i++) {
+               double[] oldLocation = cursor.locations[i];
+               if (oldLocation[cursor.splitDimension] > cursor.splitValue) {
+                   // Right
+                   right.locations[right.locationCount] = oldLocation;
+                   right.locationCount++;
+                   right.extendBounds(oldLocation);
+               }
+               else {
+                   // Left
+                   left.locations[left.locationCount] = oldLocation;
+                   left.locationCount++;
+                   left.extendBounds(oldLocation);
+               }
+            }
+
+            // Make into stem
+            cursor.left = left;
+            cursor.right = right;
+            cursor.locations = null;
+            cursor.nodeSplit(left);
+            cursor.nodeSplit(right);
+        }
+    }
+
+
     protected double pointDist(double[] p1, double[] p2) {
         double d = 0;
 
@@ -343,7 +334,7 @@ public class KdTree<T> {
 
         return d;
     }
-    
+
     protected double pointRegionDist(double[] point, double[] min, double[] max) {
         double d = 0;
 
@@ -363,40 +354,28 @@ public class KdTree<T> {
 
         return d;
     }
-    
-    public String toString(){
-        if (data == null)
-            return "";
 
-        String ret="";
-        for(int i=0; i<this.locationCount;i++)
-        {
-            ret += this.data[i] + " ";
-        }
-        return ret;
-    }
-    
     protected double getAxisWeightHint(int i) {
         return 1.0;
     }
- 
+
     /**
      * Internal class for child nodes
      */
-    private class ChildNode extends KdTree<T> {
-        private ChildNode(KdTree<T> parent, boolean right) {
+    private class ChildNode extends KdTree {
+        private ChildNode(KdTree parent, boolean right) {
             super(parent, right);
         }
- 
+
         // Distance measurements are always called from the root node
         protected double pointDist(double[] p1, double[] p2) {
             throw new IllegalStateException();
         }
- 
+
         protected double pointRegionDist(double[] point, double[] min, double[] max) {
             throw new IllegalStateException();
         }
-    } 
+    }
 
     private static String darrayToString(double[] array) {
         String retval = "";
@@ -406,22 +385,5 @@ public class KdTree<T> {
         return retval;
     }
 
-    public static void main(String[] args) {
-        KdTree<String> tree = new KdTree<String>(2, 2, SplitMethod.HALFWAY);
-        tree.addPoint(new double[] { 1.0, 1.0 }, "hello1");
-        tree.addPoint(new double[] { 10.0, 2.0 }, "world2");
-        tree.addPoint(new double[] { 3.0, 4.0 }, "earth3");
-        tree.addPoint(new double[] { 1.0, 1.0 }, "hello2");
-        tree.addPoint(new double[] { 6.0, 7.0 }, "earth4");
-        tree.addPoint(new double[] { 16.0, 7.0 }, "earth5");
-        tree.addPoint(new double[] { 1.0, 1.0 }, "hello3");
-        tree.addPoint(new double[] { 1.0, 1.0 }, "hello4");
-        
-        System.out.println(tree);
-        KdTree<String> leaf = tree.getLeaf(new double[] { 1.0, 1.0 });
-        System.out.println(leaf);
-        System.out.println(darrayToString(leaf.maxLimit));
-        System.out.println(darrayToString(leaf.minLimit));
-    }
-
 }
+

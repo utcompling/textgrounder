@@ -195,7 +195,8 @@ abstract class DistDocumentTable[
   def create_and_init_document(schema: Schema, fieldvals: Seq[String],
       record_in_table: Boolean, must_have_coord: Boolean = true) = {
     val split = schema.get_field_or_else(fieldvals, "split", "unknown")
-    num_records_by_split(split) += 1
+    if (record_in_table)
+      num_records_by_split(split) += 1
     val doc = try {
       imp_create_and_init_document(schema, fieldvals, record_in_table)
     } catch {
@@ -214,8 +215,10 @@ abstract class DistDocumentTable[
       val tokens = double_tokens.toInt
       // Our training docs should not have partial counts.
       assert(tokens == double_tokens)
-      num_documents_by_split(split) += 1
-      word_tokens_of_documents_by_split(split) += tokens
+      if (record_in_table) {
+        num_documents_by_split(split) += 1
+        word_tokens_of_documents_by_split(split) += tokens
+      }
       if (!doc.has_coord && must_have_coord) {
         errprint("Document %s skipped because it has no coordinate", doc)
         num_documents_skipped_because_lacking_coordinates_by_split(split) += 1
@@ -256,7 +259,7 @@ abstract class DistDocumentTable[
    * @param cell_grid Cell grid to add newly created DistDocuments to
    */
   class DistDocumentTableFileProcessor(
-    suffix: String, cell_grid: TGrid
+    suffix: String, cell_grid: TGrid, pass: Int
   ) extends DistDocumentFileProcessor(suffix, driver) {
     def handle_document(fieldvals: Seq[String]) = {
       val doc = create_and_init_document(schema, fieldvals, true)
@@ -272,7 +275,7 @@ abstract class DistDocumentTable[
         filehand: FileHandler, file: String,
         compression: String, realname: String) = {
       val task =
-        new ExperimentMeteredTask(driver, "document", "reading",
+        new ExperimentMeteredTask(driver, "document", "reading pass " + pass,
               maxtime = driver.params.max_time_per_stage)
       // Stop if we've reached the maximum
       var should_stop = false
@@ -320,10 +323,13 @@ abstract class DistDocumentTable[
   def read_training_documents(filehand: FileHandler, dir: String,
       suffix: String, cell_grid: TGrid) {
 
-    val training_distproc =
-      new DistDocumentTableFileProcessor("training-" + suffix, cell_grid)
-    training_distproc.read_schema_from_corpus(filehand, dir)
-    training_distproc.process_files(filehand, Seq(dir))
+    for (pass <- 1 to cell_grid.num_training_passes) {
+      val training_distproc =
+        new DistDocumentTableFileProcessor("training-" + suffix, cell_grid, pass)
+      cell_grid.begin_training_pass(pass)
+      training_distproc.read_schema_from_corpus(filehand, dir)
+      training_distproc.process_files(filehand, Seq(dir))
+    }
   }
 
   def clear_training_document_distributions() {

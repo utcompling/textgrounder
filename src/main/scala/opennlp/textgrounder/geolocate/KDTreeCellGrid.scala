@@ -29,47 +29,27 @@ import ags.utils.KdTree
 
 import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.experiment._
+import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 class KdTreeCell(
   cellgrid: KdTreeCellGrid,
-  val kdleaf : KdTree[SphereDocument]
-) extends RectangularCell(cellgrid) with
-    DocumentRememberingCell[SphereCoord, SphereDocument] {
+  val kdleaf : KdTree
+) extends RectangularCell(cellgrid) {
 
   def get_northeast_coord () : SphereCoord = {
     new SphereCoord(kdleaf.minLimit(0), kdleaf.minLimit(1))
   }
-  
+
   def get_southwest_coord () : SphereCoord = {
     new SphereCoord(kdleaf.maxLimit(0), kdleaf.maxLimit(1))
   }
-  
-  def iterate_documents () : Iterable[SphereDocument] = {
-    kdleaf.getData()
-  }
 
-  override def get_center_coord () = {
-    if (cellgrid.table.driver.params.center_method == "center") {
-      // center method
-      super.get_center_coord
-    } else {
-      // centroid method
-      var sum_lat = 0.0
-      var sum_long = 0.0
-      for (art <- kdleaf.getData) {
-        sum_lat += art.coord.lat
-        sum_long += art.coord.long
-      }
-      SphereCoord(sum_lat / kdleaf.size, sum_long / kdleaf.size)
-    }
-  }
-  
   def describe_indices () : String = {
     "Placeholder"
   }
-  
+
   def describe_location () : String = {
-    get_boundary.toString
+    get_boundary.toString + " (Center: " + get_center_coord + ")"
   }
 }
 
@@ -84,7 +64,7 @@ object KdTreeCellGrid {
   }
 }
 
-class KdTreeCellGrid(table: SphereDocumentTable, 
+class KdTreeCellGrid(table: SphereDocumentTable,
                      bucketSize: Int,
                      splitMethod: KdTree.SplitMethod,
                      useBackoff: Boolean,
@@ -94,13 +74,51 @@ class KdTreeCellGrid(table: SphereDocumentTable,
    * Total number of cells in the grid.
    */
   var total_num_cells: Int = 0
-  var kdtree : KdTree[SphereDocument] = new KdTree[SphereDocument](2, bucketSize, splitMethod)
-  val leaves_to_cell : Map[KdTree[SphereDocument], KdTreeCell] = Map()
+  var kdtree: KdTree = new KdTree(2, bucketSize, splitMethod)
 
-  // FIXME!!! What about when `create_non_recorded` = true (i.e. we need to
-  // create a non-recorded cell)? 
+  val nodes_to_cell: Map[KdTree, KdTreeCell] = Map()
+  val leaves_to_cell: Map[KdTree, KdTreeCell] = Map()
+
+  override val num_training_passes: Int = 2
+  var current_training_pass: Int = 0
+
+  override def begin_training_pass(pass: Int) = {
+    current_training_pass = pass
+
+    if (pass == 1) {
+      // do nothing
+    } else if (pass == 2) {
+      // we've seen all the coordinates. we need to build up
+      // the entire kd-tree structure now, the centroids, and
+      // clean out the data.
+
+      val task = new ExperimentMeteredTask(table.driver, "K-d tree structure",
+        "generating")
+
+      // build the full kd-tree structure.
+      kdtree.balance
+
+      for (node <- kdtree.getNodes) {
+        val c = new KdTreeCell(this, node)
+        nodes_to_cell.update(node, c)
+        task.item_processed()
+      }
+      task.finish()
+
+      // no longer need to keep all our locations in memory. destroy
+      // them. to free up memory.
+      kdtree.annihilateData
+    } else {
+      // definitely should not get here
+      assert(false);
+    }
+  }
+
   def find_best_cell_for_coord(coord: SphereCoord,
       create_non_recorded: Boolean) = {
+    // FIXME: implementation note: the KD tree should tile the entire earth's surface,
+    // but there's a possibility of something going awry here if we've never
+    // seen a evaluation point before.
     leaves_to_cell(kdtree.getLeaf(Array(coord.lat, coord.long)))
   }
 
@@ -108,7 +126,18 @@ class KdTreeCellGrid(table: SphereDocumentTable,
    * Add the given document to the cell grid.
    */
   def add_document_to_cell(document: SphereDocument) {
-    kdtree.addPoint(Array(document.coord.lat, document.coord.long), document)
+    if (current_training_pass == 1) {
+      kdtree.addPoint(Array(document.coord.lat, document.coord.long))
+    } else if (current_training_pass == 2) {
+      val leaf = kdtree.getLeaf(Array(document.coord.lat, document.coord.long))
+      var n = leaf
+      while (n != null) {
+        nodes_to_cell(n).add_document(document)
+        n = n.parent;
+      }
+    } else {
+      assert(false)
+    }
   }
 
   /**
@@ -121,18 +150,9 @@ class KdTreeCellGrid(table: SphereDocumentTable,
     total_num_cells = kdtree.getLeaves.size
     num_non_empty_cells = total_num_cells
 
-    val nodes_to_cell : Map[KdTree[SphereDocument], KdTreeCell] = Map()
-
-    { // Put in a block to control scope of 'task'
-      val task = new ExperimentMeteredTask(table.driver, "K-d tree cell",
-        "generating")
-      for (node <- kdtree.getNodes) {
-        val c = new KdTreeCell(this, node)
-        c.generate_dist
-        nodes_to_cell.update(node, c)
-        task.item_processed()
-      }
-      task.finish()
+    // need to finish generating all the word distributions
+    for (c <- nodes_to_cell.valuesIterator) {
+      c.finish()
     }
 
     if (interpolateWeight > 0) {
@@ -145,7 +165,7 @@ class KdTreeCellGrid(table: SphereDocumentTable,
       // We'll do it top-down so dependencies are met.
 
       val iwtopdown = true
-      val nodes = 
+      val nodes =
         if (iwtopdown) kdtree.getNodes.toList
         else kdtree.getNodes.reverse
 
@@ -178,21 +198,16 @@ class KdTreeCellGrid(table: SphereDocumentTable,
       task.finish()
     }
 
-    { // Put in a block to control scope of 'task' and such
-      val task = new ExperimentMeteredTask(table.driver, "K-d tree cell",
-        "updating")
-      val nodes = if (useBackoff) kdtree.getNodes else kdtree.getLeaves
-      for (node <- nodes) {
-        leaves_to_cell.update(node, nodes_to_cell(node))
-        task.item_processed()
-      }
-      task.finish()
+    // here we need to drop nonleaf nodes unless backoff is enabled.
+    val nodes = if (useBackoff) kdtree.getNodes else kdtree.getLeaves
+    for (node <- nodes) {
+      leaves_to_cell.update(node, nodes_to_cell(node))
     }
   }
 
   /**
    * Iterate over all non-empty cells.
-   * 
+   *
    * @param nonempty_word_dist If given, returned cells must also have a
    *   non-empty word distribution; otherwise, they just need to have at least
    *   one document in them. (Not all documents have word distributions, esp.

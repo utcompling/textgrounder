@@ -209,19 +209,8 @@ abstract class MinMaxScoreStrategy[
    * indicates the cell and 'score' the score.
    */
   def return_ranked_cells(word_dist: WordDist) = {
-    val cell_buf = mutable.Buffer[(TCell, Double)]()
-    for (
-      cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
-    ) {
-      if (debug("lots")) {
-        errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
-          cell.describe_indices(), cell.describe_location(),
-          cell.combined_dist.num_docs_for_word_dist)
-      }
-
-      val score = score_cell(word_dist, cell)
-      cell_buf += ((cell, score))
-    }
+    val cells = cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
+    val cell_buf = cells.par.map(c => (c, score_cell(word_dist, c))).toBuffer
 
     /* SCALABUG:
        If written simply as 'cell_buf sortWith (_._2 < _._2)',
@@ -229,10 +218,18 @@ abstract class MinMaxScoreStrategy[
        if/then as follows, return type is Iterable, even though both
        forks have the same type of mutable.buffer!
      */
-    if (prefer_minimum)
-      cell_buf sortWith (_._2 < _._2)
-    else
-      cell_buf sortWith (_._2 > _._2)
+    val retval =
+      if (prefer_minimum)
+        cell_buf sortWith (_._2 < _._2)
+      else
+        cell_buf sortWith (_._2 > _._2)
+    if (debug("lots")) {
+      for ((cell, score) <- retval)
+        errprint("Nonempty cell at indices %s = location %s, num_documents = %s, score = %s",
+          cell.describe_indices(), cell.describe_location(),
+          cell.combined_dist.num_docs_for_word_dist, score)
+    }
+    retval
   }
 }
 
