@@ -26,15 +26,15 @@ object DocumentRankerByError {
       sys.exit(0)
     }
 
-    val docsAndErrors:List[(String, Double)] =
+    val docsAndErrors:List[(String, Double, Coordinate, Coordinate)] =
       (for((docName, trueCoord, predCoord) <- LogUtil.parseLogFile(logFile.value.get)) yield {
         val dist = trueCoord.distanceInKm(predCoord)
 
-        (docName, dist)
+        (docName, dist, trueCoord, predCoord)
       }).sortWith((x, y) => x._2 < y._2)
 
-    for((docName, dist) <- docsAndErrors) {
-      println(docName+"\t"+dist)
+    for((docName, dist, trueCoord, predCoord) <- docsAndErrors) {
+      println(docName+"\t"+dist+"\t"+trueCoord+"\t"+predCoord)
     }
   }
 }
