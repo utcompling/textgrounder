@@ -181,12 +181,14 @@ class PseudoGoodTuringSmoothedWordDist(
 
   def innerToString = ", %.2f unseen mass" format unseen_mass
 
-   /**
-    * Here we compute the value of `overall_unseen_mass`, which depends
-    * on the global `overall_word_probs` computed from all of the
-    * distributions.
-    */
+  protected def imp_add_word_distribution_partial(xworddist: WordDist, partial: Double){
+  }
 
+ /**
+   * Here we compute the value of `overall_unseen_mass`, which depends
+   * on the global `overall_word_probs` computed from all of the
+   * distributions.
+   */
   protected def imp_finish_after_global() {
     // Make sure that overall_word_probs has been computed properly.
     assert(factory.owp_adjusted)

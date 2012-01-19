@@ -34,6 +34,7 @@ import opennlp.textgrounder.util.printutil.{errprint, warning}
 import GeolocateDriver.Debug._
 import WordDist.memoizer._
 import GenericTypes._
+import opennlp.textgrounder.util.Serializer
 
 // val use_sorted_list = false
 
@@ -248,14 +249,11 @@ trait FastSlowKLDivergence {
    * possible rounding error).
    */
   protected def imp_kl_divergence(other: WordDist, partial: Boolean) = {
-    /*
     val test_kldiv = false
     if (test_kldiv)
       test_kl_divergence(other, partial)
     else
       fast_kl_divergence(other, partial)
-    */
-    slow_kl_divergence(other, partial)
   }
 }
 
@@ -386,6 +384,8 @@ abstract class WordDist {
    */
   protected def imp_add_word_distribution(worddist: WordDist)
 
+  protected def imp_add_word_distribution_partial(worddist: WordDist, partial: Double)
+
   /**
    * Incorporate the given distribution into our distribution.
    */
@@ -394,6 +394,13 @@ abstract class WordDist {
     assert(!finished_before_global)
     assert(worddist.finished_before_global)
     imp_add_word_distribution(worddist)
+  }
+
+  def add_word_distribution_partial(worddist: WordDist, partial: Double) {
+    assert(!finished)
+    assert(!finished_before_global)
+    assert(worddist.finished_before_global)
+    imp_add_word_distribution_partial(worddist,partial)
   }
 
   /**

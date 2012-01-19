@@ -24,7 +24,7 @@ object TwitterPull {
   type Record = (String, Tweet)
   // author = (username, earliest timestamp, best lat, best lng, max followers, max following, number of tweets pulled)
   type Author = (String, Int, Double, Double, Int, Int, Int)
-  type AuthorWord = (Author, String)
+  type AuthorWord = (String, String)
   // wordcount = (word, number of ocurrences)
   type WordCount = (String, Long)
 
@@ -45,10 +45,10 @@ object TwitterPull {
     }
   }
 
-  def is_valid_tweet(r: Record): Boolean = {
+  def is_valid_tweet(id_r: (String, Record)): Boolean = {
     // filters out invalid tweets, as well as trivial spam
-    val (a, (ts, text, lat, lng, fers, fing, numtw)) = r
-    ts != 0 && a != "" && !(lat == 0.0 && lng == 0.0)
+    val (tw_id, (a, (ts, text, lat, lng, fers, fing, numtw))) = id_r
+    tw_id != "" && ts != 0 && a != "" && !(lat == 0.0 && lng == 0.0)
   }
 
   val MAX_NUMBER_FOLLOWING = 1000
@@ -77,16 +77,14 @@ object TwitterPull {
   }
 
 
+  val empty_tweet: (String, Record) = ("", ("", (0, "", Double.NaN, Double.NaN, 0, 0, 0)))
 
-
-  val empty_tweet: Record = ("", (0, "", Double.NaN, Double.NaN, 0, 0, 0))
-
-  def parse_json(line: String): Record = {
+  def parse_json(line: String): (String, Record) = {
     try {
       val parsed = json.parse(line)
       val author = force_value(parsed \ "user" \ "screen_name")
       val timestamp = parse_time(force_value(parsed \ "created_at"))
-      val text = force_value(parsed \ "text")
+      val text = force_value(parsed \ "text").replaceAll("\\s+", " ")
       val followers = force_value(parsed \ "user" \ "followers_count").toInt
       val following = force_value(parsed \ "user" \ "friends_count").toInt
       val tweet_id = force_value(parsed \ "id_str")
@@ -99,12 +97,17 @@ object TwitterPull {
             (parsed \ "coordinates" \ "coordinates" values).asInstanceOf[List[Number]]
           (latlng(1).doubleValue, latlng(0).doubleValue)
         }
-      (author, (timestamp, text, lat, lng, followers, following, 1))
+      (tweet_id, (author, (timestamp, text, lat, lng, followers, following, 1)))
     } catch {
       case jpe: json.JsonParser.ParseException => empty_tweet
       case npe: NullPointerException => empty_tweet
       case nfe: NumberFormatException => empty_tweet
     }
+  }
+
+  def tweet_once(id_rs: (String, Iterable[Record])): Record = {
+    val (id, rs) = id_rs
+    rs.head
   }
 
   def merge_records(tweet1: Tweet, tweet2: Tweet): Tweet = {
@@ -136,11 +139,7 @@ object TwitterPull {
   }
 
   def normalize_word(word: String): String = {
-    val lower = word.toLowerCase
-    if (lower.startsWith("#"))
-      lower.substring(1)
-    else
-      lower
+    word.toLowerCase
   }
 
   def tokenize(text: String): Iterable[String] = {
@@ -153,21 +152,52 @@ object TwitterPull {
       word.startsWith("@")
   }
 
-  def emit_words(r: Record): Iterable[(AuthorWord, Long)] = {
+  def checkpoint_str(r: Record): String = {
     val (author, (ts, text, lat, lng, fers, fing, numtw)) = r
-    for (word <- tokenize(text) if !filter_word(word))
-      yield (((author, ts, lat, lng, fers, fing, numtw), word), 1L)
+    val text_2 = text.replaceAll("\\s+", " ")
+    val s = Seq(author, ts, lat, lng, fers, fing, numtw, "", text_2) mkString "\t"
+    s
   }
 
-  def reposition_word(awc: (AuthorWord, Long)): (Author, WordCount) = {
+  def from_checkpoint_to_record(line: String): Record = {
+    val split = line.split("\t\t")
+    val (author_data, text) = (split(0), split(1))
+    val split2 = author_data.split("\t")
+    val author = split2(0)
+    val ts = split2(1).toInt
+    val lat = split2(2).toDouble
+    val lng = split2(3).toDouble
+    val fers = split2(4).toInt
+    val fing = split2(5).toInt
+    val numtw = split2(6).toInt
+    (author, (ts, text, lat, lng, fers, fing, numtw))
+  }
+
+  def from_checkpoint_to_author_text(line: String): (String, String) = {
+    val split = line.split("\t\t")
+    if (split.length != 2) {
+      System.err.println("Bad line: " + line)
+      ("", "")
+    } else {
+      (split(0), split(1))
+    }
+  }
+
+  def emit_words(author_text: (String, String)): Iterable[(AuthorWord, Long)] = {
+    val (authordata, text) = author_text
+    for (word <- tokenize(text) if !filter_word(word))
+      yield ((authordata, word), 1L)
+  }
+
+  def reposition_word(awc: (AuthorWord, Long)): (String, WordCount) = {
     val ((author, word), c) = awc
     (author, (word, c))
   }
 
-  def nicely_format_plain(awcs: (Author, Iterable[WordCount])): String = {
-    val ((author, ts, lat, lng, fers, fing, numtw), wcs) = awcs
+  def nicely_format_plain(awcs: (String, Iterable[WordCount])): String = {
+    val (author, wcs) = awcs
     val nice_text = wcs.map((w: WordCount) => w._1 + ":" + w._2).mkString(" ")
-    author + "\t" + ts + "\t" + lat + "," + lng + "\t" + fers + "\t" + fing + "\t" + numtw + "\t" + nice_text
+    author + "\t" + nice_text
   }
 
   def main(args: Array[String]) = withHadoopArgs(args) { a =>
@@ -180,12 +210,20 @@ object TwitterPull {
         sys.error("Expecting input and output path.")
       }
 
+    /*
     // Firstly we load up all the (new-line-seperated) json lines
     val lines: DList[String] = TextInput.fromTextFile(inputPath)
 
     // Filter out some trivially invalid tweets and parse the json
-    val values_extracted = lines.map(parse_json)
-                                .filter(is_valid_tweet)
+    val values_extracted = lines.map(parse_json).filter(is_valid_tweet)
+
+    val single_tweets = values_extracted.groupByKey.map(tweet_once)
+
+    val checkpoint = single_tweets.map(checkpoint_str)
+    DList.persist(TextOutput.toTextFile(checkpoint, outputPath + "-st"))
+
+    val lines: DList[String] = TextInput.fromTextFile(outputPath + "-st")
+    val values_extracted = lines.map(from_checkpoint_to_record)
 
     // group by author, combine the records, keeping the earliest
     // tweet with a specific coordinate
@@ -196,8 +234,17 @@ object TwitterPull {
                               .filter(is_nonspammer)
                               .filter(northamerica_only)
 
+
+    val checkpoint = with_coord.map(checkpoint_str)
+    DList.persist(TextOutput.toTextFile(checkpoint, outputPath + "-cp"))
+
+    */
+
+    // load from the checkpoint
+    val lines_cp: DList[String] = TextInput.fromTextFile(outputPath + "-cp")
     // word count
-    val emitted_words = with_coord.flatMap(emit_words)
+    val emitted_words = lines_cp.map(from_checkpoint_to_author_text)
+                                .flatMap(emit_words)
     val word_counts = emitted_words.groupByKey.combine((a: Long, b: Long) => (a + b))
 
     // regroup with author as key, word pairs as values
@@ -208,7 +255,6 @@ object TwitterPull {
 
     // save to disk
     DList.persist(TextOutput.toTextFile(nicely_formatted, outputPath))
-
   }
 }
 

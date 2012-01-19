@@ -138,7 +138,29 @@ class CombinedWordDist(factory: WordDistFactory) {
       num_docs_for_word_dist += 1
     }
   }
+
+  def add_document_partial(doc: DistDocument[_],partial: Double) {
+    assert (doc.split == "training")
+
+    /* Add link count of document to cell. */
+    doc.incoming_links match {
+      // Might be None, for unknown link count
+      case Some(x) => incoming_links += x
+      case _ =>
+    }
+    num_docs_for_links += 1
+
+    if (doc.dist == null) {
+      if (Params.max_time_per_stage == 0.0 && Params.num_training_docs == 0)
+        warning("Saw document %s without distribution", doc)
+    } else {
+
+      word_dist.add_word_distribution_partial(doc.dist,partial)
+      num_docs_for_word_dist += 1
+    }
+  }
 }
+
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cell distributions                          //
