@@ -202,6 +202,7 @@ object TwitterPull {
 
   def main(args: Array[String]) = withHadoopArgs(args) { a =>
 
+    /*
     // make sure we get all the input
     val (inputPath, outputPath) =
       if (a.length == 2) {
@@ -210,7 +211,6 @@ object TwitterPull {
         sys.error("Expecting input and output path.")
       }
 
-    /*
     // Firstly we load up all the (new-line-seperated) json lines
     val lines: DList[String] = TextInput.fromTextFile(inputPath)
 
@@ -238,8 +238,6 @@ object TwitterPull {
     val checkpoint = with_coord.map(checkpoint_str)
     DList.persist(TextOutput.toTextFile(checkpoint, outputPath + "-cp"))
 
-    */
-
     // load from the checkpoint
     val lines_cp: DList[String] = TextInput.fromTextFile(outputPath + "-cp")
     // word count
@@ -255,6 +253,7 @@ object TwitterPull {
 
     // save to disk
     DList.persist(TextOutput.toTextFile(nicely_formatted, outputPath))
+    */
   }
 }
 
