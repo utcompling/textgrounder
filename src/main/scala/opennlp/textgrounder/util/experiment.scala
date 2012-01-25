@@ -20,6 +20,7 @@ import scala.collection.mutable
 
 import argparser._
 import collectionutil._
+import ioutil.{FileHandler, LocalFileHandler}
 import osutil._
 import printutil.{errprint, set_stdout_stderr_utf_8}
 import textutil._
@@ -378,7 +379,7 @@ package object experiment {
     /**
      * Group that local counters are placed in.
      */
-    val local_counter_group: String 
+    val local_counter_group = "textgrounder"
 
     /**
      * Return ID of current task.  This is used for Hadoop or similar, to handle
@@ -397,6 +398,22 @@ package object experiment {
      * Underlying implementation to return the value of the given counter.
      */
     protected def imp_get_counter(name: String): Long
+  }
+
+  /**
+   * Implementation of driver-statistics mix-in that simply stores the
+   * counters locally.
+   */
+  trait StandaloneExperimentDriverStats extends ExperimentDriverStats {
+    val counter_values = longmap[String]()
+
+    def get_task_id = 0
+
+    protected def imp_increment_counter(name: String, incr: Long) {
+      counter_values(name) += incr
+    }
+
+    protected def imp_get_counter(name: String) = counter_values(name)
   }
 
   /**
@@ -605,6 +622,26 @@ package object experiment {
      * for debugging.
      */
     def output_ancillary_parameters() {}
+  }
+
+  /**
+   * An extended version for use when both Hadoop and standalone versions of
+   * the project will be created.
+   */
+
+  abstract class HadoopableArgParserExperimentDriver extends
+      ArgParserExperimentDriver with ExperimentDriverStats {
+    /**
+     * FileHandler object for this driver.
+     */
+    private val local_file_handler = new LocalFileHandler
+
+    /**
+     * The file handler object for abstracting file access using either the
+     * Hadoop or regular Java API.  By default, references the regular API,
+     * but can be overridden.
+     */
+    def get_file_handler: FileHandler = local_file_handler
   }
 
   /**

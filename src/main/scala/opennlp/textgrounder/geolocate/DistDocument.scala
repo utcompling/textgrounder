@@ -37,7 +37,7 @@ import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.Serializer
 import opennlp.textgrounder.util.textutil.capfirst
 
-import GeolocateDriver.Debug._
+import GridLocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
 //                          DistDocument tables                            //
@@ -63,13 +63,16 @@ class DocumentLoadingProperties {
  * Class maintaining tables listing all documents and mapping between
  * names, ID's and documents.
  */
-abstract class DistDocumentTable[TCoord : Serializer,
-TDoc <: DistDocument[TCoord]](
+abstract class DistDocumentTable[
+  TCoord : Serializer,
+  TDoc <: DistDocument[TCoord],
+  TGrid <: CellGrid[TCoord,TDoc,_]
+](
   /* SCALABUG!!! Declaring TDoc <: DistDocument[TCoord] isn't sufficient
      for Scala to believe that null is an OK value for TDoc, even though
      DistDocument is a reference type and hence TDoc must be reference.
    */
-  val driver: GeolocateDriver,
+  val driver: GridLocateDriver,
   val word_dist_factory: WordDistFactory
 ) {
   /**
@@ -224,6 +227,8 @@ TDoc <: DistDocument[TCoord]](
           num_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += 1
           word_tokens_of_would_be_recorded_documents_skipped_because_lacking_coordinates_by_split(split) += tokens
         }
+        // SCALABUG, same bug with null and a generic type inheriting from
+        // a reference type
         null.asInstanceOf[TDoc]
       }
       if (doc.has_coord) {
@@ -254,7 +259,7 @@ TDoc <: DistDocument[TCoord]](
    * @param cell_grid Cell grid to add newly created DistDocuments to
    */
   class DistDocumentTableFileProcessor(
-    suffix: String, cell_grid: CellGrid[TCoord,TDoc,_], pass: Int
+    suffix: String, cell_grid: TGrid, pass: Int
   ) extends DistDocumentFileProcessor(suffix, driver) {
     def handle_document(fieldvals: Seq[String]) = {
       val doc = create_and_init_document(schema, fieldvals, true)
@@ -316,7 +321,7 @@ TDoc <: DistDocument[TCoord]](
    * @param cell_grid Cell grid into which the documents are added.
    */
   def read_training_documents(filehand: FileHandler, dir: String,
-      suffix: String, cell_grid: CellGrid[TCoord,TDoc,_]) {
+      suffix: String, cell_grid: TGrid) {
 
     for (pass <- 1 to cell_grid.num_training_passes) {
       val training_distproc =
@@ -541,7 +546,7 @@ case class DocumentValidationException(
  */
 abstract class DistDocument[TCoord : Serializer](
   val schema: Schema,
-  val table: DistDocumentTable[TCoord,_]
+  val table: DistDocumentTable[TCoord,_,_]
 ) {
 
   import DistDocument._, DistDocumentConverters._

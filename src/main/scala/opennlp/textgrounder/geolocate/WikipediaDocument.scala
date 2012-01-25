@@ -30,7 +30,7 @@ import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.textutil.capfirst
 
 import WordDist.memoizer._
-import GeolocateDriver.Debug._
+import GridLocateDriver.Debug._
 import DistDocumentConverters._
 
 /**

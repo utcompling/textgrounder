@@ -32,7 +32,7 @@ import opennlp.textgrounder.util.collectionutil.DynamicArray
 import opennlp.textgrounder.util.ioutil.{FileHandler, FileFormatException}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
-import GeolocateDriver.Debug._
+import GridLocateDriver.Debug._
 import WordDist.memoizer._
 import GenericTypes._
 
@@ -65,10 +65,10 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
       (but not `num_words`) as local variables when they were constructors;
       doesn't seem a good idea.  By redoing it this way, we avoid the
       problem. */
-  def this(keys: Array[Word], values: Array[Int], num_words: Int) {
+  def this(keys: Array[String], values: Array[Int], num_words: Int) {
     this()
     for (i <- 0 until num_words)
-      counts(keys(i)) = values(i)
+      counts(memoize_string(keys(i))) = values(i)
     num_word_tokens = counts.values.sum
   }
   
@@ -85,7 +85,7 @@ abstract class UnigramWordDist extends WordDist with FastSlowKLDivergence {
       for ((word, count) <- counts.toSeq.sortWith(_._2 > _._2).view(0, num_words_to_print))
       yield "%s=%s" format (unmemoize_string(word), count) 
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
-    "UnigramWordDist(%d types, %f tokens%s%s, %s)" format (
+    "UnigramWordDist(%d types, %s tokens%s%s, %s)" format (
         num_word_types, num_word_tokens, innerToString, finished_str, words)
   }
 
@@ -221,7 +221,7 @@ trait SimpleUnigramWordDistReader extends WordDistReader {
    * Internal DynamicArray holding the keys (canonicalized words).
    */
   protected val keys_dynarr =
-    new DynamicArray[Word](initial_alloc = initial_dynarr_size)
+    new DynamicArray[String](initial_alloc = initial_dynarr_size)
   /**
    * Internal DynamicArray holding the values (word counts).
    */
@@ -238,16 +238,14 @@ trait SimpleUnigramWordDistReader extends WordDistReader {
    * Called each time a word is seen.  This can accept or reject the word
    * (e.g. based on whether the count is high enough or the word is in
    * a stopwords list), and optionally change the word into something else
-   * (e.g. the lowercased version or a generic -OOV-).  It should also
-   * memoize the word appropriately.
+   * (e.g. the lowercased version or a generic -OOV-).
    *
    * @param word Raw word seen
    * @param count Raw count for the word
-   * @return A memoized version of a modified form of the word, or
-   *   None to reject the word.
+   * @return A modified form of the word, or None to reject the word.
    */
   def canonicalize_accept_word(doc: GenericDistDocument,
-    word: String, count: Int): Option[Word]
+    word: String, count: Int): Option[String]
 
   def parse_counts(doc: GenericDistDocument, countstr: String) {
     keys_dynarr.clear()
@@ -294,7 +292,7 @@ trait SimpleUnigramWordDistReader extends WordDistReader {
   }
 
   def set_unigram_word_dist(doc: GenericDistDocument,
-      keys: Array[Word], values: Array[Int], num_words: Int,
+      keys: Array[String], values: Array[Int], num_words: Int,
       is_training_set: Boolean)
 }
 
@@ -309,7 +307,7 @@ abstract class UnigramWordDistFactory extends
     /* minimum_word_count (--minimum-word-count) currently handled elsewhere.
        FIXME: Perhaps should be handled here. */
     if (!is_stopword(doc, lword))
-      Some(memoize_string(lword))
+      Some(lword)
     else
       None
   }

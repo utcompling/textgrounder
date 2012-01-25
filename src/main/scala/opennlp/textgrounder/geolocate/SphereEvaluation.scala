@@ -35,7 +35,7 @@ import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.textutil.split_text_into_words
 
-import GeolocateDriver.Debug._
+import GridLocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
 //                 General statistics on evaluation results                //
@@ -214,16 +214,17 @@ class SphereGroupedDocumentEvalStats(
 //                             Main evaluation code                        //
 /////////////////////////////////////////////////////////////////////////////
 
-abstract class SphereGeolocateDocumentEvaluator[TEvalDoc, TEvalRes](
-  override val strategy: SphereGeolocateDocumentStrategy,
+abstract class GeolocateDocumentEvaluator[TEvalDoc, TEvalRes](
+  strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends GeolocateDocumentEvaluator[SphereCoord, SphereDocument, SphereCell,
+) extends DocumentEvaluator[SphereCoord, SphereDocument, SphereCell,
   SphereCellGrid, TEvalDoc, TEvalRes](strategy, stratname, driver) {
   type TGroupedEvalStats = SphereGroupedDocumentEvalStats
-  def create_grouped_eval_stats(driver: GeolocateDocumentTypeDriver,
+  def create_grouped_eval_stats(driver: GridLocateDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
-    new TGroupedEvalStats(driver, cell_grid.asInstanceOf[SphereCellGrid],
+    new SphereGroupedDocumentEvalStats(driver,
+      cell_grid.asInstanceOf[SphereCellGrid],
       results_by_range)
 }
 
@@ -241,191 +242,56 @@ class SphereDocumentEvaluationResult(
 /**
  * Class to do document geolocating on documents from the document data, in
  * the dev or test set.
- *
- * FIXME!! Should probably be generalized to work beyond simply SphereDocuments
- * and such.
  */
 class CorpusGeolocateDocumentEvaluator(
-  strategy: SphereGeolocateDocumentStrategy,
+  strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends SphereGeolocateDocumentEvaluator[
-  SphereDocument, SphereDocumentEvaluationResult
+) extends CorpusDocumentEvaluator[
+  SphereCoord, SphereDocument, SphereCell, SphereCellGrid,
+  SphereDocumentEvaluationResult
 ](strategy, stratname, driver) {
+  // FIXME, the following 8 lines are copied from GeolocateDocumentEvaluator
+  type TGroupedEvalStats = SphereGroupedDocumentEvalStats
+  def create_grouped_eval_stats(driver: GridLocateDriver,
+    cell_grid: SphereCellGrid, results_by_range: Boolean) =
+    new SphereGroupedDocumentEvalStats(driver,
+      cell_grid.asInstanceOf[SphereCellGrid],
+      results_by_range)
+  def create_evaluation_result(document: SphereDocument, pred_cell: SphereCell,
+      true_rank: Int) =
+    new SphereDocumentEvaluationResult(document, pred_cell, true_rank)
 
-  /**
-   * A file processor that reads corpora containing document metadata and
-   * creates a DistDocument for each document described, and evaluates it.
-   *
-   * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "counts" or "document-metadata"
-   * @param cell_grid Cell grid to add newly created DistDocuments to
-   */
-  class EvaluateCorpusFileProcessor(
-    suffix: String
-  ) extends DistDocumentFileProcessor(suffix, driver) {
-    def handle_document(fieldvals: Seq[String]) = {
-      val doc = driver.document_table.create_and_init_document(
-        schema, fieldvals, false)
-      if (doc == null) (false, true)
+  def print_individual_result(doctag: String, document: SphereDocument,
+      result: SphereDocumentEvaluationResult,
+      pred_cells: Array[(SphereCell, Double)]) {
+    errprint("%s:Document %s:", doctag, document)
+    // errprint("%s:Document distribution: %s", doctag, document.dist)
+    errprint("%s:  %d types, %f tokens",
+      doctag, document.dist.num_word_types, document.dist.num_word_tokens)
+    errprint("%s:  true cell at rank: %s", doctag, result.true_rank)
+    errprint("%s:  true cell: %s", doctag, result.true_cell)
+    for (i <- 0 until 5) {
+      errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
+        doctag, i + 1, pred_cells(i)._2, pred_cells(i)._1)
+    }
+    errprint("%s:  Distance %.2f km to true cell center at %s",
+      doctag, result.true_truedist, result.true_center)
+    errprint("%s:  Distance %.2f km to predicted cell center at %s",
+      doctag, result.pred_truedist, result.pred_center)
+    assert(doctag(0) == '#')
+    if (debug("gridrank") ||
+      (debuglist("gridrank") contains doctag.drop(1))) {
+      val grsize = debugval("gridranksize").toInt
+      if (!result.true_cell.isInstanceOf[MultiRegularCell])
+        warning("Can't output ranking grid, cell not of right type")
       else {
-        doc.dist.finish_after_global()
-        process_document(doc)
+        strategy.cell_grid.asInstanceOf[MultiRegularCellGrid].
+          output_ranking_grid(
+            pred_cells.asInstanceOf[Seq[(MultiRegularCell, Double)]],
+            result.true_cell.asInstanceOf[MultiRegularCell], grsize)
       }
     }
-
-    def process_lines(lines: Iterator[String],
-        filehand: FileHandler, file: String,
-        compression: String, realname: String) = {
-      var should_stop = false
-      breakable {
-        for (line <- lines) {
-          if (!parse_row(line)) {
-            should_stop = true
-            break
-          }
-        }
-      }
-      output_resource_usage()
-      !should_stop
-    }
-  }
-
-  def process_files(filehand: FileHandler, files: Iterable[String]): Boolean = {
-    /* NOTE: `files` must actually be a list of directories, e.g. as
-       comes from the value of --input-corpus. */
-    for (dir <- files) {
-      val fileproc = new EvaluateCorpusFileProcessor(
-        driver.params.eval_set + "-" + driver.document_file_suffix)
-      fileproc.read_schema_from_corpus(filehand, dir)
-      if (!fileproc.process_files(filehand, Seq(dir)))
-        return false
-    }
-    return true
-  }
-
-  //title = None
-  //words = []
-  //for line in openr(filename, errors="replace"):
-  //  if (rematch("Article title: (.*)$", line))
-  //    if (title != null)
-  //      yield (title, words)
-  //    title = m_[1]
-  //    words = []
-  //  else if (rematch("Link: (.*)$", line))
-  //    args = m_[1].split('|')
-  //    truedoc = args[0]
-  //    linkword = truedoc
-  //    if (len(args) > 1)
-  //      linkword = args[1]
-  //    words.append(linkword)
-  //  else:
-  //    words.append(line)
-  //if (title != null)
-  //  yield (title, words)
-
-  override def would_skip_document(document: SphereDocument, doctag: String) = {
-    if (document.dist == null) {
-      // This can (and does) happen when --max-time-per-stage is set,
-      // so that the counts for many documents don't get read in.
-      if (driver.params.max_time_per_stage == 0.0 && driver.params.num_training_docs == 0)
-        warning("Can't evaluate document %s without distribution", document)
-      true
-    } else false
-  }
-
-  def evaluate_document(document: SphereDocument, doctag: String):
-      SphereDocumentEvaluationResult = {
-    if (would_skip_document(document, doctag)) {
-      evalstats.increment_counter("documents.skipped")
-      return null
-    }
-    assert(document.dist.finished)
-    val true_cell =
-      strategy.cell_grid.find_best_cell_for_coord(document.coord, true)
-    if (debug("lots") || debug("commontop")) {
-      val naitr = true_cell.combined_dist.num_docs_for_word_dist
-      errprint("Evaluating document %s with %s word-dist documents in true cell",
-        document, naitr)
-    }
-
-    /* That is:
-
-       pred_cells = List of predicted cells, from best to worst; each list
-          entry is actually a tuple of (cell, score) where lower scores
-          are better
-       true_rank = Rank of true cell among predicted cells
-     */
-    val (pred_cells, true_rank) =
-      if (driver.params.oracle_results)
-        (Array((true_cell, 0.0)), 1)
-      else {
-        def get_computed_results() = {
-          val cells = strategy.return_ranked_cells(document.dist).toArray
-          var rank = 1
-          var broken = false
-          breakable {
-            for ((cell, value) <- cells) {
-              if (cell eq true_cell) {
-                broken = true
-                break
-              }
-              rank += 1
-            }
-          }
-          if (!broken)
-            rank = 1000000000
-          (cells, rank)
-        }
-
-        get_computed_results()
-      }
-    val result =
-      new SphereDocumentEvaluationResult(document, pred_cells(0)._1, true_rank)
-
-    if (debug("all-scores")) {
-      for (((cell, value), index) <- pred_cells.zipWithIndex) {
-        errprint("%s: %6d: Cell at %s: score = %g", doctag, index + 1,
-          cell.describe_indices(), value)
-      }
-    }
-    val want_indiv_results =
-      !driver.params.oracle_results && !driver.params.no_individual_results
-    evalstats.record_result(result)
-    if (result.num_docs_in_true_cell == 0) {
-      evalstats.increment_counter("documents.no_training_documents_in_cell")
-    }
-    if (want_indiv_results) {
-      errprint("%s:Document %s:", doctag, document)
-      // errprint("%s:Document distribution: %s", doctag, document.dist)
-      errprint("%s:  %d types, %f tokens",
-        doctag, document.dist.num_word_types, document.dist.num_word_tokens)
-      errprint("%s:  true cell at rank: %s", doctag, true_rank)
-      errprint("%s:  true cell: %s", doctag, result.true_cell)
-      for (i <- 0 until 5) {
-        errprint("%s:  Predicted cell (at rank %s): %s",
-          doctag, i + 1, pred_cells(i)._1)
-      }
-      errprint("%s:  Distance %.2f km to true cell center at %s",
-        doctag, result.true_truedist, result.true_center)
-      errprint("%s:  Distance %.2f km to predicted cell center at %s",
-        doctag, result.pred_truedist, result.pred_center)
-      assert(doctag(0) == '#')
-      if (debug("gridrank") ||
-        (debuglist("gridrank") contains doctag.drop(1))) {
-        val grsize = debugval("gridranksize").toInt
-        if (!true_cell.isInstanceOf[MultiRegularCell])
-          warning("Can't output ranking grid, cell not of right type")
-        else {
-          strategy.cell_grid.asInstanceOf[MultiRegularCellGrid].
-            output_ranking_grid(
-              pred_cells.asInstanceOf[Seq[(MultiRegularCell, Double)]],
-              true_cell.asInstanceOf[MultiRegularCell], grsize)
-        }
-      }
-    }
-
-    return result
   }
 }
 
@@ -437,10 +303,10 @@ class TitledDocumentResult { }
  * in the PCL Travel corpus.
  */
 class PCLTravelGeolocateDocumentEvaluator(
-  strategy: SphereGeolocateDocumentStrategy,
+  strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends SphereGeolocateDocumentEvaluator[
+) extends GeolocateDocumentEvaluator[
   TitledDocument, TitledDocumentResult
 ](strategy, stratname, driver) with DocumentIteratingEvaluator[
   TitledDocument, TitledDocumentResult

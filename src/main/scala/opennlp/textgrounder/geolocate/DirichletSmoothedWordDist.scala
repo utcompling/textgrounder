@@ -28,7 +28,7 @@ import util.control.Breaks._
 import java.io._
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.printutil.errprint
-import GeolocateDriver.Debug._
+import GridLocateDriver.Debug._
 import WordDist.memoizer._
 
 /**
@@ -93,10 +93,10 @@ class DirichletSmoothedWordDistFactory extends
   }
 
   def create_word_dist() =
-    new DirichletSmoothedWordDist(this, Array[Word](), Array[Int](), 0,
+    new DirichletSmoothedWordDist(this, Array[String](), Array[Int](), 0,
       note_globally = false)
 
-  def set_unigram_word_dist(doc: DistDocument[_], keys: Array[Word],
+  def set_unigram_word_dist(doc: DistDocument[_], keys: Array[String],
       values: Array[Int], num_words: Int, is_training_set: Boolean) {
     doc.dist = new DirichletSmoothedWordDist(this, keys, values,
       num_words, note_globally = is_training_set)
@@ -118,7 +118,7 @@ class DirichletSmoothedWordDistFactory extends
 
 class DirichletSmoothedWordDist(
   val factory: DirichletSmoothedWordDistFactory, 
-  keys: Array[Word], 
+  keys: Array[String], 
   values: Array[Int], 
   num_words: Int, 
   note_globally: Boolean

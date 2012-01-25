@@ -31,7 +31,7 @@ import java.io._
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.printutil.errprint
 
-import GeolocateDriver.Debug._
+import GridLocateDriver.Debug._
 import WordDist.memoizer._
 import GenericTypes._
 
@@ -92,9 +92,9 @@ class PGTSmoothedBigramWordDistFactory extends BigramWordDistFactory {
   }
 
   def set_bigram_word_dist(doc: GenericDistDocument,
-      keys: Array[Word], values: Array[Int], num_words: Int,
-      bigram_keys: Array[Word], bigram_values: Array[Int], num_bigrams: Int,
-      is_training_set: Boolean) {
+      keys: Array[String], values: Array[Int], num_words: Int,
+      bigram_keys: Array[(String, String)], bigram_values: Array[Int],
+      num_bigrams: Int, is_training_set: Boolean) {
     doc.dist =
       new PGTSmoothedBigramWordDist(this, keys, values, num_words,
         bigram_keys, bigram_values, num_bigrams,
@@ -102,7 +102,8 @@ class PGTSmoothedBigramWordDistFactory extends BigramWordDistFactory {
   }
   
   def create_word_dist() =
-    new PGTSmoothedBigramWordDist(this, Array[Word](), Array[Int](), 0, Array[Word](), Array[Int](), 0)
+    new PGTSmoothedBigramWordDist(this, Array[String](), Array[Int](), 0,
+      Array[(String, String)](), Array[Int](), 0)
 }
 /**
  * Create a pseudo-Good-Turing smoothed word distribution given a table
@@ -119,10 +120,10 @@ class PGTSmoothedBigramWordDistFactory extends BigramWordDistFactory {
 
 class PGTSmoothedBigramWordDist(
   val factory: PGTSmoothedBigramWordDistFactory,
-  unigramKeys: Array[Word],
+  unigramKeys: Array[String],
   unigramValues: Array[Int],
   num_unigrams: Int,
-  bigramKeys: Array[Word],
+  bigramKeys: Array[(String, String)],
   bigramValues: Array[Int],
   num_bigrams: Int,
   val note_globally: Boolean = true

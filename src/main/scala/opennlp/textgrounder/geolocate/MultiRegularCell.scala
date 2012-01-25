@@ -30,7 +30,7 @@ import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.printutil.{errout, errprint}
 import opennlp.textgrounder.util.experiment._
 
-import GeolocateDriver.Debug._
+import GridLocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
 //                         A regularly spaced grid                         //

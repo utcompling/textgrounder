@@ -25,7 +25,7 @@ package opennlp.textgrounder.geolocate
 import scala.collection.mutable
 import math.{log, sqrt}
 import opennlp.textgrounder.util.collectionutil.DynamicArray
-import GeolocateDriver.Debug._
+import GridLocateDriver.Debug._
 import opennlp.textgrounder.geolocate.WordDist.memoizer.Word
 
 /**

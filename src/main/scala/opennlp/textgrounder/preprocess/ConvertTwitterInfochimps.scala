@@ -518,7 +518,8 @@ class TwitterInfochimpsStatsFileProcessor(
   }
 }
 
-class ConvertTwitterInfochimpsDriver extends ProcessFilesDriver {
+class ConvertTwitterInfochimpsDriver extends
+    ProcessFilesDriver with StandaloneExperimentDriverStats {
   type TParam = ConvertTwitterInfochimpsParameters
   
   override def handle_parameters() {
@@ -540,6 +541,7 @@ class ConvertTwitterInfochimpsDriver extends ProcessFilesDriver {
   }
 
   override def run_after_setup() {
+    val filehand = get_file_handler
     if (params.output_min_stats)
       new TwitterInfochimpsStatsFileProcessor(params).
         process_files(filehand, params.files)
