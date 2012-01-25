@@ -209,31 +209,33 @@ abstract class MinMaxScoreStrategy[
    * indicates the cell and 'score' the score.
    */
   def return_ranked_cells(word_dist: WordDist) = {
-    /*
-     The "old" way of doing things; Stephen resurrected it when merging
-     the Dirichlet stuff, perhaps by accident
-     */
+    val old = true
+    val cell_buf =
+      if (old) {
+      /*
+       The "old" (non-parallel) way of doing things; Stephen resurrected it when
+       merging the Dirichlet stuff.  Attempting to use the parallel method
+       caused an assertion failure after about 1200 of 1895 documents using
+       GeoText.
+       */
+        val buffer = mutable.Buffer[(TCell, Double)]()
 
-    /*
-    val cell_buf = mutable.Buffer[(SphereCell, Double)]()
+        for (cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)) {
+          if (debug("lots")) {
+            errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
+              cell.describe_indices(), cell.describe_location(),
+              cell.combined_dist.num_docs_for_word_dist)
+          }
 
-    for (
-      cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
-    ) {
-      if (debug("lots")) {
-        errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
-          cell.describe_indices(), cell.describe_location(),
-          cell.combined_dist.num_docs_for_word_dist)
+          val score = score_cell(word_dist, cell)
+          buffer += ((cell, score))
+        }
+        buffer
+      } else {
+        /* The new way of doing things */
+        val cells = cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
+        cells.par.map(c => (c, score_cell(word_dist, c))).toBuffer
       }
-
-      val score = score_cell(word_dist, cell)
-      cell_buf += ((cell, score))
-    }
-    */
-
-    /* The new way of doing things */
-    val cells = cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
-    val cell_buf = cells.par.map(c => (c, score_cell(word_dist, c))).toBuffer
 
     /* SCALABUG:
        If written simply as 'cell_buf sortWith (_._2 < _._2)',
@@ -248,7 +250,7 @@ abstract class MinMaxScoreStrategy[
         cell_buf sortWith (_._2 > _._2)
     /* If using the new way, this code applies for debugging (old way has
        the debugging code embedded into it). */
-    if (debug("lots")) {
+    if (!old && debug("lots")) {
       for ((cell, score) <- retval)
         errprint("Nonempty cell at indices %s = location %s, num_documents = %s, score = %s",
           cell.describe_indices(), cell.describe_location(),
