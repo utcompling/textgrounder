@@ -30,11 +30,11 @@ import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.printutil.{errprint, warning}
  
-import opennlp.textgrounder.gridlocate._
-import opennlp.textgrounder.worddist._
+import opennlp.textgrounder.gridlocate.DistDocument
+import opennlp.textgrounder.gridlocate.GenericTypes._
 
+import opennlp.textgrounder.worddist._
 import WordDist.memoizer._
-import GenericTypes._
 
 class KMLParameters {
   // Minimum and maximum colors
