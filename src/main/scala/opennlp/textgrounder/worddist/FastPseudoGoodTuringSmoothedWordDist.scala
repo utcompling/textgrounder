@@ -20,7 +20,7 @@
 //////// Copyright (c) 2010, 2011 Ben Wing.
 ////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.worddist
 
 import scala.collection.mutable
 import math.{log, sqrt}

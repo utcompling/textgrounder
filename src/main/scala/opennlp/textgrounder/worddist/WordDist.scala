@@ -20,7 +20,7 @@
 //////// Copyright (c) 2010, 2011 Ben Wing.
 ////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.worddist
 
 import math._
 import collection.mutable
@@ -30,10 +30,12 @@ import com.codahale.trove.{mutable => trovescala}
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.printutil.{errprint, warning}
+import opennlp.textgrounder.util.Serializer
 
-import GridLocateDriver.Debug._
+import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
+import opennlp.textgrounder.gridlocate.GenericTypes._
+
 import WordDist.memoizer._
-import GenericTypes._
 
 // val use_sorted_list = false
 

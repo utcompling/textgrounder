@@ -22,8 +22,8 @@ import collection.mutable
 
 import java.io.{InputStream, PrintStream}
 
-import opennlp.textgrounder.geolocate.IdentityMemoizer._
-import opennlp.textgrounder.geolocate.DistDocument
+import opennlp.textgrounder.worddist.IdentityMemoizer._
+import opennlp.textgrounder.gridlocate.DistDocument
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil.DynamicArray

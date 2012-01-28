@@ -20,7 +20,7 @@
 //////// Copyright (c) 2010, 2011 Ben Wing.
 ////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.gridlocate
 
 import collection.mutable
 import util.matching.Regex
@@ -36,6 +36,8 @@ import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.Serializer
 import opennlp.textgrounder.util.textutil.capfirst
+
+import opennlp.textgrounder.worddist._
 
 import GridLocateDriver.Debug._
 
