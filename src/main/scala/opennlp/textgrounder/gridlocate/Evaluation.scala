@@ -33,8 +33,6 @@ import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.{curtimehuman, output_resource_usage}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
-import opennlp.textgrounder.worddist._
-
 import GridLocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////

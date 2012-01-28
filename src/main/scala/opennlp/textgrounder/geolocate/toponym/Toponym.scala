@@ -34,8 +34,8 @@ import opennlp.textgrounder.gridlocate._
 import opennlp.textgrounder.geolocate._
 import GridLocateDriver.Debug._
 
-import opennlp.textgrounder.worddist._
-import WordDist.memoizer._
+import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
+import opennlp.textgrounder.worddist.WordDist.memoizer._
 
 /* FIXME: Eliminate this. */
 import GeolocateToponymApp.Params

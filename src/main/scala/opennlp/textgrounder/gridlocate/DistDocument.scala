@@ -37,7 +37,7 @@ import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.Serializer
 import opennlp.textgrounder.util.textutil.capfirst
 
-import opennlp.textgrounder.worddist._
+import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
 
 import GridLocateDriver.Debug._
 
