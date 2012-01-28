@@ -35,8 +35,11 @@ import opennlp.textgrounder.util.ioutil.{FileHandler, LocalFileHandler}
 import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.errprint
 
-import WordDist.memoizer._
+import opennlp.textgrounder.gridlocate._
 import GridLocateDriver.Debug._
+
+import opennlp.textgrounder.worddist._
+import WordDist.memoizer._
 
 /*
 

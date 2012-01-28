@@ -30,11 +30,15 @@ import opennlp.textgrounder.util.ioutil.{FileHandler, Schema}
 import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil.{errout, errprint, warning}
 
+import opennlp.textgrounder.gridlocate._
 import opennlp.textgrounder.geolocate._
 import GridLocateDriver.Debug._
+
+import opennlp.textgrounder.worddist._
+import WordDist.memoizer._
+
 /* FIXME: Eliminate this. */
 import GeolocateToponymApp.Params
-import WordDist.memoizer._
 
 // A class holding the boundary of a geographic object.  Currently this is
 // just a bounding box, but eventually may be expanded to including a

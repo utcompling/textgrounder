@@ -36,6 +36,8 @@ import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.mathutil.{mean, median}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
+import opennlp.textgrounder.gridlocate._
+
 /* Basic idea for hooking up Geolocate with Hadoop.  Hadoop works in terms
    of key-value pairs, as follows:
 

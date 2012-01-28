@@ -20,13 +20,13 @@
 //////// Copyright (c) 2010, 2011 Ben Wing.
 ////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.worddist
 
 import scala.collection.mutable
 import math.{log, sqrt}
 import opennlp.textgrounder.util.collectionutil.DynamicArray
-import GridLocateDriver.Debug._
-import opennlp.textgrounder.geolocate.WordDist.memoizer.Word
+
+import WordDist.memoizer.Word
 
 /**
   Fast implementation of KL-divergence and cosine-similarity algorithms
@@ -41,7 +41,7 @@ import opennlp.textgrounder.geolocate.WordDist.memoizer.Word
   the moment in case we need to convert it to Java, C++, etc.
  */
 
-object FastDirichletSmoothedWordDist {
+object FastUnigramSmoothedWordDist {
   /*
    In normal operation of fast_kl_divergence(), we are passed the same
    'self' distribution repeatedly with different 'other' distributions,
@@ -92,7 +92,7 @@ object FastDirichletSmoothedWordDist {
   def fast_dirichlet_smoothed_kl_divergence_(self: DirichletSmoothedWordDist, other: DirichletSmoothedWordDist,
     partial: Boolean = false): Double = {
     
-    val smoothingParameter = 0.999
+    val smoothingParameter = 0.999 
     
 //    val pcounts = self.counts
     val qcounts = other.counts

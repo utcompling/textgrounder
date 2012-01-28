@@ -20,7 +20,7 @@
 //////// Copyright (c) 2010, 2011 Ben Wing.
 ////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.worddist
 
 import math._
 import collection.mutable
@@ -32,9 +32,11 @@ import opennlp.textgrounder.util.collectionutil.DynamicArray
 import opennlp.textgrounder.util.ioutil.{FileHandler, FileFormatException}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
-import GridLocateDriver.Debug._
+import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
+import opennlp.textgrounder.gridlocate.GenericTypes._
+import opennlp.textgrounder.gridlocate.DistDocument
+
 import WordDist.memoizer._
-import GenericTypes._
 
 /**
  * Unigram word distribution with a table listing counts for each word,

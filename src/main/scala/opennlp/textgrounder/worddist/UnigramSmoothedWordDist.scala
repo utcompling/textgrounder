@@ -13,44 +13,21 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-
-////////
-//////// PseudoGoodTuringSmoothedWordDist.scala
-////////
-//////// Copyright (c) 2010, 2011 Ben Wing.
-////////
-
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.worddist
 
 import math._
 import collection.mutable
 import util.control.Breaks._
-
 import java.io._
-
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.printutil.errprint
 
-import GridLocateDriver.Debug._
-import WordDist.memoizer._
-import GenericTypes._
+import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
+import opennlp.textgrounder.gridlocate.GenericTypes._
 
-/**
- * This class implements a simple version of Good-Turing smoothing where we
- * assign probability mass to unseen words equal to the probability mass of
- * all words seen once, and rescale the remaining probabilities accordingly.
- * ("Proper" Good-Turing is more general and adjusts the probabilities of
- * words seen N times according to the number of words seen N-1 times.
- * FIXME: I haven't thought carefully enough to make sure that this
- * simplified version actually makes theoretical sense, although I assume it
- * does because it can be seen as a better version of add-one or
- * add-some-value smoothing, where instead of just adding some arbitrary
- * value to unseen words, we determine the amount to add in a way that makes
- * theoretical sense (and in particular ensures that we don't assign 99%
- * of the mass or whatever to unseen words, as can happen to add-one smoothing
- * especially for bigrams or trigrams).
- */ 
-class PseudoGoodTuringSmoothedWordDistFactory extends
+import WordDist.memoizer._
+
+class UnigramSmoothedWordDistFactory extends
     UnigramWordDistFactory {
   // Total number of types seen once
   var total_num_types_seen_once = 0
@@ -87,54 +64,30 @@ class PseudoGoodTuringSmoothedWordDistFactory extends
     //// FIXME: A simple calculation reveals that in the scheme where we use
     //// globally_unseen_word_prob, total_num_types_seen_once cancels out and
     //// we never actually have to compute it.
-    total_num_types_seen_once = overall_word_probs.values count (_ == 1.0)
-    globally_unseen_word_prob =
-      total_num_types_seen_once.toDouble/total_num_word_tokens
     for ((word, count) <- overall_word_probs)
-      overall_word_probs(word) = (
-        count.toDouble/total_num_word_tokens*(1.0 - globally_unseen_word_prob))
-    // A very rough estimate, perhaps totally wrong
-    total_num_unseen_word_types =
-      total_num_types_seen_once max (total_num_word_types/20)
-    if (debug("tons"))
-      errprint("Total num types = %s, total num tokens = %s, total num_seen_once = %s, globally unseen word prob = %s, total mass = %s",
-               total_num_word_types, total_num_word_tokens,
-               total_num_types_seen_once, globally_unseen_word_prob,
-               globally_unseen_word_prob + (overall_word_probs.values sum))
+      overall_word_probs(word) = (count.toDouble/total_num_word_tokens)
   }
 
   def create_word_dist() =
-    new PseudoGoodTuringSmoothedWordDist(this, Array[String](), Array[Int](), 0,
+    new UnigramSmoothedWordDist(this, Array[String](), Array[Int](), 0,
       note_globally = false)
 
   def set_unigram_word_dist(doc: GenericDistDocument, keys: Array[String],
       values: Array[Int], num_words: Int, is_training_set: Boolean) {
-    doc.dist = new PseudoGoodTuringSmoothedWordDist(this, keys, values,
+    doc.dist = new UnigramSmoothedWordDist(this, keys, values,
       num_words, note_globally = is_training_set)
   }
 }
 
-/**
- * Create a pseudo-Good-Turing smoothed word distribution given a table
- * listing counts for each word, initialized from the given key/value pairs.
- *
- * @param key Array holding keys, possibly over-sized, so that the internal
- *   arrays from DynamicArray objects can be used
- * @param values Array holding values corresponding to each key, possibly
- *   oversize
- * @param num_words Number of actual key/value pairs to be stored 
- * @param note_globally If true, add the word counts to the global word count
- *   statistics.
- */
-
-class PseudoGoodTuringSmoothedWordDist(
-  val factory: PseudoGoodTuringSmoothedWordDistFactory,
-  keys: Array[String],
-  values: Array[Int],
-  num_words: Int,
+class UnigramSmoothedWordDist(
+  val factory: UnigramSmoothedWordDistFactory, 
+  keys: Array[String], 
+  values: Array[Int], 
+  num_words: Int, 
   note_globally: Boolean
-) extends UnigramWordDist(keys, values, num_words) {
-  type TThis = PseudoGoodTuringSmoothedWordDist
+) extends UnigramWordDist(keys, values, num_words)
+ {
+  type TThis = UnigramSmoothedWordDist
 
   /** Total probability mass to be assigned to all words not
       seen in the document, estimated (motivated by Good-Turing
@@ -181,14 +134,20 @@ class PseudoGoodTuringSmoothedWordDist(
 
   def innerToString = ", %.2f unseen mass" format unseen_mass
 
+  
   protected def imp_add_word_distribution_partial(xworddist: WordDist, partial: Double){
+    val worddist = xworddist.asInstanceOf[UnigramWordDist]
+    for ((word, count) <- worddist.counts)
+      counts(word) += count*partial
+    num_word_tokens += worddist.num_word_tokens*partial
   }
+  
+   /**
+    * Here we compute the value of `overall_unseen_mass`, which depends
+    * on the global `overall_word_probs` computed from all of the
+    * distributions.
+    */
 
- /**
-   * Here we compute the value of `overall_unseen_mass`, which depends
-   * on the global `overall_word_probs` computed from all of the
-   * distributions.
-   */
   protected def imp_finish_after_global() {
     // Make sure that overall_word_probs has been computed properly.
     assert(factory.owp_adjusted)
@@ -209,11 +168,7 @@ class PseudoGoodTuringSmoothedWordDist(
         0.5 min ((1.0 max num_types_seen_once)/num_word_tokens)
       else 0.5
     overall_unseen_mass = 1.0 - (
-      // NOTE NOTE NOTE! The toSeq needs to be added for some reason; if not,
-      // the computation yields different values, which cause a huge loss of
-      // accuracy (on the order of 10-15%).  I have no idea why; I suspect a
-      // Scala bug. (SCALABUG)
-      (for (ind <- counts.keys.toSeq)
+      (for (ind <- counts.keys)
         yield factory.overall_word_probs(ind)) sum)
     //if (use_sorted_list)
     //  counts = new SortedList(counts)
@@ -228,21 +183,18 @@ class PseudoGoodTuringSmoothedWordDist(
   }
 
   def fast_kl_divergence(other: WordDist, partial: Boolean = false) = {
-    FastPseudoGoodTuringSmoothedWordDist.fast_kl_divergence(
-      this.asInstanceOf[TThis], other.asInstanceOf[TThis],
-      partial = partial)
+    FastUnigramSmoothedWordDist.fast_kl_divergence(
+      this.asInstanceOf[UnigramSmoothedWordDist], other.asInstanceOf[UnigramSmoothedWordDist], partial = partial)
   }
 
-  def cosine_similarity(other: WordDist, partial: Boolean = false,
+  def cosine_similarity(other: WordDist, partial: Boolean = false, 
       smoothed: Boolean = false) = {
     if (smoothed)
-      FastPseudoGoodTuringSmoothedWordDist.fast_smoothed_cosine_similarity(
-        this.asInstanceOf[TThis], other.asInstanceOf[TThis],
-        partial = partial)
+      FastUnigramSmoothedWordDist.fast_smoothed_cosine_similarity(
+        this.asInstanceOf[UnigramSmoothedWordDist], other.asInstanceOf[UnigramSmoothedWordDist], partial = partial)
     else
-      FastPseudoGoodTuringSmoothedWordDist.fast_cosine_similarity(
-        this.asInstanceOf[TThis], other.asInstanceOf[TThis],
-        partial = partial)
+      FastUnigramSmoothedWordDist.fast_cosine_similarity(
+        this.asInstanceOf[UnigramSmoothedWordDist], other.asInstanceOf[UnigramSmoothedWordDist], partial = partial)
   }
 
   def kl_divergence_34(other: UnigramWordDist) = {      
@@ -251,15 +203,14 @@ class PseudoGoodTuringSmoothedWordDist(
       overall_probs_diff_words += factory.overall_word_probs(word)
     }
 
-    inner_kl_divergence_34(other.asInstanceOf[TThis],
-      overall_probs_diff_words)
+    inner_kl_divergence_34(other.asInstanceOf[UnigramSmoothedWordDist], overall_probs_diff_words)
   }
-      
+
   /**
    * Actual implementation of steps 3 and 4 of KL-divergence computation, given
    * a value that we may want to compute as part of step 2.
    */
-  def inner_kl_divergence_34(other: TThis,
+  def inner_kl_divergence_34(other: UnigramSmoothedWordDist, 
       overall_probs_diff_words: Double) = {
     var kldiv = 0.0
 
@@ -343,4 +294,3 @@ class PseudoGoodTuringSmoothedWordDist(
     retval
   }
 }
-

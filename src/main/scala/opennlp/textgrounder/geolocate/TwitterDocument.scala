@@ -24,7 +24,7 @@ package opennlp.textgrounder.geolocate
 
 import opennlp.textgrounder.util.ioutil.Schema
 
-import WordDist.memoizer._
+import opennlp.textgrounder.worddist.WordDist.memoizer._
 
 class TwitterTweetDocument(
   schema: Schema,

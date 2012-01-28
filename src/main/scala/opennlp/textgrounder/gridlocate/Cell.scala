@@ -20,7 +20,7 @@
 //////// Copyright (c) 2010, 2011 Ben Wing.
 ////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.gridlocate
 
 import collection.mutable
 
@@ -29,6 +29,7 @@ import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util._
 import opennlp.textgrounder.util.experiment._
 
+import opennlp.textgrounder.worddist._
 import WordDist.memoizer._
 /* FIXME: Eliminate this. */
 import GridLocateDriver.Params

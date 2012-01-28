@@ -35,7 +35,8 @@ import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.textutil.split_text_into_words
 
-import GridLocateDriver.Debug._
+import opennlp.textgrounder.gridlocate._
+import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
 //                 General statistics on evaluation results                //

@@ -26,7 +26,8 @@ import math._
 
 import opennlp.textgrounder.util.distances._
 
-import WordDist.memoizer._
+import opennlp.textgrounder.gridlocate._
+import opennlp.textgrounder.worddist.WordDist.memoizer._
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cell distributions                          //

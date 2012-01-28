@@ -20,7 +20,7 @@
 //////// Copyright (c) 2010, 2011 Ben Wing.
 ////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.gridlocate
 
 import util.control.Breaks._
 import collection.mutable
@@ -32,6 +32,8 @@ import opennlp.textgrounder.util.ioutil.{FileHandler, FileProcessor}
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.{curtimehuman, output_resource_usage}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
+
+import opennlp.textgrounder.worddist._
 
 import GridLocateDriver.Debug._
 
