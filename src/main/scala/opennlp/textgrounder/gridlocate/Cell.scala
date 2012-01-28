@@ -29,8 +29,8 @@ import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util._
 import opennlp.textgrounder.util.experiment._
 
-import opennlp.textgrounder.worddist._
-import WordDist.memoizer._
+import opennlp.textgrounder.worddist.{WordDist,WordDistFactory,UnigramWordDist}
+import opennlp.textgrounder.worddist.WordDist.memoizer._
 /* FIXME: Eliminate this. */
 import GridLocateDriver.Params
 

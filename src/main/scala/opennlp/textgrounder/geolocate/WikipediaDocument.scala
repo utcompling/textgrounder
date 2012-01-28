@@ -32,8 +32,7 @@ import opennlp.textgrounder.util.textutil.capfirst
 import opennlp.textgrounder.gridlocate._
 import GridLocateDriver.Debug._
 
-import opennlp.textgrounder.worddist._
-import WordDist.memoizer._
+import opennlp.textgrounder.worddist.WordDist.memoizer._
 
 import DistDocumentConverters._
 

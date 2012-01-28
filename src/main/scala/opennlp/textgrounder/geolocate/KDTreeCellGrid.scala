@@ -32,7 +32,7 @@ import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
 import opennlp.textgrounder.gridlocate._
-import opennlp.textgrounder.worddist._
+import opennlp.textgrounder.worddist.UnigramWordDist
 
 class KdTreeCell(
   cellgrid: KdTreeCellGrid,
