@@ -28,7 +28,7 @@ import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.printutil.warning
 
-import opennlp.textgrounder.gridlocate._
+import opennlp.textgrounder.gridlocate.{DistDocument,DistDocumentTable,CellGrid}
 import opennlp.textgrounder.gridlocate.DistDocumentConverters._
 
 import opennlp.textgrounder.worddist.WordDistFactory

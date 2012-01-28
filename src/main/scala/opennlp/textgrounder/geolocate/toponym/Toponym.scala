@@ -30,9 +30,9 @@ import opennlp.textgrounder.util.ioutil.{FileHandler, Schema}
 import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil.{errout, errprint, warning}
 
-import opennlp.textgrounder.gridlocate._
+import opennlp.textgrounder.gridlocate.{CombinedWordDist,EvalStats,TestFileEvaluator,DocumentIteratingEvaluator}
+import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 import opennlp.textgrounder.geolocate._
-import GridLocateDriver.Debug._
 
 import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
 import opennlp.textgrounder.worddist.WordDist.memoizer._

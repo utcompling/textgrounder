@@ -31,7 +31,6 @@ import opennlp.textgrounder.util.distances.SphereCoord
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
-import opennlp.textgrounder.gridlocate._
 import opennlp.textgrounder.worddist.UnigramWordDist
 
 class KdTreeCell(

@@ -30,7 +30,6 @@ import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.printutil.{errout, errprint}
 import opennlp.textgrounder.util.experiment._
 
-import opennlp.textgrounder.gridlocate._
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 
 /////////////////////////////////////////////////////////////////////////////
