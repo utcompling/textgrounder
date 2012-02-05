@@ -38,7 +38,7 @@ import opennlp.textgrounder.util.mathutil.mean
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.printutil.warning
 
-import opennlp.textgrounder.geolocate.DistDocument
+import opennlp.textgrounder.gridlocate.DistDocument
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                              //
