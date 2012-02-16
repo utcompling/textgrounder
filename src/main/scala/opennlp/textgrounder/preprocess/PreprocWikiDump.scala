@@ -5,9 +5,9 @@ import org.apache.tools.bzip2._
 
 object PreprocWikiDump {
 
-  val MAX_COUNT = 100000
+  val MAX_COUNT = 200000
   val NEW_PAGE = "    <title>"
-  val coordRE = """\|\s*latG|\|\s*latitude|\{\{\s*Coord?\s|\|\s*Breitengrad|\{\{\s*Coordinate\s""".r
+  val coordRE = """\|\s*latd|\|\s*lat_deg|\|\s*latG|\|\s*latitude|\{\{\s*Coord?|\|\s*Breitengrad|\{\{\s*Coordinate\s""".r
 
   def main(args: Array[String]) {
     val fileInputStream = new FileInputStream(new File(args(0)))
@@ -41,7 +41,7 @@ object PreprocWikiDump {
       }
       
       line = in.readLine
-      //lineCount += 1
+      lineCount += 1
     }
 
     println("Geotagged page count: "+geotaggedPageCount)
