@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+# -*- coding: utf-8 -*-
 #######
 ####### processwiki.py
 #######
@@ -324,7 +324,7 @@ split_output_files = None
 split_suffixes = None
 
 # Current file to output to
-cur_output_file = sys.stdout
+cur_output_file = sys.stderr
 
 # Name of current split (training, dev, test)
 cur_split_name = ''
@@ -379,17 +379,18 @@ def set_next_split_file():
 ### internal links.  Then, the parser can be called recursively if
 ### necessary to handle such expressions.
 
+left_ref_re = r'<ref.*?>'
 # Return braces and brackets separately from other text.
-simple_balanced_re = re.compile(r'<ref>|</ref>|[^{}\[\]<]+|[{}\[\]]|<')
+simple_balanced_re = re.compile(left_ref_re + r'|</ref>|[^{}\[\]<]+|[{}\[\]]|<')
 #simple_balanced_re = re.compile(r'[^{}\[\]]+|[{}\[\]]')
 
 # Return braces, brackets and pipe symbols separately from other text.
-balanced_pipe_re = re.compile(r'<ref>|</ref>|[^{}\[\]|<]+|[{}\[\]|]|<')
+balanced_pipe_re = re.compile(left_ref_re + r'|</ref>|[^{}\[\]|<]+|[{}\[\]|]|<')
 #balanced_pipe_re = re.compile(r'[^{}\[\]|]+|[{}\[\]|]')
 
 # Return braces, brackets, and newlines separately from other text.
 # Useful for handling Wikipedia tables, denoted with {| ... |}.
-balanced_table_re = re.compile(r'<ref>|</ref>|[^{}\[\]\n<]+|[{}\[\]\n]|<')
+balanced_table_re = re.compile(left_ref_re + r'|</ref>|[^{}\[\]\n<]+|[{}\[\]\n]|<')
 #balanced_table_re = re.compile(r'[^{}\[\]\n]+|[{}\[\]\n]')
 
 left_match_chars = {'{':'}', '[':']', '<ref>':'</ref>'}
@@ -410,6 +411,13 @@ top-level separators, such as vertical bar.'''
   for string in textre.findall(text):
     if debug['debugparens']:
       errprint("pbt: Saw %s, parenlevel=%s" % (string, parenlevel))
+    if string.startswith('<ref'):
+      #errprint("Saw reference: %s" % string)
+      if not string.endswith('>'):
+        wikiwarning("Strange parsing, saw odd ref tag: %s" % string)
+      if string.endswith('/>'):
+        continue
+      string = '<ref>'
     if string in right_match_chars:
       if parenlevel == 0:
         wikiwarning("Nesting level would drop below 0; string = %s, prevstring = %s" % (string, prevstring.replace('\n','\\n')))
@@ -422,14 +430,20 @@ top-level separators, such as vertical bar.'''
         the_left = leftmatches[-should_pop_off]
         if should_left != the_left:
           if should_left == '<ref>':
-            while (len(leftmatches) - should_pop_off >= 0 and
-                should_left != leftmatches[len(leftmatches)-should_pop_off]):
-              should_pop_off += 1
-            if should_pop_off >= 0:
-              wikiwarning("%s non-matching brackets inside of <ref>...</ref>: %s ; prevstring = %s" % (should_pop_off - 1, ' '.join(left_match_chars[x] for x in leftmatches[len(leftmatches)-should_pop_off:]), prevstring.replace('\n','\\n')))
-            else:
+            wikiwarning("Saw unmatched </ref>")
+            in_ref = any([match for match in leftmatches if match == '<ref>'])
+            if not in_ref:
               wikiwarning("Stray </ref>??; prevstring = %s" % prevstring.replace('\n','\\n'))
               should_pop_off = 0
+            else:
+              while (len(leftmatches) - should_pop_off >= 0 and
+                  should_left != leftmatches[len(leftmatches)-should_pop_off]):
+                should_pop_off += 1
+              if should_pop_off >= 0:
+                wikiwarning("%s non-matching brackets inside of <ref>...</ref>: %s ; prevstring = %s" % (should_pop_off - 1, ' '.join(left_match_chars[x] for x in leftmatches[len(leftmatches)-should_pop_off:]), prevstring.replace('\n','\\n')))
+              else:
+                wikiwarning("Inside of <ref> but still interpreted as stray </ref>??; prevstring = %s" % prevstring.replace('\n','\\n'))
+                should_pop_off = 0
           elif the_left == '<ref>':
             wikiwarning("Stray %s inside of <ref>...</ref>; prevstring = %s" % (string, prevstring.replace('\n','\\n')))
             should_pop_off = 0
@@ -461,8 +475,12 @@ top-level separators, such as vertical bar.'''
     prevstring = string
   leftover = ''.join(strbuf)
   if leftover:
-    splitprint("Left with %s characters of text with unmatched left paren, brace or bracket: [%s]" % (len(leftover), leftover))
-    splitprint("Reparsing:")
+    wikiwarning("Unmatched left paren, brace or bracket: %s characters remaining" % len(leftover))
+    maxleft_display = 60
+    wikiwarning("Remaining text: [%s]" % (
+      leftover if len(leftover) <= maxleft_display
+      else '%s...' % leftover[0:maxleft_display]))
+    wikiwarning("Reparsing:")
     for string in parse_balanced_text(textre, leftover, throw_away = parenlevel):
       yield string
 
@@ -503,7 +521,7 @@ lowercased and have the whitespace stripped from them).'''
         value = value.strip()
       hash[key] = value
     else:
-      #uniprint("Unable to process template argument %s" % arg)
+      #errprint("Unable to process template argument %s" % arg)
       nonparam_args.append(arg) 
   return (hash, nonparam_args)
 
@@ -560,10 +578,10 @@ class SourceTextHandler(object):
     # filtered out.  Note that when we process macros and extract the relevant
     # text from them, we need to recursively process that text.
   
-    if debug['lots']: uniprint("Entering process_source_text: [%s]" % text)
+    if debug['lots']: errprint("Entering process_source_text: [%s]" % text)
   
     for foo in parse_simple_balanced_text(text):
-      if debug['lots']: uniprint("parse_simple_balanced_text yields: [%s]" % foo)
+      if debug['lots']: errprint("parse_simple_balanced_text yields: [%s]" % foo)
   
       if foo.startswith('[['):
         gen = self.process_internal_link(foo)
@@ -577,14 +595,14 @@ class SourceTextHandler(object):
       elif foo.startswith('['):
         gen = self.process_external_link(foo)
   
-      elif foo.startswith('<ref>'):
+      elif foo.startswith('<ref'):
         gen = self.process_reference(foo)
   
       else:
         gen = self.process_text_chunk(foo)
   
       for chunk in gen:
-        if debug['lots']: uniprint("process_source_text yields: [%s]" % chunk)
+        if debug['lots']: errprint("process_source_text yields: [%s]" % chunk)
         yield chunk
   
 # An article source-text handler that recursively processes text inside of
@@ -621,6 +639,8 @@ all_templates = intdict()
 def safe_float(x):
   '''Convert a string to floating point, but don't crash on errors;
 instead, output a warning.'''
+  if x is None:
+    return 0.
   try:
     return float(x)
   except:
@@ -635,7 +655,7 @@ values into a decimal +/- latitude or longitude.'''
   return nsew*(safe_float(d) + safe_float(m)/60. + safe_float(s)/3600.)
 
 convert_ns = {'N':1, 'S':-1}
-convert_ew = {'E':1, 'W':-1}
+convert_ew = {'E':1, 'W':-1, 'L':1, 'O':-1}
 
 # Get the default value for the hemisphere, as a multiplier +1 or -1.
 # We need to handle Australian places specially, as S latitude, E longitude.
@@ -650,23 +670,28 @@ def get_hemisphere(temptype, is_lat):
     else: return -1
   else: return 1
 
-# Utility function for get_latd_coord() and get_lat_deg_coord().
+def getarg(argsearch, args, default):
+  for x in argsearch:
+    val = args.get(x, None)
+    if val is not None:
+      return val
+  return default
+
+# Utility function for get_latd_coord().
 # Extract out either latitude or longitude from a template of type
-# TEMPTYPE with arguments ARGS.  LAT is a string, e.g. 'lat' or 'long'.
-# DMS_SUFF is a three-argument list, e.g. ['d', 'm', 's'] if arguments
-# like 'latd' or 'longm' are expected.  OFFPARAM is the parameter
-# indicating the offset to the N, S, E or W.  IS_LAT is True if a latitude
-# is being extracted, False for longitude.
-def get_lat_long_1(temptype, args, lat, dms_suff, offparam, is_lat):
-  dsuff = dms_suff[0]
-  msuff = dms_suff[1]
-  ssuff = dms_suff[2]
-  if '%s%s' % (lat, dsuff) not in args:
-    wikiwarning("No %s%s seen for template type %s" % (lat, dsuff, temptype))
-  d = args.get('%s%s' % (lat, dsuff), 0)
-  m = args.get('%s%s' % (lat, msuff), 0)
-  s = args.get('%s%s' % (lat, ssuff), 0)
-  if offparam not in args:
+# TEMPTYPE with arguments ARGS.  LATD/LATM/LATS are lists or tuples of
+# parameters to look up to retrieve the appropriate value. OFFPARAM is the
+# list of possible parameters indicating the offset to the N, S, E or W.
+# IS_LAT is True if a latitude is being extracted, False for longitude.
+def get_lat_long_1(temptype, args, latd, latm, lats, offparam, is_lat):
+  d = getarg(latd, args, None)
+  if d is None:
+    wikiwarning("No %s seen for template type %s" % (latd, temptype))
+    d = 0.
+  m = getarg(latm, args, 0.)
+  s = getarg(lats, args, 0.)
+  hemis = getarg(offparam, args, None)
+  if hemis is None:
     wikiwarning("No %s seen for template type %s" % (offparam, temptype))
     hemismult = get_hemisphere(temptype, is_lat)
   else:
@@ -674,30 +699,29 @@ def get_lat_long_1(temptype, args, lat, dms_suff, offparam, is_lat):
       convert = convert_ns
     else:
       convert = convert_ew
-    hemismult = convert.get(args[offparam], 0)
+    hemismult = convert.get(hemis, 0)
     if hemismult == 0:
-      wikiwarning("%s for template type %s has bad value %s" %
-               (offparam, temptype, args[offparam]))
+      wikiwarning("%s for template type %s has bad value: [%s]" %
+               (offparam, temptype, hemis))
   return convert_dms(hemismult, d, m, s)
 
 def get_latd_coord(temptype, args):
   '''Given a template of type TEMPTYPE with arguments ARGS, assumed to have
-a latitude/longitude specification in it using latd and longd, extract out
-and return a tuple of decimal (latitude, longitude) values.'''
-  lat = get_lat_long_1(temptype, args, 'lat', ['d', 'm', 's'],
-                       'latns', is_lat=True)
-  long = get_lat_long_1(temptype, args, 'long', ['d', 'm', 's'],
-                        'longew', is_lat=False)
-  return (lat, long)
-
-def get_lat_deg_coord(temptype, args):
-  '''Given a template of type TEMPTYPE with arguments ARGS, assumed to have
-a latitude/longitude specification in it using lat_deg and lon_deg, extract out
-and return a tuple of decimal (latitude, longitude) values.'''
-  lat = get_lat_long_1(temptype, args, 'lat', ['_deg', '_min', '_sec'],
-                       'lat_dir', is_lat=True)
-  long = get_lat_long_1(temptype, args, 'lon', ['_deg', '_min', '_sec'],
-                        'lon_dir', is_lat=False)
+a latitude/longitude specification in it using latd/lat_deg/etc. and
+longd/lon_deg/etc., extract out and return a tuple of decimal
+(latitude, longitude) values.'''
+  lat = get_lat_long_1(temptype, args,
+      ('latd', 'latg', 'lat_deg'),
+      ('latm', 'lat_min'),
+      ('lats', 'lat_sec'),
+      ('latns', 'latp', 'lap', 'lat_dir'),
+      is_lat=True)
+  long = get_lat_long_1(temptype, args,
+      ('longd', 'lond', 'longg', 'long', 'lon_deg'),
+      ('longm', 'lonm', 'lon_min'),
+      ('longs', 'lons', 'lon_sec'),
+      ('longew', 'longp', 'lonp', 'lon_dir'),
+      is_lat=False)
   return (lat, long)
 
 def get_latitude_coord(temptype, args):
@@ -761,7 +785,7 @@ region: the "political region for terrestrial coordinates", i.e. the country
         country plus next-level subdivision (state, province, etc.)
 globe: which planet or satellite the coordinate is on (esp. if not the Earth)
 '''
-  if debug['some']: uniprint("Passed in args %s" % args)
+  if debug['some']: errprint("Passed in args %s" % args)
   # Filter out optional "template arguments", add a bunch of blank arguments
   # at the end to make sure we don't get out-of-bounds errors in
   # get_coord_1()
@@ -785,7 +809,7 @@ globe: which planet or satellite the coordinate is on (esp. if not the Earth)
 def get_coord_params(temptype, args):
   '''Parse a Coord template and return a list of tuples of coordinate
 parameters (see comment under get_coord).'''
-  if debug['some']: uniprint("Passed in args %s" % args)
+  if debug['some']: errprint("Passed in args %s" % args)
   # Filter out optional "template arguments"
   filtargs = [x for x in args if '=' not in x]
   if filtargs and ':' in filtargs[-1]:
@@ -793,6 +817,38 @@ parameters (see comment under get_coord).'''
     return coord_params
   else:
     return []
+
+def get_geocoordenadas_coord(temptype, args):
+  '''Parse a geocoordenadas template (common in the Portuguese Wikipedia) and
+return a tuple (lat,long) for latitude and longitude.  TEMPTYPE is the
+template name.  ARGS is the raw arguments for the template.  Typical example
+is:
+
+{{geocoordenadas|39_15_34_N_24_57_9_E_type:waterbody|39° 15′ 34&quot; N, 24° 57′ 9&quot; O}}
+'''
+  if debug['some']: errprint("Passed in args %s" % args)
+  # Filter out optional "template arguments", add a bunch of blank arguments
+  # at the end to make sure we don't get out-of-bounds errors in
+  # get_coord_1()
+  # FIXME: Returning 0/0 is bad, since this might be a legitimate coordinate
+  if len(args) == 0:
+    wikiwarning("No arguments to template 'geocoordenadas'")
+    return (0., 0.)
+  else:
+    # Yes, every one of the following problems occurs: Extra spaces; commas
+    # used instead of periods; lowercase nsew; use of O (Oeste) for "West",
+    # "L" (Leste) for "East"
+    arg = args[0].upper().strip().replace(',','.')
+    m = re.match(r'([0-9.]+)(?:_([0-9.]+))?(?:_([0-9.]+))?_([NS])_([0-9.]+)(?:_([0-9.]+))?(?:_([0-9.]+))?_([EWOL])(?:_.*)?$', arg)
+    if not m:
+      wikiwarning("Unrecognized argument %s to template 'geocoordenadas'" %
+          args[0])
+      return (0., 0.)
+    else:
+      (latd, latm, lats, latns, longd, longm, longs, longew) = \
+          m.groups()
+      return (convert_dms(convert_ns[latns], latd, latm, lats),
+              convert_dms(convert_ew[longew], longd, longm, longs))
 
 class ExtractCoordinatesFromSource(RecursiveSourceTextHandler):
   '''Given the article text TEXT of an article (in general, after first-
@@ -811,33 +867,35 @@ applied to the text before being sent here.'''
   def process_template(self, text):
     # Look for a Coord, Infobox, etc. template that may have coordinates in it
     lat = long = None
-    if debug['some']: uniprint("Enter process_template: [%s]" % text)
+    if debug['some']: errprint("Enter process_template: [%s]" % text)
     tempargs = get_macro_args(text)
     temptype = tempargs[0].strip()
-    if debug['some']: uniprint("Template type: %s" % temptype)
+    if debug['some']: errprint("Template type: %s" % temptype)
     lowertemp = temptype.lower()
     # Look for a coordinate template
     if lowertemp in ('coord', 'coor d', 'coor dm', 'coor dms',
+                     'coor title d', 'coor title dm', 'coor title dms',
                      'coor dec', 'coorheader') \
         or lowertemp.startswith('geolinks') \
         or lowertemp.startswith('mapit'):
       (lat, long) = get_coord(temptype, tempargs[1:])
+    elif lowertemp == 'geocoordenadas':
+      (lat, long) = get_geocoordenadas_coord(temptype, tempargs[1:])
     else:
       # Look for any other template with a 'latd' or 'latitude' parameter.
       # Usually these will be Infobox-type templates.  Possibly we should only
       # look at templates whose lowercased name begins with "infobox".
       (paramshash, _) = find_template_params(tempargs[1:], True)
-      if 'latd' in paramshash:
+      # 'latg' is Portuguese (g = grau)
+      if ('latd' in paramshash or 'latg' in paramshash or
+          'lat_deg' in paramshash):
         templates_with_coords[lowertemp] += 1
         (lat, long) = get_latd_coord(temptype, paramshash)
-      elif 'lat_deg' in paramshash:
-        templates_with_coords[lowertemp] += 1
-        (lat, long) = get_lat_deg_coord(temptype, paramshash)
       elif 'latitude' in paramshash:
         templates_with_coords[lowertemp] += 1
         (lat, long) = get_latitude_coord(temptype, paramshash)
     if lat or long:
-      if debug['some']: uniprint("Saw coordinate %s,%s in template type %s" %
+      if debug['some']: errprint("Saw coordinate %s,%s in template type %s" %
                 (lat, long, temptype))
       self.coords.append((lowertemp,lat,long))
     # Recursively process the text inside the template in case there are
@@ -1024,7 +1082,7 @@ def yield_internal_link_args(text):
 # joined by spaces.
 def yield_template_args(text):
   # For a template, do something smart depending on the template.
-  if debug['lots']: uniprint("yield_template_args called with: %s" % text)
+  if debug['lots']: errprint("yield_template_args called with: %s" % text)
 
   # OK, this is a hack, but a useful one.  There are lots of templates that
   # look like {{Emancipation Proclamation draft}} or
@@ -1042,7 +1100,7 @@ def yield_template_args(text):
     return
 
   tempargs = get_macro_args(text)
-  if debug['lots']: uniprint("template args: %s" % tempargs)
+  if debug['lots']: errprint("template args: %s" % tempargs)
   temptype = tempargs[0].strip().lower()
 
   if debug['some']:
@@ -1050,8 +1108,8 @@ def yield_template_args(text):
 
   # Extract the parameter and non-parameter arguments.
   (paramhash, nonparam) = find_template_params(tempargs[1:], False)
-  #uniprint("params: %s" % paramhash)
-  #uniprint("nonparam: %s" % nonparam)
+  #errprint("params: %s" % paramhash)
+  #errprint("nonparam: %s" % nonparam)
 
   # For certain known template types, use the values from the interesting
   # parameter args and ignore the others.  For other template types,
@@ -1090,7 +1148,7 @@ def yield_template_args(text):
 # Process a table into separate chunks.  Unlike code for processing
 # internal links, the chunks should have whitespace added where necessary.
 def yield_table_chunks(text):
-  if debug['lots']: uniprint("Entering yield_table_chunks: [%s]" % text)
+  if debug['lots']: errprint("Entering yield_table_chunks: [%s]" % text)
 
   # Given a single line or part of a line, and an indication (ATSTART) of
   # whether we just saw a beginning-of-line separator, split on within-line
@@ -1110,9 +1168,9 @@ def yield_table_chunks(text):
   # Just a wrapper function around process_table_chunk_1() for logging
   # purposes.
   def process_table_chunk(text, atstart):
-    if debug['lots']: uniprint("Entering process_table_chunk: [%s], %s" % (text, atstart))
+    if debug['lots']: errprint("Entering process_table_chunk: [%s], %s" % (text, atstart))
     for chunk in process_table_chunk_1(text, atstart):
-      if debug['lots']: uniprint("process_table_chunk yields: [%s]" % chunk)
+      if debug['lots']: errprint("process_table_chunk yields: [%s]" % chunk)
       yield chunk
 
   # Strip off {| and |}
@@ -1126,7 +1184,7 @@ def yield_table_chunks(text):
   # process_table_chunk(), which will split a line on within-line separators
   # (e.g. || or !!) and strip out directives.
   for arg in parse_balanced_text(balanced_table_re, text):
-    if debug['lots']: uniprint("parse_balanced_text(balanced_table_re) yields: [%s]" % arg)
+    if debug['lots']: errprint("parse_balanced_text(balanced_table_re) yields: [%s]" % arg)
     # If we see a newline, reset the flags and yield the newline.  This way,
     # a whitespace will always be inserted.
     if arg == '\n':
@@ -1152,7 +1210,7 @@ def yield_table_chunks(text):
 # yield the words.  Also ignore words with a colon in the middle, indicating
 # likely URL's and similar directives.
 def split_text_into_words(text):
-  (text, _) = re.subn(r'<ref>', r' ', text)
+  (text, _) = re.subn(left_ref_re, r' ', text)
   if Opts.no_tokenize:
     # No tokenization requested.  Just split on whitespace.  But still try
     # to eliminate URL's.  Rather than just look for :, we look for :/, which
@@ -1215,7 +1273,7 @@ class ExtractUsefulText(SourceTextHandler):
   def process_table(self, text):
     '''Process a table into chunks of raw text and yield them.'''
     for bar in yield_table_chunks(text):
-      if debug['lots']: uniprint("process_table yields: [%s]" % bar)
+      if debug['lots']: errprint("process_table yields: [%s]" % bar)
       for baz in self.process_source_text(bar):
         yield baz
   
@@ -1245,6 +1303,10 @@ def format_text_first_pass(text):
   # Get rid of all text inside of <math>...</math>, which is in a different
   # format (TeX), and mostly non-useful.
   (text, _) = re.subn(r'(?s)<math>.*?</math>', '', text)
+
+  # Try getting rid of everything in a reference
+  #(text, _) = re.subn(r'(?s)<ref.*?>.*?</ref>', '', text)
+  #(text, _) = re.subn(r'(?s)<ref[^<>/]*?/>', '', text)
 
   # Convert occurrences of &nbsp; and &ndash; and similar, which occur often
   # (note that SAX itself should handle entities like this; occurrences that
@@ -1448,7 +1510,7 @@ class OutputAllWords(ArticleHandlerForUsefulText):
     splitprint("Article title: %s" % self.title)
     splitprint("Article ID: %s" % self.id)
     for word in word_generator:
-      if debug['some']: uniprint("Saw word: %s" % word)
+      if debug['some']: errprint("Saw word: %s" % word)
       else: splitprint("%s" % word)
 
   def process_text_for_data(self, text):
@@ -1671,13 +1733,13 @@ class GenerateToponymEvalData(ArticleHandler):
     splitprint("Article title: %s" % self.title)
     chunkgen = ToponymEvalDataHandler().process_source_text(text)
     #for chunk in chunkgen:
-    #  uniprint("Saw chunk: %s" % (chunk,))
+    #  errprint("Saw chunk: %s" % (chunk,))
     # groupby() allows us to group all the non-link chunks (which are raw
     # strings) together efficiently
     for k, g in itertools.groupby(chunkgen,
                                   lambda chunk: type(chunk) is tuple):
       #args = [arg for arg in g]
-      #uniprint("Saw k=%s, g=%s" % (k,args))
+      #errprint("Saw k=%s, g=%s" % (k,args))
       if k:
          for (linktext, linkargs) in g:
            splitprint("Link: %s" % '|'.join(linkargs))
@@ -1704,7 +1766,7 @@ class GenerateArticleData(ArticleHandler):
     listof = self.title.startswith('List of ')
     disambig = self.id in disambig_pages_by_id
     list = listof or disambig or namespace in ('Category', 'Book')
-    uniprint("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" %
+    errprint("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" %
              (self.id, self.title, cur_split_name, redirtitle, namespace,
               yesno[listof], yesno[disambig], yesno[list]))
 
@@ -2042,7 +2104,7 @@ Used for testing purposes.  Default %default.""")
   elif opts.generate_toponym_eval:
     main_process_input(GenerateToponymEvalData())
   elif opts.generate_article_data:
-    uniprint('id\ttitle\tsplit\tredir\tnamespace\tis_list_of\tis_disambig\tis_list')
+    errprint('id\ttitle\tsplit\tredir\tnamespace\tis_list_of\tis_disambig\tis_list')
     main_process_input(GenerateArticleData())
 
 #import cProfile
