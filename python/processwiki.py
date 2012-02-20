@@ -309,17 +309,6 @@ def read_disambig_id_file(filename):
 #    Note that "return generator2()" *will* work inside of a function that is
 #    not a generator, i.e. has no "yield" statement in it.
 
-
-def wikiwarning(foo):
-  warning("Article %s: %s" % (debug_cur_title, foo))
-
-# Output a string of maximum length, adding ... if too long
-def bound_string_length(str, maxlen=60):
-  if len(str) <= maxlen:
-    return str
-  else:
-    return '%s...' % str[0:maxlen]
-
 #######################################################################
 #                         Splitting the output                        #
 #######################################################################
@@ -332,6 +321,7 @@ split_suffixes = None
 
 # Current file to output to
 cur_output_file = sys.stdout
+debug_to_stderr = False
 
 # Name of current split (training, dev, test)
 cur_split_name = ''
@@ -504,6 +494,24 @@ def splitprint(text):
   '''Print text (possibly Unicode) to the appropriate output, either stdout
 or one of the split output files.'''
   uniprint(text, outfile=cur_output_file)
+
+def outprint(text):
+  '''Print text (possibly Unicode) to stdout (but stderr in certain debugging
+modes).'''
+  if debug_to_stderr:
+    errprint(text)
+  else:
+    uniprint(text)
+
+def wikiwarning(foo):
+  warning("Article %s: %s" % (debug_cur_title, foo))
+
+# Output a string of maximum length, adding ... if too long
+def bound_string_length(str, maxlen=60):
+  if len(str) <= maxlen:
+    return str
+  else:
+    return '%s...' % str[0:maxlen]
 
 def find_template_params(args, strip_values):
   '''Find the parameters specified in template arguments, i.e. the arguments
@@ -1842,7 +1850,7 @@ class GenerateArticleData(ArticleHandler):
     listof = self.title.startswith('List of ')
     disambig = self.id in disambig_pages_by_id
     list = listof or disambig or namespace in ('Category', 'Book')
-    splitprint("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" %
+    outprint("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" %
              (self.id, self.title, cur_split_name, redirtitle, namespace,
               yesno[listof], yesno[disambig], yesno[list]))
 
@@ -2150,6 +2158,7 @@ Used for testing purposes.  Default %default.""")
       debug[f] = True
   if debug['err'] or debug['some'] or debug['lots'] or debug['sax']:
     cur_output_file = sys.stderr
+    debug_to_stderr = True
 
   if opts.split_training_dev_test:
     init_output_files(opts.split_training_dev_test,
@@ -2182,7 +2191,7 @@ Used for testing purposes.  Default %default.""")
   elif opts.generate_toponym_eval:
     main_process_input(GenerateToponymEvalData())
   elif opts.generate_article_data:
-    splitprint('id\ttitle\tsplit\tredir\tnamespace\tis_list_of\tis_disambig\tis_list')
+    outprint('id\ttitle\tsplit\tredir\tnamespace\tis_list_of\tis_disambig\tis_list')
     main_process_input(GenerateArticleData())
 
 #import cProfile
