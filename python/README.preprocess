@@ -2,6 +2,10 @@ This file describes how to preprocess the Wikipedia dump to get the various
 necessary files.  The most important script is 'run-processwiki', which
 mostly makes use of 'processwiki.py'.
 
+=========== Quick start ==========
+Use 'preprocess-dump' to run all of the steps below.
+This calls 'run-processwiki'.
+
 =========== Introduction ==========
 For 'run-processwiki', output goes to the current directory, and input mostly
 comes from the current directory.  There are several steps to run, which
