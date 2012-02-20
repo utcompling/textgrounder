@@ -29,9 +29,10 @@ import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.textutil.capfirst
 
-import WordDist.memoizer._
-import GeolocateDriver.Debug._
-import DistDocumentConverters._
+import opennlp.textgrounder.gridlocate.DistDocumentConverters._
+import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
+
+import opennlp.textgrounder.worddist.WordDist.memoizer._
 
 /**
  * A document corresponding to a Wikipedia article.

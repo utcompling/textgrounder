@@ -22,12 +22,12 @@ import java.io._
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.experiment.ExperimentDriverApp
+import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.printutil.warning
 
-import opennlp.textgrounder.geolocate.DistDocument
+import opennlp.textgrounder.gridlocate.DistDocument
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                              //
@@ -281,7 +281,8 @@ class FrobCorpusFileProcessor(
   }
 }
 
-class FrobCorpusDriver extends ProcessFilesDriver {
+class FrobCorpusDriver extends
+    ProcessFilesDriver with StandaloneExperimentDriverStats {
   type TParam = FrobCorpusParameters
   
   override def handle_parameters() {
@@ -307,6 +308,7 @@ class FrobCorpusDriver extends ProcessFilesDriver {
   override def run_after_setup() {
     super.run_after_setup()
 
+    val filehand = get_file_handler
     val fileproc =
       new FrobCorpusFileProcessor(filehand, params)
     fileproc.read_schema_from_corpus(filehand, params.input_dir)

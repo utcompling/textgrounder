@@ -20,13 +20,14 @@
 //////// Copyright (c) 2010, 2011 Ben Wing.
 ////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.worddist
 
 import scala.collection.mutable
 import math.{log, sqrt}
+
 import opennlp.textgrounder.util.collectionutil.DynamicArray
-import GeolocateDriver.Debug._
-import opennlp.textgrounder.geolocate.WordDist.memoizer.Word
+
+import WordDist.memoizer.Word
 
 /**
   Fast implementation of KL-divergence and cosine-similarity algorithms
@@ -41,7 +42,7 @@ import opennlp.textgrounder.geolocate.WordDist.memoizer.Word
   the moment in case we need to convert it to Java, C++, etc.
  */
 
-object FastDirichletSmoothedWordDist {
+object FastPseudoGoodTuringSmoothedWordDist {
   /*
    In normal operation of fast_kl_divergence(), we are passed the same
    'self' distribution repeatedly with different 'other' distributions,
@@ -68,11 +69,11 @@ object FastDirichletSmoothedWordDist {
     static_value_array.ensure_at_least(size)
   }
 
-  type TDist = UnigramSmoothedWordDist
-  protected var cached_worddist: UnigramWordDist = null
+  type TDist = PseudoGoodTuringSmoothedWordDist
+  protected var cached_worddist: TDist = null
   protected var cached_size: Int = 0
 
-  def setup_static_arrays(self: UnigramWordDist) {
+  def setup_static_arrays(self: TDist) {
     if (self eq cached_worddist) {
       assert(self.counts.size == cached_size)
       return
@@ -88,96 +89,20 @@ object FastDirichletSmoothedWordDist {
     pcounts.values.copyToArray(values)
   }
 
-  
-  def fast_dirichlet_smoothed_kl_divergence_(self: DirichletSmoothedWordDist, other: DirichletSmoothedWordDist,
-    partial: Boolean = false): Double = {
-    
-    val smoothingParameter = 0.999
-    
-//    val pcounts = self.counts
-    val qcounts = other.counts
-    val owprobs = self.factory.overall_word_probs
-    val unseen_prob = self.factory.globally_unseen_word_prob
-    
-    setup_static_arrays(self)
-    val pkeys = static_key_array.array
-    val pvalues = static_value_array.array
-    // 1.
-
-    /* See comments above -- normal operation of fast_kl_divergence()
-       means that we can usually reuse the same arrays we retrieved
-       previously.  Since DynamicArray[T] is specialized on T, the
-       arrays in 'pkeys' and 'pvalues' will be direct Java arrays of
-       ints, and the array accesses below compile down to direct
-       array-access bytecodes. */
-
-//    setup_static_arrays(self)
-//    val pkeys = self.counts.keys.toSeq.toArray[Int]//static_key_array.array
-//    val pvalues = //static_value_array.array
-    val psize = self.counts.toSeq.size
-    val qsize = qcounts.toSeq.size
-    
-    
-//    val vocabSize2 = pkeys.toSet.union(qcounts.keySet).size - 1 //very time-intensive and wrong too 
-    // -1 for the one extra empty array index 
-    
-//    println(vocabSize,vocabSize2,psize,pkeys.toSet.size,pcounts.values.size,pcounts.keys.size,pcounts.keys.toSet.size,self.num_word_tokens,qsize,qcounts.keySet.size,numCommon)
-    
-    
-    
-//    println(vocabSize)
-//    println(psize,qcounts.size,pkeys.size,self.counts.size,pkeys.toSet.size)
-
-    var kldiv = 0.0
-    /* THIS IS THE INSIDE LOOP.  THIS IS THE CODE BOTTLENECK.  THIS IS IT.
-       
-       This code needs to scream.  Hence we do extra setup above involving
-       static arrays, to avoid having a function call through a function
-       pointer (through the "obvious" use of forEach()). FIXME: But see
-       comment above.
-      
-       Note that HotSpot is good about inlining function calls.
-       Hence we can assume that the calls to apply() below (e.g.
-       qcounts(word)) will be inlined.  However, it's *very important*
-       to avoid doing anything that creates objects each iteration,
-       and best to avoid creating objects per call to fast_kl_divergence().
-       This object creation will kill us, as it will trigger tons
-       and tons of garbage collection.
-
-       Recent HotSpot implementations (6.0 rev 14 and above) have "escape
-       analysis" that *might* make the object creation magically vanish,
-       but don't count on it.
-     */
-    var i = 0
-    while (i < psize) {
-      val word = pkeys(i)
-      val pcount = pvalues(i)//pvalues(i)
-      val p = pcount/self.num_word_tokens
-      var owprob = owprobs(word)
-      if (owprob==0.0)
-        owprob = unseen_prob
-      val q = (qcounts(word)*smoothingParameter/other.num_word_tokens 
-          + owprob*(1-smoothingParameter))
-
-      kldiv += p * (log(p) - log(q))
-      i+=1
-    }
-  
-//    if (partial)
-      return kldiv
-    
-  }
-  
   /**
    A fast implementation of KL-divergence that uses inline lookups as much
    as possible.
    */
-  def fast_kl_divergence(self: UnigramSmoothedWordDist, other: UnigramSmoothedWordDist,
-    partial: Boolean = false): Double = {	//self is the doc
-    
-    val alphaSmoothed=0.01
-    
-//    val pcounts = self.counts
+  def fast_kl_divergence(self: TDist, other: TDist,
+    partial: Boolean = false): Double = {
+    val pfact = (1.0 - self.unseen_mass)/self.num_word_tokens
+    val qfact = (1.0 - other.unseen_mass)/other.num_word_tokens
+    val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
+    val qfact_globally_unseen_prob = (other.unseen_mass*
+        self.factory.globally_unseen_word_prob /
+        self.factory.total_num_unseen_word_types)
+    val owprobs = self.factory.overall_word_probs
+    val pcounts = self.counts
     val qcounts = other.counts
 
     // 1.
@@ -189,39 +114,14 @@ object FastDirichletSmoothedWordDist {
        ints, and the array accesses below compile down to direct
        array-access bytecodes. */
 
-//    setup_static_arrays(self)
-//    val pkeys = self.counts.keys.toSeq.toArray[Int]//static_key_array.array
-//    val pvalues = //static_value_array.array
-    
     setup_static_arrays(self)
     val pkeys = static_key_array.array
     val pvalues = static_value_array.array
-    
-    val psize = self.counts.toSeq.size
-    val qsize = qcounts.toSeq.size
-    
-    var numCommon = 0.0
-    var i = 0
-    while (i < psize) {
-      val word = pkeys(i)
-      val qcount = qcounts(word)
-      if (qcount != 0) numCommon+=1
-      i+=1
-    }
-    
-    val vocabSize = psize+qsize-numCommon
-//    val vocabSize2 = pkeys.toSet.union(qcounts.keySet).size - 1 //very time-intensive and wrong too 
-    // -1 for the one extra empty array index 
-    
-//    println(vocabSize,vocabSize2,psize,pkeys.toSet.size,pcounts.values.size,pcounts.keys.size,pcounts.keys.toSet.size,self.num_word_tokens,qsize,qcounts.keySet.size,numCommon)
-    
-    val invVocabSize : Double = 1.0/vocabSize
-    val invVocabSizeSquare = invVocabSize*invVocabSize 
-    
-    
-//    println(vocabSize)
-//    println(psize,qcounts.size,pkeys.size,self.counts.size,pkeys.toSet.size)
+    val psize = self.counts.size
 
+    // FIXME!! p * log(p) is the same for all calls of fast_kl_divergence
+    // on this item, so we could cache it.  Not clear it would save much
+    // time, though.
     var kldiv = 0.0
     /* THIS IS THE INSIDE LOOP.  THIS IS THE CODE BOTTLENECK.  THIS IS IT.
        
@@ -242,21 +142,46 @@ object FastDirichletSmoothedWordDist {
        analysis" that *might* make the object creation magically vanish,
        but don't count on it.
      */
-    i = 0
+    var i = 0
     while (i < psize) {
       val word = pkeys(i)
-      val pcount = pvalues(i)//pvalues(i)
-      val p = pcount/self.num_word_tokens
-      val q = (qcounts(word)+ alphaSmoothed*invVocabSizeSquare)/(other.num_word_tokens + alphaSmoothed*invVocabSize)
-
+      val pcount = pvalues(i)
+      val p = pcount * pfact
+      val q = {
+        val qcount = qcounts(word)
+        if (qcount != 0) qcount * qfact
+        else {
+          val owprob = owprobs(word)
+          if (owprob != 0.0) owprob * qfact_unseen
+          else qfact_globally_unseen_prob
+        }
+      }
+      //if (q == 0.0)
+      //  errprint("Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s",
+      //           word, qfact_globally_unseen_prob, qcount, qfact)
+      //if (p == 0.0 || q == 0.0)
+      //  errprint("Warning: zero value: p=%s q=%s word=%s pcount=%s qcount=%s qfact=%s qfact_unseen=%s owprobs=%s",
+      //      p, q, word, pcount, qcount, qfact, qfact_unseen,
+      //      owprobs(word))
       kldiv += p * (log(p) - log(q))
       i += 1
     }
   
-//    if (partial)
+    if (partial)
       return kldiv
 
     // 2.
+    val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
+    var overall_probs_diff_words = 0.0
+    for ((word, qcount) <- qcounts if !(pcounts contains word)) {
+      val word_overall_prob = owprobs(word)
+      val p = word_overall_prob * pfact_unseen
+      val q = qcount * qfact
+      kldiv += p * (log(p) - log(q))
+      overall_probs_diff_words += word_overall_prob
+    }    
+
+    return kldiv + self.inner_kl_divergence_34(other, overall_probs_diff_words)
   }
   
   // The older implementation that uses smoothed probabilities.
@@ -268,7 +193,7 @@ object FastDirichletSmoothedWordDist {
   probability due to smoothing.  But with parameter "partial" to true we
   proceed as with KL-divergence and ignore words not in P.
    */
-  def fast_smoothed_cosine_similarity(self: UnigramSmoothedWordDist, other: UnigramSmoothedWordDist,
+  def fast_smoothed_cosine_similarity(self: TDist, other: TDist,
     partial: Boolean = false): Double = {
     val pfact = (1.0 - self.unseen_mass)/self.num_word_tokens
     val qfact = (1.0 - other.unseen_mass)/other.num_word_tokens
@@ -347,7 +272,7 @@ object FastDirichletSmoothedWordDist {
   probability due to smoothing.  But with parameter "partial" to true we
   proceed as with KL-divergence and ignore words not in P.
    */
-  def fast_cosine_similarity(self: UnigramSmoothedWordDist, other: UnigramSmoothedWordDist,
+  def fast_cosine_similarity(self: TDist, other: TDist,
     partial: Boolean = false) = {
     val pfact = 1.0/self.num_word_tokens
     val qfact = 1.0/other.num_word_tokens

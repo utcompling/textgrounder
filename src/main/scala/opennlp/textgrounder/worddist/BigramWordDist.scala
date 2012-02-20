@@ -20,7 +20,7 @@
 //////// Copyright (c) 2011 Ben Wing.
 ////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.worddist
 
 import math._
 import collection.mutable
@@ -30,9 +30,10 @@ import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.ioutil.{FileHandler, FileFormatException}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
-import GeolocateDriver.Debug._
+import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
+import opennlp.textgrounder.gridlocate.GenericTypes._
+
 import WordDist.memoizer._
-import GenericTypes._
 
 /**
  * Bigram word distribution with a table listing counts for each word,
@@ -47,29 +48,41 @@ import GenericTypes._
  */
 
 abstract class BigramWordDist(
-  unigramKeys: Array[Word],
+  unigramKeys: Array[String],
   unigramValues: Array[Int],
   num_unigrams: Int,
-  bigramKeys: Array[Word],
+  bigramKeys: Array[(String, String)],
   bigramValues: Array[Int],
   num_bigrams: Int
 ) extends WordDist {
 
   val unicounts = create_word_int_map()
   for (i <- 0 until num_unigrams)
-    unicounts(unigramKeys(i)) = unigramValues(i)
+    unicounts(memoize_string(unigramKeys(i))) = unigramValues(i)
   var num_word_tokens : Double = unicounts.values.sum
   
   def num_word_types = unicounts.size
 
   val bicounts = create_word_int_map()
   for (i <- 0 until num_bigrams)
-    bicounts(bigramKeys(i)) = bigramValues(i)
+    bicounts(memoize_bigram(bigramKeys(i))) = bigramValues(i)
   var num_bigram_tokens = bicounts.values.sum
 
   def num_bigram_types = bicounts.size
 
   def innerToString: String
+
+  /**
+   * Memoize a bigram.  The words should be encoded to remove ':' signs,
+   * just as they are stored in the document file.
+   */
+  def memoize_bigram(bigram: (String, String)) = {
+    val word1 = bigram._1
+    val word2 = bigram._2
+    assert(!(word1 contains ':'))
+    assert(!(word2 contains ':'))
+    memoize_string(word1 + ":" + word2)
+  }
 
   override def toString = {
     val finished_str =
@@ -246,7 +259,7 @@ trait SimpleBigramWordDistReader extends WordDistReader {
    * Internal DynamicArray holding the keys (canonicalized words).
    */
   protected val keys_dynarr =
-    new DynamicArray[Word](initial_alloc = initial_dynarr_size)
+    new DynamicArray[String](initial_alloc = initial_dynarr_size)
   /**
    * Internal DynamicArray holding the values (word counts).
    */
@@ -260,7 +273,7 @@ trait SimpleBigramWordDistReader extends WordDistReader {
   protected val raw_keys_set = mutable.Set[String]()
   /** Same as `keys_dynarr`, for bigrams. */
   protected val bigram_keys_dynarr =
-    new DynamicArray[Word](initial_alloc = initial_dynarr_size)
+    new DynamicArray[(String, String)](initial_alloc = initial_dynarr_size)
   /** Same as `values_dynarr`, for bigrams. */
   protected val bigram_values_dynarr =
     new DynamicArray[Int](initial_alloc = initial_dynarr_size)
@@ -272,7 +285,6 @@ trait SimpleBigramWordDistReader extends WordDistReader {
    * reject the word (e.g. based on whether the count is high enough or
    * the word is in a stopwords list), and optionally change the word into
    * something else (e.g. the lowercased version or a generic -OOV-).
-   * It should also memoize the word appropriately.
    *
    * @param doc Document whose distribution is being initialized.
    * @param word Raw word seen.  NOTE: Unlike in the case of UnigramWordDist,
@@ -280,37 +292,22 @@ trait SimpleBigramWordDistReader extends WordDistReader {
    *   (In particular, this means that colons are replaced with %3A, and
    *   percent signs by %25.)
    * @param count Raw count for the word
-   * @return A memoized version of a modified form of the word, or
-   *   None to reject the word.
+   * @return A modified form of the word, or None to reject the word.
    */
   def canonicalize_accept_unigram(doc: GenericDistDocument,
-      word: String, count: Int): Option[Word]
+      word: String, count: Int): Option[String]
 
   /**
    * Called each time a bigram word count is seen.  This can accept or
    * reject the bigram, much like for `canonicalize_accept_unigram`.
-   * Bigrams can be memoized using `memoize_bigram`.
    *
    * @param doc Document whose distribution is being initialized.
    * @param bigram Tuple of `(word1, word2)` describing bigram.
    * @param count Raw count for the bigram
-   * @return A memoized version of a modified form of the bigram, or
-   *   None to reject the bigram.
+   * @return A modified form of the bigram, or None to reject the bigram.
    */
   def canonicalize_accept_bigram(doc: GenericDistDocument,
-      bigram: (String, String), count: Int): Option[Word]
-
-  /**
-   * Memoize a bigram.  The words should be encoded to remove ':' signs,
-   * just as they are stored in the document file.
-   */
-  def memoize_bigram(bigram: (String, String)) = {
-    val word1 = bigram._1
-    val word2 = bigram._2
-    assert(!(word1 contains ':'))
-    assert(!(word2 contains ':'))
-    memoize_string(word1 + ":" + word2)
-  }
+      bigram: (String, String), count: Int): Option[(String, String)]
 
   def parse_counts(doc: GenericDistDocument, countstr: String) {
     keys_dynarr.clear()
@@ -353,8 +350,8 @@ trait SimpleBigramWordDistReader extends WordDistReader {
         raw_bigram_keys_set += word
         val opt_canon_word = canonicalize_accept_bigram(doc, word, count)
         if (opt_canon_word != None) {
-          keys_dynarr += opt_canon_word.get
-          values_dynarr += count
+          bigram_keys_dynarr += opt_canon_word.get
+          bigram_values_dynarr += count
         }
       } else
         throw FileFormatException(
@@ -375,9 +372,9 @@ trait SimpleBigramWordDistReader extends WordDistReader {
   }
 
   def set_bigram_word_dist(doc: GenericDistDocument,
-      keys: Array[Word], values: Array[Int], num_words: Int,
-      bigram_keys: Array[Word], bigram_values: Array[Int], num_bigrams: Int,
-      is_training_set: Boolean)
+      keys: Array[String], values: Array[Int], num_words: Int,
+      bigram_keys: Array[(String, String)], bigram_values: Array[Int],
+      num_bigrams: Int, is_training_set: Boolean)
 }
 
 /**
@@ -396,7 +393,7 @@ abstract class BigramWordDistFactory extends
     /* minimum_word_count (--minimum-word-count) currently handled elsewhere.
        FIXME: Perhaps should be handled here. */
     if (!is_stopword(doc, lword))
-      Some(memoize_string(lword))
+      Some(lword)
     else
       None
   }
@@ -407,7 +404,7 @@ abstract class BigramWordDistFactory extends
     val cword2 = canonicalize_word(doc, raw_bigram._2)
     /* minimum_word_count (--minimum-word-count) currently handled elsewhere.
        FIXME: Perhaps should be handled here. */
-    Some(memoize_bigram((cword1, cword1)))
+    Some((cword1, cword1))
   }
 }
 

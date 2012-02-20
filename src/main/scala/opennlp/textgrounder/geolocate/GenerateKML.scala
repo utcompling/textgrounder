@@ -27,10 +27,14 @@ import java.io.{FileSystem=>_,_}
 import org.apache.hadoop.io._
 
 import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.printutil.{errprint, warning}
+ 
+import opennlp.textgrounder.gridlocate.DistDocument
+import opennlp.textgrounder.gridlocate.GenericTypes._
 
+import opennlp.textgrounder.worddist._
 import WordDist.memoizer._
-import GenericTypes._
 
 class KMLParameters {
   // Minimum and maximum colors
@@ -55,7 +59,6 @@ file is generated for each word, using the value of '--kml-prefix' and adding
 '.kml' to it.""")
   // Same as above but a sequence
   var split_kml_words:Seq[String] = _
-  var split_kml_words_memoized:Seq[Word] = _
   var kml_prefix =
     ap.option[String]("kml-prefix", "kp",
       default = "kml-dist.",
@@ -81,11 +84,11 @@ low values more visible.  Possibilities are 'none' (no transformation),
 /* A factory that filters the distributions to contain only the words we
    care about, to save memory and time. */
 class FilterPseudoGoodTuringSmoothedWordDistFactory(
-    filter_words: Seq[Word]
+    filter_words: Seq[String]
   ) extends PseudoGoodTuringSmoothedWordDistFactory {
-  val oov = memoize_string("-OOV-")
+  val oov = "-OOV-"
   override def set_unigram_word_dist(doc: GenericDistDocument,
-      keys: Array[Word], values: Array[Int], num_words: Int,
+      keys: Array[String], values: Array[Int], num_words: Int,
       is_training_set: Boolean) {
     val (newkeys, newvalues) =
       (for ((k, v) <- (keys zip values).take(num_words);
@@ -126,7 +129,7 @@ class WordCellTupleWritable extends
 }
 
 class GenerateKMLDriver extends
-    GeolocateDriver with StandaloneGeolocateDriverStats {
+    GeolocateDriver with StandaloneExperimentDriverStats {
   type TParam = GenerateKMLParameters
   type TRunRes = Unit
 
@@ -134,15 +137,13 @@ class GenerateKMLDriver extends
     super.handle_parameters()
     need(params.kml_words, "kml-words")
     params.split_kml_words = params.kml_words.split(',')
-    params.split_kml_words_memoized =
-      for (w <- params.split_kml_words) yield memoize_string(w)
   }
 
   override def initialize_word_dist_suffix() = 
     DistDocument.unigram_counts_suffix
   override def initialize_word_dist_factory() = {
     new FilterPseudoGoodTuringSmoothedWordDistFactory(
-      params.split_kml_words_memoized)
+      params.split_kml_words)
   }
 
   /**

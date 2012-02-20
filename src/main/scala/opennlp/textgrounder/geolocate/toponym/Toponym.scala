@@ -30,11 +30,15 @@ import opennlp.textgrounder.util.ioutil.{FileHandler, Schema}
 import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil.{errout, errprint, warning}
 
+import opennlp.textgrounder.gridlocate.{CombinedWordDist,EvalStats,TestFileEvaluator,DocumentIteratingEvaluator}
+import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 import opennlp.textgrounder.geolocate._
-import GeolocateDriver.Debug._
+
+import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
+import opennlp.textgrounder.worddist.WordDist.memoizer._
+
 /* FIXME: Eliminate this. */
 import GeolocateToponymApp.Params
-import WordDist.memoizer._
 
 // A class holding the boundary of a geographic object.  Currently this is
 // just a bounding box, but eventually may be expanded to including a
@@ -898,7 +902,7 @@ abstract class GeolocateToponymEvaluator(
   strategy: GeolocateToponymStrategy,
   stratname: String,
   driver: GeolocateToponymDriver
-) extends GeolocateTestFileEvaluator[
+) extends TestFileEvaluator[
   GeogWordDocument, ToponymEvaluationResult
 ](stratname, driver) with DocumentIteratingEvaluator[
   GeogWordDocument, ToponymEvaluationResult
@@ -1538,10 +1542,10 @@ Default '%default'.""")
 }
 
 class GeolocateToponymDriver extends
-    GeolocateDriver with StandaloneGeolocateDriverStats {
+    GeolocateDriver with StandaloneExperimentDriverStats {
   type TParam = GeolocateToponymParameters
   type TRunRes =
-    Seq[(String, GeolocateToponymStrategy, GeolocateTestFileEvaluator[_,_])]
+    Seq[(String, GeolocateToponymStrategy, TestFileEvaluator[_,_])]
 
   override def handle_parameters() {
     super.handle_parameters()

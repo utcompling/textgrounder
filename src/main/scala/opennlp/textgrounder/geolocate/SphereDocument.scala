@@ -27,7 +27,11 @@ import collection.mutable
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.printutil.warning
-import DistDocumentConverters._
+
+import opennlp.textgrounder.gridlocate.{DistDocument,DistDocumentTable,CellGrid}
+import opennlp.textgrounder.gridlocate.DistDocumentConverters._
+
+import opennlp.textgrounder.worddist.WordDistFactory
 
 abstract class SphereDocument(
   schema: Schema,
@@ -86,9 +90,9 @@ abstract class SphereDocumentSubtable[TDoc <: SphereDocument](
  * type of corpus (e.g. Wikipedia or Twitter).
  */
 class SphereDocumentTable(
-  driver: GeolocateDriver,
+  override val driver: GeolocateDriver,
   word_dist_factory: WordDistFactory
-) extends DistDocumentTable[SphereCoord, SphereDocument](
+) extends DistDocumentTable[SphereCoord, SphereDocument, SphereCellGrid](
   driver, word_dist_factory
 ) {
   val corpus_type_to_subtable =

@@ -13,7 +13,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.worddist
 
 import math._
 import collection.mutable
@@ -21,9 +21,11 @@ import util.control.Breaks._
 import java.io._
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.printutil.errprint
-import opennlp.textgrounder.geolocate.WordDist.memoizer._
-import opennlp.textgrounder.geolocate.GenericTypes._
-import GeolocateDriver.Debug._
+
+import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
+import opennlp.textgrounder.gridlocate.GenericTypes._
+
+import WordDist.memoizer._
 
 class UnigramSmoothedWordDistFactory extends
     UnigramWordDistFactory {
@@ -67,10 +69,10 @@ class UnigramSmoothedWordDistFactory extends
   }
 
   def create_word_dist() =
-    new UnigramSmoothedWordDist(this, Array[Word](), Array[Int](), 0,
+    new UnigramSmoothedWordDist(this, Array[String](), Array[Int](), 0,
       note_globally = false)
 
-  def set_unigram_word_dist(doc: DistDocument[_], keys: Array[Word],
+  def set_unigram_word_dist(doc: GenericDistDocument, keys: Array[String],
       values: Array[Int], num_words: Int, is_training_set: Boolean) {
     doc.dist = new UnigramSmoothedWordDist(this, keys, values,
       num_words, note_globally = is_training_set)
@@ -79,7 +81,7 @@ class UnigramSmoothedWordDistFactory extends
 
 class UnigramSmoothedWordDist(
   val factory: UnigramSmoothedWordDistFactory, 
-  keys: Array[Word], 
+  keys: Array[String], 
   values: Array[Int], 
   num_words: Int, 
   note_globally: Boolean

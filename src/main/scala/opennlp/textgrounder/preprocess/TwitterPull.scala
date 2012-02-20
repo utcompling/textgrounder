@@ -210,7 +210,6 @@ object TwitterPull {
         sys.error("Expecting input and output path.")
       }
 
-    /*
     // Firstly we load up all the (new-line-seperated) json lines
     val lines: DList[String] = TextInput.fromTextFile(inputPath)
 
@@ -219,15 +218,15 @@ object TwitterPull {
 
     val single_tweets = values_extracted.groupByKey.map(tweet_once)
 
-    val checkpoint = single_tweets.map(checkpoint_str)
-    DList.persist(TextOutput.toTextFile(checkpoint, outputPath + "-st"))
+    val checkpoint1 = single_tweets.map(checkpoint_str)
+    DList.persist(TextOutput.toTextFile(checkpoint1, outputPath + "-st"))
 
-    val lines: DList[String] = TextInput.fromTextFile(outputPath + "-st")
-    val values_extracted = lines.map(from_checkpoint_to_record)
+    val lines2: DList[String] = TextInput.fromTextFile(outputPath + "-st")
+    val values_extracted2 = lines2.map(from_checkpoint_to_record)
 
     // group by author, combine the records, keeping the earliest
     // tweet with a specific coordinate
-    val concatted = values_extracted.groupByKey.combine(merge_records)
+    val concatted = values_extracted2.groupByKey.combine(merge_records)
 
     // filter every user that doesn't have a specific coordinate
     val with_coord = concatted.filter(has_latlng)
@@ -237,8 +236,6 @@ object TwitterPull {
 
     val checkpoint = with_coord.map(checkpoint_str)
     DList.persist(TextOutput.toTextFile(checkpoint, outputPath + "-cp"))
-
-    */
 
     // load from the checkpoint
     val lines_cp: DList[String] = TextInput.fromTextFile(outputPath + "-cp")

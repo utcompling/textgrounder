@@ -20,7 +20,7 @@
 //////// Copyright (c) 2010, 2011 Ben Wing.
 ////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.gridlocate
 
 import collection.mutable
 
@@ -29,9 +29,10 @@ import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util._
 import opennlp.textgrounder.util.experiment._
 
-import WordDist.memoizer._
+import opennlp.textgrounder.worddist.{WordDist,WordDistFactory,UnigramWordDist}
+import opennlp.textgrounder.worddist.WordDist.memoizer._
 /* FIXME: Eliminate this. */
-import GeolocateDriver.Params
+import GridLocateDriver.Params
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Word distributions                          //
@@ -242,7 +243,8 @@ class WordCellDist[TCoord,
 }
 
 abstract class CellDistFactory[
-  TCoord, TDoc <: DistDocument[TCoord],
+  TCoord,
+  TDoc <: DistDocument[TCoord],
   TCell <: GeoCell[TCoord, TDoc]
 ](
   val lru_cache_size: Int
@@ -351,10 +353,12 @@ abstract class GeoCell[TCoord, TDoc <: DistDocument[TCoord]](
           most_popular_document, mostpopdoc_links)
       else ""
 
-    "GeoCell(%s%s%s, %d documents(dist), %d documents(links), %d links)" format (
+    "GeoCell(%s%s%s, %d documents(dist), %d documents(links), %s types, %s tokens, %d links)" format (
       describe_location(), unfinished, contains,
       combined_dist.num_docs_for_word_dist,
       combined_dist.num_docs_for_links,
+      combined_dist.word_dist.num_word_types,
+      combined_dist.word_dist.num_word_tokens,
       combined_dist.incoming_links)
   }
 
@@ -493,7 +497,7 @@ abstract class CellGrid[
   TDoc <: DistDocument[TCoord],
   TCell <: GeoCell[TCoord, TDoc]
 ](
-    val table: DistDocumentTable[TCoord, TDoc]
+    val table: DistDocumentTable[TCoord, TDoc, _ <: CellGrid[TCoord, TDoc, TCell]]
 ) {
 
   /**

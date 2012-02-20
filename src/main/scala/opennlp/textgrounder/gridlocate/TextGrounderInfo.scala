@@ -20,7 +20,7 @@
 //////// Copyright (c) 2011 Ben Wing.
 ////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.gridlocate
 
 import opennlp.textgrounder.util.printutil.errprint
 
