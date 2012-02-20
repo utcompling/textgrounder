@@ -313,6 +313,13 @@ def read_disambig_id_file(filename):
 def wikiwarning(foo):
   warning("Article %s: %s" % (debug_cur_title, foo))
 
+# Output a string of maximum length, adding ... if too long
+def bound_string_length(str, maxlen=60):
+  if len(str) <= maxlen:
+    return str
+  else:
+    return '%s...' % str[0:maxlen]
+
 #######################################################################
 #                         Splitting the output                        #
 #######################################################################
@@ -324,7 +331,7 @@ split_output_files = None
 split_suffixes = None
 
 # Current file to output to
-cur_output_file = sys.stderr
+cur_output_file = sys.stdout
 
 # Name of current split (training, dev, test)
 cur_split_name = ''
@@ -476,14 +483,10 @@ top-level separators, such as vertical bar.'''
   leftover = ''.join(strbuf)
   if leftover:
     wikiwarning("Unmatched left paren, brace or bracket: %s characters remaining" % len(leftover))
-    maxleft_display = 60
-    wikiwarning("Remaining text: [%s]" % (
-      leftover if len(leftover) <= maxleft_display
-      else '%s...' % leftover[0:maxleft_display]))
+    wikiwarning("Remaining text: [%s]" % bound_string_length(leftover))
     wikiwarning("Reparsing:")
     for string in parse_balanced_text(textre, leftover, throw_away = parenlevel):
       yield string
-
 
 def parse_simple_balanced_text(text):
   '''Parse text in TEXT containing balanced expressions surrounded by single
@@ -678,14 +681,14 @@ def getarg(argsearch, temptype, args, rawargs, warnifnot=True):
         return val
     if warnifnot:
       wikiwarning("None of params %s seen in template {{%s|%s}}" % (
-        ','.join(argsearch), temptype, '|'.join(rawargs)))
+        ','.join(argsearch), temptype, bound_string_length('|'.join(rawargs))))
   else:
     val = args.get(argsearch, None)
     if val is not None:
       return val
     if warnifnot:
       wikiwarning("Param %s seen in template {{%s|%s}}" % (
-        argsearch, temptype, '|'.join(rawargs)))
+        argsearch, temptype, bound_string_length('|'.join(rawargs))))
   return None
 
 # Utility function for get_latd_coord().
@@ -1839,7 +1842,7 @@ class GenerateArticleData(ArticleHandler):
     listof = self.title.startswith('List of ')
     disambig = self.id in disambig_pages_by_id
     list = listof or disambig or namespace in ('Category', 'Book')
-    errprint("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" %
+    splitprint("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" %
              (self.id, self.title, cur_split_name, redirtitle, namespace,
               yesno[listof], yesno[disambig], yesno[list]))
 
@@ -2145,6 +2148,8 @@ Used for testing purposes.  Default %default.""")
     flags = re.split(r'[,\s]+', opts.debug)
     for f in flags:
       debug[f] = True
+  if debug['err'] or debug['some'] or debug['lots'] or debug['sax']:
+    cur_output_file = sys.stderr
 
   if opts.split_training_dev_test:
     init_output_files(opts.split_training_dev_test,
@@ -2177,7 +2182,7 @@ Used for testing purposes.  Default %default.""")
   elif opts.generate_toponym_eval:
     main_process_input(GenerateToponymEvalData())
   elif opts.generate_article_data:
-    errprint('id\ttitle\tsplit\tredir\tnamespace\tis_list_of\tis_disambig\tis_list')
+    splitprint('id\ttitle\tsplit\tredir\tnamespace\tis_list_of\tis_disambig\tis_list')
     main_process_input(GenerateArticleData())
 
 #import cProfile
