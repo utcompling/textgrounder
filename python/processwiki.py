@@ -1500,7 +1500,7 @@ class ArticleHandler(object):
     ### Look to see if the article is a redirect
   
     if redirect:
-      m = re.match(r'(?i)#REDIRECT\s*:?\s*\[\[(.*?)\]\]', text.strip())
+      m = re.match(ur'(?i)#(?:REDIRECT|REDIRECT TO|REDIRECTION|REDIRECCIÓN|REDIRECIONAMENTO|WEITERLEITUNG)\s*:?\s*\[\[(.*?)\]\]', text.strip())
       if m:
         self.process_redirect(m.group(1))
         # NOTE: There may be additional templates specified along with a
