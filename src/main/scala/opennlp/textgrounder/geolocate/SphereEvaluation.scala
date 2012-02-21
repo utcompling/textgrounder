@@ -263,6 +263,8 @@ class CorpusGeolocateDocumentEvaluator(
       true_rank: Int) =
     new SphereDocumentEvaluationResult(document, pred_cell, true_rank)
 
+  val num_nearest_neighbors = driver.params.num_nearest_neighbors
+
   def print_individual_result(doctag: String, document: SphereDocument,
       result: SphereDocumentEvaluationResult,
       pred_cells: Array[(SphereCell, Double)]) {
@@ -280,6 +282,17 @@ class CorpusGeolocateDocumentEvaluator(
       doctag, result.true_truedist, result.true_center)
     errprint("%s:  Distance %.2f km to predicted cell center at %s",
       doctag, result.pred_truedist, result.pred_center)
+
+    val kNN = pred_cells.take(num_nearest_neighbors)
+
+    val avg_dist_of_neighbors = kNN.zip(kNN.map(n => spheredist(n._1.get_center_coord, result.true_center))).sortWith((x,y) => x._2 < y._2).take(num_nearest_neighbors/2).map(_._2).sum / (num_nearest_neighbors/2)
+    errprint("%s:  Average distance from true cell center to %s closest cells' centers from %s best matches: %.2f km",
+      doctag, (num_nearest_neighbors/2), num_nearest_neighbors, avg_dist_of_neighbors)
+
+    if(avg_dist_of_neighbors < result.pred_truedist)
+      driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist")
+
+  
     assert(doctag(0) == '#')
     if (debug("gridrank") ||
       (debuglist("gridrank") contains doctag.drop(1))) {

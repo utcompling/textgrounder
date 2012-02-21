@@ -524,6 +524,10 @@ considered (but if an error occurs upon parsing a file, it will be ignored).
 Each file is read in and then disambiguation is performed.  Not used during
 document geolocation when --eval-format=internal (the default).""")
 
+  var num_nearest_neighbors =
+    ap.option[Int]("num-nearest-neighbors", "knn", default=10,
+      help = """Number of nearest neighbors (k in kNN); default is %default.""")
+
   //// Options indicating which documents to train on or evaluate
   var eval_set =
     ap.option[String]("eval-set", "es", metavar = "SET",

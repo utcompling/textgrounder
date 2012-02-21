@@ -657,6 +657,8 @@ abstract class CorpusDocumentEvaluator[
         document, naitr)
     }
 
+    //val num_nearest_neighbors = 10
+
     /* That is:
 
        pred_cells = List of predicted cells, from best to worst; each list
@@ -703,8 +705,13 @@ abstract class CorpusDocumentEvaluator[
     if (result.num_docs_in_true_cell == 0) {
       evalstats.increment_counter("documents.no_training_documents_in_cell")
     }
-    if (want_indiv_results)
+    if (want_indiv_results) {
+      //val cells_for_average = pred_cells.zip(pred_cells.map(_._1.center))
+      //for((cell, score) <- pred_cells) {
+      //  val scell = cell.asInstanceOf[GeoCell[GeoCoord, GeoDoc]]
+      //}
       print_individual_result(doctag, document, result, pred_cells)
+    }
 
     return result
   }
