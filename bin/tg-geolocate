@@ -19,6 +19,7 @@ Currently recognized values for CORPUS:
 wikipedia         Run on Wikipedia.
 twitter           Run on the GeoText twitter corpus.
 twitter-wiki      Run on a combination of both of the above corpora.
+gutonly-small     Run on the GeoTwitterUT small corpus.
 
 The option '--hadoop' causes the application to be run using Hadoop
 (a package for large-scale parallel processing).  Before doing this,

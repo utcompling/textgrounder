@@ -285,6 +285,8 @@ class CorpusGeolocateDocumentEvaluator(
 
     val kNN = pred_cells.take(num_nearest_neighbors)
 
+    //kNN.zip(kNN.map(n => spheredist(n._1.get_center_coord, result.true_center))).sortWith((x,y) => x._2 < y._2).take(num_nearest_neighbors/2).foreach(println)
+
     val avg_dist_of_neighbors = kNN.zip(kNN.map(n => spheredist(n._1.get_center_coord, result.true_center))).sortWith((x,y) => x._2 < y._2).take(num_nearest_neighbors/2).map(_._2).sum / (num_nearest_neighbors/2)
     errprint("%s:  Average distance from true cell center to %s closest cells' centers from %s best matches: %.2f km",
       doctag, (num_nearest_neighbors/2), num_nearest_neighbors, avg_dist_of_neighbors)

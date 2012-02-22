@@ -18,6 +18,7 @@ docthresh-*       Run on the GeoText twitter corpus, with the given document
 twitter           Run on the GeoText twitter corpus, with document threshold 5.
 twitter-wiki      Run on a combination of the 'wikipedia' and 'twitter'
                   corpora.
+gutonly-small     Run on the GeoTwitterUT small corpus.
 *                 Run on some other corpus in the corpus dir (located
                   at $TG_CORPUS_DIR).
 
@@ -77,6 +78,8 @@ output_args() {
       echo --input-corpus $TG_CORPUS_DIR/twitter-geotext/$1 ;;
     twitter-wiki )
       output_args wikipedia; output_args twitter ;;
+    gutonly-small )
+      echo --input-corpus $TG_CORPUS_DIR/gutonly-small ;;
     * )
       echo --input-corpus $TG_CORPUS_DIR/$1 ;;
   esac
