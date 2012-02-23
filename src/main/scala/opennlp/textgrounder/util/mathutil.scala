@@ -16,6 +16,8 @@
 
 package opennlp.textgrounder.util
 
+import math._
+
 package object mathutil {
   /**
    *  Return the median value of a list.  List will be sorted, so this is O(n).
@@ -36,5 +38,51 @@ package object mathutil {
    */
   def mean(list: Seq[Double]) = {
     list.sum / list.length
+  }
+
+  def variance(x: Seq[Double]) = {
+    val m = mean(x)
+    mean(for (y <- x) yield ((y - m) * (y - m)))
+  }
+
+  def stddev(x: Seq[Double]) = sqrt(variance(x))
+
+  abstract class MeanShift[Coord : Manifest](
+      h:Double = 1.0,
+      min_variance:Double = 1e-10,
+      max_iterations:Int = 100
+    ) {
+    def squared_distance(x:Coord, y:Coord): Double
+    def weighted_sum(weights:Array[Double], points:Array[Coord]): Coord
+    def scaled_sum(scalar:Double, points:Array[Coord]): Coord
+
+    def vec_mean(points:Array[Coord]) = scaled_sum(1.0/points.length, points)
+
+    def vec_variance(points:Array[Coord]) = {
+      def m = vec_mean(points)
+      mean(
+        for (i <- 0 until points.length) yield squared_distance(m, points(i)))
+    }
+
+    def mean_shift(list: Seq[Coord]):Array[Coord] = {
+      var variance = min_variance + 1
+      var numiters = 0
+      val points = list.toArray
+      val shifted = list.toArray
+      while (variance >= min_variance && numiters <= max_iterations) {
+        for (j <- 0 until points.length) {
+          val y = shifted(j)
+          val weights =
+            (for (i <- 0 until points.length)
+             yield exp(-squared_distance(y, points(i))/(h*h)))
+          val weight_sum = weights sum
+          val normalized_weights = weights.map(_ / weight_sum).toArray
+          shifted(j) = weighted_sum(normalized_weights, points)
+        }
+        numiters += 1
+        variance = vec_variance(shifted)
+      }
+      shifted
+    }
   }
 } 
