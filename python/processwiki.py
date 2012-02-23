@@ -681,6 +681,9 @@ def get_hemisphere(temptype, is_lat):
     else: return -1
   else: return 1
 
+# Get an argument (ARGSEARCH) by name from a hash table (ARGS).  Multiple
+# synonymous names can be looked up by giving a list or tuple for ARGSEARCH.
+# Other parameters control warning messages.
 def getarg(argsearch, temptype, args, rawargs, warnifnot=True):
   if isinstance(argsearch, tuple) or isinstance(argsearch, list):
     for x in argsearch:
@@ -695,7 +698,7 @@ def getarg(argsearch, temptype, args, rawargs, warnifnot=True):
     if val is not None:
       return val
     if warnifnot:
-      wikiwarning("Param %s seen in template {{%s|%s}}" % (
+      wikiwarning("Param %s not seen in template {{%s|%s}}" % (
         argsearch, temptype, bound_string_length('|'.join(rawargs))))
   return None
 
@@ -723,6 +726,9 @@ def get_lat_long_1(temptype, args, rawargs, latd, latm, lats, offparam, is_lat):
                (offparam, temptype, hemis))
   return convert_dms(hemismult, d, m, s)
 
+latd_arguments = ('latd', 'latg', 'lat_deg', 'latitudedegrees',
+  'latitudinegradi', 'latitudine gradi', 'latitudine_d',
+  'breitengrad', 'breddegrad', 'bredde_grad')
 def get_latd_coord(temptype, args, rawargs):
   '''Given a template of type TEMPTYPE with arguments ARGS (converted into
 a hash table; also available in raw form as RAWARGS), assumed to have
@@ -730,25 +736,70 @@ a latitude/longitude specification in it using latd/lat_deg/etc. and
 longd/lon_deg/etc., extract out and return a tuple of decimal
 (latitude, longitude) values.'''
   lat = get_lat_long_1(temptype, args, rawargs,
-      ('latd', 'latg', 'lat_deg'),
-      ('latm', 'lat_min'),
-      ('lats', 'lat_sec'),
-      ('latns', 'latp', 'lap', 'lat_dir'),
+      latd_arguments,
+      ('latm', 'lat_min', 'latitudeminutes',
+         'latitudineminuti', 'latitudine minute', 'latitudine_m',
+         'breitenminute', 'bredde_min'),
+      ('lats', 'lat_sec', 'latitudeseconds', 'latitudinesecondi',
+         'latitudine_s', 'breitensekunde'),
+      ('latns', 'latp', 'lap', 'lat_dir', 'latitudine ns'),
       is_lat=True)
   long = get_lat_long_1(temptype, args, rawargs,
-      ('longd', 'lond', 'longg', 'long', 'lon_deg'),
-      ('longm', 'lonm', 'lon_min'),
-      ('longs', 'lons', 'lon_sec'),
-      ('longew', 'longp', 'lonp', 'lon_dir'),
+      # Typos like Longtitude do occur in the Spanish Wikipedia at least
+      ('longd', 'lond', 'longg', 'long', 'lon_deg',
+         'longitudinegradi', 'longitudine gradi',
+         'longitudine_d', 'longitudedegrees', 'longtitudedegrees',
+         u'längengrad', 'lengdegrad', u'længde_grad'),
+      ('longm', 'lonm', 'lon_min', 'longitudineminuti', 'longitudine_m',
+         'longitudeminutes', 'longtitudeminutes',
+         u'längenminute', u'længde_min'),
+      ('longs', 'lons', 'lon_sec', 'longitudinesecondi', 'longitudine_s',
+         'longitudeseconds', 'longtitudeseconds', u'längensekunde'),
+      ('longew', 'longp', 'lonp', 'lon_dir', 'longitudine ew'),
       is_lat=False)
   return (lat, long)
 
-def get_latitude_coord(temptype, args, rawargs):
-  '''Given a template of type TEMPTYPE with arguments ARGS, assumed to have
-a latitude/longitude specification in it using latitude/longitude, extract out
-and return a tuple of decimal (latitude, longitude) values.'''
-  lat = safe_float(getarg('latitude', temptype, args, rawargs))
-  long = safe_float(getarg('longitude', temptype, args, rawargs))
+def get_built_in_lat_long_1(temptype, args, rawargs, latd, latm, lats, is_lat):
+  d = getarg(latd, temptype, args, rawargs)
+  m = getarg(latm, temptype, args, rawargs, warnifnot=False) 
+  s = getarg(lats, temptype, args, rawargs, warnifnot=False)
+  return convert_dms(mult, d, m, s)
+
+built_in_latd_north_arguments = ('stopnin')
+built_in_latd_south_arguments = ('stopnis')
+built_in_longd_north_arguments = ('stopnie')
+built_in_longd_south_arguments = ('stopniw')
+
+def get_built_in_lat_coord(temptype, args, rawargs):
+  '''Given a template of type TEMPTYPE with arguments ARGS (converted into
+a hash table; also available in raw form as RAWARGS), assumed to have
+a latitude/longitude specification in it using stopniN/etc. (where the
+direction NSEW is built into the argument name), extract out and return a
+tuple of decimal (latitude, longitude) values.'''
+  if getarg(built_in_latd_north_arguments) is not None:
+    mult = 1
+  elif getarg(built_in_latd_south_arguments) is not None:
+    mult = -1
+  else:
+    wikiwarning("Didn't see any appropriate stopniN/stopniS param")
+    mult = 0.
+  lat = get_built_in_lat_long_1(temptype, args, rawargs,
+      ('stopnin', 'stopnis'),
+      ('minutn', 'minuts'),
+      ('sekundn', 'sekunds'),
+      mult)
+  if getarg(built_in_longd_north_arguments) is not None:
+    mult = 1
+  elif getarg(built_in_longd_south_arguments) is not None:
+    mult = -1
+  else:
+    wikiwarning("Didn't see any appropriate stopniE/stopniW param")
+    mult = 0.
+  long = get_built_in_lat_long_1(temptype, args, rawargs,
+      ('stopnie', 'stopniw'),
+      ('minute', 'minutw'),
+      ('sekunde', 'sekundw'),
+      mult)
   return (lat, long)
 
 def get_german_style_coord(arg):
@@ -770,12 +821,19 @@ def get_german_style_coord(arg):
   else:
     return safe_float(arg)
 
-def get_breitengrad_coord(temptype, args, rawargs):
+latitude_arguments = ('latitude', 'latitud')
+longitude_arguments = ('longitude', 'longitud')
+
+def get_latitude_coord(temptype, args, rawargs):
   '''Given a template of type TEMPTYPE with arguments ARGS, assumed to have
-a latitude/longitude specification in it using breitengrad/längengrad,
-extract out and return a tuple of decimal (latitude, longitude) values.'''
-  lat = get_german_style_coord(getarg('breitengrad', temptype, args, rawargs))
-  long = get_german_style_coord(getarg(u'längengrad', temptype, args, rawargs))
+a latitude/longitude specification in it, extract out and return a tuple of
+decimal (latitude, longitude) values.'''
+  # German-style (e.g. 72/53/15/E) also occurs in the French Wikipedia with
+  # 'latitude' and such, so just check for it everywhere.
+  lat = get_german_style_coord(getarg(latitude_arguments,
+    temptype, args, rawargs))
+  long = get_german_style_coord(getarg(longitude_arguments,
+    temptype, args, rawargs))
   return (lat, long)
 
 # Utility function for get_coord().  Extract out the latitude or longitude
@@ -948,32 +1006,43 @@ applied to the text before being sent here.'''
     lowertemp = temptype.lower()
     rawargs = tempargs[1:]
     # Look for a coordinate template
-    if lowertemp in ('coord', 'coor d', 'coor dm', 'coor dms',
+    if lowertemp in ('coord', 'coordp', 'coords',
+                     'koord', #Norwegian
+                     'coor', 'coor d', 'coor dm', 'coor dms',
                      'coor title d', 'coor title dm', 'coor title dms',
                      'coor dec', 'coorheader') \
         or lowertemp.startswith('geolinks') \
-        or lowertemp.startswith('mapit'):
+        or lowertemp.startswith('mapit') \
+        or lowertemp.startswith('koordynaty'): # Coordinates in Polish:
       (lat, long) = get_coord(temptype, rawargs)
     elif lowertemp == 'coordinate':
       (lat, long) = get_coordinate_coord(temptype, rawargs)
-    elif lowertemp == 'geocoordenadas':
+    elif lowertemp in ('geocoordenadas', u'coördinaten'):
+      # geocoordenadas is Portuguese, coördinaten is Dutch, and they work
+      # the same way
       (lat, long) = get_geocoordenadas_coord(temptype, rawargs)
     else:
       # Look for any other template with a 'latd' or 'latitude' parameter.
       # Usually these will be Infobox-type templates.  Possibly we should only
       # look at templates whose lowercased name begins with "infobox".
       (paramshash, _) = find_template_params(rawargs, True)
-      # 'latg' is Portuguese (g = grau)
-      if ('latd' in paramshash or 'latg' in paramshash or
-          'lat_deg' in paramshash):
+      if getarg(latd_arguments, temptype, paramshash, rawargs, warnifnot=False) is not None:
+        #errprint("seen: [%s] in {{%s|%s}}" % (getarg(latd_arguments, temptype, paramshash, rawargs), temptype, rawargs))
         templates_with_coords[lowertemp] += 1
         (lat, long) = get_latd_coord(temptype, paramshash, rawargs)
-      elif 'latitude' in paramshash:
+      elif getarg(latitude_arguments, temptype, paramshash, rawargs, warnifnot=False) is not None:
+        #errprint("seen: [%s] in {{%s|%s}}" % (getarg(latitude_arguments, temptype, paramshash, rawargs), temptype, rawargs))
         templates_with_coords[lowertemp] += 1
         (lat, long) = get_latitude_coord(temptype, paramshash, rawargs)
-      elif 'breitengrad' in paramshash:
+      elif (getarg(built_in_latd_north_arguments, temptype, paramshash,
+                   rawargs, warnifnot=False) is not None or
+            getarg(built_in_latd_south_arguments, temptype, paramshash,
+                   rawargs, warnifnot=False) is not None):
+        #errprint("seen: [%s] in {{%s|%s}}" % (getarg(built_in_latd_north_arguments, temptype, paramshash, rawargs), temptype, rawargs))
+        #errprint("seen: [%s] in {{%s|%s}}" % (getarg(built_in_latd_south_arguments, temptype, paramshash, rawargs), temptype, rawargs))
         templates_with_coords[lowertemp] += 1
-        (lat, long) = get_breitengrad_coord(temptype, paramshash, rawargs)
+        (lat, long) = get_built_in_lat_coord(temptype, paramshash, rawargs)
+
     if lat or long:
       if lat is None:
         lat = 0.
