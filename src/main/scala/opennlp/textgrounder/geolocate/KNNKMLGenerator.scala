@@ -15,9 +15,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 ////////
-//////// ErrorKMLGenerator.scala
+//////// KNNKMLGenerator.scala
 ////////
-//////// Copyright (c) 2011.
+//////// Copyright (c) 2012.
 ////////
 
 package opennlp.textgrounder.geolocate
@@ -31,16 +31,16 @@ import opennlp.textgrounder.util.LogUtil
 import scala.collection.JavaConversions._
 import org.clapper.argot._
 
-object ErrorKMLGenerator {
+object KNNKMLGenerator {
 
   val factory = XMLOutputFactory.newInstance
+  val rand = new scala.util.Random
 
   import ArgotConverters._
 
-  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.geolocate.ErrorKMLGenerator", preUsage = Some("TextGrounder"))
+  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.geolocate.KNNKMLGenerator", preUsage = Some("TextGrounder"))
   val logFile = parser.option[String](List("l", "log"), "log", "log input file")
   val kmlOutFile = parser.option[String](List("k", "kml"), "kml", "kml output file")
-  val usePred = parser.option[String](List("p", "pred"), "pred", "show predicted rather than gold locations")
 
   def main(args: Array[String]) {
     try {
@@ -59,32 +59,42 @@ object ErrorKMLGenerator {
       sys.exit(0)
     }
 
-    val rand = new scala.util.Random
-
     val outFile = new File(kmlOutFile.value.get)
     val stream = new BufferedOutputStream(new FileOutputStream(outFile))
     val out = factory.createXMLStreamWriter(stream, "UTF-8")
 
-    KMLUtil.writeHeader(out, "errors-at-"+(if(usePred.value == None) "true" else "pred"))
+    KMLUtil.writeHeader(out, "knn")
 
-    for((docName, trueCoord, predCoordOrig, neighbors) <- LogUtil.parseLogFile(logFile.value.get)) {
-      val predCoord = Coordinate.fromDegrees(predCoordOrig.getLatDegrees() + (rand.nextDouble() - 0.5) * .1,
-                                             predCoordOrig.getLngDegrees() + (rand.nextDouble() - 0.5) * .1);
+    for((docName, trueCoord, predCoord, neighbors) <- LogUtil.parseLogFile(logFile.value.get)) {
 
-      //val dist = trueCoord.distanceInKm(predCoord)
+      val jPredCoord = jitter(predCoord)
 
-      val coord1 = if(usePred.value == None) trueCoord else predCoord
-      val coord2 = if(usePred.value == None) predCoord else trueCoord
+      KMLUtil.writePinPlacemark(out, docName, trueCoord)
+      KMLUtil.writePinPlacemark(out, docName, jPredCoord, "blue")
+      KMLUtil.writePlacemark(out, "#1", jPredCoord, KMLUtil.RADIUS*10)
+      KMLUtil.writeLinePlacemark(out, trueCoord, jPredCoord, "redLine")
 
-      KMLUtil.writeArcLinePlacemark(out, coord1, coord2);
-      KMLUtil.writePinPlacemark(out, docName, coord1, "yellow");
-      //KMLUtil.writePlacemark(out, docName, coord1, KMLUtil.RADIUS);
-      KMLUtil.writePinPlacemark(out, docName, coord2, "blue");
-      //KMLUtil.writePolygon(out, docName, coord, KMLUtil.SIDES, KMLUtil.RADIUS, math.log(dist) * KMLUtil.BARSCALE/2)
+      for((neighbor, rank) <- neighbors) {
+        val jNeighbor = jitter(neighbor)
+        /*if(rank == 1) {
+          KMLUtil.writePlacemark(out, "#1", neighbor, KMLUtil.RADIUS*10)
+        }*/
+        if(rank != 1) {
+          KMLUtil.writePlacemark(out, "#"+rank, jNeighbor, KMLUtil.RADIUS*10)
+          KMLUtil.writePinPlacemark(out, docName, jNeighbor, "green")
+          /*if(!neighbor.equals(predCoord))*/ KMLUtil.writeLinePlacemark(out, trueCoord, jNeighbor)
+        }
+      }
+
     }
 
     KMLUtil.writeFooter(out)
 
     out.close
+  }
+
+  def jitter(coord:Coordinate): Coordinate = {
+    Coordinate.fromDegrees(coord.getLatDegrees() + (rand.nextDouble() - 0.5) * .1,
+                           coord.getLngDegrees() + (rand.nextDouble() - 0.5) * .1);
   }
 }

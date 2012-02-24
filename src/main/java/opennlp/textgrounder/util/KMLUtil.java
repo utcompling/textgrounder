@@ -64,7 +64,7 @@ public class KMLUtil {
     w.writeEndElement(); // PolyStyle
     w.writeStartElement("LineStyle");
     KMLUtil.writeWithCharacters(w, "color", "ff0000ff");
-    KMLUtil.writeWithCharacters(w, "with", "3");
+    KMLUtil.writeWithCharacters(w, "width", "3");
     w.writeEndElement(); // LineStyle
     w.writeStartElement("IconStyle");
     w.writeEmptyElement("Icon");
@@ -72,12 +72,26 @@ public class KMLUtil {
     w.writeEndElement(); // Style
 
     w.writeStartElement("Style");
+    w.writeAttribute("id", "whiteLine");
+    w.writeStartElement("LineStyle");
+    KMLUtil.writeWithCharacters(w, "color", "ffffffff");
+    KMLUtil.writeWithCharacters(w, "width", "3");
+    w.writeEndElement(); // LineStyle
+    w.writeEndElement(); // Style
+
+    w.writeStartElement("Style");
+    w.writeAttribute("id", "redLine");
+    w.writeStartElement("LineStyle");
+    KMLUtil.writeWithCharacters(w, "color", "ff0000ff");
+    KMLUtil.writeWithCharacters(w, "width", "3");
+    w.writeEndElement(); // LineStyle
+    w.writeEndElement(); // Style
+
+    w.writeStartElement("Style");
     w.writeAttribute("id", "blue");
     w.writeStartElement("IconStyle");
-    //KMLUtil.writeWithCharacters(w, "color", "ffff0000");
     w.writeStartElement("Icon");
     KMLUtil.writeWithCharacters(w, "href", "http://maps.google.com/mapfiles/kml/paddle/blu-blank-lv.png");
-    //KMLUtil.writeWithCharacters(w, "scale", "0.5);
     w.writeEndElement(); // Icon
     w.writeEndElement(); // IconStyle
     w.writeEndElement(); // Style
@@ -85,10 +99,17 @@ public class KMLUtil {
     w.writeStartElement("Style");
     w.writeAttribute("id", "yellow");
     w.writeStartElement("IconStyle");
-    //KMLUtil.writeWithCharacters(w, "color", "ffff0000");
     w.writeStartElement("Icon");
     KMLUtil.writeWithCharacters(w, "href", "http://maps.google.com/mapfiles/kml/paddle/ylw-blank-lv.png");
-    //KMLUtil.writeWithCharacters(w, "scale", "10.0");
+    w.writeEndElement(); // Icon
+    w.writeEndElement(); // IconStyle
+    w.writeEndElement(); // Style
+
+    w.writeStartElement("Style");
+    w.writeAttribute("id", "green");
+    w.writeStartElement("IconStyle");
+    w.writeStartElement("Icon");
+    KMLUtil.writeWithCharacters(w, "href", "http://maps.google.com/mapfiles/kml/paddle/grn-blank-lv.png");
     w.writeEndElement(); // Icon
     w.writeEndElement(); // IconStyle
     w.writeEndElement(); // Style
@@ -218,6 +239,29 @@ public class KMLUtil {
 
     public static void writeLinePlacemark(XMLStreamWriter w, Coordinate coord1, Coordinate coord2)
                                           throws XMLStreamException {
+        writeLinePlacemark(w, coord1, coord2, "whiteLine");
+    }
+
+    public static void writeLinePlacemark(XMLStreamWriter w, Coordinate coord1, Coordinate coord2, String styleUrl)
+                                          throws XMLStreamException {
+        w.writeStartElement("Placemark");
+        KMLUtil.writeWithCharacters(w, "styleUrl", "#"+styleUrl);
+        w.writeStartElement("LineString");
+        KMLUtil.writeWithCharacters(w, "gx:altitudeOffset", "0");
+        KMLUtil.writeWithCharacters(w, "extrude", "1");
+        KMLUtil.writeWithCharacters(w, "tessellate", "1");
+        KMLUtil.writeWithCharacters(w, "altitudeMode", "clampToGround");
+        KMLUtil.writeWithCharacters(w, "gx:drawOrder", "0");
+        w.writeStartElement("coordinates");
+        w.writeCharacters(df.format(coord1.getLngDegrees())+","+df.format(coord1.getLatDegrees())+",0\n");
+        w.writeCharacters(df.format(coord2.getLngDegrees())+","+df.format(coord2.getLatDegrees())+",0\n");
+        w.writeEndElement(); // coordinates
+        w.writeEndElement(); // LineString
+        w.writeEndElement(); // Placemark
+    }
+
+    public static void writeArcLinePlacemark(XMLStreamWriter w, Coordinate coord1, Coordinate coord2)
+                                             throws XMLStreamException {
         w.writeStartElement("Placemark");
         KMLUtil.writeWithCharacters(w, "styleUrl", "#bar");
         w.writeStartElement("LineString");
@@ -256,7 +300,7 @@ public class KMLUtil {
     w.writeEndElement(); // Point
     w.writeEndElement(); // Placemark*/
 
-      writePlacemark(w, name, coord, radius);
+    writePlacemark(w, name, coord, radius);
 
     w.writeStartElement("Placemark");
     KMLUtil.writeWithCharacters(w, "name", name + " POLYGON");
