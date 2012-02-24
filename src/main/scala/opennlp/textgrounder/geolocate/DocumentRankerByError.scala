@@ -27,7 +27,7 @@ object DocumentRankerByError {
     }
 
     val docsAndErrors:List[(String, Double, Coordinate, Coordinate)] =
-      (for((docName, trueCoord, predCoord) <- LogUtil.parseLogFile(logFile.value.get)) yield {
+      (for((docName, trueCoord, predCoord, neighbors) <- LogUtil.parseLogFile(logFile.value.get)) yield {
         val dist = trueCoord.distanceInKm(predCoord)
 
         (docName, dist, trueCoord, predCoord)

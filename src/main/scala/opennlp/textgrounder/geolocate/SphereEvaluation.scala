@@ -278,21 +278,27 @@ class CorpusGeolocateDocumentEvaluator(
       errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
         doctag, i + 1, pred_cells(i)._2, pred_cells(i)._1)
     }
+
+    //for (num_nearest_neighbors <- 2 to 100 by 2) {
+    val kNN = pred_cells.take(num_nearest_neighbors).map(_._1)
+    val kNNranks = pred_cells.take(num_nearest_neighbors).zipWithIndex.map(p => (p._1._1, p._2+1)).toMap
+    val closest_half_with_dists = kNN.map(n => (n, spheredist(n.get_center_coord, document.coord))).sortWith(_._2 < _._2).take(num_nearest_neighbors/2)
+
+    closest_half_with_dists.zipWithIndex.foreach(c => errprint("%s:  #%s close neighbor: %s; error distance: %.2f km",
+      doctag, kNNranks(c._1._1), c._1._1.get_center_coord, c._1._2))
+
     errprint("%s:  Distance %.2f km to true cell center at %s",
       doctag, result.true_truedist, result.true_center)
     errprint("%s:  Distance %.2f km to predicted cell center at %s",
       doctag, result.pred_truedist, result.pred_center)
 
-    val kNN = pred_cells.take(num_nearest_neighbors)
-
-    //kNN.zip(kNN.map(n => spheredist(n._1.get_center_coord, result.true_center))).sortWith((x,y) => x._2 < y._2).take(num_nearest_neighbors/2).foreach(println)
-
-    val avg_dist_of_neighbors = kNN.zip(kNN.map(n => spheredist(n._1.get_center_coord, result.true_center))).sortWith((x,y) => x._2 < y._2).take(num_nearest_neighbors/2).map(_._2).sum / (num_nearest_neighbors/2)
+    val avg_dist_of_neighbors = mean(closest_half_with_dists.map(_._2))
     errprint("%s:  Average distance from true cell center to %s closest cells' centers from %s best matches: %.2f km",
       doctag, (num_nearest_neighbors/2), num_nearest_neighbors, avg_dist_of_neighbors)
 
     if(avg_dist_of_neighbors < result.pred_truedist)
-      driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist")
+      driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
+    //}
 
   
     assert(doctag(0) == '#')

@@ -5,14 +5,15 @@ import opennlp.textgrounder.topo._
 object LogUtil {
 
   val DOC_PREFIX = "Document "
-  //val DOC_PREFIX = "Article "
   val TRUE_COORD_PREFIX = " at ("
   val PRED_COORD_PREFIX = " predicted cell center at ("
+  val NEIGHBOR_PREFIX = " close neighbor: ("
 
-  def parseLogFile(filename: String): List[(String, Coordinate, Coordinate)] = {
+  def parseLogFile(filename: String): List[(String, Coordinate, Coordinate, List[(Coordinate, Int)])] = {
     val lines = scala.io.Source.fromFile(filename).getLines
 
     var docName:String = null
+    var neighbors:List[(Coordinate, Int)] = null
     var trueCoord:Coordinate = null
     var predCoord:Coordinate = null
 
@@ -29,6 +30,23 @@ object LogUtil {
           endIndex = line.indexOf(")", startIndex)
           val rawCoords = line.slice(startIndex, endIndex).split(",")
           trueCoord = Coordinate.fromDegrees(rawCoords(0).toDouble, rawCoords(1).toDouble)
+
+          neighbors = List()
+
+          None
+        }
+
+        else if(line.contains(NEIGHBOR_PREFIX)) {
+          val startIndex = line.indexOf(NEIGHBOR_PREFIX) + NEIGHBOR_PREFIX.length
+          val endIndex = line.indexOf(")", startIndex)
+          val rawCoords = line.slice(startIndex, endIndex).split(",")
+          val curNeighbor = Coordinate.fromDegrees(rawCoords(0).toDouble, rawCoords(1).toDouble)
+          val rankStartIndex = line.indexOf("#", 1)+1
+          val rankEndIndex = line.indexOf(" ", rankStartIndex)
+          val rank = line.slice(rankStartIndex, rankEndIndex).toInt
+          
+          neighbors = neighbors ::: ((curNeighbor, rank) :: Nil)
+
           None
         }
 
@@ -38,7 +56,7 @@ object LogUtil {
           val rawCoords = line.slice(startIndex, endIndex).split(",")
           predCoord = Coordinate.fromDegrees(rawCoords(0).toDouble, rawCoords(1).toDouble)
 
-          Some((docName, trueCoord, predCoord))
+          Some((docName, trueCoord, predCoord, neighbors))
         }
 
         else None
