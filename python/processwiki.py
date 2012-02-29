@@ -660,10 +660,32 @@ instead, output a warning.'''
       wikiwarning("Expected number, saw %s" % x)
     return 0.
 
+def get_german_style_coord(arg):
+  '''Handle plain floating-point numbers as well as "German-style"
+deg/min/sec/DIR indicators like 45/32/30/E.'''
+  if arg is None:
+    return 0. # FIXME: Return None?
+  if ' ' in arg:
+    arg = re.sub(' .*$', '', arg)
+  if '/' in arg:
+    m = re.match('([0-9.]+)/([0-9.]+)?/([0-9.]+)?/([NSEWnsew])', arg)
+    if m:
+      (deg, min, sec, offind) = m.groups()
+      offind = offind.upper()
+      if offind in convert_ns:
+        off = convert_ns[offind]
+      else:
+        off = convert_ew[offind]
+      return convert_dms(off, deg, min, sec)
+    wikiwarning("Unrecognized DEG/MIN/SEC/HEMIS-style indicator: %s" % arg)
+    return 0. # FIXME: Return None?
+  else:
+    return safe_float(arg)
+
 def convert_dms(nsew, d, m, s):
   '''Convert a multiplier (1 or N or E, -1 for S or W) and degree/min/sec
 values into a decimal +/- latitude or longitude.'''
-  return nsew*(safe_float(d) + safe_float(m)/60. + safe_float(s)/3600.)
+  return nsew*(get_german_style_coord(d) + safe_float(m)/60. + safe_float(s)/3600.)
 
 convert_ns = {'N':1, 'S':-1}
 convert_ew = {'E':1, 'W':-1, 'L':1, 'O':-1}
@@ -671,7 +693,10 @@ convert_ew = {'E':1, 'W':-1, 'L':1, 'O':-1}
 # Get the default value for the hemisphere, as a multiplier +1 or -1.
 # We need to handle Australian places specially, as S latitude, E longitude.
 # We need to handle Pittsburgh neighborhoods specially, as N latitude, W longitude.
-# Otherwise assume +1.
+# Otherwise assume +1, so that we leave the values alone.  This is important
+# because some fields may specifically use signed values to indicate the
+# hemisphere directly, or use other methods of indicating hemisphere (e.g.
+# "German"-style "72/50/35/W").
 def get_hemisphere(temptype, is_lat):
   if temptype.lower().startswith('infobox australia'):
     if is_lat: return -1
@@ -801,25 +826,6 @@ tuple of decimal (latitude, longitude) values.'''
       ('sekunde', 'sekundw'),
       mult)
   return (lat, long)
-
-def get_german_style_coord(arg):
-  if arg is None:
-    return arg
-  arg = re.sub(' .*$', '', arg)
-  if '/' in arg:
-    m = re.match('([0-9.]+)/([0-9.]+)?/([0-9.]+)?/([NSEWnsew])', arg)
-    if m:
-      (deg, min, sec, offind) = m.groups()
-      offind = offind.upper()
-      if offind in convert_ns:
-        off = convert_ns[offind]
-      else:
-        off = convert_ew[offind]
-      return convert_dms(off, deg, min, sec)
-    wikiwarning("Unrecognized DEG/MIN/SEC/HEMIS-style indicator: %s" % arg)
-    return None
-  else:
-    return safe_float(arg)
 
 latitude_arguments = ('latitude', 'latitud')
 longitude_arguments = ('longitude', 'longitud')
