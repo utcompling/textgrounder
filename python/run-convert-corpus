@@ -18,7 +18,7 @@ TG_PREPROC_DIR="$TEXTGROUNDER_DIR/python"
 # mmv output-*-docthresh docthresh-*
 # cd $tge
 # rm -rf convert-corpora-*
-# run-convert-corpus --steps all $cotg/docthresh-*
+# run-convert-corpus --steps all --add-dir-prefix $cotg/docthresh-*
 # cd convert-corpora-4
 # for x in docthresh-*; do (echo $x; cd $x; mmv geotext-twitter-* twitter-geotext-*; bzip2 *-unigram-counts.txt); done
 # cd $cotg
@@ -29,7 +29,7 @@ TG_PREPROC_DIR="$TEXTGROUNDER_DIR/python"
 
 help() {
   cat <<FOO
-Usage: $0 --steps "STEPS ..." DIR ...
+Usage: $0 --steps "STEPS ..." [--output-dir-prefix PREFIX] [--add-dir-prefix] DIR ...
 
 Convert corpora using various steps (e.g. from old-style to new-style,
 removing unneeded GeoText fields, splitting by training/dev/test split).
@@ -52,16 +52,33 @@ split-by-training = Split into sub-corpora based on the 'split' field
 Each step writes its output into a new directory, and the next step uses
 that directory and writes its output into another new directory.
 
+--output-dir-prefix specifies the prefix used for naming the temporary
+output directories into which intermediate and final results are stored.
+The default is 'convert-corpora'; then, 'convert-corpora-1' contains the
+results from running the first step in --steps, 'convert-corpora-2'
+contains results from the second step, etc.  Final results are in the
+highest-numbered such directory.
+
+--add-dir-prefix, if given, controls whether the INPUT directory will be
+added to the end of the prefix used in the schema and data files generated
+in the corpora inside of the output dirs.  Normally, the existing prefix
+of the files is used as the new prefix, but with --add-dir-prefix, the
+input directory will also be added.  This is mostly useful for handling
+the different threshold values, where the input corpora files for all
+threshold values have the same names but we want differently-named output
+corpora.  For Wikipedia corpora, don't use it.
 FOO
   exit 1
 }
 
 steps=
 output_dir_prefix=convert-corpora
+add_dir_prefix=
 while true; do
   case "$1" in
     --steps ) steps="$2"; shift 2 ;;
     --output-dir-prefix ) output_dir_prefix="$2"; shift 2 ;;
+    --add-dir-prefix ) add_dir_prefix="--add-dir-prefix"; shift ;;
     * ) break ;;
   esac
 done
@@ -72,6 +89,10 @@ fi
 
 if [ "$steps" = all ]; then
   steps="convert-to-schema-and-document merge-metadata-and-old-counts frob-geotext split-by-training"
+fi
+
+if [ "$steps" = wiki ]; then
+  steps="convert-to-schema-and-document merge-metadata-and-old-counts split-by-training"
 fi
 
 echo "Steps are $steps"
@@ -96,7 +117,7 @@ echo "Input dir is '$input_dir', output dir is '$output_dir' ..."
 
 if [ "$step" = convert-to-schema-and-document ]; then
   $TG_PREPROC_DIR/convert-old-docfile-to-metadata-schema-and-file \
-    --output-dir "$output_dir" "$input_dir"
+    $add_dir_prefix --output-dir "$output_dir" "$input_dir"
 
 elif [ "$step" = merge-metadata-and-old-counts ]; then
   textgrounder run opennlp.textgrounder.preprocess.MergeMetadataAndOldCounts \
