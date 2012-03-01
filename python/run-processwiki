@@ -221,11 +221,18 @@ elif [ "$step" = combine-article-data ]; then
 
 # Uses a different program, not processwiki.
 echo "Combining article data ..."
+echo "Beginning at `date`:"
+echo "Executing: $GENERATE_COMBINED \
+  --links-file $OUT_COORD_LINKS_FILE \
+  --coords-file $OUT_COORDS_FILE \
+  --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
+  > $OUT_COMBINED_DOCUMENT_DATA_FILE"
 $GENERATE_COMBINED \
   --links-file $OUT_COORD_LINKS_FILE \
   --coords-file $OUT_COORDS_FILE \
   --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
   > $OUT_COMBINED_DOCUMENT_DATA_FILE
+echo "Ended at `date`."
 
 elif [ "$step" = split-dump ]; then
 
@@ -233,10 +240,16 @@ PERMUTE_WIKI="$TG_PYTHON_DIR/permute_wiki.py"
 
 # Uses a different program, not processwiki.
 echo "Splitting dump file ..."
+echo "Beginning at `date`:"
+echo "Executing: bzcat $OUT_DUMP_FILE | $PERMUTE_WIKI --mode=split \
+  --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
+  --split-prefix $SPLIT_PREFIX \
+  --number-of-splits $NUM_SPLITS $OTHEROPTS"
 bzcat $OUT_DUMP_FILE | $PERMUTE_WIKI --mode=split \
   --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
   --split-prefix $SPLIT_PREFIX \
   --number-of-splits $NUM_SPLITS $OTHEROPTS
+echo "Ended at `date`."
 
 elif [ "$step" = coord-counts ]; then
 
@@ -290,13 +303,17 @@ fi
 if [ "$NUM_SIMULTANEOUS" -eq 1 -o -z "$outfile" -o "$cansplit" = "no" ]; then
 
   # Operate in non-split mode
+  echo "Beginning at `date`:"
   echo "$action ..."
   if [ -n "$outfile" ]; then
+    echo "Executing: bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS > $outfile"
     bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS > $outfile
   else
+    echo "Executing: bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS"
     bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS
   fi
   echo "$action ... done."
+  echo "Ended at `date`."
 
 else
 
@@ -313,6 +330,7 @@ else
   numrun=0
   i=0
   splits=""
+  splits_removable=""
   while [ "$i" -lt "$NUM_SPLITS" ]; do
     SPLITFILE="$SPLIT_PREFIX.$i"
     if [ ! -e "$SPLITFILE" ]; then
@@ -324,13 +342,18 @@ else
     if [ "$numleft" -gt 0 ]; then
       split_outfile="$outfile.split-processwiki.$i"
       splits="$splits $split_outfile"
+      splits_removable="$splits_removable $split_outfile"
+      echo "Beginning at `date`:"
+      echo "Executing: cat $SPLIT_PREFIX.prolog $SPLITFILE $SPLIT_PREFIX.epilog | $PROCESSWIKI $args $OTHEROPTS > $split_outfile &"
       cat $SPLIT_PREFIX.prolog $SPLITFILE $SPLIT_PREFIX.epilog | $PROCESSWIKI $args $OTHEROPTS > $split_outfile &
+      echo "Ended at `date`."
       numleft=`expr $numleft - 1`
       numrun=`expr $numrun + 1`
     fi
     if [ "$numleft" -eq 0 ]; then
       echo "Waiting for $numrun processes to finish..."
       wait
+      echo "Ended at `date`."
       numleft="$NUM_SIMULTANEOUS"
       numrun=0
     fi
@@ -339,12 +362,18 @@ else
   if [ "$numrun" -gt 0 ]; then
     echo "Waiting for $numrun processes to finish..."
     wait
+      echo "Ended at `date`."
     numrun=0
   fi
   echo "$action, combining the files ..."
   all_files="$splits"
   echo "$action, concatenating all files ($all_files) ..."
+  echo "Beginning at `date`:"
+  echo "Executing: cat $all_files > $outfile"
   cat $all_files > $outfile
+  echo "Ended at `date`."
+  echo "$action, removing intermediate split files ($splits_removable) ..."
+  rm -f $splits_removable
   echo "$action ... done."
 
 fi
