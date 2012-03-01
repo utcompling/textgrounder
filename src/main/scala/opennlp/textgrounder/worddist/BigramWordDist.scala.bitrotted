@@ -250,7 +250,7 @@ abstract class BigramWordDist(
   }
 }
 
-trait SimpleBigramWordDistReader extends WordDistReader {
+trait SimpleBigramWordDistConstructor extends WordDistConstructor {
   /**
    * Initial size of the internal DynamicArray objects; an optimization.
    */
@@ -381,7 +381,7 @@ trait SimpleBigramWordDistReader extends WordDistReader {
  * General factory for BigramWordDist distributions.
  */ 
 abstract class BigramWordDistFactory extends
-    WordDistFactory with SimpleBigramWordDistReader {
+    WordDistFactory with SimpleBigramWordDistConstructor {
   def canonicalize_word(doc: GenericDistDocument, word: String) = {
     val lword = maybe_lowercase(doc, word)
     if (!is_stopword(doc, lword)) lword else "-OOV-"

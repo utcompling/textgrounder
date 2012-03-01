@@ -80,9 +80,11 @@ class CombinedWordDist(factory: WordDistFactory) {
   def is_empty() = num_docs_for_links == 0
 
   /**
-   *  Add the given document to the total distribution seen so far
+   *  Add the given document to the total distribution seen so far.
+   *  `partial` is a scaling factor (between 0.0 and 1.0) used for
+   *  interpolating multiple distributions.
    */
-  def add_document(doc: DistDocument[_]) {
+  def add_document(doc: DistDocument[_], partial: Double = 1.0) {
     /* Formerly, we arranged things so that we were passed in all documents,
        regardless of the split.  The reason for this was that the decision
        was made to accumulate link counts from all documents, even in the
@@ -135,28 +137,7 @@ class CombinedWordDist(factory: WordDistFactory) {
       if (Params.max_time_per_stage == 0.0 && Params.num_training_docs == 0)
         warning("Saw document %s without distribution", doc)
     } else {
-      word_dist.add_word_distribution(doc.dist)
-      num_docs_for_word_dist += 1
-    }
-  }
-
-  def add_document_partial(doc: DistDocument[_],partial: Double) {
-    assert (doc.split == "training")
-
-    /* Add link count of document to cell. */
-    doc.incoming_links match {
-      // Might be None, for unknown link count
-      case Some(x) => incoming_links += x
-      case _ =>
-    }
-    num_docs_for_links += 1
-
-    if (doc.dist == null) {
-      if (Params.max_time_per_stage == 0.0 && Params.num_training_docs == 0)
-        warning("Saw document %s without distribution", doc)
-    } else {
-
-      word_dist.add_word_distribution_partial(doc.dist,partial)
+      word_dist.add_word_distribution(doc.dist, partial)
       num_docs_for_word_dist += 1
     }
   }
@@ -414,8 +395,8 @@ abstract class GeoCell[TCoord, TDoc <: DistDocument[TCoord]](
    */
   def finish() {
     assert(!finished)
-    combined_dist.word_dist.finish(
-      minimum_word_count = cell_grid.table.driver.params.minimum_word_count)
+    combined_dist.word_dist.finish_before_global()
+    combined_dist.word_dist.finish_after_global()
   }
 }
 

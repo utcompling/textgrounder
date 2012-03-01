@@ -19,6 +19,7 @@ package opennlp.textgrounder.util
 import math._
 
 import printutil.warning
+import mathutil.MeanShift
 
 /*
   The coordinates of a point are spherical coordinates, indicating a
@@ -227,5 +228,35 @@ package object distances {
       average_longitudes(long1, long2 - 360.)
     else
       (long1 + long2) / 2.0
+  }
+
+  class SphereMeanShift extends MeanShift[SphereCoord] {
+    def squared_distance(x: SphereCoord, y:SphereCoord) = {
+      val dist = spheredist(x, y)
+      dist * dist
+    }
+
+    def weighted_sum(weights:Array[Double], points:Array[SphereCoord]) = {
+      val len = weights.length
+      var lat = 0.0
+      var long = 0.0
+      for (i <- 0 until len) {
+        val w = weights(i)
+        val c = points(i)
+        lat += c.lat * w
+        long += c.long * w
+      }
+      SphereCoord(lat, long)
+    }
+
+    def scaled_sum(scalar:Double, points:Array[SphereCoord]) = {
+      var lat = 0.0
+      var long = 0.0
+      for (c <- points) {
+        lat += c.lat * scalar
+        long += c.long * scalar
+      }
+      SphereCoord(lat, long)
+    }
   }
 }

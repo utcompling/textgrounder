@@ -659,12 +659,11 @@ abstract class DistDocument[TCoord : Serializer](
         val is_training_set = (this.split == "training")
         val is_eval_set = (this.split == table.driver.params.eval_set)
         assert (is_training_set || is_eval_set)
-        table.word_dist_factory.initialize_distribution(this, value,
-          is_training_set)
-        dist.finish_before_global(minimum_word_count =
-          table.driver.params.minimum_word_count)
+        table.word_dist_factory.constructor.initialize_distribution(this,
+          value, is_training_set)
+        dist.finish_before_global()
       }
-      case _ => () // Just eat the  other parameters
+      case _ => () // Just eat the other parameters
     }
   }
 
