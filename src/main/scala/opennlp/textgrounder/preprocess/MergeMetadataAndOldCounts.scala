@@ -63,7 +63,7 @@ class MMCParameters(ap: ArgParser) extends
  * read the distributions and pass them to `handle_document`.
  */
 
-trait SimpleUnigramWordDistReader {
+trait SimpleUnigramWordDistConstructor {
   val initial_dynarr_size = 1000
   val keys_dynarr =
     new DynamicArray[Word](initial_alloc = initial_dynarr_size)
@@ -130,7 +130,7 @@ class MMCUnigramWordDistHandler(
   filehand: FileHandler,
   output_dir: String,
   output_file_prefix: String
-) extends SimpleUnigramWordDistReader {
+) extends SimpleUnigramWordDistConstructor {
   val new_schema = new Schema(schema.fieldnames ++ Seq("counts"),
     schema.fixed_values)
   val writer = new CorpusWriter(new_schema, "unigram-counts")
