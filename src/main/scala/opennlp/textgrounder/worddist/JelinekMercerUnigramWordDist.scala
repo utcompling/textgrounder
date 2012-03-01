@@ -28,7 +28,7 @@ package opennlp.textgrounder.worddist
  */ 
 class JelinekMercerUnigramWordDistFactory(
     interpolate_string: String,
-    val discount_factor: Double
+    val jelinek_factor: Double
   ) extends DiscountedUnigramWordDistFactory(interpolate_string != "no") {
   def create_word_dist(note_globally: Boolean) =
     new JelinekMercerUnigramWordDist(this, note_globally)
@@ -41,9 +41,8 @@ class JelinekMercerUnigramWordDist(
     factory, note_globally
   ) {
   override protected def imp_finish_after_global() {
-    unseen_mass = (1.0 -
-      factory.asInstanceOf[JelinekMercerUnigramWordDistFactory].
-      discount_factor)
+    unseen_mass = (factory.asInstanceOf[JelinekMercerUnigramWordDistFactory].
+      jelinek_factor)
     super.imp_finish_after_global()
   }
 }

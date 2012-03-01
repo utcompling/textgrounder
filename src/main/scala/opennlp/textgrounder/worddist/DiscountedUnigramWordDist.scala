@@ -193,6 +193,9 @@ abstract class DiscountedUnigramWordDist(
           yield factory.overall_word_probs(ind)) sum)
     //if (use_sorted_list)
     //  counts = new SortedList(counts)
+    if (debug("discount-factor") || debug("discountfactor"))
+      errprint("For distribution %s, num_word_tokens = %s, unseen_mass = %g"
+        format (this, num_word_tokens, unseen_mass))
   }
 
   def fast_kl_divergence(other: WordDist, partial: Boolean = false) = {
