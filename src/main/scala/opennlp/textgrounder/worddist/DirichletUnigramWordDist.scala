@@ -28,7 +28,7 @@ package opennlp.textgrounder.worddist
  */ 
 class DirichletUnigramWordDistFactory(
     interpolate_string: String,
-    val discount_factor: Double
+    val dirichlet_factor: Double
   ) extends DiscountedUnigramWordDistFactory(interpolate_string != "no") {
   def create_word_dist(note_globally: Boolean) =
     new DirichletUnigramWordDist(this, note_globally)
@@ -41,9 +41,11 @@ class DirichletUnigramWordDist(
     factory, note_globally
   ) {
   override protected def imp_finish_after_global() {
-    /* FIXME!! Not right factor */
-    unseen_mass = (1.0 -
-      factory.asInstanceOf[DirichletUnigramWordDistFactory].discount_factor)
+    unseen_mass = 1.0 -
+      (num_word_tokens.toDouble /
+        (num_word_tokens +
+          factory.asInstanceOf[DirichletUnigramWordDistFactory].
+            dirichlet_factor))
     super.imp_finish_after_global()
   }
 }

@@ -566,12 +566,13 @@ class RandomGridLocateDocumentStrategy[
       ap.option[String]("word-dist", "wd",
         default = "pseudo-good-turing",
         choices = Seq("pseudo-good-turing", "pseudo-good-turing-bigram", "dirichlet", "jelinek-mercer"),
+        aliases = Map("jelinek-mercer" -> Seq("jelinek")),
         help = """Type of word distribution to use.  Possibilities are
   'pseudo-good-turing' (a simplified version of Good-Turing over a unigram
   distribution), 'dirichlet' (Dirichlet smoothing over a unigram distribution),
-  'jelinek-mercer' (Jelinek-Mercer smoothing over a unigram distribution),
-  and 'pseudo-good-turing-bigram' (a non-smoothed bigram distribution??).
-  Default '%default'.
+  'jelinek' or 'jelinek-mercer' (Jelinek-Mercer smoothing over a unigram
+  distribution), and 'pseudo-good-turing-bigram' (a non-smoothed bigram
+  distribution??).  Default '%default'.
 
   Note that all three involve some type of discounting, i.e. taking away a
   certain amount of probability mass compared with the maximum-likelihood
@@ -593,19 +594,27 @@ class RandomGridLocateDocumentStrategy[
       ap.option[String]("interpolate",
         default = "default",
         choices = Seq("yes", "no", "default"),
+        aliases = Map("yes" -> Seq("interpolate"), "no" -> Seq("backoff")),
         help = """Whether to do interpolation rather than back-off.
   Possibilities are 'yes', 'no', and 'default' (which means 'yes' when doing
   Dirichlet or Jelinek-Mercer smoothing, 'no' when doing pseudo-Good-Turing
   smoothing).""")
-    var discount_factor =
-      ap.option[Double]("discount-factor", "df",
-        default = 0.9,
-        help = """Discounting factor when doing Dirichlet or Jelinek-Mercer
-  smoothing.  The lower the value, the more relative weight to give to the
-  global distribution vis-a-vis the document-specific distribution.  For
-  Jelinek-Mercer, this should be a value between 1.0 (no smoothing at all)
-  and 0.0 (total smoothing, i.e. use only the global distribution and ignore
-  document-specific distributions entirely).""")
+    var jelinek_factor =
+      ap.option[Double]("jelinek-factor", "jf",
+        default = 0.3,
+        help = """Smoothing factor when doing Jelinek-Mercer smoothing.
+  The higher the value, the more relative weight to give to the global
+  distribution vis-a-vis the document-specific distribution.  This
+  should be a value between 0.0 (no smoothing at all) and 1.0 (total
+  smoothing, i.e. use only the global distribution and ignore
+  document-specific distributions entirely).  Default %default.""")
+    var dirichlet_factor =
+      ap.option[Double]("dirichlet-factor", "df",
+        default = 500,
+        help = """Smoothing factor when doing Dirichlet smoothing.
+  The higher the value, the more relative weight to give to the global
+  distribution vis-a-vis the document-specific distribution.  Default
+  %default.""")
     var preserve_case_words =
       ap.flag("preserve-case-words", "pcw",
         help = """Don't fold the case of words used to compute and
@@ -801,8 +810,8 @@ class RandomGridLocateDocumentStrategy[
 
       need_seq(params.input_corpus, "input-corpus")
     
-      if (params.discount_factor < 0.0 || params.discount_factor > 1.0) {
-        param_error("Value for --discount-factor must be between 0.0 and 1.0, but is %g" format params.discount_factor)
+      if (params.jelinek_factor < 0.0 || params.jelinek_factor > 1.0) {
+        param_error("Value for --jelinek-factor must be between 0.0 and 1.0, but is %g" format params.jelinek_factor)
       }
 
       // Need to have `document_file_suffix` set early on, but factory
@@ -852,10 +861,10 @@ class RandomGridLocateDocumentStrategy[
           params.discount_factor)
       else */ if (params.word_dist == "dirichlet")
       new DirichletUnigramWordDistFactory(params.interpolate,
-        params.discount_factor)
+        params.dirichlet_factor)
     else if (params.word_dist == "jelinek-mercer")
       new JelinekMercerUnigramWordDistFactory(params.interpolate,
-        params.discount_factor)
+        params.jelinek_factor)
     else
       new PseudoGoodTuringUnigramWordDistFactory(params.interpolate)
   }
