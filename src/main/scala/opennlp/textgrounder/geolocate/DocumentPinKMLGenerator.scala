@@ -59,7 +59,7 @@ object DocumentPinKMLGenerator {
       println("You must specify a KML output file via -k.")
       sys.exit(0)
     }
-    val offset = if(tokenIndexOffset != None) tokenIndexOffset.value.get else 0
+    val offset = if(tokenIndexOffset.value != None) tokenIndexOffset.value.get else 0
 
     val outFile = new File(kmlOutFile.value.get)
     val stream = new BufferedOutputStream(new FileOutputStream(outFile))
