@@ -236,13 +236,18 @@ class DocumentEvaluationResult[
  * Subclass of `DocumentEvaluationResult` where the predicted coordinate
  * is specifically the central point of one of the grid cells.
  *
+ * @tparam TCoord type of a coordinate
+ * @tparam TDoc type of a document
+ * @tparam TCell type of a cell
+ * @tparam TGrid type of a cell grid
+ *
  * @param document document whose coordinate is predicted
  * @param pred_cell top-ranked predicted cell in which the document should
  *        belong
  * @param true_rank rank of the document's true cell among all of the
  *        predicted cell
  */
-class DocumentEvaluationResultCell[
+class RankedDocumentEvaluationResult[
   TCoord,
   TDoc <: DistDocument[TCoord],
   TCell <: GeoCell[TCoord, TDoc],
@@ -323,13 +328,31 @@ abstract class RankedDocumentEvalStats(
  * and number of documents in true cell. ("Grouped" in the sense that we may be
  * computing not only results for the documents as a whole but also for various
  * subgroups.)
+ *
+ * @tparam TCoord type of a coordinate
+ * @tparam TDoc type of a document
+ * @tparam TCell type of a cell
+ * @tparam TGrid type of a cell grid
+ * @tparam TEvalRes type of object holding result of evaluating a document
+ *
+ * @param driver_stats Object (possibly a trait) through which global-level
+ *   program statistics can be accumulated (in a Hadoop context, this maps
+ *   to counters).
+ * @param cell_grid Cell grid against which results were derived.
+ * @param results_by_range If true, record more detailed range-by-range
+ *   subresults.  Not on by default because Hadoop may choke on the large
+ *   number of counters created this way.
  */
 abstract class GroupedDocumentEvalStats[
   TCoord,
   TDoc <: DistDocument[TCoord],
   TCell <: GeoCell[TCoord, TDoc],
   TGrid <: CellGrid[TCoord, TDoc, TCell],
-  -TDocEvalRes <: DocumentEvaluationResult[TCoord, TDoc, TCell, TGrid]
+  /* The following - sign is necessary (indicating contravariance) because of
+     the use of subclasses like RankedSphereDocumentEvaluationResult in
+     RankedSphereCellGridEvaluator, whereas GroupedSphereDocumentEvalStats
+     merely uses SphereDocumentEvaluationResult. */
+  -TEvalRes <: DocumentEvaluationResult[TCoord, TDoc, TCell, TGrid]
 ](
   driver_stats: ExperimentDriverStats,
   cell_grid: CellGrid[TCoord,TDoc,TCell],
@@ -371,15 +394,15 @@ abstract class GroupedDocumentEvalStats[
     new DoubleTableByRange(dist_fractions_for_error_dist,
       create_stats_for_range("true_dist_to_pred_center", _))
 
-  def record_one_result(stats: DocumentEvalStats, res: TDocEvalRes) {
+  def record_one_result(stats: DocumentEvalStats, res: TEvalRes) {
     res.record_result(stats)
   }
 
-  def record_one_oracle_result(stats: DocumentEvalStats, res: TDocEvalRes) {
+  def record_one_oracle_result(stats: DocumentEvalStats, res: TEvalRes) {
     stats.record_oracle_distance(res.true_truedist)
   }
 
-  def record_result(res: TDocEvalRes) {
+  def record_result(res: TEvalRes) {
     record_one_result(all_document, res)
     record_one_oracle_result(all_document, res)
     // Stephen says recording so many counters leads to crashes (at the 51st
@@ -388,7 +411,7 @@ abstract class GroupedDocumentEvalStats[
       record_result_by_range(res)
   }
 
-  def record_result_by_range(res: TDocEvalRes) {
+  def record_result_by_range(res: TEvalRes) {
     val naitr = docs_by_naitr.get_collector(res.num_docs_in_true_cell)
     record_one_result(naitr, res)
   }
@@ -651,7 +674,7 @@ abstract class TestDocumentEvaluator[TEvalDoc, TEvalRes](
  * names `TDoc` and `TGrid` due to a naming clash.  Possibly there is a
  * solution to this problem but if so I can't figure it out.
  */
-abstract class CorpusDocumentEvaluator[
+abstract class CellGridEvaluator[
   TCoord,
   XTDoc <: DistDocument[TCoord],
   TCell <: GeoCell[TCoord, XTDoc],
@@ -847,7 +870,7 @@ abstract class CorpusDocumentEvaluator[
 }
 
 /**
- * An implementation of `CorpusDocumentEvaluator` that compares the test
+ * An implementation of `CellGridEvaluator` that compares the test
  * document against each pseudo-document in the cell grid, ranks them by
  * score and computes the document's location by the central point of the
  * top-ranked cell.
@@ -864,7 +887,7 @@ abstract class CorpusDocumentEvaluator[
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
-abstract class RankedCorpusDocumentEvaluator[
+abstract class RankedCellGridEvaluator[
   TCoord,
   XTDoc <: DistDocument[TCoord],
   TCell <: GeoCell[TCoord, XTDoc],
@@ -874,7 +897,7 @@ abstract class RankedCorpusDocumentEvaluator[
   strategy: GridLocateDocumentStrategy[TCell, XTGrid],
   stratname: String,
   driver: GridLocateDriver { type TGrid = XTGrid; type TDoc = XTDoc } // GridLocateDocumentTypeDriver
-) extends CorpusDocumentEvaluator[
+) extends CellGridEvaluator[
   TCoord, XTDoc, TCell, XTGrid, TEvalRes
 ](strategy, stratname, driver) {
   /**
@@ -917,7 +940,7 @@ abstract class RankedCorpusDocumentEvaluator[
 }
 
 /**
- * An implementation of `CorpusDocumentEvaluator` that compares the test
+ * An implementation of `CellGridEvaluator` that compares the test
  * document against each pseudo-document in the cell grid, selects the
  * top N ranked pseudo-documents for some N, and uses the mean-shift
  * algorithm to determine a single point that is hopefully in the middle
@@ -936,7 +959,7 @@ abstract class RankedCorpusDocumentEvaluator[
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  */
-abstract class MeanShiftCorpusDocumentEvaluator[
+abstract class MeanShiftCellGridEvaluator[
   TCoord,
   XTDoc <: DistDocument[TCoord],
   TCell <: GeoCell[TCoord, XTDoc],
@@ -950,7 +973,7 @@ abstract class MeanShiftCorpusDocumentEvaluator[
   mean_shift_window: Double,
   mean_shift_max_stddev: Double,
   mean_shift_max_iterations: Int
-) extends CorpusDocumentEvaluator[
+) extends CellGridEvaluator[
   TCoord, XTDoc, TCell, XTGrid, TEvalRes
 ](strategy, stratname, driver) {
   /**
@@ -982,6 +1005,13 @@ abstract class MeanShiftCorpusDocumentEvaluator[
   }
 }
 
+/**
+ * A trait used when '--eval-format' is not 'internal', i.e. the test documents
+ * don't come from the same corpus used to supply the training documents,
+ * but come from some separate text file.  This is a general interface for
+ * iterating over files and returning the test documents in those files
+ * (possibly more than one per file).
+ */
 trait DocumentIteratingEvaluator[TEvalDoc, TEvalRes] extends
   TestDocumentEvaluator[TEvalDoc, TEvalRes] {
   /**
