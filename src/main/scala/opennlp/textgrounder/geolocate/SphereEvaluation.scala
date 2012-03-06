@@ -64,10 +64,6 @@ trait SphereDocumentEvalStats extends DocumentEvalStats {
     oracle_degree_dists += oracle_degree_dist
   }
 
-  protected def km_and_miles(kmdist: Double) = {
-    "%.2f km (%.2f miles)" format (kmdist, kmdist / km_per_mile)
-  }
-
   protected def output_result_with_units(kmdist: Double) = km_and_miles(kmdist)
 
   override def output_incorrect_results() {
@@ -332,45 +328,11 @@ class RankedSphereCellGridEvaluator(
       pred_cell: SphereCell, true_rank: Int) =
     new RankedSphereDocumentEvaluationResult(document, pred_cell, true_rank)
 
-  val num_nearest_neighbors = driver.params.num_nearest_neighbors
-
-  def print_individual_result(doctag: String, document: SphereDocument,
+  override def print_individual_result(doctag: String, document: SphereDocument,
       result: SphereDocumentEvaluationResult,
       pred_cells: Array[(SphereCell, Double)]) {
-    errprint("%s:Document %s:", doctag, document)
-    // errprint("%s:Document distribution: %s", doctag, document.dist)
-    errprint("%s:  %d types, %f tokens",
-      doctag, document.dist.num_word_types, document.dist.num_word_tokens)
-    errprint("%s:  true cell at rank: %s", doctag,
-      result.asInstanceOf[RankedSphereDocumentEvaluationResult].true_rank)
-    errprint("%s:  true cell: %s", doctag, result.true_cell)
-    for (i <- 0 until 5) {
-      errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
-        doctag, i + 1, pred_cells(i)._2, pred_cells(i)._1)
-    }
+    super.print_individual_result(doctag, document, result, pred_cells)
 
-    //for (num_nearest_neighbors <- 2 to 100 by 2) {
-    val kNN = pred_cells.take(num_nearest_neighbors).map(_._1)
-    val kNNranks = pred_cells.take(num_nearest_neighbors).zipWithIndex.map(p => (p._1._1, p._2+1)).toMap
-    val closest_half_with_dists = kNN.map(n => (n, spheredist(n.get_center_coord, document.coord))).sortWith(_._2 < _._2).take(num_nearest_neighbors/2)
-
-    closest_half_with_dists.zipWithIndex.foreach(c => errprint("%s:  #%s close neighbor: %s; error distance: %.2f km",
-      doctag, kNNranks(c._1._1), c._1._1.get_center_coord, c._1._2))
-
-    errprint("%s:  Distance %.2f km to true cell center at %s",
-      doctag, result.true_truedist, result.true_center)
-    errprint("%s:  Distance %.2f km to predicted cell center at %s",
-      doctag, result.pred_truedist, result.pred_coord)
-
-    val avg_dist_of_neighbors = mean(closest_half_with_dists.map(_._2))
-    errprint("%s:  Average distance from true cell center to %s closest cells' centers from %s best matches: %.2f km",
-      doctag, (num_nearest_neighbors/2), num_nearest_neighbors, avg_dist_of_neighbors)
-
-    if(avg_dist_of_neighbors < result.pred_truedist)
-      driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
-    //}
-
-  
     assert(doctag(0) == '#')
     if (debug("gridrank") ||
       (debuglist("gridrank") contains doctag.drop(1))) {
@@ -414,20 +376,6 @@ class MeanShiftSphereCellGridEvaluator(
   def create_coord_evaluation_result(document: SphereDocument,
       cell_grid: SphereCellGrid, pred_coord: SphereCoord) =
     new CoordSphereDocumentEvaluationResult(document, cell_grid, pred_coord)
-
-  def print_individual_result(doctag: String, document: SphereDocument,
-      result: SphereDocumentEvaluationResult) {
-    errprint("%s:Document %s:", doctag, document)
-    // errprint("%s:Document distribution: %s", doctag, document.dist)
-    errprint("%s:  %d types, %f tokens",
-      doctag, document.dist.num_word_types, document.dist.num_word_tokens)
-    errprint("%s:  true cell: %s", doctag, result.true_cell)
-
-    errprint("%s:  Distance %.2f km to true cell center at %s",
-      doctag, result.true_truedist, result.true_center)
-    errprint("%s:  Distance %.2f km to predicted cell center at %s",
-      doctag, result.pred_truedist, result.pred_coord)
-  }
 }
 
 case class TitledDocument(title: String, text: String)

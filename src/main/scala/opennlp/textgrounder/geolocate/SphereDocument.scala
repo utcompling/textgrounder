@@ -49,6 +49,7 @@ abstract class SphereDocument(
 
   def distance_to_coord(coord2: SphereCoord) = spheredist(coord, coord2)
   def degree_distance_to_coord(coord2: SphereCoord) = degree_dist(coord, coord2)
+  def output_distance(dist: Double) = km_and_miles(dist)
 }
 
 /**
