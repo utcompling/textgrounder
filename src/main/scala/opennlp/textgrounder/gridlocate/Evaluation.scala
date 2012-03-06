@@ -348,11 +348,7 @@ abstract class GroupedDocumentEvalStats[
   TDoc <: DistDocument[TCoord],
   TCell <: GeoCell[TCoord, TDoc],
   TGrid <: CellGrid[TCoord, TDoc, TCell],
-  /* The following - sign is necessary (indicating contravariance) because of
-     the use of subclasses like RankedSphereDocumentEvaluationResult in
-     RankedSphereCellGridEvaluator, whereas GroupedSphereDocumentEvalStats
-     merely uses SphereDocumentEvaluationResult. */
-  -TEvalRes <: DocumentEvaluationResult[TCoord, TDoc, TCell, TGrid]
+  TEvalRes <: DocumentEvaluationResult[TCoord, TDoc, TCell, TGrid]
 ](
   driver_stats: ExperimentDriverStats,
   cell_grid: TGrid,
