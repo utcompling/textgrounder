@@ -322,12 +322,12 @@ class RankedSphereCellGridEvaluator(
   driver: GeolocateDocumentTypeDriver
 ) extends RankedCellGridEvaluator[
   SphereCoord, SphereDocument, SphereCell, SphereCellGrid,
-  RankedSphereDocumentEvaluationResult
+  SphereDocumentEvaluationResult
 ](strategy, stratname, driver) {
   def create_grouped_eval_stats(driver: GridLocateDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
-    new GroupedSphereDocumentEvalStats(driver,
-      cell_grid, results_by_range, is_ranked = true)
+    new GroupedSphereDocumentEvalStats(
+      driver, cell_grid, results_by_range, is_ranked = true)
   def create_cell_evaluation_result(document: SphereDocument,
       pred_cell: SphereCell, true_rank: Int) =
     new RankedSphereDocumentEvaluationResult(document, pred_cell, true_rank)
@@ -335,13 +335,14 @@ class RankedSphereCellGridEvaluator(
   val num_nearest_neighbors = driver.params.num_nearest_neighbors
 
   def print_individual_result(doctag: String, document: SphereDocument,
-      result: RankedSphereDocumentEvaluationResult,
+      result: SphereDocumentEvaluationResult,
       pred_cells: Array[(SphereCell, Double)]) {
     errprint("%s:Document %s:", doctag, document)
     // errprint("%s:Document distribution: %s", doctag, document.dist)
     errprint("%s:  %d types, %f tokens",
       doctag, document.dist.num_word_types, document.dist.num_word_tokens)
-    errprint("%s:  true cell at rank: %s", doctag, result.true_rank)
+    errprint("%s:  true cell at rank: %s", doctag,
+      result.asInstanceOf[RankedSphereDocumentEvaluationResult].true_rank)
     errprint("%s:  true cell: %s", doctag, result.true_cell)
     for (i <- 0 until 5) {
       errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
@@ -408,8 +409,8 @@ class MeanShiftSphereCellGridEvaluator(
   mean_shift_max_stddev, mean_shift_max_iterations) {
   def create_grouped_eval_stats(driver: GridLocateDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
-    new GroupedSphereDocumentEvalStats(driver,
-      cell_grid, results_by_range, is_ranked = false)
+    new GroupedSphereDocumentEvalStats(
+      driver, cell_grid, results_by_range, is_ranked = false)
   def create_coord_evaluation_result(document: SphereDocument,
       cell_grid: SphereCellGrid, pred_coord: SphereCoord) =
     new CoordSphereDocumentEvaluationResult(document, cell_grid, pred_coord)
