@@ -30,7 +30,7 @@ import opennlp.textgrounder.util.ioutil.{FileHandler, Schema}
 import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil.{errout, errprint, warning}
 
-import opennlp.textgrounder.gridlocate.{CombinedWordDist,EvalStats,TestFileEvaluator,DocumentIteratingEvaluator}
+import opennlp.textgrounder.gridlocate.{CombinedWordDist,EvalStats,TestDocumentEvaluator,DocumentIteratingEvaluator}
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 import opennlp.textgrounder.geolocate._
 
@@ -903,7 +903,7 @@ abstract class GeolocateToponymEvaluator(
   strategy: GeolocateToponymStrategy,
   stratname: String,
   driver: GeolocateToponymDriver
-) extends TestFileEvaluator[
+) extends TestDocumentEvaluator[
   GeogWordDocument, ToponymEvaluationResult
 ](stratname, driver) with DocumentIteratingEvaluator[
   GeogWordDocument, ToponymEvaluationResult
@@ -1546,7 +1546,7 @@ class GeolocateToponymDriver extends
     GeolocateDriver with StandaloneExperimentDriverStats {
   type TParam = GeolocateToponymParameters
   type TRunRes =
-    Seq[(String, GeolocateToponymStrategy, TestFileEvaluator[_,_])]
+    Seq[(String, GeolocateToponymStrategy, TestDocumentEvaluator[_,_])]
 
   override def handle_parameters() {
     super.handle_parameters()

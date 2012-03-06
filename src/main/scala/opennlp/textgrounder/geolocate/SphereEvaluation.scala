@@ -44,26 +44,17 @@ import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 
 //////// Statistics for geolocating documents
 
-class SphereDocumentEvalStats(
-  driver_stats: ExperimentDriverStats,
-  prefix: String,
-  max_rank_for_credit: Int = 10
-) extends DocumentEvalStats(
-  driver_stats, prefix, max_rank_for_credit) {
+trait SphereDocumentEvalStats extends DocumentEvalStats {
   // "True dist" means actual distance in km's or whatever.
   // "Degree dist" is the distance in degrees.
   val degree_dists = mutable.Buffer[Double]()
   val oracle_degree_dists = mutable.Buffer[Double]()
 
-  def record_result(rank: Int, pred_true_dist: Double,
-      pred_degree_dist: Double) {
-    super.record_result(rank, pred_true_dist)
+  def record_predicted_degree_distance(pred_degree_dist: Double) {
     degree_dists += pred_degree_dist
   }
 
-  def record_oracle_result(oracle_true_dist: Double,
-      oracle_degree_dist: Double) {
-    super.record_oracle_result(oracle_true_dist)
+  def record_oracle_degree_distance(oracle_degree_dist: Double) {
     oracle_degree_dists += oracle_degree_dist
   }
 
@@ -85,6 +76,27 @@ class SphereDocumentEvalStats(
 }
 
 /**
+ * SphereDocument version of `CoordDocumentEvalStats`.
+ */
+class CoordSphereDocumentEvalStats(
+  driver_stats: ExperimentDriverStats,
+  prefix: String
+) extends CoordDocumentEvalStats(driver_stats, prefix)
+  with SphereDocumentEvalStats {
+}
+
+/**
+ * SphereDocument version of `RankedDocumentEvalStats`.
+ */
+class RankedSphereDocumentEvalStats(
+  driver_stats: ExperimentDriverStats,
+  prefix: String,
+  max_rank_for_credit: Int = 10
+) extends RankedDocumentEvalStats(driver_stats, prefix, max_rank_for_credit)
+  with SphereDocumentEvalStats {
+}
+
+/**
  * Class for statistics for geolocating documents, with separate
  * sets of statistics for different intervals of error distances and
  * number of documents in true cell.
@@ -93,14 +105,18 @@ class SphereDocumentEvalStats(
 class SphereGroupedDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
   cell_grid: SphereCellGrid,
-  results_by_range: Boolean
+  results_by_range: Boolean,
+  is_ranked: Boolean
 ) extends GroupedDocumentEvalStats[
-  SphereCoord, SphereDocument, SphereCell](
-  driver_stats, cell_grid, results_by_range) {
-  type TBasicEvalStats = SphereDocumentEvalStats
-  type TDocEvalRes = SphereDocumentEvaluationResult
-  override def create_stats(prefix: String) =
-    new SphereDocumentEvalStats(driver_stats, prefix)
+  SphereCoord, SphereDocument, SphereCell, SphereCellGrid,
+  SphereDocumentEvaluationResult
+](driver_stats, cell_grid, results_by_range) {
+  override def create_stats(prefix: String) = {
+    if (is_ranked)
+      new RankedSphereDocumentEvalStats(driver_stats, prefix)
+    else
+      new CoordSphereDocumentEvalStats(driver_stats, prefix)
+  }
 
   val docs_by_degree_dist_to_true_center =
     docmap("degree_dist_to_true_center")
@@ -109,17 +125,21 @@ class SphereGroupedDocumentEvalStats(
     new DoubleTableByRange(dist_fractions_for_error_dist,
       create_stats_for_range("degree_dist_to_pred_center", _))
 
-  override def record_one_result(stats: TBasicEvalStats,
-      res: TDocEvalRes) {
-    stats.record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
+  override def record_one_result(stats: DocumentEvalStats,
+      res: SphereDocumentEvaluationResult) {
+    super.record_one_result(stats, res)
+    stats.asInstanceOf[SphereDocumentEvalStats].
+      record_predicted_degree_distance(res.pred_degdist)
   }
 
-  override def record_one_oracle_result(stats: TBasicEvalStats,
-      res: TDocEvalRes) {
-    stats.record_oracle_result(res.true_truedist, res.true_degdist)
+  override def record_one_oracle_result(stats: DocumentEvalStats,
+      res: SphereDocumentEvaluationResult) {
+    super.record_one_oracle_result(stats, res)
+    stats.asInstanceOf[SphereDocumentEvalStats].
+      record_oracle_degree_distance(res.true_degdist)
   }
 
-  override def record_result_by_range(res: TDocEvalRes) {
+  override def record_result_by_range(res: SphereDocumentEvaluationResult) {
     super.record_result_by_range(res)
 
     /* FIXME: This code specific to MultiRegularCellGrid is kind of ugly.
@@ -146,10 +166,10 @@ class SphereGroupedDocumentEvalStats(
         fracinc * floor(frac_true_degdist / fracinc)
       val rounded_frac_true_degdist =
         fracinc * floor(frac_true_degdist / fracinc)
-      docs_by_true_dist_to_true_center(rounded_frac_true_truedist).
-        record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
-      docs_by_degree_dist_to_true_center(rounded_frac_true_degdist).
-        record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
+      res.record_result(docs_by_true_dist_to_true_center(
+        rounded_frac_true_truedist))
+      res.record_result(docs_by_degree_dist_to_true_center(
+        rounded_frac_true_degdist))
 
       /* For distance to center of predicted cell, which may be large, since
          predicted cell may be nowhere near the true cell.  Again we convert
@@ -159,17 +179,17 @@ class SphereGroupedDocumentEvalStats(
          cell size */
       val frac_pred_truedist = res.pred_truedist / multigrid.km_per_cell
       val frac_pred_degdist = res.pred_degdist / multigrid.degrees_per_cell
-      docs_by_true_dist_to_pred_center.get_collector(frac_pred_truedist).
-        record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
-      docs_by_degree_dist_to_pred_center.get_collector(frac_pred_degdist).
-        record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
+      res.record_result(docs_by_true_dist_to_pred_center.get_collector(
+        frac_pred_truedist))
+      res.record_result(docs_by_degree_dist_to_pred_center.get_collector(
+        frac_pred_degdist))
      } else if (cell_grid.isInstanceOf[KdTreeCellGrid]) {
        // for kd trees, we do something similar to above, but round to the nearest km...
        val kdgrid = cell_grid.asInstanceOf[KdTreeCellGrid]
-       docs_by_true_dist_to_true_center(round(res.true_truedist)).
-         record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
-       docs_by_degree_dist_to_true_center(round(res.true_degdist)).
-         record_result(res.true_rank, res.pred_truedist, res.pred_degdist)
+       res.record_result(docs_by_true_dist_to_true_center(
+         round(res.true_truedist)))
+       res.record_result(docs_by_degree_dist_to_true_center(
+         round(res.true_degdist)))
     }
   }
 
@@ -215,58 +235,95 @@ class SphereGroupedDocumentEvalStats(
 //                             Main evaluation code                        //
 /////////////////////////////////////////////////////////////////////////////
 
-abstract class GeolocateDocumentEvaluator[TEvalDoc, TEvalRes](
-  strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
-  stratname: String,
-  driver: GeolocateDocumentTypeDriver
-) extends DocumentEvaluator[SphereCoord, SphereDocument, SphereCell,
-  SphereCellGrid, TEvalDoc, TEvalRes](strategy, stratname, driver) {
-  type TGroupedEvalStats = SphereGroupedDocumentEvalStats
-  def create_grouped_eval_stats(driver: GridLocateDriver,
-    cell_grid: SphereCellGrid, results_by_range: Boolean) =
-    new SphereGroupedDocumentEvalStats(driver,
-      cell_grid.asInstanceOf[SphereCellGrid],
-      results_by_range)
+trait SphereDocumentEvaluationResult extends DocumentEvaluationResult[
+  SphereCoord, SphereDocument, SphereCell, SphereCellGrid
+] {
+  val xdocument: SphereDocument
+  /* The following must be declared as 'lazy' because 'xdocument' above isn't
+     initialized at creation time (which is impossible because traits can't
+     have construction parameters). */
+  /**
+   * Distance in degrees between document's coordinate and central
+   * point of true cell
+   */
+  lazy val true_degdist = xdocument.degree_distance_to_coord(true_center)
+  /**
+   * Distance in degrees between document's coordinate and predicted
+   * coordinate
+   */
+  lazy val pred_degdist = xdocument.degree_distance_to_coord(pred_coord)
 }
 
-class SphereDocumentEvaluationResult(
+/**
+ * Result of evaluating a SphereDocument using an algorithm that does
+ * cell-by-cell comparison and computes a ranking of all the cells.
+ * The predicted coordinate is the central point of the top-ranked cell,
+ * and the cell grid is derived from the cell.
+ *
+ * @param document document whose coordinate is predicted
+ * @param pred_cell top-ranked predicted cell in which the document should
+ *        belong
+ * @param true_rank rank of the document's true cell among all of the
+ *        predicted cell
+ */
+class SphereDocumentEvaluationResultCell(
   document: SphereDocument,
   pred_cell: SphereCell,
   true_rank: Int
-) extends DocumentEvaluationResult[SphereCoord, SphereDocument, SphereCell](
+) extends DocumentEvaluationResultCell[
+  SphereCoord, SphereDocument, SphereCell, SphereCellGrid
+  ](
   document, pred_cell, true_rank
-) {
-  val true_degdist = document.degree_distance_to_coord(true_center)
-  val pred_degdist = document.degree_distance_to_coord(pred_center)
+) with SphereDocumentEvaluationResult {
+  val xdocument = document
+}
+
+/**
+ * Result of evaluating a SphereDocument using an algorithm that
+ * predicts a coordinate that is not necessarily the central point of
+ * any cell (e.g. using a mean-shift algorithm).
+ *
+ * @param document document whose coordinate is predicted
+ * @param cell_grid cell grid against which error comparison should be done
+ * @param pred_coord predicted coordinate of the document
+ */
+class SphereDocumentEvaluationResultCoord(
+  document: SphereDocument,
+  cell_grid: SphereCellGrid,
+  pred_coord: SphereCoord
+) extends DocumentEvaluationResult[
+  SphereCoord, SphereDocument, SphereCell, SphereCellGrid
+  ](
+  document, cell_grid, pred_coord
+) with SphereDocumentEvaluationResult {
+  val xdocument = document
 }
 
 /**
  * Class to do document geolocating on documents from the document data, in
  * the dev or test set.
  */
-class CorpusGeolocateDocumentEvaluator(
+class RankedCorpusGeolocateDocumentEvaluator(
   strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends CorpusDocumentEvaluator[
+) extends RankedCorpusDocumentEvaluator[
   SphereCoord, SphereDocument, SphereCell, SphereCellGrid,
-  SphereDocumentEvaluationResult
+  SphereDocumentEvaluationResultCell
 ](strategy, stratname, driver) {
-  // FIXME, the following 8 lines are copied from GeolocateDocumentEvaluator
-  type TGroupedEvalStats = SphereGroupedDocumentEvalStats
   def create_grouped_eval_stats(driver: GridLocateDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
     new SphereGroupedDocumentEvalStats(driver,
       cell_grid.asInstanceOf[SphereCellGrid],
-      results_by_range)
-  def create_evaluation_result(document: SphereDocument, pred_cell: SphereCell,
-      true_rank: Int) =
-    new SphereDocumentEvaluationResult(document, pred_cell, true_rank)
+      results_by_range, is_ranked = true)
+  def create_cell_evaluation_result(document: SphereDocument,
+      pred_cell: SphereCell, true_rank: Int) =
+    new SphereDocumentEvaluationResultCell(document, pred_cell, true_rank)
 
   val num_nearest_neighbors = driver.params.num_nearest_neighbors
 
   def print_individual_result(doctag: String, document: SphereDocument,
-      result: SphereDocumentEvaluationResult,
+      result: SphereDocumentEvaluationResultCell,
       pred_cells: Array[(SphereCell, Double)]) {
     errprint("%s:Document %s:", doctag, document)
     // errprint("%s:Document distribution: %s", doctag, document.dist)
@@ -290,7 +347,7 @@ class CorpusGeolocateDocumentEvaluator(
     errprint("%s:  Distance %.2f km to true cell center at %s",
       doctag, result.true_truedist, result.true_center)
     errprint("%s:  Distance %.2f km to predicted cell center at %s",
-      doctag, result.pred_truedist, result.pred_center)
+      doctag, result.pred_truedist, result.pred_coord)
 
     val avg_dist_of_neighbors = mean(closest_half_with_dists.map(_._2))
     errprint("%s:  Average distance from true cell center to %s closest cells' centers from %s best matches: %.2f km",
@@ -317,6 +374,47 @@ class CorpusGeolocateDocumentEvaluator(
   }
 }
 
+/**
+ * Class to do document geolocating on documents from the document data, in
+ * the dev or test set.
+ */
+class MeanShiftCorpusGeolocateDocumentEvaluator(
+  strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
+  stratname: String,
+  driver: GeolocateDocumentTypeDriver,
+  k_best: Int,
+  mean_shift_window: Double,
+  mean_shift_max_stddev: Double,
+  mean_shift_max_iterations: Int
+) extends MeanShiftCorpusDocumentEvaluator[
+  SphereCoord, SphereDocument, SphereCell, SphereCellGrid,
+  SphereDocumentEvaluationResult
+](strategy, stratname, driver, k_best, mean_shift_window,
+  mean_shift_max_stddev, mean_shift_max_iterations) {
+  def create_grouped_eval_stats(driver: GridLocateDriver,
+    cell_grid: SphereCellGrid, results_by_range: Boolean) =
+    new SphereGroupedDocumentEvalStats(driver,
+      cell_grid.asInstanceOf[SphereCellGrid],
+      results_by_range, is_ranked = false)
+  def create_coord_evaluation_result(document: SphereDocument,
+      cell_grid: SphereCellGrid, pred_coord: SphereCoord) =
+    new SphereDocumentEvaluationResultCoord(document, cell_grid, pred_coord)
+
+  def print_individual_result(doctag: String, document: SphereDocument,
+      result: SphereDocumentEvaluationResult) {
+    errprint("%s:Document %s:", doctag, document)
+    // errprint("%s:Document distribution: %s", doctag, document.dist)
+    errprint("%s:  %d types, %f tokens",
+      doctag, document.dist.num_word_types, document.dist.num_word_tokens)
+    errprint("%s:  true cell: %s", doctag, result.true_cell)
+
+    errprint("%s:  Distance %.2f km to true cell center at %s",
+      doctag, result.true_truedist, result.true_center)
+    errprint("%s:  Distance %.2f km to predicted cell center at %s",
+      doctag, result.pred_truedist, result.pred_coord)
+  }
+}
+
 case class TitledDocument(title: String, text: String)
 class TitledDocumentResult { }
 
@@ -328,9 +426,9 @@ class PCLTravelGeolocateDocumentEvaluator(
   strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends GeolocateDocumentEvaluator[
+) extends TestDocumentEvaluator[
   TitledDocument, TitledDocumentResult
-](strategy, stratname, driver) with DocumentIteratingEvaluator[
+](stratname, driver) with DocumentIteratingEvaluator[
   TitledDocument, TitledDocumentResult
 ] {
   def iter_documents(filehand: FileHandler, filename: String) = {
@@ -377,6 +475,9 @@ class PCLTravelGeolocateDocumentEvaluator(
     }
 
     new TitledDocumentResult()
+  }
+
+  def output_results(isfinal: Boolean = false) {
   }
 }
 
