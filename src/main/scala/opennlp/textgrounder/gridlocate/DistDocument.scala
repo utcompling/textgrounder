@@ -689,6 +689,11 @@ abstract class DistDocument[TCoord : Serializer](
   def struct: scala.xml.Elem
 
   def distance_to_coord(coord2: TCoord): Double
+
+  /**
+   * Output a distance with attached units
+   */
+  def output_distance(dist: Double): String
 }
 
 object DistDocument {

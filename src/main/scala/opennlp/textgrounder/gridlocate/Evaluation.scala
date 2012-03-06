@@ -904,12 +904,50 @@ abstract class RankedCellGridEvaluator[
   def create_cell_evaluation_result(document: XTDoc, pred_cell: TCell,
     true_rank: Int): TEvalRes
 
+  val num_nearest_neighbors = driver.params.num_nearest_neighbors
+
   /**
    * Print out the evaluation result, possibly along with some of the
    * top-ranked cells.
    */
   def print_individual_result(doctag: String, document: XTDoc,
-    result: TEvalRes, pred_cells: Array[(TCell, Double)])
+    result: TEvalRes, pred_cells: Array[(TCell, Double)]) {
+    errprint("%s:Document %s:", doctag, document)
+    // errprint("%s:Document distribution: %s", doctag, document.dist)
+    errprint("%s:  %d types, %f tokens",
+      doctag, document.dist.num_word_types, document.dist.num_word_tokens)
+    errprint("%s:  true cell at rank: %s", doctag,
+      result.asInstanceOf[RankedDocumentEvaluationResult[_,_,_,_]].true_rank)
+    errprint("%s:  true cell: %s", doctag, result.true_cell)
+    for (i <- 0 until 5) {
+      errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
+        doctag, i + 1, pred_cells(i)._2, pred_cells(i)._1)
+    }
+
+    //for (num_nearest_neighbors <- 2 to 100 by 2) {
+    val kNN = pred_cells.take(num_nearest_neighbors).map(_._1)
+    val kNNranks = pred_cells.take(num_nearest_neighbors).zipWithIndex.map(p => (p._1._1, p._2+1)).toMap
+    val closest_half_with_dists = kNN.map(n => (n, document.distance_to_coord(n.get_center_coord))).sortWith(_._2 < _._2).take(num_nearest_neighbors/2)
+
+    closest_half_with_dists.zipWithIndex.foreach(
+      c => errprint("%s:  #%s close neighbor: %s; error distance: %s",
+        doctag, kNNranks(c._1._1), c._1._1.get_center_coord,
+        document.output_distance(c._1._2)))
+
+    errprint("%s:  Distance %s to true cell center at %s",
+      doctag, document.output_distance(result.true_truedist), result.true_center)
+    errprint("%s:  Distance %s to predicted cell center at %s",
+      doctag, document.output_distance(result.pred_truedist), result.pred_coord)
+
+    val avg_dist_of_neighbors = mean(closest_half_with_dists.map(_._2))
+    errprint("%s:  Average distance from true cell center to %s closest cells' centers from %s best matches: %s",
+      doctag, (num_nearest_neighbors/2), num_nearest_neighbors,
+      document.output_distance(avg_dist_of_neighbors))
+
+    if(avg_dist_of_neighbors < result.pred_truedist)
+      driver.increment_local_counter("instances.num_where_avg_dist_of_neighbors_beats_pred_truedist.%s" format num_nearest_neighbors)
+    //}
+  }
 
   def imp_evaluate_document(document: XTDoc, doctag: String,
       true_cell: TCell, want_indiv_results: Boolean): TEvalRes = {
@@ -930,6 +968,73 @@ abstract class RankedCellGridEvaluator[
       //}
       print_individual_result(doctag, document, result, pred_cells)
     }
+
+    return result
+  }
+}
+
+/**
+ * A general implementation of `CellGridEvaluator` that returns a single
+ * best point for a given test document.
+ *
+ * @tparam TCoord Type of the coordinate assigned to a document
+ * @tparam XTDoc Type of the training and test documents
+ * @tparam TCell Type of a cell in a cell grid
+ * @tparam XTGrid Type of a cell grid
+ * @tparam TEvalRes Type of result of evaluating a document.
+ *
+ * @param strategy Object encapsulating the strategy used for performing
+ *   evaluation.
+ * @param stratname Name of the strategy used for performing evaluation.
+ * @param driver Driver class that encapsulates command-line parameters and
+ *   such.
+ */
+abstract class CoordCellGridEvaluator[
+  TCoord,
+  XTDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, XTDoc],
+  XTGrid <: CellGrid[TCoord, XTDoc, TCell],
+  TEvalRes <: DocumentEvaluationResult[TCoord, XTDoc, TCell, XTGrid]
+](
+  strategy: GridLocateDocumentStrategy[TCell, XTGrid],
+  stratname: String,
+  driver: GridLocateDriver { type TGrid = XTGrid; type TDoc = XTDoc } // GridLocateDocumentTypeDriver
+) extends CellGridEvaluator[
+  TCoord, XTDoc, TCell, XTGrid, TEvalRes
+](strategy, stratname, driver) {
+  /**
+   * Create an evaluation-result object describing the predicted coordinate.
+   */
+  def create_coord_evaluation_result(document: XTDoc, cell_grid: XTGrid,
+    pred_coord: TCoord): TEvalRes
+
+  /**
+   * Print out the evaluation result.
+   */
+  def print_individual_result(doctag: String, document: XTDoc,
+      result: TEvalRes) {
+    errprint("%s:Document %s:", doctag, document)
+    // errprint("%s:Document distribution: %s", doctag, document.dist)
+    errprint("%s:  %d types, %f tokens",
+      doctag, document.dist.num_word_types, document.dist.num_word_tokens)
+    errprint("%s:  true cell: %s", doctag, result.true_cell)
+
+    errprint("%s:  Distance %s to true cell center at %s",
+      doctag, document.output_distance(result.true_truedist), result.true_center)
+    errprint("%s:  Distance %s to predicted cell center at %s",
+      doctag, document.output_distance(result.pred_truedist), result.pred_coord)
+  }
+
+  def find_best_point(document: XTDoc, true_cell: TCell): TCoord
+
+  def imp_evaluate_document(document: XTDoc, doctag: String,
+      true_cell: TCell, want_indiv_results: Boolean): TEvalRes = {
+    val pred_coord = find_best_point(document, true_cell)
+    val result = create_coord_evaluation_result(document, strategy.cell_grid,
+      pred_coord)
+
+    if (want_indiv_results)
+      print_individual_result(doctag, document, result)
 
     return result
   }
@@ -969,35 +1074,15 @@ abstract class MeanShiftCellGridEvaluator[
   mean_shift_window: Double,
   mean_shift_max_stddev: Double,
   mean_shift_max_iterations: Int
-) extends CellGridEvaluator[
+) extends CoordCellGridEvaluator[
   TCoord, XTDoc, TCell, XTGrid, TEvalRes
 ](strategy, stratname, driver) {
-  /**
-   * Create an evaluation-result object describing the predicted coordinate.
-   */
-  def create_coord_evaluation_result(document: XTDoc, cell_grid: XTGrid,
-    pred_coord: TCoord): TEvalRes
-
-  /**
-   * Print out the evaluation result.
-   */
-  def print_individual_result(doctag: String, document: XTDoc,
-    result: TEvalRes)
-
-  def imp_evaluate_document(document: XTDoc, doctag: String,
-      true_cell: TCell, want_indiv_results: Boolean): TEvalRes = {
+  def find_best_point(document: XTDoc, true_cell: TCell) = {
     //val num_nearest_neighbors = 10
     // FIXME, implement the appropriate mean-shift algorithm here.
     // Note that 'mean_shift_window' is the value of 'h' in the mean-shift
     // algorithm; similarly for the other parameters.
-    val pred_coord: TCoord = null.asInstanceOf[TCoord] // FIXME, implement me
-    val result = create_coord_evaluation_result(document, strategy.cell_grid,
-      pred_coord)
-
-    if (want_indiv_results)
-      print_individual_result(doctag, document, result)
-
-    return result
+    null.asInstanceOf[TCoord] // FIXME, implement me
   }
 }
 
