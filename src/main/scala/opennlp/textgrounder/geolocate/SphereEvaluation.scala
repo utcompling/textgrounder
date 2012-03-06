@@ -298,7 +298,7 @@ class CoordSphereDocumentEvaluationResult(
   document: SphereDocument,
   cell_grid: SphereCellGrid,
   pred_coord: SphereCoord
-) extends DocumentEvaluationResult[
+) extends CoordDocumentEvaluationResult[
   SphereCoord, SphereDocument, SphereCell, SphereCellGrid
   ](
   document, cell_grid, pred_coord
@@ -376,6 +376,8 @@ class MeanShiftSphereCellGridEvaluator(
   def create_coord_evaluation_result(document: SphereDocument,
       cell_grid: SphereCellGrid, pred_coord: SphereCoord) =
     new CoordSphereDocumentEvaluationResult(document, cell_grid, pred_coord)
+  def create_mean_shift_obj(h: Double, max_stddev: Double,
+    max_iterations: Int) = new SphereMeanShift(h, max_stddev, max_iterations)
 }
 
 case class TitledDocument(title: String, text: String)
