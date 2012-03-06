@@ -629,9 +629,9 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
     if (params.eval_format == "pcl-travel")
       new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
     else if (params.coord_strategy =="top-ranked")
-      new RankedCorpusGeolocateDocumentEvaluator(strategy, stratname, this)
+      new RankedSphereCellGridEvaluator(strategy, stratname, this)
     else
-      new MeanShiftCorpusGeolocateDocumentEvaluator(strategy, stratname, this,
+      new MeanShiftSphereCellGridEvaluator(strategy, stratname, this,
         params.k_best, params.mean_shift_window,
         params.mean_shift_max_stddev,
         params.mean_shift_max_iterations)

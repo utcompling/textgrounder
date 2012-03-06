@@ -37,7 +37,7 @@ import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.mathutil.{mean, median}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
-import opennlp.textgrounder.gridlocate.{CorpusDocumentEvaluator,TextGrounderInfo,DistDocumentFileProcessor}
+import opennlp.textgrounder.gridlocate.{CellGridEvaluator,TextGrounderInfo,DistDocumentFileProcessor}
 
 /* Basic idea for hooking up Geolocate with Hadoop.  Hadoop works in terms
    of key-value pairs, as follows:
@@ -225,7 +225,7 @@ class DocumentEvaluationMapper extends
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver() = new TDriver
 
-  var evaluators: Iterable[CorpusDocumentEvaluator[SphereCoord,SphereDocument,_,_,_]] = null
+  var evaluators: Iterable[CellGridEvaluator[SphereCoord,SphereDocument,_,_,_]] = null
   val task = new ExperimentMeteredTask(driver, "document", "evaluating")
 
   class HadoopDocumentFileProcessor(
@@ -291,7 +291,7 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
       evaluators =
         for ((stratname, strategy) <- driver.strategies)
           yield driver.create_document_evaluator(strategy, stratname).
-            asInstanceOf[CorpusDocumentEvaluator[
+            asInstanceOf[CellGridEvaluator[
               SphereCoord,SphereDocument,_,_,_]]
       if (driver.params.input_corpus.length != 1) {
         driver.params.parser.error(

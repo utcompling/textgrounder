@@ -924,7 +924,7 @@ object GridLocateDriver {
   var Params: GridLocateParameters = _
   val Debug: DebugSettings = new DebugSettings
 
-  // Debug flags (from CorpusGeolocateDocumentEvaluator) -- need to set them
+  // Debug flags (from SphereCellGridEvaluator) -- need to set them
   // here before we parse the command-line debug settings. (FIXME, should
   // be a better way that introduces fewer long-range dependencies like
   // this)
