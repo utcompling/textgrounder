@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# USAGE: download-preprocess-wiki WIKITAG
+#
+# where WIKITAG is something like 'dewiki-20120225'. (Which needs to exist.)
+
+wikitag="$1"
+mkdir -p $wikitag
+cd $wikitag
+echo "Downloading Wikipedia corpus $wikitag ..."
+wikidir="`echo $wikitag | sed 's/-/\//'`"
+wget -nd http://dumps.wikimedia.org/$wikidir/$wikitag-pages-articles.xml.bz2
+echo "Downloading Wikipedia corpus $wikitag ... done."
+echo "Preprocessing Wikipedia corpus $wikitag ..."
+preprocess-dump $wikitag
+echo "Preprocessing Wikipedia corpus $wikitag ... done."
+echo "Converting Wikipedia corpus $wikitag to latest format ..."
+mkdir convert
+cd convert
+ln -s .. $wikitag
+run-convert-corpus --steps wiki $wikitag
+mv convert-corpora-3/$wikitag/* $wikitag
+cd ..
+rm -rf convert
+echo "Converting Wikipedia corpus $wikitag to latest format ... done."
+cd ..
