@@ -172,39 +172,109 @@ class EvalStatsWithRank(
 
 //////// Statistics for locating documents
 
-case class DocumentEvaluationResult[
+/**
+ * General class for the result of evaluating a document.  Specifies a
+ * document, cell grid, and the predicted coordinate for the document.
+ * The reason that a cell grid needs to be given is that we need to
+ * retrieve the cell that the document belongs to in order to get the
+ * "central point" (center or centroid of the cell), and in general we
+ * may be operating with multiple cell grids (e.g. in the combination of
+ * uniform and k-D tree grids). (FIXME: I don't know if this is actually
+ * true.)
+ *
+ * FIXME: Perhaps we should redo the results in terms of pseudo-documents
+ * instead of cells.
+ *
+ * @tparam TCoord type of a coordinate
+ * @tparam TDoc type of a document
+ * @tparam TCell type of a cell
+ * @tparam TGrid type of a cell grid
+ *
+ * @param document document whose coordinate is predicted
+ * @param cell_grid cell grid against which error comparison should be done
+ * @param pred_coord predicted coordinate of the document
+ */
+class DocumentEvaluationResult[
   TCoord,
   TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc]
+  TCell <: GeoCell[TCoord, TDoc],
+  TGrid <: CellGrid[TCoord, TDoc, TCell]
 ](
-  document: TDoc,
-  pred_cell: TCell,
-  true_rank: Int
+  val document: TDoc,
+  val cell_grid: TGrid,
+  val pred_coord: TCoord
 ) {
-  val true_cell =
-    pred_cell.cell_grid.find_best_cell_for_coord(document.coord, true)
+  /**
+   * True cell in the cell grid in which the document belongs
+   */
+  val true_cell = cell_grid.find_best_cell_for_coord(document.coord, true)
+  /**
+   * Number of documents in the true cell
+   */
   val num_docs_in_true_cell = true_cell.combined_dist.num_docs_for_word_dist
+  /**
+   * Central point of the true cell
+   */
   val true_center = true_cell.get_center_coord()
+  /**
+   * "True distance" (rather than e.g. degree distance) between document's
+   * coordinate and central point of true cell
+   */
   val true_truedist = document.distance_to_coord(true_center)
-  val pred_center = pred_cell.get_center_coord()
-  val pred_truedist = document.distance_to_coord(pred_center)
+  /**
+   * "True distance" (rather than e.g. degree distance) between document's
+   * coordinate and predicted coordinate
+   */
+  val pred_truedist = document.distance_to_coord(pred_coord)
+
+  def record_result(stats: DocumentEvalStats) {
+    stats.record_predicted_distance(pred_truedist)
+  }
 }
 
-abstract class DocumentEvalStats(
-  driver_stats: ExperimentDriverStats,
-  prefix: String,
-  max_rank_for_credit: Int = 10
-) extends EvalStatsWithRank(driver_stats, prefix, max_rank_for_credit) {
+/**
+ * Subclass of `DocumentEvaluationResult` where the predicted coordinate
+ * is specifically the central point of one of the grid cells.
+ *
+ * @param document document whose coordinate is predicted
+ * @param pred_cell top-ranked predicted cell in which the document should
+ *        belong
+ * @param true_rank rank of the document's true cell among all of the
+ *        predicted cell
+ */
+class DocumentEvaluationResultCell[
+  TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc],
+  TGrid <: CellGrid[TCoord, TDoc, TCell]
+](
+  document: TDoc,
+  val pred_cell: TCell,
+  val true_rank: Int
+) extends DocumentEvaluationResult[TCoord, TDoc, TCell, TGrid](
+  document, pred_cell.cell_grid.asInstanceOf[TGrid],
+  pred_cell.get_center_coord()
+) {
+  override def record_result(stats: DocumentEvalStats) {
+    super.record_result(stats)
+    stats.asInstanceOf[RankedDocumentEvalStats].record_true_rank(true_rank)
+  }
+}
+
+/**
+ * A basic class for accumulating statistics from multiple evaluation
+ * results.
+ */
+trait DocumentEvalStats extends EvalStats {
   // "True dist" means actual distance in km's or whatever.
   val true_dists = mutable.Buffer[Double]()
   val oracle_true_dists = mutable.Buffer[Double]()
 
-  def record_result(rank: Int, pred_true_dist: Double) {
-    super.record_result(rank)
+  def record_predicted_distance(pred_true_dist: Double) {
     true_dists += pred_true_dist
   }
 
-  def record_oracle_result(oracle_true_dist: Double) {
+  def record_oracle_distance(oracle_true_dist: Double) {
     oracle_true_dists += oracle_true_dist
   }
 
@@ -222,23 +292,50 @@ abstract class DocumentEvalStats(
 }
 
 /**
- * Class for statistics for locating documents, with separate
- * sets of statistics for different intervals of error distances and
- * number of documents in true cell.
+ * A class for accumulating statistics from multiple evaluation results,
+ * where the results directly specify a coordinate (rather than e.g. a cell).
  */
+abstract class CoordDocumentEvalStats(
+  driver_stats: ExperimentDriverStats,
+  prefix: String
+) extends EvalStats(driver_stats, prefix, Map[String, String]())
+  with DocumentEvalStats {
+}
 
-abstract class GroupedDocumentEvalStats[TCoord,
+/**
+ * A class for accumulating statistics from multiple evaluation results,
+ * including statistics on the rank of the true cell.
+ */
+abstract class RankedDocumentEvalStats(
+  driver_stats: ExperimentDriverStats,
+  prefix: String,
+  max_rank_for_credit: Int = 10
+) extends EvalStatsWithRank(driver_stats, prefix, max_rank_for_credit)
+  with DocumentEvalStats {
+  def record_true_rank(rank: Int) {
+    record_result(rank)
+  }
+}
+
+/**
+ * Class for accumulating statistics from multiple document evaluation results,
+ * with separate sets of statistics for different intervals of error distances
+ * and number of documents in true cell. ("Grouped" in the sense that we may be
+ * computing not only results for the documents as a whole but also for various
+ * subgroups.)
+ */
+abstract class GroupedDocumentEvalStats[
+  TCoord,
   TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc]](
+  TCell <: GeoCell[TCoord, TDoc],
+  TGrid <: CellGrid[TCoord, TDoc, TCell],
+  -TDocEvalRes <: DocumentEvaluationResult[TCoord, TDoc, TCell, TGrid]
+](
   driver_stats: ExperimentDriverStats,
   cell_grid: CellGrid[TCoord,TDoc,TCell],
   results_by_range: Boolean
 ) {
-  type TBasicEvalStats <: DocumentEvalStats
-  type TDocEvalRes <:
-    DocumentEvaluationResult[TCoord, TDoc, TCell]
-
-  def create_stats(prefix: String): TBasicEvalStats
+  def create_stats(prefix: String): DocumentEvalStats
   def create_stats_for_range[T](prefix: String, range: T) =
     create_stats(prefix + ".byrange." + range)
 
@@ -258,7 +355,7 @@ abstract class GroupedDocumentEvalStats[TCoord,
   // and longitudinally.
   val dist_fraction_increment = 0.25
   def docmap(prefix: String) =
-    new SettingDefaultHashMap[Double, TBasicEvalStats](
+    new SettingDefaultHashMap[Double, DocumentEvalStats](
       create_stats_for_range(prefix, _))
   val docs_by_true_dist_to_true_center =
     docmap("true_dist_to_true_center")
@@ -274,12 +371,12 @@ abstract class GroupedDocumentEvalStats[TCoord,
     new DoubleTableByRange(dist_fractions_for_error_dist,
       create_stats_for_range("true_dist_to_pred_center", _))
 
-  def record_one_result(stats: TBasicEvalStats, res: TDocEvalRes) {
-    stats.record_result(res.true_rank, res.pred_truedist)
+  def record_one_result(stats: DocumentEvalStats, res: TDocEvalRes) {
+    res.record_result(stats)
   }
 
-  def record_one_oracle_result(stats: TBasicEvalStats, res: TDocEvalRes) {
-    stats.record_oracle_result(res.true_truedist)
+  def record_one_oracle_result(stats: DocumentEvalStats, res: TDocEvalRes) {
+    stats.record_oracle_distance(res.true_truedist)
   }
 
   def record_result(res: TDocEvalRes) {
@@ -337,14 +434,23 @@ abstract class GroupedDocumentEvalStats[TCoord,
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * Basic abstract class for reading documents from a test file and evaluating
- * on them.  Doesn't use any driver class. (FIXME, perhaps we should
- * integrate this into TestFileEvaluator.)
+ * Basic abstract class for evaluating a test document.  Doesn't use any
+ * driver class.
+ *
+ * TestDocumentEvaluator is currently the only subclass. (FIXME: Perhaps we
+ * should integrate the two.) The reason they are separated is because
+ * TestDocumentEvaluator makes use of a GridLocateDriver class, which
+ * encapsulates (among other things) various command-line parameters,
+ * in particular command-line parameters that allow a subset of the
+ * total set of documents to be evaluated.
  *
  * @tparam TEvalDoc Type of document to evaluate.
  * @tparam TEvalRes Type of result of evaluating a document.
+ *
+ * @param stratname Name of the strategy used to perform evaluation.
+ *   This is output in various status messages.
  */
-abstract class BasicTestFileEvaluator[TEvalDoc, TEvalRes](
+abstract class BasicTestDocumentEvaluator[TEvalDoc, TEvalRes](
   val stratname: String
 ) {
   var documents_processed = 0
@@ -369,8 +475,13 @@ abstract class BasicTestFileEvaluator[TEvalDoc, TEvalRes](
   def would_stop_processing(new_processed: Int) = false
 
   /**
-   * Return true if document was actually processed and evaluated; false
-   * if skipped.
+   * Evaluate a document.  Return an object describing the results of the
+   * evaluation.
+   *
+   * @param document Document to evaluate.
+   * @param doctag A short string identifying the document (e.g. '#25'),
+   *   to be printed out at the beginning of diagnostic lines describing
+   *   the document and its evaluation results.
    */
   def evaluate_document(doc: TEvalDoc, doctag: String):
     TEvalRes
@@ -459,24 +570,22 @@ abstract class BasicTestFileEvaluator[TEvalDoc, TEvalRes](
 }
 
 /**
- * Abstract class for reading documents from a test file and evaluating
- * on them.
+ * Abstract class for evaluating a test document.
  *
  * @tparam TEvalDoc Type of document to evaluate.
  * @tparam TEvalRes Type of result of evaluating a document.
  *
- * Evaluates on all of the given files, outputting periodic results and
- * results after all files are done.  If the evaluator uses documents as
- * documents (so that it doesn't need any external test files), the value
- * of 'files' should be a sequence of one item, which is null. (If an
- * empty sequence is passed in, no evaluation will happen.)
-
- * Also returns an object containing the results.
+ * @param stratname Name of the strategy used for performing evaluation.
+ * @param driver Driver class that encapsulates command-line parameters and
+ *   such.
+ *
+ * This is a subclass of `BasicTestDocumentEvaluator` which uses the command-line
+ * parameters to determine which documents should be skipped.
  */
-abstract class TestFileEvaluator[TEvalDoc, TEvalRes](
+abstract class TestDocumentEvaluator[TEvalDoc, TEvalRes](
   stratname: String,
   val driver: GridLocateDriver
-) extends BasicTestFileEvaluator[TEvalDoc, TEvalRes](stratname) {
+) extends BasicTestDocumentEvaluator[TEvalDoc, TEvalRes](stratname) {
   override val task = new MeteredTask("document", "evaluating",
     maxtime = driver.params.max_time_per_stage)
   var skip_initial = driver.params.skip_initial_test_docs
@@ -508,51 +617,63 @@ abstract class TestFileEvaluator[TEvalDoc, TEvalRes](
   }
 }
 
-abstract class DocumentEvaluator[
-  TCoord,
-  TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc],
-  TGrid <: CellGrid[TCoord, TDoc, TCell],
-  TEvalDoc,
-  TEvalRes
-](
-  val strategy: GridLocateDocumentStrategy[TCell, TGrid],
-  stratname: String,
-  driver: GridLocateDriver // GridLocateDocumentTypeDriver
-) extends TestFileEvaluator[TEvalDoc, TEvalRes](stratname, driver) {
-  type TGroupedEvalStats <: GroupedDocumentEvalStats[TCoord,TDoc,TCell]
-  def create_grouped_eval_stats(driver: GridLocateDriver, // GridLocateDocumentTypeDriver
-    cell_grid: TGrid, results_by_range: Boolean):
-    TGroupedEvalStats
-  val evalstats = create_grouped_eval_stats(driver,
-    strategy.cell_grid, results_by_range = driver.params.results_by_range)
-
-  def output_results(isfinal: Boolean = false) {
-    evalstats.output_results(all_results = isfinal)
-  }
-}
-
 /**
- * Class to do document grid-location on documents from the document data, in
- * the dev or test set.
+ * Abstract class for evaluating a test document by comparing it against each
+ * of the cells in a cell grid, where each cell has an associated
+ * pseudo-document created by amalgamating all of the training documents
+ * in the cell.
+ *
+ * Abstract class for for evaluating a test document where a collection of
+ * documents has been divided into "training" and "test" sets, and the
+ * training set used to construct a cell grid in which the training
+ * documents in a particular cell are amalgamated to form a pseudo-document
+ * and evaluation of a test document proceeds by comparing it against each
+ * pseudo-document in turn.
+ *
+ * This is the highest-level evaluation class that includes the concept of a
+ * coordinate that is associated with training and test documents, so that
+ * computation of error distances possible.
+ *
+ * @tparam TCoord Type of the coordinate assigned to a document
+ * @tparam XTDoc Type of the training and test documents
+ * @tparam TCell Type of a cell in a cell grid
+ * @tparam XTGrid Type of a cell grid
+ * @tparam TEvalRes Type of result of evaluating a document.
+ *
+ * @param strategy Object encapsulating the strategy used for performing
+ *   evaluation.
+ * @param stratname Name of the strategy used for performing evaluation.
+ * @param driver Driver class that encapsulates command-line parameters and
+ *   such.
+ *
+ * Note that we are forced to use the strange names `XTDoc` and `XTGrid`
+ * because of an apparent Scala bug that prevents use of the more obvious
+ * names `TDoc` and `TGrid` due to a naming clash.  Possibly there is a
+ * solution to this problem but if so I can't figure it out.
  */
 abstract class CorpusDocumentEvaluator[
   TCoord,
   XTDoc <: DistDocument[TCoord],
   TCell <: GeoCell[TCoord, XTDoc],
-  // SCALABUG: No way access something called 'TGrid' at this scope in the
+  // SCALABUG: No way to access something called 'TGrid' at this scope in the
   // line below where it says 'type TGrid = XTGrid'
   XTGrid <: CellGrid[TCoord, XTDoc, TCell],
-  TEvalRes <: DocumentEvaluationResult[_,_,_]
+  TEvalRes <: DocumentEvaluationResult[TCoord, XTDoc, TCell, XTGrid]
 ](
   strategy: GridLocateDocumentStrategy[TCell, XTGrid],
   stratname: String,
   driver: GridLocateDriver { type TGrid = XTGrid; type TDoc = XTDoc } // GridLocateDocumentTypeDriver
-) extends DocumentEvaluator[
-  TCoord, XTDoc, TCell, XTGrid, XTDoc, TEvalRes
-](strategy, stratname, driver) {
-  override type TGroupedEvalStats <:
-    GroupedDocumentEvalStats[TCoord,XTDoc,TCell] { type TDocEvalRes = TEvalRes }
+) extends TestDocumentEvaluator[XTDoc, TEvalRes](stratname, driver) {
+  def create_grouped_eval_stats(driver: GridLocateDriver, // GridLocateDocumentTypeDriver
+    cell_grid: XTGrid, results_by_range: Boolean):
+    GroupedDocumentEvalStats[TCoord, XTDoc, TCell, XTGrid, TEvalRes]
+
+  val evalstats = create_grouped_eval_stats(driver,
+    strategy.cell_grid, results_by_range = driver.params.results_by_range)
+
+  def output_results(isfinal: Boolean = false) {
+    evalstats.output_results(all_results = isfinal)
+ }
 
   /**
    * A file processor that reads corpora containing document metadata and
@@ -635,19 +756,76 @@ abstract class CorpusDocumentEvaluator[
     } else false
   }
 
-  def create_evaluation_result(document: XTDoc, pred_cell: TCell,
-    true_rank: Int): TEvalRes
+  /**
+   * Compare the document to the pseudo-documents associated with each cell,
+   * using the strategy for this evaluator.  Return a tuple
+   * (pred_cells, true_rank), where:
+   *
+   *  pred_cells = List of predicted cells, from best to worst; each list
+   *     entry is actually a tuple of (cell, score) where lower scores
+   *     are better
+   *  true_rank = Rank of true cell among predicted cells
+   *
+   * @param document Document to evaluate.
+   * @param true_cell Cell in the cell grid which contains the document.
+   */
+  def return_ranked_cells(document: XTDoc, true_cell: TCell) = {
+    if (driver.params.oracle_results)
+      (Array((true_cell, 0.0)), 1)
+    else {
+      def get_computed_results() = {
+        val cells = strategy.return_ranked_cells(document.dist).toArray
+        var rank = 1
+        var broken = false
+        breakable {
+          for ((cell, value) <- cells) {
+            if (cell eq true_cell) {
+              broken = true
+              break
+            }
+            rank += 1
+          }
+        }
+        if (!broken)
+          rank = 1000000000
+        (cells, rank)
+      }
 
-  def print_individual_result(doctag: String, document: XTDoc,
-    result: TEvalRes, pred_cells: Array[(TCell, Double)])
-
-  def evaluate_document(document: XTDoc, doctag: String): TEvalRes = {
-    if (would_skip_document(document, doctag)) {
-      evalstats.increment_counter("documents.skipped")
-      // SCALABUG: Doesn't automatically recognize TEvalRes as a reference
-      // type despite being a subclass of DocumentEvaluationResult
-      return null.asInstanceOf[TEvalRes]
+      get_computed_results()
     }
+  }
+
+  /**
+   * Actual implementation of code to evaluate a document.  Optionally
+   * Return an object describing the results of the evaluation, and
+   * optionally print out information on these results.
+   *
+   * @param document Document to evaluate.
+   * @param doctag A short string identifying the document (e.g. '#25'),
+   *   to be printed out at the beginning of diagnostic lines describing
+   *   the document and its evaluation results.
+   * @param true_cell Cell in the cell grid which contains the document.
+   * @param want_indiv_results Whether we should print out individual
+   *   evaluation results for the document.
+   */
+  def imp_evaluate_document(document: XTDoc, doctag: String,
+      true_cell: TCell, want_indiv_results: Boolean): TEvalRes
+
+  /**
+   * Evaluate a document, record statistics about it, etc.  Calls
+   * `imp_evaluate_document` to do the document evaluation and optionally
+   * print out information on the results, and records the results in
+   * `evalstat`.
+   *
+   * Return an object describing the results of the evaluation.
+   *
+   * @param document Document to evaluate.
+   * @param doctag A short string identifying the document (e.g. '#25'),
+   *   to be printed out at the beginning of diagnostic lines describing
+   *   the document and its evaluation results.
+   */
+  def evaluate_document(document: XTDoc, doctag: String): TEvalRes = {
+    assert(!would_skip_document(document, doctag))
     assert(document.dist.finished)
     val true_cell =
       strategy.cell_grid.find_best_cell_for_coord(document.coord, true)
@@ -656,54 +834,75 @@ abstract class CorpusDocumentEvaluator[
       errprint("Evaluating document %s with %s word-dist documents in true cell",
         document, naitr)
     }
+    val want_indiv_results =
+      !driver.params.oracle_results && !driver.params.no_individual_results
+    val result = imp_evaluate_document(document, doctag, true_cell,
+      want_indiv_results)
+    evalstats.record_result(result)
+    if (result.num_docs_in_true_cell == 0) {
+      evalstats.increment_counter("documents.no_training_documents_in_cell")
+    }
+    result
+  }
+}
 
-    //val num_nearest_neighbors = 10
+/**
+ * An implementation of `CorpusDocumentEvaluator` that compares the test
+ * document against each pseudo-document in the cell grid, ranks them by
+ * score and computes the document's location by the central point of the
+ * top-ranked cell.
+ *
+ * @tparam TCoord Type of the coordinate assigned to a document
+ * @tparam XTDoc Type of the training and test documents
+ * @tparam TCell Type of a cell in a cell grid
+ * @tparam XTGrid Type of a cell grid
+ * @tparam TEvalRes Type of result of evaluating a document.
+ *
+ * @param strategy Object encapsulating the strategy used for performing
+ *   evaluation.
+ * @param stratname Name of the strategy used for performing evaluation.
+ * @param driver Driver class that encapsulates command-line parameters and
+ *   such.
+ */
+abstract class RankedCorpusDocumentEvaluator[
+  TCoord,
+  XTDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, XTDoc],
+  XTGrid <: CellGrid[TCoord, XTDoc, TCell],
+  TEvalRes <: DocumentEvaluationResult[TCoord, XTDoc, TCell, XTGrid]
+](
+  strategy: GridLocateDocumentStrategy[TCell, XTGrid],
+  stratname: String,
+  driver: GridLocateDriver { type TGrid = XTGrid; type TDoc = XTDoc } // GridLocateDocumentTypeDriver
+) extends CorpusDocumentEvaluator[
+  TCoord, XTDoc, TCell, XTGrid, TEvalRes
+](strategy, stratname, driver) {
+  /**
+   * Create an evaluation-result object describing the top-ranked
+   * predicted cell and the rank of the document's true cell among
+   * all predicted cells.
+   */
+  def create_cell_evaluation_result(document: XTDoc, pred_cell: TCell,
+    true_rank: Int): TEvalRes
 
-    /* That is:
+  /**
+   * Print out the evaluation result, possibly along with some of the
+   * top-ranked cells.
+   */
+  def print_individual_result(doctag: String, document: XTDoc,
+    result: TEvalRes, pred_cells: Array[(TCell, Double)])
 
-       pred_cells = List of predicted cells, from best to worst; each list
-          entry is actually a tuple of (cell, score) where lower scores
-          are better
-       true_rank = Rank of true cell among predicted cells
-     */
-    val (pred_cells, true_rank) =
-      if (driver.params.oracle_results)
-        (Array((true_cell, 0.0)), 1)
-      else {
-        def get_computed_results() = {
-          val cells = strategy.return_ranked_cells(document.dist).toArray
-          var rank = 1
-          var broken = false
-          breakable {
-            for ((cell, value) <- cells) {
-              if (cell eq true_cell) {
-                broken = true
-                break
-              }
-              rank += 1
-            }
-          }
-          if (!broken)
-            rank = 1000000000
-          (cells, rank)
-        }
-
-        get_computed_results()
-      }
-
-    val result = create_evaluation_result(document, pred_cells(0)._1, true_rank)
+  def imp_evaluate_document(document: XTDoc, doctag: String,
+      true_cell: TCell, want_indiv_results: Boolean): TEvalRes = {
+    val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
+    val result =
+      create_cell_evaluation_result(document, pred_cells(0)._1, true_rank)
 
     if (debug("all-scores")) {
       for (((cell, value), index) <- pred_cells.zipWithIndex) {
         errprint("%s: %6d: Cell at %s: score = %g", doctag, index + 1,
           cell.describe_indices(), value)
       }
-    }
-    val want_indiv_results =
-      !driver.params.oracle_results && !driver.params.no_individual_results
-    evalstats.record_result(result)
-    if (result.num_docs_in_true_cell == 0) {
-      evalstats.increment_counter("documents.no_training_documents_in_cell")
     }
     if (want_indiv_results) {
       //val cells_for_average = pred_cells.zip(pred_cells.map(_._1.center))
@@ -717,8 +916,74 @@ abstract class CorpusDocumentEvaluator[
   }
 }
 
+/**
+ * An implementation of `CorpusDocumentEvaluator` that compares the test
+ * document against each pseudo-document in the cell grid, selects the
+ * top N ranked pseudo-documents for some N, and uses the mean-shift
+ * algorithm to determine a single point that is hopefully in the middle
+ * of the strongest cluster of points among the central points of the
+ * pseudo-documents.
+ *
+ * @tparam TCoord Type of the coordinate assigned to a document
+ * @tparam XTDoc Type of the training and test documents
+ * @tparam TCell Type of a cell in a cell grid
+ * @tparam XTGrid Type of a cell grid
+ * @tparam TEvalRes Type of result of evaluating a document.
+ *
+ * @param strategy Object encapsulating the strategy used for performing
+ *   evaluation.
+ * @param stratname Name of the strategy used for performing evaluation.
+ * @param driver Driver class that encapsulates command-line parameters and
+ *   such.
+ */
+abstract class MeanShiftCorpusDocumentEvaluator[
+  TCoord,
+  XTDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, XTDoc],
+  XTGrid <: CellGrid[TCoord, XTDoc, TCell],
+  TEvalRes <: DocumentEvaluationResult[TCoord, XTDoc, TCell, XTGrid]
+](
+  strategy: GridLocateDocumentStrategy[TCell, XTGrid],
+  stratname: String,
+  driver: GridLocateDriver { type TGrid = XTGrid; type TDoc = XTDoc }, // GridLocateDocumentTypeDriver
+  k_best: Int,
+  mean_shift_window: Double,
+  mean_shift_max_stddev: Double,
+  mean_shift_max_iterations: Int
+) extends CorpusDocumentEvaluator[
+  TCoord, XTDoc, TCell, XTGrid, TEvalRes
+](strategy, stratname, driver) {
+  /**
+   * Create an evaluation-result object describing the predicted coordinate.
+   */
+  def create_coord_evaluation_result(document: XTDoc, cell_grid: XTGrid,
+    pred_coord: TCoord): TEvalRes
+
+  /**
+   * Print out the evaluation result.
+   */
+  def print_individual_result(doctag: String, document: XTDoc,
+    result: TEvalRes)
+
+  def imp_evaluate_document(document: XTDoc, doctag: String,
+      true_cell: TCell, want_indiv_results: Boolean): TEvalRes = {
+    //val num_nearest_neighbors = 10
+    // FIXME, implement the appropriate mean-shift algorithm here.
+    // Note that 'mean_shift_window' is the value of 'h' in the mean-shift
+    // algorithm; similarly for the other parameters.
+    val pred_coord: TCoord = null.asInstanceOf[TCoord] // FIXME, implement me
+    val result = create_coord_evaluation_result(document, strategy.cell_grid,
+      pred_coord)
+
+    if (want_indiv_results)
+      print_individual_result(doctag, document, result)
+
+    return result
+  }
+}
+
 trait DocumentIteratingEvaluator[TEvalDoc, TEvalRes] extends
-  TestFileEvaluator[TEvalDoc, TEvalRes] {
+  TestDocumentEvaluator[TEvalDoc, TEvalRes] {
   /**
    * Return an Iterable listing the documents retrievable from the given
    * filename.
@@ -745,4 +1010,3 @@ trait DocumentIteratingEvaluator[TEvalDoc, TEvalRes] extends
     fileproc.process_files(filehand, files)
   }
 }
-
