@@ -27,7 +27,7 @@ import collection.mutable
 
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.experiment.ExperimentDriverStats
-import opennlp.textgrounder.util.mathutil.{mean, median}
+import opennlp.textgrounder.util.mathutil._
 import opennlp.textgrounder.util.ioutil.{FileHandler, FileProcessor}
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.{curtimehuman, output_resource_usage}
@@ -229,6 +229,41 @@ class DocumentEvaluationResult[
 
   def record_result(stats: DocumentEvalStats) {
     stats.record_predicted_distance(pred_truedist)
+  }
+}
+
+/**
+ * Subclass of `DocumentEvaluationResult` where the predicted coordinate
+ * is a point, not necessarily the central point of one of the grid cells.
+ *
+ * @tparam TCoord type of a coordinate
+ * @tparam TDoc type of a document
+ * @tparam TCell type of a cell
+ * @tparam TGrid type of a cell grid
+ *
+ * @param document document whose coordinate is predicted
+ * @param cell_grid cell grid against which error comparison should be done
+ * @param pred_coord predicted coordinate of the document
+ */
+class CoordDocumentEvaluationResult[
+  TCoord,
+  TDoc <: DistDocument[TCoord],
+  TCell <: GeoCell[TCoord, TDoc],
+  TGrid <: CellGrid[TCoord, TDoc, TCell]
+](
+  document: TDoc,
+  cell_grid: TGrid,
+  pred_coord: TCoord
+) extends DocumentEvaluationResult[TCoord, TDoc, TCell, TGrid](
+  document, cell_grid, pred_coord
+) {
+  override def record_result(stats: DocumentEvalStats) {
+    super.record_result(stats)
+    // It doesn't really make sense to record a result as "correct" or
+    // "incorrect" but we need to record something; just do "false"
+    // FIXME: Fix the incorrect assumption here that "correct" or
+    // "incorrect" always exists.
+    stats.asInstanceOf[CoordDocumentEvalStats].record_result(false)
   }
 }
 
@@ -1077,12 +1112,17 @@ abstract class MeanShiftCellGridEvaluator[
 ) extends CoordCellGridEvaluator[
   TCoord, XTDoc, TCell, XTGrid, TEvalRes
 ](strategy, stratname, driver) {
+  def create_mean_shift_obj(h: Double, max_stddev: Double,
+    max_iterations: Int): MeanShift[TCoord]
+
+  val mean_shift_obj = create_mean_shift_obj(mean_shift_window,
+    mean_shift_max_stddev, mean_shift_max_iterations)
+
   def find_best_point(document: XTDoc, true_cell: TCell) = {
-    //val num_nearest_neighbors = 10
-    // FIXME, implement the appropriate mean-shift algorithm here.
-    // Note that 'mean_shift_window' is the value of 'h' in the mean-shift
-    // algorithm; similarly for the other parameters.
-    null.asInstanceOf[TCoord] // FIXME, implement me
+    val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
+    val top_k = pred_cells.take(k_best).map(_._1.get_center_coord)
+    val shifted_values = mean_shift_obj.mean_shift(top_k)
+    mean_shift_obj.vec_mean(shifted_values)
   }
 }
 

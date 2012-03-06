@@ -234,7 +234,11 @@ package object distances {
       (long1 + long2) / 2.0
   }
 
-  class SphereMeanShift extends MeanShift[SphereCoord] {
+  class SphereMeanShift(
+    h: Double = 1.0,
+    max_stddev: Double = 1e-10,
+    max_iterations: Int = 100
+  ) extends MeanShift[SphereCoord](h, max_stddev, max_iterations) {
     def squared_distance(x: SphereCoord, y:SphereCoord) = {
       val dist = spheredist(x, y)
       dist * dist

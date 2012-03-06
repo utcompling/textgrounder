@@ -48,9 +48,9 @@ package object mathutil {
   def stddev(x: Seq[Double]) = sqrt(variance(x))
 
   abstract class MeanShift[Coord : Manifest](
-      h:Double = 1.0,
-      max_stddev:Double = 1e-10,
-      max_iterations:Int = 100
+      h: Double = 1.0,
+      max_stddev: Double = 1e-10,
+      max_iterations: Int = 100
     ) {
     def squared_distance(x:Coord, y:Coord): Double
     def weighted_sum(weights:Array[Double], points:Array[Coord]): Coord
