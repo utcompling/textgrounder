@@ -327,8 +327,7 @@ class RankedSphereCellGridEvaluator(
   def create_grouped_eval_stats(driver: GridLocateDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
     new GroupedSphereDocumentEvalStats(driver,
-      cell_grid.asInstanceOf[SphereCellGrid],
-      results_by_range, is_ranked = true)
+      cell_grid, results_by_range, is_ranked = true)
   def create_cell_evaluation_result(document: SphereDocument,
       pred_cell: SphereCell, true_rank: Int) =
     new RankedSphereDocumentEvaluationResult(document, pred_cell, true_rank)

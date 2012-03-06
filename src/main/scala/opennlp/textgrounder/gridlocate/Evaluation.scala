@@ -355,7 +355,7 @@ abstract class GroupedDocumentEvalStats[
   -TEvalRes <: DocumentEvaluationResult[TCoord, TDoc, TCell, TGrid]
 ](
   driver_stats: ExperimentDriverStats,
-  cell_grid: CellGrid[TCoord,TDoc,TCell],
+  cell_grid: TGrid,
   results_by_range: Boolean
 ) {
   def create_stats(prefix: String): DocumentEvalStats
