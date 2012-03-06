@@ -387,6 +387,67 @@ Default is 'partial-kl-divergence'.
 NOTE: Multiple --strategy options can be given, and each strategy will
 be tried, one after the other.""")
 
+  var coord_strategy =
+    ap.option[String]("coord-strategy", "cs",
+      default = "top-ranked",
+      choices = Seq("top-ranked", "mean-shift"),
+      help = """Strategy/strategies to use to choose the best coordinate for
+a document.
+
+'top-ranked' means to choose the single best-ranked cell according to the
+scoring strategy specified using '--strategy', and use its central point.
+
+'mean-shift' means to take the K best cells (according to '--k-best'),
+and then compute a single point using the mean-shift algorithm.  This
+algorithm works by steadily shifting each point towards the others by
+computing an average of the points surrounding a given point, weighted
+by a function that drops off rapidly as the distance from the point
+increases (specifically, the weighting is the same as for a Gaussian density,
+with a parameter H, specified using '--mean-shift-window', that corresponds to
+the standard deviation in the Gaussian distribution function).  The idea is
+that the points will eventually converge on the largest cluster within the
+original points.  The algorithm repeatedly moves the points closer to each
+other until either the total standard deviation of the points (i.e.
+approximately the average distance of the points from their mean) is less than
+the value specified by '--mean-shift-max-stddev', or the number of iterations
+exceeds '--mean-shift-max-iterations'.
+
+Default '%default'.""")
+
+  var k_best =
+    ap.option[Int]("k-best", "kb",
+      default = 10,
+      help = """Value of K for use in the mean-shift algorithm
+(see '--coord-strategy').  For this value of K, we choose the K best cells
+and then apply the mean-shift algorithm to the central points of those cells.
+
+Default '%default'.""")
+
+  var mean_shift_window =
+    ap.option[Double]("mean-shift-window", "msw",
+      default = 1.0,
+      help = """Window to use in the mean-shift algorithm
+(see '--coord-strategy').
+
+Default '%default'.""")
+
+  var mean_shift_max_stddev =
+    ap.option[Double]("mean-shift-max-stddev", "msms",
+      default = 1e-10,
+      help = """Maximum allowed standard deviation (i.e. approximately the
+average distance of the points from their mean) among the points selected by
+the mean-shift algorithm (see '--coord-strategy').
+
+Default '%default'.""")
+
+  var mean_shift_max_iterations =
+    ap.option[Int]("mean-shift-max-iterations", "msmi",
+      default = 100,
+      help = """Maximum number of iterations in the mean-shift algorithm
+(see '--coord-strategy').
+
+Default '%default'.""")
+
   var baseline_strategy =
     ap.multiOption[String]("baseline-strategy", "bs",
       default = Seq("internal-link"),
@@ -429,7 +490,7 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
   override type TParam <: GeolocateDocumentParameters
   type TRunRes =
     Seq[(String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
-         TestFileEvaluator[_,_])]
+         TestDocumentEvaluator[_,_])]
 
   var strategies: Seq[(String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid])] = _
 
@@ -548,7 +609,7 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
    *
    * The current return type is as follows:
    *
-   * Seq[(java.lang.String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid], scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.TestFileEvaluator
+   * Seq[(java.lang.String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid], scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.TestDocumentEvaluator
    *
    * This means you get a sequence of tuples of
    * (strategyname, strategy, results)
@@ -556,19 +617,29 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
    * strategyname = name of strategy as given on command line
    * strategy = strategy object
    * results = map listing results for each document (an abstract type
-   * defined in TestFileEvaluator; the result type EvaluationResult
+   * defined in TestDocumentEvaluator; the result type EvaluationResult
    * is practically an abstract type, too -- the most useful dynamic
    * type in practice is DocumentEvaluationResult)
    */
 
+  def create_document_evaluator(
+      strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
+      stratname: String) = {
+    // Generate reader object
+    if (params.eval_format == "pcl-travel")
+      new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
+    else if (params.coord_strategy =="top-ranked")
+      new RankedCorpusGeolocateDocumentEvaluator(strategy, stratname, this)
+    else
+      new MeanShiftCorpusGeolocateDocumentEvaluator(strategy, stratname, this,
+        params.k_best, params.mean_shift_window,
+        params.mean_shift_max_stddev,
+        params.mean_shift_max_iterations)
+  }
+
   def run_after_setup() = {
-    process_strategies(strategies)((stratname, strategy) => {
-      // Generate reader object
-      if (params.eval_format == "pcl-travel")
-        new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
-      else
-        new CorpusGeolocateDocumentEvaluator(strategy, stratname, this)
-    })
+    process_strategies(strategies)((stratname, strategy) =>
+      create_document_evaluator(strategy, stratname))
   }
 }
 

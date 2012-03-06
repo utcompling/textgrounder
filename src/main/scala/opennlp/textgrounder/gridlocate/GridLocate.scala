@@ -904,7 +904,7 @@ class RandomGridLocateDocumentStrategy[
   }
 
   protected def process_strategies[T](strategies: Seq[(String, T)])(
-      geneval: (String, T) => TestFileEvaluator[_,_]) = {
+      geneval: (String, T) => TestDocumentEvaluator[_,_]) = {
     for ((stratname, strategy) <- strategies) yield {
       val evalobj = geneval(stratname, strategy)
       // For --eval-format=internal, there is no eval file.  To make the

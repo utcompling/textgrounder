@@ -30,13 +30,14 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.hadoop.fs.Path
 
 import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment.ExperimentMeteredTask
 import opennlp.textgrounder.util.hadoop._
 import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.mathutil.{mean, median}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
-import opennlp.textgrounder.gridlocate.{TextGrounderInfo,DistDocumentFileProcessor}
+import opennlp.textgrounder.gridlocate.{CorpusDocumentEvaluator,TextGrounderInfo,DistDocumentFileProcessor}
 
 /* Basic idea for hooking up Geolocate with Hadoop.  Hadoop works in terms
    of key-value pairs, as follows:
@@ -224,7 +225,7 @@ class DocumentEvaluationMapper extends
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver() = new TDriver
 
-  var evaluators: Iterable[CorpusGeolocateDocumentEvaluator] = null
+  var evaluators: Iterable[CorpusDocumentEvaluator[SphereCoord,SphereDocument,_,_,_]] = null
   val task = new ExperimentMeteredTask(driver, "document", "evaluating")
 
   class HadoopDocumentFileProcessor(
@@ -283,18 +284,24 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
   var processor: HadoopDocumentFileProcessor = _
   override def init(context: TContext) {
     super.init(context)
-    evaluators =
-      for ((stratname, strategy) <- driver.strategies)
-        yield new CorpusGeolocateDocumentEvaluator(strategy, stratname,
-          driver)
-    if (driver.params.input_corpus.length != 1) {
+    if (driver.params.eval_format != "internal")
       driver.params.parser.error(
-        "FIXME: For Hadoop, currently need exactly one corpus")
-    } else {
-      processor = new HadoopDocumentFileProcessor(context)
-      processor.read_schema_from_corpus(driver.get_file_handler,
-          driver.params.input_corpus(0))
-      context.progress
+        "For Hadoop, '--eval-format' must be 'internal'")
+    else {
+      evaluators =
+        for ((stratname, strategy) <- driver.strategies)
+          yield driver.create_document_evaluator(strategy, stratname).
+            asInstanceOf[CorpusDocumentEvaluator[
+              SphereCoord,SphereDocument,_,_,_]]
+      if (driver.params.input_corpus.length != 1) {
+        driver.params.parser.error(
+          "FIXME: For Hadoop, currently need exactly one corpus")
+      } else {
+        processor = new HadoopDocumentFileProcessor(context)
+        processor.read_schema_from_corpus(driver.get_file_handler,
+            driver.params.input_corpus(0))
+        context.progress
+      }
     }
   }
 

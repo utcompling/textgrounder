@@ -49,7 +49,7 @@ package object mathutil {
 
   abstract class MeanShift[Coord : Manifest](
       h:Double = 1.0,
-      min_variance:Double = 1e-10,
+      max_stddev:Double = 1e-10,
       max_iterations:Int = 100
     ) {
     def squared_distance(x:Coord, y:Coord): Double
@@ -65,11 +65,11 @@ package object mathutil {
     }
 
     def mean_shift(list: Seq[Coord]):Array[Coord] = {
-      var variance = min_variance + 1
+      var next_stddev = max_stddev + 1
       var numiters = 0
       val points = list.toArray
       val shifted = list.toArray
-      while (variance >= min_variance && numiters <= max_iterations) {
+      while (next_stddev >= max_stddev && numiters <= max_iterations) {
         for (j <- 0 until points.length) {
           val y = shifted(j)
           val weights =
@@ -80,7 +80,7 @@ package object mathutil {
           shifted(j) = weighted_sum(normalized_weights, points)
         }
         numiters += 1
-        variance = vec_variance(shifted)
+        next_stddev = sqrt(vec_variance(shifted))
       }
       shifted
     }
