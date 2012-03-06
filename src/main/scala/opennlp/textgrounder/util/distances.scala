@@ -80,6 +80,10 @@ package object distances {
   // Number of miles per degree, at the equator.
   val miles_per_degree = km_per_degree / km_per_mile
 
+  def km_and_miles(kmdist: Double) = {
+    "%.2f km (%.2f miles)" format (kmdist, kmdist / km_per_mile)
+  }
+
   // A 2-dimensional coordinate.
   //
   // The following fields are defined:
