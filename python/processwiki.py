@@ -647,24 +647,31 @@ templates_with_coords = intdict()
 # Accumulate a table of all templates, with counts.
 all_templates = intdict()
 
-def safe_float(x):
-  '''Convert a string to floating point, but don't crash on errors;
-instead, output a warning.'''
+def safe_float_1(x):
+  '''Subfunction of safe_float.  Always return None.'''
   if x is None:
-    return 0.
+    return None
   try:
     return float(x)
   except:
     x = x.strip()
     if x:
       wikiwarning("Expected number, saw %s" % x)
-    return 0.
+    return None
+
+def safe_float(x, zero_on_error=False):
+  '''Convert a string to floating point, but don't crash on errors;
+instead, output a warning.  If 'zero_on_error', return 0 if no number could
+be produced; otherwise, return None.'''
+  ret = safe_float_1(x)
+  if ret is None and zero_on_error: return 0.
+  return ret
 
 def get_german_style_coord(arg):
   '''Handle plain floating-point numbers as well as "German-style"
 deg/min/sec/DIR indicators like 45/32/30/E.'''
   if arg is None:
-    return 0. # FIXME: Return None?
+    return None
   if ' ' in arg:
     arg = re.sub(' .*$', '', arg)
   if '/' in arg:
@@ -678,14 +685,18 @@ deg/min/sec/DIR indicators like 45/32/30/E.'''
         off = convert_ew[offind]
       return convert_dms(off, deg, min, sec)
     wikiwarning("Unrecognized DEG/MIN/SEC/HEMIS-style indicator: %s" % arg)
-    return 0. # FIXME: Return None?
+    return None
   else:
     return safe_float(arg)
 
 def convert_dms(nsew, d, m, s):
   '''Convert a multiplier (1 or N or E, -1 for S or W) and degree/min/sec
 values into a decimal +/- latitude or longitude.'''
-  return nsew*(get_german_style_coord(d) + safe_float(m)/60. + safe_float(s)/3600.)
+  lat = get_german_style_coord(d)
+  if lat is None:
+    return None
+  return nsew*(lat + safe_float(m, zero_on_error = True)/60. +
+      safe_float(s, zero_on_error = True)/3600.)
 
 convert_ns = {'N':1, 'S':-1}
 convert_ew = {'E':1, 'W':-1, 'L':1, 'O':-1}
@@ -837,7 +848,7 @@ tuple of decimal (latitude, longitude) values.'''
     mult = -1
   else:
     wikiwarning("Didn't see any appropriate stopniN/stopniS param")
-    mult = 0.
+    mult = 1 # Arbitrarily set to N, probably accurate in Poland
   lat = get_built_in_lat_long_1(temptype, args, rawargs,
       ('stopnin', 'stopnis'),
       ('minutn', 'minuts'),
@@ -849,7 +860,7 @@ tuple of decimal (latitude, longitude) values.'''
     mult = -1
   else:
     wikiwarning("Didn't see any appropriate stopniE/stopniW param")
-    mult = 0.
+    mult = 1 # Arbitrarily set to E, probably accurate in Poland
   long = get_built_in_lat_long_1(temptype, args, rawargs,
       ('stopnie', 'stopniw'),
       ('minute', 'minutw'),
@@ -952,11 +963,11 @@ globe: which planet or satellite the coordinate is on (esp. if not the Earth)
     (paramshash, _) = find_template_params(args, True)
     lat = paramshash.get('lat', None) or paramshash.get('latitude', None)
     long = paramshash.get('long', None) or paramshash.get('longitude', None)
-    if not lat or not long:
+    if lat is None or long is None:
       wikiwarning("Can't find latitude/longitude in {{%s|%s}}" %
               (temptype, '|'.join(args)))
-    lat = safe_float(lat) if lat else 0.
-    long = safe_float(long) if long else 0.
+    lat = safe_float(lat)
+    long = safe_float(long)
     return (lat, long)
 
 def get_coordinate_coord(temptype, rawargs):
@@ -1011,10 +1022,9 @@ is:
   # Filter out optional "template arguments", add a bunch of blank arguments
   # at the end to make sure we don't get out-of-bounds errors in
   # get_coord_1()
-  # FIXME: Returning 0/0 is bad, since this might be a legitimate coordinate
   if len(args) == 0:
     wikiwarning("No arguments to template 'geocoordenadas'")
-    return (0., 0.)
+    return (None, None)
   else:
     # Yes, every one of the following problems occurs: Extra spaces; commas
     # used instead of periods; lowercase nsew; use of O (Oeste) for "West",
@@ -1024,7 +1034,7 @@ is:
     if not m:
       wikiwarning("Unrecognized argument %s to template 'geocoordenadas'" %
           args[0])
-      return (0., 0.)
+      return (None, None)
     else:
       (latd, latm, lats, latns, longd, longm, longs, longew) = \
           m.groups()
@@ -1097,13 +1107,15 @@ applied to the text before being sent here.'''
         templates_with_coords[lowertemp] += 1
         (lat, long) = get_built_in_lat_coord(temptype, paramshash, rawargs)
 
-    if lat or long:
-      if lat is None:
-        lat = 0.
-      if long is None:
-        long = 0.
-      if debug['some']: errprint("Saw coordinate %s,%s in template type %s" %
-                (lat, long, temptype))
+    if debug['some']: errprint("Saw coordinate %s,%s in template type %s" %
+              (lat, long, temptype))
+    if lat is None and long is not None:
+      errprint("Saw longitude %s but no latitude in template: %s" %
+          (long, bound_string_length(text)))
+    if long is None and lat is not None:
+      errprint("Saw latitude %s but no latitude in template: %s" %
+          (lat, bound_string_length(text)))
+    if lat is not None and long is not None:
       self.coords.append((lowertemp,lat,long))
     # Recursively process the text inside the template in case there are
     # coordinates in it.
