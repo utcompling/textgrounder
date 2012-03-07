@@ -751,8 +751,12 @@ def get_lat_long_1(temptype, args, rawargs, latd, latm, lats, offparam, is_lat):
                (offparam, temptype, hemis))
   return convert_dms(hemismult, d, m, s)
 
-latd_arguments = ('latd', 'latg', 'lat_deg', 'latitudedegrees',
-  'latitudinegradi', 'latitudine gradi', 'latitudine_d',
+latd_arguments = ('latd', 'latg', 'lat_d',
+  'latdeg', 'lat_deg', 'lat_degrees', 'latitudedegrees',
+  'latitudinegradi', 'latitudine_gradi', 'latitudine gradi',
+  'latgradi',
+  'latitudine_d',
+  'latitudegraden',
   'breitengrad', 'breddegrad', 'bredde_grad')
 def get_latd_coord(temptype, args, rawargs):
   '''Given a template of type TEMPTYPE with arguments ARGS (converted into
@@ -762,25 +766,51 @@ longd/lon_deg/etc., extract out and return a tuple of decimal
 (latitude, longitude) values.'''
   lat = get_lat_long_1(temptype, args, rawargs,
       latd_arguments,
-      ('latm', 'lat_min', 'latitudeminutes',
-         'latitudineminuti', 'latitudine minute', 'latitudine_m',
+      ('latm', 'latmin', 'lat_min', 'lat_m', 'lat_minutes', 'latitudeminutes',
+         'latitudineprimi', 'latitudine_primi', 'latitudine primi',
+         'latprimi',
+         'latitudineminuti', 'latitudine_minuti', 'latitudine minuti',
+         'latminuti',
+         'latitudine_m',
+         'latitudeminuten',
          'breitenminute', 'bredde_min'),
-      ('lats', 'lat_sec', 'latitudeseconds', 'latitudinesecondi',
-         'latitudine_s', 'breitensekunde'),
-      ('latns', 'latp', 'lap', 'lat_dir', 'latitudine ns'),
+      ('lats', 'latsec', 'lat_sec', 'lat_s', 'lat_seconds', 'latitudeseconds',
+         'latitudinesecondi', 'latitudine_secondi', 'latitudine secondi',
+         'latsecondi',
+         'latitudine_s',
+         'latitudeseconden',
+         'breitensekunde'),
+      ('latns', 'latp', 'lap', 'lat_dir', 'lat_direction',
+         'latitudinens', 'latitudine_ns', 'latitudine ns'),
       is_lat=True)
   long = get_lat_long_1(temptype, args, rawargs,
       # Typos like Longtitude do occur in the Spanish Wikipedia at least
-      ('longd', 'lond', 'longg', 'long', 'lon_deg',
-         'longitudinegradi', 'longitudine gradi',
-         'longitudine_d', 'longitudedegrees', 'longtitudedegrees',
-         u'längengrad', 'lengdegrad', u'længde_grad'),
-      ('longm', 'lonm', 'lon_min', 'longitudineminuti', 'longitudine_m',
+      ('longd', 'lond', 'longg', 'long',
+         'londeg', 'lon_deg', 'long_d', 'long_degrees',
+         'longitudinegradi', 'longitudine_gradi', 'longitudine gradi',
+         'longgradi',
+         'longitudine_d',
+         'longitudedegrees', 'longtitudedegrees',
+         'longitudegraden',
+         u'längengrad', 'laengengrad', 'lengdegrad', u'længde_grad'),
+      ('longm', 'lonm', 'lonmin', 'lon_min', 'long_m', 'long_minutes',
+         'longitudineprimi', 'longitudine_primi', 'longitudine primi',
+         'longprimi',
+         'longitudineminuti', 'longitudine_minuti', 'longitudine minuti',
+         'longminuti',
+         'longitudine_m',
          'longitudeminutes', 'longtitudeminutes',
+         'longitudeminuten',
          u'längenminute', u'længde_min'),
-      ('longs', 'lons', 'lon_sec', 'longitudinesecondi', 'longitudine_s',
-         'longitudeseconds', 'longtitudeseconds', u'längensekunde'),
-      ('longew', 'longp', 'lonp', 'lon_dir', 'longitudine ew'),
+      ('longs', 'lons', 'lonsec', 'lon_sec', 'long_s', 'long_seconds',
+         'longitudinesecondi', 'longitudine_secondi', 'longitudine secondi',
+         'longsecondi',
+         'longitudine_s',
+         'longitudeseconds', 'longtitudeseconds',
+         'longitudeseconden',
+         u'längensekunde'),
+      ('longew', 'longp', 'lonp', 'lon_dir', 'long_direction',
+         'longitudineew', 'longitudine_ew', 'longitudine ew'),
       is_lat=False)
   return (lat, long)
 
@@ -827,15 +857,28 @@ tuple of decimal (latitude, longitude) values.'''
       mult)
   return (lat, long)
 
-latitude_arguments = ('latitude', 'latitud')
-longitude_arguments = ('longitude', 'longitud')
+latitude_arguments = ('latitude', 'latitud', 'latitudine',
+    # NOTE: We want to prefer breitengrad over breite because islands may
+    # have both, with breite simply specifying the width while breitengrad
+    # specifies the latitude.  But sometimes breitengrad occurs with
+    # breitenminute, so we list it in the latd arguments as well, which
+    # we check first.
+    'breitengrad', 'breite',
+    #'lat' # Appears in non-article coordinates
+    #'lat_dec' # Appears to be associated with non-Earth coordinates
+    )
+longitude_arguments = ('longitude', 'longitud', 'longitudine',
+    u'längengrad', u'laengengrad', u'länge', u'laenge'
+    #'long' # Appears in non-article coordinates
+    #'long_dec' # Appears to be associated with non-Earth coordinates
+    )
 
 def get_latitude_coord(temptype, args, rawargs):
   '''Given a template of type TEMPTYPE with arguments ARGS, assumed to have
 a latitude/longitude specification in it, extract out and return a tuple of
 decimal (latitude, longitude) values.'''
-  # German-style (e.g. 72/53/15/E) also occurs in the French Wikipedia with
-  # 'latitude' and such, so just check for it everywhere.
+  # German-style (e.g. 72/53/15/E) also occurs with 'latitude' and such,
+  # so just check for it everywhere.
   lat = get_german_style_coord(getarg(latitude_arguments,
     temptype, args, rawargs))
   long = get_german_style_coord(getarg(longitude_arguments,
@@ -1036,6 +1079,11 @@ applied to the text before being sent here.'''
         #errprint("seen: [%s] in {{%s|%s}}" % (getarg(latd_arguments, temptype, paramshash, rawargs), temptype, rawargs))
         templates_with_coords[lowertemp] += 1
         (lat, long) = get_latd_coord(temptype, paramshash, rawargs)
+      # NOTE: DO NOT CHANGE ORDER.  We want to check latd first and check
+      # latitude afterwards for various reasons (e.g. so that cases where
+      # breitengrad and breitenminute occur get found).  FIXME: Maybe we
+      # don't need get_latitude_coord at all, but get_latd_coord will
+      # suffice.
       elif getarg(latitude_arguments, temptype, paramshash, rawargs, warnifnot=False) is not None:
         #errprint("seen: [%s] in {{%s|%s}}" % (getarg(latitude_arguments, temptype, paramshash, rawargs), temptype, rawargs))
         templates_with_coords[lowertemp] += 1
@@ -1554,6 +1602,31 @@ class ArticleHandler(object):
     self.title = None
     self.id = None
 
+  redirect_commands = "|".join([
+      # English, etc.
+      'redirect', 'redirect to',
+      # Italian (IT)
+      'rinvia', 'rinvio',
+      # Polish (PL)
+      'patrz', 'przekieruj', 'tam',
+      # Dutch (NL)
+      'doorverwijzing',
+      # French (FR)
+      'redirection',
+      # Spanish (ES)
+      u'redirección',
+      # Portuguese (PT)
+      'redirecionamento',
+      # German (DE)
+      'weiterleitung',
+      # Russian (RU)
+      u'перенаправление',
+    ])
+ 
+  global redirect_re
+  redirect_re = re.compile(ur'(?i)#(?:%s)\s*:?\s*\[\[(.*?)\]\]' %
+      redirect_commands)
+
   # Process the text of article TITLE, with text TEXT.  The default
   # implementation does the following:
   #
@@ -1583,7 +1656,7 @@ class ArticleHandler(object):
     ### Look to see if the article is a redirect
   
     if redirect:
-      m = re.match(ur'(?i)#(?:REDIRECT|REDIRECT TO|REDIRECTION|REDIRECCIÓN|REDIRECIONAMENTO|WEITERLEITUNG)\s*:?\s*\[\[(.*?)\]\]', text.strip())
+      m = redirect_re.match(text.strip())
       if m:
         self.process_redirect(m.group(1))
         # NOTE: There may be additional templates specified along with a
