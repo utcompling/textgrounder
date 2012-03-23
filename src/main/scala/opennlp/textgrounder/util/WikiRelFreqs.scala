@@ -12,16 +12,16 @@ object WikiRelFreqs extends App {
   def getFreqs(filename:String):Map[String, Double] = {
     val wordCountRE = """^(\w+)\s=\s(\d+)$""".r
     val lines = scala.io.Source.fromFile(filename).getLines
-    val freqs = new scala.collection.mutable.HashMap[String, Double]
-    var total = 0
+    val freqs = new scala.collection.mutable.HashMap[String, Long]
+    var total = 0l
     var lineCount = 0
 
     for(line <- lines) {
       if(wordCountRE.findFirstIn(line) != None) {
         val wordCountRE(word, count) = line
         val lowerWord = word.toLowerCase
-        val oldCount = freqs.getOrElse(lowerWord, 0.0)
-        freqs.put(lowerWord, oldCount + count.toDouble)
+        val oldCount = freqs.getOrElse(lowerWord, 0l)
+        freqs.put(lowerWord, oldCount + count.toInt)
         total += count.toInt
       }
       if(lineCount % 10000000 == 0)
@@ -29,6 +29,6 @@ object WikiRelFreqs extends App {
       lineCount += 1
     }
 
-    freqs.map(p => (p._1, p._2 / total)).toMap
+    freqs.map(p => (p._1, p._2.toDouble / total)).toMap
   }
 }
