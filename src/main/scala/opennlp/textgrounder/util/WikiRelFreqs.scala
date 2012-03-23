@@ -14,6 +14,7 @@ object WikiRelFreqs extends App {
     val lines = scala.io.Source.fromFile(filename).getLines
     val freqs = new scala.collection.mutable.HashMap[String, Float]
     var total = 0
+    var lineCount = 0
 
     for(line <- lines) {
       if(wordCountRE.findFirstIn(line) != None) {
@@ -23,6 +24,9 @@ object WikiRelFreqs extends App {
         freqs.put(lowerWord, oldCount + count.toFloat)
         total += count.toInt
       }
+      if(lineCount % 10000000 == 0)
+        println(filename+" "+lineCount)
+      lineCount += 1
     }
 
     freqs.map(p => (p._1, p._2 / total)).toMap
