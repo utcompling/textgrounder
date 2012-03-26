@@ -178,6 +178,7 @@ class DefaultUnigramWordDistConstructor(
   factory: WordDistFactory,
   ignore_case: Boolean,
   stopwords: Set[String],
+  whitelist: Set[String],
   minimum_word_count: Int = 1
 ) extends WordDistConstructor(factory: WordDistFactory) {
   /**
@@ -233,7 +234,7 @@ class DefaultUnigramWordDistConstructor(
   protected def add_word_with_count(counts: WordDoubleMap,
       word: String, count: Int) {
     val lword = maybe_lowercase(word)
-    if (!(stopwords contains lword))
+    if (!stopwords.contains(lword) && (whitelist.size == 0 || whitelist.contains(lword)))
       counts(memoize_string(lword)) += count
   }
 

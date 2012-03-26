@@ -458,6 +458,19 @@ class RandomGridLocateDocumentStrategy[
   }
 
   /////////////////////////////////////////////////////////////////////////////
+  //                                   Whitelist                             //
+  /////////////////////////////////////////////////////////////////////////////
+
+  object Whitelist {
+    def read_whitelist(filehand: FileHandler, whitelist_filename: String): Set[String] = {
+      if(whitelist_filename == null || whitelist_filename.length == 0)
+        Nil.toSet
+      else
+        filehand.openr(whitelist_filename).toSet
+    }
+  }
+
+  /////////////////////////////////////////////////////////////////////////////
   //                                  Main code                              //
   /////////////////////////////////////////////////////////////////////////////
 
@@ -487,6 +500,14 @@ class RandomGridLocateDocumentStrategy[
         help = """File containing list of stopwords.  If not specified,
   a default list of English stopwords (stored in the TextGrounder distribution)
   is used.""")
+
+    var whitelist_file =
+      ap.option[String]("whitelist-file",
+         metavar = "FILE",
+         help = """File containing a whitelist of words. If specified, ONLY
+  words on the list will be read from any corpora; other words will be ignored.
+  If not specified, all words (except those on the stopword list) will be
+  read.""")
 
     var input_corpus =
       ap.multiOption[String]("i", "input-corpus",
@@ -788,6 +809,7 @@ class RandomGridLocateDocumentStrategy[
     type TDocTable <: DistDocumentTable[_, TDoc, TGrid]
     override type TParam <: GridLocateParameters
     var stopwords: Set[String] = _
+    var whitelist: Set[String] = _
     var cell_grid: TGrid = _
     var document_table: TDocTable = _
     var word_dist_factory: WordDistFactory = _
@@ -843,8 +865,13 @@ class RandomGridLocateDocumentStrategy[
       else stopwords
     }
 
+    protected def get_whitelist() = {
+      whitelist
+    }
+
     protected def initialize_word_dist_constructor(factory: WordDistFactory) = {
       val the_stopwords = get_stopwords()
+      val the_whitelist = get_whitelist()
       /* if (num_ngrams == 2)
         new DefaultBigramWordDistConstructor(factory, ...)
       else */
@@ -852,6 +879,7 @@ class RandomGridLocateDocumentStrategy[
           factory,
           ignore_case = !params.preserve_case_words,
           stopwords = the_stopwords,
+          whitelist = the_whitelist,
           minimum_word_count = params.minimum_word_count)
     }
 
@@ -873,6 +901,10 @@ class RandomGridLocateDocumentStrategy[
     Stopwords.read_stopwords(get_file_handler, params.stopwords_file)
   }
 
+  protected def read_whitelist() = {
+    Whitelist.read_whitelist(get_file_handler, params.whitelist_file)
+  }
+
   protected def read_documents(table: TDocTable) {
     for (fn <- params.input_corpus)
       table.read_training_documents(get_file_handler, fn,
@@ -882,12 +914,13 @@ class RandomGridLocateDocumentStrategy[
 
   def setup_for_run() {
     stopwords = read_stopwords()
+    whitelist = read_whitelist()
     word_dist_factory = initialize_word_dist_factory()
     word_dist_constructor = initialize_word_dist_constructor(word_dist_factory)
     word_dist_factory.set_word_dist_constructor(word_dist_constructor)
     document_table = initialize_document_table(word_dist_factory)
     cell_grid = initialize_cell_grid(document_table)
-    // This accesses the stopwords through the pointer to this in
+    // This accesses the stopwords and whitelist through the pointer to this in
     // document_table.
     read_documents(document_table)
     if (debug("stop-after-reading-dists")) {

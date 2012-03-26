@@ -88,9 +88,10 @@ class FilterUnigramWordDistConstructor(
     filter_words: Seq[String],
     ignore_case: Boolean,
     stopwords: Set[String],
+    whitelist: Set[String],
     minimum_word_count: Int = 1
   ) extends DefaultUnigramWordDistConstructor(
-    factory, ignore_case, stopwords, minimum_word_count
+    factory, ignore_case, stopwords, whitelist, minimum_word_count
   ) {
 
   override def finish_before_global(dist: WordDist) {
@@ -152,6 +153,7 @@ class GenerateKMLDriver extends
     if (num_ngrams > 1)
       param_error("Only unigram word distribution words with GenerateKML")
     val the_stopwords = get_stopwords()
+    val the_whitelist = get_whitelist()
     /* if (num_ngrams == 2)
       new FilterBigramWordDistConstructor(factory, ...)
     else */
@@ -160,6 +162,7 @@ class GenerateKMLDriver extends
         params.split_kml_words,
         ignore_case = !params.preserve_case_words,
         stopwords = the_stopwords,
+        whitelist = the_whitelist,
         minimum_word_count = params.minimum_word_count)
   }
 
