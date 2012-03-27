@@ -231,11 +231,17 @@ class DefaultUnigramWordDistConstructor(
 
   var seen_documents = new scala.collection.mutable.HashSet[String]()
 
+  // Returns true if the word was counted, false if it was ignored due to stoplisting
+  // and/or whitelisting
   protected def add_word_with_count(counts: WordDoubleMap,
-      word: String, count: Int) {
+      word: String, count: Int): Boolean = {
     val lword = maybe_lowercase(word)
-    if (!stopwords.contains(lword) && (whitelist.size == 0 || whitelist.contains(lword)))
+    if (!stopwords.contains(lword) && (whitelist.size == 0 || whitelist.contains(lword))) {
       counts(memoize_string(lword)) += count
+      true
+    }
+    else
+      false
   }
 
   protected def imp_add_document(dist: WordDist, words: Traversable[String]) {
@@ -256,8 +262,18 @@ class DefaultUnigramWordDistConstructor(
   protected def imp_add_keys_values(dist: WordDist, keys: Array[String],
       values: Array[Int], num_words: Int) {
     val counts = dist.asInstanceOf[UnigramWordDist].counts
-    for (i <- 0 until num_words)
-      add_word_with_count(counts, keys(i), values(i))
+    var addedTypes = 0
+    var addedTokens = 0
+    var totalTokens = 0
+    for (i <- 0 until num_words) {
+      if(add_word_with_count(counts, keys(i), values(i))) {
+        addedTypes += 1
+        addedTokens += values(i)
+      }
+      totalTokens += values(i)
+    }
+    errprint("Fraction of word types kept:"+(addedTypes.toDouble/num_words))
+    errprint("Fraction of word tokens kept:"+(addedTokens.toDouble/totalTokens))
   } 
 
   protected def imp_finish_before_global(dist: WordDist) {
