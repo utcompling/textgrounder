@@ -45,6 +45,9 @@ article_namespaces = ['User', 'Wikipedia', 'File', 'MediaWiki', 'Template',
                       'Help', 'Category', 'Thread', 'Summary', 'Portal',
                       'Book']
 
+article_namespaces = {}
+article_namespaces_lower = {}
+
 article_namespace_aliases = {
   'P':'Portal', 'H':'Help', 'T':'Template',
   'CAT':'Category', 'Cat':'Category', 'C':'Category',
@@ -526,7 +529,7 @@ lowercased and have the whitespace stripped from them).'''
   for arg in args:
     m = re.match(r'(?s)(.*?)=(.*)', arg)
     if m:
-      key = m.group(1).strip().lower()
+      key = m.group(1).strip().lower().replace('_','').replace(' ','')
       value = m.group(2)
       if strip_values:
         value = value.strip()
@@ -546,9 +549,16 @@ will always be returned (in the case of an empty macro, it will be
 the string "empty macro"), so that code that parses templates need
 not worry about crashing on these syntactic errors.'''
 
-  macroargs = [foo for foo in
-              parse_balanced_text(balanced_pipe_re, macro[2:-2])
-              if foo != '|']
+  macroargs1 = [foo for foo in
+               parse_balanced_text(balanced_pipe_re, macro[2:-2])]
+  macroargs2 = []
+  # Concatenate adjacent args if neither one is a |
+  for x in macroargs1:
+    if x == '|' or len(macroargs2) == 0 or macroargs2[-1] == '|':
+      macroargs2 += [x]
+    else:
+      macroargs2[-1] += x
+  macroargs = [x for x in macroargs2 if x != '|']
   if not macroargs:
     wikiwarning("Strange macro with no arguments: %s" % macroargs)
     return ['empty macro']
@@ -652,9 +662,18 @@ def safe_float_1(x):
   if x is None:
     return None
   try:
+    x = x.strip()
+  except:
+    pass
+  try:
     return float(x)
   except:
-    x = x.strip()
+    # In the Portuguese version at least, we have entries like
+    # {{Coor title d|51.30.23|N|0.7.35|O|type:landmark|region:GB}}
+    m = re.match(r'(-?[0-9]+)\.([0-9]+)\.([0-9]+)', x)
+    if m:
+      (deg, min, sec) = m.groups()
+      return convert_dms(1, deg, min, sec)
     if x:
       wikiwarning("Expected number, saw %s" % x)
     return None
@@ -672,50 +691,82 @@ def get_german_style_coord(arg):
 deg/min/sec/DIR indicators like 45/32/30/E.'''
   if arg is None:
     return None
+  arg = arg.lstrip()
   if ' ' in arg:
     arg = re.sub(' .*$', '', arg)
   if '/' in arg:
-    m = re.match('([0-9.]+)/([0-9.]+)?/([0-9.]+)?/([NSEWnsew])', arg)
+    m = re.match('([0-9.]+)/([0-9.]+)?/([0-9.]+)?(?:/([NSEWOnsewo]))?', arg)
     if m:
       (deg, min, sec, offind) = m.groups()
-      offind = offind.upper()
-      if offind in convert_ns:
-        off = convert_ns[offind]
+      if offind:
+        offind = offind.upper()
+        if offind in convert_ns:
+          off = convert_ns[offind]
+        else:
+          off = convert_ew_german[offind]
       else:
-        off = convert_ew[offind]
+        off = 1
       return convert_dms(off, deg, min, sec)
     wikiwarning("Unrecognized DEG/MIN/SEC/HEMIS-style indicator: %s" % arg)
     return None
   else:
     return safe_float(arg)
 
-def convert_dms(nsew, d, m, s):
+def convert_dms(nsew, d, m, s, decimal = False):
   '''Convert a multiplier (1 or N or E, -1 for S or W) and degree/min/sec
 values into a decimal +/- latitude or longitude.'''
   lat = get_german_style_coord(d)
   if lat is None:
     return None
-  return nsew*(lat + safe_float(m, zero_on_error = True)/60. +
-      safe_float(s, zero_on_error = True)/3600.)
+  min = safe_float(m, zero_on_error = True)
+  sec = safe_float(s, zero_on_error = True)
+  if min < 0: min = -min
+  if sec < 0: sec = -sec
+  if min > 60:
+    wikiwarning("Out-of-bounds minutes %s" % min)
+    return None
+  if sec > 60:
+    wikiwarning("Out-of-bounds seconds %s" % sec)
+    return None
+  return nsew*(lat + min/60. + sec/3600.)
 
 convert_ns = {'N':1, 'S':-1}
 convert_ew = {'E':1, 'W':-1, 'L':1, 'O':-1}
+# Blah!! O=Ost="east" in German but O=Oeste="west" in Spanish/Portuguese
+convert_ew_german = {'E':1, 'W':-1, 'O':1}
 
 # Get the default value for the hemisphere, as a multiplier +1 or -1.
-# We need to handle Australian places specially, as S latitude, E longitude.
-# We need to handle Pittsburgh neighborhoods specially, as N latitude, W longitude.
+# We need to handle the following as S latitude, E longitude:
+#   -- Infobox Australia
+#   -- Info/Localidade de Angola
+#   -- Info/Município de Angola
+#   -- Info/Localidade de Moçambique
+
+# We need to handle the following as N latitude, W longitude:
+#   -- Infobox Pittsburgh neighborhood
+#   -- Info/Assentamento/Madeira
+#   -- Info/Localidade da Madeira
+#   -- Info/Assentamento/Marrocos
+#   -- Info/Localidade dos EUA
+#   -- Info/PousadaPC
+#   -- Info/Antigas freguesias de Portugal
 # Otherwise assume +1, so that we leave the values alone.  This is important
 # because some fields may specifically use signed values to indicate the
 # hemisphere directly, or use other methods of indicating hemisphere (e.g.
 # "German"-style "72/50/35/W").
 def get_hemisphere(temptype, is_lat):
-  if temptype.lower().startswith('infobox australia'):
-    if is_lat: return -1
-    else: return 1
-  elif temptype.lower().startswith('infobox pittsburgh neighborhood'):
-    if is_lat: return 1
-    else: return -1
-  else: return 1
+  for x in ('infobox australia', 'info/localidade de angola',
+      u'info/município de angola', u'info/localidade de moçambique'):
+    if temptype.lower().startswith(x):
+      if is_lat: return -1
+      else: return 1
+  for x in ('infobox pittsburgh neighborhood', 'info/assentamento/madeira',
+      'info/assentamento/marrocos', 'info/localidade dos eua', 'info/pousadapc',
+      'info/antigas freguesias de portugal'):
+    if temptype.lower().startswith(x):
+      if is_lat: return 1
+      else: return -1
+  return 1
 
 # Get an argument (ARGSEARCH) by name from a hash table (ARGS).  Multiple
 # synonymous names can be looked up by giving a list or tuple for ARGSEARCH.
@@ -726,14 +777,14 @@ def getarg(argsearch, temptype, args, rawargs, warnifnot=True):
       val = args.get(x, None)
       if val is not None:
         return val
-    if warnifnot:
+    if warnifnot or debug['some']:
       wikiwarning("None of params %s seen in template {{%s|%s}}" % (
         ','.join(argsearch), temptype, bound_string_length('|'.join(rawargs))))
   else:
     val = args.get(argsearch, None)
     if val is not None:
       return val
-    if warnifnot:
+    if warnifnot or debug['some']:
       wikiwarning("Param %s not seen in template {{%s|%s}}" % (
         argsearch, temptype, bound_string_length('|'.join(rawargs))))
   return None
@@ -756,19 +807,16 @@ def get_lat_long_1(temptype, args, rawargs, latd, latm, lats, offparam, is_lat):
       convert = convert_ns
     else:
       convert = convert_ew
-    hemismult = convert.get(hemis, 0)
-    if hemismult == 0:
+    hemismult = convert.get(hemis, None)
+    if hemismult is None:
       wikiwarning("%s for template type %s has bad value: [%s]" %
                (offparam, temptype, hemis))
+      return None
   return convert_dms(hemismult, d, m, s)
 
-latd_arguments = ('latd', 'latg', 'lat_d',
-  'latdeg', 'lat_deg', 'lat_degrees', 'latitudedegrees',
-  'latitudinegradi', 'latitudine_gradi', 'latitudine gradi',
-  'latgradi',
-  'latitudine_d',
-  'latitudegraden',
-  'breitengrad', 'breddegrad', 'bredde_grad')
+latd_arguments = ('latd', 'latg', 'latdeg', 'latdegrees', 'latitudedegrees',
+  'latitudinegradi', 'latgradi', 'latitudined', 'latitudegraden',
+  'breitengrad', 'breddegrad', 'breddegrad')
 def get_latd_coord(temptype, args, rawargs):
   '''Given a template of type TEMPTYPE with arguments ARGS (converted into
 a hash table; also available in raw form as RAWARGS), assumed to have
@@ -777,51 +825,38 @@ longd/lon_deg/etc., extract out and return a tuple of decimal
 (latitude, longitude) values.'''
   lat = get_lat_long_1(temptype, args, rawargs,
       latd_arguments,
-      ('latm', 'latmin', 'lat_min', 'lat_m', 'lat_minutes', 'latitudeminutes',
-         'latitudineprimi', 'latitudine_primi', 'latitudine primi',
-         'latprimi',
-         'latitudineminuti', 'latitudine_minuti', 'latitudine minuti',
-         'latminuti',
-         'latitudine_m',
-         'latitudeminuten',
-         'breitenminute', 'bredde_min'),
-      ('lats', 'latsec', 'lat_sec', 'lat_s', 'lat_seconds', 'latitudeseconds',
-         'latitudinesecondi', 'latitudine_secondi', 'latitudine secondi',
-         'latsecondi',
-         'latitudine_s',
-         'latitudeseconden',
+      ('latm', 'latmin', 'latminutes', 'latitudeminutes',
+         'latitudineprimi', 'latprimi',
+         'latitudineminuti', 'latminuti', 'latitudinem', 'latitudeminuten',
+         'breitenminute', 'breddemin'),
+      ('lats', 'latsec', 'latseconds', 'latitudeseconds',
+         'latitudinesecondi', 'latsecondi', 'latitudines', 'latitudeseconden',
          'breitensekunde'),
-      ('latns', 'latp', 'lap', 'lat_dir', 'lat_direction',
-         'latitudinens', 'latitudine_ns', 'latitudine ns'),
+      ('latns', 'latp', 'lap', 'latdir', 'latdirection', 'latitudinens'),
       is_lat=True)
   long = get_lat_long_1(temptype, args, rawargs,
       # Typos like Longtitude do occur in the Spanish Wikipedia at least
-      ('longd', 'lond', 'longg', 'long',
-         'londeg', 'lon_deg', 'long_d', 'long_degrees',
-         'longitudinegradi', 'longitudine_gradi', 'longitudine gradi',
-         'longgradi',
-         'longitudine_d',
+      ('longd', 'lond', 'longg', 'long', 'longdeg', 'londeg',
+         'longdegrees', 'londegrees',
+         'longitudinegradi', 'longgradi', 'longitudined',
          'longitudedegrees', 'longtitudedegrees',
          'longitudegraden',
-         u'längengrad', 'laengengrad', 'lengdegrad', u'længde_grad'),
-      ('longm', 'lonm', 'lonmin', 'lon_min', 'long_m', 'long_minutes',
-         'longitudineprimi', 'longitudine_primi', 'longitudine primi',
-         'longprimi',
-         'longitudineminuti', 'longitudine_minuti', 'longitudine minuti',
-         'longminuti',
-         'longitudine_m',
+         u'längengrad', 'laengengrad', 'lengdegrad', u'længdegrad'),
+      ('longm', 'lonm', 'longmin', 'lonmin',
+         'longminutes', 'lonminutes',
+         'longitudineprimi', 'longprimi',
+         'longitudineminuti', 'longminuti', 'longitudinem',
          'longitudeminutes', 'longtitudeminutes',
          'longitudeminuten',
-         u'längenminute', u'længde_min'),
-      ('longs', 'lons', 'lonsec', 'lon_sec', 'long_s', 'long_seconds',
-         'longitudinesecondi', 'longitudine_secondi', 'longitudine secondi',
-         'longsecondi',
-         'longitudine_s',
+         u'längenminute', u'længdemin'),
+      ('longs', 'lons', 'longsec', 'lonsec',
+         'longseconds', 'lonseconds',
+         'longitudinesecondi', 'longsecondi', 'longitudines',
          'longitudeseconds', 'longtitudeseconds',
          'longitudeseconden',
          u'längensekunde'),
-      ('longew', 'longp', 'lonp', 'lon_dir', 'long_direction',
-         'longitudineew', 'longitudine_ew', 'longitudine ew'),
+      ('longew', 'lonew', 'longp', 'lonp', 'longdir', 'londir',
+         'longdirection', 'londirection', 'longitudineew'),
       is_lat=False)
   return (lat, long)
 
@@ -842,9 +877,9 @@ a hash table; also available in raw form as RAWARGS), assumed to have
 a latitude/longitude specification in it using stopniN/etc. (where the
 direction NSEW is built into the argument name), extract out and return a
 tuple of decimal (latitude, longitude) values.'''
-  if getarg(built_in_latd_north_arguments) is not None:
+  if getarg(built_in_latd_north_arguments, temptype, args, rawargs) is not None:
     mult = 1
-  elif getarg(built_in_latd_south_arguments) is not None:
+  elif getarg(built_in_latd_south_arguments, temptype, args, rawargs) is not None:
     mult = -1
   else:
     wikiwarning("Didn't see any appropriate stopniN/stopniS param")
@@ -854,9 +889,9 @@ tuple of decimal (latitude, longitude) values.'''
       ('minutn', 'minuts'),
       ('sekundn', 'sekunds'),
       mult)
-  if getarg(built_in_longd_north_arguments) is not None:
+  if getarg(built_in_longd_north_arguments, temptype, args, rawargs) is not None:
     mult = 1
-  elif getarg(built_in_longd_south_arguments) is not None:
+  elif getarg(built_in_longd_south_arguments, temptype, args, rawargs) is not None:
     mult = -1
   else:
     wikiwarning("Didn't see any appropriate stopniE/stopniW param")
@@ -869,19 +904,16 @@ tuple of decimal (latitude, longitude) values.'''
   return (lat, long)
 
 latitude_arguments = ('latitude', 'latitud', 'latitudine',
-    # NOTE: We want to prefer breitengrad over breite because islands may
-    # have both, with breite simply specifying the width while breitengrad
-    # specifies the latitude.  But sometimes breitengrad occurs with
-    # breitenminute, so we list it in the latd arguments as well, which
-    # we check first.
-    'breitengrad', 'breite',
+    'breitengrad',
+    # 'breite', Sometimes used for latitudes but also for other types of width
     #'lat' # Appears in non-article coordinates
-    #'lat_dec' # Appears to be associated with non-Earth coordinates
+    #'latdec' # Appears to be associated with non-Earth coordinates
     )
 longitude_arguments = ('longitude', 'longitud', 'longitudine',
-    u'längengrad', u'laengengrad', u'länge', u'laenge'
+    u'längengrad', u'laengengrad',
+    # u'länge', u'laenge', Sometimes used for longitudes but also for other lengths
     #'long' # Appears in non-article coordinates
-    #'long_dec' # Appears to be associated with non-Earth coordinates
+    #'longdec' # Appears to be associated with non-Earth coordinates
     )
 
 def get_latitude_coord(temptype, args, rawargs):
@@ -896,18 +928,32 @@ decimal (latitude, longitude) values.'''
     temptype, args, rawargs))
   return (lat, long)
 
+def get_infobox_ort_coord(temptype, args, rawargs):
+  '''Given a template 'Infobox Ort' with arguments ARGS, assumed to have
+a latitude/longitude specification in it, extract out and return a tuple of
+decimal (latitude, longitude) values.'''
+  # German-style (e.g. 72/53/15/E) also occurs with 'latitude' and such,
+  # so just check for it everywhere.
+  lat = get_german_style_coord(getarg((u'breite',),
+    temptype, args, rawargs))
+  long = get_german_style_coord(getarg((u'länge', u'laenge'),
+    temptype, args, rawargs))
+  return (lat, long)
+
 # Utility function for get_coord().  Extract out the latitude or longitude
 # values out of a Coord structure.  Return a tuple (OFFSET, VAL) for decimal
 # latitude or longitude VAL and OFFSET indicating the offset of the next
 # argument after the arguments used to produce the value.
-def get_coord_1(args, nsew, convert_nsew):
-  if args[1] in nsew:
+def get_coord_1(args, convert_nsew):
+  if args[1] in convert_nsew:
     d = args[0]; m = 0; s = 0; i = 1
-  elif args[2] in nsew:
+  elif args[2] in convert_nsew:
     d = args[0]; m = args[1]; s = 0; i = 2
-  elif args[3] in nsew:
+  elif args[3] in convert_nsew:
     d = args[0]; m = args[1]; s = args[2]; i = 3
-  else: return (1, args[0])
+  else:
+    # Will happen e.g. in the style where only positive/negative are given
+    return (1, convert_dms(1, args[0], 0, 0))
   return (i+1, convert_dms(convert_nsew[args[i]], d, m, s))
 
 # FIXME!  To be more accurate, we need to look at the template parameters,
@@ -949,15 +995,15 @@ region: the "political region for terrestrial coordinates", i.e. the country
         country plus next-level subdivision (state, province, etc.)
 globe: which planet or satellite the coordinate is on (esp. if not the Earth)
 '''
-  if debug['some']: errprint("Passed in args %s" % args)
+  if debug['some']: errprint("Coord: Passed in args %s" % args)
   # Filter out optional "template arguments", add a bunch of blank arguments
   # at the end to make sure we don't get out-of-bounds errors in
   # get_coord_1()
   filtargs = [x for x in args if '=' not in x]
   if filtargs:
     filtargs += ['','','','','','']
-    (i, lat) = get_coord_1(filtargs, ('N','S'), convert_ns)
-    (_, long) = get_coord_1(filtargs[i:], ('E','W'), convert_ew)
+    (i, lat) = get_coord_1(filtargs, convert_ns)
+    (_, long) = get_coord_1(filtargs[i:], convert_ew)
     return (lat, long)
   else:
     (paramshash, _) = find_template_params(args, True)
@@ -970,7 +1016,19 @@ globe: which planet or satellite the coordinate is on (esp. if not the Earth)
     long = safe_float(long)
     return (lat, long)
 
-def get_coordinate_coord(temptype, rawargs):
+def check_for_bad_globe(paramshash):
+  if debug['some']: errprint("check_for_bad_globe: Passed in args %s" % paramshash)
+  globe = paramshash.get('globe', "").strip()
+  if globe:
+    if globe == "earth":
+      wikiwarning("Interesting, saw globe=earth")
+    else:
+      wikiwarning("Rejecting as non-earth, in template 'Coordinate/Coord/etc.' saw globe=%s"
+          % globe)
+      return True
+  return False
+
+def get_coordinate_coord(extract_coords_obj, temptype, rawargs):
   '''Parse a Coordinate template and return a tuple (lat,long) for latitude and
 longitude.  TEMPTYPE is the template name.  ARGS is the raw arguments for
 the template.  These templates tend to occur in the German Wikipedia. Examples:
@@ -982,6 +1040,9 @@ the template.  These templates tend to occur in the German Wikipedia. Examples:
 '''
   if debug['some']: errprint("Passed in args %s" % rawargs)
   (paramshash, _) = find_template_params(rawargs, True)
+  if check_for_bad_globe(paramshash):
+    extract_coords_obj.notearth = True
+    return (None, None)
   lat = get_german_style_coord(getarg('ns', temptype, paramshash, rawargs))
   long = get_german_style_coord(getarg('ew', temptype, paramshash, rawargs))
   return (lat, long)
@@ -992,23 +1053,14 @@ parameters (see comment under get_coord).'''
   if debug['some']: errprint("Passed in args %s" % args)
   # Filter out optional "template arguments"
   filtargs = [x for x in args if '=' not in x]
+  if debug['some']: errprint("get_coord_params: filtargs: %s" % filtargs)
+  hash = {}
   if filtargs and ':' in filtargs[-1]:
-    coord_params = [tuple(x.split(':')) for x in filtargs[-1].split('_')]
-    return coord_params
-  else:
-    return []
-
-def get_coord_params(temptype, args):
-  '''Parse a Coord template and return a list of tuples of coordinate
-parameters (see comment under get_coord).'''
-  if debug['some']: errprint("Passed in args %s" % args)
-  # Filter out optional "template arguments"
-  filtargs = [x for x in args if '=' not in x]
-  if filtargs and ':' in filtargs[-1]:
-    coord_params = [tuple(x.split(':')) for x in filtargs[-1].split('_')]
-    return coord_params
-  else:
-    return []
+    for x in filtargs[-1].split('_'):
+      if ':' in x:
+        (key, value) = x.split(':', 1)
+        hash[key] = value
+  return hash
 
 def get_geocoordenadas_coord(temptype, args):
   '''Parse a geocoordenadas template (common in the Portuguese Wikipedia) and
@@ -1054,6 +1106,7 @@ applied to the text before being sent here.'''
 
   def __init__(self):
     self.coords = []
+    self.notearth = False
 
   def process_template(self, text):
     # Look for a Coord, Infobox, etc. template that may have coordinates in it
@@ -1064,6 +1117,20 @@ applied to the text before being sent here.'''
     if debug['some']: errprint("Template type: %s" % temptype)
     lowertemp = temptype.lower()
     rawargs = tempargs[1:]
+    if (lowertemp.startswith('info/crater') or
+        lowertemp.endswith(' crater data') or
+        lowertemp.startswith('marsgeo') or
+        lowertemp.startswith('encelgeo') or
+        # All of the following are for heavenly bodies
+        lowertemp.startswith('infobox feature on ') or
+        lowertemp in (u'info/acidente geográfico de vênus',
+                      u'infobox außerirdische region',
+                      'infobox lunar mare', 'encelgeo-crater',
+                      'infobox marskrater', 'infobox mondkrater',
+                      'infobox mondstruktur')):
+        self.notearth = True
+        wikiwarning("Rejecting as not on Earth because saw template %s" % temptype)
+        return []
     # Look for a coordinate template
     if lowertemp in ('coord', 'coordp', 'coords',
                      'koord', #Norwegian
@@ -1074,8 +1141,12 @@ applied to the text before being sent here.'''
         or lowertemp.startswith('mapit') \
         or lowertemp.startswith('koordynaty'): # Coordinates in Polish:
       (lat, long) = get_coord(temptype, rawargs)
+      coord_params = get_coord_params(temptype, tempargs[1:])
+      if check_for_bad_globe(coord_params):
+        self.notearth = True
+        return []
     elif lowertemp == 'coordinate':
-      (lat, long) = get_coordinate_coord(temptype, rawargs)
+      (lat, long) = get_coordinate_coord(self, temptype, rawargs)
     elif lowertemp in ('geocoordenadas', u'coördinaten'):
       # geocoordenadas is Portuguese, coördinaten is Dutch, and they work
       # the same way
@@ -1087,7 +1158,6 @@ applied to the text before being sent here.'''
       (paramshash, _) = find_template_params(rawargs, True)
       if getarg(latd_arguments, temptype, paramshash, rawargs, warnifnot=False) is not None:
         #errprint("seen: [%s] in {{%s|%s}}" % (getarg(latd_arguments, temptype, paramshash, rawargs), temptype, rawargs))
-        templates_with_coords[lowertemp] += 1
         (lat, long) = get_latd_coord(temptype, paramshash, rawargs)
       # NOTE: DO NOT CHANGE ORDER.  We want to check latd first and check
       # latitude afterwards for various reasons (e.g. so that cases where
@@ -1096,7 +1166,6 @@ applied to the text before being sent here.'''
       # suffice.
       elif getarg(latitude_arguments, temptype, paramshash, rawargs, warnifnot=False) is not None:
         #errprint("seen: [%s] in {{%s|%s}}" % (getarg(latitude_arguments, temptype, paramshash, rawargs), temptype, rawargs))
-        templates_with_coords[lowertemp] += 1
         (lat, long) = get_latitude_coord(temptype, paramshash, rawargs)
       elif (getarg(built_in_latd_north_arguments, temptype, paramshash,
                    rawargs, warnifnot=False) is not None or
@@ -1104,19 +1173,29 @@ applied to the text before being sent here.'''
                    rawargs, warnifnot=False) is not None):
         #errprint("seen: [%s] in {{%s|%s}}" % (getarg(built_in_latd_north_arguments, temptype, paramshash, rawargs), temptype, rawargs))
         #errprint("seen: [%s] in {{%s|%s}}" % (getarg(built_in_latd_south_arguments, temptype, paramshash, rawargs), temptype, rawargs))
-        templates_with_coords[lowertemp] += 1
         (lat, long) = get_built_in_lat_coord(temptype, paramshash, rawargs)
+      elif lowertemp in ('infobox ort', 'infobox verwaltungseinheit'):
+        (lat, long) = get_infobox_ort_coord(temptype, paramshash, rawargs)
 
-    if debug['some']: errprint("Saw coordinate %s,%s in template type %s" %
+    if debug['some']: wikiwarning("Saw coordinate %s,%s in template type %s" %
               (lat, long, temptype))
     if lat is None and long is not None:
-      errprint("Saw longitude %s but no latitude in template: %s" %
+      wikiwarning("Saw longitude %s but no latitude in template: %s" %
           (long, bound_string_length(text)))
     if long is None and lat is not None:
-      errprint("Saw latitude %s but no latitude in template: %s" %
+      wikiwarning("Saw latitude %s but no longitude in template: %s" %
           (lat, bound_string_length(text)))
     if lat is not None and long is not None:
-      self.coords.append((lowertemp,lat,long))
+      if lat == 0.0 and long == 0.0:
+        wikiwarning("Rejecting coordinate because zero latitude and longitude seen")
+      elif lat > 90.0 or lat < -90.0 or long > 180.0 or long < -180.0:
+        wikiwarning("Rejecting coordinate because out of bounds latitude or longitude: (%s,%s)" % (lat, long))
+      else:
+        if lat == 0.0 or long == 0.0:
+          wikiwarning("Zero value in latitude and/or longitude: (%s,%s)" %
+              (lat, long))
+        self.coords.append((lowertemp,lat,long))
+        templates_with_coords[lowertemp] += 1
     # Recursively process the text inside the template in case there are
     # coordinates in it.
     return self.process_source_text(text[2:-2])
@@ -1201,20 +1280,22 @@ Record info found in 'loctype'.'''
         or lowertemp.startswith('mapit'):
       params = get_coord_params(temptype, tempargs[1:])
       if params:
+        # WARNING, this returns a hash table, not a list of tuples
+        # like the others do below.
         self.loctype += [['coord-params', params]]
     else:
       (paramshash, _) = find_template_params(tempargs[1:], True)
       if lowertemp == 'infobox settlement':
         params = []
-        for x in ['settlement_type',
-                  'subdivision_type', 'subdivision_type1', 'subdivision_type2',
-                  'subdivision_name', 'subdivision_name1', 'subdivision_name2',
-                  'coordinates_type', 'coordinates_region']:
+        for x in ['settlementtype',
+                  'subdivisiontype', 'subdivisiontype1', 'subdivisiontype2',
+                  'subdivisionname', 'subdivisionname1', 'subdivisionname2',
+                  'coordinatestype', 'coordinatesregion']:
           val = paramshash.get(x, None)
           if val:
             params += [(x, val)]
         self.loctype += [['infobox-settlement', params]]
-      elif ('latd' in paramshash or 'lat_deg' in paramshash or
+      elif ('latd' in paramshash or 'latdeg' in paramshash or
           'latitude' in paramshash):
         self.loctype += \
             [['other-template-with-coord', [('template', temptype)]]]
@@ -1258,7 +1339,8 @@ def yield_internal_link_args(text):
   if m:
     # Something like [[Image:...]] or [[wikt:...]] or [[fr:...]]
     namespace = m.group(1).lower()
-    if namespace in ('image', 'file'):
+    namespace = article_namespaces_lower.get(namespace, namespace)
+    if namespace in ('image', 6): # 6 = file
       # For image links, filter out non-interesting args
       for arg in tempargs[1:]:
         # Ignore uninteresting args
@@ -1339,17 +1421,18 @@ def yield_template_args(text):
       # A fairly arbitrary list of "interesting" parameters.
       if re.match(r'(last|first|authorlink)[1-9]?$', key) or \
          re.match(r'(author|editor)[1-9]?-(last|first|link)$', key) or \
-         key in ('coauthors', 'others', 'title', 'trans_title',
-                 'quote', 'work', 'contribution', 'chapter', 'trans_chapter',
+         key in ('coauthors', 'others', 'title', 'transtitle',
+                 'quote', 'work', 'contribution', 'chapter', 'transchapter',
                  'series', 'volume'):
         yield value
   elif re.match(r'infobox', temptype):
     # Handle Infoboxes.
     for (key,value) in paramhash.items():
       # A fairly arbitrary list of "interesting" parameters.
+      # Remember that _ and space are removed.
       if key in ('name', 'fullname', 'nickname', 'altname', 'former',
-                 'alt', 'caption', 'description', 'title', 'title_orig',
-                 'image_caption', 'imagecaption', 'map_caption', 'mapcaption',
+                 'alt', 'caption', 'description', 'title', 'titleorig',
+                 'imagecaption', 'imagecaption', 'mapcaption',
                  # Associated with states, etc.
                  'motto', 'mottoenglish', 'slogan', 'demonym', 'capital',
                  # Add more here
@@ -1833,7 +1916,9 @@ def output_title_and_coordinates(title, id, lat, long):
 def extract_coordinates_from_article(text):
   handler = ExtractCoordinatesFromSource()
   for foo in handler.process_source_text(text): pass
-  if len(handler.coords) > 0:
+  if handler.notearth:
+    return None
+  elif len(handler.coords) > 0:
     # Prefer a coordinate specified using {{Coord|...}} or similar to
     # a coordinate in an Infobox, because the latter tend to be less
     # accurate.
@@ -2009,7 +2094,8 @@ class GenerateArticleData(ArticleHandler):
     yesno = {True:'yes', False:'no'}
     listof = self.title.startswith('List of ')
     disambig = self.id in disambig_pages_by_id
-    list = listof or disambig or namespace in ('Category', 'Book')
+    nskey = article_namespace_aliases.get(namespace, namespace)
+    list = listof or disambig or nskey in (14, 108) # ('Category', 'Book')
     outprint("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" %
              (self.id, self.title, cur_split_name, redirtitle, namespace,
               yesno[listof], yesno[disambig], yesno[list]))
@@ -2100,17 +2186,21 @@ it to be dynamically manipulated).  Given the size of the XML dump file
   def __init__(self, output_handler):
     errprint("Beginning processing of Wikipedia dump...")
     self.curpath = []
+    self.curattrs = []
     self.curtext = None
     self.output_handler = output_handler
     self.status = StatusMessage('article')
     
   def startElement(self, name, attrs):
     '''Handler for beginning of XML element.'''
-    if debug['sax']: errprint("startElement() saw %s/%s" % (name, attrs))
+    if debug['sax']:
+      errprint("startElement() saw %s/%s" % (name, attrs))
+      for (key,val) in attrs.items(): errprint("  Attribute (%s,%s)" % (key,val))
     # We should never see an element inside of the Wikipedia text.
     if self.curpath:
       assert self.curpath[-1] != 'text'
     self.curpath.append(name)
+    self.curattrs.append(attrs)
     self.curtext = []
     # We care about the title, ID, and redirect status.  Reset them for
     # every page; this is especially important for redirect status.
@@ -2134,6 +2224,7 @@ combined chunks.'''
     eltext = ''.join(self.curtext) if self.curtext else ''
     self.curtext = None # Stop tracking text
     self.curpath.pop()
+    attrs = self.curattrs.pop()
     if name == 'title':
       self.title = eltext
     # ID's occur in three places: the page ID, revision ID and contributor ID.
@@ -2142,6 +2233,12 @@ combined chunks.'''
       self.id = eltext
     elif name == 'redirect':
       self.redirect = True
+    elif name == 'namespace':
+      key = attrs.getValue("key")
+      if debug['sax']: errprint("Saw namespace, key=%s, eltext=%s" %
+          (key, eltext))
+      article_namespaces[eltext] = key
+      article_namespaces_lower[eltext.lower()] = key
     elif name == 'text':
       # If we saw the end of the article text, join all the text chunks
       # together and call process_article_text() on it.

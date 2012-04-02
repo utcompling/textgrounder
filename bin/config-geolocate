@@ -47,8 +47,9 @@
 #
 # 3. PCL_TRAVEL_DIR: Optional; location of PCL travel corpus and related files.
 #
-# 4. NO_USE_PERMUTED: Optional; if non-blank, don't use permuted version of
-#                     Wikipedia data files.
+# 4. USE_PERMUTED: Optional; if "false", don't use permuted version of
+#                  Wikipedia data files. If "true", do use it.  Otherwise,
+#                  use it if it appears available, otherwise not.  
 #
 # 5. WP_VERSION: Optional; if set, should specify the prefix of a dump file,
 #                which will be used for the dump file and all files computed
@@ -134,10 +135,18 @@ fi
 set_wp_version() {
   WP_VERSION="$1"
   DUMP_PREFIX="$1"
-  if [ -z "$NO_USE_PERMUTED" ]; then
+  if [ -z "$USE_PERMUTED" ]; then
     if [ -e "$TG_CORPUS_DIR/wikipedia/$WP_VERSION/$WP_VERSION-permuted-pages-articles.xml.bz2" ]; then
       DUMP_PREFIX="$1-permuted"
     fi
+  elif [ "$USE_PERMUTED" = "true" ]; then
+    permuted_file="$TG_CORPUS_DIR/wikipedia/$WP_VERSION/$WP_VERSION-permuted-pages-articles.xml.bz2"
+    if [ -e "$permuted_file" ]; then
+      :
+    else
+      echo "WARNING: Permuted file $permuted_file does not appear to exist, but using anyway."
+    fi
+    DUMP_PREFIX="$1-permuted"
   fi
 
   WP_VERSION_DIR="$TG_WIKIPEDIA_DIR/$WP_VERSION"

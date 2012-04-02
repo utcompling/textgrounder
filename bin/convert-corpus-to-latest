@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# USAGE: convert-corpus-to-latest WIKITAG
+#
+# where WIKITAG is something like 'dewiki-20120225'. (Which needs to exist.)
+
+# Process options
+
+#NO_DOWNLOAD=false
+while true; do
+  case "$1" in
+    --no-download ) NO_DOWNLOAD=true; shift ;;
+    -- ) shift; break ;;
+    * ) break ;;
+  esac
+done
+
+wikitag="$1"
+cd $wikitag
+echo "Converting Wikipedia corpus $wikitag to latest format ..."
+mkdir convert
+cd convert
+ln -s .. $wikitag
+run-convert-corpus --steps wiki $wikitag
+mv convert-corpora-3/$wikitag/* $wikitag
+cd ..
+rm -rf convert
+echo "Converting Wikipedia corpus $wikitag to latest format ... done."
+cd ..
