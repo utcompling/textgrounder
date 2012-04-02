@@ -99,7 +99,10 @@ Other important environment variables (with default settings in
 'config-geolocate', but which you might want to override):
 
 WP_VERSION       Specifies which dump file to use, e.g. "enwiki-20100905".
-NO_USE_PERMUTED  If set, uses the non-permuted version of the dump file.
+USE_PERMUTED     If set to "false", uses the non-permuted version of the dump
+                 file.  If set to "true", always try to use the permuted
+                 version.  If blank, use permuted version if it appears to
+                 exist, non-permuted otherwise.
 
 Output files are in the current directory.
 
@@ -124,10 +127,10 @@ ln -s ../../somewhere/else/enwiki-20111007-pages-articles.xml.bz2 .
 
 2. Generate the basic and combined article data files for the non-permuted dump
 
-WP_VERSION=enwiki-20111007 NO_USE_PERMUTED=t run-processwiki combined-article-data
+WP_VERSION=enwiki-20111007 USE_PERMUTED=false run-processwiki combined-article-data
 
 3. Generate a permuted dump file; all future commands will operate on the
-   permuted dump file, because we won't use NO_USE_PERMUTED.
+   permuted dump file, because we won't specify a value for USE_PERMUTED.
 
 WP_VERSION=enwiki-20111007 run-permute all
 
@@ -177,6 +180,8 @@ echo "Executing step '$step' ..."
 
 action=
 cansplit=yes
+outfile=
+args=
 
 if [ "$step" = article-data ]; then
 
@@ -203,7 +208,6 @@ elif [ "$step" = location-type ]; then
 
 action="Generating location-type data"
 args="--output-location-type"
-outfile=
 # Don't split because we output to separate split files (FIXME why?).
 cansplit=no
 
@@ -221,18 +225,14 @@ elif [ "$step" = combine-article-data ]; then
 
 # Uses a different program, not processwiki.
 echo "Combining article data ..."
-echo "Beginning at `date`:"
-echo "Executing: $GENERATE_COMBINED \
-  --links-file $OUT_COORD_LINKS_FILE \
+args="--links-file $OUT_COORD_LINKS_FILE \
   --coords-file $OUT_COORDS_FILE \
-  --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
-  > $OUT_COMBINED_DOCUMENT_DATA_FILE"
-$GENERATE_COMBINED \
-  --links-file $OUT_COORD_LINKS_FILE \
-  --coords-file $OUT_COORDS_FILE \
-  --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
-  > $OUT_COMBINED_DOCUMENT_DATA_FILE
-echo "Ended at `date`."
+  --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE"
+outfile="$OUT_COMBINED_DOCUMENT_DATA_FILE"
+cmd="$GENERATE_COMBINED $args > $outfile"
+echo "Executing at `date`: $cmd"
+$GENERATE_COMBINED $args > $outfile
+echo "Ended at `date`: $cmd"
 
 elif [ "$step" = split-dump ]; then
 
@@ -240,16 +240,13 @@ PERMUTE_WIKI="$TG_PYTHON_DIR/permute_wiki.py"
 
 # Uses a different program, not processwiki.
 echo "Splitting dump file ..."
-echo "Beginning at `date`:"
-echo "Executing: bzcat $OUT_DUMP_FILE | $PERMUTE_WIKI --mode=split \
-  --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
+args="--mode=split --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
   --split-prefix $SPLIT_PREFIX \
   --number-of-splits $NUM_SPLITS $OTHEROPTS"
-bzcat $OUT_DUMP_FILE | $PERMUTE_WIKI --mode=split \
-  --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
-  --split-prefix $SPLIT_PREFIX \
-  --number-of-splits $NUM_SPLITS $OTHEROPTS
-echo "Ended at `date`."
+cmd="bzcat $OUT_DUMP_FILE | $PERMUTE_WIKI $args"
+echo "Executing at `date`: $cmd"
+bzcat $OUT_DUMP_FILE | $PERMUTE_WIKI $args
+echo "Ended at `date`: $cmd"
 
 elif [ "$step" = coord-counts ]; then
 
@@ -300,20 +297,24 @@ echo "Unrecognized step $step"
 
 fi
 
-if [ "$NUM_SIMULTANEOUS" -eq 1 -o -z "$outfile" -o "$cansplit" = "no" ]; then
+if [ -z "$action" ]; then
+  : # do nothing
+elif [ "$NUM_SIMULTANEOUS" -eq 1 -o -z "$outfile" -o "$cansplit" = "no" ]; then
 
   # Operate in non-split mode
-  echo "Beginning at `date`:"
   echo "$action ..."
   if [ -n "$outfile" ]; then
-    echo "Executing: bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS > $outfile"
+    cmd="bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS > $outfile"
+    echo "Executing at `date`: $cmd"
     bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS > $outfile
+    echo "Ended at `date`: $cmd"
   else
-    echo "Executing: bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS"
+    cmd="bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS"
+    echo "Executing at `date`: $cmd"
     bzcat $OUT_DUMP_FILE | $PROCESSWIKI $args $OTHEROPTS
+    echo "Ended at `date`: $cmd"
   fi
   echo "$action ... done."
-  echo "Ended at `date`."
 
 else
 
@@ -343,17 +344,18 @@ else
       split_outfile="$outfile.split-processwiki.$i"
       splits="$splits $split_outfile"
       splits_removable="$splits_removable $split_outfile"
-      echo "Beginning at `date`:"
-      echo "Executing: cat $SPLIT_PREFIX.prolog $SPLITFILE $SPLIT_PREFIX.epilog | $PROCESSWIKI $args $OTHEROPTS > $split_outfile &"
-      cat $SPLIT_PREFIX.prolog $SPLITFILE $SPLIT_PREFIX.epilog | $PROCESSWIKI $args $OTHEROPTS > $split_outfile &
-      echo "Ended at `date`."
+      cat_args="$SPLIT_PREFIX.prolog $SPLITFILE $SPLIT_PREFIX.epilog"
+      cmd="cat $cat_args | $PROCESSWIKI $args $OTHEROPTS > $split_outfile &"
+      echo "Executing at `date`: $cmd"
+      cat $cat_args | $PROCESSWIKI $args $OTHEROPTS > $split_outfile &
+      echo "Ended at at `date`: $cmd"
       numleft=`expr $numleft - 1`
       numrun=`expr $numrun + 1`
     fi
     if [ "$numleft" -eq 0 ]; then
       echo "Waiting for $numrun processes to finish..."
       wait
-      echo "Ended at `date`."
+      echo "Ended at `date`: Waiting."
       numleft="$NUM_SIMULTANEOUS"
       numrun=0
     fi
@@ -362,16 +364,16 @@ else
   if [ "$numrun" -gt 0 ]; then
     echo "Waiting for $numrun processes to finish..."
     wait
-      echo "Ended at `date`."
+    echo "Ended at `date`: Waiting."
     numrun=0
   fi
   echo "$action, combining the files ..."
   all_files="$splits"
   echo "$action, concatenating all files ($all_files) ..."
-  echo "Beginning at `date`:"
-  echo "Executing: cat $all_files > $outfile"
+  cmd="cat $all_files > $outfile"
+  echo "Executing at `date`: $cmd"
   cat $all_files > $outfile
-  echo "Ended at `date`."
+  echo "Ended at `date`: $cmd"
   echo "$action, removing intermediate split files ($splits_removable) ..."
   rm -f $splits_removable
   echo "$action ... done."

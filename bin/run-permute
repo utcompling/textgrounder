@@ -14,7 +14,7 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
 fi
 
 # Non-standard here: Don't use permuted dumps
-NO_USE_PERMUTED=t
+USE_PERMUTED=false
 . $TEXTGROUNDER_DIR/bin/config-geolocate
 
 TG_PYTHON_DIR="$TEXTGROUNDER_DIR/python"
@@ -114,6 +114,13 @@ else
   steps="$*"
 fi
 
+docmd() {
+  cmd="$*"
+  echo "Executing at `date`: $cmd"
+  sh -c "$cmd"
+  echo "Ending at `date`: $cmd"
+}
+
 echo "Steps are $steps"
 
 for step in $steps; do
@@ -121,17 +128,26 @@ echo "Executing step '$step' ..."
 
 if [ "$step" = permute ]; then
 echo "Permuting articles ..."
-$PERMUTE_WIKI --article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
-  --mode=permute $OTHEROPTS > $PERMUTED_OUT_ORIG_DOCUMENT_DATA_FILE
+args="--article-data-file $OUT_ORIG_DOCUMENT_DATA_FILE \
+  --mode=permute $OTHEROPTS"
+outfile="$PERMUTED_OUT_ORIG_DOCUMENT_DATA_FILE"
+cmd="$PERMUTE_WIKI $args > $outfile"
+echo "Executing at `date`: $cmd"
+$PERMUTE_WIKI $args > $outfile
+echo "Ending at `date`: $cmd"
 
 elif [ "$step" = split ]; then
 echo "Splitting dump file ..."
 
-bzcat $OUT_DUMP_FILE | $PERMUTE_WIKI --mode=split \
+args="--mode=split \
   --article-data-file $PERMUTED_OUT_ORIG_DOCUMENT_DATA_FILE \
   --split-prefix $SPLIT_PREFIX \
   --number-of-splits $NUM_SPLITS \
-  $OTHEROPTS
+  $OTHEROPTS"
+cmd="bzcat $OUT_DUMP_FILE | $PERMUTE_WIKI $args"
+echo "Executing at `date`: $cmd"
+bzcat $OUT_DUMP_FILE | $PERMUTE_WIKI $args
+echo "Ending at `date`: $cmd"
 
 elif [ "$step" = sort ]; then
 echo "Sorting the split files ..."
@@ -142,17 +158,26 @@ while [ "$i" -lt "$NUM_SPLITS" ]; do
   SPLITFILE="$SPLIT_PREFIX.$i"
   SPLITARTS="$SPLITFILE.articles"
   echo "Sorting file $SPLITFILE..."
+  args="-a $SPLITARTS --mode=sort"
+  outfile="$SPLITFILE.sorted"
   if [ "$NUM_SIMULTANEOUS" -eq 1 ]; then
-    < $SPLITFILE $PERMUTE_WIKI -a $SPLITARTS --mode=sort > $SPLITFILE.sorted
+    cmd="< $SPLITFILE $PERMUTE_WIKI $args > $outfile"
+    echo "Executing at `date`: $cmd"
+    < $SPLITFILE $PERMUTE_WIKI $args > $outfile
+    echo "Ending at `date`: $cmd"
   else
     if [ "$numleft" -gt 0 ]; then
-      < $SPLITFILE $PERMUTE_WIKI -a $SPLITARTS --mode=sort > $SPLITFILE.sorted &
+      cmd="< $SPLITFILE $PERMUTE_WIKI $args > $outfile &"
+      echo "Executing at `date`: $cmd"
+      < $SPLITFILE $PERMUTE_WIKI $args > $outfile &
+      echo "Ending at `date`: $cmd"
       numleft=`expr $numleft - 1`
       numrun=`expr $numrun + 1`
     fi
     if [ "$numleft" -eq 0 ]; then
       echo "Waiting for $numrun processes to finish..."
       wait
+      echo "Ending at `date`: Waiting."
       numleft="$NUM_SIMULTANEOUS"
       numrun=0
     fi
@@ -162,6 +187,7 @@ done
 if [ "$numrun" -gt 0 ]; then
   echo "Waiting for $numrun processes to finish..."
   wait
+  echo "Ending at `date`: Waiting."
   numrun=0
 fi
 
@@ -175,7 +201,10 @@ while [ "$i" -lt "$NUM_SPLITS" ]; do
 done
 all_files="$SPLIT_PREFIX.prolog $splits $SPLIT_PREFIX.epilog"
 echo "Concatenating $all_files ..."
+cmd="cat $all_files | bzip2 > $PERMUTED_DUMP_FILE"
+echo "Executing at `date`: $cmd"
 cat $all_files | bzip2 > $PERMUTED_DUMP_FILE
+echo "Ending at `date`: $cmd"
 
 else
 echo "Unrecognized step $step"

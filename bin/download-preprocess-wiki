@@ -1,0 +1,38 @@
+#!/bin/sh
+
+# USAGE: download-preprocess-wiki WIKITAG
+#
+# where WIKITAG is something like 'dewiki-20120225'. (Which needs to exist.)
+
+# Process options
+
+NO_DOWNLOAD=false
+PREPROCESS_OPTS=
+while true; do
+  case "$1" in
+    --no-download ) NO_DOWNLOAD=true; shift ;;
+    --no-permute ) PREPROCESS_OPTS="$PREPROCESS_OPTS --no-permute"; shift ;;
+    -- ) shift; break ;;
+    * ) break ;;
+  esac
+done
+
+wikitag="$1"
+mkdir -p $wikitag
+cd $wikitag
+if [ "$NO_DOWNLOAD" != "true" ]; then
+  echo "Downloading Wikipedia corpus $wikitag ..."
+  wikidir="`echo $wikitag | sed 's/-/\//'`"
+  wget -nd http://dumps.wikimedia.org/$wikidir/$wikitag-pages-articles.xml.bz2
+  echo "Downloading Wikipedia corpus $wikitag ... done."
+fi
+echo "Preprocessing Wikipedia corpus $wikitag ..."
+preprocess-dump $PREPROCESS_OPTS $wikitag
+echo "Preprocessing Wikipedia corpus $wikitag ... done."
+echo "Converting $wikitag to latest format ..."
+convert-corpus-to-latest $wikitag
+echo "Converting $wikitag to latest format ... done."
+echo "Settings permissions on $wikitag ..."
+# Make tree world-readable
+chmod -R u+w,a+rX .
+echo "Settings permissions on $wikitag ... done."

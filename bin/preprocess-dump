@@ -1,0 +1,59 @@
+#!/bin/sh
+
+# Process options
+
+NO_PERMUTE=false
+while true; do
+  case "$1" in
+    --no-permute ) NO_PERMUTE=true; shift ;;
+    -- ) shift; break ;;
+    * ) break ;;
+  esac
+done
+
+if [ -z "$*" ]; then
+  cat <<FOO
+Usage: $0 DUMP-PREFIX
+
+Generate all text files from a raw dump.
+
+FOO
+  exit 1
+fi
+
+dumppref="$1"
+
+# This needs to be set for all subprocesses we call
+export WP_VERSION="$dumppref"
+
+if [ "$NO_PERMUTE" != true ]; then
+  # Generate article-data file from orginal dump
+  USE_PERMUTED=false run-processwiki article-data
+
+  # Generate a permuted dump file; all future commands will operate on the
+  # permuted dump file, because we will set USE_PERMUTED appropriately.
+  run-permute all
+fi
+
+# Apparently there's a possible race condition in detection, so forcibly
+# use the permuted file.
+export USE_PERMUTED=true
+# Split the dump so we can faster afterwards
+run-processwiki split-dump
+
+# Now make everything be simultaneous if possible
+export NUM_SIMULTANEOUS=8
+
+# Generate permuted combined article-data file
+run-processwiki combined-article-data
+
+run-processwiki coord-counts all-counts coord-woords all-words
+
+echo "Removing remaining split files ..."
+rm -rf $dumppref-split*
+rm -rf foobar.*
+echo "Removing remaining split files ... done."
+
+# mv -i *.bz2 *.txt $TG_WIKIPEDIA_DIR
+# chmod a-w $TG_WIKIPEDIA_DIR/*
+
