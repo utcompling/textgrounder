@@ -439,16 +439,17 @@ class RandomGridLocateDocumentStrategy[
   /////////////////////////////////////////////////////////////////////////////
 
   object Stopwords {
-    val stopwords_file_in_tg = "data/lists/stopwords.english"
+    val stopwords_file_in_tg = "src/main/resources/data/%s/stopwords.txt"
 
     // Read in the list of stopwords from the given filename.
-    def read_stopwords(filehand: FileHandler, stopwords_filename: String) = {
+    def read_stopwords(filehand: FileHandler, stopwords_filename: String,
+        language: String) = {
       def compute_stopwords_filename(filename: String) = {
         if (filename != null) filename
         else {
           val tgdir = TextGrounderInfo.get_textgrounder_dir
           // Concatenate directory and rest in most robust way
-          filehand.join_filename(tgdir, stopwords_file_in_tg)
+          filehand.join_filename(tgdir, stopwords_file_in_tg format language)
         }
       }
       val filename = compute_stopwords_filename(stopwords_filename)
@@ -493,16 +494,27 @@ class RandomGridLocateDocumentStrategy[
     protected val ap =
       if (parser == null) new ArgParser("unknown") else parser
 
+    var language =
+      ap.option[String]("language", "lang",
+         default = "eng",
+         metavar = "LANG",
+         aliases = Map("eng" -> Seq("en"), "por" -> Seq("pt"),
+                       "deu" -> Seq("de")),
+         help = """Name of language of corpus.  Currently used only to
+  initialize the value of the stopwords file, if not explicitly set.
+  Two- and three-letter ISO-639 codes can be used.  Currently recognized:
+  English (en, eng); German (de, deu); Portuguese (pt, por).""")
+
     //// Input files
     var stopwords_file =
-      ap.option[String]("stopwords-file",
+      ap.option[String]("stopwords-file", "sf",
         metavar = "FILE",
         help = """File containing list of stopwords.  If not specified,
   a default list of English stopwords (stored in the TextGrounder distribution)
   is used.""")
 
     var whitelist_file =
-      ap.option[String]("whitelist-file",
+      ap.option[String]("whitelist-file", "wf",
          metavar = "FILE",
          help = """File containing a whitelist of words. If specified, ONLY
   words on the list will be read from any corpora; other words will be ignored.
@@ -898,7 +910,8 @@ class RandomGridLocateDocumentStrategy[
   }
 
   protected def read_stopwords() = {
-    Stopwords.read_stopwords(get_file_handler, params.stopwords_file)
+    Stopwords.read_stopwords(get_file_handler, params.stopwords_file,
+      params.language)
   }
 
   protected def read_whitelist() = {
