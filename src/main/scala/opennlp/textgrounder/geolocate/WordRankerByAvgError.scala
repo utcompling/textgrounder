@@ -4,7 +4,7 @@ import opennlp.textgrounder.util.Twokenize
 import org.clapper.argot._
 import java.io._
 
-object WordRankerByAvgError {
+object WordRankerByAvgError { 
 
   import ArgotConverters._
 
