@@ -302,14 +302,14 @@ $ hadoop fs -ls
 Then, for example to run the Geolocate subproject on the GeoText Twitter
 corpus using Hadoop distributed mode, do this:
 
-$ tg-geolocate --hadoop-nondist twitter
+$ tg-geolocate --hadoop twitter
 
 This will invoke 'hadoop' to run the code.
 
 If something goes wrong, or you just want to see more exactly what is being
 run, use the '--verbose' option, e.g.:
 
-$ tg-geolocate --verbose --hadoop-nondist twitter
+$ tg-geolocate --verbose --hadoop twitter
 
 This will output the exact command lines being executed.
 
