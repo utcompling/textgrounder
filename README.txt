@@ -12,7 +12,6 @@ information:
 
 https://bitbucket.org/utcompling/textgrounder/wiki/Home
 
-
 ============
 Introduction
 ============
@@ -30,7 +29,6 @@ model derived from a large corpus of already geolocated documents,
 such as Wikipedia -- i.e. it is supervised (at least in some sense).
 The Toponym subproject primarily relies only on a Gazetteer -- i.e.
 a list of possible toponyms; hence it is more unsupervised.
-
 
 ========================================
 Introduction to the Geolocate Subproject
