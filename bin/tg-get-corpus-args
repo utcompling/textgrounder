@@ -39,11 +39,11 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
   exit 1
 fi
 
-hadoop=
+HADOOP=no
 
 while true ; do
   case "$1" in
-    --hadoop) hadoop=yes; shift ;;
+    --hadoop) HADOOP=yes; shift ;;
     --help) help; exit 1 ;;
     --) shift ; break ;;
     *) break ;;
@@ -52,12 +52,6 @@ done
 
 if [ -z "$1" -o "$1" = help ]; then
   help; exit 1
-fi
-
-if [ -n "$hadoop" ]; then
-  # If we're running under Hadoop, use a hierarchy in HDFS, by setting
-  # the following variable.
-  TG_USE_HDFS=yes
 fi
 
 . $TEXTGROUNDER_DIR/bin/config-geolocate
@@ -69,20 +63,20 @@ output_args() {
     #       --counts-file $IN_COORD_COUNTS_FILE ;;
     wikipedia )
       # Use the default version (usually enwiki-20100905)
-      echo --input-corpus $TG_CORPUS_DIR/wikipedia/$WP_VERSION ;;
+      echo --input-corpus $TG_CORPUS_URL/wikipedia/$WP_VERSION ;;
     enwiki-* )
       set_wp_version "$1"
-      echo --input-corpus $TG_CORPUS_DIR/wikipedia/$1 ;;
+      echo --input-corpus $TG_CORPUS_URL/wikipedia/$1 ;;
     twitter )
-      echo --input-corpus $TG_CORPUS_DIR/twitter-geotext/docthresh-5 ;;
+      echo --input-corpus $TG_CORPUS_URL/twitter-geotext/docthresh-5 ;;
     docthresh-* )
-      echo --input-corpus $TG_CORPUS_DIR/twitter-geotext/$1 ;;
+      echo --input-corpus $TG_CORPUS_URL/twitter-geotext/$1 ;;
     twitter-wiki )
       output_args wikipedia; output_args twitter ;;
     *:* | /* )
       echo --input-corpus $1 ;;
     * )
-      echo --input-corpus $TG_CORPUS_DIR/$1 ;;
+      echo --input-corpus $TG_CORPUS_URL/$1 ;;
   esac
 }
 

@@ -99,8 +99,8 @@ Other important environment variables (with default settings in
 'config-geolocate', but which you might want to override):
 
 WP_VERSION       Specifies which dump file to use, e.g. "enwiki-20100905".
-USE_PERMUTED     If set to "false", uses the non-permuted version of the dump
-                 file.  If set to "true", always try to use the permuted
+USE_PERMUTED     If set to "no", uses the non-permuted version of the dump
+                 file.  If set to "yes", always try to use the permuted
                  version.  If blank, use permuted version if it appears to
                  exist, non-permuted otherwise.
 
@@ -127,7 +127,7 @@ ln -s ../../somewhere/else/enwiki-20111007-pages-articles.xml.bz2 .
 
 2. Generate the basic and combined article data files for the non-permuted dump
 
-WP_VERSION=enwiki-20111007 USE_PERMUTED=false run-processwiki combined-article-data
+WP_VERSION=enwiki-20111007 USE_PERMUTED=no run-processwiki combined-article-data
 
 3. Generate a permuted dump file; all future commands will operate on the
    permuted dump file, because we won't specify a value for USE_PERMUTED.
