@@ -14,7 +14,7 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
 fi
 
 # Non-standard here: Don't use permuted dumps
-USE_PERMUTED=false
+USE_PERMUTED=no
 . $TEXTGROUNDER_DIR/bin/config-geolocate
 
 TG_PYTHON_DIR="$TEXTGROUNDER_DIR/python"

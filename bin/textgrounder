@@ -11,8 +11,6 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
   exit 1
 fi
 
-. config-geolocate
-
 JAVA="$JAVA_HOME/bin/java"
 HADOOP_BINARY="${HADOOP_BINARY:-hadoop}"
 
@@ -20,15 +18,16 @@ HADOOP_BINARY="${HADOOP_BINARY:-hadoop}"
 
 # Process options
 
-VERBOSE=false
-DEBUG=false
+VERBOSE=no
+DEBUG=no
 HADOOP=
+HADOOP_NONDIST=
 MEMORY=
 JAVA_MISC_OPT=
 while true; do
   case "$1" in
-    -verbose | --verbose ) VERBOSE=true; shift ;;
-    -debug | --debug ) DEBUG=true; shift ;;
+    -verbose | --verbose ) VERBOSE=yes; shift ;;
+    -debug | --debug ) DEBUG=yes; shift ;;
     -m | -memory | --memory ) MEMORY="$2"; shift 2 ;;
     -minheap | --minheap )
       JAVA_MISC_OPT="$JAVA_MISC_OPT -XX:MinHeapFreeRatio=$2"; shift 2 ;;
@@ -39,10 +38,14 @@ while true; do
     -compressed-oops | --compressed-oops )
       JAVA_MISC_OPT="$JAVA_MISC_OPT -XX:+UseCompressedOops"; shift ;;
     -hadoop | --hadoop) HADOOP=yes; shift ;;
+    -hadoop-nondist | --hadoop-nondist) HADOOP_NONDIST=yes; shift ;;
     -- ) shift; break ;;
     * ) break ;;
   esac
 done
+
+# Must go after HADOOP is set
+. config-geolocate
 
 # For info on Sun JVM options, see:
 
@@ -65,21 +68,21 @@ if [ -n "$MEMORY" ]; then
   JAVA_MEMORY_OPT="-Xmx$MEMORY"
 elif [ -n "$TG_SET_JVM_MEMORY" ]; then
   MEMMB=`$TEXTGROUNDER_DIR/bin/textgrounder-memory`
-  if [ "$VERBOSE" = true ]; then
+  if [ "$VERBOSE" = yes ]; then
     echo "Output from textgrounder-memory is: $MEMMB"
   fi
   if [ "$MEMMB" = unknown ]; then
     # The old way we set the heap size, to a very high virtual size.
     if [ -z "$MEMORY" ]; then
       if $JAVA -version 2>&1 | grep '64-Bit' > /dev/null; then
-       JAVA_IS_64=true
+       JAVA_IS_64=yes
        # Maximum on Linux is about 127t (127 TB, i.e. 130,048 GB).  Maximum on
        # MacOS X 10.6 (Snow Leopard) is about 125t, but values that big cause a
        # pause of about 6 seconds at the beginning and a couple of seconds at
        # the end on my 4GB Mac.  4t doesn't cause much of a pause.
        MEMORY=4t
       else
-       JAVA_IS_64=false
+       JAVA_IS_64=no
        MEMORY=2g
       fi
     fi
@@ -89,12 +92,12 @@ elif [ -n "$TG_SET_JVM_MEMORY" ]; then
   JAVA_MEMORY_OPT="-Xmx$MEMORY"
 fi
 
-if [ "$VERBOSE" = true -a -n "$JAVA_MEMORY_OPT" ]; then
+if [ "$VERBOSE" = yes -a -n "$JAVA_MEMORY_OPT" ]; then
   echo "Setting maximum JVM heap size to $MEMORY"
 fi
 
 JAVA_DEBUG_OPT=
-if [ "$DEBUG" = true ]; then
+if [ "$DEBUG" = yes ]; then
   # Print details about when and how garbage collection happens; recommended
   # in http://www.oracle.com/technetwork/java/gc-tuning-5-138395.html
   JAVA_DEBUG_OPT="-verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+TraceClassUnloading"
@@ -219,19 +222,19 @@ execute()
 {
   local CD
   if [ "$1" = "--cd" ]; then
-    CD=true
+    CD=yes
     shift
   else
-    CD=false
+    CD=no
   fi
   RUNCMD="$1"; shift
-  if [ "$VERBOSE" = true ]; then
-    if [ "$CD" = true ]; then
+  if [ "$VERBOSE" = yes ]; then
+    if [ "$CD" = yes ]; then
       echo Executing: cd $TEXTGROUNDER_DIR
     fi
     echo Executing: $RUNCMD ${1+"$@"}
   fi
-  if [ "$CD" = true ]; then
+  if [ "$CD" = yes ]; then
     cd $TEXTGROUNDER_DIR
   fi
   $RUNCMD ${1+"$@"}
@@ -281,14 +284,20 @@ else
     spher-run) CLASS=$TGBAYESAPP.TrainSphericalModel;;
 
     # Geolocate commands
-    geolocate-document) CLASS=$TGGEOLOCATE.GeolocateDocumentApp;;
-    # Note that the only difference between running in distributed and
-    # non-distributed mode is how we run things (using 'hadoop jar' for
-    # distributed, 'java' for non-distributed) and the input paths we
-    # pass (through --textgrounder-dir here, and also through corpora
-    # paths in 'tg-geolocate').
-    hadoop-nondist-geolocate-document) HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_DIR" CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp;;
-    hadoop-geolocate-document) HADOOP_ARGS="--textgrounder-dir $TG_HADOOP_DIR" HADOOP=yes CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp;;
+    geolocate-document)
+      # Note that the only difference between running in distributed and
+      # non-distributed mode is how we run things (using 'hadoop jar' for
+      # distributed, 'java' for non-distributed) and the input paths we
+      # pass (through --textgrounder-dir here, and also through corpora
+      # paths in 'tg-geolocate').
+      if [ -n "$HADOOP" ]; then
+        HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp
+      elif [ -n "$HADOOP_NONDIST" ]; then
+        HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp
+      else
+        CLASS=$TGGEOLOCATE.GeolocateDocumentApp
+      fi
+    ;;
     geolocate-toponym) CLASS=$TGGEOLOCATE.toponym.GeolocateToponymApp;;
     generate-kml) CLASS=$TGGEOLOCATE.GenerateKMLApp;;
 
