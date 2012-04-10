@@ -13,15 +13,20 @@ wikipedia         Run on Wikipedia (same as enwiki-20100905).
 enwiki-20100905   Run on English Wikipedia dump from September 5, 2010.
 enwiki-20111007   Run on English Wikipedia dump from October 7, 2011.
 enwiki-*          Run on some other English Wikipedia dump.
+ptwiki-*          Run on some Portuguese Wikipedia dump.
+dewiki-*          Run on some German Wikipedia dump.
+*wiki-*           Run on some other Wikipedia dump.
 docthresh-*       Run on the GeoText twitter corpus, with the given document
                   threshold.
-twitter           Run on the GeoText twitter corpus, with document threshold 5.
-twitter-wiki      Run on a combination of the 'wikipedia' and 'twitter'
+twitter-geotext   Run on the GeoText twitter corpus, with document threshold 5.
+geotext           Synonym for 'twitter-geotext'.
+geotext-wiki      Run on a combination of the 'wikipedia' and 'geotext'
                   corpora.
 gutonly-big       Run on the GeoTwitterUT big corpus.
 gutonly-small     Run on the GeoTwitterUT small corpus.
 *                 Run on some other corpus in the corpus dir (located
                   at $TG_CORPUS_DIR).
+/*, file:*        Run on some other corpus at the specified absolute location.
 
 The document threshold for the GeoText twitter corpus controls the threshold
 at which vocabulary items are discarded (items occurring in fewer than the
@@ -54,6 +59,18 @@ if [ -z "$1" -o "$1" = help ]; then
   help; exit 1
 fi
 
+process_wikipedia() {
+  case "$1" in
+    # Only have stopwords files for these languages currently
+    enwiki-* ) lang=en ;;
+    ptwiki-* ) lang=pt ;;
+    dewiki-* ) lang=de ;;
+    * ) lang=en ;;
+  esac
+  set_wp_version "$1"
+  echo --language $lang --input-corpus $TG_CORPUS_URL/wikipedia/$1
+}
+
 . $TEXTGROUNDER_DIR/bin/config-geolocate
 
 output_args() {
@@ -63,16 +80,15 @@ output_args() {
     #       --counts-file $IN_COORD_COUNTS_FILE ;;
     wikipedia )
       # Use the default version (usually enwiki-20100905)
-      echo --input-corpus $TG_CORPUS_URL/wikipedia/$WP_VERSION ;;
-    enwiki-* )
-      set_wp_version "$1"
-      echo --input-corpus $TG_CORPUS_URL/wikipedia/$1 ;;
-    twitter )
+      process_wikipedia $WP_VERSION ;;
+    *wiki-* )
+      process_wikipedia "$1" ;;
+    geotext | twitter-geotext | twitter )
       echo --input-corpus $TG_CORPUS_URL/twitter-geotext/docthresh-5 ;;
     docthresh-* )
       echo --input-corpus $TG_CORPUS_URL/twitter-geotext/$1 ;;
     twitter-wiki )
-      output_args wikipedia; output_args twitter ;;
+      output_args wikipedia; output_args geotext ;;
     *:* | /* )
       echo --input-corpus $1 ;;
     * )
