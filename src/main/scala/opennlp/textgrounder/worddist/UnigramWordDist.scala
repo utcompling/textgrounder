@@ -272,8 +272,9 @@ class DefaultUnigramWordDistConstructor(
       }
       totalTokens += values(i)
     }
-    errprint("Fraction of word types kept:"+(addedTypes.toDouble/num_words))
-    errprint("Fraction of word tokens kept:"+(addedTokens.toDouble/totalTokens))
+    // Way too much output to keep enabled
+    //errprint("Fraction of word types kept:"+(addedTypes.toDouble/num_words))
+    //errprint("Fraction of word tokens kept:"+(addedTokens.toDouble/totalTokens))
   } 
 
   protected def imp_finish_before_global(dist: WordDist) {
