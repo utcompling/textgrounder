@@ -32,10 +32,8 @@ file-system and compute servers on one machine and doesn't require
 any special building or data copying.
 
 The option '--app' specifies the application to run; by default it does
-document-level geotagging. (Normally, the default application is
-'geolocate-document', but it may be 'hadoop-geolocate-document' or
-'hadoop-nondist-geolocate-document' depending on the above Hadoop-related
-settings.)
+document-level geotagging.  Normally, the default application is
+'geolocate-document'.
 
 See also 'run-nohup', which can be used to wrap an invocation of this script
 in a way that it will not be killed by session exit when run in the background,
@@ -67,10 +65,9 @@ while true ; do
     --help ) help; exit 1 ;;
     --app ) tgapp="$2"; shift 2 ;;
     --hadoop )
-      hadoop_arg="--hadoop"
-      default_tgapp="hadoop-geolocate-document"; shift ;;
+      hadoop_arg="--hadoop"; tgopts="$tgopts --hadoop"; shift ;;
     --hadoop-nondist )
-      default_tgapp="hadoop-nondist-geolocate-document"; shift ;;
+      tgopts="$tgopts --hadoop-nondist"; shift ;;
     -minheap | --minheap ) tgopts="$tgopts --minheap $2"; shift 2 ;;
     -maxheap | --maxheap ) tgopts="$tgopts --maxheap $2"; shift 2 ;;
     -memory | --memory ) tgopts="$tgopts --memory $2"; shift 2 ;;

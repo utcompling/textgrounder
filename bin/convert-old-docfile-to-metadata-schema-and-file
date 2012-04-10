@@ -109,11 +109,11 @@ EOF
     if [ "$numfiles" -eq 1 -a -e "$file" ]; then
       echo "Input file is $file" >&2
       echo "$file"
-      foundgood=true
+      foundgood=yes
       break
     fi
   done
-  if [ "$foundgood" != "true" ]; then
+  if [ "$foundgood" != "yes" ]; then
     echo "Can't find a suitable input file for global '$glob'." >&2
     exit 1
   fi
@@ -133,7 +133,7 @@ do_dir() {
   #echo "realbase=$realbase"
   prefix=`basename $realbase $docsuffix`
   echo "Prefix of input file is $prefix"
-  if [ "$dir_prefix" = true ]; then
+  if [ "$dir_prefix" = yes ]; then
     prefix="$prefix-$dirbase"
     echo "New prefix (incorporating directory name) is $prefix"
   fi
@@ -151,10 +151,10 @@ do_dir() {
 }
 
 output_dir=new-convert-schema-and-file
-dir_prefix=false
+dir_prefix=no
 while true; do
   case "$1" in
-    --add-dir-prefix ) dir_prefix=true; shift 1 ;;
+    --add-dir-prefix ) dir_prefix=yes; shift 1 ;;
     --output-dir ) output_dir="$2"; shift 2 ;;
     * ) break ;;
   esac

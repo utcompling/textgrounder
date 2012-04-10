@@ -6,11 +6,11 @@
 
 # Process options
 
-NO_DOWNLOAD=false
+DONT_DOWNLOAD=no
 PREPROCESS_OPTS=
 while true; do
   case "$1" in
-    --no-download ) NO_DOWNLOAD=true; shift ;;
+    --no-download ) DONT_DOWNLOAD=yes; shift ;;
     --no-permute ) PREPROCESS_OPTS="$PREPROCESS_OPTS --no-permute"; shift ;;
     -- ) shift; break ;;
     * ) break ;;
@@ -20,7 +20,7 @@ done
 wikitag="$1"
 mkdir -p $wikitag
 cd $wikitag
-if [ "$NO_DOWNLOAD" != "true" ]; then
+if [ "$DONT_DOWNLOAD" != "yes" ]; then
   echo "Downloading Wikipedia corpus $wikitag ..."
   wikidir="`echo $wikitag | sed 's/-/\//'`"
   wget -nd http://dumps.wikimedia.org/$wikidir/$wikitag-pages-articles.xml.bz2

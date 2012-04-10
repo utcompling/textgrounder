@@ -2,10 +2,10 @@
 
 # Process options
 
-NO_PERMUTE=false
+DONT_PERMUTE=no
 while true; do
   case "$1" in
-    --no-permute ) NO_PERMUTE=true; shift ;;
+    --no-permute ) DONT_PERMUTE=yes; shift ;;
     -- ) shift; break ;;
     * ) break ;;
   esac
@@ -26,9 +26,9 @@ dumppref="$1"
 # This needs to be set for all subprocesses we call
 export WP_VERSION="$dumppref"
 
-if [ "$NO_PERMUTE" != true ]; then
+if [ "$DONT_PERMUTE" != yes ]; then
   # Generate article-data file from orginal dump
-  USE_PERMUTED=false run-processwiki article-data
+  USE_PERMUTED=no run-processwiki article-data
 
   # Generate a permuted dump file; all future commands will operate on the
   # permuted dump file, because we will set USE_PERMUTED appropriately.
@@ -37,7 +37,7 @@ fi
 
 # Apparently there's a possible race condition in detection, so forcibly
 # use the permuted file.
-export USE_PERMUTED=true
+export USE_PERMUTED=yes
 # Split the dump so we can faster afterwards
 run-processwiki split-dump
 

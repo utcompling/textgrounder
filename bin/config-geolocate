@@ -32,14 +32,14 @@
 #    c. If you're actually on the UTexas comp ling machines, which put the
 #       above directories under `/groups`, or you have exactly the same
 #       structure on another machine, just set TG_ON_COMP_LING_MACHINES to
-#       a non-empty value, and the variables will all get set properly.
+#       "yes", and the variables will all get set properly.
 #
 #    d. If you're on the UTexas Longhorn cluster, you can use the data
 #       stored under `/scratch/01683/benwing` by setting TG_ON_LONGHORN to
-#       a non-empty value, and the variables will all get set properly.
+#       "yes", and the variables will all get set properly.
 #
-#    e. If you're running under Hadoop, set TG_USE_HDFS to a non-blank
-#       value; then, TG_GROUPS_DIR will be set to the value of TG_HADOOP_DIR
+#    e. If you're running under Hadoop, set TG_USE_HDFS to "yes"; then,
+#       TG_GROUPS_DIR will be set to the value of TG_HADOOP_DIR
 #       (see below; actually refers to a directory in the Hadoop File System),
 #       and the above data-file variables will be set appropriately.  Use
 #       the script 'tg-copy-data-to-hadoop' to copy data files to the
@@ -47,8 +47,8 @@
 #
 # 3. PCL_TRAVEL_DIR: Optional; location of PCL travel corpus and related files.
 #
-# 4. USE_PERMUTED: Optional; if "false", don't use permuted version of
-#                  Wikipedia data files. If "true", do use it.  Otherwise,
+# 4. USE_PERMUTED: Optional; if "no", don't use permuted version of
+#                  Wikipedia data files. If "yes", do use it.  Otherwise,
 #                  use it if it appears available, otherwise not.  
 #
 # 5. WP_VERSION: Optional; if set, should specify the prefix of a dump file,
@@ -75,11 +75,17 @@ fi
 
 TG_HADOOP_DIR=${TG_HADOOP_DIR:-textgrounder-data}
 
-if [ -n "$TG_USE_HDFS" ]; then
+if [ "$HADOOP" != yes ]; then
+  TG_REAL_USE_HDFS=no
+else
+  TG_REAL_USE_HDFS=${TG_USE_HDFS:-no}
+fi
+
+if [ "$TG_REAL_USE_HDFS" = yes ]; then
   TG_GROUPS_DIR=$TG_HADOOP_DIR
-elif [ -n "$TG_ON_COMP_LING_MACHINES" ]; then
+elif [ "$TG_ON_COMP_LING_MACHINES" = yes ]; then
   TG_GROUPS_DIR=/groups
-elif [ -n "$TG_ON_LONGHORN" ]; then
+elif [ "$TG_ON_LONGHORN" = yes ]; then
   TG_GROUPS_DIR=/scratch/01683/benwing
 fi
 
@@ -92,6 +98,19 @@ if [ -z "$TG_CORPUS_DIR" ]; then
   echo "Must set TG_CORPUS_DIR to location of TextGrounder corpus files"
   exit 1
 fi
+
+if [ "$TG_REAL_USE_HDFS" = yes ]; then
+  TG_FILE_PREF=
+  TEXTGROUNDER_URL=$TG_HADOOP_DIR
+elif [ "$HADOOP" = yes ]; then
+  TG_FILE_PREF=file:
+  TEXTGROUNDER_URL=file:$TEXTGROUNDER_DIR
+else
+  TG_FILE_PREF=
+  TEXTGROUNDER_URL=$TEXTGROUNDER_DIR
+fi
+
+TG_CORPUS_URL=$TG_FILE_PREF$TG_CORPUS_DIR
 
 if [ -z "$TG_AUX_DIR" ]; then
   echo "TG_AUX_DIR should be set to the location of aux data files"
@@ -139,7 +158,7 @@ set_wp_version() {
     if [ -e "$TG_CORPUS_DIR/wikipedia/$WP_VERSION/$WP_VERSION-permuted-pages-articles.xml.bz2" ]; then
       DUMP_PREFIX="$1-permuted"
     fi
-  elif [ "$USE_PERMUTED" = "true" ]; then
+  elif [ "$USE_PERMUTED" = "yes" ]; then
     permuted_file="$TG_CORPUS_DIR/wikipedia/$WP_VERSION/$WP_VERSION-permuted-pages-articles.xml.bz2"
     if [ -e "$permuted_file" ]; then
       :
