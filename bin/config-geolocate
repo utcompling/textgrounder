@@ -16,8 +16,6 @@
 #    a. At the lowest level, you can directly set the relevant environment
 #       variables.  There are three of them:
 #
-#       TG_WIKIPEDIA_DIR: location of Wikipedia data files
-#       TG_TWITTER_DIR: location of Twitter data files
 #       TG_AUX_DIR: location of auxiliary files (currently only the World
 #                   Gazetteer, needed only when running the `geotag-toponym`
 #                   app)
@@ -125,9 +123,9 @@ fi
 
 TRCONLL_DEV_DIR="$PCL_TRAVEL_DIR/data/trconlldevtest/dev"
 
-GEOTEXT_CORPUS_TOP="$TG_TWITTER_DIR/GeoText.2010-10-12"
+GEOTEXT_CORPUS_TOP="$TG_CORPUS_DIR/twitter-geotext/GeoText.2010-10-12"
 #GEOTEXT_INPUT_DIR="$GEOTEXT_CORPUS_TOP/processed_data"
-GEOTEXT_OUTPUT_DIR="$TG_TWITTER_DIR/output-40-docthresh"
+GEOTEXT_OUTPUT_DIR="$TG_CORPUS_DIR/twitter-geotext/output-40-docthresh"
 
 # The partial names of the various files we generate or read from -- i.e.
 # minus any dump prefix or path.
@@ -168,7 +166,7 @@ set_wp_version() {
     DUMP_PREFIX="$1-permuted"
   fi
 
-  WP_VERSION_DIR="$TG_WIKIPEDIA_DIR/$WP_VERSION"
+  WP_VERSION_DIR="$TG_CORPUS_DIR/wikipedia/$WP_VERSION"
 
   set_wp_version_specific_vars
 }

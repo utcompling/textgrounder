@@ -44,9 +44,6 @@ while true; do
   esac
 done
 
-# Must go after HADOOP is set
-. config-geolocate
-
 # For info on Sun JVM options, see:
 
 # http://java.sun.com/docs/hotspot/VMOptions.html
@@ -256,6 +253,10 @@ elif [ "$CMD" = 'build-all' ]; then
   execute --cd "$RUN_SBT update compile" ${1+"$@"}
 
 else  
+
+  # Include now because we need TEXTGROUNDER_URL; but not before so that
+  # we don't get complaints about TG_CORPUS_DIR otherwise.
+  . config-geolocate
 
   CLASS=
   HADOOP_ARGS=
