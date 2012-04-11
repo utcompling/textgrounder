@@ -59,8 +59,13 @@ steps="$*"
 
 process_corpus_dir() {
   cd $TG_CORPUS_DIR
-  for item in `find $1 -name '*unigram-counts*.txt' -print`; do
-    $hadoop fs -put $item "$TG_HADOOP_DIR/corpora/$item"
+  for type in unigram-counts bigram-counts text; do
+    for ext in .txt .txt.bz2 .txt.gz; do
+      # Old style: for item in `find $1 -name '*unigram-counts*.txt' -print`;
+      for item in `find $1 -name "*${type}*$ext" -print`; do
+        $hadoop fs -put $item "$TG_HADOOP_DIR/corpora/$item"
+      done
+    done
   done
 }
 
