@@ -161,7 +161,7 @@ up and running and to test that everything is in place and working.
 
    Run the following:
 
-   tg-geolocate twitter
+   tg-geolocate geotext
 
    If all is well, this should do document-level geolocation on the GeoText
    Twitter corpus with a grid size of 1 degree.  Because this is a small
@@ -267,7 +267,7 @@ the 'update' task of SBT is used).  As an example, to run the Geolocate
 subproject on the GeoText Twitter corpus (which is very small and hence
 is a good test):
 
-$ tg-geolocate --hadoop-nondist twitter
+$ tg-geolocate --hadoop-nondist geotext
 
 If you have appropriately set up all your data files and set the environment
 variable(s) needed to tell TextGrounder where they are located, this should
@@ -285,7 +285,32 @@ $ textgrounder build assembly
 This builds a self-contained JAR file containing not only the TextGrounder
 code but all of the libraries needed to run the code.
 
-You will also need to copy some data to the Hadoop File System, which you
+There are two ways of accessing the data files, either through the local
+file system or through HDFS (the Hadoop Distributed File System).  The latter
+way may be more efficient in that Hadoop is optimized for HDFS, but it
+requires a bit more work, in that the data needs to be copied into HDFS.
+The former does not require this, but does require that the relevant files
+are visible on all nodes that will be running the program.
+
+-------- Running with local data ----------
+
+To run with data accessed through the local file system, simply add the
+'--hadoop' option, for example:
+
+$ tg-geolocate --hadoop geotext
+
+This will invoke 'hadoop' to run the code.
+
+If something goes wrong, or you just want to see more exactly what is being
+run, use the '--verbose' option, e.g.:
+
+$ tg-geolocate --verbose --hadoop geotext
+
+This will output the exact command lines being executed.
+
+-------- Running with data in HDFS ----------
+
+The first step is to copy the data to the Hadoop File System, which you
 can do using 'tg-copy-data-to-hadoop'.  The simplest thing is just to copy
 all the data, including the Wikipedia and Twitter corpora and some extra
 data needed by TextGrounder:
@@ -301,18 +326,6 @@ $ hadoop fs -ls
 
 Then, for example to run the Geolocate subproject on the GeoText Twitter
 corpus using Hadoop distributed mode, do this:
-
-$ tg-geolocate --hadoop twitter
-
-This will invoke 'hadoop' to run the code.
-
-If something goes wrong, or you just want to see more exactly what is being
-run, use the '--verbose' option, e.g.:
-
-$ tg-geolocate --verbose --hadoop twitter
-
-This will output the exact command lines being executed.
-
 
 ============================================
 Further Details for the Geolocate Subproject
@@ -372,7 +385,7 @@ scripts available:
 
   * `tg-geolocate` is the script you probably want to use.  It takes a
     CORPUS parameter to specify which corpus you want to act on (currently
-    recognized: `wikipedia`, `twitter`, and `twitter-wiki`, which is a
+    recognized: `wikipedia`, `geotext`, and `geotext-wiki`, which is a
     combination of both corpora).  This sets up additional arguments to
     specify the data files for the corpus/corpora to be loaded/evaluated.
     The application to run is specified by the `--app` option; if omitted,
@@ -619,14 +632,14 @@ here but may be useful if you have an enormous amount of data (e.g. all
 of Wikipedia).
 
 {{{
-for x in 0 5 40; do geolocate-twitter --doc-thresh $x --mts=300 --degrees-per-cell=1 --mode=generate-kml --kml-words='cool,coo,kool,kewl' --kml-prefix=kml-dist.$x.none. --kml-transform=none; done 
+for x in 0 5 40; do tg-geolocate geotext --doc-thresh $x --mts=300 --degrees-per-cell=1 --mode=generate-kml --kml-words='cool,coo,kool,kewl' --kml-prefix=kml-dist.$x.none. --kml-transform=none; done 
 }}}
 
 Another example, just for the words "cool" and "coo", but with different
 kinds of transformation of the probabilities.
 
 {{{
-for x in none log logsquared; do geolocate-twitter --doc-thresh 5 --mts=300 --degrees-per-cell=1 --mode=generate-kml --kml-words='cool,coo' --kml-prefix=kml-dist.5.$x. --kml-transform=$x; done 
+for x in none log logsquared; do tg-geolocate geotext --doc-thresh 5 --mts=300 --degrees-per-cell=1 --mode=generate-kml --kml-words='cool,coo' --kml-prefix=kml-dist.5.$x. --kml-transform=$x; done 
 }}}
 
 === Generating data ===
