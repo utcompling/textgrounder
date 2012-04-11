@@ -10,17 +10,37 @@ echo_and_hadoop()
 help()
 {
   cat <<FOO
-Usage: $0 CORPUS
+Usage: $0 CORPUS ...
 
-Copy corpus or TextGrounder data into Hadoop.
+Copy corpus or TextGrounder data into the Hadoop File System (HDFS).  Not
+strictly necessary for running under Hadoop, provided that the data is
+available through the local file system on each machine, but likely better
+for Hadoop performance.  TextGrounder uses HDFS if TG_USE_HDFS has the
+value of 'yes'.
 
 Currently recognized values for CORPUS:
 
-wikipedia         Wikipedia corpus.
-twitter           Twitter (GeoText) corpus.
 textgrounder      TextGrounder data.
-all               All of the above.
+*wiki-*           Some Wikipedia corpus (e.g. enwiki-20120307).
+wikipedia         ALL WIKIPEDIA CORPORA (a lot of them -- don't do this
+                  unless you really want them all!).
+twitter-geotext   Twitter GeoText corpus (with all thresholds).
+geotext           Synonym for 'twitter-geotext'.
+*                 Any other relative filename is interpreted as a directory
+                  name relative to the corpus directory stored in TG_CORPUS_DIR
+                  (current value: $TG_CORPUS_DIR).
+                  All corpora contained under this directory are recursively
+                  copied, with the directory structure preserved, including the
+                  top-level directory specified. (Note that the values of
+                  'wikipedia' and 'twitter-geotext' aren't actually special
+                  in that both of them name directories underneath
+                  TG_CORPUS_DIR.)
+/*                Any absolute filename is processed recursively, similarly to
+                  a relative filename, but is not assumed to be located
+                  under TG_CORPUS_DIR.
 
+At a minimum, you need to copy the 'textgrounder' data and one corpus,
+whichever one you want to run on.
 FOO
 }
 
@@ -35,29 +55,35 @@ fi
 
 . $TEXTGROUNDER_DIR/bin/config-geolocate
 
-if [ "$*" = "all" ]; then
-  steps="wikipedia twitter textgrounder"
-else
-  steps="$*"
-fi
+steps="$*"
+
+process_corpus_dir() {
+  cd $TG_CORPUS_DIR
+  for type in unigram-counts bigram-counts text; do
+    for ext in .txt .txt.bz2 .txt.gz; do
+      # Old style: for item in `find $1 -name '*unigram-counts*.txt' -print`;
+      for item in `find $1 -name "*${type}*$ext" -print`; do
+        $hadoop fs -put $item "$TG_HADOOP_DIR/corpora/$item"
+      done
+    done
+  done
+}
 
 for step in $steps ; do
-  if [ "$step" = textgrounder ]; then
-    $hadoop fs -put "$TEXTGROUNDER_DIR/data" "$TG_HADOOP_DIR/data"
-  elif [ "$step" = wikipedia ]; then
-    WIKI_DATE="`echo $OUT_COMBINED_DOCUMENT_DATA_FILE | sed s/-combined-document-data.txt//`"
-    for item in $TG_CORPUS_DIR/wikipedia/$WIKI_DATE/*
-    do
-        itembase=`basename $item`
-        $hadoop fs -put $item "$TG_HADOOP_DIR/corpora/wikipedia/$WIKI_DATE/$itembase"
-    done
-  elif [ "$step" = twitter ]; then
-    for x in $TG_CORPUS_DIR/twitter-geotext/docthresh-*; do
-      dir=`basename $x`
-      $hadoop fs -put $x "$TG_HADOOP_DIR/corpora/twitter-geotext/$dir"
-    done
-  else
-    echo "Unrecognized corpus value: $step"
-    help; exit 1
-  fi
+  case "$step" in
+    textgrounder )
+      for dir in data src/main/resources/data ; do
+        $hadoop fs -put "$TEXTGROUNDER_DIR/$dir" "$TG_HADOOP_DIR/$dir"
+      done
+      ;;
+    *wiki-* )
+      process_corpus_dir wikipedia/$step
+      ;;
+    geotext )
+      process_corpus_dir twitter-geotext
+      ;;
+    * )
+      process_corpus_dir $step
+      ;;
+  esac
 done

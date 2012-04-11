@@ -385,9 +385,14 @@ scripts available:
 
   * `tg-geolocate` is the script you probably want to use.  It takes a
     CORPUS parameter to specify which corpus you want to act on (currently
-    recognized: `wikipedia`, `geotext`, and `geotext-wiki`, which is a
-    combination of both corpora).  This sets up additional arguments to
-    specify the data files for the corpus/corpora to be loaded/evaluated.
+    recognized: `geotext`; a Wikipedia corpus, e.g. `enwiki-20120307` or
+    `ptwiki-20120315`; `wikipedia`, which picks some "default" Wikipedia
+    corpus, specifically `enwiki-20100905` (the same one used for the
+    original Wing+Baldridge paper, and quite old by now); and
+    `geotext-wiki`, which is a combination of both the `wikipedia` and
+    `geotext` corpora).  This sets up additional arguments to
+    specify the data files for the corpus/corpora to be loaded/evaluated,
+    and the language of the data, e.g. to select the correct stopwords list.
     The application to run is specified by the `--app` option; if omitted,
     it defaults to `geolocate-document` (other possibilities are
     `generate-kml` and `geolocate-toponym`).  For the Twitter corpora,
@@ -435,8 +440,8 @@ scripts available:
 
 You can invoke `tg-geolocate wikipedia` with no options, and it will do
 something reasonable: It will attempt to geolocate the entire dev set of
-the Wikipedia corpus, using KL divergence as a strategy, with a grid size
-of 1 degrees.  Options you may find useful (which also apply to
+the old English Wikipedia corpus, using KL divergence as a strategy, with
+a grid size of 1 degrees.  Options you may find useful (which also apply to
 `textgrounder geolocate` and all front ends):
 
 `--degrees-per-cell NUM`
