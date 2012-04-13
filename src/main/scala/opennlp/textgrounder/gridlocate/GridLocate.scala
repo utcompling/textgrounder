@@ -244,7 +244,7 @@ class RandomGridLocateDocumentStrategy[
 
     def return_ranked_cells(word_dist: WordDist) = {
       // FIXME, eliminate this global reference
-      val parallel = GridLocateDriver.Params.parallel
+      val parallel = !GridLocateDriver.Params.no_parallel
       val cell_buf = {
         if (parallel)
           return_ranked_cells_parallel(word_dist)
@@ -718,9 +718,9 @@ class RandomGridLocateDocumentStrategy[
   Used only when --strategy=average-cell-probability.""")
 
     //// Miscellaneous options for controlling internal operation
-    var parallel =
-      ap.flag("parallel",
-        help = """If true, do ranking computations in parallel.""")
+    var no_parallel =
+      ap.flag("no-parallel",
+        help = """If true, don't do ranking computations in parallel.""")
     var test_kl =
       ap.flag("test-kl",
         help = """If true, run both fast and slow KL-divergence variations and
