@@ -523,6 +523,13 @@ package object experiment {
      * Output the values of "command-line" parameters (see above)
      */
     def output_command_line_parameters() {
+      errprint("")
+      errprint("Non-default parameter values:")
+      for (name <- arg_parser.argNames) {
+        if (arg_parser.specified(name))
+          errprint("%30s: %s", name, arg_parser(name))
+      }
+      errprint("")
       errprint("Parameter values:")
       for (name <- arg_parser.argNames) {
         errprint("%30s: %s", name, arg_parser(name))
