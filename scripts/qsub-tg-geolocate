@@ -1,0 +1,68 @@
+#!/bin/sh
+
+# CHANGE THESE AS PER YOUR SETTINGS
+export TEXTGROUNDER_DIR="$HOME/devel/textgrounder"
+export HADOOP_DIR="~/patched-hadoop-0.20.2-new"
+export SCRATCH="/scratch/01683/benwing"
+export EXPDIR="$SCRATCH/exps/longruns"
+
+# notify me when done
+export PROWL_KEY="FILL IN HERE"
+USE_PROWL=false
+function prowl () {
+    curl -f 'https://api.prowlapp.com/publicapi/add' -d "apikey=$PROWL_KEY" --data-binary "description=$1" -d "application=`hostname`" > /dev/null 2>&1
+}
+
+#-----------------------------------------------------------------------------
+#$ -V
+#$ -cwd
+#$ -N tg-geolocate
+#$ -j y
+#$ -o $HOME/tg-geolocate.qsub.out
+#$ -pe 1way 8
+#$ -q hadoop
+#$ -P data
+#$ -l h_rt=24:00:00
+#$ -A TeXIT
+#-----------------------------------------------------------------------------
+
+# everything after this should be good
+
+##################### Process arguments
+
+export ORIGARGS="$*"
+. $TEXTGROUNDER_DIR/bin/tg-geolocate-process-opts
+DATASET="$1"
+
+if [ -z "$1" ]; then
+  echo "No dataset specified."
+  exit 1
+fi
+
+shift
+ARGS="$*"
+
+# Change "--foo-bar --bar-bat 5 --baz-bar quux/qu --bat --bat2" into
+#   ".foo-bar.bar-bat=5.baz-bar=quux-qu.bat.bat2"
+
+ARGID=`echo " $ARGS" | sed -e 's/  *--*\([^ ]*\)  *\([^-][^ ]*\)/ \1=\2/g' -e 's/ *--*\([^ ]*\)/ \1/g' -e 's/ /./g' -e 's/\//-/g'`
+export ID="$DATASET$ARGID"
+
+##################### Set PATH and other vars
+
+export LOGDIR="$EXPDIR/$DATASET"
+
+cd $TEXTGROUNDER_DIR
+export PATH="`pwd`/bin:$PATH"
+export TG_ON_LONGHORN=yes
+
+##################### Run it
+
+mkdir -p $LOGDIR
+
+cd $LOGDIR
+run-nohup -i $ID tg-geolocate $ORIGARGS
+
+if [ "$USE_PROWL" = "true" ]; then
+  prowl "Done with $OUTFILE (`date`)"
+fi
