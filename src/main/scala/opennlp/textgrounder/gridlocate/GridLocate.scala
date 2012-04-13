@@ -685,6 +685,10 @@ class RandomGridLocateDocumentStrategy[
         default = 1,
         help = """Minimum count of words to consider in word
   distributions.  Words whose count is less than this value are ignored.""")
+   var tf_idf =
+     ap.flag("tf-idf", "tfidf",
+        help = """Adjust word counts according to TF-IDF weighting (i.e.
+  downweight words that occur in many documents).""")
 
     //// Options used when doing Naive Bayes geolocation
     var naive_bayes_weighting =

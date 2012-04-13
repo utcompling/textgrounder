@@ -322,4 +322,3 @@ class DefaultUnigramWordDistConstructor(
  * General factory for UnigramWordDist distributions.
  */ 
 abstract class UnigramWordDistFactory extends WordDistFactory { }
-
