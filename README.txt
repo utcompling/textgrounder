@@ -311,26 +311,54 @@ This will output the exact command lines being executed.
 -------- Running with data in HDFS ----------
 
 The first step is to copy the data to the Hadoop File System, which you
-can do using 'tg-copy-data-to-hadoop'.  The simplest thing is just to copy
-all the data, including the Wikipedia and Twitter corpora and some extra
-data needed by TextGrounder:
+can do using 'tg-copy-data-to-hadoop'.  You need to copy two things,
+the corpus or corpora you want to run on and some ancillary data needed
+for TextGrounder (basically the stop lists).  You run the command as follows:
 
-$ tg-copy-data-to-hadoop all
+$ tg-copy-data-to-hadoop CORPUS ...
 
-This copies the data under a directory named by the TG_HADOOP_DIR environment
-variable.  If not set, it is initialized by default to a subdirectory named
-'textgrounder-data' under your home directory on the Hadoop File System.
-You can't see this using 'ls', but it should appear if you run the following:
+where CORPUS is the name of a corpus, similar to what is specified when
+running 'tg-geolocate'.  Additionally, the pseudo-corpus 'textgrounder'
+will copy the ancillary TextGrounder data.  For example, to copy
+the Portuguese Wikipedia for March 15, 2012, as well as the ancillary data,
+run the following:
 
-$ hadoop fs -ls
+$ tg-copy-data-to-hadoop textgrounder ptwiki-20120315
 
-Then, for example to run the Geolocate subproject on the GeoText Twitter
-corpus using Hadoop distributed mode, do this:
+Other possibilities for CORPUS are 'geotext' (the Twitter GeoText corpus),
+any other corpus listed in the corpus directory (TG_CORPUS_DIR), any
+tree containing corpora (all corpora underneath will be copied and the
+directory structure preserved), or any absolute path to a corpus or
+tree of corpora.
+
+Then, run as follows:
+
+$ TG_USE_HDFS=yes tg-geolocate --hadoop geotext
+
+If you use '--verbose' as follows, you can see exactly which options are
+being passed to the underlying 'textgrounder' script:
+
+$ TG_USE_HDFS=yes tg-geolocate --hadoop --verbose geotext
+
+By default, the data copied using 'tg-copy-data-to-hadoop' and referenced
+by 'tg-geolocate' or 'textgrounder' is placed in the directory
+'textgrounder-data' under your home directory on HDFS.  You can change this
+by setting TG_HADOOP_DIR before running 'tg-copy-data-to-hadoop'.
+
+========================================
+Specifying where the corpora are located
+========================================
+
+The corpora are located using the environment variable TG_CORPUS_DIR.
+If this is unset, and TG_GROUPS_DIR is set, it will be initialized to
+the 'corpora' subdirectory of this variable.  If you are running
+directly on Longhorn, you can set TG_ON_LONGHORN to 'yes', which will
+set things up appropriately to use the corpora located in
+/scratch/01683/benwing/corpora.
 
 ============================================
 Further Details for the Geolocate Subproject
 ============================================
-
 
 === Obtaining the Data ===
 
