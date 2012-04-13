@@ -55,32 +55,7 @@ fi
 
 # Option processing
 
-tgopts=
-default_tgapp=geolocate-document
-tgapp=
-hadoop_arg=
-
-while true ; do
-  case "$1" in
-    --help ) help; exit 1 ;;
-    --app ) tgapp="$2"; shift 2 ;;
-    --hadoop )
-      hadoop_arg="--hadoop"; tgopts="$tgopts --hadoop"; shift ;;
-    --hadoop-nondist )
-      tgopts="$tgopts --hadoop-nondist"; shift ;;
-    -minheap | --minheap ) tgopts="$tgopts --minheap $2"; shift 2 ;;
-    -maxheap | --maxheap ) tgopts="$tgopts --maxheap $2"; shift 2 ;;
-    -memory | --memory ) tgopts="$tgopts --memory $2"; shift 2 ;;
-    -escape-analysis | --escape-analysis )
-      tgopts="$tgopts --escape-analysis"; shift ;;
-    -compressed-oops | --compressed-oops )
-      tgopts="$tgopts --compressed-oops"; shift ;;
-    -verbose | --verbose ) tgopts="$tgopts --verbose"; shift ;;
-    -debug-jvm | --debug-jvm ) tgopts="$tgopts --debug"; shift ;;
-    -- ) shift ; break ;;
-    * ) break ;;
-  esac
-done
+. $TEXTGROUNDER_DIR/bin/tg-geolocate-process-opts
 
 if [ -z "$1" -o "$1" = "help" ]; then
   help; exit 1
