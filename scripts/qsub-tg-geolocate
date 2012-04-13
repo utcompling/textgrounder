@@ -45,7 +45,7 @@ ARGS="$*"
 # Change "--foo-bar --bar-bat 5 --baz-bar quux/qu --bat --bat2" into
 #   ".foo-bar.bar-bat=5.baz-bar=quux-qu.bat.bat2"
 
-ARGID=`echo " $ARGS" | sed -e 's/  *--*\([^ ]*\)  *\([^-][^ ]*\)/ \1=\2/g' -e 's/ *--*\([^ ]*\)/ \1/g' -e 's/ /./g' -e 's/\//-/g'`
+ARGID=`echo " $ARGS" | sed -e 's/  *--*\([^ ]*\)  *\([^-][^ ]*\)/ \1=\2/g' -e 's/  *--*\([^ ]*\)/ \1/g' -e 's/ /./g' -e 's/\//-/g'`
 export ID="$DATASET$ARGID"
 
 ##################### Set PATH and other vars
