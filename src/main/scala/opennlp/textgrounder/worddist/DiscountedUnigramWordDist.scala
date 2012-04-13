@@ -98,6 +98,7 @@ abstract class DiscountedUnigramWordDist(
   note_globally: Boolean
 ) extends UnigramWordDist(gen_factory, note_globally) {
   type TThis = DiscountedUnigramWordDist
+  type TKLCache = DiscountedUnigramKLDivergenceCache
   def dufactory = gen_factory.asInstanceOf[DiscountedUnigramWordDistFactory]
 
   /** Total probability mass to be assigned to all words not
@@ -198,10 +199,12 @@ abstract class DiscountedUnigramWordDist(
         format (this, num_word_tokens, unseen_mass))
   }
 
-  def fast_kl_divergence(other: WordDist, partial: Boolean = false) = {
+  def fast_kl_divergence(cache: KLDivergenceCache, other: WordDist,
+      partial: Boolean = false) = {
     FastDiscountedUnigramWordDist.fast_kl_divergence(
-      this.asInstanceOf[TThis], other.asInstanceOf[TThis],
-      interpolate = dufactory.interpolate, partial = partial)
+      this.asInstanceOf[TThis], cache.asInstanceOf[TKLCache],
+      other.asInstanceOf[TThis], interpolate = dufactory.interpolate,
+      partial = partial)
   }
 
   def cosine_similarity(other: WordDist, partial: Boolean = false,

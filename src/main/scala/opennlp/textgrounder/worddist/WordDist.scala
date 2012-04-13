@@ -34,6 +34,8 @@ import opennlp.textgrounder.util.Serializer
 
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 import opennlp.textgrounder.gridlocate.GenericTypes._
+// FIXME! For reference to GridLocateDriver.Params
+import opennlp.textgrounder.gridlocate.GridLocateDriver
 
 import WordDist.memoizer._
 
@@ -187,6 +189,8 @@ object IdentityMemoizer extends Memoizer {
  * compares the two.
  */
 trait FastSlowKLDivergence {
+  def get_kl_divergence_cache(): KLDivergenceCache
+
   /**
    * This is a basic implementation of the computation of the KL-divergence
    * between this distribution and another distribution, including possible
@@ -228,14 +232,16 @@ trait FastSlowKLDivergence {
    * A fast, optimized implementation of KL-divergence.  See the discussion in
    * `slow_kl_divergence_debug`.
    */
-  def fast_kl_divergence(other: WordDist, partial: Boolean = false): Double
+  def fast_kl_divergence(cache: KLDivergenceCache, other: WordDist,
+      partial: Boolean = false): Double
 
   /**
    * Check fast and slow KL-divergence versions against each other.
    */
-  def test_kl_divergence(other: WordDist, partial: Boolean = false) = {
+  def test_kl_divergence(cache: KLDivergenceCache, other: WordDist,
+      partial: Boolean = false) = {
     val slow_kldiv = slow_kl_divergence(other, partial)
-    val fast_kldiv = fast_kl_divergence(other, partial)
+    val fast_kldiv = fast_kl_divergence(cache, other, partial)
     if (abs(fast_kldiv - slow_kldiv) > 1e-8) {
       errprint("Fast KL-div=%s but slow KL-div=%s", fast_kldiv, slow_kldiv)
       assert(fast_kldiv == slow_kldiv)
@@ -250,12 +256,13 @@ trait FastSlowKLDivergence {
    * small amount different (the small amount rather than 0 to account for
    * possible rounding error).
    */
-  protected def imp_kl_divergence(other: WordDist, partial: Boolean) = {
-    val test_kldiv = false
+  protected def imp_kl_divergence(cache: KLDivergenceCache, other: WordDist,
+      partial: Boolean) = {
+    val test_kldiv = GridLocateDriver.Params.test_kl
     if (test_kldiv)
-      test_kl_divergence(other, partial)
+      test_kl_divergence(cache, other, partial)
     else
-      fast_kl_divergence(other, partial)
+      fast_kl_divergence(cache, other, partial)
   }
 }
 
@@ -365,6 +372,9 @@ abstract class WordDistConstructor(factory: WordDistFactory) {
    */
   def initialize_distribution(doc: GenericDistDocument, countstr: String,
       is_training_set: Boolean)
+}
+
+class KLDivergenceCache {
 }
 
 /**
@@ -526,12 +536,16 @@ abstract class WordDist(factory: WordDistFactory, val note_globally: Boolean) {
    * Actual implementation of `kl_divergence` by subclasses.
    * External callers should use `kl_divergence`.
    */
-  protected def imp_kl_divergence(other: WordDist, partial: Boolean): Double
+  protected def imp_kl_divergence(cache: KLDivergenceCache,
+    other: WordDist, partial: Boolean): Double
 
   /**
    * Compute the KL-divergence between this distribution and another
    * distribution.
    * 
+   * @param cache Cached information about this distribution, used to
+   *   speed up computations.  Never needs to be supplied; null can always
+   *   be given, to cause a new cache to be created.
    * @param other The other distribution to compute against.
    * @param partial If true, only compute the contribution involving words
    *   that exist in our distribution; otherwise we also have to take
@@ -541,11 +555,14 @@ abstract class WordDist(factory: WordDistFactory, val note_globally: Boolean) {
    *   
    * @return The KL-divergence value.
    */
-  def kl_divergence(other: WordDist, partial: Boolean = false) = {
+  def kl_divergence(cache: KLDivergenceCache, other: WordDist,
+      partial: Boolean = false) = {
     assert(finished)
     assert(other.finished)
-    imp_kl_divergence(other, partial)
+    imp_kl_divergence(cache, other, partial)
   }
+
+  def get_kl_divergence_cache(): KLDivergenceCache = null
 
   /**
    * Compute the symmetric KL-divergence between two distributions by averaging
@@ -553,9 +570,10 @@ abstract class WordDist(factory: WordDistFactory, val note_globally: Boolean) {
    * 
    * @param partial Same as in `kl_divergence`.
    */
-  def symmetric_kldiv(other: WordDist, partial: Boolean = false) = {
-    0.5*this.kl_divergence(other, partial) +
-    0.5*this.kl_divergence(other, partial)
+  def symmetric_kldiv(cache: KLDivergenceCache, other: WordDist,
+      partial: Boolean = false) = {
+    0.5*this.kl_divergence(cache, other, partial) +
+    0.5*this.kl_divergence(cache, other, partial)
   }
 
   /**

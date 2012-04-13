@@ -210,34 +210,47 @@ class RandomGridLocateDocumentStrategy[
      * cells. Return a sequence of tuples (cell, score) where 'cell'
      * indicates the cell and 'score' the score.
      */
-    def return_ranked_cells(word_dist: WordDist) = {
-      val old = true
-      val cell_buf =
-        if (old) {
-        /*
-         The "old" (non-parallel) way of doing things; Stephen resurrected it when
-         merging the Dirichlet stuff.  Attempting to use the parallel method
-         caused an assertion failure after about 1200 of 1895 documents using
-         GeoText.
-         */
-          val buffer = mutable.Buffer[(TCell, Double)]()
+    def return_ranked_cells_serially(word_dist: WordDist) = {
+      /*
+       The non-parallel way of doing things; Stephen resurrected it when
+       merging the Dirichlet stuff.  Attempting to use the parallel method
+       caused an assertion failure after about 1200 of 1895 documents using
+       GeoText.
+       */
+        val buffer = mutable.Buffer[(TCell, Double)]()
 
-          for (cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)) {
-            if (debug("lots")) {
-              errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
-                cell.describe_indices(), cell.describe_location(),
-                cell.combined_dist.num_docs_for_word_dist)
-            }
-
-            val score = score_cell(word_dist, cell)
-            buffer += ((cell, score))
+        for (cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)) {
+          if (debug("lots")) {
+            errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
+              cell.describe_indices(), cell.describe_location(),
+              cell.combined_dist.num_docs_for_word_dist)
           }
-          buffer
-        } else {
-          /* The new way of doing things */
-          val cells = cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
-          cells.par.map(c => (c, score_cell(word_dist, c))).toBuffer
+
+          val score = score_cell(word_dist, cell)
+          buffer += ((cell, score))
         }
+        buffer
+    }
+
+    /**
+     * Compare a word distribution (for a document, typically) against all
+     * cells. Return a sequence of tuples (cell, score) where 'cell'
+     * indicates the cell and 'score' the score.
+     */
+    def return_ranked_cells_parallel(word_dist: WordDist) = {
+      val cells = cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
+      cells.par.map(c => (c, score_cell(word_dist, c))).toBuffer
+    }
+
+    def return_ranked_cells(word_dist: WordDist) = {
+      // FIXME, eliminate this global reference
+      val parallel = GridLocateDriver.Params.parallel
+      val cell_buf = {
+        if (parallel)
+          return_ranked_cells_parallel(word_dist)
+        else
+          return_ranked_cells_serially(word_dist)
+      }
 
       /* SCALABUG:
          If written simply as 'cell_buf sortWith (_._2 < _._2)',
@@ -250,9 +263,10 @@ class RandomGridLocateDocumentStrategy[
           cell_buf sortWith (_._2 < _._2)
         else
           cell_buf sortWith (_._2 > _._2)
-      /* If using the new way, this code applies for debugging (old way has
-         the debugging code embedded into it). */
-      if (!old && debug("lots")) {
+
+      /* If doing things parallel, this code applies for debugging
+         (serial has the debugging code embedded into it). */
+      if (parallel && debug("lots")) {
         for ((cell, score) <- retval)
           errprint("Nonempty cell at indices %s = location %s, num_documents = %s, score = %s",
             cell.describe_indices(), cell.describe_location(),
@@ -285,18 +299,27 @@ class RandomGridLocateDocumentStrategy[
     symmetric: Boolean = false
   ) extends MinMaxScoreStrategy[TCell, TGrid](cell_grid, true) {
 
+    var self_kl_cache: KLDivergenceCache = null
+    val slow = false
+
+    def call_kl_divergence(self: WordDist, other: WordDist) =
+      self.kl_divergence(self_kl_cache, other, partial = partial)
+
     def score_cell(word_dist: WordDist, cell: TCell) = {
       val cell_word_dist = cell.combined_dist.word_dist
-      var kldiv =
-        word_dist.kl_divergence(cell_word_dist, partial = partial)
+      var kldiv = call_kl_divergence(word_dist, cell_word_dist)
       if (symmetric) {
-        val kldiv2 = cell_word_dist.kl_divergence(word_dist, partial = partial)
+        val kldiv2 = cell_word_dist.kl_divergence(null, word_dist,
+          partial = partial)
         kldiv = (kldiv + kldiv2) / 2.0
       }
       kldiv
     }
 
     override def return_ranked_cells(word_dist: WordDist) = {
+      // This will be used by `score_cell` above.
+      self_kl_cache = word_dist.get_kl_divergence_cache()
+
       val cells = super.return_ranked_cells(word_dist)
 
       if (debug("kldiv") && word_dist.isInstanceOf[FastSlowKLDivergence]) {
@@ -689,6 +712,15 @@ class RandomGridLocateDocumentStrategy[
         default = 400,
         help = """Number of entries in the LRU cache.  Default %default.
   Used only when --strategy=average-cell-probability.""")
+
+    //// Miscellaneous options for controlling internal operation
+    var parallel =
+      ap.flag("parallel",
+        help = """If true, do ranking computations in parallel.""")
+    var test_kl =
+      ap.flag("test-kl",
+        help = """If true, run both fast and slow KL-divergence variations and
+  test to make sure results are the same.""")
 
     //// Debugging/output options
     var max_time_per_stage =
