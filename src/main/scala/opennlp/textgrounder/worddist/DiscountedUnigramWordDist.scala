@@ -28,6 +28,8 @@ import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.printutil.errprint
 
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
+// FIXME! For --tf-idf
+import opennlp.textgrounder.gridlocate.GridLocateDriver
 import opennlp.textgrounder.gridlocate.GenericTypes._
 
 import WordDist.memoizer._
@@ -48,6 +50,9 @@ abstract class DiscountedUnigramWordDistFactory(
    */
   var overall_word_probs = create_word_double_map()
   var owp_adjusted = false
+  var document_freq = create_word_double_map()
+  var num_documents = 0
+  var global_normalization_factor = 0.0
 
   override def note_dist_globally(dist: WordDist) {
     val udist = dist.asInstanceOf[DiscountedUnigramWordDist]
@@ -62,7 +67,10 @@ abstract class DiscountedUnigramWordDistFactory(
         // Our training docs should never have partial (interpolated) counts.
         assert (count == count.toInt)
         total_num_word_tokens += count.toInt
+        // Note document frequency of word
+        document_freq(word) += 1
       }
+      num_documents += 1
     }
     if (debug("lots")) {
       errprint("""For word dist, total tokens = %s, unseen_mass = %s, overall unseen mass = %s""",
@@ -87,9 +95,15 @@ abstract class DiscountedUnigramWordDistFactory(
     owp_adjusted = true
     // A holdout from the "old way".
     val globally_unseen_word_prob = 0.0
+    if (GridLocateDriver.Params.tf_idf) {
+      for ((word, count) <- overall_word_probs)
+        overall_word_probs(word) =
+          count*math.log(num_documents/document_freq(word))
+    }
+    global_normalization_factor = ((overall_word_probs.values) sum)
     for ((word, count) <- overall_word_probs)
       overall_word_probs(word) = (
-        count.toDouble/total_num_word_tokens*(1.0 - globally_unseen_word_prob))
+        count.toDouble/global_normalization_factor*(1.0 - globally_unseen_word_prob))
   }
 }
 
@@ -171,6 +185,8 @@ abstract class DiscountedUnigramWordDist(
 
   def innerToString = ", %.2f unseen mass" format unseen_mass
 
+  var normalization_factor = 0.0
+
   /**
    * Here we compute the value of `overall_unseen_mass`, which depends
    * on the global `overall_word_probs` computed from all of the
@@ -192,6 +208,11 @@ abstract class DiscountedUnigramWordDist(
         // Scala bug. (SCALABUG)
         (for (ind <- counts.keys.toSeq)
           yield factory.overall_word_probs(ind)) sum)
+    if (GridLocateDriver.Params.tf_idf) {
+      for ((word, count) <- counts.toSeq) // SCALABUG, necessary?
+        counts(word) = count*log(factory.num_documents/factory.document_freq(word))
+    }
+    normalization_factor = ((counts.values) sum)
     //if (use_sorted_list)
     //  counts = new SortedList(counts)
     if (debug("discount-factor") || debug("discountfactor"))
@@ -290,7 +311,7 @@ abstract class DiscountedUnigramWordDist(
       //            unseen_mass, overall_unseen_mass)
       // }
       val owprob = factory.overall_word_probs.getOrElse(word, 0.0)
-      val mle_wordprob = wordcount.toDouble/num_word_tokens
+      val mle_wordprob = wordcount.toDouble/normalization_factor
       val wordprob = mle_wordprob*(1.0 - unseen_mass) + owprob*unseen_mass
       if (debug("lots"))
         errprint("Word %s, seen in document, wordprob = %s",
@@ -333,7 +354,7 @@ abstract class DiscountedUnigramWordDist(
           //          wordcount, unseen_mass)
           //  for ((word, count) <- self.counts)
           //    errprint("%s: %s", word, count)
-          val wordprob = wordcount.toDouble/num_word_tokens*(1.0 - unseen_mass)
+          val wordprob = wordcount.toDouble/normalization_factor*(1.0 - unseen_mass)
           if (debug("lots"))
             errprint("Word %s, seen in document, wordprob = %s",
                      unmemoize_string(word), wordprob)
