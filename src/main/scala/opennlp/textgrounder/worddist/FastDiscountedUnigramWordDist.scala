@@ -45,59 +45,46 @@ import WordDist.memoizer.Word
   the moment in case we need to convert it to Java, C++, etc.
  */
 
+class DiscountedUnigramKLDivergenceCache(
+    val worddist: DiscountedUnigramWordDist
+  ) extends KLDivergenceCache {
+  val self_size = worddist.counts.size
+  val self_keys = worddist.counts.keys.toArray
+  val self_values = worddist.counts.values.toArray
+}
+
 object FastDiscountedUnigramWordDist {
-  /*
-   In normal operation of fast_kl_divergence(), we are passed the same
-   'self' distribution repeatedly with different 'other' distributions,
-   as we compare a given document against all the different
-   non-empty cells of the Earth.  In each call, we have to iterate
-   over all elements in the hash table, so we cache the elements and
-   only retrieve again next time we're passed a different 'self'
-   distribution.
-   
-   NOTE: This assumes no change to 'self' in the midst of these calls!
-   RESULTS WILL BE WRONG OTHERWISE!  You can use test_kl_divergence()
-   to test correct operation, which compares the result of this function
-   to a different, slower but safer KL-divergence implementation.
-   */
-  protected val initial_static_array_size = 1000
-  protected val static_key_array =
-    new DynamicArray[Word](initial_alloc = initial_static_array_size)
-  /* These arrays are specialized, so when we retrieve the underlying
-     array we get a raw array. */
-  protected val static_value_array =
-    new DynamicArray[Double](initial_alloc = initial_static_array_size)
-  protected def size_static_arrays(size: Int) {
-    static_key_array.ensure_at_least(size)
-    static_value_array.ensure_at_least(size)
-  }
-
   type TDist = DiscountedUnigramWordDist
-  protected var cached_worddist: TDist = null
-  protected var cached_size: Int = 0
 
-  def setup_static_arrays(self: TDist) {
-    if (self eq cached_worddist) {
-      assert(self.counts.size == cached_size)
-      return
-    }
-    // Retrieve keys and values of P (self) into static arrays.
-    val pcounts = self.counts
-    cached_worddist = self
-    cached_size = pcounts.size
-    size_static_arrays(cached_size)
-    val keys = static_key_array.array
-    val values = static_value_array.array
-    pcounts.keys.copyToArray(keys)
-    pcounts.values.copyToArray(values)
-  }
+  def get_kl_divergence_cache(self: TDist) =
+    new DiscountedUnigramKLDivergenceCache(self)
 
-  /**
+  /*
    A fast implementation of KL-divergence that uses inline lookups as much
-   as possible.
+   as possible.  Uses cached values if possible to avoid garbage from
+   copying arrays.
+
+   In normal operation of grid location, we repeatedly do KL divergence
+   with the same `self` distribution and different `other` distributions,
+   and we have to iterate over all key/value pairs in `self`, so caching
+   the `self` keys and values into arrays is useful.  `cache` can be
+   null (no cache available) or a cache created using
+   `get_kl_divergence_cache`, which must have been called on `self`,
+   and NO CHANGES to `self` made between cache creation time and use time.
    */
-  def fast_kl_divergence(self: TDist, other: TDist, interpolate: Boolean,
-      partial: Boolean = false): Double = {
+  def fast_kl_divergence(self: TDist,
+      cache: DiscountedUnigramKLDivergenceCache,
+      other: TDist, interpolate: Boolean, partial: Boolean = false): Double = {
+
+    val the_cache =
+      if (cache == null)
+        get_kl_divergence_cache(self)
+      else
+        cache
+    assert(the_cache.worddist == self)
+    assert(the_cache.self_size == self.counts.size)
+    val pkeys = the_cache.self_keys
+    val pvalues = the_cache.self_values
     val pfact = (1.0 - self.unseen_mass)/self.num_word_tokens
     val qfact = (1.0 - other.unseen_mass)/other.num_word_tokens
     val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
@@ -114,16 +101,6 @@ object FastDiscountedUnigramWordDist {
 
     // 1.
 
-    /* See comments above -- normal operation of fast_kl_divergence()
-       means that we can usually reuse the same arrays we retrieved
-       previously.  Since DynamicArray[T] is specialized on T, the
-       arrays in 'pkeys' and 'pvalues' will be direct Java arrays of
-       ints, and the array accesses below compile down to direct
-       array-access bytecodes. */
-
-    setup_static_arrays(self)
-    val pkeys = static_key_array.array
-    val pvalues = static_value_array.array
     val psize = self.counts.size
 
     // FIXME!! p * log(p) is the same for all calls of fast_kl_divergence
@@ -133,7 +110,7 @@ object FastDiscountedUnigramWordDist {
     /* THIS IS THE INSIDE LOOP.  THIS IS THE CODE BOTTLENECK.  THIS IS IT.
        
        This code needs to scream.  Hence we do extra setup above involving
-       static arrays, to avoid having a function call through a function
+       arrays, to avoid having a function call through a function
        pointer (through the "obvious" use of forEach()). FIXME: But see
        comment above.
       
