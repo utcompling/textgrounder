@@ -2,9 +2,8 @@
 
 # CHANGE THESE AS PER YOUR SETTINGS
 export TEXTGROUNDER_DIR="$HOME/devel/textgrounder"
-export HADOOP_DIR="~/patched-hadoop-0.20.2-new"
-export SCRATCH="/scratch/01683/benwing"
-export EXPDIR="$SCRATCH/exps/longruns"
+#export HADOOP_DIR="~/patched-hadoop-0.20.2-new"
+export EXPDIR="/scratch/01683/benwing/exps/longruns"
 
 # notify me when done
 export PROWL_KEY="FILL IN HERE"
