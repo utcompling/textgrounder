@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Extract results from a number of runs.
 
@@ -7,19 +7,61 @@
 # a line giving the errors along with relevant parameters for that particular
 # run.
 
+sort=no
+avgsort=no
+meansort=no
+mediansort=no
+verbose=no
+while true; do
+  case "$1" in
+    --sort | --sort-average | --sort-avg ) sort=yes ; avgsort=yes; shift ;;
+    --sort-mean ) sort=yes ; meansort=yes; shift ;;
+    --sort-median ) sort=yes ; mediansort=yes; shift ;;
+    --verbose ) verbose=yes ; shift ;;
+    * ) break ;;
+  esac
+done
+
+if [ "$verbose" != yes ]; then
+  echo "Mean	Median	Average File"
+fi
+
+function output() {
 for x in ${1+"$@"}; do
-  echo $x
-  echo ""
-  args="`grep '^Arguments:' $x`"
+  #echo $x
+  #echo ""
+  args="`grep -m 1 '^Arguments:' $x`"
   args="`echo $args | sed -e 's/^Arguments: //' -e 's/--input-corpus [^ ]*\///'`"
   args="`echo $args | sed -e 's/  *--*\([^ ]*\)  *\([^-][^ ]*\)/ \1=\2/g' -e 's/  *--*\([^ ]*\)/ \1/g' -e 's/ /./g' -e 's/\//-/g'`"
-  sed -n '/^Final results/,/^Ending final results/p' $x | egrep '(^Final results|true error)' | perl -ne "print '$args', '  ', \$_"
-  mean="`sed -n '/^Final results/,/^Ending final results/p' $x | egrep 'Mean true error' | perl -pe 's/.*distance = (.*?) .*/$1/'`"
-  median="`sed -n '/^Final results/,/^Ending final results/p' $x | egrep 'Median true error' | perl -pe 's/.*distance = (.*?) .*/$1/'`"
+  results="`sed -n '/^Final results/,/^Ending final results/p' $x`"
+  mean=$(echo "$results" | egrep 'Mean true error' | perl -pe 's/.*distance = (.*?) .*/$1/')
+  median=$(echo "$results" | egrep 'Median true error' | perl -pe 's/.*distance = (.*?) .*/$1/')
   #echo "Mean: $mean"
   #echo "Median: $median"
+  avg=
   if [ -n "$mean" -a -n "$median" ]; then
-    avg=`echo "5k $mean $median + 2/p" | dc`
-    echo "$args   Avg-mean-median true error distance = $avg km"
+    avg=`echo "2k $mean $median + 2/p" | dc`
+  fi
+  if [ "$verbose" = yes ]; then
+    echo "$results" | grep 'true error' | perl -ne "print '$args', '  ', \$_"
+    if [ -n "$avg" ]; then
+      echo "$args   Avg-mean-median true error distance = $avg km"
+    fi
+  else
+    if [ -n "$mean" -o -n "$median" -o -n "$avg" ]; then
+      echo "$mean	$median	$avg	$args"
+    fi
   fi
 done
+}
+
+if [ "$avgsort" = yes ]; then
+  output ${1+"$@"} | sort -n -k 3
+elif [ "$meansort" = yes ]; then
+  output ${1+"$@"} | sort -n -k 1
+elif [ "$mediansort" = yes ]; then
+  output ${1+"$@"} | sort -n -k 2
+else
+  output ${1+"$@"}
+fi
+
