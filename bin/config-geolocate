@@ -152,12 +152,14 @@ fi
 set_wp_version() {
   WP_VERSION="$1"
   DUMP_PREFIX="$1"
+  WP_VERSION_DIR="$TG_CORPUS_DIR/wikipedia/$WP_VERSION"
+
+  permuted_file="$WP_VERSION_DIR/$WP_VERSION-permuted-pages-articles.xml.bz2"
   if [ -z "$USE_PERMUTED" ]; then
-    if [ -e "$TG_CORPUS_DIR/wikipedia/$WP_VERSION/$WP_VERSION-permuted-pages-articles.xml.bz2" ]; then
+    if [ -e "$permuted_file" ]; then
       DUMP_PREFIX="$1-permuted"
     fi
   elif [ "$USE_PERMUTED" = "yes" ]; then
-    permuted_file="$TG_CORPUS_DIR/wikipedia/$WP_VERSION/$WP_VERSION-permuted-pages-articles.xml.bz2"
     if [ -e "$permuted_file" ]; then
       :
     else
@@ -165,8 +167,6 @@ set_wp_version() {
     fi
     DUMP_PREFIX="$1-permuted"
   fi
-
-  WP_VERSION_DIR="$TG_CORPUS_DIR/wikipedia/$WP_VERSION"
 
   set_wp_version_specific_vars
 }
@@ -196,15 +196,7 @@ set_wp_version_specific_vars() {
   # The full pathnames of the various files we read from during experiment-
   # running, including full path info.
   IN_GAZETTEER_FILE="$TG_AUX_DIR/$OUT_GAZETTEER_FILE"
-  IN_ORIG_DOCUMENT_DATA_FILE="$WP_VERSION_DIR/$OUT_ORIG_DOCUMENT_DATA_FILE"
-  IN_COMBINED_DOCUMENT_DATA_FILE="$WP_VERSION_DIR/$OUT_COMBINED_DOCUMENT_DATA_FILE"
-  IN_COORDS_FILE="$WP_VERSION_DIR/$OUT_COORDS_FILE"
-  IN_COORD_COUNTS_FILE="$WP_VERSION_DIR/$OUT_COORD_COUNTS_FILE"
-  IN_COORD_LINKS_FILE="$WP_VERSION_DIR/$OUT_COORD_LINKS_FILE"
-  IN_TOPONYM_EVAL_FILE="$WP_VERSION_DIR/$OUT_TOPONYM_EVAL_FILE"
-  IN_DISAMBIG_ID_FILE="$WP_VERSION_DIR/$OUT_DISAMBIG_ID_FILE"
-  IN_TITLE2ID_FILE="$WP_VERSION_DIR/$OUT_TITLE2ID_FILE"
-  IN_DUMP_FILE="$WP_VERSION_DIR/$OUT_DUMP_FILE"
+  #IN_DISAMBIG_ID_FILE="$WP_VERSION_DIR/$OUT_DISAMBIG_ID_FILE"
 }
 
 set_wp_version $WP_VERSION
