@@ -1,8 +1,12 @@
 #!/bin/sh
 
-# USAGE: download-preprocess-wiki WIKITAG
+# USAGE: download-preprocess-wiki [--no-download] [--no-permute] WIKITAG
 #
-# where WIKITAG is something like 'dewiki-20120225'. (Which needs to exist.)
+# where WIKITAG is something like 'dewiki-20120225', which names an existing
+# version of Wikipedia on http://dumps.wikipedia.org.  This downloads the
+# given Wikipedia dump into a subdirectory of the current directory
+# named WIKITAG, and then preprocesses it into a corpus of the format
+# needed by TextGrounder.  See README.preproces.
 
 # Process options
 
@@ -16,6 +20,18 @@ while true; do
     * ) break ;;
   esac
 done
+
+if [ -z "$*" ]; then
+  cat <<FOO
+Usage: $0 [--no-download] [--no-permute] WIKITAG
+
+Download a Wikipedia dump from http://dumps.wikipedia.org and preprocess it
+into a TextGrounder corpus.  WIKITAG is something like 'dewiki-20120225'.
+See README.preprocess and the comments in the source file for more details.
+
+FOO
+  exit 1
+fi
 
 wikitag="$1"
 mkdir -p $wikitag
@@ -34,5 +50,5 @@ convert-corpus-to-latest $wikitag
 echo "Converting $wikitag to latest format ... done."
 echo "Settings permissions on $wikitag ..."
 # Make tree world-readable
-chmod -R u+w,a+rX .
+chmod -R u+w,a+rX $wikitag
 echo "Settings permissions on $wikitag ... done."

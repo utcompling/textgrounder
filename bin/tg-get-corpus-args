@@ -75,9 +75,6 @@ process_wikipedia() {
 
 output_args() {
   case "$1" in
-    #wikipedia )
-    #  echo --document-file $IN_COMBINED_DOCUMENT_DATA_FILE \
-    #       --counts-file $IN_COORD_COUNTS_FILE ;;
     wikipedia )
       # Use the default version (usually enwiki-20100905)
       process_wikipedia $WP_VERSION ;;
