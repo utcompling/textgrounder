@@ -216,8 +216,8 @@ abstract class DiscountedUnigramWordDist(
     //if (use_sorted_list)
     //  counts = new SortedList(counts)
     if (debug("discount-factor") || debug("discountfactor"))
-      errprint("For distribution %s, num_word_tokens = %s, unseen_mass = %g"
-        format (this, num_word_tokens, unseen_mass))
+      errprint("For distribution %s, norm_factor = %g, num_word_tokens = %s, unseen_mass = %g"
+        format (this, normalization_factor, num_word_tokens, unseen_mass))
   }
 
   def fast_kl_divergence(cache: KLDivergenceCache, other: WordDist,
