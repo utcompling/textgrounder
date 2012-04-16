@@ -1,10 +1,13 @@
 #!/bin/sh
 
-# Run the steps to get a permuted dump file.  To generate everything, use
+# Run the steps to get a permuted dump file.  See documentation below.
 #
-#  run-permute all
+# Usual invocation is something like
 #
-# Else, do one of the steps:
+#   WP_VERSION=enwiki-20111007 run-permute all
+#
+# This will permute the dump file in the current directory; WP_VERSION
+# controls the name of the dump file.
 #
 ### (Almost) standard boilerplate to get config ###
 
@@ -33,7 +36,7 @@ A sample run, assuming you recently downloaded the 20111007 (October 7, 2011)
 English-language Wikipedia dump into the current directory and used
 'run-processwiki' to generate the article-data file:
 
-TG_WIKIPEDIA_DIR=. WP_VERSION=enwiki-20111007 run-permute all
+WP_VERSION=enwiki-20111007 run-permute all
 
 (See 'run-processwiki'.)
 
@@ -52,20 +55,15 @@ all = permute split sort combine
 In fact, running it using 'all' is the normal way to do things, as it
 does all steps to generate the permuted data file, in the right order.
 
-Input comes from the files in $TG_WIKIPEDIA_DIR
-(set by the environment variable TG_WIKIPEDIA_DIR or similar; see
-'config-geolocate' in $TEXTGROUNDER_DIR/bin),
-especially the dump file, which has a name like
-enwiki-20100905-pages-articles.xml.bz2.
+Input comes from the files in the current directory, especially
+$OUT_DUMP_FILE (which should have a name like
+enwiki-20100905-pages-articles.xml.bz2).
 
 Important environment variables (with default settings in 'config-geolocate'
 or in this script, but which you might want to override):
 
-TG_WIKIPEDIA_DIR  If you recently downloaded the dump file and generate the
-                  article data file, both of these will be in the current
-                  dir, not in the final resting place for corpora; so you
-                  want to set this to ".".
-WP_VERSION        Specifies which dump file to use, e.g. "enwiki-20100905".
+WP_VERSION        Version of Wikipedia being processed, e.g. "enwiki-20100905";
+                  specifies which dump file to use.
 NUM_SPLITS        Number of parts in which the permuted dump file is
                   constructed separately, before being put together.  Useful
                   because otherwise too much memory might be used.

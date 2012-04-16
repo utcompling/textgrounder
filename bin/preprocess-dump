@@ -1,5 +1,18 @@
 #!/bin/sh
 
+# USAGE: preprocess-dump [--no-permute] WIKITAG
+#
+# This script goes through a series of steps to preprocess a raw Wikipedia
+# dump (as downloaded from dumps.wikipedia.org) in a set of data files
+# describing a series of documents by their word counts and coordinates.
+# Formerly, this data served as the input to TextGrounder, but now an
+# additional step is needed to convert the data to the corpus format
+# currently used by TextGrounder.  A higher-level script
+# 'download-preprocess-wiki' can be used to directly download a dump,
+# preprocess it, and convert it into a TextGrounder corpus.
+#
+# See also README.preprocess.
+
 # Process options
 
 DONT_PERMUTE=no
@@ -13,9 +26,12 @@ done
 
 if [ -z "$*" ]; then
   cat <<FOO
-Usage: $0 DUMP-PREFIX
+Usage: $0 [--no-permute] WIKITAG
 
-Generate all text files from a raw dump.
+Generate a set of preprocessed data files from a raw Wikipedia dump, as
+downloaded from dumps.wikipedia.org.  WIKITAG is something like
+'dewiki-20120225'.  See README.preprocess and the comments in the source file
+for more details.
 
 FOO
   exit 1
@@ -54,6 +70,6 @@ rm -rf $dumppref-split*
 rm -rf foobar.*
 echo "Removing remaining split files ... done."
 
-# mv -i *.bz2 *.txt $TG_WIKIPEDIA_DIR
-# chmod a-w $TG_WIKIPEDIA_DIR/*
+# mv -i *.bz2 *.txt $TG_CORPUS_DIR/wikipedia/$WP_VERSION
+# chmod a-w $TG_CORPUS_DIR/wikipedia/$WP_VERSION/*
 
