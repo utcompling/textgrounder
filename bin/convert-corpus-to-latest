@@ -16,7 +16,6 @@ while true; do
 done
 
 wikitag="$1"
-cd $wikitag
 echo "Converting Wikipedia corpus $wikitag to latest format ..."
 mkdir convert
 cd convert
@@ -26,4 +25,3 @@ mv convert-corpora-3/$wikitag/* $wikitag
 cd ..
 rm -rf convert
 echo "Converting Wikipedia corpus $wikitag to latest format ... done."
-cd ..
