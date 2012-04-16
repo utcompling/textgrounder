@@ -73,10 +73,40 @@ if [ -e "$outfile" ]; then
   done
 fi
 
+# Make a file name absolute.
+function make_absolute() {
+  python -c "import os;print os.path.realpath('$1')"
+}
+
+# A version that doesn't use Python.  It doesn't properly canonicalize file names, but
+# does handle file names given as URL's (file:/foo/bar).
+#function make_absolute() {
+#  # Check for file:/foo/bar/...  or http://foo.com/...
+#  case "$1" in
+#    *:/* )
+#      if echo "$1" | grep '^[A-Za-z_][A-Za-z0-9_]*:/' > /dev/null 2>&1; then
+#        echo "$1"; return 0
+#      fi ;;
+#  esac
+#
+#  case "$1" in
+#    /* )
+#    echo "$1"; return 0 ;;
+#    * )
+#    pwd=`pwd`
+#    case "$pwd" in
+#      */ ) echo "$pwd$1"; return 1 ;;
+#      *  ) echo "$pwd/$1"; return 1 ;;
+#    esac
+#    ;;
+#  esac
+#}
+
 if [ "$quiet" != "yes" ]; then
+  absout=`make_absolute "$outfile"`
   (
   echo "Nohup wrapper running on `hostname` at time `date`"
-  echo "Output file: $outfile"
+  echo "Output file: $absout"
   echo "Nohup script invoked as: $0$shiftedcmds" ${1+"$@"}
   echo "Invoking: $runprog" ${1+"$@"}
   echo "(all above info also sent to output file)"
