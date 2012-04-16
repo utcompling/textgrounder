@@ -2,16 +2,13 @@
 
 # CHANGE THESE AS PER YOUR SETTINGS
 export TEXTGROUNDER_DIR="$HOME/devel/textgrounder"
-export HADOOP_DIR="~/patched-hadoop-0.20.2-new"
-export SCRATCH="/scratch/01683/benwing"
-export EXPDIR="$SCRATCH/exps/longruns"
+#export HADOOP_DIR="~/patched-hadoop-0.20.2-new"
+export EXPDIR="/scratch/01683/benwing/exps/longruns"
 
-# notify me when done
+# IF YOU HAVE SIGNED UP FOR PROWL (FOR NOTIFICATIONS TO YOUR CELL PHONE),
+# CHANGE THE FOLLOWING KEY TO YOUR KEY AND SET 'USE_PROWL' TO "yes".
 export PROWL_KEY="FILL IN HERE"
-USE_PROWL=false
-function prowl () {
-    curl -f 'https://api.prowlapp.com/publicapi/add' -d "apikey=$PROWL_KEY" --data-binary "description=$1" -d "application=`hostname`" > /dev/null 2>&1
-}
+USE_PROWL=no
 
 #-----------------------------------------------------------------------------
 #$ -V
@@ -27,6 +24,16 @@ function prowl () {
 #-----------------------------------------------------------------------------
 
 # everything after this should be good
+
+##################### Functions for running prowl and frobbing args
+
+function frobargs() {
+  echo " $1" | sed -e 's/  *--*\([^ ]*\)  *\([^-][^ ]*\)/ \1=\2/g' -e 's/  *--*\([^ ]*\)/ \1/g' -e 's/ /./g' -e 's/\//-/g'
+}
+
+function prowl () {
+    curl -f 'https://api.prowlapp.com/publicapi/add' -d "apikey=$PROWL_KEY" --data-binary "description=$1" -d "application=`hostname`>tg-geolocate" > /dev/null 2>&1
+}
 
 ##################### Process arguments
 
@@ -45,7 +52,7 @@ ARGS="$*"
 # Change "--foo-bar --bar-bat 5 --baz-bar quux/qu --bat --bat2" into
 #   ".foo-bar.bar-bat=5.baz-bar=quux-qu.bat.bat2"
 
-ARGID=`echo " $ARGS" | sed -e 's/  *--*\([^ ]*\)  *\([^-][^ ]*\)/ \1=\2/g' -e 's/  *--*\([^ ]*\)/ \1/g' -e 's/ /./g' -e 's/\//-/g'`
+ARGID=`frobargs "$ARGS"`
 export ID="$DATASET$ARGID"
 
 ##################### Set PATH and other vars
@@ -63,6 +70,6 @@ mkdir -p $LOGDIR
 cd $LOGDIR
 run-nohup -i $ID tg-geolocate $ORIGARGS
 
-if [ "$USE_PROWL" = "true" ]; then
-  prowl "Done with $OUTFILE (`date`)"
+if [ "$USE_PROWL" = "yes" ]; then
+  prowl "Done with $ID (`date`)"
 fi
