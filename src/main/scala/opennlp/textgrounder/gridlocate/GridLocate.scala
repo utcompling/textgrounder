@@ -622,7 +622,8 @@ class RandomGridLocateDocumentStrategy[
       ap.option[String]("word-dist", "wd",
         default = "pseudo-good-turing",
         choices = Seq("pseudo-good-turing", "pseudo-good-turing-bigram", "dirichlet", "jelinek-mercer"),
-        aliases = Map("jelinek-mercer" -> Seq("jelinek")),
+        aliases = Map("jelinek-mercer" -> Seq("jelinek"),
+                      "pseudo-good-turing" -> Seq("pgt")),
         help = """Type of word distribution to use.  Possibilities are
   'pseudo-good-turing' (a simplified version of Good-Turing over a unigram
   distribution), 'dirichlet' (Dirichlet smoothing over a unigram distribution),
