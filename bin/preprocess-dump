@@ -47,7 +47,7 @@ export NUM_SIMULTANEOUS=8
 # Generate permuted combined article-data file
 run-processwiki combined-article-data
 
-run-processwiki coord-counts all-counts coord-woords all-words
+run-processwiki coord-counts all-counts coord-words all-words
 
 echo "Removing remaining split files ..."
 rm -rf $dumppref-split*
