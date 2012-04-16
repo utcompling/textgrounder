@@ -1,5 +1,26 @@
 #!/bin/sh
 
+# To run this file, there are two possible modes.
+
+# 1. Single-run example:
+#
+# $ qsub-tg-geolocate --verbose geotext --word-dist jelinek --jelinek-factor 0.4
+#
+# Here we specify arguments as if we were running tg-geolocate.  This can
+# include arguments before the dataset, e.g. --verbose (as shown) or
+# '--memory 30g' or similar.
+#
+# 2. Multi-run example:
+#
+# $ qsub-tg-geolocate 0.1 0.2 0.3 -- --verbose geotext --word-dist jelinek --jelinek-factor {}
+#
+# In this case, we specify a set of arguments, followed by --, followed in
+# turn by the arguments by tg-geolocate, where {} is replaced by the
+# argument in question.  This will cause multiple invocations of tg-geolocate,
+# looping over the arguments given (in this case, three invocations, with
+# the Jelinek factors 0.1, 0.2 and 0.3).
+
+
 # CHANGE THESE AS PER YOUR SETTINGS
 export TEXTGROUNDER_DIR="$HOME/devel/textgrounder"
 #export HADOOP_DIR="~/patched-hadoop-0.20.2-new"
@@ -37,23 +58,35 @@ function prowl () {
 
 ##################### Process arguments
 
+has_multiarg=no
+for x in ${1+"$@"}; do
+  if [ "$x" = "--" ]; then
+    has_multiarg=yes
+    break
+  fi
+done
+
+multiarg=
+if [ "$has_multiarg" = yes ]; then
+  while [ "$1" != "--" ]; do
+    multiarg="$multiarg $1"
+    shift
+  done
+  shift
+fi
+
 export ORIGARGS="$*"
 . $TEXTGROUNDER_DIR/bin/tg-geolocate-process-opts
-DATASET="$1"
 
 if [ -z "$1" ]; then
   echo "No dataset specified."
   exit 1
 fi
 
+DATASET="$1"
 shift
+
 ARGS="$*"
-
-# Change "--foo-bar --bar-bat 5 --baz-bar quux/qu --bat --bat2" into
-#   ".foo-bar.bar-bat=5.baz-bar=quux-qu.bat.bat2"
-
-ARGID=`frobargs "$ARGS"`
-export ID="$DATASET$ARGID"
 
 ##################### Set PATH and other vars
 
@@ -68,7 +101,22 @@ export TG_ON_LONGHORN=yes
 mkdir -p $LOGDIR
 
 cd $LOGDIR
-run-nohup -i $ID tg-geolocate $ORIGARGS
+if [ -z "$multiarg" ]; then
+  # Change "--foo-bar --bar-bat 5 --baz-bar quux/qu --bat --bat2" into
+  #   ".foo-bar.bar-bat=5.baz-bar=quux-qu.bat.bat2"
+
+  ARGID=`frobargs "$ARGS"`
+  ID="$DATASET$ARGID"
+  run-nohup -i $ID tg-geolocate $ORIGARGS
+else
+  for x in $multiarg; do
+    EXECARGS=`echo $ORIGARGS | sed s/{}/$x/g`
+    IDARGS=`echo $ARGS | sed s/{}/$x/g`
+    ARGID=`frobargs "$IDARGS"`
+    ID="$DATASET$ARGID"
+    run-nohup -i $ID tg-geolocate $EXECARGS
+  done
+fi
 
 if [ "$USE_PROWL" = "yes" ]; then
   prowl "Done with $ID (`date`)"
