@@ -221,6 +221,35 @@ class BasicBinaryPerceptronTrainer(
   }
 }
 
+trait PassiveAggressivePerceptronTrainer {
+  val _variant: Int
+  val _aggressiveness_param: Double
+
+  assert(_variant >= 0 && _variant <= 2)
+  assert(_aggressiveness_param > 0)
+
+  def compute_update_factor(loss: Double, sqmag: Double) = {
+    if (_variant == 0)
+      loss / sqmag
+    else if (_variant == 1)
+      _aggressiveness_param min (loss / sqmag)
+    else
+      loss / (sqmag + 1.0/(2.0*_aggressiveness_param))
+  }
+
+  /** Return set of "yes" labels associated with an instance.  Currently only
+    * one yes label per instance, but this could be changed by redoing this
+    * function. */
+  def yes_labels(label: Int, num_classes: Int) =
+    (0 until 0) ++ (label to label)
+
+  /** Return set of "no" labels associated with an instance -- complement of
+    * the set of "yes" labels. */
+  def no_labels(label: Int, num_classes: Int) =
+    (0 until label) ++ (label until num_classes)
+
+}
+
 /** Train a binary perceptron using the basic algorithm.  See the above
   * description of the general perceptron training algorithm.  When processing
   * a training instance, the algorithm is "passive" in the sense that it makes
@@ -248,18 +277,13 @@ class PassiveAggressiveBinaryPerceptronTrainer(
   aggressiveness_param: Double = 20.0,
   error_threshold: Double = 1e-10,
   max_iterations: Int = 1000
-) extends BinaryPerceptronTrainer(error_threshold, max_iterations) {
-  assert(variant >= 0 && variant <= 2)
-  assert(aggressiveness_param > 0)
+) extends BinaryPerceptronTrainer(error_threshold, max_iterations)
+    with PassiveAggressivePerceptronTrainer {
+  val _variant = variant; val _aggressiveness_param = aggressiveness_param
   def update_scale_factor(inst: FeatureVector, label: Int, score: Double) = {
-    val loss = 0.0 max (1 - label*score)
+    val loss = 0.0 max (1.0 - label*score)
     val sqmag = inst.squared_magnitude
-    if (variant == 0)
-      loss / sqmag
-    else if (variant == 1)
-      aggressiveness_param min (loss / sqmag)
-    else
-      loss / (sqmag + 1/(2*aggressiveness_param))
+    compute_update_factor(loss, sqmag)
   }
 }
 
@@ -274,6 +298,18 @@ object Maxutil {
     * itself, when the function is applied to the arguments. */
   def argandmax[T](args: Seq[T], fun: T => Double) = {
     (args zip args.map(fun)).maxBy(_._2)
+  }
+
+  /** Return the argument producing the minimum when the function is applied
+    * to it. */
+  def argmin[T](args: Seq[T], fun: T => Double) = {
+    (args zip args.map(fun)).minBy(_._2)._1
+  }
+
+  /** Return both the argument producing the minimum and the minimum value
+    * itself, when the function is applied to the arguments. */
+  def argandmin[T](args: Seq[T], fun: T => Double) = {
+    (args zip args.map(fun)).minBy(_._2)
   }
 }
 
@@ -291,7 +327,23 @@ class SingleWeightMultiClassPerceptron (
 
   /** Classify a given instance, returning the class. */
   def classify(instance: FeatureVector) =
-    Maxutil.argmax[Int](1 to num_classes, instance.dot_product(weights, _))
+    Maxutil.argmax[Int](0 until num_classes, instance.dot_product(weights, _))
+}
+
+/**
+ * A multi-class perceptron with a different set of weights for each class.
+ * Note that the feature vector is also passed the class in when a value is
+ * requested.
+ */
+class MultiClassPerceptron (
+  val weights: IndexedSeq[Array[Double]]
+) {
+  val num_classes = weights.length
+  assert (num_classes >= 2)
+
+  /** Classify a given instance, returning the class. */
+  def classify(instance: FeatureVector) =
+    Maxutil.argmax[Int](0 until num_classes, x=>instance.dot_product(weights(x), x))
 }
 
 /**
@@ -324,37 +376,15 @@ abstract class SingleWeightMultiClassPerceptronTrainer(
  * Class for training a passive-aggressive multi-class perceptron with only a
  * single set of weights for all classes.
  */
-abstract class PassiveAggressiveSingleWeightMultiClassPerceptronTrainer(
+class PassiveAggressiveSingleWeightMultiClassPerceptronTrainer(
   variant: Int,
   aggressiveness_param: Double = 20.0,
   error_threshold: Double = 1e-10,
   max_iterations: Int = 1000
 ) extends SingleWeightMultiClassPerceptronTrainer(
-    error_threshold, max_iterations) {
-  assert(variant >= 0 && variant <= 2)
-  assert(aggressiveness_param > 0)
-
-  def update_scale_factor(inst: FeatureVector, label: Int, score: Double) = {
-    val loss = 0.0 max (1 - label*score)
-    val sqmag = inst.squared_magnitude
-    if (variant == 0)
-      loss / sqmag
-    else if (variant == 1)
-      aggressiveness_param min (loss / sqmag)
-    else
-      loss / (sqmag + 1/(2*aggressiveness_param))
-  }
-
-  /** Return set of "yes" labels associated with an instance.  Currently only
-    * one yes label per instance, but this could be changed by redoing this
-    * function. */
-  def yes_labels(label: Int, num_classes: Int) =
-    (0 until 0) ++ (label to label)
-
-  /** Return set of "no" labels associated with an instance -- complement of
-    * the set of "yes" labels. */
-  def no_labels(label: Int, num_classes: Int) =
-    (0 until label) ++ (label until num_classes)
+  error_threshold, max_iterations
+) with PassiveAggressivePerceptronTrainer {
+  val _variant = variant; val _aggressiveness_param = aggressiveness_param
 
   /**
    * Actually train a passive-aggressive single-weight multi-class
@@ -372,36 +402,26 @@ abstract class PassiveAggressiveSingleWeightMultiClassPerceptronTrainer(
     while (iter < max_iterations) {
       var total_error = 0.0
       for ((inst, label) <- zipped) {
-//        val r = label
-//        val (
-//
-//        val margin = inst.dot_product(weights)
-//        val scale = update_scale_factor(inst, label, score)
-//        for (i <- 0 until len)
-//          weights(i) += scale*inst(i)
-//        total_error += math.abs(scale)
+        val yeslabs = yes_labels(label, num_classes)
+        val nolabs = no_labels(label, num_classes)
+        val (r,rscore) =
+          Maxutil.argandmin[Int](yeslabs, inst.dot_product(weights, _))
+        val (s,sscore) =
+          Maxutil.argandmax[Int](nolabs, inst.dot_product(weights, _))
+        val margin = rscore - sscore
+        val loss = 0.0 max (1.0 - margin)
+        val sqmagdiff = ((0 until len).map(i => {
+          val diff = inst(i, r) - inst(i, s); diff*diff })).sum
+        val scale = compute_update_factor(loss, sqmagdiff)
+        (0 until len).foreach(i => {
+           weights(i) += scale*(inst(i, r) - inst(i, s)) })
+        total_error += math.abs(scale)
       }
       if (total_error < error_threshold)
         break
     }
     new SingleWeightMultiClassPerceptron(weights, num_classes)
   }
-}
-
-/**
- * A multi-class perceptron with a different set of weights for each class.
- * Note that the feature vector is also passed the class in when a value is
- * requested.
- */
-class MultiClassPerceptron (
-  val weights: IndexedSeq[Array[Double]]
-) {
-  val num_classes = weights.length
-  assert (num_classes >= 2)
-
-  /** Classify a given instance, returning the class. */
-  def classify(instance: FeatureVector) =
-    Maxutil.argmax[Int](1 to num_classes, x=>instance.dot_product(weights(x), x))
 }
 
 /**
@@ -425,10 +445,64 @@ abstract class MultiClassPerceptronTrainer(
       assert(label >= 0 && label < num_classes)
     val len = instances(0).length
     IndexedSeq[Array[Double]](
-      (for (i <- 1 to num_classes) yield new_weights(len)) :_*)
+      (for (i <- 0 until num_classes) yield new_weights(len)) :_*)
   }
 
   def apply(instances: Seq[FeatureVector], labels: Seq[Int],
     num_classes: Int): MultiClassPerceptron
 }
 
+/**
+ * Class for training a passive-aggressive multi-class perceptron with only a
+ * single set of weights for all classes.
+ */
+class PassiveAggressiveMultiClassPerceptronTrainer(
+  variant: Int,
+  aggressiveness_param: Double = 20.0,
+  error_threshold: Double = 1e-10,
+  max_iterations: Int = 1000
+) extends MultiClassPerceptronTrainer(
+  error_threshold, max_iterations
+) with PassiveAggressivePerceptronTrainer {
+  val _variant = variant; val _aggressiveness_param = aggressiveness_param
+
+  /**
+   * Actually train a passive-aggressive multi-weight multi-class
+   * perceptron.  Note that, although we're passed in a single correct label
+   * per instance, the code below is written so that it can handle a set of
+   * correct labels; you'd just have to change `yes_labels` and `no_labels`
+   * and pass the appropriate set of correct labels in.
+   */
+  def apply(instances: Seq[FeatureVector], labels: Seq[Int],
+    num_classes: Int) = {
+    val weights = initialize(instances, labels, num_classes)
+    val len = weights(0).length
+    var iter = 0
+    val zipped = (instances zip labels)
+    while (iter < max_iterations) {
+      var total_error = 0.0
+      for ((inst, label) <- zipped) {
+        val yeslabs = yes_labels(label, num_classes)
+        val nolabs = no_labels(label, num_classes)
+        val (r,rscore) =
+          Maxutil.argandmin[Int](yeslabs, x => inst.dot_product(weights(x), x))
+        val (s,sscore) =
+          Maxutil.argandmax[Int](nolabs, x => inst.dot_product(weights(x), x))
+        val margin = rscore - sscore
+        val loss = 0.0 max (1.0 - margin)
+        val rmag = ((0 until len).map(i => { val x = inst(i, r); x*x })).sum
+        val smag = ((0 until len).map(i => { val x = inst(i, s); x*x })).sum
+        val sqmagdiff = rmag + smag
+        val scale = compute_update_factor(loss, sqmagdiff)
+        val rweights = weights(r)
+        (0 until len).foreach(i => { rweights(i) += scale*inst(i, r) })
+        val sweights = weights(s)
+        (0 until len).foreach(i => { sweights(i) -= scale*inst(i, s) })
+        total_error += math.abs(scale)
+      }
+      if (total_error < error_threshold)
+        break
+    }
+    new MultiClassPerceptron(weights)
+  }
+}
