@@ -104,6 +104,10 @@ class BasicVector(
   }
 }
 
+/**
+ * A binary perceptron, created from an array of weights.  Normally
+ * created automatically by one of the trainer classes.
+ */
 class BinaryPerceptron (
   val weights: Array[Double]
 ) {
@@ -112,6 +116,7 @@ class BinaryPerceptron (
     val sc = score(instance)
     if (sc > 0) 1 else -1
   }
+
   /** Score a given instance.  If the score is &gt; 0, 1 is predicted,
     * else -1. */
   def score(instance: FeatureVector) = instance.dot_product(weights)
@@ -119,8 +124,8 @@ class BinaryPerceptron (
 
 /**
  * Class for training a perceptron given a set of training instances and
- * associated labels.  The basic perceptron algorithm, in all its variants,
- * works as follows:
+ * associated labels.  The basic perceptron training algorithm, in all its
+ * variants, works as follows:
  *
  * 1. We do multiple iterations, and in each iteration we loop through the
  *    training instances.
@@ -145,23 +150,30 @@ class BinaryPerceptron (
  *    iterations.
  */
 abstract class PerceptronTrainer {
-  /** Create and initialize a vector of weights of length `len`. */
+  /** Create and initialize a vector of weights of length `len`.
+    * By default, initialized to all 0's, but could be changed. */
   def new_weights(len: Int) = new Array[Double](len)
 
-  /** Check that the number of instances matches the number of labels, and
-    * that all instances have the same length. */
-  def check_sequence_lengths(instances: Seq[FeatureVector], labels: Seq[Int]) {
-    assert(instances.length > 0)
-    assert(instances.length == labels.length)
-    val len = instances(0).length
-    for (inst <- instances)
+  /** Check that all instances have the same length. */
+  def check_sequence_lengths(data: Iterable[(FeatureVector, Int)]) {
+    val len = data.head._1.length
+    for ((inst, label) <- data)
       assert(inst.length == len)
   }
 }
 
 /**
  * Class for training a binary perceptron given a set of training instances
- * and associated labels.
+ * and associated labels.  Use function application to train a new
+ * perceptron, e.g. `new BinaryPerceptronTrainer()(data)`.
+ *
+ * @param error_threshold Threshold that the sum of all scale factors for
+ *    all instances must be below in order for training to stop.  In
+ *    practice, in order to succeed with a threshold such as 1e-10, the
+ *    actual sum of scale factors must be 0.
+ * @param max_iterations Maximum number of iterations.  Training stops either
+ *    when the threshold constraint succeeds of the maximum number of
+ *    iterations is reached.
  */
 abstract class BinaryPerceptronTrainer(
   error_threshold: Double = 1e-10,
@@ -172,29 +184,33 @@ abstract class BinaryPerceptronTrainer(
 
   /** Check that the arguments passed in are kosher, and return an array of
     * the weights to be learned. */
-  def initialize(instances: Seq[FeatureVector], labels: Seq[Int]) = {
-    check_sequence_lengths(instances, labels)
-    for (label <- labels)
+  def initialize(data: Iterable[(FeatureVector, Int)]) = {
+    check_sequence_lengths(data)
+    for ((inst, label) <- data)
       assert(label == 1 || label == -1)
-    new_weights(instances(0).length)
+    new_weights(data.head._1.length)
   }
 
   /** Return the scale factor used for updating the weight vector to a
-    * new weight vector. */
-  def update_scale_factor(inst: FeatureVector, label: Int, score: Double):
+    * new weight vector.
+    *
+    * @param inst Instance we are currently processing.
+    * @param label True label of that instance.
+    * @param score Predicted score on that instance.
+    */
+  def get_scale_factor(inst: FeatureVector, label: Int, score: Double):
     Double
 
   /** Train a binary perceptron given a set of labeled instances. */
-  def apply(instances: Seq[FeatureVector], labels: Seq[Int]) = {
-    val weights = initialize(instances, labels)
+  def apply(data: Iterable[(FeatureVector, Int)]) = {
+    val weights = initialize(data)
     val len = weights.length
     var iter = 0
-    val zipped = (instances zip labels)
     while (iter < max_iterations) {
       var total_error = 0.0
-      for ((inst, label) <- zipped) {
+      for ((inst, label) <- data) {
         val score = inst.dot_product(weights)
-        val scale = update_scale_factor(inst, label, score)
+        val scale = get_scale_factor(inst, label, score)
         for (i <- 0 until len)
           weights(i) += scale*inst(i)
         total_error += math.abs(scale)
@@ -218,7 +234,7 @@ class BasicBinaryPerceptronTrainer(
   error_threshold: Double = 1e-10,
   max_iterations: Int = 1000
 ) extends BinaryPerceptronTrainer(error_threshold, max_iterations) {
-  def update_scale_factor(inst: FeatureVector, label: Int, score: Double) = {
+  def get_scale_factor(inst: FeatureVector, label: Int, score: Double) = {
     val pred = if (score > 0) 1 else -1
     alpha*(label - pred)
   }
@@ -268,12 +284,14 @@ trait PassiveAggressivePerceptronTrainer {
   * as possible that was learned previously (the minimal constraint
   * satisfaction).
   *
-  * Variant 0 directly implements the algorithm just described.  The other
-  * variants are designed for training sets that may not be linearly
-  * separable, and as a result are less aggressive.  Variant 1 simply limits
-  * the total change to be no more than a given factor, while variant 2 scales
-  * the total change down relatively.  In both cases, an "aggressiveness
-  * factor" needs to be given.
+  * @param variant Variant 0 directly implements the algorithm just
+  *  described.  The other variants are designed for training sets that may
+  *  not be linearly separable, and as a result are less aggressive.
+  *  Variant 1 simply limits the total change to be no more than a given
+  *  factor, while variant 2 scales the total change down relatively.  In
+  *  both cases, an "aggressiveness factor" needs to be given.
+  * @param aggressiveness_param As just described above.  Higher values
+  *  cause more aggressive changes to the weight vector during training.
   */
 class PassiveAggressiveBinaryPerceptronTrainer(
   variant: Int,
@@ -283,7 +301,7 @@ class PassiveAggressiveBinaryPerceptronTrainer(
 ) extends BinaryPerceptronTrainer(error_threshold, max_iterations)
     with PassiveAggressivePerceptronTrainer {
   val _variant = variant; val _aggressiveness_param = aggressiveness_param
-  def update_scale_factor(inst: FeatureVector, label: Int, score: Double) = {
+  def get_scale_factor(inst: FeatureVector, label: Int, score: Double) = {
     val loss = 0.0 max (1.0 - label*score)
     val sqmag = inst.squared_magnitude
     compute_update_factor(loss, sqmag)
@@ -293,25 +311,25 @@ class PassiveAggressiveBinaryPerceptronTrainer(
 object Maxutil {
   /** Return the argument producing the maximum when the function is applied
     * to it. */
-  def argmax[T](args: Seq[T], fun: T => Double) = {
+  def argmax[T](args: Iterable[T], fun: T => Double) = {
     (args zip args.map(fun)).maxBy(_._2)._1
   }
 
   /** Return both the argument producing the maximum and the maximum value
     * itself, when the function is applied to the arguments. */
-  def argandmax[T](args: Seq[T], fun: T => Double) = {
+  def argandmax[T](args: Iterable[T], fun: T => Double) = {
     (args zip args.map(fun)).maxBy(_._2)
   }
 
   /** Return the argument producing the minimum when the function is applied
     * to it. */
-  def argmin[T](args: Seq[T], fun: T => Double) = {
+  def argmin[T](args: Iterable[T], fun: T => Double) = {
     (args zip args.map(fun)).minBy(_._2)._1
   }
 
   /** Return both the argument producing the minimum and the minimum value
     * itself, when the function is applied to the arguments. */
-  def argandmin[T](args: Seq[T], fun: T => Double) = {
+  def argandmin[T](args: Iterable[T], fun: T => Double) = {
     (args zip args.map(fun)).minBy(_._2)
   }
 }
@@ -378,17 +396,15 @@ abstract class SingleWeightMultiClassPerceptronTrainer(
 
   /** Check that the arguments passed in are kosher, and return an array of
     * the weights to be learned. */
-  def initialize(instances: Seq[FeatureVector], labels: Seq[Int],
-      num_classes: Int) = {
+  def initialize(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
     assert(num_classes >= 2)
-    check_sequence_lengths(instances, labels)
-    for (label <- labels)
+    for ((inst, label) <- data)
       assert(label >= 0 && label < num_classes)
-    new_weights(instances(0).length)
+    new_weights(data.head._1.length)
   }
 
-  def apply(instances: Seq[FeatureVector], labels: Seq[Int],
-    num_classes: Int): SingleWeightMultiClassPerceptron
+  def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int):
+    SingleWeightMultiClassPerceptron
 }
 
 /**
@@ -412,15 +428,13 @@ class PassiveAggressiveSingleWeightMultiClassPerceptronTrainer(
    * correct labels; you'd just have to change `yes_labels` and `no_labels`
    * and pass the appropriate set of correct labels in.
    */
-  def apply(instances: Seq[FeatureVector], labels: Seq[Int],
-      num_classes: Int) = {
-    val weights = initialize(instances, labels, num_classes)
+  def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
+    val weights = initialize(data, num_classes)
     val len = weights.length
     var iter = 0
-    val zipped = (instances zip labels)
     while (iter < max_iterations) {
       var total_error = 0.0
-      for ((inst, label) <- zipped) {
+      for ((inst, label) <- data) {
         def dotprod(x: Int) = inst.dot_product(weights, x)
         val yeslabs = yes_labels(label, num_classes)
         val nolabs = no_labels(label, num_classes)
@@ -455,19 +469,17 @@ abstract class MultiClassPerceptronTrainer(
 
   /** Check that the arguments passed in are kosher, and return an array of
     * the weights to be learned. */
-  def initialize(instances: Seq[FeatureVector], labels: Seq[Int],
-      num_classes: Int) = {
+  def initialize(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
     assert(num_classes >= 2)
-    check_sequence_lengths(instances, labels)
-    for (label <- labels)
+    for ((inst, label) <- data)
       assert(label >= 0 && label < num_classes)
-    val len = instances(0).length
+    val len = data.head._1.length
     IndexedSeq[Array[Double]](
       (for (i <- 0 until num_classes) yield new_weights(len)) :_*)
   }
 
-  def apply(instances: Seq[FeatureVector], labels: Seq[Int],
-    num_classes: Int): MultiClassPerceptron
+  def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int):
+    MultiClassPerceptron
 }
 
 /**
@@ -491,15 +503,13 @@ class PassiveAggressiveMultiClassPerceptronTrainer(
    * correct labels; you'd just have to change `yes_labels` and `no_labels`
    * and pass the appropriate set of correct labels in.
    */
-  def apply(instances: Seq[FeatureVector], labels: Seq[Int],
-    num_classes: Int) = {
-    val weights = initialize(instances, labels, num_classes)
+  def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
+    val weights = initialize(data, num_classes)
     val len = weights(0).length
     var iter = 0
-    val zipped = (instances zip labels)
     while (iter < max_iterations) {
       var total_error = 0.0
-      for ((inst, label) <- zipped) {
+      for ((inst, label) <- data) {
         def dotprod(x: Int) = inst.dot_product(weights(x), x)
         val yeslabs = yes_labels(label, num_classes)
         val nolabs = no_labels(label, num_classes)
@@ -560,16 +570,14 @@ abstract class PassiveAggressiveCostSensitiveSingleWeightMultiClassPerceptronTra
    * correct labels; you'd just have to change `yes_labels` and `no_labels`
    * and pass the appropriate set of correct labels in.
    */
-  def apply(instances: Seq[FeatureVector], labels: Seq[Int],
-      num_classes: Int) = {
-    val weights = initialize(instances, labels, num_classes)
+  def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
+    val weights = initialize(data, num_classes)
     val len = weights.length
     var iter = 0
-    val zipped = (instances zip labels)
     val all_labs = 0 until num_classes
     while (iter < max_iterations) {
       var total_error = 0.0
-      for ((inst, label) <- zipped) {
+      for ((inst, label) <- data) {
         def dotprod(x: Int) = inst.dot_product(weights, x)
         val goldscore = dotprod(label)
         val predlab =
@@ -577,8 +585,7 @@ abstract class PassiveAggressiveCostSensitiveSingleWeightMultiClassPerceptronTra
             Maxutil.argmax[Int](all_labs, dotprod(_))
           else
             Maxutil.argmax[Int](all_labs,
-              x=>(dotprod(x) - goldscore +
-                  math.sqrt(cost(label, x))))
+              x=>(dotprod(x) - goldscore + math.sqrt(cost(label, x))))
         val loss = dotprod(predlab) - goldscore +
           math.sqrt(cost(label, predlab))
         val sqmagdiff = ((0 until len).map(i => {
@@ -631,16 +638,14 @@ abstract class PassiveAggressiveCostSensitiveMultiClassPerceptronTrainer(
    * correct labels; you'd just have to change `yes_labels` and `no_labels`
    * and pass the appropriate set of correct labels in.
    */
-  def apply(instances: Seq[FeatureVector], labels: Seq[Int],
-      num_classes: Int) = {
-    val weights = initialize(instances, labels, num_classes)
+  def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
+    val weights = initialize(data, num_classes)
     val len = weights(0).length
     var iter = 0
-    val zipped = (instances zip labels)
     val all_labs = 0 until num_classes
     while (iter < max_iterations) {
       var total_error = 0.0
-      for ((inst, label) <- zipped) {
+      for ((inst, label) <- data) {
         def dotprod(x: Int) = inst.dot_product(weights(x), x)
         val goldscore = dotprod(label)
         val predlab =
@@ -648,8 +653,7 @@ abstract class PassiveAggressiveCostSensitiveMultiClassPerceptronTrainer(
             Maxutil.argmax[Int](all_labs, dotprod(_))
           else
             Maxutil.argmax[Int](all_labs,
-              x=>(dotprod(x) - goldscore +
-                  math.sqrt(cost(label, x))))
+              x=>(dotprod(x) - goldscore + math.sqrt(cost(label, x))))
         val loss = dotprod(predlab) - goldscore +
           math.sqrt(cost(label, predlab))
         val rmag =
