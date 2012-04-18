@@ -13,8 +13,6 @@ fi
 
 . $TEXTGROUNDER_DIR/bin/config-geolocate
 
-TG_PYTHON_DIR="$TEXTGROUNDER_DIR/python"
-
 mkdir -p $GEOTEXT_OUTPUT_DIR
 
 TWITTER_PROC="$TG_PYTHON_DIR/twitter_geotext_process.py"

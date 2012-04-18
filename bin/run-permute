@@ -20,8 +20,6 @@ fi
 USE_PERMUTED=no
 . $TEXTGROUNDER_DIR/bin/config-geolocate
 
-TG_PYTHON_DIR="$TEXTGROUNDER_DIR/python"
-
 ### End boilerplate to get config ###
 
 if [ -z "$*" ]; then
