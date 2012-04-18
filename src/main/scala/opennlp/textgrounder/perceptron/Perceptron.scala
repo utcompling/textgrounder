@@ -402,12 +402,11 @@ class PassiveAggressiveSingleWeightMultiClassPerceptronTrainer(
     while (iter < max_iterations) {
       var total_error = 0.0
       for ((inst, label) <- zipped) {
+        def dotprod(x: Int) = inst.dot_product(weights, x)
         val yeslabs = yes_labels(label, num_classes)
         val nolabs = no_labels(label, num_classes)
-        val (r,rscore) =
-          Maxutil.argandmin[Int](yeslabs, inst.dot_product(weights, _))
-        val (s,sscore) =
-          Maxutil.argandmax[Int](nolabs, inst.dot_product(weights, _))
+        val (r,rscore) = Maxutil.argandmin[Int](yeslabs, dotprod(_))
+        val (s,sscore) = Maxutil.argandmax[Int](nolabs, dotprod(_))
         val margin = rscore - sscore
         val loss = 0.0 max (1.0 - margin)
         val sqmagdiff = ((0 until len).map(i => {
@@ -482,12 +481,11 @@ class PassiveAggressiveMultiClassPerceptronTrainer(
     while (iter < max_iterations) {
       var total_error = 0.0
       for ((inst, label) <- zipped) {
+        def dotprod(x: Int) = inst.dot_product(weights(x), x)
         val yeslabs = yes_labels(label, num_classes)
         val nolabs = no_labels(label, num_classes)
-        val (r,rscore) =
-          Maxutil.argandmin[Int](yeslabs, x => inst.dot_product(weights(x), x))
-        val (s,sscore) =
-          Maxutil.argandmax[Int](nolabs, x => inst.dot_product(weights(x), x))
+        val (r,rscore) = Maxutil.argandmin[Int](yeslabs, dotprod(_))
+        val (s,sscore) = Maxutil.argandmax[Int](nolabs, dotprod(_))
         val margin = rscore - sscore
         val loss = 0.0 max (1.0 - margin)
         val rmag = ((0 until len).map(i => { val x = inst(i, r); x*x })).sum
@@ -498,6 +496,153 @@ class PassiveAggressiveMultiClassPerceptronTrainer(
         (0 until len).foreach(i => { rweights(i) += scale*inst(i, r) })
         val sweights = weights(s)
         (0 until len).foreach(i => { sweights(i) -= scale*inst(i, s) })
+        total_error += math.abs(scale)
+      }
+      if (total_error < error_threshold)
+        break
+    }
+    new MultiClassPerceptron(weights)
+  }
+}
+
+/**
+ * Class for training a cost-sensitive multi-class perceptron with only a
+ * single set of weights for all classes.
+ */
+abstract class CostSensitiveSingleWeightMultiClassPerceptronTrainer(
+  error_threshold: Double = 1e-10,
+  max_iterations: Int = 1000
+) extends SingleWeightMultiClassPerceptronTrainer {
+  assert(error_threshold >= 0)
+  assert(max_iterations > 0)
+
+  def cost(correct: Int, predicted: Int): Double
+}
+
+/**
+ * Class for training a passive-aggressive cost-sensitive multi-class
+ * perceptron with only a single set of weights for all classes.
+ */
+abstract class PassiveAggressiveCostSensitiveSingleWeightMultiClassPerceptronTrainer(
+  prediction_based: Boolean,
+  variant: Int,
+  aggressiveness_param: Double = 20.0,
+  error_threshold: Double = 1e-10,
+  max_iterations: Int = 1000
+) extends CostSensitiveSingleWeightMultiClassPerceptronTrainer(
+  error_threshold, max_iterations
+) with PassiveAggressivePerceptronTrainer {
+  val _variant = variant; val _aggressiveness_param = aggressiveness_param
+
+  /**
+   * Actually train a passive-aggressive single-weight multi-class
+   * perceptron.  Note that, although we're passed in a single correct label
+   * per instance, the code below is written so that it can handle a set of
+   * correct labels; you'd just have to change `yes_labels` and `no_labels`
+   * and pass the appropriate set of correct labels in.
+   */
+  def apply(instances: Seq[FeatureVector], labels: Seq[Int],
+      num_classes: Int) = {
+    val weights = initialize(instances, labels, num_classes)
+    val len = weights.length
+    var iter = 0
+    val zipped = (instances zip labels)
+    val all_labs = 0 until num_classes
+    while (iter < max_iterations) {
+      var total_error = 0.0
+      for ((inst, label) <- zipped) {
+        def dotprod(x: Int) = inst.dot_product(weights, x)
+        val goldscore = dotprod(label)
+        val predlab =
+          if (prediction_based)
+            Maxutil.argmax[Int](all_labs, dotprod(_))
+          else
+            Maxutil.argmax[Int](all_labs,
+              x=>(dotprod(x) - goldscore +
+                  math.sqrt(cost(label, x))))
+        val loss = dotprod(predlab) - goldscore +
+          math.sqrt(cost(label, predlab))
+        val sqmagdiff = ((0 until len).map(i => {
+          val diff = inst(i, label) - inst(i, predlab); diff*diff })).sum
+        val scale = compute_update_factor(loss, sqmagdiff)
+        (0 until len).foreach(i => {
+           weights(i) += scale*(inst(i, label) - inst(i, predlab)) })
+        total_error += math.abs(scale)
+      }
+      if (total_error < error_threshold)
+        break
+    }
+    new SingleWeightMultiClassPerceptron(weights, num_classes)
+  }
+}
+
+/**
+ * Class for training a cost-sensitive multi-class perceptron with a separate
+ * set of weights per class.
+ */
+abstract class CostSensitiveMultiClassPerceptronTrainer(
+  error_threshold: Double = 1e-10,
+  max_iterations: Int = 1000
+) extends MultiClassPerceptronTrainer {
+  assert(error_threshold >= 0)
+  assert(max_iterations > 0)
+
+  def cost(correct: Int, predicted: Int): Double
+}
+
+/**
+ * Class for training a passive-aggressive cost-sensitive multi-class
+ * perceptron with a separate set of weights per class.
+ */
+abstract class PassiveAggressiveCostSensitiveMultiClassPerceptronTrainer(
+  prediction_based: Boolean,
+  variant: Int,
+  aggressiveness_param: Double = 20.0,
+  error_threshold: Double = 1e-10,
+  max_iterations: Int = 1000
+) extends CostSensitiveMultiClassPerceptronTrainer(
+  error_threshold, max_iterations
+) with PassiveAggressivePerceptronTrainer {
+  val _variant = variant; val _aggressiveness_param = aggressiveness_param
+
+  /**
+   * Actually train a passive-aggressive single-weight multi-class
+   * perceptron.  Note that, although we're passed in a single correct label
+   * per instance, the code below is written so that it can handle a set of
+   * correct labels; you'd just have to change `yes_labels` and `no_labels`
+   * and pass the appropriate set of correct labels in.
+   */
+  def apply(instances: Seq[FeatureVector], labels: Seq[Int],
+      num_classes: Int) = {
+    val weights = initialize(instances, labels, num_classes)
+    val len = weights(0).length
+    var iter = 0
+    val zipped = (instances zip labels)
+    val all_labs = 0 until num_classes
+    while (iter < max_iterations) {
+      var total_error = 0.0
+      for ((inst, label) <- zipped) {
+        def dotprod(x: Int) = inst.dot_product(weights(x), x)
+        val goldscore = dotprod(label)
+        val predlab =
+          if (prediction_based)
+            Maxutil.argmax[Int](all_labs, dotprod(_))
+          else
+            Maxutil.argmax[Int](all_labs,
+              x=>(dotprod(x) - goldscore +
+                  math.sqrt(cost(label, x))))
+        val loss = dotprod(predlab) - goldscore +
+          math.sqrt(cost(label, predlab))
+        val rmag =
+          ((0 until len).map(i => { val x = inst(i, label); x*x })).sum
+        val smag =
+          ((0 until len).map(i => { val x = inst(i, predlab); x*x })).sum
+        val sqmagdiff = rmag + smag
+        val scale = compute_update_factor(loss, sqmagdiff)
+        val rweights = weights(label)
+        (0 until len).foreach(i => { rweights(i) += scale*inst(i, label) })
+        val sweights = weights(predlab)
+        (0 until len).foreach(i => { sweights(i) -= scale*inst(i, predlab) })
         total_error += math.abs(scale)
       }
       if (total_error < error_threshold)
