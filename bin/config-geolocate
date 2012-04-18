@@ -71,6 +71,8 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
   exit 1
 fi
 
+TG_PYTHON_DIR="$TEXTGROUNDER_DIR/src/main/python"
+
 TG_HADOOP_DIR=${TG_HADOOP_DIR:-textgrounder-data}
 
 if [ "$HADOOP" != yes ]; then
@@ -111,9 +113,9 @@ fi
 TG_CORPUS_URL=$TG_FILE_PREF$TG_CORPUS_DIR
 
 if [ -z "$TG_AUX_DIR" ]; then
-  echo "TG_AUX_DIR should be set to the location of aux data files"
-  echo "Proceeding, because may not need to use these files (only needed"
-  echo "when using --mode=geotag-toponyms)"
+  #echo "TG_AUX_DIR should be set to the location of aux data files"
+  #echo "Proceeding, because may not need to use these files (only needed"
+  #echo "when using --mode=geotag-toponyms)"
   TG_AUX_DIR="/nonexistent-location/download-textgrounder-aux-files-please"
 fi
 
