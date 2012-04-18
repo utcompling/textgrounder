@@ -1,6 +1,6 @@
-package opennlp.textgrounder.util
+package opennlp.textgrounder.tr.util
 
-import opennlp.textgrounder.topo._
+import opennlp.textgrounder.tr.topo._
 
 object LogUtil {
 
