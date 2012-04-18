@@ -261,19 +261,20 @@ else
   CLASS=
   HADOOP_ARGS=
   TGPACK=opennlp.textgrounder
+  TGTRAPP=$TGPACK.tr.app
   TGAPP=$TGPACK.app
   TGBAYESAPP=$TGPACK.bayesian.apps
   TGGEOLOCATE=$TGPACK.geolocate
 
   case $CMD in
     # Various commands
-    resolve) CLASS=$TGAPP.RunResolver;;
-    geotext-lp) CLASS=$TGAPP.GeoTextLabelProp;;
-    import-gazetteer) CLASS=$TGAPP.ImportGazetteer;;
-    import-corpus) CLASS=$TGAPP.ImportCorpus;;
-    preprocess-labelprop) CLASS=$TGAPP.LabelPropPreproc;;
-    write-to-kml) CLASS=$TGAPP.WriteCorpusToKML;;
-    eval) CLASS=$TGAPP.EvaluateCorpus;;
+    resolve) CLASS=$TGTRAPP.RunResolver;;
+    geotext-lp) CLASS=$TGTRAPP.GeoTextLabelProp;;
+    import-gazetteer) CLASS=$TGTRAPP.ImportGazetteer;;
+    import-corpus) CLASS=$TGTRAPP.ImportCorpus;;
+    preprocess-labelprop) CLASS=$TGTRAPP.LabelPropPreproc;;
+    write-to-kml) CLASS=$TGTRAPP.WriteCorpusToKML;;
+    eval) CLASS=$TGTRAPP.EvaluateCorpus;;
 
     # Commands in the Bayesian code (there are many more)
     rlda-convert-from) CLASS=$TGBAYESAPP.ConvertFromRegionModelFormat;;
