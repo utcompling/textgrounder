@@ -25,9 +25,9 @@ package opennlp.textgrounder.geolocate
 import java.io._
 import javax.xml.datatype._
 import javax.xml.stream._
-import opennlp.textgrounder.topo._
-import opennlp.textgrounder.util.KMLUtil
-import opennlp.textgrounder.util.LogUtil
+import opennlp.textgrounder.tr.topo._
+import opennlp.textgrounder.tr.util.KMLUtil
+import opennlp.textgrounder.tr.util.LogUtil
 import scala.collection.JavaConversions._
 import org.clapper.argot._
 

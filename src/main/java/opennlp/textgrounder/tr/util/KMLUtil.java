@@ -13,13 +13,13 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-package opennlp.textgrounder.util;
+package opennlp.textgrounder.tr.util;
 
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
 //import opennlp.textgrounder.old.topostructs.Coordinate;
-import opennlp.textgrounder.topo.*;
+import opennlp.textgrounder.tr.topo.*;
 import java.text.*;
 
 /**
