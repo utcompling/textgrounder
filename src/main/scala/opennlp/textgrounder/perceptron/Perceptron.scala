@@ -109,9 +109,12 @@ class BinaryPerceptron (
 ) {
   /** Classify a given instance, returning the class, either -1 or 1. */
   def classify(instance: FeatureVector) = {
-    val score = instance.dot_product(weights)
-    if (score > 0) 1 else -1
+    val sc = score(instance)
+    if (sc > 0) 1 else -1
   }
+  /** Score a given instance.  If the score is &gt; 0, 1 is predicted,
+    * else -1. */
+  def score(instance: FeatureVector) = instance.dot_product(weights)
 }
 
 /**
@@ -327,7 +330,15 @@ class SingleWeightMultiClassPerceptron (
 
   /** Classify a given instance, returning the class. */
   def classify(instance: FeatureVector) =
-    Maxutil.argmax[Int](0 until num_classes, instance.dot_product(weights, _))
+    Maxutil.argmax[Int](0 until num_classes, score_class(instance, _))
+
+  /** Score a given instance for a single class. */
+  def score_class(instance: FeatureVector, clazz: Int) =
+    instance.dot_product(weights, clazz)
+
+  /** Score a given instance, returning an array of scores, one per class. */
+  def score(instance: FeatureVector) =
+    (0 until num_classes).map(score_class(instance, _)).toArray
 }
 
 /**
@@ -343,7 +354,15 @@ class MultiClassPerceptron (
 
   /** Classify a given instance, returning the class. */
   def classify(instance: FeatureVector) =
-    Maxutil.argmax[Int](0 until num_classes, x=>instance.dot_product(weights(x), x))
+    Maxutil.argmax[Int](0 until num_classes, score_class(instance, _))
+
+  /** Score a given instance for a single class. */
+  def score_class(instance: FeatureVector, clazz: Int) =
+    instance.dot_product(weights(clazz), clazz)
+
+  /** Score a given instance, returning an array of scores, one per class. */
+  def score(instance: FeatureVector) =
+    (0 until num_classes).map(score_class(instance, _)).toArray
 }
 
 /**
