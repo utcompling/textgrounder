@@ -20,7 +20,7 @@ public class BaseApp {
     private String kmlOutputPath = null;
     private boolean outputGoldLocations = false;
     private boolean outputUserKML = false;
-    private boolean useGoldToponyms = false;
+    protected boolean useGoldToponyms = false;
     private String geoGazetteerFilename = null;
     private String serializedGazetteerPath = null;
     private String serializedCorpusInputPath = null;
