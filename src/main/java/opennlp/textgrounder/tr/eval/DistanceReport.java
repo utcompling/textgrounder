@@ -32,6 +32,14 @@ public class DistanceReport {
         return distances.size();
     }
 
+    public double getFractionDistancesWithinThreshold(double threshold) {
+        int count = 0;
+        for(double distance : distances)
+            if(distance <= threshold)
+                count++;
+        return ((double)count) / distances.size();
+    }
+
     public double getMinDistance() {
         if(distances.size() == 0) return -1;
         sort();
