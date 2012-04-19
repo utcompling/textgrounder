@@ -73,6 +73,7 @@ public class EvaluateCorpus extends BaseApp {
             System.out.println("Median error distance (km): " + dreport.getMedianDistance());
             System.out.println("Minimum error distance (km): " + dreport.getMinDistance());
             System.out.println("Maximum error distance (km): " + dreport.getMaxDistance());
+            System.out.println("Fraction of distances within 161 km: " + dreport.getFractionDistancesWithinThreshold(161.0));
             System.out.println("Total documents evaluated: " + dreport.getNumDistances());
         }
 
@@ -84,12 +85,13 @@ public class EvaluateCorpus extends BaseApp {
             System.out.println("\nP: " + report.getPrecision());
             System.out.println("R: " + report.getRecall());
             System.out.println("F: " + report.getFScore());
-            System.out.println("A: " + report.getAccuracy());
+            //System.out.println("A: " + report.getAccuracy());
 
             System.out.println("\nMean error distance (km): " + dreport.getMeanDistance());
             System.out.println("Median error distance (km): " + dreport.getMedianDistance());
             System.out.println("Minimum error distance (km): " + dreport.getMinDistance());
             System.out.println("Maximum error distance (km): " + dreport.getMaxDistance());
+            System.out.println("Fraction of distances within 161 km: " + dreport.getFractionDistancesWithinThreshold(161.0));
             System.out.println("Total toponyms evaluated: " + dreport.getNumDistances());
         }
     }
