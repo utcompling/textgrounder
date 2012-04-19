@@ -64,10 +64,14 @@ public class SignatureEvaluator extends Evaluator {
         return locs;
     }
 
+    private DistanceReport dreport = null;
+    public DistanceReport getDistanceReport() { return dreport; }
+
     @Override
     public Report evaluate(Corpus<Token> pred, boolean useSelected) {
         
         Report report = new Report();
+        dreport = new DistanceReport();
 
         Map<String, Location> goldLocs = populateSigsAndLocations(corpus, true);
         Map<String, Location> predLocs = populateSigsAndLocations(pred, false);
@@ -76,6 +80,9 @@ public class SignatureEvaluator extends Evaluator {
             if(predLocs.containsKey(context)) {
                 Location goldLoc = goldLocs.get(context);
                 Location predLoc = predLocs.get(context);
+
+                if(predLoc != null)
+                    dreport.addDistance(goldLoc.distanceInKm(predLoc));
 
                 if(isClosestMatch(goldLoc, predLoc, predCandidates.get(context))) {//goldLocs.get(context) == predLocs.get(context)) {
                     //System.out.println("TP: " + context + "|" + goldLocs.get(context));
