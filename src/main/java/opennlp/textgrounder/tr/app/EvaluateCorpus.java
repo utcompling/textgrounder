@@ -60,33 +60,37 @@ public class EvaluateCorpus extends BaseApp {
             System.out.println("done.");
         }
 
-        currentRun.doEval(systemCorpus, goldCorpus, currentRun.getCorpusFormat());
+        currentRun.doEval(systemCorpus, goldCorpus, currentRun.getCorpusFormat(), currentRun.getUseGoldToponyms());
     }
 
-    public void doEval(Corpus systemCorpus, Corpus goldCorpus, Enum<BaseApp.CORPUS_FORMAT> corpusFormat) throws Exception {
+    public void doEval(Corpus systemCorpus, Corpus goldCorpus, Enum<BaseApp.CORPUS_FORMAT> corpusFormat, boolean useGoldToponyms) throws Exception {
+        System.out.print("\nEvaluating...");
         if(corpusFormat == CORPUS_FORMAT.GEOTEXT) {
-            System.out.print("\nEvaluating...");
             DocDistanceEvaluator evaluator = new DocDistanceEvaluator(systemCorpus);
             DistanceReport dreport = evaluator.evaluate();
-            System.out.println("done.");
-            
+
             System.out.println("\nMean error distance (km): " + dreport.getMeanDistance());
             System.out.println("Median error distance (km): " + dreport.getMedianDistance());
             System.out.println("Minimum error distance (km): " + dreport.getMinDistance());
             System.out.println("Maximum error distance (km): " + dreport.getMaxDistance());
             System.out.println("Total documents evaluated: " + dreport.getNumDistances());
         }
-        else {
-            System.out.print("\nEvaluating...");
-            Evaluator evaluator = new SignatureEvaluator(goldCorpus);
-            Report report = evaluator.evaluate(systemCorpus, false);
-            System.out.println("done.");
 
-            System.out.println("\nResults:");
-            System.out.println("P: " + report.getPrecision());
+        else {
+            SignatureEvaluator evaluator = new SignatureEvaluator(goldCorpus);
+            Report report = evaluator.evaluate(systemCorpus, false);
+            DistanceReport dreport = evaluator.getDistanceReport();
+
+            System.out.println("\nP: " + report.getPrecision());
             System.out.println("R: " + report.getRecall());
             System.out.println("F: " + report.getFScore());
             System.out.println("A: " + report.getAccuracy());
+
+            System.out.println("\nMean error distance (km): " + dreport.getMeanDistance());
+            System.out.println("Median error distance (km): " + dreport.getMedianDistance());
+            System.out.println("Minimum error distance (km): " + dreport.getMinDistance());
+            System.out.println("Maximum error distance (km): " + dreport.getMaxDistance());
+            System.out.println("Total toponyms evaluated: " + dreport.getNumDistances());
         }
     }
 

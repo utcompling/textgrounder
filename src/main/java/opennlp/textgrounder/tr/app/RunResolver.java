@@ -124,7 +124,7 @@ public class RunResolver extends BaseApp {
 
         if(goldCorpus != null || currentRun.getCorpusFormat() == CORPUS_FORMAT.GEOTEXT) {
             EvaluateCorpus evaluateCorpus = new EvaluateCorpus();
-            evaluateCorpus.doEval(disambiguated, goldCorpus, currentRun.getCorpusFormat());
+            evaluateCorpus.doEval(disambiguated, goldCorpus, currentRun.getCorpusFormat(), true);
         }
 
         if(currentRun.getSerializedCorpusOutputPath() != null) {

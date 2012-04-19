@@ -68,7 +68,7 @@ object GeoTextLabelPropDecoder extends BaseApp {
     }
 
     val eval = new EvaluateCorpus
-    eval.doEval(corpus, corpus, CORPUS_FORMAT.GEOTEXT)
+    eval.doEval(corpus, corpus, CORPUS_FORMAT.GEOTEXT, true)
   }
 
   def findGreatestCell(innertokens: Array[String]): Int = {

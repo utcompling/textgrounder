@@ -22,7 +22,7 @@ public class DocDistanceEvaluator {
 
                 Coordinate systemCoord = doc.getSystemCoord();
                 Coordinate goldCoord = doc.getGoldCoord();
-                
+
                 if(systemCoord != null && goldCoord != null) {
                     dreport.addDistance(systemCoord.distanceInKm(goldCoord));
                 }
