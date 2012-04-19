@@ -147,6 +147,10 @@ public class Location implements Serializable {
     return this.getRegion().distance(other.getRegion());
   }
 
+  public double distanceInKm(Location other) {
+    return this.getRegion().distanceInKm(other.getRegion());
+  }
+
   @Override
   public String toString() {
     return String.format("%8d (%s), %s, (%s), %d", this.id, this.name, this.type, this.region.getCenter(), this.population);
