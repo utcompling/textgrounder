@@ -43,6 +43,7 @@ public class BaseApp {
         RANDOM,
         BASIC_MIN_DIST,
         WEIGHTED_MIN_DIST,
+        LABEL_PROP,
         LABEL_PROP_DEFAULT_RULE,
         LABEL_PROP_CONTEXT_SENSITIVE,
         LABEL_PROP_COMPLEX
@@ -154,6 +155,8 @@ public class BaseApp {
                         resolverType = RESOLVER_TYPE.RANDOM;
                     else if(value.toLowerCase().startsWith("w"))
                         resolverType = RESOLVER_TYPE.WEIGHTED_MIN_DIST;
+                    else if(value.equalsIgnoreCase("labelprop"))
+                        resolverType = RESOLVER_TYPE.LABEL_PROP;
                     else if(value.toLowerCase().startsWith("labelpropd"))
                         resolverType = RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE;
                     else if(value.toLowerCase().startsWith("labelpropcontext"))
