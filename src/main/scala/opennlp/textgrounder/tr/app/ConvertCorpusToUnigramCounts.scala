@@ -30,8 +30,10 @@ object ConvertCorpusToUnigramCounts extends App {
       }
     }
 
+    print(doc.getId.drop(1)+"\t")
     print(doc.getId+"\t")
     print("0,0\t")
+    print("1\t\tMain\tno\tno\tno\t")
     for((word, count) <- unigramCounts) {
       print(word+":"+count+" ")
     }
