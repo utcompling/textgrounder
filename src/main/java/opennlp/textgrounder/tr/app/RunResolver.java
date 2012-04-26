@@ -94,7 +94,7 @@ public class RunResolver extends BaseApp {
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.LABEL_PROP) {
             System.out.print("Running LABEL PROP resolver...");
-            resolver = new LabelPropResolver();
+            resolver = new LabelPropResolver(currentRun.getLogFilePath());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE) {
             System.out.print("Running LABEL PROP DEFAULT RULE resolver, using graph at " + currentRun.getGraphInputPath() + " ...");

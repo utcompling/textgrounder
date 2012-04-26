@@ -18,6 +18,7 @@ public class BaseApp {
     private String outputPath = null;
     private String xmlInputPath = null;
     private String kmlOutputPath = null;
+    private String logFilePath = null;
     private boolean outputGoldLocations = false;
     private boolean outputUserKML = false;
     protected boolean useGoldToponyms = false;
@@ -99,6 +100,8 @@ public class BaseApp {
                 "(preprocess-labelprop only) path to wikipedia file (article titles, article IDs, and word lists)");
         options.addOption("is", "input-stoplist", true,
                 "(preprocess-labelprob only) path to stop list input file (one stop word per line)");
+
+        options.addOption("l", "log file input", true, "log file input, from document geolocation");
 
         options.addOption("ner", "named-entity-recognizer", true,
         "option for using High Recall NER");
@@ -195,7 +198,10 @@ public class BaseApp {
                     /*case 't':
                     readAsTR = true;
                     break;*/
-
+                case 'l':
+                    if(option.getOpt().equals("l"))
+                        logFilePath = value;
+                    break;
                 case 'm':
                     if(option.getOpt().equals("minlat"))
                         minLat = Double.parseDouble(value.replaceAll("n", "-"));
@@ -315,6 +321,10 @@ public class BaseApp {
 
     public String getStoplistInputPath() {
         return stoplistInputPath;
+    }
+
+    public String getLogFilePath() {
+        return logFilePath;
     }
 
     public Region getBoundingBox() {
