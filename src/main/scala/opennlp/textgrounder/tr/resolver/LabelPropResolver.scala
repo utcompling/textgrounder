@@ -11,7 +11,7 @@ import gnu.trove._
 
 import scala.collection.JavaConversions._
 
-class LabelPropResolver extends Resolver {
+class LabelPropResolver(val logFilePath:String) extends Resolver {
 
   val DPC = 1.0
 
@@ -31,7 +31,7 @@ class LabelPropResolver extends Resolver {
     
     val graph = createGraph(corpus)
 
-    JuntoRunner(graph, .01, .01, .01, 100, false)
+    JuntoRunner(graph, 1.0, .01, .01, 10, false)
 
     // Interpret output graph and setSelectedIdx of toponyms accordingly:
 
@@ -39,22 +39,35 @@ class LabelPropResolver extends Resolver {
     (for ((id, vertex) <- graph._vertices) yield {
       if(docTokNodeRE.findFirstIn(id) != None) {
         val docTokNodeRE(docid, tokidx) = id
-        Some(((docid, tokidx.toInt), getGreatestCell(vertex.GetEstimatedLabelScores)))
+        //println(DOC+docid+"_"+TOK+tokidx+"  "+getGreatestCell(vertex.GetEstimatedLabelScores))
+        //println(id)
+        /*val scores = vertex.GetEstimatedLabelScores
+        val cellScorePairs = (for(key <- scores.keys) yield {
+          (key,scores.get(key.toString))
+        })
+        cellScorePairs.sortWith((x, y) => x._2 > y._2).foreach(x => print(x._1+":"+x._2+"   "))
+        println
+        println(getGreatestCell(vertex.GetEstimatedLabelScores))*/
+        Some(((docid, tokidx.toInt), getGreatestCell(vertex.GetEstimatedLabelScores, nonemptyCellNums.toSet)))
       }
-      else
+      else {
+        //println(id)
         None
+      }
     }).flatten.toMap
 
     for(doc <- corpus) {
+      var tokenIndex = -1
       for(sent <- doc) {
-        var tokenIndex = -1
-        for(toponym <- sent.getToponyms) {
+        for(toponym <- sent.getToponyms.filter(_.getAmbiguity > 0)) {
           tokenIndex += 1
           val predCell = tokensToCells.getOrElse((doc.getId, tokenIndex), -1)
           if(predCell != -1) {
             val indexToSelect = TopoUtil.getCorrectCandidateIndex(toponym, predCell, DPC)
-            if(indexToSelect != -1)
+            if(indexToSelect != -1) {
               toponym.setSelectedIdx(indexToSelect)
+              //println(toponym.getSelected)
+            }
           }
         }
       }
@@ -63,9 +76,9 @@ class LabelPropResolver extends Resolver {
     corpus
   }
 
-  def getGreatestCell(estimatedLabelScores: TObjectDoubleHashMap[String]): Int = {
+  def getGreatestCell(estimatedLabelScores: TObjectDoubleHashMap[String], nonemptyCellNums: Set[Int]): Int = {
     estimatedLabelScores.keys(Array[String]()).filter(_.startsWith(CELL_LABEL))
-      .maxBy(estimatedLabelScores.get(_)).substring(CELL_LABEL.length).toInt
+      .map(_.drop(CELL_LABEL.length).toInt).filter(nonemptyCellNums(_)).maxBy(x => estimatedLabelScores.get(CELL_LABEL+x))
   }
 
   def createGraph(corpus:StoredCorpus) = {
@@ -76,61 +89,116 @@ class LabelPropResolver extends Resolver {
   }
 
   def getEdges(corpus:StoredCorpus): List[Edge] = {
-    getTokDocEdges(corpus:StoredCorpus) ::: getTokDocTypeEdges(corpus) :::
-    getDocTypeGlobalTypeEdges(corpus) ::: getGlobalTypeLocationEdges(corpus) :::
-    getLocationCellEdges(corpus)
+    getTokDocEdges(corpus) :::
+    //getTokTokEdges(corpus) ::: 
+    //getTokDocTypeEdges(corpus) :::
+    //getDocTypeGlobalTypeEdges(corpus) :::
+    getTokGlobalTypeEdges(corpus) ::: // alternative to the above two edge sets
+    getGlobalTypeLocationEdges(corpus) :::
+    getLocationCellEdges(corpus) :::
+    getCellCellEdges
   }
 
   def getTokDocEdges(corpus:StoredCorpus): List[Edge] = {
+    var result =
     (for(doc <- corpus) yield {
+      var tokenIndex = -1
       (for(sent <- doc) yield {
-        var tokenIndex = -1
-        (for(toponym <- sent.getToponyms) yield {
+        (for(toponym <- sent.getToponyms.filter(_.getAmbiguity > 0)) yield {
           tokenIndex += 1
           new Edge(DOC+doc.getId, DOC+doc.getId+"_"+TOK+tokenIndex, 1.0)
         })
       }).flatten
     }).flatten.toList
+    //result.foreach(println)
+    result
+  }
+
+  def getTokTokEdges(corpus:StoredCorpus): List[Edge] = {
+    var result =
+    (for(doc <- corpus) yield {
+      var prevTok:String = null
+      var tokenIndex = -1
+      (for(sent <- doc) yield {
+        (for(toponym <- sent.getToponyms.filter(_.getAmbiguity > 0)) yield {
+          tokenIndex += 1
+          val curTok = DOC+doc.getId+"_"+TOK+tokenIndex
+          val edge =
+          if(prevTok != null)
+            Some(new Edge(prevTok, curTok, 1.0))
+          else
+            None
+          prevTok = curTok
+          edge
+        }).flatten
+      }).flatten
+    }).flatten.toList
+    //result.foreach(println)
+    result
   }
 
   def getTokDocTypeEdges(corpus:StoredCorpus): List[Edge] = {
+    val result = 
     (for(doc <- corpus) yield {
+      var tokenIndex = -1
       (for(sent <- doc) yield {
-        var tokenIndex = -1
-        (for(toponym <- sent.getToponyms) yield {
+        (for(toponym <- sent.getToponyms.filter(_.getAmbiguity > 0)) yield {
+          tokenIndex += 1
+          new Edge(DOC+doc.getId+"_"+TOK+tokenIndex, DOC+doc.getId+"_"+TYPE+toponym.getForm, 1.0)
+        })
+      }).flatten
+    }).flatten.toList
+    //result.foreach(println)
+    result
+  }
+
+  def getDocTypeGlobalTypeEdges(corpus:StoredCorpus): List[Edge] = {
+    val result = (for(doc <- corpus) yield {
+      (for(sent <- doc) yield {
+        (for(toponym <- sent.getToponyms.filter(_.getAmbiguity > 0)) yield {
+          new Edge(DOC+doc.getId+"_"+TYPE+toponym.getForm, TPNM_TYPE+toponym.getForm, 1.0)
+        })
+      }).flatten
+    }).flatten.toList
+    //result.foreach(println)
+    result
+  }
+
+  // This is an alternative to using BOTH of the above two edge sets:
+  //   Don't instantiate DocType edges and go straight from tokens to global types
+  def getTokGlobalTypeEdges(corpus:StoredCorpus): List[Edge] = {
+    val result = 
+    (for(doc <- corpus) yield {
+      var tokenIndex = -1
+      (for(sent <- doc) yield {
+        (for(toponym <- sent.getToponyms.filter(_.getAmbiguity > 0)) yield {
           tokenIndex += 1
           new Edge(DOC+doc.getId+"_"+TOK+tokenIndex, TPNM_TYPE+toponym.getForm, 1.0)
         })
       }).flatten
     }).flatten.toList
-  }
-
-  def getDocTypeGlobalTypeEdges(corpus:StoredCorpus): List[Edge] = {
-    (for(doc <- corpus) yield {
-      (for(sent <- doc) yield {
-        (for(toponym <- sent.getToponyms) yield {
-          new Edge(DOC+doc.getId+"_"+TYPE+toponym.getForm, TPNM_TYPE+toponym.getForm, 1.0)
-        })
-      }).flatten
-    }).flatten.toList
+    //result.foreach(println)
+    result
   }
 
   def getGlobalTypeLocationEdges(corpus:StoredCorpus): List[Edge] = {
-    (for(doc <- corpus) yield {
+    val result = (for(doc <- corpus) yield {
       (for(sent <- doc) yield {
-        (for(toponym <- sent.getToponyms) yield {
+        (for(toponym <- sent.getToponyms.filter(_.getAmbiguity > 0)) yield {
           (for(loc <- toponym.getCandidates) yield {
             new Edge(TPNM_TYPE+toponym.getForm, LOC+loc.getId, 1.0)
           })
         }).flatten
       }).flatten
     }).flatten.toList
+    //result.foreach(println)
+    result
   }
 
   def getLocationCellEdges(corpus:StoredCorpus): List[Edge] = {
-    (for(doc <- corpus) yield {
+    val result = (for(doc <- corpus) yield {
       (for(sent <- doc) yield {
-        (for(toponym <- sent.getToponyms) yield {
+        (for(toponym <- sent.getToponyms.filter(_.getAmbiguity > 0)) yield {
           (for(loc <- toponym.getCandidates) yield {
             (for(cellNum <- TopoUtil.getCellNumbers(loc, DPC)) yield {
               nonemptyCellNums.add(cellNum)
@@ -140,12 +208,69 @@ class LabelPropResolver extends Resolver {
         }).flatten
       }).flatten
     }).flatten.toList
+
+    //result.foreach(println)
+
+    result
+  }
+
+  def getCellCellEdges: List[Edge] = {
+    var lon = 0.0
+    var lat = 0.0
+    val edges = new collection.mutable.ListBuffer[Edge]
+    while(lon < 360.0/DPC) {
+      lat = 0.0
+      while(lat < 180.0/DPC) {
+        val curCellNumber = TopoUtil.getCellNumber(lat, lon, DPC)
+        //if(nonemptyCellNums contains curCellNumber) {
+          val leftCellNumber = TopoUtil.getCellNumber(lat, lon - DPC, DPC)
+          //if(nonemptyCellNums contains leftCellNumber)
+            edges.append(new Edge(CELL+curCellNumber, CELL+leftCellNumber, 1.0))
+          val rightCellNumber = TopoUtil.getCellNumber(lat, lon + DPC, DPC)
+          //if(nonemptyCellNums contains rightCellNumber)
+            edges.append(new Edge(CELL+curCellNumber, CELL+rightCellNumber, 1.0))
+          val topCellNumber = TopoUtil.getCellNumber(lat + DPC, lon, DPC)
+          //if(nonemptyCellNums contains topCellNumber)
+            edges.append(new Edge(CELL+curCellNumber, CELL+topCellNumber, 1.0))
+          val bottomCellNumber = TopoUtil.getCellNumber(lat - DPC, lon, DPC)
+          //if(nonemptyCellNums contains bottomCellNumber)
+            edges.append(new Edge(CELL+curCellNumber, CELL+bottomCellNumber, 1.0))
+        //}
+        lat += DPC
+      }
+      lon += DPC
+    }
+    //edges.foreach(println)
+    edges.toList
   }
 
   def getSeeds(corpus:StoredCorpus): List[Label] = {
-    (for(cellNum <- nonemptyCellNums) yield {
+    getCellCellLabelSeeds(corpus) ::: getDocCellLabelSeeds
+  }
+
+  def getCellCellLabelSeeds(corpus:StoredCorpus): List[Label] = {
+    val result = (for(cellNum <- nonemptyCellNums) yield {
       new Label(CELL+cellNum, CELL_LABEL+cellNum, 1.0)
     }).toList
+    //result.foreach(println)
+    result
+  }
+
+  def getDocCellLabelSeeds: List[Label] = {
+    val result =
+    if(logFilePath != null) {
+      (for((docName, trueCoord, predCoord, neighbors) <- LogUtil.parseLogFile(logFilePath)) yield {
+        val maxCellNumber = TopoUtil.getCellNumber(predCoord, DPC)
+        if(maxCellNumber != -1 /*&& nonemptyCellNums.contains(maxCellNumber)*/)
+          Some(new Label(DOC+docName, CELL_LABEL+maxCellNumber, 1.0))
+        else
+          None
+      }).flatten.toList
+    }
+    else
+      Nil
+    //result.foreach(println)
+    result
   }
 
 }

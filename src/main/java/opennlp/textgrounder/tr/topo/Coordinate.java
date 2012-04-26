@@ -103,8 +103,10 @@ public class Coordinate implements Serializable {
     }
 
     public double distance(Coordinate other) {
+      if(this.lat == other.lat && this.lng == other.lng)
+        return 0;
       return Math.acos(Math.sin(this.lat) * Math.sin(other.lat)
-           + Math.cos(this.lat) * Math.cos(other.lat) * Math.cos(other.lng - this.lng));
+                                + Math.cos(this.lat) * Math.cos(other.lat) * Math.cos(other.lng - this.lng));
     }
 
     public double distanceInKm(Coordinate other) {

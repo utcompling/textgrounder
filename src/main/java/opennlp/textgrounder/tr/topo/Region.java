@@ -78,8 +78,10 @@ public abstract class Region implements Serializable {
   }
 
   public double distanceInKm(Region other) {
-    //return this.distance(other.getCenter());
-    double minDist = Double.POSITIVE_INFINITY;
+      if(this.getRepresentatives().size() == 1 && other.getRepresentatives().size() == 1)
+          return this.getCenter().distanceInKm(other.getCenter());
+    //return this.distanceInKm(other.getCenter());
+    /*double minDist = Double.POSITIVE_INFINITY;
     for(Coordinate coord : this.getRepresentatives()) {
         for(Coordinate otherCoord : other.getRepresentatives()) {
             double curDist = coord.distanceInKm(otherCoord);
@@ -87,7 +89,8 @@ public abstract class Region implements Serializable {
                 minDist = curDist;
         }
     }
-    return minDist;
+    return minDist;*/
+    return 6372.8 * this.distance(other);
   }
 }
 
