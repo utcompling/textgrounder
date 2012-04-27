@@ -53,10 +53,10 @@ public class TopoUtil {
 
         for(Coordinate coord : location.getRegion().getRepresentatives()) {
         
-            int x = (int) ((coord.getLng() + 180.0) / dpc);
-            int y = (int) ((coord.getLat() + 90.0) / dpc);
+            /*int x = (int) ((coord.getLng() + 180.0) / dpc);
+              int y = (int) ((coord.getLat() + 90.0) / dpc);*/
 
-            cellNumbers.add(x * 1000 + y);
+            cellNumbers.add(getCellNumber(coord.getLat(), coord.getLng(), dpc)/*x * 1000 + y*/);
         }
 
         return cellNumbers;
@@ -64,11 +64,24 @@ public class TopoUtil {
 
     public static int getCellNumber(double lat, double lon, double dpc) {
 
-        if(lat < 0 || lat >= 180/dpc) return -1;
-        if(lon < 0) lon += 360/dpc;
-        if(lon >= 360/dpc) lon -= 360/dpc;
+        int x = (int) ((lon + 180.0) / dpc);
+        int y = (int) ((lat + 90.0) / dpc);
 
-        return (int)((int)(lat/dpc) * 1000 + (lon/dpc));
+        if(y < 0 || y >= 180/dpc) return -1;
+        if(x < 0) x += 360/dpc;
+        if(x > 360/dpc) x -= 360/dpc;
+
+        return x * 1000 + y;
+
+        // Make everything positive:
+        /*lat += 90/dpc;
+        lon += 180/dpc;
+
+        if(lat < 0 || lat >= 180/dpc) return -1;
+        if(lon < 0) lon += 360/dpc; // wrap lon around
+        if(lon >= 360/dpc) lon -= 360/dpc; // wrap lon around
+
+        return (int)((int)(lat/dpc) * 1000 + (lon/dpc));*/
     }
 
     public static int getCellNumber(Coordinate coord, double dpc) {
