@@ -259,10 +259,10 @@ class LabelPropResolver(val logFilePath:String) extends Resolver {
   def getDocCellLabelSeeds: List[Label] = {
     val result =
     if(logFilePath != null) {
-      (for((docName, trueCoord, predCoord, neighbors) <- LogUtil.parseLogFile(logFilePath)) yield {
-        val maxCellNumber = TopoUtil.getCellNumber(predCoord, DPC)
+      (for(pe <- LogUtil.parseLogFile(logFilePath)) yield {
+        val maxCellNumber = TopoUtil.getCellNumber(pe.predCoord, DPC)
         if(maxCellNumber != -1 /*&& nonemptyCellNums.contains(maxCellNumber)*/)
-          Some(new Label(DOC+docName, CELL_LABEL+maxCellNumber, 1.0))
+          Some(new Label(DOC+pe.docName, CELL_LABEL+maxCellNumber, 1.0))
         else
           None
       }).flatten.toList

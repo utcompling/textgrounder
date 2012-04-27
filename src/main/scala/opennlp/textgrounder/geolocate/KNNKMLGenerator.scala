@@ -65,24 +65,24 @@ object KNNKMLGenerator {
 
     KMLUtil.writeHeader(out, "knn")
 
-    for((docName, trueCoord, predCoord, neighbors) <- LogUtil.parseLogFile(logFile.value.get)) {
+    for(pe <- LogUtil.parseLogFile(logFile.value.get)) {
 
-      val jPredCoord = jitter(predCoord)
+      val jPredCoord = jitter(pe.predCoord)
 
-      KMLUtil.writePinPlacemark(out, docName, trueCoord)
-      KMLUtil.writePinPlacemark(out, docName, jPredCoord, "blue")
+      KMLUtil.writePinPlacemark(out, pe.docName, pe.trueCoord)
+      KMLUtil.writePinPlacemark(out, pe.docName, jPredCoord, "blue")
       KMLUtil.writePlacemark(out, "#1", jPredCoord, KMLUtil.RADIUS*10)
-      KMLUtil.writeLinePlacemark(out, trueCoord, jPredCoord, "redLine")
+      KMLUtil.writeLinePlacemark(out, pe.trueCoord, jPredCoord, "redLine")
 
-      for((neighbor, rank) <- neighbors) {
+      for((neighbor, rank) <- pe.neighbors) {
         val jNeighbor = jitter(neighbor)
         /*if(rank == 1) {
           KMLUtil.writePlacemark(out, "#1", neighbor, KMLUtil.RADIUS*10)
         }*/
         if(rank != 1) {
           KMLUtil.writePlacemark(out, "#"+rank, jNeighbor, KMLUtil.RADIUS*10)
-          KMLUtil.writePinPlacemark(out, docName, jNeighbor, "green")
-          /*if(!neighbor.equals(predCoord))*/ KMLUtil.writeLinePlacemark(out, trueCoord, jNeighbor)
+          KMLUtil.writePinPlacemark(out, pe.docName, jNeighbor, "green")
+          /*if(!neighbor.equals(pe.predCoord))*/ KMLUtil.writeLinePlacemark(out, pe.trueCoord, jNeighbor)
         }
       }
 
