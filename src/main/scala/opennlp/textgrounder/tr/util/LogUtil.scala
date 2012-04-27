@@ -9,7 +9,7 @@ object LogUtil {
   val PRED_COORD_PREFIX = " predicted cell center at ("
   val NEIGHBOR_PREFIX = " close neighbor: ("
 
-  def parseLogFile(filename: String): List[(String, Coordinate, Coordinate, List[(Coordinate, Int)])] = {
+  def parseLogFile(filename: String): List[LogFileParseElement]/*List[(String, Coordinate, Coordinate, List[(Coordinate, Int)])]*/ = {
     val lines = scala.io.Source.fromFile(filename).getLines
 
     var docName:String = null
@@ -56,7 +56,9 @@ object LogUtil {
           val rawCoords = line.slice(startIndex, endIndex).split(",")
           predCoord = Coordinate.fromDegrees(rawCoords(0).toDouble, rawCoords(1).toDouble)
 
-          Some((docName, trueCoord, predCoord, neighbors))
+          Some(new LogFileParseElement(docName, trueCoord, predCoord, neighbors))
+
+          //Some((docName, trueCoord, predCoord, neighbors))
         }
 
         else None
@@ -65,4 +67,11 @@ object LogUtil {
     }).flatten.toList
   }
 
+}
+
+class LogFileParseElement(
+  val docName: String,
+  val trueCoord: Coordinate,
+  val predCoord: Coordinate,
+  val neighbors: List[(Coordinate, Int)]) {
 }
