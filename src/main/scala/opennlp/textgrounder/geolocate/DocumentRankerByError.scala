@@ -3,8 +3,8 @@ package opennlp.textgrounder.geolocate
 // This program takes a log file and outputs the document names to standard out, ranked by prediction error.
 
 import org.clapper.argot._
-import opennlp.textgrounder.topo._
-import opennlp.textgrounder.util.LogUtil
+import opennlp.textgrounder.tr.topo._
+import opennlp.textgrounder.tr.util.LogUtil
 
 object DocumentRankerByError {
 
@@ -27,10 +27,10 @@ object DocumentRankerByError {
     }
 
     val docsAndErrors:List[(String, Double, Coordinate, Coordinate)] =
-      (for((docName, trueCoord, predCoord, neighbors) <- LogUtil.parseLogFile(logFile.value.get)) yield {
-        val dist = trueCoord.distanceInKm(predCoord)
+      (for(pe <- LogUtil.parseLogFile(logFile.value.get)) yield {
+        val dist = pe.trueCoord.distanceInKm(pe.predCoord)
 
-        (docName, dist, trueCoord, predCoord)
+        (pe.docName, dist, pe.trueCoord, pe.predCoord)
       }).sortWith((x, y) => x._2 < y._2)
 
     for((docName, dist, trueCoord, predCoord) <- docsAndErrors) {

@@ -25,9 +25,9 @@ package opennlp.textgrounder.geolocate
 import java.io._
 import javax.xml.datatype._
 import javax.xml.stream._
-import opennlp.textgrounder.topo._
-import opennlp.textgrounder.util.KMLUtil
-import opennlp.textgrounder.util.LogUtil
+import opennlp.textgrounder.tr.topo._
+import opennlp.textgrounder.tr.util.KMLUtil
+import opennlp.textgrounder.tr.util.LogUtil
 import scala.collection.JavaConversions._
 import org.clapper.argot._
 
@@ -67,20 +67,20 @@ object ErrorKMLGenerator {
 
     KMLUtil.writeHeader(out, "errors-at-"+(if(usePred.value == None) "true" else "pred"))
 
-    for((docName, trueCoord, predCoordOrig, neighbors) <- LogUtil.parseLogFile(logFile.value.get)) {
-      val predCoord = Coordinate.fromDegrees(predCoordOrig.getLatDegrees() + (rand.nextDouble() - 0.5) * .1,
-                                             predCoordOrig.getLngDegrees() + (rand.nextDouble() - 0.5) * .1);
+    for(pe <- LogUtil.parseLogFile(logFile.value.get)) {
+      val predCoord = Coordinate.fromDegrees(pe.predCoord.getLatDegrees() + (rand.nextDouble() - 0.5) * .1,
+                                             pe.predCoord.getLngDegrees() + (rand.nextDouble() - 0.5) * .1);
 
       //val dist = trueCoord.distanceInKm(predCoord)
 
-      val coord1 = if(usePred.value == None) trueCoord else predCoord
-      val coord2 = if(usePred.value == None) predCoord else trueCoord
+      val coord1 = if(usePred.value == None) pe.trueCoord else predCoord
+      val coord2 = if(usePred.value == None) predCoord else pe.trueCoord
 
       KMLUtil.writeArcLinePlacemark(out, coord1, coord2);
-      KMLUtil.writePinPlacemark(out, docName, coord1, "yellow");
-      //KMLUtil.writePlacemark(out, docName, coord1, KMLUtil.RADIUS);
-      KMLUtil.writePinPlacemark(out, docName, coord2, "blue");
-      //KMLUtil.writePolygon(out, docName, coord, KMLUtil.SIDES, KMLUtil.RADIUS, math.log(dist) * KMLUtil.BARSCALE/2)
+      KMLUtil.writePinPlacemark(out, pe.docName, coord1, "yellow");
+      //KMLUtil.writePlacemark(out, pe.docName, coord1, KMLUtil.RADIUS);
+      KMLUtil.writePinPlacemark(out, pe.docName, coord2, "blue");
+      //KMLUtil.writePolygon(out, pe.docName, coord, KMLUtil.SIDES, KMLUtil.RADIUS, math.log(dist) * KMLUtil.BARSCALE/2)
     }
 
     KMLUtil.writeFooter(out)
