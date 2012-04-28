@@ -1,4 +1,4 @@
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.preprocess
 
 import org.clapper.argot._
 import java.io._
@@ -7,7 +7,7 @@ object GroupTweetsIntoDocuments {
 
   import ArgotConverters._
 
-  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.geolocate.GroupTweetsIntoDocuments", preUsage = Some("TextGrounder"))
+  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.preprocess.GroupTweetsIntoDocuments", preUsage = Some("TextGrounder"))
   val corpusFile = parser.option[String](List("i", "input"), "list", "corpus input file")
   val listFile = parser.option[String](List("l", "list"), "list", "list input file")
   val outDirPath = parser.option[String](List("o", "out"), "out", "output directory")

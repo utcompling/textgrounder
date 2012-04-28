@@ -1,14 +1,14 @@
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.postprocess
 
 import opennlp.textgrounder.util.Twokenize
 import org.clapper.argot._
 import java.io._
 
-object WordRankerByAvgErrorUT {
+object WordRankerByAvgError { 
 
   import ArgotConverters._
 
-  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.geolocate.WordRankerByAvgError", preUsage = Some("TextGrounder"))
+  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.postprocess.WordRankerByAvgError", preUsage = Some("TextGrounder"))
   val corpusFile = parser.option[String](List("i", "input"), "list", "corpus input file")
   val listFile = parser.option[String](List("l", "list"), "list", "list input file")
   val docThresholdOption = parser.option[Int](List("t", "threshold"), "threshold", "document frequency threshold")
@@ -40,33 +40,48 @@ object WordRankerByAvgErrorUT {
 
     val wordsToErrors = new scala.collection.mutable.HashMap[String, Double]
     val wordsToDocNames = new scala.collection.mutable.HashMap[String, scala.collection.immutable.HashSet[String]]
+    val wordDocToCount = new scala.collection.mutable.HashMap[(String, String), Int]
+    val docSizes = new scala.collection.mutable.HashMap[String, Int]
+    //val docNames = new scala.collection.mutable.HashSet[String]
 
     var line:String = in.readLine
 
     while(line != null) {
       val tokens = line.split("\t")
-      if(tokens.length >= 3) {
+      if(tokens.length >= 6) {
         val docName = tokens(0)
         if(docNamesAndErrors.contains(docName)) {
+          //docNames += docName
           val error = docNamesAndErrors(docName)
-          val text = tokens(2)
+          val tweet = tokens(5)
           
-          val wordsAndCounts:Map[String, Int] = text.split(" ").map(p => (p.split(":")(0), p.split(":")(1).toInt)).toMap
-          val docSize = text.split(" ").map(_.split(":")(1).toInt).sum
+          val words = Twokenize(tweet).map(_.toLowerCase)//.toSet
           
-          for((word, count) <- wordsAndCounts) {
-            //if(!word.startsWith("@user_")) {
-              val prevError = wordsToErrors.getOrElse(word, 0.0)
-              wordsToErrors.put(word, prevError + error * count.toDouble/docSize)
+          for(word <- words) {
+            if(!word.startsWith("@user_")) {
+              val prevDocSize = docSizes.getOrElse(docName, 0)
+              docSizes.put(docName, prevDocSize + 1)
+              val prevCount = wordDocToCount.getOrElse((word, docName), 0)
+              wordDocToCount.put((word, docName), prevCount + 1)
               val prevSet = wordsToDocNames.getOrElse(word, new scala.collection.immutable.HashSet())
               wordsToDocNames.put(word, prevSet + docName)
-            //}
+              //val prevError = wordsToErrors.getOrElse(word, 0.0)
+              //wordsToErrors.put(word, prevError + error)
+            }
           }
         }
       }
       line = in.readLine
     }  
     in.close
+
+    for((word, docNames) <- wordsToDocNames) {
+      for(docName <- docNames) {
+        val count = wordDocToCount((word, docName))
+        val prevError = wordsToErrors.getOrElse(word, 0.0)
+        wordsToErrors.put(word, prevError + count.toDouble / docSizes(docName) * docNamesAndErrors(docName))
+      }
+    }
 
     wordsToErrors.foreach(p => if(wordsToDocNames(p._1).size < docThreshold) wordsToErrors.remove(p._1))
 
