@@ -1,4 +1,4 @@
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.postprocess
 
 // This program takes a log file and outputs the document names to standard out, ranked by prediction error.
 
@@ -10,7 +10,7 @@ object DocumentRankerByError {
 
   import ArgotConverters._
 
-  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.geolocate.DocumentRankerByError", preUsage = Some("TextGrounder"))
+  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.postprocess.DocumentRankerByError", preUsage = Some("TextGrounder"))
   val logFile = parser.option[String](List("l", "log"), "log", "log input file")
   
   def main(args: Array[String]) {
