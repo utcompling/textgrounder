@@ -23,11 +23,7 @@
 package opennlp.textgrounder.worddist
 
 import math._
-import collection.mutable
 
-import com.codahale.trove.{mutable => trovescala}
-
-import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.Serializer
