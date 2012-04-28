@@ -986,6 +986,16 @@ class RandomGridLocateDocumentStrategy[
     cell_grid.finish()
   }
 
+  /**
+   * Given a list of strategies, process each in turn, evaluating all
+   * documents using the strategy.
+   *
+   * @param strategies List of (name, strategy) pairs, giving strategy
+   *   names and objects.
+   * @param geneval Function to create an evaluator object to evaluate
+   *   all documents, given a strategy.
+   * @tparam T Supertype of all the strategy objects.
+   */
   protected def process_strategies[T](strategies: Seq[(String, T)])(
       geneval: (String, T) => TestDocumentEvaluator[_,_]) = {
     for ((stratname, strategy) <- strategies) yield {
