@@ -1,5 +1,14 @@
 package opennlp.textgrounder.worddist
 
+import collection.mutable
+
+import com.codahale.trove.{mutable => trovescala}
+
+import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
+
+import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.printutil.errprint
+
 /**
  * A class for "memoizing" words, i.e. mapping them to some other type
  * (e.g. Int) that should be faster to compare and potentially require
