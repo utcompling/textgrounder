@@ -604,6 +604,33 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
   }
 
   /**
+   * Create the document evaluator object used to evaluate a given
+   * document.
+   *
+   * @param strategy Strategy object that implements the mechanism for
+   *   scoring different pseudodocuments against a document.  The
+   *   strategy computes a ranked list of all pseudodocuments, with
+   *   corresponding scores.  The document evaluator then uses this to
+   *   finish evaluating the document (e.g. picking the top-ranked one,
+   *   applying the mean-shift algorithm, etc.).
+   * @param stratname Name of the strategy.
+   */
+  def create_document_evaluator(
+      strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
+      stratname: String) = {
+    // Generate reader object
+    if (params.eval_format == "pcl-travel")
+      new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
+    else if (params.coord_strategy =="top-ranked")
+      new RankedSphereCellGridEvaluator(strategy, stratname, this)
+    else
+      new MeanShiftSphereCellGridEvaluator(strategy, stratname, this,
+        params.k_best, params.mean_shift_window,
+        params.mean_shift_max_stddev,
+        params.mean_shift_max_iterations)
+  }
+
+  /**
    * Do the actual document geolocation.  Results to stderr (see above), and
    * also returned.
    *
@@ -621,22 +648,6 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
    * is practically an abstract type, too -- the most useful dynamic
    * type in practice is DocumentEvaluationResult)
    */
-
-  def create_document_evaluator(
-      strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
-      stratname: String) = {
-    // Generate reader object
-    if (params.eval_format == "pcl-travel")
-      new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
-    else if (params.coord_strategy =="top-ranked")
-      new RankedSphereCellGridEvaluator(strategy, stratname, this)
-    else
-      new MeanShiftSphereCellGridEvaluator(strategy, stratname, this,
-        params.k_best, params.mean_shift_window,
-        params.mean_shift_max_stddev,
-        params.mean_shift_max_iterations)
-  }
-
   def run_after_setup() = {
     process_strategies(strategies)((stratname, strategy) =>
       create_document_evaluator(strategy, stratname))
