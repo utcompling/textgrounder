@@ -15,12 +15,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 ////////
-//////// ErrorKMLGenerator.scala
+//////// DocumentPinKMLGenerator.scala
 ////////
-//////// Copyright (c) 2011.
+//////// Copyright (c) 2012.
 ////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.postprocess
 
 import java.io._
 import javax.xml.datatype._
@@ -31,16 +31,17 @@ import opennlp.textgrounder.tr.util.LogUtil
 import scala.collection.JavaConversions._
 import org.clapper.argot._
 
-object ErrorKMLGenerator {
+object DocumentPinKMLGenerator {
 
   val factory = XMLOutputFactory.newInstance
+  val rand = new scala.util.Random
 
   import ArgotConverters._
 
-  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.geolocate.ErrorKMLGenerator", preUsage = Some("TextGrounder"))
-  val logFile = parser.option[String](List("l", "log"), "log", "log input file")
+  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.postprocess.DocumentPinKMLGenerator", preUsage = Some("TextGrounder"))
+  val inFile = parser.option[String](List("i", "input"), "input", "input file")
   val kmlOutFile = parser.option[String](List("k", "kml"), "kml", "kml output file")
-  val usePred = parser.option[String](List("p", "pred"), "pred", "show predicted rather than gold locations")
+  val tokenIndexOffset = parser.option[Int](List("o", "offset"), "offset", "token index offset")
 
   def main(args: Array[String]) {
     try {
@@ -50,37 +51,30 @@ object ErrorKMLGenerator {
       case e: ArgotUsageException => println(e.message); sys.exit(0)
     }
 
-    if(logFile.value == None) {
-      println("You must specify a log input file via -l.")
+    if(inFile.value == None) {
+      println("You must specify an input file via -i.")
       sys.exit(0)
     }
     if(kmlOutFile.value == None) {
       println("You must specify a KML output file via -k.")
       sys.exit(0)
     }
-
-    val rand = new scala.util.Random
+    val offset = if(tokenIndexOffset.value != None) tokenIndexOffset.value.get else 0
 
     val outFile = new File(kmlOutFile.value.get)
     val stream = new BufferedOutputStream(new FileOutputStream(outFile))
     val out = factory.createXMLStreamWriter(stream, "UTF-8")
 
-    KMLUtil.writeHeader(out, "errors-at-"+(if(usePred.value == None) "true" else "pred"))
+    KMLUtil.writeHeader(out, inFile.value.get)
 
-    for(pe <- LogUtil.parseLogFile(logFile.value.get)) {
-      val predCoord = Coordinate.fromDegrees(pe.predCoord.getLatDegrees() + (rand.nextDouble() - 0.5) * .1,
-                                             pe.predCoord.getLngDegrees() + (rand.nextDouble() - 0.5) * .1);
-
-      //val dist = trueCoord.distanceInKm(predCoord)
-
-      val coord1 = if(usePred.value == None) pe.trueCoord else predCoord
-      val coord2 = if(usePred.value == None) predCoord else pe.trueCoord
-
-      KMLUtil.writeArcLinePlacemark(out, coord1, coord2);
-      KMLUtil.writePinPlacemark(out, pe.docName, coord1, "yellow");
-      //KMLUtil.writePlacemark(out, pe.docName, coord1, KMLUtil.RADIUS);
-      KMLUtil.writePinPlacemark(out, pe.docName, coord2, "blue");
-      //KMLUtil.writePolygon(out, pe.docName, coord, KMLUtil.SIDES, KMLUtil.RADIUS, math.log(dist) * KMLUtil.BARSCALE/2)
+    for(line <- scala.io.Source.fromFile(inFile.value.get).getLines) {
+      val tokens = line.split("\t")
+      if(tokens.length >= 3+offset) {
+        val docName = tokens(1+offset)
+        val coordTextPair = tokens(2+offset).split(",")
+        val coord = Coordinate.fromDegrees(coordTextPair(0).toDouble, coordTextPair(1).toDouble)
+        KMLUtil.writePinPlacemark(out, docName, coord)
+      }
     }
 
     KMLUtil.writeFooter(out)

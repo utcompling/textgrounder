@@ -15,12 +15,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 ////////
-//////// DocumentPinKMLGenerator.scala
+//////// KNNKMLGenerator.scala
 ////////
 //////// Copyright (c) 2012.
 ////////
 
-package opennlp.textgrounder.geolocate
+package opennlp.textgrounder.postprocess
 
 import java.io._
 import javax.xml.datatype._
@@ -31,17 +31,16 @@ import opennlp.textgrounder.tr.util.LogUtil
 import scala.collection.JavaConversions._
 import org.clapper.argot._
 
-object DocumentPinKMLGenerator {
+object KNNKMLGenerator {
 
   val factory = XMLOutputFactory.newInstance
   val rand = new scala.util.Random
 
   import ArgotConverters._
 
-  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.geolocate.DocumentPinKMLGenerator", preUsage = Some("TextGrounder"))
-  val inFile = parser.option[String](List("i", "input"), "input", "input file")
+  val parser = new ArgotParser("textgrounder run opennlp.textgrounder.postprocess.KNNKMLGenerator", preUsage = Some("TextGrounder"))
+  val logFile = parser.option[String](List("l", "log"), "log", "log input file")
   val kmlOutFile = parser.option[String](List("k", "kml"), "kml", "kml output file")
-  val tokenIndexOffset = parser.option[Int](List("o", "offset"), "offset", "token index offset")
 
   def main(args: Array[String]) {
     try {
@@ -51,34 +50,51 @@ object DocumentPinKMLGenerator {
       case e: ArgotUsageException => println(e.message); sys.exit(0)
     }
 
-    if(inFile.value == None) {
-      println("You must specify an input file via -i.")
+    if(logFile.value == None) {
+      println("You must specify a log input file via -l.")
       sys.exit(0)
     }
     if(kmlOutFile.value == None) {
       println("You must specify a KML output file via -k.")
       sys.exit(0)
     }
-    val offset = if(tokenIndexOffset.value != None) tokenIndexOffset.value.get else 0
 
     val outFile = new File(kmlOutFile.value.get)
     val stream = new BufferedOutputStream(new FileOutputStream(outFile))
     val out = factory.createXMLStreamWriter(stream, "UTF-8")
 
-    KMLUtil.writeHeader(out, inFile.value.get)
+    KMLUtil.writeHeader(out, "knn")
 
-    for(line <- scala.io.Source.fromFile(inFile.value.get).getLines) {
-      val tokens = line.split("\t")
-      if(tokens.length >= 3+offset) {
-        val docName = tokens(1+offset)
-        val coordTextPair = tokens(2+offset).split(",")
-        val coord = Coordinate.fromDegrees(coordTextPair(0).toDouble, coordTextPair(1).toDouble)
-        KMLUtil.writePinPlacemark(out, docName, coord)
+    for(pe <- LogUtil.parseLogFile(logFile.value.get)) {
+
+      val jPredCoord = jitter(pe.predCoord)
+
+      KMLUtil.writePinPlacemark(out, pe.docName, pe.trueCoord)
+      KMLUtil.writePinPlacemark(out, pe.docName, jPredCoord, "blue")
+      KMLUtil.writePlacemark(out, "#1", jPredCoord, KMLUtil.RADIUS*10)
+      KMLUtil.writeLinePlacemark(out, pe.trueCoord, jPredCoord, "redLine")
+
+      for((neighbor, rank) <- pe.neighbors) {
+        val jNeighbor = jitter(neighbor)
+        /*if(rank == 1) {
+          KMLUtil.writePlacemark(out, "#1", neighbor, KMLUtil.RADIUS*10)
+        }*/
+        if(rank != 1) {
+          KMLUtil.writePlacemark(out, "#"+rank, jNeighbor, KMLUtil.RADIUS*10)
+          KMLUtil.writePinPlacemark(out, pe.docName, jNeighbor, "green")
+          /*if(!neighbor.equals(pe.predCoord))*/ KMLUtil.writeLinePlacemark(out, pe.trueCoord, jNeighbor)
+        }
       }
+
     }
 
     KMLUtil.writeFooter(out)
 
     out.close
+  }
+
+  def jitter(coord:Coordinate): Coordinate = {
+    Coordinate.fromDegrees(coord.getLatDegrees() + (rand.nextDouble() - 0.5) * .1,
+                           coord.getLngDegrees() + (rand.nextDouble() - 0.5) * .1);
   }
 }
