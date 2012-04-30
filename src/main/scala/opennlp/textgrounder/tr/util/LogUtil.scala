@@ -96,12 +96,13 @@ class LogFileParseElement(
   val predCells: List[(Int, Double, Coordinate)],
   val neighbors: List[(Coordinate, Int)]) {
 
-    def getProbDistOverPredCells(dpc: Double): Map[Int, Double] = {
+    def getProbDistOverPredCells(knn:Int, dpc:Double): List[(Int, Double)] = {
       var sum = 0.0
-      (for((rank, kl, blCoord) <- predCells) yield {
+      val myKNN = if(knn < 0) predCells.size else knn
+      (for((rank, kl, blCoord) <- predCells.take(myKNN)) yield {
         val unnormalized = math.exp(-kl)
         sum += unnormalized
         (TopoUtil.getCellNumber(blCoord, dpc), unnormalized)
-      }).map(p => (p._1, p._2/sum)).toMap
+      }).map(p => (p._1, p._2/sum)).toList
     }
 }

@@ -40,10 +40,13 @@ public class BaseApp {
     
     private int numIterations = 1;
 
+    private int knnForLP = -1;
+
     public static enum RESOLVER_TYPE {
         RANDOM,
         BASIC_MIN_DIST,
         WEIGHTED_MIN_DIST,
+        DOC_DIST,
         LABEL_PROP,
         LABEL_PROP_DEFAULT_RULE,
         LABEL_PROP_CONTEXT_SENSITIVE,
@@ -102,6 +105,7 @@ public class BaseApp {
                 "(preprocess-labelprob only) path to stop list input file (one stop word per line)");
 
         options.addOption("l", "log file input", true, "log file input, from document geolocation");
+        options.addOption("knn", "knn", true, "k nearest neighbors to consider from document geolocation log file");
 
         options.addOption("ner", "named-entity-recognizer", true,
         "option for using High Recall NER");
@@ -158,6 +162,8 @@ public class BaseApp {
                         resolverType = RESOLVER_TYPE.RANDOM;
                     else if(value.toLowerCase().startsWith("w"))
                         resolverType = RESOLVER_TYPE.WEIGHTED_MIN_DIST;
+                    else if(value.toLowerCase().startsWith("d"))
+                        resolverType = RESOLVER_TYPE.DOC_DIST;
                     else if(value.equalsIgnoreCase("labelprop"))
                         resolverType = RESOLVER_TYPE.LABEL_PROP;
                     else if(value.toLowerCase().startsWith("labelpropd"))
@@ -201,6 +207,10 @@ public class BaseApp {
                 case 'l':
                     if(option.getOpt().equals("l"))
                         logFilePath = value;
+                    break;
+                case 'k':
+                    if(option.getOpt().equals("knn"))
+                        knnForLP = Integer.parseInt(value);
                     break;
                 case 'm':
                     if(option.getOpt().equals("minlat"))
@@ -325,6 +335,10 @@ public class BaseApp {
 
     public String getLogFilePath() {
         return logFilePath;
+    }
+
+    public int getKnnForLP() {
+        return knnForLP;
     }
 
     public Region getBoundingBox() {

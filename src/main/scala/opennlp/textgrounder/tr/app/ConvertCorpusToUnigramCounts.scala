@@ -11,6 +11,8 @@ import scala.collection.JavaConversions._
 
 object ConvertCorpusToUnigramCounts extends App {
 
+  val alphanumRE = """^[a-z0-9]+$""".r
+
   val tokenizer = new OpenNLPTokenizer
 
   val corpus = Corpus.createStoredCorpus
@@ -24,8 +26,10 @@ object ConvertCorpusToUnigramCounts extends App {
       for(rawToken <- sent) {
         for(token <- rawToken.getForm.split(" ")) {
           val ltoken = token.toLowerCase
-          val prevCount = unigramCounts.getOrElse(ltoken, 0)
-          unigramCounts.put(ltoken, prevCount + 1)
+          if(alphanumRE.findFirstIn(ltoken) != None) {
+            val prevCount = unigramCounts.getOrElse(ltoken, 0)
+            unigramCounts.put(ltoken, prevCount + 1)
+          }
         }
       }
     }
