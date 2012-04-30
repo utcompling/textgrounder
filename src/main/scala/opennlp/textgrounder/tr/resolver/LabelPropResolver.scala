@@ -11,7 +11,9 @@ import gnu.trove._
 
 import scala.collection.JavaConversions._
 
-class LabelPropResolver(val logFilePath:String) extends Resolver {
+class LabelPropResolver(
+  val logFilePath:String,
+  val knn:Int) extends Resolver {
 
   val DPC = 1.0
 
@@ -260,11 +262,9 @@ class LabelPropResolver(val logFilePath:String) extends Resolver {
     val result =
     if(logFilePath != null) {
       (for(pe <- LogUtil.parseLogFile(logFilePath)) yield {
-        val maxCellNumber = TopoUtil.getCellNumber(pe.predCoord, DPC)
-        if(maxCellNumber != -1 /*&& nonemptyCellNums.contains(maxCellNumber)*/)
-          Some(new Label(DOC+pe.docName, CELL_LABEL+maxCellNumber, 1.0))
-        else
-          None
+        (for((cellNum, probMass) <- pe.getProbDistOverPredCells(knn, DPC)) yield {
+          new Label(DOC+pe.docName, CELL_LABEL+cellNum, probMass)
+        })
       }).flatten.toList
     }
     else

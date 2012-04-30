@@ -92,9 +92,13 @@ public class RunResolver extends BaseApp {
             System.out.println("Running WEIGHTED MINIMUM DISTANCE resolver with " + currentRun.getNumIterations() + " iteration(s)...");
             resolver = new WeightedMinDistResolver(currentRun.getNumIterations());
         }
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.DOC_DIST) {
+            System.out.println("Running DOC DIST resolver...");
+            resolver = new DocDistResolver(currentRun.getLogFilePath());
+        }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.LABEL_PROP) {
             System.out.print("Running LABEL PROP resolver...");
-            resolver = new LabelPropResolver(currentRun.getLogFilePath());
+            resolver = new LabelPropResolver(currentRun.getLogFilePath(), currentRun.getKnnForLP());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.LABEL_PROP_DEFAULT_RULE) {
             System.out.print("Running LABEL PROP DEFAULT RULE resolver, using graph at " + currentRun.getGraphInputPath() + " ...");
