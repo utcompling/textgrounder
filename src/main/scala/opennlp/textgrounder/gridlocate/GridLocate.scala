@@ -584,6 +584,11 @@ class RandomGridLocateDocumentStrategy[
       ap.option[Int]("num-nearest-neighbors", "knn", default = 4,
         help = """Number of nearest neighbors (k in kNN); default is %default.""")
 
+    var num_top_cells_to_output =
+      ap.option[Int]("num-top-cells-to-output", "num-top-cells", default = 5,
+        help = """Number of nearest neighbor cells to output; default is %default;
+  -1 means output all""")
+
     //// Options indicating which documents to train on or evaluate
     var eval_set =
       ap.option[String]("eval-set", "es", metavar = "SET",

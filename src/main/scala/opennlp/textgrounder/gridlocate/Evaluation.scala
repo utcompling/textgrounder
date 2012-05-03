@@ -914,6 +914,7 @@ abstract class RankedCellGridEvaluator[
     true_rank: Int): TEvalRes
 
   val num_nearest_neighbors = driver.params.num_nearest_neighbors
+  val num_top_cells_to_output = driver.params.num_top_cells_to_output
 
   /**
    * Print out the evaluation result, possibly along with some of the
@@ -928,7 +929,10 @@ abstract class RankedCellGridEvaluator[
     errprint("%s:  true cell at rank: %s", doctag,
       result.asInstanceOf[RankedDocumentEvaluationResult[_,_,_,_]].true_rank)
     errprint("%s:  true cell: %s", doctag, result.true_cell)
-    for (i <- 0 until 5) {
+    val num_cells = if(num_top_cells_to_output >= 0)
+                      math.min(num_top_cells_to_output, pred_cells.size)
+                    else pred_cells.size
+    for (i <- 0 until num_cells) {
       errprint("%s:  Predicted cell (at rank %s, kl-div %s): %s",
         doctag, i + 1, pred_cells(i)._2, pred_cells(i)._1)
     }
