@@ -488,45 +488,66 @@ abstract class GroupedDocumentEvalStats[
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * Basic abstract class for evaluating a test document.  Doesn't use any
- * driver class.
- *
- * TestDocumentEvaluator is currently the only subclass. (FIXME: Perhaps we
- * should integrate the two.) The reason they are separated is because
- * TestDocumentEvaluator makes use of a GridLocateDriver class, which
- * encapsulates (among other things) various command-line parameters,
- * in particular command-line parameters that allow a subset of the
- * total set of documents to be evaluated.
+ * Abstract class for evaluating a corpus of test documents.
+ * Uses the command-line parameters to determine which documents
+ * should be skipped.
  *
  * @tparam TEvalDoc Type of document to evaluate.
  * @tparam TEvalRes Type of result of evaluating a document.
  *
- * @param stratname Name of the strategy used to perform evaluation.
+ * @param stratname Name of the strategy used for performing evaluation.
  *   This is output in various status messages.
+ * @param driver Driver class that encapsulates command-line parameters and
+ *   such, in particular command-line parameters that allow a subset of the
+ *   total set of documents to be evaluated.
  */
-abstract class BasicTestDocumentEvaluator[TEvalDoc, TEvalRes](
-  val stratname: String
+abstract class CorpusEvaluator[TEvalDoc, TEvalRes](
+  stratname: String,
+  val driver: GridLocateDriver
 ) {
   var documents_processed = 0
   val results = mutable.Map[TEvalDoc, TEvalRes]()
+  var skip_initial = driver.params.skip_initial_test_docs
+  var skip_n = 0
+
+  /**
+   * Return true if we should skip the next document due to parameters
+   * calling for certain documents in a certain sequence to be skipped.
+   */
+  def would_skip_by_parameters() = {
+    var do_skip = false
+    if (skip_initial != 0) {
+      skip_initial -= 1
+      do_skip = true
+    } else if (skip_n != 0) {
+      skip_n -= 1
+      do_skip = true
+    } else
+      skip_n = driver.params.every_nth_test_doc - 1
+    do_skip
+  }
+        
+  /**
+   * Return true if we should stop processing, given that `new_processed`
+   * items have already been processed.
+   */
+  def would_stop_processing(new_processed: Int) = {
+    // If max # of docs reached, stop
+    val stop = (driver.params.num_test_docs > 0 &&
+                 new_processed >= driver.params.num_test_docs)
+    if (stop) {
+      errprint("")
+      errprint("Stopping because limit of %s documents reached",
+        driver.params.num_test_docs)
+    }
+    stop
+  }
 
   /**
    * Return true if document would be skipped; false if processed and
    * evaluated.
    */
   def would_skip_document(doc: TEvalDoc, doctag: String) = false
-
-  /**
-   * Return true if we should skip the next document due to parameters
-   * calling for certain documents in a certain sequence to be skipped.
-   */
-  def would_skip_by_parameters() = false
-
-  /**
-   * Return true if we should stop processing, given that `new_processed`
-   * items have already been processed.
-   */
-  def would_stop_processing(new_processed: Int) = false
 
   /**
    * Evaluate a document.  Return an object describing the results of the
@@ -546,7 +567,8 @@ abstract class BasicTestDocumentEvaluator[TEvalDoc, TEvalRes](
    */
   def output_results(isfinal: Boolean = false): Unit
 
-  val task = new MeteredTask("document", "evaluating")
+  val task = new MeteredTask("document", "evaluating",
+    maxtime = driver.params.max_time_per_stage)
   var last_elapsed = 0.0
   var last_processed = 0
 
@@ -624,54 +646,6 @@ abstract class BasicTestDocumentEvaluator[TEvalDoc, TEvalRes](
 }
 
 /**
- * Abstract class for evaluating a test document.
- *
- * @tparam TEvalDoc Type of document to evaluate.
- * @tparam TEvalRes Type of result of evaluating a document.
- *
- * @param stratname Name of the strategy used for performing evaluation.
- * @param driver Driver class that encapsulates command-line parameters and
- *   such.
- *
- * This is a subclass of `BasicTestDocumentEvaluator` which uses the command-line
- * parameters to determine which documents should be skipped.
- */
-abstract class TestDocumentEvaluator[TEvalDoc, TEvalRes](
-  stratname: String,
-  val driver: GridLocateDriver
-) extends BasicTestDocumentEvaluator[TEvalDoc, TEvalRes](stratname) {
-  override val task = new MeteredTask("document", "evaluating",
-    maxtime = driver.params.max_time_per_stage)
-  var skip_initial = driver.params.skip_initial_test_docs
-  var skip_n = 0
-
-  override def would_skip_by_parameters() = {
-    var do_skip = false
-    if (skip_initial != 0) {
-      skip_initial -= 1
-      do_skip = true
-    } else if (skip_n != 0) {
-      skip_n -= 1
-      do_skip = true
-    } else
-      skip_n = driver.params.every_nth_test_doc - 1
-    do_skip
-  }
-        
-  override def would_stop_processing(new_processed: Int) = {
-    // If max # of docs reached, stop
-    val stop = (driver.params.num_test_docs > 0 &&
-                 new_processed >= driver.params.num_test_docs)
-    if (stop) {
-      errprint("")
-      errprint("Stopping because limit of %s documents reached",
-        driver.params.num_test_docs)
-    }
-    stop
-  }
-}
-
-/**
  * Abstract class for evaluating a test document by comparing it against each
  * of the cells in a cell grid, where each cell has an associated
  * pseudo-document created by amalgamating all of the training documents
@@ -714,10 +688,10 @@ abstract class CellGridEvaluator[
   XTGrid <: CellGrid[TCoord, XTDoc, TCell],
   TEvalRes <: DocumentEvaluationResult[TCoord, XTDoc, TCell, XTGrid]
 ](
-  strategy: GridLocateDocumentStrategy[TCell, XTGrid],
-  stratname: String,
+  val strategy: GridLocateDocumentStrategy[TCell, XTGrid],
+  val stratname: String,
   driver: GridLocateDriver { type TGrid = XTGrid; type TDoc = XTDoc } // GridLocateDocumentTypeDriver
-) extends TestDocumentEvaluator[XTDoc, TEvalRes](stratname, driver) {
+) extends CorpusEvaluator[XTDoc, TEvalRes](stratname, driver) {
   def create_grouped_eval_stats(driver: GridLocateDriver, // GridLocateDocumentTypeDriver
     cell_grid: XTGrid, results_by_range: Boolean):
     GroupedDocumentEvalStats[TCoord, XTDoc, TCell, XTGrid, TEvalRes]
@@ -1134,7 +1108,7 @@ abstract class MeanShiftCellGridEvaluator[
  * (possibly more than one per file).
  */
 trait DocumentIteratingEvaluator[TEvalDoc, TEvalRes] extends
-  TestDocumentEvaluator[TEvalDoc, TEvalRes] {
+  CorpusEvaluator[TEvalDoc, TEvalRes] {
   /**
    * Return an Iterable listing the documents retrievable from the given
    * filename.
