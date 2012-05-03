@@ -148,7 +148,10 @@ class CombinedWordDist(factory: WordDistFactory) {
 //                             Cell distributions                          //
 /////////////////////////////////////////////////////////////////////////////
 
-/** A simple distribution associating a probability with each cell. */
+/**
+ * A general distribution over cells, associating a probability with each
+ * cell.  The caller needs to provide the probabilities.
+ */
 
 class CellDist[
   TCoord,
@@ -173,14 +176,16 @@ class CellDist[
 }
 
 /**
- * Distribution over cells, as might be attached to a word.  If we have a
- *  set of cells, each with a word distribution, then we can imagine
- *  conceptually inverting the process to generate a cell distribution over
- *  words.  Basically, for a given word, look to see what its probability is
- *  in all cells; normalize, and we have a cell distribution.
+ * Distribution over cells that is associated with a word. This class knows
+ * how to populate its own probabilities, based on the relative probabilities
+ * of the word in the word distributions of the various cells.  That is,
+ * if we have a set of cells, each with a word distribution, then we can
+ * imagine conceptually inverting the process to generate a cell distribution
+ * over words.  Basically, for a given word, look to see what its probability
+ * is in all cells; normalize, and we have a cell distribution.
  *
- *  @param word Word for which the cell is computed
- *  @param cellprobs Hash table listing probabilities associated with cells
+ * @param word Word for which the cell is computed
+ * @param cellprobs Hash table listing probabilities associated with cells
  */
 
 class WordCellDist[TCoord,
@@ -223,6 +228,22 @@ class WordCellDist[TCoord,
   init()
 }
 
+/**
+ * Factory object for creating CellDists, i.e. objects describing a
+ * distribution over cells.  You can create two types of CellDists, one for
+ * a single word and one based on a distribution of words.  The former
+ * process returns a WordCellDist, which initializes the probability
+ * distribution over cells as described for that class.  The latter process
+ * returns a basic CellDist.  It works by retrieving WordCellDists for
+ * each of the words in the distribution, and then averaging all of these
+ * distributions, weighted according to probability of the word in the word
+ * distribution.
+ *
+ * @param lru_cache_size Size of the cache used to avoid creating a new
+ *   WordCellDist for a given word when one is already available for that
+ *   word.
+ */
+
 abstract class CellDistFactory[
   TCoord,
   TDoc <: DistDocument[TCoord],
@@ -236,8 +257,10 @@ abstract class CellDistFactory[
 
   var cached_dists: LRUCache[Word, TCellDist] = null
 
-  // Return a cell distribution over a given word, using a least-recently-used
-  // cache to optimize access.
+  /**
+   * Return a cell distribution over a single word, using a least-recently-used
+   * cache to optimize access.
+   */
   def get_cell_dist(cell_grid: TGrid, word: Word) = {
     if (cached_dists == null)
       cached_dists = new LRUCache(maxsize = lru_cache_size)

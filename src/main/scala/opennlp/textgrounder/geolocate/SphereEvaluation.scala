@@ -391,7 +391,7 @@ class PCLTravelGeolocateDocumentEvaluator(
   strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends TestDocumentEvaluator[
+) extends CorpusEvaluator[
   TitledDocument, TitledDocumentResult
 ](stratname, driver) with DocumentIteratingEvaluator[
   TitledDocument, TitledDocumentResult

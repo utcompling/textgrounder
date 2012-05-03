@@ -490,7 +490,7 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
   override type TParam <: GeolocateDocumentParameters
   type TRunRes =
     Seq[(String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
-         TestDocumentEvaluator[_,_])]
+         CorpusEvaluator[_,_])]
 
   var strategies: Seq[(String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid])] = _
 
@@ -636,7 +636,7 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
    *
    * The current return type is as follows:
    *
-   * Seq[(java.lang.String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid], scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.TestDocumentEvaluator
+   * Seq[(java.lang.String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid], scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.CorpusEvaluator
    *
    * This means you get a sequence of tuples of
    * (strategyname, strategy, results)
@@ -644,7 +644,7 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
    * strategyname = name of strategy as given on command line
    * strategy = strategy object
    * results = map listing results for each document (an abstract type
-   * defined in TestDocumentEvaluator; the result type EvaluationResult
+   * defined in CorpusEvaluator; the result type EvaluationResult
    * is practically an abstract type, too -- the most useful dynamic
    * type in practice is DocumentEvaluationResult)
    */
