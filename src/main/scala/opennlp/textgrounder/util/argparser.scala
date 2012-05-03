@@ -267,10 +267,10 @@ package object argparser {
       implicit conversion.
    */
 
-   /**
-    * Implicit conversion function for Ints.  Automatically selected
-    * for Int-type arguments.
-    */
+  /**
+   * Implicit conversion function for Ints.  Automatically selected
+   * for Int-type arguments.
+   */
   implicit def convertInt(rawval: String, name: String, ap: ArgParser) = {
     try { rawval.toInt }
     catch {
@@ -280,10 +280,10 @@ package object argparser {
     }
   }
 
-   /**
-    * Implicit conversion function for Doubles.  Automatically selected
-    * for Int-type arguments.
-    */
+  /**
+   * Implicit conversion function for Doubles.  Automatically selected
+   * for Int-type arguments.
+   */
   implicit def convertDouble(rawval: String, name: String, ap: ArgParser) = {
     try { rawval.toDouble }
     catch {
@@ -294,18 +294,136 @@ package object argparser {
     }
   }
 
-   /**
-    * Implicit conversion function for Strings.  Automatically selected
-    * for String-type arguments.
-    */
+  /**
+   * Check restrictions on `value`, the parsed value for option named
+   * `name`.  Restrictions can specify that the number must be greater than or
+   * equal, or strictly greater than, a given number -- and/or that the
+   * number must be less than or equal, or strictly less than, a given
+   * number.  Signal an error if restrictions not met.
+   *
+   * @tparam T Numeric type of `value` (e.g. Int or Double).
+   * @param minposs Required: Minimum possible value for this numeric type;
+   *   used as the default value for certain non-specified arguments.
+   * @param maxposs Required: Maximum possible value for this numeric type;
+   *   used as the default value for certain non-specified arguments.
+   * @param gt If specified, `value` must be greater than the given number.
+   * @param ge If specified, `value` must be greater than or equal to the
+   *   given number.
+   * @param lt If specified, `value` must be less than the given number.
+   * @param le If specified, `value` must be less than or equal to the
+   *   given number.
+   */
+  def check_restrictions[T <% Ordered[T]](value: T, name: String, ap: ArgParser,
+      minposs: T, maxposs: T)(gt: T = minposs, ge: T = minposs,
+      lt: T = maxposs, le: T = maxposs) {
+    val has_lower_bound = !(gt == minposs && ge == minposs)
+    val has_upper_bound = !(lt == maxposs && le == maxposs)
+    val has_open_lower_bound = (gt != minposs)
+    val has_open_upper_bound = (lt != maxposs)
+
+    def check_lower_bound(): String = {
+      if (!has_lower_bound) null
+      else if (has_open_lower_bound) {
+        if (value > gt) null
+        else "strictly greater than %s" format gt
+      } else {
+        if (value >= ge) null
+        else "at least %s" format ge
+      }
+    }
+    def check_upper_bound(): String = {
+      if (!has_upper_bound) null
+      else if (has_open_upper_bound) {
+        if (value < lt) null
+        else "strictly less than %s" format lt
+      } else {
+        if (value <= le) null
+        else "at most %s" format le
+      }
+    }
+
+    val lowerstr = check_lower_bound()
+    val upperstr = check_upper_bound()
+
+    def range_error(restriction: String) {
+      val msg = """Argument "%s" has value %s, but must be %s.""" format
+        (name, value, restriction)
+      throw new ArgParserRangeException(msg)
+    }
+
+    if (lowerstr != null && upperstr != null)
+      range_error("%s and %s" format (lowerstr, upperstr))
+    else if (lowerstr != null)
+      range_error("%s" format lowerstr)
+    else if (upperstr != null)
+      range_error("%s" format upperstr)
+  }
+
+  /**
+   * Conversion function for Ints.  Also check that the result meets the
+   * given restrictions (conditions).
+   */
+  def convertRestrictedInt(
+    gt: Int = Int.MinValue, ge: Int = Int.MinValue,
+    lt: Int = Int.MaxValue, le: Int = Int.MaxValue
+  ) = {
+    (rawval: String, name: String, ap: ArgParser) => {
+      val retval = convertInt(rawval, name, ap)
+      check_restrictions[Int](retval, name, ap, Int.MinValue, Int.MaxValue)(
+        gt = gt, ge = ge, lt = lt, le = le)
+      retval
+    }
+  }
+
+  /**
+   * Conversion function for Doubles.  Also check that the result meets the
+   * given restrictions (conditions).
+   */
+  def convertRestrictedDouble(
+    gt: Double = Double.NegativeInfinity, ge: Double = Double.NegativeInfinity,
+    lt: Double = Double.PositiveInfinity, le: Double = Double.PositiveInfinity
+  ) = {
+    (rawval: String, name: String, ap: ArgParser) => {
+      val retval = convertDouble(rawval, name, ap)
+      check_restrictions[Double](retval, name, ap,
+        Double.NegativeInfinity, Double.PositiveInfinity)(
+        gt = gt, ge = ge, lt = lt, le = le)
+      retval
+    }
+  }
+
+  /**
+   * Conversion function for positive Int.  Checks that the result is &gt; 0.
+   */
+  def convertPositiveInt = convertRestrictedInt(gt = 0)
+  /**
+   * Conversion function for non-negative Int.  Check that the result is &gt;=
+   * 0.
+   */
+  def convertNonNegativeInt = convertRestrictedInt(ge = 0)
+
+  /**
+   * Conversion function for positive Double.  Checks that the result is &gt; 0.
+   */
+  def convertPositiveDouble = convertRestrictedDouble(gt = 0)
+  /**
+   * Conversion function for non-negative Double.  Check that the result is &gt;=
+   * 0.
+   */
+  def convertNonNegativeDouble = convertRestrictedDouble(ge = 0)
+
+  /**
+   * Implicit conversion function for Strings.  Automatically selected
+   * for String-type arguments.
+   */
   implicit def convertString(rawval: String, name: String, ap: ArgParser) = {
     rawval
   }
 
-   /**
-    * Implicit conversion function for Boolean arguments, used for options
-    * that take a value (rather than flags).
-    */
+  /**
+   * Implicit conversion function for Boolean arguments, used for options
+   * that take a value (rather than flags).
+   */
   implicit def convertBoolean(rawval: String, name: String, ap: ArgParser) = {
     rawval.toLowerCase match {
       case "yes" => true
@@ -381,6 +499,18 @@ package object argparser {
    * @param cause exception, if propagating an exception
    */
   class ArgParserConversionException(
+    message: String,
+    cause: Option[Throwable] = None
+  ) extends ArgParserException(message, cause)
+
+  /**
+   * Thrown to indicate that a command line argument was outside of a
+   * required range.
+   *
+   * @param message exception message
+   * @param cause exception, if propagating an exception
+   */
+  class ArgParserRangeException(
     message: String,
     cause: Option[Throwable] = None
   ) extends ArgParserException(message, cause)
