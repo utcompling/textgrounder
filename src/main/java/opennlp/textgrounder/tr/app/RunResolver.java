@@ -96,6 +96,10 @@ public class RunResolver extends BaseApp {
             System.out.println("Running DOC DIST resolver...");
             resolver = new DocDistResolver(currentRun.getLogFilePath());
         }
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.TOPO_AS_DOC_DIST) {
+            System.out.println("Running TOPO AS DOC DIST resolver...");
+            resolver = new ToponymAsDocDistResolver(currentRun.getLogFilePath());
+        }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.LABEL_PROP) {
             System.out.print("Running LABEL PROP resolver...");
             resolver = new LabelPropResolver(currentRun.getLogFilePath(), currentRun.getKnnForLP());

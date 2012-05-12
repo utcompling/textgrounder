@@ -47,6 +47,7 @@ public class BaseApp {
         BASIC_MIN_DIST,
         WEIGHTED_MIN_DIST,
         DOC_DIST,
+        TOPO_AS_DOC_DIST,
         LABEL_PROP,
         LABEL_PROP_DEFAULT_RULE,
         LABEL_PROP_CONTEXT_SENSITIVE,
@@ -164,6 +165,8 @@ public class BaseApp {
                         resolverType = RESOLVER_TYPE.WEIGHTED_MIN_DIST;
                     else if(value.toLowerCase().startsWith("d"))
                         resolverType = RESOLVER_TYPE.DOC_DIST;
+                    else if(value.toLowerCase().startsWith("t"))
+                        resolverType = RESOLVER_TYPE.TOPO_AS_DOC_DIST;
                     else if(value.equalsIgnoreCase("labelprop"))
                         resolverType = RESOLVER_TYPE.LABEL_PROP;
                     else if(value.toLowerCase().startsWith("labelpropd"))
