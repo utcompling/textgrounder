@@ -88,6 +88,19 @@ public class TopoUtil {
         return getCellNumber(coord.getLatDegrees(), coord.getLngDegrees(), dpc);
     }
 
+    public static Coordinate getCellCenter(int cellNumber, double dpc) {
+        int x = cellNumber / 1000;
+        int y = cellNumber % 1000;
+
+        double lat = (dpc * y - 90) + dpc/2.0;
+        double lon = (dpc * x - 180) + dpc/2.0;
+
+        if(lat >= 90) lat -= 90;
+        if(lon >= 180) lon -= 180;
+
+        return Coordinate.fromDegrees(lat, lon);
+    }
+
     public static int getCorrectCandidateIndex(Toponym toponym, Map<Integer, Double> cellDistribution, double dpc) {
         double maxMass = Double.NEGATIVE_INFINITY;
         int maxIndex = -1;
