@@ -20,6 +20,7 @@ import opennlp.textgrounder.tr.topo.*;
 
 public abstract class Document<A extends Token> implements Iterable<Sentence<A>>, Serializable {
   protected final String id;
+  public String title = null;
   protected Coordinate goldCoord;
   protected Coordinate systemCoord;
   protected String timestamp;
@@ -36,6 +37,11 @@ public abstract class Document<A extends Token> implements Iterable<Sentence<A>>
       this(id, null, null, null);
   }
 
+  public Document(String id, String title) {
+      this(id);
+      this.title = title;
+  }
+
   public Document(String id, String timestamp, Coordinate goldCoord) {
       this(id, timestamp, goldCoord, null);
   }
@@ -45,11 +51,16 @@ public abstract class Document<A extends Token> implements Iterable<Sentence<A>>
   }
 
   public Document(String id, String timestamp, Coordinate goldCoord, Coordinate systemCoord, Enum<SECTION> section) {
+      this(id, timestamp, goldCoord, systemCoord, section, null);
+  }
+
+  public Document(String id, String timestamp, Coordinate goldCoord, Coordinate systemCoord, Enum<SECTION> section, String title) {
     this.id = id;
     this.timestamp = timestamp;
     this.goldCoord = goldCoord;
     this.systemCoord = systemCoord;
     this.section = section;
+    this.title = title;
   }
 
   public String getId() {

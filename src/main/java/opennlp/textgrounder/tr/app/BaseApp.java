@@ -58,7 +58,8 @@ public class BaseApp {
     public static enum CORPUS_FORMAT {
         PLAIN,
         TRCONLL,
-        GEOTEXT
+        GEOTEXT,
+        WIKITEXT
     }
     protected Enum<CORPUS_FORMAT> corpusFormat = CORPUS_FORMAT.PLAIN;
 	
