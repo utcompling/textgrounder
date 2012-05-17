@@ -42,9 +42,6 @@ object FilterGeotaggedWiki extends App {
   }
   in.close
 
-  val recognizer = new OpenNLPRecognizer
-  val tokenizer = new OpenNLPTokenizer
-
   val wikiTextCorpus = Corpus.createStreamCorpus
 
   wikiTextCorpus.addSource(new WikiTextSource(new BufferedReader(new FileReader(wikiTextInputFile.value.get))))
