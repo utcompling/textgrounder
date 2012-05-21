@@ -13,7 +13,8 @@ crossPaths := false
 retrieveManaged := true
 
 resolvers ++= Seq(
-  "OpenNLP Maven Repository" at "http://opennlp.sourceforge.net/maven2"
+  "OpenNLP Maven Repository" at "http://opennlp.sourceforge.net/maven2",
+  "repo.codahale.com" at "http://repo.codahale.com"
 //  Resolver for trove-scala source; nonexistent here yet
 //  "repo.codahale.com" at "http://repo.codahale.com",
 //  Resolver if you want to find stuff out of your local Maven cache
@@ -49,9 +50,10 @@ libraryDependencies ++= Seq(
   // The following needed for Scoobi
   "javassist" % "javassist" % "3.12.1.GA",
   // Trove
-  "net.sf.trove4j" % "trove4j" % "3.0.2"
+  "net.sf.trove4j" % "trove4j" % "3.0.2",
 //  Find repository for trove-scala; currently stored unmanaged
 //  "com.codahale" % "trove-scala_2.9.1" % "0.0.1-SNAPSHOT"
+    "com.codahale" % "jerkson_2.9.1" % "0.5.0"  
   )
 
 // turn on all warnings in Java code
