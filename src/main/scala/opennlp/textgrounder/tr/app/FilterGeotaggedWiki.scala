@@ -29,7 +29,7 @@ object FilterGeotaggedWiki extends App {
     case e: ArgotUsageException => println(e.message); sys.exit(0)
   }
 
-  val ids = new collection.mutable.HashSet[Int]
+  val ids = new collection.mutable.HashSet[String]
 
   val fis = new FileInputStream(wikiCorpusInputFile.value.get)
   fis.read; fis.read
@@ -37,7 +37,7 @@ object FilterGeotaggedWiki extends App {
   val in = new BufferedReader(new InputStreamReader(cbzis))
   var curLine = in.readLine
   while(curLine != null) {
-    ids += curLine.split("\t")(0).toInt
+    ids += curLine.split("\t")(0)
     curLine = in.readLine
   }
   in.close

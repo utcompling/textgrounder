@@ -6,6 +6,7 @@ import opennlp.textgrounder.tr.topo._
 import opennlp.textgrounder.tr.text._
 import opennlp.textgrounder.tr.text.prep._
 import opennlp.textgrounder.tr.text.io._
+import opennlp.textgrounder.tr.util._
 
 import scala.collection.JavaConversions._
 
@@ -23,7 +24,7 @@ object ConvertCorpusToToponymAsDoc extends App {
   corpus.load
 
   for(doc <- corpus) {
-    val docAsArray = getDocAsArray(doc)
+    val docAsArray = TextUtil.getDocAsArray(doc)
     var tokIndex = 0
     for(token <- docAsArray) {
       if(token.isToponym && token.asInstanceOf[Toponym].hasGold) {
@@ -60,13 +61,5 @@ object ConvertCorpusToToponymAsDoc extends App {
     }
 
     unigramCounts.toMap
-  }
-
-  def getDocAsArray(doc:Document[StoredToken]): Array[StoredToken] = {
-    (for(sent <- doc) yield {
-      (for(token <- sent.filter(t => alphanumRE.findFirstIn(t.getForm) != None)) yield {
-        token
-      })
-    }).flatten.toArray
   }
 }
