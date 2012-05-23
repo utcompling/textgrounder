@@ -117,6 +117,9 @@ object SupervisedTRMaxentModelTrainer extends App {
   val dir =
     if(modelsOutputDir.value.get != None) {
       println("Training Maxent models for each toponym type, outputting to directory " + modelsOutputDir.value.get + " ...")
+      val dirFile:File = new File(modelsOutputDir.value.get)
+      if(!dirFile.exists)
+        dirFile.mkdir
       if(modelsOutputDir.value.get.endsWith("/"))
         modelsOutputDir.value.get
       else
