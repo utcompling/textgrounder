@@ -102,6 +102,9 @@ object SupervisedTRMaxentModelTrainer extends App {
           if(bestCellNum != -1) {
             val contextFeatures = getContextFeatures(docAsArray, tokIndex, windowSize, stoplist)
             val prevSet = toponymsToTrainingSets.getOrElse(token.getForm, Nil)
+            print(toponym+": ")
+            contextFeatures.foreach(f => print(f+","))
+            println(bestCellNum)
             
             toponymsToTrainingSets.put(token.getForm, (contextFeatures, bestCellNum.toString) :: prevSet)
           }
@@ -162,7 +165,9 @@ object MaxentEventStreamFactory {
     new BasicEventStream(new DataStream {
       def nextToken: AnyRef = {
         val next = iterator.next
-        (next._1.toList ::: (next._2 :: Nil)).mkString(",")
+        val featuresAndLabel = (next._1.toList ::: (next._2 :: Nil)).mkString(",")
+        println(featuresAndLabel)
+        featuresAndLabel
       }
       def hasNext: Boolean = iterator.hasNext
     }, ",")
