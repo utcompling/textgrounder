@@ -46,6 +46,8 @@ object SupervisedTRMaxentModelTrainer extends App {
   println("Reading toponyms from TR-CoNLL at " + trInputFile.value.get + " ...")
   val toponyms:Set[String] = CorpusInfo.getCorpusInfo(trInputFile.value.get).map(_._1).toSet
 
+  toponyms.foreach(println)
+
   println("Reading Wikipedia geotags from " + wikiCorpusInputFile.value.get + "...")
   val idsToCoords = new collection.mutable.HashMap[String, Coordinate]
   val fis = new FileInputStream(wikiCorpusInputFile.value.get)
@@ -93,9 +95,16 @@ object SupervisedTRMaxentModelTrainer extends App {
   for(doc <- wikiTextCorpus) {
     if(idsToCoords.containsKey(doc.getId)) {
       val docCoord = idsToCoords(doc.getId)
+      println(doc.getId+" has a geotag: "+docCoord)
       val docAsArray = TextUtil.getDocAsArray(doc)
       var tokIndex = 0
       for(token <- docAsArray) {
+        if(token.isToponym && token.asInstanceOf[Toponym].getAmbiguity > 0) {
+          if(toponyms(token.getForm))
+            println(token.getForm+" is a toponym we care about.")
+          else
+            println(token.getForm+" is a toponym, but we don't care about it.")
+        }
         if(token.isToponym && token.asInstanceOf[Toponym].getAmbiguity > 0 && toponyms(token.getForm)) {
           val toponym = token.asInstanceOf[Toponym]
           val bestCellNum = getBestCellNum(toponym, docCoord, threshold, dpc)
@@ -113,6 +122,7 @@ object SupervisedTRMaxentModelTrainer extends App {
       }
     }
     else {
+      println(doc.getId+" does not have a geotag.")
       for(sent <- doc) { for(token <- sent) {} }
     }
   }
