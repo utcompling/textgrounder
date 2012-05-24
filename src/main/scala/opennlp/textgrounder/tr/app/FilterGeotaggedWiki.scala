@@ -49,8 +49,8 @@ object FilterGeotaggedWiki extends App {
 
   for(doc <- wikiTextCorpus) {
     if(ids contains doc.getId) {
-      println("Article title: " + doc.getId)
-      println("Article ID: " + doc.title)
+      println("Article title: " + doc.title)
+      println("Article ID: " + doc.getId)
       for(sent <- doc) {
         for(token <- sent) {
           println(token.getOrigForm)
