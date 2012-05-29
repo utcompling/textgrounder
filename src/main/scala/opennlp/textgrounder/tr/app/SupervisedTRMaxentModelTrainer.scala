@@ -143,10 +143,17 @@ object SupervisedTRMaxentModelTrainer extends App {
       ""
     }
   for((toponym, trainingSet) <- toponymsToTrainingSets) {
-    val model = GIS.trainModel(MaxentEventStreamFactory(trainingSet.toIterator), iterations, cutoff)
+    val outFile = new File(dir + toponym.replaceAll(" ", "_")+".txt")
+    val out = new BufferedWriter(new FileWriter(outFile))
+    for((context, label) <- trainingSet) {
+      for(feature <- context) out.write(feature+",")
+      out.write(label+"\n")
+    }
+    out.close
+    /*val model = GIS.trainModel(MaxentEventStreamFactory(trainingSet.toIterator), iterations, cutoff)
     val modelWriter = new BinaryGISModelWriter(model, new File(dir + toponym.replaceAll(" ", "_")+".mxm"))
     modelWriter.persist()
-    modelWriter.close()
+    modelWriter.close()*/
   }
 
   println("All done.")
