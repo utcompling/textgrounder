@@ -29,10 +29,11 @@ object SupervisedTRMaxentModelTrainer extends App {
   val gazInputFile = parser.option[String](List("g", "gaz"), "gaz", "serialized gazetteer input file")
   val stoplistInputFile = parser.option[String](List("s", "stoplist"), "stoplist", "stopwords input file")
   val modelsOutputDir = parser.option[String](List("d", "models-dir"), "models-dir", "models output directory")
+  val thresholdParam = parser.option[Double](List("t", "threshold"), "threshold", "maximum distance threshold")
 
   val windowSize = 20
   val dpc = 1.0
-  val threshold = 1.0
+  val threshold = if(thresholdParam.value != None) thresholdParam.value.get else 1.0
   val iterations = 10
   val cutoff = 5
 
