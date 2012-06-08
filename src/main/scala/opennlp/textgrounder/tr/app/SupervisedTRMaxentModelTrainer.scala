@@ -20,7 +20,7 @@ import opennlp.maxent._
 import opennlp.maxent.io._
 import opennlp.model._
 
-object SupervisedTRMaxentModelTrainer extends App {
+object SupervisedTRFeatureExtractor extends App {
   val parser = new ArgotParser("textgrounder run opennlp.textgrounder.tr.app.SupervisedTRMaxentModelTrainer", preUsage = Some("Textgrounder"))
 
   val wikiCorpusInputFile = parser.option[String](List("c", "corpus"), "corpus", "wiki training corpus input file")
@@ -34,8 +34,6 @@ object SupervisedTRMaxentModelTrainer extends App {
   val windowSize = 20
   val dpc = 1.0
   val threshold = if(thresholdParam.value != None) thresholdParam.value.get else 1.0
-  val iterations = 10
-  val cutoff = 5
 
   try {
     parser.parse(args)
@@ -175,6 +173,25 @@ object SupervisedTRMaxentModelTrainer extends App {
       }
     }
     -1
+  }
+}
+
+object SupervisedTRMaxentModelTrainer extends App {
+
+  val iterations = 10
+  val cutoff = 2
+
+  val dir = new File(args(0))
+  for(file <- dir.listFiles.filter(_.getName.endsWith(".txt"))) {
+    val reader = new BufferedReader(new FileReader(file))
+    val dataStream = new PlainTextByLineDataStream(reader)
+    val eventStream = new BasicEventStream(dataStream, ",")
+
+    //GIS.PRINT_MESSAGES = false
+    val model = GIS.trainModel(eventStream, iterations, cutoff)
+    val modelWriter = new BinaryGISModelWriter(model, new File(file.getAbsolutePath.replaceAll(".txt", ".mxm")))
+    modelWriter.persist()
+    modelWriter.close()
   }
 }
 
