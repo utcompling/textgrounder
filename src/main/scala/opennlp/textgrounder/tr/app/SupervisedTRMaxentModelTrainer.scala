@@ -183,15 +183,19 @@ object SupervisedTRMaxentModelTrainer extends App {
 
   val dir = new File(args(0))
   for(file <- dir.listFiles.filter(_.getName.endsWith(".txt"))) {
-    val reader = new BufferedReader(new FileReader(file))
-    val dataStream = new PlainTextByLineDataStream(reader)
-    val eventStream = new BasicEventStream(dataStream, ",")
+    try {
+      val reader = new BufferedReader(new FileReader(file))
+      val dataStream = new PlainTextByLineDataStream(reader)
+      val eventStream = new BasicEventStream(dataStream, ",")
 
-    //GIS.PRINT_MESSAGES = false
-    val model = GIS.trainModel(eventStream, iterations, cutoff)
-    val modelWriter = new BinaryGISModelWriter(model, new File(file.getAbsolutePath.replaceAll(".txt", ".mxm")))
-    modelWriter.persist()
-    modelWriter.close()
+      //GIS.PRINT_MESSAGES = false
+      val model = GIS.trainModel(eventStream, iterations, cutoff)
+      val modelWriter = new BinaryGISModelWriter(model, new File(file.getAbsolutePath.replaceAll(".txt", ".mxm")))
+      modelWriter.persist()
+      modelWriter.close()
+    } catch {
+      case e: Exception => e.printStackTrace
+    }
   }
 }
 
