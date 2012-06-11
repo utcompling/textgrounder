@@ -1,8 +1,11 @@
 package opennlp.textgrounder.tr.app
 
 import java.io._
+import java.util.zip._
 
+import opennlp.textgrounder.tr.util._
 import opennlp.textgrounder.tr.topo._
+import opennlp.textgrounder.tr.topo.gaz._
 import opennlp.textgrounder.tr.text._
 import opennlp.textgrounder.tr.text.prep._
 import opennlp.textgrounder.tr.text.io._
@@ -15,10 +18,33 @@ object ConvertCorpusToUnigramCounts extends App {
 
   val tokenizer = new OpenNLPTokenizer
 
-  val corpus = Corpus.createStoredCorpus
-  corpus.addSource(new TrXMLDirSource(new File(args(0)), tokenizer))
-  corpus.setFormat(BaseApp.CORPUS_FORMAT.TRCONLL)
-  corpus.load
+  var corpus = Corpus.createStoredCorpus
+  if(args(0).endsWith("txt")) {
+    /*
+    val tokenizer = new OpenNLPTokenizer
+    //val recognizer = new OpenNLPRecognizer
+    //val gis = new GZIPInputStream(new FileInputStream(args(1)))
+    //val ois = new ObjectInputStream(gis)
+    //val gnGaz = ois.readObject.asInstanceOf[GeoNamesGazetteer]
+    //gis.close
+    corpus.addSource(new PlainTextSource(
+      new BufferedReader(new FileReader(args(0))), new OpenNLPSentenceDivider(), tokenizer))
+    //corpus.addSource(new ToponymAnnotator(new PlainTextSource(
+    //		new BufferedReader(new FileReader(args(0))), new OpenNLPSentenceDivider(), tokenizer),
+    //          recognizer, gnGaz, null))
+    corpus.setFormat(BaseApp.CORPUS_FORMAT.PLAIN)
+    */
+    val importCorpus = new ImportCorpus
+    corpus = importCorpus.doImport(args(0), args(1), BaseApp.CORPUS_FORMAT.PLAIN, false)
+  }
+  else {
+    corpus.addSource(new TrXMLDirSource(new File(args(0)), tokenizer))
+    corpus.setFormat(BaseApp.CORPUS_FORMAT.TRCONLL)
+    corpus.load
+  }
+  //corpus.load
+
+  System.err.println(corpus.size)
 
   for(doc <- corpus) {
     val unigramCounts = new collection.mutable.HashMap[String, Int]

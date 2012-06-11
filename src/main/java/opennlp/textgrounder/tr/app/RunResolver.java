@@ -116,6 +116,10 @@ public class RunResolver extends BaseApp {
             System.out.print("Running LABEL PROP COMPLEX resolver, using graph at " + currentRun.getGraphInputPath() + " ...");
             resolver = new LabelPropComplexResolver(currentRun.getGraphInputPath());
         }
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.MAXENT) {
+            System.out.print("Running MAXENT resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " ...");
+            resolver = new MaxentResolver(currentRun.getMaxentModelDirInputPath());
+        }
         else {//if(getResolverType() == RESOLVER_TYPE.BASIC_MIN_DIST) {
             System.out.print("Running BASIC MINIMUM DISTANCE resolver...");
             resolver = new BasicMinDistResolver();
