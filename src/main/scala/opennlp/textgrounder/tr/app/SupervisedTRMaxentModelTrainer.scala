@@ -108,7 +108,7 @@ object SupervisedTRFeatureExtractor extends App {
           val toponym = token.asInstanceOf[Toponym]
           val bestCellNum = getBestCellNum(toponym, docCoord, threshold, dpc)
           if(bestCellNum != -1) {
-            val contextFeatures = getContextFeatures(docAsArray, tokIndex, windowSize, stoplist)
+            val contextFeatures = TextUtil.getContextFeatures(docAsArray, tokIndex, windowSize, stoplist)
             val prevSet = toponymsToTrainingSets.getOrElse(token.getForm, Nil)
             print(toponym+": ")
             contextFeatures.foreach(f => print(f+","))
@@ -156,15 +156,6 @@ object SupervisedTRFeatureExtractor extends App {
   }
 
   println("All done.")
-
-
-  def getContextFeatures(docAsArray:Array[Token], tokIndex:Int, windowSize:Int, stoplist:Set[String]): Array[String] = {
-    val startIndex = math.max(0, tokIndex - windowSize)
-    val endIndex = math.min(docAsArray.length, tokIndex + windowSize + 1)
-
-    Array.concat(docAsArray.slice(startIndex, tokIndex).map(_.getForm),
-                 docAsArray.slice(tokIndex + 1, endIndex).map(_.getForm)).filterNot(stoplist(_))
-  }
 
   def getBestCellNum(toponym:Toponym, docCoord:Coordinate, threshold:Double, dpc:Double): Int = {
     for(loc <- toponym.getCandidates) {
