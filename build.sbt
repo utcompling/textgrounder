@@ -66,4 +66,18 @@ seq(assemblySettings: _*)
 
 test in assembly := {}
 
+//excludedJars in assembly <<= (fullClasspath in assembly) map { cp => 
+//  cp filter {x => Seq("jasper-compiler-5.5.12.jar", "jasper-runtime-5.5.12.jar", "commons-beanutils-1.7.0.jar", "servlet-api-2.5-20081211.jar") contains x.data.getName }
+//}
+
+mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) =>
+  {
+    case x => {
+      val oldstrat = old(x)
+      if (oldstrat == MergeStrategy.deduplicate) MergeStrategy.first
+      else oldstrat
+    }
+  }
+}
+
 jarName in assembly := "textgrounder-assembly.jar"
