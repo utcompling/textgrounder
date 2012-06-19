@@ -1,9 +1,7 @@
 package opennlp.textgrounder.preprocess
 
 import net.liftweb.json
-import com.nicta.scoobi._
 import com.nicta.scoobi.Scoobi._
-import com.nicta.scoobi.io.text._
 import java.io._
 import java.lang.Double.isNaN
 import java.text.{SimpleDateFormat, ParseException}
@@ -19,7 +17,7 @@ import opennlp.textgrounder.util.distances.{spheredist, SphereCoord}
  * --input-corpus argument of tg-geolocate.
  */
 
-object TwitterPullLocationVariance {
+object TwitterPullLocationVariance extends ScoobiApp {
   type Tweet = (Double, Double)
   type Record = (String, Tweet)
 
@@ -129,11 +127,10 @@ object TwitterPullLocationVariance {
     (s_a(0), (s_a(1).toDouble, s_a(2).toDouble))
   }
 
-  def main(args: Array[String]) = withHadoopArgs(args) { a =>
-    // make sure we get all the input
+  def run() {
     val (inputPath, outputPath) =
-      if (a.length == 2) {
-        (a(0), a(1))
+      if (args.length == 2) {
+        (args(0), args(1))
       } else {
         sys.error("Expecting input and output path.")
       }
@@ -146,7 +143,7 @@ object TwitterPullLocationVariance {
                                                    .filter(has_latlng)
 
     val checkpointed = single_tweets.map(checkpoint_str)
-    DList.persist(TextOutput.toTextFile(checkpointed, inputPath + "-st"))
+    persist(TextOutput.toTextFile(checkpointed, inputPath + "-st"))
     */
 
     val single_tweets_lines: DList[String] = TextInput.fromTextFile(inputPath + "-st")
@@ -156,7 +153,7 @@ object TwitterPullLocationVariance {
     val averaged = grouped_by_author.map(mean_variance_and_maxdistance)
 
     val nicely_formatted = averaged.map(nicely_format)
-    DList.persist(TextOutput.toTextFile(nicely_formatted, outputPath))
+    persist(TextOutput.toTextFile(nicely_formatted, outputPath))
   }
 }
 
