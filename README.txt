@@ -267,15 +267,16 @@ the 'update' task of SBT is used).  As an example, to run the Geolocate
 subproject on the GeoText Twitter corpus (which is very small and hence
 is a good test):
 
-$ tg-geolocate --hadoop-nondist geotext
+$ tg-geolocate --hadoop-nondist geotext output
 
 If you have appropriately set up all your data files and set the environment
 variable(s) needed to tell TextGrounder where they are located, this should
-run on the corpus.  The current run reports a mean distance error of
-about 1017 kilometers, and a median distance error of about 648 kilometers.
-(NOTE: This may change!  In particular the results may get better.  But if
-your numbers are significantly larger, or enormously smaller, something is
-wrong.)
+run on the corpus.  The results should appear inside of a subdirectory called
+`output`, in a file called `part-r-00000` or similar.  The current run reports
+a mean distance error of about 941 kilometers, and a median distance error of
+about 505 kilometers. (NOTE: This may change!  In particular the results may
+get better.  But if your numbers are significantly larger, or enormously
+smaller, something is wrong.)
 
 To run properly using Hadoop (in distributed mode), you need an additional
 build step:
@@ -292,14 +293,28 @@ requires a bit more work, in that the data needs to be copied into HDFS.
 The former does not require this, but does require that the relevant files
 are visible on all nodes that will be running the program.
 
--------- Running with local data ----------
+-------- Running Hadoop normally (distributed mode), with local data ----------
 
-To run with data accessed through the local file system, simply add the
-'--hadoop' option, for example:
+To run Hadoop normally (in distributed mode, using multiple compute nodes
+as necessary, rather than simulating it using non-distributed mode, as
+described above), but with data accessed through the local file system,
+simply add the '--hadoop' option, for example:
 
-$ tg-geolocate --hadoop geotext
+$ tg-geolocate --hadoop geotext output
 
-This will invoke 'hadoop' to run the code.
+This will invoke 'hadoop' to run the code.  Again, `output` is the
+subdirectory to store the results in; in this case, it is located on HDFS.
+You can see this as follows:
+
+$ hadoop fs -ls
+
+You should see `output` as one of the directories.  If this directory already
+exists, you will get an error; choose a different name, or use
+`hadoop fs -rmr output` to remove it first.  The results should appear inside
+of `output`, in a file called `part-r-00000` or similar, with numbers the
+same as above.  You can see the output as follows:
+
+$ hadoop fs -cat 'output/*'
 
 If something goes wrong, or you just want to see more exactly what is being
 run, use the '--verbose' option, e.g.:
@@ -308,7 +323,7 @@ $ tg-geolocate --verbose --hadoop geotext
 
 This will output the exact command lines being executed.
 
--------- Running with data in HDFS ----------
+-------- Running Hadoop normally, with data in HDFS ----------
 
 The first step is to copy the data to the Hadoop File System, which you
 can do using 'tg-copy-data-to-hadoop'.  You need to copy two things,
@@ -333,12 +348,12 @@ tree of corpora.
 
 Then, run as follows:
 
-$ TG_USE_HDFS=yes tg-geolocate --hadoop geotext
+$ TG_USE_HDFS=yes tg-geolocate --hadoop geotext output
 
 If you use '--verbose' as follows, you can see exactly which options are
 being passed to the underlying 'textgrounder' script:
 
-$ TG_USE_HDFS=yes tg-geolocate --hadoop --verbose geotext
+$ TG_USE_HDFS=yes tg-geolocate --hadoop --verbose geotext output
 
 By default, the data copied using 'tg-copy-data-to-hadoop' and referenced
 by 'tg-geolocate' or 'textgrounder' is placed in the directory
