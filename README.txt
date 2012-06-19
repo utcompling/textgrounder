@@ -251,7 +251,7 @@ Documentation for SBT is here:
 
 https://github.com/harrah/xsbt/wiki
 
-Note: if you have SBT 0.11.0 already installed on your system, you can
+Note: if you have SBT 0.11.3 already installed on your system, you can
 also just call it directly with "sbt" in TEXTGROUNDER_DIR.
 
 
@@ -386,10 +386,10 @@ There are three sets of data to download:
     listed separately here and bzipped, in case you don't want them all.
     If you're not sure, get them all; or read down below to see which ones
     you need.
-  * Auxiliary files, in `wikigrounder-aux-1.0.tar.bz2`. NOTE: Currently the
-    only auxiliary file you need is the World Gazetteer, and that is needed
-    only when doing toponym resolution.
   * The processed Twitter data, in `wikigrounder-twitter-1.0.tar.bz2`.
+  * Auxiliary files, in `wikigrounder-aux-1.0.tar.bz2`. NOTE: These really
+    aren't needed any more.  The only remaining auxiliary file is the
+    World Gazetteer, and that is needed only when doing toponym resolution.
 
 Untar these files somewhere.  Then set the following environment variables:
   * `TG_WIKIPEDIA_DIR` points to the directory containing the Wikipedia data.
@@ -690,11 +690,14 @@ kinds of transformation of the probabilities.
 for x in none log logsquared; do tg-geolocate geotext --doc-thresh 5 --mts=300 --degrees-per-cell=1 --mode=generate-kml --kml-words='cool,coo' --kml-prefix=kml-dist.5.$x. --kml-transform=$x; done 
 }}}
 
-=== Generating data ===
+=== Generating data by preprocessing Wikipedia dump files ===
 
-Scripts were written to extract data from the raw Wikipedia dump files
-and from the Twitter corpus and output in the format required above for
-`textgrounder geolocate`.
+Scripts were written to extract data from raw Wikipedia dump files
+and from Twitter, and output in the "TextGrounder corpus format"
+required above for `textgrounder geolocate`.
+
+*NOTE*: See `README.preprocess` for detailed instructions on how to
+preprocess a raw Wikipedia dump to generate the TextGrounder-format corpora.
 
 *NOTE*: Parsing raw Wikipedia dump files is not easy.  Perhaps better
 would have been to download and run the MediaWiki software that generates
@@ -723,10 +726,99 @@ the Wikipedia data files (but does not generate every possible file that
 can be generated).  If you have your own dump file, change the name in
 `config-geolocate`.
 
-Similarly, to generate Twitter data, use `python/run-process-twitter`, which
-is a front end for `python/twitter_geotext_process.py`.
+=== Preprocessing of Twitter ===
 
-FIXME: Document more.
+There's a script `python/run-process-geotext` used to preprocess the GeoText
+corpus of Eisenstein et al. (2010) into a TextGrounder corpus.  This is a
+front end for `python/twitter_geotext_process.py` and runs similarly to
+the Wikipedia preprocessing code above.
+
+Preprocessing of raw Twitter tweets in JSON format (as are obtained using
+the Twitter Streaming API) is done using Scoobi
+(https://github.com/nicta/scoobi).  Scoobi is a high-level framework built on
+top of Hadoop that lets you do functional-programming-style data processing
+(mapping, filtering, etc. of lists) almost exactly as if the data was stored
+as lists in local memory, but automatically converts the operations under the
+hood into MapReduce steps.
+
+An example of a preprocessing file is `TwitterPull.scala` (badly named),
+which processes JSON-format tweets into a TextGrounder corpus, grouping tweets
+by user and combining them all into a single document.  The framework for
+doing this isn't by any means as developed or automated as the framework
+for processing Wikipedia.  For example, `TwitterPull.scala` generates a
+single data file in (more or less) the correct TextGrounder corpus format,
+but the file isn't named in a way that TextGrounder will recognize it, and
+the corresponding schema file is nonexistent and needs to be created by hand.
+
+In general, code written using Scoobi should "just work", and require litle
+or no more effort to get working than anything else that uses Hadoop.
+Specifically, you have to compile the code, build an assembly exactly as you
+would do for running other Hadoop code (see above), copy the data into HDFS,
+and run.  For example, you can run `TwitterPull.scala` as follows using
+the TextGrounder front end:
+
+$ textgrounder --hadoop run opennlp.textgrounder.preprocess.TwitterPull input output
+
+or you can run it directly using `hadoop`:
+
+$ hadoop jar $TEXTGROUNDER_DIR/target/textgrounder-assembly.jar opennlp.textgrounder.preprocess.TwitterPull input output
+
+In both cases, it is assumed that the data to be preprocessed is located in
+the HDFS directory `input` and the results are stored into the HDFS directory
+`output`.  All the files in the `input` directory will be logically
+concatenated and then processed; in the case of `TwitterPull`, they should be
+text files containing JSON-format tweets.
+
+Files that are compressed using GZIP or BZIP2 will automatically be
+decompressed.  Note that decompression will take some time, especially of
+BZIP2, and may in fact be the dominating factor in the processing time.
+Furthermore, GZIP files can't be split by Hadoop, and BZIP2 files can't be
+split unless you're using Hadoop 0.21 or later, and Hadoop will choke on
+combined BZIP2 files created by concatenating multiple individual BZIP2 files
+unless you're using Hadoop 0.21 or later.  Hence unless splitting is possible,
+you should limit the size of each input file to about 1 GB uncompressed, or
+about 100 MB compressed; that's maybe 24 hours worth of Spritzer downloading
+as of June 2012.
+
+There's a script called `twitter-pull` inside of the Twools package
+(https://bitbucket.org/utcompling/twools), which can be used for downloading
+tweets from Twitter.  This automatically handles retrying after errors along
+with exponential backoff (absolutely necessary when doing Twitter streaming,
+or you will get locked out temporarily), and starts a new file after a
+certain time period (by default, one day), to keep the resulting BZIP-ped
+files from getting overly large, as described above.
+
+You should also be able to run in non-distributed mode by using the option
+`--hadoop-nondist` in place of `--hadoop`, e.g.:
+
+$ textgrounder --hadoop-nondist run opennlp.textgrounder.preprocess.TwitterPull input output
+
+or you can run it directly using `java`:
+
+$ java -cp $TEXTGROUNDER_DIR/target/textgrounder-assembly.jar opennlp.textgrounder.preprocess.TwitterPull input output
+
+In both cases, `input` and `output` will refer to subdirectories on the local
+file system instead of in HDFS.
+
+If this procedure doesn't work and the problem appears to be in the JAR
+assembly, an alternative procedure to build this assembly is to use the
+Scoobi-specific `package-hadoop` extension to SBT.  Unfortunately, this is
+incompatible with `sbt-assembly` (used for building assemblies the normal way),
+and hence it can't be enabled by default; a little bit of hacking of the
+build procedure is required.  Specifically:
+
+1. Move the file `project/scoobi.scala` to `project/project/scoobi.scala`.
+2. Edit the file `build.sbt`, which contains the SBT build instructions,
+   and comment out the portions that refer to `sbt-assembly` (otherwise you
+   will get a syntax error when trying to run SBT).  This specifically is
+   the first line (an import statement for `AssemblyKeys`), as well as a
+   section of lines at the end beginning with `seq(assemblySettings ...)`.
+3. Then you should be able to build a JAR assembly using `sbt package-hadoop`.
+   This will also be in the `target` subdirectory but have a name something
+   like `TextGrounder-hadoop-0.3.0.jar`.
+4. You will then have to run this JAR using the "direct" methods above
+   (not using the `textgrounder` wrapper, because it will attempt to use
+   the JAR named `textgrounder-assembly.jar`, as built by `sbt-assembly`).
 
 
 ===========
