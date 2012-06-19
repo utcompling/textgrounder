@@ -28,10 +28,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.hadoop.conf.{Configuration, Configured}
 import org.apache.hadoop.fs._
 
-import com.nicta.scoobi._
 import com.nicta.scoobi.Scoobi._
-import com.nicta.scoobi.io.text._
-import com.nicta.scoobi.io.text.TextInput._
 
 /*
 
@@ -71,7 +68,7 @@ The fields are:
  * Convert files in the Infochimps Twitter corpus into files in our format.
  */
 
-object ScoobiConvertTwitterInfochimps {
+object ScoobiConvertTwitterInfochimps extends ScoobiApp {
 
   def usage() {
     sys.error("""Usage: ConvertTwitterInfochimps INFILE OUTDIR
@@ -82,7 +79,7 @@ OUTDIR is the directory to store the results in.
 """)
   }
 
-  def main(orig_args: Array[String]) = withHadoopArgs(orig_args) { args =>
+  def run() {
     if (args.length != 2)
       usage()
     val infile = args(0)
@@ -91,7 +88,7 @@ OUTDIR is the directory to store the results in.
     val fields = List("id", "title", "split", "coord", "time",
       "username", "userid", "reply_username", "reply_userid", "anchor", "lang")
 
-    val tweets = extractFromDelimitedTextFile("\t", infile) {
+    val tweets = fromDelimitedTextFile("\t", infile) {
       case id :: time :: userid :: username :: _ ::
           reply_username :: reply_userid :: _ :: text :: anchor :: lang ::
           lat :: long :: _ :: _ :: _ :: _ => {
@@ -102,7 +99,7 @@ OUTDIR is the directory to store the results in.
         (metadata mkString "\t", textdata mkString "\t")
       }
     }
-    DList.persist (
+    persist (
       TextOutput.toTextFile(tweets.map(_._1),
         "%s-twitter-infochimps-combined-document-data.txt" format outdir),
       TextOutput.toTextFile(tweets.map(_._2),

@@ -1,9 +1,7 @@
 package opennlp.textgrounder.preprocess
 
 import net.liftweb.json
-import com.nicta.scoobi._
 import com.nicta.scoobi.Scoobi._
-import com.nicta.scoobi.io.text._
 import java.io._
 import java.lang.Double.isNaN
 import java.text.{SimpleDateFormat, ParseException}
@@ -45,7 +43,7 @@ import opennlp.textgrounder.util.Twokenize
 
 class Options(val keytype: String, val timeslice: Double) { }
 
-object TwitterPull {
+object TwitterPull extends ScoobiApp {
   // Tweet = Data for a tweet other than the tweet ID =
   // (timestamp, text, lat, lng, followers, following, number of tweets)
   // Note that we have "number of tweets" since we merge multiple tweets into
@@ -312,7 +310,7 @@ object TwitterPull {
     key + "\t" + nice_text
   }
 
-  def main(orig_args: Array[String]) = withHadoopArgs(orig_args) { args =>
+  def run() {
     var by_time = false
     var timeslice = 6.0
     var a = args
@@ -354,7 +352,7 @@ object TwitterPull {
 
     // Checkpoint the resulting tweets (minus ID) onto disk.
     val checkpoint1 = single_tweets.map(checkpoint_str)
-    DList.persist(TextOutput.toTextFile(checkpoint1, outputPath + "-st"))
+    persist(TextOutput.toTextFile(checkpoint1, outputPath + "-st"))
 
     // Then load back up.
     val lines2: DList[String] = TextInput.fromTextFile(outputPath + "-st")
@@ -375,7 +373,7 @@ object TwitterPull {
 
     // Checkpoint a second time.
     val checkpoint = with_coord.map(checkpoint_str)
-    DList.persist(TextOutput.toTextFile(checkpoint, outputPath + "-cp"))
+    persist(TextOutput.toTextFile(checkpoint, outputPath + "-cp"))
 
     // Load from second checkpoint.  Note that each time we checkpoint,
     // we extract the "text" field and stick it at the end.  This time
@@ -401,7 +399,7 @@ object TwitterPull {
     val nicely_formatted = regrouped_by_key.map(nicely_format_plain)
 
     // Save to disk.
-    DList.persist(TextOutput.toTextFile(nicely_formatted, outputPath))
+    persist(TextOutput.toTextFile(nicely_formatted, outputPath))
   }
 }
 

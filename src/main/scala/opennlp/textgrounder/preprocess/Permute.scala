@@ -1,16 +1,14 @@
 package opennlp.textgrounder.preprocess
 
 import util.Random
-import com.nicta.scoobi._
 import com.nicta.scoobi.Scoobi._
-import com.nicta.scoobi.io.text._
 import java.io._
 
 /*
  * This program randomly permutes all the lines in a text file.
  */
 
-object Permute {
+object Permute extends ScoobiApp {
   val rnd = new Random
 
   def generate_key(line: String): (Double, String) = {
@@ -23,11 +21,11 @@ object Permute {
       yield v
   }
 
-  def main(args: Array[String]) = withHadoopArgs(args) { a =>
+  def run() {
     // make sure we get all the input
     val (inputPath, outputPath) =
-      if (a.length == 2) {
-        (a(0), a(1))
+      if (args.length == 2) {
+        (args(0), args(1))
       } else {
         sys.error("Expecting input and output path.")
       }
@@ -45,7 +43,7 @@ object Permute {
     val keys_removed = keys_sorted.flatMap(remove_key)
 
     // save to disk
-    DList.persist(TextOutput.toTextFile(keys_removed, outputPath))
+    persist(TextOutput.toTextFile(keys_removed, outputPath))
 
   }
 }
