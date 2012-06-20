@@ -41,14 +41,14 @@ import opennlp.textgrounder.util.Twokenize
  * people they are following.
  */
 
-class Options(val keytype: String, val timeslice: Double) { }
+class Options(val keytype: String, val timeslice: Int) { }
 
 object TwitterPull extends ScoobiApp {
   // Tweet = Data for a tweet other than the tweet ID =
-  // (timestamp, text, lat, lng, followers, following, number of tweets)
+  // (user, timestamp, text, lat, lng, followers, following, number of tweets)
   // Note that we have "number of tweets" since we merge multiple tweets into
   // a document, and also use type Tweet for them.
-  type Tweet = (String, Double, String, Double, Double, Int, Int, Int)
+  type Tweet = (String, Long, String, Double, Double, Int, Int, Int)
   // TweetID = numeric string used to uniquely identify a tweet.
   type TweetID = String
   // Record = Data for tweet along with the key (e.g. username, timestamp) =
@@ -59,7 +59,7 @@ object TwitterPull extends ScoobiApp {
   // TweetNoText = Data for a merged set of tweets other than the text =
   // (username, earliest timestamp, best lat, best lng, max followers,
   //    max following, number of tweets pulled)
-  type TweetNoText = (String, Double, Double, Double, Int, Int, Int)
+  type TweetNoText = (String, Long, Double, Double, Int, Int, Int)
   // KeyWord = (username, word)
   type KeyWord = (String, String)
   // WordCount = (word, number of ocurrences)
@@ -76,13 +76,13 @@ object TwitterPull extends ScoobiApp {
    * Convert a Twitter timestamp, e.g. "Tue Jun 05 14:31:21 +0000 2012", into
    * a time in seconds since the Epoch (Jan 1 1970, or so).
    */
-  def parse_time(timestring: String): Double = {
+  def parse_time(timestring: String): Long = {
     val sdf = new SimpleDateFormat("EEE MMM dd HH:mm:ss ZZZZZ yyyy")
     try {
       sdf.parse(timestring)
-      sdf.getCalendar.getTimeInMillis / 1000
+      sdf.getCalendar.getTimeInMillis
     } catch {
-      case pe: ParseException => 0.0
+      case pe: ParseException => 0
     }
   }
 
@@ -149,7 +149,7 @@ object TwitterPull extends ScoobiApp {
   /**
    * An empty tweet, stored as a full IDRecord.
    */
-  val empty_tweet: IDRecord = ("", ("", ("", 0.0, "", Double.NaN, Double.NaN, 0, 0, 0)))
+  val empty_tweet: IDRecord = ("", ("", ("", 0, "", Double.NaN, Double.NaN, 0, 0, 0)))
 
   /**
    * Parse a JSON line into a tweet.  Return value is an IDRecord, including
@@ -175,7 +175,10 @@ object TwitterPull extends ScoobiApp {
         }
       val key = opts.keytype match {
         case "user" => user
-        case _ => ((timestamp / opts.timeslice).toInt * opts.timeslice).toString
+        case _ => {
+          val slice_milli = opts.timeslice * 1000
+          ((timestamp / slice_milli) * slice_milli).toString
+        }
       }
       (tweet_id, (key, (user, timestamp, text, lat, lng, followers, following, 1)))
     } catch {
@@ -274,7 +277,7 @@ object TwitterPull extends ScoobiApp {
     val split2 = tweet_no_text.split("\t")
     val key = split2(0)
     val user = split2(1)
-    val ts = split2(2).toDouble
+    val ts = split2(2).toLong
     val lat = split2(3).toDouble
     val lng = split2(4).toDouble
     val fers = split2(5).toInt
@@ -307,12 +310,12 @@ object TwitterPull extends ScoobiApp {
   def nicely_format_plain(kwcs: (String, Iterable[WordCount])): String = {
     val (key, wcs) = kwcs
     val nice_text = wcs.map((w: WordCount) => w._1 + ":" + w._2).mkString(" ")
-    key + "\t" + nice_text
+    nice_text
   }
 
   def run() {
     var by_time = false
-    var timeslice = 6.0
+    var timeslice = 6
     var a = args
 
     breakable {
@@ -321,7 +324,7 @@ object TwitterPull extends ScoobiApp {
           by_time = true
           a = a.tail
         } else if (a(0) == "--timeslice" || a(0) == "--time-slice") {
-          timeslice = a(1).toDouble
+          timeslice = a(1).toInt
           a = a.tail.tail
         } else break
       }
