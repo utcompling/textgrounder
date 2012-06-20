@@ -60,8 +60,9 @@ object TwitterPull extends ScoobiApp {
   // (username, earliest timestamp, best lat, best lng, max followers,
   //    max following, number of tweets pulled)
   type TweetNoText = (String, Long, Double, Double, Int, Int, Int)
-  // KeyWord = (username, word)
-  type KeyWord = (String, String)
+  // TweetWord = Data for the tweet minus the text, plus an individual word
+  //   from the text = (tweet_no_text_as_string, word)
+  type TweetWord = (String, String)
   // WordCount = (word, number of ocurrences)
   type WordCount = (String, Long)
 
@@ -80,7 +81,7 @@ object TwitterPull extends ScoobiApp {
     val sdf = new SimpleDateFormat("EEE MMM dd HH:mm:ss ZZZZZ yyyy")
     try {
       sdf.parse(timestring)
-      sdf.getCalendar.getTimeInMillis
+      sdf.getCalendar.getTimeInMillis / 1000
     } catch {
       case pe: ParseException => 0
     }
@@ -175,10 +176,7 @@ object TwitterPull extends ScoobiApp {
         }
       val key = opts.keytype match {
         case "user" => user
-        case _ => {
-          val slice_milli = opts.timeslice * 1000
-          ((timestamp / slice_milli) * slice_milli).toString
-        }
+        case _ => ((timestamp / opts.timeslice) * opts.timeslice).toString
       }
       (tweet_id, (key, (user, timestamp, text, lat, lng, followers, following, 1)))
     } catch {
@@ -296,21 +294,35 @@ object TwitterPull extends ScoobiApp {
     }
   }
 
-  def emit_words(tweet_text: (String, String)): Iterable[(KeyWord, Long)] = {
+  /**
+   * Given the tweet data minus the text field combined into a string,
+   * plus the text field, tokenize the text and emit the words individually.
+   * Each word is emitted along with the text data and a count of 1,
+   * and later grouping + combining will add all the 1's to get the
+   * word count.
+   */
+  def emit_words(tweet_text: (String, String)): Iterable[(TweetWord, Long)] = {
     val (tweet_no_text, text) = tweet_text
     for (word <- tokenize(text) if !filter_word(word))
       yield ((tweet_no_text, word), 1L)
   }
 
-  def reposition_word(kwc: (KeyWord, Long)): (String, WordCount) = {
-    val ((key, word), c) = kwc
-    (key, (word, c))
+  /**
+   * We made the value in the key-value pair be a count so we can combine
+   * the counts easily to get the total word count, and stuffed all the
+   * rest of the data (tweet data plus word) into the key, but now we have to
+   * rearrange to move the word back into the value.
+   */
+  def reposition_word(twc: (TweetWord, Long)): (String, WordCount) = {
+    val ((tweet_no_text, word), c) = twc
+    (tweet_no_text, (word, c))
   }
 
-  def nicely_format_plain(kwcs: (String, Iterable[WordCount])): String = {
-    val (key, wcs) = kwcs
+  def nicely_format_plain(twcs: (String, Iterable[WordCount])): String = {
+    val (tweet_no_text, wcs) = twcs
     val nice_text = wcs.map((w: WordCount) => w._1 + ":" + w._2).mkString(" ")
-    nice_text
+    // Need to drop the first field, which is the key.
+    tweet_no_text.dropWhile(_ != '\t').tail + "\t" + nice_text
   }
 
   def run() {
@@ -366,12 +378,16 @@ object TwitterPull extends ScoobiApp {
     // from the earliest/ tweet with a specific coordinate.
     val concatted = values_extracted2.groupByKey.combine(merge_records)
 
-    // Filter the tweet combinations, removing users without a specific
-    // coordinate; users that appear to be "spammers" or other users with
-    // non-standard behavior; and users located outside of North America.
-    val with_coord = concatted.filter(has_latlng)
-                              .filter(is_nonspammer)
-                              .filter(northamerica_only)
+    // If grouping by user, filter the tweet combinations, removing users
+    // without a specific coordinate; users that appear to be "spammers" or
+    // other users with non-standard behavior; and users located outside of
+    // North America.  FIXME: We still want to filter spammers; but this
+    // is trickier when not grouping by user.  How to do it?
+    val with_coord =
+      if (by_time) concatted
+      else
+        concatted.filter(has_latlng).filter(is_nonspammer).
+          filter(northamerica_only)
 
 
     // Checkpoint a second time.
