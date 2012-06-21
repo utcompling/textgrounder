@@ -1,22 +1,21 @@
-# use glob syntax.
-syntax: glob
-
-output
-netbeans
+# Git file listing glob patterns specifying files to be ignored when
+# looking for "untracked" files.
+output/
+netbeans/
 *.kml
 *.gz
 *.class
-**/*.orig
+*.orig
 data/pcl_travel
 data/trdev
 data/xml-trdev
 data/raw-trdev
-api
-target
-tmp
+api/
+target/
+tmp/
 *~
 project/boot
-lib_managed
+lib_managed/
 data/models/*.bin
 data/gazetteers/*.zip
 
@@ -28,5 +27,5 @@ data/gazetteers/*.zip
 *.pyc
 python/wikigrounder/build
 python/wikigrounder/kl_divergence.c
-logs
+logs/
 alltrials-*.sh
