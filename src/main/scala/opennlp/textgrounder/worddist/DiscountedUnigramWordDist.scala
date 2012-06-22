@@ -1,4 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
+//  DiscountedUnigramWordDist.scala
+//
 //  Copyright (C) 2010, 2011, 2012 Ben Wing, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,12 +15,6 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-
-////////
-//////// DiscountedUnigramWordDist.scala
-////////
-//////// Copyright (c) 2010, 2011, 2012 Ben Wing.
-////////
 
 package opennlp.textgrounder.worddist
 
