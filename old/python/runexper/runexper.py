@@ -6,6 +6,10 @@ import os
 import time
 from nlputil import *
 
+# NOTE NOTE NOTE: This was an early attempt at writing an experiment-running
+# front end.  Superseded by the simpler program run-geolocate-exper.py
+# and by qsub-tg-geolocate for submitting multiple experiments using qsub.
+
 # A more-better config parser.  Expands using $foo references instead of
 # %(foo)s references.  References are looked up as follows:
 #
