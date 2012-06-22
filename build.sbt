@@ -81,7 +81,7 @@ libraryDependencies ++= Seq(
   // "javassist" % "javassist" % "3.12.1.GA",
   //
   // Find repository for trove-scala; currently stored unmanaged
-  // "com.codahale" % "trove-scala_2.9.1" % "0.0.1-SNAPSHOT"
+  // "com.codahale" % "trove-scala_2.9.1" % "0.0.2-SNAPSHOT"
   // Jerkson - a better library for processing JSON, although still in
   // development
   "com.codahale" % "jerkson_2.9.1" % "0.5.0"  
