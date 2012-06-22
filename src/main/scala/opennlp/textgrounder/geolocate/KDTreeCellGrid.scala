@@ -1,5 +1,9 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  Copyright (C) 2011 The University of Texas at Austin
+//  KDTreeCellGrid.scala
+//
+//  Copyright (C) 2011, 2012 Stephen Roller, The University of Texas at Austin
+//  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
+//  Copyright (C) 2011 Mike Speriosu, The University of Texas at Austin
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -13,12 +17,6 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
-
-////////
-//////// KDTreeCellGrid.scala
-////////
-//////// Copyright (c) 2011.
-////////
 
 package opennlp.textgrounder.geolocate
 
