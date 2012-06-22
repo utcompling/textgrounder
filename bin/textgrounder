@@ -103,7 +103,7 @@ if [ "$DEBUG" = yes ]; then
 fi
 
 JARS="`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`"
-SCALA_LIB="$HOME/.sbt/boot/scala-2.9.1/lib/scala-library.jar"
+SCALA_LIB="$HOME/.sbt/boot/scala-2.9.2/lib/scala-library.jar"
 CP="$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
 
 HADOOP_COMMAND="$HADOOP_BINARY jar $TEXTGROUNDER_DIR/target/textgrounder-assembly.jar"
