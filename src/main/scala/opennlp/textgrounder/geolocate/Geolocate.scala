@@ -42,8 +42,64 @@ import opennlp.textgrounder.worddist.WordDist.memoizer._
 /*
 
 This module is the main driver module for the Geolocate subproject.
-See GridLocate.scala.
+The Geolocate subproject does document-level geolocation and is part
+of TextGrounder.  An underlying GridLocate framework is provided
+for doing work of various sorts with documents that are amalgamated
+into grids (e.g. over the Earth or over dates or times).  This means
+that code for Geolocate is split between `textgrounder.geolocate` and
+`textgrounder.gridlocate`.  See also GridLocate.scala.
 
+The Geolocate code works as follows:
+
+-- The main entry class is GeolocateDocumentApp.  This is hooked into
+   GeolocateDocumentDriver.  The driver classes implement the logic for
+   running the program -- in fact, this logic in the superclass
+   GeolocateDocumentTypeDriver so that a separate Hadoop driver can be
+   provided.  The separate driver class is provided so that we can run
+   the geolocate app and other TextGrounder apps programmatically as well
+   as from the command line, and the complication of multiple driver
+   classes is (at least partly) due to supporting various apps, e.g.
+   GenerateKML (a separate app for generating KML files graphically
+   illustrating the corpus).  The mechanism that implements the driver
+   class is in textgrounder.util.experiment.  The actual entry point is
+   in ExperimentApp.main(), although the entire implementation is in
+   ExperimentApp.implement_main().
+-- The class GeolocateDocumentParameters holds descriptions of all of the
+   various command-line parameters, as well as the values of those
+   parameters when read from the command line (or alternatively, filled in
+   by another program using the programmatic interface).  This inherits
+   from GeolocateParameters, which supplies parameters common to other
+   TextGrounder apps.  Argument parsing is handled using
+   textgrounder.util.argparser, a custom argument-parsing package built on
+   top of Argot.
+-- The driver class has three main methods. `handle_parameters` verifies
+   that valid combinations of parameters were specified. `setup_for_run`
+   creates some internal structures necessary for running, and
+   `run_after_setup` does the actual running.  The reason for the separation
+   of the two is that only the former is used by the Hadoop driver.
+   (FIXME: Perhaps there's a better way of handling this.)
+
+In order to support all the various command-line parameters, the logic for
+doing geolocation is split up into various classes:
+
+-- Classes exist in `gridlocate` for an individual document (DistDocument),
+   the table of all documents (DistDocumentTable), the grid containing cells
+   into which the documents are placed (CellGrid), and the individual cells
+   in the grid (GeoCell).  There also needs to be a class specifying a
+   coordinate identifying a document (e.g. time or latitude/longitude pair).
+   Specific versions of all of these are created for Geolocate, identified
+   by the word "Sphere" (SphereDocument, SphereCell, SphereCoord, etc.),
+   which is intended to indicate the fact that the grid refers to locations
+   on the surface of a sphere.
+-- The cell grid class SphereGrid has subclasses for the different types of
+   grids (MultiRegularCellGrid, KDTreeCellGrid).
+-- Different types of strategy objects (subclasses of
+   GeolocateDocumentStrategy, in turn a subclass of GridLocateDocumentStrategy)
+   implement the different inference methods specified using `--strategy`,
+   e.g. KLDivergenceStrategy or NaiveBayesDocumentStrategy. The driver method
+   `setup_for_run` creates the necessary strategy objects.
+-- Evaluation is performed using different CellGridEvaluator objects, e.g.
+   RankedSphereCellGridEvaluator and MeanShiftSphereCellGridEvaluator. 
 */
 
 /////////////////////////////////////////////////////////////////////////////
@@ -194,7 +250,7 @@ tiling cell to compute each multi cell.  If the value is more than
 1, the multi cells overlap.""")
 
   //// Options for using KD trees, and related parameters
-  var kd_tree = 
+  var kd_tree =
     ap.flag("kd-tree", "kd", "kdtree",
       help = """Specifies we should use a KD tree rather than uniform
 grid cell.""")
@@ -223,12 +279,12 @@ splits leaves to have an equal number of documents, and 'maxmargin',
 which splits at the maximum margin between two points. All splits are always
 on the longest dimension. Default '%default'.""")
 
-  var kd_use_backoff = 
+  var kd_use_backoff =
     ap.flag("kd-backoff", "kd-use-backoff",
       help = """Specifies if we should back off to larger cell distributions.""")
 
   var kd_interpolate_weight =
-    ap.option[Double]("kd-interpolate-weight", "kdiw", default=0.0,
+    ap.option[Double]("kd-interpolate-weight", "kdiw", default = 0.0,
       help = """Specifies the weight given to parent distributions.
 Default value '%default' means no interpolation is used.""")
 
@@ -274,15 +330,15 @@ abstract class GeolocateDriver extends GridLocateDriver {
 
   protected def initialize_cell_grid(table: SphereDocumentTable) = {
     if (params.combined_kd_grid) {
-      val kdcg = 
-          KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method, 
-            params.kd_use_backoff, params.kd_interpolate_weight)
-      val mrcg = 
+      val kdcg =
+        KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method,
+          params.kd_use_backoff, params.kd_interpolate_weight)
+      val mrcg =
         new MultiRegularCellGrid(degrees_per_cell,
           params.width_of_multi_cell, table)
       new CombinedModelCellGrid(table, Seq(mrcg, kdcg))
     } else if (params.kd_tree) {
-      KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method, 
+      KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method,
         params.kd_use_backoff, params.kd_interpolate_weight)
     } else {
       new MultiRegularCellGrid(degrees_per_cell,
@@ -619,7 +675,7 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
     // Generate reader object
     if (params.eval_format == "pcl-travel")
       new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
-    else if (params.coord_strategy =="top-ranked")
+    else if (params.coord_strategy == "top-ranked")
       new RankedSphereCellGridEvaluator(strategy, stratname, this)
     else
       new MeanShiftSphereCellGridEvaluator(strategy, stratname, this,
