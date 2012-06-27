@@ -622,7 +622,7 @@ package object experiment {
   abstract class ArgParserExperimentDriver extends ExperimentDriver {
     override type TParam <: ArgParserParameters
     
-    override def param_error(string: String) {
+    override def param_error(string: String)  = {
       params.parser.error(string)
     }
 

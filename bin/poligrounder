@@ -4,10 +4,10 @@
 # setting the maximum heap size.
 RESERVED_MEMORY=512
 
-TEXTGROUNDER_VERSION=0.3.0
+POLIGROUNDER_VERSION=0.1.0
 
-if [ -z "$TEXTGROUNDER_DIR" ]; then
-  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+if [ -z "$POLIGROUNDER_DIR" ]; then
+  echo "Must set POLIGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
@@ -64,7 +64,7 @@ JAVA_MEMORY_OPT=
 if [ -n "$MEMORY" ]; then
   JAVA_MEMORY_OPT="-Xmx$MEMORY"
 elif [ -n "$TG_SET_JVM_MEMORY" ]; then
-  MEMMB=`$TEXTGROUNDER_DIR/bin/textgrounder-memory`
+  MEMMB=`$POLIGROUNDER_DIR/bin/textgrounder-memory`
   if [ "$VERBOSE" = yes ]; then
     echo "Output from textgrounder-memory is: $MEMMB"
   fi
@@ -102,11 +102,11 @@ if [ "$DEBUG" = yes ]; then
   #JAVA_DEBUG_OPT="$JAVA_DEBUG_OPT -XX:+TraceClassLoading"
 fi
 
-JARS="`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`"
+JARS="`echo $POLIGROUNDER_DIR/lib/*.jar $POLIGROUNDER_DIR/lib_managed/*/*.jar $POLIGROUNDER_DIR/lib_managed/*/*/*.jar $POLIGROUNDER_DIR/lib_managed/*/*/*/*.jar $POLIGROUNDER_DIR/output/*.jar $POLIGROUNDER_DIR/target/*.jar | tr ' ' ':'`"
 SCALA_LIB="$HOME/.sbt/boot/scala-2.9.2/lib/scala-library.jar"
-CP="$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
+CP="$POLIGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
 
-HADOOP_COMMAND="$HADOOP_BINARY jar $TEXTGROUNDER_DIR/target/textgrounder-assembly.jar"
+HADOOP_COMMAND="$HADOOP_BINARY jar $POLIGROUNDER_DIR/target/textgrounder-assembly.jar"
 JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $TG_JAVA_OPT -classpath $CP"
 #Running Scala using Java currently works, and ensures that we will run
 #properly even if Scala isn't installed on the system or an older version
@@ -119,7 +119,7 @@ shift
 help()
 {
 cat <<EOF
-TextGrounder $TEXTGROUNDER_VERSION usage:
+TextGrounder $POLIGROUNDER_VERSION usage:
   textgrounder [OPTIONS ...] COMMAND [ARGS ...]
 
 Options (mostly low-level):
@@ -147,7 +147,7 @@ Options (mostly low-level):
 
 Environment variables:
 
-  TEXTGROUNDER_DIR      Location of TextGrounder installation; needs to be
+  POLIGROUNDER_DIR      Location of TextGrounder installation; needs to be
                         set for this script to work at all.
   TG_SET_JVM_MEMORY     If non-blank, set the maximum JVM heap size to slightly
                         under the total physical memory size; useful if you
@@ -214,7 +214,7 @@ command for more information.
 EOF
 }
 
-RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=256m -Xmx512M -Xss2M -jar $TEXTGROUNDER_DIR/bin/sbt-launch-*.jar"
+RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=256m -Xmx512M -Xss2M -jar $POLIGROUNDER_DIR/bin/sbt-launch-*.jar"
 
 execute()
 {
@@ -228,12 +228,12 @@ execute()
   RUNCMD="$1"; shift
   if [ "$VERBOSE" = yes ]; then
     if [ "$CD" = yes ]; then
-      echo Executing: cd $TEXTGROUNDER_DIR
+      echo Executing: cd $POLIGROUNDER_DIR
     fi
     echo Executing: $RUNCMD ${1+"$@"}
   fi
   if [ "$CD" = yes ]; then
-    cd $TEXTGROUNDER_DIR
+    cd $POLIGROUNDER_DIR
   fi
   $RUNCMD ${1+"$@"}
 }
@@ -285,7 +285,7 @@ else
 
     # Geolocate commands
     geolocate-document)
-      # Include now because we need TEXTGROUNDER_URL; but not before so that
+      # Include now because we need POLIGROUNDER_URL; but not before so that
       # we don't get complaints about TG_CORPUS_DIR otherwise.
       . config-geolocate
 
@@ -295,9 +295,9 @@ else
       # pass (through --textgrounder-dir here, and also through corpora
       # paths in 'tg-geolocate').
       if [ -n "$HADOOP" ]; then
-        HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp
+        HADOOP_ARGS="--textgrounder-dir $POLIGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp
       elif [ -n "$HADOOP_NONDIST" ]; then
-        HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp
+        HADOOP_ARGS="--textgrounder-dir $POLIGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp
       else
         CLASS=$TGGEOLOCATE.GeolocateDocumentApp
       fi

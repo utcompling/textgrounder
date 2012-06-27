@@ -3,7 +3,7 @@
 help()
 {
   cat <<FOO
-Usage: $0 [--hadoop | --hadoop-nondist] [--app APP] [TEXTGROUNDER-OPTIONS ...] CORPUS [APP-OPTIONS ...]
+Usage: $0 [--hadoop | --hadoop-nondist] [--app APP] [POLIGROUNDER-OPTIONS ...] CORPUS [APP-OPTIONS ...]
 
 Run 'textgrounder geolocate-document' (or another related app), passing it
 the appropriate arguments for running on the specific corpus specified by
@@ -46,16 +46,16 @@ FOO
 # for usage by other scripts, and inserts these options before the
 # user-supplied options, so that the latter override the former.
 
-if [ -z "$TEXTGROUNDER_DIR" ]; then
-  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+if [ -z "$POLIGROUNDER_DIR" ]; then
+  echo "Must set POLIGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
-. $TEXTGROUNDER_DIR/bin/config-geolocate
+. $POLIGROUNDER_DIR/bin/config-geolocate
 
 # Option processing
 
-. $TEXTGROUNDER_DIR/bin/tg-geolocate-process-opts
+. $POLIGROUNDER_DIR/bin/tg-geolocate-process-opts
 
 if [ -z "$1" -o "$1" = "help" ]; then
   help; exit 1
@@ -69,7 +69,7 @@ shift
 
 # __TG_EXTRA_ARGS is for other scripts calling us; see above.
 # LOCAL_ARGS comes from config-geolocate and allows for system-supplied args.
-geolocate="$TEXTGROUNDER_DIR/bin/textgrounder $tgopts $tgapp $corpusargs $__TG_EXTRA_ARGS $LOCAL_ARGS"
+geolocate="$POLIGROUNDER_DIR/bin/textgrounder $tgopts $tgapp $corpusargs $__TG_EXTRA_ARGS $LOCAL_ARGS"
 
 echo Executing: $geolocate ${1+"$@"}
 $geolocate ${1+"$@"}

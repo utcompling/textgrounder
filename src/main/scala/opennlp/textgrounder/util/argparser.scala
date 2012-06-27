@@ -1301,7 +1301,7 @@ package object argparser {
       }
     }
 
-    def error(msg: String) {
+    def error(msg: String) = {
       throw new ArgParserConversionException(msg)
     }
   }
