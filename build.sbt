@@ -1,8 +1,8 @@
 import AssemblyKeys._ // for sbt-assembly
 
-name := "TextGrounder"
+name := "PoliGrounder"
 
-version := "0.3.0"
+version := "0.1.0"
 
 organization := "OpenNLP"
 

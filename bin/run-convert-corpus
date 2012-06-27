@@ -1,7 +1,7 @@
 #!/bin/sh
 
-if [ -z "$TEXTGROUNDER_DIR" ]; then
-  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+if [ -z "$POLIGROUNDER_DIR" ]; then
+  echo "Must set POLIGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 

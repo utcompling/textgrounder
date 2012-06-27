@@ -39,8 +39,8 @@ read from the Hadoop File System rather than locally.
 FOO
 }
 
-if [ -z "$TEXTGROUNDER_DIR" ]; then
-  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+if [ -z "$POLIGROUNDER_DIR" ]; then
+  echo "Must set POLIGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
@@ -71,7 +71,7 @@ process_wikipedia() {
   echo --language $lang --input-corpus $TG_CORPUS_URL/wikipedia/$1
 }
 
-. $TEXTGROUNDER_DIR/bin/config-geolocate
+. $POLIGROUNDER_DIR/bin/config-geolocate
 
 output_args() {
   case "$1" in

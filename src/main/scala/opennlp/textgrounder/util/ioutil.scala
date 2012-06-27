@@ -431,6 +431,11 @@ package object ioutil {
   }
 
   class LocalFileHandler extends FileHandler {
+    def check_exists(filename: String) {
+      if (!new File(filename).exists)
+        throw new FileNotFoundException("%s (No such file or directory)"
+          format filename)
+    }
     def get_raw_input_stream(filename: String) = new FileInputStream(filename)
     def get_raw_output_stream(filename: String) = new FileOutputStream(filename)
     def split_filename(filename: String) = {
@@ -439,13 +444,17 @@ package object ioutil {
     }
     def join_filename(dir: String, file: String) =
       new File(dir, file).toString
-    def is_directory(filename: String) =
+    def is_directory(filename: String) = {
+      check_exists(filename)
       new File(filename).isDirectory
-    def make_directories(filename: String):Boolean =
+    }
+    def make_directories(filename: String): Boolean =
       new File(filename).mkdirs
-    def list_files(dir: String) =
+    def list_files(dir: String) = {
+      check_exists(dir)
       for (file <- new File(dir).listFiles)
         yield file.toString
+    }
   }
 
   val local_file_handler = new LocalFileHandler
