@@ -152,6 +152,24 @@ class TimeCellGrid(
   def initialize_cells() {
     from_cell.finish()
     to_cell.finish()
+    /* FIXME!!!
+      1. Should this be is_empty or is_empty_for_word_dist?  Do we even need
+         this distinction?
+      2. Computation of num_non_empty_cells should happen automatically!
+    */
+    if (!from_cell.combined_dist.is_empty_for_word_dist)
+      num_non_empty_cells += 1
+    if (!to_cell.combined_dist.is_empty_for_word_dist)
+      num_non_empty_cells += 1
+    for ((cell, name) <- Seq((from_cell, "from"), (to_cell, "to"))) {
+      val comdist = cell.combined_dist
+      errprint("Number of documents in %s-chunk: %s", name,
+        comdist.num_docs_for_word_dist)
+      errprint("Number of types in %s-chunk: %s", name,
+        comdist.word_dist.asInstanceOf[UnigramWordDist].num_word_types)
+      errprint("Number of tokens in %s-chunk: %s", name,
+        comdist.word_dist.asInstanceOf[UnigramWordDist].num_word_tokens)
+    }
   }
 
   def compare_cells(min_word_prob: Double) {
