@@ -55,7 +55,6 @@ import opennlp.textgrounder.worddist.WordDist.memoizer._
  * @param cellprobs Hash table listing probabilities associated with cells
  */
 
- */
 class SphereWordCellDist(
   cell_grid: SphereCellGrid,
   word: Word

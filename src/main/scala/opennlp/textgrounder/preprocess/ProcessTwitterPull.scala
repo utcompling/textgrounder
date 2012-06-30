@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  TwitterPull.scala
+//  ProcessTwitterPull.scala
 //
 //  Copyright (C) 2012 Stephen Roller, The University of Texas at Austin
 //  Copyright (C) 2012 Ben Wing, The University of Texas at Austin
@@ -32,32 +32,35 @@ import opennlp.textgrounder.util.Twokenize
 /*
  * This program takes, as input, files which contain one tweet
  * per line in json format as directly pulled from the twitter
- * API. It outputs a folder that may be used as the --input-corpus
- * argument of tg-geolocate.  This is in "TextGrounder corpus" format,
- * with one document per line, fields separated by tabs, and all the words and
- * counts placed in a single field, of the form "WORD1:COUNT1 WORD2:COUNT2 ...".
+ * API. It combines the tweets either by user or by time, and outputs a
+ * folder that may be used as the --input-corpus argument of tg-geolocate.
+ * This is in "TextGrounder corpus" format, with one document per line,
+ * fields separated by tabs, and all the words and counts placed in a single
+ * field, of the form "WORD1:COUNT1 WORD2:COUNT2 ...".
+ *
  * The fields currently output are:
  *
  * 1. user
  * 2. timestamp
- * 3. latitude
- * 4. longitude
- * 5. number of followers (people following the user)
- * 6. number of people the user is following
- * 7. number of tweets merged to form the per-user document
+ * 3. latitude,longitude
+ * 4. number of followers (people following the user)
+ * 5. number of people the user is following
+ * 6. number of tweets merged to form the per-user document
+ * 7. unigram text of combined tweets
  *
- * No schema is generated; it must be created by hand.
+ * NOTE: A schema is generated and properly named, but the main file is
+ * currently given a name by Scoobi and needs to be renamed to correspond
+ * with the schema file: e.g. if the schema file is called
+ * "sep-22-debate-training-unigram-counts-schema.txt", then the main file
+ * should be called "sep-22-debate-training-unigram-counts.txt".
  *
- * FIXME: The corpus is supposed to have latitude and longitude as a single
- * "coordinate" field, but they appear to be separate fields here.
- *
- * The code first merges by user, using the earliest geolocated tweet as the
+ * When merging by user, the code uses the earliest geolocated tweet as the
  * user's location; tweets with a bounding box as their location rather than a
  * single point are treated as if they have no location.  Then the code filters
  * out users that have no geolocation or have a geolocation outside of North
- * America (according to a crude bounding box), as well as those that are identified
- * as likely "spammers" according to their number of followers and number of
- * people they are following.
+ * America (according to a crude bounding box), as well as those that are
+ * identified as likely "spammers" according to their number of followers and
+ * number of people they are following.
  */
 
 class Options(val keytype: String, val timeslice: Int) { }
