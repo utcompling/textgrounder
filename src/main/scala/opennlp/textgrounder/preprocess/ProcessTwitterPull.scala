@@ -63,14 +63,14 @@ import opennlp.textgrounder.util.Twokenize
  * number of people they are following.
  */
 
-class TwitterPullOptions {
+class ProcessTwitterPullOptions {
   var keytype = "user"
   var timeslice = 6000L
   var corpus_name = "unknown"
   var split = "training"
 }
 
-object TwitterPull extends ScoobiApp {
+object ProcessTwitterPull extends ScoobiApp {
   // Tweet = Data for a tweet other than the tweet ID =
   // (user, timestamp, text, lat, lng, followers, following, number of tweets)
   // Note that we have "number of tweets" since we merge multiple tweets into
@@ -183,7 +183,7 @@ object TwitterPull extends ScoobiApp {
    * Parse a JSON line into a tweet.  Return value is an IDRecord, including
    * the tweet ID, username, text and all other data.
    */
-  def parse_json(line: String, opts: TwitterPullOptions): IDRecord = {
+  def parse_json(line: String, opts: ProcessTwitterPullOptions): IDRecord = {
     try {
       val parsed = json.parse(line)
       val user = force_value(parsed \ "user" \ "screen_name")
@@ -370,7 +370,7 @@ object TwitterPull extends ScoobiApp {
     Seq(user, ts, latlngstr, fers, fing, numtw, nice_text) mkString "\t"
   }
 
-  def output_schema(outputPath: String, opts: TwitterPullOptions) {
+  def output_schema(outputPath: String, opts: ProcessTwitterPullOptions) {
     val filename =
       "%s/%s-%s-unigram-counts-schema.txt" format
         (outputPath, opts.corpus_name, opts.split)
@@ -390,7 +390,7 @@ object TwitterPull extends ScoobiApp {
   }
 
   def run() {
-    val opts = new TwitterPullOptions
+    val opts = new ProcessTwitterPullOptions
     var a = args
 
     breakable {
