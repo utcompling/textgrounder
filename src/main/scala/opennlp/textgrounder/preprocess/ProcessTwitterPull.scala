@@ -28,6 +28,7 @@ import java.text.{SimpleDateFormat, ParseException}
 import util.control.Breaks._
 
 import opennlp.textgrounder.util.Twokenize
+import opennlp.textgrounder.util.argparser._
 
 /*
  * This program takes, as input, files which contain one tweet
@@ -63,11 +64,24 @@ import opennlp.textgrounder.util.Twokenize
  * number of people they are following.
  */
 
-class ProcessTwitterPullOptions {
+class ProcessTwitterPullParams(ap: ArgParser) {
+  // The following is set based on presence or absence of --by-time
   var keytype = "user"
-  var timeslice = 6000L
-  var corpus_name = "unknown"
-  var split = "training"
+  var timeslice_float =
+    ap.option[Double]("timeslice", "time-slice", default = 6.0,
+  help="""Number of seconds per timeslice when grouping '--by-time'.
+  Can be a fractional number.  Default %default.""")
+  // The following is set based on --timeslice
+  var timeslice: Long = _
+  var corpus_name = ap.option[String]("corpus-name", default = "unknown",
+  help="""Name of corpus; for identification purposes.  Default '%default'.""")
+  var split = ap.option[String]("split", default = "training",
+  help="""Split (training, dev, test) to place data in.  Default %default.""")
+  var by_time = ap.flag("by-time")
+  var input = ap.positional[String]("INPUT",
+    help = "Source directory to read files from.")
+  var output = ap.positional[String]("OUTPUT",
+    help = "Destination directory to place files in.")
 }
 
 object ProcessTwitterPull extends ScoobiApp {
@@ -183,7 +197,7 @@ object ProcessTwitterPull extends ScoobiApp {
    * Parse a JSON line into a tweet.  Return value is an IDRecord, including
    * the tweet ID, username, text and all other data.
    */
-  def parse_json(line: String, opts: ProcessTwitterPullOptions): IDRecord = {
+  def parse_json(line: String, opts: ProcessTwitterPullParams): IDRecord = {
     try {
       val parsed = json.parse(line)
       val user = force_value(parsed \ "user" \ "screen_name")
@@ -370,10 +384,10 @@ object ProcessTwitterPull extends ScoobiApp {
     Seq(user, ts, latlngstr, fers, fing, numtw, nice_text) mkString "\t"
   }
 
-  def output_schema(outputPath: String, opts: ProcessTwitterPullOptions) {
+  def output_schema(opts: ProcessTwitterPullParams) {
     val filename =
       "%s/%s-%s-unigram-counts-schema.txt" format
-        (outputPath, opts.corpus_name, opts.split)
+        (opts.output, opts.corpus_name, opts.split)
     val p = new PrintWriter(new File(filename))
     def print_seq(s: String*) {
       p.println(s mkString "\t")
@@ -390,37 +404,19 @@ object ProcessTwitterPull extends ScoobiApp {
   }
 
   def run() {
-    val opts = new ProcessTwitterPullOptions
-    var a = args
-
-    breakable {
-      while (a.length > 0) {
-        if (a(0) == "--by-time") {
-          opts.keytype = "timestamp"
-          a = a.tail
-        } else if (a(0) == "--timeslice" || a(0) == "--time-slice") {
-          opts.timeslice = (a(1).toDouble * 1000).toLong
-          a = a.tail.tail
-        } else if (a(0) == "--name") {
-          opts.corpus_name = a(1)
-          a = a.tail.tail
-        } else if (a(0) == "--split") {
-          opts.split = a(1)
-          a = a.tail.tail
-        } else break
-      }
-    }
-
-    // make sure we get all the input
-    val (inputPath, outputPath) =
-      if (a.length == 2) {
-        (a(0), a(1))
-      } else {
-        sys.error("Expecting input and output path.")
-      }
+    val ap = new ArgParser("ProcessTwitterPull")
+    // This first call is necessary, even though it doesn't appear to do
+    // anything.  In particular, this ensures that all arguments have been
+    // defined on `ap` prior to parsing.
+    new ProcessTwitterPullParams(ap)
+    ap.parse(args)
+    val opts = new ProcessTwitterPullParams(ap)
+    if (opts.by_time)
+      opts.keytype = "timestamp"
+    opts.timeslice = (opts.timeslice_float * 1000).toLong
 
     // Firstly we load up all the (new-line-separated) JSON lines.
-    val lines: DList[String] = TextInput.fromTextFile(inputPath)
+    val lines: DList[String] = TextInput.fromTextFile(opts.input)
 
     // Parse JSON into tweet records (IDRecord), filter out invalid tweets.
     val values_extracted = lines.map(parse_json(_, opts)).filter(is_valid_tweet)
@@ -434,10 +430,10 @@ object ProcessTwitterPull extends ScoobiApp {
 
     // Checkpoint the resulting tweets (minus ID) onto disk.
     val checkpoint1 = single_tweets.map(checkpoint_str)
-    persist(TextOutput.toTextFile(checkpoint1, outputPath + "-st"))
+    persist(TextOutput.toTextFile(checkpoint1, opts.output + "-st"))
 
     // Then load back up.
-    val lines2: DList[String] = TextInput.fromTextFile(outputPath + "-st")
+    val lines2: DList[String] = TextInput.fromTextFile(opts.output + "-st")
     val values_extracted2 = lines2.map(from_checkpoint_to_record)
 
     // Group by username, then combine the tweets for a user into a
@@ -459,14 +455,14 @@ object ProcessTwitterPull extends ScoobiApp {
 
     // Checkpoint a second time.
     val checkpoint = with_coord.map(checkpoint_str)
-    persist(TextOutput.toTextFile(checkpoint, outputPath + "-cp"))
+    persist(TextOutput.toTextFile(checkpoint, opts.output + "-cp"))
 
     // Load from second checkpoint.  Note that each time we checkpoint,
     // we extract the "text" field and stick it at the end.  This time
     // when loading it up, we use `from_checkpoint_to_tweet_text`, which
     // gives us the tweet data as a string (minus text) and the text, as
     // two separate strings.
-    val lines_cp: DList[String] = TextInput.fromTextFile(outputPath + "-cp")
+    val lines_cp: DList[String] = TextInput.fromTextFile(opts.output + "-cp")
 
     // Now word count.  We run `from_checkpoint_to_tweet_text` (see above)
     // to get separate access to the text, then Twokenize it into words
@@ -485,10 +481,10 @@ object ProcessTwitterPull extends ScoobiApp {
     val nicely_formatted = regrouped_by_key.map(nicely_format_plain)
 
     // Save to disk.
-    persist(TextOutput.toTextFile(nicely_formatted, outputPath))
+    persist(TextOutput.toTextFile(nicely_formatted, opts.output))
 
     // create a schema
-    output_schema(outputPath, opts)
+    output_schema(opts)
   }
 }
 
