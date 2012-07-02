@@ -29,8 +29,8 @@ sealed abstract class Expr {
   def matches(x: Seq[String]): Boolean
 }
 
-case class EConst(value: String) extends Expr {
-  def matches(x: Seq[String]) = x contains value
+case class EConst(value: Seq[String]) extends Expr {
+  def matches(x: Seq[String]) = x containsSlice value
 }
 
 case class EAnd(left:Expr, right:Expr) extends Expr {
@@ -83,13 +83,17 @@ object ExprParser extends StandardTokenParsers {
     override val lexical = new ExprLexical
     lexical.delimiters ++= List("&","|","!","(",")")
 
-    def value = numericLit ^^ { s => EConst(s) }
+    def word = numericLit ^^ { s => EConst(Seq(s)) }
 
-    def parens:Parser[Expr] = "(" ~> expr <~ ")"
+    def words =
+        word.+ ^^ { x => EConst(x.flatMap(_ match { case EConst(y) => y })) }
 
-    def not:Parser[ENot] = "!" ~> term ^^ { ENot(_) }
 
-    def term = ( value | parens | not )
+    def parens: Parser[Expr] = "(" ~> expr <~ ")"
+
+    def not: Parser[ENot] = "!" ~> term ^^ { ENot(_) }
+
+    def term = ( words | parens | not )
 
     def andexpr = term * (
             "&" ^^^ { (a:Expr, b:Expr) => EAnd(a,b) } )
@@ -99,12 +103,12 @@ object ExprParser extends StandardTokenParsers {
 
     def expr = ( orexpr | term )
 
-    def parse(s:String) = {
+    def parse(s :String) = {
         val tokens = new lexical.Scanner(s)
         phrase(expr)(tokens)
     }
 
-    def apply(s:String):Expr = {
+    def apply(s: String): Expr = {
         parse(s) match {
             case Success(tree, _) => tree
             case e: NoSuccess =>
