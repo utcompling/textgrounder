@@ -89,25 +89,15 @@ object ExprParser extends StandardTokenParsers {
 
     def not:Parser[ENot] = "!" ~> term ^^ { ENot(_) }
 
-    def term = ( value |  parens | not )
+    def term = ( value | parens | not )
 
-    def binaryOp(level:Int):Parser[((Expr,Expr)=>Expr)] = {
-        level match {
-            case 1 =>
-                "|" ^^^ { (a:Expr, b:Expr) => EOr(a,b) }
-            case 2 =>
-                "&" ^^^ { (a:Expr, b:Expr) => EAnd(a,b) }
-            case _ => throw new RuntimeException("bad precedence level "+level)
-        }
-    }
-    val minPrec = 1
-    val maxPrec = 2
+    def andexpr = term * (
+            "&" ^^^ { (a:Expr, b:Expr) => EAnd(a,b) } )
 
-    def binary(level:Int):Parser[Expr] =
-        if (level>maxPrec) term
-        else binary(level+1) * binaryOp(level)
+    def orexpr = andexpr * (
+            "|" ^^^ { (a:Expr, b:Expr) => EOr(a,b) } )
 
-    def expr = ( binary(minPrec) | term )
+    def expr = ( orexpr | term )
 
     def parse(s:String) = {
         val tokens = new lexical.Scanner(s)
@@ -135,4 +125,3 @@ object ExprParser extends StandardTokenParsers {
     //A main method for testing
     def main(args: Array[String]) = test(args(0), args(1).split("""\s"""))
 }
-
