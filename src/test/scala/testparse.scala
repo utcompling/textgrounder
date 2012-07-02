@@ -1,6 +1,8 @@
-import scala.util.parsing.combinator.syntactical.StdTokenParsers
-import scala.util.parsing.combinator.lexical.StdLexical
-
+import scala.util.parsing.combinator.syntactical._
+import scala.util.parsing.combinator.lexical._
+import scala.util.parsing.combinator.token._
+import scala.collection.mutable.HashSet
+import scala.util.parsing.input.CharArrayReader.EofCh
 
 object ArithmeticParser extends StdTokenParsers with Application {
  type Tokens = StdLexical
@@ -77,13 +79,47 @@ class ExprLexical extends StdLexical {
     }
 }
 
+class FilterLexical extends StdLexical {
+  // see `token` in `Scanners`
+  override def token: Parser[Token] =
+    ( delim
+    | unquotedWordChar ~ rep( unquotedWordChar )  ^^
+       { case first ~ rest => processIdent(first :: rest mkString "") }
+    | '\"' ~ rep( quotedWordChar ) ~ '\"' ^^
+       { case '\"' ~ chars ~ '\"' => StringLit(chars mkString "") }
+    | EofCh                                             ^^^ EOF
+    | '\"' ~> failure("unclosed string literal")
+    | failure("illegal character")
+    )
+
+  def isPrintable(ch: Char) =
+     !ch.isControl && !ch.isSpaceChar && !ch.isWhitespace && ch != EofCh
+  def isPrintableNonDelim(ch: Char) =
+     isPrintable(ch) && ch != '(' && ch != ')'
+  def unquotedWordChar = elem("unquoted word char",
+     ch => ch != '"' && isPrintableNonDelim(ch))
+  def quotedWordChar = elem("quoted word char",
+     ch => ch != '"' && ch != '\n' && ch != EofCh)
+
+ // // see `whitespace in `Scanners`
+ // def whitespace: Parser[Any] = rep(
+ //     whitespaceChar
+ // //  | '/' ~ '/' ~ rep( chrExcept(EofCh, '\n') )
+ //   )
+
+  override protected def processIdent(name: String) =
+    if (reserved contains name) Keyword(name) else StringLit(name)
+}
+
 import scala.util.parsing.combinator.syntactical._
 
 object ExprParser extends StandardTokenParsers {
-    override val lexical = new ExprLexical
-    lexical.delimiters ++= List("&","|","!","(",")")
+    override val lexical = new FilterLexical
+    lexical.reserved ++= List("&", "|", "!")
+    // lexical.delimiters ++= List("&","|","!","(",")")
+    lexical.delimiters ++= List("(",")")
 
-    def word = numericLit ^^ { s => EConst(Seq(s)) }
+    def word = stringLit ^^ { s => EConst(Seq(s)) }
 
     def words =
         word.+ ^^ { x => EConst(x.flatMap(_ match { case EConst(y) => y })) }
