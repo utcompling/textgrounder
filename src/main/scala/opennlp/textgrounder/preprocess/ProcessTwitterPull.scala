@@ -29,6 +29,7 @@ import util.control.Breaks._
 
 import opennlp.textgrounder.util.Twokenize
 import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.gridlocate.DistDocument
 
 /*
  * This program takes, as input, files which contain one tweet
@@ -36,8 +37,8 @@ import opennlp.textgrounder.util.argparser._
  * API. It combines the tweets either by user or by time, and outputs a
  * folder that may be used as the --input-corpus argument of tg-geolocate.
  * This is in "TextGrounder corpus" format, with one document per line,
- * fields separated by tabs, and all the words and counts placed in a single
- * field, of the form "WORD1:COUNT1 WORD2:COUNT2 ...".
+ * fields separated by tabs, and all the ngrams and counts placed in a single
+ * field, of the form "WORD1:WORD2:...:COUNT WORD1:WORD2:...:COUNT ...".
  *
  * The fields currently output are:
  *
@@ -67,17 +68,28 @@ import opennlp.textgrounder.util.argparser._
 class ProcessTwitterPullParams(ap: ArgParser) {
   // The following is set based on presence or absence of --by-time
   var keytype = "user"
-  var timeslice_float =
-    ap.option[Double]("timeslice", "time-slice", default = 6.0,
-  help="""Number of seconds per timeslice when grouping '--by-time'.
-  Can be a fractional number.  Default %default.""")
+  var timeslice_float = ap.option[Double]("timeslice", "time-slice",
+    default = 6.0,
+    help="""Number of seconds per timeslice when grouping '--by-time'.
+    Can be a fractional number.  Default %default.""")
   // The following is set based on --timeslice
   var timeslice: Long = _
   var corpus_name = ap.option[String]("corpus-name", default = "unknown",
-  help="""Name of corpus; for identification purposes.  Default '%default'.""")
+    help="""Name of corpus; for identification purposes.
+    Default '%default'.""")
   var split = ap.option[String]("split", default = "training",
-  help="""Split (training, dev, test) to place data in.  Default %default.""")
-  var by_time = ap.flag("by-time")
+    help="""Split (training, dev, test) to place data in.  Default %default.""")
+  var by_time = ap.flag("by-time",
+    help="""Group tweets by time instead of by user.  When this is used, all
+    tweets within a timeslice of a give number of seconds (specified using
+    '--timeslice') are grouped together.""")
+  var preserve_case = ap.flag("preserve-case",
+    help="""Don't lowercase words.  This preserves the difference
+    between e.g. the name "Mark" and the word "mark".""")
+  var max_ngram = ap.option[Int]("max-ngram", "max-n-gram", "ngram", "n-gram",
+    default = 1,
+    help="""Largest size of n-grams to create.  Default 1, i.e. distribution
+    only contains unigrams.""")
   var input = ap.positional[String]("INPUT",
     help = "Source directory to read files from.")
   var output = ap.positional[String]("OUTPUT",
@@ -101,11 +113,13 @@ object ProcessTwitterPull extends ScoobiApp {
   // (username, earliest timestamp, best lat, best lng, max followers,
   //    max following, number of tweets pulled)
   type TweetNoText = (String, Long, Double, Double, Int, Int, Int)
-  // TweetWord = Data for the tweet minus the text, plus an individual word
-  //   from the text = (tweet_no_text_as_string, word)
-  type TweetWord = (String, String)
-  // WordCount = (word, number of ocurrences)
-  type WordCount = (String, Long)
+  // TweetNgram = Data for the tweet minus the text, plus an individual ngram
+  //   from the text = (tweet_no_text_as_string, ngram)
+  type TweetNgram = (String, String)
+  // NgramCount = (ngram, number of ocurrences)
+  type NgramCount = (String, Long)
+
+  var Opts: ProcessTwitterPullParams = _
 
   def force_value(value: json.JValue): String = {
     if ((value values) == null)
@@ -176,6 +190,7 @@ object ProcessTwitterPull extends ScoobiApp {
   val MIN_LNG = -126.0
   val MAX_LAT = 49.0
   val MAX_LNG = -60.0
+
   /**
    * Return true of this tweet (combination) is located within the
    * bounding box fo North America.
@@ -197,7 +212,7 @@ object ProcessTwitterPull extends ScoobiApp {
    * Parse a JSON line into a tweet.  Return value is an IDRecord, including
    * the tweet ID, username, text and all other data.
    */
-  def parse_json(line: String, opts: ProcessTwitterPullParams): IDRecord = {
+  def parse_json(line: String): IDRecord = {
     try {
       val parsed = json.parse(line)
       val user = force_value(parsed \ "user" \ "screen_name")
@@ -215,9 +230,9 @@ object ProcessTwitterPull extends ScoobiApp {
             (parsed \ "coordinates" \ "coordinates" values).asInstanceOf[List[Number]]
           (latlng(1).doubleValue, latlng(0).doubleValue)
         }
-      val key = opts.keytype match {
+      val key = Opts.keytype match {
         case "user" => user
-        case _ => ((timestamp / opts.timeslice) * opts.timeslice).toString
+        case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
       }
       (tweet_id, (key, (user, timestamp, text, lat, lng, followers, following, 1)))
     } catch {
@@ -227,17 +242,19 @@ object ProcessTwitterPull extends ScoobiApp {
     }
   }
 
-  // Select the first tweet with the same ID.  For various reasons we may
-  // have duplicates of the same tweet among our data.  E.g. it seems that
-  // Twitter itself sometimes streams duplicates through its Streaming API,
-  // and data from different sources will almost certainly have duplicates.
-  // Furthermore, sometimes we want to get all the tweets even in the presence
-  // of flakiness that causes Twitter to sometimes bomb out in a Streaming
-  // session and take a while to restart, so we have two or three simultaneous
-  // streams going recording the same stuff, hoping that Twitter bombs out at
-  // different points in the different sessions (which is generally true).
-  // Then, all or almost all the tweets are available in the different streams,
-  // but there is a lot of duplication that needs to be tossed aside.
+  /**
+   * Select the first tweet with the same ID.  For various reasons we may
+   * have duplicates of the same tweet among our data.  E.g. it seems that
+   * Twitter itself sometimes streams duplicates through its Streaming API,
+   * and data from different sources will almost certainly have duplicates.
+   * Furthermore, sometimes we want to get all the tweets even in the presence
+   * of flakiness that causes Twitter to sometimes bomb out in a Streaming
+   * session and take a while to restart, so we have two or three simultaneous
+   * streams going recording the same stuff, hoping that Twitter bombs out at
+   * different points in the different sessions (which is generally true).
+   * Then, all or almost all the tweets are available in the different streams,
+   * but there is a lot of duplication that needs to be tossed aside.
+   */
   def tweet_once(id_rs: (TweetID, Iterable[Record])): Record = {
     val (id, rs) = id_rs
     rs.head
@@ -278,7 +295,7 @@ object ProcessTwitterPull extends ScoobiApp {
    * Return true if tweet (combination) has a fully-specified latitude
    * and longitude.
    */
-  def has_latlng(r: Record): Boolean = {
+  def has_latlng(r: Record) = {
     val (key, (user, ts, text, lat, lng, fers, fing, numtw)) = r
     !isNaN(lat) && !isNaN(lng)
   }
@@ -286,23 +303,53 @@ object ProcessTwitterPull extends ScoobiApp {
   /**
    * Convert a word to lowercase.
    */
-  def normalize_word(word: String): String = {
-    word.toLowerCase
+  def normalize_word(word: String) = {
+    if (Opts.preserve_case)
+      word
+    else
+      word.toLowerCase
   }
 
   /**
-   * Use Twokenize to break up a tweet into separate tokens.
+   * Use Twokenize to break up a tweet into separate ngrams.
    */
-  def tokenize(text: String): Iterable[String] = {
-    return Twokenize(text).map(normalize_word)
+  def tokenize(text: String): Iterable[Iterable[String]] = {
+    // First, tokenize into separate tokens ("words") using Twokenize.
+    val words = Twokenize(text).map(normalize_word)
+
+    // Then, generate all possible ngrams up to a specified maximum length,
+    // where each ngram is a sequence of words.  `sliding` overlays a sliding
+    // window of a given size on a sequence to generate successive
+    // subsequences -- exactly what we want to generate ngrams.  So we
+    // generate all 1-grams, then all 2-grams, etc. up to the maximum size,
+    // and then concatenate the separate lists together (that's what `flatMap`
+    // does).
+    (1 to Opts.max_ngram).flatMap(words.sliding(_))
   }
 
-  def filter_word(word: String): Boolean = {
-    word.contains("http://") ||
-      word.contains(":") ||
-      word.startsWith("@")
+  /**
+   * Return true if word should be filtered out.
+   */
+  def filter_word(word: String) = {
+    // word.contains("http://") || word.contains(":") || word.startsWith("@")
+    word.contains("http://") || word.contains("https://")
   }
 
+  /**
+   * Return true if n-gram should be filtered out.
+   */
+  def filter_ngram(ngram: Iterable[String]) = {
+    ngram.exists(filter_word)
+  }
+
+  /**
+   * Convert a "record" (key plus tweet data) into a line of text suitable
+   * for writing to a "checkpoint" file.  We encode all the fields into text
+   * and separate by tabs.  The text gets moved to the end and preceded by
+   * two tabs, so it can be found more easily when re-reading. FIXME: This
+   * is fragile; will have problems if any field is blank.  Just peel off
+   * the last field, or whatever.
+   */
   def checkpoint_str(r: Record): String = {
     val (key, (user, ts, text, lat, lng, fers, fing, numtw)) = r
     val text_2 = text.replaceAll("\\s+", " ")
@@ -310,8 +357,13 @@ object ProcessTwitterPull extends ScoobiApp {
     s
   }
 
+  /**
+   * Convert a checkpointed string generated by `checkpoint_str` back into
+   * the record it came from.
+   */
   def from_checkpoint_to_record(line: String): Record = {
     val split = line.split("\t\t")
+    assert(split.length == 2)
     val (tweet_no_text, text) = (split(0), split(1))
     val (key, (user, ts, lat, lng, fers, fing, numtw)) =
       split_tweet_no_text(tweet_no_text)
@@ -343,35 +395,37 @@ object ProcessTwitterPull extends ScoobiApp {
 
   /**
    * Given the tweet data minus the text field combined into a string,
-   * plus the text field, tokenize the text and emit the words individually.
-   * Each word is emitted along with the text data and a count of 1,
+   * plus the text field, tokenize the text and emit the ngrams individually.
+   * Each ngram is emitted along with the text data and a count of 1,
    * and later grouping + combining will add all the 1's to get the
-   * word count.
+   * ngram count.
    */
-  def emit_words(tweet_text: (String, String)): Iterable[(TweetWord, Long)] = {
+  def emit_ngrams(tweet_text: (String, String)):
+      Iterable[(TweetNgram, Long)] = {
     val (tweet_no_text, text) = tweet_text
-    for (word <- tokenize(text) if !filter_word(word))
-      yield ((tweet_no_text, word), 1L)
+    for (ngram <- tokenize(text) if !filter_ngram(ngram))
+      yield ((tweet_no_text, DistDocument.encode_ngram_for_counts_field(ngram)),
+             1L)
   }
 
   /**
    * We made the value in the key-value pair be a count so we can combine
-   * the counts easily to get the total word count, and stuffed all the
-   * rest of the data (tweet data plus word) into the key, but now we have to
-   * rearrange to move the word back into the value.
+   * the counts easily to get the total ngram count, and stuffed all the
+   * rest of the data (tweet data plus ngram) into the key, but now we have to
+   * rearrange to move the ngram back into the value.
    */
-  def reposition_word(twc: (TweetWord, Long)): (String, WordCount) = {
-    val ((tweet_no_text, word), c) = twc
-    (tweet_no_text, (word, c))
+  def reposition_ngram(tnc: (TweetNgram, Long)): (String, NgramCount) = {
+    val ((tweet_no_text, ngram), c) = tnc
+    (tweet_no_text, (ngram, c))
   }
 
   /**
-   * Given tweet data minus text plus an iterable of word-count pairs,
+   * Given tweet data minus text plus an iterable of ngram-count pairs,
    * convert to a string suitable for outputting.
    */
-  def nicely_format_plain(twcs: (String, Iterable[WordCount])): String = {
-    val (tweet_no_text, wcs) = twcs
-    val nice_text = wcs.map((w: WordCount) => w._1 + ":" + w._2).mkString(" ")
+  def nicely_format_plain(tncs: (String, Iterable[NgramCount])): String = {
+    val (tweet_no_text, ncs) = tncs
+    val nice_text = ncs.map((w: NgramCount) => w._1 + ":" + w._2).mkString(" ")
     val (key, (user, ts, lat, lng, fers, fing, numtw)) =
       split_tweet_no_text(tweet_no_text)
     // Latitude/longitude need to be combined into a single field, but only
@@ -384,10 +438,10 @@ object ProcessTwitterPull extends ScoobiApp {
     Seq(user, ts, latlngstr, fers, fing, numtw, nice_text) mkString "\t"
   }
 
-  def output_schema(opts: ProcessTwitterPullParams) {
+  def output_schema() {
     val filename =
       "%s/%s-%s-unigram-counts-schema.txt" format
-        (opts.output, opts.corpus_name, opts.split)
+        (Opts.output, Opts.corpus_name, Opts.split)
     val p = new PrintWriter(new File(filename))
     def print_seq(s: String*) {
       p.println(s mkString "\t")
@@ -395,11 +449,11 @@ object ProcessTwitterPull extends ScoobiApp {
     try {
       print_seq("user", "timestamp", "coord", "followers", "following",
         "numtweets", "counts")
-      print_seq("corpus", opts.corpus_name)
-      print_seq("corpus-type", "twitter-%s" format opts.keytype)
-      if (opts.keytype == "timestamp")
-        print_seq("corpus-timeslice", opts.timeslice.toString)
-      print_seq("split", opts.split)
+      print_seq("corpus", Opts.corpus_name)
+      print_seq("corpus-type", "twitter-%s" format Opts.keytype)
+      if (Opts.keytype == "timestamp")
+        print_seq("corpus-timeslice", Opts.timeslice.toString)
+      print_seq("split", Opts.split)
     } finally { p.close() }
   }
 
@@ -410,16 +464,16 @@ object ProcessTwitterPull extends ScoobiApp {
     // defined on `ap` prior to parsing.
     new ProcessTwitterPullParams(ap)
     ap.parse(args)
-    val opts = new ProcessTwitterPullParams(ap)
-    if (opts.by_time)
-      opts.keytype = "timestamp"
-    opts.timeslice = (opts.timeslice_float * 1000).toLong
+    Opts = new ProcessTwitterPullParams(ap)
+    if (Opts.by_time)
+      Opts.keytype = "timestamp"
+    Opts.timeslice = (Opts.timeslice_float * 1000).toLong
 
     // Firstly we load up all the (new-line-separated) JSON lines.
-    val lines: DList[String] = TextInput.fromTextFile(opts.input)
+    val lines: DList[String] = TextInput.fromTextFile(Opts.input)
 
     // Parse JSON into tweet records (IDRecord), filter out invalid tweets.
-    val values_extracted = lines.map(parse_json(_, opts)).filter(is_valid_tweet)
+    val values_extracted = lines.map(parse_json).filter(is_valid_tweet)
 
     // Filter out duplicate tweets -- group by Tweet ID and then take the
     // first tweet for a given ID.  Duplicate tweets occur for various
@@ -430,10 +484,10 @@ object ProcessTwitterPull extends ScoobiApp {
 
     // Checkpoint the resulting tweets (minus ID) onto disk.
     val checkpoint1 = single_tweets.map(checkpoint_str)
-    persist(TextOutput.toTextFile(checkpoint1, opts.output + "-st"))
+    persist(TextOutput.toTextFile(checkpoint1, Opts.output + "-st"))
 
     // Then load back up.
-    val lines2: DList[String] = TextInput.fromTextFile(opts.output + "-st")
+    val lines2: DList[String] = TextInput.fromTextFile(Opts.output + "-st")
     val values_extracted2 = lines2.map(from_checkpoint_to_record)
 
     // Group by username, then combine the tweets for a user into a
@@ -447,7 +501,7 @@ object ProcessTwitterPull extends ScoobiApp {
     // North America.  FIXME: We still want to filter spammers; but this
     // is trickier when not grouping by user.  How to do it?
     val with_coord =
-      if (opts.keytype == "timestamp") concatted
+      if (Opts.keytype == "timestamp") concatted
       else
         concatted.filter(has_latlng).filter(is_nonspammer).
           filter(northamerica_only)
@@ -455,36 +509,38 @@ object ProcessTwitterPull extends ScoobiApp {
 
     // Checkpoint a second time.
     val checkpoint = with_coord.map(checkpoint_str)
-    persist(TextOutput.toTextFile(checkpoint, opts.output + "-cp"))
+    persist(TextOutput.toTextFile(checkpoint, Opts.output + "-cp"))
 
     // Load from second checkpoint.  Note that each time we checkpoint,
     // we extract the "text" field and stick it at the end.  This time
     // when loading it up, we use `from_checkpoint_to_tweet_text`, which
     // gives us the tweet data as a string (minus text) and the text, as
     // two separate strings.
-    val lines_cp: DList[String] = TextInput.fromTextFile(opts.output + "-cp")
+    val lines_cp: DList[String] = TextInput.fromTextFile(Opts.output + "-cp")
 
-    // Now word count.  We run `from_checkpoint_to_tweet_text` (see above)
-    // to get separate access to the text, then Twokenize it into words
-    // and emit a series of key-value pairs of (word, count).
-    val emitted_words = lines_cp.map(from_checkpoint_to_tweet_text)
-                                .flatMap(emit_words)
-    // Group based on key (the word) and combine by adding up the individual
+    // Now count ngrams.  We run `from_checkpoint_to_tweet_text` (see above)
+    // to get separate access to the text, then Twokenize it into words,
+    // generate ngrams from them and emit a series of key-value pairs of
+    // (ngram, count).
+    val emitted_ngrams = lines_cp.map(from_checkpoint_to_tweet_text)
+                                 .flatMap(emit_ngrams)
+    // Group based on key (the ngram) and combine by adding up the individual
     // counts.
-    val word_counts = emitted_words.groupByKey.combine((a: Long, b: Long) => (a + b))
+    val ngram_counts =
+      emitted_ngrams.groupByKey.combine((a: Long, b: Long) => a + b)
 
     // Regroup with proper key (user, timestamp, etc.) as key,
-    // word pairs as values.
-    val regrouped_by_key = word_counts.map(reposition_word).groupByKey
+    // ngram pairs as values.
+    val regrouped_by_key = ngram_counts.map(reposition_ngram).groupByKey
 
     // Nice string output.
     val nicely_formatted = regrouped_by_key.map(nicely_format_plain)
 
     // Save to disk.
-    persist(TextOutput.toTextFile(nicely_formatted, opts.output))
+    persist(TextOutput.toTextFile(nicely_formatted, Opts.output))
 
     // create a schema
-    output_schema(opts)
+    output_schema()
   }
 }
 
