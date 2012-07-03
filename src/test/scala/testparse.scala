@@ -60,7 +60,7 @@ class FilterLexical extends StdLexical {
        { case first ~ rest => processIdent(first :: rest mkString "") }
     | '\"' ~ rep( quotedWordChar ) ~ '\"' ^^
        { case '\"' ~ chars ~ '\"' => StringLit(chars mkString "") }
-    | EofCh                                             ^^^ EOF
+    | EofCh ^^^ EOF
     | '\"' ~> failure("unclosed string literal")
     | failure("illegal character")
     )
