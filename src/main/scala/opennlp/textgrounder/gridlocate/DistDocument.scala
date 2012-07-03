@@ -719,10 +719,26 @@ object DistDocument {
   }
 
   /**
+   * Encode an n-gram into text suitable for the "counts" field.  The
+   * individual words are separated by colons, and each word is encoded
+   * using `encode_word_for_counts_field`.
+   */
+  def encode_ngram_for_counts_field(ngram: Iterable[String]) = {
+    ngram.map(encode_word_for_counts_field) mkString ":"
+  }
+
+  /**
    * Decode a word encoded using `encode_word_for_counts_field`.
    */
   def decode_word_for_counts_field(word: String) = {
     word.replace("%3A", ":").replace("%3a", ":").replace("%25", "%")
+  }
+
+  /**
+   * Decode an n-gram encoded using `encode_ngram_for_counts_field`.
+   */
+  def decode_ngram_for_counts_field(word: String) = {
+    word.split(":").map(decode_word_for_counts_field)
   }
 
   // val fixed_fields = Seq("corpus", "title", "id", "split", "coord")
