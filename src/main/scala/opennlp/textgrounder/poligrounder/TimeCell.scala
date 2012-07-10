@@ -108,8 +108,8 @@ class TimeCellGrid(
   override val table: TimeDocumentTable
 ) extends CellGrid[TimeCoord, TimeDocument, TimeCell](table) {
   var total_num_cells = 2
-  protected val from_cell = new TimeCell(from_chunk._1, from_chunk._2, this)
-  protected val to_cell = new TimeCell(to_chunk._1, to_chunk._2, this)
+  val from_cell = new TimeCell(from_chunk._1, from_chunk._2, this)
+  val to_cell = new TimeCell(to_chunk._1, to_chunk._2, this)
 
   def find_best_cell_for_coord(coord: TimeCoord,
       create_non_recorded: Boolean) = {
@@ -167,74 +167,80 @@ class TimeCellGrid(
         comdist.word_dist.num_word_tokens)
     }
   }
+}
 
-  def compare_cells(min_prob: Double) {
-    from_cell.combined_dist.word_dist match {
-      case _: UnigramWordDist => compare_unigram_cells(min_prob)
-      case _: NgramWordDist => compare_ngram_cells(min_prob)
+abstract class DistributionComparer(min_prob: Double, max_items: Int) {
+  type Item
+  type Dist
+
+  def get_dist(cell: TimeCell): Dist =
+    cell.combined_dist.word_dist.asInstanceOf[Dist]
+  def get_keys(dist: Dist): collection.Set[Item]
+  def lookup_item(dist: Dist, item: Item): Double
+  def format_item(item: Item): String
+
+  def compare_cells(grid: TimeCellGrid) {
+    val fromdist = get_dist(grid.from_cell)
+    val todist = get_dist(grid.to_cell)
+
+    val itemdiff =
+      for {
+        item <- get_keys(fromdist) ++ get_keys(todist)
+        p = lookup_item(fromdist, item)
+        q = lookup_item(todist, item)
+        if p >= min_prob || q >= min_prob
+      } yield (item, p - q)
+    val diff_up = itemdiff filter (_._2 > 0)
+    val diff_down = itemdiff filter (_._2 < 0) map (x => (x._1, x._2.abs))
+    def print_diffs(diffs: Iterable[(Item, Double)],
+        incdec: String, updown: String) {
+      println("")
+      println("Items that %s in probability:" format incdec)
+      println("------------------------------------")
+      for ((item, prob) <- diffs.toSeq.sortWith(_._2 > _._2).take(max_items)) {
+        println("%s: %s - %s = %s%s" format
+          (format_item(item),
+           format_float(lookup_item(fromdist, item)),
+           format_float(lookup_item(todist, item)),
+           updown, format_float(prob)))
+      }
+      println("")
+    }
+    print_diffs(diff_up, "increased", "+")
+    print_diffs(diff_down, "decreased", "-")
+  }
+}
+
+class UnigramComparer(min_prob: Double, max_items: Int) extends
+    DistributionComparer(min_prob, max_items) {
+  type Item = Word
+  type Dist = UnigramWordDist
+
+  def get_keys(dist: Dist) = dist.counts.keySet
+  def lookup_item(dist: Dist, item: Item) = dist.lookup_word(item)
+  def format_item(item: Item) = unmemoize_string(item)
+}
+
+class NgramComparer(min_prob: Double, max_items: Int) extends
+    DistributionComparer(min_prob, max_items) {
+  import NgramStorage.Ngram
+  type Item = Ngram
+  type Dist = NgramWordDist
+
+  def get_keys(dist: Dist) = dist.model.iter_ngrams.map(_._1).toSet
+  def lookup_item(dist: Dist, item: Item) = dist.lookup_ngram(item)
+  def format_item(item: Item) = item mkString " "
+}
+
+object DistributionComparer {
+  def compare_cells(grid: TimeCellGrid, min_prob: Double, max_items: Int) {
+    grid.from_cell.combined_dist.word_dist match {
+      case _: UnigramWordDist =>
+        new UnigramComparer(min_prob, max_items).compare_cells(grid)
+      case _: NgramWordDist =>
+        new NgramComparer(min_prob, max_items).compare_cells(grid)
       case _ => throw new IllegalArgumentException("Don't know how to compare this type of word distribution")
     }
-  }
-
-  def compare_unigram_cells(min_prob: Double) {
-    def get_dist(cell: TimeCell) =
-      cell.combined_dist.word_dist.asInstanceOf[UnigramWordDist]
-    def get_keys(dist: UnigramWordDist) =
-      dist.counts.keySet
-    val fromdist = get_dist(from_cell)
-    val todist = get_dist(to_cell)
-
-    val worddiff =
-      for {
-        word <- get_keys(fromdist) ++ get_keys(todist)
-        p = fromdist.lookup_word(word)
-        q = todist.lookup_word(word)
-        if p >= min_prob || q >= min_prob
-      } yield (word, p - q)
-    val diff_up = worddiff filter (_._2 > 0)
-    val diff_down = worddiff filter (_._2 < 0) map (x => (x._1, x._2.abs))
-    def print_diffs(diffs: Iterable[(Word, Double)], updown: String) {
-      for ((word, prob) <- diffs.toSeq.sortWith(_._2 > _._2)) {
-        println("%s: %s - %s = %s%s" format
-          (unmemoize_string(word),
-           format_float(fromdist.lookup_word(word)),
-           format_float(todist.lookup_word(word)),
-           updown, format_float(prob)))
-      }
-    }
-    print_diffs(diff_up, "+")
-    print_diffs(diff_down, "-")
-  }
-
-  def compare_ngram_cells(min_prob: Double) {
-    import NgramStorage.Ngram
-    def get_dist(cell: TimeCell) =
-      cell.combined_dist.word_dist.asInstanceOf[NgramWordDist]
-    def get_keys(dist: NgramWordDist) =
-      dist.model.iter_ngrams.map(_._1).toSet
-    val fromdist = get_dist(from_cell)
-    val todist = get_dist(to_cell)
-
-    val ngramdiff =
-      for {
-        ngram <- get_keys(fromdist) ++ get_keys(todist)
-        p = fromdist.lookup_ngram(ngram)
-        q = todist.lookup_ngram(ngram)
-        if p >= min_prob || q >= min_prob
-      } yield (ngram, p - q)
-    val diff_up = ngramdiff filter (_._2 > 0)
-    val diff_down = ngramdiff filter (_._2 < 0) map (x => (x._1, x._2.abs))
-    def print_diffs(diffs: Iterable[(Ngram, Double)], updown: String) {
-      for ((ngram, prob) <- diffs.toSeq.sortWith(_._2 > _._2)) {
-        println("%s: %s - %s = %s%s" format
-          (ngram mkString " ",
-           format_float(fromdist.lookup_ngram(ngram)),
-           format_float(todist.lookup_ngram(ngram)),
-           updown, format_float(prob)))
-      }
-    }
-    print_diffs(diff_up, "+")
-    print_diffs(diff_down, "-")
   }
 }
 
