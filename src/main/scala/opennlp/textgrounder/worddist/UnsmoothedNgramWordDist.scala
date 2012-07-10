@@ -18,25 +18,15 @@
 
 package opennlp.textgrounder.worddist
 
-import math._
+class UnsmoothedNgramWordDistFactory extends NgramWordDistFactory {
+  def create_word_dist(note_globally: Boolean) =
+    new UnsmoothedNgramWordDist(this, note_globally)
 
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.printutil.errprint
-
-import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
-// FIXME! For --tf-idf
-import opennlp.textgrounder.gridlocate.GridLocateDriver
-import opennlp.textgrounder.gridlocate.GenericTypes._
-
-import WordDist.memoizer._
-
-abstract class UnsmoothedNgramWordDistFactory
-  extends NgramWordDistFactory {
   def finish_global_distribution() {
   }
 }
 
-abstract class UnsmoothedNgramWordDist(
+class UnsmoothedNgramWordDist(
   gen_factory: WordDistFactory,
   note_globally: Boolean
 ) extends NgramWordDist(gen_factory, note_globally) {
@@ -46,7 +36,11 @@ abstract class UnsmoothedNgramWordDist(
 
   def innerToString = ""
 
+  // For some reason, retrieving this value from the model is fantastically slow
+  var num_tokens = 0.0
+
   protected def imp_finish_after_global() {
+    num_tokens = model.num_tokens
   }
 
   def fast_kl_divergence(cache: KLDivergenceCache, other: WordDist,
@@ -65,7 +59,7 @@ abstract class UnsmoothedNgramWordDist(
     assert(false, "Not implemented")
     0.0
   }
-      
+ 
   /**
    * Actual implementation of steps 3 and 4 of KL-divergence computation, given
    * a value that we may want to compute as part of step 2.
@@ -77,5 +71,5 @@ abstract class UnsmoothedNgramWordDist(
   }
 
   def lookup_ngram(ngram: Ngram) =
-    model.get_ngram_count(ngram).toDouble / model.num_tokens
+    model.get_ngram_count(ngram).toDouble / num_tokens
 }

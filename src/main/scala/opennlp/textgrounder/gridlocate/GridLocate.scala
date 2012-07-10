@@ -961,9 +961,9 @@ class RandomGridLocateDocumentStrategy[
     }
 
     protected def initialize_word_dist_factory() = {
-      /* if (params.word_dist == "unsmoothed-ngram")
+      if (params.word_dist == "unsmoothed-ngram")
         new UnsmoothedNgramWordDistFactory
-      else */ if (params.word_dist == "dirichlet")
+      else if (params.word_dist == "dirichlet")
         new DirichletUnigramWordDistFactory(params.interpolate,
           params.dirichlet_factor)
       else if (params.word_dist == "jelinek-mercer")
