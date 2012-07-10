@@ -17,12 +17,6 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-////////
-//////// UnigramWordDist.scala
-////////
-//////// Copyright (c) 2010, 2011 Ben Wing.
-////////
-
 package opennlp.textgrounder.worddist
 
 import math._
@@ -109,7 +103,7 @@ abstract class UnigramWordDist(
     val other = xother.asInstanceOf[UnigramWordDist]
     var kldiv = 0.0
     val contribs =
-      if (return_contributing_words) mutable.Map[Word, Double]() else null
+      if (return_contributing_words) mutable.Map[String, Double]() else null
     // 1.
     for (word <- counts.keys) {
       val p = lookup_word(word)
@@ -121,7 +115,7 @@ abstract class UnigramWordDist(
       else {
         kldiv += p*(log(p) - log(q))
         if (return_contributing_words)
-          contribs(word) = p*(log(p) - log(q))
+          contribs(unmemoize_string(word)) = p*(log(p) - log(q))
       }
     }
 
@@ -134,7 +128,7 @@ abstract class UnigramWordDist(
         val q = other.lookup_word(word)
         kldiv += p*(log(p) - log(q))
         if (return_contributing_words)
-          contribs(word) = p*(log(p) - log(q))
+          contribs(unmemoize_string(word)) = p*(log(p) - log(q))
       }
 
       val retval = kldiv + kl_divergence_34(other)
@@ -217,7 +211,7 @@ class DefaultUnigramWordDistConstructor(
    */
   protected val raw_keys_set = mutable.Set[String]()
 
-  def parse_counts(countstr: String) {
+  protected def parse_counts(countstr: String) {
     keys_dynarr.clear()
     values_dynarr.clear()
     raw_keys_set.clear()
@@ -238,6 +232,7 @@ class DefaultUnigramWordDistConstructor(
         throw FileFormatException(
           "Word %s seen twice in same counts list" format word)
       raw_keys_set += word
+      /* FIXME: We aren't canonicalizing here, but simply decoding. */
       val decoded_word = DistDocument.decode_word_for_counts_field(word)
       keys_dynarr += decoded_word
       values_dynarr += count
@@ -259,7 +254,7 @@ class DefaultUnigramWordDistConstructor(
       false
   }
 
-  protected def imp_add_document(dist: WordDist, words: Traversable[String]) {
+  protected def imp_add_document(dist: WordDist, words: Iterable[String]) {
     val counts = dist.asInstanceOf[UnigramWordDist].counts
     for (word <- words)
       add_word_with_count(counts, word, 1)
@@ -274,6 +269,10 @@ class DefaultUnigramWordDistConstructor(
       counts(word) += count
   }
 
+  /**
+   * Actual implementation of `add_keys_values` by subclasses.
+   * External callers should use `add_keys_values`.
+   */
   protected def imp_add_keys_values(dist: WordDist, keys: Array[String],
       values: Array[Int], num_words: Int) {
     val counts = dist.asInstanceOf[UnigramWordDist].counts
@@ -291,6 +290,22 @@ class DefaultUnigramWordDistConstructor(
     //errprint("Fraction of word types kept:"+(addedTypes.toDouble/num_words))
     //errprint("Fraction of word tokens kept:"+(addedTokens.toDouble/totalTokens))
   } 
+
+  /**
+   * Incorporate a set of (key, value) pairs into the distribution.
+   * The number of pairs to add should be taken from `num_words`, not from
+   * the actual length of the arrays passed in.  The code should be able
+   * to handle the possibility that the same word appears multiple times,
+   * adding up the counts for each appearance of the word.
+   */
+  protected def add_keys_values(dist: WordDist,
+      keys: Array[String], values: Array[Int], num_words: Int) {
+    assert(!dist.finished)
+    assert(!dist.finished_before_global)
+    assert(keys.length >= num_words)
+    assert(values.length >= num_words)
+    imp_add_keys_values(dist, keys, values, num_words)
+  }
 
   protected def imp_finish_before_global(dist: WordDist) {
     val counts = dist.asInstanceOf[UnigramWordDist].counts

@@ -557,7 +557,7 @@ class RandomGridLocateDocumentStrategy[
   tweets for a given user, etc.  The corpus generally contains one or more
   "views" on the raw data comprising the corpus, with different views
   corresponding to differing ways of representing the original text of the
-  documents -- as raw, word-split text; as unigram word counts; as bigram word
+  documents -- as raw, word-split text; as unigram word counts; as n-gram word
   counts; etc.  Each such view has a schema file and one or more document files.
   The latter contains all the data for describing each document, including
   title, split (training, dev or test) and other metadata, as well as the text
@@ -635,15 +635,16 @@ class RandomGridLocateDocumentStrategy[
     var word_dist =
       ap.option[String]("word-dist", "wd",
         default = "pseudo-good-turing",
-        choices = Seq("pseudo-good-turing", "pseudo-good-turing-bigram", "dirichlet", "jelinek-mercer"),
+        choices = Seq("pseudo-good-turing", "dirichlet", "jelinek-mercer",
+          "unsmoothed-ngram"),
         aliases = Map("jelinek-mercer" -> Seq("jelinek"),
                       "pseudo-good-turing" -> Seq("pgt")),
         help = """Type of word distribution to use.  Possibilities are
   'pseudo-good-turing' (a simplified version of Good-Turing over a unigram
   distribution), 'dirichlet' (Dirichlet smoothing over a unigram distribution),
   'jelinek' or 'jelinek-mercer' (Jelinek-Mercer smoothing over a unigram
-  distribution), and 'pseudo-good-turing-bigram' (a non-smoothed bigram
-  distribution??).  Default '%default'.
+  distribution), and 'unsmoothed-ngram' (an unsmoothed n-gram distribution).
+  Default '%default'.
 
   Note that all three involve some type of discounting, i.e. taking away a
   certain amount of probability mass compared with the maximum-likelihood
@@ -700,6 +701,12 @@ class RandomGridLocateDocumentStrategy[
         default = 1,
         help = """Minimum count of words to consider in word
   distributions.  Words whose count is less than this value are ignored.""")
+    var max_ngram_length =
+      ap.option[Int]("max-ngram-length", "mnl", metavar = "NUM",
+        default = 3,
+        help = """Maximum length of n-grams to generate when generating
+  n-grams from a raw document.  Does not apply when reading in a corpus that
+  has already been parsed into n-grams (as is usually the case).""")
    var tf_idf =
      ap.flag("tf-idf", "tfidf",
         help = """Adjust word counts according to TF-IDF weighting (i.e.
@@ -912,14 +919,14 @@ class RandomGridLocateDocumentStrategy[
 
     protected def initialize_cell_grid(table: TDocTable): TGrid
 
-    protected def num_ngrams = {
-      if (params.word_dist == "pseudo-good-turing-bigram") 2
-      else 1
+    protected def word_dist_type = {
+      if (params.word_dist == "unsmoothed-ngram") "ngram"
+      else "unigram"
     }
 
     protected def initialize_word_dist_suffix() = {
-      if (num_ngrams == 2)
-        DistDocument.bigram_counts_suffix
+      if (word_dist_type == "ngram")
+        DistDocument.ngram_counts_suffix
       else
         DistDocument.unigram_counts_suffix
     }
@@ -936,9 +943,15 @@ class RandomGridLocateDocumentStrategy[
     protected def initialize_word_dist_constructor(factory: WordDistFactory) = {
       val the_stopwords = get_stopwords()
       val the_whitelist = get_whitelist()
-      /* if (num_ngrams == 2)
-        new DefaultBigramWordDistConstructor(factory, ...)
-      else */
+      if (word_dist_type == "ngram")
+        new DefaultNgramWordDistConstructor(
+          factory,
+          ignore_case = !params.preserve_case_words,
+          stopwords = the_stopwords,
+          whitelist = the_whitelist,
+          minimum_word_count = params.minimum_word_count,
+          max_ngram_length = params.max_ngram_length)
+      else
         new DefaultUnigramWordDistConstructor(
           factory,
           ignore_case = !params.preserve_case_words,
@@ -948,17 +961,16 @@ class RandomGridLocateDocumentStrategy[
     }
 
     protected def initialize_word_dist_factory() = {
-      /* if (params.word_dist == "pseudo-good-turing-bigram")
-        new PGTBigramWordDistFactory(params.interpolate,
-          params.discount_factor)
+      /* if (params.word_dist == "unsmoothed-ngram")
+        new UnsmoothedNgramWordDistFactory
       else */ if (params.word_dist == "dirichlet")
-      new DirichletUnigramWordDistFactory(params.interpolate,
-        params.dirichlet_factor)
-    else if (params.word_dist == "jelinek-mercer")
-      new JelinekMercerUnigramWordDistFactory(params.interpolate,
-        params.jelinek_factor)
-    else
-      new PseudoGoodTuringUnigramWordDistFactory(params.interpolate)
+        new DirichletUnigramWordDistFactory(params.interpolate,
+          params.dirichlet_factor)
+      else if (params.word_dist == "jelinek-mercer")
+        new JelinekMercerUnigramWordDistFactory(params.interpolate,
+          params.jelinek_factor)
+      else
+        new PseudoGoodTuringUnigramWordDistFactory(params.interpolate)
   }
 
   protected def read_stopwords() = {

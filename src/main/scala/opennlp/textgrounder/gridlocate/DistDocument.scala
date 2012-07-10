@@ -696,7 +696,7 @@ abstract class DistDocument[TCoord : Serializer](
 object DistDocument {
   val document_metadata_suffix = "document-metadata"
   val unigram_counts_suffix = "unigram-counts"
-  val bigram_counts_suffix = "bigram-counts"
+  val ngram_counts_suffix = "ngram-counts"
   val text_suffix = "text"
 
   /**
@@ -737,8 +737,29 @@ object DistDocument {
   /**
    * Decode an n-gram encoded using `encode_ngram_for_counts_field`.
    */
-  def decode_ngram_for_counts_field(word: String) = {
-    word.split(":").map(decode_word_for_counts_field)
+  def decode_ngram_for_counts_field(ngram: String) = {
+    ngram.split(":", -1).map(decode_word_for_counts_field)
+  }
+
+  /**
+   * Split counts field into the encoded n-gram section and the word count.
+   */
+  def shallow_split_counts_field(field: String) = {
+    val last_colon = field.lastIndexOf(':')
+    if (last_colon < 0)
+      throw FileFormatException(
+        "Counts field must be of the form WORD:WORD:...:COUNT, but %s seen"
+          format field)
+    val count = field.slice(last_colon + 1, field.length).toInt
+    (field.slice(0, last_colon), count)
+  }
+
+  /**
+   * Split counts field into n-gram and word count.
+   */
+  def deep_split_counts_field(field: String) = {
+    val (encoded_ngram, count) = shallow_split_counts_field(field)
+    (decode_ngram_for_counts_field(encoded_ngram), count)
   }
 
   // val fixed_fields = Seq("corpus", "title", "id", "split", "coord")

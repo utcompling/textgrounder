@@ -58,9 +58,9 @@ trait FastSlowKLDivergence {
    *   and often also (esp. in the presence of smoothing) the contribution
    *   of all other words in the vocabulary.
    * @param return_contributing_words If true, return a map listing
-   *   the words in both distributions (or, for a partial KL-divergence,
-   *   the words in our distribution) and the amount of total KL-divergence
-   *   they compute, useful for debugging.
+   *   the words (or n-grams, or whatever) in both distributions (or, for a
+   *   partial KL-divergence, the words in our distribution) and the amount
+   *   of total KL-divergence they compute, useful for debugging.
    *   
    * @return A tuple of (divergence, word_contribs) where the first
    *   value is the actual KL-divergence and the second is the map
@@ -69,7 +69,7 @@ trait FastSlowKLDivergence {
    */
   def slow_kl_divergence_debug(xother: WordDist, partial: Boolean = false,
       return_contributing_words: Boolean = false):
-      (Double, collection.Map[Word, Double])
+      (Double, collection.Map[String, Double])
 
   /**
    * Compute the KL-divergence using the "slow" algorithm of
@@ -133,7 +133,7 @@ abstract class WordDistConstructor(factory: WordDistFactory) {
    * Actual implementation of `add_document` by subclasses.
    * External callers should use `add_document`.
    */
-  protected def imp_add_document(dist: WordDist, words: Traversable[String])
+  protected def imp_add_document(dist: WordDist, words: Iterable[String])
 
   /**
    * Actual implementation of `add_word_distribution` by subclasses.
@@ -143,22 +143,16 @@ abstract class WordDistConstructor(factory: WordDistFactory) {
     partial: Double = 1.0)
 
   /**
-   * Actual implementation of `add_keys_values` by subclasses.
-   * External callers should use `add_keys_values`.
-   */
-  protected def imp_add_keys_values(dist: WordDist,
-      keys: Array[String], values: Array[Int], num_words: Int)
-
-  /**
    * Actual implementation of `finish_before_global` by subclasses.
    * External callers should use `finish_before_global`.
    */
   protected def imp_finish_before_global(dist: WordDist)
 
   /**
-   * Incorporate a document into the distribution.
+   * Incorporate a document into the distribution.  The document is described
+   * by a sequence of words.
    */
-  def add_document(dist: WordDist, words: Traversable[String]) {
+  def add_document(dist: WordDist, words: Iterable[String]) {
     assert(!dist.finished)
     assert(!dist.finished_before_global)
     imp_add_document(dist, words)
@@ -175,22 +169,6 @@ abstract class WordDistConstructor(factory: WordDistFactory) {
     assert(!dist.finished_before_global)
     assert(partial >= 0.0 && partial <= 1.0)
     imp_add_word_distribution(dist, other, partial)
-  }
-
-  /**
-   * Incorporate a set of (key, value) pairs into the distribution.
-   * The number of pairs to add should be taken from `num_words`, not from
-   * the actual length of the arrays passed in.  The code should be able
-   * to handle the possibility that the same word appears multiple times,
-   * adding up the counts for each appearance of the word.
-   */
-  def add_keys_values(dist: WordDist,
-      keys: Array[String], values: Array[Int], num_words: Int) {
-    assert(!dist.finished)
-    assert(!dist.finished_before_global)
-    assert(keys.length >= num_words)
-    assert(values.length >= num_words)
-    imp_add_keys_values(dist, keys, values, num_words)
   }
 
   /**
@@ -324,7 +302,7 @@ abstract class WordDist(factory: WordDistFactory, val note_globally: Boolean) {
   /**
    * Incorporate a document into the distribution.
    */
-  def add_document(words: Traversable[String]) {
+  def add_document(words: Iterable[String]) {
     factory.constructor.add_document(this, words)
   }
 
@@ -335,18 +313,6 @@ abstract class WordDist(factory: WordDistFactory, val note_globally: Boolean) {
    */
   def add_word_distribution(other: WordDist, partial: Double = 1.0) {
     factory.constructor.add_word_distribution(this, other, partial)
-  }
-
-  /**
-   * Incorporate a set of (key, value) pairs into the distribution.
-   * The number of pairs to add should be taken from `num_words`, not from
-   * the actual length of the arrays passed in.  The code should be able
-   * to handle the possibility that the same word appears multiple times,
-   * adding up the counts for each appearance of the word.
-   */
-  def add_keys_values(keys: Array[String], values: Array[Int],
-      num_words: Int) {
-    factory.constructor.add_keys_values(this, keys, values, num_words)
   }
 
   /**
