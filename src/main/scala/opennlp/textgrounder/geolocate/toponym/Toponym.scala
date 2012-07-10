@@ -30,7 +30,7 @@ import opennlp.textgrounder.util.ioutil.{FileHandler, Schema}
 import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil.{errout, errprint, warning}
 
-import opennlp.textgrounder.gridlocate.{CombinedWordDist,EvalStats,CorpusEvaluator,DocumentIteratingEvaluator}
+import opennlp.textgrounder.gridlocate._
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 import opennlp.textgrounder.geolocate._
 
@@ -856,9 +856,10 @@ class NaiveBayesToponymStrategy(
     val topo_table = cell_grid.table.asInstanceOf[TopoDocumentTable]
     val params = topo_table.topo_driver.params
 
-    var distobj =
+    val gen_distobj =
       if (params.context_type == "document") doc.dist
       else doc.find_combined_word_dist(cell_grid).word_dist
+    val distobj = UnigramStrategy.check_unigram_dist(gen_distobj)
     var totalprob = 0.0
     var total_word_weight = 0.0
     val (word_weight, baseline_weight) =

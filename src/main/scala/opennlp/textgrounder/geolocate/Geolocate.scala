@@ -116,7 +116,8 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
   val cdist_factory =
     new SphereCellDistFactory(sphere_grid.table.driver.params.lru_cache_size)
 
-  def return_ranked_cells(word_dist: WordDist) = {
+  def return_ranked_cells(gen_word_dist: WordDist) = {
+    val word_dist = UnigramStrategy.check_unigram_dist(gen_word_dist)
     val wikipedia_table = sphere_grid.table.wikipedia_subtable
 
     // Look for a toponym, then a proper noun, then any word.
@@ -139,7 +140,8 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
 class LinkMostCommonToponymGeolocateDocumentStrategy(
   sphere_grid: SphereCellGrid
 ) extends GeolocateDocumentStrategy(sphere_grid) {
-  def return_ranked_cells(word_dist: WordDist) = {
+  def return_ranked_cells(gen_word_dist: WordDist) = {
+    val word_dist = UnigramStrategy.check_unigram_dist(gen_word_dist)
     val wikipedia_table = sphere_grid.table.wikipedia_subtable
 
     var maxword = word_dist.find_most_common_word(

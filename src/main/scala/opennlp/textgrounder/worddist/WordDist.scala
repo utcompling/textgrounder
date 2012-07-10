@@ -449,23 +449,4 @@ abstract class WordDist(factory: WordDistFactory, val note_globally: Boolean) {
    * @param worddist Distribution of document.
    */
   def get_nbayes_logprob(worddist: WordDist): Double
-
-  /**
-   * Return the probabilitiy of a given word in the distribution.
-   * FIXME: Should be moved into either UnigramWordDist or a new
-   * UnigramLikeWordDist, since for N-grams we really want the whole N-gram,
-   * and for some language models this type of lookup makes no sense at all. 
-   */
-  def lookup_word(word: Word): Double
-  
-  /**
-   * Look for the most common word matching a given predicate.
-   * @param pred Predicate, passed the raw (unmemoized) form of a word.
-   *   Should return true if a word matches.
-   * @return Most common word matching the predicate (wrapped with
-   *   Some()), or None if no match.
-   * 
-   * FIXME: Probably should be moved similar to `lookup_word`.
-   */
-  def find_most_common_word(pred: String => Boolean): Option[Word] 
 }

@@ -165,7 +165,19 @@ abstract class UnigramWordDist(
     logprob
   }
 
-  def find_most_common_word(pred: String => Boolean) = {
+  /**
+   * Return the probabilitiy of a given word in the distribution.
+   */
+  def lookup_word(word: Word): Double
+  
+  /**
+   * Look for the most common word matching a given predicate.
+   * @param pred Predicate, passed the raw (unmemoized) form of a word.
+   *   Should return true if a word matches.
+   * @return Most common word matching the predicate (wrapped with
+   *   Some()), or None if no match.
+   */
+  def find_most_common_word(pred: String => Boolean): Option[Word] = {
     val filtered =
       (for ((word, count) <- counts if pred(unmemoize_string(word)))
         yield (word, count)).toSeq

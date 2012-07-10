@@ -110,6 +110,15 @@ import GenericTypes._
 //                           Evaluation strategies                         //
 /////////////////////////////////////////////////////////////////////////////
 
+object UnigramStrategy {
+  def check_unigram_dist(word_dist: WordDist) = {
+    word_dist match {
+      case x: UnigramWordDist => x
+      case _ => throw new IllegalArgumentException("You must use a unigram word distribution with this strategy")
+    }
+  }
+}
+
 /**
  * Abstract class for reading documents from a test file and doing
  * document grid-location on them (as opposed, e.g., to trying to locate
