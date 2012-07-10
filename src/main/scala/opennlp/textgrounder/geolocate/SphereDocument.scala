@@ -24,7 +24,7 @@ import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.printutil.warning
 
-import opennlp.textgrounder.gridlocate.{DistDocument,DistDocumentTable,CellGrid}
+import opennlp.textgrounder.gridlocate.{DistDocument,DistDocumentTable}
 import opennlp.textgrounder.gridlocate.DistDocumentConverters._
 
 import opennlp.textgrounder.worddist.WordDistFactory
@@ -152,14 +152,6 @@ class SphereDocumentTable(
       subtable.finish_document_loading()
     super.finish_document_loading()
   }
-}
-
-/**
- * Abstract class for a grid of cells covering the earth.
- */
-abstract class SphereCellGrid(
-  override val table: SphereDocumentTable
-) extends CellGrid[SphereCoord, SphereDocument, SphereCell](table) {
 }
 
 /**
