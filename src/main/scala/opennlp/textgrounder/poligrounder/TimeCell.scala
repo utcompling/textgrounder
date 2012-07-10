@@ -35,10 +35,6 @@ import opennlp.textgrounder.worddist._
 import opennlp.textgrounder.worddist.WordDist.memoizer._
 
 /////////////////////////////////////////////////////////////////////////////
-//                             Cell distributions                          //
-/////////////////////////////////////////////////////////////////////////////
-
-/////////////////////////////////////////////////////////////////////////////
 //                             Cells in a grid                             //
 /////////////////////////////////////////////////////////////////////////////
 
@@ -166,36 +162,79 @@ class TimeCellGrid(
       errprint("Number of documents in %s-chunk: %s", name,
         comdist.num_docs_for_word_dist)
       errprint("Number of types in %s-chunk: %s", name,
-        comdist.word_dist.asInstanceOf[UnigramWordDist].num_word_types)
+        comdist.word_dist.num_word_types)
       errprint("Number of tokens in %s-chunk: %s", name,
-        comdist.word_dist.asInstanceOf[UnigramWordDist].num_word_tokens)
+        comdist.word_dist.num_word_tokens)
     }
   }
 
-  def compare_cells(min_word_prob: Double) {
-    val fromdist = from_cell.combined_dist.word_dist.asInstanceOf[UnigramWordDist]
-    val todist = to_cell.combined_dist.word_dist.asInstanceOf[UnigramWordDist]
+  def compare_cells(min_prob: Double) {
+    from_cell.combined_dist.word_dist match {
+      case _: UnigramWordDist => compare_unigram_cells(min_prob)
+      case _: NgramWordDist => compare_ngram_cells(min_prob)
+      case _ => throw new IllegalArgumentException("Don't know how to compare this type of word distribution")
+    }
+  }
 
-    val worddiff = create_word_double_map()
-    for (word <- fromdist.counts.keys) {
-      val p = fromdist.lookup_word(word)
-      val q = todist.lookup_word(word)
-      if (p >= min_word_prob || q >= min_word_prob)
-        worddiff(word) = (p - q).abs
+  def compare_unigram_cells(min_prob: Double) {
+    def get_dist(cell: TimeCell) =
+      cell.combined_dist.word_dist.asInstanceOf[UnigramWordDist]
+    def get_keys(dist: UnigramWordDist) =
+      dist.counts.keySet
+    val fromdist = get_dist(from_cell)
+    val todist = get_dist(to_cell)
+
+    val worddiff =
+      for {
+        word <- get_keys(fromdist) ++ get_keys(todist)
+        p = fromdist.lookup_word(word)
+        q = todist.lookup_word(word)
+        if p >= min_prob || q >= min_prob
+      } yield (word, p - q)
+    val diff_up = worddiff filter (_._2 > 0)
+    val diff_down = worddiff filter (_._2 < 0) map (x => (x._1, x._2.abs))
+    def print_diffs(diffs: Iterable[(Word, Double)], updown: String) {
+      for ((word, prob) <- diffs.toSeq.sortWith(_._2 > _._2)) {
+        println("%s: %s - %s = %s%s" format
+          (unmemoize_string(word),
+           format_float(fromdist.lookup_word(word)),
+           format_float(todist.lookup_word(word)),
+           updown, format_float(prob)))
+      }
     }
-    for (word <- todist.counts.keys) {
-      val p = fromdist.lookup_word(word)
-      val q = todist.lookup_word(word)
-      if (p >= min_word_prob || q >= min_word_prob)
-        worddiff(word) = (p - q).abs
+    print_diffs(diff_up, "+")
+    print_diffs(diff_down, "-")
+  }
+
+  def compare_ngram_cells(min_prob: Double) {
+    import NgramStorage.Ngram
+    def get_dist(cell: TimeCell) =
+      cell.combined_dist.word_dist.asInstanceOf[NgramWordDist]
+    def get_keys(dist: NgramWordDist) =
+      dist.model.iter_ngrams.map(_._1).toSet
+    val fromdist = get_dist(from_cell)
+    val todist = get_dist(to_cell)
+
+    val ngramdiff =
+      for {
+        ngram <- get_keys(fromdist) ++ get_keys(todist)
+        p = fromdist.lookup_ngram(ngram)
+        q = todist.lookup_ngram(ngram)
+        if p >= min_prob || q >= min_prob
+      } yield (ngram, p - q)
+    val diff_up = ngramdiff filter (_._2 > 0)
+    val diff_down = ngramdiff filter (_._2 < 0) map (x => (x._1, x._2.abs))
+    def print_diffs(diffs: Iterable[(Ngram, Double)], updown: String) {
+      for ((ngram, prob) <- diffs.toSeq.sortWith(_._2 > _._2)) {
+        println("%s: %s - %s = %s%s" format
+          (ngram mkString " ",
+           format_float(fromdist.lookup_ngram(ngram)),
+           format_float(todist.lookup_ngram(ngram)),
+           updown, format_float(prob)))
+      }
     }
-    for ((word, count) <- worddiff.toSeq.sortWith(_._2 > _._2)) {
-      println("%s: %s - %s = %s" format
-        (unmemoize_string(word),
-         format_float(fromdist.lookup_word(word)),
-         format_float(todist.lookup_word(word)),
-         format_float(count)))
-    }
+    print_diffs(diff_up, "+")
+    print_diffs(diff_down, "-")
   }
 }
 
