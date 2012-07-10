@@ -262,6 +262,9 @@ abstract class NgramWordDist(
 
   val model = new OpenNLPNgramStorer
 
+  def num_word_types = model.num_types
+  def num_word_tokens = model.num_tokens
+
   def innerToString: String
 
   override def toString = {

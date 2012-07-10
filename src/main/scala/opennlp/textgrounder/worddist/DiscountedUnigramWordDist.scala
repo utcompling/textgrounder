@@ -84,7 +84,7 @@ abstract class DiscountedUnigramWordDistFactory(
   // look up in.
   // unknown_document_counts = ([], [])
 
-  def finish_global_distribution() = {
+  def finish_global_distribution() {
     /* We do in-place conversion of counts to probabilities.  Make sure
        this isn't done twice!! */
     assert (!owp_adjusted)
