@@ -21,7 +21,7 @@ package opennlp.textgrounder.geolocate
 
 import opennlp.textgrounder.util.distances._
 
-import opennlp.textgrounder.gridlocate.GeoCell
+import opennlp.textgrounder.gridlocate.{GeoCell,CellGrid}
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cells in a grid                             //
@@ -224,5 +224,13 @@ abstract class RectangularCell(
     </Placemark>
     // !!PY2SCALA: END_PASSTHRU
   }
+}
+
+/**
+ * Abstract class for a grid of cells covering the earth.
+ */
+abstract class SphereCellGrid(
+  override val table: SphereDocumentTable
+) extends CellGrid[SphereCoord, SphereDocument, SphereCell](table) {
 }
 
