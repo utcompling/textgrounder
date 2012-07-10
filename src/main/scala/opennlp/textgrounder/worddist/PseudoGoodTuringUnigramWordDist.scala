@@ -52,7 +52,7 @@ class PseudoGoodTuringUnigramWordDistFactory(
   // look up in.
   // unknown_document_counts = ([], [])
 
-  override def finish_global_distribution() = {
+  override def finish_global_distribution() {
     // Now, adjust overall_word_probs accordingly.
     //// FIXME: A simple calculation reveals that in the scheme where we use
     //// globally_unseen_word_prob, total_num_types_seen_once cancels out and

@@ -307,8 +307,9 @@ class DefaultUnigramWordDistConstructor(
     imp_add_keys_values(dist, keys, values, num_words)
   }
 
-  protected def imp_finish_before_global(dist: WordDist) {
-    val counts = dist.asInstanceOf[UnigramWordDist].counts
+  protected def imp_finish_before_global(gendist: WordDist) {
+    val dist = gendist.asInstanceOf[UnigramWordDist]
+    val counts = dist.counts
     val oov = memoize_string("-OOV-")
 
     /* Add the distribution to the global stats before eliminating

@@ -280,13 +280,13 @@ object WordDist {
  */
 abstract class WordDist(factory: WordDistFactory, val note_globally: Boolean) {
   /** Number of word tokens seen in the distribution. */
-  var num_word_tokens: Double
+  def num_word_tokens: Double
 
   /**
    * Number of word types seen in the distribution
    * (i.e. number of different vocabulary items seen).
    */
-  def num_word_types: Int
+  def num_word_types: Long
   
   /**
    * Whether we have finished computing the distribution, and therefore can
