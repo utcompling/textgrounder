@@ -146,20 +146,17 @@ class GenerateKMLDriver extends
 
   override protected def initialize_word_dist_constructor(
       factory: WordDistFactory) = {
-    if (num_ngrams > 1)
-      param_error("Only unigram word distribution words with GenerateKML")
+    if (word_dist_type != "unigram")
+      param_error("Only unigram word distributions supported with GenerateKML")
     val the_stopwords = get_stopwords()
     val the_whitelist = get_whitelist()
-    /* if (num_ngrams == 2)
-      new FilterBigramWordDistConstructor(factory, ...)
-    else */
-      new FilterUnigramWordDistConstructor(
-        factory,
-        params.split_kml_words,
-        ignore_case = !params.preserve_case_words,
-        stopwords = the_stopwords,
-        whitelist = the_whitelist,
-        minimum_word_count = params.minimum_word_count)
+    new FilterUnigramWordDistConstructor(
+      factory,
+      params.split_kml_words,
+      ignore_case = !params.preserve_case_words,
+      stopwords = the_stopwords,
+      whitelist = the_whitelist,
+      minimum_word_count = params.minimum_word_count)
   }
 
   /**

@@ -101,7 +101,7 @@ abstract class BigramWordDist(
         innerToString, finished_str, get_words(unicounts), get_words(bicounts))
   }
 
-  protected def imp_add_document(words: Traversable[String],
+  protected def imp_add_document(words: Iterable[String],
       ignore_case: Boolean, stopwords: Set[String]) {
     errprint("add_document")
     var previous = "<START>";
