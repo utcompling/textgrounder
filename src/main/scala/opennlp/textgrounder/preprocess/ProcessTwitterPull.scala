@@ -303,11 +303,35 @@ object ProcessTwitterPull extends ScoobiApp {
   /**
    * Convert a word to lowercase.
    */
-  def normalize_word(word: String) = {
-    if (Opts.preserve_case)
-      word
+  def normalize_word(orig_word: String) = {
+    val word =
+      if (Opts.preserve_case)
+        orig_word
+      else
+        orig_word.toLowerCase
+    // word.startsWith("@")
+    if (word.contains("http://") || word.contains("https://"))
+      "-LINK-"
     else
-      word.toLowerCase
+      word
+  }
+
+  /**
+   * Return true if word should be filtered out (post-normalization).
+   */
+  def reject_word(word: String) = {
+    word == "-LINK-"
+  }
+
+  /**
+   * Return true if ngram should be filtered out (post-normalization).
+   * Here we filter out things where every word should be filtered, or
+   * where the first or last word should be filtered (in such a case, all
+   * the rest will be contained in a one-size-down n-gram).
+   */
+  def reject_ngram(ngram: Iterable[String]) = {
+    ngram.forall(reject_word) || reject_word(ngram.head) ||
+      reject_word(ngram.last)
   }
 
   /**
@@ -324,22 +348,7 @@ object ProcessTwitterPull extends ScoobiApp {
     // generate all 1-grams, then all 2-grams, etc. up to the maximum size,
     // and then concatenate the separate lists together (that's what `flatMap`
     // does).
-    (1 to Opts.max_ngram).flatMap(words.sliding(_))
-  }
-
-  /**
-   * Return true if word should be filtered out.
-   */
-  def filter_word(word: String) = {
-    // word.contains("http://") || word.contains(":") || word.startsWith("@")
-    word.contains("http://") || word.contains("https://")
-  }
-
-  /**
-   * Return true if n-gram should be filtered out.
-   */
-  def filter_ngram(ngram: Iterable[String]) = {
-    ngram.exists(filter_word)
+    (1 to Opts.max_ngram).flatMap(words.sliding(_)).filter(!reject_ngram(_))
   }
 
   /**
@@ -403,7 +412,7 @@ object ProcessTwitterPull extends ScoobiApp {
   def emit_ngrams(tweet_text: (String, String)):
       Iterable[(TweetNgram, Long)] = {
     val (tweet_no_text, text) = tweet_text
-    for (ngram <- tokenize(text) if !filter_ngram(ngram))
+    for (ngram <- tokenize(text))
       yield ((tweet_no_text, DistDocument.encode_ngram_for_counts_field(ngram)),
              1L)
   }
@@ -438,10 +447,14 @@ object ProcessTwitterPull extends ScoobiApp {
     Seq(user, ts, latlngstr, fers, fing, numtw, nice_text) mkString "\t"
   }
 
+  /**
+   * Output a schema file of the appropriate name.
+   */
   def output_schema() {
+    val dist_type = if (Opts.max_ngram == 1) "unigram" else "ngram"
     val filename =
-      "%s/%s-%s-unigram-counts-schema.txt" format
-        (Opts.output, Opts.corpus_name, Opts.split)
+      "%s/%s-%s-%s-counts-schema.txt" format
+        (Opts.output, Opts.corpus_name, Opts.split, dist_type)
     val p = new PrintWriter(new File(filename))
     def print_seq(s: String*) {
       p.println(s mkString "\t")
