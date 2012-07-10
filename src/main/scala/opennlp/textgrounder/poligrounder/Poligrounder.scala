@@ -112,9 +112,17 @@ class PoligrounderParameters(parser: ArgParser = null) extends
     ap.option[String]("t", "to",
       help = """Chunk of end time to compare.""")
 
-  var min_word_prob =
-    ap.option[Double]("min-word-prob", "mwp",
-      help = """Mininum word probability when comparing distributions.""")
+  var min_prob =
+    ap.option[Double]("min-prob", "mp", default = 0.0,
+      help = """Mininum probability when comparing distributions.
+      Default is 0.0, which means no restrictions.""")
+
+  var max_items =
+    ap.option[Int]("max-items", "mi", default = 200,
+      help = """Maximum number of items (words or n-grams) to output when
+      comparing distributions.  Default is %default.  This applies separately
+      to those items that have increased and decreased, meaning the total
+      number counting both kinds may be as much as twice the maximum.""")
 }
 
 class PoligrounderDriver extends
@@ -205,7 +213,8 @@ class PoligrounderDriver extends
   }
 
   def run_after_setup() {
-    cell_grid.asInstanceOf[TimeCellGrid].compare_cells(params.min_word_prob)
+    DistributionComparer.compare_cells(cell_grid.asInstanceOf[TimeCellGrid],
+      params.min_prob, params.max_items)
   }
 }
 
