@@ -1,4 +1,4 @@
-///////////////////////////////////////////////////////////////////////////////
+
 //  ProcessTwitterPull.scala
 //
 //  Copyright (C) 2012 Stephen Roller, The University of Texas at Austin
@@ -29,6 +29,7 @@ import util.control.Breaks._
 
 import opennlp.textgrounder.util.Twokenize
 import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.printutil._
 import opennlp.textgrounder.gridlocate.DistDocument
 
 /*
@@ -79,6 +80,43 @@ class ProcessTwitterPullParams(ap: ArgParser) {
     Default '%default'.""")
   var split = ap.option[String]("split", default = "training",
     help="""Split (training, dev, test) to place data in.  Default %default.""")
+  var filter = ap.option[String]("filter",
+    help="""Boolean expression used to filter tweets to be output.
+Expression consists of one or more sequences of words, joined by the operators
+AND, OR and NOT.  A sequence of words matches a tweet if and only if that exact
+sequence is found in the tweet (tweets are matched after they have been
+tokenized).  AND has higher precedence than OR.  Parentheses can be used
+for grouping or precedence.  Any word that is quoted is treated as a literal
+regardless of the characters in it; this can be used to treat words such as
+"AND" literally.  Matching is case-insensitive; use '--cfilter' for
+case-sensitive matching.  Note that the use of '--preserve-case' has no effect
+on the case sensitivity of filtering; it rather affects whether the output
+is converted to lowercase or left as-is.
+
+Examples:
+
+--filter "mitt romney OR obama"
+
+Look for any tweets containing the sequence "mitt romney" (in any case) or
+"Obama".
+
+--filter "mitt AND romney OR barack AND obama"
+
+Look for any tweets containing either the words "mitt" and "romney" (in any
+case and anywhere in the tweet) or the words "barack" and "obama".
+
+--filter "hillary OR bill AND clinton"
+
+Look for any tweets containing either the word "hillary" or both the words
+"bill" and "clinton" (anywhere in the tweet).
+
+--filter "(hillary OR bill) AND clinton"
+
+Look for any tweets containing the word "clinton" as well as either the words
+"bill" or "hillary".""")
+  var cfilter = ap.option[String]("cfilter",
+    help="""Boolean expression used to filter tweets to be output, with
+    case-sensitive matching.  Format is identical to '--filter'.""")
   var by_time = ap.flag("by-time",
     help="""Group tweets by time instead of by user.  When this is used, all
     tweets within a timeslice of a give number of seconds (specified using
@@ -94,6 +132,164 @@ class ProcessTwitterPullParams(ap: ArgParser) {
     help = "Source directory to read files from.")
   var output = ap.positional[String]("OUTPUT",
     help = "Destination directory to place files in.")
+}
+
+import scala.util.parsing.combinator.lexical.StdLexical
+import scala.util.parsing.combinator.syntactical._
+import scala.util.parsing.input.CharArrayReader.EofCh
+
+/**
+ * A class used for filtering tweets using a boolean expression.
+ * Parsing of the boolean expression uses Scala parsing combinators.
+ *
+ * To use, create an instance of this class; then call `parse` to
+ * parse an expression into an abstract syntax tree object.  Then use
+ * the `matches` method on this object to match against a tweet.
+ */
+class TweetFilterParser(foldcase: Boolean) extends StandardTokenParsers {
+  sealed abstract class Expr {
+    /**
+     * Check if this expression matches the given sequence of words.
+     */
+    def matches(x: Seq[String]) =
+      if (foldcase)
+        check(x map (_.toLowerCase))
+      else
+        check(x)
+    // Not meant to be called externally.
+    def check(x: Seq[String]): Boolean
+  }
+
+  case class EConst(value: Seq[String]) extends Expr {
+    def check(x: Seq[String]) = x containsSlice value
+  }
+
+  case class EAnd(left:Expr, right:Expr) extends Expr {
+    def check(x: Seq[String]) = left.check(x) && right.check(x)
+  }
+
+  case class EOr(left:Expr, right:Expr) extends Expr {
+    def check(x: Seq[String]) = left.check(x) || right.check(x)
+  }
+
+  case class ENot(e:Expr) extends Expr {
+    def check(x: Seq[String]) = !e.check(x)
+  }
+
+  class ExprLexical extends StdLexical {
+    override def token: Parser[Token] = floatingToken | super.token
+
+    def floatingToken: Parser[Token] =
+      rep1(digit) ~ optFraction ~ optExponent ^^
+        { case intPart ~ frac ~ exp => NumericLit(
+            (intPart mkString "") :: frac :: exp :: Nil mkString "")}
+
+    def chr(c:Char) = elem("", ch => ch==c )
+    def sign = chr('+') | chr('-')
+    def optSign = opt(sign) ^^ {
+      case None => ""
+      case Some(sign) => sign
+    }
+    def fraction = '.' ~ rep(digit) ^^ {
+      case dot ~ ff => dot :: (ff mkString "") :: Nil mkString ""
+    }
+    def optFraction = opt(fraction) ^^ {
+      case None => ""
+      case Some(fraction) => fraction
+    }
+    def exponent = (chr('e') | chr('E')) ~ optSign ~ rep1(digit) ^^ {
+      case e ~ optSign ~ exp => e :: optSign :: (exp mkString "") :: Nil mkString ""
+    }
+    def optExponent = opt(exponent) ^^ {
+      case None => ""
+      case Some(exponent) => exponent
+    }
+  }
+
+  class FilterLexical extends StdLexical {
+    // see `token` in `Scanners`
+    override def token: Parser[Token] =
+      ( delim
+      | unquotedWordChar ~ rep( unquotedWordChar )  ^^
+         { case first ~ rest => processIdent(first :: rest mkString "") }
+      | '\"' ~ rep( quotedWordChar ) ~ '\"' ^^
+         { case '\"' ~ chars ~ '\"' => StringLit(chars mkString "") }
+      | EofCh ^^^ EOF
+      | '\"' ~> failure("unclosed string literal")
+      | failure("illegal character")
+      )
+
+    def isPrintable(ch: Char) =
+       !ch.isControl && !ch.isSpaceChar && !ch.isWhitespace && ch != EofCh
+    def isPrintableNonDelim(ch: Char) =
+       isPrintable(ch) && ch != '(' && ch != ')'
+    def unquotedWordChar = elem("unquoted word char",
+       ch => ch != '"' && isPrintableNonDelim(ch))
+    def quotedWordChar = elem("quoted word char",
+       ch => ch != '"' && ch != '\n' && ch != EofCh)
+
+   // // see `whitespace in `Scanners`
+   // def whitespace: Parser[Any] = rep(
+   //     whitespaceChar
+   // //  | '/' ~ '/' ~ rep( chrExcept(EofCh, '\n') )
+   //   )
+
+    override protected def processIdent(name: String) =
+      if (reserved contains name) Keyword(name) else StringLit(name)
+  }
+
+  override val lexical = new FilterLexical
+  lexical.reserved ++= List("AND", "OR", "NOT")
+  // lexical.delimiters ++= List("&","|","!","(",")")
+  lexical.delimiters ++= List("(",")")
+
+  def word = stringLit ^^ {
+    s => EConst(Seq(if (foldcase) s.toLowerCase else s))
+  }
+
+  def words = word.+ ^^ {
+    x => EConst(x.flatMap(_ match { case EConst(y) => y }))
+  }
+
+  def parens: Parser[Expr] = "(" ~> expr <~ ")"
+
+  def not: Parser[ENot] = "NOT" ~> term ^^ { ENot(_) }
+
+  def term = ( words | parens | not )
+
+  def andexpr = term * (
+    "AND" ^^^ { (a:Expr, b:Expr) => EAnd(a,b) } )
+
+  def orexpr = andexpr * (
+    "OR" ^^^ { (a:Expr, b:Expr) => EOr(a,b) } )
+
+  def expr = ( orexpr | term )
+
+  def maybe_parse(s: String) = {
+    val tokens = new lexical.Scanner(s)
+    phrase(expr)(tokens)
+  }
+
+  def parse(s: String): Expr = {
+    maybe_parse(s) match {
+      case Success(tree, _) => tree
+      case e: NoSuccess =>
+        throw new IllegalArgumentException("Bad syntax: "+s)
+    }
+  }
+
+  def test(exprstr: String, tweet: Seq[String]) = {
+    maybe_parse(exprstr) match {
+      case Success(tree, _) =>
+        println("Tree: "+tree)
+        val v = tree.matches(tweet)
+        println("Eval: "+v)
+      case e: NoSuccess => errprint("%s\n" format e)
+    }
+  }
+  
+  //A main method for testing
+  def main(args: Array[String]) = test(args(0), args(1).split("""\s"""))
 }
 
 object ProcessTwitterPull extends ScoobiApp {
@@ -335,23 +531,6 @@ object ProcessTwitterPull extends ScoobiApp {
   }
 
   /**
-   * Use Twokenize to break up a tweet into separate ngrams.
-   */
-  def tokenize(text: String): Iterable[Iterable[String]] = {
-    // First, tokenize into separate tokens ("words") using Twokenize.
-    val words = Twokenize(text).map(normalize_word)
-
-    // Then, generate all possible ngrams up to a specified maximum length,
-    // where each ngram is a sequence of words.  `sliding` overlays a sliding
-    // window of a given size on a sequence to generate successive
-    // subsequences -- exactly what we want to generate ngrams.  So we
-    // generate all 1-grams, then all 2-grams, etc. up to the maximum size,
-    // and then concatenate the separate lists together (that's what `flatMap`
-    // does).
-    (1 to Opts.max_ngram).flatMap(words.sliding(_)).filter(!reject_ngram(_))
-  }
-
-  /**
    * Convert a "record" (key plus tweet data) into a line of text suitable
    * for writing to a "checkpoint" file.  We encode all the fields into text
    * and separate by tabs.  The text gets moved to the end and preceded by
@@ -402,6 +581,38 @@ object ProcessTwitterPull extends ScoobiApp {
     }
   }
 
+  def create_parser(expr: String, foldcase: Boolean) = {
+    if (expr == null) null
+    else new TweetFilterParser(foldcase).parse(expr)
+  }
+
+  lazy val filter_ast = create_parser(Opts.filter, foldcase = true)
+  lazy val cfilter_ast = create_parser(Opts.cfilter, foldcase = false)
+
+  /**
+   * Use Twokenize to break up a tweet into tokens, filter it if necessary
+   * according to --filter and --cfilter, and separate into ngrams.
+   */
+  def break_tweet_into_ngrams(text: String):
+      Iterable[Iterable[String]] = {
+    val words = Twokenize(text)
+    if ((filter_ast == null || (filter_ast matches words)) &&
+        (cfilter_ast == null || (cfilter_ast matches words))) {
+      val normwords = words.map(normalize_word)
+
+      // Then, generate all possible ngrams up to a specified maximum length,
+      // where each ngram is a sequence of words.  `sliding` overlays a sliding
+      // window of a given size on a sequence to generate successive
+      // subsequences -- exactly what we want to generate ngrams.  So we
+      // generate all 1-grams, then all 2-grams, etc. up to the maximum size,
+      // and then concatenate the separate lists together (that's what `flatMap`
+      // does).
+      (1 to Opts.max_ngram).
+        flatMap(normwords.sliding(_)).filter(!reject_ngram(_))
+    } else
+      Iterable[Iterable[String]]()
+  }
+
   /**
    * Given the tweet data minus the text field combined into a string,
    * plus the text field, tokenize the text and emit the ngrams individually.
@@ -412,7 +623,7 @@ object ProcessTwitterPull extends ScoobiApp {
   def emit_ngrams(tweet_text: (String, String)):
       Iterable[(TweetNgram, Long)] = {
     val (tweet_no_text, text) = tweet_text
-    for (ngram <- tokenize(text))
+    for (ngram <- break_tweet_into_ngrams(text))
       yield ((tweet_no_text, DistDocument.encode_ngram_for_counts_field(ngram)),
              1L)
   }
@@ -513,15 +724,15 @@ object ProcessTwitterPull extends ScoobiApp {
     // other users with non-standard behavior; and users located outside of
     // North America.  FIXME: We still want to filter spammers; but this
     // is trickier when not grouping by user.  How to do it?
-    val with_coord =
+    val good_tweets =
       if (Opts.keytype == "timestamp") concatted
-      else
-        concatted.filter(has_latlng).filter(is_nonspammer).
-          filter(northamerica_only)
-
+      else concatted.filter(x =>
+             has_latlng(x) &&
+             is_nonspammer(x) &&
+             northamerica_only(x))
 
     // Checkpoint a second time.
-    val checkpoint = with_coord.map(checkpoint_str)
+    val checkpoint = good_tweets.map(checkpoint_str)
     persist(TextOutput.toTextFile(checkpoint, Opts.output + "-cp"))
 
     // Load from second checkpoint.  Note that each time we checkpoint,
