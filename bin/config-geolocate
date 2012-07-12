@@ -10,22 +10,19 @@
 
 # 1. TEXTGROUNDER_DIR: Always required, points to top level of TextGrounder
 #                      distribution.
-# 2. Files pointing to the corpora and auxiliary files.  There are various
-#    ways to get these files located:
+# 2. Variables pointing to the corpora files: Either TG_CORPUS_DIR (which
+#    points to where the corpora are stored), or some other variable that
+#    triggers the setting of TG_CORPUS_DIR, as follows:
 #
-#    a. At the lowest level, you can directly set the relevant environment
-#       variables.  There are three of them:
+#    a. At the lowest level, you can simply set TG_CORPUS_DIR directly,
+#       and if set it will be used in preference to any of the methods below.
 #
-#       TG_AUX_DIR: location of auxiliary files (currently only the World
-#                   Gazetteer, needed only when running the `geotag-toponym`
-#                   app)
-#
-#    b. If you have these files in a directory structure like the one on
-#       the UTexas comp ling machines, you can set TG_GROUPS_DIR to the
-#       root of that directory structure.  This assumes that the Wikipedia
-#       data is in `corpora/wikipedia`, the Twitter data is in
-#       `corpora/twitter-geotext` (i.e. the GeoText Twitter corpus
-#       specifically), and the aux data is in `projects/textgrounder/data`.
+#    b. If you have the data files in a directory structure like the one on
+#       the UTexas comp ling machines with the corpora stored under a
+#       directory `.../corpora` and other stuff stored in particular places
+#       (e.g. auxiliary data, used for the `geolocate-toponym` subproject,
+#       stored in `.../projects/textgrounder/data`), you can set
+#       TG_GROUPS_DIR to the root of that directory structure.
 #
 #    c. If you're actually on the UTexas comp ling machines, which put the
 #       above directories under `/groups`, or you have exactly the same
@@ -43,11 +40,23 @@
 #       the script 'tg-copy-data-to-hadoop' to copy data files to the
 #       Hadoop File System underneath TG_HADOOP_DIR.
 #
-# 3. PCL_TRAVEL_DIR: Optional; location of PCL travel corpus and related files.
+# 3. TG_HADOOP_DIR: Optional; location of corpus and TextGrounder data files
+#                   in the Hadoop File System (HDFS).  By default, set to the
+#                   relative directory 'textgrounder-data', which means it
+#                   is relative to your home directory in HDFS, which is
+#                   normally /user/$USER.  See also the variable TG_USE_HDFS,
+#                   described above.
+#
+#
+# The following two are used during preprocessing of a Wikipedia dump.
+# Normally, it isn't necessary to set these variables, as they will be set
+# automatically when using either the highest-level preprocessing script
+# `download-preprocess-wiki` or the next-level scripts `preprocess-dump` and
+# `convert-corpus-to-latest`.
 #
 # 4. USE_PERMUTED: Optional; if "no", don't use permuted version of
 #                  Wikipedia data files. If "yes", do use it.  Otherwise,
-#                  use it if it appears available, otherwise not.  
+#                  use it if it appears available, otherwise not.
 #
 # 5. WP_VERSION: Optional; if set, should specify the prefix of a dump file,
 #                which will be used for the dump file and all files computed
@@ -58,18 +67,13 @@
 #                use one of the current dumps that have been completely
 #                preprocessed -- currently 'enwiki-20100905', the version
 #                used in Wing and Baldridge 2011.
-#
-# 6. TG_HADOOP_DIR: Optional; location of corpus and TextGrounder data files
-#                   in the Hadoop File System (HDFS).  By default, set to the
-#                   relative directory 'textgrounder-data', which means it
-#                   is relative to your home directory in HDFS, which is
-#                   normally /user/$USER.  See also the variable TG_USE_HDFS,
-#                   described above.
 
 if [ -z "$TEXTGROUNDER_DIR" ]; then
   echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
+
+CONFIG_GEOLOCATE_INCLUDED=yes
 
 TG_PYTHON_DIR="$TEXTGROUNDER_DIR/src/main/python"
 
@@ -91,7 +95,6 @@ fi
 
 if [ -n "$TG_GROUPS_DIR" ]; then
   TG_CORPUS_DIR=${TG_CORPUS_DIR:-$TG_GROUPS_DIR/corpora}
-  TG_AUX_DIR=${TG_AUX_DIR:-$TG_GROUPS_DIR/projects/textgrounder/data}
 fi
 
 if [ -z "$TG_CORPUS_DIR" ]; then
@@ -111,19 +114,6 @@ else
 fi
 
 TG_CORPUS_URL=$TG_FILE_PREF$TG_CORPUS_DIR
-
-if [ -z "$TG_AUX_DIR" ]; then
-  #echo "TG_AUX_DIR should be set to the location of aux data files"
-  #echo "Proceeding, because may not need to use these files (only needed"
-  #echo "when using --mode=geotag-toponyms)"
-  TG_AUX_DIR="/nonexistent-location/download-textgrounder-aux-files-please"
-fi
-
-if [ -z "$PCL_TRAVEL_DIR" ]; then
-  PCL_TRAVEL_DIR="/nonexistent-location/download-pcl-travel-files-please"
-fi
-
-TRCONLL_DEV_DIR="$PCL_TRAVEL_DIR/data/trconlldevtest/dev"
 
 GEOTEXT_CORPUS_TOP="$TG_CORPUS_DIR/twitter-geotext/GeoText.2010-10-12"
 #GEOTEXT_INPUT_DIR="$GEOTEXT_CORPUS_TOP/processed_data"
@@ -176,9 +166,6 @@ set_wp_version() {
 set_wp_version_specific_vars() {
   PAGES_ARTICLES_PREFIX="$DUMP_PREFIX-pages-articles"
 
-  # The full names of the various files we generate or read from during
-  # preprocessing, including the dump prefix, but without any path info.
-  OUT_GAZETTEER_FILE="world-dataen-fixed.txt"
   OUT_ORIG_DOCUMENT_DATA_FILE="$DUMP_PREFIX-$ORIG_DOCUMENT_DATA_SUFFIX"
   OUT_COMBINED_DOCUMENT_DATA_FILE="$DUMP_PREFIX-$COMBINED_DOCUMENT_DATA_SUFFIX"
   OUT_COORDS_FILE="$DUMP_PREFIX-$COORDS_SUFFIX"
@@ -195,9 +182,6 @@ set_wp_version_specific_vars() {
   OUT_TITLE2ID_FILE="$PAGES_ARTICLES_PREFIX.$TITLE2ID_SUFFIX"
   OUT_DUMP_FILE="$PAGES_ARTICLES_PREFIX.$DUMP_SUFFIX"
 
-  # The full pathnames of the various files we read from during experiment-
-  # running, including full path info.
-  IN_GAZETTEER_FILE="$TG_AUX_DIR/$OUT_GAZETTEER_FILE"
   #IN_DISAMBIG_ID_FILE="$WP_VERSION_DIR/$OUT_DISAMBIG_ID_FILE"
 }
 

@@ -14,6 +14,7 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
   exit 1
 fi
 
-. $TEXTGROUNDER_DIR/bin/config-geolocate
+NEED_PCL_TRAVEL_DIR=yes
+. $TEXTGROUNDER_DIR/bin/config-geolocate-toponym
 
 __TG_EXTRA_ARGS="--eval-file $TRCONLL_DEV_DIR --eval-format tr-conll --gazetteer-file $IN_GAZETTEER_FILE" $TEXTGROUNDER_DIR/bin/tg-geolocate --app geolocate-toponym ${1+"$@"}

@@ -254,10 +254,6 @@ elif [ "$CMD" = 'build-all' ]; then
 
 else  
 
-  # Include now because we need TEXTGROUNDER_URL; but not before so that
-  # we don't get complaints about TG_CORPUS_DIR otherwise.
-  . config-geolocate
-
   CLASS=
   HADOOP_ARGS=
   TGPACK=opennlp.textgrounder
@@ -287,6 +283,10 @@ else
 
     # Geolocate commands
     geolocate-document)
+      # Include now because we need TEXTGROUNDER_URL; but not before so that
+      # we don't get complaints about TG_CORPUS_DIR otherwise.
+      . config-geolocate
+
       # Note that the only difference between running in distributed and
       # non-distributed mode is how we run things (using 'hadoop jar' for
       # distributed, 'java' for non-distributed) and the input paths we
@@ -300,7 +300,9 @@ else
         CLASS=$TGGEOLOCATE.GeolocateDocumentApp
       fi
     ;;
-    geolocate-toponym) CLASS=$TGGEOLOCATE.toponym.GeolocateToponymApp;;
+    geolocate-toponym)
+       
+      CLASS=$TGGEOLOCATE.toponym.GeolocateToponymApp;;
     generate-kml) CLASS=$TGGEOLOCATE.GenerateKMLApp;;
 
     # Misc
