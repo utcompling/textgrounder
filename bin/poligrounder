@@ -14,7 +14,7 @@ fi
 JAVA="$JAVA_HOME/bin/java"
 HADOOP_BINARY="${HADOOP_BINARY:-hadoop}"
 
-# NOTE: If environment var TG_JAVA_OPT is set on entry, it will be used.
+# NOTE: If environment var PG_JAVA_OPT is set on entry, it will be used.
 
 # Process options
 
@@ -63,7 +63,7 @@ JAVA_MEMORY_OPT=
 # the physical memory of the machine.  
 if [ -n "$MEMORY" ]; then
   JAVA_MEMORY_OPT="-Xmx$MEMORY"
-elif [ -n "$TG_SET_JVM_MEMORY" ]; then
+elif [ -n "$PG_SET_JVM_MEMORY" ]; then
   MEMMB=`$POLIGROUNDER_DIR/bin/textgrounder-memory`
   if [ "$VERBOSE" = yes ]; then
     echo "Output from textgrounder-memory is: $MEMMB"
@@ -107,7 +107,7 @@ SCALA_LIB="$HOME/.sbt/boot/scala-2.9.2/lib/scala-library.jar"
 CP="$POLIGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
 
 HADOOP_COMMAND="$HADOOP_BINARY jar $POLIGROUNDER_DIR/target/textgrounder-assembly.jar"
-JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $TG_JAVA_OPT -classpath $CP"
+JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $PG_JAVA_OPT -classpath $CP"
 #Running Scala using Java currently works, and ensures that we will run
 #properly even if Scala isn't installed on the system or an older version
 #is installed. (Since we download our own Scala libraries.)
@@ -127,7 +127,7 @@ Options (mostly low-level):
   --memory MEM          Specify maximum heap size (e.g. 2048m or 20g); if not
                         given, textgrounder will attempt to set the heap size
                         to slightly under physical memory if the environment
-                        variable TG_SET_JVM_MEMORY is set; otherwise, the
+                        variable PG_SET_JVM_MEMORY is set; otherwise, the
                         JVM will be left to set the heap size automatically.
   --verbose             Show what commands are being executed.
   --debug               Tell the JVM to output debugging info.
@@ -149,10 +149,10 @@ Environment variables:
 
   POLIGROUNDER_DIR      Location of TextGrounder installation; needs to be
                         set for this script to work at all.
-  TG_SET_JVM_MEMORY     If non-blank, set the maximum JVM heap size to slightly
+  PG_SET_JVM_MEMORY     If non-blank, set the maximum JVM heap size to slightly
                         under the total physical memory size; useful if you
                         are getting out-of-memory errors.
-  TG_JAVA_OPT           If non-blank, should contain additional options for
+  PG_JAVA_OPT           If non-blank, should contain additional options for
                         the JVM, and will be passed directly to the 'java'
                         executable.  See 'java -help' and 'java -X' for a
                         description of some possible options, although neither

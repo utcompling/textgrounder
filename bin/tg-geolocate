@@ -47,7 +47,7 @@ FOO
 # user-supplied options, so that the latter override the former.
 
 if [ -z "$POLIGROUNDER_DIR" ]; then
-  echo "Must set POLIGROUNDER_DIR to top level of TextGrounder distribution"
+  echo "Must set POLIGROUNDER_DIR to top level of PoliGrounder distribution"
   exit 1
 fi
 
