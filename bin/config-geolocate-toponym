@@ -1,0 +1,58 @@
+#!/bin/sh
+
+# This script computes the paths of all files needed by any of the
+# preprocessing or experiment-running apps in the geolocate-toponym app of
+# TextGrounder, in addition to the paths computed using `config-geolocate`,
+# which is assumed to have been run before this.
+ 
+# You need to set the following environment variables on input, in addition
+# to those set for or by `config-geolocate`:
+#
+# 1. TG_AUX_DIR: Location of auxiliary files (currently only the World
+#                Gazetteer, needed only when running the `geolocate-toponym`
+#                app).  This can be set directly; or if not set and
+#                TG_GROUPS_DIR is set, it will be set to the subdirectory
+#                `.../projects/textgrounder/data` of TG_GROUPS_DIR.
+#
+# 2. PCL_TRAVEL_DIR: Optional; location of PCL travel corpus and related files.
+#
+
+if [ "$CONFIG_GEOLOCATE_INCLUDED" != "yes" ]; then
+  . config-geolocate
+fi
+
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
+  exit 1
+fi
+
+if [ -n "$TG_GROUPS_DIR" ]; then
+  TG_AUX_DIR=${TG_AUX_DIR:-$TG_GROUPS_DIR/projects/textgrounder/data}
+fi
+
+if [ -z "$TG_AUX_DIR" ]; then
+  if [ "$NEED_TG_AUX_DIR" != "no" ]; then
+    echo "TG_AUX_DIR should be set to the location of aux data files"
+    exit 1
+  else
+    TG_AUX_DIR="/nonexistent-location/download-textgrounder-aux-files-please"
+  fi
+fi
+
+if [ -z "$PCL_TRAVEL_DIR" ]; then
+  if [ "$NEED_PCL_TRAVEL_DIR" = "yes" ]; then
+    echo "PCL_TRAVEL_DIR should be set to the location of PCL travel files"
+    exit 1
+  else
+    PCL_TRAVEL_DIR="/nonexistent-location/download-pcl-travel-files-please"
+  fi
+fi
+
+TRCONLL_DEV_DIR="$PCL_TRAVEL_DIR/data/trconlldevtest/dev"
+
+# The full names of the various files we generate or read from during
+# preprocessing, including the dump prefix, but without any path info.
+OUT_GAZETTEER_FILE="world-dataen-fixed.txt"
+# The full pathnames of the various files we read from during experiment-
+# running, including full path info.
+IN_GAZETTEER_FILE="$TG_AUX_DIR/$OUT_GAZETTEER_FILE"

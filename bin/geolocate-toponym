@@ -13,6 +13,6 @@ if [ -z "$TEXTGROUNDER_DIR" ]; then
   exit 1
 fi
 
-. $TEXTGROUNDER_DIR/bin/config-geolocate
+. $TEXTGROUNDER_DIR/bin/config-geolocate-toponym
 
 __TG_EXTRA_ARGS="--gazetteer-file $IN_GAZETTEER_FILE" $TEXTGROUNDER_DIR/bin/tg-geolocate --app geolocate-toponym ${1+"$@"}

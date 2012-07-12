@@ -135,18 +135,30 @@ up and running and to test that everything is in place and working.
 
 4. Obtain the data.
 
-   -- If you are on a UTexas Comp Ling machine or the UTexas Longhorn cluster,
+   1. If you are on a UTexas Comp Ling machine or the UTexas Longhorn cluster,
       the data is already there.  Just set the environment variable
       TG_ON_COMP_LING_MACHINES to something non-blank if you're on a UTexas
       Comp Ling machine; likewise for TG_ON_LONGHORN if you're on Longhorn.
-   -- Otherwise, you'll probably have to download the data.  If you have
-      access to either of the above machines, look in 'bin/config-geolocate'
-      to see where the environment variables TG_WIKIPEDIA_DIR, TG_TWITTER_DIR
-      and TG_AUX_DIR point to, and copy those directories, preserving the
-      directory structure starting with '.../corpora' and '.../projects'.
-      Then set TG_GROUPS_DIR to the directory holding 'corpora' and 'projects'.
-   -- Otherwise, download the data and set up the appropriate environment
-      variables, as described below.
+   2. If you have access to either of the above machines, look in
+      `bin/config-geolocate` to see where the environment variable
+      TG_GROUPS_DIR points to, and copy the relevant TextGrounder corpora out
+      of the `.../corpora` directory; these will generally be the directories
+      `wikipedia`, `twitter-geotext`, anything beginning with `gut...`, and
+      anything beginning with `ut...`.   You might also want to copy the
+      `.../projects/textgrounder` and `.../projects/pcl_travel` directories,
+      especially if you're doing work with toponym resolution.  All of these
+      directories should be placed under some directory with a structure
+      that mirrors the source structure, starting with the `.../corpora`
+      or `.../projects` directories.  Then set TG_GROUPS_DIR to the
+      top-level directory into which you placed these various directories.
+   3. Otherwise, you might be able to download the data and set up the
+      appropriate environment variables, as described below.
+   4. Otherwise, you can generate at least Wikipedia and Twitter data from
+      Wikipedia dumps (publically available) and JSON-format tweets pulled
+      using the Twitter API.  As described in `config-geolocate`, the
+      variable TG_CORPUS_DIR points to the directory holding the TextGrounder
+      corpora and can be set directly, or TG_GROUPS_DIR can be set if the
+      TextGrounder corpora are held in a directory named `.../corpora`.
 
 5. Build the system.
 
@@ -391,10 +403,13 @@ There are three sets of data to download:
     aren't needed any more.  The only remaining auxiliary file is the
     World Gazetteer, and that is needed only when doing toponym resolution.
 
-Untar these files somewhere.  Then set the following environment variables:
-  * `TG_WIKIPEDIA_DIR` points to the directory containing the Wikipedia data.
-  * `TG_TWITTER_DIR` points to the directory containing the Twitter data.
-  * `TG_AUX_DIR` points to the directory containing the auxiliary data.
+Untar these files somewhere.  It is generally recommended that you create
+a directory and set `TG_GROUPS_DIR` to point to it; then put the Wikipedia
+and Twitter data underneath the `$TG_GROUPS_DIR/corpora` subdirectory, and the
+auxiliary files (if needed) under `$TG_GROUPS_DIR/projects/textgrounder/data`.
+Alternatively, `TG_CORPUS_DIR` can be used to directly point to where the
+corpora are stored, and `TG_AUX_DIR` to directly point to where the auxiliary
+files (if needed) are stored.
 
 (Alternatively, if you are running on a UTexas Comp Ling machine, or a
 machine with a copy of the relevant portions of /groups/corpora and
