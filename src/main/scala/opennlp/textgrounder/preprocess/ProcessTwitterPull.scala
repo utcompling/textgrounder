@@ -292,30 +292,8 @@ class TweetFilterParser(foldcase: Boolean) extends StandardTokenParsers {
   def main(args: Array[String]) = test(args(0), args(1).split("""\s"""))
 }
 
-object ProcessTwitterPull extends ScoobiApp {
-  // Tweet = Data for a tweet other than the tweet ID =
-  // (user, timestamp, text, lat, lng, followers, following, number of tweets)
-  // Note that we have "number of tweets" since we merge multiple tweets into
-  // a document, and also use type Tweet for them.
-  type Tweet = (String, Long, String, Double, Double, Int, Int, Int)
-  // TweetID = numeric string used to uniquely identify a tweet.
-  type TweetID = String
-  // Record = Data for tweet along with the key (e.g. username, timestamp) =
-  // (key, tweet data)
-  type Record = (String, Tweet)
-  // IDRecord = Tweet ID along with all other data for a tweet.
-  type IDRecord = (TweetID, Record)
-  // TweetNoText = Data for a merged set of tweets other than the text =
-  // (username, earliest timestamp, best lat, best lng, max followers,
-  //    max following, number of tweets pulled)
-  type TweetNoText = (String, Long, Double, Double, Int, Int, Int)
-  // TweetNgram = Data for the tweet minus the text, plus an individual ngram
-  //   from the text = (tweet_no_text_as_string, ngram)
-  type TweetNgram = (String, String)
-  // NgramCount = (ngram, number of ocurrences)
-  type NgramCount = (String, Long)
-
-  var Opts: ProcessTwitterPullParams = _
+object ParseAndUniquifyTweets {
+  import ProcessTwitterPull._
 
   def force_value(value: json.JValue): String = {
     if ((value values) == null)
@@ -339,6 +317,47 @@ object ProcessTwitterPull extends ScoobiApp {
   }
 
   /**
+   * An empty tweet, stored as a full IDRecord.
+   */
+  val empty_tweet: IDRecord = ("", ("", ("", 0, "", Double.NaN, Double.NaN, 0, 0, 0)))
+
+  /**
+   * Parse a JSON line into a tweet.  Return value is an IDRecord, including
+   * the tweet ID, username, text and all other data.
+   */
+  def parse_json(line: String): IDRecord = {
+    // For testing
+    // errprint("parsing JSON: %s", line)
+    try {
+      val parsed = json.parse(line)
+      val user = force_value(parsed \ "user" \ "screen_name")
+      val timestamp = parse_time(force_value(parsed \ "created_at"))
+      val text = force_value(parsed \ "text").replaceAll("\\s+", " ")
+      val followers = force_value(parsed \ "user" \ "followers_count").toInt
+      val following = force_value(parsed \ "user" \ "friends_count").toInt
+      val tweet_id = force_value(parsed \ "id_str")
+      val (lat, lng) = 
+        if ((parsed \ "coordinates" values) == null ||
+            (force_value(parsed \ "coordinates" \ "type") != "Point")) {
+          (Double.NaN, Double.NaN)
+        } else {
+          val latlng: List[Number] = 
+            (parsed \ "coordinates" \ "coordinates" values).asInstanceOf[List[Number]]
+          (latlng(1).doubleValue, latlng(0).doubleValue)
+        }
+      val key = Opts.keytype match {
+        case "user" => user
+        case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
+      }
+      (tweet_id, (key, (user, timestamp, text, lat, lng, followers, following, 1)))
+    } catch {
+      case jpe: json.JsonParser.ParseException => empty_tweet
+      case npe: NullPointerException => empty_tweet
+      case nfe: NumberFormatException => empty_tweet
+    }
+  }
+
+  /**
    * Return true if this tweet is "valid" in that it doesn't have any
    * out-of-range values (blank strings or 0-valued quantities).  Note
    * that we treat a case where both latitude and longitude are 0 as
@@ -349,6 +368,96 @@ object ProcessTwitterPull extends ScoobiApp {
     // filters out invalid tweets, as well as trivial spam
     val (tw_id, (key, (user, ts, text, lat, lng, fers, fing, numtw))) = id_r
     tw_id != "" && ts != 0.0 && user != "" && !(lat == 0.0 && lng == 0.0)
+  }
+
+  /**
+   * Select the first tweet with the same ID.  For various reasons we may
+   * have duplicates of the same tweet among our data.  E.g. it seems that
+   * Twitter itself sometimes streams duplicates through its Streaming API,
+   * and data from different sources will almost certainly have duplicates.
+   * Furthermore, sometimes we want to get all the tweets even in the presence
+   * of flakiness that causes Twitter to sometimes bomb out in a Streaming
+   * session and take a while to restart, so we have two or three simultaneous
+   * streams going recording the same stuff, hoping that Twitter bombs out at
+   * different points in the different sessions (which is generally true).
+   * Then, all or almost all the tweets are available in the different streams,
+   * but there is a lot of duplication that needs to be tossed aside.
+   */
+  def tweet_once(id_rs: (TweetID, Iterable[Record])): Record = {
+    val (id, rs) = id_rs
+    rs.head
+  }
+
+  def apply(lines: DList[String]) = {
+    // Parse JSON into tweet records (IDRecord), filter out invalid tweets.
+    val values_extracted = lines.map(parse_json).filter(is_valid_tweet)
+
+    // Filter out duplicate tweets -- group by Tweet ID and then take the
+    // first tweet for a given ID.  Duplicate tweets occur for various
+    // reasons, e.g. sometimes in the stream itself due to Twitter errors,
+    // or when combining data from multiple, possibly overlapping, sources.
+    // In the process, the tweet ID's are discarded.
+    val single_tweets = values_extracted.groupByKey.map(tweet_once)
+
+    // Checkpoint the resulting tweets (minus ID) onto disk.
+    single_tweets.map(checkpoint_str)
+  }
+}
+
+object GroupTweetsAndSelectGood {
+  import ProcessTwitterPull._
+
+  /**
+   * Convert a checkpointed string generated by `checkpoint_str` back into
+   * the record it came from.
+   */
+  def from_checkpoint_to_record(line: String): Record = {
+    val split = line.split("\t\t")
+    assert(split.length == 2)
+    val (tweet_no_text, text) = (split(0), split(1))
+    val (key, (user, ts, lat, lng, fers, fing, numtw)) =
+      split_tweet_no_text(tweet_no_text)
+    (key, (user, ts, text, lat, lng, fers, fing, numtw))
+  }
+
+  /**
+   * Merge the data associated with two tweets or tweet combinations
+   * into a single tweet combination.  Concatenate text.  Find maximum
+   * numbers of followers and followees.  Add number of tweets in each.
+   * For latitude and longitude, take the earliest provided values
+   * ("earliest" by timestamp and "provided" meaning not missing).
+   */
+  def merge_records(tweet1: Tweet, tweet2: Tweet): Tweet = {
+    val (user1, ts1, text1, lat1, lng1, fers1, fing1, numtw1) = tweet1
+    val (user2, ts2, text2, lat2, lng2, fers2, fing2, numtw2) = tweet2
+    val (fers, fing) = (math.max(fers1, fers2), math.max(fing1, fing2))
+    val text = text1 + " " + text2
+    val numtw = numtw1 + numtw2
+
+    val (lat, lng, ts) = 
+      if (isNaN(lat1) && isNaN(lat2)) {
+        (lat1, lng1, math.min(ts1, ts2))
+      } else if (isNaN(lat2)) {
+        (lat1, lng1, ts1)
+      } else if (isNaN(lat1)) {
+        (lat2, lng2, ts2)
+      } else if (ts1 < ts2) {
+        (lat1, lng1, ts1)
+      } else {
+        (lat2, lng2, ts2)
+      }
+
+    // FIXME maybe want to track the different users
+    (user1, ts, text, lat, lng, fers, fing, numtw)
+  }
+
+  /**
+   * Return true if tweet (combination) has a fully-specified latitude
+   * and longitude.
+   */
+  def has_latlng(r: Record) = {
+    val (key, (user, ts, text, lat, lng, fers, fing, numtw)) = r
+    !isNaN(lat) && !isNaN(lng)
   }
 
   val MAX_NUMBER_FOLLOWING = 1000
@@ -398,104 +507,42 @@ object ProcessTwitterPull extends ScoobiApp {
       (lng >= MIN_LNG && lng <= MAX_LNG)
   }
 
+  def apply(lines2: DList[String]) = {
+    val values_extracted2 = lines2.map(from_checkpoint_to_record)
 
-  /**
-   * An empty tweet, stored as a full IDRecord.
-   */
-  val empty_tweet: IDRecord = ("", ("", ("", 0, "", Double.NaN, Double.NaN, 0, 0, 0)))
+    // Group by username, then combine the tweets for a user into a
+    // tweet combination, with text concatenated and the location taken
+    // from the earliest/ tweet with a specific coordinate.
+    val concatted = values_extracted2.groupByKey.combine(merge_records)
 
-  /**
-   * Parse a JSON line into a tweet.  Return value is an IDRecord, including
-   * the tweet ID, username, text and all other data.
-   */
-  def parse_json(line: String): IDRecord = {
-    // For testing
-    // errprint("parsing JSON: %s", line)
-    try {
-      val parsed = json.parse(line)
-      val user = force_value(parsed \ "user" \ "screen_name")
-      val timestamp = parse_time(force_value(parsed \ "created_at"))
-      val text = force_value(parsed \ "text").replaceAll("\\s+", " ")
-      val followers = force_value(parsed \ "user" \ "followers_count").toInt
-      val following = force_value(parsed \ "user" \ "friends_count").toInt
-      val tweet_id = force_value(parsed \ "id_str")
-      val (lat, lng) = 
-        if ((parsed \ "coordinates" values) == null ||
-            (force_value(parsed \ "coordinates" \ "type") != "Point")) {
-          (Double.NaN, Double.NaN)
-        } else {
-          val latlng: List[Number] = 
-            (parsed \ "coordinates" \ "coordinates" values).asInstanceOf[List[Number]]
-          (latlng(1).doubleValue, latlng(0).doubleValue)
-        }
-      val key = Opts.keytype match {
-        case "user" => user
-        case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
-      }
-      (tweet_id, (key, (user, timestamp, text, lat, lng, followers, following, 1)))
-    } catch {
-      case jpe: json.JsonParser.ParseException => empty_tweet
-      case npe: NullPointerException => empty_tweet
-      case nfe: NumberFormatException => empty_tweet
+    // If grouping by user, filter the tweet combinations, removing users
+    // without a specific coordinate; users that appear to be "spammers" or
+    // other users with non-standard behavior; and users located outside of
+    // North America.  FIXME: We still want to filter spammers; but this
+    // is trickier when not grouping by user.  How to do it?
+    val good_tweets =
+      if (Opts.keytype == "timestamp") concatted
+      else concatted.filter(x =>
+             has_latlng(x) &&
+             is_nonspammer(x) &&
+             northamerica_only(x))
+
+    // Checkpoint a second time.
+    good_tweets.map(checkpoint_str)
+  }
+}
+
+object TokenizeFilterAndCountTweets {
+  import ProcessTwitterPull._
+
+  def from_checkpoint_to_tweet_text(line: String): (String, String) = {
+    val split = line.split("\t\t")
+    if (split.length != 2) {
+      System.err.println("Bad line: " + line)
+      ("", "")
+    } else {
+      (split(0), split(1))
     }
-  }
-
-  /**
-   * Select the first tweet with the same ID.  For various reasons we may
-   * have duplicates of the same tweet among our data.  E.g. it seems that
-   * Twitter itself sometimes streams duplicates through its Streaming API,
-   * and data from different sources will almost certainly have duplicates.
-   * Furthermore, sometimes we want to get all the tweets even in the presence
-   * of flakiness that causes Twitter to sometimes bomb out in a Streaming
-   * session and take a while to restart, so we have two or three simultaneous
-   * streams going recording the same stuff, hoping that Twitter bombs out at
-   * different points in the different sessions (which is generally true).
-   * Then, all or almost all the tweets are available in the different streams,
-   * but there is a lot of duplication that needs to be tossed aside.
-   */
-  def tweet_once(id_rs: (TweetID, Iterable[Record])): Record = {
-    val (id, rs) = id_rs
-    rs.head
-  }
-
-  /**
-   * Merge the data associated with two tweets or tweet combinations
-   * into a single tweet combination.  Concatenate text.  Find maximum
-   * numbers of followers and followees.  Add number of tweets in each.
-   * For latitude and longitude, take the earliest provided values
-   * ("earliest" by timestamp and "provided" meaning not missing).
-   */
-  def merge_records(tweet1: Tweet, tweet2: Tweet): Tweet = {
-    val (user1, ts1, text1, lat1, lng1, fers1, fing1, numtw1) = tweet1
-    val (user2, ts2, text2, lat2, lng2, fers2, fing2, numtw2) = tweet2
-    val (fers, fing) = (math.max(fers1, fers2), math.max(fing1, fing2))
-    val text = text1 + " " + text2
-    val numtw = numtw1 + numtw2
-
-    val (lat, lng, ts) = 
-      if (isNaN(lat1) && isNaN(lat2)) {
-        (lat1, lng1, math.min(ts1, ts2))
-      } else if (isNaN(lat2)) {
-        (lat1, lng1, ts1)
-      } else if (isNaN(lat1)) {
-        (lat2, lng2, ts2)
-      } else if (ts1 < ts2) {
-        (lat1, lng1, ts1)
-      } else {
-        (lat2, lng2, ts2)
-      }
-
-    // FIXME maybe want to track the different users
-    (user1, ts, text, lat, lng, fers, fing, numtw)
-  }
-
-  /**
-   * Return true if tweet (combination) has a fully-specified latitude
-   * and longitude.
-   */
-  def has_latlng(r: Record) = {
-    val (key, (user, ts, text, lat, lng, fers, fing, numtw)) = r
-    !isNaN(lat) && !isNaN(lng)
   }
 
   /**
@@ -530,57 +577,6 @@ object ProcessTwitterPull extends ScoobiApp {
   def reject_ngram(ngram: Iterable[String]) = {
     ngram.forall(reject_word) || reject_word(ngram.head) ||
       reject_word(ngram.last)
-  }
-
-  /**
-   * Convert a "record" (key plus tweet data) into a line of text suitable
-   * for writing to a "checkpoint" file.  We encode all the fields into text
-   * and separate by tabs.  The text gets moved to the end and preceded by
-   * two tabs, so it can be found more easily when re-reading. FIXME: This
-   * is fragile; will have problems if any field is blank.  Just peel off
-   * the last field, or whatever.
-   */
-  def checkpoint_str(r: Record): String = {
-    val (key, (user, ts, text, lat, lng, fers, fing, numtw)) = r
-    val text_2 = text.replaceAll("\\s+", " ")
-    val s = Seq(key, user, ts, lat, lng, fers, fing, numtw, "", text_2) mkString "\t"
-    s
-  }
-
-  /**
-   * Convert a checkpointed string generated by `checkpoint_str` back into
-   * the record it came from.
-   */
-  def from_checkpoint_to_record(line: String): Record = {
-    val split = line.split("\t\t")
-    assert(split.length == 2)
-    val (tweet_no_text, text) = (split(0), split(1))
-    val (key, (user, ts, lat, lng, fers, fing, numtw)) =
-      split_tweet_no_text(tweet_no_text)
-    (key, (user, ts, text, lat, lng, fers, fing, numtw))
-  }
-
-  def split_tweet_no_text(tweet_no_text: String): (String, TweetNoText) = {
-    val split2 = tweet_no_text.split("\t")
-    val key = split2(0)
-    val user = split2(1)
-    val ts = split2(2).toLong
-    val lat = split2(3).toDouble
-    val lng = split2(4).toDouble
-    val fers = split2(5).toInt
-    val fing = split2(6).toInt
-    val numtw = split2(7).toInt
-    (key, (user, ts, lat, lng, fers, fing, numtw))
-  }
-
-  def from_checkpoint_to_tweet_text(line: String): (String, String) = {
-    val split = line.split("\t\t")
-    if (split.length != 2) {
-      System.err.println("Bad line: " + line)
-      ("", "")
-    } else {
-      (split(0), split(1))
-    }
   }
 
   def create_parser(expr: String, foldcase: Boolean) = {
@@ -660,6 +656,80 @@ object ProcessTwitterPull extends ScoobiApp {
     Seq(user, ts, latlngstr, fers, fing, numtw, nice_text) mkString "\t"
   }
 
+  def apply(lines_cp: DList[String]) = {
+    // Now count ngrams.  We run `from_checkpoint_to_tweet_text` (see above)
+    // to get separate access to the text, then Twokenize it into words,
+    // generate ngrams from them and emit a series of key-value pairs of
+    // (ngram, count).
+    val emitted_ngrams = lines_cp.map(from_checkpoint_to_tweet_text)
+                                 .flatMap(emit_ngrams)
+    // Group based on key (the ngram) and combine by adding up the individual
+    // counts.
+    val ngram_counts =
+      emitted_ngrams.groupByKey.combine((a: Long, b: Long) => a + b)
+
+    // Regroup with proper key (user, timestamp, etc.) as key,
+    // ngram pairs as values.
+    val regrouped_by_key = ngram_counts.map(reposition_ngram).groupByKey
+
+    // Nice string output.
+    regrouped_by_key.map(nicely_format_plain)
+  }
+}
+
+object ProcessTwitterPull extends ScoobiApp {
+  // Tweet = Data for a tweet other than the tweet ID =
+  // (user, timestamp, text, lat, lng, followers, following, number of tweets)
+  // Note that we have "number of tweets" since we merge multiple tweets into
+  // a document, and also use type Tweet for them.
+  type Tweet = (String, Long, String, Double, Double, Int, Int, Int)
+  // TweetID = numeric string used to uniquely identify a tweet.
+  type TweetID = String
+  // Record = Data for tweet along with the key (e.g. username, timestamp) =
+  // (key, tweet data)
+  type Record = (String, Tweet)
+  // IDRecord = Tweet ID along with all other data for a tweet.
+  type IDRecord = (TweetID, Record)
+  // TweetNoText = Data for a merged set of tweets other than the text =
+  // (username, earliest timestamp, best lat, best lng, max followers,
+  //    max following, number of tweets pulled)
+  type TweetNoText = (String, Long, Double, Double, Int, Int, Int)
+  // TweetNgram = Data for the tweet minus the text, plus an individual ngram
+  //   from the text = (tweet_no_text_as_string, ngram)
+  type TweetNgram = (String, String)
+  // NgramCount = (ngram, number of ocurrences)
+  type NgramCount = (String, Long)
+
+  var Opts: ProcessTwitterPullParams = _
+
+  /**
+   * Convert a "record" (key plus tweet data) into a line of text suitable
+   * for writing to a "checkpoint" file.  We encode all the fields into text
+   * and separate by tabs.  The text gets moved to the end and preceded by
+   * two tabs, so it can be found more easily when re-reading. FIXME: This
+   * is fragile; will have problems if any field is blank.  Just peel off
+   * the last field, or whatever.
+   */
+  def checkpoint_str(r: Record): String = {
+    val (key, (user, ts, text, lat, lng, fers, fing, numtw)) = r
+    val text_2 = text.replaceAll("\\s+", " ")
+    val s = Seq(key, user, ts, lat, lng, fers, fing, numtw, "", text_2) mkString "\t"
+    s
+  }
+
+  def split_tweet_no_text(tweet_no_text: String): (String, TweetNoText) = {
+    val split2 = tweet_no_text.split("\t")
+    val key = split2(0)
+    val user = split2(1)
+    val ts = split2(2).toLong
+    val lat = split2(3).toDouble
+    val lng = split2(4).toDouble
+    val fers = split2(5).toInt
+    val fing = split2(6).toInt
+    val numtw = split2(7).toInt
+    (key, (user, ts, lat, lng, fers, fing, numtw))
+  }
+
   /**
    * Output a schema file of the appropriate name.
    */
@@ -716,43 +786,12 @@ object ProcessTwitterPull extends ScoobiApp {
     // Firstly we load up all the (new-line-separated) JSON lines.
     val lines: DList[String] = TextInput.fromTextFile(Opts.input)
 
-    // Parse JSON into tweet records (IDRecord), filter out invalid tweets.
-    val values_extracted = lines.map(parse_json).filter(is_valid_tweet)
-
-    // Filter out duplicate tweets -- group by Tweet ID and then take the
-    // first tweet for a given ID.  Duplicate tweets occur for various
-    // reasons, e.g. sometimes in the stream itself due to Twitter errors,
-    // or when combining data from multiple, possibly overlapping, sources.
-    // In the process, the tweet ID's are discarded.
-    val single_tweets = values_extracted.groupByKey.map(tweet_once)
-
-    // Checkpoint the resulting tweets (minus ID) onto disk.
-    val checkpoint1 = single_tweets.map(checkpoint_str)
+    val checkpoint1 = ParseAndUniquifyTweets(lines)
     persist(TextOutput.toTextFile(checkpoint1, Opts.output + "-st"))
 
     // Then load back up.
     val lines2: DList[String] = TextInput.fromTextFile(Opts.output + "-st")
-    val values_extracted2 = lines2.map(from_checkpoint_to_record)
-
-    // Group by username, then combine the tweets for a user into a
-    // tweet combination, with text concatenated and the location taken
-    // from the earliest/ tweet with a specific coordinate.
-    val concatted = values_extracted2.groupByKey.combine(merge_records)
-
-    // If grouping by user, filter the tweet combinations, removing users
-    // without a specific coordinate; users that appear to be "spammers" or
-    // other users with non-standard behavior; and users located outside of
-    // North America.  FIXME: We still want to filter spammers; but this
-    // is trickier when not grouping by user.  How to do it?
-    val good_tweets =
-      if (Opts.keytype == "timestamp") concatted
-      else concatted.filter(x =>
-             has_latlng(x) &&
-             is_nonspammer(x) &&
-             northamerica_only(x))
-
-    // Checkpoint a second time.
-    val checkpoint = good_tweets.map(checkpoint_str)
+    val checkpoint = GroupTweetsAndSelectGood(lines2)
     persist(TextOutput.toTextFile(checkpoint, Opts.output + "-cp"))
 
     // Load from second checkpoint.  Note that each time we checkpoint,
@@ -762,23 +801,7 @@ object ProcessTwitterPull extends ScoobiApp {
     // two separate strings.
     val lines_cp: DList[String] = TextInput.fromTextFile(Opts.output + "-cp")
 
-    // Now count ngrams.  We run `from_checkpoint_to_tweet_text` (see above)
-    // to get separate access to the text, then Twokenize it into words,
-    // generate ngrams from them and emit a series of key-value pairs of
-    // (ngram, count).
-    val emitted_ngrams = lines_cp.map(from_checkpoint_to_tweet_text)
-                                 .flatMap(emit_ngrams)
-    // Group based on key (the ngram) and combine by adding up the individual
-    // counts.
-    val ngram_counts =
-      emitted_ngrams.groupByKey.combine((a: Long, b: Long) => a + b)
-
-    // Regroup with proper key (user, timestamp, etc.) as key,
-    // ngram pairs as values.
-    val regrouped_by_key = ngram_counts.map(reposition_ngram).groupByKey
-
-    // Nice string output.
-    val nicely_formatted = regrouped_by_key.map(nicely_format_plain)
+    val nicely_formatted = TokenizeFilterAndCountTweets(lines_cp)
 
     // Save to disk.
     persist(TextOutput.toTextFile(nicely_formatted, Opts.output))
