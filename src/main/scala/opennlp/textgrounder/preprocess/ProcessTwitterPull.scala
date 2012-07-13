@@ -409,6 +409,8 @@ object ProcessTwitterPull extends ScoobiApp {
    * the tweet ID, username, text and all other data.
    */
   def parse_json(line: String): IDRecord = {
+    // For testing
+    // errprint("parsing JSON: %s", line)
     try {
       val parsed = json.parse(line)
       val user = force_value(parsed \ "user" \ "screen_name")
@@ -681,17 +683,35 @@ object ProcessTwitterPull extends ScoobiApp {
     } finally { p.close() }
   }
 
+  def output_command_line_parameters(arg_parser: ArgParser) {
+    errprint("")
+    errprint("Non-default parameter values:")
+    for (name <- arg_parser.argNames) {
+      if (arg_parser.specified(name))
+        errprint("%30s: %s", name, arg_parser(name))
+    }
+    errprint("")
+    errprint("Parameter values:")
+    for (name <- arg_parser.argNames) {
+      errprint("%30s: %s", name, arg_parser(name))
+      //errprint("%30s: %s", name, arg_parser.getType(name))
+    }
+    errprint("")
+  }
+
   def run() {
     val ap = new ArgParser("ProcessTwitterPull")
     // This first call is necessary, even though it doesn't appear to do
     // anything.  In particular, this ensures that all arguments have been
     // defined on `ap` prior to parsing.
     new ProcessTwitterPullParams(ap)
+    errprint("Parsing args: %s", args mkString " ")
     ap.parse(args)
     Opts = new ProcessTwitterPullParams(ap)
     if (Opts.by_time)
       Opts.keytype = "timestamp"
     Opts.timeslice = (Opts.timeslice_float * 1000).toLong
+    output_command_line_parameters(ap)
 
     // Firstly we load up all the (new-line-separated) JSON lines.
     val lines: DList[String] = TextInput.fromTextFile(Opts.input)
