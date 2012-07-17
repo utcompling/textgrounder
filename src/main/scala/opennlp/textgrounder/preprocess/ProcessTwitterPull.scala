@@ -19,11 +19,13 @@
 
 package opennlp.textgrounder.preprocess
 
-import net.liftweb.json
+//import net.liftweb.json
+import com.codahale.jerkson
 import com.nicta.scoobi.Scoobi._
 import java.io._
 import java.lang.Double.isNaN
 import java.text.{SimpleDateFormat, ParseException}
+import collection.JavaConversions._
 
 import util.control.Breaks._
 
@@ -128,6 +130,16 @@ Look for any tweets containing the word "clinton" as well as either the words
     default = 1,
     help="""Largest size of n-grams to create.  Default 1, i.e. distribution
     only contains unigrams.""")
+  var min_tweets = ap.option[Int]("min-tweets",
+    default = 10,
+    help="""Minimum number of tweets per user for user to be accepted in
+    --by-user mode.""")
+  var max_tweets = ap.option[Int]("max-tweets",
+    default = 1000,
+    help="""Maximum number of tweets per user for user to be accepted in
+    --by-user mode.""")
+  var debug = ap.flag("debug",
+    help="""Output debug info about tweet processing/acceptance.""")
   var input = ap.positional[String]("INPUT",
     help = "Source directory to read files from.")
   var output = ap.positional[String]("OUTPUT",
@@ -295,11 +307,14 @@ class TweetFilterParser(foldcase: Boolean) extends StandardTokenParsers {
 object ParseAndUniquifyTweets {
   import ProcessTwitterPull._
 
-  def force_value(value: json.JValue): String = {
-    if ((value values) == null)
-        null
-    else
-        (value values) toString
+  def get_string(value: Map[String, Any], l1: String) = {
+    value(l1).asInstanceOf[String]
+  }
+
+  def get_2nd_level_value[T](value: Map[String, Any], l1: String,
+      l2: String) = {
+    value(l1).asInstanceOf[java.util.LinkedHashMap[String,Any]](l2).
+      asInstanceOf[T]
   }
 
   /**
@@ -321,6 +336,11 @@ object ParseAndUniquifyTweets {
    */
   val empty_tweet: IDRecord = ("", ("", ("", 0, "", Double.NaN, Double.NaN, 0, 0, 0)))
 
+  def parse_problem(line: String, e: Exception) = {
+    errprint("Error parsing line: %s\n%s", line, e)
+    empty_tweet
+  }
+
   /**
    * Parse a JSON line into a tweet.  Return value is an IDRecord, including
    * the tweet ID, username, text and all other data.
@@ -329,20 +349,22 @@ object ParseAndUniquifyTweets {
     // For testing
     // errprint("parsing JSON: %s", line)
     try {
-      val parsed = json.parse(line)
-      val user = force_value(parsed \ "user" \ "screen_name")
-      val timestamp = parse_time(force_value(parsed \ "created_at"))
-      val text = force_value(parsed \ "text").replaceAll("\\s+", " ")
-      val followers = force_value(parsed \ "user" \ "followers_count").toInt
-      val following = force_value(parsed \ "user" \ "friends_count").toInt
-      val tweet_id = force_value(parsed \ "id_str")
+      val parsed = jerkson.Json.parse[Map[String,Any]](line)
+      val user = get_2nd_level_value[String](parsed, "user", "screen_name")
+      val timestamp = parse_time(get_string(parsed, "created_at"))
+      val text = get_string(parsed, "text").replaceAll("\\s+", " ")
+      val followers = get_2nd_level_value[Int](parsed, "user", "followers_count")
+      val following = get_2nd_level_value[Int](parsed, "user", "friends_count")
+      val tweet_id = get_string(parsed, "id_str")
       val (lat, lng) = 
-        if ((parsed \ "coordinates" values) == null ||
-            (force_value(parsed \ "coordinates" \ "type") != "Point")) {
+        if (parsed("coordinates") == null ||
+            get_2nd_level_value[String](parsed, "coordinates", "type")
+              != "Point") {
           (Double.NaN, Double.NaN)
         } else {
-          val latlng: List[Number] = 
-            (parsed \ "coordinates" \ "coordinates" values).asInstanceOf[List[Number]]
+          val latlng = 
+            get_2nd_level_value[java.util.ArrayList[Number]](parsed,
+              "coordinates", "coordinates")
           (latlng(1).doubleValue, latlng(0).doubleValue)
         }
       val key = Opts.keytype match {
@@ -351,9 +373,16 @@ object ParseAndUniquifyTweets {
       }
       (tweet_id, (key, (user, timestamp, text, lat, lng, followers, following, 1)))
     } catch {
-      case jpe: json.JsonParser.ParseException => empty_tweet
-      case npe: NullPointerException => empty_tweet
-      case nfe: NumberFormatException => empty_tweet
+      case jpe: jerkson.ParsingException =>
+        parse_problem(line, jpe)
+      case npe: NullPointerException =>
+        parse_problem(line, npe)
+      case nfe: NumberFormatException =>
+        parse_problem(line, nfe)
+      case nsee: NoSuchElementException =>
+        parse_problem(line, nsee)
+      case e: Exception =>
+        { parse_problem(line, e); throw e }
     }
   }
 
@@ -463,8 +492,6 @@ object GroupTweetsAndSelectGood {
   val MAX_NUMBER_FOLLOWING = 1000
   val MIN_NUMBER_FOLLOWING = 5
   val MIN_NUMBER_FOLLOWERS = 10
-  val MIN_NUMBER_TWEETS = 10
-  val MAX_NUMBER_TWEETS = 1000
   /**
    * Return true if this tweet combination (tweets for a given user)
    * appears to reflect a "spammer" user or some other user with
@@ -485,9 +512,13 @@ object GroupTweetsAndSelectGood {
   def is_nonspammer(r: Record): Boolean = {
     val (key, (user, ts, text, lat, lng, fers, fing, numtw)) = r
 
-    (fing >= MIN_NUMBER_FOLLOWING && fing <= MAX_NUMBER_FOLLOWING) &&
+    val retval =
+      (fing >= MIN_NUMBER_FOLLOWING && fing <= MAX_NUMBER_FOLLOWING) &&
       (fers >= MIN_NUMBER_FOLLOWERS) &&
-      (numtw >= MIN_NUMBER_TWEETS && numtw <= MAX_NUMBER_TWEETS)
+      (numtw >= Opts.min_tweets && numtw <= Opts.max_tweets)
+    if (Opts.debug && retval == false)
+      errprint("Rejecting is_nonspammer %s", r)
+    retval
   }
 
   // bounding box for north america
@@ -503,8 +534,19 @@ object GroupTweetsAndSelectGood {
   def northamerica_only(r: Record): Boolean = {
     val (key, (user, ts, text, lat, lng, fers, fing, numtw)) = r
 
-    (lat >= MIN_LAT && lat <= MAX_LAT) &&
-      (lng >= MIN_LNG && lng <= MAX_LNG)
+    val retval = (lat >= MIN_LAT && lat <= MAX_LAT) &&
+                 (lng >= MIN_LNG && lng <= MAX_LNG)
+    if (Opts.debug && retval == false)
+      errprint("Rejecting northamerica_only %s", r)
+    retval
+  }
+
+  def is_good_tweet(r: Record): Boolean = {
+    if (Opts.debug)
+      errprint("Considering %s", r)
+    has_latlng(r) &&
+    is_nonspammer(r) &&
+    northamerica_only(r)
   }
 
   def apply(lines2: DList[String]) = {
@@ -522,10 +564,7 @@ object GroupTweetsAndSelectGood {
     // is trickier when not grouping by user.  How to do it?
     val good_tweets =
       if (Opts.keytype == "timestamp") concatted
-      else concatted.filter(x =>
-             has_latlng(x) &&
-             is_nonspammer(x) &&
-             northamerica_only(x))
+      else concatted.filter(is_good_tweet)
 
     // Checkpoint a second time.
     good_tweets.map(checkpoint_str)
