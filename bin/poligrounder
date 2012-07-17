@@ -106,7 +106,16 @@ JARS="`echo $POLIGROUNDER_DIR/lib/*.jar $POLIGROUNDER_DIR/lib_managed/*/*.jar $P
 SCALA_LIB="$HOME/.sbt/boot/scala-2.9.2/lib/scala-library.jar"
 CP="$POLIGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
 
-HADOOP_COMMAND="$HADOOP_BINARY jar $POLIGROUNDER_DIR/target/textgrounder-assembly.jar"
+ASSEMBLY_DIR="$POLIGROUNDER_DIR/target"
+ASSEMBLY_GLOB="$ASSEMBLY_DIR/PoliGrounder-hadoop-*.jar"
+if [ "`echo $ASSEMBLY_GLOB`" = "$ASSEMBLY_GLOB" ]; then
+  ASSEMBLY_FILE="$ASSEMBLY_DIR/textgrounder-assembly.jar"
+else     
+  ASSEMBLY_FILE=`ls -1 $ASSEMBLY_GLOB | head -1`
+fi       
+        
+HADOOP_COMMAND="$HADOOP_BINARY jar $ASSEMBLY_FILE"
+
 JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $PG_JAVA_OPT -classpath $CP"
 #Running Scala using Java currently works, and ensures that we will run
 #properly even if Scala isn't installed on the system or an older version
