@@ -46,14 +46,18 @@ object TextUtil {
     val startIndex = math.max(0, tokIndex - windowSize)
     val endIndex = math.min(docAsArray.length, tokIndex + windowSize + 1)
 
-    docAsArray.map(_.getOrigForm).slice(startIndex, endIndex).mkString("", " ", "")
+    (docAsArray.slice(startIndex, tokIndex).map(_.getOrigForm).mkString("", " ", "") +
+    " [["+docAsArray(tokIndex).getOrigForm+"]] " +
+    docAsArray.slice(tokIndex + 1, endIndex).map(_.getOrigForm).mkString("", " ", "")).trim
   }
 
   def getContext(docAsArray:Array[StoredToken], tokIndex:Int, windowSize:Int): String = {
     val startIndex = math.max(0, tokIndex - windowSize)
     val endIndex = math.min(docAsArray.length, tokIndex + windowSize + 1)
 
-    docAsArray.map(_.getOrigForm).slice(startIndex, endIndex).mkString("", " ", "")
+    (docAsArray.slice(startIndex, tokIndex).map(_.getOrigForm).mkString("", " ", "") +
+    " [["+docAsArray(tokIndex).getOrigForm+"]] " +
+    docAsArray.slice(tokIndex + 1, endIndex).map(_.getOrigForm).mkString("", " ", "")).trim
   }
 
 }

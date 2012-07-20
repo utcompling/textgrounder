@@ -22,7 +22,8 @@ import scala.collection.JavaConversions._
 class VisualizeCorpus extends PApplet {
 
   class TopoMention(val toponym:Toponym,
-                    val context:String)
+                    val context:String,
+                    val docid:String)
 
   var mapDetail:de.fhpotsdam.unfolding.Map = null
   var topoTextArea:Textarea = null
@@ -33,6 +34,7 @@ class VisualizeCorpus extends PApplet {
 
   override def setup {
     size(800, 600, GLConstants.GLGRAPHICS)
+    frame.setTitle("Corpus Visualizer")
     val cp5 = new ControlP5(this)
 
     mapDetail = new de.fhpotsdam.unfolding.Map(this, "detail", 10, 10, 585, 580/*, true, false, new Microsoft.AerialProvider*/)
@@ -63,7 +65,7 @@ class VisualizeCorpus extends PApplet {
             val pair = (coord.getLatDegrees.toFloat, coord.getLngDegrees.toFloat)
             val prevList = coordsMap.getOrElse(pair, Nil)
             val context = TextUtil.getContext(docArray, tokIndex, CONTEXT_SIZE)
-            coordsMap.put(pair, (prevList ::: (new TopoMention(toponym, context) :: Nil)))
+            coordsMap.put(pair, (prevList ::: (new TopoMention(toponym, context, doc.getId) :: Nil)))
           }
         }
         tokIndex += 1
@@ -109,9 +111,13 @@ class VisualizeCorpus extends PApplet {
       for(topoMention <- selectedCirc._3) {
         sb.append("\n\n")
         sb.append(i)
-        sb.append(". ...")
+        sb.append(". ")
+        if(!topoMention.context.startsWith("[[")) sb.append("...")
         sb.append(topoMention.context)
-        sb.append("...")
+        if(!topoMention.context.endsWith("]]")) sb.append("...")
+        sb.append(" (")
+        sb.append(topoMention.docid)
+        sb.append(")")
         i += 1
       }
       topoTextArea.setText(sb.toString)
