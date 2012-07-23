@@ -29,6 +29,7 @@ import scala.collection.mutable
 import java.io.{Console=>_,_}
 
 import textutil._
+import ioutil._
 import osutil._
 
 package object printutil {
@@ -80,6 +81,17 @@ package object printutil {
       errout_stream = stream
   }
 
+  def get_errout_stream(file: String) = {
+    if (file == null)
+      System.err
+    else
+      (new LocalFileHandler).openw(file, append = true, bufsize = -1)
+  }
+
+  def set_errout_file(file: String) {
+    set_errout_stream(get_errout_stream(file))
+  }
+
   protected def format_outtext(format: String, args: Any*) = {
     // If no arguments, assume that we've been passed a raw string to print,
     // so print it directly rather than passing it to 'format', which might
@@ -91,6 +103,15 @@ package object printutil {
       errout_prefix + outtext
     else
       outtext
+  }
+
+  def errfile(file: String, format: String, args: Any*) {
+    val stream = get_errout_stream(file)
+    stream.println(format_outtext(format, args: _*))
+    need_prefix = true
+    stream.flush()
+    if (stream != System.err)
+      stream.close()
   }
 
   def errprint(format: String, args: Any*) {
