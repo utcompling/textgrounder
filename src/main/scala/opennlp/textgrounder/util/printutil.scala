@@ -71,6 +71,15 @@ package object printutil {
  
   var need_prefix = true
 
+  var errout_stream: PrintStream = System.err
+
+  def set_errout_stream(stream: PrintStream) {
+    if (stream == null)
+      errout_stream = System.err
+    else
+      errout_stream = stream
+  }
+
   protected def format_outtext(format: String, args: Any*) = {
     // If no arguments, assume that we've been passed a raw string to print,
     // so print it directly rather than passing it to 'format', which might
@@ -85,16 +94,16 @@ package object printutil {
   }
 
   def errprint(format: String, args: Any*) {
-    System.err.println(format_outtext(format, args: _*))
+    errout_stream.println(format_outtext(format, args: _*))
     need_prefix = true
-    System.err.flush()
+    errout_stream.flush()
   }
 
   def errout(format: String, args: Any*) {
     val text = format_outtext(format, args: _*)
-    System.err.print(text)
+    errout_stream.print(text)
     need_prefix = text.last == '\n'
-    System.err.flush()
+    errout_stream.flush()
   }
 
   /**

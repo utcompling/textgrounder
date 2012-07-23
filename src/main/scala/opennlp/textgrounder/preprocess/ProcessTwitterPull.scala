@@ -31,6 +31,7 @@ import util.control.Breaks._
 
 import opennlp.textgrounder.util.Twokenize
 import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.printutil._
 import opennlp.textgrounder.gridlocate.DistDocument
 
@@ -140,6 +141,8 @@ Look for any tweets containing the word "clinton" as well as either the words
     --by-user mode.""")
   var debug = ap.flag("debug",
     help="""Output debug info about tweet processing/acceptance.""")
+  var debug_file = ap.option[String]("debug-file",
+    help="""File to write debug info to, instead of stderr.""")
   var input = ap.positional[String]("INPUT",
     help = "Source directory to read files from.")
   var output = ap.positional[String]("OUTPUT",
@@ -820,6 +823,8 @@ object ProcessTwitterPull extends ScoobiApp {
     if (Opts.by_time)
       Opts.keytype = "timestamp"
     Opts.timeslice = (Opts.timeslice_float * 1000).toLong
+    if (Opts.debug_file != null)
+      set_errout_stream((new LocalFileHandler).openw(Opts.debug_file, bufsize = -1))
     output_command_line_parameters(ap)
 
     // Firstly we load up all the (new-line-separated) JSON lines.
