@@ -340,7 +340,7 @@ object ParseAndUniquifyTweets {
   val empty_tweet: IDRecord = ("", ("", ("", 0, "", Double.NaN, Double.NaN, 0, 0, 0)))
 
   def parse_problem(line: String, e: Exception) = {
-    errprint("Error parsing line: %s\n%s", line, e)
+    dbg("Error parsing line: %s\n%s", line, e)
     empty_tweet
   }
 
@@ -350,7 +350,7 @@ object ParseAndUniquifyTweets {
    */
   def parse_json(line: String): IDRecord = {
     // For testing
-    // errprint("parsing JSON: %s", line)
+    // dbg("parsing JSON: %s", line)
     try {
       val parsed = jerkson.Json.parse[Map[String,Any]](line)
       val user = get_2nd_level_value[String](parsed, "user", "screen_name")
@@ -520,7 +520,7 @@ object GroupTweetsAndSelectGood {
       (fers >= MIN_NUMBER_FOLLOWERS) &&
       (numtw >= Opts.min_tweets && numtw <= Opts.max_tweets)
     if (Opts.debug && retval == false)
-      errprint("Rejecting is_nonspammer %s", r)
+      dbg("Rejecting is_nonspammer %s", r)
     retval
   }
 
@@ -540,13 +540,13 @@ object GroupTweetsAndSelectGood {
     val retval = (lat >= MIN_LAT && lat <= MAX_LAT) &&
                  (lng >= MIN_LNG && lng <= MAX_LNG)
     if (Opts.debug && retval == false)
-      errprint("Rejecting northamerica_only %s", r)
+      dbg("Rejecting northamerica_only %s", r)
     retval
   }
 
   def is_good_tweet(r: Record): Boolean = {
     if (Opts.debug)
-      errprint("Considering %s", r)
+      dbg("Considering %s", r)
     has_latlng(r) &&
     is_nonspammer(r) &&
     northamerica_only(r)
@@ -744,6 +744,10 @@ object ProcessTwitterPull extends ScoobiApp {
 
   var Opts: ProcessTwitterPullParams = _
 
+  def dbg(format: String, args: Any*) {
+    errfile(Opts.debug_file, format, args: _*)
+  }
+
   /**
    * Convert a "record" (key plus tweet data) into a line of text suitable
    * for writing to a "checkpoint" file.  We encode all the fields into text
@@ -796,19 +800,19 @@ object ProcessTwitterPull extends ScoobiApp {
   }
 
   def output_command_line_parameters(arg_parser: ArgParser) {
-    errprint("")
-    errprint("Non-default parameter values:")
+    dbg("")
+    dbg("Non-default parameter values:")
     for (name <- arg_parser.argNames) {
       if (arg_parser.specified(name))
-        errprint("%30s: %s", name, arg_parser(name))
+        dbg("%30s: %s", name, arg_parser(name))
     }
-    errprint("")
-    errprint("Parameter values:")
+    dbg("")
+    dbg("Parameter values:")
     for (name <- arg_parser.argNames) {
-      errprint("%30s: %s", name, arg_parser(name))
-      //errprint("%30s: %s", name, arg_parser.getType(name))
+      dbg("%30s: %s", name, arg_parser(name))
+      //dbg("%30s: %s", name, arg_parser.getType(name))
     }
-    errprint("")
+    dbg("")
   }
 
   def run() {
@@ -824,7 +828,8 @@ object ProcessTwitterPull extends ScoobiApp {
       Opts.keytype = "timestamp"
     Opts.timeslice = (Opts.timeslice_float * 1000).toLong
     if (Opts.debug_file != null)
-      set_errout_stream((new LocalFileHandler).openw(Opts.debug_file, bufsize = -1))
+      set_errout_file(Opts.debug_file)
+
     output_command_line_parameters(ap)
 
     // Firstly we load up all the (new-line-separated) JSON lines.

@@ -48,8 +48,14 @@ package object hadoop {
     def get_raw_input_stream(filename: String) =
       get_file_system(filename).open(new Path(filename))
   
-    def get_raw_output_stream(filename: String) =
-      get_file_system(filename).create(new Path(filename))
+    def get_raw_output_stream(filename: String, append: Boolean) = {
+      val fs = get_file_system(filename)
+      val path = new Path(filename)
+      if (append)
+        fs.append(path)
+      else
+        fs.create(path)
+    }
 
     def split_filename(filename: String) = {
       val path = new Path(filename)

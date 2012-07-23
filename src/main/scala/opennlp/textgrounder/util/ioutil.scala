@@ -164,8 +164,9 @@ package object ioutil {
      *   buffer size is used.  If &gt; 0, the specified size is used.  If
      *   &lt; 0, there is no buffering.
      */
-    def get_output_stream(filename: String, bufsize: Int = 0) = {
-      val raw_out = get_raw_output_stream(filename)
+    def get_output_stream(filename: String, append: Boolean,
+        bufsize: Int = 0) = {
+      val raw_out = get_raw_output_stream(filename, append)
       if (bufsize < 0)
         raw_out
       else if (bufsize == 0)
@@ -352,7 +353,7 @@ package object ioutil {
      *   assigned to the file, including the compression suffix, if any.
      */
     def get_output_stream_handling_compression(filename: String,
-        compression: String = "none", bufsize: Int = 0) = {
+        append: Boolean, compression: String = "none", bufsize: Int = 0) = {
       val realname = compression match {
         case "gzip" => GzipUtils.getCompressedFilename(filename)
         case "bzip2" => BZip2Utils.getCompressedFilename(filename)
@@ -360,7 +361,7 @@ package object ioutil {
         case _ => throw new IllegalArgumentException(
           "Invalid compression argument: %s" format compression)
         }
-      val raw_out = get_output_stream(realname, bufsize)
+      val raw_out = get_output_stream(realname, append, bufsize)
       val out = wrap_output_stream_with_compression(raw_out, compression)
       (out, realname)
     }
@@ -383,11 +384,11 @@ package object ioutil {
      *   every output call. (Note that if compression is in effect, the
      *   flush may not actually cause anything to get written.)
      */
-    def openw(filename: String, encoding: String = "UTF-8",
-        compression: String = "none", bufsize: Int = 0,
-        autoflush: Boolean = false) = {
+    def openw(filename: String, append: Boolean = false,
+        encoding: String = "UTF-8", compression: String = "none",
+        bufsize: Int = 0, autoflush: Boolean = false) = {
       val (out, _) =
-        get_output_stream_handling_compression(filename, compression,
+        get_output_stream_handling_compression(filename, append, compression,
           bufsize)
       new PrintStream(out, autoflush, encoding)
     }
@@ -403,7 +404,7 @@ package object ioutil {
      * Return an unbuffered OutputStream that writes to the given file,
      * overwriting an existing file.
      */
-    def get_raw_output_stream(filename: String): OutputStream
+    def get_raw_output_stream(filename: String, append: Boolean): OutputStream
     /**
      * Split a string naming a file into the directory it's in and the
      * final component.
@@ -437,7 +438,8 @@ package object ioutil {
           format filename)
     }
     def get_raw_input_stream(filename: String) = new FileInputStream(filename)
-    def get_raw_output_stream(filename: String) = new FileOutputStream(filename)
+    def get_raw_output_stream(filename: String, append: Boolean) =
+      new FileOutputStream(filename, append)
     def split_filename(filename: String) = {
       val file = new File(filename)
       (file.getParent, file.getName)
