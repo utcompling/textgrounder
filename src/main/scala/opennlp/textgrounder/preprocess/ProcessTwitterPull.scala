@@ -19,7 +19,7 @@
 
 package opennlp.textgrounder.preprocess
 
-//import net.liftweb.json
+import net.liftweb
 import com.codahale.jerkson
 import com.nicta.scoobi.Scoobi._
 import java.io._
@@ -143,6 +143,8 @@ Look for any tweets containing the word "clinton" as well as either the words
     help="""Output debug info about tweet processing/acceptance.""")
   var debug_file = ap.option[String]("debug-file",
     help="""File to write debug info to, instead of stderr.""")
+  var use_jerkson = ap.flag("use-jerkson",
+    help="""Use Jerkson instead of Lift to parse JSON.""")
   var input = ap.positional[String]("INPUT",
     help = "Source directory to read files from.")
   var output = ap.positional[String]("OUTPUT",
@@ -310,16 +312,6 @@ class TweetFilterParser(foldcase: Boolean) extends StandardTokenParsers {
 object ParseAndUniquifyTweets {
   import ProcessTwitterPull._
 
-  def get_string(value: Map[String, Any], l1: String) = {
-    value(l1).asInstanceOf[String]
-  }
-
-  def get_2nd_level_value[T](value: Map[String, Any], l1: String,
-      l2: String) = {
-    value(l1).asInstanceOf[java.util.LinkedHashMap[String,Any]](l2).
-      asInstanceOf[T]
-  }
-
   /**
    * Convert a Twitter timestamp, e.g. "Tue Jun 05 14:31:21 +0000 2012", into
    * a time in milliseconds since the Epoch (Jan 1 1970, or so).
@@ -344,13 +336,67 @@ object ParseAndUniquifyTweets {
     empty_tweet
   }
 
+  def force_value(value: liftweb.json.JValue): String = {
+    if ((value values) == null)
+      null
+    else
+      (value values) toString
+  }
+
   /**
-   * Parse a JSON line into a tweet.  Return value is an IDRecord, including
-   * the tweet ID, username, text and all other data.
+   * Parse a JSON line into a tweet, using Lift.
    */
-  def parse_json(line: String): IDRecord = {
-    // For testing
-    // dbg("parsing JSON: %s", line)
+  def parse_json_lift(line: String): IDRecord = {
+    try {
+      val parsed = liftweb.json.parse(line)
+      val user = force_value(parsed \ "user" \ "screen_name")
+      val timestamp = parse_time(force_value(parsed \ "created_at"))
+      val text = force_value(parsed \ "text").replaceAll("\\s+", " ")
+      val followers = force_value(parsed \ "user" \ "followers_count").toInt
+      val following = force_value(parsed \ "user" \ "friends_count").toInt
+      val tweet_id = force_value(parsed \ "id_str")
+      val (lat, lng) = 
+        if ((parsed \ "coordinates" values) == null ||
+            (force_value(parsed \ "coordinates" \ "type") != "Point")) {
+          (Double.NaN, Double.NaN)
+        } else {
+          val latlng: List[Number] = 
+            (parsed \ "coordinates" \ "coordinates" values).asInstanceOf[List[Number]]
+          (latlng(1).doubleValue, latlng(0).doubleValue)
+        }
+      val key = Opts.keytype match {
+        case "user" => user
+        case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
+      }
+      (tweet_id, (key, (user, timestamp, text, lat, lng, followers, following, 1)))
+    } catch {
+      case jpe: liftweb.json.JsonParser.ParseException =>
+        parse_problem(line, jpe)
+      case npe: NullPointerException =>
+        parse_problem(line, npe)
+      case nfe: NumberFormatException =>
+        parse_problem(line, nfe)
+      case e: Exception =>
+        { parse_problem(line, e); throw e }
+      case npe: NullPointerException => empty_tweet
+    }
+  }
+
+  def get_string(value: Map[String, Any], l1: String) = {
+    value(l1).asInstanceOf[String]
+  }
+
+  def get_2nd_level_value[T](value: Map[String, Any], l1: String,
+      l2: String) = {
+    value(l1).asInstanceOf[java.util.LinkedHashMap[String,Any]](l2).
+      asInstanceOf[T]
+  }
+
+  /**
+   * Parse a JSON line into a tweet, using Jerkson.
+   */
+
+  def parse_json_jerkson(line: String): IDRecord = {
     try {
       val parsed = jerkson.Json.parse[Map[String,Any]](line)
       val user = get_2nd_level_value[String](parsed, "user", "screen_name")
@@ -387,6 +433,21 @@ object ParseAndUniquifyTweets {
       case e: Exception =>
         { parse_problem(line, e); throw e }
     }
+  }
+
+  /*
+   * Parse a JSON line into a tweet.  Return value is an IDRecord, including
+   * the tweet ID, username, text and all other data.
+   */
+  def parse_json(line: String): IDRecord = {
+    // For testing
+    // dbg("parsing JSON: %s", line)
+    if (line.trim == "")
+      empty_tweet
+    else if (Opts.use_jerkson)
+      parse_json_jerkson(line)
+    else
+      parse_json_lift(line)
   }
 
   /**
