@@ -66,7 +66,8 @@ libraryDependencies ++= Seq(
   "net.sf.trove4j" % "trove4j" % "3.0.2",
   //
   // Scoobi
-  "com.nicta" % "scoobi_2.9.2" % "0.4.0",
+  // "com.nicta" % "scoobi_2.9.2" % "0.4.0",
+  "com.nicta" % "scoobi_2.9.2" % "0.5.0-SNAPSHOT",
   // "provided" if we use Scoobi's package-hadoop instead of sbt-assembly.
   // This is another way of building an assembly for Hadoop that includes all
   // the dependent libraries into the JAR file.  To do that, we have to move
