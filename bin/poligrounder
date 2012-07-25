@@ -106,16 +106,6 @@ JARS="`echo $POLIGROUNDER_DIR/lib/*.jar $POLIGROUNDER_DIR/lib_managed/*/*.jar $P
 SCALA_LIB="$HOME/.sbt/boot/scala-2.9.2/lib/scala-library.jar"
 CP="$POLIGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
 
-ASSEMBLY_DIR="$POLIGROUNDER_DIR/target"
-ASSEMBLY_GLOB="$ASSEMBLY_DIR/PoliGrounder-hadoop-*.jar"
-if [ "`echo $ASSEMBLY_GLOB`" = "$ASSEMBLY_GLOB" ]; then
-  ASSEMBLY_FILE="$ASSEMBLY_DIR/textgrounder-assembly.jar"
-else     
-  ASSEMBLY_FILE=`ls -1 $ASSEMBLY_GLOB | head -1`
-fi       
-        
-HADOOP_COMMAND="$HADOOP_BINARY jar $ASSEMBLY_FILE"
-
 JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $PG_JAVA_OPT -classpath $CP"
 #Running Scala using Java currently works, and ensures that we will run
 #properly even if Scala isn't installed on the system or an older version
@@ -328,6 +318,23 @@ else
   # wrong directory.
 
   if [ -n "$HADOOP" ]; then
+    ASSEMBLY_DIR="$POLIGROUNDER_DIR/target"
+    ASSEMBLY_GLOB="$ASSEMBLY_DIR/PoliGrounder-*.jar"
+    if [ "`echo $ASSEMBLY_GLOB`" = "$ASSEMBLY_GLOB" ]; then
+      echo "No assembly file!  Unable to execute in Hadoop distribute mode."
+      exit 1
+    else
+      NUM_ASSEMBLY_FILES=`ls -1 $ASSEMBLY_GLOB | wc -l`
+      ASSEMBLY_FILE=`ls -1 $ASSEMBLY_GLOB | head -1`
+      if [ "$NUM_ASSEMBLY_FILES" -ne 1 ]; then
+        echo "Warning!  More than one assembly file found:"
+        ls -1 $ASSEMBLY_GLOB
+        echo "Choosing $ASSEMBLY_FILE"
+      fi
+    fi       
+            
+    HADOOP_COMMAND="$HADOOP_BINARY jar $ASSEMBLY_FILE"
+
     execute "$HADOOP_COMMAND $CLASS" $HADOOP_ARGS ${1+"$@"}
   else
     execute "$JAVA_COMMAND $CLASS" $HADOOP_ARGS ${1+"$@"}
