@@ -22,6 +22,7 @@ package opennlp.textgrounder.preprocess
 import net.liftweb
 import com.codahale.jerkson
 import com.nicta.scoobi.Scoobi._
+import com.nicta.scoobi.application.HadoopLogFactory
 import java.io._
 import java.lang.Double.isNaN
 import java.text.{SimpleDateFormat, ParseException}
@@ -900,6 +901,8 @@ object ProcessTwitterPull extends ScoobiApp {
     if (Opts.by_time)
       Opts.keytype = "timestamp"
     Opts.timeslice = (Opts.timeslice_float * 1000).toLong
+    if (Opts.debug)
+      HadoopLogFactory.setQuiet(false)
     if (Opts.debug_file != null)
       set_errout_file(Opts.debug_file)
 
