@@ -16,6 +16,7 @@ import opennlp.textgrounder.tr.text.prep._
 import opennlp.textgrounder.tr.util._
 
 import java.io._
+import java.awt.event._
 
 import scala.collection.JavaConversions._
 
@@ -27,23 +28,46 @@ class VisualizeCorpus extends PApplet {
 
   var mapDetail:de.fhpotsdam.unfolding.Map = null
   var topoTextArea:Textarea = null
+  var checkbox:CheckBox = null
 
-  val INIT_WIDTH = 1024
-  val INIT_HEIGHT = 768
+  var allButton:Button = null
+  var noneButton:Button = null
+
+  val INIT_WIDTH = 1280//1024
+  val INIT_HEIGHT = 720//768
+
+  val RADIUS = 10
 
   val BORDER_WIDTH = 10
   val TEXTAREA_WIDTH = 185
+  val BUTTONPANEL_WIDTH = 35
+  val CHECKBOX_WIDTH = 185 - BUTTONPANEL_WIDTH
   var textareaHeight = INIT_HEIGHT - BORDER_WIDTH*2
-  var mapWidth = INIT_WIDTH - TEXTAREA_WIDTH - BORDER_WIDTH*3
+  var mapWidth = INIT_WIDTH - TEXTAREA_WIDTH - CHECKBOX_WIDTH - BUTTONPANEL_WIDTH - BORDER_WIDTH*4
   var mapHeight = INIT_HEIGHT - BORDER_WIDTH*2
-  var textareaX = mapWidth+BORDER_WIDTH*2
+  var checkboxX = BORDER_WIDTH + BUTTONPANEL_WIDTH
+  var checkboxHeight = textareaHeight
+  var mapX = checkboxX + CHECKBOX_WIDTH + BORDER_WIDTH
+  var textareaX = mapWidth + CHECKBOX_WIDTH + BUTTONPANEL_WIDTH + BORDER_WIDTH*3
+
+  val SLIDER_WIDTH = 5
+
+  var BUTTON_WIDTH = 27
+  var BUTTON_HEIGHT = 15
+  val NONE_BUTTON_Y = BORDER_WIDTH + BUTTON_HEIGHT + 10
 
   val CONTEXT_SIZE = 20
 
+  var cp5:ControlP5 = null
+
   val coordsMap = new scala.collection.mutable.HashMap[(Float, Float), List[TopoMention]]
+  var docList:Array[String] = null
+  var shownDocs:Set[String] = null
 
   var oldWidth = INIT_WIDTH
   var oldHeight = INIT_HEIGHT
+
+  var checkboxTotalHeight = 0
 
   override def setup {
     size(INIT_WIDTH, INIT_HEIGHT/*, GLConstants.GLGRAPHICS*/)
@@ -51,12 +75,12 @@ class VisualizeCorpus extends PApplet {
     frame.setTitle("Corpus Visualizer")
     //textMode(PConstants.SHAPE)
 
-    val cp5 = new ControlP5(this)
+    cp5 = new ControlP5(this)
 
-    mapDetail = new de.fhpotsdam.unfolding.Map(this, "detail", BORDER_WIDTH, BORDER_WIDTH, mapWidth, mapHeight/*, true, false, new Microsoft.AerialProvider*/)
-    mapDetail.zoomToLevel(4)
+    mapDetail = new de.fhpotsdam.unfolding.Map(this, "detail", mapX, BORDER_WIDTH, mapWidth, mapHeight/*, true, false, new Microsoft.AerialProvider*/)
     mapDetail.setZoomRange(2, 10)
-    //mapDetail.zoomAndPanTo(new Location(25.0f, 12.0f), 2) // map center
+    //mapDetail.zoomToLevel(4)
+    mapDetail.zoomAndPanTo(new Location(25.0f, 12.0f), 2) // map center
     //mapDetail.zoomAndPanTo(new Location(38.5f, -98.0f), 2) // USA center
     val eventDispatcher = MapUtils.createDefaultEventDispatcher(this, mapDetail)
 
@@ -67,10 +91,47 @@ class VisualizeCorpus extends PApplet {
                       .setLineHeight(14)
                       .setColor(color(0))
 
+    allButton = cp5.addButton("all")
+                   .setPosition(BORDER_WIDTH, BORDER_WIDTH)
+                   .setSize(BUTTON_WIDTH, BUTTON_HEIGHT)
+
+    noneButton = cp5.addButton("none")
+                    .setPosition(BORDER_WIDTH, NONE_BUTTON_Y)
+                    .setSize(BUTTON_WIDTH,  BUTTON_HEIGHT)
+
+    checkbox = cp5.addCheckBox("checkBox")
+                  .setPosition(checkboxX, BORDER_WIDTH)
+                  .setColorForeground(color(120))
+                  .setColorActive(color(0, 200, 0))
+                  .setColorLabel(color(0))
+                  .setSize(10, 10)
+                  .setItemsPerRow(1)
+                  .setSpacingColumn(30)
+                  .setSpacingRow(10)
+
+    cp5.addSlider("slider")
+       .setPosition(checkboxX + CHECKBOX_WIDTH - SLIDER_WIDTH, BORDER_WIDTH)
+       .setSize(SLIDER_WIDTH, checkboxHeight)
+       .setRange(0, 1)
+       .setValue(1)
+       .setLabelVisible(false)
+       .setSliderMode(Slider.FLEXIBLE)
+       .setHandleSize(40)
+       .setColorBackground(color(255))
+
+    class myMWListener(vc:VisualizeCorpus) extends MouseWheelListener {
+      def mouseWheelMoved(mwe:MouseWheelEvent) {
+        vc.mouseWheel(mwe.getWheelRotation)
+      }
+    }
+
+    addMouseWheelListener(new myMWListener(this))
+
     val tokenizer = new OpenNLPTokenizer
     val corpus = TopoUtil.readStoredCorpusFromSerialized(VisualizeCorpus.inputFile)
 
-    for(doc <- corpus) {
+    docList =
+    (for(doc <- corpus) yield {
       val docArray = TextUtil.getDocAsArray(doc)
       var tokIndex = 0
       for(token <- docArray) {
@@ -86,11 +147,18 @@ class VisualizeCorpus extends PApplet {
         }
         tokIndex += 1
       }
-    }
+      checkbox.addItem(doc.getId, 0)
+      doc.getId
+    }).toArray
 
+    shownDocs = docList.toSet
+
+    checkboxTotalHeight = docList.size * 20
+    if(checkboxTotalHeight <= height)
+      cp5.getController("slider").hide
+    checkbox.activateAll
   }
 
-  val RADIUS = 10
   var selectedCirc:(Float, Float, List[TopoMention]) = null
   var oldSelectedCirc = selectedCirc
   var onScreen:List[((Float, Float), List[TopoMention])] = Nil
@@ -99,37 +167,35 @@ class VisualizeCorpus extends PApplet {
   override def draw {
     background(255)
 
-    /*if(width != oldWidth || height != oldHeight) {
-      mapWidth = width - TEXTAREA_WIDTH - BORDER_WIDTH*3
-      mapHeight = height - BORDER_WIDTH*2
-      textareaX = mapWidth+BORDER_WIDTH*2
-      textareaHeight = mapHeight
-
-      mapDetail.mapDisplay.resize(mapWidth, mapHeight)
-      topoTextArea.setPosition(textareaX, BORDER_WIDTH)
-                  .setSize(TEXTAREA_WIDTH, textareaHeight)
-
-      oldWidth = width
-      oldHeight = height
-    }*/
-
     mapDetail.draw
 
-    onScreen =
-    (for(((lat,lng),topolist) <- coordsMap) yield {
-      val ufLoc:de.fhpotsdam.unfolding.geo.Location = new de.fhpotsdam.unfolding.geo.Location(lat, lng)
-      val xy:Array[Float] = mapDetail.getScreenPositionFromLocation(ufLoc)
-      if(xy(0) >= BORDER_WIDTH + RADIUS && xy(0) <= mapWidth + BORDER_WIDTH - RADIUS
-         && xy(1) >= BORDER_WIDTH + RADIUS && xy(1) <= mapHeight + BORDER_WIDTH - RADIUS) {
-        if(selectedCirc != null && lat == selectedCirc._1 && lng == selectedCirc._2)
-          fill(200, 0, 0, 100)
-        else
-          fill(0, 200, 0, 100)
-        ellipse(xy(0), xy(1), RADIUS*2, RADIUS*2)
-        fill(1)
-        text(topolist.size, xy(0)-RADIUS/4, xy(1)+RADIUS/4)
+    checkbox.setPosition(checkboxX, BORDER_WIDTH -
+                         ((1.0 - cp5.getController("slider").getValue) * (checkboxTotalHeight - checkboxHeight)).toInt)
 
-        Some(((lat,lng),topolist))
+    onScreen =
+    (for(((lat,lng),rawTopolist) <- coordsMap) yield {
+      val topolist = rawTopolist.filter(tm => shownDocs(tm.docid))
+      if(topolist.size > 0) {
+        val ufLoc:de.fhpotsdam.unfolding.geo.Location = new de.fhpotsdam.unfolding.geo.Location(lat, lng)
+        val xy:Array[Float] = mapDetail.getScreenPositionFromLocation(ufLoc)
+        if(xy(0) >= mapX + RADIUS && xy(0) <= mapX + mapWidth - RADIUS
+           && xy(1) >= BORDER_WIDTH + RADIUS && xy(1) <= mapHeight + BORDER_WIDTH - RADIUS) {
+             if(selectedCirc != null && lat == selectedCirc._1 && lng == selectedCirc._2)
+               fill(200, 0, 0, 100)
+             else
+               fill(0, 200, 0, 100)
+             ellipse(xy(0), xy(1), RADIUS*2, RADIUS*2)
+             fill(1)
+             val num = topolist.size
+             if(num < 10)
+               text(num, xy(0)-(RADIUS.toFloat/3.2).toInt, xy(1)+(RADIUS.toFloat/2.1).toInt)
+             else
+               text(num, xy(0)-(RADIUS.toFloat/1.3).toInt, xy(1)+(RADIUS.toFloat/2.1).toInt)
+             
+             Some(((lat,lng),topolist))
+           }
+           else
+             None
       }
       else
         None
@@ -140,7 +206,7 @@ class VisualizeCorpus extends PApplet {
         sb.setLength(0)
         sb.append(selectedCirc._3(0).toponym.getOrigForm)
         var i = 1
-        for(topoMention <- selectedCirc._3) {
+        for(topoMention <- selectedCirc._3.filter(tm => shownDocs(tm.docid))) {
           sb.append("\n\n")
           sb.append(i)
           sb.append(". ")
@@ -170,25 +236,72 @@ class VisualizeCorpus extends PApplet {
 
   override def mouseReleased {
 
-    var clickedCirc = false
-    for(((lat, lng), topolist) <- onScreen) {
-      val xy:Array[Float] = mapDetail.getScreenPositionFromLocation(new de.fhpotsdam.unfolding.geo.Location(lat, lng))
-      if(PApplet.dist(mouseX, mouseY, xy(0), xy(1)) <= RADIUS) {
-        oldSelectedCirc = selectedCirc
-        selectedCirc = (lat, lng, topolist)
-        clickedCirc = true
+    if(mouseX >= mapX && mouseX <= mapX + mapWidth
+       && mouseY >= BORDER_WIDTH && mouseY <= BORDER_WIDTH + mapHeight) { // clicked in map
+      var clickedCirc = false
+      for(((lat, lng), topolist) <- onScreen) {
+        val xy:Array[Float] = mapDetail.getScreenPositionFromLocation(new de.fhpotsdam.unfolding.geo.Location(lat, lng))
+        if(PApplet.dist(mouseX, mouseY, xy(0), xy(1)) <= RADIUS) {
+          oldSelectedCirc = selectedCirc
+          selectedCirc = (lat, lng, topolist)
+          clickedCirc = true
+        }
+      }
+      if(mouseX == mousePressedX && mouseY == mousePressedY) { // didn't drag
+        if(selectedCirc != null/* && PApplet.dist(mouseX, mouseY, selectedCirc._1, selectedCirc._2) > RADIUS*/)
+          topoTextArea.scroll(0)
+        if(!clickedCirc) {
+          oldSelectedCirc = selectedCirc
+          selectedCirc = null
+        }
       }
     }
-    if(mouseX == mousePressedX && mouseY == mousePressedY) {
-      if(selectedCirc != null/* && PApplet.dist(mouseX, mouseY, selectedCirc._1, selectedCirc._2) > RADIUS*/)
-        topoTextArea.scroll(0)
-      if(!clickedCirc) {
-        oldSelectedCirc = selectedCirc
-        selectedCirc = null
+
+    if(mouseX >= BORDER_WIDTH && mouseX <= checkboxX + CHECKBOX_WIDTH
+       && mouseY >= 0 && mouseY <= BORDER_WIDTH + checkboxHeight) {
+      shownDocs = checkbox.getItems.filter(_.getState == true).map(_.getLabel).toSet
+
+      if(selectedCirc != null) {
+        val topolist = coordsMap((selectedCirc._1, selectedCirc._2)).filter(tm => shownDocs(tm.docid))
+        if(topolist.length > 0) {
+          selectedCirc = (selectedCirc._1, selectedCirc._2, topolist)
+        }
+        else {
+          oldSelectedCirc = selectedCirc
+          selectedCirc = null
+        }
       }
     }
   }
 
+  def controlEvent(e:ControlEvent) {
+    //try {
+      if(mouseX >= BORDER_WIDTH && mouseX <= BORDER_WIDTH + BUTTON_WIDTH) {
+        if(mouseY >= BORDER_WIDTH && mouseY <= BORDER_WIDTH + BUTTON_HEIGHT) {
+          checkbox.activateAll
+          shownDocs = docList.toSet
+        }
+        else if(mouseY >= NONE_BUTTON_Y && mouseY <= NONE_BUTTON_Y + BUTTON_HEIGHT) {
+          checkbox.deactivateAll
+          shownDocs.clear
+        }
+      }
+    /*} catch {
+      case e: Exception => //e.printStackTrace
+    }*/
+  }
+
+  def mouseWheel(delta:Int) {
+    if(mouseX >= BORDER_WIDTH && mouseX <= checkboxX + CHECKBOX_WIDTH - SLIDER_WIDTH
+       && mouseY >= 0 && mouseY <= BORDER_WIDTH + checkboxHeight) {
+      val slider = cp5.getController("slider")
+      slider.setValue(slider.getValue - delta.toFloat / 100)
+    }
+    else if(mouseX >= textareaX && mouseX <= textareaX + TEXTAREA_WIDTH
+       && mouseY >= BORDER_WIDTH && mouseY <= BORDER_WIDTH + textareaHeight) {
+      topoTextArea.scrolled(delta * 2)
+    }
+  }
 
 }
 
