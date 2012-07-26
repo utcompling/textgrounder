@@ -22,7 +22,8 @@ package opennlp.textgrounder.preprocess
 import net.liftweb
 import com.codahale.jerkson
 import com.nicta.scoobi.Scoobi._
-import com.nicta.scoobi.application.HadoopLogFactory
+import com.nicta.scoobi.testing.HadoopLogFactory
+// import com.nicta.scoobi.application.HadoopLogFactory
 import java.io._
 import java.lang.Double.isNaN
 import java.text.{SimpleDateFormat, ParseException}
