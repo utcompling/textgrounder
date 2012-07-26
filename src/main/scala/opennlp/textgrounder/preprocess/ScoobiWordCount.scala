@@ -1,7 +1,8 @@
 package opennlp.textgrounder.preprocess
 
 import com.nicta.scoobi.Scoobi._
-import com.nicta.scoobi.application.HadoopLogFactory
+import com.nicta.scoobi.testing.HadoopLogFactory
+// import com.nicta.scoobi.application.HadoopLogFactory
 import org.apache.commons.logging.LogFactory
 import java.io._
 
