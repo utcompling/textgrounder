@@ -71,7 +71,8 @@ public class PlainTextDirSource extends DocumentSource {
 				this.current.close();
 			}
 			if (this.currentIdx < this.files.size()) {
-				this.current = new PlainTextSource(new BufferedReader(new FileReader(this.files.get(this.currentIdx))), this.divider ,this.tokenizer);
+                            File currentFile = this.files.get(this.currentIdx);
+                            this.current = new PlainTextSource(new BufferedReader(new FileReader(currentFile)), this.divider, this.tokenizer, currentFile.getName());
 			}
 		} catch (IOException e) {
 			System.err.println("Error while reading text file "+this.files.get(this.currentIdx).getName());

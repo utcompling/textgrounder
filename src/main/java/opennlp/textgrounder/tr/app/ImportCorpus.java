@@ -81,7 +81,7 @@ public class ImportCorpus extends BaseApp {
         }
 	else if (corpusInputPath.endsWith("txt")) {
             corpus.addSource(new ToponymAnnotator(new PlainTextSource(
-		new BufferedReader(new FileReader(corpusInputPath)), new OpenNLPSentenceDivider(), tokenizer),
+                             new BufferedReader(new FileReader(corpusInputPath)), new OpenNLPSentenceDivider(), tokenizer, corpusInputPath),
                 recognizer, gnGaz, null));
 	}
         else {

@@ -38,7 +38,7 @@ object Preprocess extends App {
 
     val in = new BufferedReader(new FileReader(args(0)))
     corpus.addSource(
-     new ToponymAnnotator(new PlainTextSource(in, divider, tokenizer),
+     new ToponymAnnotator(new PlainTextSource(in, divider, tokenizer, args(0)),
      recognizer, gazetteer
     ))
 
