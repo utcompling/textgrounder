@@ -43,7 +43,7 @@ public class PlainTextSource extends TextSource {
 
   public PlainTextSource(BufferedReader reader, SentenceDivider divider, Tokenizer tokenizer)
     throws IOException {
-    this(reader, divider, tokenizer, 5);
+    this(reader, divider, tokenizer, -1);
   }
 
   public PlainTextSource(BufferedReader reader, SentenceDivider divider, Tokenizer tokenizer, int parasPerDocument)
@@ -69,8 +69,9 @@ public class PlainTextSource extends TextSource {
       public Iterator<Sentence<Token>> iterator() {
         final List<List<Token>> sentences = new ArrayList<List<Token>>();
         while (PlainTextSource.this.current != null &&
-               PlainTextSource.this.current.length() > 0 &&
-               PlainTextSource.this.number < PlainTextSource.this.parasPerDocument) {
+               (PlainTextSource.this.parasPerDocument == -1 ||
+                (PlainTextSource.this.current.length() > 0 &&
+                 PlainTextSource.this.number < PlainTextSource.this.parasPerDocument))) {
           for (String sentence : PlainTextSource.this.divider.divide(PlainTextSource.this.current)) {
             List<Token> tokens = new ArrayList<Token>();
             for (String token : PlainTextSource.this.tokenizer.tokenize(sentence)) {
