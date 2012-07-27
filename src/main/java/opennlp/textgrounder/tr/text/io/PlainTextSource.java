@@ -40,13 +40,15 @@ public class PlainTextSource extends TextSource {
   private String current;
   private int currentIdx;
   private int parasPerDocument;
+  private String docId;
 
-  public PlainTextSource(BufferedReader reader, SentenceDivider divider, Tokenizer tokenizer)
+  public PlainTextSource(BufferedReader reader, SentenceDivider divider, Tokenizer tokenizer, String id)
     throws IOException {
-    this(reader, divider, tokenizer, -1);
+      this(reader, divider, tokenizer, id, -1);
   }
 
-  public PlainTextSource(BufferedReader reader, SentenceDivider divider, Tokenizer tokenizer, int parasPerDocument)
+    public PlainTextSource(BufferedReader reader, SentenceDivider divider, Tokenizer tokenizer,
+                           String id, int parasPerDocument)
     throws IOException {
     super(reader);
     this.divider = divider;
@@ -57,6 +59,7 @@ public class PlainTextSource extends TextSource {
     this.number = 0;
     this.currentIdx = 0;
     this.parasPerDocument = parasPerDocument;
+    this.docId = id;
   }
 
   public boolean hasNext() {
@@ -64,7 +67,7 @@ public class PlainTextSource extends TextSource {
   }
 
   public Document<Token> next() {
-    return new Document<Token>(null) {
+    return new Document<Token>(this.docId) {
       private static final long serialVersionUID = 42L;
       public Iterator<Sentence<Token>> iterator() {
         final List<List<Token>> sentences = new ArrayList<List<Token>>();

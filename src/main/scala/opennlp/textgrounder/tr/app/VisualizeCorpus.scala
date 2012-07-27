@@ -128,7 +128,7 @@ class VisualizeCorpus extends PApplet {
     addMouseWheelListener(new myMWListener(this))
 
     val tokenizer = new OpenNLPTokenizer
-    val corpus = TopoUtil.readStoredCorpusFromSerialized(VisualizeCorpus.inputFile)
+    val corpus = TopoUtil.readStoredCorpusFromSerialized(VisualizeCorpus.inputFile) //Stored
 
     docList =
     (for(doc <- corpus) yield {
