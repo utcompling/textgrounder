@@ -24,6 +24,7 @@ import com.codahale.jerkson
 import com.nicta.scoobi.Scoobi._
 import com.nicta.scoobi.testing.HadoopLogFactory
 // import com.nicta.scoobi.application.HadoopLogFactory
+import org.apache.hadoop.fs.{FileSystem=>HFileSystem,_}
 import java.io._
 import java.lang.Double.isNaN
 import java.text.{SimpleDateFormat, ParseException}
@@ -34,6 +35,7 @@ import util.control.Breaks._
 import opennlp.textgrounder.util.Twokenize
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.ioutil._
+import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil._
 import opennlp.textgrounder.gridlocate.DistDocument
 
@@ -849,15 +851,20 @@ class ProcessTwitterPullShared(Opts: ProcessTwitterPullParams) {
 
 class ProcessTwitterPull(Opts: ProcessTwitterPullParams)
     extends ProcessTwitterPullShared(Opts) {
+  def corpus_suffix = {
+    val dist_type = if (Opts.max_ngram == 1) "unigram" else "ngram"
+    "%s-%s-counts" format (Opts.split, dist_type)
+  }
+
   /**
    * Output a schema file of the appropriate name.
    */
-  def output_schema() {
-    val dist_type = if (Opts.max_ngram == 1) "unigram" else "ngram"
+  def output_schema(fs: HFileSystem) {
     val filename =
-      "%s/%s-%s-%s-counts-schema.txt" format
-        (Opts.output, Opts.corpus_name, Opts.split, dist_type)
-    val p = new PrintWriter(new File(filename))
+      "%s/%s-%s-schema.txt" format
+        (Opts.output, Opts.corpus_name, corpus_suffix)
+    errprint("Outputting a schema to %s ...", filename)
+    val p = new PrintWriter(fs.create(new Path(filename)))
     def print_seq(s: String*) {
       p.println(s mkString "\t")
     }
@@ -891,6 +898,7 @@ class ProcessTwitterPull(Opts: ProcessTwitterPullParams)
 
 object ProcessTwitterPull extends ScoobiApp {
   def run() {
+    initialize_osutil()
     val ap = new ArgParser("ProcessTwitterPull")
     // This first call is necessary, even though it doesn't appear to do
     // anything.  In particular, this ensures that all arguments have been
@@ -910,31 +918,59 @@ object ProcessTwitterPull extends ScoobiApp {
     val ptp = new ProcessTwitterPull(Opts)
     ptp.output_command_line_parameters(ap)
 
+    errprint("Step 1: Load up the JSON tweets, parse into records, remove duplicates, checkpoint.")
     // Firstly we load up all the (new-line-separated) JSON lines.
     val lines: DList[String] = TextInput.fromTextFile(Opts.input)
 
     val checkpoint1 = ParseAndUniquifyTweets(Opts, lines)
     persist(TextOutput.toTextFile(checkpoint1, Opts.output + "-st"))
+    errprint("Step 1: done.")
 
     // Then load back up.
+    errprint("Step 2: Load parsed tweets, group, filter bad results.")
+    if (Opts.by_time)
+      errprint("        (grouping by time, with slices of %g seconds)",
+        Opts.timeslice_float)
+    else
+      errprint("        (grouping by user)")
     val lines2: DList[String] = TextInput.fromTextFile(Opts.output + "-st")
     val checkpoint = GroupTweetsAndSelectGood(Opts, lines2)
     persist(TextOutput.toTextFile(checkpoint, Opts.output + "-cp"))
+    errprint("Step 2: done.")
 
     // Load from second checkpoint.  Note that each time we checkpoint,
     // we extract the "text" field and stick it at the end.  This time
     // when loading it up, we use `from_checkpoint_to_tweet_text`, which
     // gives us the tweet data as a string (minus text) and the text, as
     // two separate strings.
+    errprint("Step 3: Load grouped tweets, tokenize, counts ngrams, output corpus.")
     val lines_cp: DList[String] = TextInput.fromTextFile(Opts.output + "-cp")
 
     val nicely_formatted = TokenizeFilterAndCountTweets(Opts, lines_cp)
 
     // Save to disk.
     persist(TextOutput.toTextFile(nicely_formatted, Opts.output))
+    errprint("Step 3: done.")
+
+    // Rename output files appropriately
+    errprint("Renaming output files ...")
+    val fs = configuration.fs
+    val globpat = "%s/*-r-*" format Opts.output
+    for (file <- fs.globStatus(new Path(globpat))) {
+      val path = file.getPath
+      val basename = path.getName
+      val newname = "%s/%s-%s-%s.txt" format (
+        Opts.output, Opts.corpus_name, basename, ptp.corpus_suffix)
+      errprint("Renaming %s to %s", path, newname)
+      fs.rename(path, new Path(newname))
+    }
 
     // create a schema
-    ptp.output_schema()
+    ptp.output_schema(fs)
+
+    errprint("All done with everything.")
+    errprint("")
+    output_resource_usage()
   }
 }
 

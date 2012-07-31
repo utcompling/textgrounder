@@ -558,7 +558,7 @@ class ConvertTwitterInfochimpsDriver extends
 object ConvertTwitterInfochimps extends
     ExperimentDriverApp("ConvertTwitterInfochimps") {
   type TDriver = ConvertTwitterInfochimpsDriver
-  
+
   override def description =
 """Convert input files in the Infochimps Twitter corpus into files in the
 format expected by TextGrounder.  If --output-stats or a related argument
