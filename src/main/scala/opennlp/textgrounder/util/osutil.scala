@@ -48,9 +48,30 @@ package object osutil {
 
   import java.lang.management._
   def getpid() = ManagementFactory.getRuntimeMXBean().getName().split("@")(0)
+  private var initialized = false
+  private def check_initialized() {
+    if (!initialized)
+      throw new IllegalStateException("""You must call initialize_osutil() 
+at the beginning of your program, in order to use get_program_time_usage()""")
+  }
+  /**
+   * Call this if you use `get_program_time_usage` or `output_resource_usage`.
+   * This is necessary in order to record the time at the beginning of the
+   * program.
+   */
+  def initialize_osutil() {
+    // Simply calling this function is enough, because it will trigger the
+    // loading of the class associated with package object osutil, which
+    // will cause `beginning_prog_time` to get set.  We set a flag to verify
+    // that this is done.
+    initialized = true
+  }
   val beginning_prog_time = curtimesecs()
   
-  def get_program_time_usage() = curtimesecs() - beginning_prog_time
+  def get_program_time_usage() = {
+    check_initialized()
+    curtimesecs() - beginning_prog_time
+  }
 
   /**
    * Return memory usage as a 
