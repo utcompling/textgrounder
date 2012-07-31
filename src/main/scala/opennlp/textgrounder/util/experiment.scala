@@ -566,6 +566,7 @@ package object experiment {
      *   positive for errorThis needs to be called explicitly from the
      */
     def implement_main(args: Array[String]) = {
+      initialize_osutil()
       set_stdout_stderr_utf_8()
       errprint("Beginning operation at %s" format humandate_full(beginning_time))
       errprint("Arguments: %s" format (args mkString " "))
