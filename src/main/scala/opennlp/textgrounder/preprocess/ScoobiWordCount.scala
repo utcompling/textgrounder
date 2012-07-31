@@ -4,10 +4,24 @@ import com.nicta.scoobi.Scoobi._
 import com.nicta.scoobi.testing.HadoopLogFactory
 // import com.nicta.scoobi.application.HadoopLogFactory
 import org.apache.commons.logging.LogFactory
+import org.apache.hadoop.fs.FileSystem
 import java.io._
 
 object ScoobiWordCount extends ScoobiApp {
   def run() {
+    // There's some magic here in the source code to make the get() call
+    // work -- there's an implicit conversion in object ScoobiConfiguration
+    // from a ScoobiConfiguration to a Hadoop Configuration, which has get()
+    // defined on it.  Evidently implicit conversions in the companion object
+    // get made available automatically for classes or something?
+    System.err.println("mapred.job.tracker " +
+      configuration.get("mapred.job.tracker", "value not found"))
+    // System.err.println("job tracker " + jobTracker)
+    // System.err.println("file system " + fs)
+    System.err.println("configure file system " + configuration.fs)
+    System.err.println("file system key " +
+      configuration.get(FileSystem.FS_DEFAULT_NAME_KEY, "value not found"))
+
     val lines = fromTextFile(args(0))
 
     def splitit(x: String) = {
