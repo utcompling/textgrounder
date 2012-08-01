@@ -147,10 +147,11 @@ class VisualizeCorpus extends PApplet {
         }
         tokIndex += 1
       }
-      checkbox.addItem(doc.getId, 0)
+      //checkbox.addItem(doc.getId, 0)
       doc.getId
     }).toArray
 
+    docList.toList.sortBy(x => x).foreach(x => checkbox.addItem(x, 0))
     shownDocs = docList.toSet
 
     checkboxTotalHeight = docList.size * 20
@@ -203,10 +204,14 @@ class VisualizeCorpus extends PApplet {
 
     if(selectedCirc != oldSelectedCirc) {
       if(selectedCirc != null) {
+        val topoMentions = selectedCirc._3.filter(tm => shownDocs(tm.docid))
         sb.setLength(0)
         sb.append(selectedCirc._3(0).toponym.getOrigForm)
+        sb.append(" (")
+        sb.append(topoMentions.size)
+        sb.append(")")
         var i = 1
-        for(topoMention <- selectedCirc._3.filter(tm => shownDocs(tm.docid))) {
+        for(topoMention <- topoMentions) {
           sb.append("\n\n")
           sb.append(i)
           sb.append(". ")
