@@ -183,6 +183,7 @@ Commands for toponym resolution:
   resolve ...           run the toponomy resolver
   write-to-kml ...      write a resolved corpus to visualizable KML format
   eval ...              evaluated a resolved corpus against a gold corpus
+  viz ...               visualize a serialized corpus
 
 Commands for the Geolocate module:
 
@@ -271,6 +272,7 @@ else
     preprocess-labelprop) CLASS=$TGTRAPP.LabelPropPreproc;;
     write-to-kml) CLASS=$TGTRAPP.WriteCorpusToKML;;
     eval) CLASS=$TGTRAPP.EvaluateCorpus;;
+    viz) CLASS=$TGTRAPP.VisualizeCorpus;;
 
     # Commands in the Bayesian code (there are many more)
     rlda-convert-from) CLASS=$TGBAYESAPP.ConvertFromRegionModelFormat;;
