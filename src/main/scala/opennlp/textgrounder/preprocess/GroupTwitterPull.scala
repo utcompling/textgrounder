@@ -1,4 +1,3 @@
-
 //  GroupTwitterPull.scala
 //
 //  Copyright (C) 2012 Stephen Roller, The University of Texas at Austin
@@ -332,7 +331,7 @@ class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
   /**
    * An empty tweet, stored as a full IDRecord.
    */
-  val empty_tweet: IDRecord = ("", ("", ("", 0, "", Double.NaN, Double.NaN, 0, 0, 0)))
+  val empty_tweet: IDRecord = ("", ("", Tweet.empty))
 
   def parse_problem(line: String, e: Exception) = {
     dbg("Error parsing line: %s\n%s", line, e)
@@ -358,20 +357,21 @@ class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
       val followers = force_value(parsed \ "user" \ "followers_count").toInt
       val following = force_value(parsed \ "user" \ "friends_count").toInt
       val tweet_id = force_value(parsed \ "id_str")
-      val (lat, lng) = 
+      val (lat, long) =
         if ((parsed \ "coordinates" values) == null ||
             (force_value(parsed \ "coordinates" \ "type") != "Point")) {
           (Double.NaN, Double.NaN)
         } else {
-          val latlng: List[Number] = 
+          val latlong: List[Number] =
             (parsed \ "coordinates" \ "coordinates" values).asInstanceOf[List[Number]]
-          (latlng(1).doubleValue, latlng(0).doubleValue)
+          (latlong(1).doubleValue, latlong(0).doubleValue)
         }
       val key = Opts.keytype match {
         case "user" => user
         case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
       }
-      (tweet_id, (key, (user, timestamp, text, lat, lng, followers, following, 1)))
+      (tweet_id, (key,
+        Tweet(user, timestamp, text, lat, long, followers, following, 1)))
     } catch {
       case jpe: liftweb.json.JsonParser.ParseException =>
         parse_problem(line, jpe)
@@ -408,22 +408,23 @@ class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
       val followers = get_2nd_level_value[Int](parsed, "user", "followers_count")
       val following = get_2nd_level_value[Int](parsed, "user", "friends_count")
       val tweet_id = get_string(parsed, "id_str")
-      val (lat, lng) = 
+      val (lat, long) =
         if (parsed("coordinates") == null ||
             get_2nd_level_value[String](parsed, "coordinates", "type")
               != "Point") {
           (Double.NaN, Double.NaN)
         } else {
-          val latlng = 
+          val latlong =
             get_2nd_level_value[java.util.ArrayList[Number]](parsed,
               "coordinates", "coordinates")
-          (latlng(1).doubleValue, latlng(0).doubleValue)
+          (latlong(1).doubleValue, latlong(0).doubleValue)
         }
       val key = Opts.keytype match {
         case "user" => user
         case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
       }
-      (tweet_id, (key, (user, timestamp, text, lat, lng, followers, following, 1)))
+      (tweet_id, (key,
+        Tweet(user, timestamp, text, lat, long, followers, following, 1)))
     } catch {
       case jpe: jerkson.ParsingException =>
         parse_problem(line, jpe)
@@ -462,8 +463,9 @@ class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
    */
   def is_valid_tweet(id_r: IDRecord): Boolean = {
     // filters out invalid tweets, as well as trivial spam
-    val (tw_id, (key, (user, ts, text, lat, lng, fers, fing, numtw))) = id_r
-    tw_id != "" && ts != 0.0 && user != "" && !(lat == 0.0 && lng == 0.0)
+    val (tw_id, (key, tw)) = id_r
+    tw_id != "" && tw.timestamp != 0 && tw.user != "" &&
+      !(tw.lat == 0.0 && tw.long == 0.0)
   }
 
   /**
@@ -514,9 +516,9 @@ class GroupTweetsAndSelectGood(Opts: GroupTwitterPullParams)
     val split = line.split("\t\t")
     assert(split.length == 2)
     val (tweet_no_text, text) = (split(0), split(1))
-    val (key, (user, ts, lat, lng, fers, fing, numtw)) =
-      split_tweet_no_text(tweet_no_text)
-    (key, (user, ts, text, lat, lng, fers, fing, numtw))
+    val (key, tnt) = split_tweet_no_text(tweet_no_text)
+    (key, Tweet(tnt.user, tnt.timestamp, text, tnt.lat, tnt.long,
+                tnt.followers, tnt.following, tnt.numtweets))
   }
 
   /**
@@ -526,37 +528,38 @@ class GroupTweetsAndSelectGood(Opts: GroupTwitterPullParams)
    * For latitude and longitude, take the earliest provided values
    * ("earliest" by timestamp and "provided" meaning not missing).
    */
-  def merge_records(tweet1: Tweet, tweet2: Tweet): Tweet = {
-    val (user1, ts1, text1, lat1, lng1, fers1, fing1, numtw1) = tweet1
-    val (user2, ts2, text2, lat2, lng2, fers2, fing2, numtw2) = tweet2
-    val (fers, fing) = (math.max(fers1, fers2), math.max(fing1, fing2))
-    val text = text1 + " " + text2
-    val numtw = numtw1 + numtw2
+  def merge_records(tw1: Tweet, tw2: Tweet): Tweet = {
+    val (followers, following) =
+      (math.max(tw1.followers, tw2.followers),
+       math.max(tw1.following, tw2.following))
+    val text = tw1.text + " " + tw2.text
+    val numtweets = tw1.numtweets + tw2.numtweets
 
-    val (lat, lng, ts) = 
-      if (isNaN(lat1) && isNaN(lat2)) {
-        (lat1, lng1, math.min(ts1, ts2))
-      } else if (isNaN(lat2)) {
-        (lat1, lng1, ts1)
-      } else if (isNaN(lat1)) {
-        (lat2, lng2, ts2)
-      } else if (ts1 < ts2) {
-        (lat1, lng1, ts1)
+    val (lat, long, timestamp) =
+      if (isNaN(tw1.lat) && isNaN(tw2.lat)) {
+        (tw1.lat, tw1.long, math.min(tw1.timestamp, tw2.timestamp))
+      } else if (isNaN(tw2.lat)) {
+        (tw1.lat, tw1.long, tw1.timestamp)
+      } else if (isNaN(tw1.lat)) {
+        (tw2.lat, tw2.long, tw2.timestamp)
+      } else if (tw1.timestamp < tw2.timestamp) {
+        (tw1.lat, tw1.long, tw1.timestamp)
       } else {
-        (lat2, lng2, ts2)
+        (tw2.lat, tw2.long, tw2.timestamp)
       }
 
     // FIXME maybe want to track the different users
-    (user1, ts, text, lat, lng, fers, fing, numtw)
+    Tweet(tw1.user, timestamp, text, lat, long, followers, following,
+      numtweets)
   }
 
   /**
    * Return true if tweet (combination) has a fully-specified latitude
    * and longitude.
    */
-  def has_latlng(r: Record) = {
-    val (key, (user, ts, text, lat, lng, fers, fing, numtw)) = r
-    !isNaN(lat) && !isNaN(lng)
+  def has_latlong(r: Record) = {
+    val (key, tw) = r
+    !isNaN(tw.lat) && !isNaN(tw.long)
   }
 
   val MAX_NUMBER_FOLLOWING = 1000
@@ -580,12 +583,13 @@ class GroupTweetsAndSelectGood(Opts: GroupTwitterPullParams)
    * this is backwards?
    */
   def is_nonspammer(r: Record): Boolean = {
-    val (key, (user, ts, text, lat, lng, fers, fing, numtw)) = r
+    val (key, tw) = r
 
     val retval =
-      (fing >= MIN_NUMBER_FOLLOWING && fing <= MAX_NUMBER_FOLLOWING) &&
-      (fers >= MIN_NUMBER_FOLLOWERS) &&
-      (numtw >= Opts.min_tweets && numtw <= Opts.max_tweets)
+      (tw.following >= MIN_NUMBER_FOLLOWING &&
+         tw.following <= MAX_NUMBER_FOLLOWING) &&
+      (tw.followers >= MIN_NUMBER_FOLLOWERS) &&
+      (tw.numtweets >= Opts.min_tweets && tw.numtweets <= Opts.max_tweets)
     if (Opts.debug && retval == false)
       dbg("Rejecting is_nonspammer %s", r)
     retval
@@ -602,10 +606,9 @@ class GroupTweetsAndSelectGood(Opts: GroupTwitterPullParams)
    * bounding box fo North America.
    */
   def northamerica_only(r: Record): Boolean = {
-    val (key, (user, ts, text, lat, lng, fers, fing, numtw)) = r
-
-    val retval = (lat >= MIN_LAT && lat <= MAX_LAT) &&
-                 (lng >= MIN_LNG && lng <= MAX_LNG)
+    val (key, tw) = r
+    val retval = (tw.lat >= MIN_LAT && tw.lat <= MAX_LAT) &&
+                 (tw.long >= MIN_LNG && tw.long <= MAX_LNG)
     if (Opts.debug && retval == false)
       dbg("Rejecting northamerica_only %s", r)
     retval
@@ -614,7 +617,7 @@ class GroupTweetsAndSelectGood(Opts: GroupTwitterPullParams)
   def is_good_tweet(r: Record): Boolean = {
     if (Opts.debug)
       dbg("Considering %s", r)
-    has_latlng(r) &&
+    has_latlong(r) &&
     is_nonspammer(r) &&
     northamerica_only(r)
   }
@@ -756,16 +759,16 @@ class TokenizeFilterAndCountTweets(Opts: GroupTwitterPullParams)
   def nicely_format_plain(tncs: (String, Iterable[NgramCount])): String = {
     val (tweet_no_text, ncs) = tncs
     val nice_text = ncs.map((w: NgramCount) => w._1 + ":" + w._2).mkString(" ")
-    val (key, (user, ts, lat, lng, fers, fing, numtw)) =
-      split_tweet_no_text(tweet_no_text)
+    val (key, tnt) = split_tweet_no_text(tweet_no_text)
     // Latitude/longitude need to be combined into a single field, but only
     // if both actually exist.
-    val latlngstr =
-      if (!isNaN(lat) && !isNaN(lng))
-        "%s,%s" format (lat, lng)
+    val latlongstr =
+      if (!isNaN(tnt.lat) && !isNaN(tnt.long))
+        "%s,%s" format (tnt.lat, tnt.long)
       else ""
     // Put back together but drop key.
-    Seq(user, ts, latlngstr, fers, fing, numtw, nice_text) mkString "\t"
+    Seq(tnt.user, tnt.timestamp, latlongstr, tnt.followers, tnt.following,
+        tnt.numtweets, nice_text) mkString "\t"
   }
 }
 
@@ -793,25 +796,74 @@ object TokenizeFilterAndCountTweets {
   }
 }
 
+/**
+ * Data for a tweet other than the tweet ID.
+ * Note that we have "number of tweets" since we merge multiple tweets into
+ * a document, and also use type Tweet or TweetNoText for them. */
+case class Tweet(
+  user: String,
+  timestamp: Long,
+  text: String,
+  lat: Double,
+  long: Double,
+  followers: Int,
+  following: Int,
+  numtweets: Int
+)
+
+object Tweet {
+  def empty = Tweet("", 0, "", Double.NaN, Double.NaN, 0, 0, 0)
+  // Not needed unless we have Tweet inside of a DList, it seems?
+  // But we do, in intermediate results?
+  // implicit val tweetFmt = mkCaseWireFormat(Tweet.apply _, Tweet.unapply _)
+}
+
+/**
+ * Data for a merged set of tweets other than the text.
+ *
+ * @param user User name (FIXME: or one of them, when going by time; should
+ *    do something smarter)
+ * @param timestamp Earliest timestamp
+ * @param lat Best latitude
+ * @param long Best longitude
+ * @param followers Max followers
+ * @param following Max following
+ * @param numtweets Number of tweets merged
+ */
+case class TweetNoText(
+  user: String,
+  timestamp: Long,
+  lat: Double,
+  long: Double,
+  followers: Int,
+  following: Int,
+  numtweets: Int
+)
+object TweetNoText {
+  // implicit val tweetNoTextFmt =
+  //   mkCaseWireFormat(TweetNoText.apply _, TweetNoText.unapply _)
+}
+
+// type TweetNoText = (String, Long, Double, Double, Int, Int, Int)
+// TweetNgram = Data for the tweet minus the text, plus an individual ngram
+//   from the text = (tweet_no_text_as_string, ngram)
+
 class GroupTwitterPullShared(Opts: GroupTwitterPullParams) {
-  // Tweet = Data for a tweet other than the tweet ID =
-  // (user, timestamp, text, lat, lng, followers, following, number of tweets)
-  // Note that we have "number of tweets" since we merge multiple tweets into
-  // a document, and also use type Tweet for them.
-  type Tweet = (String, Long, String, Double, Double, Int, Int, Int)
+  // type Tweet = (String, Long, String, Double, Double, Int, Int, Int)
   // TweetID = numeric string used to uniquely identify a tweet.
   type TweetID = String
+
+  //case class Record(
+  //  key: String,
+  //  tweet: Tweet
+  //)
+  //implicit val recordFmt = mkCaseWireFormat(Record, Record.unapply _)
+
   // Record = Data for tweet along with the key (e.g. username, timestamp) =
   // (key, tweet data)
   type Record = (String, Tweet)
   // IDRecord = Tweet ID along with all other data for a tweet.
   type IDRecord = (TweetID, Record)
-  // TweetNoText = Data for a merged set of tweets other than the text =
-  // (username, earliest timestamp, best lat, best lng, max followers,
-  //    max following, number of tweets pulled)
-  type TweetNoText = (String, Long, Double, Double, Int, Int, Int)
-  // TweetNgram = Data for the tweet minus the text, plus an individual ngram
-  //   from the text = (tweet_no_text_as_string, ngram)
   type TweetNgram = (String, String)
   // NgramCount = (ngram, number of ocurrences)
   type NgramCount = (String, Long)
@@ -829,9 +881,10 @@ class GroupTwitterPullShared(Opts: GroupTwitterPullParams) {
    * the last field, or whatever.
    */
   def checkpoint_str(r: Record): String = {
-    val (key, (user, ts, text, lat, lng, fers, fing, numtw)) = r
-    val text_2 = text.replaceAll("\\s+", " ")
-    val s = Seq(key, user, ts, lat, lng, fers, fing, numtw, "", text_2) mkString "\t"
+    val (key, tw) = r
+    val text_2 = tw.text.replaceAll("\\s+", " ")
+    val s = Seq(key, tw.user, tw.timestamp, tw.lat, tw.long, tw.followers,
+      tw.following, tw.numtweets, "", text_2) mkString "\t"
     s
   }
 
@@ -839,13 +892,14 @@ class GroupTwitterPullShared(Opts: GroupTwitterPullParams) {
     val split2 = tweet_no_text.split("\t")
     val key = split2(0)
     val user = split2(1)
-    val ts = split2(2).toLong
+    val timestamp = split2(2).toLong
     val lat = split2(3).toDouble
-    val lng = split2(4).toDouble
-    val fers = split2(5).toInt
-    val fing = split2(6).toInt
-    val numtw = split2(7).toInt
-    (key, (user, ts, lat, lng, fers, fing, numtw))
+    val long = split2(4).toDouble
+    val followers = split2(5).toInt
+    val following = split2(6).toInt
+    val numtweets = split2(7).toInt
+    (key, TweetNoText(user, timestamp, lat, long, followers, following,
+      numtweets))
   }
 }
 
