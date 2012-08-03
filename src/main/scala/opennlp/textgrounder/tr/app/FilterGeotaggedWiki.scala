@@ -12,7 +12,7 @@ import opennlp.textgrounder.tr.text.io._
 
 import scala.collection.JavaConversions._
 
-import org.apache.tools.bzip2._
+import org.apache.commons.compress.compressors.bzip2._
 import org.clapper.argot._
 import ArgotConverters._
 
@@ -33,7 +33,7 @@ object FilterGeotaggedWiki extends App {
 
   val fis = new FileInputStream(wikiCorpusInputFile.value.get)
   fis.read; fis.read
-  val cbzis = new CBZip2InputStream(fis)
+  val cbzis = new BZip2CompressorInputStream(fis)
   val in = new BufferedReader(new InputStreamReader(cbzis))
   var curLine = in.readLine
   while(curLine != null) {

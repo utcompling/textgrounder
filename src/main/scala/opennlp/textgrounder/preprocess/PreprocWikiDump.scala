@@ -19,7 +19,7 @@
 package opennlp.textgrounder.preprocess
 
 import java.io._
-import org.apache.tools.bzip2._
+import org.apache.commons.compress.compressors.bzip2._
 
 /*
  * DOCUMENT ME!  Commit message says "for use with Mallet in getting topics
@@ -35,7 +35,7 @@ object PreprocWikiDump {
     val fileInputStream = new FileInputStream(new File(args(0)))
     fileInputStream.read(); // otherwise null pointer
     fileInputStream.read();
-    val cbzip2InputStream = new CBZip2InputStream(fileInputStream)
+    val cbzip2InputStream = new BZip2CompressorInputStream(fileInputStream)
     val in = new BufferedReader(new InputStreamReader(cbzip2InputStream))
 
     var totalPageCount = 0
