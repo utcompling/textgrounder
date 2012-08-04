@@ -762,7 +762,45 @@ object DistDocument {
     (decode_ngram_for_counts_field(encoded_ngram), count)
   }
 
-  // val fixed_fields = Seq("corpus", "title", "id", "split", "coord")
+  /**
+   * Serialize a sequence of (word, count) pairs into the format used
+   * in a corpus.
+   */
+  def encode_word_count_map(seq: collection.Seq[(String, Int)]) = {
+    // Sorting isn't strictly necessary but ensures consistent output as well
+    // as putting the most significant items first, for visual confirmation.
+    (for ((word, count) <- seq sortWith (_._2 > _._2)) yield
+      ("%s:%s" format (encode_word_for_counts_field(word), count))
+    ) mkString " "
+  }
+
+  /**
+   * Deserialize an encoded word-count map into a sequence of
+   * (word, count) pairs.
+   */
+  def decode_word_count_map(encoded: String) = {
+    if (encoded.length == 0)
+      Array[(String, Int)]()
+    else
+      {
+      val wordcounts = encoded.split(" ")
+      for (wordcount <- wordcounts) yield {
+        val split_wordcount = wordcount.split(":", -1)
+        if (split_wordcount.length != 2)
+          throw FileFormatException(
+            "For unigram counts, items must be of the form WORD:COUNT, but %s seen"
+            format wordcount)
+        val Array(word, strcount) = split_wordcount
+        if (word.length == 0)
+          throw FileFormatException(
+            "For unigram counts, WORD in WORD:COUNT must not be empty, but %s seen"
+            format wordcount)
+        val count = strcount.toInt
+        val decoded_word = DistDocument.decode_word_for_counts_field(word)
+        (decoded_word, count)
+      }
+    }
+  }
 }
 
 

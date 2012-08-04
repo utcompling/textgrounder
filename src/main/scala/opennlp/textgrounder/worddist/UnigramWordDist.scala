@@ -215,26 +215,13 @@ class DefaultUnigramWordDistConstructor(
     keys_dynarr.clear()
     values_dynarr.clear()
     raw_keys_set.clear()
-    val wordcounts = countstr.split(" ")
-    for (wordcount <- wordcounts) yield {
-      val split_wordcount = wordcount.split(":", -1)
-      if (split_wordcount.length != 2)
-        throw FileFormatException(
-          "For unigram counts, items must be of the form WORD:COUNT, but %s seen"
-          format wordcount)
-      val Array(word, strcount) = split_wordcount
-      if (word.length == 0)
-        throw FileFormatException(
-          "For unigram counts, WORD in WORD:COUNT must not be empty, but %s seen"
-          format wordcount)
-      val count = strcount.toInt
+    for ((word, count) <- DistDocument.decode_word_count_map(countstr)) {
+      /* FIXME: Is this necessary? */
       if (raw_keys_set contains word)
         throw FileFormatException(
           "Word %s seen twice in same counts list" format word)
       raw_keys_set += word
-      /* FIXME: We aren't canonicalizing here, but simply decoding. */
-      val decoded_word = DistDocument.decode_word_for_counts_field(word)
-      keys_dynarr += decoded_word
+      keys_dynarr += word
       values_dynarr += count
     }
   }
