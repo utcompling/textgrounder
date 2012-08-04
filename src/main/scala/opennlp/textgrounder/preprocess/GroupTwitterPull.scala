@@ -146,8 +146,8 @@ Look for any tweets containing the word "clinton" as well as either the words
     help="""Output debug info about tweet processing/acceptance.""")
   var debug_file = ap.option[String]("debug-file",
     help="""File to write debug info to, instead of stderr.""")
-  var use_jerkson = ap.flag("use-jerkson",
-    help="""Use Jerkson instead of Lift to parse JSON.""")
+//  var use_jerkson = ap.flag("use-jerkson",
+//    help="""Use Jerkson instead of Lift to parse JSON.""")
   var input = ap.positional[String]("INPUT",
     help = "Source directory to read files from.")
   var output = ap.positional[String]("OUTPUT",
@@ -459,45 +459,46 @@ class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
    * Parse a JSON line into a tweet, using Jerkson.
    */
 
-  def parse_json_jerkson(line: String): IDRecord = {
-    try {
-      val parsed = jerkson.Json.parse[Map[String,Any]](line)
-      val user = get_2nd_level_value[String](parsed, "user", "screen_name")
-      val timestamp = parse_time(get_string(parsed, "created_at"))
-      val text = get_string(parsed, "text").replaceAll("\\s+", " ")
-      val followers = get_2nd_level_value[Int](parsed, "user", "followers_count")
-      val following = get_2nd_level_value[Int](parsed, "user", "friends_count")
-      val tweet_id = get_string(parsed, "id_str")
-      val (lat, long) =
-        if (parsed("coordinates") == null ||
-            get_2nd_level_value[String](parsed, "coordinates", "type")
-              != "Point") {
-          (Double.NaN, Double.NaN)
-        } else {
-          val latlong =
-            get_2nd_level_value[java.util.ArrayList[Number]](parsed,
-              "coordinates", "coordinates")
-          (latlong(1).doubleValue, latlong(0).doubleValue)
-        }
-      val key = Opts.keytype match {
-        case "user" => user
-        case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
-      }
-      (tweet_id, (key,
-        Tweet(user, timestamp, text, lat, long, followers, following, 1)))
-    } catch {
-      case jpe: jerkson.ParsingException =>
-        parse_problem(line, jpe)
-      case npe: NullPointerException =>
-        parse_problem(line, npe)
-      case nfe: NumberFormatException =>
-        parse_problem(line, nfe)
-      case nsee: NoSuchElementException =>
-        parse_problem(line, nsee)
-      case e: Exception =>
-        { parse_problem(line, e); throw e }
-    }
-  }
+//  def parse_json_jerkson(line: String): IDRecord = {
+//    try {
+//      val parsed = jerkson.Json.parse[Map[String,Any]](line)
+//      val user = get_2nd_level_value[String](parsed, "user", "screen_name")
+//      val timestamp = parse_time(get_string(parsed, "created_at"))
+//      val text = get_string(parsed, "text").replaceAll("\\s+", " ")
+//      val followers = get_2nd_level_value[Int](parsed, "user", "followers_count")
+//      val following = get_2nd_level_value[Int](parsed, "user", "friends_count")
+//      val tweet_id = get_string(parsed, "id_str")
+//      val (lat, long) =
+//        if (parsed("coordinates") == null ||
+//            get_2nd_level_value[String](parsed, "coordinates", "type")
+//              != "Point") {
+//          (Double.NaN, Double.NaN)
+//        } else {
+//          val latlong =
+//            get_2nd_level_value[java.util.ArrayList[Number]](parsed,
+//              "coordinates", "coordinates")
+//          (latlong(1).doubleValue, latlong(0).doubleValue)
+//        }
+//      val key = Opts.keytype match {
+//        case "user" => user
+//        case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
+//      }
+//      (tweet_id, (key,
+//        Tweet(text, TweetNoText(user, timestamp, lat, long,
+//          followers, following, 1, FIXME: user_mentions))))
+//    } catch {
+//      case jpe: jerkson.ParsingException =>
+//        parse_problem(line, jpe)
+//      case npe: NullPointerException =>
+//        parse_problem(line, npe)
+//      case nfe: NumberFormatException =>
+//        parse_problem(line, nfe)
+//      case nsee: NoSuchElementException =>
+//        parse_problem(line, nsee)
+//      case e: Exception =>
+//        { parse_problem(line, e); throw e }
+//    }
+//  }
 
   /*
    * Parse a JSON line into a tweet.  Return value is an IDRecord, including
@@ -508,8 +509,8 @@ class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
     // dbg("parsing JSON: %s", line)
     if (line.trim == "")
       empty_tweet
-    else if (Opts.use_jerkson)
-      parse_json_jerkson(line)
+    // else if (Opts.use_jerkson)
+    //   parse_json_jerkson(line)
     else
       parse_json_lift(line)
   }
