@@ -65,12 +65,12 @@ object GroupTwitterPull extends ScoobiApp {
  * should be called "sep-22-debate-training-unigram-counts.txt".
  *
  * When merging by user, the code uses the earliest geolocated tweet as the
- * user's location; tweets with a bounding box as their location rather than a
- * single point are treated as if they have no location.  Then the code filters
- * out users that have no geolocation or have a geolocation outside of North
- * America (according to a crude bounding box), as well as those that are
- * identified as likely "spammers" according to their number of followers and
- * number of people they are following.
+ * user's location; tweets with a bounding box as their location rather than
+ * a single point are treated as if they have no location.  Then the code
+ * filters out users that have no geolocation or have a geolocation outside
+ * of North America (according to a crude bounding box), as well as those
+ * that are identified as likely "spammers" according to their number of
+ * followers and number of people they are following.
  */
 
 class GroupTwitterPullParams(ap: ArgParser) {
@@ -222,7 +222,8 @@ class TweetFilterParser(foldcase: Boolean) extends StandardTokenParsers {
       case Some(fraction) => fraction
     }
     def exponent = (chr('e') | chr('E')) ~ optSign ~ rep1(digit) ^^ {
-      case e ~ optSign ~ exp => e :: optSign :: (exp mkString "") :: Nil mkString ""
+      case e ~ optSign ~ exp =>
+        e :: optSign :: (exp mkString "") :: Nil mkString ""
     }
     def optExponent = opt(exponent) ^^ {
       case None => ""
@@ -551,13 +552,14 @@ class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
    * have duplicates of the same tweet among our data.  E.g. it seems that
    * Twitter itself sometimes streams duplicates through its Streaming API,
    * and data from different sources will almost certainly have duplicates.
-   * Furthermore, sometimes we want to get all the tweets even in the presence
-   * of flakiness that causes Twitter to sometimes bomb out in a Streaming
-   * session and take a while to restart, so we have two or three simultaneous
-   * streams going recording the same stuff, hoping that Twitter bombs out at
-   * different points in the different sessions (which is generally true).
-   * Then, all or almost all the tweets are available in the different streams,
-   * but there is a lot of duplication that needs to be tossed aside.
+   * Furthermore, sometimes we want to get all the tweets even in the
+   * presence of flakiness that causes Twitter to sometimes bomb out in a
+   * Streaming session and take a while to restart, so we have two or three
+   * simultaneous streams going recording the same stuff, hoping that Twitter
+   * bombs out at different points in the different sessions (which is
+   * generally true). Then, all or almost all the tweets are available in
+   * the different streams, but there is a lot of duplication that needs to
+   * be tossed aside.
    */
   def tweet_once(id_rs: (TweetID, Iterable[Record])): Record = {
     val (id, rs) = id_rs
@@ -821,7 +823,8 @@ class TokenizeFilterAndCountTweets(Opts: GroupTwitterPullParams)
    */
   def nicely_format_plain(tncs: (String, Iterable[NgramCount])): String = {
     val (tweet_no_text, ncs) = tncs
-    val nice_text = ncs.map((w: NgramCount) => w._1 + ":" + w._2).mkString(" ")
+    val nice_text =
+      ncs.map((w: NgramCount) => w._1 + ":" + w._2).mkString(" ")
     val (key, tnt) = split_tweet_no_text(tweet_no_text)
     // Latitude/longitude need to be combined into a single field, but only
     // if both actually exist.
