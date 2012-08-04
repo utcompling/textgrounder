@@ -350,6 +350,66 @@ class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
    */
   def parse_json_lift(line: String): IDRecord = {
     try {
+      /* The result of parsing is a JValue, which is an abstract type with
+         subtypes for all of the types of objects found in JSON: maps, arrays,
+         strings, integers, doubles, booleans.  Corresponding to the atomic
+         types are JString, JInt, JDouble, JBool.  Corresponding to arrays is
+         JArray (which underlyingly holds something like a List[JValue]), and
+         corresponding to maps is JObject.  JObject underlyingly holds
+         something like a List[JField], and a JField is a structure holding a
+         'name' (a string) and a 'value' (a JValue).  The following
+         operations can be done on these objects:
+
+         1. For JArray, JObject and JField, the method 'children' yields
+            a List[JValue] of their children.  For JObject, as mentioned
+            above, this will be a list of JField objects.  For JField
+            objects, this will be a one-element list of whatever was
+            in 'value'.
+         2. JArray, JObject and JField can be indexed like an array.
+            Indexing JArray is obvious.  Indexing JObject gives a JField
+            object, and indexing JField tries to index the object in the
+            field's 'value' element.
+         3. You can directly fetch the components of a JField using the
+            accessors 'name' and 'value'.
+
+         4. You can retrieve the underlying Scala form of any object using
+            'values'.  This returns JArrays as a List, JObject as a Map, and
+            JField as a tuple of (name, value).  The conversion is deep, in
+            that subobjects are recursively converted.  However, the result
+            type isn't necessarily useful -- for atoms you get more or less
+            what you expect (although BigInt instead of Int), and for JField
+            it's just a tuple, but for JArray and JObject the type of the
+            expression is a path-dependent type ending in 'Value'.  So you
+            will probably have to cast it using asInstanceOf[]. (For Maps,
+            consider using Map[String, Any], since you don't necessarily know
+            the type of the different elements, which may vary from element
+            to element.
+
+         5. For JObject, you can do a field lookup using the "\" operator,
+            as shown below.  This yields a JValue, onto which you can do
+            another "\" if it happens to be another JObject. (That's because
+            "\", like 'apply', 'values' and 'children' is defined on the
+            JValue itself.  When "\" is given a non-existent field name,
+            or run on a JInt or other atom, the result is JNothing.
+         6. You can also pass a class (one of the subclasses of JValue) to
+            "\" instead of a string, e.g. classOf[JInt], to find children
+            with this type.  BEWARE: It looks only at the children returned
+            by the 'children' method, which (for objects) are all of type
+            JField, so looking for JInt won't help even if you have some
+            key-value pairs where the value is an integer.
+         7. You can also use "\\" to do multi-level lookup, i.e. this
+            recursively traipses down 'children' and 'children' of 'children'
+            and does the equivalent of "\" on each.  The return value is a
+            List, with 'values' applied to each element of the List to
+            convert to Scala objects.  Beware that you only get the items
+            themselves, without the field names. That is, if you search for
+            e.g. a JInt, you'll get back a List[Int] with a lot of numbers
+            in it -- but no indication of where they came from or what the
+            associated field name was.
+         8. There's also 'extract' for getting a JObject as a case class,
+            as well as 'map', 'filter', '++', and other standard methods for
+            collections.
+      */
       val parsed = liftweb.json.parse(line)
       val user = force_value(parsed \ "user" \ "screen_name")
       val timestamp = parse_time(force_value(parsed \ "created_at"))
