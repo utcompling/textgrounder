@@ -128,10 +128,7 @@ class FrobCorpusFileProcessor(
       val counts = intmap[String]()
       for (word <- text.split(" ", -1))
         counts(word) += 1
-      val counts_text =
-        (for ((word, count) <- counts.toSeq sortWith (_._2 > _._2)) yield
-          ("%s:%s" format (DistDocument.encode_word_for_counts_field(word),
-            count))) mkString " "
+      val counts_text = DistDocument.encode_word_count_map(counts.toSeq)
       docparams += (("counts", counts_text))
     }
     docparams.toSeq
