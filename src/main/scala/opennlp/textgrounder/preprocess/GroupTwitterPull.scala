@@ -916,7 +916,6 @@ implicit val tweetFmt = mkCaseWireFormat(Tweet.apply _, Tweet.unapply _)
 // TweetNgram = Data for the tweet minus the text, plus an individual ngram
 //   from the text = (tweet_no_text_as_string, ngram)
 
-class GroupTwitterPullShared(Opts: GroupTwitterPullParams) {
   // type Tweet = (String, Long, String, Double, Double, Int, Int, Int)
   // TweetID = numeric string used to uniquely identify a tweet.
   type TweetID = String
@@ -936,6 +935,7 @@ class GroupTwitterPullShared(Opts: GroupTwitterPullParams) {
   // NgramCount = (ngram, number of ocurrences)
   type NgramCount = (String, Long)
 
+class GroupTwitterPullShared(Opts: GroupTwitterPullParams) {
   def dbg(format: String, args: Any*) {
     errfile(Opts.debug_file, format, args: _*)
   }
