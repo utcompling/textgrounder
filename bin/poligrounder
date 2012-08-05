@@ -213,7 +213,7 @@ command for more information.
 EOF
 }
 
-RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=256m -Xmx512M -Xss2M -jar $POLIGROUNDER_DIR/bin/sbt-launch-*.jar"
+RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=256m -Xmx1024M -Xss2M -jar $POLIGROUNDER_DIR/bin/sbt-launch-*.jar"
 
 execute()
 {
