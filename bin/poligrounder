@@ -24,9 +24,14 @@ HADOOP=
 HADOOP_NONDIST=
 MEMORY=
 JAVA_MISC_OPT=
+JAVA_USER_OPT=
 while true; do
   case "$1" in
     -verbose | --verbose ) VERBOSE=yes; shift ;;
+    -debug-class | --debug-class )
+      # I think that -verbose:class is the same as -XX:+TraceClassLoading.
+      JAVA_MISC_OPT="$JAVA_MISC_OPT -verbose:class -XX:+TraceClassUnloading"
+      shift ;;
     -debug | --debug ) DEBUG=yes; shift ;;
     -m | -memory | --memory ) MEMORY="$2"; shift 2 ;;
     -minheap | --minheap )
@@ -37,6 +42,8 @@ while true; do
       JAVA_MISC_OPT="$JAVA_MISC_OPT -XX:+DoEscapeAnalysis"; shift ;;
     -compressed-oops | --compressed-oops )
       JAVA_MISC_OPT="$JAVA_MISC_OPT -XX:+UseCompressedOops"; shift ;;
+    -java-opt | --java-opt )
+      JAVA_USER_OPT="$JAVA_USER_OPT $2"; shift 2 ;;
     -hadoop | --hadoop) HADOOP=yes; shift ;;
     -hadoop-nondist | --hadoop-nondist) HADOOP_NONDIST=yes; shift ;;
     -- ) shift; break ;;
@@ -98,7 +105,8 @@ if [ "$DEBUG" = yes ]; then
   # Print details about when and how garbage collection happens; recommended
   # in http://www.oracle.com/technetwork/java/gc-tuning-5-138395.html
   JAVA_DEBUG_OPT="-verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+TraceClassUnloading"
-  #This will output a lot of stuff about class loading.
+  #This will output a lot of stuff about class loading.  Enable it using
+  # --debug-class if you want.
   #JAVA_DEBUG_OPT="$JAVA_DEBUG_OPT -XX:+TraceClassLoading"
 fi
 
@@ -106,11 +114,10 @@ JARS="`echo $POLIGROUNDER_DIR/lib/*.jar $POLIGROUNDER_DIR/lib_managed/*/*.jar $P
 SCALA_LIB="$HOME/.sbt/boot/scala-2.9.2/lib/scala-library.jar"
 CP="$POLIGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
 
-JAVA_COMMAND="$JAVA $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $PG_JAVA_OPT -classpath $CP"
-#Running Scala using Java currently works, and ensures that we will run
-#properly even if Scala isn't installed on the system or an older version
-#is installed. (Since we download our own Scala libraries.)
-#SCALA_COMMAND="scala -classpath $CP"
+# Later options override earlier ones, so put command-line options after
+# the ones taken from environment variables (PG_JAVA_OPT and to some extent
+# JAVA_MEMORY_OPT, because it depends on env var PG_SET_JVM_MEMORY).
+JAVA_COMMAND="$JAVA $PG_JAVA_OPT $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $JAVA_USER_OPT -classpath $CP"
 
 CMD="$1"
 shift
@@ -129,6 +136,7 @@ Options (mostly low-level):
                         variable PG_SET_JVM_MEMORY is set; otherwise, the
                         JVM will be left to set the heap size automatically.
   --verbose             Show what commands are being executed.
+  --debug-class         Show each class loaded, and where it's loaded from.
   --debug               Tell the JVM to output debugging info.
   --minheap RATIO, --maxheap RATIO
                         Set the minimum and maximum free heap ratios.  If the
@@ -143,6 +151,11 @@ Options (mostly low-level):
                         in Java 6 release 23 and later); may reduce memory
                         size on 64-bit machines (and possibly speed things up
                         as well).
+  --java-opt OPTION     Add an arbitrary option to the 'java' executable.
+                        To include multiple options, either enclose in quotes
+                        or repeat '--java-opt' multiple times. (NOTE: Spaces
+                        not currently handled inside of options specified
+                        this way.)
 
 Environment variables:
 
