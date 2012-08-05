@@ -351,6 +351,12 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     }
 
     /**
+     * Convert a list of items to a map counting how many of each item occurs.
+     */
+    def list_to_item_count_map[T : Ordering](list: Seq[T]) =
+      list.sorted groupBy identity mapValues (_.size)
+
+    /**
      * Parse a JSON line into a tweet, using Lift.
      */
     def parse_json_lift(line: String): IDRecord = {
@@ -418,7 +424,8 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
         val parsed = liftweb.json.parse(line)
         val user = force_value(parsed \ "user" \ "screen_name")
         val timestamp = parse_time(force_value(parsed \ "created_at"))
-        val text = force_value(parsed \ "text").replaceAll("\\s+", " ")
+        val raw_text = force_value(parsed \ "text")
+        val text = raw_text.replaceAll("\\s+", " ")
         val followers = force_value(parsed \ "user" \ "followers_count").toInt
         val following = force_value(parsed \ "user" \ "friends_count").toInt
         val tweet_id = force_value(parsed \ "id_str")
@@ -434,13 +441,28 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
           }
         // Retrieve "user_mentions", which is a list of mentions, each
         // listing the span of text, the user actually mentioned, etc.
-        // For each mention, fetch the user actually mentioned.
-        val user_mentions_list = (parsed \ "entities" \ "user_mentions" values).
-          asInstanceOf[List[Map[String, Any]]].map(_("screen_name").toString)
-        // Convert into a map counting mentions.  Do it this way to count
+        val user_mentions_raw = (parsed \ "entities" \ "user_mentions" values).
+          asInstanceOf[List[Map[String, Any]]]
+        // For each mention, fetch the user actually mentioned. Sort and
+        // convert into a map counting mentions.  Do it this way to count
         // multiple mentions properly.
-        val user_mentions =
-          user_mentions_list.sorted groupBy identity mapValues (_.size)
+        val user_mentions_retweets =
+          for { men <- user_mentions_raw
+                screen_name = men("screen_name").toString
+                indices = men("indices").asInstanceOf[List[Number]]
+                start = indices(0).intValue
+                retweet = (start >= 3 &&
+                           raw_text.slice(start - 3, start) == "RT ")
+              }
+            yield (screen_name, retweet)
+        val user_mentions_list =
+          for { (screen_name, retweet) <- user_mentions_retweets }
+            yield screen_name
+        val retweets_list =
+          for { (screen_name, retweet) <- user_mentions_retweets if retweet }
+            yield screen_name
+        val user_mentions = list_to_item_count_map(user_mentions_list)
+        val retweets = list_to_item_count_map(retweets_list)
 
         val key = Opts.keytype match {
           case "user" => user
@@ -448,7 +470,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
         }
         (tweet_id, (key,
           Tweet(text, TweetNoText(user, timestamp, lat, long,
-            followers, following, 1, user_mentions))))
+            followers, following, 1, user_mentions, retweets))))
       } catch {
         case jpe: liftweb.json.JsonParser.ParseException =>
           parse_problem(line, jpe)
@@ -502,7 +524,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   //      }
   //      (tweet_id, (key,
   //        Tweet(text, TweetNoText(user, timestamp, lat, long,
-  //          followers, following, 1, FIXME: user_mentions))))
+  //          followers, following, 1, FIXME: user_mentions, FIXME: retweets))))
   //    } catch {
   //      case jpe: jerkson.ParsingException =>
   //        parse_problem(line, jpe)
@@ -589,6 +611,13 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   class GroupTweetsAndSelectGood(Opts: GroupTwitterPullParams)
       extends GroupTwitterPullShared(Opts) {
     /**
+     * Combine two maps, adding up the numbers where overlap occurs.
+     */
+    def combine_maps[T, U <: Int](
+      map1: Map[T, U], map2: Map[T, U]) =
+        map1 ++ map2.map { case (k,v) => k -> (v + map1.getOrElse(k,0)) }
+
+    /**
      * Merge the data associated with two tweets or tweet combinations
      * into a single tweet combination.  Concatenate text.  Find maximum
      * numbers of followers and followees.  Add number of tweets in each.
@@ -603,10 +632,8 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
          math.max(t1.following, t2.following))
       val text = tw1.text + " " + tw2.text
       val numtweets = t1.numtweets + t2.numtweets
-      // Combine two maps, adding up the numbers where overlap occurs
-      val user_mentions =
-        t1.user_mentions ++ t2.user_mentions.map {
-          case (k,v) => k -> (v + t1.user_mentions.getOrElse(k,0)) }
+      val user_mentions = combine_maps(t1.user_mentions, t2.user_mentions)
+      val retweets = combine_maps(t1.retweets, t2.retweets)
 
       val (lat, long, timestamp) =
         if (isNaN(t1.lat) && isNaN(t2.lat)) {
@@ -623,7 +650,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
 
       // FIXME maybe want to track the different users
       Tweet(text, TweetNoText(t1.user, timestamp, lat, long,
-        followers, following, numtweets, user_mentions))
+        followers, following, numtweets, user_mentions, retweets))
     }
 
     /**
@@ -834,9 +861,11 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
         else ""
       val user_mentions =
         DistDocument.encode_word_count_map(tnt.user_mentions.toSeq)
+      val retweets =
+        DistDocument.encode_word_count_map(tnt.retweets.toSeq)
       // Put back together but drop key.
       Seq(tnt.user, tnt.timestamp, latlongstr, tnt.followers, tnt.following,
-          tnt.numtweets, user_mentions, nice_text) mkString "\t"
+          tnt.numtweets, user_mentions, retweets, nice_text) mkString "\t"
     }
   }
 
@@ -874,11 +903,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   )
 
   object Tweet {
-    def empty =
-      Tweet(text="", TweetNoText(user="", timestamp=0,
-          lat=Double.NaN, long=Double.NaN,
-          followers=0, following=0, numtweets=0,
-          user_mentions=Map[String, Int]()))
+    def empty = Tweet(text="", TweetNoText.empty)
     // Not needed unless we have Tweet inside of a DList, it seems?
     // But we do, in intermediate results?
   }
@@ -895,6 +920,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
    * @param following Max following
    * @param numtweets Number of tweets merged
    * @param user_mentions Map of all @-mentions of users + counts
+   * @param retweets Like `user_mentions` but only for retweet mentions
    */
   case class TweetNoText(
     user: String,
@@ -904,11 +930,24 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     followers: Int,
     following: Int,
     numtweets: Int,
-    user_mentions: Map[String, Int]
+    user_mentions: Map[String, Int],
+    retweets: Map[String, Int]
+    /* NOTE: If you add a field here, you need to update a bunch of places,
+       including (of course) wherever a TweetNoText is created, but also
+       some less obvious places.  In all:
+
+       -- the doc string just above
+       -- the definition of TweetNoText.empty()
+       -- parse_json_lift() above, and the FIXME in parse_json_jerkson()
+       -- merge_records() above
+       -- checkpoint_str() and split_tweet_no_text() below
+       -- nicely_format_plain() above and output_schema() below
+    */
   )
   object TweetNoText {
     def empty =
-      TweetNoText("", 0, Double.NaN, Double.NaN, 0, 0, 0, Map[String, Int]())
+      TweetNoText("", 0, Double.NaN, Double.NaN, 0, 0, 0,
+        Map[String, Int](), Map[String, Int]())
   }
   implicit val tweetNoTextFmt =
     mkCaseWireFormat(TweetNoText.apply _, TweetNoText.unapply _)
@@ -955,8 +994,12 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
       val text_2 = tw.text.replaceAll("\\s+", " ")
       val user_mentions =
         DistDocument.encode_word_count_map(tn.user_mentions.toSeq)
-      val s = Seq(key, tn.user, tn.timestamp, tn.lat, tn.long, tn.followers,
-        tn.following, tn.numtweets, user_mentions, text_2) mkString "\t"
+      val retweets =
+        DistDocument.encode_word_count_map(tn.retweets.toSeq)
+      val s = Seq(
+        key, tn.user, tn.timestamp, tn.lat, tn.long, tn.followers,
+        tn.following, tn.numtweets, user_mentions, retweets, text_2
+        ) mkString "\t"
       s
     }
 
@@ -976,9 +1019,10 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
       val following = split2(6).toInt
       val numtweets = split2(7).toInt
       val user_mentions = DistDocument.decode_word_count_map(split2(8)).toMap
-      assert(split2.length == 9)
+      val retweets = DistDocument.decode_word_count_map(split2(9)).toMap
+      assert(split2.length == 10)
       (key, TweetNoText(user, timestamp, lat, long, followers, following,
-        numtweets, user_mentions))
+        numtweets, user_mentions, retweets))
     }
 
     /**
@@ -1027,7 +1071,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
       }
       try {
         print_seq("user", "timestamp", "coord", "followers", "following",
-          "numtweets", "user-mentions", "counts")
+          "numtweets", "user-mentions", "retweets", "counts")
         print_seq("corpus", Opts.corpus_name)
         print_seq("corpus-type", "twitter-%s" format Opts.keytype)
         if (Opts.keytype == "timestamp")
