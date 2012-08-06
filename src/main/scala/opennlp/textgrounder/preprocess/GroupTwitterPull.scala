@@ -343,23 +343,40 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
       empty_tweet
     }
 
-    def force_value(value: liftweb.json.JValue): String = {
-      if ((value values) == null)
-        null
-      else
-        (value values) toString
-    }
-
     /**
      * Convert a list of items to a map counting how many of each item occurs.
      */
     def list_to_item_count_map[T : Ordering](list: Seq[T]) =
       list.sorted groupBy identity mapValues (_.size)
 
+    // Used internally to force an exit when a problem in parse_json_lift
+    // occurs.
+    private class ParseJSonExit extends Exception { }
+
     /**
      * Parse a JSON line into a tweet, using Lift.
      */
     def parse_json_lift(line: String): IDRecord = {
+
+      /**
+       * Retrieve a string along a path, checking to make sure the path
+       * exists.
+       */
+      def force_string(value: liftweb.json.JValue, fields: String*) = {
+        var fieldval = value
+        var path = List[String]()
+        for (field <- fields) {
+          path :+= field
+          fieldval \= field
+          if (fieldval == liftweb.json.JNothing) {
+            dbg("Can't find field path %s in tweet: %s", path mkString ".",
+              line)
+            throw new ParseJSonExit
+          }
+        }
+        fieldval.values.toString
+      }
+
       try {
         /* The result of parsing is a JValue, which is an abstract type with
            subtypes for all of the types of objects found in JSON: maps, arrays,
@@ -422,65 +439,66 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
               collections.
         */
         val parsed = liftweb.json.parse(line)
-        val user = force_value(parsed \ "user" \ "screen_name")
-        val timestamp = parse_time(force_value(parsed \ "created_at"))
-        val raw_text = force_value(parsed \ "text")
-        val text = raw_text.replaceAll("\\s+", " ")
-        val followers = force_value(parsed \ "user" \ "followers_count").toInt
-        val following = force_value(parsed \ "user" \ "friends_count").toInt
-        val tweet_id = force_value(parsed \ "id_str")
-        val (lat, long) =
-          if ((parsed \ "coordinates" values) == null ||
-              (force_value(parsed \ "coordinates" \ "type") != "Point")) {
-            (Double.NaN, Double.NaN)
-          } else {
-            val latlong: List[Number] =
-              (parsed \ "coordinates" \ "coordinates" values).
-                asInstanceOf[List[Number]]
-            (latlong(1).doubleValue, latlong(0).doubleValue)
-          }
-        // Retrieve "user_mentions", which is a list of mentions, each
-        // listing the span of text, the user actually mentioned, etc.
-        val user_mentions_raw = (parsed \ "entities" \ "user_mentions" values).
-          asInstanceOf[List[Map[String, Any]]]
-        // For each mention, fetch the user actually mentioned. Sort and
-        // convert into a map counting mentions.  Do it this way to count
-        // multiple mentions properly.
-        val user_mentions_retweets =
-          for { men <- user_mentions_raw
-                screen_name = men("screen_name").toString
-                indices = men("indices").asInstanceOf[List[Number]]
-                start = indices(0).intValue
-                retweet = (start >= 3 &&
-                           raw_text.slice(start - 3, start) == "RT ")
-              }
-            yield (screen_name, retweet)
-        val user_mentions_list =
-          for { (screen_name, retweet) <- user_mentions_retweets }
-            yield screen_name
-        val retweets_list =
-          for { (screen_name, retweet) <- user_mentions_retweets if retweet }
-            yield screen_name
-        val user_mentions = list_to_item_count_map(user_mentions_list)
-        val retweets = list_to_item_count_map(retweets_list)
+        if ((parsed \ "delete" values) != None)
+          empty_tweet
+        else {
+          val user = force_string(parsed, "user", "screen_name")
+          val timestamp = parse_time(force_string(parsed, "created_at"))
+          val raw_text = force_string(parsed, "text")
+          val text = raw_text.replaceAll("\\s+", " ")
+          val followers = force_string(parsed, "user", "followers_count").toInt
+          val following = force_string(parsed, "user", "friends_count").toInt
+          val tweet_id = force_string(parsed, "id_str")
+          val (lat, long) =
+            if ((parsed \ "coordinates" \ "type" values).toString != "Point") {
+              (Double.NaN, Double.NaN)
+            } else {
+              val latlong: List[Number] =
+                (parsed \ "coordinates" \ "coordinates" values).
+                  asInstanceOf[List[Number]]
+              (latlong(1).doubleValue, latlong(0).doubleValue)
+            }
+          // Retrieve "user_mentions", which is a list of mentions, each
+          // listing the span of text, the user actually mentioned, etc.
+          val user_mentions_raw =
+            (parsed \ "entities" \ "user_mentions" values).
+            asInstanceOf[List[Map[String, Any]]]
+          // For each mention, fetch the user actually mentioned. Sort and
+          // convert into a map counting mentions.  Do it this way to count
+          // multiple mentions properly.
+          val user_mentions_retweets =
+            for { men <- user_mentions_raw
+                  screen_name = men("screen_name").toString
+                  indices = men("indices").asInstanceOf[List[Number]]
+                  start = indices(0).intValue
+                  retweet = (start >= 3 &&
+                             raw_text.slice(start - 3, start) == "RT ")
+                }
+              yield (screen_name, retweet)
+          val user_mentions_list =
+            for { (screen_name, retweet) <- user_mentions_retweets }
+              yield screen_name
+          val retweets_list =
+            for { (screen_name, retweet) <- user_mentions_retweets if retweet }
+              yield screen_name
+          val user_mentions = list_to_item_count_map(user_mentions_list)
+          val retweets = list_to_item_count_map(retweets_list)
 
-        val key = Opts.keytype match {
-          case "user" => user
-          case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
+          val key = Opts.keytype match {
+            case "user" => user
+            case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
+          }
+          (tweet_id, (key,
+            Tweet(text, TweetNoText(user, timestamp, lat, long,
+              followers, following, 1, user_mentions, retweets))))
         }
-        (tweet_id, (key,
-          Tweet(text, TweetNoText(user, timestamp, lat, long,
-            followers, following, 1, user_mentions, retweets))))
       } catch {
-        case jpe: liftweb.json.JsonParser.ParseException =>
-          parse_problem(line, jpe)
-        case npe: NullPointerException =>
-          parse_problem(line, npe)
-        case nfe: NumberFormatException =>
-          parse_problem(line, nfe)
+        case jpe: liftweb.json.JsonParser.ParseException => parse_problem(line, jpe)
+        case npe: NullPointerException => parse_problem(line, npe)
+        case nfe: NumberFormatException => parse_problem(line, nfe)
+        case _: ParseJSonExit => empty_tweet
         case e: Exception =>
           { parse_problem(line, e); throw e }
-        case npe: NullPointerException => empty_tweet
       }
     }
 
