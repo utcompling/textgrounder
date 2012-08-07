@@ -336,7 +336,7 @@ package object hadoop {
      * Set the Job object, if we're running the job-running code on the
      * client. (Note that we have to set the job like this, rather than have
      * it passed in at creation time, e.g. through an abstract field,
-     * because of bootstrapping issues; explained in HadoopExperimentApp.
+     * because of bootstrapping issues; explained in HadoopExperimentApp.)
      */
 
     def set_job(job: Job) {
