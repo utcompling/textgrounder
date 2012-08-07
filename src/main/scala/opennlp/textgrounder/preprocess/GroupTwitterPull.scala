@@ -18,18 +18,21 @@
 
 package opennlp.textgrounder.preprocess
 
-import net.liftweb
-import com.codahale.jerkson
-import com.nicta.scoobi.Scoobi._
-import com.nicta.scoobi.testing.HadoopLogFactory
-// import com.nicta.scoobi.application.HadoopLogFactory
-import org.apache.hadoop.fs.{FileSystem=>HFileSystem,_}
+import collection.JavaConversions._
+import util.control.Breaks._
+
 import java.io._
 import java.lang.Double.isNaN
 import java.text.{SimpleDateFormat, ParseException}
-import collection.JavaConversions._
 
-import util.control.Breaks._
+import net.liftweb
+import org.apache.commons.logging.LogFactory
+import org.apache.hadoop.fs.{FileSystem=>HFileSystem,_}
+// import com.codahale.jerkson
+
+import com.nicta.scoobi.Scoobi._
+import com.nicta.scoobi.testing.HadoopLogFactory
+// import com.nicta.scoobi.application.HadoopLogFactory
 
 import opennlp.textgrounder.util.Twokenize
 import opennlp.textgrounder.util.argparser._
@@ -319,6 +322,8 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
 
   class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
       extends GroupTwitterPullShared(Opts) {
+    lazy val logger = LogFactory.getLog("GroupTwitterPull.Parse")
+
     /**
      * Convert a Twitter timestamp, e.g. "Tue Jun 05 14:31:21 +0000 2012", into
      * a time in milliseconds since the Epoch (Jan 1 1970, or so).
@@ -339,7 +344,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     val empty_tweet: IDRecord = ("", ("", Tweet.empty))
 
     def parse_problem(line: String, e: Exception) = {
-      dbg("Error parsing line: %s\n%s", line, e)
+      logger.warn("Error parsing line: %s\n%s" format (line, e))
       empty_tweet
     }
 
@@ -369,8 +374,9 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
           path :+= field
           fieldval \= field
           if (fieldval == liftweb.json.JNothing) {
-            dbg("Can't find field path %s in tweet: %s", path mkString ".",
-              line)
+            logger.warn(
+               "Can't find field path %s in tweet: %s" format (
+                 path mkString ".", line))
             throw new ParseJSonExit
           }
         }
@@ -563,7 +569,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
      */
     def parse_json(line: String): IDRecord = {
       // For testing
-      // dbg("parsing JSON: %s", line)
+      // logger.debug("parsing JSON: %s" format line)
       if (line.trim == "")
         empty_tweet
       // else if (Opts.use_jerkson)
@@ -628,6 +634,9 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
 
   class GroupTweetsAndSelectGood(Opts: GroupTwitterPullParams)
       extends GroupTwitterPullShared(Opts) {
+
+    lazy val logger = LogFactory.getLog("GroupTwitterPull.Group")
+
     /**
      * Combine two maps, adding up the numbers where overlap occurs.
      */
@@ -710,7 +719,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
         (tn.followers >= MIN_NUMBER_FOLLOWERS) &&
         (tn.numtweets >= Opts.min_tweets && tn.numtweets <= Opts.max_tweets)
       if (Opts.debug && retval == false)
-        dbg("Rejecting is_nonspammer %s", r)
+        logger.info("Rejecting is_nonspammer %s" format r)
       retval
     }
 
@@ -730,13 +739,13 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
       val retval = (tn.lat >= MIN_LAT && tn.lat <= MAX_LAT) &&
                    (tn.long >= MIN_LNG && tn.long <= MAX_LNG)
       if (Opts.debug && retval == false)
-        dbg("Rejecting northamerica_only %s", r)
+        logger.info("Rejecting northamerica_only %s" format r)
       retval
     }
 
     def is_good_geo_tweet(r: Record): Boolean = {
       if (Opts.debug)
-        dbg("Considering %s", r)
+        logger.info("Considering %s" format r)
       has_latlong(r) &&
       is_nonspammer(r) &&
       northamerica_only(r)
@@ -996,10 +1005,6 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   type NgramCount = (String, Long)
 
   class GroupTwitterPullShared(Opts: GroupTwitterPullParams) {
-    def dbg(format: String, args: Any*) {
-      errfile(Opts.debug_file, format, args: _*)
-    }
-
     /**
      * Convert a "record" (key plus tweet data) into a line of text suitable
      * for writing to a "checkpoint" file.  We encode all the fields into text
@@ -1070,6 +1075,8 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
 
   class GroupTwitterPull(Opts: GroupTwitterPullParams)
       extends GroupTwitterPullShared(Opts) {
+    lazy val logger = LogFactory.getLog("GroupTwitterPull.Driver")
+
     def corpus_suffix = {
       val dist_type = if (Opts.max_ngram == 1) "unigram" else "ngram"
       "%s-%s-counts" format (Opts.split, dist_type)
@@ -1082,7 +1089,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
       val filename =
         "%s/%s-%s-schema.txt" format
           (Opts.output, Opts.corpus_name, corpus_suffix)
-      errprint("Outputting a schema to %s ...", filename)
+      logger.info("Outputting a schema to %s ..." format filename)
       val p = new PrintWriter(fs.create(new Path(filename)))
       def print_seq(s: String*) {
         p.println(s mkString "\t")
@@ -1099,30 +1106,36 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     }
 
     def output_command_line_parameters(arg_parser: ArgParser) {
-      dbg("")
-      dbg("Non-default parameter values:")
+      // Output using errprint() rather than logger() so that the results
+      // stand out more.
+      errprint("")
+      errprint("Non-default parameter values:")
       for (name <- arg_parser.argNames) {
         if (arg_parser.specified(name))
-          dbg("%30s: %s", name, arg_parser(name))
+          errprint("%30s: %s" format (name, arg_parser(name)))
       }
-      dbg("")
-      dbg("Parameter values:")
+      errprint("")
+      errprint("Parameter values:")
       for (name <- arg_parser.argNames) {
-        dbg("%30s: %s", name, arg_parser(name))
-        //dbg("%30s: %s", name, arg_parser.getType(name))
+        errprint("%30s: %s" format (name, arg_parser(name)))
+        //errprint("%30s: %s" format (name, arg_parser.getType(name)))
       }
-      dbg("")
+      errprint("")
     }
   }
 
   def run() {
+    lazy val logger = LogFactory.getLog("GroupTwitterPull.Group")
     initialize_osutil()
     val ap = new ArgParser("GroupTwitterPull")
     // This first call is necessary, even though it doesn't appear to do
     // anything.  In particular, this ensures that all arguments have been
     // defined on `ap` prior to parsing.
     new GroupTwitterPullParams(ap)
-    errprint("Parsing args: %s", args mkString " ")
+    // Here and below, output using errprint() rather than logger() so that
+    // the basic steps stand out more -- when accompanied by typical logger
+    // prefixes, they easily disappear.
+    errprint("Parsing args: %s" format (args mkString " "))
     ap.parse(args)
     val Opts = new GroupTwitterPullParams(ap)
     if (Opts.by_time)
@@ -1147,8 +1160,8 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     // Then load back up.
     errprint("Step 2: Load parsed tweets, group, filter bad results.")
     if (Opts.by_time)
-      errprint("        (grouping by time, with slices of %g seconds)",
-        Opts.timeslice_float)
+      errprint("        (grouping by time, with slices of %g seconds)"
+        format Opts.timeslice_float)
     else
       errprint("        (grouping by user)")
     val lines2: DList[String] = TextInput.fromTextFile(Opts.output + "-st")
@@ -1179,7 +1192,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
       val basename = path.getName
       val newname = "%s/%s-%s-%s.txt" format (
         Opts.output, Opts.corpus_name, basename, ptp.corpus_suffix)
-      errprint("Renaming %s to %s", path, newname)
+      errprint("Renaming %s to %s" format (path, newname))
       fs.rename(path, new Path(newname))
     }
 
