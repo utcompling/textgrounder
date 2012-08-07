@@ -42,6 +42,9 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
   private int[] toponymOrigMap;
 
   private int maxToponymAmbiguity;
+  private double avgToponymAmbiguity = 0.0;
+  private int tokenCount = 0;
+  private int toponymTokenCount = 0;
 
   private final ArrayList<Document<StoredToken>> documents;
   private final ArrayList<List<Location>> candidateLists;
@@ -83,6 +86,18 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
     return this.maxToponymAmbiguity;
   }
 
+  public double getAvgToponymAmbiguity() {
+    return this.avgToponymAmbiguity;
+  }
+
+  public int getTokenCount() {
+    return this.tokenCount;
+  }
+
+  public int getToponymTokenCount() {
+    return this.toponymTokenCount;
+  }
+
   public void load() {
     for (Document<Token> document : wrapped) {
       ArrayList<Sentence<StoredToken>> sentences = new ArrayList<Sentence<StoredToken>>();
@@ -90,6 +105,7 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
       for (Sentence<Token> sentence : document) {
         List<Token> tokens = sentence.getTokens();
         int[] tokenIdxs = new int[tokens.size()];
+        this.tokenCount += tokens.size();
 
         for (int i = 0; i < tokenIdxs.length; i++) {
           Token token = tokens.get(i);
@@ -102,6 +118,10 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
         for (Iterator<Span<Token>> it = sentence.toponymSpans(); it.hasNext(); ) {
           Span<Token> span = it.next();
           Toponym toponym = (Toponym) span.getItem();
+
+          this.toponymTokenCount++;
+
+          this.avgToponymAmbiguity += toponym.getAmbiguity();
 
           if (toponym.getAmbiguity() > this.maxToponymAmbiguity) {
             this.maxToponymAmbiguity = toponym.getAmbiguity();
@@ -148,6 +168,8 @@ public class CompactCorpus extends StoredCorpus implements Serializable {
       else
           this.documents.add(new StoredDocument(document.getId(), sentences));
     }
+
+    this.avgToponymAmbiguity /= this.toponymTokenCount;
 
     this.tokenOrigMap = new int[this.tokenOrigLexicon.size()];
     this.toponymOrigMap = new int[this.toponymOrigLexicon.size()];
