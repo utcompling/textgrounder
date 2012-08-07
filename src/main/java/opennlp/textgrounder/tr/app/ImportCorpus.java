@@ -95,7 +95,11 @@ public class ImportCorpus extends BaseApp {
         System.out.println("done.");
 
         System.out.println("\nNumber of documents: " + corpus.getDocumentCount());
+        System.out.println("Number of word tokens: " + corpus.getTokenCount());
+        System.out.println("Number of word types: " + corpus.getTokenTypeCount());
+        System.out.println("Number of toponym tokens: " + corpus.getToponymTokenCount());
         System.out.println("Number of toponym types: " + corpus.getToponymTypeCount());
+        System.out.println("Average ambiguity (locations per toponym): " + corpus.getAvgToponymAmbiguity());
         System.out.println("Maximum ambiguity (locations per toponym): " + corpus.getMaxToponymAmbiguity());
 
         return corpus;

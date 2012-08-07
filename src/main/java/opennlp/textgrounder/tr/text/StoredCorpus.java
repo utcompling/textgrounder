@@ -28,6 +28,8 @@ public abstract class StoredCorpus extends Corpus<StoredToken> implements Serial
   public abstract int getToponymTypeCount();
   public abstract int getToponymOrigTypeCount();
   public abstract int getMaxToponymAmbiguity();
+  public abstract double getAvgToponymAmbiguity();
+  public abstract int getTokenCount();
+  public abstract int getToponymTokenCount();
   public abstract void load();
 }
-
