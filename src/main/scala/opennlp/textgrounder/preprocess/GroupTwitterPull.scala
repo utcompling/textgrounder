@@ -484,12 +484,27 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
           val user_mentions_retweets =
             for { men <- user_mentions_raw
                   screen_name = men("screen_name").toString
+                  namelen = screen_name.length
                   indices = men("indices").asInstanceOf[List[Number]]
                   start = indices(0).intValue
+                  end = indices(1).intValue
                   retweet = (start >= 3 &&
                              raw_text.slice(start - 3, start) == "RT ")
-                }
-              yield (screen_name, retweet)
+                  if {
+                    if (namelen == 0) {
+                      warning(
+                        "Zero-length screen name in interval [%d,%d], skipped",
+                        start, end)
+                    }
+                    namelen > 0
+                  }
+                } yield {
+              if (end - start - 1 != namelen)
+                warning("Strange indices [%d,%d] for screen name %s, length %d != %d, text context is '%s'",
+                  start, end, screen_name, end - start - 1, namelen,
+                  raw_text.slice(start, end))
+              (screen_name, retweet)
+            }
           val user_mentions_list =
             for { (screen_name, retweet) <- user_mentions_retweets }
               yield screen_name
