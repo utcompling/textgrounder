@@ -323,30 +323,12 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
       extends GroupTwitterPullShared(Opts) {
     lazy val logger = LogFactory.getLog("GroupTwitterPull.Parse")
-
-    /**
-     * Convert a Twitter timestamp, e.g. "Tue Jun 05 14:31:21 +0000 2012", into
-     * a time in milliseconds since the Epoch (Jan 1 1970, or so).
-     */
-    def parse_time(timestring: String): Long = {
-      val sdf = new SimpleDateFormat("EEE MMM dd HH:mm:ss ZZZZZ yyyy")
-      try {
-        sdf.parse(timestring)
-        sdf.getCalendar.getTimeInMillis
-      } catch {
-        case pe: ParseException => 0
-      }
-    }
+    var lineno = 0
 
     /**
      * An empty tweet, stored as a full IDRecord.
      */
     val empty_tweet: IDRecord = ("", ("", Tweet.empty))
-
-    def parse_problem(line: String, e: Exception) = {
-      logger.warn("Error parsing line: %s\n%s" format (line, e))
-      empty_tweet
-    }
 
     /**
      * Convert a list of items to a map counting how many of each item occurs.
@@ -363,6 +345,35 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
      */
     def parse_json_lift(line: String): IDRecord = {
 
+      def warning(fmt: String, args: Any*) {
+        logger.warn("Line %d: %s: %s" format
+          (lineno, fmt format (args: _*), line))
+      }
+
+      /**
+       * Convert a Twitter timestamp, e.g. "Tue Jun 05 14:31:21 +0000 2012",
+       * into a time in milliseconds since the Epoch (Jan 1 1970, or so).
+       */
+      def parse_time(timestring: String): Long = {
+        val sdf = new SimpleDateFormat("EEE MMM dd HH:mm:ss ZZZZZ yyyy")
+        try {
+          sdf.parse(timestring)
+          sdf.getCalendar.getTimeInMillis
+        } catch {
+          case pe: ParseException => {
+            logger.warn("Error parsing date %s on line %s: %s\n%s" format (
+              timestring, lineno, line, pe))
+            0
+          }
+        }
+      }
+
+      def parse_problem(e: Exception) = {
+        logger.warn("Error parsing line %s: %s\n%s" format (
+          lineno, line, e))
+        empty_tweet
+      }
+
       /**
        * Retrieve a string along a path, checking to make sure the path
        * exists.
@@ -374,9 +385,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
           path :+= field
           fieldval \= field
           if (fieldval == liftweb.json.JNothing) {
-            logger.warn(
-               "Can't find field path %s in tweet: %s" format (
-                 path mkString ".", line))
+            warning("Can't find field path %s in tweet", path mkString ".")
             throw new ParseJSonExit
           }
         }
@@ -499,12 +508,12 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
               followers, following, 1, user_mentions, retweets))))
         }
       } catch {
-        case jpe: liftweb.json.JsonParser.ParseException => parse_problem(line, jpe)
-        case npe: NullPointerException => parse_problem(line, npe)
-        case nfe: NumberFormatException => parse_problem(line, nfe)
+        case jpe: liftweb.json.JsonParser.ParseException => parse_problem(jpe)
+        case npe: NullPointerException => parse_problem(npe)
+        case nfe: NumberFormatException => parse_problem(nfe)
         case _: ParseJSonExit => empty_tweet
         case e: Exception =>
-          { parse_problem(line, e); throw e }
+          { parse_problem(e); throw e }
       }
     }
 
@@ -568,6 +577,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
      * the tweet ID, username, text and all other data.
      */
     def parse_json(line: String): IDRecord = {
+      lineno += 1
       // For testing
       // logger.debug("parsing JSON: %s" format line)
       if (line.trim == "")
