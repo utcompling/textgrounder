@@ -322,8 +322,13 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
 
   class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
       extends GroupTwitterPullShared(Opts) {
-    lazy val logger = LogFactory.getLog("GroupTwitterPull.Parse")
+    val operation_category = "GroupTwitterPull.Parse"
+    lazy val logger = LogFactory.getLog(operation_category)
     var lineno = 0
+
+    def bump_counter(counter: String) {
+      incrCounter(operation_category, counter)
+    }
 
     /**
      * An empty tweet, stored as a full IDRecord.
@@ -361,6 +366,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
           sdf.getCalendar.getTimeInMillis
         } catch {
           case pe: ParseException => {
+            bump_counter("unparsable date")
             logger.warn("Error parsing date %s on line %s: %s\n%s" format (
               timestring, lineno, line, pe))
             0
@@ -385,6 +391,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
           path :+= field
           fieldval \= field
           if (fieldval == liftweb.json.JNothing) {
+            bump_counter("ERROR: tweet with missing field")
             warning("Can't find field path %s in tweet", path mkString ".")
             throw new ParseJSonExit
           }
@@ -454,9 +461,10 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
               collections.
         */
         val parsed = liftweb.json.parse(line)
-        if ((parsed \ "delete" values) != None)
+        if ((parsed \ "delete" values) != None) {
+          bump_counter("tweet deletion notices skipped")
           empty_tweet
-        else {
+        } else {
           val user = force_string(parsed, "user", "screen_name")
           val timestamp = parse_time(force_string(parsed, "created_at"))
           val raw_text = force_string(parsed, "text")
@@ -492,6 +500,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
                              raw_text.slice(start - 3, start) == "RT ")
                   if {
                     if (namelen == 0) {
+                      bump_counter("zero length screen name seen")
                       warning(
                         "Zero-length screen name in interval [%d,%d], skipped",
                         start, end)
@@ -499,10 +508,12 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
                     namelen > 0
                   }
                 } yield {
-              if (end - start - 1 != namelen)
+              if (end - start - 1 != namelen) {
+                bump_counter("wrong length interval for screen name seen")
                 warning("Strange indices [%d,%d] for screen name %s, length %d != %d, text context is '%s'",
                   start, end, screen_name, end - start - 1, namelen,
                   raw_text.slice(start, end))
+              }
               (screen_name, retweet)
             }
           val user_mentions_list =
@@ -523,12 +534,23 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
               followers, following, 1, user_mentions, retweets))))
         }
       } catch {
-        case jpe: liftweb.json.JsonParser.ParseException => parse_problem(jpe)
-        case npe: NullPointerException => parse_problem(npe)
-        case nfe: NumberFormatException => parse_problem(nfe)
+        case jpe: liftweb.json.JsonParser.ParseException => {
+          bump_counter("ERROR: lift-json parsing error")
+          parse_problem(jpe)
+        }
+        case npe: NullPointerException => {
+          bump_counter("ERROR: NullPointerException when parsing")
+          parse_problem(npe)
+        }
+        case nfe: NumberFormatException => {
+          bump_counter("ERROR: NumberFormatException when parsing")
+          parse_problem(nfe)
+        }
         case _: ParseJSonExit => empty_tweet
-        case e: Exception =>
-          { parse_problem(e); throw e }
+        case e: Exception => {
+          bump_counter("ERROR: %s when parsing" format e.getClass.getName)
+          parse_problem(e); throw e
+        }
       }
     }
 
@@ -592,15 +614,26 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
      * the tweet ID, username, text and all other data.
      */
     def parse_json(line: String): IDRecord = {
+      bump_counter("total lines")
       lineno += 1
       // For testing
       // logger.debug("parsing JSON: %s" format line)
-      if (line.trim == "")
+      if (line.trim == "") {
+        bump_counter("blank lines skipped")
         empty_tweet
+      }
       // else if (Opts.use_jerkson)
       //   parse_json_jerkson(line)
-      else
-        parse_json_lift(line)
+      else {
+        bump_counter("total tweets parsed")
+        val record = parse_json_lift(line)
+        if (record eq empty_tweet) {
+          bump_counter("total tweets unsuccessfully parsed")
+        } else {
+          bump_counter("total tweets successfully parsed")
+        }
+        record
+      }
     }
 
     /**
@@ -1171,6 +1204,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     if (Opts.debug_file != null)
       set_errout_file(Opts.debug_file)
 
+    enableCounterLogging()
     val ptp = new GroupTwitterPull(Opts)
     ptp.output_command_line_parameters(ap)
 
