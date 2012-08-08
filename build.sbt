@@ -104,8 +104,10 @@ scalacOptions ++= Seq("-Ydependent-method-types", "-deprecation", "-Xlint", "-un
 
 seq(assemblySettings: _*)
 
+// Don't try to compile or run test code.
 test in assembly := {}
 
+// Example of how to exclude jars from the assembly.
 //excludedJars in assembly <<= (fullClasspath in assembly) map { cp => 
 //  cp filter {x => Seq("jasper-compiler-5.5.12.jar", "jasper-runtime-5.5.12.jar", "commons-beanutils-1.7.0.jar", "servlet-api-2.5-20081211.jar") contains x.data.getName }
 //}
