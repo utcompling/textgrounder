@@ -26,7 +26,8 @@ import java.lang.Double.isNaN
 import java.text.{SimpleDateFormat, ParseException}
 
 import net.liftweb
-import org.apache.commons.logging.LogFactory
+import org.apache.commons.logging
+import logging.LogFactory
 import org.apache.hadoop.fs.{FileSystem=>HFileSystem,_}
 // import com.codahale.jerkson
 
@@ -323,12 +324,6 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
       extends GroupTwitterPullShared(Opts) {
     val operation_category = "GroupTwitterPull.Parse"
-    lazy val logger = LogFactory.getLog(operation_category)
-    var lineno = 0
-
-    def bump_counter(counter: String) {
-      incrCounter(operation_category, counter)
-    }
 
     /**
      * An empty tweet, stored as a full IDRecord.
@@ -346,14 +341,9 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     private class ParseJSonExit extends Exception { }
 
     /**
-     * Parse a JSON line into a tweet, using Lift.
+     * Parse a JSON line into a tweet, using Lift.  Return status and record.
      */
-    def parse_json_lift(line: String): IDRecord = {
-
-      def warning(fmt: String, args: Any*) {
-        logger.warn("Line %d: %s: %s" format
-          (lineno, fmt format (args: _*), line))
-      }
+    def parse_json_lift(line: String): (String, IDRecord) = {
 
       /**
        * Convert a Twitter timestamp, e.g. "Tue Jun 05 14:31:21 +0000 2012",
@@ -377,7 +367,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
       def parse_problem(e: Exception) = {
         logger.warn("Error parsing line %s: %s\n%s" format (
           lineno, line, e))
-        empty_tweet
+        ("error", empty_tweet)
       }
 
       /**
@@ -391,8 +381,9 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
           path :+= field
           fieldval \= field
           if (fieldval == liftweb.json.JNothing) {
-            bump_counter("ERROR: tweet with missing field")
-            warning("Can't find field path %s in tweet", path mkString ".")
+            val fieldpath = path mkString "."
+            bump_counter("ERROR: tweet with missing field %s" format fieldpath)
+            warning(line, "Can't find field path %s in tweet", fieldpath)
             throw new ParseJSonExit
           }
         }
@@ -463,7 +454,10 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
         val parsed = liftweb.json.parse(line)
         if ((parsed \ "delete" values) != None) {
           bump_counter("tweet deletion notices skipped")
-          empty_tweet
+          ("delete", empty_tweet)
+        } else if ((parsed \ "limit" values) != None) {
+          bump_counter("tweet limit notices skipped")
+          ("limit", empty_tweet)
         } else {
           val user = force_string(parsed, "user", "screen_name")
           val timestamp = parse_time(force_string(parsed, "created_at"))
@@ -501,7 +495,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
                   if {
                     if (namelen == 0) {
                       bump_counter("zero length screen name seen")
-                      warning(
+                      warning(line,
                         "Zero-length screen name in interval [%d,%d], skipped",
                         start, end)
                     }
@@ -510,7 +504,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
                 } yield {
               if (end - start - 1 != namelen) {
                 bump_counter("wrong length interval for screen name seen")
-                warning("Strange indices [%d,%d] for screen name %s, length %d != %d, text context is '%s'",
+                warning(line, "Strange indices [%d,%d] for screen name %s, length %d != %d, text context is '%s'",
                   start, end, screen_name, end - start - 1, namelen,
                   raw_text.slice(start, end))
               }
@@ -529,9 +523,10 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
             case "user" => user
             case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
           }
-          (tweet_id, (key,
-            Tweet(text, TweetNoText(user, timestamp, lat, long,
-              followers, following, 1, user_mentions, retweets))))
+          ("success",
+            (tweet_id, (key,
+              Tweet(text, TweetNoText(user, timestamp, lat, long,
+                followers, following, 1, user_mentions, retweets)))))
         }
       } catch {
         case jpe: liftweb.json.JsonParser.ParseException => {
@@ -546,7 +541,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
           bump_counter("ERROR: NumberFormatException when parsing")
           parse_problem(nfe)
         }
-        case _: ParseJSonExit => empty_tweet
+        case _: ParseJSonExit => ("error", empty_tweet)
         case e: Exception => {
           bump_counter("ERROR: %s when parsing" format e.getClass.getName)
           parse_problem(e); throw e
@@ -626,11 +621,13 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
       //   parse_json_jerkson(line)
       else {
         bump_counter("total tweets parsed")
-        val record = parse_json_lift(line)
-        if (record eq empty_tweet) {
+        val (status, record) = parse_json_lift(line)
+        if (status == "error") {
           bump_counter("total tweets unsuccessfully parsed")
-        } else {
+        } else if (status == "success") {
           bump_counter("total tweets successfully parsed")
+        } else {
+          bump_counter("total tweets skipped")
         }
         record
       }
@@ -693,7 +690,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   class GroupTweetsAndSelectGood(Opts: GroupTwitterPullParams)
       extends GroupTwitterPullShared(Opts) {
 
-    lazy val logger = LogFactory.getLog("GroupTwitterPull.Group")
+    val operation_category = "GroupTwitterPull.Group"
 
     /**
      * Combine two maps, adding up the numbers where overlap occurs.
@@ -837,6 +834,9 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
 
   class TokenizeFilterAndCountTweets(Opts: GroupTwitterPullParams)
       extends GroupTwitterPullShared(Opts) {
+
+    val operation_category = "GroupTwitterPull.Tokenize"
+
     /**
      * Convert a word to lowercase.
      */
@@ -1062,7 +1062,21 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   // NgramCount = (ngram, number of ocurrences)
   type NgramCount = (String, Long)
 
-  class GroupTwitterPullShared(Opts: GroupTwitterPullParams) {
+  abstract class GroupTwitterPullShared(Opts: GroupTwitterPullParams) {
+
+    var lineno = 0
+    val operation_category: String
+    lazy val logger = LogFactory.getLog(operation_category)
+
+    def warning(line: String, fmt: String, args: Any*) {
+      logger.warn("Line %d: %s: %s" format
+        (lineno, fmt format (args: _*), line))
+    }
+
+    def bump_counter(counter: String) {
+      incrCounter(operation_category, counter)
+    }
+
     /**
      * Convert a "record" (key plus tweet data) into a line of text suitable
      * for writing to a "checkpoint" file.  We encode all the fields into text
@@ -1091,19 +1105,25 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
      */
     def split_tweet_no_text(tweet_no_text: String): (String, TweetNoText) = {
       val split2 = tweet_no_text.split("\t", -1)
-      val key = split2(0)
-      val user = split2(1)
-      val timestamp = split2(2).toLong
-      val lat = split2(3).toDouble
-      val long = split2(4).toDouble
-      val followers = split2(5).toInt
-      val following = split2(6).toInt
-      val numtweets = split2(7).toInt
-      val user_mentions = DistDocument.decode_word_count_map(split2(8)).toMap
-      val retweets = DistDocument.decode_word_count_map(split2(9)).toMap
-      assert(split2.length == 10)
-      (key, TweetNoText(user, timestamp, lat, long, followers, following,
-        numtweets, user_mentions, retweets))
+      if (split2.length != 10) {
+        warning(tweet_no_text, "Non-text portion of line should have 10 fields, but only %d", split2.length)
+        bump_counter("saw %d fields instead of 10" format split2.length)
+        ("UNKNOWN", TweetNoText.empty)
+      } else {
+        val key = split2(0)
+        val user = split2(1)
+        val timestamp = split2(2).toLong
+        val lat = split2(3).toDouble
+        val long = split2(4).toDouble
+        val followers = split2(5).toInt
+        val following = split2(6).toInt
+        val numtweets = split2(7).toInt
+        val user_mentions = DistDocument.decode_word_count_map(split2(8)).toMap
+        val retweets = DistDocument.decode_word_count_map(split2(9)).toMap
+        assert(split2.length == 10)
+        (key, TweetNoText(user, timestamp, lat, long, followers, following,
+          numtweets, user_mentions, retweets))
+      }
     }
 
     /**
@@ -1112,9 +1132,11 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
      * the text.
      */
     def from_checkpoint_to_tweet_text(line: String): (String, String) = {
+      lineno += 1
       val last_tab = line.lastIndexOf('\t')
       if (last_tab < 0) {
-        System.err.println("Bad line, no tabs in it: " + line)
+        warning(line, "Bad line, no tabs in it")
+        bump_counter("bad line, no tabs in it")
         ("", "")
       } else
         (line.slice(0, last_tab), line.slice(last_tab + 1, line.length))
@@ -1133,7 +1155,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
 
   class GroupTwitterPull(Opts: GroupTwitterPullParams)
       extends GroupTwitterPullShared(Opts) {
-    lazy val logger = LogFactory.getLog("GroupTwitterPull.Driver")
+    val operation_category = "GroupTwitterPull.Driver"
 
     def corpus_suffix = {
       val dist_type = if (Opts.max_ngram == 1) "unigram" else "ngram"
