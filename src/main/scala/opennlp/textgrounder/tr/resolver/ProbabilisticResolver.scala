@@ -38,8 +38,28 @@ class ProbabilisticResolver(val logFilePath:String,
     val reader = new BinaryGISModelReader(dataInputStream)
     val model = reader.getModel
 
+    //println(file.getName.dropRight(4))
     (file.getName.dropRight(4), model)
   }).toMap
+
+  var toponymsToCounts = new scala.collection.mutable.HashMap[String, Int]
+  var total = 0
+  for(doc <- corpus) {
+    for(sent <- doc) {
+      for(token <- sent) {
+        if(token.isToponym) {
+          val prevCount = toponymsToCounts.getOrElse(token.getForm, 0)
+          toponymsToCounts.put(token.getForm, prevCount + 1)
+        }
+        total += 1
+      }
+    }
+  }
+
+  val toponymsToFrequencies = toponymsToCounts.map(p => (p._1, p._2.toDouble / total)).toMap
+  toponymsToCounts.clear // trying to free up some memory
+  toponymsToCounts = null
+  //toponymsToFrequencies.foreach(p => println(p._1+": "+p._2))
 
   for(doc <- corpus) {
     val docAsArray = TextUtil.getDocAsArray(doc)
@@ -53,8 +73,13 @@ class ProbabilisticResolver(val logFilePath:String,
         if(toponymsToModels.containsKey(toponym.getForm)) {
           val contextFeatures = TextUtil.getContextFeatures(docAsArray, tokIndex, WINDOW_SIZE, Set[String]())
 
-          MaxentResolver.getCellDist(toponymsToModels(toponym.getForm), contextFeatures,
+          //println("getting a cell dist for "+toponym.getForm)
+
+          /*val d = */MaxentResolver.getCellDist(toponymsToModels(toponym.getForm), contextFeatures,
                                      toponym.getCandidates.toList, DPC)
+          //println(d.size)
+          //d.foreach(println)
+          //d
         }
         else
           null
@@ -62,7 +87,8 @@ class ProbabilisticResolver(val logFilePath:String,
         // P(l|d)
         val cellDistGivenDocument = docIdToCellDist.getOrElse(doc.getId, null)
 
-        val lambda = 0.7 // this will vary later, perhaps based on the frequency of the toponym in the training and/or eval data
+        val topFreq = toponymsToFrequencies(toponym.getForm)
+        val lambda = topFreq / (topFreq + 1.0E-5)//0.7
 
         var indexToSelect = -1
         var maxProb = 0.0
@@ -82,10 +108,22 @@ class ProbabilisticResolver(val logFilePath:String,
           else
             0.0
 
-          // P(l|t,d)
-          val probOfLocation = lambda * localContextComponent + (1-lambda) * documentComponent
+          /*if(localContextComponent == 0.0) {
+            if(documentComponent == 0.0) {
+              println("BOTH ZERO")
+            }
+            else {
+              println("LOCAL ZERO")
+            }
+          }
+          else if(documentComponent == 0.0)
+            println("DOC ZERO")*/
 
-          // Need to incorporate administrative level here ( P(a|t,d) ), summing over all possible values for a and multiplying with P(l|t,d)
+          // Incorporate administrative level here
+          val adminLevelComponent = getAdminLevelComponent(cand.getType, cand.getAdmin1Code)
+
+          // P(l|t,d)
+          val probOfLocation = adminLevelComponent * (lambda * localContextComponent + (1-lambda) * documentComponent)
 
           if(probOfLocation > maxProb) {
             indexToSelect = candIndex
@@ -114,6 +152,30 @@ class ProbabilisticResolver(val logFilePath:String,
   }
     
   corpus
+  }
+
+  //val countryRE = """^\w\w\.\d\d$""".r
+  val usStateRE = """^US\.[A-Za-z][A-Za-z]$""".r
+
+  def getAdminLevelComponent(locType:Location.Type, admin1Code:String): Double = {
+    if(locType == Location.Type.STATE) {
+      if(usStateRE.findFirstIn(admin1Code) != None) {
+        //println(admin1Code+" .2")
+        .2
+      }
+      else {
+        //println(admin1Code+" .7")
+        .7
+      }
+    }
+    else if(locType == Location.Type.CITY) {
+      //println("CITY")
+      0.095
+    }
+    else {
+      //println("ELSE")
+      0.005
+    }
   }
 
 }
