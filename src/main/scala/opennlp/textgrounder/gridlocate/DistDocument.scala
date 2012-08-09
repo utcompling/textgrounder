@@ -699,23 +699,33 @@ object DistDocument {
   val ngram_counts_suffix = "ngram-counts"
   val text_suffix = "text"
 
+  val chars_to_encode = List('%', ':', ' ', '\t', '\n')
+  val encode_chars_regex = "[%s]".format(chars_to_encode mkString "").r
+  val encode_chars_map =
+    chars_to_encode.map(c => (c.toString, "%%%02X".format(c.toInt))).toMap
+  val decode_chars_map =
+    encode_chars_map.toSeq.flatMap {
+      case (dec, enc) => List((enc, dec), (enc.toLowerCase, dec)) }.toMap
+  val decode_chars_regex = "(%s)".format(decode_chars_map.keys mkString "|").r
+
   /**
    * Encode a word for placement inside a "counts" field.  Colons and spaces
-   * are used for separation.  There should be no spaces because words are
-   * tokenized on spaces, but we have to escape colons.  We do this using
-   * URL-style-encoding, replacing : by %3A; hence we also have to escape %
-   * signs. (We could equally well use HTML-style encoding; then we'd have to
-   * escape &amp; instead of :.) Note that regardless of whether we use
-   * URL-style or HTML-style encoding, we probably want to do the encoding
-   * ourselves rather than use a predefined encoder.  We could in fact use
-   * the presupplied URL encoder, but it would encode all sorts of stuff,
+   * are used for separation, and tabs and newlines are used for separating
+   * fields and records.  We need to escape all of these characters (normally
+   * whitespace should be filtered out during tokenization, but for some
+   * applications it won't necessarily).  We do this using URL-style-encoding,
+   * e.g. replacing : by %3A; hence we also have to escape % signs. (We could
+   * equally well use HTML-style encoding; then we'd have to escape &amp;
+   * instead of :.) Note that regardless of whether we use URL-style or
+   * HTML-style encoding, we probably want to do the encoding ourselves
+   * rather than use a predefined encoder.  We could in fact use the
+   * presupplied URL encoder, but it would encode all sorts of stuff,
    * which is unnecessary and would make the raw files harder to read.
    * In the case of HTML-style encoding, : isn't even escaped, so that
    * wouldn't work at all.
    */
   def encode_word_for_counts_field(word: String) = {
-    assert(!(word contains ' '))
-    word.replace("%", "%25").replace(":", "%3A")
+    encode_chars_regex.replaceAllIn(word, m => encode_chars_map(m.matched))
   }
 
   /**
@@ -731,7 +741,7 @@ object DistDocument {
    * Decode a word encoded using `encode_word_for_counts_field`.
    */
   def decode_word_for_counts_field(word: String) = {
-    word.replace("%3A", ":").replace("%3a", ":").replace("%25", "%")
+    decode_chars_regex.replaceAllIn(word, m => decode_chars_map(m.matched))
   }
 
   /**
