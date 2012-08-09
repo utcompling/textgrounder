@@ -42,8 +42,8 @@ class MaxentResolver(val modelDirPath:String) extends Resolver {
           //print("Features for "+token.getForm+": ")
           //contextFeatures.foreach(f => print(f+","))
           //println
-          val bestIndex = getBestIndex(toponymsToModels(token.getForm), contextFeatures,
-                                           token.asInstanceOf[Toponym].getCandidates.toList)
+          val bestIndex = MaxentResolver.getBestIndex(toponymsToModels(token.getForm), contextFeatures,
+                                           token.asInstanceOf[Toponym].getCandidates.toList, dpc)
           //println("best index for "+token.getForm+": "+bestIndex)
           if(bestIndex != -1)
             token.asInstanceOf[Toponym].setSelectedIdx(bestIndex)
@@ -54,8 +54,10 @@ class MaxentResolver(val modelDirPath:String) extends Resolver {
 
     corpus
   }
+}
 
-  def getBestIndex(model:AbstractModel, features:Array[String], candidates:List[Location]): Int = {
+object MaxentResolver {
+  def getBestIndex(model:AbstractModel, features:Array[String], candidates:List[Location], dpc:Double): Int = {
     val candCellNums = candidates.map(c => TopoUtil.getCellNumber(c.getRegion.getCenter, dpc)).toSet
     //candCellNums.foreach(println)
     val cellNumToCandIndex = candidates.zipWithIndex
@@ -74,5 +76,15 @@ class MaxentResolver(val modelDirPath:String) extends Resolver {
         return cellNumToCandIndex(label)
     }
     -1
+  }
+
+  def getCellDist(model:AbstractModel, features:Array[String], candidates:List[Location], dpc:Double): Map[Int, Double] = {
+    val candCellNums = candidates.map(c => TopoUtil.getCellNumber(c.getRegion.getCenter, dpc)).toSet
+    
+    val labels = model.getDataStructures()(2).asInstanceOf[Array[String]]
+    val result = model.eval(features)
+    val relevantResult = result.zipWithIndex.filter(r => candCellNums contains labels(r._2))
+    val normFactor = relevantResult.map(_._1).sum
+    relevantResult.map(r => (r._2, r._1 / normFactor)).toMap
   }
 }

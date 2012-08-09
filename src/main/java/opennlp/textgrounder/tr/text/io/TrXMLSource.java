@@ -45,6 +45,7 @@ import opennlp.textgrounder.tr.util.Span;
 public class TrXMLSource extends DocumentSource {
   private final XMLStreamReader in;
   private final Tokenizer tokenizer;
+  private boolean corpusWrapped = false;
 
   public TrXMLSource(Reader reader, Tokenizer tokenizer) throws XMLStreamException {
     this.tokenizer = tokenizer;
@@ -55,6 +56,7 @@ public class TrXMLSource extends DocumentSource {
     while (this.in.hasNext() && this.in.next() != XMLStreamReader.START_ELEMENT) {}
     if (this.in.getLocalName().equals("corpus")) {
       this.in.nextTag();
+      this.corpusWrapped = true;
     }
   }
 
@@ -75,6 +77,13 @@ public class TrXMLSource extends DocumentSource {
   }
 
   public boolean hasNext() {
+      //try {
+          if(this.in.isEndElement() && this.in.getLocalName().equals("doc") && this.corpusWrapped) {
+              this.nextTag();
+          }
+          //} catch(XMLStreamException e) {
+          //System.err.println("Error while closing TR-XML file.");
+          //}
     return this.in.isStartElement() && this.in.getLocalName().equals("doc");
   }
 

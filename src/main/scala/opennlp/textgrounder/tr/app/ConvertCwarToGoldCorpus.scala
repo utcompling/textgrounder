@@ -106,11 +106,11 @@ object ConvertCwarToGoldCorpus extends App {
                 if(matchingCand == cand)
                   print(" selected=\"true\"")
                 println(">")
-                println("            <representatives>")
+                /*println("            <representatives>")
                 for(rep <- region.getRepresentatives) {
                   println("              <rep lat=\""+rep.getLatDegrees+"\" long=\""+rep.getLngDegrees+"\"/>")
                 }
-                println("            </representatives>")
+                println("            </representatives>")*/
               }
               println("        </candidates>")
               println("      </toponym>")
