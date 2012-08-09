@@ -93,7 +93,7 @@ public class RunResolver extends BaseApp {
             resolver = new WeightedMinDistResolver(currentRun.getNumIterations());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.DOC_DIST) {
-            System.out.println("Running DOC DIST resolver...");
+            System.out.println("Running DOC DIST resolver, using log file at " + currentRun.getLogFilePath() + " ...");
             resolver = new DocDistResolver(currentRun.getLogFilePath());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.TOPO_AS_DOC_DIST) {
@@ -119,6 +119,11 @@ public class RunResolver extends BaseApp {
         else if(currentRun.getResolverType() == RESOLVER_TYPE.MAXENT) {
             System.out.print("Running MAXENT resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " ...");
             resolver = new MaxentResolver(currentRun.getMaxentModelDirInputPath());
+        }
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.PROB) {
+            System.out.println("Running PROBABILISTIC resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " and log file at " + currentRun.getLogFilePath());
+
+            resolver = new ProbabilisticResolver(currentRun.getLogFilePath(), currentRun.getMaxentModelDirInputPath());
         }
         else {//if(getResolverType() == RESOLVER_TYPE.BASIC_MIN_DIST) {
             System.out.print("Running BASIC MINIMUM DISTANCE resolver...");

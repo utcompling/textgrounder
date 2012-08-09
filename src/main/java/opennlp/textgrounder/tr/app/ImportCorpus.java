@@ -41,7 +41,8 @@ public class ImportCorpus extends BaseApp {
                                         boolean useGoldToponyms) throws Exception {
 
         checkExists(corpusInputPath);
-        checkExists(serGazInputPath);
+        if(!useGoldToponyms || doKMeans)
+            checkExists(serGazInputPath);
 
         Tokenizer tokenizer = new OpenNLPTokenizer();
         OpenNLPRecognizer recognizer = new OpenNLPRecognizer();
@@ -65,13 +66,22 @@ public class ImportCorpus extends BaseApp {
         System.out.print("Reading raw corpus from " + corpusInputPath + " ...");
         StoredCorpus corpus = Corpus.createStoredCorpus();
         if(corpusFormat == CORPUS_FORMAT.TRCONLL) {
+            File corpusInputFile = new File(corpusInputPath);
             if(useGoldToponyms) {
-                corpus.addSource(new CandidateRepopulator(new TrXMLDirSource(new File(corpusInputPath), tokenizer), gnGaz));
+                if(corpusInputFile.isDirectory())
+                    corpus.addSource(new CandidateRepopulator(new TrXMLDirSource(new File(corpusInputPath), tokenizer), gnGaz));
+                else
+                    corpus.addSource(new CandidateRepopulator(new TrXMLSource(new BufferedReader(new FileReader(corpusInputPath)), tokenizer), gnGaz));
             }
             else {
-                corpus.addSource(new ToponymAnnotator(
-                    new ToponymRemover(new TrXMLDirSource(new File(corpusInputPath), tokenizer)),
-                    recognizer, gnGaz, null));
+                if(corpusInputFile.isDirectory())
+                    corpus.addSource(new ToponymAnnotator(
+                           new ToponymRemover(new TrXMLDirSource(new File(corpusInputPath), tokenizer)),
+                           recognizer, gnGaz, null));
+                else
+                    corpus.addSource(new ToponymAnnotator(
+                           new ToponymRemover(new TrXMLSource(new BufferedReader(new FileReader(corpusInputPath)), tokenizer)),
+                           recognizer, gnGaz, null));
             }
         }
         else if(corpusFormat == CORPUS_FORMAT.GEOTEXT) {

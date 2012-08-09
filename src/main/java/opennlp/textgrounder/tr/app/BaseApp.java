@@ -32,7 +32,7 @@ public class BaseApp {
 
     private Region boundingBox = null;
 
-    private boolean doKMeans = false;
+    protected boolean doKMeans = false;
 
     private String graphOutputPath = null;
     private String seedOutputPath = null;
@@ -53,7 +53,8 @@ public class BaseApp {
         LABEL_PROP_DEFAULT_RULE,
         LABEL_PROP_CONTEXT_SENSITIVE,
         LABEL_PROP_COMPLEX,
-        MAXENT
+        MAXENT,
+        PROB
     }
     protected Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
 
@@ -183,6 +184,8 @@ public class BaseApp {
                         resolverType = RESOLVER_TYPE.LABEL_PROP_COMPLEX;
                     else if(value.toLowerCase().startsWith("m"))
                         resolverType = RESOLVER_TYPE.MAXENT;
+                    else if(value.toLowerCase().startsWith("p"))
+                        resolverType = RESOLVER_TYPE.PROB;
                     else
                         resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
                     break; 
