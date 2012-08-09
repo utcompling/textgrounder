@@ -1133,13 +1133,16 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
      */
     def from_checkpoint_to_tweet_text(line: String): (String, String) = {
       lineno += 1
+      bump_counter("lines read")
       val last_tab = line.lastIndexOf('\t')
       if (last_tab < 0) {
         warning(line, "Bad line, no tabs in it")
         bump_counter("bad line, no tabs in it")
         ("", "")
-      } else
+      } else {
+        bump_counter("good lines read")
         (line.slice(0, last_tab), line.slice(last_tab + 1, line.length))
+      }
     }
 
     /**
