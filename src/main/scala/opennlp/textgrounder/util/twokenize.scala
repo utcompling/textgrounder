@@ -137,37 +137,42 @@ object Twokenize {
     val splitPunctText = splitEdgePunct(text)
     val textLength = splitPunctText.length
 
-    // Find the matches for subsequences that should be protected,
-    // e.g. URLs, 1.0, U.N.K.L.E., 12:53
+    // Find the matches for subsequences that should be protected
+    // (not further split), e.g. URLs, 1.0, U.N.K.L.E., 12:53
     val matches = Protected.findAllIn(splitPunctText).matchData.toList
 
-    // The spans of the "bads" should not be split.
-    val badSpans = matches map (mat => Tuple2(mat.start, mat.end))
+    // The protected spans should not be split.
+    val protectedSpans = matches map (mat => Tuple2(mat.start, mat.end))
 
-    // Create a list of indices to create the "goods", which can be
-    // split. We are taking "bad" spans like 
+    // Create a list of indices to create the "splittables", which can be
+    // split. We are taking protected spans like 
     //     List((2,5), (8,10)) 
     // to create 
     ///    List(0, 2, 5, 8, 10, 12)
     // where, e.g., "12" here would be the textLength
-    val indices = (0 :: badSpans.foldRight(List[Int]())((x,y) => x._1 :: x._2 :: y)) ::: List(textLength)
+    val indices =
+      (0 :: (protectedSpans flatMap { case (start,end) => List(start,end) })
+         ::: List(textLength))
     
     // Group the indices and map them to their respective portion of the string
-    val goods = indices.grouped(2) map { x => splitPunctText.slice(x(0),x(1)) } toList
+    val splittableSpans =
+      indices.grouped(2) map { x => splitPunctText.slice(x(0),x(1)) } toList
 
-    //The 'good' strings are safe to be further tokenized by whitespace
-    val splitGoods = goods map { str => str.trim.split(" ").toList }
+    //The 'splittable' strings are safe to be further tokenized by whitespace
+    val splittables = splittableSpans map { str => str.trim.split(" ").toList }
 
     //Storing as List[List[String]] to make zip easier later on 
-    val bads = badSpans map { case(start,end) => List(splitPunctText.slice(start,end)) }
+    val protecteds = protectedSpans map {
+      case(start,end) => List(splitPunctText.slice(start,end)) }
 
-    //  Reinterpolate the 'good' and 'bad' Lists, ensuring that
-    //  additonal tokens from last good item get included
+    //  Reinterpolate the 'splittable' and 'protected' Lists, ensuring that
+    //  additonal tokens from last splittable item get included
     val zippedStr = 
-      (if (splitGoods.length == bads.length) 
-        splitGoods.zip(bads) map { pair => pair._1 ++ pair._2 }
+      (if (splittables.length == protecteds.length) 
+        splittables.zip(protecteds) map { pair => pair._1 ++ pair._2 }
       else 
-        (splitGoods.zip(bads) map { pair => pair._1 ++ pair._2 }) ::: List(splitGoods.last)
+        ((splittables.zip(protecteds) map { pair => pair._1 ++ pair._2 }) :::
+         List(splittables.last))
      ).flatten
 
     // Split based on special patterns (like contractions) and check all tokens are non empty
