@@ -102,6 +102,9 @@ javacOptions ++= Seq("-Xlint")
 // on by default, although I assume this applies only to Scala 2.10.
 scalacOptions ++= Seq("-Ydependent-method-types", "-deprecation", "-Xlint", "-unchecked")
 
+// Add optimization
+scalacOptions ++= Seq("-optimise")
+
 seq(assemblySettings: _*)
 
 // Don't try to compile or run test code.
