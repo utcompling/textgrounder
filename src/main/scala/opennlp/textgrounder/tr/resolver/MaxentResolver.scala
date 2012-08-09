@@ -80,11 +80,22 @@ object MaxentResolver {
 
   def getCellDist(model:AbstractModel, features:Array[String], candidates:List[Location], dpc:Double): Map[Int, Double] = {
     val candCellNums = candidates.map(c => TopoUtil.getCellNumber(c.getRegion.getCenter, dpc)).toSet
-    
-    val labels = model.getDataStructures()(2).asInstanceOf[Array[String]]
+    //candCellNums.foreach(n => print(n+","))
+    //println
+
+    val labels = model.getDataStructures()(2).asInstanceOf[Array[String]].map(_.toInt)
+    //labels.foreach(l => print(l+","))
+    //println
     val result = model.eval(features)
+    //result.foreach(r => print(r+","))
+    //println
     val relevantResult = result.zipWithIndex.filter(r => candCellNums contains labels(r._2))
+    //relevantResult.foreach(r => print(r+","))
+    //println
     val normFactor = relevantResult.map(_._1).sum
-    relevantResult.map(r => (r._2, r._1 / normFactor)).toMap
+    /*val toReturn = */relevantResult.map(r => (labels(r._2), r._1 / normFactor)).toMap
+    //toReturn.foreach(r => print(r+","))
+    //println
+    //toReturn
   }
 }
