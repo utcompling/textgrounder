@@ -29,6 +29,7 @@ import net.liftweb
 import org.apache.commons.logging
 import logging.LogFactory
 import org.apache.hadoop.fs.{FileSystem=>HFileSystem,_}
+import org.apache.log4j.{Level=>JLevel,_}
 // import com.codahale.jerkson
 
 import com.nicta.scoobi.Scoobi._
@@ -1224,8 +1225,11 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     if (Opts.by_time)
       Opts.keytype = "timestamp"
     Opts.timeslice = (Opts.timeslice_float * 1000).toLong
-    if (Opts.debug)
+    if (Opts.debug) {
       HadoopLogFactory.setQuiet(false)
+      HadoopLogFactory.setLogLevel(HadoopLogFactory.TRACE)
+      LogManager.getRootLogger().setLevel(JLevel.DEBUG.asInstanceOf[JLevel])
+    }
     if (Opts.debug_file != null)
       set_errout_file(Opts.debug_file)
 
