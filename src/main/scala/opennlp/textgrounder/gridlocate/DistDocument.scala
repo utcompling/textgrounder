@@ -699,14 +699,15 @@ object DistDocument {
   val ngram_counts_suffix = "ngram-counts"
   val text_suffix = "text"
 
-  val chars_to_encode = List('%', ':', ' ', '\t', '\n')
-  val encode_chars_regex = "[%s]".format(chars_to_encode mkString "").r
-  val encode_chars_map =
+  private val chars_to_encode = List('%', ':', ' ', '\t', '\n')
+  private val encode_chars_regex = "[%s]".format(chars_to_encode mkString "").r
+  private val encode_chars_map =
     chars_to_encode.map(c => (c.toString, "%%%02X".format(c.toInt))).toMap
-  val decode_chars_map =
+  private val decode_chars_map =
     encode_chars_map.toSeq.flatMap {
       case (dec, enc) => List((enc, dec), (enc.toLowerCase, dec)) }.toMap
-  val decode_chars_regex = "(%s)".format(decode_chars_map.keys mkString "|").r
+  private val decode_chars_regex =
+    "(%s)".format(decode_chars_map.keys mkString "|").r
 
   /**
    * Encode a word for placement inside a "counts" field.  Colons and spaces
@@ -773,15 +774,25 @@ object DistDocument {
   }
 
   /**
+   * Serialize a sequence of (encoded-word, count) pairs into the format used
+   * in a corpus.  The word or ngram must already have been encoded using
+   * `encode_word_for_counts_field` or `encode_ngram_for_counts_field`.
+   */
+  def shallow_encode_word_count_map(seq: collection.Seq[(String, Int)]) = {
+    // Sorting isn't strictly necessary but ensures consistent output as well
+    // as putting the most significant items first, for visual confirmation.
+    (for ((word, count) <- seq sortWith (_._2 > _._2)) yield
+      ("%s:%s" format (word, count))) mkString " "
+  }
+
+  /**
    * Serialize a sequence of (word, count) pairs into the format used
    * in a corpus.
    */
   def encode_word_count_map(seq: collection.Seq[(String, Int)]) = {
-    // Sorting isn't strictly necessary but ensures consistent output as well
-    // as putting the most significant items first, for visual confirmation.
-    (for ((word, count) <- seq sortWith (_._2 > _._2)) yield
-      ("%s:%s" format (encode_word_for_counts_field(word), count))
-    ) mkString " "
+    shallow_encode_word_count_map(seq map {
+      case (word, count) => (encode_word_for_counts_field(word), count)
+    })
   }
 
   /**
