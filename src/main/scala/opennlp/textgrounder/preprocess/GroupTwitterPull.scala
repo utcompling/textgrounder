@@ -822,8 +822,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
         if (Opts.geographic_only) concatted.filter(obj.is_good_geo_tweet)
         else concatted
 
-      // Checkpoint a second time.
-      good_tweets.map(obj.checkpoint_str)
+      good_tweets
     }
   }
 
@@ -913,14 +912,14 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     }
 
     /**
-     * Given tweet split into two parts (non-text and text), tokenize the
-     * text into ngrams, count words and format the result as a field;
-     * then convert the whole into a record to be written out.
+     * Given a tweet, tokenize the text into ngrams, count words and format
+     * the result as a field; then convert the whole into a record to be
+     * written out.
      */
-    def tokenize_count_and_format(split_tweet: (String, String)): String = {
-      val (tweet_no_text, text) = split_tweet
-      val formatted_text = emit_ngrams(text)
-      val (key, tnt) = split_tweet_no_text(tweet_no_text)
+    def tokenize_count_and_format(record: Record): String = {
+      val (key, tweet) = record
+      val tnt = tweet.notext
+      val formatted_text = emit_ngrams(tweet.text)
       // Latitude/longitude need to be combined into a single field, but only
       // if both actually exist.
       val latlongstr =
@@ -939,14 +938,13 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
    * Tokenize the combined text into words, count them up and output results.
    */
   object TokenizeFilterAndCountTweets {
-    def apply(Opts: GroupTwitterPullParams, lines_cp: DList[String]) = {
+    def apply(Opts: GroupTwitterPullParams, lines_cp: DList[Record]) = {
       val obj = new TokenizeFilterAndCountTweets(Opts)
 
       // We run `from_checkpoint_to_tweet_text` (see above) to get separate
       // access to the text, then Twokenize it into words, generate ngrams
       // from them, count, and format into a record.
-      lines_cp.map(obj.from_checkpoint_to_tweet_text).
-        map(obj.tokenize_count_and_format)
+      lines_cp.map(obj.tokenize_count_and_format)
     }
   }
 
@@ -1221,30 +1219,18 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     errprint("Step 1: done.")
 
     // Then load back up.
-    errprint("Step 2: Load parsed tweets, group, filter bad results.")
+    errprint("""Step 2: Load parsed tweets, group, filter bad results;
+      tokenize, count ngrams, output corpus.""")
     if (Opts.by_time)
       errprint("        (grouping by time, with slices of %g seconds)"
         format Opts.timeslice_float)
     else
       errprint("        (grouping by user)")
     val lines2: DList[String] = TextInput.fromTextFile(Opts.output + "-st")
-    val checkpoint = GroupTweetsAndSelectGood(Opts, lines2)
-    persist(TextOutput.toTextFile(checkpoint, Opts.output + "-cp"))
-    errprint("Step 2: done.")
-
-    // Load from second checkpoint.  Note that each time we checkpoint,
-    // we extract the "text" field and stick it at the end.  This time
-    // when loading it up, we use `from_checkpoint_to_tweet_text`, which
-    // gives us the tweet data as a string (minus text) and the text, as
-    // two separate strings.
-    errprint("Step 3: Load grouped tweets, tokenize, counts ngrams, output corpus.")
-    val lines_cp: DList[String] = TextInput.fromTextFile(Opts.output + "-cp")
-
-    val nicely_formatted = TokenizeFilterAndCountTweets(Opts, lines_cp)
-
-    // Save to disk.
+    val grouped_tweets = GroupTweetsAndSelectGood(Opts, lines2)
+    val nicely_formatted = TokenizeFilterAndCountTweets(Opts, grouped_tweets)
     persist(TextOutput.toTextFile(nicely_formatted, Opts.output))
-    errprint("Step 3: done.")
+    errprint("Step 2: done.")
 
     // Rename output files appropriately
     errprint("Renaming output files ...")
