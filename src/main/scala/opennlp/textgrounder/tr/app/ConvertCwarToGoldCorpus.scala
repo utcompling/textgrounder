@@ -106,7 +106,7 @@ object ConvertCwarToGoldCorpus extends App {
                       +center.getLngDegrees+"\" type=\""+cand.getType+"\" admin1code=\""
                       +cand.getAdmin1Code+"\"")
                 if(matchingCand == cand)
-                  print(" selected=\"true\"")
+                  print(" selected=\"yes\"")
                 println("/>")
                 /*println("            <representatives>")
                 for(rep <- region.getRepresentatives) {

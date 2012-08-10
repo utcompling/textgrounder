@@ -88,7 +88,7 @@ class ProbabilisticResolver(val logFilePath:String,
         val cellDistGivenDocument = docIdToCellDist.getOrElse(doc.getId, null)
 
         val topFreq = toponymsToFrequencies(toponym.getForm)
-        val lambda = topFreq / (topFreq + 1.0E-5)//0.7
+        val lambda = topFreq / (topFreq + 1.0E-3)//0.7
 
         var indexToSelect = -1
         var maxProb = 0.0
