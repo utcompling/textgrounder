@@ -3,6 +3,7 @@ package opennlp.textgrounder.tr.app
 import opennlp.textgrounder.tr.topo._
 import opennlp.textgrounder.tr.util._
 import opennlp.textgrounder.tr.topo.gaz._
+import opennlp.textgrounder.tr.text.io._
 import java.util.zip._
 
 import java.io._
@@ -80,7 +81,7 @@ object ConvertCwarToGoldCorpus extends App {
           val candidates = gaz.lookup(form.toLowerCase)
           val goldCoord = tgnToCoord.getOrElse(tgnRaw.toInt, null)
           if(candidates == null || goldCoord == null) {
-            for(tok <- form.split(" "))
+            for(tok <- form.split(" ").filter(t => CorpusXMLWriter.isSanitary(BaseApp.CORPUS_FORMAT.PLAIN, t)))
               println("      <w tok=\""+tok+"\"/>")
           }
           else {
@@ -91,11 +92,12 @@ object ConvertCwarToGoldCorpus extends App {
               }
             }
             if(matchingCand == null) {
-              for(tok <- form.split(" "))
+              for(tok <- form.split(" ").filter(t => CorpusXMLWriter.isSanitary(BaseApp.CORPUS_FORMAT.PLAIN, t)))
                 println("      <w tok=\""+tok+"\"/>")
             }
             else {
-              println("      <toponym term=\""+form+"\">")
+              val formToWrite = if(CorpusXMLWriter.isSanitary(BaseApp.CORPUS_FORMAT.PLAIN, form)) form else "MALFORMED"
+              println("      <toponym term=\""+formToWrite+"\">")
               println("        <candidates>")
               for(cand <- candidates) {
                 val region = cand.getRegion
@@ -118,7 +120,9 @@ object ConvertCwarToGoldCorpus extends App {
           }
         }
         else {
-          println("      <w tok=\""+TextUtil.stripPunc(token)+"\"/>")
+          val strippedToken = TextUtil.stripPunc(token)
+          if(CorpusXMLWriter.isSanitary(BaseApp.CORPUS_FORMAT.PLAIN, strippedToken))
+            println("      <w tok=\""+strippedToken+"\"/>")
         }
       }
       println("    </s>")

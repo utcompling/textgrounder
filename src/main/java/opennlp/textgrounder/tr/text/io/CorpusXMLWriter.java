@@ -120,10 +120,10 @@ public class CorpusXMLWriter {
     out.writeEndElement();
   }
 
-    private String okChars = "!?:;,'\"|+=-_*^%$#@`~(){}[]\\/";
+    private static String okChars = "!?:;,'\"|+=-_*^%$#@`~(){}[]\\/";
 
-    private boolean isSanitary(String s) {
-        if(corpus.getFormat() != BaseApp.CORPUS_FORMAT.GEOTEXT)
+    public static boolean isSanitary(Enum<BaseApp.CORPUS_FORMAT> corpusFormat, String s) {
+        if(corpusFormat != BaseApp.CORPUS_FORMAT.GEOTEXT)
             return true;
         for(int i = 0; i < s.length(); i++) {
             char curChar = s.charAt(i);
@@ -136,7 +136,7 @@ public class CorpusXMLWriter {
 
   protected void writeToken(XMLStreamWriter out, Token token) throws XMLStreamException {
     out.writeStartElement("w");
-    if(isSanitary(token.getOrigForm()))
+    if(isSanitary(corpus.getFormat(), token.getOrigForm()))
         out.writeAttribute("tok", token.getOrigForm());
     else
         out.writeAttribute("tok", " ");
@@ -145,7 +145,7 @@ public class CorpusXMLWriter {
 
   protected void writeToponym(XMLStreamWriter out, Toponym toponym) throws XMLStreamException {
     out.writeStartElement("toponym");
-    if(isSanitary(toponym.getOrigForm()))
+    if(isSanitary(corpus.getFormat(), toponym.getOrigForm()))
        out.writeAttribute("term", toponym.getOrigForm());
     else
        out.writeAttribute("term", " ");
