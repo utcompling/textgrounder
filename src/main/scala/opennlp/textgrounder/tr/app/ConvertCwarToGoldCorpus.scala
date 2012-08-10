@@ -81,7 +81,7 @@ object ConvertCwarToGoldCorpus extends App {
           val candidates = gaz.lookup(form.toLowerCase)
           val goldCoord = tgnToCoord.getOrElse(tgnRaw.toInt, null)
           if(candidates == null || goldCoord == null) {
-            for(tok <- form.split(" ").filter(t => CorpusXMLWriter.isSanitary(BaseApp.CORPUS_FORMAT.PLAIN, t)))
+            for(tok <- form.split(" ").filter(t => CorpusXMLWriter.isSanitary(/*BaseApp.CORPUS_FORMAT.PLAIN, */t)))
               println("      <w tok=\""+tok+"\"/>")
           }
           else {
@@ -92,11 +92,11 @@ object ConvertCwarToGoldCorpus extends App {
               }
             }
             if(matchingCand == null) {
-              for(tok <- form.split(" ").filter(t => CorpusXMLWriter.isSanitary(BaseApp.CORPUS_FORMAT.PLAIN, t)))
+              for(tok <- form.split(" ").filter(t => CorpusXMLWriter.isSanitary(/*BaseApp.CORPUS_FORMAT.PLAIN, */t)))
                 println("      <w tok=\""+tok+"\"/>")
             }
             else {
-              val formToWrite = if(CorpusXMLWriter.isSanitary(BaseApp.CORPUS_FORMAT.PLAIN, form)) form else "MALFORMED"
+              val formToWrite = if(CorpusXMLWriter.isSanitary(/*BaseApp.CORPUS_FORMAT.PLAIN, */form)) form else "MALFORMED"
               println("      <toponym term=\""+formToWrite+"\">")
               println("        <candidates>")
               for(cand <- candidates) {
@@ -121,7 +121,7 @@ object ConvertCwarToGoldCorpus extends App {
         }
         else {
           val strippedToken = TextUtil.stripPunc(token)
-          if(CorpusXMLWriter.isSanitary(BaseApp.CORPUS_FORMAT.PLAIN, strippedToken))
+          if(CorpusXMLWriter.isSanitary(/*BaseApp.CORPUS_FORMAT.PLAIN, */strippedToken))
             println("      <w tok=\""+strippedToken+"\"/>")
         }
       }
