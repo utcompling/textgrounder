@@ -41,7 +41,7 @@ import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil._
-import opennlp.textgrounder.gridlocate.DistDocument
+import opennlp.textgrounder.gridlocate.DistDocument._
 
 object GroupTwitterPull extends ScoobiApp {
   /*
@@ -330,12 +330,6 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
      * An empty tweet, stored as a full IDRecord.
      */
     val empty_tweet: IDRecord = ("", ("", Tweet.empty))
-
-    /**
-     * Convert a list of items to a map counting how many of each item occurs.
-     */
-    def list_to_item_count_map[T : Ordering](list: Seq[T]) =
-      list.sorted groupBy identity mapValues (_.size)
 
     // Used internally to force an exit when a problem in parse_json_lift
     // occurs.
@@ -905,39 +899,27 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     }
 
     /**
-     * Given the tweet data minus the text field combined into a string,
-     * plus the text field, tokenize the text and emit the ngrams individually.
+     * Tokenize a tweet text string into ngrams and count them, emitting
+     * the word-count pairs encoded into a string.
+     * and emit the ngrams individually.
      * Each ngram is emitted along with the text data and a count of 1,
      * and later grouping + combining will add all the 1's to get the
      * ngram count.
      */
-    def emit_ngrams(tweet_text: (String, String)):
-        Iterable[(TweetNgram, Long)] = {
-      val (tweet_no_text, text) = tweet_text
-      for (ngram <- break_tweet_into_ngrams(text))
-        yield ((tweet_no_text, DistDocument.encode_ngram_for_counts_field(ngram)),
-               1L)
+    def emit_ngrams(tweet_text: String): String = {
+      val ngrams = break_tweet_into_ngrams(tweet_text).toSeq.map(
+        encode_ngram_for_counts_field)
+      shallow_encode_word_count_map(list_to_item_count_map(ngrams).toSeq)
     }
 
     /**
-     * We made the value in the key-value pair be a count so we can combine
-     * the counts easily to get the total ngram count, and stuffed all the
-     * rest of the data (tweet data plus ngram) into the key, but now we have to
-     * rearrange to move the ngram back into the value.
+     * Given tweet split into two parts (non-text and text), tokenize the
+     * text into ngrams, count words and format the result as a field;
+     * then convert the whole into a record to be written out.
      */
-    def reposition_ngram(tnc: (TweetNgram, Long)): (String, NgramCount) = {
-      val ((tweet_no_text, ngram), c) = tnc
-      (tweet_no_text, (ngram, c))
-    }
-
-    /**
-     * Given tweet data minus text plus an iterable of ngram-count pairs,
-     * convert to a string suitable for outputting.
-     */
-    def nicely_format_plain(tncs: (String, Iterable[NgramCount])): String = {
-      val (tweet_no_text, ncs) = tncs
-      val nice_text =
-        ncs.map((w: NgramCount) => w._1 + ":" + w._2).mkString(" ")
+    def tokenize_count_and_format(split_tweet: (String, String)): String = {
+      val (tweet_no_text, text) = split_tweet
+      val formatted_text = emit_ngrams(text)
       val (key, tnt) = split_tweet_no_text(tweet_no_text)
       // Latitude/longitude need to be combined into a single field, but only
       // if both actually exist.
@@ -945,37 +927,26 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
         if (!isNaN(tnt.lat) && !isNaN(tnt.long))
           "%s,%s" format (tnt.lat, tnt.long)
         else ""
-      val user_mentions =
-        DistDocument.encode_word_count_map(tnt.user_mentions.toSeq)
-      val retweets =
-        DistDocument.encode_word_count_map(tnt.retweets.toSeq)
+      val user_mentions = encode_word_count_map(tnt.user_mentions.toSeq)
+      val retweets = encode_word_count_map(tnt.retweets.toSeq)
       // Put back together but drop key.
       Seq(tnt.user, tnt.timestamp, latlongstr, tnt.followers, tnt.following,
-          tnt.numtweets, user_mentions, retweets, nice_text) mkString "\t"
+          tnt.numtweets, user_mentions, retweets, formatted_text) mkString "\t"
     }
   }
 
+  /**
+   * Tokenize the combined text into words, count them up and output results.
+   */
   object TokenizeFilterAndCountTweets {
     def apply(Opts: GroupTwitterPullParams, lines_cp: DList[String]) = {
       val obj = new TokenizeFilterAndCountTweets(Opts)
 
-      // Now count ngrams.  We run `from_checkpoint_to_tweet_text` (see above)
-      // to get separate access to the text, then Twokenize it into words,
-      // generate ngrams from them and emit a series of key-value pairs of
-      // (ngram, count).
-      val emitted_ngrams = lines_cp.map(obj.from_checkpoint_to_tweet_text)
-                                   .flatMap(obj.emit_ngrams)
-      // Group based on key (the ngram) and combine by adding up the individual
-      // counts.
-      val ngram_counts =
-        emitted_ngrams.groupByKey.combine((a: Long, b: Long) => a + b)
-
-      // Regroup with proper key (user, timestamp, etc.) as key,
-      // ngram pairs as values.
-      val regrouped_by_key = ngram_counts.map(obj.reposition_ngram).groupByKey
-
-      // Nice string output.
-      regrouped_by_key.map(obj.nicely_format_plain)
+      // We run `from_checkpoint_to_tweet_text` (see above) to get separate
+      // access to the text, then Twokenize it into words, generate ngrams
+      // from them, count, and format into a record.
+      lines_cp.map(obj.from_checkpoint_to_tweet_text).
+        map(obj.tokenize_count_and_format)
     }
   }
 
@@ -1079,6 +1050,12 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     }
 
     /**
+     * Convert a list of items to a map counting how many of each item occurs.
+     */
+    def list_to_item_count_map[T : Ordering](list: Seq[T]) =
+      list.sorted groupBy identity mapValues (_.size)
+
+    /**
      * Convert a "record" (key plus tweet data) into a line of text suitable
      * for writing to a "checkpoint" file.  We encode all the fields into text
      * and separate by tabs.  The text gets moved to the end so that we can
@@ -1088,10 +1065,8 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
       val (key, tw) = r
       val tn = tw.notext
       val text_2 = tw.text.replaceAll("\\s+", " ")
-      val user_mentions =
-        DistDocument.encode_word_count_map(tn.user_mentions.toSeq)
-      val retweets =
-        DistDocument.encode_word_count_map(tn.retweets.toSeq)
+      val user_mentions = encode_word_count_map(tn.user_mentions.toSeq)
+      val retweets = encode_word_count_map(tn.retweets.toSeq)
       val s = Seq(
         key, tn.user, tn.timestamp, tn.lat, tn.long, tn.followers,
         tn.following, tn.numtweets, user_mentions, retweets, text_2
@@ -1119,8 +1094,8 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
         val followers = split2(5).toInt
         val following = split2(6).toInt
         val numtweets = split2(7).toInt
-        val user_mentions = DistDocument.decode_word_count_map(split2(8)).toMap
-        val retweets = DistDocument.decode_word_count_map(split2(9)).toMap
+        val user_mentions = decode_word_count_map(split2(8)).toMap
+        val retweets = decode_word_count_map(split2(9)).toMap
         assert(split2.length == 10)
         (key, TweetNoText(user, timestamp, lat, long, followers, following,
           numtweets, user_mentions, retweets))
