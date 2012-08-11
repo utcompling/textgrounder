@@ -63,7 +63,7 @@ for line in fileinput.input():
       #print account
       account = "@" + account
     m = re.match("^([A-Z][A-Z])0*([0-9]+)?$", where)
-    if m:
+    if title == "Rep" and m:
       state = m.group(1)
       district = m.group(2) or "At Large"
       office = "%s %s %s" % (title, state, district)
