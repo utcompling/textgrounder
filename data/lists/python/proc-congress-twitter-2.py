@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+# For processing us-senators-on-twitter-the-81.
 import fileinput
 import re
 
