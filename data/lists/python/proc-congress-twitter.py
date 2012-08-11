@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+# For processing us-senators-reps-twitter-wethepeoplenation.com from
+# wethepeoplenation.com.
 import fileinput
 import re
 

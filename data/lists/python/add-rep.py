@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+# A one-off for fixing up an old form of us-congress-twitter.txt.
 import fileinput
 import re
 

@@ -3,6 +3,14 @@
 import fileinput
 import re
 
+# Process raw output from govsm.com, either House, Senate or Governors, or
+# campaigns for any of the three.  Note that for campaigns for Governors,
+# you will need to insert a line
+#
+# Welcome to the Governors Campaigns
+#
+# above the section containing the campaigns for governor.
+
 campaigns = False
 where = ""
 party = ""
