@@ -38,12 +38,91 @@ import com.nicta.scoobi.testing.HadoopLogFactory
 
 import opennlp.textgrounder.util.Twokenize
 import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil._
 import opennlp.textgrounder.gridlocate.DistDocument._
 
-object GroupTwitterPull extends ScoobiApp {
+class GroupTwitterPullParams(ap: ArgParser) extends
+    ScoobiProcessFilesParams(ap) {
+  // The following is set based on presence or absence of --by-time
+  var keytype = "user"
+  var timeslice_float = ap.option[Double]("timeslice", "time-slice",
+    default = 6.0,
+    help="""Number of seconds per timeslice when grouping '--by-time'.
+    Can be a fractional number.  Default %default.""")
+  // The following is set based on --timeslice
+  var timeslice: Long = _
+  var corpus_name = ap.option[String]("corpus-name", default = "unknown",
+    help="""Name of corpus; for identification purposes.
+    Default '%default'.""")
+  var split = ap.option[String]("split", default = "training",
+    help="""Split (training, dev, test) to place data in.  Default %default.""")
+  var filter = ap.option[String]("filter",
+    help="""Boolean expression used to filter tweets to be output.
+Expression consists of one or more sequences of words, joined by the operators
+AND, OR and NOT.  A sequence of words matches a tweet if and only if that exact
+sequence is found in the tweet (tweets are matched after they have been
+tokenized).  AND has higher precedence than OR.  Parentheses can be used
+for grouping or precedence.  Any word that is quoted is treated as a literal
+regardless of the characters in it; this can be used to treat words such as
+"AND" literally.  Matching is case-insensitive; use '--cfilter' for
+case-sensitive matching.  Note that the use of '--preserve-case' has no effect
+on the case sensitivity of filtering; it rather affects whether the output
+is converted to lowercase or left as-is.
+
+Examples:
+
+--filter "mitt romney OR obama"
+
+Look for any tweets containing the sequence "mitt romney" (in any case) or
+"Obama".
+
+--filter "mitt AND romney OR barack AND obama"
+
+Look for any tweets containing either the words "mitt" and "romney" (in any
+case and anywhere in the tweet) or the words "barack" and "obama".
+
+--filter "hillary OR bill AND clinton"
+
+Look for any tweets containing either the word "hillary" or both the words
+"bill" and "clinton" (anywhere in the tweet).
+
+--filter "(hillary OR bill) AND clinton"
+
+Look for any tweets containing the word "clinton" as well as either the words
+"bill" or "hillary".""")
+  var cfilter = ap.option[String]("cfilter",
+    help="""Boolean expression used to filter tweets to be output, with
+    case-sensitive matching.  Format is identical to '--filter'.""")
+  var by_time = ap.flag("by-time",
+    help="""Group tweets by time instead of by user.  When this is used, all
+    tweets within a timeslice of a give number of seconds (specified using
+    '--timeslice') are grouped together.""")
+  var geographic_only = ap.flag("geographic-only", "geog",
+    help="""Filter out tweets that don't have a geotag or that have a
+geotag outside of North America.  Also filter on min/max-followers, etc.""")
+  var preserve_case = ap.flag("preserve-case",
+    help="""Don't lowercase words.  This preserves the difference
+    between e.g. the name "Mark" and the word "mark".""")
+  var max_ngram = ap.option[Int]("max-ngram", "max-n-gram", "ngram", "n-gram",
+    default = 1,
+    help="""Largest size of n-grams to create.  Default 1, i.e. distribution
+    only contains unigrams.""")
+  var min_tweets = ap.option[Int]("min-tweets",
+    default = 10,
+    help="""Minimum number of tweets per user for user to be accepted in
+    --by-user mode.""")
+  var max_tweets = ap.option[Int]("max-tweets",
+    default = 1000,
+    help="""Maximum number of tweets per user for user to be accepted in
+    --by-user mode.""")
+//     var use_jerkson = ap.flag("use-jerkson",
+//       help="""Use Jerkson instead of Lift to parse JSON.""")
+}
+
+object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
   /*
    * This program takes, as input, files which contain one tweet
    * per line in json format as directly pulled from the twitter
@@ -77,91 +156,6 @@ object GroupTwitterPull extends ScoobiApp {
    * that are identified as likely "spammers" according to their number of
    * followers and number of people they are following.
    */
-
-  class GroupTwitterPullParams(ap: ArgParser) {
-    // The following is set based on presence or absence of --by-time
-    var keytype = "user"
-    var timeslice_float = ap.option[Double]("timeslice", "time-slice",
-      default = 6.0,
-      help="""Number of seconds per timeslice when grouping '--by-time'.
-      Can be a fractional number.  Default %default.""")
-    // The following is set based on --timeslice
-    var timeslice: Long = _
-    var corpus_name = ap.option[String]("corpus-name", default = "unknown",
-      help="""Name of corpus; for identification purposes.
-      Default '%default'.""")
-    var split = ap.option[String]("split", default = "training",
-      help="""Split (training, dev, test) to place data in.  Default %default.""")
-    var filter = ap.option[String]("filter",
-      help="""Boolean expression used to filter tweets to be output.
-Expression consists of one or more sequences of words, joined by the operators
-AND, OR and NOT.  A sequence of words matches a tweet if and only if that exact
-sequence is found in the tweet (tweets are matched after they have been
-tokenized).  AND has higher precedence than OR.  Parentheses can be used
-for grouping or precedence.  Any word that is quoted is treated as a literal
-regardless of the characters in it; this can be used to treat words such as
-"AND" literally.  Matching is case-insensitive; use '--cfilter' for
-case-sensitive matching.  Note that the use of '--preserve-case' has no effect
-on the case sensitivity of filtering; it rather affects whether the output
-is converted to lowercase or left as-is.
-
-Examples:
-
---filter "mitt romney OR obama"
-
-Look for any tweets containing the sequence "mitt romney" (in any case) or
-"Obama".
-
---filter "mitt AND romney OR barack AND obama"
-
-Look for any tweets containing either the words "mitt" and "romney" (in any
-case and anywhere in the tweet) or the words "barack" and "obama".
-
---filter "hillary OR bill AND clinton"
-
-Look for any tweets containing either the word "hillary" or both the words
-"bill" and "clinton" (anywhere in the tweet).
-
---filter "(hillary OR bill) AND clinton"
-
-Look for any tweets containing the word "clinton" as well as either the words
-"bill" or "hillary".""")
-    var cfilter = ap.option[String]("cfilter",
-      help="""Boolean expression used to filter tweets to be output, with
-      case-sensitive matching.  Format is identical to '--filter'.""")
-    var by_time = ap.flag("by-time",
-      help="""Group tweets by time instead of by user.  When this is used, all
-      tweets within a timeslice of a give number of seconds (specified using
-      '--timeslice') are grouped together.""")
-    var geographic_only = ap.flag("geographic-only", "geog",
-      help="""Filter out tweets that don't have a geotag or that have a
-geotag outside of North America.  Also filter on min/max-followers, etc.""")
-    var preserve_case = ap.flag("preserve-case",
-      help="""Don't lowercase words.  This preserves the difference
-      between e.g. the name "Mark" and the word "mark".""")
-    var max_ngram = ap.option[Int]("max-ngram", "max-n-gram", "ngram", "n-gram",
-      default = 1,
-      help="""Largest size of n-grams to create.  Default 1, i.e. distribution
-      only contains unigrams.""")
-    var min_tweets = ap.option[Int]("min-tweets",
-      default = 10,
-      help="""Minimum number of tweets per user for user to be accepted in
-      --by-user mode.""")
-    var max_tweets = ap.option[Int]("max-tweets",
-      default = 1000,
-      help="""Maximum number of tweets per user for user to be accepted in
-      --by-user mode.""")
-    var debug = ap.flag("debug",
-      help="""Output debug info about tweet processing/acceptance.""")
-    var debug_file = ap.option[String]("debug-file",
-      help="""File to write debug info to, instead of stderr.""")
-//     var use_jerkson = ap.flag("use-jerkson",
-//       help="""Use Jerkson instead of Lift to parse JSON.""")
-    var input = ap.positional[String]("INPUT",
-      help = "Source directory to read files from.")
-    var output = ap.positional[String]("OUTPUT",
-      help = "Destination directory to place files in.")
-  }
 
   import scala.util.parsing.combinator.lexical.StdLexical
   import scala.util.parsing.combinator.syntactical._
@@ -323,7 +317,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   }
 
   class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
-      extends GroupTwitterPullShared(Opts) {
+      extends GroupTwitterPullShared {
     val operation_category = "GroupTwitterPull.Parse"
 
     /**
@@ -683,16 +677,9 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   }
 
   class GroupTweetsAndSelectGood(Opts: GroupTwitterPullParams)
-      extends GroupTwitterPullShared(Opts) {
+      extends GroupTwitterPullShared {
 
     val operation_category = "GroupTwitterPull.Group"
-
-    /**
-     * Combine two maps, adding up the numbers where overlap occurs.
-     */
-    def combine_maps[T, U <: Int](
-      map1: Map[T, U], map2: Map[T, U]) =
-        map1 ++ map2.map { case (k,v) => k -> (v + map1.getOrElse(k,0)) }
 
     /**
      * Merge the data associated with two tweets or tweet combinations
@@ -827,7 +814,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   }
 
   class TokenizeFilterAndCountTweets(Opts: GroupTwitterPullParams)
-      extends GroupTwitterPullShared(Opts) {
+      extends GroupTwitterPullShared {
 
     val operation_category = "GroupTwitterPull.Tokenize"
 
@@ -1032,26 +1019,8 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   // NgramCount = (ngram, number of ocurrences)
   type NgramCount = (String, Long)
 
-  abstract class GroupTwitterPullShared(Opts: GroupTwitterPullParams) {
-
-    var lineno = 0
-    val operation_category: String
-    lazy val logger = LogFactory.getLog(operation_category)
-
-    def warning(line: String, fmt: String, args: Any*) {
-      logger.warn("Line %d: %s: %s" format
-        (lineno, fmt format (args: _*), line))
-    }
-
-    def bump_counter(counter: String) {
-      incrCounter(operation_category, counter)
-    }
-
-    /**
-     * Convert a list of items to a map counting how many of each item occurs.
-     */
-    def list_to_item_count_map[T : Ordering](list: Seq[T]) =
-      list.sorted groupBy identity mapValues (_.size)
+  abstract class GroupTwitterPullShared extends ScoobiProcessFilesShared {
+    val progname = "GroupTwitterPull"
 
     /**
      * Convert a "record" (key plus tweet data) into a line of text suitable
@@ -1131,8 +1100,9 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   }
 
   class GroupTwitterPull(Opts: GroupTwitterPullParams)
-      extends GroupTwitterPullShared(Opts) {
-    val operation_category = "GroupTwitterPull.Driver"
+      extends GroupTwitterPullShared {
+
+    val operation_category = "Driver"
 
     def corpus_suffix = {
       val dist_type = if (Opts.max_ngram == 1) "unigram" else "ngram"
@@ -1161,54 +1131,17 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
         print_seq("split", Opts.split)
       } finally { p.close() }
     }
-
-    def output_command_line_parameters(arg_parser: ArgParser) {
-      // Output using errprint() rather than logger() so that the results
-      // stand out more.
-      errprint("")
-      errprint("Non-default parameter values:")
-      for (name <- arg_parser.argNames) {
-        if (arg_parser.specified(name))
-          errprint("%30s: %s" format (name, arg_parser(name)))
-      }
-      errprint("")
-      errprint("Parameter values:")
-      for (name <- arg_parser.argNames) {
-        errprint("%30s: %s" format (name, arg_parser(name)))
-        //errprint("%30s: %s" format (name, arg_parser.getType(name)))
-      }
-      errprint("")
-    }
   }
 
+  def create_params(ap: ArgParser) = new GroupTwitterPullParams(ap)
+  val progname = "GroupTwitterPull"
+
   def run() {
-    lazy val logger = LogFactory.getLog("GroupTwitterPull.Group")
-    initialize_osutil()
-    val ap = new ArgParser("GroupTwitterPull")
-    // This first call is necessary, even though it doesn't appear to do
-    // anything.  In particular, this ensures that all arguments have been
-    // defined on `ap` prior to parsing.
-    new GroupTwitterPullParams(ap)
-    // Here and below, output using errprint() rather than logger() so that
-    // the basic steps stand out more -- when accompanied by typical logger
-    // prefixes, they easily disappear.
-    errprint("Parsing args: %s" format (args mkString " "))
-    ap.parse(args)
-    val Opts = new GroupTwitterPullParams(ap)
+    val Opts = init_scoobi_app()
     if (Opts.by_time)
       Opts.keytype = "timestamp"
     Opts.timeslice = (Opts.timeslice_float * 1000).toLong
-    if (Opts.debug) {
-      HadoopLogFactory.setQuiet(false)
-      HadoopLogFactory.setLogLevel(HadoopLogFactory.TRACE)
-      LogManager.getRootLogger().setLevel(JLevel.DEBUG.asInstanceOf[JLevel])
-    }
-    if (Opts.debug_file != null)
-      set_errout_file(Opts.debug_file)
-
-    enableCounterLogging()
     val ptp = new GroupTwitterPull(Opts)
-    ptp.output_command_line_parameters(ap)
 
     errprint("Step 1: Load up the JSON tweets, parse into records, remove duplicates, checkpoint.")
     // Firstly we load up all the (new-line-separated) JSON lines.
@@ -1248,9 +1181,18 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     // create a schema
     ptp.output_schema(fs)
 
-    errprint("All done with everything.")
-    errprint("")
-    output_resource_usage()
+    finish_scoobi_app(Opts)
   }
+  /*
+
+  To build a classifier for conserv vs liberal:
+
+  1. Look for people retweeting congressmen or governor tweets, possibly at
+     some minimum level of retweeting (or rely on followers, for some
+     minimum number of people following)
+  2. Make sure either they predominate having retweets from one party,
+     and/or use the DW-NOMINATE scores to pick out people whose average
+     ideology score of their retweets is near the extremes.
+  */
 }
 

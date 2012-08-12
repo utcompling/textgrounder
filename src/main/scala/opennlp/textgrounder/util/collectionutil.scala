@@ -683,5 +683,17 @@ package object collectionutil {
     }
   }
 
+  /**
+   * Combine two maps, adding up the numbers where overlap occurs.
+   */
+  def combine_maps[T, U <: Int](
+    map1: Map[T, U], map2: Map[T, U]) =
+      map1 ++ map2.map { case (k,v) => k -> (v + map1.getOrElse(k,0)) }
+
+  /**
+   * Convert a list of items to a map counting how many of each item occurs.
+   */
+  def list_to_item_count_map[T : Ordering](list: Seq[T]) =
+    list.sorted groupBy identity mapValues (_.size)
 }
 
