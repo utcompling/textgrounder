@@ -18,30 +18,16 @@
 
 package opennlp.textgrounder.preprocess
 
-import collection.JavaConversions._
-import util.control.Breaks._
-
-import java.io._
-import java.lang.Double.isNaN
-import java.text.{SimpleDateFormat, ParseException}
-
-import net.liftweb
-import org.apache.commons.logging
-import logging.LogFactory
-import org.apache.hadoop.fs.{FileSystem=>HFileSystem,_}
+import org.apache.commons.logging.LogFactory
 import org.apache.log4j.{Level=>JLevel,_}
-// import com.codahale.jerkson
 
 import com.nicta.scoobi.Scoobi._
 import com.nicta.scoobi.testing.HadoopLogFactory
 // import com.nicta.scoobi.application.HadoopLogFactory
 
-import opennlp.textgrounder.util.Twokenize
 import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.printutil._
-import opennlp.textgrounder.gridlocate.DistDocument._
 
 class ScoobiProcessFilesParams(ap: ArgParser) {
   var debug = ap.flag("debug",
