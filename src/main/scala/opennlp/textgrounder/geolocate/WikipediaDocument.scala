@@ -21,7 +21,7 @@ package opennlp.textgrounder.geolocate
 import collection.mutable
 
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.ioutil._
+import opennlp.textgrounder.util.corpusutil.Schema
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 import opennlp.textgrounder.util.textutil.capfirst
 

@@ -21,7 +21,7 @@ package opennlp.textgrounder.poligrounder
 import collection.mutable
 
 import opennlp.textgrounder.util.distances._
-import opennlp.textgrounder.util.ioutil._
+import opennlp.textgrounder.util.corpusutil.Schema
 import opennlp.textgrounder.util.printutil._
 
 import opennlp.textgrounder.gridlocate.{DistDocument,DistDocumentTable,CellGrid}

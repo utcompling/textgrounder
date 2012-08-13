@@ -24,6 +24,7 @@ import java.io._
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.corpusutil._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.MeteredTask
@@ -128,7 +129,7 @@ class FrobCorpusFileProcessor(
       val counts = intmap[String]()
       for (word <- text.split(" ", -1))
         counts(word) += 1
-      val counts_text = DistDocument.encode_word_count_map(counts.toSeq)
+      val counts_text = encode_word_count_map(counts.toSeq)
       docparams += (("counts", counts_text))
     }
     docparams.toSeq

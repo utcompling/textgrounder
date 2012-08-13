@@ -26,6 +26,7 @@ import util.control.Breaks._
 import java.io._
 
 import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.corpusutil._
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
@@ -548,7 +549,7 @@ abstract class DistDocument[TCoord : Serializer](
   val table: DistDocumentTable[TCoord,_,_]
 ) {
 
-  import DistDocument._, DistDocumentConverters._
+  import DistDocumentConverters._
 
   /**
    * Title of the document -- something that uniquely identifies it,
@@ -691,137 +692,6 @@ abstract class DistDocument[TCoord : Serializer](
    * Output a distance with attached units
    */
   def output_distance(dist: Double): String
-}
-
-object DistDocument {
-  val document_metadata_suffix = "document-metadata"
-  val unigram_counts_suffix = "unigram-counts"
-  val ngram_counts_suffix = "ngram-counts"
-  val text_suffix = "text"
-
-  private val chars_to_encode = List('%', ':', ' ', '\t', '\n')
-  private val encode_chars_regex = "[%s]".format(chars_to_encode mkString "").r
-  private val encode_chars_map =
-    chars_to_encode.map(c => (c.toString, "%%%02X".format(c.toInt))).toMap
-  private val decode_chars_map =
-    encode_chars_map.toSeq.flatMap {
-      case (dec, enc) => List((enc, dec), (enc.toLowerCase, dec)) }.toMap
-  private val decode_chars_regex =
-    "(%s)".format(decode_chars_map.keys mkString "|").r
-
-  /**
-   * Encode a word for placement inside a "counts" field.  Colons and spaces
-   * are used for separation, and tabs and newlines are used for separating
-   * fields and records.  We need to escape all of these characters (normally
-   * whitespace should be filtered out during tokenization, but for some
-   * applications it won't necessarily).  We do this using URL-style-encoding,
-   * e.g. replacing : by %3A; hence we also have to escape % signs. (We could
-   * equally well use HTML-style encoding; then we'd have to escape &amp;
-   * instead of :.) Note that regardless of whether we use URL-style or
-   * HTML-style encoding, we probably want to do the encoding ourselves
-   * rather than use a predefined encoder.  We could in fact use the
-   * presupplied URL encoder, but it would encode all sorts of stuff,
-   * which is unnecessary and would make the raw files harder to read.
-   * In the case of HTML-style encoding, : isn't even escaped, so that
-   * wouldn't work at all.
-   */
-  def encode_word_for_counts_field(word: String) = {
-    encode_chars_regex.replaceAllIn(word, m => encode_chars_map(m.matched))
-  }
-
-  /**
-   * Encode an n-gram into text suitable for the "counts" field.  The
-   * individual words are separated by colons, and each word is encoded
-   * using `encode_word_for_counts_field`.
-   */
-  def encode_ngram_for_counts_field(ngram: Iterable[String]) = {
-    ngram.map(encode_word_for_counts_field) mkString ":"
-  }
-
-  /**
-   * Decode a word encoded using `encode_word_for_counts_field`.
-   */
-  def decode_word_for_counts_field(word: String) = {
-    decode_chars_regex.replaceAllIn(word, m => decode_chars_map(m.matched))
-  }
-
-  /**
-   * Decode an n-gram encoded using `encode_ngram_for_counts_field`.
-   */
-  def decode_ngram_for_counts_field(ngram: String) = {
-    ngram.split(":", -1).map(decode_word_for_counts_field)
-  }
-
-  /**
-   * Split counts field into the encoded n-gram section and the word count.
-   */
-  def shallow_split_counts_field(field: String) = {
-    val last_colon = field.lastIndexOf(':')
-    if (last_colon < 0)
-      throw FileFormatException(
-        "Counts field must be of the form WORD:WORD:...:COUNT, but %s seen"
-          format field)
-    val count = field.slice(last_colon + 1, field.length).toInt
-    (field.slice(0, last_colon), count)
-  }
-
-  /**
-   * Split counts field into n-gram and word count.
-   */
-  def deep_split_counts_field(field: String) = {
-    val (encoded_ngram, count) = shallow_split_counts_field(field)
-    (decode_ngram_for_counts_field(encoded_ngram), count)
-  }
-
-  /**
-   * Serialize a sequence of (encoded-word, count) pairs into the format used
-   * in a corpus.  The word or ngram must already have been encoded using
-   * `encode_word_for_counts_field` or `encode_ngram_for_counts_field`.
-   */
-  def shallow_encode_word_count_map(seq: collection.Seq[(String, Int)]) = {
-    // Sorting isn't strictly necessary but ensures consistent output as well
-    // as putting the most significant items first, for visual confirmation.
-    (for ((word, count) <- seq sortWith (_._2 > _._2)) yield
-      ("%s:%s" format (word, count))) mkString " "
-  }
-
-  /**
-   * Serialize a sequence of (word, count) pairs into the format used
-   * in a corpus.
-   */
-  def encode_word_count_map(seq: collection.Seq[(String, Int)]) = {
-    shallow_encode_word_count_map(seq map {
-      case (word, count) => (encode_word_for_counts_field(word), count)
-    })
-  }
-
-  /**
-   * Deserialize an encoded word-count map into a sequence of
-   * (word, count) pairs.
-   */
-  def decode_word_count_map(encoded: String) = {
-    if (encoded.length == 0)
-      Array[(String, Int)]()
-    else
-      {
-      val wordcounts = encoded.split(" ")
-      for (wordcount <- wordcounts) yield {
-        val split_wordcount = wordcount.split(":", -1)
-        if (split_wordcount.length != 2)
-          throw FileFormatException(
-            "For unigram counts, items must be of the form WORD:COUNT, but %s seen"
-            format wordcount)
-        val Array(word, strcount) = split_wordcount
-        if (word.length == 0)
-          throw FileFormatException(
-            "For unigram counts, WORD in WORD:COUNT must not be empty, but %s seen"
-            format wordcount)
-        val count = strcount.toInt
-        val decoded_word = DistDocument.decode_word_for_counts_field(word)
-        (decoded_word, count)
-      }
-    }
-  }
 }
 
 
