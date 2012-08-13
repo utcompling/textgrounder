@@ -34,8 +34,8 @@ import com.nicta.scoobi.Scoobi._
 import opennlp.textgrounder.util.Twokenize
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.corpusutil._
 import opennlp.textgrounder.util.printutil._
-import opennlp.textgrounder.gridlocate.DistDocument._
 
 class GroupTwitterPullParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {

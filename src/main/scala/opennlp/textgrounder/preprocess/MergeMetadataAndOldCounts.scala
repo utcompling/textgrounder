@@ -29,6 +29,7 @@ import opennlp.textgrounder.gridlocate.DistDocument
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil.DynamicArray
+import opennlp.textgrounder.util.corpusutil._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.MeteredTask
@@ -151,7 +152,7 @@ class MMCUnigramWordDistHandler(
         (for (i <- 0 until num_words) yield {
           // errprint("Saw2 %s,%s", keys(i), values(i))
           ("%s:%s" format
-            (DistDocument.encode_word_for_counts_field(unmemoize_string(keys(i))),
+            (encode_word_for_counts_field(unmemoize_string(keys(i))),
               values(i)))
           }).
           mkString(" ")
@@ -224,7 +225,7 @@ counts file also containing the metadata.
         params.output_dir)
 
     val fileproc =
-      new MMCDocumentFileProcessor(DistDocument.document_metadata_suffix)
+      new MMCDocumentFileProcessor(document_metadata_suffix)
     fileproc.read_schema_from_corpus(filehand, params.input_dir)
 
     if (params.output_file_prefix == null) {

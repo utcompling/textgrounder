@@ -18,7 +18,7 @@
 
 package opennlp.textgrounder.geolocate
 
-import opennlp.textgrounder.util.ioutil.Schema
+import opennlp.textgrounder.util.corpusutil.Schema
 
 import opennlp.textgrounder.worddist.WordDist.memoizer._
 

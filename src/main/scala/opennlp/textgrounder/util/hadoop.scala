@@ -35,6 +35,7 @@ import java.net.URI
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.corpusutil._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.printutil.{errprint, set_errout_prefix}

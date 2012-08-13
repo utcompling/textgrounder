@@ -33,6 +33,7 @@ import org.apache.hadoop.fs._
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
+import opennlp.textgrounder.util.corpusutil._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.hadoop._
 import opennlp.textgrounder.util.ioutil._
