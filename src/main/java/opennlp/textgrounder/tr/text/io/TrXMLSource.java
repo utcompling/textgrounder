@@ -151,6 +151,8 @@ public class TrXMLSource extends DocumentSource {
 
                   if (locations.size() > 0 && goldIdx > -1) {
                     Toponym toponym = new SimpleToponym(form, locations, goldIdx);
+		    if(toponym.getGoldIdx() >= toponym.getCandidates().size())
+			System.out.println(toponym.getForm()+": "+toponym.getGoldIdx()+"/"+toponym.getCandidates().size());
                     toponymSpans.add(new Span<Toponym>(spanStart, tokens.size(), toponym));
                   }
                 }
