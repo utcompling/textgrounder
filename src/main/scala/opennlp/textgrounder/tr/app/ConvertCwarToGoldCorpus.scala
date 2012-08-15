@@ -81,7 +81,7 @@ object ConvertCwarToGoldCorpus extends App {
           val candidates = gaz.lookup(form.toLowerCase)
           val goldCoord = tgnToCoord.getOrElse(tgnRaw.toInt, null)
           if(candidates == null || goldCoord == null) {
-            for(tok <- form.split(" ").filter(t => CorpusXMLWriter.isSanitary(/*BaseApp.CORPUS_FORMAT.PLAIN, */t)))
+            for(tok <- form.split(" ").filter(t => CorpusXMLWriter.isSanitary(t)))
               println("      <w tok=\""+tok+"\"/>")
           }
           else {
@@ -92,12 +92,12 @@ object ConvertCwarToGoldCorpus extends App {
               }
             }
             if(matchingCand == null) {
-              for(tok <- form.split(" ").filter(t => CorpusXMLWriter.isSanitary(/*BaseApp.CORPUS_FORMAT.PLAIN, */t)))
+              for(tok <- form.split(" ").filter(t => CorpusXMLWriter.isSanitary(t)))
                 println("      <w tok=\""+tok+"\"/>")
             }
-            else {
-              val formToWrite = if(CorpusXMLWriter.isSanitary(/*BaseApp.CORPUS_FORMAT.PLAIN, */form)) form else "MALFORMED"
-              println("      <toponym term=\""+formToWrite+"\">")
+            //val formToWrite = if(CorpusXMLWriter.isSanitary(form)) form else "MALFORMED"
+            else if(CorpusXMLWriter.isSanitary(form)) {
+              println("      <toponym term=\""+form+"\">")
               println("        <candidates>")
               for(cand <- candidates) {
                 val region = cand.getRegion

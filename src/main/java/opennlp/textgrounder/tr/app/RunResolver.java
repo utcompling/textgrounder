@@ -36,7 +36,11 @@ public class RunResolver extends BaseApp {
         if(currentRun.getCorpusFormat() == CORPUS_FORMAT.TRCONLL) {
             System.out.print("Reading gold corpus from " + currentRun.getInputPath() + " ...");
             goldCorpus = Corpus.createStoredCorpus();
-            goldCorpus.addSource(new TrXMLDirSource(new File(currentRun.getInputPath()), tokenizer));
+            File goldFile = new File(currentRun.getInputPath());
+            if(goldFile.isDirectory())
+                goldCorpus.addSource(new TrXMLDirSource(goldFile, tokenizer));
+            else
+                goldCorpus.addSource(new TrXMLSource(new BufferedReader(new FileReader(goldFile)), tokenizer));
             goldCorpus.setFormat(CORPUS_FORMAT.TRCONLL);
             goldCorpus.load();
             System.out.println("done.");
