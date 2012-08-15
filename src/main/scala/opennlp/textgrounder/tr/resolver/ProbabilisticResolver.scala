@@ -88,7 +88,7 @@ class ProbabilisticResolver(val logFilePath:String,
         val cellDistGivenDocument = docIdToCellDist.getOrElse(doc.getId, null)
 
         val topFreq = toponymsToFrequencies(toponym.getForm)
-        val lambda = topFreq / (topFreq + 1.0E-3)//0.7
+        val lambda = topFreq / (topFreq + 1.0E-2)//0.7
 
         var indexToSelect = -1
         var maxProb = 0.0
@@ -120,7 +120,7 @@ class ProbabilisticResolver(val logFilePath:String,
             println("DOC ZERO")*/
 
           // Incorporate administrative level here
-          val adminLevelComponent = getAdminLevelComponent(cand.getType, cand.getAdmin1Code)
+          val adminLevelComponent = getAdminLevelComponent(cand, toponym.getCandidates.toList/*cand.getType, cand.getAdmin1Code*/)
 
           // P(l|t,d)
           val probOfLocation = adminLevelComponent * (lambda * localContextComponent + (1-lambda) * documentComponent)
@@ -150,30 +150,38 @@ class ProbabilisticResolver(val logFilePath:String,
       tokIndex += 1
     }
   }
+
+  // Backoff to DocDist:
+  val docDistResolver = new DocDistResolver(logFilePath)
+  docDistResolver.overwriteSelecteds = false
+  docDistResolver.disambiguate(corpus)
     
   corpus
+  }
+
+  def getAdminLevelComponent(loc:Location, candList:List[Location]): Double = {
+    val numerator = loc.getRegion.getRepresentatives.size
+    val denominator = candList.map(_.getRegion.getRepresentatives.size).sum
+    val frac = numerator.toDouble / denominator
+    frac
   }
 
   //val countryRE = """^\w\w\.\d\d$""".r
   val usStateRE = """^US\.[A-Za-z][A-Za-z]$""".r
 
-  def getAdminLevelComponent(locType:Location.Type, admin1Code:String): Double = {
+  def getAdminLevelComponentOld(locType:Location.Type, admin1Code:String): Double = {
     if(locType == Location.Type.STATE) {
-      if(usStateRE.findFirstIn(admin1Code) != None) {
-        //println(admin1Code+" .2")
+      if(usStateRE.findFirstIn(admin1Code) != None) { // US State
         .2
       }
-      else {
-        //println(admin1Code+" .7")
+      else { // Country
         .7
       }
     }
-    else if(locType == Location.Type.CITY) {
-      //println("CITY")
+    else if(locType == Location.Type.CITY) { // City
       0.095
     }
-    else {
-      //println("ELSE")
+    else { // Other
       0.005
     }
   }

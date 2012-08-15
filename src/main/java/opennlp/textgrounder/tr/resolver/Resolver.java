@@ -14,6 +14,10 @@ import opennlp.textgrounder.tr.text.*;
  */
 public abstract class Resolver {
 
+    // Make this false to have a resolver only resolve toponyms that don't already have a selected candidate
+    // (not implemented in all resolvers yet)
+    public boolean overwriteSelecteds = true;
+
     public void train(StoredCorpus corpus) {
         throw new UnsupportedOperationException("This type of resolver cannot be trained.");
     }
