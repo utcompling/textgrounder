@@ -37,8 +37,12 @@ public class SignatureEvaluator extends Evaluator {
                         if((getGoldLocations && toponym.hasGold()) ||
                            (!getGoldLocations && (toponym.hasSelected() || toponym.getAmbiguity() == 0))) {
                             toponymStarts.add(sb.length());
-                            if(getGoldLocations)
+                            if(getGoldLocations) {
+				if(toponym.getGoldIdx() == 801) {
+				    System.out.println(toponym.getForm()+": "+toponym.getGoldIdx()+"/"+toponym.getCandidates().size());
+				}
                                 curLocations.add(toponym.getCandidates().get(toponym.getGoldIdx()));
+			    }
                             else {
                                 if(toponym.getAmbiguity() > 0)
                                     curLocations.add(toponym.getCandidates().get(toponym.getSelectedIdx()));
