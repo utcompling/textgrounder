@@ -8,7 +8,7 @@ import scala.collection.JavaConversions._
 
 object TextUtil {
 
-  val alphanumRE = """^[a-zA-Z0-9]+$""".r
+  val alphanumRE = """^[a-zA-Z0-9 ]+$""".r
 
   def getDocAsArray(doc:Document[Token]): Array[Token] = {
     (for(sent <- doc) yield {

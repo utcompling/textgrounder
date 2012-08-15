@@ -61,7 +61,7 @@ object SupervisedTRFeatureExtractor extends App {
     curLine = in.readLine
   }
   in.close
-
+ 
   println("Reading serialized gazetteer from " + gazInputFile.value.get + " ...")
   val gis = new GZIPInputStream(new FileInputStream(gazInputFile.value.get))
   val ois = new ObjectInputStream(gis)
@@ -165,6 +165,7 @@ object SupervisedTRFeatureExtractor extends App {
     }
     -1
   }
+  
 }
 
 object SupervisedTRMaxentModelTrainer extends App {
