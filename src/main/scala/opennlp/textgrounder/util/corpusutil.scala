@@ -143,26 +143,31 @@ package object corpusutil {
     fieldnames: Seq[String],
     fixed_values: Map[String, String]
   ) {
+
+    val field_indices = fieldnames.zipWithIndex.toMap
+
     def get_field(fieldvals: Seq[String], key: String,
         error_if_missing: Boolean = true) =
       get_field_or_else(fieldvals, key, error_if_missing = error_if_missing)
 
     def get_field_or_else(fieldvals: Seq[String], key: String,
         default: String = null, error_if_missing: Boolean = false): String = {
-      assert(fieldvals.length == fieldnames.length)
-      var i = 0
-      while (i < fieldnames.length) {
-        if (fieldnames(i) == key) return fieldvals(i)
-        i += 1
-      }
-      return get_fixed_field(key, default, error_if_missing)
+      if (fieldvals.length != fieldnames.length)
+        throw FileFormatException(
+          "Wrong-length line, expected %d fields, found %d: %s" format (
+            fieldnames.length, fieldvals.length, fieldvals))
+      if (field_indices contains key)
+        fieldvals(field_indices(key))
+      else
+        get_fixed_field(key, default, error_if_missing)
     }
 
     def get_fixed_field(key: String, default: String = null,
         error_if_missing: Boolean = false) = {
       if (fixed_values contains key)
         fixed_values(key)
-      else Schema.error_or_default(key, default, error_if_missing)
+      else
+        Schema.error_or_default(key, default, error_if_missing)
     }
   }
 
@@ -371,32 +376,12 @@ package object corpusutil {
     }
 
     /**
-     * Locate the schema file of the appropriate suffix in the given directory.
-     */
-    def find_schema_file(filehand: FileHandler, dir: String) = {
-      val schema_regex = make_schema_file_suffix_regex(suffix)
-      val all_files = filehand.list_files(dir)
-      val files =
-        (for (file <- all_files
-          if schema_regex.findFirstMatchIn(file) != None) yield file).toSeq
-      if (files.length == 0)
-        throw new FileFormatException(
-          "Found no schema files (matching %s) in directory %s"
-          format (schema_regex, dir))
-      if (files.length > 1)
-        throw new FileFormatException(
-          "Found multiple schema files (matching %s) in directory %s: %s"
-          format (schema_regex, dir, files))
-      files(0)
-    }
-
-    /**
      * Locate and read the schema file of the appropriate suffix in the
      * given directory.  Set internal variables containing the schema file
      * and schema.
      */
     def read_schema_from_corpus(filehand: FileHandler, dir: String) {
-      schema_file = find_schema_file(filehand, dir)
+      schema_file = find_schema_file(filehand, dir, suffix)
       schema_filehand = filehand
       val (_, base) = filehand.split_filename(schema_file)
       schema_dir = dir
@@ -437,6 +422,42 @@ package object corpusutil {
       (re_quoted_suffix + possible_compression_re).r
     }
 
+    /**
+     * Locate the schema file of the appropriate suffix in the given directory.
+     */
+    def find_schema_file(filehand: FileHandler, dir: String, suffix: String) = {
+      val schema_regex = make_schema_file_suffix_regex(suffix)
+      val all_files = filehand.list_files(dir)
+      val files =
+        (for (file <- all_files
+          if schema_regex.findFirstMatchIn(file) != None) yield file).toSeq
+      if (files.length == 0)
+        throw new FileFormatException(
+          "Found no schema files (matching %s) in directory %s"
+          format (schema_regex, dir))
+      if (files.length > 1)
+        throw new FileFormatException(
+          "Found multiple schema files (matching %s) in directory %s: %s"
+          format (schema_regex, dir, files))
+      files(0)
+    }
+
+    /**
+     * Return a list of shell-style wildcard patterns matching all the document
+     * files in the given directory with the given suffix (including compressed
+     * files).
+     */
+    def get_matching_patterns(filehand: FileHandler, dir: String,
+        suffix: String) = {
+      val possible_endings = List("", ".bz2", ".gz")
+      for {ending <- possible_endings
+           full_ending = "-%s.txt%s" format (suffix, ending)
+           pattern = filehand.join_filename(dir, "*%s" format full_ending)
+           all_files = filehand.list_files(dir)
+           files = all_files.filter(_ endsWith full_ending)
+           if files.toSeq.length > 0}
+        yield pattern
+    }
   }
 
   /**
