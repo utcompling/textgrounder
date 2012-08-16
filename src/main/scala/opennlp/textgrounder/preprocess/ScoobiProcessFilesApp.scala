@@ -18,6 +18,8 @@
 
 package opennlp.textgrounder.preprocess
 
+import java.io._
+
 import org.apache.commons.logging.LogFactory
 import org.apache.log4j.{Level=>JLevel,_}
 
@@ -27,6 +29,7 @@ import com.nicta.scoobi.testing.HadoopLogFactory
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.osutil._
+import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.printutil._
 
 class ScoobiProcessFilesParams(ap: ArgParser) {
@@ -42,7 +45,7 @@ class ScoobiProcessFilesParams(ap: ArgParser) {
     help = "Destination directory to place files in.")
 }
 
-abstract class ScoobiProcessFilesShared {
+trait ScoobiProcessFilesShared {
 
   def progname: String
   val operation_category: String
@@ -59,12 +62,45 @@ abstract class ScoobiProcessFilesShared {
   def bump_counter(counter: String) {
     incrCounter(full_operation_category, counter)
   }
+
+  class ErrorWrapper {
+    errprint("Called ErrorWrapper")
+    var lineno = 0
+
+    def call[T, U](value: T, default: U)(fun: T => U) = {
+      // errprint("Called ErrorWrapper.call")
+      try {
+        lineno += 1
+        fun(value)
+      } catch {
+        case e: Exception => {
+          val writer = new StringWriter()
+          val pwriter = new PrintWriter(writer)
+          e.printStackTrace(pwriter)
+          pwriter.close()
+          logger.warn("Line %d: %s: %s\n%s" format (lineno, e, value, writer))
+          default
+        }
+      }
+    }
+  }
+
+  val wrapper_map = defaultmap[Class[_], ErrorWrapper](new ErrorWrapper, setkey = true)
+
+  def error_wrap[T, U](value: T, default: U)(fun: T => U) = {
+    // errprint("error_wrap called with fun %s", fun)
+    // errprint("class is %s", fun.getClass)
+    val wrapper = wrapper_map(fun.getClass)
+    // errprint("got wrapper %s", wrapper)
+    wrapper.call(value, default)(fun)
+  }
 }
 
-abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams] extends ScoobiApp {
+abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
+    extends ScoobiApp with ScoobiProcessFilesShared {
 
   def create_params(ap: ArgParser): ParamType
-  def progname: String
+  val operation_category = "MainApp"
   def output_command_line_parameters(arg_parser: ArgParser) {
     // Output using errprint() rather than logger() so that the results
     // stand out more.
