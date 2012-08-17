@@ -63,36 +63,62 @@ trait ScoobiProcessFilesShared {
     incrCounter(full_operation_category, counter)
   }
 
-  class ErrorWrapper {
-    errprint("Called ErrorWrapper")
+  /**
+   * A class used internally by `error_wrap`.
+   */
+  private class ErrorWrapper {
+    // errprint("Created an ErrorWrapper")
     var lineno = 0
-
-    def call[T, U](value: T, default: U)(fun: T => U) = {
-      // errprint("Called ErrorWrapper.call")
-      try {
-        lineno += 1
-        fun(value)
-      } catch {
-        case e: Exception => {
-          val writer = new StringWriter()
-          val pwriter = new PrintWriter(writer)
-          e.printStackTrace(pwriter)
-          pwriter.close()
-          logger.warn("Line %d: %s: %s\n%s" format (lineno, e, value, writer))
-          default
-        }
-      }
-    }
   }
 
-  val wrapper_map = defaultmap[Class[_], ErrorWrapper](new ErrorWrapper, setkey = true)
+  /**
+   * This is used to keep track of the line number.  Theoretically we should
+   * be able to key off of `fun` itself but this doesn't actually work,
+   * because a new object is created each time to hold the environment of
+   * the function.  However, using the class of the function works well,
+   * because internally each anonymous function is implemented by defining
+   * a new class that underlyingly implements the function.
+   */
+  private val wrapper_map =
+    defaultmap[Class[_], ErrorWrapper](new ErrorWrapper, setkey = true)
 
-  def error_wrap[T, U](value: T, default: U)(fun: T => U) = {
+  /**
+   * Wrapper function used to catch errors when doing line-oriented
+   * (or record-oriented) processing.  It is passed a value (typically,
+   * the line or record to be processed), a function to process the
+   * value, and a default value to be returned upon error.  If an error
+   * occurs during execution of the function, we log the line number,
+   * the value that triggered the error, and the error itself (including
+   * stack trace), and return the default.
+   *
+   * We need to create internal state in order to track the line number.
+   * This function is able to handle multiple overlapping or nested
+   * invocations of `error_wrap`, keyed (approximately) on the particular
+   * function invoked.
+   *
+   * @param value Value to process
+   * @param fun Function to use to process the value
+   * @param default Default value to be returned during error
+   */
+  def error_wrap[T, U](value: T, default: => U)(fun: T => U) = {
     // errprint("error_wrap called with fun %s", fun)
     // errprint("class is %s", fun.getClass)
     val wrapper = wrapper_map(fun.getClass)
     // errprint("got wrapper %s", wrapper)
-    wrapper.call(value, default)(fun)
+    try {
+      wrapper.lineno += 1
+      fun(value)
+    } catch {
+      case e: Exception => {
+        val writer = new StringWriter()
+        val pwriter = new PrintWriter(writer)
+        e.printStackTrace(pwriter)
+        pwriter.close()
+        logger.warn("Line %d: %s: %s\n%s" format
+          (wrapper.lineno, e, value, writer))
+        default
+      }
+    }
   }
 }
 
