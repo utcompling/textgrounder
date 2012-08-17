@@ -31,11 +31,14 @@ import org.apache.hadoop.fs.{FileSystem=>HFileSystem,_}
 
 import com.nicta.scoobi.Scoobi._
 
-import opennlp.textgrounder.util.Twokenize
-import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.corpusutil._
-import opennlp.textgrounder.util.printutil._
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.Twokenize
+import tgutil.argparser._
+import tgutil.collectionutil._
+import tgutil.corpusutil._
+import tgutil.ioutil.FileHandler
+import tgutil.hadoop.HadoopFileHandler
+import tgutil.printutil._
 
 class GroupTwitterPullParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {
@@ -1105,24 +1108,24 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     /**
      * Output a schema file of the appropriate name.
      */
-    def output_schema(fs: HFileSystem) {
-      val filename =
-        "%s/%s-%s-schema.txt" format
-          (Opts.output, Opts.corpus_name, corpus_suffix)
+    def output_schema(filehand: FileHandler) {
+      val filename = Schema.construct_schema_file(filehand,
+        Opts.output, Opts.corpus_name, corpus_suffix)
       logger.info("Outputting a schema to %s ..." format filename)
-      val p = new PrintWriter(fs.create(new Path(filename)))
-      def print_seq(s: String*) {
-        p.println(s mkString "\t")
-      }
-      try {
-        print_seq("user", "timestamp", "coord", "followers", "following",
-          "numtweets", "user-mentions", "retweets", "counts")
-        print_seq("corpus", Opts.corpus_name)
-        print_seq("corpus-type", "twitter-%s" format Opts.keytype)
+      val fields = Seq("user", "timestamp", "coord", "followers", "following",
+        "numtweets", "user-mentions", "retweets", "counts")
+      val fixed_fields = Map(
+        "corpus" -> Opts.corpus_name,
+        "corpus-type" -> ("twitter-%s" format Opts.keytype),
+        "split" -> Opts.split
+      ) ++ (
         if (Opts.keytype == "timestamp")
-          print_seq("corpus-timeslice", Opts.timeslice.toString)
-        print_seq("split", Opts.split)
-      } finally { p.close() }
+          Map("corpus-timeslice" -> Opts.timeslice.toString)
+        else
+          Map[String, String]()
+      )
+      val schema = new Schema(fields, fixed_fields)
+      schema.output_schema_file(filehand, filename)
     }
   }
 
@@ -1172,7 +1175,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     }
 
     // create a schema
-    ptp.output_schema(fs)
+    ptp.output_schema(new HadoopFileHandler(configuration))
 
     finish_scoobi_app(Opts)
   }
