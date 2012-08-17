@@ -169,9 +169,30 @@ package object corpusutil {
       else
         Schema.error_or_default(key, default, error_if_missing)
     }
+
+    /**
+     * Output the schema to a file.
+     */
+    def output_schema_file(filehand: FileHandler, schema_file: String,
+        split_text: String = "\t") {
+      val schema_outstream = filehand.openw(schema_file)
+      schema_outstream.println(fieldnames mkString split_text)
+      for ((field, value) <- fixed_values)
+        schema_outstream.println(List(field, value) mkString split_text)
+      schema_outstream.close()
+    }
   }
 
   object Schema {
+    /**
+     * Construct the name of a schema file, based on the given file handler,
+     * directory, prefix and suffix.  The file will end with "-schema.txt".
+     */
+    def construct_schema_file(filehand: FileHandler, dir: String,
+        prefix: String, suffix: String) =
+      CorpusFileProcessor.construct_output_file(filehand, dir, prefix,
+        suffix, "-schema.txt")
+
     /**
      * Read the given schema file.
      *
@@ -249,6 +270,7 @@ package object corpusutil {
      */
     def from_map(map: mutable.Map[String, String]) =
       map.toSeq.unzip
+
   }
 
   /**
@@ -423,6 +445,18 @@ package object corpusutil {
     }
 
     /**
+     * Construct the name of a file (either schema or document file), based
+     * on the given file handler, directory, prefix, suffix and file ending.
+     * For example, if the file ending is "-schema.txt", the file will be
+     * named `DIR/PREFIX-SUFFIX-schema.txt`.
+     */
+    def construct_output_file(filehand: FileHandler, dir: String,
+        prefix: String, suffix: String, file_ending: String) = {
+      val new_base = prefix + "-" + suffix + file_ending
+      filehand.join_filename(dir, new_base)
+    }
+
+    /**
      * Locate the schema file of the appropriate suffix in the given directory.
      */
     def find_schema_file(filehand: FileHandler, dir: String, suffix: String) = {
@@ -486,25 +520,9 @@ package object corpusutil {
      * named `DIR/PREFIX-SUFFIX-schema.txt`.
      */
     def construct_output_file(filehand: FileHandler, dir: String,
-        prefix: String, file_ending: String) = {
-      val new_base = prefix + "-" + suffix + file_ending
-      filehand.join_filename(dir, new_base)
-    }
-
-    /**
-     * Output the schema to a file.  The file will be named
-     * `DIR/PREFIX-SUFFIX-schema.txt`.
-     */
-    def output_schema_file(filehand: FileHandler, dir: String,
-        prefix: String) {
-      val schema_file = construct_output_file(filehand, dir, prefix,
-        "-schema.txt")
-      val schema_outstream = filehand.openw(schema_file)
-      schema_outstream.println(schema.fieldnames mkString split_text)
-      for ((field, value) <- schema.fixed_values)
-        schema_outstream.println(List(field, value) mkString split_text)
-      schema_outstream.close()
-    }
+        prefix: String, file_ending: String) =
+      CorpusFileProcessor.construct_output_file(filehand, dir, prefix,
+        suffix, file_ending)
 
     /**
      * Open a document file and return an output stream.  The file will be
@@ -535,6 +553,17 @@ package object corpusutil {
           (seqvals, seqvals.length, schema.fieldnames,
             schema.fieldnames.length))
       outstream.println(seqvals mkString split_text)
+    }
+
+    /**
+     * Output the schema to a file.  The file will be named
+     * `DIR/PREFIX-SUFFIX-schema.txt`.
+     */
+    def output_schema_file(filehand: FileHandler, dir: String,
+        prefix: String) {
+      val schema_file = Schema.construct_schema_file(filehand, dir, prefix,
+        suffix)
+      schema.output_schema_file(filehand, schema_file, split_text)
     }
   }
 
