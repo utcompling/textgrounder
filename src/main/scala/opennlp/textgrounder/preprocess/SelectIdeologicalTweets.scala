@@ -43,13 +43,19 @@ class SelectIdeologicalTweetsParams(val ap: ArgParser) extends
   var min_accounts = ap.option[Int]("min-accounts", default = 2,
     help="""Minimum number of political accounts mentioned by Twitter users
     in order for users to be considered.  Default %default.""")
-  var min_ideology = ap.option[Double]("min-ideology", "mi",
+  var min_conservative = ap.option[Double]("min-conservative", "mc",
     default = 0.75,
-    help="""Minimum ideology (usually on a scale from 0 to 1) to consider
-    a user as "ideological".  This should be a value greater than 0.5,
-    and will be used to check for ideology on both sides of the spectrum.
-    (For example, if the value is 0.75, then users are considered to be
-    ideological if their ideology is >= 0.75 or <= 0.25.  Default %default.""")
+    help="""Minimum ideology score to consider a user as an "ideological
+    conservative".  On the ideology scale, greater values indicate more
+    conservative.  Currently, the scale runs from 0 to 1; hence, this value
+    should be greater than 0.5.  Default %default.""")
+  var max_liberal = ap.option[Double]("max-liberal", "ml",
+    help="""Maximum ideology score to consider a user as an "ideological
+    liberal".  On the ideology scale, greater values indicate more
+    conservative.  Currently, the scale runs from 0 to 1; hence, this value
+    should be less than 0.5.  If unspecified, computed as the mirror image of
+    the value of '--min-conservative' (e.g. 0.25 if
+    --min-conservative=0.75).""")
   var corpus_name = ap.option[String]("corpus-name",
     help="""Name of output corpus; for identification purposes.
     Default to name taken from input directory.""")
@@ -182,8 +188,8 @@ object SelectIdeologicalTweets extends
         opts: SelectIdeologicalTweetsParams) = {
       for {(mention, times) <- user.mentions
            lcmention = mention.toLowerCase } yield {
-        val is_lib = user.ideology >= 1 - opts.min_ideology
-        val is_conserv = user.ideology <= opts.min_ideology
+        val is_lib = user.ideology <= opts.max_liberal
+        val is_conserv = user.ideology >= opts.min_conservative
         PotentialPolitico(
           lcmention, Map(mention->times), times,
           if (is_lib) times else 0,
@@ -297,6 +303,8 @@ object SelectIdeologicalTweets extends
     if (opts.political_twitter_accounts == null) {
       opts.ap.error("--political-twitter-accounts must be specified")
     }
+    if (!opts.ap.specified("max-liberal"))
+      opts.max_liberal = 1 - opts.min_conservative
     if (opts.corpus_name == null) {
       val (_, last_component) = filehand.split_filename(opts.input)
       opts.corpus_name = last_component.replace("*", "_")
