@@ -50,9 +50,9 @@ class GroupTwitterPullParams(ap: ArgParser) extends
     Can be a fractional number.  Default %default.""")
   // The following is set based on --timeslice
   var timeslice: Long = _
-  var corpus_name = ap.option[String]("corpus-name", default = "unknown",
-    help="""Name of corpus; for identification purposes.
-    Default '%default'.""")
+  var corpus_name = ap.option[String]("corpus-name",
+    help="""Name of output corpus; for identification purposes.
+    Default to name taken from input directory.""")
   var split = ap.option[String]("split", default = "training",
     help="""Split (training, dev, test) to place data in.  Default %default.""")
   var filter = ap.option[String]("filter",
@@ -1134,9 +1134,14 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
 
   def run() {
     val Opts = init_scoobi_app()
+    val filehand = new HadoopFileHandler(configuration)
     if (Opts.by_time)
       Opts.keytype = "timestamp"
     Opts.timeslice = (Opts.timeslice_float * 1000).toLong
+    if (Opts.corpus_name == null) {
+      val (_, last_component) = filehand.split_filename(Opts.input)
+      Opts.corpus_name = last_component.replace("*", "_")
+    }
     val ptp = new GroupTwitterPull(Opts)
 
     errprint("Step 1: Load up the JSON tweets, parse into records, remove duplicates, checkpoint.")
@@ -1175,7 +1180,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     }
 
     // create a schema
-    ptp.output_schema(new HadoopFileHandler(configuration))
+    ptp.output_schema(filehand)
 
     finish_scoobi_app(Opts)
   }
