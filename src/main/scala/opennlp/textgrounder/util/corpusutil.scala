@@ -189,7 +189,7 @@ package object corpusutil {
       val schema_outstream = filehand.openw(schema_file)
       schema_outstream.println(fieldnames mkString split_text)
       for ((field, value) <- fixed_values)
-        schema_outstream.println(List(field, value) mkString split_text)
+        schema_outstream.println(Seq(field, value) mkString split_text)
       schema_outstream.close()
     }
   }
@@ -494,7 +494,7 @@ package object corpusutil {
      */
     def get_matching_patterns(filehand: FileHandler, dir: String,
         suffix: String) = {
-      val possible_endings = List("", ".bz2", ".gz")
+      val possible_endings = Seq("", ".bz2", ".gz")
       for {ending <- possible_endings
            full_ending = "-%s.txt%s" format (suffix, ending)
            pattern = filehand.join_filename(dir, "*%s" format full_ending)
@@ -583,15 +583,25 @@ package object corpusutil {
   val ngram_counts_suffix = "ngram-counts"
   val text_suffix = "text"
 
-  private val chars_to_encode = List('%', ':', ' ', '\t', '\n')
-  private val encode_chars_regex = "[%s]".format(chars_to_encode mkString "").r
-  private val encode_chars_map =
-    chars_to_encode.map(c => (c.toString, "%%%02X".format(c.toInt))).toMap
-  private val decode_chars_map =
-    encode_chars_map.toSeq.flatMap {
-      case (dec, enc) => List((enc, dec), (enc.toLowerCase, dec)) }.toMap
-  private val decode_chars_regex =
-    "(%s)".format(decode_chars_map.keys mkString "|").r
+  class EncodeDecode(val chars_to_encode: Seq[Char]) {
+    private val encode_chars_regex = "[%s]".format(chars_to_encode mkString "").r
+    private val encode_chars_map =
+      chars_to_encode.map(c => (c.toString, "%%%02X".format(c.toInt))).toMap
+    private val decode_chars_map =
+      encode_chars_map.toSeq.flatMap {
+        case (dec, enc) => Seq((enc, dec), (enc.toLowerCase, dec)) }.toMap
+    private val decode_chars_regex =
+      "(%s)".format(decode_chars_map.keys mkString "|").r
+
+    def encode(str: String) =
+      encode_chars_regex.replaceAllIn(str, m => encode_chars_map(m.matched))
+    def decode(str: String) =
+      decode_chars_regex.replaceAllIn(str, m => decode_chars_map(m.matched))
+  }
+
+  private val endec_word_for_counts_field =
+    new EncodeDecode(Seq('%', ':', ' ', '\t', '\n'))
+  private val endec_whole_field = new EncodeDecode(Seq('%', '\t', '\n'))
 
   /**
    * Encode a word for placement inside a "counts" field.  Colons and spaces
@@ -609,9 +619,8 @@ package object corpusutil {
    * In the case of HTML-style encoding, : isn't even escaped, so that
    * wouldn't work at all.
    */
-  def encode_word_for_counts_field(word: String) = {
-    encode_chars_regex.replaceAllIn(word, m => encode_chars_map(m.matched))
-  }
+  def encode_word_for_counts_field(word: String) =
+    endec_word_for_counts_field.encode(word)
 
   /**
    * Encode an n-gram into text suitable for the "counts" field.  The
@@ -625,9 +634,23 @@ package object corpusutil {
   /**
    * Decode a word encoded using `encode_word_for_counts_field`.
    */
-  def decode_word_for_counts_field(word: String) = {
-    decode_chars_regex.replaceAllIn(word, m => decode_chars_map(m.matched))
-  }
+  def decode_word_for_counts_field(word: String) =
+    endec_word_for_counts_field.decode(word)
+
+  /**
+   * Encode a string for placement as the value of a field.  We need a way of
+   * escaping '\t' and '\n', without either character appearing in the encoded
+   * result.  We use URL-encoding, so we also need to encode '%'.  See
+   * `encode_word_for_counts_field` for more commentary.
+   */
+  def encode_field(word: String) =
+    endec_whole_field.encode(word)
+
+  /**
+   * Decode a string encoded using `encode_field`.
+   */
+  def decode_field(word: String) =
+    endec_whole_field.decode(word)
 
   /**
    * Decode an n-gram encoded using `encode_ngram_for_counts_field`.
