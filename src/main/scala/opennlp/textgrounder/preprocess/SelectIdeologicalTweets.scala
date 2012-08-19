@@ -86,7 +86,8 @@ object SelectIdeologicalTweets extends
   case class IdeologicalUser(user: String, ideology: Double,
     num_mentions: Int, mentions: Seq[(String, Int)],
     num_dem_mentions: Int, dem_mentions: Seq[(Politico, Int)],
-    num_rep_mentions: Int, rep_mentions: Seq[(Politico, Int)]) {
+    num_rep_mentions: Int, rep_mentions: Seq[(Politico, Int)],
+    text: String) {
     def encode_politico_count_map(seq: Seq[(Politico, Int)]) =
       encode_word_count_map(
         seq.map { case (politico, count) =>
@@ -95,7 +96,8 @@ object SelectIdeologicalTweets extends
       Seq(user, "%.3f" format ideology,
         num_mentions.toString, encode_word_count_map(mentions),
         num_dem_mentions.toString, encode_politico_count_map(dem_mentions),
-        num_rep_mentions.toString, encode_politico_count_map(rep_mentions)
+        num_rep_mentions.toString, encode_politico_count_map(rep_mentions),
+        text
       ) mkString "\t"
   }
   implicit val ideological_user_wire =
@@ -106,7 +108,8 @@ object SelectIdeologicalTweets extends
     def row_fields =
       Seq("user", "ideology", "num-mentions", "mentions",
         "num-dem-mentions", "dem-mentions",
-        "num-rep-mentions", "rep-mentions")
+        "num-rep-mentions", "rep-mentions",
+        "text")
 
     /**
      * For a given user, determine if the user is an "ideological user"
@@ -120,6 +123,7 @@ object SelectIdeologicalTweets extends
         val mentions =
           decode_word_count_map(schema.get_field(fields, "user-mentions"))
         val num_mentions = mentions.map(_._2).sum
+        val text = schema.get_field(fields, "text")
         val user = schema.get_field(fields, "user")
         // errprint("For user %s, mentions: %s", user, mentions.toList)
         // find mentions of a politician
@@ -142,7 +146,8 @@ object SelectIdeologicalTweets extends
             IdeologicalUser(user, ideology,
               num_mentions, mentions,
               num_dem_mentions, dem_mentions,
-              num_rep_mentions, rep_mentions)
+              num_rep_mentions, rep_mentions,
+              text)
           Some(ideo_user)
         } else None
       }}
@@ -165,21 +170,23 @@ object SelectIdeologicalTweets extends
    * @param num_ideo_mentions Sum of mentions weighted by ideology of
    *   person doing the mentioning, so that we can compute a weighted
    *   average to determine their ideology.
+   * @param all_text Text of all users mentioning the politico.
    */
   case class PotentialPolitico(lcuser: String, spellings: Map[String, Int],
     num_mentions: Int, num_lib_mentions: Int, num_conserv_mentions: Int,
-    num_ideo_mentions: Double) {
+    num_ideo_mentions: Double, all_text: Seq[String]) {
     def to_row =
       Seq(lcuser, encode_word_count_map(spellings.toSeq), num_mentions,
         num_lib_mentions, num_conserv_mentions,
-        num_ideo_mentions/num_mentions) mkString "\t"
+        num_ideo_mentions/num_mentions,
+        all_text mkString " !! ") mkString "\t"
   }
 
   object PotentialPolitico {
 
     def row_fields =
       Seq("lcuser", "spellings", "num-mentions", "num-lib-mentions",
-        "num-conserv-mentions", "ideology")
+        "num-conserv-mentions", "ideology", "all-text")
     /**
      * For a given ideological user, generate the "potential politicos": other
      * people mentioned, along with their ideological scores.
@@ -194,7 +201,8 @@ object SelectIdeologicalTweets extends
           lcmention, Map(mention->times), times,
           if (is_lib) times else 0,
           if (is_conserv) times else 0,
-          times * user.ideology
+          times * user.ideology,
+          Seq(user.text)
         )
       }
     }
@@ -209,7 +217,8 @@ object SelectIdeologicalTweets extends
         u1.num_mentions + u2.num_mentions,
         u1.num_lib_mentions + u2.num_lib_mentions,
         u1.num_conserv_mentions + u2.num_conserv_mentions,
-        u1.num_ideo_mentions + u2.num_ideo_mentions)
+        u1.num_ideo_mentions + u2.num_ideo_mentions,
+        u1.all_text ++ u2.all_text)
     }
   }
 
