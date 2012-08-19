@@ -913,21 +913,9 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       val retweets = encode_word_count_map(tnt.retweets.toSeq)
       // Put back together but drop key.
       Seq(tnt.user, tnt.timestamp, latlongstr, tnt.followers, tnt.following,
-          tnt.numtweets, user_mentions, retweets, formatted_text) mkString "\t"
-    }
-  }
-
-  /**
-   * Tokenize the combined text into words, count them up and output results.
-   */
-  object TokenizeFilterAndCountTweets {
-    def apply(Opts: GroupTwitterPullParams, lines_cp: DList[Record]) = {
-      val obj = new TokenizeFilterAndCountTweets(Opts)
-
-      // We run `from_checkpoint_to_tweet_text` (see above) to get separate
-      // access to the text, then Twokenize it into words, generate ngrams
-      // from them, count, and format into a record.
-      lines_cp.map(obj.tokenize_count_and_format)
+          tnt.numtweets, user_mentions, retweets,
+          encode_field(tweet.text), formatted_text
+        ) mkString "\t"
     }
   }
 
@@ -1113,7 +1101,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         Opts.output, Opts.corpus_name, corpus_suffix)
       logger.info("Outputting a schema to %s ..." format filename)
       val fields = Seq("user", "timestamp", "coord", "followers", "following",
-        "numtweets", "user-mentions", "retweets", "counts")
+        "numtweets", "user-mentions", "retweets", "text", "counts")
       val fixed_fields = Map(
         "corpus" -> Opts.corpus_name,
         "corpus-type" -> ("twitter-%s" format Opts.keytype),
@@ -1162,7 +1150,10 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       errprint("        (grouping by user)")
     val lines2: DList[String] = TextInput.fromTextFile(Opts.output + "-st")
     val grouped_tweets = GroupTweetsAndSelectGood(Opts, lines2)
-    val nicely_formatted = TokenizeFilterAndCountTweets(Opts, grouped_tweets)
+    val tfct = new TokenizeFilterAndCountTweets(Opts)
+    // Tokenize the combined text into words, possibly generate ngrams from them,
+    // count them up and output results formatted into a record.
+    val nicely_formatted = grouped_tweets.map(tfct.tokenize_count_and_format)
     persist(TextOutput.toTextFile(nicely_formatted, Opts.output))
     errprint("Step 2: done.")
 
