@@ -139,9 +139,20 @@ package object corpusutil {
        TextFileProcessor. */
   }
 
+  /**
+   * An object describing a corpus schema, i.e. a description of each if the
+   * fields in a corpus, along with "fixed fields" containing the same
+   * value for every row.
+   *
+   * @param fieldnames List of the name of each field
+   * @param fixed_values Map specifying additional fields possessing the
+   *   same value for every row.  This is optional, but usually at least
+   *   the "corpus" field should be given, with the name of the corpus
+   *   (currently used purely for identification purposes).
+   */
   case class Schema(
     fieldnames: Seq[String],
-    fixed_values: Map[String, String]
+    fixed_values: Map[String, String] = Map[String, String]()
   ) {
 
     val field_indices = fieldnames.zipWithIndex.toMap
