@@ -1157,18 +1157,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     persist(TextOutput.toTextFile(nicely_formatted, Opts.output))
     errprint("Step 2: done.")
 
-    // Rename output files appropriately
-    errprint("Renaming output files ...")
-    val fs = configuration.fs
-    val globpat = "%s/*-r-*" format Opts.output
-    for (file <- fs.globStatus(new Path(globpat))) {
-      val path = file.getPath
-      val basename = path.getName
-      val newname = "%s/%s-%s-%s.txt" format (
-        Opts.output, Opts.corpus_name, basename, ptp.corpus_suffix)
-      errprint("Renaming %s to %s" format (path, newname))
-      fs.rename(path, new Path(newname))
-    }
+    rename_output_files(configuration.fs, Opts.output, Opts.corpus_name,
+      ptp.corpus_suffix)
 
     // create a schema
     ptp.output_schema(filehand)
