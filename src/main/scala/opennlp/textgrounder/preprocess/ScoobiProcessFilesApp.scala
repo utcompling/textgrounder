@@ -22,6 +22,7 @@ import java.io._
 
 import org.apache.commons.logging.LogFactory
 import org.apache.log4j.{Level=>JLevel,_}
+import org.apache.hadoop.fs.{FileSystem => HFileSystem, Path}
 
 import com.nicta.scoobi.Scoobi._
 import com.nicta.scoobi.testing.HadoopLogFactory
@@ -174,6 +175,21 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
     errprint("All done with everything.")
     errprint("")
     output_resource_usage()
+  }
+
+  def rename_output_files(fs: HFileSystem, dir: String, corpus_name: String,
+    suffix: String) {
+    // Rename output files appropriately
+    errprint("Renaming output files ...")
+    val globpat = "%s/*-r-*" format dir
+    for (file <- fs.globStatus(new Path(globpat))) {
+      val path = file.getPath
+      val basename = path.getName
+      val newname = "%s/%s-%s-%s.txt" format (
+        dir, corpus_name, basename, suffix)
+      errprint("Renaming %s to %s" format (path, newname))
+      fs.rename(path, new Path(newname))
+    }
   }
 }
 

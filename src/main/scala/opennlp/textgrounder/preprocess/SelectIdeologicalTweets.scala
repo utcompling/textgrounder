@@ -59,6 +59,9 @@ class SelectIdeologicalTweetsParams(val ap: ArgParser) extends
   var corpus_name = ap.option[String]("corpus-name",
     help="""Name of output corpus; for identification purposes.
     Default to name taken from input directory.""")
+  var include_text = ap.flag("include-text",
+    help="""Include text of users sending tweets mentioning a potential
+    politico.""")
 }
 
 object SelectIdeologicalTweets extends
@@ -92,7 +95,7 @@ object SelectIdeologicalTweets extends
       encode_word_count_map(
         seq.map { case (politico, count) =>
           (politico.full_name.replace(" ", "."), count) })
-    def to_row =
+    def to_row(opts: SelectIdeologicalTweetsParams) =
       Seq(user, "%.3f" format ideology,
         num_mentions.toString, encode_word_count_map(mentions),
         num_dem_mentions.toString, encode_politico_count_map(dem_mentions),
@@ -175,11 +178,12 @@ object SelectIdeologicalTweets extends
   case class PotentialPolitico(lcuser: String, spellings: Map[String, Int],
     num_mentions: Int, num_lib_mentions: Int, num_conserv_mentions: Int,
     num_ideo_mentions: Double, all_text: Seq[String]) {
-    def to_row =
+    def to_row(opts: SelectIdeologicalTweetsParams) =
       Seq(lcuser, encode_word_count_map(spellings.toSeq), num_mentions,
         num_lib_mentions, num_conserv_mentions,
         num_ideo_mentions/num_mentions,
-        all_text mkString " !! ") mkString "\t"
+        if (opts.include_text) all_text mkString " !! " else "(omitted)"
+      ) mkString "\t"
   }
 
   object PotentialPolitico {
@@ -325,6 +329,18 @@ object SelectIdeologicalTweets extends
       CorpusFileProcessor.find_schema_file(filehand, opts.input, suffix)
     val in_schema = Schema.read_schema_file(filehand, in_schema_file)
 
+    def output_lines(lines: DList[String], corpus_suffix: String,
+        fields: Seq[String]) {
+      val outdir = opts.output + "-" + corpus_suffix
+      persist(TextOutput.toTextFile(lines, outdir))
+      val out_schema = new Schema(fields, Map("corpus" -> opts.corpus_name))
+      val out_schema_fn = Schema.construct_schema_file(filehand,
+          outdir, opts.corpus_name, corpus_suffix)
+      rename_output_files(configuration.fs, outdir, opts.corpus_name,
+        corpus_suffix)
+      out_schema.output_schema_file(filehand, out_schema_fn)
+    }
+
     errprint("Step 1: Load corpus, filter for conservatives/liberals, output.")
     val matching_patterns = CorpusFileProcessor.
         get_matching_patterns(filehand, opts.input, suffix)
@@ -332,15 +348,8 @@ object SelectIdeologicalTweets extends
     val ideo_users =
       lines.flatMap(
         IdeologicalUser.get_ideological_user(_, in_schema, accounts))
-    val outlines1 = ideo_users.map(_.to_row)
-    val corp_suffix1 = "ideo-users"
-    val outdir1 = opts.output + "-" + corp_suffix1
-    persist(TextOutput.toTextFile(outlines1, outdir1))
-    val out_schema1 = new Schema(IdeologicalUser.row_fields,
-      Map("corpus" -> opts.corpus_name))
-    val out_schema1_fn = Schema.construct_schema_file(filehand,
-        outdir1, opts.corpus_name, corp_suffix1)
-    out_schema1.output_schema_file(filehand, out_schema1_fn)
+    output_lines(ideo_users.map(_.to_row(opts)), "ideo-users",
+      IdeologicalUser.row_fields)
     errprint("Step 1: done.")
 
     errprint("Step 2: Generate potential politicos.")
@@ -349,15 +358,8 @@ object SelectIdeologicalTweets extends
       groupBy(_.lcuser).
       combine(PotentialPolitico.merge_potential_politicos).
       map(_._2)
-    val outlines2 = potential_politicos.map(_.to_row)
-    val corp_suffix2 = "potential-politicos"
-    val outdir2 = opts.output + "-" + corp_suffix2
-    persist(TextOutput.toTextFile(outlines2, outdir2))
-    val out_schema2 = new Schema(PotentialPolitico.row_fields,
-      Map("corpus" -> opts.corpus_name))
-    val out_schema2_fn = Schema.construct_schema_file(filehand,
-        outdir2, opts.corpus_name, corp_suffix2)
-    out_schema2.output_schema_file(filehand, out_schema2_fn)
+    output_lines(potential_politicos.map(_.to_row(opts)),
+      "potential_politicos", PotentialPolitico.row_fields)
     errprint("Step 2: done.")
 
     finish_scoobi_app(opts)
