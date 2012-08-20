@@ -359,7 +359,7 @@ object SelectIdeologicalTweets extends
       combine(PotentialPolitico.merge_potential_politicos).
       map(_._2)
     output_lines(potential_politicos.map(_.to_row(opts)),
-      "potential_politicos", PotentialPolitico.row_fields)
+      "potential-politicos", PotentialPolitico.row_fields)
     errprint("Step 2: done.")
 
     finish_scoobi_app(opts)
