@@ -85,10 +85,16 @@ class ProbabilisticResolver(val logFilePath:String,
           null
 
         // P(l|d)
-        val cellDistGivenDocument = docIdToCellDist.getOrElse(doc.getId, null)
+        //val prev = docIdToCellDist.getOrElse(doc.getId, null)
+        val cellDistGivenDocument = filterAndNormalize(docIdToCellDist.getOrElse(doc.getId, null), toponym)
+        /*if(prev != null) {
+          println("prev size = " + prev.size)
+          println(" new size = " + cellDistGivenDocument.size)
+          println("-----")
+        }*/
 
         val topFreq = toponymsToFrequencies(toponym.getForm)
-        val lambda = topFreq / (topFreq + 1.0E-2)//0.7
+        val lambda = topFreq / (topFreq + 1.0E-4)//0.7
 
         var indexToSelect = -1
         var maxProb = 0.0
@@ -103,7 +109,7 @@ class ProbabilisticResolver(val logFilePath:String,
             0.0
 
           val documentComponent =
-          if(cellDistGivenDocument != null)
+          if(cellDistGivenDocument != null && cellDistGivenDocument.size > 0)
             cellDistGivenDocument.getOrElse(curCellNum, 0.0)
           else
             0.0
@@ -164,6 +170,13 @@ class ProbabilisticResolver(val logFilePath:String,
     val denominator = candList.map(_.getRegion.getRepresentatives.size).sum
     val frac = numerator.toDouble / denominator
     frac
+  }
+
+  def filterAndNormalize(dist:Map[Int, Double], toponym:Toponym): Map[Int, Double] = {
+    val cells = toponym.getCandidates.map(l => TopoUtil.getCellNumber(l.getRegion.getCenter, DPC)).toSet
+    val filteredDist = dist.filter(c => cells(c._1))
+    val sum = filteredDist.map(_._2).sum
+    filteredDist.map(c => (c._1, c._2 / sum))
   }
 
   //val countryRE = """^\w\w\.\d\d$""".r

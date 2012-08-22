@@ -12,7 +12,8 @@ import opennlp.textgrounder.tr.util._
 
 import scala.collection.JavaConversions._
 
-class MaxentResolver(val modelDirPath:String) extends Resolver {
+class MaxentResolver(val logFilePath:String,
+                     val modelDirPath:String) extends Resolver {
 
   val windowSize = 20
   val dpc = 1.0
@@ -51,6 +52,11 @@ class MaxentResolver(val modelDirPath:String) extends Resolver {
         tokIndex += 1
       }
     }
+
+    // Backoff to DocDist:
+    val docDistResolver = new DocDistResolver(logFilePath)
+    docDistResolver.overwriteSelecteds = false
+    docDistResolver.disambiguate(corpus)
 
     corpus
   }

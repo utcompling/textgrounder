@@ -121,8 +121,8 @@ public class RunResolver extends BaseApp {
             resolver = new LabelPropComplexResolver(currentRun.getGraphInputPath());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.MAXENT) {
-            System.out.print("Running MAXENT resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " ...");
-            resolver = new MaxentResolver(currentRun.getMaxentModelDirInputPath());
+            System.out.print("Running MAXENT resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " and log file at " + currentRun.getLogFilePath());
+            resolver = new MaxentResolver(currentRun.getLogFilePath(), currentRun.getMaxentModelDirInputPath());
         }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.PROB) {
             System.out.println("Running PROBABILISTIC resolver, using models at " + currentRun.getMaxentModelDirInputPath() + " and log file at " + currentRun.getLogFilePath());
