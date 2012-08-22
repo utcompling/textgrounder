@@ -38,8 +38,8 @@ class ProbabilisticResolver(val logFilePath:String,
     val reader = new BinaryGISModelReader(dataInputStream)
     val model = reader.getModel
 
-    //println(file.getName.dropRight(4))
-    (file.getName.dropRight(4), model)
+    //println(file.getName.dropRight(4).replaceAll("_", " "))
+    (file.getName.dropRight(4).replaceAll("_", " "), model)
   }).toMap
 
   var toponymsToCounts = new scala.collection.mutable.HashMap[String, Int]
