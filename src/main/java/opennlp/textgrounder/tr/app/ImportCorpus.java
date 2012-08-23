@@ -11,19 +11,22 @@ import java.io.*;
 import java.util.zip.*;
 
 public class ImportCorpus extends BaseApp {
+
+    //private static int sentsPerDocument;
     
     public static void main(String[] args) throws Exception {
 
         ImportCorpus currentRun = new ImportCorpus();
 
         currentRun.initializeOptionsFromCommandLine(args);
+        //sentsPerDocument = currentRun.getSentsPerDocument();
 
         if(currentRun.getSerializedCorpusOutputPath() == null && currentRun.getOutputPath() == null) {
             System.out.println("Please specify a serialized corpus output file with the -sco flag and/or an XML output file with the -o flag.");
             System.exit(0);
         }
 
-        StoredCorpus corpus = currentRun.doImport(currentRun.getInputPath(), currentRun.getSerializedGazetteerPath(), currentRun.getCorpusFormat(), currentRun.getUseGoldToponyms());
+        StoredCorpus corpus = currentRun.doImport(currentRun.getInputPath(), currentRun.getSerializedGazetteerPath(), currentRun.getCorpusFormat(), currentRun.getUseGoldToponyms(), currentRun.getSentsPerDocument());
         
         if(currentRun.getSerializedCorpusOutputPath() != null)
             currentRun.serialize(corpus, currentRun.getSerializedCorpusOutputPath());
@@ -33,12 +36,12 @@ public class ImportCorpus extends BaseApp {
 
     public StoredCorpus doImport(String corpusInputPath, String serGazInputPath,
                                         Enum<BaseApp.CORPUS_FORMAT> corpusFormat) throws Exception {
-        return doImport(corpusInputPath, serGazInputPath, corpusFormat, false);
+        return doImport(corpusInputPath, serGazInputPath, corpusFormat, false, -1);
     }
 
     public StoredCorpus doImport(String corpusInputPath, String serGazInputPath,
                                         Enum<BaseApp.CORPUS_FORMAT> corpusFormat,
-                                        boolean useGoldToponyms) throws Exception {
+                                 boolean useGoldToponyms, int sentsPerDocument) throws Exception {
 
         checkExists(corpusInputPath);
         if(!useGoldToponyms || doKMeans)
@@ -69,9 +72,9 @@ public class ImportCorpus extends BaseApp {
             File corpusInputFile = new File(corpusInputPath);
             if(useGoldToponyms) {
                 if(corpusInputFile.isDirectory())
-                    corpus.addSource(new CandidateRepopulator(new TrXMLDirSource(new File(corpusInputPath), tokenizer), gnGaz));
+                    corpus.addSource(new CandidateRepopulator(new TrXMLDirSource(new File(corpusInputPath), tokenizer, sentsPerDocument), gnGaz));
                 else
-                    corpus.addSource(new CandidateRepopulator(new TrXMLSource(new BufferedReader(new FileReader(corpusInputPath)), tokenizer), gnGaz));
+                    corpus.addSource(new CandidateRepopulator(new TrXMLSource(new BufferedReader(new FileReader(corpusInputPath)), tokenizer, sentsPerDocument), gnGaz));
             }
             else {
                 if(corpusInputFile.isDirectory())
