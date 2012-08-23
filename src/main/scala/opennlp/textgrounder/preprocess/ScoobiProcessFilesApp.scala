@@ -111,12 +111,8 @@ trait ScoobiProcessFilesShared {
       fun(value)
     } catch {
       case e: Exception => {
-        val writer = new StringWriter()
-        val pwriter = new PrintWriter(writer)
-        e.printStackTrace(pwriter)
-        pwriter.close()
         logger.warn("Line %d: %s: %s\n%s" format
-          (wrapper.lineno, e, value, writer))
+          (wrapper.lineno, e, value, stack_trace_as_string(e)))
         default
       }
     }
