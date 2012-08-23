@@ -351,7 +351,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
 
       def parse_problem(e: Exception) = {
         logger.warn("Error parsing line %s: %s\n%s" format (
-          lineno, line, e))
+          lineno, line, stack_trace_as_string(e)))
         ("error", empty_tweet)
       }
 
@@ -373,6 +373,61 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
           }
         }
         fieldval.values.toString
+      }
+
+      /**
+       * Retrieve the list of entities of a particular type from a tweet,
+       * along with the indices referring to the entity.
+       *
+       * @param key the key referring to the type of entity
+       * @param subkey the subkey within the entity to return as the "value"
+       *   of the entity
+       */
+      def retrieve_entities_with_indices(parsed: liftweb.json.JValue,
+          key: String, subkey: String) = {
+        // Retrieve the raw list of entities based on the key.
+        val entities_raw =
+          (parsed \ "entities" \ key values).
+          asInstanceOf[List[Map[String, Any]]]
+        // For each entity, fetch the user actually mentioned. Sort and
+        // convert into a map counting mentions.  Do it this way to count
+        // multiple mentions properly.
+        for { ent <- entities_raw
+              rawvalue = ent(subkey)
+              if rawvalue != null
+              value = rawvalue.toString
+              indices = ent("indices").asInstanceOf[List[Number]]
+              start = indices(0).intValue
+              end = indices(1).intValue
+              if {
+                if (value.length == 0) {
+                  bump_counter("zero length %s/%s seen" format (key, subkey))
+                  warning(line,
+                    "Zero-length %s/%s in interval [%d,%d], skipped",
+                    key, subkey, start, end)
+                  false
+                } else true
+              }
+            }
+          yield (value, start, end)
+      }
+
+      /**
+       * Retrieve the list of entities of a particular type from a tweet,
+       * as a map with counts (so as to count multiple identical entities
+       * properly).
+       *
+       * @param key the key referring to the type of entity
+       * @param subkey the subkey within the entity to return as the "value"
+       *   of the entity
+       */
+      def retrieve_entities(parsed: liftweb.json.JValue,
+          key: String, subkey: String) = {
+        list_to_item_count_map(
+          for { (value, start, end) <-
+                retrieve_entities_with_indices(parsed, key, subkey) }
+            yield value
+        )
       }
 
       try {
@@ -460,33 +515,67 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
                   asInstanceOf[List[Number]]
               (latlong(1).doubleValue, latlong(0).doubleValue)
             }
+
+          /////////////// HANDLE ENTITIES
+
+          /* Entity types:
+
+           user_mentions: @-mentions in the text; subkeys are
+             screen_name = Username of user
+             name = Display name of user
+             id_str = ID of user, as a string
+             id = ID of user, as a number
+             indices = indices in text of @-mention, including the @
+
+           urls: URLs mentioned in the text; subkeys are
+             url = raw URL (probably a shortened reference to bit.ly etc.)
+             expanded_url = actual URL
+             display_url = display form of URL (without initial http://, cut
+               off after a point with \u2026 (Unicode ...)
+             indices = indices in text of raw URL
+             (NOTE: all URL's in the JSON text have /'s quoted as \/, and
+              display_url may not be present)
+           
+           hashtags: Hashtags mentioned in the text; subkeys are
+             text = text of the hashtag
+             indices = indices in text of hashtag, including the #
+
+           media: Embedded objects
+             type = "photo" for images
+             indices = indices of URL for image
+             url, expanded_url, display_url = similar to URL mentions
+             media_url = photo on p.twimg.com?
+             media_url_https = https:// alias for media_url
+             id_str, id = some sort of tweet ID or similar?
+             sizes = map with keys "small", "medium", "large", "thumb";
+               each has subkeys:
+                 resize = "crop" or "fit"
+                 h = height (as number)
+                 w = width (as number)
+             
+             Example of URL's for photo:
+  url = http:\/\/t.co\/AO3mRYaG
+  expanded_url = http:\/\/twitter.com\/alejandraoraa\/status\/215758169589284864\/photo\/1
+  display_url = pic.twitter.com\/AO3mRYaG
+  media_url = http:\/\/p.twimg.com\/Av6G6YBCAAAwD7J.jpg
+  media_url_https = https:\/\/p.twimg.com\/Av6G6YBCAAAwD7J.jpg
+
+"id_str":"215758169597673472"
+           */
+
           // Retrieve "user_mentions", which is a list of mentions, each
-          // listing the span of text, the user actually mentioned, etc.
-          val user_mentions_raw =
-            (parsed \ "entities" \ "user_mentions" values).
-            asInstanceOf[List[Map[String, Any]]]
-          // For each mention, fetch the user actually mentioned. Sort and
-          // convert into a map counting mentions.  Do it this way to count
-          // multiple mentions properly.
+          // listing the span of text, the user actually mentioned, etc. --
+          // along with whether the mention is a retweet (by looking for
+          // "RT" before the mention)
+          val user_mentions_raw = retrieve_entities_with_indices(
+            parsed, "user_mentions", "screen_name")
           val user_mentions_retweets =
-            for { men <- user_mentions_raw
-                  screen_name = men("screen_name").toString
+            for { (screen_name, start, end) <- user_mentions_raw
                   namelen = screen_name.length
-                  indices = men("indices").asInstanceOf[List[Number]]
-                  start = indices(0).intValue
-                  end = indices(1).intValue
                   retweet = (start >= 3 &&
                              raw_text.slice(start - 3, start) == "RT ")
-                  if {
-                    if (namelen == 0) {
-                      bump_counter("zero length screen name seen")
-                      warning(line,
-                        "Zero-length screen name in interval [%d,%d], skipped",
-                        start, end)
-                    }
-                    namelen > 0
-                  }
                 } yield {
+              // Subtract one because of the initial @ in the index reference
               if (end - start - 1 != namelen) {
                 bump_counter("wrong length interval for screen name seen")
                 warning(line, "Strange indices [%d,%d] for screen name %s, length %d != %d, text context is '%s'",
@@ -504,6 +593,11 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
           val user_mentions = list_to_item_count_map(user_mentions_list)
           val retweets = list_to_item_count_map(retweets_list)
 
+          val hashtags = retrieve_entities(parsed, "hashtags", "text")
+          val urls = retrieve_entities(parsed, "urls", "expanded_url")
+          // map
+          //  { case (url, count) => (url.replace("\\/", "/"), count) }
+
           val key = Opts.keytype match {
             case "user" => user
             case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
@@ -511,7 +605,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
           ("success",
             (tweet_id, (key,
               Tweet(text, TweetNoText(user, timestamp, lat, long,
-                followers, following, 1, user_mentions, retweets)))))
+                followers, following, 1, user_mentions, retweets,
+                hashtags, urls)))))
         }
       } catch {
         case jpe: liftweb.json.JsonParser.ParseException => {
@@ -574,7 +669,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
   //      }
   //      (tweet_id, (key,
   //        Tweet(text, TweetNoText(user, timestamp, lat, long,
-  //          followers, following, 1, FIXME: user_mentions, FIXME: retweets))))
+  //          followers, following, 1, FIXME: user_mentions, FIXME: retweets,
+  //          FIXME: hashtags, FIXME: urls))))
   //    } catch {
   //      case jpe: jerkson.ParsingException =>
   //        parse_problem(line, jpe)
@@ -694,6 +790,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       val numtweets = t1.numtweets + t2.numtweets
       val user_mentions = combine_maps(t1.user_mentions, t2.user_mentions)
       val retweets = combine_maps(t1.retweets, t2.retweets)
+      val hashtags = combine_maps(t1.hashtags, t2.hashtags)
+      val urls = combine_maps(t1.urls, t2.urls)
 
       val (lat, long, timestamp) =
         if (isNaN(t1.lat) && isNaN(t2.lat)) {
@@ -710,7 +808,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
 
       // FIXME maybe want to track the different users
       Tweet(text, TweetNoText(t1.user, timestamp, lat, long,
-        followers, following, numtweets, user_mentions, retweets))
+        followers, following, numtweets, user_mentions, retweets,
+        hashtags, urls))
     }
 
     /**
@@ -911,9 +1010,11 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         else ""
       val user_mentions = encode_word_count_map(tnt.user_mentions.toSeq)
       val retweets = encode_word_count_map(tnt.retweets.toSeq)
+      val hashtags = encode_word_count_map(tnt.hashtags.toSeq)
+      val urls = encode_word_count_map(tnt.urls.toSeq)
       // Put back together but drop key.
       Seq(tnt.user, tnt.timestamp, latlongstr, tnt.followers, tnt.following,
-          tnt.numtweets, user_mentions, retweets,
+          tnt.numtweets, user_mentions, retweets, hashtags, urls,
           encode_field(tweet.text), formatted_text
         ) mkString "\t"
     }
@@ -945,8 +1046,10 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
    * @param followers Max followers
    * @param following Max following
    * @param numtweets Number of tweets merged
-   * @param user_mentions Map of all @-mentions of users + counts
+   * @param user_mentions Item-count map of all @-mentions
    * @param retweets Like `user_mentions` but only for retweet mentions
+   * @param hashtags Item-count map of hashtags
+   * @param urls Item-count map of URL's
    */
   case class TweetNoText(
     user: String,
@@ -957,7 +1060,9 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     following: Int,
     numtweets: Int,
     user_mentions: Map[String, Int],
-    retweets: Map[String, Int]
+    retweets: Map[String, Int],
+    hashtags: Map[String, Int],
+    urls: Map[String, Int]
     /* NOTE: If you add a field here, you need to update a bunch of places,
        including (of course) wherever a TweetNoText is created, but also
        some less obvious places.  In all:
@@ -973,6 +1078,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
   object TweetNoText {
     def empty =
       TweetNoText("", 0, Double.NaN, Double.NaN, 0, 0, 0,
+        Map[String, Int](), Map[String, Int](),
         Map[String, Int](), Map[String, Int]())
   }
   implicit val tweetNoTextFmt =
@@ -1018,9 +1124,12 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       val text_2 = tw.text.replaceAll("\\s+", " ")
       val user_mentions = encode_word_count_map(tn.user_mentions.toSeq)
       val retweets = encode_word_count_map(tn.retweets.toSeq)
+      val hashtags = encode_word_count_map(tn.hashtags.toSeq)
+      val urls = encode_word_count_map(tn.urls.toSeq)
       val s = Seq(
         key, tn.user, tn.timestamp, tn.lat, tn.long, tn.followers,
-        tn.following, tn.numtweets, user_mentions, retweets, text_2
+        tn.following, tn.numtweets, user_mentions, retweets, hashtags, urls,
+        text_2
         ) mkString "\t"
       s
     }
@@ -1032,7 +1141,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
      */
     def split_tweet_no_text(tweet_no_text: String): (String, TweetNoText) = {
       val split2 = tweet_no_text.split("\t", -1)
-      if (split2.length != 10) {
+      if (split2.length != 12) {
         warning(tweet_no_text, "Non-text portion of line should have 10 fields, but only %d", split2.length)
         bump_counter("saw %d fields instead of 10" format split2.length)
         ("UNKNOWN", TweetNoText.empty)
@@ -1047,9 +1156,11 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         val numtweets = split2(7).toInt
         val user_mentions = decode_word_count_map(split2(8)).toMap
         val retweets = decode_word_count_map(split2(9)).toMap
-        assert(split2.length == 10)
+        val hashtags = decode_word_count_map(split2(10)).toMap
+        val urls = decode_word_count_map(split2(11)).toMap
+        assert(split2.length == 12)
         (key, TweetNoText(user, timestamp, lat, long, followers, following,
-          numtweets, user_mentions, retweets))
+          numtweets, user_mentions, retweets, hashtags, urls))
       }
     }
 
@@ -1101,7 +1212,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         Opts.output, Opts.corpus_name, corpus_suffix)
       logger.info("Outputting a schema to %s ..." format filename)
       val fields = Seq("user", "timestamp", "coord", "followers", "following",
-        "numtweets", "user-mentions", "retweets", "text", "counts")
+        "numtweets", "user-mentions", "retweets", "hashtags", "urls",
+        "text", "counts")
       val fixed_fields = Map(
         "corpus" -> Opts.corpus_name,
         "corpus-type" -> ("twitter-%s" format Opts.keytype),
