@@ -42,10 +42,16 @@ public class TrXMLDirSource extends DocumentSource {
   private final Tokenizer tokenizer;
   private final File[] files;
   private int currentIdx;
-    private TrXMLSource current;
+  private TrXMLSource current;
+  private int sentsPerDocument;
 
   public TrXMLDirSource(File directory, Tokenizer tokenizer) {
+    this(directory, tokenizer, -1);
+  }
+
+  public TrXMLDirSource(File directory, Tokenizer tokenizer, int sentsPerDocument) {
     this.tokenizer = tokenizer;
+    this.sentsPerDocument = sentsPerDocument;
     File[] files = directory.listFiles(new FilenameFilter() {
       public boolean accept(File dir, String name) {
         return name.endsWith(".xml");
@@ -65,7 +71,7 @@ public class TrXMLDirSource extends DocumentSource {
         this.current.close();
       }
       if (this.currentIdx < this.files.length) {
-        this.current = new TrXMLSource(new BufferedReader(new FileReader(this.files[this.currentIdx])), this.tokenizer);
+        this.current = new TrXMLSource(new BufferedReader(new FileReader(this.files[this.currentIdx])), this.tokenizer, this.sentsPerDocument);
       }
     } catch (XMLStreamException e) {
       System.err.println("Error while reading TR-XML directory file.");

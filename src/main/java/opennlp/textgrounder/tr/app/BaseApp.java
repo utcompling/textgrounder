@@ -28,6 +28,8 @@ public class BaseApp {
     private String serializedCorpusOutputPath = null;
     private String maxentModelDirInputPath = null;
 
+    private int sentsPerDocument = -1;
+
     private boolean highRecallNER = false;
 
     private Region boundingBox = null;
@@ -88,6 +90,8 @@ public class BaseApp {
         options.addOption("sco", "serialized-corpus-output-path", true, "path to serialized corpus for output");
         //options.addOption("tr", "tr-conll", false, "read input path as TR-CoNLL directory");
         options.addOption("cf", "corpus-format", true, "corpus format (Plain, TrCoNLL, GeoText) [default = Plain]");
+
+        options.addOption("spd", "sentences-per-document", true, "sentences per document (-1 for unlimited) [default = -1]");
 
         options.addOption("minlat", "minimum-latitude", true,
                 "minimum latitude for bounding box");
@@ -204,6 +208,8 @@ public class BaseApp {
                         serializedCorpusInputPath = value;
                     else if(option.getOpt().equals("sco"))
                         serializedCorpusOutputPath = value;
+                    else if(option.getOpt().equals("spd"))
+                        sentsPerDocument = Integer.parseInt(value);
                     //else if(option.getOpt().equals("sgci"))
                     //    serializedGoldCorpusInputPath = value;
                     break;
@@ -329,6 +335,10 @@ public class BaseApp {
 
     public Enum<CORPUS_FORMAT> getCorpusFormat() {
         return corpusFormat;
+    }
+
+    public int getSentsPerDocument() {
+        return sentsPerDocument;
     }
     
     public boolean isDoingKMeans() {

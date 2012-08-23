@@ -54,7 +54,7 @@ public class RunResolver extends BaseApp {
         }
         else {
             ImportCorpus importCorpus = new ImportCorpus();
-            testCorpus = importCorpus.doImport(currentRun.getInputPath(), currentRun.getSerializedGazetteerPath(), currentRun.getCorpusFormat(), currentRun.getUseGoldToponyms());
+            testCorpus = importCorpus.doImport(currentRun.getInputPath(), currentRun.getSerializedGazetteerPath(), currentRun.getCorpusFormat(), currentRun.getUseGoldToponyms(), currentRun.getSentsPerDocument());
         }
 
         StoredCorpus trainCorpus = Corpus.createStoredCorpus();

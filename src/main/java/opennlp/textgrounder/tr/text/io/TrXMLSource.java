@@ -46,9 +46,17 @@ public class TrXMLSource extends DocumentSource {
   private final XMLStreamReader in;
   private final Tokenizer tokenizer;
   private boolean corpusWrapped = false;
+  private int sentsPerDocument;
+  private int partOfDoc = 0;
+  private String curDocId;
 
   public TrXMLSource(Reader reader, Tokenizer tokenizer) throws XMLStreamException {
+    this(reader, tokenizer, -1);
+  }
+
+  public TrXMLSource(Reader reader, Tokenizer tokenizer, int sentsPerDocument) throws XMLStreamException {
     this.tokenizer = tokenizer;
+    this.sentsPerDocument = sentsPerDocument;
 
     XMLInputFactory factory = XMLInputFactory.newInstance();
     this.in = factory.createXMLStreamReader(reader);
@@ -84,21 +92,35 @@ public class TrXMLSource extends DocumentSource {
           //} catch(XMLStreamException e) {
           //System.err.println("Error while closing TR-XML file.");
           //}
-    return this.in.isStartElement() && this.in.getLocalName().equals("doc");
+          if(this.in.getLocalName().equals("doc"))
+              TrXMLSource.this.partOfDoc = 0;
+          return this.in.isStartElement() && (this.in.getLocalName().equals("doc") || this.in.getLocalName().equals("s"));
   }
 
   public Document<Token> next() {
-    assert this.in.isStartElement() && this.in.getLocalName().equals("doc");
-    String id = TrXMLSource.this.in.getAttributeValue(null, "id");
-    TrXMLSource.this.nextTag();
+    //assert this.in.isStartElement() && this.in.getLocalName().equals("doc");
+    String id;
+    if(TrXMLSource.this.sentsPerDocument <= 0)
+        id = TrXMLSource.this.in.getAttributeValue(null, "id");
+    else {
+        if(TrXMLSource.this.partOfDoc == 0)
+            TrXMLSource.this.curDocId = TrXMLSource.this.in.getAttributeValue(null, "id");
+
+        id = TrXMLSource.this.curDocId + ".p" + TrXMLSource.this.partOfDoc;
+    }
+    if(this.in.getLocalName().equals("doc"))
+        TrXMLSource.this.nextTag();
 
     return new Document(id) {
       private static final long serialVersionUID = 42L;
       public Iterator<Sentence<Token>> iterator() {
         return new SentenceIterator() {
+          int sentNumber = 0;
           public boolean hasNext() {
             if (TrXMLSource.this.in.isStartElement() &&
-                TrXMLSource.this.in.getLocalName().equals("s")) {
+                TrXMLSource.this.in.getLocalName().equals("s") &&
+                (TrXMLSource.this.sentsPerDocument <= 0 ||
+                 sentNumber < TrXMLSource.this.sentsPerDocument)) {
               return true;
             } else {
               return false;
@@ -163,6 +185,9 @@ public class TrXMLSource extends DocumentSource {
             }
 
             TrXMLSource.this.nextTag();
+            sentNumber++;
+            if(sentNumber == TrXMLSource.this.sentsPerDocument)
+                TrXMLSource.this.partOfDoc++;
             return new SimpleSentence(id, tokens, toponymSpans);           
           }
         };
