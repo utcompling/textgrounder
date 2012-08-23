@@ -152,6 +152,17 @@ package object printutil {
     errprint("-" * msg.length)
   }
 
+  /**
+   * Return the stack trace of an exception as a string.
+   */
+  def stack_trace_as_string(e: Exception) = {
+    val writer = new StringWriter()
+    val pwriter = new PrintWriter(writer)
+    e.printStackTrace(pwriter)
+    pwriter.close()
+    writer.toString
+  }
+
   ////////////////////////////////////////////////////////////////////////////
   //                              Table Output                              //
   ////////////////////////////////////////////////////////////////////////////
