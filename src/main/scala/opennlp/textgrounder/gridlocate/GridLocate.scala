@@ -594,6 +594,10 @@ class RandomGridLocateDocumentStrategy[
         help = """Number of nearest neighbor cells to output; default is %default;
   -1 means output all""")
 
+    var output_training_cell_dists =
+      ap.flag("output-training-cell-dists", "output-training-cells",
+        help = """Output the training cell distributions after they've been trained.""")
+
     //// Options indicating which documents to train on or evaluate
     var eval_set =
       ap.option[String]("eval-set", "es", metavar = "SET",
@@ -874,6 +878,7 @@ class RandomGridLocateDocumentStrategy[
     var word_dist_factory: WordDistFactory = _
     var word_dist_constructor: WordDistConstructor = _
     var document_file_suffix: String = _
+    var output_training_cell_dists: Boolean = _
 
     /**
      * Set the options to those as given.  NOTE: Currently, some of the
@@ -994,6 +999,13 @@ class RandomGridLocateDocumentStrategy[
       // System.exit(0)
     }
     cell_grid.finish()
+    if(params.output_training_cell_dists) {
+      for(cell <- cell_grid.iter_nonempty_cells(true)) {
+        print(cell.shortstr+"\t")
+        val word_dist = cell.combined_dist.word_dist
+        println(word_dist.toString)        
+      }
+    }
   }
 
   /**
