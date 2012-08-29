@@ -28,6 +28,33 @@ import traceback
 # start the file with a valid tweet, in case something invalid is in the
 # file.
 
+############################################################################
+#                               Notes                                      #
+############################################################################
+
+# When this script was run, an example run was
+#
+# run-nohup ~tgp/split_bzip.py -s 1450000000 -o split.global. ../global.tweets.2011-*.bz2 &
+#
+# The value given to -s is the uncompressed size of each split and has been
+# empirically determined to give compressed sizes slightly under 192 MB --
+# useful for Hadoop as it means that each split will take slightly under 3
+# HDFS blocks at the default 64MB block size.
+#
+# NOTE: On the Longhorn work machines with 48GB of memory, it takes about 12
+# hours to process 20-21 days of global tweets and 24-25 days of spritzer
+# tweets.  Given that you only have a maximum of 24 hours of time, you
+# should probably not process more than about a month's worth of tweets in
+# a single run. (As an alternative, if your process gets terminated due to
+# running out of time or for any other reason, try removing the last,
+# partially written split file and then rerunning the command with the
+# additional option --skip-existing.  This will cause it to redo the same split
+# but not overwrite the files that already exist.  Since bzip compression takes
+# up most of the time, this should fairly rapidly scan through all of the
+# already-written files and then do the rest of them.  As an example, a split
+# run on spritzer output that took 24 hours to process 49 days took only
+# 3.5 hours to skip through them when --skip-existing was used.)
+
 #######################################################################
 #                            Process files                            #
 #######################################################################
