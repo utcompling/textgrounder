@@ -41,7 +41,7 @@ class SelectIdeologicalTweetsParams(val ap: ArgParser) extends
     help="""File containing list of politicians and associated twitter
     accounts, for identifying liberal and conservative tweeters.""")
   var min_accounts = ap.option[Int]("min-accounts", default = 2,
-    help="""Minimum number of political accounts linked to by Twitter users
+    help="""Minimum number of political accounts referenced by Twitter users
     in order for users to be considered.  Default %default.""")
   var min_conservative = ap.option[Double]("min-conservative", "mc",
     default = 0.75,
@@ -60,21 +60,23 @@ class SelectIdeologicalTweetsParams(val ap: ArgParser) extends
     help="""Name of output corpus; for identification purposes.
     Default to name taken from input directory.""")
   var include_text = ap.flag("include-text",
-    help="""Include text of users sending tweets linking to a potential
-    politico.""")
-  var ideological_link_type = ap.option[String]("ideological-link-type", "ilt",
+    help="""Include text of users sending tweets referencing a data point.""")
+  var ideological_ref_type = ap.option[String]("ideological-ref-type", "ilt",
     default = "retweets", choices = Seq("retweets", "mentions", "followers"),
-    help="""Type of links to other accounts to use when determining the ideology
+    help="""Type of references to other accounts to use when determining the ideology
     of a user.  Possibilities are 'retweets' (accounts that tweets are retweeted
     from); 'mentions' (any @-mention of an account, including retweets);
     'following' (accounts that a user is following).  Default %default.""")
-  var politico_link_type = ap.option[String]("politico-link-type", "plt",
-    default = "mentions", choices = Seq("retweets", "mentions", "followers"),
-    help="""Type of links to other accounts to use when searching for "potential
-    politicos" that may be associated with particular ideologies.
-    Possibilities are 'retweets' (accounts that tweets are retweeted
-    from); 'mentions' (any @-mention of an account, including retweets);
-    'following' (accounts that a user is following).  Default %default.""")
+  var political_data_type = ap.option[String]("political-data-type", "pdt",
+    choices = Seq("retweets", "mentions", "followers"),
+    help="""Type of political data to track when searching for data that may
+    be associated with particular ideologies.  Possibilities are 'retweets'
+    (accounts that tweets are retweeted from); 'mentions' (any @-mention of an
+    account, including retweets); 'following' (accounts that a user is
+    following); 'hashtags'; 'unigrams'; 'bigrams'; 'trigrams'; 'ngrams'.
+    DOCUMENT THESE; NOT YET IMPLEMENTED. (NOT YET: Multiple data points can be
+    tracked simultaneously by repeating the entire option multiple times, e.g.
+    '--pdt retweets --pdt hashtags'.)""")
 }
 
 object SelectIdeologicalTweets extends
@@ -85,11 +87,13 @@ object SelectIdeologicalTweets extends
   }
 
   /**
-   * Count of total number of links given a sequence of (account, times) pairs.
+   * Count of total number of references given a sequence of (data, times) pairs
+   * of references to a particular data point.
    */
-  def count_links[T](seq: Seq[(T, Int)]) = seq.map(_._2).sum
+  def count_refs[T](seq: Seq[(T, Int)]) = seq.map(_._2).sum
   /**
-   * Count of total number of accounts given a sequence of (account, times) pairs.
+   * Count of total number of accounts given a sequence of (data, times) pairs
+   * of references to a particular data point.
    */
   def count_accounts[T](seq: Seq[(T, Int)]) = seq.length
 
@@ -106,30 +110,30 @@ object SelectIdeologicalTweets extends
     mkCaseWireFormat(Politico.apply _, Politico.unapply _)
 
   /**
-   * Description of a user and the accounts linked to, both political and
+   * Description of a user and the accounts referenced, both political and
    * nonpolitical, along with ideology.
    *
    * @param user Twitter account of the user
    * @param ideology Computed ideology of the user (higher values indicate
    *   more conservative)
-   * @param ideo_links Set of links to other accounts used in computing
+   * @param ideo_refs Set of references to other accounts used in computing
    *   the ideology (either mentions, retweets or following, based on
-   *   --ideological-link-type); this is a sequence of tuples of
+   *   --ideological-ref-type); this is a sequence of tuples of
    *   (account, times), i.e. an account and the number of times it was seen
-   * @param lib_ideo_links Subset of `ideo_links` that refer to known
+   * @param lib_ideo_refs Subset of `ideo_refs` that refer to known
    *   liberal politicos
-   * @param cons_ideo_links Subset of `ideo_links` that refer to known
+   * @param cons_ideo_refs Subset of `ideo_refs` that refer to known
    *   conservative politicos
-   * @param politico_links Set of links to other accounts used to generate
+   * @param politico_refs Set of references to other accounts used to generate
    *   potential politicos (either mentions, retweets or following, based
-   *   on --politico-link-type)
+   *   on --politico-ref-type)
    * @param text Text of user's tweets (concatenated)
    */
   case class IdeologicalUser(user: String, ideology: Double,
-    ideo_links: Seq[(String, Int)],
-    lib_ideo_links: Seq[(Politico, Int)],
-    cons_ideo_links: Seq[(Politico, Int)],
-    politico_links: Seq[(String, Int)],
+    ideo_refs: Seq[(String, Int)],
+    lib_ideo_refs: Seq[(Politico, Int)],
+    cons_ideo_refs: Seq[(Politico, Int)],
+    politico_refs: Seq[(String, Int)],
     text: String) {
     def encode_politico_count_map(seq: Seq[(Politico, Int)]) =
       encode_word_count_map(
@@ -137,14 +141,14 @@ object SelectIdeologicalTweets extends
           (politico.full_name.replace(" ", "."), count) })
     def to_row(opts: SelectIdeologicalTweetsParams) =
       Seq(user, "%.3f" format ideology,
-        count_accounts(ideo_links), count_links(ideo_links),
-          encode_word_count_map(ideo_links),
-        count_accounts(politico_links), count_links(politico_links),
-          encode_word_count_map(politico_links),
-        count_accounts(lib_ideo_links), count_links(lib_ideo_links),
-          encode_politico_count_map(lib_ideo_links),
-        count_accounts(cons_ideo_links), count_links(cons_ideo_links),
-          encode_politico_count_map(cons_ideo_links),
+        count_accounts(ideo_refs), count_refs(ideo_refs),
+          encode_word_count_map(ideo_refs),
+        count_accounts(politico_refs), count_refs(politico_refs),
+          encode_word_count_map(politico_refs),
+        count_accounts(lib_ideo_refs), count_refs(lib_ideo_refs),
+          encode_politico_count_map(lib_ideo_refs),
+        count_accounts(cons_ideo_refs), count_refs(cons_ideo_refs),
+          encode_politico_count_map(cons_ideo_refs),
         text
       ) mkString "\t"
   }
@@ -155,10 +159,10 @@ object SelectIdeologicalTweets extends
 
     def row_fields =
       Seq("user", "ideology",
-        "num-ideo-accounts", "num-ideo-links", "ideo-links",
-        "num-politico-accounts", "num-politico-links", "politico-links",
-        "num-lib-ideo-accounts", "num-lib-ideo-links", "lib-ideo-links",
-        "num-cons-ideo-accounts", "num-cons-ideo-links", "cons-ideo-links",
+        "num-ideo-accounts", "num-ideo-refs", "ideo-refs",
+        "num-politico-accounts", "num-politico-refs", "politico-refs",
+        "num-lib-ideo-accounts", "num-lib-ideo-refs", "lib-ideo-refs",
+        "num-cons-ideo-accounts", "num-cons-ideo-refs", "cons-ideo-refs",
         "text")
 
     /**
@@ -170,39 +174,39 @@ object SelectIdeologicalTweets extends
         opts: SelectIdeologicalTweetsParams) = {
       error_wrap(line, None: Option[IdeologicalUser]) { line => {
         val fields = line.split("\t", -1)
-        // get list of (links, times) pairs
-        val ideo_link_field =
-          if (opts.ideological_link_type == "mentions") "user-mentions"
-          else opts.ideological_link_type
-        val politico_link_field =
-          if (opts.politico_link_type == "mentions") "user-mentions"
-          else opts.politico_link_type
-        val ideo_links =
-          decode_word_count_map(schema.get_field(fields, ideo_link_field))
-        val politico_links =
-          decode_word_count_map(schema.get_field(fields, politico_link_field))
+        // get list of (refs, times) pairs
+        val ideo_ref_field =
+          if (opts.ideological_ref_type == "mentions") "user-mentions"
+          else opts.ideological_ref_type
+        val politico_ref_field =
+          if (opts.political_data_type == "mentions") "user-mentions"
+          else opts.political_data_type
+        val ideo_refs =
+          decode_word_count_map(schema.get_field(fields, ideo_ref_field))
+        val politico_refs =
+          decode_word_count_map(schema.get_field(fields, politico_ref_field))
         val text = schema.get_field(fields, "text")
         val user = schema.get_field(fields, "user")
-        // errprint("For user %s, ideo_links: %s", user, ideo_links.toList)
-        // find links to a politician
-        val libcons_ideo_links =
-          for {(ideo_link, times) <- ideo_links
-               account = accounts.getOrElse(ideo_link.toLowerCase, null)
+        // errprint("For user %s, ideo_refs: %s", user, ideo_refs.toList)
+        // find references to a politician
+        val libcons_ideo_refs =
+          for {(ideo_ref, times) <- ideo_refs
+               account = accounts.getOrElse(ideo_ref.toLowerCase, null)
                if account != null && {
                  //errprint("saw account %s, party %s", account, account.party);
                  "DR".contains(account.party)}}
             yield (account, times)
-        //errprint("libcons_ideo_links: %s", libcons_ideo_links.toList)
-        val (lib_ideo_links, cons_ideo_links) = libcons_ideo_links.partition {
+        //errprint("libcons_ideo_refs: %s", libcons_ideo_refs.toList)
+        val (lib_ideo_refs, cons_ideo_refs) = libcons_ideo_refs.partition {
             case (account, times) => account.party == "D" }
-        val num_lib_ideo_links = count_links(lib_ideo_links)
-        val num_cons_ideo_links = count_links(cons_ideo_links)
-        val num_libcons_ideo_links = num_lib_ideo_links + num_cons_ideo_links
-        val ideology = num_cons_ideo_links.toFloat/num_libcons_ideo_links
-        if (num_libcons_ideo_links > 0) {
+        val num_lib_ideo_refs = count_refs(lib_ideo_refs)
+        val num_cons_ideo_refs = count_refs(cons_ideo_refs)
+        val num_libcons_ideo_refs = num_lib_ideo_refs + num_cons_ideo_refs
+        val ideology = num_cons_ideo_refs.toFloat/num_libcons_ideo_refs
+        if (num_libcons_ideo_refs > 0) {
           val ideo_user =
             IdeologicalUser(user, ideology,
-              ideo_links, lib_ideo_links, cons_ideo_links, politico_links,
+              ideo_refs, lib_ideo_refs, cons_ideo_refs, politico_refs,
               text)
           Some(ideo_user)
         } else None
@@ -211,38 +215,47 @@ object SelectIdeologicalTweets extends
   }
 
   /**
-   * Description of a potential politico -- someone linked to by an
-   * ideological user.
+   * A political data point -- a piece of data (e.g. user mention, retweet,
+   * hash tag, URL, n-gram, etc.) in a tweet by an ideological user.
    *
-   * @param lcuser Twitter account of user, lowercased
-   * @param spellings Map of actual (non-lowercased) spellings of account
+   * @param data Data of the data point
+   * @param ty Type of data point
+   * @param spellings Map of actual (non-lowercased) spellings of data point
    *   by usage
-   * @param num_accounts Total number of accounts linking to user
-   * @param num_links Total number of links to user
+   * @param num_accounts Total number of accounts referencing data point
+   * @param num_refs Total number of references to data point
    * @param num_lib_accounts Number of accounts with a noticeably
-   *   "liberal" ideology linking to user
-   * @param num_lib_links Number of links to user from accounts with a
-   *   noticeably "liberal" ideology
+   *   "liberal" ideology referencing data point
+   * @param num_lib_refs Number of references to data point from accounts
+   *   with a noticeably "liberal" ideology
    * @param num_cons_accounts Number of accounts with a noticeably
-   *   "conservative" ideology linking to user
-   * @param num_cons_links Number of links to user from accounts with a
-   *   noticeably "conservative" ideology
-   * @param num_links_ideo_weighted Sum of links weighted by ideology of
-   *   person doing the linking, so that we can compute a weighted
+   *   "conservative" ideology referencing data point
+   * @param num_cons_refs Number of references to data point from accounts
+   *   with a noticeably "conservative" ideology
+   * @param num_refs_ideo_weighted Sum of references weighted by ideology of
+   *   person doing the referenceing, so that we can compute a weighted
    *   average to determine their ideology.
-   * @param all_text Text of all users linking to the politico.
+   * @param num_mentions Total number of mentions
+   * @param num_lib_mentions Number of times mentioned by people with
+   *   a noticeably "liberal" ideology
+   * @param num_conserv_mentions Number of times mentioned by people with
+   *   a noticeably "conservative" ideology
+   * @param num_ideo_mentions Sum of mentions weighted by ideology of
+   *   person doing the mentioning, so that we can compute a weighted
+   *   average to determine their ideology.
+   * @param all_text Text of all users referencing the politico.
    */
   case class PotentialPolitico(lcuser: String, spellings: Map[String, Int],
-    num_accounts: Int, num_links: Int,
-    num_lib_accounts: Int, num_lib_links: Int,
-    num_cons_accounts: Int, num_cons_links: Int,
-    num_links_ideo_weighted: Double, all_text: Seq[String]) {
+    num_accounts: Int, num_refs: Int,
+    num_lib_accounts: Int, num_lib_refs: Int,
+    num_cons_accounts: Int, num_cons_refs: Int,
+    num_refs_ideo_weighted: Double, all_text: Seq[String]) {
     def to_row(opts: SelectIdeologicalTweetsParams) =
       Seq(lcuser, encode_word_count_map(spellings.toSeq),
-        num_accounts, num_links,
-        num_lib_accounts, num_lib_links,
-        num_cons_accounts, num_cons_links,
-        num_links_ideo_weighted/num_links,
+        num_accounts, num_refs,
+        num_lib_accounts, num_lib_refs,
+        num_cons_accounts, num_cons_refs,
+        num_refs_ideo_weighted/num_refs,
         if (opts.include_text) all_text mkString " !! " else "(omitted)"
       ) mkString "\t"
   }
@@ -250,22 +263,22 @@ object SelectIdeologicalTweets extends
   object PotentialPolitico {
 
     def row_fields =
-      Seq("lcuser", "spellings", "num-accounts", "num-links",
-        "num-lib-accounts", "num-lib-links",
-        "num-cons-accounts", "num-cons-links",
+      Seq("lcuser", "spellings", "num-accounts", "num-refs",
+        "num-lib-accounts", "num-lib-refs",
+        "num-cons-accounts", "num-cons-refs",
         "ideology", "all-text")
     /**
      * For a given ideological user, generate the "potential politicos": other
-     * people linked to, along with their ideological scores.
+     * people referenced, along with their ideological scores.
      */
     def get_potential_politicos(user: IdeologicalUser,
         opts: SelectIdeologicalTweetsParams) = {
-      for {(link, times) <- user.politico_links
-           lclink = link.toLowerCase } yield {
+      for {(ref, times) <- user.politico_refs
+           lcref = ref.toLowerCase } yield {
         val is_lib = user.ideology <= opts.max_liberal
         val is_conserv = user.ideology >= opts.min_conservative
         PotentialPolitico(
-          lclink, Map(link->times), 1, times,
+          lcref, Map(ref->times), 1, times,
           if (is_lib) 1 else 0,
           if (is_lib) times else 0,
           if (is_conserv) 1 else 0,
@@ -278,18 +291,18 @@ object SelectIdeologicalTweets extends
 
     /**
      * Merge two PotentialPolitico objects, which must refer to the same user.
-     * Add up the links and combine the set of spellings.
+     * Add up the references and combine the set of spellings.
      */
     def merge_potential_politicos(u1: PotentialPolitico, u2: PotentialPolitico) = {
       assert(u1.lcuser == u2.lcuser)
       PotentialPolitico(u1.lcuser, combine_maps(u1.spellings, u2.spellings),
         u1.num_accounts + u2.num_accounts,
-        u1.num_links + u2.num_links,
+        u1.num_refs + u2.num_refs,
         u1.num_lib_accounts + u2.num_lib_accounts,
-        u1.num_lib_links + u2.num_lib_links,
+        u1.num_lib_refs + u2.num_lib_refs,
         u1.num_cons_accounts + u2.num_cons_accounts,
-        u1.num_cons_links + u2.num_cons_links,
-        u1.num_links_ideo_weighted + u2.num_links_ideo_weighted,
+        u1.num_cons_refs + u2.num_cons_refs,
+        u1.num_refs_ideo_weighted + u2.num_refs_ideo_weighted,
         u1.all_text ++ u2.all_text)
     }
   }
@@ -342,16 +355,16 @@ object SelectIdeologicalTweets extends
 
 
     /*
-     2. We go through users looking for links to these politicians.  For
-        users that link politicians, we can compute an "ideology" score of
-        the user by a weighted average of the links by the ideology of
+     2. We go through users looking for references to these politicians.  For
+        users that reference politicians, we can compute an "ideology" score of
+        the user by a weighted average of the references by the ideology of
         the politicians.
-     3. For each such user, look at all other people linked to -- the idea is
-        we want to look for people linked to a lot especially by users with
+     3. For each such user, look at all other people referenced -- the idea is
+        we want to look for people referenced a lot especially by users with
         a consistent ideology (e.g. Glenn Beck or Rush Limbaugh for
         conservatives), which we can then use to mark others as having a
         given ideology.  For each person, we generate a record with their
-        name, the number of times they were linked to and an ideology score
+        name, the number of times they were referenced and an ideology score
         and merge these all together.
      */
   }
@@ -370,16 +383,16 @@ object SelectIdeologicalTweets extends
      1. We are given a list of known politicians, their twitter accounts, and
         their ideology -- either determined simply by their party, or using
         the DW-NOMINATE score or similar.
-     2. We go through users looking for links to these politicians.  For
-        users that link to politicians, we can compute an "ideology" score of
-        the user by a weighted average of the links by the ideology of
+     2. We go through users looking for references to these politicians.  For
+        users that reference politicians, we can compute an "ideology" score of
+        the user by a weighted average of the references by the ideology of
         the politicians.
-     3. For each such user, look at all other people linked to -- the idea is
-        we want to look for people linked to a lot especially by users with
+     3. For each such user, look at all other people referenced -- the idea is
+        we want to look for people referenced a lot especially by users with
         a consistent ideology (e.g. Glenn Beck or Rush Limbaugh for
         conservatives), which we can then use to mark others as having a
         given ideology.  For each person, we generate a record with their
-        name, the number of times they were linked to and an ideology score
+        name, the number of times they were referenced and an ideology score
         and merge these all together.
      */
     val ptp = new SelectIdeologicalTweets(opts)
