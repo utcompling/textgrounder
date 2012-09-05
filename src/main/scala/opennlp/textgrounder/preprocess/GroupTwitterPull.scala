@@ -1006,7 +1006,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       // Put back together but drop key.
       Seq(tnt.user, tnt.timestamp, latlongstr, tnt.followers, tnt.following,
           tnt.numtweets, user_mentions, retweets, hashtags, urls,
-          encode_field(tweet.text), formatted_text
+          encode_string_for_field(tweet.text), formatted_text
         ) mkString "\t"
     }
   }
