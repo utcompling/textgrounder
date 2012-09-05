@@ -4,6 +4,8 @@ import opennlp.textgrounder.tr.topo._
 
 object LogUtil {
 
+  val DPC = 1.0
+
   val DOC_PREFIX = "Document "
   val PRED_CELL_RANK_PREFIX = "  Predicted cell (at rank "
   val PRED_CELL_KL_PREFIX = ", kl-div "
@@ -11,6 +13,10 @@ object LogUtil {
   val TRUE_COORD_PREFIX = " at ("
   val PRED_COORD_PREFIX = " predicted cell center at ("
   val NEIGHBOR_PREFIX = " close neighbor: ("
+
+  val CELL_BOTTOM_LEFT_COORD_PREFIX = "Cell ("
+  val NGRAM_DIST_PREFIX = "unseen mass, "
+  val ngramAndCountRE = """^(\S+)\=(\S+)$""".r
 
   def parseLogFile(filename: String): List[LogFileParseElement]/*List[(String, Coordinate, Coordinate, List[(Coordinate, Int)])]*/ = {
     val lines = scala.io.Source.fromFile(filename).getLines
@@ -85,6 +91,35 @@ object LogUtil {
       }
       else None
     }).flatten.toList
+  }
+
+  def getNgramDists(filename: String): Map[Int, Map[String, Double]] = {
+    val lines = scala.io.Source.fromFile(filename).getLines
+
+    (for(line <- lines) yield {
+      if(line.startsWith(CELL_BOTTOM_LEFT_COORD_PREFIX)) {
+        val blCoordStartIndex = CELL_BOTTOM_LEFT_COORD_PREFIX.length
+        val blCoordEndIndex = line.indexOf(")", blCoordStartIndex)
+        val rawBlCoord = line.slice(blCoordStartIndex, blCoordEndIndex).split(",")
+        val cellNum = TopoUtil.getCellNumber(rawBlCoord(0).toDouble, rawBlCoord(1).toDouble, DPC)
+
+        val ngramDistRawStartIndex = line.indexOf(NGRAM_DIST_PREFIX, blCoordEndIndex) + NGRAM_DIST_PREFIX.length
+        val ngramDistRawEndIndex = line.indexOf(")", ngramDistRawStartIndex)
+        val dist =
+        (for(token <- line.slice(ngramDistRawStartIndex, ngramDistRawEndIndex).split(" ")) yield {
+          if(ngramAndCountRE.findFirstIn(token) != None) {
+            val ngramAndCountRE(ngram, count) = token
+            Some((ngram, count.toDouble))
+          }
+          else
+            None
+        }).flatten.toMap
+
+        Some((cellNum, dist))
+      }
+      else
+        None
+    }).flatten.toMap
   }
 
 }
