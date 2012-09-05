@@ -1310,6 +1310,10 @@ package object argparser {
     def error(msg: String) = {
       throw new ArgParserConversionException(msg)
     }
+
+    def usageError(msg: String) = {
+      throw new ArgParserUsageException(msg)
+    }
   }
 }
 
