@@ -584,75 +584,73 @@ package object argparser {
       retval
     }
 
-    // Convert aliases map to a map in the other direction, i.e. from
-    // alias to canonical choice
-    def reverseAliases[T](aliases: Map[T, Iterable[T]]) = {
-      if (aliases == null)
-        Map[T, T]()
-      else
-        for {(full, abbrevs) <- aliases
-             abbrev <- if (abbrevs == null) Seq() else abbrevs}
-          yield (abbrev -> full)
-    }
-
-    // Get rid of nulls in `choices` or `aliases`.  If `aliases` is null,
-    // make it an empty map.  If `choices` is null, derive it from the
-    // canonical choices given in the `aliases` map.  Note that before
-    // calling this, a special check must be done for the case where
-    // `choices` is null *and* `aliases` is null, which is actually the
-    // most common situation.  In this case, no limited-choice restrictions
-    // apply at all.  Returns a tuple of canonicalized choices,
-    // canonicalized aliases.
+    // Combine `choices` and `aliasedChoices` into a larger list of the
+    // format of `aliasedChoices`.  Note that before calling this, a special
+    // check must be done for the case where `choices` and `aliasedChoices`
+    // are both null, which includes that no limited-choice restrictions
+    // apply at all (and is actually the most common situation).
     def canonicalizeChoicesAliases[T](choices: Seq[T],
-        aliases: Map[T, Iterable[T]]) = {
-      val newaliases = if (aliases != null) aliases else Map[T, Iterable[T]]()
-      val newchoices =
-        if (choices != null) choices else newaliases.keys.toSeq
-      (newchoices, newaliases)
+        aliasedChoices: Seq[Seq[T]]) = {
+      val newchoices = if (choices != null) choices else Seq[T]()
+      val newaliased =
+        if (aliasedChoices != null) aliasedChoices else Seq[Seq[T]]()
+      for (spellings <- newaliased) {
+        if (spellings.length == 0)
+          throw new ArgParserCodingError(
+            "Zero-length list of spellings not allowed in `aliasedChoices`:\n%s"
+            format newaliased)
+      }
+      newchoices.map(x => Seq(x)) ++ newaliased
     }
 
-    // Return a human-readable list of all choices.  If 'choices' is null,
-    // the list is derived from the canonical choices listed in 'aliases'.
-    // If 'include_aliases' is true, include the aliases in the list of
-    // choices, in parens after the canonical name.
-    def choicesList[T](choices: Seq[T],
-        aliases: Map[T, Iterable[T]], include_aliases: Boolean) = {
-      val (newchoices, newaliases) =
-        canonicalizeChoicesAliases(choices, aliases)
-      val sorted_choices = newchoices sortBy (_.toString)
-      if (!include_aliases)
-        sorted_choices mkString ", "
-      else {
+    // Convert a list of choices in the format of `aliasedChoices`
+    // (a sequence of sequences, first item is the canonical spelling)
+    // into a mapping that canonicalizes choices.
+    def getCanonMap[T](aliasedChoices: Seq[Seq[T]]) = {
+      (for {spellings <- aliasedChoices
+            canon = spellings.head
+            spelling <- spellings}
+         yield (spelling, canon)).toMap
+    }
+
+    // Return a human-readable list of all choices, based on the specifications
+    // of `choices` and `aliasedChoices`. If 'includeAliases' is true, include
+    // the aliases in the list of choices, in parens after the canonical name.
+    def choicesList[T](choices: Seq[T], aliasedChoices: Seq[Seq[T]],
+        includeAliases: Boolean) = {
+      val fullaliased =
+        canonicalizeChoicesAliases(choices, aliasedChoices)
+      if (!includeAliases)
+        fullaliased.map(_.head) mkString ", "
+      else
         (
-          for { choice <- sorted_choices
-                choice_aliases_raw = newaliases.getOrElse(choice, null)
-                choice_aliases = (
-                  if (choice_aliases_raw != null) choice_aliases_raw
-                  else Seq[T]()).toSeq sortBy (_.toString)
+          for { spellings <- fullaliased
+                canon = spellings.head
+                altspellings = spellings.tail
               }
           yield {
-            if (choice_aliases.length > 0)
-              "%s (%s)" format (choice, choice_aliases mkString "/")
-            else choice
+            if (altspellings.length > 0)
+              "%s (%s)" format (canon, altspellings mkString "/")
+            else canon.toString
           }
         ) mkString ", "
-      }
     }
 
     // Check that the given value passes any restrictions imposed by
-    // `choices` and/or `aliases`.  If not, throw an exception.
-    def checkChoices[T](converted: T, choices: Seq[T],
-        aliases: Map[T, Iterable[T]]) = {
-      if (choices == null && aliases == null) converted
+    // `choices` and/or `aliasedChoices`.  If not, throw an exception.
+    def checkChoices[T](converted: T,
+        choices: Seq[T], aliasedChoices: Seq[Seq[T]]) = {
+      if (choices == null && aliasedChoices == null) converted
       else {
-        var retval = converted
-        val (newchoices, newaliases) =
-          canonicalizeChoicesAliases(choices, aliases)
-        val revaliases = reverseAliases(aliases)
-        retval = revaliases.getOrElse(retval, retval)
-        if (newchoices contains retval) retval
+        val fullaliased =
+          canonicalizeChoicesAliases(choices, aliasedChoices)
+        val canonmap = getCanonMap(fullaliased)
+        if (canonmap contains converted)
+          canonmap(converted)
         else
-          throw new ArgParserInvalidChoiceException("Choice '%s' not one of the recognized choices: %s" format (retval, choicesList(choices, aliases, true)))
+          throw new ArgParserInvalidChoiceException(
+            "Choice '%s' not one of the recognized choices: %s"
+            format (converted, choicesList(choices, aliasedChoices, true)))
       }
     }
   }
@@ -965,8 +963,8 @@ package object argparser {
       name: Seq[String],
       default: U,
       metavar: String,
-      choices: Seq[T] = null,
-      aliases: Map[T, Iterable[T]] = null,
+      choices: Seq[T],
+      aliasedChoices: Seq[Seq[T]],
       help: String,
       create_underlying: (String, String, String) => ArgAny[U],
       is_multi: Boolean = false,
@@ -986,8 +984,8 @@ package object argparser {
           (for (s <- helpsplit) yield {
             s match {
               case "%default" => default.toString
-              case "%choices" => choicesList(choices, aliases, false)
-              case "%allchoices" => choicesList(choices, aliases, true)
+              case "%choices" => choicesList(choices, aliasedChoices, false)
+              case "%allchoices" => choicesList(choices, aliasedChoices, true)
               case "%metavar" => canon_metavar
               case "%%" => "%"
               case "%prog" => this.prog
@@ -1007,11 +1005,12 @@ package object argparser {
       }
     }
 
-    protected def argot_converter[T](convert: (String, String, ArgParser) => T,
-        canon_name: String, choices: Seq[T], aliases: Map[T, Iterable[T]]) = {
+    protected def argot_converter[T](
+        convert: (String, String, ArgParser) => T, canon_name: String,
+        choices: Seq[T], aliasedChoices: Seq[Seq[T]]) = {
       (rawval: String, argop: CommandLineArgument[T]) => {
         val converted = convert(rawval, canon_name, this)
-        checkChoices(converted, choices, aliases)
+        checkChoices(converted, choices, aliasedChoices)
       }
     }
 
@@ -1019,7 +1018,7 @@ package object argparser {
       default: T = null.asInstanceOf[T],
       metavar: String = null,
       choices: Seq[T] = null,
-      aliases: Map[T, Iterable[T]] = null,
+      aliasedChoices: Seq[Seq[T]] = null,
       help: String = "")
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
@@ -1027,10 +1026,10 @@ package object argparser {
         val arg = new ArgSingle(this, canon_name, default)
         arg.wrap =
           (argot.option[T](name.toList, canon_metavar, canon_help)
-           (argot_converter(convert, canon_name, choices, aliases)))
+           (argot_converter(convert, canon_name, choices, aliasedChoices)))
         arg
       }
-      handle_argument[T,T](name, default, metavar, choices, aliases,
+      handle_argument[T,T](name, default, metavar, choices, aliasedChoices,
         help, create_underlying _)
     }
 
@@ -1063,18 +1062,25 @@ package object argparser {
      *    value of `metavar` would be "FILE".) If not given, automatically
      *    computed from the canonical option name by capitalizing it.
      * @param choices List of possible choices for this option.  If specified,
-     *    it should be a sequence, and only the specified choices will be
-     *    allowed. (But see the `aliases` param below.) Otherwise, all
-     *    values will be allowed.
-     * @param aliases Mapping specifying aliases for choice values.
-     *    The idea is that when there are a limited number of choices, there
-     *    may be multiple aliases for a given choice, e.g. "dev", "devel" or
-     *    "development".  If given, this should be a map, with the key a
-     *    canonical choice and the value a sequence of aliases.  Note that
-     *    if `aliases` is given but `choices` is not given, the list
-     *    of possible choices is automatically derived from the keys of the
-     *    `aliases` mapping.  To this end, choices with no aliases
-     *    should be listed with `null` as the value instead of a sequence.
+     *    it should be a sequence of possible choices that will be allowed,
+     *    and only the choices that are either in this list of specified via
+     *    `aliasedChoices` will be allowed.  If neither `choices` nor
+     *    `aliasedChoices` is given, all values will be allowed.
+     * @param aliasedChoices List of possible choices for this option,
+     *    including alternative spellings (aliases).  If specified, it should
+     *    be a sequence of sequences, each of which specifies the possible
+     *    alternative spellings for a given choice and where the first listed
+     *    spelling is considered the "canonical" one.  All choices that
+     *    consist of any given spelling will be allowed, but any non-canonical
+     *    spellings will be replaced by equivalent canonical spellings.
+     *    For example, the choices of "dev", "devel" and "development" may
+     *    all mean the same thing; regardless of how the user spells this
+     *    choice, the same value will be passed to the program (whichever
+     *    spelling comes first).  Note that the value of `choices` lists
+     *    additional choices, which are equivalent to choices listed in
+     *    `aliasedChoices` without any alternative spellings.  If both
+     *    `choices` and `aliasedChoices` are omitted, all values will be
+     *    allowed.
      * @param help Help string for the option, shown in the usage string.
      * @param convert Function to convert the raw option (a string) into
      *    a value of type `T`.  The second and third parameters specify
@@ -1099,13 +1105,13 @@ package object argparser {
       default: T = null.asInstanceOf[T],
       metavar: String = null,
       choices: Seq[T] = null,
-      aliases: Map[T, Iterable[T]] = null,
+      aliasedChoices: Seq[Seq[T]] = null,
       help: String = "")
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       optionSeq[T](nonNullVals(name1, name2, name3, name4, name5, name6,
         name7, name8, name9),
         metavar = metavar, default = default, choices = choices,
-        aliases = aliases, help = help)(convert, m)
+        aliasedChoices = aliasedChoices, help = help)(convert, m)
     }
 
     def flagSeq(name: Seq[String],
@@ -1152,7 +1158,7 @@ package object argparser {
       default: Seq[T] = Seq[T](),
       metavar: String = null,
       choices: Seq[T] = null,
-      aliases: Map[T, Iterable[T]] = null,
+      aliasedChoices: Seq[Seq[T]] = null,
       help: String = "")
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       def create_underlying(canon_name: String, canon_metavar: String,
@@ -1160,10 +1166,10 @@ package object argparser {
         val arg = new ArgMulti[T](this, canon_name, default)
         arg.wrap =
           (argot.multiOption[T](name.toList, canon_metavar, canon_help)
-           (argot_converter(convert, canon_name, choices, aliases)))
+           (argot_converter(convert, canon_name, choices, aliasedChoices)))
         arg
       }
-      handle_argument[T,Seq[T]](name, default, metavar, choices, aliases,
+      handle_argument[T,Seq[T]](name, default, metavar, choices, aliasedChoices,
         help, create_underlying _, is_multi = true)
     }
 
@@ -1183,13 +1189,13 @@ package object argparser {
       default: Seq[T] = Seq[T](),
       metavar: String = null,
       choices: Seq[T] = null,
-      aliases: Map[T, Iterable[T]] = null,
+      aliasedChoices: Seq[Seq[T]] = null,
       help: String = "")
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
       multiOptionSeq[T](nonNullVals(name1, name2, name3, name4, name5, name6,
         name7, name8, name9),
         default = default, metavar = metavar, choices = choices,
-        aliases = aliases, help = help)(convert, m)
+        aliasedChoices = aliasedChoices, help = help)(convert, m)
     }
 
     /**
@@ -1205,7 +1211,7 @@ package object argparser {
     def positional[T](name: String,
       default: T = null.asInstanceOf[T],
       choices: Seq[T] = null,
-      aliases: Map[T, Iterable[T]] = null,
+      aliasedChoices: Seq[Seq[T]] = null,
       help: String = "",
       optional: Boolean = false)
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
@@ -1214,10 +1220,10 @@ package object argparser {
         val arg = new ArgSingle(this, canon_name, default, is_positional = true)
         arg.wrap =
           (argot.parameter[T](canon_name, canon_help, optional)
-           (argot_converter(convert, canon_name, choices, aliases)))
+           (argot_converter(convert, canon_name, choices, aliasedChoices)))
         arg
       }
-      handle_argument[T,T](Seq(name), default, null, choices, aliases,
+      handle_argument[T,T](Seq(name), default, null, choices, aliasedChoices,
         help, create_underlying _, is_positional = true)
     }
 
@@ -1230,7 +1236,7 @@ package object argparser {
     def multiPositional[T](name: String,
       default: Seq[T] = Seq[T](),
       choices: Seq[T] = null,
-      aliases: Map[T, Iterable[T]] = null,
+      aliasedChoices: Seq[Seq[T]] = null,
       help: String = "",
       optional: Boolean = true)
     (implicit convert: (String, String, ArgParser) => T, m: Manifest[T]) = {
@@ -1239,11 +1245,11 @@ package object argparser {
         val arg = new ArgMulti[T](this, canon_name, default, is_positional = true)
         arg.wrap =
           (argot.multiParameter[T](canon_name, canon_help, optional)
-           (argot_converter(convert, canon_name, choices, aliases)))
+           (argot_converter(convert, canon_name, choices, aliasedChoices)))
         arg
       }
       handle_argument[T,Seq[T]](Seq(name), default, null, choices,
-        aliases, help, create_underlying _,
+        aliasedChoices, help, create_underlying _,
         is_multi = true, is_positional = true)
     }
 
@@ -1353,30 +1359,23 @@ possible choices are %choices.""")
       choices = Seq("mene", "tekel", "upharsin"))
     var strategy =
       ap.multiOption[String]("s", "strategy",
-        aliases = Map(
-          "baseline" -> null, "none" -> null,
-          "full-kl-divergence" ->
-            Seq("full-kldiv", "full-kl"),
-          "partial-kl-divergence" ->
-            Seq("partial-kldiv", "partial-kl", "part-kl"),
-          "symmetric-full-kl-divergence" ->
-            Seq("symmetric-full-kldiv", "symmetric-full-kl", "sym-full-kl"),
-          "symmetric-partial-kl-divergence" ->
-            Seq("symmetric-partial-kldiv", "symmetric-partial-kl", "sym-part-kl"),
-          "cosine-similarity" ->
-            Seq("cossim"),
-          "partial-cosine-similarity" ->
-            Seq("partial-cossim", "part-cossim"),
-          "smoothed-cosine-similarity" ->
-            Seq("smoothed-cossim"),
-          "smoothed-partial-cosine-similarity" ->
-            Seq("smoothed-partial-cossim", "smoothed-part-cossim"),
-          "average-cell-probability" ->
-            Seq("avg-cell-prob", "acp"),
-          "naive-bayes-with-baseline" ->
-            Seq("nb-base"),
-          "naive-bayes-no-baseline" ->
-            Seq("nb-nobase")),
+        aliasedChoices = Seq(
+          Seq("baseline"),
+          Seq("none"),
+          Seq("full-kl-divergence", "full-kldiv", "full-kl"),
+          Seq("partial-kl-divergence", "partial-kldiv", "partial-kl", "part-kl"),
+          Seq("symmetric-full-kl-divergence", "symmetric-full-kldiv",
+              "symmetric-full-kl", "sym-full-kl"),
+          Seq("symmetric-partial-kl-divergence",
+              "symmetric-partial-kldiv", "symmetric-partial-kl", "sym-part-kl"),
+          Seq("cosine-similarity", "cossim"),
+          Seq("partial-cosine-similarity", "partial-cossim", "part-cossim"),
+          Seq("smoothed-cosine-similarity", "smoothed-cossim"),
+          Seq("smoothed-partial-cosine-similarity", "smoothed-partial-cossim",
+              "smoothed-part-cossim"),
+          Seq("average-cell-probability", "avg-cell-prob", "acp"),
+          Seq("naive-bayes-with-baseline", "nb-base"),
+          Seq("naive-bayes-no-baseline", "nb-nobase")),
         help = """A multi-string option.  This is an actual option in
 one of my research programs.  Possible choices are %choices; the full list
 of choices, including all aliases, is %allchoices.""")

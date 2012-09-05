@@ -375,44 +375,23 @@ file as a document to evaluate.""")
   var strategy =
     ap.multiOption[String]("s", "strategy",
       default = Seq("partial-kl-divergence"),
-      //      choices = Seq(
-      //        "baseline", "none",
-      //        "full-kl-divergence",
-      //        "partial-kl-divergence",
-      //        "symmetric-full-kl-divergence",
-      //        "symmetric-partial-kl-divergence",
-      //        "cosine-similarity",
-      //        "partial-cosine-similarity",
-      //        "smoothed-cosine-similarity",
-      //        "smoothed-partial-cosine-similarity",
-      //        "average-cell-probability",
-      //        "naive-bayes-with-baseline",
-      //        "naive-bayes-no-baseline",
-      //        ),
-      aliases = Map(
-        "baseline" -> null, "none" -> null,
-        "full-kl-divergence" ->
-          Seq("full-kldiv", "full-kl"),
-        "partial-kl-divergence" ->
-          Seq("partial-kldiv", "partial-kl", "part-kl"),
-        "symmetric-full-kl-divergence" ->
-          Seq("symmetric-full-kldiv", "symmetric-full-kl", "sym-full-kl"),
-        "symmetric-partial-kl-divergence" ->
-          Seq("symmetric-partial-kldiv", "symmetric-partial-kl", "sym-part-kl"),
-        "cosine-similarity" ->
-          Seq("cossim"),
-        "partial-cosine-similarity" ->
-          Seq("partial-cossim", "part-cossim"),
-        "smoothed-cosine-similarity" ->
-          Seq("smoothed-cossim"),
-        "smoothed-partial-cosine-similarity" ->
-          Seq("smoothed-partial-cossim", "smoothed-part-cossim"),
-        "average-cell-probability" ->
-          Seq("avg-cell-prob", "acp"),
-        "naive-bayes-with-baseline" ->
-          Seq("nb-base"),
-        "naive-bayes-no-baseline" ->
-          Seq("nb-nobase")),
+      aliasedChoices = Seq(
+        Seq("baseline"),
+        Seq("none"),
+        Seq("full-kl-divergence", "full-kldiv", "full-kl"),
+        Seq("partial-kl-divergence", "partial-kldiv", "partial-kl", "part-kl"),
+        Seq("symmetric-full-kl-divergence", "symmetric-full-kldiv",
+            "symmetric-full-kl", "sym-full-kl"),
+        Seq("symmetric-partial-kl-divergence",
+            "symmetric-partial-kldiv", "symmetric-partial-kl", "sym-part-kl"),
+        Seq("cosine-similarity", "cossim"),
+        Seq("partial-cosine-similarity", "partial-cossim", "part-cossim"),
+        Seq("smoothed-cosine-similarity", "smoothed-cossim"),
+        Seq("smoothed-partial-cosine-similarity", "smoothed-partial-cossim",
+            "smoothed-part-cossim"),
+        Seq("average-cell-probability", "avg-cell-prob", "acp"),
+        Seq("naive-bayes-with-baseline", "nb-base"),
+        Seq("naive-bayes-no-baseline", "nb-nobase")),
       help = """Strategy/strategies to use for geolocation.
 'baseline' means just use the baseline strategy (see --baseline-strategy).
 
@@ -507,14 +486,13 @@ Default '%default'.""")
   var baseline_strategy =
     ap.multiOption[String]("baseline-strategy", "bs",
       default = Seq("internal-link"),
-      choices = Seq("internal-link", "random",
-        "num-documents", "link-most-common-toponym",
-        "cell-distribution-most-common-toponym"),
-      aliases = Map(
-        "internal-link" -> Seq("link"),
-        "num-documents" -> Seq("num-docs", "numdocs"),
-        "cell-distribution-most-common-toponym" ->
-          Seq("celldist-most-common-toponym")),
+      aliasedChoices = Seq(
+        Seq("internal-link", "link"),
+        Seq("random"),
+        Seq("num-documents", "numdocs", "num-docs"),
+        Seq("link-most-common-toponym"),
+        Seq("cell-distribution-most-common-toponym",
+            "celldist-most-common-toponym")),
       help = """Strategy to use to compute the baseline.
 
 'internal-link' (or 'link') means use number of internal links pointing to the
