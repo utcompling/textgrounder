@@ -317,7 +317,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
 
   class ParseAndUniquifyTweets(Opts: GroupTwitterPullParams)
       extends GroupTwitterPullShared {
-    val operation_category = "GroupTwitterPull.Parse"
+    val operation_category = "Parse"
 
     /**
      * An empty tweet, stored as a full IDRecord.
@@ -726,7 +726,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
   class GroupTweetsAndSelectGood(Opts: GroupTwitterPullParams)
       extends GroupTwitterPullShared {
 
-    val operation_category = "GroupTwitterPull.Group"
+    val operation_category = "Group"
 
     /**
      * Merge the data associated with two tweets or tweet combinations
@@ -866,7 +866,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
   class TokenizeFilterAndCountTweets(Opts: GroupTwitterPullParams)
       extends GroupTwitterPullShared {
 
-    val operation_category = "GroupTwitterPull.Tokenize"
+    val operation_category = "Tokenize"
 
     /**
      * Convert a word to lowercase.
