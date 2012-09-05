@@ -1181,6 +1181,14 @@ package object argparser {
      * (NOTE: This is different from single-valued options, where the
      * default value can be explicitly specified, and if not given, will be
      * `null` for reference types.  Here, `null` will never occur.)
+     *
+     * FIXME: There should be a way of allowing for specifying multiple values
+     * in a single argument, separated by spaces, commas, etc.  We'd want the
+     * caller to be able to pass in a function to split the string.  Currently
+     * Argot doesn't seem to have a way of allowing a converter function to
+     * take a single argument and stuff in multiple values, so we probably
+     * need to modify Argot. (At some point we should just incorporate the
+     * relevant parts of Argot directly.)
      */
     def multiOption[T](
       name1: String, name2: String = null, name3: String = null,
