@@ -60,23 +60,32 @@ class SelectIdeologicalTweetsParams(ap: ArgParser) extends
     help="""Name of output corpus; for identification purposes.
     Default to name taken from input directory.""")
   var include_text = ap.flag("include-text",
-    help="""Include text of users sending tweets referencing a data point.""")
+    help="""Include text of users sending tweets referencing a feature.""")
   var ideological_ref_type = ap.option[String]("ideological-ref-type", "ilt",
     default = "retweets", choices = Seq("retweets", "mentions", "followers"),
-    help="""Type of references to other accounts to use when determining the ideology
-    of a user.  Possibilities are 'retweets' (accounts that tweets are retweeted
-    from); 'mentions' (any @-mention of an account, including retweets);
-    'following' (accounts that a user is following).  Default %default.""")
-  var political_data_type = ap.option[String]("political-data-type", "pdt",
-    choices = Seq("retweets", "mentions", "followers"),
-    help="""Type of political data to track when searching for data that may
+    help="""Type of references to other accounts to use when determining the
+    ideology of a user.  Possibilities are 'retweets' (accounts that tweets
+    are retweeted from); 'mentions' (any @-mention of an account, including
+    retweets); 'following' (accounts that a user is following).  Default
+    %default.""")
+  var political_feature_type = ap.multiOption[String]("political-feature-type",
+    "pft",
+    choices = Seq("retweets", "followers", "hashtags", "urls", "images",
+      "unigrams", "bigrams", "trigrams", "ngrams"),
+    aliasedChoices = Seq(Seq("user-mentions", "mentions")),
+    help="""Type of political features to track when searching for data that may
     be associated with particular ideologies.  Possibilities are 'retweets'
     (accounts that tweets are retweeted from); 'mentions' (any @-mention of an
     account, including retweets); 'following' (accounts that a user is
     following); 'hashtags'; 'unigrams'; 'bigrams'; 'trigrams'; 'ngrams'.
-    DOCUMENT THESE; NOT YET IMPLEMENTED. (NOT YET: Multiple data points can be
-    tracked simultaneously by repeating the entire option multiple times, e.g.
-    '--pdt retweets --pdt hashtags'.)""")
+    DOCUMENT THESE; NOT YET IMPLEMENTED. Multiple features can be tracked
+    simultaneously by specifying this option multiple times.""")
+    // FIXME: Should be able to specify multiple features separated by commas.
+    // This requires that we fix argparser.scala to allow this.  Probably
+    // should add an extra field to provide a way of splitting -- maybe a regexp,
+    // maybe a function.
+  // Schema for the input file, after file read
+  var schema: Schema = _
 }
 
 object SelectIdeologicalTweets extends
@@ -124,69 +133,76 @@ object SelectIdeologicalTweets extends
    *   liberal politicos
    * @param cons_ideo_refs Subset of `ideo_refs` that refer to known
    *   conservative politicos
-   * @param politico_refs Set of references to other accounts used to generate
-   *   potential politicos (either mentions, retweets or following, based
-   *   on --politico-ref-type)
    * @param text Text of user's tweets (concatenated)
    */
   case class IdeologicalUser(user: String, ideology: Double,
-    ideo_refs: Seq[(String, Int)],
-    lib_ideo_refs: Seq[(Politico, Int)],
-    cons_ideo_refs: Seq[(Politico, Int)],
-    politico_refs: Seq[(String, Int)],
-    text: String) {
+      ideo_refs: Seq[(String, Int)],
+      lib_ideo_refs: Seq[(Politico, Int)],
+      cons_ideo_refs: Seq[(Politico, Int)],
+      fields: Seq[String]) {
     def encode_politico_count_map(seq: Seq[(Politico, Int)]) =
       encode_word_count_map(
         seq.map { case (politico, count) =>
           (politico.full_name.replace(" ", "."), count) })
+
+    def get_feature_values(factory: IdeologicalUserFactory, ty: String) = {
+      ty match {
+        case field@("retweets" | "user-mentions" | "hashtags") =>
+          decode_word_count_map(
+            factory.user_subschema.get_field(fields, field))
+        // case "followers" => FIXME
+        // case "unigrams" => FIXME
+        // case "bigrams" => FIXME
+        // case "trigrams" => FIXME
+        // case "ngrams" => FIXME
+      }
+    }
+
     def to_row(opts: SelectIdeologicalTweetsParams) =
       Seq(user, "%.3f" format ideology,
         count_accounts(ideo_refs), count_refs(ideo_refs),
           encode_word_count_map(ideo_refs),
-        count_accounts(politico_refs), count_refs(politico_refs),
-          encode_word_count_map(politico_refs),
         count_accounts(lib_ideo_refs), count_refs(lib_ideo_refs),
           encode_politico_count_map(lib_ideo_refs),
         count_accounts(cons_ideo_refs), count_refs(cons_ideo_refs),
           encode_politico_count_map(cons_ideo_refs),
-        text
+        fields mkString "\t"
       ) mkString "\t"
   }
   implicit val ideological_user_wire =
     mkCaseWireFormat(IdeologicalUser.apply _, IdeologicalUser.unapply _)
 
-  object IdeologicalUser {
+  class IdeologicalUserFactory(opts: SelectIdeologicalTweetsParams) extends
+      SelectIdeologicalTweetsShared(opts) {
+    val operation_category = "IdeologicalUser"
 
+    val user_subschema_fieldnames =
+      opts.schema.fieldnames filterNot (_ == "user")
+    val user_subschema = new SubSchema(user_subschema_fieldnames,
+      opts.schema.fixed_values, opts.schema)
+ 
     def row_fields =
       Seq("user", "ideology",
         "num-ideo-accounts", "num-ideo-refs", "ideo-refs",
-        "num-politico-accounts", "num-politico-refs", "politico-refs",
         "num-lib-ideo-accounts", "num-lib-ideo-refs", "lib-ideo-refs",
         "num-cons-ideo-accounts", "num-cons-ideo-refs", "cons-ideo-refs",
-        "text")
+        "fields")
 
     /**
      * For a given user, determine if the user is an "ideological user"
      * and if so, return an object describing the user.
      */
-    def get_ideological_user(line: String, schema: Schema,
-        accounts: Map[String, Politico],
-        opts: SelectIdeologicalTweetsParams) = {
+    def get_ideological_user(line: String, accounts: Map[String, Politico]) = {
       error_wrap(line, None: Option[IdeologicalUser]) { line => {
         val fields = line.split("\t", -1)
         // get list of (refs, times) pairs
         val ideo_ref_field =
           if (opts.ideological_ref_type == "mentions") "user-mentions"
           else opts.ideological_ref_type
-        val politico_ref_field =
-          if (opts.political_data_type == "mentions") "user-mentions"
-          else opts.political_data_type
         val ideo_refs =
-          decode_word_count_map(schema.get_field(fields, ideo_ref_field))
-        val politico_refs =
-          decode_word_count_map(schema.get_field(fields, politico_ref_field))
-        val text = schema.get_field(fields, "text")
-        val user = schema.get_field(fields, "user")
+          decode_word_count_map(opts.schema.get_field(fields, ideo_ref_field))
+        val text = opts.schema.get_field(fields, "text")
+        val user = opts.schema.get_field(fields, "user")
         // errprint("For user %s, ideo_refs: %s", user, ideo_refs.toList)
         // find references to a politician
         val libcons_ideo_refs =
@@ -205,9 +221,8 @@ object SelectIdeologicalTweets extends
         val ideology = num_cons_ideo_refs.toFloat/num_libcons_ideo_refs
         if (num_libcons_ideo_refs > 0) {
           val ideo_user =
-            IdeologicalUser(user, ideology,
-              ideo_refs, lib_ideo_refs, cons_ideo_refs, politico_refs,
-              text)
+            IdeologicalUser(user, ideology, ideo_refs, lib_ideo_refs,
+            cons_ideo_refs, user_subschema.map_original_fieldvals(fields))
           Some(ideo_user)
         } else None
       }}
@@ -245,13 +260,13 @@ object SelectIdeologicalTweets extends
    *   average to determine their ideology.
    * @param all_text Text of all users referencing the politico.
    */
-  case class PotentialPolitico(lcuser: String, spellings: Map[String, Int],
+  case class PoliticalFeature(value: String, spellings: Map[String, Int],
     num_accounts: Int, num_refs: Int,
     num_lib_accounts: Int, num_lib_refs: Int,
     num_cons_accounts: Int, num_cons_refs: Int,
     num_refs_ideo_weighted: Double, all_text: Seq[String]) {
     def to_row(opts: SelectIdeologicalTweetsParams) =
-      Seq(lcuser, encode_word_count_map(spellings.toSeq),
+      Seq(value, encode_word_count_map(spellings.toSeq),
         num_accounts, num_refs,
         num_lib_accounts, num_lib_refs,
         num_cons_accounts, num_cons_refs,
@@ -260,10 +275,10 @@ object SelectIdeologicalTweets extends
       ) mkString "\t"
   }
 
-  object PotentialPolitico {
+  object PoliticalFeature {
 
     def row_fields =
-      Seq("lcuser", "spellings", "num-accounts", "num-refs",
+      Seq("value", "spellings", "num-accounts", "num-refs",
         "num-lib-accounts", "num-lib-refs",
         "num-cons-accounts", "num-cons-refs",
         "ideology", "all-text")
@@ -271,31 +286,32 @@ object SelectIdeologicalTweets extends
      * For a given ideological user, generate the "potential politicos": other
      * people referenced, along with their ideological scores.
      */
-    def get_potential_politicos(user: IdeologicalUser,
+    def get_political_features(factory: IdeologicalUserFactory,
+        user: IdeologicalUser, ty: String,
         opts: SelectIdeologicalTweetsParams) = {
-      for {(ref, times) <- user.politico_refs
+      for {(ref, times) <- user.get_feature_values(factory, ty)
            lcref = ref.toLowerCase } yield {
         val is_lib = user.ideology <= opts.max_liberal
         val is_conserv = user.ideology >= opts.min_conservative
-        PotentialPolitico(
+        PoliticalFeature(
           lcref, Map(ref->times), 1, times,
           if (is_lib) 1 else 0,
           if (is_lib) times else 0,
           if (is_conserv) 1 else 0,
           if (is_conserv) times else 0,
           times * user.ideology,
-          Seq(user.text)
+          Seq("FIXME fill-in text maybe")
         )
       }
     }
 
     /**
-     * Merge two PotentialPolitico objects, which must refer to the same user.
+     * Merge two PoliticalFeature objects, which must refer to the same user.
      * Add up the references and combine the set of spellings.
      */
-    def merge_potential_politicos(u1: PotentialPolitico, u2: PotentialPolitico) = {
-      assert(u1.lcuser == u2.lcuser)
-      PotentialPolitico(u1.lcuser, combine_maps(u1.spellings, u2.spellings),
+    def merge_political_features(u1: PoliticalFeature, u2: PoliticalFeature) = {
+      assert(u1.value == u2.value)
+      PoliticalFeature(u1.value, combine_maps(u1.spellings, u2.spellings),
         u1.num_accounts + u2.num_accounts,
         u1.num_refs + u2.num_refs,
         u1.num_lib_accounts + u2.num_lib_accounts,
@@ -307,8 +323,8 @@ object SelectIdeologicalTweets extends
     }
   }
 
-  implicit val potential_politico =
-    mkCaseWireFormat(PotentialPolitico.apply _, PotentialPolitico.unapply _)
+  implicit val political_feature =
+    mkCaseWireFormat(PoliticalFeature.apply _, PoliticalFeature.unapply _)
 
   class SelectIdeologicalTweets(opts: SelectIdeologicalTweetsParams)
       extends SelectIdeologicalTweetsShared(opts) {
@@ -411,7 +427,7 @@ object SelectIdeologicalTweets extends
     val suffix = "counts"
     val in_schema_file =
       CorpusFileProcessor.find_schema_file(filehand, opts.input, suffix)
-    val in_schema = Schema.read_schema_file(filehand, in_schema_file)
+    opts.schema = Schema.read_schema_file(filehand, in_schema_file)
 
     def output_lines(lines: DList[String], corpus_suffix: String,
         fields: Seq[String]) {
@@ -426,24 +442,33 @@ object SelectIdeologicalTweets extends
     }
 
     errprint("Step 1: Load corpus, filter for conservatives/liberals, output.")
+    val ideo_fact = new IdeologicalUserFactory(opts)
     val matching_patterns = CorpusFileProcessor.
         get_matching_patterns(filehand, opts.input, suffix)
     val lines: DList[String] = TextInput.fromTextFile(matching_patterns: _*)
     val ideo_users =
-      lines.flatMap(
-        IdeologicalUser.get_ideological_user(_, in_schema, accounts, opts))
+      lines.flatMap(ideo_fact.get_ideological_user(_, accounts))
     output_lines(ideo_users.map(_.to_row(opts)), "ideo-users",
-      IdeologicalUser.row_fields)
+      ideo_fact.row_fields)
     errprint("Step 1: done.")
 
-    errprint("Step 2: Generate potential politicos.")
-    val potential_politicos = ideo_users.
-      flatMap(PotentialPolitico.get_potential_politicos(_, opts)).
-      groupBy(_.lcuser).
-      combine(PotentialPolitico.merge_potential_politicos).
-      map(_._2)
-    output_lines(potential_politicos.map(_.to_row(opts)),
-      "potential-politicos", PotentialPolitico.row_fields)
+    /* This is a separate function because including it inline in the for loop
+       below results in a weird deserialization error. */
+    def handle_political_feature_type(ty: String) {
+      errprint("Step 2: Handling feature type '%s' ..." format ty)
+      val political_features = ideo_users.
+        flatMap(PoliticalFeature.
+          get_political_features(ideo_fact, _, ty, opts)).
+        groupBy(_.value).
+        combine(PoliticalFeature.merge_political_features).
+        map(_._2)
+      output_lines(political_features.map(_.to_row(opts)),
+        "political-features-%s" format ty, PoliticalFeature.row_fields)
+    }
+
+    errprint("Step 2: Generate political features.")
+    for (ty <- opts.political_feature_type)
+      handle_political_feature_type(ty)
     errprint("Step 2: done.")
 
     finish_scoobi_app(opts)
