@@ -33,7 +33,7 @@ import opennlp.textgrounder.util.osutil._
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.printutil._
 
-class ScoobiProcessFilesParams(ap: ArgParser) {
+class ScoobiProcessFilesParams(val ap: ArgParser) {
   var debug = ap.flag("debug",
     help="""Output debug info about tweet processing/acceptance.""")
   var debug_file = ap.option[String]("debug-file",
