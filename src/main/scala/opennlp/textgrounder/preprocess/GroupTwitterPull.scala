@@ -633,7 +633,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
           }
           ("success",
             (tweet_id, (key,
-              Tweet(text, TweetNoText(user, timestamp, lat, long,
+              Tweet(Seq(text), TweetNoText(user, timestamp, lat, long,
                 followers, following, 1, user_mentions, retweets,
                 hashtags, urls)))))
         }
@@ -777,7 +777,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       val (followers, following) =
         (math.max(t1.followers, t2.followers),
          math.max(t1.following, t2.following))
-      val text = tw1.text + " " + tw2.text
+      val text = tw1.text ++ tw2.text
       val numtweets = t1.numtweets + t2.numtweets
       val user_mentions = combine_maps(t1.user_mentions, t2.user_mentions)
       val retweets = combine_maps(t1.retweets, t2.retweets)
@@ -978,9 +978,10 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
      * and later grouping + combining will add all the 1's to get the
      * ngram count.
      */
-    def emit_ngrams(tweet_text: String): String = {
-      val ngrams = break_tweet_into_ngrams(tweet_text).toSeq.map(
-        encode_ngram_for_counts_field)
+    def emit_ngrams(tweet_text: Seq[String]): String = {
+      val ngrams =
+        tweet_text.flatMap(break_tweet_into_ngrams(_)).toSeq.
+          map(encode_ngram_for_counts_field)
       shallow_encode_word_count_map(list_to_item_count_map(ngrams).toSeq)
     }
 
@@ -1006,22 +1007,22 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       // Put back together but drop key.
       Seq(tnt.user, tnt.timestamp, latlongstr, tnt.followers, tnt.following,
           tnt.numtweets, user_mentions, retweets, hashtags, urls,
-          encode_string_for_field(tweet.text), formatted_text
+          tweet.text.map(encode_string_for_field(_)) mkString ">>",
+          formatted_text
         ) mkString "\t"
     }
   }
 
   /**
-   * Data for a tweet other than the tweet ID.
-   * Note that we have "number of tweets" since we merge multiple tweets into
-   * a document, and also use type Tweet or TweetNoText for them. */
+   * Data for a tweet or grouping of tweets, other than the tweet ID.
+   */
   case class Tweet(
-    text: String,
+    text: Seq[String],
     notext: TweetNoText
   )
 
   object Tweet {
-    def empty = Tweet(text="", TweetNoText.empty)
+    def empty = Tweet(Seq[String](), TweetNoText.empty)
     // Not needed unless we have Tweet inside of a DList, it seems?
     // But we do, in intermediate results?
   }
@@ -1112,7 +1113,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     def checkpoint_str(r: Record): String = {
       val (key, tw) = r
       val tn = tw.notext
-      val text_2 = tw.text.replaceAll("\\s+", " ")
+      val text_2 = tw.text.map(encode_string_for_field(_)) mkString ">>"
       val user_mentions = encode_word_count_map(tn.user_mentions.toSeq)
       val retweets = encode_word_count_map(tn.retweets.toSeq)
       val hashtags = encode_word_count_map(tn.hashtags.toSeq)
@@ -1160,17 +1161,20 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
      * a combination of all tweet data except the text (as a string), plus
      * the text.
      */
-    def from_checkpoint_to_tweet_text(line: String): (String, String) = {
+    def from_checkpoint_to_tweet_text(line: String): (String, Seq[String]) = {
       lineno += 1
       bump_counter("lines read")
       val last_tab = line.lastIndexOf('\t')
       if (last_tab < 0) {
         warning(line, "Bad line, no tabs in it")
         bump_counter("bad line, no tabs in it")
-        ("", "")
+        ("", Seq[String]())
       } else {
         bump_counter("good lines read")
-        (line.slice(0, last_tab), line.slice(last_tab + 1, line.length))
+        val fields = line.slice(0, last_tab)
+        val text = line.slice(last_tab + 1, line.length).
+          split(">>").map(decode_string_for_field(_))
+        (fields, text)
       }
     }
 
