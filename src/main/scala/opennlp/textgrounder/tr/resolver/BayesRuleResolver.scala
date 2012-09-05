@@ -33,6 +33,7 @@ class BayesRuleResolver(val logFilePath:String,
       }).toMap
 
     val ngramDists = LogUtil.getNgramDists(logFilePath)
+    //println(ngramDists.size)
 
     for(doc <- corpus) {
       val docAsArray = TextUtil.getDocAsArray(doc)
@@ -53,7 +54,7 @@ class BayesRuleResolver(val logFilePath:String,
           null
 
         var indexToSelect = -1
-        var maxProb = 0.0
+        var maxLogProb = Double.MinValue
         var candIndex = 0
         for(cand <- toponym.getCandidates) {
           val curCellNum = TopoUtil.getCellNumber(cand.getRegion.getCenter, DPC)
@@ -64,22 +65,32 @@ class BayesRuleResolver(val logFilePath:String,
           else
             0.0
 
+          val DISCOUNT_FACTOR = 1.0E-300
+
           val dist = ngramDists.getOrElse(curCellNum, null)
-          val probOfDocGivenLocation = 
+          val logProbOfDocGivenLocation = 
           if(dist != null) {
-            val denom = dist.map(_._2 + 1.0).sum + 1.0 // add 1 smoothing
+            val denom = dist.map(_._2).sum
+            val unkMass = DISCOUNT_FACTOR * (dist.size+1)
             (for(word <- docAsArray.map(_.getForm.split(" ")).flatten) yield {
-              dist.getOrElse(word, 1.0) / denom
-            }).product
+              math.log((dist.getOrElse(word, unkMass) - DISCOUNT_FACTOR) / denom)
+            }).sum
           }
           else
             0.0
+          //println(" = " + probOfDocGivenLocation)
 
-          val probOfLocation = localContextComponent * probOfDocGivenLocation
+          /*print(cand.getName + " in cell " + curCellNum + ": ")
+          if(dist == null)
+            println("NULL")
+          else
+            println(probOfDocGivenLocation)*/
 
-          if(probOfLocation > maxProb) {
+          val logProbOfLocation = math.log(localContextComponent) + logProbOfDocGivenLocation
+
+          if(logProbOfLocation > maxLogProb) {
             indexToSelect = candIndex
-            maxProb = probOfLocation
+            maxLogProb = logProbOfLocation
           }
 
           candIndex += 1
