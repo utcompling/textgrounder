@@ -527,8 +527,11 @@ class RandomGridLocateDocumentStrategy[
       ap.option[String]("language", "lang",
          default = "eng",
          metavar = "LANG",
-         aliases = Map("eng" -> Seq("en"), "por" -> Seq("pt"),
-                       "deu" -> Seq("de")),
+         aliasedChoices = Seq(
+           Seq("eng", "en"),
+           Seq("por", "pt"),
+           Seq("deu", "de")
+         ),
          help = """Name of language of corpus.  Currently used only to
   initialize the value of the stopwords file, if not explicitly set.
   Two- and three-letter ISO-639 codes can be used.  Currently recognized:
@@ -603,8 +606,7 @@ class RandomGridLocateDocumentStrategy[
     var eval_set =
       ap.option[String]("eval-set", "es", metavar = "SET",
         default = "dev",
-        choices = Seq("dev", "test"),
-        aliases = Map("dev" -> Seq("devel")),
+        aliasedChoices = Seq(Seq("dev", "devel"), Seq("test")),
         help = """Set to use for evaluation during document geolocation when
   when --eval-format=internal ('dev' or 'devel' for the development set,
   'test' for the test set).  Default '%default'.""")
@@ -636,10 +638,11 @@ class RandomGridLocateDocumentStrategy[
     var word_dist =
       ap.option[String]("word-dist", "wd",
         default = "pseudo-good-turing",
-        choices = Seq("pseudo-good-turing", "dirichlet", "jelinek-mercer",
-          "unsmoothed-ngram"),
-        aliases = Map("jelinek-mercer" -> Seq("jelinek"),
-                      "pseudo-good-turing" -> Seq("pgt")),
+        aliasedChoices = Seq(
+          Seq("pseudo-good-turing", "pgt"),
+          Seq("dirichlet"),
+          Seq("jelinek-mercer", "jelinek"),
+          Seq("unsmoothed-ngram")),
         help = """Type of word distribution to use.  Possibilities are
   'pseudo-good-turing' (a simplified version of Good-Turing over a unigram
   distribution), 'dirichlet' (Dirichlet smoothing over a unigram distribution),
@@ -666,8 +669,10 @@ class RandomGridLocateDocumentStrategy[
     var interpolate =
       ap.option[String]("interpolate",
         default = "default",
-        choices = Seq("yes", "no", "default"),
-        aliases = Map("yes" -> Seq("interpolate"), "no" -> Seq("backoff")),
+        aliasedChoices = Seq(
+          Seq("yes", "interpolate"),
+          Seq("no", "backoff"),
+          Seq("default")),
         help = """Whether to do interpolation rather than back-off.
   Possibilities are 'yes', 'no', and 'default' (which means 'yes' when doing
   Dirichlet or Jelinek-Mercer smoothing, 'no' when doing pseudo-Good-Turing

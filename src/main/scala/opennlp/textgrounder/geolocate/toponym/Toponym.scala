@@ -1462,17 +1462,11 @@ NOTE: type 'world' is the only one currently implemented.  Default
   var strategy =
     ap.multiOption[String]("s", "strategy",
       default = Seq("baseline"),
-      //      choices = Seq(
-      //        "baseline", "none",
-      //        "naive-bayes-with-baseline",
-      //        "naive-bayes-no-baseline",
-      //        ),
-      aliases = Map(
-        "baseline" -> null, "none" -> null,
-        "naive-bayes-with-baseline" ->
-          Seq("nb-base"),
-        "naive-bayes-no-baseline" ->
-          Seq("nb-nobase")),
+      aliasedChoices = Seq(
+        Seq("baseline"),
+        Seq("none"),
+        Seq("naive-bayes-with-baseline", "nb-base"),
+        Seq("naive-bayes-no-baseline", "nb-nobase")),
       help = """Strategy/strategies to use for geolocating.
 'baseline' means just use the baseline strategy (see --baseline-strategy).
 
@@ -1492,11 +1486,10 @@ be tried, one after the other.""")
   var baseline_strategy =
     ap.multiOption[String]("baseline-strategy", "bs",
       default = Seq("internal-link"),
-      choices = Seq("internal-link", "random",
-        "num-documents"),
-      aliases = Map(
-        "internal-link" -> Seq("link"),
-        "num-documents" -> Seq("num-docs", "numdocs")),
+      aliasedChoices = Seq(
+        Seq("internal-link", "link"),
+        Seq("random"),
+        Seq("num-documents", "numdocs", "num-docs")),
       help = """Strategy to use to compute the baseline.
 
 'internal-link' (or 'link') means use number of internal links pointing to the
