@@ -27,7 +27,6 @@ import java.text.{SimpleDateFormat, ParseException}
 import net.liftweb
 import org.apache.commons.logging
 import org.apache.hadoop.fs.{FileSystem=>HFileSystem,_}
-// import com.codahale.jerkson
 
 import com.nicta.scoobi.Scoobi._
 
@@ -114,8 +113,6 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     default = 1000,
     help="""Maximum number of tweets per user for user to be accepted in
     --by-user mode.""")
-//     var use_jerkson = ap.flag("use-jerkson",
-//       help="""Use Jerkson instead of Lift to parse JSON.""")
 
   override def check_usage() {
     timeslice = (timeslice_float * 1000).toLong
@@ -645,52 +642,6 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         asInstanceOf[T]
     }
 
-    /**
-     * Parse a JSON line into a tweet, using Jerkson.
-     */
-
-  //  def parse_json_jerkson(line: String): IDRecord = {
-  //    try {
-  //      val parsed = jerkson.Json.parse[Map[String,Any]](line)
-  //      val user = get_2nd_level_value[String](parsed, "user", "screen_name")
-  //      val timestamp = parse_time(get_string(parsed, "created_at"))
-  //      val text = get_string(parsed, "text").replaceAll("\\s+", " ")
-  //      val followers = get_2nd_level_value[Int](parsed, "user", "followers_count")
-  //      val following = get_2nd_level_value[Int](parsed, "user", "friends_count")
-  //      val tweet_id = get_string(parsed, "id_str")
-  //      val (lat, long) =
-  //        if (parsed("coordinates") == null ||
-  //            get_2nd_level_value[String](parsed, "coordinates", "type")
-  //              != "Point") {
-  //          (Double.NaN, Double.NaN)
-  //        } else {
-  //          val latlong =
-  //            get_2nd_level_value[java.util.ArrayList[Number]](parsed,
-  //              "coordinates", "coordinates")
-  //          (latlong(1).doubleValue, latlong(0).doubleValue)
-  //        }
-  //      val key = Opts.keytype match {
-  //        case "user" => user
-  //        case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
-  //      }
-  //      (tweet_id, (key,
-  //        Tweet(text, TweetNoText(user, timestamp, lat, long,
-  //          followers, following, 1, FIXME: user_mentions, FIXME: retweets,
-  //          FIXME: hashtags, FIXME: urls))))
-  //    } catch {
-  //      case jpe: jerkson.ParsingException =>
-  //        parse_problem(line, jpe)
-  //      case npe: NullPointerException =>
-  //        parse_problem(line, npe)
-  //      case nfe: NumberFormatException =>
-  //        parse_problem(line, nfe)
-  //      case nsee: NoSuchElementException =>
-  //        parse_problem(line, nsee)
-  //      case e: Exception =>
-  //        { parse_problem(line, e); throw e }
-  //    }
-  //  }
-
     /*
      * Parse a JSON line into a tweet.  Return value is an IDRecord, including
      * the tweet ID, username, text and all other data.
@@ -704,8 +655,6 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         bump_counter("blank lines skipped")
         empty_tweet
       }
-      // else if (Opts.use_jerkson)
-      //   parse_json_jerkson(line)
       else {
         bump_counter("total tweets parsed")
         val (status, record) = parse_json_lift(line)
@@ -1075,7 +1024,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
 
        -- the doc string just above
        -- the definition of TweetNoText.empty()
-       -- parse_json_lift() above, and the FIXME in parse_json_jerkson()
+       -- parse_json_lift() above
        -- merge_records() above
        -- checkpoint_str() and split_tweet_no_text() below
        -- nicely_format_plain() above and output_schema() below
