@@ -629,7 +629,7 @@ package object corpusutil {
   private val endec_word_for_counts_field =
     new EncodeDecode(Seq('%', ':', ' ', '\t', '\n'))
   private val endec_string_for_field =
-    new EncodeDecode(Seq('%', ':', '\t', '\n'))
+    new EncodeDecode(Seq('%', '>', '\t', '\n'))
 
   /**
    * Encode a word for placement inside a "counts" field.  Colons and spaces
@@ -671,8 +671,10 @@ package object corpusutil {
   /**
    * Encode a string for placement as the value of a field.  This is
    * similar to `encode_word_for_counts_field` except that we don't
-   * encode spaces.  We encode colons for possible use as a separator
-   * inside of a field.
+   * encode spaces.  We encode '&gt;' for possible use as a separator
+   * inside of a field (since it's almost certain not to occur, because
+   * we generally get HTML-encoded text; and even if not, it's fairly
+   * rare).
    */
   def encode_string_for_field(word: String) =
     endec_string_for_field.encode(word)
