@@ -1,4 +1,4 @@
-//  SelectIdeologicalTweets.scala
+//  FindPolitical.scala
 //
 //  Copyright (C) 2012 Ben Wing, The University of Texas at Austin
 //
@@ -34,7 +34,7 @@ import tgutil.collectionutil._
 import tgutil.osutil._
 import tgutil.printutil._
 
-class SelectIdeologicalTweetsParams(ap: ArgParser) extends
+class FindPoliticalParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {
   var political_twitter_accounts = ap.option[String](
     "political-twitter-accounts", "pta",
@@ -88,11 +88,11 @@ class SelectIdeologicalTweetsParams(ap: ArgParser) extends
   var schema: Schema = _
 }
 
-object SelectIdeologicalTweets extends
-    ScoobiProcessFilesApp[SelectIdeologicalTweetsParams] {
-  abstract class SelectIdeologicalTweetsShared(opts: SelectIdeologicalTweetsParams)
+object FindPolitical extends
+    ScoobiProcessFilesApp[FindPoliticalParams] {
+  abstract class FindPoliticalShared(opts: FindPoliticalParams)
     extends ScoobiProcessFilesShared {
-    val progname = "SelectIdeologicalTweets"
+    val progname = "FindPolitical"
   }
 
   /**
@@ -158,7 +158,7 @@ object SelectIdeologicalTweets extends
       }
     }
 
-    def to_row(opts: SelectIdeologicalTweetsParams) =
+    def to_row(opts: FindPoliticalParams) =
       Seq(user, "%.3f" format ideology,
         count_accounts(ideo_refs), count_refs(ideo_refs),
           encode_word_count_map(ideo_refs),
@@ -172,8 +172,8 @@ object SelectIdeologicalTweets extends
   implicit val ideological_user_wire =
     mkCaseWireFormat(IdeologicalUser.apply _, IdeologicalUser.unapply _)
 
-  class IdeologicalUserFactory(opts: SelectIdeologicalTweetsParams) extends
-      SelectIdeologicalTweetsShared(opts) {
+  class IdeologicalUserFactory(opts: FindPoliticalParams) extends
+      FindPoliticalShared(opts) {
     val operation_category = "IdeologicalUser"
 
     val user_subschema_fieldnames =
@@ -265,7 +265,7 @@ object SelectIdeologicalTweets extends
     num_lib_accounts: Int, num_lib_refs: Int,
     num_cons_accounts: Int, num_cons_refs: Int,
     num_refs_ideo_weighted: Double, all_text: Seq[String]) {
-    def to_row(opts: SelectIdeologicalTweetsParams) =
+    def to_row(opts: FindPoliticalParams) =
       Seq(value, encode_word_count_map(spellings.toSeq),
         num_accounts, num_refs,
         num_lib_accounts, num_lib_refs,
@@ -288,7 +288,7 @@ object SelectIdeologicalTweets extends
      */
     def get_political_features(factory: IdeologicalUserFactory,
         user: IdeologicalUser, ty: String,
-        opts: SelectIdeologicalTweetsParams) = {
+        opts: FindPoliticalParams) = {
       for {(ref, times) <- user.get_feature_values(factory, ty)
            lcref = ref.toLowerCase } yield {
         val is_lib = user.ideology <= opts.max_liberal
@@ -326,8 +326,8 @@ object SelectIdeologicalTweets extends
   implicit val political_feature =
     mkCaseWireFormat(PoliticalFeature.apply _, PoliticalFeature.unapply _)
 
-  class SelectIdeologicalTweets(opts: SelectIdeologicalTweetsParams)
-      extends SelectIdeologicalTweetsShared(opts) {
+  class FindPolitical(opts: FindPoliticalParams)
+      extends FindPoliticalShared(opts) {
     val operation_category = "Driver"
 
     /**
@@ -385,8 +385,8 @@ object SelectIdeologicalTweets extends
      */
   }
 
-  def create_params(ap: ArgParser) = new SelectIdeologicalTweetsParams(ap)
-  val progname = "SelectIdeologicalTweets"
+  def create_params(ap: ArgParser) = new FindPoliticalParams(ap)
+  val progname = "FindPolitical"
 
   def run() {
     // For testing
@@ -411,7 +411,7 @@ object SelectIdeologicalTweets extends
         name, the number of times they were referenced and an ideology score
         and merge these all together.
      */
-    val ptp = new SelectIdeologicalTweets(opts)
+    val ptp = new FindPolitical(opts)
     val filehand = new HadoopFileHandler(configuration)
     if (opts.political_twitter_accounts == null) {
       opts.ap.error("--political-twitter-accounts must be specified")
