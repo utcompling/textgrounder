@@ -628,31 +628,35 @@ package object corpusutil {
 
   private val endec_word_for_counts_field =
     new EncodeDecode(Seq('%', ':', ' ', '\t', '\n'))
-  private val endec_whole_field = new EncodeDecode(Seq('%', '\t', '\n'))
+  private val endec_string_for_field =
+    new EncodeDecode(Seq('%', ':', '\t', '\n'))
 
   /**
    * Encode a word for placement inside a "counts" field.  Colons and spaces
-   * are used for separation, and tabs and newlines are used for separating
-   * fields and records.  We need to escape all of these characters (normally
-   * whitespace should be filtered out during tokenization, but for some
-   * applications it won't necessarily).  We do this using URL-style-encoding,
-   * e.g. replacing : by %3A; hence we also have to escape % signs. (We could
-   * equally well use HTML-style encoding; then we'd have to escape &amp;
-   * instead of :.) Note that regardless of whether we use URL-style or
-   * HTML-style encoding, we probably want to do the encoding ourselves
-   * rather than use a predefined encoder.  We could in fact use the
-   * presupplied URL encoder, but it would encode all sorts of stuff,
-   * which is unnecessary and would make the raw files harder to read.
-   * In the case of HTML-style encoding, : isn't even escaped, so that
-   * wouldn't work at all.
+   * are used for separation inside of a field, and tabs and newlines are used
+   * for separating fields and records.  We need to escape all of these
+   * characters (normally whitespace should be filtered out during
+   * tokenization, but for some applications it won't necessarily).  We do this
+   * using URL-style-encoding, e.g. replacing : by %3A; hence we also have to
+   * escape % signs. (We could equally well use HTML-style encoding; then we'd
+   * have to escape &amp; instead of :.) Note that regardless of whether we use
+   * URL-style or HTML-style encoding, we probably want to do the encoding
+   * ourselves rather than use a predefined encoder.  We could in fact use the
+   * presupplied URL encoder, but it would encode all sorts of stuff, which is
+   * unnecessary and would make the raw files harder to read.  In the case of
+   * HTML-style encoding, : isn't even escaped, so that wouldn't work at all.
    */
   def encode_word_for_counts_field(word: String) =
     endec_word_for_counts_field.encode(word)
 
   /**
-   * Encode an n-gram into text suitable for the "counts" field.  The
+   * Encode an n-gram into text suitable for the "counts" field.
+   The
    * individual words are separated by colons, and each word is encoded
-   * using `encode_word_for_counts_field`.
+   * using `encode_word_for_counts_field`.  We need to encode '\n'
+   * (record separator), '\t' (field separator), ' ' (separator between
+   * word/count pairs), ':' (separator between word and count),
+   * '%' (encoding indicator).
    */
   def encode_ngram_for_counts_field(ngram: Iterable[String]) = {
     ngram.map(encode_word_for_counts_field) mkString ":"
@@ -665,19 +669,19 @@ package object corpusutil {
     endec_word_for_counts_field.decode(word)
 
   /**
-   * Encode a string for placement as the value of a field.  We need a way of
-   * escaping '\t' and '\n', without either character appearing in the encoded
-   * result.  We use URL-encoding, so we also need to encode '%'.  See
-   * `encode_word_for_counts_field` for more commentary.
+   * Encode a string for placement as the value of a field.  This is
+   * similar to `encode_word_for_counts_field` except that we don't
+   * encode spaces.  We encode colons for possible use as a separator
+   * inside of a field.
    */
-  def encode_field(word: String) =
-    endec_whole_field.encode(word)
+  def encode_string_for_field(word: String) =
+    endec_string_for_field.encode(word)
 
   /**
-   * Decode a string encoded using `encode_field`.
+   * Decode a string encoded using `encode_string_for_field`.
    */
-  def decode_field(word: String) =
-    endec_whole_field.decode(word)
+  def decode_string_for_field(word: String) =
+    endec_string_for_field.decode(word)
 
   /**
    * Decode an n-gram encoded using `encode_ngram_for_counts_field`.
