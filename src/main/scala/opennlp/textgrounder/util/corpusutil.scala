@@ -150,9 +150,9 @@ package object corpusutil {
    *   the "corpus" field should be given, with the name of the corpus
    *   (currently used purely for identification purposes).
    */
-  case class Schema(
-    fieldnames: Seq[String],
-    fixed_values: Map[String, String] = Map[String, String]()
+  class Schema(
+    val fieldnames: Seq[String],
+    val fixed_values: Map[String, String] = Map[String, String]()
   ) {
 
     val field_indices = fieldnames.zipWithIndex.toMap
@@ -192,6 +192,33 @@ package object corpusutil {
         schema_outstream.println(Seq(field, value) mkString split_text)
       schema_outstream.close()
     }
+  }
+
+  /**
+   * A Schema that can be used to select some fields from a larger schema.
+   *
+   * @param fieldnames Names of fields in this schema; should be a subset of
+   *   the field names in `orig_schema`
+   * @param fixed_values Fixed values in this schema
+   * @param orig_schema Original schema from which fields have been selected.
+   */
+  class SubSchema(
+    fieldnames: Seq[String],
+    fixed_values: Map[String, String] = Map[String, String](),
+    val orig_schema: Schema
+  ) extends Schema(fieldnames, fixed_values) {
+    val orig_field_indices =
+      orig_schema.field_indices.filterKeys(fieldnames contains _).values.toSet
+
+    /**
+     * Given a set of field values corresponding to the original schema
+     * (`orig_schema`), produce a list of field values corresponding to this
+     * schema.
+     */
+    def map_original_fieldvals(fieldvals: Seq[String]) =
+      fieldvals.zipWithIndex.
+        filter { case (x, ind) => orig_field_indices contains ind }.
+        map { case (x, ind) => x }
   }
 
   object Schema {

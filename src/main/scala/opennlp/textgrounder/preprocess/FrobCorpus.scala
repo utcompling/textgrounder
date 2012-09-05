@@ -174,7 +174,7 @@ class FrobCorpusFileProcessor(
          `unsplit_writer`.
        */
       val new_schema =
-        Schema(fieldnames, modify_fixed_values(schema.fixed_values))
+        new Schema(fieldnames, modify_fixed_values(schema.fixed_values))
       unsplit_writer = new CorpusWriter(new_schema, params.output_suffix)
       unsplit_writer.output_schema_file(output_filehand, params.output_dir,
         schema_prefix)
@@ -209,7 +209,7 @@ class FrobCorpusFileProcessor(
         val new_fixed_values =
           schema.fixed_values + (params.split_by_field -> split)
         val new_schema =
-          Schema(new_fieldnames, modify_fixed_values(new_fixed_values))
+          new Schema(new_fieldnames, modify_fixed_values(new_fixed_values))
         val writer = new CorpusWriter(new_schema, params.output_suffix)
         writer.output_schema_file(output_filehand, params.output_dir,
           schema_prefix + "-" + split)
