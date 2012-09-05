@@ -44,6 +44,8 @@ class ScoobiProcessFilesParams(val ap: ArgParser) {
     help = "Source directory to read files from.")
   var output = ap.positional[String]("OUTPUT",
     help = "Destination directory to place files in.")
+
+  def check_usage() {}
 }
 
 trait ScoobiProcessFilesShared {
@@ -155,6 +157,7 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
     errprint("Parsing args: %s" format (args mkString " "))
     ap.parse(args)
     val Opts = create_params(ap)
+    Opts.check_usage()
     enableCounterLogging()
     if (Opts.debug) {
       HadoopLogFactory.setQuiet(false)
