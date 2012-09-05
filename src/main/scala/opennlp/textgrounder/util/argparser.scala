@@ -284,7 +284,7 @@ package object argparser {
 
   /**
    * Implicit conversion function for Doubles.  Automatically selected
-   * for Int-type arguments.
+   * for Double-type arguments.
    */
   implicit def convertDouble(rawval: String, name: String, ap: ArgParser) = {
     try { rawval.toDouble }
