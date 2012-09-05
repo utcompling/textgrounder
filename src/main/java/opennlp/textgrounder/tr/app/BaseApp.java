@@ -56,7 +56,8 @@ public class BaseApp {
         LABEL_PROP_CONTEXT_SENSITIVE,
         LABEL_PROP_COMPLEX,
         MAXENT,
-        PROB
+        PROB,
+        BAYES_RULE
     }
     protected Enum<RESOLVER_TYPE> resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
 
@@ -190,6 +191,8 @@ public class BaseApp {
                         resolverType = RESOLVER_TYPE.MAXENT;
                     else if(value.toLowerCase().startsWith("p"))
                         resolverType = RESOLVER_TYPE.PROB;
+                    else if(value.toLowerCase().startsWith("bayes"))
+                        resolverType = RESOLVER_TYPE.BAYES_RULE;
                     else
                         resolverType = RESOLVER_TYPE.BASIC_MIN_DIST;
                     break; 
