@@ -116,6 +116,12 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     --by-user mode.""")
 //     var use_jerkson = ap.flag("use-jerkson",
 //       help="""Use Jerkson instead of Lift to parse JSON.""")
+
+  override def check_usage() {
+    timeslice = (timeslice_float * 1000).toLong
+    if (output_format == "raw" && grouping != "none")
+      ap.usageError("`raw` output format only allowed when `--grouping=none`")
+  }
 }
 
 object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
@@ -1235,9 +1241,6 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
   def run() {
     val Opts = init_scoobi_app()
     val filehand = new HadoopFileHandler(configuration)
-    if (Opts.by_time)
-      Opts.keytype = "timestamp"
-    Opts.timeslice = (Opts.timeslice_float * 1000).toLong
     if (Opts.corpus_name == null) {
       val (_, last_component) = filehand.split_filename(Opts.input)
       Opts.corpus_name = last_component.replace("*", "_")
