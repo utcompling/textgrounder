@@ -34,7 +34,7 @@ import tgutil.collectionutil._
 import tgutil.osutil._
 import tgutil.printutil._
 
-class SelectIdeologicalTweetsParams(val ap: ArgParser) extends
+class SelectIdeologicalTweetsParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {
   var political_twitter_accounts = ap.option[String](
     "political-twitter-accounts", "pta",
