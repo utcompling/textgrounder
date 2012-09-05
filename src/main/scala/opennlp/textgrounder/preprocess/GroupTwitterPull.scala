@@ -41,19 +41,35 @@ import tgutil.printutil._
 
 class GroupTwitterPullParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {
-  // The following is set based on presence or absence of --by-time
-  var keytype = "user"
-  var timeslice_float = ap.option[Double]("timeslice", "time-slice",
-    default = 6.0,
-    help="""Number of seconds per timeslice when grouping '--by-time'.
-    Can be a fractional number.  Default %default.""")
-  // The following is set based on --timeslice
-  var timeslice: Long = _
+  var grouping = ap.option[String]("grouping", "g", "gr", "group",
+    choices = Seq("user", "time", "none"),
+    default = "user",
+    help="""Mode for grouping tweets.  There are currently three methods
+    of grouping: `user`, `time` (i.e. all tweets within a given
+    timeslice, specified with `--timeslice`) and `none` (no grouping;
+    tweets are passed through directly, after duplicated tweets have been
+    removed).""")
+  var output_format = ap.option[String]("output-format", "of",
+    choices = Seq("corpus", "raw"),
+    default = "corpus",
+    help="""Format for output of tweets or tweet groups.  Possibilities are
+    `corpus` (store in a TextGrounder-style corpus, i.e. as a simple database
+    with one record per line, fields separated by TAB characters, and a
+    schema indicating the names of the columns); and `raw` (simply output
+    JSON-formatted tweets directly, exactly as received; only possible for
+    `--grouping=none`, in which case the input tweets will be output
+    directly, after removing duplicates.""")
   var corpus_name = ap.option[String]("corpus-name",
     help="""Name of output corpus; for identification purposes.
     Default to name taken from input directory.""")
   var split = ap.option[String]("split", default = "training",
     help="""Split (training, dev, test) to place data in.  Default %default.""")
+  var timeslice_float = ap.option[Double]("timeslice", "time-slice",
+    default = 6.0,
+    help="""Number of seconds per timeslice when `--grouping=time`.
+    Can be a fractional number.  Default %default.""")
+  // The following is set based on --timeslice
+  var timeslice: Long = _
   var filter = ap.option[String]("filter",
     help="""Boolean expression used to filter tweets to be output.
 Expression consists of one or more sequences of words, joined by the operators
@@ -91,10 +107,6 @@ Look for any tweets containing the word "clinton" as well as either the words
   var cfilter = ap.option[String]("cfilter",
     help="""Boolean expression used to filter tweets to be output, with
     case-sensitive matching.  Format is identical to '--filter'.""")
-  var by_time = ap.flag("by-time",
-    help="""Group tweets by time instead of by user.  When this is used, all
-    tweets within a timeslice of a give number of seconds (specified using
-    '--timeslice') are grouped together.""")
   var geographic_only = ap.flag("geographic-only", "geog",
     help="""Filter out tweets that don't have a geotag or that have a
 geotag outside of North America.  Also filter on min/max-followers, etc.""")
@@ -329,7 +341,17 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     private class ParseJSonExit extends Exception { }
 
     /**
-     * Parse a JSON line into a tweet, using Lift.  Return status and record.
+     * Parse a JSON line into a tweet, using Lift.
+     *
+     * @return status and record.
+     * Normally, when status == "success", record consists of the following:
+     * (tweet_id, (key, tweet)) where `tweet_id` is the ID of the tweet,
+     * `key` is what the grouping is done on, and `tweet` is the extracted
+     * data of the tweet (a `Tweet` object).  However, when --output-format=raw,
+     * we want to output the original JSON directly, so instead we return
+     * (tweet_id, (line, Tweet.empty)) where `line` is the original JSON
+     * text and `Tweet.empty` is a fixed, empty Tweet.  We still need the
+     * `tweet_id` so that we can group on it to eliminate duplicates.
      */
     def parse_json_lift(line: String): (String, IDRecord) = {
 
@@ -501,6 +523,9 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         } else if ((parsed \ "limit" values) != None) {
           bump_counter("tweet limit notices skipped")
           ("limit", empty_tweet)
+        } else if (Opts.output_format == "raw") {
+          val tweet_id = force_string(parsed, "id_str")
+          ("success", (tweet_id, (line, Tweet.empty)))
         } else {
           val user = force_string(parsed, "user", "screen_name")
           val timestamp = parse_time(force_string(parsed, "created_at"))
@@ -601,9 +626,10 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
           // map
           //  { case (url, count) => (url.replace("\\/", "/"), count) }
 
-          val key = Opts.keytype match {
+          val key = Opts.grouping match {
             case "user" => user
-            case _ => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
+            case "time" => ((timestamp / Opts.timeslice) * Opts.timeslice).toString
+            case "none" => tweet_id
           }
           ("success",
             (tweet_id, (key,
@@ -708,18 +734,28 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     def apply(Opts: GroupTwitterPullParams, lines: DList[String]) = {
       val obj = new ParseAndUniquifyTweets(Opts)
 
-      // Parse JSON into tweet records (IDRecord), filter out invalid tweets.
-      val values_extracted = lines.map(obj.parse_json).filter(obj.is_valid_tweet)
-
       // Filter out duplicate tweets -- group by Tweet ID and then take the
       // first tweet for a given ID.  Duplicate tweets occur for various
       // reasons, e.g. sometimes in the stream itself due to Twitter errors,
       // or when combining data from multiple, possibly overlapping, sources.
       // In the process, the tweet ID's are discarded.
-      val single_tweets = values_extracted.groupByKey.map(obj.tweet_once)
+      def filter_duplicates(values: DList[IDRecord]): DList[Record] =
+        values.groupByKey.map(obj.tweet_once)
 
-      // Checkpoint the resulting tweets (minus ID) onto disk.
-      single_tweets.map(obj.checkpoint_str)
+      // Parse JSON into tweet records (IDRecord).
+      val values_extracted = lines.map(obj.parse_json)
+
+      if (Opts.output_format == "raw")
+        /* If we're outputting raw, all we do is filter out duplicates and
+           directly output the string (stored in the `key` part of the
+           `Record` tuple) */
+        filter_duplicates(values_extracted).map(_._1)
+      else
+        /* Otherwise, filter out invalid tweets first, then filter out
+         * duplicates and nicely format the tweets into sets of fields.
+         */
+        filter_duplicates(values_extracted.filter(obj.is_valid_tweet)).
+          map(obj.checkpoint_str)
     }
   }
 
@@ -1171,10 +1207,10 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         "text", "counts")
       val fixed_fields = Map(
         "corpus" -> Opts.corpus_name,
-        "corpus-type" -> ("twitter-%s" format Opts.keytype),
+        "corpus-type" -> ("twitter-%s" format Opts.grouping),
         "split" -> Opts.split
       ) ++ (
-        if (Opts.keytype == "timestamp")
+        if (Opts.grouping == "time")
           Map("corpus-timeslice" -> Opts.timeslice.toString)
         else
           Map[String, String]()
@@ -1200,32 +1236,42 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     // Firstly we load up all the (new-line-separated) JSON lines.
     val lines: DList[String] = TextInput.fromTextFile(Opts.input)
 
-    val checkpoint1 = ParseAndUniquifyTweets(Opts, lines)
-    persist(TextOutput.toTextFile(checkpoint1, Opts.output + "-st"))
-    errprint("Step 1: done.")
+      val checkpoint1 = ParseAndUniquifyTweets(Opts, lines)
+    if (Opts.output_format == "raw") {
+      persist(TextOutput.toTextFile(checkpoint1, Opts.output))
+      errprint("Step 1: done.")
+    } else {
+      persist(TextOutput.toTextFile(checkpoint1, Opts.output + "-st"))
+      errprint("Step 1: done.")
 
-    // Then load back up.
-    errprint("""Step 2: Load parsed tweets, group, filter bad results;
-      tokenize, count ngrams, output corpus.""")
-    if (Opts.by_time)
-      errprint("        (grouping by time, with slices of %g seconds)"
-        format Opts.timeslice_float)
-    else
-      errprint("        (grouping by user)")
-    val lines2: DList[String] = TextInput.fromTextFile(Opts.output + "-st")
-    val grouped_tweets = GroupTweetsAndSelectGood(Opts, lines2)
-    val tfct = new TokenizeFilterAndCountTweets(Opts)
-    // Tokenize the combined text into words, possibly generate ngrams from them,
-    // count them up and output results formatted into a record.
-    val nicely_formatted = grouped_tweets.map(tfct.tokenize_count_and_format)
-    persist(TextOutput.toTextFile(nicely_formatted, Opts.output))
-    errprint("Step 2: done.")
+      // Then load back up.
+      errprint("""Step 2: Load parsed tweets, group, filter bad results;
+        tokenize, count ngrams, output corpus.""")
+      errprint(Opts.grouping match {
+        case "time" =>
+          "        (grouping by time, with slices of %g seconds)".
+            format(Opts.timeslice_float)
+        case "user" =>
+          "        (grouping by user)"
+        case "none" =>
+          "        (not grouping)"
+      })
+      val lines2: DList[String] = TextInput.fromTextFile(Opts.output + "-st")
+      val grouped_tweets = GroupTweetsAndSelectGood(Opts, lines2)
+      val tfct = new TokenizeFilterAndCountTweets(Opts)
+      // Tokenize the combined text into words, possibly generate ngrams
+      // from them, count them up and output results formatted into a record.
+      val nicely_formatted = grouped_tweets.map(tfct.tokenize_count_and_format)
+      persist(TextOutput.toTextFile(nicely_formatted, Opts.output))
+      errprint("Step 2: done.")
+    }
 
     rename_output_files(configuration.fs, Opts.output, Opts.corpus_name,
       ptp.corpus_suffix)
 
     // create a schema
-    ptp.output_schema(filehand)
+    if (Opts.output_format != "raw")
+      ptp.output_schema(filehand)
 
     finish_scoobi_app(Opts)
   }
