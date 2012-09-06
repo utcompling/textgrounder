@@ -26,6 +26,7 @@ import ioutil.{FileHandler, LocalFileHandler}
 import osutil._
 import printutil.{errprint, set_stdout_stderr_utf_8}
 import textutil._
+import timeutil.format_minutes_seconds
 
 package object experiment {
   /**

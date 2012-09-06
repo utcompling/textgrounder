@@ -84,26 +84,6 @@ package object textutil {
     formatstr format x
   }
 
-  def format_minutes_seconds(seconds: Double, hours: Boolean = true) = {
-    var secs = seconds
-    var mins = (secs / 60).toInt
-    secs = secs % 60
-    val hourstr = {
-      if (!hours) ""
-      else {
-        val hours = (mins / 60).toInt
-        mins = mins % 60
-        if (hours > 0) "%s hour%s " format (hours, if (hours == 1) "" else "s")
-        else ""
-      }
-    }
-    val secstr = (if (secs.toInt == secs) "%s" else "%1.1f") format secs
-    "%s%s minute%s %s second%s" format (
-        hourstr,
-        mins, if (mins == 1) "" else "s",
-        secstr, if (secs == 1) "" else "s")
-  }
-  
   ////////////////////////////////////////////////////////////////////////////
   //                           Other string functions                       //
   ////////////////////////////////////////////////////////////////////////////
