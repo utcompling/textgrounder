@@ -63,13 +63,15 @@ import util.Random
 import math._
 import collection.mutable
 
-import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.distances._
-import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil.{FileHandler, LocalFileHandler}
-import opennlp.textgrounder.util.osutil.output_resource_usage
-import opennlp.textgrounder.util.printutil.errprint
+import opennlp.textgrounder.{util=>tgutil}
+import tgutil.argparser._
+import tgutil.collectionutil._
+import tgutil.distances._
+import tgutil.experiment._
+import tgutil.ioutil.{FileHandler, LocalFileHandler}
+import tgutil.osutil.output_resource_usage
+import tgutil.printutil.errprint
+import tgutil.timeutil._
 
 import opennlp.textgrounder.gridlocate._
 import GridLocateDriver.Debug._
@@ -137,69 +139,15 @@ class PoligrounderDriver extends
   var from_chunk: (Long, Long) = _
   var to_chunk: (Long, Long) = _
 
-  /**
-   * Parse a date and return a time as milliseconds since the Epoch
-   * (Jan 1, 1970).  Accepts various formats, all variations of the
-   * following:
-   *
-   * 20100802180502PST (= August 2, 2010, 18:05:02 Pacific Standard Time)
-   * 20100802060502pmPST (= same)
-   * 20100802100502pm (= same if current time zone is Eastern Daylight)
-   *
-   * That is, either 12-hour or 24-hour time can be given, and the time
-   * zone can be omitted.  In addition, part or all of the time of day
-   * (hours, minutes, seconds) can be omitted.  Years must always be
-   * full (i.e. 4 digits).
-   */
-  def parse_date(datestr: String): Long = {
-    // Variants for the hour-minute-second portion
-    val hms_variants = List("", "HH", "HHmm", "HHmmss", "hhaa", "hhmmaa",
-      "hhmmssaa")
-    // Fully-specified format including date
-    val full_fmt = hms_variants.map("yyyyMMdd"+_)
-    // All formats, including variants with time zone specified
-    val all_fmt = full_fmt ++ full_fmt.map(_+"zz")
-    for (fmt <- all_fmt) {
-      val pos = new java.text.ParsePosition(0)
-      val formatter = new java.text.SimpleDateFormat(fmt)
-      // (Possibly we shouldn't do this?) This rejects nonstandardness, e.g.
-      // out-of-range values such as month 13 or hour 25; that's useful for
-      // error-checking in case someone messed up entering the date.
-      formatter.setLenient(false)
-      val date = formatter.parse(datestr, pos)
-      if (date != null && pos.getIndex == datestr.length)
-        return date.getTime
-    }
-    param_error("Can't parse time '%s'; should be something like 201008021805pm"
-      format datestr)
-  }
-
-  /**
-   * Parse an interval specification, e.g. "5h" for 5 hours or "3m2s" for
-   * "3 minutes 2 seconds".
-   *
-   * Return Long.MinValue if can't parse.
-   */
-  def parse_interval(interval: String): Long = {
-    // FIXME: Write this!
-    interval.toInt * 1000 
-  }
-
-  def parse_date_and_interval(str: String) = {
-    val date_interval = str.split("/")
-    if (date_interval.length != 2)
-      param_error("Time chunk %s must be of the format 'START/INTERVAL'"
-        format str)
-    else {
-      val Array(datestr, intervalstr) = date_interval
-      val date = parse_date(datestr)
-      (date, date + parse_interval(intervalstr))
-    }
-  }
-
   override def handle_parameters() {
-    from_chunk = parse_date_and_interval(params.from)
-    to_chunk = parse_date_and_interval(params.to)
+    def parse_interval(param: String) = {
+      parse_date_interval(param) match {
+        case (Some((start, end)), "") => (start, end)
+        case (None, errmess) => param_error(errmess)
+      }
+    }
+    from_chunk = parse_interval(params.from)
+    to_chunk = parse_interval(params.to)
 
     super.handle_parameters()
   }

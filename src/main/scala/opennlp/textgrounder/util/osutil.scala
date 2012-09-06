@@ -27,6 +27,7 @@ import java.io._
 import ioutil._
 import printutil._
 import textutil._
+import timeutil.format_minutes_seconds
 
 package object osutil {
 

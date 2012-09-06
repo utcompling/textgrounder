@@ -21,6 +21,7 @@ package opennlp.textgrounder.util
 import osutil._
 import printutil.errprint
 import textutil._
+import timeutil.format_minutes_seconds
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Metered Tasks                               //
