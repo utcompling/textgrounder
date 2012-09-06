@@ -108,45 +108,30 @@ package object textutil {
   //                           Other string functions                       //
   ////////////////////////////////////////////////////////////////////////////
 
-  // A function to make up for a missing feature in Scala.  Split a text
-  // into segments but also return the delimiters.  Regex matches the
-  // delimiters.  Return a list of tuples (TEXT, DELIM).  The last tuple
-  // with have an empty delim.
-  def re_split_with_delimiter(regex: Regex, text: String) = {
+  /**
+   * Split a string, similar to `str.split(delim_re, -1)`, but also
+   * return the delimiters.  Return an Iterable of tuples `(text, delim)`
+   * where `delim` is the delimiter following each section of text.  The
+   * last delimiter will be an empty string.
+   */
+  def re_split_with_delimiter(delim_re: Regex, str: String):
+      Iterable[(String, String)] = {
+    // Find all occurrences of regexp, extract start and end positions,
+    // flatten, and add suitable positions for the start and end of the string.
+    // Adding the end-of-string position twice ensures that we get the empty
+    // delimiter at the end.
     val delim_intervals =
-      for (m <- regex.findAllIn(text).matchData) yield List(m.start, m.end)
-    val flattened = List(0) ++ (delim_intervals reduce (_ ++ _)) ++
-      List(text.length, text.length)
-    val interval_texts = flattened.iterator.sliding(2) map (
-        x => {
-          val Seq(y,z) = x
-          text.slice(y,z)
-        }
-      )
-    interval_texts grouped 2
+      Iterator(0) ++
+      delim_re.findAllIn(str).matchData.flatMap(m => Iterator(m.start, m.end)) ++
+      Iterator(str.length, str.length)
+    // Group into (start, end) pairs for both text and delimiter, extract
+    // the strings, group into text-delimiter tuples and convert to Iterable.
+    delim_intervals sliding 2 map {
+      case Seq(start, end) => str.slice(start, end)
+    } grouped 2 map {
+      case Seq(text, delim) => (text, delim)
+    } toIterable
   }
-
-  // In fact, split(..., -1) works exactly like this function.
-  // /* A function to make up for a bug in Scala.  The normal split() is broken
-  //    in that if the delimiter occurs at the end of the line, it gets ignored;
-  //    in fact, multiple such delimiters at end of line get ignored.  We hack
-  //    around that by adding an extra char at the end and then removing it
-  //    later. */
-  // def splittext(str: String, ch: Char) = {
-  //   val ch2 = if (ch == 'x') 'y' else 'x'
-  //   val stradd = str + ch2
-  //   val ret = stradd.split(ch)
-  //   ret(ret.length - 1) = ret(ret.length - 1).dropRight(1)
-  //   ret
-  // }
-
-  // A worse implementation -- it will fail if there are any NUL bytes
-  // in the input.
-  // def propersplit(str: String, ch: Char) = {
-  //   val chs = ch.toString
-  //   for (x <- str.replace(chs, chs + "\000").split(ch))
-  //     yield x.replace("\000", "")
-  // }
 
   def split_text_into_words(text: String, ignore_punc: Boolean=false,
     include_nl: Boolean=false) = {
@@ -157,7 +142,7 @@ package object textutil {
     // 'ignore_punc' is given.  Also, if 'include_nl' is given, newlines are
     // returned as their own words; otherwise, they are treated like all other
     // whitespace (i.e. ignored).
-    (for (Seq(word, punc) <-
+    (for ((word, punc) <-
           re_split_with_delimiter("""([,;."):]*(?:\s+|$)[("]*)""".r, text)) yield
        Seq(word) ++ (
          for (p <- punc; if !(" \t\r\f\013" contains p)) yield (
