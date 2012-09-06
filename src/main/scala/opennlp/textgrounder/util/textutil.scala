@@ -94,7 +94,7 @@ package object textutil {
    * where `delim` is the delimiter following each section of text.  The
    * last delimiter will be an empty string.
    */
-  def re_split_with_delimiter(delim_re: Regex, str: String):
+  def split_with_delim(str: String, delim_re: Regex):
       Iterable[(String, String)] = {
     // Find all occurrences of regexp, extract start and end positions,
     // flatten, and add suitable positions for the start and end of the string.
@@ -123,7 +123,7 @@ package object textutil {
     // returned as their own words; otherwise, they are treated like all other
     // whitespace (i.e. ignored).
     (for ((word, punc) <-
-          re_split_with_delimiter("""([,;."):]*(?:\s+|$)[("]*)""".r, text)) yield
+          split_with_delim(text, """([,;."):]*(?:\s+|$)[("]*)""".r)) yield
        Seq(word) ++ (
          for (p <- punc; if !(" \t\r\f\013" contains p)) yield (
            if (p == '\n') (if (include_nl) p.toString else "")
