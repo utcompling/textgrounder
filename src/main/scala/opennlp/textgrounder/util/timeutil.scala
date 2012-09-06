@@ -80,19 +80,19 @@ package object timeutil {
   }
 
   /**
-   * Parse a length-of-time specification, e.g. "5h" for 5 hours or "3m2s" for
+   * Parse a time offset specification, e.g. "5h" for 5 hours or "3m2s" for
    * "3 minutes 2 seconds".  Negative values are allowed, to specify
-   * intervals going backwards in time.  If able to parse, return a tuple
+   * offsets going backwards in time.  If able to parse, return a tuple
    * (Some(millisecs),""); else return (None,errmess) specifying an error
    * message.
    */
-  def parse_time_length(str: String): (Option[Long], String) = {
+  def parse_time_offset(str: String): (Option[Long], String) = {
     if (str.length == 0)
-      return (None, "Time length cannot be empty")
+      return (None, "Time offset cannot be empty")
     val sections =
       split_with_delim(str.toLowerCase, "[a-z]+".r).filterNot {
         case (text, delim) => text.length == 0 && delim.length == 0 }
-    val length_secs =
+    val offset_secs =
       (for ((valstr, units) <- sections) yield {
         val multiplier =
           units match {
@@ -101,10 +101,10 @@ package object timeutil {
             case "h" => 60*60
             case "d" => 60*60*24
             case "" => 
-              return (None, "Missing units in component '%s' in time length '%s'; should be e.g. '25s' or '10h30m'"
+              return (None, "Missing units in component '%s' in time offset '%s'; should be e.g. '25s' or '10h30m'"
                 format (valstr + units, str))
             case _ =>
-              return (None, "Unrecognized component '%s' in time length '%s'; should be e.g. '25s' or '10h30m'"
+              return (None, "Unrecognized component '%s' in time offset '%s'; should be e.g. '25s' or '10h30m'"
                 format (valstr + units, str))
           }
         val value =
@@ -112,32 +112,32 @@ package object timeutil {
             valstr.toDouble
           } catch {
             case e => return (None,
-              "Unable to convert value '%s' in component '%s' in time length '%s': %s" format
+              "Unable to convert value '%s' in component '%s' in time offset '%s': %s" format
               (valstr, valstr + units, str, e))
           }
         multiplier * value
       }).sum
-    (Some((length_secs * 1000).toLong), "")
+    (Some((offset_secs * 1000).toLong), "")
   }
 
   /**
-   * Parse a date and length of time into an interval.  Should be of the
+   * Parse a date and offset into an interval.  Should be of the
    * form TIME/LENGTH, e.g. '20100802180502PST/2h3m' (= starting at
    * August 2, 2010, 18:05:02 Pacific Standard Time, ending exactly
-   * 2 hours 3 minutes later).  Negative lengths are allowed, to indicate
+   * 2 hours 3 minutes later).  Negative offsets are allowed, to indicate
    * an interval backwards from a reference point.
    * 
-   * @return Ttuple of `(Some((start, end)),"")` if able to parse, else
+   * @return Tuple of `(Some((start, end)),"")` if able to parse, else
    * return None along with an error message.
    */
   def parse_date_interval(str: String): (Option[(Long, Long)], String) = {
-    val date_length = str.split("/", -1)
-    if (date_length.length != 2)
+    val date_offset = str.split("/", -1)
+    if (date_offset.length != 2)
       (None, "Time chunk %s must be of the format 'START/LENGTH'"
         format str)
     else {
-      val Array(datestr, lengthstr) = date_length
-      val timelen = parse_time_length(lengthstr) match {
+      val Array(datestr, offsetstr) = date_offset
+      val timelen = parse_time_offset(offsetstr) match {
         case (Some(len), "") => len
         case (None, errmess) => return (None, errmess)
       }
