@@ -38,6 +38,7 @@ import tgutil.corpusutil._
 import tgutil.ioutil.FileHandler
 import tgutil.hadoop.HadoopFileHandler
 import tgutil.printutil._
+import tgutil.timeutil._
 
 class GroupTwitterPullParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {
@@ -210,6 +211,14 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       def check(x: Seq[String]) = !e.check(x)
     }
 
+    case class TimeCompare(op: String, time: Long) extends Expr {
+      def check(x: Seq[String]) = true // FIXME
+    }
+
+    case class TimeWithin(interval: (Long, Long)) extends Expr {
+      def check(x: Seq[String]) = true // FIXME
+    }
+
     // NOT CURRENTLY USED, but potentially useful as an indicator of how to
     // implement a parser for numbers.
 //    class ExprLexical extends StdLexical {
@@ -276,9 +285,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     }
 
     override val lexical = new FilterLexical
-    lexical.reserved ++= List("AND", "OR", "NOT")
-    // lexical.delimiters ++= List("&","|","!","(",")")
-    lexical.delimiters ++= List("(",")")
+    lexical.reserved ++= List("AND", "OR", "NOT", "TIME", "WITHIN")
+    lexical.delimiters ++= List("(", ")", "<", "<=", ">", ">=")
 
     def word = stringLit ^^ {
       s => EConst(Seq(if (foldcase) s.toLowerCase else s))
@@ -288,11 +296,35 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       x => EConst(x.flatMap(_ match { case EConst(y) => y }))
     }
 
+    def compare_op = ( "<=" | "<" | ">=" | ">" )
+
+    def time = stringLit ^^ { s => (s, parse_date(s)) } ^? (
+      { case (_, Some(x)) => x },
+      { case (s, None) => "Unable to parse date %s" format s } )
+
+    def short_interval = stringLit ^^ { parse_date_interval(_) } ^? (
+      { case (Some((from, to)), "") => (from, to) },
+      { case (None, errmess) => errmess } )
+     
+    def full_interval = "(" ~> time ~ time <~ ")" ^^ {
+      case from ~ to => (from, to) }
+    
+    def interval = (short_interval | full_interval)
+
+    def time_compare = "TIME" ~> compare_op ~ time ^^ {
+      case op ~ time => TimeCompare(op, time)
+      // case op~time if parse_time(time) => TimeCompare(op, time)
+    }
+
+    def time_within = "TIME" ~> "WITHIN" ~> interval ^^ {
+      interval => TimeWithin(interval)
+    }
+
     def parens: Parser[Expr] = "(" ~> expr <~ ")"
 
     def not: Parser[ENot] = "NOT" ~> term ^^ { ENot(_) }
 
-    def term = ( words | parens | not )
+    def term = ( words | parens | not | time_compare | time_within )
 
     def andexpr = term * (
       "AND" ^^^ { (a:Expr, b:Expr) => EAnd(a,b) } )
@@ -311,7 +343,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       maybe_parse(s) match {
         case Success(tree, _) => tree
         case e: NoSuccess =>
-          throw new IllegalArgumentException("Bad syntax: "+s)
+          throw new
+            IllegalArgumentException("Bad syntax: %s: %s" format (s, e))
       }
     }
 
