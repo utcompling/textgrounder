@@ -273,6 +273,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
        -- parse_json_lift() below
        -- merge_records() below
        -- tokenize_count_and_format() and output_schema() below
+       -- TweetFilterParser.main() below
     */
   )
   object TweetNoText {
