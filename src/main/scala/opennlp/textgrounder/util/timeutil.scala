@@ -48,14 +48,15 @@ package object timeutil {
    * (Jan 1, 1970).  Accepts various formats, all variations of the
    * following:
    *
-   * 20100802180502PST (= August 2, 2010, 18:05:02 Pacific Standard Time)
-   * 20100802060502pmPST (= same)
-   * 20100802100502pm (= same if current time zone is Eastern Daylight)
+   * 20100802180500PST (= August 2, 2010, 18:05:00 Pacific Standard Time)
+   * 2010:08:02:0605pmPST (= same)
+   * 20100802:10:05pm (= same if current time zone is Eastern Daylight)
    *
-   * That is, either 12-hour or 24-hour time can be given, and the time
-   * zone can be omitted.  In addition, part or all of the time of day
-   * (hours, minutes, seconds) can be omitted.  Years must always be
-   * full (i.e. 4 digits).
+   * That is, either 12-hour or 24-hour time can be given, colons can be
+   * inserted anywhere for readability, and the time zone can be omitted or
+   * specified.  In addition, part or all of the time of day (hours,
+   * minutes, seconds) can be omitted.  Years must always be full (i.e.
+   * 4 digits).
    */
   def parse_date(datestr: String): Option[Long] = {
     // Variants for the hour-minute-second portion
@@ -72,19 +73,20 @@ package object timeutil {
       // out-of-range values such as month 13 or hour 25; that's useful for
       // error-checking in case someone messed up entering the date.
       formatter.setLenient(false)
-      val date = formatter.parse(datestr, pos)
-      if (date != null && pos.getIndex == datestr.length)
+      val canon_datestr = datestr.replace(":", "")
+      val date = formatter.parse(canon_datestr, pos)
+      if (date != null && pos.getIndex == canon_datestr.length)
         return Some(date.getTime)
     }
     None
   }
 
   /**
-   * Parse a time offset specification, e.g. "5h" for 5 hours or "3m2s" for
-   * "3 minutes 2 seconds".  Negative values are allowed, to specify
-   * offsets going backwards in time.  If able to parse, return a tuple
-   * (Some(millisecs),""); else return (None,errmess) specifying an error
-   * message.
+   * Parse a time offset specification, e.g. "5h" (or "+5h") for 5 hours,
+   * or "3m2s" for "3 minutes 2 seconds".  Negative values are allowed,
+   * to specify offsets going backwards in time.  If able to parse, return
+   * a tuple (Some(millisecs),""); else return (None,errmess) specifying
+   * an error message.
    */
   def parse_time_offset(str: String): (Option[Long], String) = {
     if (str.length == 0)
