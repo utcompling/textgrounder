@@ -212,6 +212,115 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
    * following.
    */
 
+  /**
+   * Data for a tweet or grouping of tweets, other than the tweet ID.
+   */
+  case class Tweet(
+    text: Seq[String],
+    notext: TweetNoText
+  )
+
+  object Tweet {
+    def empty = Tweet(Seq[String](), TweetNoText.empty)
+  }
+
+  /**
+   * Data for a merged set of tweets other than the text.
+   *
+   * @param user User name (FIXME: or one of them, when going by time; should
+   *    do something smarter)
+   * @param min_timestamp Earliest timestamp
+   * @param max_timestamp Latest timestamp
+   * @param geo_timestamp Earliest timestamp of tweet with corresponding
+   *    location
+   * @param lat Best latitude (corresponding to the earliest tweet)
+   * @param long Best longitude (corresponding to the earliest tweet)
+   * @param followers Max followers
+   * @param following Max following
+   * @param numtweets Number of tweets merged
+   * @param user_mentions Item-count map of all @-mentions
+   * @param retweets Like `user_mentions` but only for retweet mentions
+   * @param hashtags Item-count map of hashtags
+   * @param urls Item-count map of URL's
+   */
+  case class TweetNoText(
+    user: String,
+    min_timestamp: Long,
+    max_timestamp: Long,
+    geo_timestamp: Long,
+    lat: Double,
+    long: Double,
+    followers: Int,
+    following: Int,
+    numtweets: Int,
+    user_mentions: Map[String, Int],
+    retweets: Map[String, Int],
+    hashtags: Map[String, Int],
+    urls: Map[String, Int]
+    /* NOTE: If you add a field here, you need to update a bunch of places,
+       including (of course) wherever a TweetNoText is created, but also
+       some less obvious places.  In all:
+
+       -- the doc string just above
+       -- the definition of TweetNoText.empty()
+       -- parse_json_lift() above
+       -- merge_records() above
+       -- nicely_format_plain() above and output_schema() below
+    */
+  )
+  object TweetNoText {
+    def empty =
+      TweetNoText("", 0, 0, 0, Double.NaN, Double.NaN, 0, 0, 0,
+        Map[String, Int](), Map[String, Int](),
+        Map[String, Int](), Map[String, Int]())
+  }
+  implicit val tweetNoTextFmt =
+    mkCaseWireFormat(TweetNoText.apply _, TweetNoText.unapply _)
+  implicit val tweetFmt = mkCaseWireFormat(Tweet.apply _, Tweet.unapply _)
+
+  // type TweetNoText = (String, Long, Double, Double, Int, Int, Int)
+  // TweetNgram = Data for the tweet minus the text, plus an individual ngram
+  //   from the text = (tweet_no_text_as_string, ngram)
+
+  // type Tweet = (String, Long, String, Double, Double, Int, Int, Int)
+  // TweetID = numeric string used to uniquely identify a tweet.
+  type TweetID = String
+
+  /**
+   * A tweet along with ancillary data used for merging and filtering.
+   *
+   * @param key Key used for grouping (username or timestamp); stores the
+   *   raw text of a JSON when `--output-format=raw`.
+   * @param matches Whether the tweet matches the user-level boolean filters
+   *   (if any)
+   * @param tweet The tweet itself.
+   */
+  case class Record(
+    key: String,
+    matches: Boolean,
+    tweet: Tweet
+  )
+  implicit val recordWire = mkCaseWireFormat(Record.apply _, Record.unapply _)
+
+  object Record {
+    def empty = Record("", true, Tweet.empty)
+  }
+
+  // IDRecord = Tweet ID along with all other data for a tweet.
+  type IDRecord = (TweetID, Record)
+  type TweetNgram = (String, String)
+  // NgramCount = (ngram, number of ocurrences)
+  type NgramCount = (String, Long)
+
+  abstract class GroupTwitterPullAction extends ScoobiProcessFilesShared {
+    val progname = "GroupTwitterPull"
+
+    def create_parser(expr: String, foldcase: Boolean) = {
+      if (expr == null) null
+      else new TweetFilterParser(foldcase).parse(expr)
+    }
+  }
+
   import scala.util.parsing.combinator.lexical.StdLexical
   import scala.util.parsing.combinator.syntactical._
   import scala.util.parsing.input.CharArrayReader.EofCh
@@ -1143,116 +1252,6 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
           tweet.text.map(encode_string_for_field(_)) mkString ">>",
           formatted_text
         ) mkString "\t"
-    }
-  }
-
-  /**
-   * Data for a tweet or grouping of tweets, other than the tweet ID.
-   */
-  case class Tweet(
-    text: Seq[String],
-    notext: TweetNoText
-  )
-
-  object Tweet {
-    def empty = Tweet(Seq[String](), TweetNoText.empty)
-  }
-
-  /**
-   * Data for a merged set of tweets other than the text.
-   *
-   * @param user User name (FIXME: or one of them, when going by time; should
-   *    do something smarter)
-   * @param min_timestamp Earliest timestamp
-   * @param max_timestamp Latest timestamp
-   * @param geo_timestamp Earliest timestamp of tweet with corresponding
-   *    location
-   * @param lat Best latitude (corresponding to the earliest tweet)
-   * @param long Best longitude (corresponding to the earliest tweet)
-   * @param followers Max followers
-   * @param following Max following
-   * @param numtweets Number of tweets merged
-   * @param user_mentions Item-count map of all @-mentions
-   * @param retweets Like `user_mentions` but only for retweet mentions
-   * @param hashtags Item-count map of hashtags
-   * @param urls Item-count map of URL's
-   */
-  case class TweetNoText(
-    user: String,
-    min_timestamp: Long,
-    max_timestamp: Long,
-    geo_timestamp: Long,
-    lat: Double,
-    long: Double,
-    followers: Int,
-    following: Int,
-    numtweets: Int,
-    user_mentions: Map[String, Int],
-    retweets: Map[String, Int],
-    hashtags: Map[String, Int],
-    urls: Map[String, Int]
-    /* NOTE: If you add a field here, you need to update a bunch of places,
-       including (of course) wherever a TweetNoText is created, but also
-       some less obvious places.  In all:
-
-       -- the doc string just above
-       -- the definition of TweetNoText.empty()
-       -- parse_json_lift() above
-       -- merge_records() above
-       -- nicely_format_plain() above and output_schema() below
-    */
-  )
-  object TweetNoText {
-    def empty =
-      TweetNoText("", 0, 0, 0, Double.NaN, Double.NaN, 0, 0, 0,
-        Map[String, Int](), Map[String, Int](),
-        Map[String, Int](), Map[String, Int]())
-  }
-  implicit val tweetNoTextFmt =
-    mkCaseWireFormat(TweetNoText.apply _, TweetNoText.unapply _)
-  implicit val tweetFmt = mkCaseWireFormat(Tweet.apply _, Tweet.unapply _)
-
-
-  // type TweetNoText = (String, Long, Double, Double, Int, Int, Int)
-  // TweetNgram = Data for the tweet minus the text, plus an individual ngram
-  //   from the text = (tweet_no_text_as_string, ngram)
-
-  // type Tweet = (String, Long, String, Double, Double, Int, Int, Int)
-  // TweetID = numeric string used to uniquely identify a tweet.
-  type TweetID = String
-
-  /**
-   * A tweet along with ancillary data used for merging and filtering.
-   *
-   * @param key Key used for grouping (username or timestamp); stores the
-   *   raw text of a JSON when `--output-format=raw`.
-   * @param matches Whether the tweet matches the user-level boolean filters
-   *   (if any)
-   * @param tweet The tweet itself.
-   */
-  case class Record(
-    key: String,
-    matches: Boolean,
-    tweet: Tweet
-  )
-  implicit val recordWire = mkCaseWireFormat(Record.apply _, Record.unapply _)
-
-  object Record {
-    def empty = Record("", true, Tweet.empty)
-  }
-
-  // IDRecord = Tweet ID along with all other data for a tweet.
-  type IDRecord = (TweetID, Record)
-  type TweetNgram = (String, String)
-  // NgramCount = (ngram, number of ocurrences)
-  type NgramCount = (String, Long)
-
-  abstract class GroupTwitterPullAction extends ScoobiProcessFilesShared {
-    val progname = "GroupTwitterPull"
-
-    def create_parser(expr: String, foldcase: Boolean) = {
-      if (expr == null) null
-      else new TweetFilterParser(foldcase).parse(expr)
     }
   }
 
