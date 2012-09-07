@@ -243,6 +243,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
    * @param long Best longitude (corresponding to the earliest tweet)
    * @param followers Max followers
    * @param following Max following
+   * @param lang Language used
    * @param numtweets Number of tweets merged
    * @param user_mentions Item-count map of all @-mentions
    * @param retweets Like `user_mentions` but only for retweet mentions
@@ -259,6 +260,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     long: Double,
     followers: Int,
     following: Int,
+    lang: String,
     numtweets: Int,
     user_mentions: Map[String, Int],
     retweets: Map[String, Int],
@@ -278,7 +280,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
   )
   object TweetNoText {
     def empty =
-      TweetNoText("", 0, 0, 0, 0, Double.NaN, Double.NaN, 0, 0, 0,
+      TweetNoText("", 0, 0, 0, 0, Double.NaN, Double.NaN, 0, 0, "unknown", 0,
         Map[String, Int](), Map[String, Int](),
         Map[String, Int](), Map[String, Int]())
   }
@@ -547,7 +549,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       }
       val tweet =
         Tweet(Seq(text), TweetNoText("user", 0, timestamp, timestamp,
-          timestamp, Double.NaN, Double.NaN, 0, 0, 1,
+          timestamp, Double.NaN, Double.NaN, 0, 0, "unknown", 1,
           Map[String, Int](), Map[String, Int](),
           Map[String, Int](), Map[String, Int]()))
       test(args(0), tweet)
@@ -751,6 +753,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
           val followers = force_string(parsed, "user", "followers_count").toInt
           val following = force_string(parsed, "user", "friends_count").toInt
           val tweet_id = force_string(parsed, "id_str")
+          val lang = force_string(parsed, "user", "lang")
           val (lat, long) =
             if ((parsed \ "coordinates" \ "type" values).toString != "Point") {
               (Double.NaN, Double.NaN)
@@ -854,7 +857,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
           ("success",
             (Record(key, true,
               Tweet(Seq(text), TweetNoText(user, tweet_id.toLong, timestamp,
-                timestamp, timestamp, lat, long, followers, following, 1,
+                timestamp, timestamp, lat, long, followers, following, lang, 1,
                 user_mentions, retweets, hashtags, urls)))))
         }
       } catch {
@@ -1001,6 +1004,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       val t1 = tw1.tweet.notext
       val t2 = tw2.tweet.notext
       val id = if (t1.id != t2.id) -1L else t1.id
+      val lang = if (t1.lang != t2.lang) "[multiple]" else t1.lang
       val (followers, following) =
         (math.max(t1.followers, t2.followers),
          math.max(t1.following, t2.following))
@@ -1029,7 +1033,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       // FIXME maybe want to track the different users
       val tweet =
         Tweet(text, TweetNoText(t1.user, id, min_timestamp, max_timestamp,
-          geo_timestamp, lat, long, followers, following, numtweets,
+          geo_timestamp, lat, long, followers, following, lang, numtweets,
           user_mentions, retweets, hashtags, urls))
       Record(tw1.key, tw1.matches || tw2.matches, tweet)
     }
@@ -1231,7 +1235,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       // Put back together but drop key.
       Seq(tnt.user, tnt.id,
           tnt.min_timestamp, tnt.max_timestamp, tnt.geo_timestamp,
-          latlongstr, tnt.followers, tnt.following, tnt.numtweets,
+          latlongstr, tnt.followers, tnt.following, tnt.lang, tnt.numtweets,
           user_mentions, retweets, hashtags, urls,
           tweet.text.map(encode_string_for_field(_)) mkString ">>",
           formatted_text
@@ -1257,7 +1261,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         opts.output, opts.corpus_name, corpus_suffix)
       logger.info("Outputting a schema to %s ..." format filename)
       val fields = Seq("user", "id", "min-timestamp", "max-timestamp",
-        "geo-timestamp","coord", "followers", "following",
+        "geo-timestamp","coord", "followers", "following", "lang",
         "numtweets", "user-mentions", "retweets", "hashtags", "urls",
         "text", "counts")
       val fixed_fields = Map(
