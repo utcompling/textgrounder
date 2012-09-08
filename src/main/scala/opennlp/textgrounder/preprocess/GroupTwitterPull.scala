@@ -159,6 +159,8 @@ Look for any tweets containing the word "clinton" as well as either the words
   the filter will be passed through.""")
   var cfilter_users = ap.option[String]("cfilter-users",
     help="""Same as `--filter-users` but does case-sensitive matching.""")
+  var statistics = ap.flag("statistics",
+    help="""Output statistics on users, tweets, etc.""")
   var geographic_only = ap.flag("geographic-only", "geog",
     help="""Filter out tweets that don't have a geotag or that have a
 geotag outside of North America.  Also filter on min/max-followers, etc.""")
@@ -1243,6 +1245,165 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     }
   }
 
+  case class FeatureValueStats(
+    ty: String,
+    value: String,
+    num_tweets: Int,
+    min_timestamp: Timestamp,
+    max_timestamp: Timestamp,
+    users: Map[String, Int],
+    langs: Map[String, Int]
+  ) {
+    def to_row(opts: GroupTwitterPullParams) =
+      Seq(ty, value, num_tweets.toString,
+        min_timestamp.toString, max_timestamp.toString,
+        encode_word_count_map(users.toSeq),
+        encode_word_count_map(langs.toSeq)
+      ) mkString "\t"
+  }
+
+  implicit val featureValueStatsWire =
+    mkCaseWireFormat(FeatureValueStats.apply _, FeatureValueStats.unapply _)
+
+  object FeatureValueStats {
+    def row_fields =
+      Seq("type", "value", "num-tweets",
+      "min-timestamp", "max-timestamp",
+      "users", "langs")
+
+    def from_tweet(tweet: Tweet, ty: String, value: String) = {
+      val nt = tweet.notext
+      FeatureValueStats(ty, value, 1, nt.min_timestamp,
+        nt.max_timestamp, Map(nt.user -> 1), Map(nt.lang -> 1))
+    }
+
+    def merge_stats(x1: FeatureValueStats, x2: FeatureValueStats) = {
+      assert(x1.ty == x2.ty)
+      assert(x1.value == x2.value)
+      FeatureValueStats(x1.ty, x1.value,
+        x1.num_tweets + x2.num_tweets,
+        math.min(x1.min_timestamp, x2.min_timestamp),
+        math.max(x1.max_timestamp, x2.max_timestamp),
+        combine_maps(x1.users, x2.users),
+        combine_maps(x1.langs, x2.langs))
+    }
+  }
+
+  /**
+   * Statistics on any tweet "feature" (e.g. user, language) that can be
+   * identified by a value of some type (e.g. string, number) and has an
+   * associated map of occurrences of values of the feature.
+   */
+  case class FeatureStats(
+    ty: String,
+    lowest_value_by_sort: String,
+    highest_value_by_sort: String,
+    most_common_value: String,
+    most_common_count: Int,
+    least_common_value: String,
+    least_common_count: Int,
+    num_value_types: Int,
+    num_value_occurrences: Int
+  ) {
+    def to_row(opts: GroupTwitterPullParams) =
+      Seq(ty, lowest_value_by_sort, highest_value_by_sort,
+        most_common_value, most_common_count.toString,
+        least_common_value, least_common_count.toString,
+        num_value_types.toString,
+        num_value_occurrences.toString
+      ) mkString "\t"
+  }
+
+  implicit val featureStatsWire =
+    mkCaseWireFormat(FeatureStats.apply _, FeatureStats.unapply _)
+
+  object FeatureStats {
+    def row_fields =
+      Seq("type", "lowest_value_by_sort", "highest_value_by_sort",
+        "most_common_value", "most_common_count",
+        "least_common_value", "least_common_count",
+        "num_value_types", "num_value_occurrences")
+
+    def from_value_stats(vs: FeatureValueStats) =
+      FeatureStats(vs.ty, vs.value, vs.value, vs.value, vs.num_tweets,
+      vs.value, vs.num_tweets, 1, vs.num_tweets)
+
+    def merge_stats(x1: FeatureStats, x2: FeatureStats) = {
+      assert(x1.ty == x2.ty)
+      val (most_common_value, most_common_count) =
+        if (x1.most_common_count > x2.most_common_count)
+          (x1.most_common_value, x1.most_common_count)
+        else
+          (x2.most_common_value, x2.most_common_count)
+      val (least_common_value, least_common_count) =
+        if (x1.least_common_count < x2.least_common_count)
+          (x1.least_common_value, x1.least_common_count)
+        else
+          (x2.least_common_value, x2.least_common_count)
+      FeatureStats(x1.ty,
+        if (x1.lowest_value_by_sort < x2.lowest_value_by_sort)
+          x1.lowest_value_by_sort
+        else x2.lowest_value_by_sort,
+        if (x1.highest_value_by_sort > x2.highest_value_by_sort)
+          x1.highest_value_by_sort
+        else x2.highest_value_by_sort,
+        most_common_value, most_common_count,
+        least_common_value, least_common_count,
+        x1.num_value_types + x2.num_value_types,
+        x1.num_value_occurrences + x2.num_value_occurrences)
+    }
+  }
+
+  class GetStats(opts: GroupTwitterPullParams)
+      extends GroupTwitterPullAction {
+
+    val operation_category = "GetStats"
+
+    def stats_for_tweet(tweet: Tweet) = {
+      Seq(FeatureValueStats.from_tweet(tweet, "user", tweet.notext.user),
+          FeatureValueStats.from_tweet(tweet, "lang", tweet.notext.lang))
+    }
+
+    /**
+     * Compute statistics on a DList of tweets.
+     */
+    def get_by_value(tweets: DList[Record]) = {
+      /* Operations:
+
+         1. For each tweet, and for each feature we're interested in getting
+            stats on (e.g. users, languages, etc.), generate a tuple
+            (keytype, key, value) that has the type of feature as `keytype`
+            (e.g. "user"), the value of the feature in `key` (e.g. the user
+            name), and some sort of stats object (e.g. `FeatureStats`),
+            giving statistics on that user (etc.) derived from the individual
+            tweet.
+
+         2. Take the resulting DList and group by grouping key.  Combine the
+            resulting `FeatureStats` together by adding their values or
+            taking max/min or whatever. (If there are multiple feature types,
+            we might have multiple classes involved, so we need to condition
+            on the feature type.)
+
+         3. The resulting DList has one entry per feature value, giving
+            stats on all tweets corresponding to that feature value.  We
+            want to aggregate again of feature type, to get statistics on
+            the whole type (e.g. how many different feature values, how
+            often they occur).
+       */
+      tweets.flatMap(x => stats_for_tweet(x.tweet)).
+      groupBy({ stats => (stats.ty, stats.value)}).
+      combine(FeatureValueStats.merge_stats).
+      map(_._2)
+    }
+
+    def get_by_type(values: DList[FeatureValueStats]) = {
+      values.map(FeatureStats.from_value_stats(_)).
+      groupBy({ stats => stats.ty }).
+      combine(FeatureStats.merge_stats).
+      map(_._2)
+    }
+  }
+
   class GroupTwitterPull(opts: GroupTwitterPullParams)
       extends GroupTwitterPullAction {
 
@@ -1305,19 +1466,50 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     // Firstly we load up all the (new-line-separated) JSON lines.
     val lines: DList[String] = TextInput.fromTextFile(opts.input)
 
+    errprint("GroupTwitterPull: Generate tweets ...")
     val tweets1 = new ParseAndUniquifyTweets(opts)(lines)
 
-    /* If we're outputting raw, output the JSON that we stashed into
-       the grouping key (the `key` part of the `Record` class). */
-    if (opts.output_format == "raw") {
-      persist(TextOutput.toTextFile(tweets1.map(_.key), opts.output))
-    } else {
-      val grouped_tweets = new GroupTweetsAndSelectGood(opts)(tweets1)
-      val tfct = new TokenizeFilterAndCountTweets(opts)
-      // Tokenize the combined text into words, possibly generate ngrams
-      // from them, count them up and output results formatted into a record.
-      val nicely_formatted = grouped_tweets.map(tfct.tokenize_count_and_format)
-      persist(TextOutput.toTextFile(nicely_formatted, opts.output))
+    val tweets =
+      /* If we're outputting raw, output the JSON that we stashed into
+         the grouping key (the `key` part of the `Record` class). */
+      if (opts.output_format == "raw") {
+        persist(TextOutput.toTextFile(tweets1.map(_.key), opts.output))
+        tweets1
+      } else {
+        val grouped_tweets = new GroupTweetsAndSelectGood(opts)(tweets1)
+        val tfct = new TokenizeFilterAndCountTweets(opts)
+        // Tokenize the combined text into words, possibly generate ngrams
+        // from them, count them up and output results formatted into a record.
+        val nicely_formatted = grouped_tweets.map(tfct.tokenize_count_and_format)
+        persist(TextOutput.toTextFile(nicely_formatted, opts.output))
+        grouped_tweets
+      }
+
+    def output_lines(lines: DList[String], corpus_suffix: String,
+        fields: Seq[String]) {
+      val outdir = opts.output + "-" + corpus_suffix
+      persist(TextOutput.toTextFile(lines, outdir))
+      val out_schema = new Schema(fields, Map("corpus" -> opts.corpus_name))
+      val out_schema_fn = Schema.construct_schema_file(filehand,
+          outdir, opts.corpus_name, corpus_suffix)
+      rename_output_files(configuration.fs, outdir, opts.corpus_name,
+        corpus_suffix)
+      out_schema.output_schema_file(filehand, out_schema_fn)
+    }
+
+    if (opts.statistics) {
+      errprint("GroupTwitterPull: Generate statistics ...")
+
+      val get_stats = new GetStats(opts)
+      errprint("GroupTwitterPull: Get stats by value ...")
+      val by_value = get_stats.get_by_value(tweets)
+      output_lines(by_value.map(_.to_row(opts)), "by-value",
+        FeatureValueStats.row_fields)
+
+      errprint("GroupTwitterPull: Get stats by type ...")
+      val by_type = get_stats.get_by_type(by_value)
+      output_lines(by_type.map(_.to_row(opts)), "by-type",
+        FeatureStats.row_fields)
     }
     errprint("GroupTwitterPull: done.")
 
