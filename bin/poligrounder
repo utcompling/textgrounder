@@ -7,7 +7,7 @@ RESERVED_MEMORY=512
 POLIGROUNDER_VERSION=0.1.0
 
 if [ -z "$POLIGROUNDER_DIR" ]; then
-  echo "Must set POLIGROUNDER_DIR to top level of TextGrounder distribution"
+  echo "Must set POLIGROUNDER_DIR to top level of PoliGrounder distribution"
   exit 1
 fi
 
@@ -125,13 +125,13 @@ shift
 help()
 {
 cat <<EOF
-TextGrounder $POLIGROUNDER_VERSION usage:
-  textgrounder [OPTIONS ...] COMMAND [ARGS ...]
+PoliGrounder $POLIGROUNDER_VERSION usage:
+  poligrounder [OPTIONS ...] COMMAND [ARGS ...]
 
 Options (mostly low-level):
 
   --memory MEM          Specify maximum heap size (e.g. 2048m or 20g); if not
-                        given, textgrounder will attempt to set the heap size
+                        given, PoliGrounder will attempt to set the heap size
                         to slightly under physical memory if the environment
                         variable PG_SET_JVM_MEMORY is set; otherwise, the
                         JVM will be left to set the heap size automatically.
@@ -159,7 +159,7 @@ Options (mostly low-level):
 
 Environment variables:
 
-  POLIGROUNDER_DIR      Location of TextGrounder installation; needs to be
+  POLIGROUNDER_DIR      Location of PoliGrounder installation; needs to be
                         set for this script to work at all.
   PG_SET_JVM_MEMORY     If non-blank, set the maximum JVM heap size to slightly
                         under the total physical memory size; useful if you
@@ -179,10 +179,25 @@ Environment variables:
 
 General commands:
 
-  build-all             build TextGrounder from source using SBT
-  build                 enter SBT command line, to issue further commands
-  build COMMAND ...     run SBT using some other arbitrary command(s)
-  run CLASS ...         run the main method of a given class
+  build-all             Build PoliGrounder from source using SBT.
+  build                 Enter SBT command line, to issue further commands.
+  build COMMAND ...     Run SBT using some other arbitrary command(s).
+  sbt COMMAND ...       Run SBT using some other arbitrary command(s); same
+                        as 'build'.
+  run CLASS ...         Run the main method of a given class (with the
+                        classpath set appropriately to pick up all
+                        PoliGrounder and library classes).
+  javap OPTIONS ...     Run 'javap' (with the classpath set appropriately).
+  scala OPTIONS ...     Run 'scala' (with the classpath set appropriately);
+                        useful for getting a console to experiment with the
+                        PoliGrounder code.  Note that you can also use the
+                        command 'sbt console', although that requires that
+                        SBT is set up properly and you can build from source
+                        without errors.
+  run-cp PROGRAM ...    Run an arbitrary Java-based program, setting up the
+                        classpath appropriately.  This assumes that the
+                        program takes the '-classpath' option with the same
+                        format as 'java' and 'javac'.
   help                  output this help message
 
 Commands for toponym resolution:
@@ -254,15 +269,28 @@ execute()
 if [ -z "$CMD" ]; then
   help; exit 1
 
-elif [ "$CMD" = 'build' ]; then
+elif [ "$CMD" = 'javap' ]; then
 
-  # We need to cd to the top-level TextGrounder dir when running SBT,
+  execute javap -classpath "$CP" ${1+"$@"}
+
+elif [ "$CMD" = 'scala' ]; then
+
+  execute scala -classpath "$CP" ${1+"$@"}
+
+elif [ "$CMD" = 'run-cp' ]; then
+
+  CP_CMD="$1"; shift
+  execute "$CP_CMD" -classpath "$CP" ${1+"$@"}
+
+elif [ "$CMD" = 'build' -o "$CMD" = 'sbt' ]; then
+
+  # We need to cd to the top-level PoliGrounder dir when running SBT,
   # so the proper build.sbt file gets picked up, etc.
   execute --cd "$RUN_SBT" ${1+"$@"}
 
 elif [ "$CMD" = 'build-all' ]; then
 
-  # We need to cd to the top-level TextGrounder dir when running SBT,
+  # We need to cd to the top-level PoliGrounder dir when running SBT,
   # so the proper build.sbt file gets picked up, etc.
   execute --cd "$RUN_SBT update compile" ${1+"$@"}
 
@@ -326,7 +354,7 @@ else
     *) echo "Unrecognized command: $CMD"; help; exit 1;;
   esac
 
-  # We need to *not* cd to the top-level TextGrounder dir, otherwise if
+  # We need to *not* cd to the top-level PoliGrounder dir, otherwise if
   # there are command-line arguments referring relatively to files, the
   # files won't be found because the lookup will be relative to the
   # wrong directory.
