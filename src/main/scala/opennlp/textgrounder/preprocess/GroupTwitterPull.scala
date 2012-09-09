@@ -44,22 +44,29 @@ class GroupTwitterPullParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {
   var grouping = ap.option[String]("grouping", "g", "gr", "group",
     choices = Seq("user", "time", "none"),
-    default = "user",
     help="""Mode for grouping tweets.  There are currently three methods
     of grouping: `user`, `time` (i.e. all tweets within a given
     timeslice, specified with `--timeslice`) and `none` (no grouping;
     tweets are passed through directly, after duplicated tweets have been
-    removed).""")
+    removed).  Default is `user` when `--ouput-format=corpus`, and `none`
+    otherwise.""")
   var output_format = ap.option[String]("output-format", "of",
-    choices = Seq("corpus", "raw"),
+    choices = Seq("corpus", "stats", "raw"),
     default = "corpus",
     help="""Format for output of tweets or tweet groups.  Possibilities are
-    `corpus` (store in a TextGrounder-style corpus, i.e. as a simple database
+    
+    -- `corpus` (Store in a TextGrounder-style corpus, i.e. as a simple database
     with one record per line, fields separated by TAB characters, and a
-    schema indicating the names of the columns); and `raw` (simply output
-    JSON-formatted tweets directly, exactly as received; only possible for
-    `--grouping=none`, in which case the input tweets will be output
-    directly, after removing duplicates.""")
+    schema indicating the names of the columns.)
+  
+    -- `raw` (Simply output JSON-formatted tweets directly, exactly as received;
+    only possible for `--grouping=none`, in which case the input tweets will be
+    output directly, after removing duplicates.)
+    
+    -- `stats` (Corpus-style output with statistics on the tweets, users, etc.
+    rather than the tweets themselves.  Generally doesn't make much sense when
+    used with any kind of grouping, because it will then output statistics on
+    the results of grouping rather than on the actual tweets.)""")
   var corpus_name = ap.option[String]("corpus-name",
     help="""Name of output corpus; for identification purposes.
     Default to name taken from input directory.""")
@@ -152,15 +159,13 @@ Look for any tweets containing the word "clinton" as well as either the words
   var cfilter_tweets = ap.option[String]("cfilter-tweets",
     help="""Boolean expression used to filter tweets to be output, with
     case-sensitive matching.  Format is identical to `--filter-tweets`.""")
-  var filter_users = ap.option[String]("filter-users",
-    help="""Boolean expression used to filter on the user level; only
-  applicable with --grouping=user.  This is like `--filter-tweets` but
-  filters users in such a way that all users with *any* tweet matching
-  the filter will be passed through.""")
-  var cfilter_users = ap.option[String]("cfilter-users",
-    help="""Same as `--filter-users` but does case-sensitive matching.""")
-  var statistics = ap.flag("statistics",
-    help="""Output statistics on users, tweets, etc.""")
+  var filter_groups = ap.option[String]("filter-groups",
+    help="""Boolean expression used to filter on the grouped-tweet level.
+  This is like `--filter-tweets` but filters groups of tweets (grouped
+  according to `--grouping`), such that groups of tweets will be accepted
+  if *any* tweet matches the filter.""")
+  var cfilter_groups = ap.option[String]("cfilter-groups",
+    help="""Same as `--filter-groups` but does case-sensitive matching.""")
   var geographic_only = ap.flag("geographic-only", "geog",
     help="""Filter out tweets that don't have a geotag or that have a
 geotag outside of North America.  Also filter on min/max-followers, etc.""")
@@ -182,6 +187,8 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
 
   override def check_usage() {
     timeslice = (timeslice_float * 1000).toLong
+    if (grouping == null)
+      grouping = if (output_format == "corpus") "user" else "none"
     if (output_format == "raw" && grouping != "none")
       ap.usageError("`raw` output format only allowed when `--grouping=none`")
   }
@@ -215,15 +222,20 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
    */
 
   /**
-   * Data for a tweet or grouping of tweets, other than the tweet ID.
+   * Data for a tweet or grouping of tweets.
+   *
+   * @param line Raw JSON for tweet; only stored when --output-format=raw
+   * @param text Text for tweet or tweets (a Seq in case of multiple tweets)
+   * @param notext Rest of data
    */
   case class Tweet(
+    json: String,
     text: Seq[String],
     notext: TweetNoText
   )
 
   object Tweet {
-    def empty = Tweet(Seq[String](), TweetNoText.empty)
+    def empty = Tweet("", Seq[String](), TweetNoText.empty)
   }
 
   // TweetID = Twitter's numeric ID used to uniquely identify a tweet.
@@ -286,9 +298,9 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         Map[String, Int](), Map[String, Int](),
         Map[String, Int](), Map[String, Int]())
   }
-  implicit val tweetNoTextFmt =
+  implicit val tweetNoTextWire =
     mkCaseWireFormat(TweetNoText.apply _, TweetNoText.unapply _)
-  implicit val tweetFmt = mkCaseWireFormat(Tweet.apply _, Tweet.unapply _)
+  implicit val tweetWire = mkCaseWireFormat(Tweet.apply _, Tweet.unapply _)
 
   /**
    * A tweet along with ancillary data used for merging and filtering.
@@ -550,7 +562,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
           "Unable to parse date %s" format args(1))
       }
       val tweet =
-        Tweet(Seq(text), TweetNoText("user", 0, timestamp, timestamp,
+        Tweet("", Seq(text), TweetNoText("user", 0, timestamp, timestamp,
           timestamp, Double.NaN, Double.NaN, 0, 0, "unknown", 1,
           Map[String, Int](), Map[String, Int](),
           Map[String, Int](), Map[String, Int]()))
@@ -566,7 +578,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     /**
      * An empty tweet.
      */
-    val empty_tweet = Record.empty
+    val empty_tweet = Tweet.empty
 
     // Used internally to force an exit when a problem in parse_json_lift
     // occurs.
@@ -575,9 +587,9 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     /**
      * Parse a JSON line into a tweet, using Lift.
      *
-     * @return status and record.
+     * @return status and tweet.
      */
-    def parse_json_lift(line: String): (String, Record) = {
+    def parse_json_lift(line: String): (String, Tweet) = {
 
       /**
        * Convert a Twitter timestamp, e.g. "Tue Jun 05 14:31:21 +0000 2012",
@@ -848,19 +860,11 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
           // map
           //  { case (url, count) => (url.replace("\\/", "/"), count) }
 
-          val key =
-            if (opts.output_format == "raw") line
-            else opts.grouping match {
-              case "user" => user
-              case "time" =>
-                ((timestamp / opts.timeslice) * opts.timeslice).toString
-              case "none" => tweet_id
-            }
           ("success",
-            (Record(key, true,
-              Tweet(Seq(text), TweetNoText(user, tweet_id.toLong, timestamp,
-                timestamp, timestamp, lat, long, followers, following, lang, 1,
-                user_mentions, retweets, hashtags, urls)))))
+            Tweet(if (opts.output_format == "raw") line else "",
+              Seq(text), TweetNoText(user, tweet_id.toLong, timestamp,
+              timestamp, timestamp, lat, long, followers, following, lang, 1,
+              user_mentions, retweets, hashtags, urls)))
         }
       } catch {
         case jpe: liftweb.json.JsonParser.ParseException => {
@@ -896,7 +900,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     /*
      * Parse a JSON line into a tweet.
      */
-    def parse_json(line: String): Record = {
+    def parse_json(line: String) = {
       bump_counter("total lines")
       lineno += 1
       // For testing
@@ -907,7 +911,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       }
       else {
         bump_counter("total tweets parsed")
-        val (status, record) = parse_json_lift(line)
+        val (status, tweet) = parse_json_lift(line)
         if (status == "error") {
           bump_counter("total tweets unsuccessfully parsed")
         } else if (status == "success") {
@@ -915,7 +919,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         } else {
           bump_counter("total tweets skipped")
         }
-        record
+        tweet
       }
     }
 
@@ -926,9 +930,9 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
      * invalid even though technically such a place could exist. (FIXME,
      * use NaN or something to indicate a missing latitude or longitude).
      */
-    def is_valid_tweet(r: Record): Boolean = {
+    def is_valid_tweet(tweet: Tweet): Boolean = {
       // filters out invalid tweets, as well as trivial spam
-      val tn = r.tweet.notext
+      val tn = tweet.notext
       tn.id != 0 && tn.min_timestamp != 0 && tn.max_timestamp != 0 &&
         tn.user != "" && !(tn.lat == 0.0 && tn.long == 0.0)
     }
@@ -947,9 +951,9 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
      * the different streams, but there is a lot of duplication that needs to
      * be tossed aside.
      */
-    def tweet_once(id_rs: (TweetID, Iterable[Record])): Record = {
-      val (id, rs) = id_rs
-      rs.head
+    def tweet_once(id_tweets: (TweetID, Iterable[Tweet])) = {
+      val (id, tweets) = id_tweets
+      tweets.head
     }
 
     lazy val filter_tweets_ast =
@@ -966,18 +970,17 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
        (cfilter_tweets_ast == null || (cfilter_tweets_ast matches tweet))
     }
 
+    // Filter out duplicate tweets -- group by tweet ID and then take the
+    // first tweet for a given ID.  Duplicate tweets occur for various
+    // reasons, e.g. sometimes in the stream itself due to Twitter errors,
+    // or when combining data from multiple, possibly overlapping, sources.
+    def filter_duplicates(values: DList[Tweet]) =
+      values.groupBy(_.notext.id).map(tweet_once)
+
+    def filter_tweets(values: DList[Tweet]) =
+      filter_duplicates(values).filter(x => filter_tweet_by_tweet_filters(x))
+
     def apply(lines: DList[String]) = {
-
-      // Filter out duplicate tweets -- group by tweet ID and then take the
-      // first tweet for a given ID.  Duplicate tweets occur for various
-      // reasons, e.g. sometimes in the stream itself due to Twitter errors,
-      // or when combining data from multiple, possibly overlapping, sources.
-      def filter_duplicates(values: DList[Record]): DList[Record] =
-        values.groupBy(_.tweet.notext.id).map(tweet_once)
-
-      def filter_tweets(values: DList[Record]) =
-        filter_duplicates(values).filter(x =>
-          filter_tweet_by_tweet_filters(x.tweet))
 
       // Parse JSON into tweet records.
       val values_extracted = lines.map(parse_json)
@@ -989,10 +992,35 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     }
   }
 
-  class GroupTweetsAndSelectGood(opts: GroupTwitterPullParams)
+  class GroupTweets(opts: GroupTwitterPullParams)
       extends GroupTwitterPullAction {
 
     val operation_category = "Group"
+
+    lazy val filter_groups_ast =
+      create_parser(opts.filter_groups, foldcase = true)
+    lazy val cfilter_groups_ast =
+      create_parser(opts.cfilter_groups, foldcase = false)
+
+    /**
+     * Apply any boolean filters given in `--filter-groups` or
+     * `--cfilter-groups`.
+     */
+    def filter_tweet_by_group_filters(tweet: Tweet) = {
+      (filter_groups_ast == null || (filter_groups_ast matches tweet)) &&
+       (cfilter_groups_ast == null || (cfilter_groups_ast matches tweet))
+    }
+
+    def tweet_to_record(tweet: Tweet) = {
+      val nt = tweet.notext
+      val key = opts.grouping match {
+        case "user" => nt.user
+        case "time" =>
+          ((nt.min_timestamp / opts.timeslice) * opts.timeslice).toString
+        case "none" => nt.id.toString
+      }
+      Record(key, filter_tweet_by_group_filters(tweet), tweet)
+    }
 
     /**
      * Merge the data associated with two tweets or tweet combinations
@@ -1034,7 +1062,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
 
       // FIXME maybe want to track the different users
       val tweet =
-        Tweet(text, TweetNoText(t1.user, id, min_timestamp, max_timestamp,
+        Tweet("", text, TweetNoText(t1.user, id, min_timestamp, max_timestamp,
           geo_timestamp, lat, long, followers, following, lang, numtweets,
           user_mentions, retweets, hashtags, urls))
       Record(tw1.key, tw1.matches || tw2.matches, tweet)
@@ -1044,8 +1072,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
      * Return true if tweet (combination) has a fully-specified latitude
      * and longitude.
      */
-    def has_latlong(r: Record) = {
-      val tw = r.tweet
+    def has_latlong(tw: Tweet) = {
       !isNaN(tw.notext.lat) && !isNaN(tw.notext.long)
     }
 
@@ -1069,8 +1096,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
      * instead too many people that a given account is following.  Perhaps
      * this is backwards?
      */
-    def is_nonspammer(r: Record): Boolean = {
-      val tn = r.tweet.notext
+    def is_nonspammer(tw: Tweet): Boolean = {
+      val tn = tw.notext
 
       val retval =
         (tn.following >= MIN_NUMBER_FOLLOWING &&
@@ -1078,7 +1105,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         (tn.followers >= MIN_NUMBER_FOLLOWERS) &&
         (tn.numtweets >= opts.min_tweets && tn.numtweets <= opts.max_tweets)
       if (opts.debug && retval == false)
-        logger.info("Rejecting is_nonspammer %s" format r)
+        logger.info("Rejecting is_nonspammer %s" format tw)
       retval
     }
 
@@ -1092,57 +1119,48 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
      * Return true of this tweet (combination) is located within the
      * bounding box fo North America.
      */
-    def northamerica_only(r: Record): Boolean = {
-      val tn = r.tweet.notext
+    def northamerica_only(tw: Tweet): Boolean = {
+      val tn = tw.notext
       val retval = (tn.lat >= MIN_LAT && tn.lat <= MAX_LAT) &&
                    (tn.long >= MIN_LNG && tn.long <= MAX_LNG)
       if (opts.debug && retval == false)
-        logger.info("Rejecting northamerica_only %s" format r)
+        logger.info("Rejecting northamerica_only %s" format tw)
       retval
     }
 
-    def is_good_geo_tweet(r: Record): Boolean = {
+    def is_good_geo_tweet(tw: Tweet): Boolean = {
       if (opts.debug)
-        logger.info("Considering %s" format r)
-      has_latlong(r) &&
-      is_nonspammer(r) &&
-      northamerica_only(r)
+        logger.info("Considering %s" format tw)
+      has_latlong(tw) &&
+      is_nonspammer(tw) &&
+      northamerica_only(tw)
     }
 
-    lazy val filter_users_ast =
-      create_parser(opts.filter_users, foldcase = true)
-    lazy val cfilter_users_ast =
-      create_parser(opts.cfilter_users, foldcase = false)
-
-    /**
-     * Apply any boolean filters given in `--filter-users` or
-     * `--cfilter-users`.
-     */
-    def filter_tweet_by_user_filters(tweet: Tweet) = {
-      (filter_users_ast == null || (filter_users_ast matches tweet)) &&
-       (cfilter_users_ast == null || (cfilter_users_ast matches tweet))
-    }
-
-    def apply(tweets: DList[Record]) = {
-      // Group by username, then combine the tweets for a user into a
+    def apply(tweets: DList[Tweet]) = {
+      // Group by grouping key (username, timestamp, etc.).  username, then combine the records for a user into a
       // tweet combination, with text concatenated and the location taken
-      // from the earliest tweet with a specific coordinate.
-      val concatted = tweets.groupBy(_.key).combine(merge_records).map(_._2)
+      // from the earliest tweet with a specific coordinate; then filter
+      // according to group-level user filters and convert back to tweets,
+      // since we have no more need of the extra record-level info.
+      val concatted = tweets.
+        map(tweet_to_record).   // convert to Record (which contains grouping
+                                // key and group-level filter result)
+        groupBy(_.key).         // group on grouping key
+        combine(merge_records). // merge value tweet records
+        filter(_._2.matches).   // apply group-level user filters
+        map(_._2.tweet)         // convert back to Tweet
 
       // If grouping by user, filter the tweet combinations, removing users
       // without a specific coordinate; users that appear to be "spammers" or
       // other users with non-standard behavior; and users located outside of
       // North America.  FIXME: We still want to filter spammers; but this
       // is trickier when not grouping by user.  How to do it?
-      val good_tweets =
-        if (opts.geographic_only) concatted.filter(is_good_geo_tweet)
-        else concatted
-
-      good_tweets.filter(_.matches)
+      if (opts.geographic_only) concatted.filter(is_good_geo_tweet)
+      else concatted
     }
   }
 
-  class TokenizeFilterAndCountTweets(opts: GroupTwitterPullParams)
+  class TokenizeCountAndFormat(opts: GroupTwitterPullParams)
       extends GroupTwitterPullAction {
 
     val operation_category = "Tokenize"
@@ -1220,8 +1238,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
      * the result as a field; then convert the whole into a record to be
      * written out.
      */
-    def tokenize_count_and_format(record: Record): String = {
-      val tweet = record.tweet
+    def tokenize_count_and_format(tweet: Tweet): String = {
       val tnt = tweet.notext
       val formatted_text = emit_ngrams(tweet.text)
       // Latitude/longitude need to be combined into a single field, but only
@@ -1250,15 +1267,11 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     value: String,
     num_tweets: Int,
     min_timestamp: Timestamp,
-    max_timestamp: Timestamp,
-    users: Map[String, Int],
-    langs: Map[String, Int]
+    max_timestamp: Timestamp
   ) {
     def to_row(opts: GroupTwitterPullParams) =
       Seq(ty, value, num_tweets.toString,
-        min_timestamp.toString, max_timestamp.toString,
-        encode_word_count_map(users.toSeq),
-        encode_word_count_map(langs.toSeq)
+        min_timestamp.toString, max_timestamp.toString
       ) mkString "\t"
   }
 
@@ -1268,13 +1281,11 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
   object FeatureValueStats {
     def row_fields =
       Seq("type", "value", "num-tweets",
-      "min-timestamp", "max-timestamp",
-      "users", "langs")
+      "min-timestamp", "max-timestamp")
 
     def from_tweet(tweet: Tweet, ty: String, value: String) = {
       val nt = tweet.notext
-      FeatureValueStats(ty, value, 1, nt.min_timestamp,
-        nt.max_timestamp, Map(nt.user -> 1), Map(nt.lang -> 1))
+      FeatureValueStats(ty, value, 1, nt.min_timestamp, nt.max_timestamp)
     }
 
     def merge_stats(x1: FeatureValueStats, x2: FeatureValueStats) = {
@@ -1283,9 +1294,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       FeatureValueStats(x1.ty, x1.value,
         x1.num_tweets + x2.num_tweets,
         math.min(x1.min_timestamp, x2.min_timestamp),
-        math.max(x1.max_timestamp, x2.max_timestamp),
-        combine_maps(x1.users, x2.users),
-        combine_maps(x1.langs, x2.langs))
+        math.max(x1.max_timestamp, x2.max_timestamp))
     }
   }
 
@@ -1367,7 +1376,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     /**
      * Compute statistics on a DList of tweets.
      */
-    def get_by_value(tweets: DList[Record]) = {
+    def get_by_value(tweets: DList[Tweet]) = {
       /* Operations:
 
          1. For each tweet, and for each feature we're interested in getting
@@ -1390,7 +1399,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
             the whole type (e.g. how many different feature values, how
             often they occur).
        */
-      tweets.flatMap(x => stats_for_tweet(x.tweet)).
+      tweets.flatMap(x => stats_for_tweet(x)).
       groupBy({ stats => (stats.ty, stats.value)}).
       combine(FeatureValueStats.merge_stats).
       map(_._2)
@@ -1456,10 +1465,16 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
           format(opts.timeslice_float)
       case "user" =>
         "grouping by user"
-      case "none" if opts.output_format == "raw" =>
-        "not grouping, outputting tweets as raw JSON"
       case "none" =>
         "not grouping"
+    }))
+    errprint("GroupTwitterPull: " + (opts.output_format match {
+      case "corpus" =>
+        "outputting tweets as a TextGrounder corpus"
+      case "raw" =>
+        "outputting tweets as raw JSON"
+      case "stats" =>
+        "outputting statistics on tweets"
     }))
     val ptp = new GroupTwitterPull(opts)
 
@@ -1469,21 +1484,10 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     errprint("GroupTwitterPull: Generate tweets ...")
     val tweets1 = new ParseAndUniquifyTweets(opts)(lines)
 
+    /* Maybe group tweets */
     val tweets =
-      /* If we're outputting raw, output the JSON that we stashed into
-         the grouping key (the `key` part of the `Record` class). */
-      if (opts.output_format == "raw") {
-        persist(TextOutput.toTextFile(tweets1.map(_.key), opts.output))
-        tweets1
-      } else {
-        val grouped_tweets = new GroupTweetsAndSelectGood(opts)(tweets1)
-        val tfct = new TokenizeFilterAndCountTweets(opts)
-        // Tokenize the combined text into words, possibly generate ngrams
-        // from them, count them up and output results formatted into a record.
-        val nicely_formatted = grouped_tweets.map(tfct.tokenize_count_and_format)
-        persist(TextOutput.toTextFile(nicely_formatted, opts.output))
-        grouped_tweets
-      }
+      if (opts.grouping == "none") tweets1
+      else new GroupTweets(opts)(tweets1)
 
     def output_lines(lines: DList[String], corpus_suffix: String,
         fields: Seq[String]) {
@@ -1497,21 +1501,25 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       out_schema.output_schema_file(filehand, out_schema_fn)
     }
 
-    if (opts.statistics) {
-      errprint("GroupTwitterPull: Generate statistics ...")
-
-      val get_stats = new GetStats(opts)
-      errprint("GroupTwitterPull: Get stats by value ...")
-      val by_value = get_stats.get_by_value(tweets)
-      output_lines(by_value.map(_.to_row(opts)), "by-value",
-        FeatureValueStats.row_fields)
-
-      errprint("GroupTwitterPull: Get stats by type ...")
-      val by_type = get_stats.get_by_type(by_value)
-      output_lines(by_type.map(_.to_row(opts)), "by-type",
-        FeatureStats.row_fields)
+    opts.output_format match {
+      case "raw" =>
+        /* If we're outputting raw, output the JSON of the tweet. */
+        persist(TextOutput.toTextFile(tweets.map(_.json), opts.output))
+      case "corpus" => {
+        val tfct = new TokenizeCountAndFormat(opts)
+        // Tokenize the combined text into words, possibly generate ngrams
+        // from them, count them up and output results formatted into a record.
+        val nicely_formatted = tweets.map(tfct.tokenize_count_and_format)
+        persist(TextOutput.toTextFile(nicely_formatted, opts.output))
+      }
+      case "stats" => {
+        val get_stats = new GetStats(opts)
+        val by_value = get_stats.get_by_value(tweets)
+        val by_type = get_stats.get_by_type(by_value)
+        output_lines(by_type.map(_.to_row(opts)), "by-type",
+          FeatureStats.row_fields)
+      }
     }
-    errprint("GroupTwitterPull: done.")
 
     rename_output_files(configuration.fs, opts.output, opts.corpus_name,
       ptp.corpus_suffix)
@@ -1519,6 +1527,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     // create a schema
     if (opts.output_format != "raw")
       ptp.output_schema(filehand)
+
+    errprint("GroupTwitterPull: done.")
 
     finish_scoobi_app(opts)
   }
