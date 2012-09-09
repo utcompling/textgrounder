@@ -686,9 +686,16 @@ package object collectionutil {
   /**
    * Combine two maps, adding up the numbers where overlap occurs.
    */
-  def combine_maps[T, U <: Int](
-    map1: Map[T, U], map2: Map[T, U]) =
-      map1 ++ map2.map { case (k,v) => k -> (v + map1.getOrElse(k,0)) }
+  def combine_maps[T, U <: Int](map1: Map[T, U], map2: Map[T, U]) = {
+      /* We need to iterate over one of the maps and add each element to the
+         other map, checking first to see if it already exists.  Make sure
+         to iterate over the smallest map, so that repeated combination of
+         maps will have O(n) rather than worst-case O(N^2). */
+      if (map1.size > map2.size)
+        map1 ++ map2.map { case (k,v) => k -> (v + map1.getOrElse(k,0)) }
+      else
+        map2 ++ map1.map { case (k,v) => k -> (v + map2.getOrElse(k,0)) }
+    }
 
   /**
    * Convert a list of items to a map counting how many of each item occurs.
