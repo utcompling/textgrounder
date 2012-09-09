@@ -23,6 +23,7 @@ import collection.JavaConversions._
 import java.io._
 import java.lang.Double.isNaN
 import java.text.{SimpleDateFormat, ParseException}
+import java.util.Date
 
 import net.liftweb
 import org.apache.commons.logging
@@ -1242,15 +1243,26 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     }
   }
 
+  /**
+   * @param ty Type of value
+   * @param key2 Second-level key to group on; Typically, either we want the
+   *   individual value to appear in the overall stats (at 2nd level) or not;
+   *   when not, put the individual value in `value`, and put the value of
+   *   `ty` in `key2`; otherwise, put the individual value in `key2`, and
+   *   usually put a constant value (e.g. "") in `value` so all relevant
+   *   tweets get grouped together.
+   * @param value See above.
+   */
   case class FeatureValueStats(
     ty: String,
+    key2: String,
     value: String,
     num_tweets: Int,
     min_timestamp: Timestamp,
     max_timestamp: Timestamp
   ) {
     def to_row(opts: GroupTwitterPullParams) =
-      Seq(ty, value, num_tweets.toString,
+      Seq(ty, key2, value, num_tweets.toString,
         min_timestamp.toString, max_timestamp.toString
       ) mkString "\t"
   }
@@ -1260,17 +1272,19 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
 
   object FeatureValueStats {
     def row_fields =
-      Seq("type", "value", "num-tweets",
+      Seq("type", "key2", "value", "num-tweets",
       "min-timestamp", "max-timestamp")
 
-    def from_tweet(tweet: Tweet, ty: String, value: String) = {
-      FeatureValueStats(ty, value, 1, tweet.min_timestamp, tweet.max_timestamp)
+    def from_tweet(tweet: Tweet, ty: String, key2: String, value: String) = {
+      FeatureValueStats(ty, key2, value, 1, tweet.min_timestamp,
+        tweet.max_timestamp)
     }
 
     def merge_stats(x1: FeatureValueStats, x2: FeatureValueStats) = {
       assert(x1.ty == x2.ty)
+      assert(x1.key2 == x2.key2)
       assert(x1.value == x2.value)
-      FeatureValueStats(x1.ty, x1.value,
+      FeatureValueStats(x1.ty, x1.key2, x1.value,
         x1.num_tweets + x2.num_tweets,
         math.min(x1.min_timestamp, x2.min_timestamp),
         math.max(x1.max_timestamp, x2.max_timestamp))
@@ -1284,6 +1298,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
    */
   case class FeatureStats(
     ty: String,
+    key2: String,
     lowest_value_by_sort: String,
     highest_value_by_sort: String,
     most_common_value: String,
@@ -1294,11 +1309,12 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     num_value_occurrences: Int
   ) {
     def to_row(opts: GroupTwitterPullParams) =
-      Seq(ty, lowest_value_by_sort, highest_value_by_sort,
+      Seq(ty, key2, lowest_value_by_sort, highest_value_by_sort,
         most_common_value, most_common_count.toString,
         least_common_value, least_common_count.toString,
         num_value_types.toString,
-        num_value_occurrences.toString
+        num_value_occurrences.toString,
+        num_value_occurrences.toDouble/num_value_types toString
       ) mkString "\t"
   }
 
@@ -1307,17 +1323,18 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
 
   object FeatureStats {
     def row_fields =
-      Seq("type", "lowest_value_by_sort", "highest_value_by_sort",
-        "most_common_value", "most_common_count",
-        "least_common_value", "least_common_count",
-        "num_value_types", "num_value_occurrences")
+      Seq("type", "key2", "lowest-value-by-sort", "highest-value-by-sort",
+        "most-common-value", "most-common-count",
+        "least-common-value", "least-common-count",
+        "num-value-types", "num-value-occurrences", "avg-value-occurrences")
 
     def from_value_stats(vs: FeatureValueStats) =
-      FeatureStats(vs.ty, vs.value, vs.value, vs.value, vs.num_tweets,
+      FeatureStats(vs.ty, vs. key2, vs.value, vs.value, vs.value, vs.num_tweets,
       vs.value, vs.num_tweets, 1, vs.num_tweets)
 
     def merge_stats(x1: FeatureStats, x2: FeatureStats) = {
       assert(x1.ty == x2.ty)
+      assert(x1.key2 == x2.key2)
       val (most_common_value, most_common_count) =
         if (x1.most_common_count > x2.most_common_count)
           (x1.most_common_value, x1.most_common_count)
@@ -1328,7 +1345,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
           (x1.least_common_value, x1.least_common_count)
         else
           (x2.least_common_value, x2.least_common_count)
-      FeatureStats(x1.ty,
+      FeatureStats(x1.ty, x1.key2,
         if (x1.lowest_value_by_sort < x2.lowest_value_by_sort)
           x1.lowest_value_by_sort
         else x2.lowest_value_by_sort,
@@ -1347,9 +1364,29 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
 
     val operation_category = "GetStats"
 
+    val date_fmts = Seq(
+      ("year", "yyyy"),                   // Ex: "2012"
+      ("year-month", "yyyy-MMM"),         // Ex. "2012-Jul"
+      ("year-month-date", "yyyy-MMM-dd"), // Ex. "2012-Jul-5"
+      ("month", "MMM"),                   // Ex. "Jul"
+      ("month, week", "MMM, 'week' W"),   // Ex. "Jul, week 2" (1-based)
+      ("month date", "MMM dd"),           // Ex. "Dec 25"
+      ("daywk", "EEE"),                   // Ex. "Mon"
+      ("hour", "HHaa"),                   // Ex. "09am"
+      ("daywk, hour", "EEE, HHaa"),       // Ex. "Mon, 23pm"
+      ("daywk in month", "EEE 'in' MMM")  // Ex. "Thu in Jul"
+    )
+    lazy val sdfs =
+      for ((engl, fmt) <- date_fmts) yield (engl, new SimpleDateFormat(fmt))
+
     def stats_for_tweet(tweet: Tweet) = {
-      Seq(FeatureValueStats.from_tweet(tweet, "user", tweet.user),
-          FeatureValueStats.from_tweet(tweet, "lang", tweet.lang))
+      Seq(FeatureValueStats.from_tweet(tweet, "user", "user", tweet.user),
+          // Get a summary for all languages plus a summary for each lang
+          FeatureValueStats.from_tweet(tweet, "lang", tweet.lang, ""),
+          FeatureValueStats.from_tweet(tweet, "lang", "lang", tweet.lang)) ++
+        sdfs.map { case (engl, fmt) =>
+          FeatureValueStats.from_tweet(
+            tweet, engl, fmt.format(new Date(tweet.min_timestamp)), "") }
     }
 
     /**
@@ -1379,14 +1416,14 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
             often they occur).
        */
       tweets.flatMap(x => stats_for_tweet(x)).
-      groupBy({ stats => (stats.ty, stats.value)}).
+      groupBy({ stats => (stats.ty, stats.key2, stats.value)}).
       combine(FeatureValueStats.merge_stats).
       map(_._2)
     }
 
     def get_by_type(values: DList[FeatureValueStats]) = {
       values.map(FeatureStats.from_value_stats(_)).
-      groupBy({ stats => stats.ty }).
+      groupBy({ stats => (stats.ty, stats.key2) }).
       combine(FeatureStats.merge_stats).
       map(_._2)
     }
