@@ -33,8 +33,8 @@ class VisualizeCorpus extends PApplet {
   var allButton:Button = null
   var noneButton:Button = null
 
-  val INIT_WIDTH = 1280//1024
-  val INIT_HEIGHT = 720//768
+  val INIT_WIDTH = if(VisualizeCorpus.inputWidth > 0) VisualizeCorpus.inputWidth else 1280
+  val INIT_HEIGHT = if(VisualizeCorpus.inputHeight > 0) VisualizeCorpus.inputHeight else 720
 
   val RADIUS = 10
 
@@ -313,9 +313,15 @@ class VisualizeCorpus extends PApplet {
 object VisualizeCorpus extends PApplet {
 
   var inputFile:String = null
+  var inputWidth:Int = -1
+  var inputHeight:Int = -1
 
   def main(args:Array[String]) {
     inputFile = args(0)
+    if(args.size >= 3) {
+      inputWidth = args(1).toInt
+      inputHeight = args(2).toInt
+    }
     PApplet.main(Array(/*"--present", */"opennlp.textgrounder.tr.app.VisualizeCorpus"))
   }
 }
