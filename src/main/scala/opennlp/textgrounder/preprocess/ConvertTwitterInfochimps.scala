@@ -108,7 +108,7 @@ are computed.""")
       help = """File(s) to process for input.""")
 }
 
-abstract class TwitterInfochimpsFileProcessor extends TextFileProcessor {
+abstract class TwitterInfochimpsFileProcessor extends TextFileProcessor[Unit] {
   def process_lines(lines: Iterator[String],
       filehand: FileHandler, file: String,
       compression: String, realname: String) = {
@@ -144,7 +144,7 @@ abstract class TwitterInfochimpsFileProcessor extends TextFileProcessor {
     task.finish()
     print_msg_heading("Memory/time usage:", blank_lines_before = 3)
     output_resource_usage(dojava = false)
-    true
+    (true, ())
   }
 
   // To be implemented

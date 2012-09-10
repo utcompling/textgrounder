@@ -175,7 +175,7 @@ class MMCUnigramWordDistHandler(
  */
 class MMCDocumentFileProcessor(
   suffix: String
-) extends CorpusFileProcessor(suffix) {
+) extends CorpusFieldFileProcessor[Unit](suffix) {
   val document_fieldvals = mutable.Map[String, Seq[String]]()
 
   def process_row(fieldvals: Seq[String]) = {
@@ -193,7 +193,7 @@ class MMCDocumentFileProcessor(
       parse_row(line)
     }
     task.finish()
-    true
+    (true, ())
   }
 }
 

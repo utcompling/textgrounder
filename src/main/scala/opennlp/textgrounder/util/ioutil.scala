@@ -588,8 +588,10 @@ package object ioutil {
    * names a directory, all files in the directory will be processed.
    * If a file is given as 'null', that will be passed on unchanged.
    * (Useful to signal input taken from an internal source.)
+   *
+   * @tparam T Type of result associated with a file.
    */
-  abstract class FileProcessor {
+  trait FileProcessor[T] {
 
     /**
      * Process all files, calling `process_file` on each.
@@ -600,20 +602,24 @@ package object ioutil {
      *   e.g. for specifying input from an internal source).
      * @param output_messages If true, output messages indicating the
      *   files being processed.
-     * @return True if file processing continued to completion,
-     *   false if interrupted because an invocation of `process_file`
-     *   returns false.
+     * @return Tuple `(completed, values)` where `completed` is True if file
+     *   processing continued to completion, false if interrupted because an
+     *   invocation of `process_file` returned false, and `values` is a
+     *   sequence of the individual values for each file.
      */
     def process_files(filehand: FileHandler, files: Iterable[String],
         output_messages: Boolean = true) = {
       var broken = false
       begin_processing(filehand, files)
+      val buf = mutable.Buffer[T]()
       breakable {
         def process_one_file(filename: String) {
           if (output_messages && filename != null)
             errprint("Processing file %s..." format filename)
           begin_process_file(filehand, filename)
-          if (!process_file(filehand, filename)) {
+          val (continue, value) = process_file(filehand, filename)
+          buf += value
+          if (!continue) {
             // This works because of the way 'breakable' is implemented
             // (dynamically-scoped).  Might "break" (stop working) if break
             // is made totally lexically-scoped.
@@ -631,8 +637,7 @@ package object ioutil {
               if (output_messages)
                 errprint("Processing directory %s..." format dir)
               begin_process_directory(filehand, dir)
-              val files = filehand.list_files(dir)
-              for (file <- filter_dir_files(filehand, dir, files)) {
+              for (file <- list_files(filehand, dir)) {
                 process_one_file(file)
               }
               end_process_directory(filehand, dir)
@@ -641,7 +646,7 @@ package object ioutil {
         }
       }
       end_processing(filehand, files)
-      !broken
+      (!broken, buf.toSeq)
     }
 
     /*********************** MUST BE IMPLEMENTED *************************/
@@ -651,10 +656,11 @@ package object ioutil {
      *
      * @param filehand The FileHandler for working with the file.
      * @param file The file to process (possibly null, see above).
-     * @return True if file processing should continue; false to
-     *   abort any further processing.
+     * @return A tuple of `(continue, result)` where `continue` is a Boolean
+     *   (True if file processing should continue) and `result` is the result
+     *   of processing this file.
      */
-    def process_file(filehand: FileHandler, file: String): Boolean
+    def process_file(filehand: FileHandler, file: String): (Boolean, T)
 
     /***************** MAY BE IMPLEMENTED (THROUGH OVERRIDING) ***************/
 
@@ -719,19 +725,15 @@ package object ioutil {
     }
 
     /**
-     * Called when opening a directory to filter out unwanted files.
-     * Takes a list of files, returns the filtered list of files.
-     * Must be overridden, since its default definition is simply to
-     * return all files in the directory.
+     * List the files in a directory to be processed.
      *
      * @param filehand The FileHandler for working with the files.
      * @param dir Directory being processed.
-     * @param files The list of files in the directory.
      *
-     * @return The filtered list.
+     * @return The list of files to process.
      */
-    def filter_dir_files(filehand: FileHandler, dir: String,
-        files: Iterable[String]) = files
+    def list_files(filehand: FileHandler, dir: String) =
+      filehand.list_files(dir)
   }
 
   /**
@@ -739,7 +741,7 @@ package object ioutil {
    * the same mechanism for processing the files themselves as in
    * `FileProcessor`.
    */
-  abstract class TextFileProcessor extends FileProcessor {
+  trait TextFileProcessor[T] extends FileProcessor[T] {
     /**
      * Process a given file.
      *
@@ -775,7 +777,7 @@ package object ioutil {
      */
     def process_lines(lines: Iterator[String],
         filehand: FileHandler, file: String,
-        compression: String, realname: String): Boolean
+        compression: String, realname: String): (Boolean, T)
 
     /***************** MAY BE IMPLEMENTED (THROUGH OVERRIDING) ***************/
 
@@ -792,22 +794,6 @@ package object ioutil {
     def begin_process_lines(lines: Iterator[String],
         filehand: FileHandler, file: String,
         compression: String, realname: String) { }
-
-    /*
-       The following may be implemented, but have default, mostly empty,
-       definitions.  These are the same as for the base FileProcessor.
-
-    def begin_process_directory(filehand: FileHandler, dir: String) {
-    }
-    def end_process_directory(filehand: FileHandler, dir: String) {
-    }
-    def begin_processing(filehand: FileHandler, files: Iterable[String]) {
-    }
-    def end_processing(filehand: FileHandler, files: Iterable[String]) {
-    }
-    def filter_dir_files(filehand: FileHandler, dir: String,
-        files:Seq[String]) = files
-    */
   }
 
   ////////////////////////////////////////////////////////////////////////////

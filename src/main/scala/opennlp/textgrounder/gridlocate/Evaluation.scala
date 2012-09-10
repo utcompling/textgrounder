@@ -735,18 +735,20 @@ abstract class CellGridEvaluator[
         }
       }
       output_resource_usage()
-      !should_stop
+      (!should_stop, ())
     }
   }
 
-  def process_files(filehand: FileHandler, files: Iterable[String]): Boolean = {
+  def process_files(filehand: FileHandler, files: Iterable[String]):
+      Boolean = {
     /* NOTE: `files` must actually be a list of directories, e.g. as
        comes from the value of --input-corpus. */
     for (dir <- files) {
       val fileproc = new EvaluateCorpusFileProcessor(
         driver.params.eval_set + "-" + driver.document_file_suffix)
       fileproc.read_schema_from_corpus(filehand, dir)
-      if (!fileproc.process_files(filehand, Seq(dir)))
+      val (continue, _) = fileproc.process_files(filehand, Seq(dir))
+      if (!continue)
         return false
     }
     return true
@@ -1118,22 +1120,24 @@ trait DocumentIteratingEvaluator[TEvalDoc, TEvalRes] extends
   def iter_documents(filehand: FileHandler, filename: String):
     Iterable[TEvalDoc]
 
-  class EvaluationFileProcessor extends FileProcessor {
+  class EvaluationFileProcessor extends FileProcessor[Unit] {
     /* Process all documents in a given file.  If return value is false,
        processing was interrupted due to a limit being reached, and
        no more files should be processed. */
-    def process_file(filehand: FileHandler, filename: String): Boolean = {
+    def process_file(filehand: FileHandler, filename: String):
+        (Boolean, Unit) = {
       for (doc <- iter_documents(filehand, filename)) {
         val (processed, keep_going) = process_document(doc)
         if (!keep_going)
-          return false
+          return (false, ())
       }
-      return true
+      return (true, ())
     }
   }
 
   def process_files(filehand: FileHandler, files: Iterable[String]) = {
     val fileproc = new EvaluationFileProcessor
-    fileproc.process_files(filehand, files)
+    val (complete, _) = fileproc.process_files(filehand, files)
+    complete
   }
 }

@@ -36,9 +36,9 @@ package object corpusutil {
    * @param split_re Regular expression used to split one field from another.
    *   By default a tab character.
    */
-  abstract class FieldTextFileProcessor(
-    split_re: String = "\t"
-  ) extends TextFileProcessor {
+  trait FieldTextFileProcessor[T] extends TextFileProcessor[T] {
+    val split_re: String = "\t"
+
     var all_num_processed = 0
     var all_num_bad = 0
     var num_processed = 0
@@ -365,9 +365,9 @@ package object corpusutil {
    * @param suffix the suffix of the corpus files, as described above
    *     
    */
-  abstract class CorpusFileProcessor(
+  abstract class CorpusFileProcessor[T](
     suffix: String
-  ) extends FieldTextFileProcessor {
+  ) extends TextFileProcessor[T] {
     import CorpusFileProcessor._
 
     /**
@@ -419,7 +419,6 @@ package object corpusutil {
 
     def set_schema(schema: Schema) {
       this.schema = schema
-      set_fieldnames(schema.fieldnames)
     }
 
     override def begin_process_lines(lines: Iterator[String],
@@ -451,12 +450,11 @@ package object corpusutil {
     }
 
     /**
-     * Filter function to restrict the files processed to only the
-     * document files of the appropriate suffix.
+     * List only the document files of the appropriate suffix.
      */
-    override def filter_dir_files(filehand: FileHandler, dir: String,
-        files: Iterable[String]) = {
+    override def list_files(filehand: FileHandler, dir: String) = {
       val filter = make_document_file_suffix_regex(suffix)
+      val files = filehand.list_files(dir)
       for (file <- files if filter.findFirstMatchIn(file) != None) yield file
     }
   }
@@ -529,6 +527,22 @@ package object corpusutil {
            files = all_files.filter(_ endsWith full_ending)
            if files.toSeq.length > 0}
         yield pattern
+    }
+  }
+
+  /**
+   * File processor for reading in a "corpus" of documents and processing
+   * rows as arrays of files (ala `FieldTextFileProcessor`).
+   *
+   * @param suffix the suffix of the corpus files, as described above
+   *     
+   */
+  abstract class CorpusFieldFileProcessor[T](
+    suffix: String
+  ) extends CorpusFileProcessor[T](suffix) with FieldTextFileProcessor[T] {
+    override def set_schema(schema: Schema) {
+      super.set_schema(schema)
+      set_fieldnames(schema.fieldnames)
     }
   }
 
