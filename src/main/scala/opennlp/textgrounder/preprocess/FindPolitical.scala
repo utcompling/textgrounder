@@ -424,7 +424,7 @@ object FindPolitical extends
     }
     val accounts = ptp.read_ideological_accounts(opts.political_twitter_accounts)
     // errprint("Accounts: %s", accounts)
-    val suffix = "counts"
+    val suffix = "tweets"
     val in_schema_file =
       CorpusFileProcessor.find_schema_file(filehand, opts.input, suffix)
     opts.schema = Schema.read_schema_file(filehand, in_schema_file)
