@@ -6,6 +6,8 @@ RESERVED_MEMORY=512
 
 POLIGROUNDER_VERSION=0.1.0
 
+HADOOP_FAILURE_OK_ARGS="-Dmapred.max.map.failures.percent=20 -Dmapred.max.reduce.failures.percent=20"
+
 if [ -z "$POLIGROUNDER_DIR" ]; then
   echo "Must set POLIGROUNDER_DIR to top level of PoliGrounder distribution"
   exit 1
@@ -187,6 +189,12 @@ General commands:
   run CLASS ...         Run the main method of a given class (with the
                         classpath set appropriately to pick up all
                         PoliGrounder and library classes).
+  hdebrun CLASS ...     Stands for "Hadoop debug run".  Same as 'run', but
+                        turn on stuff more suitable for a Hadoop run during
+                        debugging.  Turns on --verbose and --hadoop and adds
+                        some Hadoop options immediately after the class name
+                        to allow some number (by default, 20%) of all map and
+                        reduce tasks to fail without killing the whole job.
   javap OPTIONS ...     Run 'javap' (with the classpath set appropriately).
   scala OPTIONS ...     Run 'scala' (with the classpath set appropriately);
                         useful for getting a console to experiment with the
@@ -350,6 +358,10 @@ else
 
     # Misc
     run) CLASS="$1"; shift;;
+    hdebrun)
+      VERBOSE=yes; HADOOP=yes; CLASS="$1"; shift;
+      HADOOP_ARGS="$HADOOP_FAILURE_OK_ARGS $HADOOP_ARGS"
+      ;;
     help) help; exit 1;;
     *) echo "Unrecognized command: $CMD"; help; exit 1;;
   esac
