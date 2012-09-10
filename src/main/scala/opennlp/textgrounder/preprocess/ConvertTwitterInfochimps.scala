@@ -31,7 +31,7 @@ import opennlp.textgrounder.util.ioutil.{FileHandler, LocalFileHandler, TextFile
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil._
-import opennlp.textgrounder.util.textutil.long_with_commas
+import opennlp.textgrounder.util.textutil.with_commas
 import opennlp.textgrounder.util.Twokenize
 
 /*
@@ -356,9 +356,9 @@ class TwitterStatistics(params: ConvertTwitterInfochimpsParameters) {
     finish_statistics()
 
     val how_many_summary = 10000
-    val how_many_summary_str = long_with_commas(how_many_summary)
+    val how_many_summary_str = with_commas(how_many_summary)
     val how_many_detail = 100
-    val how_many_detail_str = long_with_commas(how_many_detail)
+    val how_many_detail_str = with_commas(how_many_detail)
 
     errprint("")
     errprint("Earliest tweet: %s at %s" format

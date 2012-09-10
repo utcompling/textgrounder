@@ -168,7 +168,7 @@ at the beginning of your program, in order to use get_program_time_usage()""")
       if (mem <= 0)
         errprint("Unknown")
       else
-        errprint("%s bytes", long_with_commas(mem))
+        errprint("%s bytes", with_commas(mem))
     }
   }
 
@@ -178,15 +178,15 @@ at the beginning of your program, in order to use get_program_time_usage()""")
     val (vszmeth, vsz) = get_program_memory_usage(virtual = true,
       method = "auto")
     errprint("Memory usage, virtual memory size (%s): %s bytes", vszmeth,
-      long_with_commas(vsz))
+      with_commas(vsz))
     val (rssmeth, rss) = get_program_memory_usage(virtual = false,
       method = "auto")
     errprint("Memory usage, actual (i.e. resident set) (%s): %s bytes", rssmeth,
-      long_with_commas(rss))
+      with_commas(rss))
     if (dojava) {
       val (_, java) = get_program_memory_usage(virtual = false,
         method = "java")
-      errprint("Memory usage, Java heap: %s bytes", long_with_commas(java))
+      errprint("Memory usage, Java heap: %s bytes", with_commas(java))
     } else
       System.gc()
   }
