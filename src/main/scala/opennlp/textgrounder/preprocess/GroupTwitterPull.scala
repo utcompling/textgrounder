@@ -1436,7 +1436,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
 
     def corpus_suffix = {
       val dist_type = if (opts.max_ngram == 1) "unigram" else "ngram"
-      "%s-%s-counts" format (opts.split, dist_type)
+      "%s-%s-counts-tweets" format (opts.split, dist_type)
     }
 
     /**
