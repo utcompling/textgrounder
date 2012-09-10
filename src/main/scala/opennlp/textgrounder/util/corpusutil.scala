@@ -108,7 +108,7 @@ package object corpusutil {
 
     def process_lines(lines: Iterator[String],
         filehand: FileHandler, file: String,
-        compression: String, realname: String): Boolean
+        compression: String, realname: String): (Boolean, T)
 
        A simple implementation simply loops over all the lines and calls
        parse_row() on each one.
@@ -191,6 +191,24 @@ package object corpusutil {
       for ((field, value) <- fixed_values)
         schema_outstream.println(Seq(field, value) mkString split_text)
       schema_outstream.close()
+    }
+
+    /**
+     * Output a row describing a document.
+     *
+     * @param outstream The output stream to write to, as returned by
+     *   `open_document_file`.
+     * @param fieldvals Iterable describing the field values to be written.
+     *   There should be as many items as there are field names in the
+     *   `fieldnames` field of the schema.
+     */
+    def output_row(outstream: PrintStream, fieldvals: Seq[String],
+        split_text: String = "\t") {
+      assert(fieldvals.length == fieldnames.length,
+        "values %s (length %s) not same length as fields %s (length %s)" format
+          (fieldvals, fieldvals.length, fieldnames,
+            fieldnames.length))
+      outstream.println(fieldvals mkString split_text)
     }
   }
 
@@ -566,17 +584,6 @@ package object corpusutil {
     val split_text = "\t"
 
     /**
-     * Construct the name of a file (either schema or document file), based
-     * on the given file handler, directory, prefix, suffix and file ending.
-     * For example, if the file ending is "-schema.txt", the file will be
-     * named `DIR/PREFIX-SUFFIX-schema.txt`.
-     */
-    def construct_output_file(filehand: FileHandler, dir: String,
-        prefix: String, file_ending: String) =
-      CorpusFileProcessor.construct_output_file(filehand, dir, prefix,
-        suffix, file_ending)
-
-    /**
      * Open a document file and return an output stream.  The file will be
      * named `DIR/PREFIX-SUFFIX.txt`, possibly with an additional suffix
      * (e.g. `.bz2`), depending on the specified compression (which defaults
@@ -585,26 +592,9 @@ package object corpusutil {
      */
     def open_document_file(filehand: FileHandler, dir: String,
         prefix: String, compression: String = "none") = {
-      val file = construct_output_file(filehand, dir, prefix, ".txt")
+      val file = CorpusFileProcessor.construct_output_file(filehand, dir,
+        prefix, suffix, ".txt")
       filehand.openw(file, compression = compression)
-    }
-
-    /**
-     * Output a row describing a document.
-     *
-     * @param outstream The output stream to write to, as returned by
-     *   `open_document_file`.
-     * @param fieldvals Iterable describing the field values to be written.
-     *   There should be as many items as there are field names in the
-     *   `fieldnames` field of the schema.
-     */
-    def output_row(outstream: PrintStream, fieldvals: Iterable[String]) {
-      val seqvals = fieldvals.toSeq
-      assert(seqvals.length == schema.fieldnames.length,
-        "values %s (length %s) not same length as fields %s (length %s)" format
-          (seqvals, seqvals.length, schema.fieldnames,
-            schema.fieldnames.length))
-      outstream.println(seqvals mkString split_text)
     }
 
     /**

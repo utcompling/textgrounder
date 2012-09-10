@@ -270,12 +270,12 @@ class FrobCorpusFileProcessor(
         assert(nosplit_fieldnames == writer.schema.fieldnames,
           "resulting fieldnames %s should be same as schema fieldnames %s"
             format (nosplit_fieldnames, writer.schema.fieldnames))
-        writer.output_row(outstream, nosplit_fieldvals)
+        writer.schema.output_row(outstream, nosplit_fieldvals)
       }
     } else {
       val (writer, outstream) =
         get_unsplit_writer_and_outstream(new_fieldnames, new_fieldvals)
-      writer.output_row(outstream, new_fieldvals)
+      writer.schema.output_row(outstream, new_fieldvals)
     }
     (true, true)
   }

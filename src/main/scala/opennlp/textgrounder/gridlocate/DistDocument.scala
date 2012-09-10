@@ -639,7 +639,7 @@ abstract class DistDocument[TCoord : Serializer](
     }
   }
 
-  def get_fields(fields: Iterable[String]) = {
+  def get_fields(fields: Seq[String]) = {
     for (field <- fields;
          value = get_field(field);
          if value != null)
@@ -932,6 +932,6 @@ class DistDocumentWriter[TCoord : Serializer](
   suffix: String
 ) extends CorpusWriter(schema, suffix) {
   def output_document(outstream: PrintStream, doc: DistDocument[TCoord]) {
-    output_row(outstream, doc.get_fields(schema.fieldnames))
+    schema.output_row(outstream, doc.get_fields(schema.fieldnames))
   }
 }
