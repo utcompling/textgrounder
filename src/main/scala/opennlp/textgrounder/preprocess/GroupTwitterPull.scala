@@ -273,19 +273,52 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
        some less obvious places.  In all:
 
        -- the doc string just above
-       -- the definition of Tweet.empty()
+       -- the definition of to_row(), Tweet.empty() and Tweet.row_fields()
        -- parse_json_lift() below
        -- merge_records() below
-       -- tokenize_count_and_format() and output_schema() below
        -- TweetFilterParser.main() below
     */
-  )
+  ) {
+    def to_row = {
+      import Encoder.{long => elong, _}
+      // Latitude/longitude need to be combined into a single field, but only
+      // if both actually exist.
+      val latlongstr =
+        if (!isNaN(lat) && !isNaN(long)) "%s,%s" format (lat, long)
+        else ""
+      // Drop key.
+      Seq(
+        string(user),
+        elong(id),
+        timestamp(min_timestamp),
+        timestamp(max_timestamp),
+        timestamp(geo_timestamp),
+        latlongstr,
+        int(followers),
+        int(following),
+        string(lang),
+        int(numtweets),
+        count_map(user_mentions),
+        count_map(retweets),
+        count_map(hashtags),
+        count_map(urls),
+        seq_string(text)
+      ) mkString "\t"
+    }
+  }
+
   object Tweet {
     def empty =
       Tweet("", Seq[String](), "unknown", 0, 0, 0, 0,
         Double.NaN, Double.NaN, 0, 0, "unknown", 0,
         Map[String, Int](), Map[String, Int](),
         Map[String, Int](), Map[String, Int]())
+
+    def row_fields =
+      Seq("user", "id", "min-timestamp", "max-timestamp",
+        "geo-timestamp","coord", "followers", "following", "lang",
+        "numtweets", "user-mentions", "retweets", "hashtags", "urls",
+        "text")
   }
   implicit val tweetWire = mkCaseWireFormat(Tweet.apply _, Tweet.unapply _)
 
@@ -1220,26 +1253,9 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
      * written out.
      */
     def tokenize_count_and_format(tweet: Tweet): String = {
+      val encoded_tweet = tweet.to_row
       val formatted_text = emit_ngrams(tweet.text)
-      // Latitude/longitude need to be combined into a single field, but only
-      // if both actually exist.
-      val latlongstr =
-        if (!isNaN(tweet.lat) && !isNaN(tweet.long))
-          "%s,%s" format (tweet.lat, tweet.long)
-        else ""
-      val user_mentions = encode_word_count_map(tweet.user_mentions.toSeq)
-      val retweets = encode_word_count_map(tweet.retweets.toSeq)
-      val hashtags = encode_word_count_map(tweet.hashtags.toSeq)
-      val urls = encode_word_count_map(tweet.urls.toSeq)
-      // Put back together but drop key.
-      Seq(tweet.user, tweet.id,
-          tweet.min_timestamp, tweet.max_timestamp, tweet.geo_timestamp,
-          latlongstr, tweet.followers, tweet.following, tweet.lang,
-          tweet.numtweets,
-          user_mentions, retweets, hashtags, urls,
-          tweet.text.map(encode_string_for_field(_)) mkString ">>",
-          formatted_text
-        ) mkString "\t"
+      encoded_tweet + "\t" + formatted_text
     }
   }
 
@@ -1261,10 +1277,17 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     min_timestamp: Timestamp,
     max_timestamp: Timestamp
   ) {
-    def to_row(opts: GroupTwitterPullParams) =
-      Seq(ty, key2, value, num_tweets.toString,
-        min_timestamp.toString, max_timestamp.toString
+    def to_row(opts: GroupTwitterPullParams) = {
+      import Encoder._
+      Seq(
+        string(ty),
+        string(key2),
+        string(value),
+        int(num_tweets),
+        timestamp(min_timestamp),
+        timestamp(max_timestamp)
       ) mkString "\t"
+    }
   }
 
   implicit val featureValueStatsWire =
@@ -1272,8 +1295,27 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
 
   object FeatureValueStats {
     def row_fields =
-      Seq("type", "key2", "value", "num-tweets",
-      "min-timestamp", "max-timestamp")
+      Seq(
+        "type",
+        "key2",
+        "value",
+        "num-tweets",
+        "min-timestamp",
+        "max-timestamp")
+
+    def from_row(row: String, opts: GroupTwitterPullParams) = {
+      import Decoder._
+      val Array(ty, key2, value, num_tweets, min_timestamp, max_timestamp) =
+        row.split("\t", -1)
+      FeatureValueStats(
+        string(ty),
+        string(key2),
+        string(value),
+        int(num_tweets),
+        timestamp(min_timestamp),
+        timestamp(max_timestamp)
+      )
+    }
 
     def from_tweet(tweet: Tweet, ty: String, key2: String, value: String) = {
       FeatureValueStats(ty, key2, value, 1, tweet.min_timestamp,
@@ -1308,14 +1350,22 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     num_value_types: Int,
     num_value_occurrences: Int
   ) {
-    def to_row(opts: GroupTwitterPullParams) =
-      Seq(ty, key2, lowest_value_by_sort, highest_value_by_sort,
-        most_common_value, most_common_count.toString,
-        least_common_value, least_common_count.toString,
-        num_value_types.toString,
-        num_value_occurrences.toString,
-        num_value_occurrences.toDouble/num_value_types toString
+    def to_row(opts: GroupTwitterPullParams) = {
+      import Encoder._
+      Seq(
+        string(ty),
+        string(key2),
+        string(lowest_value_by_sort),
+        string(highest_value_by_sort),
+        string(most_common_value),
+        int(most_common_count),
+        string(least_common_value),
+        int(least_common_count),
+        int(num_value_types),
+        int(num_value_occurrences),
+        double(num_value_occurrences.toDouble/num_value_types)
       ) mkString "\t"
+    }
   }
 
   implicit val featureStatsWire =
@@ -1323,10 +1373,40 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
 
   object FeatureStats {
     def row_fields =
-      Seq("type", "key2", "lowest-value-by-sort", "highest-value-by-sort",
-        "most-common-value", "most-common-count",
-        "least-common-value", "least-common-count",
-        "num-value-types", "num-value-occurrences", "avg-value-occurrences")
+      Seq(
+        "type",
+        "key2",
+        "lowest-value-by-sort",
+        "highest-value-by-sort",
+        "most-common-value",
+        "most-common-count",
+        "least-common-value",
+        "least-common-count",
+        "num-value-types",
+        "num-value-occurrences",
+        "avg-value-occurrences"
+      )
+
+    def from_row(row: String, opts: GroupTwitterPullParams) = {
+      import Decoder._
+      val Array(ty, key2, lowest_value_by_sort, highest_value_by_sort,
+        most_common_value, most_common_count,
+        least_common_value, least_common_count,
+        num_value_types, num_value_occurrences, avo) =
+        row.split("\t", -1)
+      FeatureStats(
+        string(ty),
+        string(key2),
+        string(lowest_value_by_sort),
+        string(highest_value_by_sort),
+        string(most_common_value),
+        int(most_common_count),
+        string(least_common_value),
+        int(least_common_count),
+        int(num_value_types),
+        int(num_value_occurrences)
+      )
+    }
 
     def from_value_stats(vs: FeatureValueStats) =
       FeatureStats(vs.ty, vs. key2, vs.value, vs.value, vs.value, vs.num_tweets,
@@ -1446,10 +1526,9 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       val filename = Schema.construct_schema_file(filehand,
         opts.output, opts.corpus_name, corpus_suffix)
       logger.info("Outputting a schema to %s ..." format filename)
-      val fields = Seq("user", "id", "min-timestamp", "max-timestamp",
-        "geo-timestamp","coord", "followers", "following", "lang",
-        "numtweets", "user-mentions", "retweets", "hashtags", "urls",
-        "text", "counts")
+      // We add the counts data to what to_row() normally outputs so we
+      // have to add the same field here
+      val fields = Tweet.row_fields ++ Seq("counts")
       val fixed_fields = Map(
         "corpus" -> opts.corpus_name,
         "corpus-type" -> ("twitter-%s" format opts.grouping),
