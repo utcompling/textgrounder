@@ -627,9 +627,9 @@ package object corpusutil {
   }
 
   private val endec_word_for_counts_field =
-    new EncodeDecode(Seq('%', ':', ' ', '\t', '\n'))
+    new EncodeDecode(Seq('%', ':', ' ', '\t', '\n', '\r', '\f'))
   private val endec_string_for_field =
-    new EncodeDecode(Seq('%', '>', '\t', '\n'))
+    new EncodeDecode(Seq('%', '>', '\t', '\n', '\r', '\f'))
 
   /**
    * Encode a word for placement inside a "counts" field.  Colons and spaces
