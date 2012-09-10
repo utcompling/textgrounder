@@ -48,10 +48,10 @@ package object textutil {
 
   // Originally based on code from:
   // http://stackoverflow.com/questions/1823058/how-to-print-number-with-commas-as-thousands-separators-in-python-2-x
-  def long_with_commas(x: Long): String = {
+  def with_commas(x: Long): String = {
     var mx = x
     if (mx < 0)
-      "-" + long_with_commas(-mx)
+      "-" + with_commas(-mx)
     else {
       var result = ""
       while (mx >= 1000) {
@@ -64,12 +64,12 @@ package object textutil {
   }
   
   // My own version
-  def float_with_commas(x: Double) = {
+  def with_commas(x: Double): String = {
     val intpart = floor(x).toInt
     val fracpart = x - intpart
-    long_with_commas(intpart) + ("%.2f" format fracpart).drop(1)
+    with_commas(intpart) + ("%.2f" format fracpart).drop(1)
   }
- 
+
   // Try to format something with reasonable precision.
   def format_float(x: Double) = {
     var precision = 2
