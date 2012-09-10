@@ -39,6 +39,7 @@ import tgutil.corpusutil._
 import tgutil.ioutil.FileHandler
 import tgutil.hadoop.HadoopFileHandler
 import tgutil.printutil._
+import tgutil.textutil.with_commas
 import tgutil.timeutil._
 
 class GroupTwitterPullParams(ap: ArgParser) extends
@@ -1349,7 +1350,14 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     least_common_count: Int,
     num_value_types: Int,
     num_value_occurrences: Int
-  ) {
+  ) extends Ordered[FeatureStats] {
+    def compare(that: FeatureStats) = {
+      (ty compare that.ty) match {
+        case 0 => key2 compare that.key2
+        case x => x
+      }
+    }
+
     def to_row(opts: GroupTwitterPullParams) = {
       import Encoder._
       Seq(
@@ -1448,22 +1456,22 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
 
     val date_fmts = Seq(
       ("year", "yyyy"),                   // Ex: "2012"
-      ("year-month", "yyyy-MM (MMM)"),    // Ex. "2012-07 (Jul)"
-      ("year-month-date",
+      ("year/month", "yyyy-MM (MMM)"),    // Ex. "2012-07 (Jul)"
+      ("year/month/day",
         "yyyy-MM-dd (MMM d)"),            // Ex. "2012-07-05 (Jul 5)"
       ("month", "'month' MM (MMM)"),      // Ex. "month 07 (Jul)"
-      ("month, week",
+      ("month/week",
         "'month' MM (MMM), 'week' W"),    // Ex. "month 07 (Jul), week 2"
-      ("month date", "MM-dd (MMM d)"),    // Ex. "07-05 (Jul 5)"
+      ("month/day", "MM-dd (MMM d)"),     // Ex. "07-05 (Jul 5)"
       ("weekday", "'weekday' 'QQ' (EEE)"),// Ex. "weekday 2 (Mon)"
       ("hour", "HHaa"),                   // Ex. "09am"
-      ("weekday, hour",
+      ("weekday/hour",
          "'weekday' 'QQ' (EEE), HHaa"),   // Ex. "weekday 2 (Mon), 23pm"
-      ("hour, weekday",
+      ("hour/weekday",
         "HHaa, 'weekday' 'QQ' (EEE)"),    // Ex. "23pm, weekday 2 (Mon)"
-      ("weekday, month", "'weekday' 'QQ' (EEE), 'month' MM (MMM)"),
+      ("weekday/month", "'weekday' 'QQ' (EEE), 'month' MM (MMM)"),
                                     // Ex. "weekday 5 (Thu), month 07 (Jul)"
-      ("month, weekday", "'month' MM (MMM), 'weekday' 'QQ' (EEE)")
+      ("month/weekday", "'month' MM (MMM), 'weekday' 'QQ' (EEE)")
                                    // Ex. "month 07 (Jul), weekday 5 (Thu)"
     )
     lazy val calinst = Calendar.getInstance
@@ -1692,9 +1700,25 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         val by_value = get_stats.get_by_value(tweets)
         val dlist_by_type = get_stats.get_by_type(by_value)
         val by_type = persist(dlist_by_type.materialize)
-        val stats_suffix = "stats-by-type"
-        local_output_lines(by_type.map(_.to_row(opts)), stats_suffix,
-          FeatureStats.row_fields)
+        val stats_suffix = "stats"
+        local_output_lines(by_type.toSeq.sorted.map(_.to_row(opts)),
+          stats_suffix, FeatureStats.row_fields)
+        val userstat = by_type.filter(x =>
+          x.ty == "user" && x.key2 == "user").toSeq(0)
+        errprint("Summary: %s tweets by %s users = %.2f tweets/user",
+          with_commas(userstat.num_value_occurrences),
+          with_commas(userstat.num_value_types),
+          userstat.num_value_occurrences.toDouble / userstat.num_value_types)
+        val monthstat = by_type.filter(_.ty == "year/month")
+        errprint("\nSummary by month:")
+        for (mo <- monthstat)
+          errprint("%20s: %12s tweets", mo.key2,
+            with_commas(mo.num_value_occurrences))
+        val daystat = by_type.filter(_.ty == "year/month/day")
+        errprint("\nSummary by day:")
+        for (d <- daystat)
+          errprint("%20s: %12s tweets", d.key2,
+            with_commas(d.num_value_occurrences))
       }
     }
 
