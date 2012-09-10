@@ -305,7 +305,7 @@ abstract class DistDocumentTable[
       }
       task.finish()
       output_resource_usage()
-      !should_stop
+      (!should_stop, ())
     }
   }
 
@@ -817,7 +817,7 @@ object DistDocumentConverters {
 abstract class DistDocumentFileProcessor(
   suffix: String,
   val dstats: ExperimentDriverStats
-) extends CorpusFileProcessor(suffix) {
+) extends CorpusFieldFileProcessor[Unit](suffix) {
 
   /******** Counters to track what's going on ********/
 

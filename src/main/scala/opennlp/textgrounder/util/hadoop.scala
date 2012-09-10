@@ -235,13 +235,13 @@ package object hadoop {
          seen, for Hadoop's benefit. */
       class RetrieveDocumentFilesFileProcessor(
         suffix: String
-      ) extends CorpusFileProcessor(suffix) {
+      ) extends CorpusFileProcessor[Unit](suffix) {
         def process_lines(lines: Iterator[String],
             filehand: FileHandler, file: String,
             compression: String, realname: String) = {
           errprint("Called with %s", file)
           FileInputFormat.addInputPath(job, new Path(file))
-          true
+          (true, ())
         }
 
         def process_row(fieldvals: Seq[String]) =
