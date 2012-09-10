@@ -762,4 +762,29 @@ package object corpusutil {
       }
     }
   }
+
+  object Encoder {
+    def count_map(x: Map[String, Int]) = encode_word_count_map(x.toSeq)
+    def count_map_seq(x: collection.Seq[(String, Int)]) =
+      encode_word_count_map(x)
+    def string(x: String) = encode_string_for_field(x)
+    def seq_string(x: Seq[String]) =
+      x.map(encode_string_for_field) mkString ">>"
+    def timestamp(x: Long) = x.toString
+    def long(x: Long) = x.toString
+    def int(x: Int) = x.toString
+    def double(x: Double) = x.toString
+  }
+
+  object Decoder {
+    def count_map(x: String) = decode_word_count_map(x).toMap
+    def count_map_seq(x: String) = decode_word_count_map(x)
+    def string(x: String) = decode_string_for_field(x)
+    def seq_string(x: String) = x.split(">>", -1).map(decode_string_for_field)
+    def timestamp(x: String) = x.toLong
+    def long(x: String) = x.toLong
+    def int(x: String) = x.toInt
+    def double(x: String) = x.toDouble
+  }
+
 }
