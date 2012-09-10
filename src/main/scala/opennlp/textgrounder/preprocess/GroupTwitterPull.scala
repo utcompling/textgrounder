@@ -1387,7 +1387,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         "avg-value-occurrences"
       )
 
-    def from_row(row: String, opts: GroupTwitterPullParams) = {
+    def from_row(row: String) = {
       import Decoder._
       val Array(ty, key2, lowest_value_by_sort, highest_value_by_sort,
         most_common_value, most_common_count,
@@ -1442,23 +1442,76 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
   class GetStats(opts: GroupTwitterPullParams)
       extends GroupTwitterPullAction {
 
+    import java.util.Calendar
+
     val operation_category = "GetStats"
 
     val date_fmts = Seq(
       ("year", "yyyy"),                   // Ex: "2012"
-      ("year-month", "yyyy-MMM"),         // Ex. "2012-Jul"
-      ("year-month-date", "yyyy-MMM-dd"), // Ex. "2012-Jul-5"
-      ("month", "MMM"),                   // Ex. "Jul"
-      ("month, week", "MMM, 'week' W"),   // Ex. "Jul, week 2" (1-based)
-      ("month date", "MMM dd"),           // Ex. "Dec 25"
-      ("daywk", "EEE"),                   // Ex. "Mon"
+      ("year-month", "yyyy-MM (MMM)"),    // Ex. "2012-07 (Jul)"
+      ("year-month-date",
+        "yyyy-MM-dd (MMM d)"),            // Ex. "2012-07-05 (Jul 5)"
+      ("month", "'month' MM (MMM)"),      // Ex. "month 07 (Jul)"
+      ("month, week",
+        "'month' MM (MMM), 'week' W"),    // Ex. "month 07 (Jul), week 2"
+      ("month date", "MM-dd (MMM d)"),    // Ex. "07-05 (Jul 5)"
+      ("weekday", "'weekday' 'QQ' (EEE)"),// Ex. "weekday 2 (Mon)"
       ("hour", "HHaa"),                   // Ex. "09am"
-      ("daywk, hour", "EEE, HHaa"),       // Ex. "Mon, 23pm"
-      ("daywk in month", "EEE 'in' MMM")  // Ex. "Thu in Jul"
+      ("weekday, hour",
+         "'weekday' 'QQ' (EEE), HHaa"),   // Ex. "weekday 2 (Mon), 23pm"
+      ("hour, weekday",
+        "HHaa, 'weekday' 'QQ' (EEE)"),    // Ex. "23pm, weekday 2 (Mon)"
+      ("weekday, month", "'weekday' 'QQ' (EEE), 'month' MM (MMM)"),
+                                    // Ex. "weekday 5 (Thu), month 07 (Jul)"
+      ("month, weekday", "'month' MM (MMM), 'weekday' 'QQ' (EEE)")
+                                   // Ex. "month 07 (Jul), weekday 5 (Thu)"
     )
+    lazy val calinst = Calendar.getInstance
     lazy val sdfs =
       for ((engl, fmt) <- date_fmts) yield (engl, new SimpleDateFormat(fmt))
 
+    /**
+     * Format a timestamp according to a date format.  This would be easy if
+     * not for the fact that SimpleDateFormat provides no way of inserting
+     * the numeric equivalent of a day of the week, which we want in order
+     * to make sorting turn out correctly.  So we have to retrieve it using
+     * the `Calendar` class and shoehorn it in wherever the non-code QQ
+     * was inserted.
+     *
+     * NOTE, a quick guide to Java date-related classes:
+     *
+     * java.util.Date: A simple wrapper around a timestamp in "Epoch time",
+     *   i.e. milliseconds after the Unix Epoch of Jan 1, 1970, 00:00:00 GMT.
+     *   Formerly also used for converting timestamps into human-style
+     *   dates, but all that stuff is long deprecated because of lack of
+     *   internationalization support.
+     * java.util.Calendar: A class that supports conversion between timestamps
+     *   and human-style dates, e.g. to figure out the year, month and day of
+     *   a given timestamp.  Supports time zones, daylight savings oddities,
+     *   etc.  Subclasses are supposed to represent different calendar systems
+     *   but in reality there's only one, named GregorianCalendar but which
+     *   actually supports both Gregorian (modern) and Julian (old-style,
+     *   with no leap-year special-casing of years divisible by 100) calendars,
+     *   with a configurable cross-over point.  Support for other calendars
+     *   (Islamic, Jewish, etc.) is provided by third-party libraries (e.g.
+     *   JodaTime), which typically discard the java.util.Calendar framework
+     *   and create their own.
+     * java.util.DateFormat: A class that supports conversion between
+     *   timestamps and human-style dates nicely formatted into a string, e.g.
+     *   generating strings like "Jul 23, 2012 08:05pm".  Again, theoretically
+     *   there are particular subclasses to support different formatting
+     *   mechanisms but in reality there's only one, SimpleDateFormat.
+     *   Readable dates are formatted using a template, and there's a good
+     *   deal of localization-specific stuff under the hood that theoretically
+     *   the programmer doesn't need to worry about.
+     */
+    def format_date(time: Timestamp, fmt: SimpleDateFormat) = {
+      val output = fmt.format(new Date(time))
+      calinst.setTimeInMillis(time)
+      val weekday = calinst.get(Calendar.DAY_OF_WEEK)
+      output.replace("QQ", weekday.toString)
+    }
+      
     def stats_for_tweet(tweet: Tweet) = {
       Seq(FeatureValueStats.from_tweet(tweet, "user", "user", tweet.user),
           // Get a summary for all languages plus a summary for each lang
@@ -1466,7 +1519,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
           FeatureValueStats.from_tweet(tweet, "lang", "lang", tweet.lang)) ++
         sdfs.map { case (engl, fmt) =>
           FeatureValueStats.from_tweet(
-            tweet, engl, fmt.format(new Date(tweet.min_timestamp)), "") }
+            tweet, engl, format_date(tweet.min_timestamp, fmt), "") }
     }
 
     /**
@@ -1584,8 +1637,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       if (opts.grouping == "none") tweets1
       else new GroupTweets(opts)(tweets1)
 
-    def output_lines(lines: DList[String], corpus_suffix: String,
-        fields: Seq[String]) {
+    def dlist_output_lines(lines: DList[String], corpus_suffix: String,
+        fields: Seq[String]) = {
       val outdir = opts.output + "-" + corpus_suffix
       persist(TextOutput.toTextFile(lines, outdir))
       val out_schema = new Schema(fields, Map("corpus" -> opts.corpus_name))
@@ -1594,34 +1647,56 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       rename_output_files(configuration.fs, outdir, opts.corpus_name,
         corpus_suffix)
       out_schema.output_schema_file(filehand, out_schema_fn)
+      outdir
+    }
+
+    def local_output_lines(lines: Iterable[String], corpus_suffix: String,
+        fields: Seq[String]) = {
+      val outdir = opts.output + "-" + corpus_suffix
+      filehand.make_directories(outdir)
+      val out_schema = new Schema(fields, Map("corpus" -> opts.corpus_name))
+      val out_schema_file = Schema.construct_schema_file(filehand,
+          outdir, opts.corpus_name, corpus_suffix)
+      out_schema.output_schema_file(filehand, out_schema_file)
+      val outfile = CorpusFileProcessor.construct_output_file(filehand, outdir,
+        opts.corpus_name, corpus_suffix, ".txt")
+      val outstr = filehand.openw(outfile)
+      lines.map(outstr.println(_))
+      outstr.close()
+      outdir
+    }
+
+    def rename_outfiles() {
+      rename_output_files(configuration.fs, opts.output, opts.corpus_name,
+        ptp.corpus_suffix)
     }
 
     opts.output_format match {
-      case "raw" =>
+      case "raw" => {
         /* If we're outputting raw, output the JSON of the tweet. */
         persist(TextOutput.toTextFile(tweets.map(_.json), opts.output))
+        rename_outfiles()
+      }
       case "corpus" => {
         val tfct = new TokenizeCountAndFormat(opts)
         // Tokenize the combined text into words, possibly generate ngrams
         // from them, count them up and output results formatted into a record.
         val nicely_formatted = tweets.map(tfct.tokenize_count_and_format)
         persist(TextOutput.toTextFile(nicely_formatted, opts.output))
+        rename_outfiles()
+        // create a schema
+        ptp.output_schema(filehand)
       }
       case "stats" => {
         val get_stats = new GetStats(opts)
         val by_value = get_stats.get_by_value(tweets)
-        val by_type = get_stats.get_by_type(by_value)
-        output_lines(by_type.map(_.to_row(opts)), "by-type",
+        val dlist_by_type = get_stats.get_by_type(by_value)
+        val by_type = persist(dlist_by_type.materialize)
+        val stats_suffix = "stats-by-type"
+        local_output_lines(by_type.map(_.to_row(opts)), stats_suffix,
           FeatureStats.row_fields)
       }
     }
-
-    rename_output_files(configuration.fs, opts.output, opts.corpus_name,
-      ptp.corpus_suffix)
-
-    // create a schema
-    if (opts.output_format != "raw")
-      ptp.output_schema(filehand)
 
     errprint("GroupTwitterPull: done.")
 
