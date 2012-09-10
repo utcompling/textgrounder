@@ -157,7 +157,7 @@ class MMCUnigramWordDistHandler(
           }).
           mkString(" ")
       val new_params = params ++ Seq(counts)
-      writer.output_row(outstream, new_params)
+      writer.schema.output_row(outstream, new_params)
     }
     true
   }
