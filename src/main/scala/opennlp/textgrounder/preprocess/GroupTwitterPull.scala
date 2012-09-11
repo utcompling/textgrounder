@@ -1699,26 +1699,28 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         val get_stats = new GetStats(opts)
         val by_value = get_stats.get_by_value(tweets)
         val dlist_by_type = get_stats.get_by_type(by_value)
-        val by_type = persist(dlist_by_type.materialize)
+        val by_type = persist(dlist_by_type.materialize).toSeq.sorted
         val stats_suffix = "stats"
-        local_output_lines(by_type.toSeq.sorted.map(_.to_row(opts)),
+        local_output_lines(by_type.map(_.to_row(opts)),
           stats_suffix, FeatureStats.row_fields)
         val userstat = by_type.filter(x =>
           x.ty == "user" && x.key2 == "user").toSeq(0)
-        errprint("Summary: %s tweets by %s users = %.2f tweets/user",
+        errprint("\nCombined summary:")
+        errprint("%s tweets by %s users = %.2f tweets/user",
           with_commas(userstat.num_value_occurrences),
           with_commas(userstat.num_value_types),
           userstat.num_value_occurrences.toDouble / userstat.num_value_types)
         val monthstat = by_type.filter(_.ty == "year/month")
         errprint("\nSummary by month:")
         for (mo <- monthstat)
-          errprint("%20s: %12s tweets", mo.key2,
+          errprint("%-20s: %12s tweets", mo.key2,
             with_commas(mo.num_value_occurrences))
         val daystat = by_type.filter(_.ty == "year/month/day")
         errprint("\nSummary by day:")
         for (d <- daystat)
-          errprint("%20s: %12s tweets", d.key2,
+          errprint("%-20s: %12s tweets", d.key2,
             with_commas(d.num_value_occurrences))
+        errprint("\n")
       }
     }
 
