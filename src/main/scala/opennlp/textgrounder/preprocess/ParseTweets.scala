@@ -1,4 +1,4 @@
-//  GroupTwitterPull.scala
+//  ParseTweets.scala
 //
 //  Copyright (C) 2012 Stephen Roller, The University of Texas at Austin
 //  Copyright (C) 2012 Ben Wing, The University of Texas at Austin
@@ -42,7 +42,7 @@ import tgutil.printutil._
 import tgutil.textutil.with_commas
 import tgutil.timeutil._
 
-class GroupTwitterPullParams(ap: ArgParser) extends
+class ParseTweetsParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {
   var grouping = ap.option[String]("grouping", "g", "gr", "group",
     choices = Seq("user", "time", "none"),
@@ -196,7 +196,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   }
 }
 
-object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
+object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   /*
    * This program takes, as input, files which contain one tweet per line
    * in JSON format as directly pulled from the twitter API. It groups the
@@ -343,8 +343,11 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     def empty = Record("", true, Tweet.empty)
   }
 
-  abstract class GroupTwitterPullAction extends ScoobiProcessFilesShared {
-    val progname = "GroupTwitterPull"
+  /**
+   * A generic action in the ParseTweets app.
+   */
+  abstract class ParseTweetsAction extends ScoobiProcessFilesAction {
+    val progname = "ParseTweets"
 
     def create_parser(expr: String, foldcase: Boolean) = {
       if (expr == null) null
@@ -590,8 +593,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     }
   }
 
-  class ParseAndUniquifyTweets(opts: GroupTwitterPullParams)
-      extends GroupTwitterPullAction {
+  class ParseAndUniquifyTweets(opts: ParseTweetsParams)
+      extends ParseTweetsAction {
 
     val operation_category = "Parse"
 
@@ -1011,8 +1014,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     }
   }
 
-  class GroupTweets(opts: GroupTwitterPullParams)
-      extends GroupTwitterPullAction {
+  class GroupTweets(opts: ParseTweetsParams)
+      extends ParseTweetsAction {
 
     val operation_category = "Group"
 
@@ -1175,8 +1178,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     }
   }
 
-  class TokenizeCountAndFormat(opts: GroupTwitterPullParams)
-      extends GroupTwitterPullAction {
+  class TokenizeCountAndFormat(opts: ParseTweetsParams)
+      extends ParseTweetsAction {
 
     val operation_category = "Tokenize"
 
@@ -1278,7 +1281,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     min_timestamp: Timestamp,
     max_timestamp: Timestamp
   ) {
-    def to_row(opts: GroupTwitterPullParams) = {
+    def to_row(opts: ParseTweetsParams) = {
       import Encoder._
       Seq(
         string(ty),
@@ -1304,7 +1307,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
         "min-timestamp",
         "max-timestamp")
 
-    def from_row(row: String, opts: GroupTwitterPullParams) = {
+    def from_row(row: String, opts: ParseTweetsParams) = {
       import Decoder._
       val Array(ty, key2, value, num_tweets, min_timestamp, max_timestamp) =
         row.split("\t", -1)
@@ -1358,7 +1361,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       }
     }
 
-    def to_row(opts: GroupTwitterPullParams) = {
+    def to_row(opts: ParseTweetsParams) = {
       import Encoder._
       Seq(
         string(ty),
@@ -1447,8 +1450,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     }
   }
 
-  class GetStats(opts: GroupTwitterPullParams)
-      extends GroupTwitterPullAction {
+  class GetStats(opts: ParseTweetsParams)
+      extends ParseTweetsAction {
 
     import java.util.Calendar
 
@@ -1570,8 +1573,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     }
   }
 
-  class GroupTwitterPull(opts: GroupTwitterPullParams)
-      extends GroupTwitterPullAction {
+  class ParseTweetsDriver(opts: ParseTweetsParams)
+      extends ParseTweetsAction {
 
     val operation_category = "Driver"
 
@@ -1605,8 +1608,8 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
     }
   }
 
-  def create_params(ap: ArgParser) = new GroupTwitterPullParams(ap)
-  val progname = "GroupTwitterPull"
+  def create_params(ap: ArgParser) = new ParseTweetsParams(ap)
+  val progname = "ParseTweets"
 
   def run() {
     val opts = init_scoobi_app()
@@ -1615,7 +1618,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       val (_, last_component) = filehand.split_filename(opts.input)
       opts.corpus_name = last_component.replace("*", "_")
     }
-    errprint("GroupTwitterPull: " + (opts.grouping match {
+    errprint("ParseTweets: " + (opts.grouping match {
       case "time" =>
         "grouping by time, with slices of %g seconds".
           format(opts.timeslice_float)
@@ -1624,7 +1627,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       case "none" =>
         "not grouping"
     }))
-    errprint("GroupTwitterPull: " + (opts.output_format match {
+    errprint("ParseTweets: " + (opts.output_format match {
       case "corpus" =>
         "outputting tweets as a TextGrounder corpus"
       case "raw" =>
@@ -1632,12 +1635,12 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       case "stats" =>
         "outputting statistics on tweets"
     }))
-    val ptp = new GroupTwitterPull(opts)
+    val ptp = new ParseTweetsDriver(opts)
 
     // Firstly we load up all the (new-line-separated) JSON lines.
     val lines: DList[String] = TextInput.fromTextFile(opts.input)
 
-    errprint("GroupTwitterPull: Generate tweets ...")
+    errprint("ParseTweets: Generate tweets ...")
     val tweets1 = new ParseAndUniquifyTweets(opts)(lines)
 
     /* Maybe group tweets */
@@ -1724,7 +1727,7 @@ object GroupTwitterPull extends ScoobiProcessFilesApp[GroupTwitterPullParams] {
       }
     }
 
-    errprint("GroupTwitterPull: done.")
+    errprint("ParseTweets: done.")
 
     finish_scoobi_app(opts)
   }

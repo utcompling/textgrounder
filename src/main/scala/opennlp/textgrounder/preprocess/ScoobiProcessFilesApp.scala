@@ -1,4 +1,4 @@
-//  GroupTwitterPull.scala
+//  ScoobiProcessFilesApp.scala
 //
 //  Copyright (C) 2012 Stephen Roller, The University of Texas at Austin
 //  Copyright (C) 2012 Ben Wing, The University of Texas at Austin
@@ -15,6 +15,10 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * This file provides support for a Scoobi application that processes files.
+ */
 
 package opennlp.textgrounder.preprocess
 
@@ -35,20 +39,33 @@ import opennlp.textgrounder.util.printutil._
 
 class ScoobiProcessFilesParams(val ap: ArgParser) {
   var debug = ap.flag("debug",
-    help="""Output debug info about tweet processing/acceptance.""")
+    help="""Output debug info about data processing.""")
   var debug_file = ap.option[String]("debug-file",
     help="""File to write debug info to, instead of stderr.""")
-//     var use_jerkson = ap.flag("use-jerkson",
-//       help="""Use Jerkson instead of Lift to parse JSON.""")
   var input = ap.positional[String]("INPUT",
     help = "Source directory to read files from.")
   var output = ap.positional[String]("OUTPUT",
     help = "Destination directory to place files in.")
 
+  /**
+   * Check usage of command-line parameters and use `ap.usageError` to
+   * signal that an error occurred.
+   */
   def check_usage() {}
 }
 
-trait ScoobiProcessFilesShared {
+/**
+ * An "action" -- simply used to encapsulate code to perform arbitrary
+ * operations.  Encapsulating them like this allows information (e.g.
+ * command-line options) to be made available to the routines without
+ * using global variables, which won't work when the routines to be
+ * executed are done in a Hadoop task rather than on the client (which
+ * runs on the user's own machine, typically the Hadoop job node).
+ * You need to set the values of `progname` and `operation_category`,
+ * which appear in log messages (output using `warning`) and in
+ * counters (incremented using `bump_counter`).
+ */
+trait ScoobiProcessFilesAction {
 
   def progname: String
   val operation_category: String
@@ -122,7 +139,7 @@ trait ScoobiProcessFilesShared {
 }
 
 abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
-    extends ScoobiApp with ScoobiProcessFilesShared {
+    extends ScoobiApp with ScoobiProcessFilesAction {
 
   def create_params(ap: ArgParser): ParamType
   val operation_category = "MainApp"
