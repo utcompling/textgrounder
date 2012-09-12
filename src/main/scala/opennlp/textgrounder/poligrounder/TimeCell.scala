@@ -189,7 +189,7 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
         p = lookup_item(fromdist, item)
         q = lookup_item(todist, item)
         if p >= min_prob || q >= min_prob
-      } yield (item, p - q)
+      } yield (item, q - p)
     val diff_up = itemdiff filter (_._2 > 0)
     val diff_down = itemdiff filter (_._2 < 0) map (x => (x._1, x._2.abs))
     def print_diffs(diffs: Iterable[(Item, Double)],
