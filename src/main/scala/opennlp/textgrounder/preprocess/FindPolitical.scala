@@ -90,8 +90,8 @@ class FindPoliticalParams(ap: ArgParser) extends
 
 object FindPolitical extends
     ScoobiProcessFilesApp[FindPoliticalParams] {
-  abstract class FindPoliticalShared(opts: FindPoliticalParams)
-    extends ScoobiProcessFilesShared {
+  abstract class FindPoliticalAction(opts: FindPoliticalParams)
+    extends ScoobiProcessFilesAction {
     val progname = "FindPolitical"
   }
 
@@ -145,7 +145,7 @@ object FindPolitical extends
         seq.map { case (politico, count) =>
           (politico.full_name.replace(" ", "."), count) })
 
-    def get_feature_values(factory: IdeologicalUserFactory, ty: String) = {
+    def get_feature_values(factory: IdeologicalUserAction, ty: String) = {
       ty match {
         case field@("retweets" | "user-mentions" | "hashtags") =>
           decode_word_count_map(
@@ -172,8 +172,8 @@ object FindPolitical extends
   implicit val ideological_user_wire =
     mkCaseWireFormat(IdeologicalUser.apply _, IdeologicalUser.unapply _)
 
-  class IdeologicalUserFactory(opts: FindPoliticalParams) extends
-      FindPoliticalShared(opts) {
+  class IdeologicalUserAction(opts: FindPoliticalParams) extends
+      FindPoliticalAction(opts) {
     val operation_category = "IdeologicalUser"
 
     val user_subschema_fieldnames =
@@ -286,7 +286,7 @@ object FindPolitical extends
      * For a given ideological user, generate the "potential politicos": other
      * people referenced, along with their ideological scores.
      */
-    def get_political_features(factory: IdeologicalUserFactory,
+    def get_political_features(factory: IdeologicalUserAction,
         user: IdeologicalUser, ty: String,
         opts: FindPoliticalParams) = {
       for {(ref, times) <- user.get_feature_values(factory, ty)
@@ -326,8 +326,8 @@ object FindPolitical extends
   implicit val political_feature =
     mkCaseWireFormat(PoliticalFeature.apply _, PoliticalFeature.unapply _)
 
-  class FindPolitical(opts: FindPoliticalParams)
-      extends FindPoliticalShared(opts) {
+  class FindPoliticalDriver(opts: FindPoliticalParams)
+      extends FindPoliticalAction(opts) {
     val operation_category = "Driver"
 
     /**
@@ -411,7 +411,7 @@ object FindPolitical extends
         name, the number of times they were referenced and an ideology score
         and merge these all together.
      */
-    val ptp = new FindPolitical(opts)
+    val ptp = new FindPoliticalDriver(opts)
     val filehand = new HadoopFileHandler(configuration)
     if (opts.political_twitter_accounts == null) {
       opts.ap.error("--political-twitter-accounts must be specified")
@@ -442,7 +442,7 @@ object FindPolitical extends
     }
 
     errprint("Step 1: Load corpus, filter for conservatives/liberals, output.")
-    val ideo_fact = new IdeologicalUserFactory(opts)
+    val ideo_fact = new IdeologicalUserAction(opts)
     val matching_patterns = CorpusFileProcessor.
         get_matching_patterns(filehand, opts.input, suffix)
     val lines: DList[String] = TextInput.fromTextFile(matching_patterns: _*)
