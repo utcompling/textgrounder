@@ -152,6 +152,10 @@ class PoligrounderDriver extends
     super.handle_parameters()
   }
 
+  override protected def initialize_word_dist_suffix() = {
+    super.initialize_word_dist_suffix() + "-tweets"
+  }
+
   protected def initialize_document_table(word_dist_factory: WordDistFactory) = {
     new TimeDocumentTable(this, word_dist_factory)
   }
