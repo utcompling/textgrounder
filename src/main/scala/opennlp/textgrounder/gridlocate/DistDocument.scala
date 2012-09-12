@@ -259,7 +259,8 @@ abstract class DistDocumentTable[
    * @param cell_grid Cell grid to add newly created DistDocuments to
    */
   class DistDocumentTableFileProcessor(
-    suffix: String, cell_grid: TGrid, pass: Int
+    suffix: String, cell_grid: TGrid,
+    task: ExperimentMeteredTask
   ) extends DistDocumentFileProcessor(suffix, driver) {
     def handle_document(fieldvals: Seq[String]) = {
       val doc = create_and_init_document(schema, fieldvals, true)
@@ -274,9 +275,6 @@ abstract class DistDocumentTable[
     def process_lines(lines: Iterator[String],
         filehand: FileHandler, file: String,
         compression: String, realname: String) = {
-      val task =
-        new ExperimentMeteredTask(driver, "document", "reading pass " + pass,
-              maxtime = driver.params.max_time_per_stage)
       // Stop if we've reached the maximum
       var should_stop = false
       breakable {
@@ -303,8 +301,6 @@ abstract class DistDocumentTable[
             break
         }
       }
-      task.finish()
-      output_resource_usage()
       (!should_stop, ())
     }
   }
@@ -324,11 +320,16 @@ abstract class DistDocumentTable[
       suffix: String, cell_grid: TGrid) {
 
     for (pass <- 1 to cell_grid.num_training_passes) {
-      val training_distproc =
-        new DistDocumentTableFileProcessor("training-" + suffix, cell_grid, pass)
       cell_grid.begin_training_pass(pass)
+      val task =
+        new ExperimentMeteredTask(driver, "document", "reading pass " + pass,
+              maxtime = driver.params.max_time_per_stage)
+      val training_distproc =
+        new DistDocumentTableFileProcessor("training-" + suffix, cell_grid, task)
       training_distproc.read_schema_from_corpus(filehand, dir)
       training_distproc.process_files(filehand, Seq(dir))
+      task.finish()
+      output_resource_usage()
     }
   }
 
@@ -912,10 +913,12 @@ abstract class DistDocumentFileProcessor(
       }
     }
 
-    note("documents.processed", "documents processed")
-    note("documents.skipped", "documents skipped")
-    note("documents.bad", "bad documents")
-    note("documents.total", "total documents")
+    if (debug("per-document")) {
+      note("documents.processed", "documents processed")
+      note("documents.skipped", "documents skipped")
+      note("documents.bad", "bad documents")
+      note("documents.total", "total documents")
+    }
     super.end_process_file(filehand, file)
   }
 }
