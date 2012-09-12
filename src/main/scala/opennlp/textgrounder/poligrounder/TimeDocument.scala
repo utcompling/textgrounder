@@ -47,7 +47,7 @@ class TimeDocument(
 
   override def set_field(name: String, value: String) {
     name match {
-      case "timestamp" => coord = get_x_or_null[TimeCoord](value)
+      case "min-timestamp" => coord = get_x_or_null[TimeCoord](value)
       case _ => super.set_field(name, value)
     }
   }
