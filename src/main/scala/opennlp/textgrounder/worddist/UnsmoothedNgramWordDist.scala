@@ -71,5 +71,5 @@ class UnsmoothedNgramWordDist(
   }
 
   def lookup_ngram(ngram: Ngram) =
-    model.get_item_count(ngram).toDouble / num_tokens
+    model.get_item(ngram).toDouble / num_tokens
 }

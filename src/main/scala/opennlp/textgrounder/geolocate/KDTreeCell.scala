@@ -185,7 +185,7 @@ class KdTreeCellGrid(table: SphereDocumentTable,
         val pmodel = pwd.asInstanceOf[UnigramWordDist].model
 
         for ((k,v) <- pmodel.iter_items) {
-          val oldv = if (model contains k) model.get_item_count(k) else 0.0
+          val oldv = if (model contains k) model.get_item(k) else 0.0
           val newv = oldv + interpolateWeight * v
           if (newv > interpolateWeight)
             model.set_item(k, newv)

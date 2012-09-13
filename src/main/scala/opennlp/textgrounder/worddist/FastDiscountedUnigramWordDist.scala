@@ -127,7 +127,7 @@ object FastDiscountedUnigramWordDist {
       while (i < psize) {
         val word = pkeys(i)
         val pcount = pvalues(i)
-        val qcount = qmodel.get_item_count(word)
+        val qcount = qmodel.get_item(word)
         val owprob = owprobs(word)
         val p = pcount * pfact + owprob * pfact_unseen
         val q = qcount * qfact + owprob * qfact_unseen
@@ -148,7 +148,7 @@ object FastDiscountedUnigramWordDist {
         val pcount = pvalues(i)
         val p = pcount * pfact
         val q = {
-          val qcount = qmodel.get_item_count(word)
+          val qcount = qmodel.get_item(word)
           if (qcount != 0) qcount * qfact
           else {
             val owprob = owprobs(word)
@@ -227,7 +227,7 @@ object FastDiscountedUnigramWordDist {
     for ((word, pcount) <- pmodel.iter_items) {
       val p = pcount * pfact
       val q = {
-        val qcount = qmodel.get_item_count(word)
+        val qcount = qmodel.get_item(word)
         val owprob = owprobs(word)
         qcount * qfact + owprob * qfact_unseen
       }
@@ -296,7 +296,7 @@ object FastDiscountedUnigramWordDist {
     var q2sum = 0.0
     for ((word, pcount) <- pmodel.iter_items) {
       val p = pcount * pfact
-      val q = qmodel.get_item_count(word) * qfact
+      val q = qmodel.get_item(word) * qfact
       //if (q == 0.0)
       //  errprint("Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s",
       //           word, qfact_globally_unseen_prob, qcount, qfact)

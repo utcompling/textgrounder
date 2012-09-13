@@ -72,7 +72,7 @@ class UnigramStorage extends ItemStorage[Word] {
 
   def contains(item: Word) = counts contains item
 
-  def get_item_count(item: Word) = counts(item)
+  def get_item(item: Word) = counts(item)
 
   def iter_items = counts.toIterable
 
