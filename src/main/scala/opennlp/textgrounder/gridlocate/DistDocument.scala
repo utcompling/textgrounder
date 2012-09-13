@@ -211,10 +211,10 @@ abstract class DistDocumentTable[
     } else {
       assert(doc.split == split)
       assert(doc.dist != null)
-      val double_tokens = doc.dist.num_word_tokens
+      val double_tokens = doc.dist.model.num_tokens
       val tokens = double_tokens.toInt
-      // Our training docs should not have partial counts.
-      assert(tokens == double_tokens)
+      // Partial counts should not occur in training documents.
+      assert(double_tokens == tokens)
       if (record_in_table) {
         num_documents_by_split(split) += 1
         word_tokens_of_documents_by_split(split) += tokens

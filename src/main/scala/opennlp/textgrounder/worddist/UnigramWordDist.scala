@@ -36,6 +36,60 @@ import opennlp.textgrounder.gridlocate.GenericTypes._
 import WordDist.memoizer._
 
 /**
+ * An interface for storing and retrieving vocabulary items (e.g. words,
+ * n-grams, etc.).
+ *
+ * @tparam Item Type of the items stored.
+ */
+class UnigramStorage extends ItemStorage[Word] {
+
+  /**
+   * A map (or possibly a "sorted list" of tuples, to save memory?) of
+   * (word, count) items, specifying the counts of all words seen
+   * at least once.  These are given as double because in some cases
+   * they may store "partial" counts (in particular, when the K-d tree
+   * code does interpolation on cells).  FIXME: This seems ugly, perhaps
+   * there is a better way?
+   */
+  val counts = create_word_double_map()
+  var tokens_accurate = true
+  var num_tokens_val = 0.0
+
+  def add_item(item: Word, count: Double) {
+    counts(item) += count
+    num_tokens_val += count
+  }
+
+  def set_item(item: Word, count: Double) {
+    counts(item) = count
+    tokens_accurate = false
+  }
+
+  def remove_item(item: Word) {
+    counts -= item
+    tokens_accurate = false
+  }
+
+  def contains(item: Word) = counts contains item
+
+  def get_item_count(item: Word) = counts(item)
+
+  def iter_items = counts.toIterable
+
+  def iter_keys = counts.keys
+
+  def num_tokens = {
+    if (!tokens_accurate) {
+      num_tokens_val = counts.values.sum
+      tokens_accurate = true
+    }
+    num_tokens_val
+  }
+
+  def num_types = counts.size
+}
+
+/**
  * Unigram word distribution with a table listing counts for each word,
  * initialized from the given key/value pairs.
  *
@@ -51,18 +105,9 @@ abstract class UnigramWordDist(
     factory: WordDistFactory,
     note_globally: Boolean
   ) extends WordDist(factory, note_globally) with FastSlowKLDivergence {
-  /**
-   * A map (or possibly a "sorted list" of tuples, to save memory?) of
-   * (word, count) items, specifying the counts of all words seen
-   * at least once.  These are given as double because in some cases
-   * they may store "partial" counts (in particular, when the K-d tree
-   * code does interpolation on cells).  FIXME: This seems ugly, perhaps
-   * there is a better way?
-   */
-  val counts = create_word_double_map()
-  var num_word_tokens = 0.0
-
-  def num_word_types = counts.size
+  type Item = Word
+  val pmodel = new UnigramStorage()
+  val model = pmodel
 
   def innerToString: String
 
@@ -70,13 +115,16 @@ abstract class UnigramWordDist(
     val finished_str =
       if (!finished) ", unfinished" else ""
     val num_words_to_print = 15
-    val need_dots = counts.size > num_words_to_print
+    val need_dots = model.num_types > num_words_to_print
     val items =
-      for ((word, count) <- counts.toSeq.sortWith(_._2 > _._2).view(0, num_words_to_print))
+      for ((word, count) <-
+        model.iter_items.toSeq.sortWith(_._2 > _._2).
+          view(0, num_words_to_print))
       yield "%s=%s" format (unmemoize_string(word), count) 
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
     "UnigramWordDist(%d types, %s tokens%s%s, %s)" format (
-        num_word_types, num_word_tokens, innerToString, finished_str, words)
+        model.num_types, model.num_tokens, innerToString,
+        finished_str, words)
   }
 
   /**
@@ -105,7 +153,7 @@ abstract class UnigramWordDist(
     val contribs =
       if (return_contributing_words) mutable.Map[String, Double]() else null
     // 1.
-    for (word <- counts.keys) {
+    for (word <- model.iter_keys) {
       val p = lookup_word(word)
       val q = other.lookup_word(word)
       if (q == 0.0)
@@ -123,7 +171,7 @@ abstract class UnigramWordDist(
       (kldiv, contribs)
     else {
       // Step 2.
-      for (word <- other.counts.keys if !(counts contains word)) {
+      for (word <- other.model.iter_keys if !(model contains word)) {
         val p = lookup_word(word)
         val q = other.lookup_word(word)
         kldiv += p*(log(p) - log(q))
@@ -145,7 +193,7 @@ abstract class UnigramWordDist(
   def get_nbayes_logprob(xworddist: WordDist) = {
     val worddist = xworddist.asInstanceOf[UnigramWordDist]
     var logprob = 0.0
-    for ((word, count) <- worddist.counts) {
+    for ((word, count) <- worddist.model.iter_items) {
       val value = lookup_word(word)
       if (value <= 0) {
         // FIXME: Need to figure out why this happens (perhaps the word was
@@ -173,7 +221,7 @@ abstract class UnigramWordDist(
    */
   def find_most_common_word(pred: String => Boolean): Option[Word] = {
     val filtered =
-      (for ((word, count) <- counts if pred(unmemoize_string(word)))
+      (for ((word, count) <- model.iter_items if pred(unmemoize_string(word)))
         yield (word, count)).toSeq
     if (filtered.length == 0) None
     else {
@@ -230,11 +278,12 @@ class DefaultUnigramWordDistConstructor(
 
   // Returns true if the word was counted, false if it was ignored due to stoplisting
   // and/or whitelisting
-  protected def add_word_with_count(counts: WordDoubleMap,
-      word: String, count: Int): Boolean = {
+  protected def add_word_with_count(model: UnigramStorage, word: String,
+      count: Int): Boolean = {
     val lword = maybe_lowercase(word)
-    if (!stopwords.contains(lword) && (whitelist.size == 0 || whitelist.contains(lword))) {
-      counts(memoize_string(lword)) += count
+    if (!stopwords.contains(lword) &&
+        (whitelist.size == 0 || whitelist.contains(lword))) {
+      model.add_item(memoize_string(lword), count)
       true
     }
     else
@@ -242,18 +291,18 @@ class DefaultUnigramWordDistConstructor(
   }
 
   protected def imp_add_document(dist: WordDist, words: Iterable[String]) {
-    val counts = dist.asInstanceOf[UnigramWordDist].counts
+    val model = dist.asInstanceOf[UnigramWordDist].model
     for (word <- words)
-      add_word_with_count(counts, word, 1)
+      add_word_with_count(model, word, 1)
   }
 
   protected def imp_add_word_distribution(dist: WordDist, other: WordDist,
       partial: Double) {
     // FIXME: Implement partial!
-    val counts = dist.asInstanceOf[UnigramWordDist].counts
-    val othercounts = other.asInstanceOf[UnigramWordDist].counts
-    for ((word, count) <- othercounts)
-      counts(word) += count
+    val model = dist.asInstanceOf[UnigramWordDist].model
+    val othermodel = other.asInstanceOf[UnigramWordDist].model
+    for ((word, count) <- othermodel.iter_items)
+      model.add_item(word, count)
   }
 
   /**
@@ -262,12 +311,12 @@ class DefaultUnigramWordDistConstructor(
    */
   protected def imp_add_keys_values(dist: WordDist, keys: Array[String],
       values: Array[Int], num_words: Int) {
-    val counts = dist.asInstanceOf[UnigramWordDist].counts
+    val model = dist.asInstanceOf[UnigramWordDist].model
     var addedTypes = 0
     var addedTokens = 0
     var totalTokens = 0
     for (i <- 0 until num_words) {
-      if(add_word_with_count(counts, keys(i), values(i))) {
+      if(add_word_with_count(model, keys(i), values(i))) {
         addedTypes += 1
         addedTokens += values(i)
       }
@@ -296,20 +345,19 @@ class DefaultUnigramWordDistConstructor(
 
   protected def imp_finish_before_global(gendist: WordDist) {
     val dist = gendist.asInstanceOf[UnigramWordDist]
-    val counts = dist.counts
+    val model = dist.model
     val oov = memoize_string("-OOV-")
 
     /* Add the distribution to the global stats before eliminating
        infrequent words. */
-    dist.num_word_tokens = counts.values.sum
     factory.note_dist_globally(dist)
 
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.
     if (minimum_word_count > 1) {
-      for ((word, count) <- counts if count < minimum_word_count) {
-        counts -= word
-        counts(oov) += count
+      for ((word, count) <- model.iter_items if count < minimum_word_count) {
+        model.remove_item(word)
+        model.add_item(oov, count)
       }
     }
   }

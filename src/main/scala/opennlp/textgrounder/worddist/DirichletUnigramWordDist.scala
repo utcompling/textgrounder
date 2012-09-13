@@ -38,8 +38,8 @@ class DirichletUnigramWordDist(
   ) {
   override protected def imp_finish_after_global() {
     unseen_mass = 1.0 -
-      (num_word_tokens.toDouble /
-        (num_word_tokens +
+      (model.num_tokens.toDouble /
+        (model.num_tokens +
           factory.asInstanceOf[DirichletUnigramWordDistFactory].
             dirichlet_factor))
     super.imp_finish_after_global()

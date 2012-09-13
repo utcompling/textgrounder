@@ -162,9 +162,9 @@ class TimeCellGrid(
       errprint("Number of documents in %s-chunk: %s", name,
         comdist.num_docs_for_word_dist)
       errprint("Number of types in %s-chunk: %s", name,
-        comdist.word_dist.num_word_types)
+        comdist.word_dist.model.num_types)
       errprint("Number of tokens in %s-chunk: %s", name,
-        comdist.word_dist.num_word_tokens)
+        comdist.word_dist.model.num_tokens)
     }
   }
 }
@@ -216,7 +216,7 @@ class UnigramComparer(min_prob: Double, max_items: Int) extends
   type Item = Word
   type Dist = UnigramWordDist
 
-  def get_keys(dist: Dist) = dist.counts.keySet
+  def get_keys(dist: Dist) = dist.model.iter_keys.toSet
   def lookup_item(dist: Dist, item: Item) = dist.lookup_word(item)
   def format_item(item: Item) = unmemoize_string(item)
 }
@@ -227,7 +227,7 @@ class NgramComparer(min_prob: Double, max_items: Int) extends
   type Item = Ngram
   type Dist = NgramWordDist
 
-  def get_keys(dist: Dist) = dist.model.iter_ngrams.map(_._1).toSet
+  def get_keys(dist: Dist) = dist.model.iter_items.map(_._1).toSet
   def lookup_item(dist: Dist, item: Item) = dist.lookup_ngram(item)
   def format_item(item: Item) = item mkString " "
 }

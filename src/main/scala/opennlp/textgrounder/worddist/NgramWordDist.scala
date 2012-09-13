@@ -42,46 +42,8 @@ object NgramStorage {
 /**
  * An interface for storing and retrieving ngrams.
  */
-trait NgramStorage {
+trait NgramStorage extends ItemStorage[NgramStorage.Ngram] {
   type Ngram = NgramStorage.Ngram
-  /**************************** Abstract functions ***********************/
-
-  /**
-   * Add an n-gram with the given count.  If the n-gram exists already,
-   * add the count to the existing value.
-   */
-  def add_ngram(ngram: Ngram, count: Int)
-
-  /**
-   * Remove an n-gram, if it exists.
-   */
-  def remove_ngram(ngram: Ngram)
-
-  /**
-   * Return whether a given n-gram is stored.
-   */
-  def contains(ngram: Ngram): Boolean
-
-  /**
-   * Return the count of a given n-gram.
-   */
-  def get_ngram_count(ngram: Ngram): Int
-
-  /**
-   * Iterate over all n-grams that are stored.
-   */
-  def iter_ngrams: Iterable[(Ngram, Int)]
-
-  /**
-   * Total number of tokens stored.
-   */
-  def num_tokens: Long
-
-  /**
-   * Total number of n-gram types (i.e. number of distinct n-grams)
-   * stored.
-   */
-  def num_types: Long
 }
 
 /**
@@ -100,21 +62,35 @@ class OpenNLPNgramStorer extends NgramStorage {
    * Add an n-gram with the given count.  If the n-gram exists already,
    * add the count to the existing value.
    */
-  def add_ngram(ngram: Ngram, count: Int) {
+  def add_item(ngram: Ngram, count: Double) {
+    if (count != count.toInt)
+      throw new IllegalArgumentException(
+        "Partial count %s not allowed in this class" format count)
     val sl_ngram = new StringList(ngram.toSeq: _*)
     /* OpenNLP only lets you either add 1 to a possibly non-existing n-gram
        or set the count of an existing n-gram. */
     model.add(sl_ngram)
     if (count != 1) {
       val existing_count = model.getCount(sl_ngram)
-      model.setCount(sl_ngram, existing_count + count - 1)
+      model.setCount(sl_ngram, existing_count + count.toInt - 1)
     }
+  }
+
+  def set_item(ngram: Ngram, count: Double) {
+    if (count != count.toInt)
+      throw new IllegalArgumentException(
+        "Partial count %s not allowed in this class" format count)
+    val sl_ngram = new StringList(ngram.toSeq: _*)
+    /* OpenNLP only lets you either add 1 to a possibly non-existing n-gram
+       or set the count of an existing n-gram. */
+    model.add(sl_ngram)
+    model.setCount(sl_ngram, count.toInt)
   }
 
   /**
    * Remove an n-gram, if it exists.
    */
-  def remove_ngram(ngram: Ngram) {
+  def remove_item(ngram: Ngram) {
     val sl_ngram = new StringList(ngram.toSeq: _*)
     model.remove(sl_ngram)
   }
@@ -130,7 +106,7 @@ class OpenNLPNgramStorer extends NgramStorage {
   /**
    * Return whether a given n-gram is stored.
    */
-  def get_ngram_count(ngram: Ngram) = {
+  def get_item_count(ngram: Ngram) = {
     val sl_ngram = new StringList(ngram.toSeq: _*)
     model.getCount(sl_ngram)
   }
@@ -138,7 +114,7 @@ class OpenNLPNgramStorer extends NgramStorage {
   /**
    * Iterate over all n-grams that are stored.
    */
-  def iter_ngrams: Iterable[(Ngram, Int)] = {
+  def iter_keys = {
     import collection.JavaConversions._
     // Iterators suck.  Should not be exposed directly.
     // Actually you can iterate over the model without using `iterator`
@@ -146,19 +122,33 @@ class OpenNLPNgramStorer extends NgramStorage {
     // list before iterating over it.  Doing it as below iterates over
     // the list as it's generated.
     for (x <- model.iterator.toIterable)
-      yield (x.iterator.toIterable, model.getCount(x))
+      yield x.iterator.toIterable
+  }
+
+  /**
+   * Iterate over all n-grams that are stored.
+   */
+  def iter_items = {
+    import collection.JavaConversions._
+    // Iterators suck.  Should not be exposed directly.
+    // Actually you can iterate over the model without using `iterator`
+    // but it doesn't appear to work right -- it generates the entire
+    // list before iterating over it.  Doing it as below iterates over
+    // the list as it's generated.
+    for (x <- model.iterator.toIterable)
+      yield (x.iterator.toIterable, model.getCount(x).toDouble)
   }
 
   /**
    * Total number of tokens stored.
    */
-  def num_tokens: Long = model.numberOfGrams
+  def num_tokens = model.numberOfGrams.toDouble
 
   /**
    * Total number of n-gram types (i.e. number of distinct n-grams)
    * stored for n-grams of size `len`.
    */
-  def num_types: Long = model.size
+  def num_types = model.size
 }
 
 /**
@@ -259,11 +249,8 @@ abstract class NgramWordDist(
     note_globally: Boolean
   ) extends WordDist(factory, note_globally) with FastSlowKLDivergence {
   import NgramStorage.Ngram
-
+  type Item = Ngram
   val model = new OpenNLPNgramStorer
-
-  def num_word_types = model.num_types
-  def num_word_tokens = model.num_tokens
 
   def innerToString: String
 
@@ -273,7 +260,7 @@ abstract class NgramWordDist(
     val num_words_to_print = 15
     val need_dots = model.num_types > num_words_to_print
     val items =
-      for ((word, count) <- (model.iter_ngrams.toSeq.sortWith(_._2 > _._2).
+      for ((word, count) <- (model.iter_items.toSeq.sortWith(_._2 > _._2).
                                    view(0, num_words_to_print)))
         yield "%s=%s" format (word mkString " ", count) 
     val words = (items mkString " ") + (if (need_dots) " ..." else "")
@@ -371,12 +358,12 @@ class DefaultNgramWordDistConstructor(
     // FIXME: Not right with stopwords or whitelist
     //if (!stopwords.contains(lgram) &&
     //    (whitelist.size == 0 || whitelist.contains(lgram))) {
-    //  dist.add_ngram(lgram, count)
+    //  dist.add_item(lgram, count)
     //  true
     //}
     //else
     //  false
-    dist.model.add_ngram(lgram, count)
+    dist.model.add_item(lgram, count)
     return true
   }
 
@@ -397,8 +384,8 @@ class DefaultNgramWordDistConstructor(
     // FIXME: Implement partial!
     val dist = gendist.asInstanceOf[NgramWordDist].model
     val other = genother.asInstanceOf[NgramWordDist].model
-    for ((ngram, count) <- other.iter_ngrams)
-      dist.add_ngram(ngram, count)
+    for ((ngram, count) <- other.iter_items)
+      dist.add_item(ngram, count)
   }
 
   /**
@@ -442,9 +429,9 @@ class DefaultNgramWordDistConstructor(
     // FIXME!!! This should almost surely operate at the word level, not the
     // n-gram level.
     if (minimum_word_count > 1) {
-      for ((ngram, count) <- model.iter_ngrams if count < minimum_word_count) {
-        model.remove_ngram(ngram)
-        model.add_ngram(oov, count)
+      for ((ngram, count) <- model.iter_items if count < minimum_word_count) {
+        model.remove_item(ngram)
+        model.add_item(oov, count)
       }
     }
   }

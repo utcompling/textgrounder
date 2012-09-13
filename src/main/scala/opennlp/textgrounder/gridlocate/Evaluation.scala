@@ -925,7 +925,7 @@ abstract class RankedCellGridEvaluator[
     errprint("%s:Document %s:", doctag, document)
     // errprint("%s:Document distribution: %s", doctag, document.dist)
     errprint("%s:  %d types, %f tokens",
-      doctag, document.dist.num_word_types, document.dist.num_word_tokens)
+      doctag, document.dist.model.num_types, document.dist.model.num_tokens)
     errprint("%s:  true cell at rank: %s", doctag,
       result.asInstanceOf[RankedDocumentEvaluationResult[_,_,_,_]].true_rank)
     errprint("%s:  true cell: %s", doctag, result.true_cell)
@@ -1029,7 +1029,7 @@ abstract class CoordCellGridEvaluator[
     errprint("%s:Document %s:", doctag, document)
     // errprint("%s:Document distribution: %s", doctag, document.dist)
     errprint("%s:  %d types, %f tokens",
-      doctag, document.dist.num_word_types, document.dist.num_word_tokens)
+      doctag, document.dist.model.num_types, document.dist.model.num_tokens)
     errprint("%s:  true cell: %s", doctag, result.true_cell)
 
     errprint("%s:  Distance %s to true cell center at %s",

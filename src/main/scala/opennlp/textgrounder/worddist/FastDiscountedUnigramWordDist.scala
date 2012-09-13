@@ -44,9 +44,9 @@ import WordDist.memoizer.Word
 class DiscountedUnigramKLDivergenceCache(
     val worddist: DiscountedUnigramWordDist
   ) extends KLDivergenceCache {
-  val self_size = worddist.counts.size
-  val self_keys = worddist.counts.keys.toArray
-  val self_values = worddist.counts.values.toArray
+  val self_size = worddist.model.num_types
+  val self_keys = worddist.model.iter_keys.toArray
+  val self_values = worddist.model.iter_items.map { case (k,v) => v}.toArray
 }
 
 object FastDiscountedUnigramWordDist {
@@ -78,11 +78,11 @@ object FastDiscountedUnigramWordDist {
       else
         cache
     assert(the_cache.worddist == self)
-    assert(the_cache.self_size == self.counts.size)
+    assert(the_cache.self_size == self.model.num_types)
     val pkeys = the_cache.self_keys
     val pvalues = the_cache.self_values
-    val pfact = (1.0 - self.unseen_mass)/self.num_word_tokens
-    val qfact = (1.0 - other.unseen_mass)/other.num_word_tokens
+    val pfact = (1.0 - self.unseen_mass)/self.model.num_tokens
+    val qfact = (1.0 - other.unseen_mass)/other.model.num_tokens
     val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
     val factory = self.dufactory
@@ -92,12 +92,12 @@ object FastDiscountedUnigramWordDist {
         factory.total_num_unseen_word_types)
     */
     val owprobs = factory.overall_word_probs
-    val pcounts = self.counts
-    val qcounts = other.counts
+    val pmodel = self.model
+    val qmodel = other.model
 
     // 1.
 
-    val psize = self.counts.size
+    val psize = self.model.num_types
 
     // FIXME!! p * log(p) is the same for all calls of fast_kl_divergence
     // on this item, so we could cache it.  Not clear it would save much
@@ -127,7 +127,7 @@ object FastDiscountedUnigramWordDist {
       while (i < psize) {
         val word = pkeys(i)
         val pcount = pvalues(i)
-        val qcount = qcounts(word)
+        val qcount = qmodel.get_item_count(word)
         val owprob = owprobs(word)
         val p = pcount * pfact + owprob * pfact_unseen
         val q = qcount * qfact + owprob * qfact_unseen
@@ -148,7 +148,7 @@ object FastDiscountedUnigramWordDist {
         val pcount = pvalues(i)
         val p = pcount * pfact
         val q = {
-          val qcount = qcounts(word)
+          val qcount = qmodel.get_item_count(word)
           if (qcount != 0) qcount * qfact
           else {
             val owprob = owprobs(word)
@@ -181,7 +181,7 @@ object FastDiscountedUnigramWordDist {
 
     // 2.
     var overall_probs_diff_words = 0.0
-    for ((word, qcount) <- qcounts if !(pcounts contains word)) {
+    for ((word, qcount) <- qmodel.iter_items if !(pmodel contains word)) {
       val word_overall_prob = owprobs(word)
       val p = word_overall_prob * pfact_unseen
       val q = qcount * qfact
@@ -203,8 +203,8 @@ object FastDiscountedUnigramWordDist {
    */
   def fast_smoothed_cosine_similarity(self: TDist, other: TDist,
     partial: Boolean = false): Double = {
-    val pfact = (1.0 - self.unseen_mass)/self.num_word_tokens
-    val qfact = (1.0 - other.unseen_mass)/other.num_word_tokens
+    val pfact = (1.0 - self.unseen_mass)/self.model.num_tokens
+    val qfact = (1.0 - other.unseen_mass)/other.model.num_tokens
     val qfact_unseen = other.unseen_mass / other.overall_unseen_mass
     val factory = self.dufactory
     /* Not needed in the new way
@@ -213,8 +213,8 @@ object FastDiscountedUnigramWordDist {
         factory.total_num_unseen_word_types)
     */
     val owprobs = factory.overall_word_probs
-    val pcounts = self.counts
-    val qcounts = other.counts
+    val pmodel = self.model
+    val qmodel = other.model
 
     // 1.
 
@@ -224,10 +224,10 @@ object FastDiscountedUnigramWordDist {
     var pqsum = 0.0
     var p2sum = 0.0
     var q2sum = 0.0
-    for ((word, pcount) <- pcounts) {
+    for ((word, pcount) <- pmodel.iter_items) {
       val p = pcount * pfact
       val q = {
-        val qcount = qcounts(word)
+        val qcount = qmodel.get_item_count(word)
         val owprob = owprobs(word)
         qcount * qfact + owprob * qfact_unseen
       }
@@ -249,7 +249,7 @@ object FastDiscountedUnigramWordDist {
     // 2.
     val pfact_unseen = self.unseen_mass / self.overall_unseen_mass
     var overall_probs_diff_words = 0.0
-    for ((word, qcount) <- qcounts if !(pcounts contains word)) {
+    for ((word, qcount) <- qmodel.iter_items if !(pmodel contains word)) {
       val word_overall_prob = owprobs(word)
       val p = word_overall_prob * pfact_unseen
       val q = qcount * qfact
@@ -282,11 +282,11 @@ object FastDiscountedUnigramWordDist {
    */
   def fast_cosine_similarity(self: TDist, other: TDist,
     partial: Boolean = false) = {
-    val pfact = 1.0/self.num_word_tokens
-    val qfact = 1.0/other.num_word_tokens
+    val pfact = 1.0/self.model.num_tokens
+    val qfact = 1.0/other.model.num_tokens
     // 1.
-    val pcounts = self.counts
-    val qcounts = other.counts
+    val pmodel = self.model
+    val qmodel = other.model
 
     // FIXME!! Length of p is the same for all calls of fast_cosine_similarity
     // on this item, so we could cache it.  Not clear it would save much
@@ -294,9 +294,9 @@ object FastDiscountedUnigramWordDist {
     var pqsum = 0.0
     var p2sum = 0.0
     var q2sum = 0.0
-    for ((word, pcount) <- pcounts) {
+    for ((word, pcount) <- pmodel.iter_items) {
       val p = pcount * pfact
-      val q = qcounts(word) * qfact
+      val q = qmodel.get_item_count(word) * qfact
       //if (q == 0.0)
       //  errprint("Strange: word=%s qfact_globally_unseen_prob=%s qcount=%s qfact=%s",
       //           word, qfact_globally_unseen_prob, qcount, qfact)
@@ -311,7 +311,7 @@ object FastDiscountedUnigramWordDist {
   
     // 2.
     if (!partial)
-    for ((word, qcount) <- qcounts if !(pcounts contains word)) {
+    for ((word, qcount) <- qmodel.iter_items if !(pmodel contains word)) {
       val q = qcount * qfact
       q2sum += q * q
     }
