@@ -55,7 +55,7 @@ abstract class DiscountedUnigramWordDistFactory(
     super.note_dist_globally(dist)
     if (dist.note_globally) {
       assert(!owp_adjusted)
-      for ((word, count) <- udist.counts) {
+      for ((word, count) <- udist.model.iter_items) {
         if (!(overall_word_probs contains word))
           total_num_word_types += 1
         // Record in overall_word_probs; note more tokens seen.
@@ -70,7 +70,7 @@ abstract class DiscountedUnigramWordDistFactory(
     }
     if (debug("lots")) {
       errprint("""For word dist, total tokens = %s, unseen_mass = %s, overall unseen mass = %s""",
-        udist.num_word_tokens, udist.unseen_mass, udist.overall_unseen_mass)
+        udist.model.num_tokens, udist.unseen_mass, udist.overall_unseen_mass)
     }
   }
 
@@ -201,19 +201,21 @@ abstract class DiscountedUnigramWordDist(
         // NOTE NOTE NOTE! The toSeq needs to be added for some reason; if not,
         // the computation yields different values, which cause a huge loss of
         // accuracy (on the order of 10-15%).  I have no idea why; I suspect a
-        // Scala bug. (SCALABUG)
-        (for (ind <- counts.keys.toSeq)
+        // Scala bug. (SCALABUG) (Or, it used to occur when the code read
+        // 'counts.keys.toSeq'; who knows now.)
+        (for (ind <- model.iter_keys.toSeq)
           yield factory.overall_word_probs(ind)) sum)
     if (GridLocateDriver.Params.tf_idf) {
-      for ((word, count) <- counts.toSeq) // SCALABUG, necessary?
-        counts(word) = count*log(factory.num_documents/factory.document_freq(word))
+      for ((word, count) <- model.iter_items)
+        model.set_item(word,
+          count*log(factory.num_documents/factory.document_freq(word)))
     }
-    normalization_factor = ((counts.values) sum)
+    normalization_factor = model.num_tokens
     //if (use_sorted_list)
     //  counts = new SortedList(counts)
     if (debug("discount-factor") || debug("discountfactor"))
-      errprint("For distribution %s, norm_factor = %g, num_word_tokens = %s, unseen_mass = %g"
-        format (this, normalization_factor, num_word_tokens, unseen_mass))
+      errprint("For distribution %s, norm_factor = %g, model.num_tokens = %s, unseen_mass = %g"
+        format (this, normalization_factor, model.num_tokens, unseen_mass))
   }
 
   def fast_kl_divergence(cache: KLDivergenceCache, other: WordDist,
@@ -239,7 +241,7 @@ abstract class DiscountedUnigramWordDist(
   def kl_divergence_34(other: UnigramWordDist) = {
     val factory = dufactory
     var overall_probs_diff_words = 0.0
-    for (word <- other.counts.keys if !(counts contains word)) {
+    for (word <- other.model.iter_keys if !(model contains word)) {
       overall_probs_diff_words += factory.overall_word_probs(word)
     }
 
@@ -299,7 +301,7 @@ abstract class DiscountedUnigramWordDist(
     val factory = dufactory
     assert(finished)
     if (factory.interpolate) {
-      val wordcount = counts.getOrElse(word, 0.0)
+      val wordcount = if (model contains word) model.get_item_count(word) else 0.0
       // if (debug("some")) {
       //   errprint("Found counts for document %s, num word types = %s",
       //            doc, wordcounts(0).length)
@@ -314,8 +316,8 @@ abstract class DiscountedUnigramWordDist(
                  unmemoize_string(word), wordprob)
       wordprob
     } else {
-      val retval = counts.get(word) match {
-        case None => {
+      val retval =
+        if (!(model contains word)) {
           factory.overall_word_probs.get(word) match {
             case None => {
               /*
@@ -343,9 +345,9 @@ abstract class DiscountedUnigramWordDist(
               wordprob
             }
           }
-        }
-        case Some(wordcount) => {
-          //if (wordcount <= 0 or num_word_tokens <= 0 or unseen_mass >= 1.0)
+        } else {
+          val wordcount = model.get_item_count(word)
+          //if (wordcount <= 0 or model.num_tokens <= 0 or unseen_mass >= 1.0)
           //  warning("Bad values; wordcount = %s, unseen_mass = %s",
           //          wordcount, unseen_mass)
           //  for ((word, count) <- self.counts)
@@ -356,7 +358,6 @@ abstract class DiscountedUnigramWordDist(
                      unmemoize_string(word), wordprob)
           wordprob
         }
-      }
       retval
     }
   }

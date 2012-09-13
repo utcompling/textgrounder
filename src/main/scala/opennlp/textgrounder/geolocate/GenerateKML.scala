@@ -93,14 +93,14 @@ class FilterUnigramWordDistConstructor(
   override def finish_before_global(dist: WordDist) {
     super.finish_before_global(dist)
 
-    val counts = dist.asInstanceOf[UnigramWordDist].counts
+    val model = dist.asInstanceOf[UnigramWordDist].model
     val oov = memoize_string("-OOV-")
 
     // Filter the words we don't care about, to save memory and time.
-    for ((word, count) <- counts
+    for ((word, count) <- model.iter_items
          if !(filter_words contains unmemoize_string(word))) {
-      counts -= word
-      counts(oov) += count
+      model.remove_item(word)
+      model.add_item(oov, count)
     }
   }
 }

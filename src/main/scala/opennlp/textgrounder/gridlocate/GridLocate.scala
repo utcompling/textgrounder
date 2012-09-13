@@ -407,7 +407,7 @@ class RandomGridLocateDocumentStrategy[
           if (params.naive_bayes_weighting == "equal") (1.0, 1.0)
           else {
             val bw = params.naive_bayes_baseline_weight.toDouble
-            ((1.0 - bw) / word_dist.num_word_tokens, bw)
+            ((1.0 - bw) / word_dist.model.num_tokens, bw)
           }
         } else (1.0, 0.0))
 

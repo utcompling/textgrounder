@@ -275,19 +275,71 @@ object WordDist {
 }
 
 /**
+ * An interface for storing and retrieving vocabulary items (e.g. words,
+ * n-grams, etc.).
+ *
+ * @tparam Item Type of the items stored.
+ */
+trait ItemStorage[Item] {
+
+  /**
+   * Add an item with the given count.  If the item exists already,
+   * add the count to the existing value.
+   */
+  def add_item(item: Item, count: Double)
+
+  /**
+   * Set the item to the given count.  If the item exists already,
+   * replace its value with the given one.
+   */
+  def set_item(item: Item, count: Double)
+
+  /**
+   * Remove an item, if it exists.
+   */
+  def remove_item(item: Item)
+
+  /**
+   * Return whether a given item is stored.
+   */
+  def contains(item: Item): Boolean
+
+  /**
+   * Return the count of a given item.
+   */
+  def get_item_count(item: Item): Double
+
+  /**
+   * Iterate over all items that are stored.
+   */
+  def iter_items: Iterable[(Item, Double)]
+
+  /**
+   * Iterate over all keys that are stored.
+   */
+  def iter_keys: Iterable[Item]
+
+  /**
+   * Total number of tokens stored.
+   */
+  def num_tokens: Double
+
+  /**
+   * Total number of item types (i.e. number of distinct items)
+   * stored.
+   */
+  def num_types: Int
+}
+
+/**
  * A word distribution, i.e. a statistical distribution over words in
  * a document, cell, etc.
  */
-abstract class WordDist(factory: WordDistFactory, val note_globally: Boolean) {
-  /** Number of word tokens seen in the distribution. */
-  def num_word_tokens: Double
+abstract class WordDist(factory: WordDistFactory,
+    val note_globally: Boolean) {
+  type Item
+  val model: ItemStorage[Item]
 
-  /**
-   * Number of word types seen in the distribution
-   * (i.e. number of different vocabulary items seen).
-   */
-  def num_word_types: Long
-  
   /**
    * Whether we have finished computing the distribution, and therefore can
    * reliably do probability lookups.

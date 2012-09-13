@@ -173,7 +173,7 @@ abstract class CellDistFactory[
     // make it an interface for WordDist?
     val word_dist = xword_dist.asInstanceOf[UnigramWordDist]
     val cellprobs = doublemap[TCell]()
-    for ((word, count) <- word_dist.counts) {
+    for ((word, count) <- word_dist.model.iter_items) {
       val dist = get_cell_dist(cell_grid, word)
       for ((cell, prob) <- dist.cellprobs)
         cellprobs(cell) += count * prob

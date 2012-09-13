@@ -92,9 +92,9 @@ class PseudoGoodTuringUnigramWordDist(
     // Compute probabilities.  Use a very simple version of Good-Turing
     // smoothing where we assign to unseen words the probability mass of
     // words seen once, and adjust all other probs accordingly.
-    val num_types_seen_once = counts.values count (_ == 1)
+    val num_types_seen_once = model.iter_items count { case (k,v) => v == 1 }
     unseen_mass =
-      if (num_word_tokens > 0)
+      if (model.num_tokens > 0)
         // If no words seen only once, we will have a problem if we assign 0
         // to the unseen mass, as unseen words will end up with 0 probability.
         // However, if we assign a value of 1.0 to unseen_mass (which could
@@ -102,7 +102,7 @@ class PseudoGoodTuringUnigramWordDist(
         // up assigning 0 probability to seen words.  So we arbitrarily
         // limit it to 0.5, which is pretty damn much mass going to unseen
         // words.
-        0.5 min ((1.0 max num_types_seen_once)/num_word_tokens)
+        0.5 min ((1.0 max num_types_seen_once)/model.num_tokens)
       else 0.5
     super.imp_finish_after_global()
   }

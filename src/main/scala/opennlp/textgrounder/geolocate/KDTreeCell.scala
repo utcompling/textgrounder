@@ -174,25 +174,23 @@ class KdTreeCellGrid(table: SphereDocumentTable,
       for (node <- nodes if node.parent != null) {
         val cell = nodes_to_cell(node)
         val wd = cell.combined_dist.word_dist
-        val uwd = wd.asInstanceOf[UnigramWordDist]
+        val model = wd.asInstanceOf[UnigramWordDist].model
 
-        for ((k,v) <- uwd.counts) {
-          uwd.counts.put(k, (1 - interpolateWeight) * v)
+        for ((k,v) <- model.iter_items) {
+          model.set_item(k, (1 - interpolateWeight) * v)
         }
 
         val pcell = nodes_to_cell(node.parent)
         val pwd = pcell.combined_dist.word_dist
-        val puwd = pwd.asInstanceOf[UnigramWordDist]
+        val pmodel = pwd.asInstanceOf[UnigramWordDist].model
 
-        for ((k,v) <- puwd.counts) {
-          val oldv = uwd.counts.getOrElse(k, 0.0)
+        for ((k,v) <- pmodel.iter_items) {
+          val oldv = if (model contains k) model.get_item_count(k) else 0.0
           val newv = oldv + interpolateWeight * v
           if (newv > interpolateWeight)
-            uwd.counts.put(k, newv)
+            model.set_item(k, newv)
         }
 
-        // gotta update these variables
-        uwd.num_word_tokens = uwd.counts.values.sum
         task.item_processed()
       }
       task.finish()
