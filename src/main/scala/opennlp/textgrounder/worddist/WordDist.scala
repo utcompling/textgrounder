@@ -405,6 +405,26 @@ abstract class WordDist(factory: WordDistFactory,
   }
 
   /**
+   * Return the Dunning log-likelihood of an item in two different corpora,
+   * indicating how much more likely the item is in this corpus than the
+   * other to be different.
+   */
+  def dunning_log_likelihood(item: Item, other: WordDist) = {
+    val a = model.get_item(item).toDouble
+    // This cast is kind of ugly but I don't see a way around it.
+    val b = other.model.get_item(item.asInstanceOf[other.Item]).toDouble
+    val c = model.num_tokens.toDouble
+    val d = other.model.num_tokens.toDouble
+    val factor = (a+b)/(c+d)
+    val e1 = c*factor
+    val e2 = d*factor
+    val f1 = if (a > 0) a*math.log(a/e1) else 0.0
+    val f2 = if (b > 0) b*math.log(b/e2) else 0.0
+    val g2 = 2*(f1+f2)
+    g2
+  }
+
+  /**
    * Actual implementation of `kl_divergence` by subclasses.
    * External callers should use `kl_divergence`.
    */
