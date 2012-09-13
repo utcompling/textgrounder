@@ -171,11 +171,11 @@ class TimeCellGrid(
 
 abstract class DistributionComparer(min_prob: Double, max_items: Int) {
   type Item
-  type Dist
+  type Dist <: WordDist
 
   def get_dist(cell: TimeCell): Dist =
     cell.combined_dist.word_dist.asInstanceOf[Dist]
-  def get_keys(dist: Dist): collection.Set[Item]
+  def get_keys(dist: Dist) = dist.model.iter_keys.toSet
   def lookup_item(dist: Dist, item: Item): Double
   def format_item(item: Item): String
 
@@ -185,29 +185,47 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
 
     val itemdiff =
       for {
-        item <- get_keys(fromdist) ++ get_keys(todist)
+        rawitem <- get_keys(fromdist) ++ get_keys(todist)
+        item = rawitem.asInstanceOf[Item]
         p = lookup_item(fromdist, item)
         q = lookup_item(todist, item)
         if p >= min_prob || q >= min_prob
-      } yield (item, q - p)
-    val diff_up = itemdiff filter (_._2 > 0)
-    val diff_down = itemdiff filter (_._2 < 0) map (x => (x._1, x._2.abs))
-    def print_diffs(diffs: Iterable[(Item, Double)],
+      } yield (item, fromdist.dunning_log_likelihood(item.asInstanceOf[fromdist.Item], todist), q - p)
+
+    println("Items by log-likelihood:")
+    for ((item, dunning, prob) <-
+        itemdiff.toSeq.sortWith(_._2 > _._2).take(max_items)) {
+      println("%10s: %s (%s, %s = %s - %s)" format
+        (format_float(dunning),
+         format_item(item),
+         if (prob > 0) "increase" else "decrease", format_float(prob),
+         format_float(lookup_item(fromdist, item)),
+         format_float(lookup_item(todist, item))
+       ))
+    }
+    println("")
+
+    val diff_up = itemdiff filter (_._3 > 0)
+    val diff_down = itemdiff filter (_._3 < 0) map (x => (x._1, x._2, x._3.abs))
+    def print_diffs(diffs: Iterable[(Item, Double, Double)],
         incdec: String, updown: String) {
       println("")
       println("Items that %s in probability:" format incdec)
       println("------------------------------------")
-      for ((item, prob) <- diffs.toSeq.sortWith(_._2 > _._2).take(max_items)) {
-        println("%s: %s - %s = %s%s" format
+      for ((item, dunning, prob) <-
+          diffs.toSeq.sortWith(_._3 > _._3).take(max_items)) {
+        println("%s: %s - %s = %s%s (LL %s)" format
           (format_item(item),
            format_float(lookup_item(fromdist, item)),
            format_float(lookup_item(todist, item)),
-           updown, format_float(prob)))
+           updown, format_float(prob),
+           format_float(dunning)))
       }
       println("")
     }
     print_diffs(diff_up, "increased", "+")
     print_diffs(diff_down, "decreased", "-")
+
   }
 }
 
@@ -216,7 +234,6 @@ class UnigramComparer(min_prob: Double, max_items: Int) extends
   type Item = Word
   type Dist = UnigramWordDist
 
-  def get_keys(dist: Dist) = dist.model.iter_keys.toSet
   def lookup_item(dist: Dist, item: Item) = dist.lookup_word(item)
   def format_item(item: Item) = unmemoize_string(item)
 }
@@ -227,7 +244,6 @@ class NgramComparer(min_prob: Double, max_items: Int) extends
   type Item = Ngram
   type Dist = NgramWordDist
 
-  def get_keys(dist: Dist) = dist.model.iter_items.map(_._1).toSet
   def lookup_item(dist: Dist, item: Item) = dist.lookup_ngram(item)
   def format_item(item: Item) = item mkString " "
 }
