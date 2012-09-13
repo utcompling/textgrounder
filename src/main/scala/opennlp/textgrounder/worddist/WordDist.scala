@@ -307,7 +307,7 @@ trait ItemStorage[Item] {
   /**
    * Return the count of a given item.
    */
-  def get_item_count(item: Item): Double
+  def get_item(item: Item): Double
 
   /**
    * Iterate over all items that are stored.

@@ -301,7 +301,7 @@ abstract class DiscountedUnigramWordDist(
     val factory = dufactory
     assert(finished)
     if (factory.interpolate) {
-      val wordcount = if (model contains word) model.get_item_count(word) else 0.0
+      val wordcount = if (model contains word) model.get_item(word) else 0.0
       // if (debug("some")) {
       //   errprint("Found counts for document %s, num word types = %s",
       //            doc, wordcounts(0).length)
@@ -346,7 +346,7 @@ abstract class DiscountedUnigramWordDist(
             }
           }
         } else {
-          val wordcount = model.get_item_count(word)
+          val wordcount = model.get_item(word)
           //if (wordcount <= 0 or model.num_tokens <= 0 or unseen_mass >= 1.0)
           //  warning("Bad values; wordcount = %s, unseen_mass = %s",
           //          wordcount, unseen_mass)

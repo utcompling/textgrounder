@@ -106,7 +106,7 @@ class OpenNLPNgramStorer extends NgramStorage {
   /**
    * Return whether a given n-gram is stored.
    */
-  def get_item_count(ngram: Ngram) = {
+  def get_item(ngram: Ngram) = {
     val sl_ngram = new StringList(ngram.toSeq: _*)
     model.getCount(sl_ngram)
   }
