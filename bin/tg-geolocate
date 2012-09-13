@@ -5,13 +5,13 @@ help()
   cat <<FOO
 Usage: $0 [--hadoop | --hadoop-nondist] [--app APP] [POLIGROUNDER-OPTIONS ...] CORPUS [APP-OPTIONS ...]
 
-Run 'textgrounder geolocate-document' (or another related app), passing it
+Run 'poligrounder geolocate-document' (or another related app), passing it
 the appropriate arguments for running on the specific corpus specified by
 CORPUS.  Additional app-specific options can be given after the corpus name,
 to control the operation of the application. (Try 'help' or '--help' in
 place of the app options to get a help message.) Additional options to the
-'textgrounder' driver script can be given before the corpus name; these
-usually control operation of the JVM. (Use 'textgrounder help' to see a
+'poligrounder' driver script can be given before the corpus name; these
+usually control operation of the JVM. (Use 'poligrounder help' to see a
 description of these options.)
 
 Currently recognized values for CORPUS:
@@ -69,7 +69,7 @@ shift
 
 # __TG_EXTRA_ARGS is for other scripts calling us; see above.
 # LOCAL_ARGS comes from config-geolocate and allows for system-supplied args.
-geolocate="$POLIGROUNDER_DIR/bin/textgrounder $tgopts $tgapp $corpusargs $__TG_EXTRA_ARGS $LOCAL_ARGS"
+geolocate="$POLIGROUNDER_DIR/bin/poligrounder $tgopts $tgapp $corpusargs $__TG_EXTRA_ARGS $LOCAL_ARGS"
 
 echo Executing: $geolocate ${1+"$@"}
 $geolocate ${1+"$@"}
