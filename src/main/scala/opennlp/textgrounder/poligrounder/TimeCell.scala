@@ -195,7 +195,7 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
     println("Items by log-likelihood:")
     for ((item, dunning, prob) <-
         itemdiff.toSeq.sortWith(_._2 > _._2).take(max_items)) {
-      println("%10s: %s (%s, %s = %s - %s)" format
+      println("%7s: %-20s (%8s, %8s = %8s - %8s)" format
         (format_float(dunning),
          format_item(item),
          if (prob > 0) "increase" else "decrease", format_float(prob),
