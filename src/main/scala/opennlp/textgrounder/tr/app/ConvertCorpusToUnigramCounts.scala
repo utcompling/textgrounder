@@ -54,8 +54,6 @@ object ConvertCorpusToUnigramCounts extends BaseApp {
 
     val corpus = TopoUtil.readStoredCorpusFromSerialized(getSerializedCorpusInputPath)
     
-    System.err.println(corpus.size)
-    
     var i = 0
     for(doc <- corpus) {
       val unigramCounts = new collection.mutable.HashMap[String, Int]
