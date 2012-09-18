@@ -26,7 +26,7 @@ import java.io._
 
 import org.apache.commons.logging.LogFactory
 import org.apache.log4j.{Level=>JLevel,_}
-import org.apache.hadoop.fs.{FileSystem => HFileSystem, Path}
+import org.apache.hadoop.fs.{FileSystem => HFileSystem, Path, FileStatus}
 
 import com.nicta.scoobi.Scoobi._
 import com.nicta.scoobi.testing.HadoopLogFactory
