@@ -274,7 +274,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
        some less obvious places.  In all:
 
        -- the doc string just above
-       -- the definition of to_row(), Tweet.empty() and Tweet.row_fields()
+       -- the definition of to_row() and Tweet.row_fields()
        -- parse_json_lift() below
        -- merge_records() below
        -- TweetFilterParser.main() below
@@ -309,12 +309,6 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   }
 
   object Tweet {
-    def empty =
-      Tweet("", Seq[String](), "unknown", 0, 0, 0, 0,
-        Double.NaN, Double.NaN, 0, 0, "unknown", 0,
-        Map[String, Int](), Map[String, Int](),
-        Map[String, Int](), Map[String, Int]())
-
     def row_fields =
       Seq("user", "id", "min-timestamp", "max-timestamp",
         "geo-timestamp","coord", "followers", "following", "lang",
@@ -338,10 +332,6 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     tweet: Tweet
   )
   implicit val recordWire = mkCaseWireFormat(Record.apply _, Record.unapply _)
-
-  object Record {
-    def empty = Record("", true, Tweet.empty)
-  }
 
   /**
    * A generic action in the ParseTweets app.
@@ -593,15 +583,17 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
   }
 
-  class ParseAndUniquifyTweets(opts: ParseTweetsParams)
-      extends ParseTweetsAction {
+  class ParseAndUniquifyTweets(
+      opts: ParseTweetsParams,
+      set_counters: Boolean = true
+    ) extends ParseTweetsAction {
 
     val operation_category = "Parse"
 
-    /**
-     * An empty tweet.
-     */
-    val empty_tweet = Tweet.empty
+    def maybe_counter(counter: String) {
+      if (set_counters)
+        bump_counter(counter)
+    }
 
     // Used internally to force an exit when a problem in parse_json_lift
     // occurs.
@@ -625,7 +617,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           sdf.getCalendar.getTimeInMillis
         } catch {
           case pe: ParseException => {
-            bump_counter("unparsable date")
+            maybe_counter("unparsable date")
             logger.warn("Error parsing date %s on line %s: %s\n%s" format (
               timestring, lineno, line, pe))
             0
@@ -636,7 +628,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       def parse_problem(e: Exception) = {
         logger.warn("Error parsing line %s: %s\n%s" format (
           lineno, line, stack_trace_as_string(e)))
-        ("error", empty_tweet)
+        ("error", null)
       }
 
       /**
@@ -651,7 +643,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           fieldval \= field
           if (fieldval == liftweb.json.JNothing) {
             val fieldpath = path mkString "."
-            bump_counter("ERROR: tweet with missing field %s" format fieldpath)
+            maybe_counter("ERROR: tweet with missing field %s" format fieldpath)
             warning(line, "Can't find field path %s in tweet", fieldpath)
             throw new ParseJSonExit
           }
@@ -685,7 +677,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
               end = indices(1).intValue
               if {
                 if (value.length == 0) {
-                  bump_counter("zero length %s/%s seen" format (key, subkey))
+                  maybe_counter("zero length %s/%s seen" format (key, subkey))
                   warning(line,
                     "Zero-length %s/%s in interval [%d,%d], skipped",
                     key, subkey, start, end)
@@ -777,11 +769,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         */
         val parsed = liftweb.json.parse(line)
         if ((parsed \ "delete" values) != None) {
-          bump_counter("tweet deletion notices skipped")
-          ("delete", empty_tweet)
+          maybe_counter("tweet deletion notices skipped")
+          ("delete", null)
         } else if ((parsed \ "limit" values) != None) {
-          bump_counter("tweet limit notices skipped")
-          ("limit", empty_tweet)
+          maybe_counter("tweet limit notices skipped")
+          ("limit", null)
         } else {
           val user = force_string(parsed, "user", "screen_name")
           val timestamp = parse_time(force_string(parsed, "created_at"))
@@ -862,7 +854,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
                 } yield {
               // Subtract one because of the initial @ in the index reference
               if (end - start - 1 != namelen) {
-                bump_counter("wrong length interval for screen name seen")
+                maybe_counter("wrong length interval for screen name seen")
                 warning(line, "Strange indices [%d,%d] for screen name %s, length %d != %d, text context is '%s'",
                   start, end, screen_name, end - start - 1, namelen,
                   raw_text.slice(start, end))
@@ -891,20 +883,20 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         }
       } catch {
         case jpe: liftweb.json.JsonParser.ParseException => {
-          bump_counter("ERROR: lift-json parsing error")
+          maybe_counter("ERROR: lift-json parsing error")
           parse_problem(jpe)
         }
         case npe: NullPointerException => {
-          bump_counter("ERROR: NullPointerException when parsing")
+          maybe_counter("ERROR: NullPointerException when parsing")
           parse_problem(npe)
         }
         case nfe: NumberFormatException => {
-          bump_counter("ERROR: NumberFormatException when parsing")
+          maybe_counter("ERROR: NumberFormatException when parsing")
           parse_problem(nfe)
         }
-        case _: ParseJSonExit => ("error", empty_tweet)
+        case _: ParseJSonExit => ("error", null)
         case e: Exception => {
-          bump_counter("ERROR: %s when parsing" format e.getClass.getName)
+          maybe_counter("ERROR: %s when parsing" format e.getClass.getName)
           parse_problem(e); throw e
         }
       }
@@ -921,26 +913,26 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     /*
-     * Parse a JSON line into a tweet.
+     * Parse a JSON line into a tweet.  Return `null` if unable to parse.
      */
     def parse_json(line: String) = {
-      bump_counter("total lines")
+      maybe_counter("total lines")
       lineno += 1
       // For testing
       // logger.debug("parsing JSON: %s" format line)
       if (line.trim == "") {
-        bump_counter("blank lines skipped")
-        empty_tweet
+        maybe_counter("blank lines skipped")
+        null
       }
       else {
-        bump_counter("total tweets parsed")
+        maybe_counter("total tweets parsed")
         val (status, tweet) = parse_json_lift(line)
         if (status == "error") {
-          bump_counter("total tweets unsuccessfully parsed")
+          maybe_counter("total tweets unsuccessfully parsed")
         } else if (status == "success") {
-          bump_counter("total tweets successfully parsed")
+          maybe_counter("total tweets successfully parsed")
         } else {
-          bump_counter("total tweets skipped")
+          maybe_counter("total tweets skipped")
         }
         tweet
       }
@@ -1002,10 +994,13 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     def filter_tweets(values: DList[Tweet]) =
       filter_duplicates(values).filter(x => filter_tweet_by_tweet_filters(x))
 
+    /**
+     * Parse a set of JSON-formatted tweets.
+     */
     def apply(lines: DList[String]) = {
 
-      // Parse JSON into tweet records.
-      val values_extracted = lines.map(parse_json)
+      // Parse JSON into tweet records.  Filter out nulls (unparsable tweets).
+      val values_extracted = lines.map(parse_json).filter(_ != null)
 
       /* Filter duplicates, invalid tweets, tweets not matching any
          tweet-level boolean filters. (User-level boolean filters get
