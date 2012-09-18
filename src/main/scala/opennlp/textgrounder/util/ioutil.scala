@@ -242,7 +242,10 @@ package object ioutil {
      *
      * @return An iterator over lines.  Use `openr_with_compression_info` to
      *   also get the actual type of compression and the uncompressed name
-     *   of the file (minus any extension like .gz or .bzip2).
+     *   of the file (minus any extension like .gz or .bzip2). The iterator
+     *   will close itself automatically when EOF is reached if the `close`
+     *   option is set to true (the default), or it can be closed explicitly
+     *   using the `close()` method on the iterator.
      *
      * @see `FileIterator`, `openr_with_compression_info`, `get_input_stream`,
      *   `get_input_stream_handling_compression`
