@@ -1655,8 +1655,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val out_schema = new Schema(fields, Map("corpus" -> opts.corpus_name))
       val out_schema_fn = Schema.construct_schema_file(filehand,
           outdir, opts.corpus_name, corpus_suffix)
-      rename_output_files(configuration.fs, outdir, opts.corpus_name,
-        corpus_suffix)
+      rename_output_files(outdir, opts.corpus_name, corpus_suffix)
       out_schema.output_schema_file(filehand, out_schema_fn)
       outdir
     }
@@ -1678,8 +1677,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     def rename_outfiles() {
-      rename_output_files(configuration.fs, opts.output, opts.corpus_name,
-        ptp.corpus_suffix)
+      rename_output_files(opts.output, opts.corpus_name, ptp.corpus_suffix)
     }
 
     opts.output_format match {

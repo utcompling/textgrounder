@@ -193,11 +193,32 @@ abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
     output_resource_usage()
   }
 
-  def rename_output_files(fs: HFileSystem, dir: String, corpus_name: String,
-    suffix: String) {
+  /**
+   * Given a Hadoop-style path specification (specifying a single directory,
+   * a single file, or a glob), return a list of all files specified.
+   */
+  def files_of_path_spec(spec: String) = {
+    /**
+     * Expand a file status possibly referring to a directory to a list of
+     * the files within. FIXME: Should this be recursive?
+     */
+    def expand_dirs(status: FileStatus) = {
+      if (status.isDir)
+        configuration.fs.listStatus(status.getPath)
+      else
+        Array(status)
+    }
+
+    configuration.fs.globStatus(new Path(spec)).
+      flatMap(expand_dirs).
+      map(_.getPath.toString)
+  }
+
+  def rename_output_files(dir: String, corpus_name: String, suffix: String) {
     // Rename output files appropriately
     errprint("Renaming output files ...")
     val globpat = "%s/*-r-*" format dir
+    val fs = configuration.fs
     for (file <- fs.globStatus(new Path(globpat))) {
       val path = file.getPath
       val basename = path.getName
