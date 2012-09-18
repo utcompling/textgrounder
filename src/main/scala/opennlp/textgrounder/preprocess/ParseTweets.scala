@@ -45,13 +45,13 @@ import tgutil.timeutil._
 class ParseTweetsParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {
   var grouping = ap.option[String]("grouping", "g", "gr", "group",
-    choices = Seq("user", "time", "none"),
-    help="""Mode for grouping tweets.  There are currently three methods
+    choices = Seq("user", "time", "file", "none"),
+    help="""Mode for grouping tweets.  There are currently four methods
     of grouping: `user`, `time` (i.e. all tweets within a given
-    timeslice, specified with `--timeslice`) and `none` (no grouping;
-    tweets are passed through directly, after duplicated tweets have been
-    removed).  Default is `user` when `--ouput-format=corpus`, and `none`
-    otherwise.""")
+    timeslice, specified with `--timeslice`), `file` (all tweets within a
+    given input file) and `none` (no grouping; tweets are passed through
+    directly, after duplicated tweets have been removed).  Default is
+    `user` when `--ouput-format=corpus`, and `none` otherwise.""")
   var output_format = ap.option[String]("output-format", "of",
     choices = Seq("corpus", "stats", "raw"),
     default = "corpus",
@@ -231,7 +231,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   /**
    * Data for a tweet or grouping of tweets.
    *
-   * @param line Raw JSON for tweet; only stored when --output-format=raw
+   * @param json Raw JSON for tweet; only stored when --output-format=raw
+   * @param path Path of file that the tweet came from
    * @param text Text for tweet or tweets (a Seq in case of multiple tweets)
    * @param user User name (FIXME: or one of them, when going by time; should
    *    do something smarter)
@@ -253,6 +254,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
    */
   case class Tweet(
     json: String,
+    path: String,
     text: Seq[String],
     user: String,
     id: TweetID,
@@ -291,6 +293,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       Seq(
         string(user),
         elong(id),
+        string(path),
         timestamp(min_timestamp),
         timestamp(max_timestamp),
         timestamp(geo_timestamp),
@@ -310,7 +313,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
   object Tweet {
     def row_fields =
-      Seq("user", "id", "min-timestamp", "max-timestamp",
+      Seq("user", "id", "path", "min-timestamp", "max-timestamp",
         "geo-timestamp","coord", "followers", "following", "lang",
         "numtweets", "user-mentions", "retweets", "hashtags", "urls",
         "text")
@@ -575,7 +578,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           "Unable to parse date %s" format args(1))
       }
       val tweet =
-        Tweet("", Seq(text), "user", 0, timestamp, timestamp,
+        Tweet("", "", Seq(text), "user", 0, timestamp, timestamp,
           timestamp, Double.NaN, Double.NaN, 0, 0, "unknown", 1,
           Map[String, Int](), Map[String, Int](),
           Map[String, Int](), Map[String, Int]())
@@ -604,7 +607,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      *
      * @return status and tweet.
      */
-    def parse_json_lift(line: String): (String, Tweet) = {
+    def parse_json_lift(path: String, line: String): (String, Tweet) = {
 
       /**
        * Convert a Twitter timestamp, e.g. "Tue Jun 05 14:31:21 +0000 2012",
@@ -877,7 +880,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
           ("success",
             Tweet(if (opts.output_format == "raw") line else "",
-              Seq(text), user, tweet_id.toLong, timestamp,
+              path, Seq(text), user, tweet_id.toLong, timestamp,
               timestamp, timestamp, lat, long, followers, following, lang, 1,
               user_mentions, retweets, hashtags, urls))
         }
@@ -915,7 +918,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     /*
      * Parse a JSON line into a tweet.  Return `null` if unable to parse.
      */
-    def parse_json(line: String) = {
+    def parse_json(pathline: (String, String)) = {
+      val (path, line) = pathline
       maybe_counter("total lines")
       lineno += 1
       // For testing
@@ -926,7 +930,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       }
       else {
         maybe_counter("total tweets parsed")
-        val (status, tweet) = parse_json_lift(line)
+        val (status, tweet) = parse_json_lift(path, line)
         if (status == "error") {
           maybe_counter("total tweets unsuccessfully parsed")
         } else if (status == "success") {
@@ -995,9 +999,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       filter_duplicates(values).filter(x => filter_tweet_by_tweet_filters(x))
 
     /**
-     * Parse a set of JSON-formatted tweets.
+     * Parse a set of JSON-formatted tweets.  Input is (path, JSON).
      */
-    def apply(lines: DList[String]) = {
+    def apply(lines: DList[(String, String)]) = {
 
       // Parse JSON into tweet records.  Filter out nulls (unparsable tweets).
       val values_extracted = lines.map(parse_json).filter(_ != null)
@@ -1031,6 +1035,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     def tweet_to_record(tweet: Tweet) = {
       val key = opts.grouping match {
         case "user" => tweet.user
+        case "file" => tweet.path
         case "time" =>
           ((tweet.min_timestamp / opts.timeslice) * opts.timeslice).toString
         case "none" => tweet.id.toString
@@ -1051,6 +1056,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val t2 = tw2.tweet
       val id = if (t1.id != t2.id) -1L else t1.id
       val lang = if (t1.lang != t2.lang) "[multiple]" else t1.lang
+      val path = if (t1.path != t2.path) "[multiple]" else t1.path
       val (followers, following) =
         (math.max(t1.followers, t2.followers),
          math.max(t1.following, t2.following))
@@ -1078,7 +1084,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
       // FIXME maybe want to track the different users
       val tweet =
-        Tweet("", text, t1.user, id, min_timestamp, max_timestamp,
+        Tweet("", path, text, t1.user, id, min_timestamp, max_timestamp,
           geo_timestamp, lat, long, followers, following, lang, numtweets,
           user_mentions, retweets, hashtags, urls)
       Record(tw1.key, tw1.matches || tw2.matches, tweet)
@@ -1619,6 +1625,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           format(opts.timeslice_float)
       case "user" =>
         "grouping by user"
+      case "file" =>
+        "grouping by file"
       case "none" =>
         "not grouping"
     }))
@@ -1633,7 +1641,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     val ptp = new ParseTweetsDriver(opts)
 
     // Firstly we load up all the (new-line-separated) JSON lines.
-    val lines: DList[String] = TextInput.fromTextFile(opts.input)
+    val lines: DList[(String, String)] =
+      TextInput.fromTextFileWithPath(opts.input)
 
     errprint("ParseTweets: Generate tweets ...")
     val tweets1 = new ParseAndUniquifyTweets(opts)(lines)
