@@ -22,17 +22,21 @@ object ScoobiWordCount extends ScoobiApp {
     System.err.println("file system key " +
       configuration.get(FileSystem.FS_DEFAULT_NAME_KEY, "value not found"))
 
-    val lines = fromTextFile(args(0))
+    val lines =
+      // Test fromTextFileWithPath, but currently appears to trigger an
+      // infinite loop.
+      // TextInput.fromTextFileWithPath(args(0))
+      TextInput.fromTextFile(args(0)).map(x => (args(0), x))
 
     def splitit(x: String) = {
       HadoopLogFactory.setQuiet(false)
       val logger = LogFactory.getLog("foo.bar")
-      logger.info("Processing " + x)
+      // logger.info("Processing " + x)
       // System.err.println("Processing", x)
       x.split(" ")
     }
     //val counts = lines.flatMap(_.split(" "))
-    val counts = lines.flatMap(splitit)
+    val counts = lines.map(_._2).flatMap(splitit)
                           .map(word => (word, 1))
                           .groupByKey
                           .combine((a: Int, b: Int) => a + b)
