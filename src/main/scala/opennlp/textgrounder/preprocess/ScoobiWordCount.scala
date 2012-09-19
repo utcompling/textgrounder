@@ -8,17 +8,16 @@ import org.apache.hadoop.fs.FileSystem
 import java.io._
 
 object ScoobiWordCount extends ScoobiApp {
-  implicit def toPimpedDlist[K,V](dl: DList[(K, Iterable[V])]) = new 
-  PimpedDList(dl) 
-  class PimpedDList[K,V](dl: DList[(K,Iterable[V])]) { 
-      def safeCombine(f: (V, V) => V) 
-        (implicit mK: Manifest[K], 
-         wtK: WireFormat[K], 
-         grpK: Grouping[K], 
-         mV: Manifest[V], 
-         wtV: WireFormat[V]): DList[(K, V)] = dl.map { case (k, vs) => 
-  (k, vs.reduce(f)) } 
-    } 
+  implicit def toPimpedDlist[K,V](dl: DList[(K, Iterable[V])]) = new PimpedDList(dl)
+  class PimpedDList[K,V](dl: DList[(K,Iterable[V])]) {
+      def safeCombine(f: (V, V) => V)
+        (implicit mK: Manifest[K],
+         wtK: WireFormat[K],
+         grpK: Grouping[K],
+         mV: Manifest[V],
+         wtV: WireFormat[V]): DList[(K, V)] = dl.map {
+           case (k, vs) => (k, vs.reduce(f)) }
+    }
 
   def run() {
     // There's some magic here in the source code to make the get() call
