@@ -46,6 +46,10 @@ package object hadoop {
       FileSystem.get(URI.create(filename), conf)
     }
 
+    protected def file_not_found(path: String) =
+      throw new FileNotFoundException(
+        "No such file or directory: %s" format path)
+
     def get_raw_input_stream(filename: String) =
       get_file_system(filename).open(new Path(filename))
   
@@ -66,14 +70,21 @@ package object hadoop {
     def join_filename(dir: String, file: String) =
       new Path(dir, file).toString
 
-    def is_directory(filename: String) =
-      get_file_system(filename).getFileStatus(new Path(filename)).isDir
+    def is_directory(filename: String) = {
+      val status = get_file_system(filename).getFileStatus(new Path(filename))
+      if (status == null)
+        file_not_found(filename)
+      status.isDir
+    }
 
     def make_directories(filename: String):Boolean =
       get_file_system(filename).mkdirs(new Path(filename))
 
     def list_files(dir: String) = {
-      for (file <- get_file_system(dir).listStatus(new Path(dir)))
+      val status = get_file_system(dir).listStatus(new Path(dir))
+      if (status == null)
+        file_not_found(dir)
+      for (file <- status)
         yield file.getPath.toString
     }
   }
