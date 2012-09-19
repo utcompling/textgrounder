@@ -1160,12 +1160,29 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val (followers, following) =
         (math.max(t1.followers, t2.followers),
          math.max(t1.following, t2.following))
-      val text = t1.text ++ t2.text
       val numtweets = t1.numtweets + t2.numtweets
-      val user_mentions = combine_maps(t1.user_mentions, t2.user_mentions)
-      val retweets = combine_maps(t1.retweets, t2.retweets)
-      val hashtags = combine_maps(t1.hashtags, t2.hashtags)
-      val urls = combine_maps(t1.urls, t2.urls)
+      // Avoid computing stuff we will never use
+      val text =
+        if (opts.optional_fields contains "text")
+          t1.text ++ t2.text
+        else Seq[String]()
+      val empty_map = Map[String, Int]()
+      val user_mentions =
+        if (opts.optional_fields contains "user-mentions")
+          combine_maps(t1.user_mentions, t2.user_mentions)
+        else empty_map
+      val retweets =
+        if (opts.optional_fields contains "retweets")
+          combine_maps(t1.retweets, t2.retweets)
+        else empty_map
+      val hashtags =
+        if (opts.optional_fields contains "hashtags")
+          combine_maps(t1.hashtags, t2.hashtags)
+        else empty_map
+      val urls =
+        if (opts.optional_fields contains "urls")
+          combine_maps(t1.urls, t2.urls)
+        else empty_map
 
       val (lat, long, geo_timestamp) =
         if (isNaN(t1.lat) && isNaN(t2.lat)) {
