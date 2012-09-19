@@ -185,8 +185,8 @@ object FindPolitical extends
       Seq("user", "ideology",
         "num-ideo-accounts", "num-ideo-refs", "ideo-refs",
         "num-lib-ideo-accounts", "num-lib-ideo-refs", "lib-ideo-refs",
-        "num-cons-ideo-accounts", "num-cons-ideo-refs", "cons-ideo-refs",
-        "fields")
+        "num-cons-ideo-accounts", "num-cons-ideo-refs", "cons-ideo-refs") ++
+      user_subschema_fieldnames
 
     /**
      * For a given user, determine if the user is an "ideological user"
