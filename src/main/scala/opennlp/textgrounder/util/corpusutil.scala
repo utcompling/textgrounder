@@ -19,6 +19,7 @@
 package opennlp.textgrounder.util
 
 import collection.mutable
+import util.control.Breaks._
 
 import java.io.PrintStream
 
@@ -478,7 +479,7 @@ package object corpusutil {
   }
 
   object CorpusFileProcessor {
-    val possible_compression_re = """(\.[a-zA-Z0-9]+)?$"""
+    val possible_compression_re = """(\.bz2|\.bzip2|\.gz|\.gzip)?$"""
     /**
      * For a given suffix, create a regular expression
      * ([[scala.util.matching.Regex]]) that matches document files of the
@@ -537,7 +538,7 @@ package object corpusutil {
      */
     def get_matching_patterns(filehand: FileHandler, dir: String,
         suffix: String) = {
-      val possible_endings = Seq("", ".bz2", ".gz")
+      val possible_endings = Seq("", ".bz2", ".bzip2", ".gz", ".gzip")
       for {ending <- possible_endings
            full_ending = "-%s.txt%s" format (suffix, ending)
            pattern = filehand.join_filename(dir, "*%s" format full_ending)
@@ -549,19 +550,117 @@ package object corpusutil {
   }
 
   /**
-   * File processor for reading in a "corpus" of documents and processing
-   * rows as arrays of files (ala `FieldTextFileProcessor`).
+   * A basic file processor for reading in a "corpus" of documents and
+   * processing rows as arrays of fields (ala `FieldTextFileProcessor`).
+   * You might want to use the higher-level `CorpusFieldFileProcessor`.
    *
    * @param suffix the suffix of the corpus files, as described above
-   *     
    */
-  abstract class CorpusFieldFileProcessor[T](
+  abstract class BasicCorpusFieldFileProcessor[T](
     suffix: String
   ) extends CorpusFileProcessor[T](suffix) with FieldTextFileProcessor[T] {
     override def set_schema(schema: Schema) {
       super.set_schema(schema)
       set_fieldnames(schema.fieldnames)
     }
+  }
+
+  class ExitFieldProcessor[T](val value: Option[T]) extends Throwable { }
+
+  /**
+   * A file processor for reading in a "corpus" of documents and
+   * processing rows as arrays of fields (ala `FieldTextFileProcessor`).
+   * Each row is assumed to generate an object of type T.  The result
+   * of calling `process_file` will be a Seq[T] of all objects, and
+   * the result of calling `process_files` to process all files will
+   * be a Seq[Seq[T]], one per file.
+   *
+   * You should implement `handle_row`, which is passed in the field
+   * values, and should return either `Some(x)` for x of type T, if
+   * you were able to process the row, or `None` otherwise.  If you
+   * want to exit further processing, throw a `ExitFieldProcessor(value)`,
+   * where `value` is either `Some(x)` or `None`, as for a normal return
+   * value.
+   *
+   * @param suffix the suffix of the corpus files, as described above
+   */
+  abstract class CorpusFieldFileProcessor[T](suffix: String) extends
+      BasicCorpusFieldFileProcessor[Seq[T]](suffix) {
+
+    def handle_row(fieldvals: Seq[String]): Option[T]
+
+    val values_so_far = mutable.ListBuffer[T]()
+
+    def process_row(fieldvals: Seq[String]): (Boolean, Boolean) = {
+      try {
+        handle_row(fieldvals) match {
+          case Some(x) => { values_so_far += x; return (true, true) }
+          case None => { return (false, true) }
+        }
+      } catch {
+        case exit: ExitFieldProcessor[T] => {
+          exit.value match {
+            case Some(x) => { values_so_far += x; return (true, false) }
+            case None => { return (false, false) }
+          }
+        }
+      }
+    }
+
+    val task = new MeteredTask("document", "reading")
+    def process_lines(lines: Iterator[String],
+        filehand: FileHandler, file: String,
+        compression: String, realname: String) = {
+      var should_stop = false
+      values_so_far.clear()
+      breakable {
+        for (line <- lines) {
+          if (!parse_row(line)) {
+            should_stop = true
+            break
+          }
+        }
+      }
+      (!should_stop, values_so_far.toSeq)
+    }
+
+    override def end_processing(filehand: FileHandler, files: Iterable[String]) {
+      task.finish()
+      super.end_processing(filehand, files)
+    }
+
+    /**
+     * Read a corpus from a directory and return the result of processing the
+     * rows in the corpus. (If you want more control over the processing,
+     * call `read_schema_from_corpus` and then `process_files`.  This allows,
+     * for example, reading files from multiple directories with a single
+     * schema, or determining whether processing was aborted early or allowed
+     * to run to completion.)
+     *
+     * @param filehand File handler object of the directory
+     * @param dir Directory to read
+     *
+     * @return A sequence of sequences of values.  There is one inner sequence
+     *   per file read in, and each such sequence contains all the values
+     *   read from the file. (There may be fewer values than rows in a file
+     *   if some rows were rejected by `handle_row`, and there may be fewer
+     *   files read than exist in the directory if `handle_row` signalled that
+     *   processing should stop.)
+     */
+    def read_corpus(filehand: FileHandler, dir: String) = {
+      read_schema_from_corpus(filehand, dir)
+      val (finished, value) = process_files(filehand, Seq(dir))
+      value
+    }
+
+    /*
+    FIXME: Should be implemented.  Requires that process_files() returns
+    the filename along with the value. (Should not be a problem for any
+    existing users of BasicCorpusFieldFileProcessor, because AFAIK they
+    ignore the value.)
+
+    def read_corpus_with_filenames(filehand: FileHandler, dir: String) = ...
+    */
   }
 
   /**
