@@ -104,7 +104,7 @@ containing unigram counts.""")
 class FrobCorpusFileProcessor(
   output_filehand: FileHandler,
   params: FrobCorpusParameters
-) extends CorpusFieldFileProcessor[Unit](params.input_suffix) {
+) extends BasicCorpusFieldFileProcessor[Unit](params.input_suffix) {
   val split_value_to_writer = mutable.Map[String, CorpusWriter]()
   val split_value_to_outstream = mutable.Map[String, PrintStream]()
   var unsplit_writer: CorpusWriter = _

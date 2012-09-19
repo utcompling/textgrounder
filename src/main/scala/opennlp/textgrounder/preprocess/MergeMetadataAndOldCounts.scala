@@ -175,7 +175,7 @@ class MMCUnigramWordDistHandler(
  */
 class MMCDocumentFileProcessor(
   suffix: String
-) extends CorpusFieldFileProcessor[Unit](suffix) {
+) extends BasicCorpusFieldFileProcessor[Unit](suffix) {
   val document_fieldvals = mutable.Map[String, Seq[String]]()
 
   def process_row(fieldvals: Seq[String]) = {
