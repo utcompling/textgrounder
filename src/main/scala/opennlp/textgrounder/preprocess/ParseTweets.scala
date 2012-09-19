@@ -19,6 +19,7 @@
 package opennlp.textgrounder.preprocess
 
 import collection.JavaConversions._
+import collection.mutable
 
 import java.io._
 import java.lang.Double.isNaN
@@ -161,6 +162,46 @@ Look for any tweets containing the word "clinton" as well as either the words
   var cfilter_tweets = ap.option[String]("cfilter-tweets",
     help="""Boolean expression used to filter tweets to be output, with
     case-sensitive matching.  Format is identical to `--filter-tweets`.""")
+  var output_fields = ap.option[String]("output-fields",
+    default="default",
+    help="""Fields to output in corpus format.  This should consist of one or
+    more directives, separated by spaces or commas.  Directives are processed
+    sequentially.  Each directive should be one of
+    
+    1. A field name, meaning to include that field
+
+    2. A field name with a preceding - sign, meaning to exclude that field
+    
+    3. The directive 'all', meaning to include all fields, canceling any
+       previous directives.
+    
+    4. The directive 'none', meaning to include no fields, canceling any
+       previous directives.
+    
+    5. The directive 'default', meaning to set the current fields to output
+       to the default (which may vary depending on other settings), canceling
+       any previous directives.
+    
+    Currently, some fields are always output, and not subject to
+    modification through this setting.
+
+    Currently recognized optional fields:
+
+    'user-mentions': List of users mentioned, along with counts
+
+    'retweets': List of users from which tweets were retweeted, with counts
+
+    'hashtags': List of hashtags, with counts
+
+    'urls': List of URL's, with counts
+
+    'text': Actual text of all tweets
+
+    'counts': All words, with counts
+
+    The default for all types of grouping except 'file' is to include
+    everything.  For 'file', none of the above fields are included by
+    default.""")
   var filter_groups = ap.option[String]("filter-groups",
     help="""Boolean expression used to filter on the grouped-tweet level.
   This is like `--filter-tweets` but filters groups of tweets (grouped
@@ -187,12 +228,45 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     help="""Maximum number of tweets per user for user to be accepted in
     --by-user mode.""")
 
+  def parse_output_fields(fieldspec: String) = {
+    val directives = fieldspec.split("[ ,]")
+    val optfields = mutable.LinkedHashSet[String]()
+    for (direc <- Array("default") ++ directives) {
+      direc match {
+        case "default" => {
+          optfields.clear()
+          optfields ++= ParseTweets.Tweet.default_optional_fields(this)
+        }
+        case "all" => {
+          optfields.clear()
+          optfields ++= ParseTweets.Tweet.all_optional_fields
+        }
+        case "none" => {
+          optfields.clear()
+        }
+        case x if ParseTweets.Tweet.all_optional_fields contains x => {
+          optfields += x
+        }
+        case x if x.length > 0 && x(0) == '-' &&
+            (ParseTweets.Tweet.all_optional_fields contains x.tail) => {
+          optfields -= x.tail
+        }
+        case x => { ap.usageError(
+          "Unrecognized directive '%s' in --output-fields" format x)
+        }
+      }
+    }
+    optfields.toSeq
+  }
+  var optional_fields: Seq[String] = null
+
   override def check_usage() {
     timeslice = (timeslice_float * 1000).toLong
     if (grouping == null)
       grouping = if (output_format == "corpus") "user" else "none"
     if (output_format == "raw" && grouping != "none")
       ap.usageError("`raw` output format only allowed when `--grouping=none`")
+    optional_fields = parse_output_fields(output_fields)
   }
 }
 
@@ -282,7 +356,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
        -- TweetFilterParser.main() below
     */
   ) {
-    def to_row = {
+    def to_row_always = {
       import Encoder.{long => elong, _}
       // Latitude/longitude need to be combined into a single field, but only
       // if both actually exist.
@@ -301,22 +375,48 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         int(followers),
         int(following),
         string(lang),
-        int(numtweets),
-        count_map(user_mentions),
-        count_map(retweets),
-        count_map(hashtags),
-        count_map(urls),
-        seq_string(text)
-      ) mkString "\t"
+        int(numtweets)
+      )
     }
+
+    def to_row_optional(tokenize_act: TokenizeCountAndFormat,
+        include_fields: Seq[String]) = {
+      import Encoder.{long => elong, _}
+      val optfields = mutable.Buffer[String]()
+      for (field <- include_fields) {
+        val fieldval = field match {
+          case "user-mentions" => count_map(user_mentions)
+          case "retweets" => count_map(retweets)
+          case "hashtags" => count_map(hashtags)
+          case "urls" => count_map(urls)
+          case "text" => seq_string(text)
+          case "counts" => tokenize_act.emit_ngrams(text)
+        }
+        optfields += fieldval
+      }
+      optfields.toSeq
+    }
+
+    def to_row(tokenize_act: TokenizeCountAndFormat, opts: ParseTweetsParams) =
+      (to_row_always ++ to_row_optional(tokenize_act, opts.optional_fields)
+      ) mkString "\t"
   }
 
   object Tweet {
-    def row_fields =
+    def row_fields_always =
       Seq("user", "id", "path", "min-timestamp", "max-timestamp",
-        "geo-timestamp","coord", "followers", "following", "lang",
-        "numtweets", "user-mentions", "retweets", "hashtags", "urls",
-        "text")
+        "geo-timestamp", "coord", "followers", "following", "lang",
+        "numtweets")
+
+    val all_optional_fields =
+      Seq("user-mentions", "retweets", "hashtags", "urls", "text", "counts")
+    def default_optional_fields(opts: ParseTweetsParams) = {
+      if (opts.grouping == "file") Seq[String]()
+      else all_optional_fields
+    }
+
+    def row_fields(opts: ParseTweetsParams) =
+      row_fields_always ++ opts.optional_fields
   }
   implicit val tweetWire = mkCaseWireFormat(Tweet.apply _, Tweet.unapply _)
 
@@ -1258,9 +1358,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * written out.
      */
     def tokenize_count_and_format(tweet: Tweet): String = {
-      val encoded_tweet = tweet.to_row
-      val formatted_text = emit_ngrams(tweet.text)
-      encoded_tweet + "\t" + formatted_text
+      tweet.to_row(this, opts)
     }
   }
 
@@ -1593,7 +1691,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       logger.info("Outputting a schema to %s ..." format filename)
       // We add the counts data to what to_row() normally outputs so we
       // have to add the same field here
-      val fields = Tweet.row_fields ++ Seq("counts")
+      val fields = Tweet.row_fields(opts)
       val fixed_fields = Map(
         "corpus" -> opts.corpus_name,
         "corpus-type" -> ("twitter-%s" format opts.grouping),
