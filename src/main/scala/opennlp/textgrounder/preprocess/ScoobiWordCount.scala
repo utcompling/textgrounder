@@ -8,17 +8,6 @@ import org.apache.hadoop.fs.FileSystem
 import java.io._
 
 object ScoobiWordCount extends ScoobiApp {
-  implicit def toPimpedDlist[K,V](dl: DList[(K, Iterable[V])]) = new PimpedDList(dl)
-  class PimpedDList[K,V](dl: DList[(K,Iterable[V])]) {
-      def safeCombine(f: (V, V) => V)
-        (implicit mK: Manifest[K],
-         wtK: WireFormat[K],
-         grpK: Grouping[K],
-         mV: Manifest[V],
-         wtV: WireFormat[V]): DList[(K, V)] = dl.map {
-           case (k, vs) => (k, vs.reduce(f)) }
-    }
-
   def run() {
     // There's some magic here in the source code to make the get() call
     // work -- there's an implicit conversion in object ScoobiConfiguration
@@ -51,7 +40,7 @@ object ScoobiWordCount extends ScoobiApp {
                           .map(word => (word, 1))
                           .groupByKey
                           .filter { case (word, len) => word.length < 8 }
-                          .safeCombine((a: Int, b: Int) => a + b)
+                          .combine((a: Int, b: Int) => a + b)
     persist(toTextFile(counts, args(1)))
   }
 }
