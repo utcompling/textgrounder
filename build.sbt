@@ -67,7 +67,8 @@ libraryDependencies ++= Seq(
   //
   // Scoobi
   // "com.nicta" % "scoobi_2.9.2" % "0.4.0",
-  "com.nicta" % "scoobi_2.9.2" % "0.4.0-benwing-SNAPSHOT",
+  "com.nicta" % "scoobi_2.9.2" % "0.6.0-cdh3-SNAPSHOT-benwing",
+  // "com.nicta" % "scoobi_2.9.2" % "0.5.0-cdh3",
   // "com.nicta" % "scoobi_2.9.2" % "0.5.0-SNAPSHOT",
   // "provided" if we use Scoobi's package-hadoop instead of sbt-assembly.
   // This is another way of building an assembly for Hadoop that includes all
@@ -83,6 +84,7 @@ libraryDependencies ++= Seq(
   // in Scoobi (among other things), but leads to compile errors that I don't
   // know how to fix.
   //  "com.nicta" % "scoobi_2.9.2" % "0.5.0-SNAPSHOT" % "provided",
+  "log4j" % "log4j" % "1.2.16",
   // The following needed for Scoobi 0.1, but evidently not any more.
   // "javassist" % "javassist" % "3.12.1.GA",
   //
