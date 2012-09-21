@@ -416,10 +416,10 @@ class MultiRegularCellGrid(
     ) yield RegularCellIndex.coerce(this, i, j)
   }
 
-  def find_best_cell_for_coord(coord: SphereCoord,
+  def find_best_cell_for_document(doc: SphereDocument,
       create_non_recorded: Boolean) = {
     assert(all_cells_computed)
-    val index = coord_to_multi_cell_index(coord)
+    val index = coord_to_multi_cell_index(doc.coord)
     find_cell_for_cell_index(index, create = create_non_recorded,
       record_created_cell = false)
   }

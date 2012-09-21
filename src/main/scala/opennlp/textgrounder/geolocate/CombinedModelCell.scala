@@ -41,12 +41,13 @@ class CombinedModelCellGrid(table: SphereDocumentTable,
     }
   }
 
-  def find_best_cell_for_coord(coord: SphereCoord,
-                               create_non_recorded: Boolean) = {
-      val candidates = models.map(_.find_best_cell_for_coord(coord, create_non_recorded))
-                             .filter(_ != null)
+  def find_best_cell_for_document(doc: SphereDocument,
+                                  create_non_recorded: Boolean) = {
+      val candidates =
+        models.map(_.find_best_cell_for_document(doc, create_non_recorded))
+              .filter(_ != null)
       candidates.minBy((cell: SphereCell) =>
-                         spheredist(cell.get_center_coord, coord))
+                         spheredist(cell.get_center_coord, doc.coord))
   }
 
   def add_document_to_cell(document: SphereDocument) {

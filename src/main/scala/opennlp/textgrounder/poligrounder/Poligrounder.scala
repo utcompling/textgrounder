@@ -128,6 +128,11 @@ class PoligrounderParameters(parser: ArgParser = null) extends
     help="""File containing corpus output from FindPolitical, listing
     users and associated ideologies.""")
 
+  var ideological_users: Map[String, Double] = _
+  var ideological_users_liberal: Map[String, Double] = _
+  var ideological_users_conservative: Map[String, Double] = _
+  var ideological_categories: Seq[String] = _
+
   var mode = ap.option[String]("m", "mode",
     default = "combined",
     choices = Seq("combined", "ideo-users"),
@@ -181,9 +186,16 @@ class PoligrounderDriver extends
     if (params.ideological_user_corpus != null) {
       val processor = new IdeoUserFileProcessor
       val users =
-        processor.read_corpus(new LocalFileHandler, params.ideological_user_corpus)
-      errprint("Users:\n%s", users)
-    }
+        processor.read_corpus(new LocalFileHandler,
+          params.ideological_user_corpus).flatten.toMap
+      params.ideological_users = users
+      params.ideological_users_liberal =
+        users filter { case (u, ideo) => ideo < 0.33 }
+      params.ideological_users_conservative =
+        users filter { case (u, ideo) => ideo > 0.66 }
+      params.ideological_categories = Seq("liberal", "conservative")
+    } else
+      params.ideological_categories = Seq("all")
 
     super.handle_parameters()
   }
@@ -197,12 +209,28 @@ class PoligrounderDriver extends
   }
 
   protected def initialize_cell_grid(table: TimeDocumentTable) = {
-    new TimeCellGrid(from_chunk, to_chunk, table)
+    if (params.ideological_user_corpus == null)
+      new TimeCellGrid(from_chunk, to_chunk, Seq("all"), x => "all", table)
+    else
+      new TimeCellGrid(from_chunk, to_chunk, Seq("liberal", "conservative"),
+        x => {
+          if (params.ideological_users_liberal contains x.user)
+            "liberal"
+          else if (params.ideological_users_conservative contains x.user)
+            "conservative"
+          else
+            null
+        }, table)
   }
 
   def run_after_setup() {
-    DistributionComparer.compare_cells(cell_grid.asInstanceOf[TimeCellGrid],
-      params.min_prob, params.max_items)
+    if (params.ideological_user_corpus == null)
+      DistributionComparer.compare_cells(cell_grid.asInstanceOf[TimeCellGrid],
+        "all", params.min_prob, params.max_items)
+    else
+      DistributionComparer.compare_cells_2way(
+        cell_grid.asInstanceOf[TimeCellGrid], "liberal", "conservative",
+        params.min_prob, params.max_items)
   }
 }
 
