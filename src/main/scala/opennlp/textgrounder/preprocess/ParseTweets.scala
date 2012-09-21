@@ -1710,10 +1710,15 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       // have to add the same field here
       val fields = Tweet.row_fields(opts)
       val fixed_fields = Map(
-        "corpus" -> opts.corpus_name,
-        "corpus-type" -> ("twitter-%s" format opts.grouping),
-        "split" -> opts.split
-      ) ++ (
+          "corpus" -> opts.corpus_name,
+          "generating-app" -> "ParseTweets",
+          "corpus-type" -> ("twitter-%s" format opts.grouping)) ++
+        opts.non_default_params_string.toMap ++
+        Map(
+          "grouping" -> opts.grouping,
+          "output-format" -> opts.output_format,
+          "split" -> opts.split
+        ) ++ (
         if (opts.grouping == "time")
           Map("corpus-timeslice" -> opts.timeslice.toString)
         else
