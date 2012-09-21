@@ -729,10 +729,12 @@ package object corpusutil {
       decode_chars_regex.replaceAllIn(str, m => decode_chars_map(m.matched))
   }
 
-  private val endec_word_for_counts_field =
+  private val endec_string_for_count_map_field =
     new EncodeDecode(Seq('%', ':', ' ', '\t', '\n', '\r', '\f'))
-  private val endec_string_for_field =
+  private val endec_string_for_sequence_field =
     new EncodeDecode(Seq('%', '>', '\t', '\n', '\r', '\f'))
+  private val endec_string_for_whole_field =
+    new EncodeDecode(Seq('%', '\t', '\n', '\r', '\f'))
 
   /**
    * Encode a word for placement inside a "counts" field.  Colons and spaces
@@ -749,56 +751,70 @@ package object corpusutil {
    * unnecessary and would make the raw files harder to read.  In the case of
    * HTML-style encoding, : isn't even escaped, so that wouldn't work at all.
    */
-  def encode_word_for_counts_field(word: String) =
-    endec_word_for_counts_field.encode(word)
+  def encode_string_for_count_map_field(word: String) =
+    endec_string_for_count_map_field.encode(word)
 
   /**
    * Encode an n-gram into text suitable for the "counts" field.
    The
    * individual words are separated by colons, and each word is encoded
-   * using `encode_word_for_counts_field`.  We need to encode '\n'
+   * using `encode_string_for_count_map_field`.  We need to encode '\n'
    * (record separator), '\t' (field separator), ' ' (separator between
    * word/count pairs), ':' (separator between word and count),
    * '%' (encoding indicator).
    */
-  def encode_ngram_for_counts_field(ngram: Iterable[String]) = {
-    ngram.map(encode_word_for_counts_field) mkString ":"
+  def encode_ngram_for_count_map_field(ngram: Iterable[String]) = {
+    ngram.map(encode_string_for_count_map_field) mkString ":"
   }
 
   /**
-   * Decode a word encoded using `encode_word_for_counts_field`.
+   * Decode a word encoded using `encode_string_for_count_map_field`.
    */
-  def decode_word_for_counts_field(word: String) =
-    endec_word_for_counts_field.decode(word)
+  def decode_string_for_count_map_field(word: String) =
+    endec_string_for_count_map_field.decode(word)
 
   /**
-   * Encode a string for placement as the value of a field.  This is
-   * similar to `encode_word_for_counts_field` except that we don't
-   * encode spaces.  We encode '&gt;' for possible use as a separator
+   * Encode a string for placement in a field consisting of a sequence
+   * of strings.  This is similar to `encode_string_for_count_map_field` except
+   * that we don't encode spaces.  We encode '&gt;' for use as a separator
    * inside of a field (since it's almost certain not to occur, because
    * we generally get HTML-encoded text; and even if not, it's fairly
    * rare).
    */
-  def encode_string_for_field(word: String) =
-    endec_string_for_field.encode(word)
+  def encode_string_for_sequence_field(word: String) =
+    endec_string_for_sequence_field.encode(word)
 
   /**
-   * Decode a string encoded using `encode_string_for_field`.
+   * Decode a string encoded using `encode_string_for_sequence_field`.
    */
-  def decode_string_for_field(word: String) =
-    endec_string_for_field.decode(word)
+  def decode_string_for_sequence_field(word: String) =
+    endec_string_for_sequence_field.decode(word)
 
   /**
-   * Decode an n-gram encoded using `encode_ngram_for_counts_field`.
+   * Encode a string for placement in a field by itself.  This is similar
+   * to `encode_word_for_sequence_field` except that we don't encode the &gt;
+   * sign.
    */
-  def decode_ngram_for_counts_field(ngram: String) = {
-    ngram.split(":", -1).map(decode_word_for_counts_field)
+  def encode_string_for_whole_field(word: String) =
+    endec_string_for_whole_field.encode(word)
+
+  /**
+   * Decode a string encoded using `encode_string_for_whole_field`.
+   */
+  def decode_string_for_whole_field(word: String) =
+    endec_string_for_whole_field.decode(word)
+
+  /**
+   * Decode an n-gram encoded using `encode_ngram_for_count_map_field`.
+   */
+  def decode_ngram_for_count_map_field(ngram: String) = {
+    ngram.split(":", -1).map(decode_string_for_count_map_field)
   }
 
   /**
    * Split counts field into the encoded n-gram section and the word count.
    */
-  def shallow_split_counts_field(field: String) = {
+  def shallow_split_count_map_field(field: String) = {
     val last_colon = field.lastIndexOf(':')
     if (last_colon < 0)
       throw FileFormatException(
@@ -811,15 +827,15 @@ package object corpusutil {
   /**
    * Split counts field into n-gram and word count.
    */
-  def deep_split_counts_field(field: String) = {
-    val (encoded_ngram, count) = shallow_split_counts_field(field)
-    (decode_ngram_for_counts_field(encoded_ngram), count)
+  def deep_split_count_map_field(field: String) = {
+    val (encoded_ngram, count) = shallow_split_count_map_field(field)
+    (decode_ngram_for_count_map_field(encoded_ngram), count)
   }
 
   /**
    * Serialize a sequence of (encoded-word, count) pairs into the format used
    * in a corpus.  The word or ngram must already have been encoded using
-   * `encode_word_for_counts_field` or `encode_ngram_for_counts_field`.
+   * `encode_string_for_count_map_field` or `encode_ngram_for_count_map_field`.
    */
   def shallow_encode_word_count_map(seq: collection.Seq[(String, Int)]) = {
     // Sorting isn't strictly necessary but ensures consistent output as well
@@ -834,7 +850,7 @@ package object corpusutil {
    */
   def encode_word_count_map(seq: collection.Seq[(String, Int)]) = {
     shallow_encode_word_count_map(seq map {
-      case (word, count) => (encode_word_for_counts_field(word), count)
+      case (word, count) => (encode_string_for_count_map_field(word), count)
     })
   }
 
@@ -860,7 +876,7 @@ package object corpusutil {
             "For unigram counts, WORD in WORD:COUNT must not be empty, but %s seen"
             format wordcount)
         val count = strcount.toInt
-        val decoded_word = decode_word_for_counts_field(word)
+        val decoded_word = decode_string_for_count_map_field(word)
         (decoded_word, count)
       }
     }
@@ -870,9 +886,10 @@ package object corpusutil {
     def count_map(x: Map[String, Int]) = encode_word_count_map(x.toSeq)
     def count_map_seq(x: collection.Seq[(String, Int)]) =
       encode_word_count_map(x)
-    def string(x: String) = encode_string_for_field(x)
+    def string(x: String) = encode_string_for_whole_field(x)
+    def string_in_seq(x: String) = encode_string_for_sequence_field(x)
     def seq_string(x: Seq[String]) =
-      x.map(encode_string_for_field) mkString ">>"
+      x.map(encode_string_for_sequence_field) mkString ">>"
     def timestamp(x: Long) = x.toString
     def long(x: Long) = x.toString
     def int(x: Int) = x.toString
@@ -882,8 +899,9 @@ package object corpusutil {
   object Decoder {
     def count_map(x: String) = decode_word_count_map(x).toMap
     def count_map_seq(x: String) = decode_word_count_map(x)
-    def string(x: String) = decode_string_for_field(x)
-    def seq_string(x: String) = x.split(">>", -1).map(decode_string_for_field)
+    def string(x: String) = decode_string_for_whole_field(x)
+    def seq_string(x: String) =
+      x.split(">>", -1).map(decode_string_for_sequence_field)
     def timestamp(x: String) = x.toLong
     def long(x: String) = x.toLong
     def int(x: String) = x.toInt

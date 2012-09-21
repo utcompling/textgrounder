@@ -152,7 +152,7 @@ class MMCUnigramWordDistHandler(
         (for (i <- 0 until num_words) yield {
           // errprint("Saw2 %s,%s", keys(i), values(i))
           ("%s:%s" format
-            (encode_word_for_counts_field(unmemoize_string(keys(i))),
+            (encode_string_for_count_map_field(unmemoize_string(keys(i))),
               values(i)))
           }).
           mkString(" ")
