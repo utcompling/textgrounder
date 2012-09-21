@@ -54,7 +54,7 @@ class ParseTweetsParams(ap: ArgParser) extends
     directly, after duplicated tweets have been removed).  Default is
     `user` when `--ouput-format=corpus`, and `none` otherwise.""")
   var output_format = ap.option[String]("output-format", "of",
-    choices = Seq("corpus", "stats", "raw"),
+    choices = Seq("corpus", "stats", "json"),
     default = "corpus",
     help="""Format for output of tweets or tweet groups.  Possibilities are
     
@@ -62,7 +62,7 @@ class ParseTweetsParams(ap: ArgParser) extends
     with one record per line, fields separated by TAB characters, and a
     schema indicating the names of the columns.)
   
-    -- `raw` (Simply output JSON-formatted tweets directly, exactly as received;
+    -- `json` (Simply output JSON-formatted tweets directly, exactly as received;
     only possible for `--grouping=none`, in which case the input tweets will be
     output directly, after removing duplicates.)
     
@@ -264,8 +264,8 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     timeslice = (timeslice_float * 1000).toLong
     if (grouping == null)
       grouping = if (output_format == "corpus") "user" else "none"
-    if (output_format == "raw" && grouping != "none")
-      ap.usageError("`raw` output format only allowed when `--grouping=none`")
+    if (output_format == "json" && grouping != "none")
+      ap.usageError("`json` output format only allowed when `--grouping=none`")
     optional_fields = parse_output_fields(output_fields)
   }
 }
@@ -284,7 +284,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
    * "WORD1:WORD2:...:COUNT WORD1:WORD2:...:COUNT ...".
    *
    * When doing no grouping, output can also be in JSON format, using the
-   * option `--output-format=raw`.
+   * option `--output-format=json`.
    *
    * When merging, the code uses the earliest geolocated tweet as the combined
    * location; tweets with a bounding box as their location rather than
@@ -305,7 +305,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   /**
    * Data for a tweet or grouping of tweets.
    *
-   * @param json Raw JSON for tweet; only stored when --output-format=raw
+   * @param json Raw JSON for tweet; only stored when --output-format=json
    * @param path Path of file that the tweet came from
    * @param text Text for tweet or tweets (a Seq in case of multiple tweets)
    * @param user User name (FIXME: or one of them, when going by time; should
@@ -424,7 +424,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
    * A tweet along with ancillary data used for merging and filtering.
    *
    * @param key Key used for grouping (username or timestamp); stores the
-   *   raw text of a JSON when `--output-format=raw`.
+   *   raw text of a JSON when `--output-format=json`.
    * @param matches Whether the tweet matches the user-level boolean filters
    *   (if any)
    * @param tweet The tweet itself.
@@ -979,7 +979,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           //  { case (url, count) => (url.replace("\\/", "/"), count) }
 
           ("success",
-            Tweet(if (opts.output_format == "raw") line else "",
+            Tweet(if (opts.output_format == "json") line else "",
               path, Seq(text), user, tweet_id.toLong, timestamp,
               timestamp, timestamp, lat, long, followers, following, lang, 1,
               user_mentions, retweets, hashtags, urls))
@@ -1753,7 +1753,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     errprint("ParseTweets: " + (opts.output_format match {
       case "corpus" =>
         "outputting tweets as a TextGrounder corpus"
-      case "raw" =>
+      case "json" =>
         "outputting tweets as raw JSON"
       case "stats" =>
         "outputting statistics on tweets"
@@ -1805,8 +1805,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     opts.output_format match {
-      case "raw" => {
-        /* If we're outputting raw, output the JSON of the tweet. */
+      case "json" => {
+        /* We're outputting JSON's directly. */
         persist(TextOutput.toTextFile(tweets.map(_.json), opts.output))
         rename_outfiles()
       }
