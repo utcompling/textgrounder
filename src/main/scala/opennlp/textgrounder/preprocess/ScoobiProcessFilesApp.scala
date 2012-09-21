@@ -29,8 +29,8 @@ import org.apache.log4j.{Level=>JLevel,_}
 import org.apache.hadoop.fs.{FileSystem => HFileSystem, Path, FileStatus}
 
 import com.nicta.scoobi.Scoobi._
-import com.nicta.scoobi.testing.HadoopLogFactory
-// import com.nicta.scoobi.application.HadoopLogFactory
+// import com.nicta.scoobi.testing.HadoopLogFactory
+import com.nicta.scoobi.application.HadoopLogFactory
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.osutil._
@@ -150,6 +150,9 @@ trait ScoobiProcessFilesAction {
 abstract class ScoobiProcessFilesApp[ParamType <: ScoobiProcessFilesParams]
     extends ScoobiApp with ScoobiProcessFilesAction {
 
+  // This is necessary to turn off the LibJars mechanism, which is somewhat
+  // buggy and interferes with assemblies.
+  override def upload = false
   def create_params(ap: ArgParser): ParamType
   val operation_category = "MainApp"
   def output_command_line_parameters(arg_parser: ArgParser) {
