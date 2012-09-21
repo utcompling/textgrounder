@@ -52,6 +52,15 @@ class ScoobiProcessFilesParams(val ap: ArgParser) {
    * signal that an error occurred.
    */
   def check_usage() {}
+
+  def non_default_params = {
+    for (name <- ap.argNames if (ap.specified(name))) yield
+      (name, ap(name))
+  }
+  def non_default_params_string = {
+    non_default_params.map {
+      case (param,x) => (param, "%s" format x) }
+  }
 }
 
 /**
