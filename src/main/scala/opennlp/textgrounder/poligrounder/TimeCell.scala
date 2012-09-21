@@ -60,84 +60,79 @@ class TimeCell(
     "%s/%s" format (format_time(from), format_interval(to - from))
 }
 
-/* 
-  We divide the earth's surface into "tiling cells", all of which are the
-  same square size, running on latitude/longitude lines, and which have a
-  constant number of degrees on a size, set using the value of the command-
-  line option --degrees-per-cell. (Alternatively, the value of --miles-per-cell
-  or --km-per-cell are converted into degrees using 'miles_per_degree' or
-  'km_per_degree', respectively, which specify the size of a degree at
-  the equator and is derived from the value for the Earth's radius.)
+/**
+ * Pair of intervals for comparing before and after for a particular class of
+ * tweets (e.g. those from liberal or conservative users).
+ */
+class TimeCellPair(
+  val category: String,
+  val before_chunk: (Long, Long),
+  val after_chunk: (Long, Long),
+  val grid: TimeCellGrid
+) {
+  val before_cell = new TimeCell(before_chunk._1, before_chunk._2, grid)
+  val after_cell = new TimeCell(after_chunk._1, after_chunk._2, grid)
 
-  In addition, we form a square of tiling cells in order to create a
-  "multi cell", which is used to compute a distribution over words.  The
-  number of tiling cells on a side of a multi cell is determined by
-  --width-of-multi-cell.  Note that if this is greater than 1, different
-  multi cells will overlap.
-
-  To specify a cell, we use cell indices, which are derived from
-  coordinates by dividing by degrees_per_cell.  Hence, if for example
-  degrees_per_cell is 2.0, then cell indices are in the range [-45,+45]
-  for latitude and [-90,+90) for longitude.  Correspondingly, to convert
-  cell index to a SphereCoord, we multiply latitude and longitude by
-  degrees_per_cell.
-
-  In general, an arbitrary coordinate will have fractional cell indices;
-  however, the cell indices of the corners of a cell (tiling or multi)
-  will be integers.  Cells are canonically indexed and referred to by
-  the index of the southwest corner.  In other words, for a given index,
-  the latitude or longitude of the southwest corner of the corresponding
-  cell (tiling or multi) is index*degrees_per_cell.  For a tiling cell,
-  the cell includes all coordinates whose latitude or longitude is in
-  the half-open interval [index*degrees_per_cell,
-  (index+1)*degrees_per_cell).  For a multi cell, the cell includes all
-  coordinates whose latitude or longitude is in the half-open interval
-  [index*degrees_per_cell, (index+width_of_multi_cell)*degrees_per_cell).
-
-  Near the edges, tiling cells may be truncated.  Multi cells will
-  wrap around longitudinally, and will still have the same number of
-  tiling cells, but may be smaller.
-  */
+  def find_best_cell_for_coord(coord: TimeCoord) = {
+    if (before_cell contains coord) {
+      if (debug("cell"))
+        errprint("Putting document with coord %s in category %s, before-chunk %s",
+          category,  coord, before_chunk)
+      before_cell
+    } else if (after_cell contains coord) {
+      if (debug("cell"))
+        errprint("Putting document with coord %s in category %s, after-chunk %s",
+          category, coord, after_chunk)
+      after_cell
+    } else {
+      if (debug("cell"))
+        errprint("Skipping document with category %s, coord %s because not in either before-chunk %s or after-chunk %s",
+          category, coord, before_chunk, after_chunk)
+      null
+    }
+  }
+}
 
 /**
  * Class for a "grid" of time intervals.
  */
 class TimeCellGrid(
-  from_chunk: (Long, Long),
-  to_chunk: (Long, Long),
+  before_chunk: (Long, Long),
+  after_chunk: (Long, Long),
+  categories: Seq[String],
+  category_of_doc: TimeDocument => String,
   override val table: TimeDocumentTable
 ) extends CellGrid[TimeCoord, TimeDocument, TimeCell](table) {
-  var total_num_cells = 2
-  val from_cell = new TimeCell(from_chunk._1, from_chunk._2, this)
-  val to_cell = new TimeCell(to_chunk._1, to_chunk._2, this)
+  
+  val pairs = categories.map {
+    x => (x, new TimeCellPair(x, before_chunk, after_chunk, this))
+  }.toMap
+  var total_num_cells = 2 * categories.length
 
-  def find_best_cell_for_coord(coord: TimeCoord,
+  def find_best_cell_for_document(doc: TimeDocument,
       create_non_recorded: Boolean) = {
     assert(!create_non_recorded)
-    if (from_cell contains coord) {
+    val category = category_of_doc(doc)
+    if (category != null)
+      pairs(category).find_best_cell_for_coord(doc.coord)
+    else {
       if (debug("cell"))
-        errprint("Putting document with coord %s in before-chunk %s", coord, from_chunk)
-      from_cell
-    } else if (to_cell contains coord) {
-      if (debug("cell"))
-        errprint("Putting document with coord %s in after-chunk %s", coord, to_chunk)
-      to_cell
-    } else {
-      if (debug("cell"))
-        errprint("Skipping document with coord %s because not in either before-chunk %s or after-chunk %s", coord, from_chunk, to_chunk)
+        errprint("Skipping document %s because not in any category", doc)
       null
     }
   }
 
   def add_document_to_cell(doc: TimeDocument) {
-    val cell = find_best_cell_for_coord(doc.coord, false)
+    val cell = find_best_cell_for_document(doc, false)
     if (cell != null)
       cell.add_document(doc)
   }
 
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false) = {
     for {
-      v <- List(from_cell, to_cell)
+      category <- categories
+      pair = pairs(category)
+      v <- List(pair.before_cell, pair.after_cell)
       val empty = (
         if (nonempty_word_dist) v.combined_dist.is_empty_for_word_dist()
         else v.combined_dist.is_empty())
@@ -146,25 +141,29 @@ class TimeCellGrid(
   }
 
   def initialize_cells() {
-    from_cell.finish()
-    to_cell.finish()
-    /* FIXME!!!
-      1. Should this be is_empty or is_empty_for_word_dist?  Do we even need
-         this distinction?
-      2. Computation of num_non_empty_cells should happen automatically!
-    */
-    if (!from_cell.combined_dist.is_empty_for_word_dist)
-      num_non_empty_cells += 1
-    if (!to_cell.combined_dist.is_empty_for_word_dist)
-      num_non_empty_cells += 1
-    for ((cell, name) <- Seq((from_cell, "from"), (to_cell, "to"))) {
-      val comdist = cell.combined_dist
-      errprint("Number of documents in %s-chunk: %s", name,
-        comdist.num_docs_for_word_dist)
-      errprint("Number of types in %s-chunk: %s", name,
-        comdist.word_dist.model.num_types)
-      errprint("Number of tokens in %s-chunk: %s", name,
-        comdist.word_dist.model.num_tokens)
+    for (category <- categories) {
+      val pair = pairs(category)
+      pair.before_cell.finish()
+      pair.after_cell.finish()
+      /* FIXME!!!
+        1. Should this be is_empty or is_empty_for_word_dist?  Do we even need
+           this distinction?
+        2. Computation of num_non_empty_cells should happen automatically!
+      */
+      if (!pair.before_cell.combined_dist.is_empty_for_word_dist)
+        num_non_empty_cells += 1
+      if (!pair.after_cell.combined_dist.is_empty_for_word_dist)
+        num_non_empty_cells += 1
+      for ((cell, name) <-
+          Seq((pair.before_cell, "before"), (pair.after_cell, "after"))) {
+        val comdist = cell.combined_dist
+        errprint("Number of documents in %s-chunk: %s", name,
+          comdist.num_docs_for_word_dist)
+        errprint("Number of types in %s-chunk: %s", name,
+          comdist.word_dist.model.num_types)
+        errprint("Number of tokens in %s-chunk: %s", name,
+          comdist.word_dist.model.num_tokens)
+      }
     }
   }
 }
@@ -173,24 +172,26 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
   type Item
   type Dist <: WordDist
 
+  def get_pair(grid: TimeCellGrid, category: String) =
+    grid.pairs(category)
   def get_dist(cell: TimeCell): Dist =
     cell.combined_dist.word_dist.asInstanceOf[Dist]
   def get_keys(dist: Dist) = dist.model.iter_keys.toSet
   def lookup_item(dist: Dist, item: Item): Double
   def format_item(item: Item): String
 
-  def compare_cells(grid: TimeCellGrid) {
-    val fromdist = get_dist(grid.from_cell)
-    val todist = get_dist(grid.to_cell)
+  def compare_cells(grid: TimeCellGrid, category: String) {
+    val before_dist = get_dist(get_pair(grid, category).before_cell)
+    val after_dist = get_dist(get_pair(grid, category).after_cell)
 
     val itemdiff =
       for {
-        rawitem <- get_keys(fromdist) ++ get_keys(todist)
+        rawitem <- get_keys(before_dist) ++ get_keys(after_dist)
         item = rawitem.asInstanceOf[Item]
-        p = lookup_item(fromdist, item)
-        q = lookup_item(todist, item)
+        p = lookup_item(before_dist, item)
+        q = lookup_item(after_dist, item)
         if p >= min_prob || q >= min_prob
-      } yield (item, fromdist.dunning_log_likelihood(item.asInstanceOf[fromdist.Item], todist), q - p)
+      } yield (item, before_dist.dunning_log_likelihood_2x1(item.asInstanceOf[before_dist.Item], after_dist), q - p)
 
     println("Items by log-likelihood:")
     for ((item, dunning, prob) <-
@@ -199,8 +200,8 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
         (format_float(dunning),
          format_item(item),
          if (prob > 0) "increase" else "decrease", format_float(prob),
-         format_float(lookup_item(fromdist, item)),
-         format_float(lookup_item(todist, item))
+         format_float(lookup_item(before_dist, item)),
+         format_float(lookup_item(after_dist, item))
        ))
     }
     println("")
@@ -216,8 +217,8 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
           diffs.toSeq.sortWith(_._3 > _._3).take(max_items)) {
         println("%s: %s - %s = %s%s (LL %s)" format
           (format_item(item),
-           format_float(lookup_item(fromdist, item)),
-           format_float(lookup_item(todist, item)),
+           format_float(lookup_item(before_dist, item)),
+           format_float(lookup_item(after_dist, item)),
            updown, format_float(prob),
            format_float(dunning)))
       }
@@ -226,6 +227,67 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
     print_diffs(diff_up, "increased", "+")
     print_diffs(diff_down, "decreased", "-")
 
+  }
+
+  def compare_cells_2way(grid: TimeCellGrid, category1: String,
+      category2: String) {
+    val before_dist_1 = get_dist(get_pair(grid, category1).before_cell)
+    val after_dist_1 = get_dist(get_pair(grid, category1).after_cell)
+    val before_dist_2 = get_dist(get_pair(grid, category2).before_cell)
+    val after_dist_2 = get_dist(get_pair(grid, category2).after_cell)
+
+    val itemdiff =
+      for {
+        rawitem <- get_keys(before_dist_1) ++ get_keys(after_dist_1) ++
+          get_keys(before_dist_2) ++ get_keys(after_dist_2)
+        item = rawitem.asInstanceOf[Item]
+        p1 = lookup_item(before_dist_1, item)
+        q1 = lookup_item(after_dist_1, item)
+        p2 = lookup_item(before_dist_2, item)
+        q2 = lookup_item(after_dist_2, item)
+        prob1 = q1 - p1
+        prob2 = q2 - p2
+        prob12 = prob1 + prob2
+        if p1 >= min_prob || q1 >= min_prob || p2 >= min_prob || q2 >= min_prob
+      } yield (item, before_dist_1.dunning_log_likelihood_2x2(
+          item.asInstanceOf[before_dist_1.Item],
+          after_dist_1, before_dist_2, after_dist_2),
+          p1, q1, p2, q2,
+          prob1, prob2, prob12
+        )
+
+    println("Items by log-likelihood:")
+    for ((item, dunning, p1, q1, p2, q2, prob1, prob2, prob12) <-
+        itemdiff.toSeq.sortWith(_._2 > _._2).take(max_items)) {
+      println("%7s: %-20s (%8s, %8s = %8s + %8s)" format
+        (format_float(dunning),
+         format_item(item),
+         if (prob12 > 0) "increase" else "decrease",
+         format_float(prob12),
+         format_float(prob1),
+         format_float(prob2)
+       ))
+    }
+    println("")
+
+    val diff_up = itemdiff filter (_._9 > 0) map (x => (x._1, x._2, x._9))
+    val diff_down = itemdiff filter (_._9 < 0) map (x => (x._1, x._2, x._9.abs))
+    def print_diffs(diffs: Iterable[(Item, Double, Double)],
+        incdec: String, updown: String) {
+      println("")
+      println("Items that %s in probability:" format incdec)
+      println("------------------------------------")
+      for ((item, dunning, prob) <-
+          diffs.toSeq.sortWith(_._3 > _._3).take(max_items)) {
+        println("%s = %s%s (LL %s)" format
+          (format_item(item),
+           updown, format_float(prob),
+           format_float(dunning)))
+      }
+      println("")
+    }
+    print_diffs(diff_up, "increased", "+")
+    print_diffs(diff_down, "decreased", "-")
   }
 }
 
@@ -249,14 +311,26 @@ class NgramComparer(min_prob: Double, max_items: Int) extends
 }
 
 object DistributionComparer {
-  def compare_cells(grid: TimeCellGrid, min_prob: Double, max_items: Int) {
-    grid.from_cell.combined_dist.word_dist match {
+  def get_comparer(grid: TimeCellGrid, category: String, min_prob: Double,
+      max_items: Int) =
+    grid.pairs(category).before_cell.combined_dist.word_dist match {
       case _: UnigramWordDist =>
-        new UnigramComparer(min_prob, max_items).compare_cells(grid)
+        new UnigramComparer(min_prob, max_items)
       case _: NgramWordDist =>
-        new NgramComparer(min_prob, max_items).compare_cells(grid)
+        new NgramComparer(min_prob, max_items)
       case _ => throw new IllegalArgumentException("Don't know how to compare this type of word distribution")
     }
+
+  def compare_cells(grid: TimeCellGrid, category: String, min_prob: Double,
+      max_items: Int) {
+    val comparer = get_comparer(grid, category, min_prob, max_items)
+    comparer.compare_cells(grid, category)
+  }
+
+  def compare_cells_2way(grid: TimeCellGrid, category1: String,
+      category2: String, min_prob: Double, max_items: Int) {
+    val comparer = get_comparer(grid, category1, min_prob, max_items)
+    comparer.compare_cells_2way(grid, category1, category2)
   }
 }
 

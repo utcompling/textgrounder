@@ -358,16 +358,16 @@ abstract class CellGrid[
   def begin_training_pass(pass: Int) = {}
 
   /**
-   * Find the correct cell for the given coordinates.  If no such cell
-   * exists, return null if `create` is false.  Else, create an empty
-   * cell to hold the coordinates -- but do *NOT* record the cell or
-   * otherwise alter the existing cell configuration.  This situation
-   * where such a cell is needed is during evaluation.  The cell is
-   * needed purely for comparing it against existing cells and determining
-   * its center.  The reason for not recording such cells is to make
-   * sure that future evaluation results aren't affected.
+   * Find the correct cell for the given document, based on the document's
+   * coordinates and other properties.  If no such cell exists, return null
+   * if `create` is false.  Else, create an empty cell to hold the
+   * coordinates -- but do *NOT* record the cell or otherwise alter the
+   * existing cell configuration.  This situation where such a cell is needed
+   * is during evaluation.  The cell is needed purely for comparing it against
+   * existing cells and determining its center.  The reason for not recording
+   * such cells is to make sure that future evaluation results aren't affected.
    */
-  def find_best_cell_for_coord(coord: TCoord, create_non_recorded: Boolean):
+  def find_best_cell_for_document(doc: TDoc, create_non_recorded: Boolean):
     TCell
 
   /**

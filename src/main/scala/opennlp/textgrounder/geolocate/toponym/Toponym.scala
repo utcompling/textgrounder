@@ -465,7 +465,7 @@ class TopoDocument(
       div.combined_dist
     } else {
       if (combined_dist == null) {
-        val cell = cell_grid.find_best_cell_for_coord(coord, false)
+        val cell = cell_grid.find_best_cell_for_document(this, false)
         if (cell != null)
           combined_dist = cell.combined_dist
         else {

@@ -114,12 +114,12 @@ class KdTreeCellGrid(table: SphereDocumentTable,
     }
   }
 
-  def find_best_cell_for_coord(coord: SphereCoord,
+  def find_best_cell_for_document(doc: SphereDocument,
       create_non_recorded: Boolean) = {
     // FIXME: implementation note: the KD tree should tile the entire earth's surface,
     // but there's a possibility of something going awry here if we've never
     // seen a evaluation point before.
-    leaves_to_cell(kdtree.getLeaf(Array(coord.lat, coord.long)))
+    leaves_to_cell(kdtree.getLeaf(Array(doc.coord.lat, doc.coord.long)))
   }
 
   /**

@@ -172,7 +172,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
       for {
         (cand, links) <- candlinks
         val cell = {
-          val retval = sphere_grid.find_best_cell_for_coord(cand.coord, false)
+          val retval = sphere_grid.find_best_cell_for_document(cand, false)
           if (retval == null)
             errprint("Strange, found no cell for candidate %s", cand)
           retval
