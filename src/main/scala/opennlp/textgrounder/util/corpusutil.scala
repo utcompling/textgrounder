@@ -536,6 +536,16 @@ package object corpusutil {
     }
 
     /**
+     * Locate and read the schema file of the appropriate suffix in the
+     * given directory.
+     */
+    def read_schema_from_corpus(filehand: FileHandler, dir: String,
+          suffix: String) = {
+      val schema_file = find_schema_file(filehand, dir, suffix)
+      Schema.read_schema_file(filehand, schema_file)
+    }
+
+    /**
      * Return a list of shell-style wildcard patterns matching all the document
      * files in the given directory with the given suffix (including compressed
      * files).
