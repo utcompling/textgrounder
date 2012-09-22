@@ -88,8 +88,8 @@ trait ScoobiProcessFilesAction {
       (lineno, fmt format (args: _*), line))
   }
 
-  def bump_counter(counter: String) {
-    incrCounter(full_operation_category, counter)
+  def bump_counter(counter: String, amount: Long = 1) {
+    incrCounter(full_operation_category, counter, amount)
   }
 
   /**
