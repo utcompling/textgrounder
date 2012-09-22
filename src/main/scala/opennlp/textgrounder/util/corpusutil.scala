@@ -158,16 +158,20 @@ package object corpusutil {
 
     val field_indices = fieldnames.zipWithIndex.toMap
 
+    def check_values_fit_schema(fieldvals: Seq[String]) {
+      if (fieldvals.length != fieldnames.length)
+        throw FileFormatException(
+          "Wrong-length line, expected %d fields, found %d: %s" format (
+            fieldnames.length, fieldvals.length, fieldvals))
+    }
+
     def get_field(fieldvals: Seq[String], key: String,
         error_if_missing: Boolean = true) =
       get_field_or_else(fieldvals, key, error_if_missing = error_if_missing)
 
     def get_field_or_else(fieldvals: Seq[String], key: String,
         default: String = null, error_if_missing: Boolean = false): String = {
-      if (fieldvals.length != fieldnames.length)
-        throw FileFormatException(
-          "Wrong-length line, expected %d fields, found %d: %s" format (
-            fieldnames.length, fieldvals.length, fieldvals))
+      check_values_fit_schema(fieldvals)
       if (field_indices contains key)
         fieldvals(field_indices(key))
       else
