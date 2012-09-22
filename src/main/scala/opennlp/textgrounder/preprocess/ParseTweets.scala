@@ -1039,11 +1039,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         } else if (status == "success") {
           maybe_counter("total tweets successfully parsed")
         } else {
-          maybe_counter("total tweets skipped")
+          maybe_counter("total tweet-related notices skipped during parsing")
         }
         tweet
       }
     }
+
 
     /**
      * Return true if this tweet is "valid" in that it doesn't have any
@@ -1053,9 +1054,13 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * use NaN or something to indicate a missing latitude or longitude).
      */
     def is_valid_tweet(tw: Tweet): Boolean = {
+      val valid =
       // filters out invalid tweets, as well as trivial spam
-      tw.id != 0 && tw.min_timestamp != 0 && tw.max_timestamp != 0 &&
-        tw.user != "" && !(tw.lat == 0.0 && tw.long == 0.0)
+        tw.id != 0 && tw.min_timestamp != 0 && tw.max_timestamp != 0 &&
+          tw.user != "" && !(tw.lat == 0.0 && tw.long == 0.0)
+      if (!valid)
+        maybe_counter("tweets skipped due to invalid fields")
+      valid
     }
 
     /**
@@ -1074,7 +1079,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      */
     def tweet_once(id_tweets: (TweetID, Iterable[Tweet])) = {
       val (id, tweets) = id_tweets
-      tweets.head
+      val head = tweets.head
+      val skipped = tweets.tail.toSeq.length
+      if (skipped > 0)
+        maybe_counter("duplicate tweets skipped", skipped)
+      head
     }
 
     lazy val filter_tweets_ast =
@@ -1101,6 +1110,11 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     def filter_tweets(values: DList[Tweet]) =
       filter_duplicates(values).filter(x => filter_tweet_by_tweet_filters(x))
 
+    def note_remaining_tweets(tweet: Tweet) = {
+      maybe_counter("tweets remaining after filtering and uniquifying")
+      true
+    }
+
     /**
      * Parse a set of JSON-formatted tweets.  Input is (path, JSON).
      */
@@ -1112,7 +1126,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       /* Filter duplicates, invalid tweets, tweets not matching any
          tweet-level boolean filters. (User-level boolean filters get
          applied later.) */
-      filter_tweets(values_extracted.filter(is_valid_tweet))
+      val good_tweets = filter_tweets(values_extracted.filter(is_valid_tweet))
+
+      good_tweets.filter(note_remaining_tweets)
     }
   }
 
@@ -1215,7 +1231,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * and longitude.
      */
     def has_latlong(tw: Tweet) = {
-      !isNaN(tw.lat) && !isNaN(tw.long)
+      val good = !isNaN(tw.lat) && !isNaN(tw.long)
+      if (!good)
+        bump_counter("grouped tweets filtered due to missing lat/long")
+      good
     }
 
     val MAX_NUMBER_FOLLOWING = 1000
@@ -1239,14 +1258,16 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * this is backwards?
      */
     def is_nonspammer(tw: Tweet): Boolean = {
-      val retval =
+      val good =
         (tw.following >= MIN_NUMBER_FOLLOWING &&
            tw.following <= MAX_NUMBER_FOLLOWING) &&
         (tw.followers >= MIN_NUMBER_FOLLOWERS) &&
         (tw.numtweets >= opts.min_tweets && tw.numtweets <= opts.max_tweets)
-      if (opts.debug && retval == false)
+      if (opts.debug && !good)
         logger.info("Rejecting is_nonspammer %s" format tw)
-      retval
+      if (!good)
+        bump_counter("grouped tweets filtered due to failing following, followers, or min/max tweets restrictions")
+      good
     }
 
     // bounding box for north america
@@ -1260,11 +1281,13 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * bounding box fo North America.
      */
     def northamerica_only(tw: Tweet): Boolean = {
-      val retval = (tw.lat >= MIN_LAT && tw.lat <= MAX_LAT) &&
-                   (tw.long >= MIN_LNG && tw.long <= MAX_LNG)
-      if (opts.debug && retval == false)
+      val good = (tw.lat >= MIN_LAT && tw.lat <= MAX_LAT) &&
+                 (tw.long >= MIN_LNG && tw.long <= MAX_LNG)
+      if (opts.debug && !good)
         logger.info("Rejecting northamerica_only %s" format tw)
-      retval
+      if (!good)
+        bump_counter("grouped tweets filtered due to outside North America")
+      good
     }
 
     def is_good_geo_tweet(tw: Tweet): Boolean = {
@@ -1273,6 +1296,13 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       has_latlong(tw) &&
       is_nonspammer(tw) &&
       northamerica_only(tw)
+    }
+
+    def matches_group_filters(key_r: (String, Record)) = {
+      val (key, r) = key_r
+      if (!r.matches)
+        bump_counter("grouped tweets filtered by group-level filters")
+      r.matches
     }
 
     def apply(tweets: DList[Tweet]) = {
@@ -1286,7 +1316,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
                                 // key and group-level filter result)
         groupBy(_.key).         // group on grouping key
         combine(merge_records). // merge value tweet records
-        filter(_._2.matches).   // apply group-level user filters
+        filter(matches_group_filters). // apply group-level user filters
         map(_._2.tweet)         // convert back to Tweet
 
       // If grouping by user, filter the tweet combinations, removing users
