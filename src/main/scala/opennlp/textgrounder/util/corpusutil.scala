@@ -897,12 +897,11 @@ package object corpusutil {
   }
 
   object Encoder {
-    def count_map(x: Map[String, Int]) = encode_word_count_map(x.toSeq)
-    def count_map_seq(x: collection.Seq[(String, Int)]) =
-      encode_word_count_map(x)
+    def count_map(x: collection.Map[String, Int]) = encode_word_count_map(x.toSeq)
+    def count_map_seq(x: collection.Seq[(String, Int)]) = encode_word_count_map(x)
     def string(x: String) = encode_string_for_whole_field(x)
     def string_in_seq(x: String) = encode_string_for_sequence_field(x)
-    def seq_string(x: Seq[String]) =
+    def seq_string(x: collection.Seq[String]) =
       x.map(encode_string_for_sequence_field) mkString ">>"
     def timestamp(x: Long) = x.toString
     def long(x: Long) = x.toString
