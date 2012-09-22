@@ -439,7 +439,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   /**
    * A generic action in the ParseTweets app.
    */
-  abstract class ParseTweetsAction extends ScoobiProcessFilesAction {
+  trait ParseTweetsAction extends ScoobiProcessFilesAction {
     val progname = "ParseTweets"
 
     def create_parser(expr: String, foldcase: Boolean) = {
