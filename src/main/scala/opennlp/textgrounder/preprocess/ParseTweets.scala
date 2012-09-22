@@ -23,6 +23,7 @@ import collection.mutable
 
 import java.io._
 import java.lang.Double.isNaN
+import Double.NaN
 import java.text.{SimpleDateFormat, ParseException}
 import java.util.Date
 
@@ -681,7 +682,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       }
       val tweet =
         Tweet("", "", Seq(text), "user", 0, timestamp, timestamp,
-          timestamp, Double.NaN, Double.NaN, 0, 0, "unknown", 1,
+          timestamp, NaN, NaN, 0, 0, "unknown", 1,
           Map[String, Int](), Map[String, Int](),
           Map[String, Int](), Map[String, Int]())
       test(args(0), tweet)
@@ -890,7 +891,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           val lang = force_string(parsed, "user", "lang")
           val (lat, long) =
             if ((parsed \ "coordinates" \ "type" values).toString != "Point") {
-              (Double.NaN, Double.NaN)
+              (NaN, NaN)
             } else {
               val latlong: List[Number] =
                 (parsed \ "coordinates" \ "coordinates" values).
