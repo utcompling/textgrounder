@@ -402,7 +402,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       ) mkString "\t"
   }
 
-  object Tweet {
+  object Tweet extends ParseTweetsAction {
+    val operation_category = "Tweet"
+
     def row_fields_always =
       Seq("user", "id", "path", "min-timestamp", "max-timestamp",
         "geo-timestamp", "coord", "followers", "following", "lang",
