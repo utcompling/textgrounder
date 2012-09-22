@@ -693,9 +693,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     val operation_category = "Parse"
 
-    def maybe_counter(counter: String) {
+    def maybe_counter(counter: String, amount: Long = 1) {
       if (set_counters)
-        bump_counter(counter)
+        bump_counter(counter, amount)
     }
 
     // Used internally to force an exit when a problem in parse_json_lift
