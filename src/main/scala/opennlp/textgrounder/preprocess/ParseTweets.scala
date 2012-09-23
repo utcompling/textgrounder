@@ -55,15 +55,21 @@ class ParseTweetsParams(ap: ArgParser) extends
     directly, after duplicated tweets have been removed).  Default is
     `user` when `--ouput-format=corpus`, and `none` otherwise.""")
   var input_format = ap.option[String]("input-format", "if",
-    choices = Seq("corpus", "json"),
+    choices = Seq("json", "corpus", "raw-lines"),
     default = "json",
     help="""Format for input of tweets.  Possibilities are
     
+    -- `json` (Read in JSON-formatted tweets.)
+    
     -- `corpus` (Read in a TextGrounder-style corpus, i.e. as a simple database
     with one record per line, fields separated by TAB characters, and a
-    schema indicating the names of the columns.)
+    schema indicating the names of the columns.  Typically this will result
+    from a previous run of ParseTweets using the default corpus output format.)
   
-    -- `json` (Read in  JSON-formatted tweets.)""")
+    -- `raw-lines` (Read in lines of raw text and treat them as "tweets".  The
+    tweets will have no useful information in them except for the text and
+    file name, but this can still be useful for things like generating n-grams.)
+    """)
   var output_format = ap.option[String]("output-format", "of",
     choices = Seq("corpus", "stats", "json"),
     default = "corpus",
@@ -446,7 +452,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       var followers = 0
       var following = 0
       var lang = ""
-      var numtweets = 0
+      var numtweets = 1
       var user_mentions = Map[String, Int]()
       var retweets = Map[String, Int]()
       var hashtags = Map[String, Int]()
@@ -491,6 +497,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       Tweet(json, path, text, user, id, min_timestamp, max_timestamp,
         geo_timestamp, lat, long, followers, following, lang, numtweets,
         user_mentions, retweets, hashtags, urls)
+    }
+
+    def from_raw_text(path: String, text: String) = {
+      Tweet("", path, Seq(text), "", 0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "",
+        1, Map[String, Int](), Map[String, Int](),
+        Map[String, Int](), Map[String, Int]())
     }
   }
   implicit val tweetWire = mkCaseWireFormat(Tweet.apply _, Tweet.unapply _)
@@ -1107,6 +1119,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       else {
         maybe_counter("total tweets parsed")
         val (status, tweet) = opts.input_format match {
+          case "raw-lines" => ("success", Tweet.from_raw_text(path, line))
           case "json" => parse_json_lift(path, line)
           case "corpus" =>
             error_wrap(line, ("error", null: Tweet)) { line =>
@@ -1904,7 +1917,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
             filehand, opts.input, insuffix)
           TextInput.fromTextFileWithPath(matching_patterns: _*)
         }
-        case "json" => TextInput.fromTextFileWithPath(opts.input)
+        case "json" | "raw-lines"  => TextInput.fromTextFileWithPath(opts.input)
       }
     }
 
