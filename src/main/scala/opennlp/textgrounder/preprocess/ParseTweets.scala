@@ -187,24 +187,53 @@ Look for any tweets containing the word "clinton" as well as either the words
     
     1. A field name, meaning to include that field
 
-    2. A field name with a preceding - sign, meaning to exclude that field
+    2. A field set, meaning to include those fields; currently the recognized
+       sets are 'big-fields' (fields that may become arbitrarily large,
+       including 'user-mentions', 'retweets', 'hashtags', 'urls', 'text',
+       'count') and 'small-fields' (all remaining fields).
+
+    3. A field name or field set with a preceding + sign, same as if the
+       + sign were omitted.
+
+    4. A field name or field set with a preceding - sign, meaning to exclude
+       the respective field(s).
     
-    3. The directive 'all', meaning to include all fields, canceling any
+    5. The directive 'all', meaning to include all fields, canceling any
        previous directives.
     
-    4. The directive 'none', meaning to include no fields, canceling any
+    6. The directive 'none', meaning to include no fields, canceling any
        previous directives.
     
-    5. The directive 'default', meaning to set the current fields to output
+    7. The directive 'default', meaning to set the current fields to output
        to the default (which may vary depending on other settings), canceling
        any previous directives.
     
-    Currently, some fields are always output, and not subject to
-    modification through this setting.
+    Currently recognized fields:
 
-    Currently recognized optional fields:
+    'path': Path of file that the tweet came from
 
-    'user-mentions': List of users mentioned, along with counts
+    'user': User name
+
+    'id': Tweet ID
+
+    'min-timestamp': Earliest timestamp
+
+    'max-timestamp': Latest timestamp
+
+    'geo-timestamp': Earliest timestamp of tweet with corresponding location
+
+    'coord': Best latitude/longitude pair (corresponding to earliest tweet),
+      separated by a comma
+
+    'followers': Max followers
+
+    'following': Max following
+
+    'lang': Language used
+
+    'numtweets': Number of tweets merged
+
+    'user-mentions': List of @-mentions of users, along with counts
 
     'retweets': List of users from which tweets were retweeted, with counts
 
@@ -212,13 +241,17 @@ Look for any tweets containing the word "clinton" as well as either the words
 
     'urls': List of URL's, with counts
 
-    'text': Actual text of all tweets
+    'text': Actual text of all tweets, separate by >> signs
 
     'counts': All words, with counts
 
-    The default for all types of grouping except 'file' is to include
-    everything.  For 'file', none of the above fields are included by
-    default.""")
+    The default is as follows:
+    
+    1. For --input-format=raw-lines, include only 'path', 'numtweets',
+       'text' and 'counts'. (Only these fields are meaningful.)
+    2. Else, for --grouping=file, all small fields.
+    3. Else everything.
+""")
   var filter_groups = ap.option[String]("filter-groups",
     help="""Boolean expression used to filter on the grouped-tweet level.
   This is like `--filter-tweets` but filters groups of tweets (grouped
@@ -245,37 +278,66 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     help="""Maximum number of tweets per user for user to be accepted in
     --by-user mode.""")
 
+  import ParseTweets.Tweet
+
+  private def match_field(field: String) =
+    if (Tweet.all_fields contains field)
+      Some(Seq(field))
+    else if (field == "big-fields")
+      Some(Tweet.big_fields)
+    else if (field == "small-fields")
+      Some(Tweet.small_fields)
+    else
+      None
+
+  private object Field {
+    def unapply(spec: String) = {
+      if (spec.length > 0 && spec.head == '+')
+        match_field(spec.tail)
+      else
+        match_field(spec)
+    }
+  }
+
+  private object NegField {
+    def unapply(spec: String) = {
+      if (spec.length > 0 && spec.head == '-')
+        match_field(spec.tail)
+      else
+        None
+    }
+  }
+
   def parse_output_fields(fieldspec: String) = {
     val directives = fieldspec.split("[ ,]")
-    val optfields = mutable.LinkedHashSet[String]()
+    val incfields = mutable.LinkedHashSet[String]()
     for (direc <- Array("default") ++ directives) {
       direc match {
         case "default" => {
-          optfields.clear()
-          optfields ++= ParseTweets.Tweet.default_optional_fields(this)
+          incfields.clear()
+          incfields ++= ParseTweets.Tweet.default_fields(this)
         }
         case "all" => {
-          optfields.clear()
-          optfields ++= ParseTweets.Tweet.all_optional_fields
+          incfields.clear()
+          incfields ++= ParseTweets.Tweet.all_fields
         }
         case "none" => {
-          optfields.clear()
+          incfields.clear()
         }
-        case x if ParseTweets.Tweet.all_optional_fields contains x => {
-          optfields += x
+        case Field(fields) => {
+          incfields ++= fields
         }
-        case x if x.length > 0 && x(0) == '-' &&
-            (ParseTweets.Tweet.all_optional_fields contains x.tail) => {
-          optfields -= x.tail
+        case NegField(fields) => {
+          incfields --= fields
         }
         case x => { ap.usageError(
           "Unrecognized directive '%s' in --output-fields" format x)
         }
       }
     }
-    optfields.toSeq
+    incfields.toSeq
   }
-  var optional_fields: Seq[String] = _
+  var included_fields: Seq[String] = _
   var input_schema: Schema = _
 
   override def check_usage() {
@@ -284,7 +346,7 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
       grouping = if (output_format == "corpus") "user" else "none"
     if (output_format == "json" && grouping != "none")
       ap.usageError("`json` output format only allowed when `--grouping=none`")
-    optional_fields = parse_output_fields(output_fields)
+    included_fields = parse_output_fields(output_fields)
   }
 }
 
@@ -374,35 +436,27 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
        -- TweetFilterParser.main() below
     */
   ) {
-    def to_row_always = {
-      import Encoder.{long => elong, _}
-      // Latitude/longitude need to be combined into a single field, but only
-      // if both actually exist.
-      val latlongstr =
-        if (!isNaN(lat) && !isNaN(long)) "%s,%s" format (lat, long)
-        else ""
-      // Drop key.
-      Seq(
-        string(user),
-        elong(id),
-        string(path),
-        timestamp(min_timestamp),
-        timestamp(max_timestamp),
-        timestamp(geo_timestamp),
-        latlongstr,
-        int(followers),
-        int(following),
-        string(lang),
-        int(numtweets)
-      )
-    }
-
-    def to_row_optional(tokenize_act: TokenizeCountAndFormat,
-        include_fields: Seq[String]) = {
+    def to_row(tokenize_act: TokenizeCountAndFormat, opts: ParseTweetsParams) = {
       import Encoder.{long => elong, _}
       val optfields = mutable.Buffer[String]()
-      for (field <- include_fields) {
+      for (field <- opts.included_fields) {
         val fieldval = field match {
+          case "user" => string(user)
+          case "id" => elong(id)
+          case "path" => string(path)
+          case "min-timestamp" => timestamp(min_timestamp)
+          case "max-timestamp" => timestamp(max_timestamp)
+          case "geo-timestamp" => timestamp(geo_timestamp)
+          case "coord" => {
+            // Latitude/longitude need to be combined into a single field,
+            // but only if both actually exist.
+            if (!isNaN(lat) && !isNaN(long)) "%s,%s" format (lat, long)
+            else ""
+          }
+          case "followers" => int(followers)
+          case "following" => int(following)
+          case "lang" => string(lang)
+          case "numtweets" => int(numtweets)
           case "user-mentions" => count_map(user_mentions)
           case "retweets" => count_map(retweets)
           case "hashtags" => count_map(hashtags)
@@ -412,31 +466,33 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         }
         optfields += fieldval
       }
-      optfields.toSeq
+      optfields.toSeq mkString "\t"
     }
-
-    def to_row(tokenize_act: TokenizeCountAndFormat, opts: ParseTweetsParams) =
-      (to_row_always ++ to_row_optional(tokenize_act, opts.optional_fields)
-      ) mkString "\t"
   }
 
   object Tweet extends ParseTweetsAction {
     val operation_category = "Tweet"
 
-    def row_fields_always =
+    val small_fields =
       Seq("user", "id", "path", "min-timestamp", "max-timestamp",
         "geo-timestamp", "coord", "followers", "following", "lang",
         "numtweets")
 
-    val all_optional_fields =
+    val big_fields =
       Seq("user-mentions", "retweets", "hashtags", "urls", "text", "counts")
-    def default_optional_fields(opts: ParseTweetsParams) = {
-      if (opts.grouping == "file") Seq[String]()
-      else all_optional_fields
+
+    val all_fields = small_fields ++ big_fields
+
+    def default_fields(opts: ParseTweetsParams) = {
+      if (opts.input_format == "raw-lines")
+        Seq("path", "numtweets", "text", "counts")
+      else if (opts.grouping == "file")
+        small_fields
+      else
+        all_fields
     }
 
-    def row_fields(opts: ParseTweetsParams) =
-      row_fields_always ++ opts.optional_fields
+    def row_fields(opts: ParseTweetsParams) = opts.included_fields
 
     def from_row(schema: Schema, fields: Seq[String]) = {
       var json = ""
@@ -1296,24 +1352,23 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val numtweets = t1.numtweets + t2.numtweets
       // Avoid computing stuff we will never use
       val text =
-        if (opts.optional_fields contains "text")
+        if (opts.included_fields contains "text")
           t1.text ++ t2.text
         else Seq[String]()
-      val empty_map = Map[String, Int]()
       val user_mentions =
-        if (opts.optional_fields contains "user-mentions")
+        if (opts.included_fields contains "user-mentions")
           combine_maps(t1.user_mentions, t2.user_mentions)
         else empty_map
       val retweets =
-        if (opts.optional_fields contains "retweets")
+        if (opts.included_fields contains "retweets")
           combine_maps(t1.retweets, t2.retweets)
         else empty_map
       val hashtags =
-        if (opts.optional_fields contains "hashtags")
+        if (opts.included_fields contains "hashtags")
           combine_maps(t1.hashtags, t2.hashtags)
         else empty_map
       val urls =
-        if (opts.optional_fields contains "urls")
+        if (opts.included_fields contains "urls")
           combine_maps(t1.urls, t2.urls)
         else empty_map
 
