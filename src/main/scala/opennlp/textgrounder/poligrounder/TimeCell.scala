@@ -180,7 +180,7 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
   def lookup_item(dist: Dist, item: Item): Double
   def format_item(item: Item): String
 
-  def compare_cells(grid: TimeCellGrid, category: String) {
+  def compare_cells_2way(grid: TimeCellGrid, category: String) {
     val before_dist = get_dist(get_pair(grid, category).before_cell)
     val after_dist = get_dist(get_pair(grid, category).after_cell)
 
@@ -193,7 +193,7 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
         if p >= min_prob || q >= min_prob
       } yield (item, before_dist.dunning_log_likelihood_2x1(item.asInstanceOf[before_dist.Item], after_dist), q - p)
 
-    println("Items by log-likelihood:")
+    println("Items by log-likelihood for category '%s':" format category)
     for ((item, dunning, prob) <-
         itemdiff.toSeq.sortWith(_._2 > _._2).take(max_items)) {
       println("%7s: %-20s (%8s, %8s = %8s - %8s)" format
@@ -229,7 +229,7 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
 
   }
 
-  def compare_cells_2way(grid: TimeCellGrid, category1: String,
+  def compare_cells_4way(grid: TimeCellGrid, category1: String,
       category2: String) {
     val before_dist_1 = get_dist(get_pair(grid, category1).before_cell)
     val after_dist_1 = get_dist(get_pair(grid, category1).after_cell)
@@ -248,35 +248,44 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
         prob1 = q1 - p1
         prob2 = q2 - p2
         prob12 = prob1 + prob2
+        prob12diff = prob1 - prob2
         if p1 >= min_prob || q1 >= min_prob || p2 >= min_prob || q2 >= min_prob
       } yield (item, before_dist_1.dunning_log_likelihood_2x2(
           item.asInstanceOf[before_dist_1.Item],
           after_dist_1, before_dist_2, after_dist_2),
           p1, q1, p2, q2,
-          prob1, prob2, prob12
+          prob1, prob2, prob12, prob12diff
         )
 
-    println("Items by log-likelihood:")
-    for ((item, dunning, p1, q1, p2, q2, prob1, prob2, prob12) <-
+    val cat13 = category1.slice(0,3)
+    val cat23 = category2.slice(0,3)
+    val cat18 = category1.slice(0,8)
+    val cat28 = category2.slice(0,8)
+    println("%29s +%3s-%3s = %8s - %8s; %8s %8s" format (
+      "Items by 4-way log-likelihood:", cat13, cat23, cat18, cat28,
+      "overall", "change"))
+    for ((item, dunning, p1, q1, p2, q2, prob1, prob2, prob12, prob12diff) <-
         itemdiff.toSeq.sortWith(_._2 > _._2).take(max_items)) {
-      println("%7s: %-20s (%8s, %8s = %8s + %8s)" format
+      println("%7s: %-20s %8s = %8s - %8s; %8s %8s" format
         (format_float(dunning),
          format_item(item),
-         if (prob12 > 0) "increase" else "decrease",
-         format_float(prob12),
+         format_float(prob12diff),
          format_float(prob1),
-         format_float(prob2)
+         format_float(prob2),
+         if (prob12 > 0) "increase" else "decrease",
+         format_float(prob12)
        ))
     }
     println("")
 
-    val diff_up = itemdiff filter (_._9 > 0) map (x => (x._1, x._2, x._9))
-    val diff_down = itemdiff filter (_._9 < 0) map (x => (x._1, x._2, x._9.abs))
+    val diff_cat1 = itemdiff filter (_._10 > 0) map (x => (x._1, x._2, x._10))
+    val diff_cat2 = itemdiff filter (_._10 < 0) map (x => (x._1, x._2, x._10.abs))
     def print_diffs(diffs: Iterable[(Item, Double, Double)],
-        incdec: String, updown: String) {
+        category: String, updown: String) {
       println("")
-      println("Items that %s in probability:" format incdec)
-      println("------------------------------------")
+      println("Items with greatest difference leaning towards %8s:"
+        format category)
+      println("----------------------------------------------------------")
       for ((item, dunning, prob) <-
           diffs.toSeq.sortWith(_._3 > _._3).take(max_items)) {
         println("%s = %s%s (LL %s)" format
@@ -286,8 +295,12 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
       }
       println("")
     }
-    print_diffs(diff_up, "increased", "+")
-    print_diffs(diff_down, "decreased", "-")
+    print_diffs(diff_cat1, category1, "+")
+    print_diffs(diff_cat2, category2, "-")
+    println("")
+    compare_cells_2way(grid, category1)
+    println("")
+    compare_cells_2way(grid, category2)
   }
 }
 
@@ -321,16 +334,16 @@ object DistributionComparer {
       case _ => throw new IllegalArgumentException("Don't know how to compare this type of word distribution")
     }
 
-  def compare_cells(grid: TimeCellGrid, category: String, min_prob: Double,
+  def compare_cells_2way(grid: TimeCellGrid, category: String, min_prob: Double,
       max_items: Int) {
     val comparer = get_comparer(grid, category, min_prob, max_items)
-    comparer.compare_cells(grid, category)
+    comparer.compare_cells_2way(grid, category)
   }
 
-  def compare_cells_2way(grid: TimeCellGrid, category1: String,
+  def compare_cells_4way(grid: TimeCellGrid, category1: String,
       category2: String, min_prob: Double, max_items: Int) {
     val comparer = get_comparer(grid, category1, min_prob, max_items)
-    comparer.compare_cells_2way(grid, category1, category2)
+    comparer.compare_cells_4way(grid, category1, category2)
   }
 }
 
