@@ -278,22 +278,26 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
     }
     println("")
 
+    type ItemDunProb = (Item, Double, Double)
     val diff_cat1 = itemdiff filter (_._10 > 0) map (x => (x._1, x._2, x._10))
     val diff_cat2 = itemdiff filter (_._10 < 0) map (x => (x._1, x._2, x._10.abs))
-    def print_diffs(diffs: Iterable[(Item, Double, Double)],
+    def print_diffs(diffs: Iterable[ItemDunProb],
         category: String, updown: String) {
-      println("")
-      println("Items with greatest difference leaning towards %8s:"
-        format category)
-      println("----------------------------------------------------------")
-      for ((item, dunning, prob) <-
-          diffs.toSeq.sortWith(_._3 > _._3).take(max_items)) {
-        println("%s = %s%s (LL %s)" format
-          (format_item(item),
-           updown, format_float(prob),
-           format_float(dunning)))
+      def print_diffs_1(msg: String,
+          comparefun: (ItemDunProb, ItemDunProb) => Boolean) {
+        println("")
+        println("%s leaning towards %8s:" format (msg, category))
+        println("----------------------------------------------------------")
+        for ((item, dunning, prob) <-
+            diffs.toSeq.sortWith(comparefun).take(max_items)) {
+          println("%s = %s%s (LL %s)" format
+            (format_item(item),
+             updown, format_float(prob),
+             format_float(dunning)))
+        }
       }
-      println("")
+      print_diffs_1("Items by log-likelihood with difference", _._2 > _._2)
+      print_diffs_1("Items with greatest difference", _._3 > _._3)
     }
     print_diffs(diff_cat1, category1, "+")
     print_diffs(diff_cat2, category2, "-")
