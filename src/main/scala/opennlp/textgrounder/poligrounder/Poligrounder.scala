@@ -225,10 +225,11 @@ class PoligrounderDriver extends
 
   def run_after_setup() {
     if (params.ideological_user_corpus == null)
-      DistributionComparer.compare_cells(cell_grid.asInstanceOf[TimeCellGrid],
-        "all", params.min_prob, params.max_items)
-    else
       DistributionComparer.compare_cells_2way(
+        cell_grid.asInstanceOf[TimeCellGrid], "all",
+        params.min_prob, params.max_items)
+    else
+      DistributionComparer.compare_cells_4way(
         cell_grid.asInstanceOf[TimeCellGrid], "liberal", "conservative",
         params.min_prob, params.max_items)
   }
