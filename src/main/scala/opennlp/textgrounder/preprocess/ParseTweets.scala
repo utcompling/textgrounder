@@ -382,6 +382,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
   type Timestamp = Long
 
+  val empty_map = Map[String, Int]()
+
   /**
    * Data for a tweet or grouping of tweets.
    *
@@ -509,10 +511,10 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       var following = 0
       var lang = ""
       var numtweets = 1
-      var user_mentions = Map[String, Int]()
-      var retweets = Map[String, Int]()
-      var hashtags = Map[String, Int]()
-      var urls = Map[String, Int]()
+      var user_mentions = empty_map
+      var retweets = empty_map
+      var hashtags = empty_map
+      var urls = empty_map
 
       import Decoder.{long => dlong,_}
       schema.check_values_fit_schema(fields)
@@ -557,8 +559,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     def from_raw_text(path: String, text: String) = {
       Tweet("", path, Seq(text), "", 0L, 0L, 0L, 0L, NaN, NaN, 0, 0, "",
-        1, Map[String, Int](), Map[String, Int](),
-        Map[String, Int](), Map[String, Int]())
+        1, empty_map, empty_map,
+        empty_map, empty_map)
     }
   }
   implicit val tweetWire = mkCaseWireFormat(Tweet.apply _, Tweet.unapply _)
@@ -823,8 +825,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       val tweet =
         Tweet("", "", Seq(text), "user", 0, timestamp, timestamp,
           timestamp, NaN, NaN, 0, 0, "unknown", 1,
-          Map[String, Int](), Map[String, Int](),
-          Map[String, Int](), Map[String, Int]())
+          empty_map, empty_map, empty_map, empty_map)
       test(args(0), tweet)
     }
   }
