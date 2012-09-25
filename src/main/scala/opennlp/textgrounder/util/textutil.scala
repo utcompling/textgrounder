@@ -70,9 +70,18 @@ package object textutil {
     with_commas(intpart) + ("%.2f" format fracpart).drop(1)
   }
 
-  // Try to format something with reasonable precision.
-  def format_float(x: Double) = {
-    var precision = 2
+  /**
+   * Try to format a floating-point number using %f style (i.e. avoding
+   * scientific notation) and with a fixed number of significant digits
+   * after the decimal point.
+   *
+   * @param sigdigits Number of significant digits after decimal point
+   *   to display.
+   * @param include_plus If true, include a + sign before positive numbers.
+   */
+  def format_float(x: Double, sigdigits: Int = 2,
+      include_plus: Boolean = false) = {
+    var precision = sigdigits
     if (x != 0) {
       var xx = abs(x)
       while (xx < 0.1) {
@@ -80,7 +89,8 @@ package object textutil {
         precision += 1
       }
     }
-    val formatstr = "%%.%sf" format precision
+    val formatstr =
+      "%%%s.%sf" format (if (include_plus) "+" else "", precision)
     formatstr format x
   }
 
