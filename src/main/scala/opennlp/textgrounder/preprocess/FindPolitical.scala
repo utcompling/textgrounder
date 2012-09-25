@@ -40,6 +40,16 @@ class FindPoliticalParams(ap: ArgParser) extends
     "political-twitter-accounts", "pta",
     help="""File containing list of politicians and associated twitter
     accounts, for identifying liberal and conservative tweeters.""")
+  var political_twitter_accounts_format = ap.option[String](
+    "political-twitter-accounts-format", "ptaf",
+    default = "officeholders",
+    choices = Seq("officeholders", "ideo-users"),
+    help="""Format for file specified in --political-twitter-accounts.
+    Possibilities: 'officeholders' (a file containing data gleaned from
+    the Internet, specifying holders of political offices and their parties),
+    'ideo-users' (output from a previous run of FindPolitical, in
+    TextGrounder corpus format, with ideology identified by a numeric
+    score).""")
   var min_accounts = ap.option[Int]("min-accounts", default = 2,
     help="""Minimum number of political accounts referenced by Twitter users
     in order for users to be considered.  Default %default.""")
@@ -86,6 +96,21 @@ class FindPoliticalParams(ap: ArgParser) extends
     // maybe a function.
   // Schema for the input file, after file read
   var schema: Schema = _
+}
+
+/**
+ * A simple field-text file processor that just records the users and ideology.
+ *
+ * @param suffix Suffix used to select document metadata files in a directory
+ */
+class IdeoUserFileProcessor extends
+    CorpusFieldFileProcessor[(String, Double)]("ideo-users") {
+  def handle_row(fieldvals: Seq[String]) = {
+    val user = schema.get_field(fieldvals, "user")
+    val ideology =
+      schema.get_field(fieldvals, "ideology").toDouble
+    Some((user.toLowerCase, ideology))
+  }
 }
 
 object FindPolitical extends
@@ -369,6 +394,16 @@ object FindPolitical extends
       all_accounts.flatten.toSeq.reverse.toMap
     }
 
+    /**
+     * Convert map of accounts-&gt;politicos to accounts-&gt;ideology
+     */
+    def politico_accounts_map_to_ideo_users_map(
+        accounts: Map[String, Politico]) = {
+      accounts.
+        filter { case (string, politico) => "DR".contains(politico.party) }.
+        map { case (string, politico) =>
+          (string, politico.party match { case "D" => 0.0; case "R" => 1.0 }) }
+    }
 
     /*
      2. We go through users looking for references to these politicians.  For
@@ -422,8 +457,19 @@ object FindPolitical extends
       val (_, last_component) = filehand.split_filename(opts.input)
       opts.corpus_name = last_component.replace("*", "_")
     }
-    val accounts = ptp.read_ideological_accounts(opts.political_twitter_accounts)
+    var accounts: Map[String, Double] =
+      if (opts.political_twitter_accounts_format == "officeholders") {
+        val politico_accounts =
+          ptp.read_ideological_accounts(opts.political_twitter_accounts)
+        ptp.politico_accounts_map_to_ideo_users_map(politico_accounts)
+      }
+      else {
+        val processor = new IdeoUserFileProcessor
+        processor.read_corpus(filehand, opts.political_twitter_accounts).
+          flatten.toMap
+      }
     // errprint("Accounts: %s", accounts)
+
     val suffix = "tweets"
     opts.schema =
       CorpusFileProcessor.read_schema_from_corpus(filehand, opts.input, suffix)
