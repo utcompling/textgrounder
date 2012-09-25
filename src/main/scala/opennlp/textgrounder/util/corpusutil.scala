@@ -199,6 +199,17 @@ package object corpusutil {
     }
 
     /**
+     * Output the schema to a file.  The file will be named
+     * `DIR/PREFIX-SUFFIX-schema.txt`.
+     */
+    def output_constructed_schema_file(filehand: FileHandler, dir: String,
+        prefix: String, suffix: String, split_text: String = "\t") {
+      val schema_file = Schema.construct_schema_file(filehand, dir, prefix,
+        suffix)
+      output_schema_file(filehand, schema_file, split_text)
+    }
+
+    /**
      * Output a row describing a document.
      *
      * @param outstream The output stream to write to, as returned by
@@ -716,9 +727,8 @@ package object corpusutil {
      */
     def output_schema_file(filehand: FileHandler, dir: String,
         prefix: String) {
-      val schema_file = Schema.construct_schema_file(filehand, dir, prefix,
-        suffix)
-      schema.output_schema_file(filehand, schema_file, split_text)
+      schema.output_constructed_schema_file(filehand, dir, prefix, suffix,
+        split_text)
     }
   }
 

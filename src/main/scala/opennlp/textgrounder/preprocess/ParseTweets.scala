@@ -2000,31 +2000,50 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       if (opts.grouping == "none") tweets1
       else new GroupTweets(opts)(tweets1)
 
+    // Construct output directory for a given corpus suffix, based on
+    // user-provided output directory
+    def output_directory_for_suffix(corpus_suffix: String) =
+      opts.output + "-" + corpus_suffix
+
+    // create a schema given a set of data fields plus user params
+    def create_schema(fields: Seq[String]) =
+      new Schema(fields, Map("corpus" -> opts.corpus_name))
+
+    // output lines of data in a DList to a corpus
     def dlist_output_lines(lines: DList[String],
         corpus_suffix: String, fields: Seq[String]) = {
-      val outdir = opts.output + "-" + corpus_suffix
+      // get output directory
+      val outdir = output_directory_for_suffix(corpus_suffix)
+
+      // output data file
       persist(TextOutput.toTextFile(lines, outdir))
-      val out_schema = new Schema(fields, Map("corpus" -> opts.corpus_name))
-      val out_schema_fn = Schema.construct_schema_file(filehand,
-          outdir, opts.corpus_name, corpus_suffix)
       rename_output_files(outdir, opts.corpus_name, corpus_suffix)
-      out_schema.output_schema_file(filehand, out_schema_fn)
+
+      // output schema file
+      val out_schema = create_schema(fields)
+      out_schema.output_constructed_schema_file(filehand, outdir,
+        opts.corpus_name, corpus_suffix)
       outdir
     }
 
+    // output lines of data in an Iterable to a corpus
     def local_output_lines(lines: Iterable[String],
         corpus_suffix: String, fields: Seq[String]) = {
-      val outdir = opts.output + "-" + corpus_suffix
+      // get output directory
+      val outdir = output_directory_for_suffix(corpus_suffix)
+
+      // output data file
       filehand.make_directories(outdir)
-      val out_schema = new Schema(fields, Map("corpus" -> opts.corpus_name))
-      val out_schema_file = Schema.construct_schema_file(filehand,
-          outdir, opts.corpus_name, corpus_suffix)
-      out_schema.output_schema_file(filehand, out_schema_file)
       val outfile = CorpusFileProcessor.construct_output_file(filehand, outdir,
         opts.corpus_name, corpus_suffix, ".txt")
       val outstr = filehand.openw(outfile)
       lines.map(outstr.println(_))
       outstr.close()
+
+      // output schema file
+      val out_schema = create_schema(fields)
+      out_schema.output_constructed_schema_file(filehand, outdir,
+        opts.corpus_name, corpus_suffix)
       outdir
     }
 
