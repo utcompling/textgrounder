@@ -66,6 +66,9 @@ class FindPoliticalParams(ap: ArgParser) extends
     should be less than 0.5.  If unspecified, computed as the mirror image of
     the value of '--min-conservative' (e.g. 0.25 if
     --min-conservative=0.75).""")
+  var iterations = ap.option[Int]("iterations", "i",
+    default = 1,
+    help="""Number of iterations when generating ideological users.""")
   var corpus_name = ap.option[String]("corpus-name",
     help="""Name of output corpus; for identification purposes.
     Default to name taken from input directory.""")
@@ -102,6 +105,8 @@ class FindPoliticalParams(ap: ArgParser) extends
       ap.error("--political-twitter-accounts must be specified")
     if (!ap.specified("max-liberal"))
       max_liberal = 1 - min_conservative
+    if (iterations <= 0)
+      ap.error("--iterations must be > 0")
   }
 }
 
@@ -128,15 +133,22 @@ object FindPolitical extends
   }
 
   /**
-   * Count of total number of references given a sequence of (data, times) pairs
+   * Count of total number of references given a sequence of
+   * (data, weight, times) pairs of references to a particular data point.
+   */
+  def count_refs[T](seq: Seq[(T, Double, Int)]) = seq.map(_._3).sum
+  /**
+   * Count of total weight given a sequence of (data, weight, times) pairs
    * of references to a particular data point.
    */
-  def count_refs[T](seq: Seq[(T, Int)]) = seq.map(_._2).sum
+  def count_weight[T](seq: Seq[(T, Double, Int)]) =
+    seq.map{ case (_, weight, times) => weight*times }.sum
+
   /**
    * Count of total number of accounts given a sequence of (data, times) pairs
    * of references to a particular data point.
    */
-  def count_accounts[T](seq: Seq[(T, Int)]) = seq.length
+  def count_accounts[T](seq: Seq[(T, Double, Int)]) = seq.length
 
 
   /**
@@ -150,6 +162,14 @@ object FindPolitical extends
   implicit val politico_wire =
     mkCaseWireFormat(Politico.apply _, Politico.unapply _)
 
+  def encode_ideo_refs_map(seq: Seq[(String, Double, Int)]) =
+    (for ((account, ideology, count) <- seq sortWith (_._3 > _._3)) yield
+      ("%s:%.2f:%s" format (
+        encode_string_for_count_map_field(account), ideology, count))
+    ) mkString " "
+
+  def empty_ideo_refs_map = Seq[(String, Double, Int)]()
+
   /**
    * Description of a user and the accounts referenced, both political and
    * nonpolitical, along with ideology.
@@ -160,23 +180,17 @@ object FindPolitical extends
    * @param ideo_refs Set of references to other accounts used in computing
    *   the ideology (either mentions, retweets or following, based on
    *   --ideological-ref-type); this is a sequence of tuples of
-   *   (account, times), i.e. an account and the number of times it was seen
-   * @param lib_ideo_refs Subset of `ideo_refs` that refer to known
-   *   liberal politicos
-   * @param cons_ideo_refs Subset of `ideo_refs` that refer to known
-   *   conservative politicos
-   * @param text Text of user's tweets (concatenated)
+   *   (account, ideology, times), i.e. an account, its ideology and the number
+   *   of times it was seen
+   * @param lib_ideo_refs Subset of `ideo_refs` that refer to liberal users
+   * @param cons_ideo_refs Subset of `ideo_refs` that refer to conservative users
+   * @param fields Field values of user's tweets (concatenated)
    */
   case class IdeologicalUser(user: String, ideology: Double,
-      ideo_refs: Seq[(String, Int)],
-      lib_ideo_refs: Seq[(Politico, Int)],
-      cons_ideo_refs: Seq[(Politico, Int)],
+      ideo_refs: Seq[(String, Double, Int)],
+      lib_ideo_refs: Seq[(String, Double, Int)],
+      cons_ideo_refs: Seq[(String, Double, Int)],
       fields: Seq[String]) {
-    def encode_politico_count_map(seq: Seq[(Politico, Int)]) =
-      encode_word_count_map(
-        seq.map { case (politico, count) =>
-          (politico.full_name.replace(" ", "."), count) })
-
     def get_feature_values(factory: IdeologicalUserAction, ty: String) = {
       ty match {
         case field@("retweets" | "user-mentions" | "hashtags") =>
@@ -192,12 +206,15 @@ object FindPolitical extends
 
     def to_row(opts: FindPoliticalParams) =
       Seq(user, "%.3f" format ideology,
-        count_accounts(ideo_refs), count_refs(ideo_refs),
-          encode_word_count_map(ideo_refs),
-        count_accounts(lib_ideo_refs), count_refs(lib_ideo_refs),
-          encode_politico_count_map(lib_ideo_refs),
-        count_accounts(cons_ideo_refs), count_refs(cons_ideo_refs),
-          encode_politico_count_map(cons_ideo_refs),
+        count_accounts(ideo_refs),
+        count_refs(ideo_refs),
+        encode_ideo_refs_map(ideo_refs),
+        count_accounts(lib_ideo_refs),
+        count_refs(lib_ideo_refs),
+        encode_ideo_refs_map(lib_ideo_refs),
+        count_accounts(cons_ideo_refs),
+        count_refs(cons_ideo_refs),
+        encode_ideo_refs_map(cons_ideo_refs),
         fields mkString "\t"
       ) mkString "\t"
   }
@@ -223,10 +240,24 @@ object FindPolitical extends
     /**
      * For a given user, determine if the user is an "ideological user"
      * and if so, return an object describing the user.
+     *
+     * @param line Line of data describing a user, from `ParseTweets --grouping=user`
+     * @param accounts Mapping of ideological accounts and their ideology
+     * @param include_extra_fields True if we should include extra fields
+     *   in the object specifying the references to ideological users that
+     *   were found; only if we're writing the objects out for human inspection,
+     *   not when we're iterating further
      */
-    def get_ideological_user(line: String, accounts: Map[String, Politico]) = {
+    def get_ideological_user(line: String, accounts: Map[String, Double],
+        include_extra_fields: Boolean) = {
       error_wrap(line, None: Option[IdeologicalUser]) { line => {
         val fields = line.split("\t", -1)
+
+        def subsetted_fields =
+          if (include_extra_fields)
+            user_subschema.map_original_fieldvals(fields)
+          else Seq[String]()
+
         // get list of (refs, times) pairs
         val ideo_ref_field =
           if (opts.ideological_ref_type == "mentions") "user-mentions"
@@ -235,28 +266,47 @@ object FindPolitical extends
           decode_word_count_map(opts.schema.get_field(fields, ideo_ref_field))
         val text = opts.schema.get_field(fields, "text")
         val user = opts.schema.get_field(fields, "user")
-        // errprint("For user %s, ideo_refs: %s", user, ideo_refs.toList)
+        //errprint("For user %s, ideo_refs: %s", user, ideo_refs.toList)
         // find references to a politician
         val libcons_ideo_refs =
           for {(ideo_ref, times) <- ideo_refs
-               account = accounts.getOrElse(ideo_ref.toLowerCase, null)
-               if account != null && {
-                 //errprint("saw account %s, party %s", account, account.party);
-                 "DR".contains(account.party)}}
-            yield (account, times)
+               lower_ideo_ref = ideo_ref.toLowerCase
+               if accounts contains lower_ideo_ref
+               ideology = accounts(lower_ideo_ref)}
+            yield (lower_ideo_ref, ideology, times)
         //errprint("libcons_ideo_refs: %s", libcons_ideo_refs.toList)
-        val (lib_ideo_refs, cons_ideo_refs) = libcons_ideo_refs.partition {
-            case (account, times) => account.party == "D" }
-        val num_lib_ideo_refs = count_refs(lib_ideo_refs)
-        val num_cons_ideo_refs = count_refs(cons_ideo_refs)
-        val num_libcons_ideo_refs = num_lib_ideo_refs + num_cons_ideo_refs
-        val ideology = num_cons_ideo_refs.toFloat/num_libcons_ideo_refs
+        val num_libcons_ideo_refs = count_refs(libcons_ideo_refs)
         if (num_libcons_ideo_refs > 0) {
+          val ideology = count_weight(libcons_ideo_refs)/num_libcons_ideo_refs
+          if (include_extra_fields) {
+            val lib_ideo_refs = libcons_ideo_refs.filter {
+              case (lower_ideo_ref, ideology, times) =>
+                ideology <= opts.max_liberal
+            }
+            val num_lib_ideo_refs = count_refs(lib_ideo_refs)
+            val cons_ideo_refs = libcons_ideo_refs.filter {
+              case (lower_ideo_ref, ideology, times) =>
+                ideology >= opts.min_conservative
+            }
+            val num_cons_ideo_refs = count_refs(cons_ideo_refs)
+            val ideo_user =
+              IdeologicalUser(user, ideology, libcons_ideo_refs, lib_ideo_refs,
+              cons_ideo_refs, subsetted_fields)
+            Some(ideo_user)
+          } else {
+            val ideo_user =
+              IdeologicalUser(user, ideology, empty_ideo_refs_map,
+                empty_ideo_refs_map, empty_ideo_refs_map, Seq[String]())
+            Some(ideo_user)
+          }
+        } else if (accounts contains user.toLowerCase) {
+          val ideology = accounts(user.toLowerCase)
           val ideo_user =
-            IdeologicalUser(user, ideology, ideo_refs, lib_ideo_refs,
-            cons_ideo_refs, user_subschema.map_original_fieldvals(fields))
+            IdeologicalUser(user, ideology, empty_ideo_refs_map,
+              empty_ideo_refs_map, empty_ideo_refs_map, subsetted_fields)
           Some(ideo_user)
-        } else None
+        } else
+          None
       }}
     }
   }
@@ -509,14 +559,26 @@ object FindPolitical extends
         opts.corpus_name, corpus_suffix)
     }
 
-    errprint("Step 1: Load corpus, filter for conservatives/liberals, output.")
+    var ideo_users: DList[IdeologicalUser] = null
+
     val ideo_fact = new IdeologicalUserAction(opts)
     val matching_patterns = CorpusFileProcessor.
         get_matching_patterns(filehand, opts.input, suffix)
     val lines: DList[String] = TextInput.fromTextFile(matching_patterns: _*)
-    val ideo_users =
-      lines.flatMap(ideo_fact.get_ideological_user(_, accounts))
-    errprint("Step 1: done.")
+
+    for (iter <- 1 to opts.iterations) {
+      errprint(
+        "Step 1, pass %d: Filter corpus for conservatives/liberals, compute ideology."
+        format iter)
+      val last_pass = iter == opts.iterations
+      ideo_users =
+        lines.flatMap(ideo_fact.get_ideological_user(_, accounts, last_pass))
+      if (!last_pass)
+        accounts =
+          persist(ideo_users.materialize).map(x =>
+            (x.user.toLowerCase, x.ideology)).toMap
+      errprint("Step 1, pass %d: done." format iter)
+    }
 
     val (ideo_users_persist, ideo_users_fixup) =
       output_lines(ideo_users.map(_.to_row(opts)), "ideo-users",
