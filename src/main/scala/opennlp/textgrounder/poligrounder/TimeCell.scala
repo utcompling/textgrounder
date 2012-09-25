@@ -193,7 +193,7 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
         if p >= min_prob || q >= min_prob
       } yield (item, before_dist.dunning_log_likelihood_2x1(item.asInstanceOf[before_dist.Item], after_dist), q - p)
 
-    println("Items by log-likelihood for category '%s':" format category)
+    println("Items by 2-way log-likelihood for category '%s':" format category)
     for ((item, dunning, prob) <-
         itemdiff.toSeq.sortWith(_._2 > _._2).take(max_items)) {
       println("%7s: %-20s (%8s, %8s = %8s - %8s)" format
@@ -236,6 +236,11 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
     val before_dist_2 = get_dist(get_pair(grid, category2).before_cell)
     val after_dist_2 = get_dist(get_pair(grid, category2).after_cell)
 
+    val cat13 = category1.slice(0,3)
+    val cat23 = category2.slice(0,3)
+    val cat18 = category1.slice(0,8)
+    val cat28 = category2.slice(0,8)
+
     val itemdiff =
       for {
         rawitem <- get_keys(before_dist_1) ++ get_keys(after_dist_1) ++
@@ -245,42 +250,43 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
         q1 = lookup_item(after_dist_1, item)
         p2 = lookup_item(before_dist_2, item)
         q2 = lookup_item(after_dist_2, item)
-        prob1 = q1 - p1
-        prob2 = q2 - p2
-        prob12 = prob1 + prob2
-        prob12diff = prob1 - prob2
         if p1 >= min_prob || q1 >= min_prob || p2 >= min_prob || q2 >= min_prob
+        abs1 = q1 - p1
+        abs2 = q2 - p2
+        pct1 = (q1 - p1)/p1*100
+        pct2 = (q2 - p2)/p2*100
+        change = {
+          if (pct1 > 0 && pct2 <= 0) "+"+cat13
+          else if (pct1 <= 0 && pct2 > 0) "+"+cat23
+          else if (pct1 < 0 && pct2 < 0) "-both"
+          else "+both"
+        }
       } yield (item, before_dist_1.dunning_log_likelihood_2x2(
           item.asInstanceOf[before_dist_1.Item],
           after_dist_1, before_dist_2, after_dist_2),
-          p1, q1, p2, q2,
-          prob1, prob2, prob12, prob12diff
+          p1, q1, p2, q2, abs1, abs2, pct1, pct2, change
         )
 
-    val cat13 = category1.slice(0,3)
-    val cat23 = category2.slice(0,3)
-    val cat18 = category1.slice(0,8)
-    val cat28 = category2.slice(0,8)
-    println("%29s +%3s-%3s = %8s - %8s; %8s %8s" format (
-      "Items by 4-way log-likelihood:", cat13, cat23, cat18, cat28,
-      "overall", "change"))
-    for ((item, dunning, p1, q1, p2, q2, prob1, prob2, prob12, prob12diff) <-
+    println("%24s change %7s%% (+-%7.7s) / %7s%% (+-%7.7s)" format (
+      "Items by 4-way log-lhood:", cat13, cat18, cat23, cat28))
+    def fmt(x: Double) = format_float(x, include_plus = true)
+    for ((item, dunning, p1, q1, p2, q2, abs1, abs2, pct1, pct2, change) <-
         itemdiff.toSeq.sortWith(_._2 > _._2).take(max_items)) {
-      println("%7s: %-20s %8s = %8s - %8s; %8s %8s" format
+      println("%7s: %-15.15s %6s: %7s%% (%9s) / %7s%% (%9s)" format
         (format_float(dunning),
          format_item(item),
-         format_float(prob12diff),
-         format_float(prob1),
-         format_float(prob2),
-         if (prob12 > 0) "increase" else "decrease",
-         format_float(prob12)
+         change,
+         fmt(pct1), fmt(abs1),
+         fmt(pct2), fmt(abs2)
        ))
     }
     println("")
 
-    type ItemDunProb = (Item, Double, Double)
-    val diff_cat1 = itemdiff filter (_._10 > 0) map (x => (x._1, x._2, x._10))
-    val diff_cat2 = itemdiff filter (_._10 < 0) map (x => (x._1, x._2, x._10.abs))
+    type ItemDunProb =
+      (Item, Double, Double, Double, Double, Double, Double,
+        Double, Double, Double, String)
+    val diff_cat1 = itemdiff filter (_._11 == "+"+cat13)
+    val diff_cat2 = itemdiff filter (_._11 == "+"+cat23)
     def print_diffs(diffs: Iterable[ItemDunProb],
         category: String, updown: String) {
       def print_diffs_1(msg: String,
@@ -288,16 +294,15 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
         println("")
         println("%s leaning towards %8s:" format (msg, category))
         println("----------------------------------------------------------")
-        for ((item, dunning, prob) <-
+        for ((item, dunning, p1, q1, p2, q2, abs1, abs2, pct1, pct2, change) <-
             diffs.toSeq.sortWith(comparefun).take(max_items)) {
-          println("%s = %s%s (LL %s)" format
-            (format_item(item),
-             updown, format_float(prob),
-             format_float(dunning)))
+          println("%-15.15s = LL %7s (%%chg-diff %7s%% = %7s%% - %7s%%)" format
+            (format_item(item), format_float(dunning),
+              fmt(pct1 - pct2), fmt(pct1), fmt(pct2)))
         }
       }
-      print_diffs_1("Items by log-likelihood with difference", _._2 > _._2)
-      print_diffs_1("Items with greatest difference", _._3 > _._3)
+      print_diffs_1("Items by 4-way log-lhood with difference", _._2 > _._2)
+      // print_diffs_1("Items with greatest difference", _._3 > _._3)
     }
     print_diffs(diff_cat1, category1, "+")
     print_diffs(diff_cat2, category2, "-")
