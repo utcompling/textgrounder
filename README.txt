@@ -1,16 +1,14 @@
-This file contains documentation on the TextGrounder project, including
+This file contains documentation on the PoliGrounder application, including
 an overview as well as configuration and build instructions. 
 
-See CHANGES for a description of the project status. 
+PoliGrounder is open-source software, stored here:
 
-See also the TextGrounder website:
+https://github.com/benwing/poligrounder
 
-https://bitbucket.org/utcompling/textgrounder/
+PoliGrounder is a fork of TextGrounder, which does document-level and
+toponym-level geolocation, whose site is as follows:
 
-In particular, see the wiki, which may have more detailed and/or up-to-date
-information:
-
-https://bitbucket.org/utcompling/textgrounder/wiki/Home
+https://github.com/utcompling/poligrounder
 
 ============
 Introduction
@@ -106,68 +104,34 @@ Requirements
 Quick start
 ===========
 
-The following describes how to quickly get the Geolocate subproject
-up and running and to test that everything is in place and working.
+The following describes how to quickly get PoliGrounder up and running and to
+test that everything is in place and working.
 
-1. Download TextGrounder.  Probably the easiest way is through Mercurial
-   (http://mercurial.selenic.com), an application for source-code management.
-   If you don't have Mercurial, you can download it from the Mercurial web
-   site, or (on Mac OS X) install it using MacPorts (http://www.macports.org);
-   you might need to install the Mac OS X Developer Tools, aka Xcode
-   (http://developer.apple.com/mac/), in order to install MacPorts.
-   Mercurial should also be available as a package in all the standard Linux
-   distributions.  Once you have Mercurial, get TextGrounder like this:
+1. Download PoliGrounder using git:
 
-   hg clone https://bitbucket.org/utcompling/textgrounder/
+   git clone https://github.com/benwing/poligrounder
 
-2. Make sure you have Java installed.  TextGrounder is developed and tested
+2. Make sure you have Java installed.  PoliGrounder is developed and tested
    on Java 6, but it might work on Java 5 (definitely not earlier).
 
 3. Set up environment variables and paths:
 
-   -- Set TEXTGROUNDER_DIR to the top-level directory of where TextGrounder
+   -- Set POLIGROUNDER_DIR to the top-level directory of where PoliGrounder
       is located.
    -- Also make sure JAVA_HOME is set to the top level of the Java
       installation tree. (On Mac OS X it's probably /Library/Java/Home.)
-   -- Make sure $TEXTGROUNDER_DIR/bin is in your PATH, so the scripts in
+   -- Make sure $POLIGROUNDER_DIR/bin is in your PATH, so the scripts in
       the 'bin' directory get found automatically.
    -- See below if you're not sure how to set environment variables.
 
-4. Obtain the data.
-
-   1. If you are on a UTexas Comp Ling machine or the UTexas Longhorn cluster,
-      the data is already there.  Just set the environment variable
-      TG_ON_COMP_LING_MACHINES to something non-blank if you're on a UTexas
-      Comp Ling machine; likewise for TG_ON_LONGHORN if you're on Longhorn.
-   2. If you have access to either of the above machines, look in
-      `bin/config-geolocate` to see where the environment variable
-      TG_GROUPS_DIR points to, and copy the relevant TextGrounder corpora out
-      of the `.../corpora` directory; these will generally be the directories
-      `wikipedia`, `twitter-geotext`, anything beginning with `gut...`, and
-      anything beginning with `ut...`.   You might also want to copy the
-      `.../projects/textgrounder` and `.../projects/pcl_travel` directories,
-      especially if you're doing work with toponym resolution.  All of these
-      directories should be placed under some directory with a structure
-      that mirrors the source structure, starting with the `.../corpora`
-      or `.../projects` directories.  Then set TG_GROUPS_DIR to the
-      top-level directory into which you placed these various directories.
-   3. Otherwise, you might be able to download the data and set up the
-      appropriate environment variables, as described below.
-   4. Otherwise, you can generate at least Wikipedia and Twitter data from
-      Wikipedia dumps (publically available) and JSON-format tweets pulled
-      using the Twitter API.  As described in `config-geolocate`, the
-      variable TG_CORPUS_DIR points to the directory holding the TextGrounder
-      corpora and can be set directly, or TG_GROUPS_DIR can be set if the
-      TextGrounder corpora are held in a directory named `.../corpora`.
-
-5. Build the system.
+4. Build the system.
 
    Run the following:
 
-   textgrounder build-all
+   poligrounder build-all
 
    This should download a whole bunch of stuff and then compile the whole
-   system.
+   system.  
 
 6. Test the system.
 
@@ -185,7 +149,7 @@ Configuring your environment variables
 ======================================
 
 The easiest thing to do is to set the environment variables JAVA_HOME
-and TEXTGROUNDER_DIR to the relevant locations on your system. Set JAVA_HOME
+and POLIGROUNDER_DIR to the relevant locations on your system. Set JAVA_HOME
 to match the top level directory containing the Java installation you
 want to use.
 
@@ -206,23 +170,23 @@ Control Panel. For example, under WinXP, go to Control Panel, click on
 System Properties, choose the Advanced tab, click on Environment
 Variables, and add your settings in the User variables area.
 
-/*Next, likewise set TEXTGROUNDER_DIR to be the top level directory where you
+/*Next, likewise set POLIGROUNDER_DIR to be the top level directory where you
 unzipped the download. In Unix, type 'pwd' in the directory where
 this file is and use the path given to you by the shell as
-TEXTGROUNDER_DIR.  You can set this in the same manner as for JAVA_HOME
+POLIGROUNDER_DIR.  You can set this in the same manner as for JAVA_HOME
 above.*/ //THIS WILL BE REMOVED
 
-Next, add the directory TEXTGROUNDER_DIR/bin to your path. For example, you
+Next, add the directory POLIGROUNDER_DIR/bin to your path. For example, you
 can set the path in your .bashrc file as follows:
 
-export PATH="$PATH:$TEXTGROUNDER_DIR/bin"
+export PATH="$PATH:$POLIGROUNDER_DIR/bin"
 
 On Windows, you should also add the python main directory to your path.
 
 Once you have taken care of these three things, you should be able to
 build and use the TextGrounder Library.
 
-Note: Spaces are allowed in JAVA_HOME but not in TEXTGROUNDER_DIR.  To set
+Note: Spaces are allowed in JAVA_HOME but not in POLIGROUNDER_DIR.  To set
 an environment variable with spaces in it, you need to put quotes around
 the value when on Unix, but you must *NOT* do this when under Windows.
 
@@ -231,11 +195,11 @@ the value when on Unix, but you must *NOT* do this when under Windows.
 Building the system from source
 ===============================
 
-TextGrounder uses SBT (Simple Build Tool) with a standard directory
+PoliGrounder uses SBT (Simple Build Tool) with a standard directory
 structure.  To build TextGrounder, type (this works in any directory,
-provided you have set TEXTGROUNDER_DIR correctly):
+provided you have set POLIGROUNDER_DIR correctly):
 
-$ textgrounder build update compile
+$ poligrounder build update compile
 
 This will compile the source files and put them in
 ./target/classes. If this is your first time running it, you will see
@@ -244,7 +208,7 @@ expected. Once that is over, the TextGrounder code will be compiled.
 
 To try out other build targets, do:
 
-$ textgrounder build
+$ poligrounder build
 
 This will drop you into the SBT interface. To see a list of possible
 actions, type 'tasks'.  (You an also see all the actions that are
@@ -264,7 +228,7 @@ Documentation for SBT is here:
 https://github.com/harrah/xsbt/wiki
 
 Note: if you have SBT 0.11.3 already installed on your system, you can
-also just call it directly with "sbt" in TEXTGROUNDER_DIR.
+also just call it directly with "sbt" in POLIGROUNDER_DIR.
 
 
 ==============================
@@ -293,7 +257,7 @@ smaller, something is wrong.)
 To run properly using Hadoop (in distributed mode), you need an additional
 build step:
 
-$ textgrounder build assembly
+$ poligrounder build assembly
 
 This builds a self-contained JAR file containing not only the TextGrounder
 code but all of the libraries needed to run the code.
@@ -345,12 +309,12 @@ for TextGrounder (basically the stop lists).  You run the command as follows:
 $ tg-copy-data-to-hadoop CORPUS ...
 
 where CORPUS is the name of a corpus, similar to what is specified when
-running 'tg-geolocate'.  Additionally, the pseudo-corpus 'textgrounder'
+running 'tg-geolocate'.  Additionally, the pseudo-corpus 'poligrounder'
 will copy the ancillary TextGrounder data.  For example, to copy
 the Portuguese Wikipedia for March 15, 2012, as well as the ancillary data,
 run the following:
 
-$ tg-copy-data-to-hadoop textgrounder ptwiki-20120315
+$ tg-copy-data-to-hadoop poligrounder ptwiki-20120315
 
 Other possibilities for CORPUS are 'geotext' (the Twitter GeoText corpus),
 any other corpus listed in the corpus directory (TG_CORPUS_DIR), any
@@ -363,13 +327,13 @@ Then, run as follows:
 $ TG_USE_HDFS=yes tg-geolocate --hadoop geotext output
 
 If you use '--verbose' as follows, you can see exactly which options are
-being passed to the underlying 'textgrounder' script:
+being passed to the underlying 'poligrounder' script:
 
 $ TG_USE_HDFS=yes tg-geolocate --hadoop --verbose geotext output
 
 By default, the data copied using 'tg-copy-data-to-hadoop' and referenced
-by 'tg-geolocate' or 'textgrounder' is placed in the directory
-'textgrounder-data' under your home directory on HDFS.  You can change this
+by 'tg-geolocate' or 'poligrounder' is placed in the directory
+'poligrounder-data' under your home directory on HDFS.  You can change this
 by setting TG_HADOOP_DIR before running 'tg-copy-data-to-hadoop'.
 
 ========================================
@@ -406,7 +370,7 @@ There are three sets of data to download:
 Untar these files somewhere.  It is generally recommended that you create
 a directory and set `TG_GROUPS_DIR` to point to it; then put the Wikipedia
 and Twitter data underneath the `$TG_GROUPS_DIR/corpora` subdirectory, and the
-auxiliary files (if needed) under `$TG_GROUPS_DIR/projects/textgrounder/data`.
+auxiliary files (if needed) under `$TG_GROUPS_DIR/projects/poligrounder/data`.
 Alternatively, `TG_CORPUS_DIR` can be used to directly point to where the
 corpora are stored, and `TG_AUX_DIR` to directly point to where the auxiliary
 files (if needed) are stored.
@@ -426,18 +390,18 @@ The Twitter data was generated from [http://www.ark.cs.cmu.edu/GeoText/ The Geo-
 
 The code in Geolocate.scala does the actual geolocating.  Although these
 are written in Java and can conceivably be run directly using `java`,
-in practice it's much more convenient using either the `textgrounder`
+in practice it's much more convenient using either the `poligrounder`
 driver script or some other even higher-level front-end script.
-`textgrounder` sets up the paths correctly so that all libraries, etc.
+`poligrounder` sets up the paths correctly so that all libraries, etc.
 will be found, and takes an application to run, knowing how to map that
 application to the actual class that implements the application.  Each
 application typically takes various command-line arguments, and
-`textgrounder` itself also takes various command-line options (given
+`poligrounder` itself also takes various command-line options (given
 *before* the application name), which mostly control operation of the
 JVM.
 
-In this case, document geotagging can be invoked directly with `textgrounder`
-using `textgrounder geolocate-document`, but the normal route is to
+In this case, document geotagging can be invoked directly with `poligrounder`
+using `poligrounder geolocate-document`, but the normal route is to
 go through a front-end script.  The following is a list of the front-end
 scripts available:
 
@@ -458,7 +422,7 @@ scripts available:
     threshold, i.e. minimum number of documents that a vocabulary item
     must be seen in; uncommon vocabulary before that is ignored (or
     rather, converted to an OOV token).  Additional arguments to both
-    the app and `textgrounder` itself can be given.  Configuration values
+    the app and `poligrounder` itself can be given.  Configuration values
     (e.g. indicating where to find Wikipedia and Twitter, given the above
     environment variables) are read from `config-geolocate` in the
     TextGrounder `bin` directory; additional site-specific configuration
@@ -500,7 +464,7 @@ You can invoke `tg-geolocate wikipedia` with no options, and it will do
 something reasonable: It will attempt to geolocate the entire dev set of
 the old English Wikipedia corpus, using KL divergence as a strategy, with
 a grid size of 1 degrees.  Options you may find useful (which also apply to
-`textgrounder geolocate` and all front ends):
+`poligrounder geolocate` and all front ends):
 
 `--degrees-per-cell NUM`
 `--dpc NUM`
@@ -709,7 +673,7 @@ for x in none log logsquared; do tg-geolocate geotext --doc-thresh 5 --mts=300 -
 
 Scripts were written to extract data from raw Wikipedia dump files
 and from Twitter, and output in the "TextGrounder corpus format"
-required above for `textgrounder geolocate`.
+required above for `poligrounder geolocate`.
 
 *NOTE*: See `README.preprocess` for detailed instructions on how to
 preprocess a raw Wikipedia dump to generate the TextGrounder-format corpora.
@@ -772,11 +736,11 @@ would do for running other Hadoop code (see above), copy the data into HDFS,
 and run.  For example, you can run `TwitterPull.scala` as follows using
 the TextGrounder front end:
 
-$ textgrounder --hadoop run opennlp.textgrounder.preprocess.TwitterPull input output
+$ poligrounder --hadoop run opennlp.poligrounder.preprocess.TwitterPull input output
 
 or you can run it directly using `hadoop`:
 
-$ hadoop jar $TEXTGROUNDER_DIR/target/textgrounder-assembly.jar opennlp.textgrounder.preprocess.TwitterPull input output
+$ hadoop jar $POLIGROUNDER_DIR/target/poligrounder-assembly.jar opennlp.poligrounder.preprocess.TwitterPull input output
 
 In both cases, it is assumed that the data to be preprocessed is located in
 the HDFS directory `input` and the results are stored into the HDFS directory
@@ -806,11 +770,11 @@ files from getting overly large, as described above.
 You should also be able to run in non-distributed mode by using the option
 `--hadoop-nondist` in place of `--hadoop`, e.g.:
 
-$ textgrounder --hadoop-nondist run opennlp.textgrounder.preprocess.TwitterPull input output
+$ poligrounder --hadoop-nondist run opennlp.poligrounder.preprocess.TwitterPull input output
 
 or you can run it directly using `java`:
 
-$ java -cp $TEXTGROUNDER_DIR/target/textgrounder-assembly.jar opennlp.textgrounder.preprocess.TwitterPull input output
+$ java -cp $POLIGROUNDER_DIR/target/poligrounder-assembly.jar opennlp.poligrounder.preprocess.TwitterPull input output
 
 In both cases, `input` and `output` will refer to subdirectories on the local
 file system instead of in HDFS.
@@ -832,8 +796,8 @@ build procedure is required.  Specifically:
    This will also be in the `target` subdirectory but have a name something
    like `TextGrounder-hadoop-0.3.0.jar`.
 4. You will then have to run this JAR using the "direct" methods above
-   (not using the `textgrounder` wrapper, because it will attempt to use
-   the JAR named `textgrounder-assembly.jar`, as built by `sbt-assembly`).
+   (not using the `poligrounder` wrapper, because it will attempt to use
+   the JAR named `poligrounder-assembly.jar`, as built by `sbt-assembly`).
 
 
 ===========
