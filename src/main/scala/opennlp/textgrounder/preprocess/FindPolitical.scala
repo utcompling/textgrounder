@@ -430,13 +430,19 @@ object FindPolitical extends
 
     def output_directory_for_suffix(corpus_suffix: String) =
       opts.output + "-" + corpus_suffix
-       
+
+    /**
+     * For the given sequence of lines and related info for writing output a corpus,
+     * return a tuple of two thunks: One for persisting the data, the other for
+     * fixing up the data into a proper corpus.
+     */
     def output_lines(lines: DList[String], corpus_suffix: String,
-        fields: Seq[String]) {
+        fields: Seq[String]) = {
       val outdir = output_directory_for_suffix(corpus_suffix)
-      persist(TextOutput.toTextFile(lines, outdir))
-      rename_output_files(outdir, opts.corpus_name, corpus_suffix)
-      output_schema_for_suffix(corpus_suffix, fields)
+      (TextOutput.toTextFile(lines, outdir), () => {
+        rename_output_files(outdir, opts.corpus_name, corpus_suffix)
+        output_schema_for_suffix(corpus_suffix, fields)
+      })
     }
 
     def output_schema_for_suffix(corpus_suffix: String, fields: Seq[String]) {
@@ -462,13 +468,14 @@ object FindPolitical extends
     val lines: DList[String] = TextInput.fromTextFile(matching_patterns: _*)
     val ideo_users =
       lines.flatMap(ideo_fact.get_ideological_user(_, accounts))
-    output_lines(ideo_users.map(_.to_row(opts)), "ideo-users",
-      ideo_fact.row_fields)
     errprint("Step 1: done.")
 
+    val (ideo_users_persist, ideo_users_fixup) =
+      output_lines(ideo_users.map(_.to_row(opts)), "ideo-users",
+        ideo_fact.row_fields)
     /* This is a separate function because including it inline in the for loop
        below results in a weird deserialization error. */
-    def handle_political_feature_type(ty: String) {
+    def handle_political_feature_type(ty: String) = {
       errprint("Step 2: Handling feature type '%s' ..." format ty)
       val political_features = ideo_users.
         flatMap(PoliticalFeature.
@@ -481,8 +488,14 @@ object FindPolitical extends
     }
 
     errprint("Step 2: Generate political features.")
-    for (ty <- opts.political_feature_type)
-      handle_political_feature_type(ty)
+    val (ft_persists, ft_fixups) = (
+      for (ty <- opts.political_feature_type) yield
+        handle_political_feature_type(ty)
+    ).unzip
+    persist(Seq(ideo_users_persist) ++ ft_persists)
+    ideo_users_fixup()
+    for (fixup <- ft_fixups)
+      fixup()
     errprint("Step 2: done.")
 
     finish_scoobi_app(opts)
