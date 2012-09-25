@@ -96,6 +96,13 @@ class FindPoliticalParams(ap: ArgParser) extends
     // maybe a function.
   // Schema for the input file, after file read
   var schema: Schema = _
+
+  override def check_usage() {
+    if (political_twitter_accounts == null)
+      ap.error("--political-twitter-accounts must be specified")
+    if (!ap.specified("max-liberal"))
+      max_liberal = 1 - min_conservative
+  }
 }
 
 /**
@@ -448,11 +455,6 @@ object FindPolitical extends
      */
     val ptp = new FindPoliticalDriver(opts)
     val filehand = new HadoopFileHandler(configuration)
-    if (opts.political_twitter_accounts == null) {
-      opts.ap.error("--political-twitter-accounts must be specified")
-    }
-    if (!opts.ap.specified("max-liberal"))
-      opts.max_liberal = 1 - opts.min_conservative
     if (opts.corpus_name == null) {
       val (_, last_component) = filehand.split_filename(opts.input)
       opts.corpus_name = last_component.replace("*", "_")
