@@ -428,10 +428,19 @@ object FindPolitical extends
     opts.schema =
       CorpusFileProcessor.read_schema_from_corpus(filehand, opts.input, suffix)
 
+    def output_directory_for_suffix(corpus_suffix: String) =
+      opts.output + "-" + corpus_suffix
+       
     def output_lines(lines: DList[String], corpus_suffix: String,
         fields: Seq[String]) {
-      val outdir = opts.output + "-" + corpus_suffix
+      val outdir = output_directory_for_suffix(corpus_suffix)
       persist(TextOutput.toTextFile(lines, outdir))
+      rename_output_files(outdir, opts.corpus_name, corpus_suffix)
+      output_schema_for_suffix(corpus_suffix, fields)
+    }
+
+    def output_schema_for_suffix(corpus_suffix: String, fields: Seq[String]) {
+      val outdir = output_directory_for_suffix(corpus_suffix)
       val fixed_fields =
         Map("corpus" -> opts.corpus_name,
             "generating-app" -> "FindPolitical",
@@ -442,10 +451,8 @@ object FindPolitical extends
           "political-feature-type" -> "%s".format(opts.political_feature_type)
         )
       val out_schema = new Schema(fields, fixed_fields)
-      val out_schema_fn = Schema.construct_schema_file(filehand,
-          outdir, opts.corpus_name, corpus_suffix)
-      rename_output_files(outdir, opts.corpus_name, corpus_suffix)
-      out_schema.output_schema_file(filehand, out_schema_fn)
+      out_schema.output_constructed_schema_file(filehand, outdir,
+        opts.corpus_name, corpus_suffix)
     }
 
     errprint("Step 1: Load corpus, filter for conservatives/liberals, output.")
