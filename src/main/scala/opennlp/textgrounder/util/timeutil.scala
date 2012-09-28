@@ -102,6 +102,7 @@ package object timeutil {
             case "m" => 60
             case "h" => 60*60
             case "d" => 60*60*24
+            case "w" => 60*60*24*7
             case "" => 
               return (None, "Missing units in component '%s' in time offset '%s'; should be e.g. '25s' or '10h30m'"
                 format (valstr + units, str))
