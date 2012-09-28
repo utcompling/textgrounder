@@ -18,6 +18,18 @@
 
 package opennlp.textgrounder.preprocess
 
+/*
+ * This program reads in tweets and processes them, optionally filtering
+ * and/or grouping them.  Normally, tweets are read in JSON format, as
+ * directly pulled from the twitter API, and output in "textdb" format,
+ * i.e. as a simple TAB-separated database with one record per line and
+ * a separate schema file specifying the column names.  However, other
+ * input and output formats can be used.  The output normally includes the
+ * text of the tweets as well as unigrams and/or n-grams.
+ *
+ * See README.txt in the top-level directory for more info.
+ */
+
 import collection.JavaConversions._
 import collection.mutable
 
@@ -362,32 +374,6 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
 }
 
 object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
-
-  /*
-   * This program takes, as input, files which contain one tweet per line
-   * in JSON format as directly pulled from the twitter API. It groups the
-   * tweets either by user, by time or not at all, and outputs a folder that
-   * may be used as the --input-corpus argument of tg-geolocate.
-   * This is in "TextGrounder corpus" format, with one document per line
-   * and fields separated by tabs.  Maps that specify the count of strings
-   * are in the format "STRING:COUNT STRING:COUNT ...", where URL encoding is
-   * used to encode characters that cannot be output directly (e.g. %20 for
-   * a space, %25 for a % sign).  Ngram maps are of the form
-   * "WORD1:WORD2:...:COUNT WORD1:WORD2:...:COUNT ...".
-   *
-   * When doing no grouping, output can also be in JSON format, using the
-   * option `--output-format=json`.
-   *
-   * When merging, the code uses the earliest geolocated tweet as the combined
-   * location; tweets with a bounding box as their location rather than
-   * a single point are treated as if they have no location.
-   *
-   * When grouping by user, the code filters out users that have no geolocation
-   * or have a geolocation outside of North America (according to a crude
-   * bounding box), as well as those that are identified as likely "spammers"
-   * according to their number of followers and number of people they are
-   * following.
-   */
 
   // TweetID = Twitter's numeric ID used to uniquely identify a tweet.
   type TweetID = Long
