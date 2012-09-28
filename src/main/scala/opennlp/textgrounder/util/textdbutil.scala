@@ -861,7 +861,7 @@ package object textdbutil {
    * in a corpus.  The word or ngram must already have been encoded using
    * `encode_string_for_count_map_field` or `encode_ngram_for_count_map_field`.
    */
-  def shallow_encode_word_count_map(seq: collection.Seq[(String, Int)]) = {
+  def shallow_encode_count_map(seq: collection.Seq[(String, Int)]) = {
     // Sorting isn't strictly necessary but ensures consistent output as well
     // as putting the most significant items first, for visual confirmation.
     (for ((word, count) <- seq sortWith (_._2 > _._2)) yield
@@ -872,8 +872,8 @@ package object textdbutil {
    * Serialize a sequence of (word, count) pairs into the format used
    * in a corpus.
    */
-  def encode_word_count_map(seq: collection.Seq[(String, Int)]) = {
-    shallow_encode_word_count_map(seq map {
+  def encode_count_map(seq: collection.Seq[(String, Int)]) = {
+    shallow_encode_count_map(seq map {
       case (word, count) => (encode_string_for_count_map_field(word), count)
     })
   }
@@ -882,7 +882,7 @@ package object textdbutil {
    * Deserialize an encoded word-count map into a sequence of
    * (word, count) pairs.
    */
-  def decode_word_count_map(encoded: String) = {
+  def decode_count_map(encoded: String) = {
     if (encoded.length == 0)
       Array[(String, Int)]()
     else
@@ -907,8 +907,8 @@ package object textdbutil {
   }
 
   object Encoder {
-    def count_map(x: collection.Map[String, Int]) = encode_word_count_map(x.toSeq)
-    def count_map_seq(x: collection.Seq[(String, Int)]) = encode_word_count_map(x)
+    def count_map(x: collection.Map[String, Int]) = encode_count_map(x.toSeq)
+    def count_map_seq(x: collection.Seq[(String, Int)]) = encode_count_map(x)
     def string(x: String) = encode_string_for_whole_field(x)
     def string_in_seq(x: String) = encode_string_for_sequence_field(x)
     def seq_string(x: collection.Seq[String]) =
@@ -920,8 +920,8 @@ package object textdbutil {
   }
 
   object Decoder {
-    def count_map(x: String) = decode_word_count_map(x).toMap
-    def count_map_seq(x: String) = decode_word_count_map(x)
+    def count_map(x: String) = decode_count_map(x).toMap
+    def count_map_seq(x: String) = decode_count_map(x)
     def string(x: String) = decode_string_for_whole_field(x)
     def seq_string(x: String) =
       x.split(">>", -1).map(decode_string_for_sequence_field)

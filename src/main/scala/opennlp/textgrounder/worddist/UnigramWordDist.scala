@@ -263,7 +263,7 @@ class DefaultUnigramWordDistConstructor(
     keys_dynarr.clear()
     values_dynarr.clear()
     raw_keys_set.clear()
-    for ((word, count) <- textdbutil.decode_word_count_map(countstr)) {
+    for ((word, count) <- textdbutil.decode_count_map(countstr)) {
       /* FIXME: Is this necessary? */
       if (raw_keys_set contains word)
         throw FileFormatException(

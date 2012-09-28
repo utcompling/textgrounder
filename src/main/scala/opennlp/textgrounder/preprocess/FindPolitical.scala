@@ -194,7 +194,7 @@ object FindPolitical extends
     def get_feature_values(factory: IdeologicalUserAction, ty: String) = {
       ty match {
         case field@("retweets" | "user-mentions" | "hashtags") =>
-          decode_word_count_map(
+          decode_count_map(
             factory.user_subschema.get_field(fields, field))
         // case "followers" => FIXME
         // case "unigrams" => FIXME
@@ -263,7 +263,7 @@ object FindPolitical extends
           if (opts.ideological_ref_type == "mentions") "user-mentions"
           else opts.ideological_ref_type
         val ideo_refs =
-          decode_word_count_map(opts.schema.get_field(fields, ideo_ref_field))
+          decode_count_map(opts.schema.get_field(fields, ideo_ref_field))
         val text = opts.schema.get_field(fields, "text")
         val user = opts.schema.get_field(fields, "user")
         //errprint("For user %s, ideo_refs: %s", user, ideo_refs.toList)
@@ -348,7 +348,7 @@ object FindPolitical extends
     num_cons_accounts: Int, num_cons_refs: Int,
     num_refs_ideo_weighted: Double, all_text: Seq[String]) {
     def to_row(opts: FindPoliticalParams) =
-      Seq(value, encode_word_count_map(spellings.toSeq),
+      Seq(value, encode_count_map(spellings.toSeq),
         num_accounts, num_refs,
         num_lib_accounts, num_lib_refs,
         num_cons_accounts, num_cons_refs,
