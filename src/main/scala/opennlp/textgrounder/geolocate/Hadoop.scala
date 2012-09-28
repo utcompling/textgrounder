@@ -165,7 +165,7 @@ import opennlp.textgrounder.gridlocate.{CellGridEvaluator,TextGrounderInfo,DistD
    
 abstract class HadoopGeolocateApp(
   progname: String
-) extends GeolocateApp(progname) with HadoopCorpusApp {
+) extends GeolocateApp(progname) with HadoopTextDBApp {
   override type TDriver <: HadoopGeolocateDriver
 
   def corpus_suffix =
@@ -294,7 +294,7 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
           "FIXME: For Hadoop, currently need exactly one corpus")
       } else {
         processor = new HadoopDocumentFileProcessor(context)
-        processor.read_schema_from_corpus(driver.get_file_handler,
+        processor.read_schema_from_textdb(driver.get_file_handler,
             driver.params.input_corpus(0))
         context.progress
       }

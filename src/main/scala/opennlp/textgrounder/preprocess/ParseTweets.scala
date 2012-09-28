@@ -49,7 +49,7 @@ import opennlp.textgrounder.{util => tgutil}
 import tgutil.Twokenize
 import tgutil.argparser._
 import tgutil.collectionutil._
-import tgutil.corpusutil._
+import tgutil.textdbutil._
 import tgutil.ioutil.FileHandler
 import tgutil.hadoop.HadoopFileHandler
 import tgutil.printutil._
@@ -68,43 +68,43 @@ class ParseTweetsParams(ap: ArgParser) extends
     directly, after duplicated tweets have been removed).  Default is
     `%default`.  Tweet grouping is used for two purposes: For filtering by
     group (using `--filter-groups` or `--cfilter-groups`) and for outputting
-    grouped tweets using `--output-format=grouped-corpus`.""")
+    grouped tweets using `--output-format=grouped-textdb`.""")
   var input_format = ap.option[String]("input-format", "if",
-    choices = Seq("json", "corpus", "raw-lines"),
+    choices = Seq("json", "textdb", "raw-lines"),
     default = "json",
     help="""Format for input of tweets.  Possibilities are
     
     -- `json` (Read in JSON-formatted tweets.)
     
-    -- `corpus` (Read in a TextGrounder-style corpus, i.e. as a simple database
+    -- `textdb` (Read in data in textdb format, i.e. as a simple database
     with one record per line, fields separated by TAB characters, and a
-    schema indicating the names of the columns.  Typically this will result
-    from a previous run of ParseTweets using the default corpus output format.)
+    separate schema file indicating the names of the columns.  Typically this
+    will result from a previous run of ParseTweets using the default textdb
+    output format.)
   
     -- `raw-lines` (Read in lines of raw text and treat them as "tweets".  The
     tweets will have no useful information in them except for the text and
     file name, but this can still be useful for things like generating n-grams.)
     """)
   var output_format = ap.option[String]("output-format", "of",
-    choices = Seq("corpus", "grouped-corpus", "ungrouped-corpus",
+    choices = Seq("textdb", "grouped-textdb", "ungrouped-textdb",
       "stats", "json"),
-    default = "corpus",
+    default = "textdb",
     help="""Format for output of tweets or tweet groups.  Possibilities are
     
-    -- `corpus`, `grouped-corpus`, `ungrouped-corpus` (Store in a
-    TextGrounder-style corpus, i.e. as a simple database with one record per
-    line, fields separated by TAB characters, and a schema indicating the names
-    of the columns. An `ungrouped-corpus` is simply where each record
-    corresponds to an individual tweet, while in a `grouped-corpus`, each
-    record corresponds to a group of tweets, according to `--grouping`.
-    The value of `corpus` is an alias for one of the other two: `grouped-corpus`
-    if a value of `--grouping` other than `none` is specified,
-    `ungrouped-corpus` otherwise.)
+    -- `textdb`, `grouped-textdb`, `ungrouped-textdb` (Store in textdb format,
+    i.e. as a simple database with one record per line, fields separated by TAB
+    characters, and a separate schema fle indicating the names of the columns.
+    An `ungrouped-textdb` is simply where each record corresponds to an
+    individual tweet, while in a `grouped-textdb`, each record corresponds to
+    a group of tweets, according to `--grouping`.  The value of `textdb` is an
+    alias for one of the other two: `grouped-textdb` if a value of `--grouping`
+    other than `none` is specified, `ungrouped-textdb` otherwise.)
   
     -- `json` (Simply output JSON-formatted tweets directly, exactly as
     received.)
     
-    -- `stats` (Corpus-style output with statistics on the tweets, users, etc.
+    -- `stats` (Textdb-style output with statistics on the tweets, users, etc.
     rather than outputting the tweets themselves.)""")
   var corpus_name = ap.option[String]("corpus-name",
     help="""Name of output corpus; for identification purposes.
@@ -200,7 +200,7 @@ Look for any tweets containing the word "clinton" as well as either the words
     case-sensitive matching.  Format is identical to `--filter-tweets`.""")
   var output_fields = ap.option[String]("output-fields",
     default="default",
-    help="""Fields to output in corpus format.  This should consist of one or
+    help="""Fields to output in textdb format.  This should consist of one or
     more directives, separated by spaces or commas.  Directives are processed
     sequentially.  Each directive should be one of
     
@@ -361,14 +361,14 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
 
   override def check_usage() {
     timeslice = (timeslice_float * 1000).toLong
-    if (output_format == "corpus") {
+    if (output_format == "textdb") {
       if (grouping != "none")
-        output_format = "grouped-corpus"
+        output_format = "grouped-textdb"
       else
-        output_format = "ungrouped-corpus"
+        output_format = "ungrouped-textdb"
     }
-    if (output_format == "grouped-corpus" && grouping == "none")
-      ap.usageError("`grouped-corpus` output format not allowed when `--grouping=none`")
+    if (output_format == "grouped-textdb" && grouping == "none")
+      ap.usageError("`grouped-textdb` output format not allowed when `--grouping=none`")
     included_fields = parse_output_fields(output_fields)
   }
 }
@@ -1158,7 +1158,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     /*
-     * Parse a line (JSON or corpus) into a tweet.  Return `null` if
+     * Parse a line (JSON or textdb) into a tweet.  Return `null` if
      * unable to parse.
      */
     def parse_line(pathline: (String, String)) = {
@@ -1176,7 +1176,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         val (status, tweet) = opts.input_format match {
           case "raw-lines" => ("success", Tweet.from_raw_text(path, line))
           case "json" => parse_json_lift(path, line)
-          case "corpus" =>
+          case "textdb" =>
             error_wrap(line, ("error", null: Tweet)) { line =>
               ("success",
                 Tweet.from_row(opts.input_schema, line.split("\t", -1)))
@@ -1953,24 +1953,24 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         "not grouping"
     }))
     errprint("ParseTweets: " + (opts.output_format match {
-      case "ungrouped-corpus" =>
-        "outputting (ungrouped) tweets as a TextGrounder corpus"
-      case "grouped-corpus" =>
-        "outputting tweet groups as a TextGrounder corpus"
+      case "ungrouped-textdb" =>
+        "outputting (ungrouped) tweets in textdb format"
+      case "grouped-textdb" =>
+        "outputting tweet groups in textdb format"
       case "json" =>
         "outputting ungrouped tweets as raw JSON"
       case "stats" =>
         "outputting statistics on tweets"
     }))
     val ptp = new ParseTweetsDriver(opts)
-    // Firstly we load up all the (new-line-separated) JSON or corpus lines.
+    // Firstly we load up all the (new-line-separated) JSON or textdb lines.
     val lines: DList[(String, String)] = {
       opts.input_format match {
-        case "corpus" => {
+        case "textdb" => {
           val insuffix = "tweets"
-          opts.input_schema = CorpusFileProcessor.read_schema_from_corpus(
+          opts.input_schema = TextDBFileProcessor.read_schema_from_textdb(
             filehand, opts.input, insuffix)
-          val matching_patterns = CorpusFileProcessor.get_matching_patterns(
+          val matching_patterns = TextDBFileProcessor.get_matching_patterns(
             filehand, opts.input, insuffix)
           TextInput.fromTextFileWithPath(matching_patterns: _*)
         }
@@ -2020,7 +2020,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
       // output data file
       filehand.make_directories(outdir)
-      val outfile = CorpusFileProcessor.construct_output_file(filehand, outdir,
+      val outfile = TextDBFileProcessor.construct_output_file(filehand, outdir,
         opts.corpus_name, corpus_suffix, ".txt")
       val outstr = filehand.openw(outfile)
       lines.map(outstr.println(_))
@@ -2043,7 +2043,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         persist(TextOutput.toTextFile(tweets.map(_.json), opts.output))
         rename_outfiles()
       }
-      case "grouped-corpus" | "ungrouped-corpus" => {
+      case "grouped-textdb" | "ungrouped-textdb" => {
         val tfct = new TokenizeCountAndFormat(opts)
         // Tokenize the combined text into words, possibly generate ngrams
         // from them, count them up and output results formatted into a record.

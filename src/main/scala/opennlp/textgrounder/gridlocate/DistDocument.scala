@@ -26,7 +26,7 @@ import util.control.Breaks._
 import java.io._
 
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.corpusutil._
+import opennlp.textgrounder.util.textdbutil._
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
@@ -326,7 +326,7 @@ abstract class DistDocumentTable[
               maxtime = driver.params.max_time_per_stage)
       val training_distproc =
         new DistDocumentTableFileProcessor("training-" + suffix, cell_grid, task)
-      training_distproc.read_schema_from_corpus(filehand, dir)
+      training_distproc.read_schema_from_textdb(filehand, dir)
       training_distproc.process_files(filehand, Seq(dir))
       task.finish()
       output_resource_usage()
@@ -818,7 +818,7 @@ object DistDocumentConverters {
 abstract class DistDocumentFileProcessor(
   suffix: String,
   val dstats: ExperimentDriverStats
-) extends BasicCorpusFieldFileProcessor[Unit](suffix) {
+) extends BasicTextDBFieldFileProcessor[Unit](suffix) {
 
   /******** Counters to track what's going on ********/
 
@@ -933,7 +933,7 @@ abstract class DistDocumentFileProcessor(
 class DistDocumentWriter[TCoord : Serializer](
   schema: Schema,
   suffix: String
-) extends CorpusWriter(schema, suffix) {
+) extends TextDBWriter(schema, suffix) {
   def output_document(outstream: PrintStream, doc: DistDocument[TCoord]) {
     schema.output_row(outstream, doc.get_fields(schema.fieldnames))
   }

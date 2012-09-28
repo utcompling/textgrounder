@@ -29,7 +29,7 @@ import opennlp.textgrounder.gridlocate.DistDocument
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil.DynamicArray
-import opennlp.textgrounder.util.corpusutil._
+import opennlp.textgrounder.util.textdbutil._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.MeteredTask
@@ -136,7 +136,7 @@ class MMCUnigramWordDistHandler(
 ) extends SimpleUnigramWordDistConstructor {
   val new_schema = new Schema(schema.fieldnames ++ Seq("counts"),
     schema.fixed_values)
-  val writer = new CorpusWriter(new_schema, "unigram-counts")
+  val writer = new TextDBWriter(new_schema, "unigram-counts")
   writer.output_schema_file(filehand, output_dir, output_file_prefix)
   val outstream = writer.open_document_file(filehand, output_dir,
     output_file_prefix, compression = "bzip2")
@@ -175,7 +175,7 @@ class MMCUnigramWordDistHandler(
  */
 class MMCDocumentFileProcessor(
   suffix: String
-) extends BasicCorpusFieldFileProcessor[Unit](suffix) {
+) extends BasicTextDBFieldFileProcessor[Unit](suffix) {
   val document_fieldvals = mutable.Map[String, Seq[String]]()
 
   def process_row(fieldvals: Seq[String]) = {
@@ -226,7 +226,7 @@ counts file also containing the metadata.
 
     val fileproc =
       new MMCDocumentFileProcessor(document_metadata_suffix)
-    fileproc.read_schema_from_corpus(filehand, params.input_dir)
+    fileproc.read_schema_from_textdb(filehand, params.input_dir)
 
     if (params.output_file_prefix == null) {
       var (_, base) = filehand.split_filename(fileproc.schema_file)

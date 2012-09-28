@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  FrobCorpus.scala
+//  FrobTextDB.scala
 //
 //  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
 //
@@ -24,7 +24,7 @@ import java.io._
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.corpusutil._
+import opennlp.textgrounder.util.textdbutil._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.MeteredTask
@@ -36,7 +36,7 @@ import opennlp.textgrounder.gridlocate.DistDocument
 //                                  Main code                              //
 /////////////////////////////////////////////////////////////////////////////
 
-class FrobCorpusParameters(ap: ArgParser) extends
+class FrobTextDBParameters(ap: ArgParser) extends
     ProcessFilesParameters(ap) {
   val input_dir =
     ap.option[String]("i", "input-dir",
@@ -101,13 +101,13 @@ containing unigram counts.""")
  *   taken from parameters)
  * @param params Parameters retrieved from the command-line arguments
  */
-class FrobCorpusFileProcessor(
+class FrobTextDBFileProcessor(
   output_filehand: FileHandler,
-  params: FrobCorpusParameters
-) extends BasicCorpusFieldFileProcessor[Unit](params.input_suffix) {
-  val split_value_to_writer = mutable.Map[String, CorpusWriter]()
+  params: FrobTextDBParameters
+) extends BasicTextDBFieldFileProcessor[Unit](params.input_suffix) {
+  val split_value_to_writer = mutable.Map[String, TextDBWriter]()
   val split_value_to_outstream = mutable.Map[String, PrintStream]()
-  var unsplit_writer: CorpusWriter = _
+  var unsplit_writer: TextDBWriter = _
   var unsplit_outstream: PrintStream = _
 
   def frob_row(fieldvals: Seq[String]) = {
@@ -175,7 +175,7 @@ class FrobCorpusFileProcessor(
        */
       val new_schema =
         new Schema(fieldnames, modify_fixed_values(schema.fixed_values))
-      unsplit_writer = new CorpusWriter(new_schema, params.output_suffix)
+      unsplit_writer = new TextDBWriter(new_schema, params.output_suffix)
       unsplit_writer.output_schema_file(output_filehand, params.output_dir,
         schema_prefix)
     }
@@ -210,7 +210,7 @@ class FrobCorpusFileProcessor(
           schema.fixed_values + (params.split_by_field -> split)
         val new_schema =
           new Schema(new_fieldnames, modify_fixed_values(new_fixed_values))
-        val writer = new CorpusWriter(new_schema, params.output_suffix)
+        val writer = new TextDBWriter(new_schema, params.output_suffix)
         writer.output_schema_file(output_filehand, params.output_dir,
           schema_prefix + "-" + split)
         split_value_to_writer(split) = writer
@@ -281,9 +281,9 @@ class FrobCorpusFileProcessor(
   }
 }
 
-class FrobCorpusDriver extends
+class FrobTextDBDriver extends
     ProcessFilesDriver with StandaloneExperimentDriverStats {
-  type TParam = FrobCorpusParameters
+  type TParam = FrobTextDBParameters
   
   override def handle_parameters() {
     need(params.input_dir, "input-dir")
@@ -310,15 +310,15 @@ class FrobCorpusDriver extends
 
     val filehand = get_file_handler
     val fileproc =
-      new FrobCorpusFileProcessor(filehand, params)
-    fileproc.read_schema_from_corpus(filehand, params.input_dir)
+      new FrobTextDBFileProcessor(filehand, params)
+    fileproc.read_schema_from_textdb(filehand, params.input_dir)
     fileproc.process_files(filehand, Seq(params.input_dir))
   }
 }
 
-object FrobCorpus extends
-    ExperimentDriverApp("FrobCorpus") {
-  type TDriver = FrobCorpusDriver
+object FrobTextDB extends
+    ExperimentDriverApp("FrobTextDB") {
+  type TDriver = FrobTextDBDriver
 
   override def description =
 """Modify a corpus by changing particular fields.  Fields can be added
