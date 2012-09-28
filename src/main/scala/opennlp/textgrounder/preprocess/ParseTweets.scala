@@ -1176,7 +1176,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       maybe_counter("total lines")
       lineno += 1
       // For testing
-      // logger.debug("parsing JSON: %s" format line)
+      if (opts.debug)
+        logger.debug("parsing JSON: %s" format line)
       if (line.trim == "") {
         maybe_counter("blank lines skipped")
         null
