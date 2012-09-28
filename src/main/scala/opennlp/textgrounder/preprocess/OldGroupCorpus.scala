@@ -186,7 +186,7 @@ class GroupCorpusDriver extends
 class GroupCorpusFileProcessor(
   context: TaskInputOutputContext[_,_,_,_],
   driver: GroupCorpusDriver
-) extends BasicTextDBFieldFileProcessor[Unit](driver.params.input_suffix) {
+) extends BasicTextDBProcessor[Unit](driver.params.input_suffix) {
   def process_row(fieldvals: Seq[String]): (Boolean, Boolean) =
     throw new IllegalStateException("This shouldn't be called")
 

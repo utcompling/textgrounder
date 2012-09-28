@@ -94,17 +94,17 @@ containing unigram counts.""")
 }
 
 /**
- * A field-text file processor that outputs fields as the came in,
- * possibly modified in various ways.
+ * A textdb processor that outputs fields as they come in, possibly modified
+ * in various ways.
  *
  * @param output_filehand FileHandler of the output corpus (directory is
  *   taken from parameters)
  * @param params Parameters retrieved from the command-line arguments
  */
-class FrobTextDBFileProcessor(
+class FrobTextDBProcessor(
   output_filehand: FileHandler,
   params: FrobTextDBParameters
-) extends BasicTextDBFieldFileProcessor[Unit](params.input_suffix) {
+) extends BasicTextDBProcessor[Unit](params.input_suffix) {
   val split_value_to_writer = mutable.Map[String, TextDBWriter]()
   val split_value_to_outstream = mutable.Map[String, PrintStream]()
   var unsplit_writer: TextDBWriter = _
@@ -310,7 +310,7 @@ class FrobTextDBDriver extends
 
     val filehand = get_file_handler
     val fileproc =
-      new FrobTextDBFileProcessor(filehand, params)
+      new FrobTextDBProcessor(filehand, params)
     fileproc.read_schema_from_textdb(filehand, params.input_dir)
     fileproc.process_files(filehand, Seq(params.input_dir))
   }

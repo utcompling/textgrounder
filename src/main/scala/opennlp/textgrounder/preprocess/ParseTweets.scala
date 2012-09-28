@@ -1968,9 +1968,9 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       opts.input_format match {
         case "textdb" => {
           val insuffix = "tweets"
-          opts.input_schema = TextDBFileProcessor.read_schema_from_textdb(
+          opts.input_schema = TextDBProcessor.read_schema_from_textdb(
             filehand, opts.input, insuffix)
-          val matching_patterns = TextDBFileProcessor.get_matching_patterns(
+          val matching_patterns = TextDBProcessor.get_matching_patterns(
             filehand, opts.input, insuffix)
           TextInput.fromTextFileWithPath(matching_patterns: _*)
         }
@@ -2020,7 +2020,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
       // output data file
       filehand.make_directories(outdir)
-      val outfile = TextDBFileProcessor.construct_output_file(filehand, outdir,
+      val outfile = TextDBProcessor.construct_output_file(filehand, outdir,
         opts.corpus_name, corpus_suffix, ".txt")
       val outstr = filehand.openw(outfile)
       lines.map(outstr.println(_))

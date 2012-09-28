@@ -27,7 +27,7 @@ import org.apache.commons.lang3.StringEscapeUtils._
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil.{FileHandler, LocalFileHandler, TextFileProcessor}
+import opennlp.textgrounder.util.ioutil.{FileHandler, LocalFileHandler, LineProcessor}
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil._
@@ -108,7 +108,7 @@ are computed.""")
       help = """File(s) to process for input.""")
 }
 
-abstract class TwitterInfochimpsFileProcessor extends TextFileProcessor[Unit] {
+abstract class TwitterInfochimpsFileProcessor extends LineProcessor[Unit] {
   def process_lines(lines: Iterator[String],
       filehand: FileHandler, file: String,
       compression: String, realname: String) = {

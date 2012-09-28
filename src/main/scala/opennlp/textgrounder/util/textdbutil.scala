@@ -28,7 +28,7 @@ import ioutil._
 
 package object textdbutil {
   /**
-   * A text-file processor where each line is made up of a fixed number
+   * A line processor where each line is made up of a fixed number
    * of fields, separated by some sort of separator (by default a tab
    * character).  No implementation is provided for `process_lines`,
    * the driver function.  This function in general should loop over the
@@ -37,7 +37,7 @@ package object textdbutil {
    * @param split_re Regular expression used to split one field from another.
    *   By default a tab character.
    */
-  trait FieldTextFileProcessor[T] extends TextFileProcessor[T] {
+  trait FieldLineProcessor[T] extends LineProcessor[T] {
     val split_re: String = "\t"
 
     var all_num_processed = 0
@@ -137,7 +137,7 @@ package object textdbutil {
     }
 
     /* Also, the same "may-be-implemented" functions from the superclass
-       TextFileProcessor. */
+       LineProcessor. */
   }
 
   /**
@@ -262,7 +262,7 @@ package object textdbutil {
      */
     def construct_schema_file(filehand: FileHandler, dir: String,
         prefix: String, suffix: String) =
-      TextDBFileProcessor.construct_output_file(filehand, dir, prefix,
+      TextDBProcessor.construct_output_file(filehand, dir, prefix,
         suffix, "-schema.txt")
 
     /**
@@ -359,7 +359,7 @@ package object textdbutil {
    *     The document files are named `DIR/PREFIX-SUFFIX.txt`
    *     (or `DIR/PREFIX-SUFFIX.txt.bz2` or similar, for compressed files),
    *     while the schema file is named `DIR/PREFIX-SUFFIX-schema.txt`.
-   *     Note that the SUFFIX is set when the `TextDBFileProcessor` is
+   *     Note that the SUFFIX is set when the `TextDBLineProcessor` is
    *     created, and typically specifies the category of corpus being
    *     read (e.g. "text" for corpora containing text or "unigram-counts"
    *     for a corpus containing unigram counts).  The directory is specified
@@ -399,10 +399,10 @@ package object textdbutil {
    * @param suffix the suffix of the corpus files, as described above
    *     
    */
-  abstract class TextDBFileProcessor[T](
+  abstract class TextDBLineProcessor[T](
     suffix: String
-  ) extends TextFileProcessor[T] {
-    import TextDBFileProcessor._
+  ) extends LineProcessor[T] {
+    import TextDBProcessor._
 
     /**
      * Name of the schema file.
@@ -493,7 +493,7 @@ package object textdbutil {
     }
   }
 
-  object TextDBFileProcessor {
+  object TextDBProcessor {
     val possible_compression_re = """(\.bz2|\.bzip2|\.gz|\.gzip)?$"""
     /**
      * For a given suffix, create a regular expression
@@ -576,14 +576,14 @@ package object textdbutil {
 
   /**
    * A basic file processor for reading in a "corpus" of documents and
-   * processing rows as arrays of fields (ala `FieldTextFileProcessor`).
-   * You might want to use the higher-level `TextDBFieldFileProcessor`.
+   * processing rows as arrays of fields (ala `FieldLineProcessor`).
+   * You might want to use the higher-level `TextDBProcessor`.
    *
    * @param suffix the suffix of the corpus files, as described above
    */
-  abstract class BasicTextDBFieldFileProcessor[T](
+  abstract class BasicTextDBProcessor[T](
     suffix: String
-  ) extends TextDBFileProcessor[T](suffix) with FieldTextFileProcessor[T] {
+  ) extends TextDBLineProcessor[T](suffix) with FieldLineProcessor[T] {
     override def set_schema(schema: Schema) {
       super.set_schema(schema)
       set_fieldnames(schema.fieldnames)
@@ -594,7 +594,7 @@ package object textdbutil {
 
   /**
    * A file processor for reading in a "corpus" of documents and
-   * processing rows as arrays of fields (ala `FieldTextFileProcessor`).
+   * processing rows as arrays of fields (ala `FieldLineProcessor`).
    * Each row is assumed to generate an object of type T.  The result
    * of calling `process_file` will be a Seq[T] of all objects, and
    * the result of calling `process_files` to process all files will
@@ -609,8 +609,8 @@ package object textdbutil {
    *
    * @param suffix the suffix of the corpus files, as described above
    */
-  abstract class TextDBFieldFileProcessor[T](suffix: String) extends
-      BasicTextDBFieldFileProcessor[Seq[T]](suffix) {
+  abstract class TextDBProcessor[T](suffix: String) extends
+      BasicTextDBProcessor[Seq[T]](suffix) {
 
     def handle_row(fieldvals: Seq[String]): Option[T]
 
@@ -681,7 +681,7 @@ package object textdbutil {
     /*
     FIXME: Should be implemented.  Requires that process_files() returns
     the filename along with the value. (Should not be a problem for any
-    existing users of BasicTextDBFieldFileProcessor, because AFAIK they
+    existing users of BasicTextDBProcessor, because AFAIK they
     ignore the value.)
 
     def read_textdb_with_filenames(filehand: FileHandler, dir: String) = ...
@@ -690,11 +690,11 @@ package object textdbutil {
 
   /**
    * Class for writing a "corpus" of documents.  The corpus has the
-   * format described in `TextDBFileProcessor`.
+   * format described in `TextDBLineProcessor`.
    *
    * @param schema the schema describing the fields in the document file
    * @param suffix the suffix of the corpus files, as described in
-   *   `TextDBFileProcessor`
+   *   `TextDBLineProcessor`
    *     
    */
   class TextDBWriter(
@@ -716,7 +716,7 @@ package object textdbutil {
      */
     def open_document_file(filehand: FileHandler, dir: String,
         prefix: String, compression: String = "none") = {
-      val file = TextDBFileProcessor.construct_output_file(filehand, dir,
+      val file = TextDBProcessor.construct_output_file(filehand, dir,
         prefix, suffix, ".txt")
       filehand.openw(file, compression = compression)
     }

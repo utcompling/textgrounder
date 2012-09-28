@@ -116,7 +116,7 @@ class FindPoliticalParams(ap: ArgParser) extends
  * @param suffix Suffix used to select document metadata files in a directory
  */
 class IdeoUserFileProcessor extends
-    TextDBFieldFileProcessor[(String, Double)]("ideo-users") {
+    TextDBProcessor[(String, Double)]("ideo-users") {
   def handle_row(fieldvals: Seq[String]) = {
     val user = schema.get_field(fieldvals, "user")
     val ideology =
@@ -524,7 +524,7 @@ object FindPolitical extends
 
     val suffix = "tweets"
     opts.schema =
-      TextDBFileProcessor.read_schema_from_textdb(filehand, opts.input, suffix)
+      TextDBProcessor.read_schema_from_textdb(filehand, opts.input, suffix)
 
     def output_directory_for_suffix(corpus_suffix: String) =
       opts.output + "-" + corpus_suffix
@@ -562,7 +562,7 @@ object FindPolitical extends
     var ideo_users: DList[IdeologicalUser] = null
 
     val ideo_fact = new IdeologicalUserAction(opts)
-    val matching_patterns = TextDBFileProcessor.
+    val matching_patterns = TextDBProcessor.
         get_matching_patterns(filehand, opts.input, suffix)
     val lines: DList[String] = TextInput.fromTextFile(matching_patterns: _*)
 
