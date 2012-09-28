@@ -148,20 +148,16 @@ IV. Download and build Poligrounder
 
    Execute the following:
 
-   $ poligrounder build assembly
+   $ poligrounder build compile
 
-   This should be executable from anywhere; it uses a script in
-   $POLIGROUNDER_DIR/bin and relies on the setting in POLIGROUNDER_DIR
+   It should be possible to execute this from any directory; it uses a script
+   in $POLIGROUNDER_DIR/bin and relies on the setting in POLIGROUNDER_DIR
    to know where the source code is.  There is a copy of SBT 0.12.0
    located inside of Poligrounder, and everything after 'poligrounder build'
-   actually gets passed directly to SBT.  In this case, the 'assembly'
-   directive causes a bunch more JAR's to get downloaded, and then
-   Poligrounder gets compiled, and eventually a self-contained "assembly"
-   or "fat JAR" gets built containing all the JAR's necessary to run
-   Poligrounder under Hadoop.
+   actually gets passed directly to SBT.
 
-   Note that for local testing, it's not actually necessary to build an
-   assembly.
+   In this case, the 'compile' directive causes a bunch more JAR's to get
+   downloaded, and then Poligrounder gets compiled.
 
 
 V. Get the data
@@ -222,7 +218,7 @@ VII. Test under Hadoop
 
 To run under Hadoop, you will need to do the following steps, in general:
 
-1. Make sure you have a self-contained JAR assembly built (see above).
+1. Make sure you have a self-contained JAR assembly built.
 2. Request machines, for running Hadoop, if necessary.
 3. Log into the Hadoop job tracker.
 4. Copy your data into HDFS (the Hadoop Distributed File System), unless
@@ -230,6 +226,19 @@ To run under Hadoop, you will need to do the following steps, in general:
    Hadoop nodes (the job tracker and all task trackers).
 5. Submit the job to Hadoop.
 6. Copy your data out of HDFS.
+
+
+------ Building an assembly ------
+
+To run Poligrounder under Hadoop, it's necessary to build a self-contained
+"assembly" or "fat JAR" containing the Poligrounder code as well as all the
+dependent JAR's necessary to run Poligrounder.
+
+To do this, execute the following:
+
+$ poligrounder build assembly
+
+Note that this step may take several minutes on some machines.
 
 
 ------ Running under Bespin ------
@@ -253,6 +262,7 @@ data cannot be stored long-term in HDFS.  All file systems are visible on
 all machines, so there is no need to copy data into HDFS, although it
 must be copied out.
 
+
 ------ Copy data into HDFS ------
 
 If it is necessary to copy data into HDFS, use 'hadoop fs -put' to copy
@@ -261,6 +271,7 @@ URL.  If data is to be read from a local file system, it will need to be
 accessed using an absolute URL with the 'file:///' prefix, e.g. on Longhorn:
 
 file:///scratch/01683/benwing/corpora/twitter-pull/all-spritzer
+
 
 ------ Submit to Hadoop ------
 
