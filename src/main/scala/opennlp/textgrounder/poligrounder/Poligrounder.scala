@@ -153,7 +153,7 @@ class PoligrounderParameters(parser: ArgParser = null) extends
  * @param suffix Suffix used to select document metadata files in a directory
  */
 class IdeoUserFileProcessor extends
-    TextDBFieldFileProcessor[(String, Double)]("ideo-users") {
+    TextDBProcessor[(String, Double)]("ideo-users") {
   def handle_row(fieldvals: Seq[String]) = {
     val user = schema.get_field(fieldvals, "user")
     val ideology =

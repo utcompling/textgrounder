@@ -246,7 +246,7 @@ package object hadoop {
          seen, for Hadoop's benefit. */
       class RetrieveDocumentFilesFileProcessor(
         suffix: String
-      ) extends TextDBFileProcessor[Unit](suffix) {
+      ) extends TextDBLineProcessor[Unit](suffix) {
         def process_lines(lines: Iterator[String],
             filehand: FileHandler, file: String,
             compression: String, realname: String) = {
@@ -254,9 +254,6 @@ package object hadoop {
           FileInputFormat.addInputPath(job, new Path(file))
           (true, ())
         }
-
-        def process_row(fieldvals: Seq[String]) =
-          throw new IllegalStateException("This shouldn't be called")
       }
 
       val fileproc = new RetrieveDocumentFilesFileProcessor(

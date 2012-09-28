@@ -818,7 +818,7 @@ object DistDocumentConverters {
 abstract class DistDocumentFileProcessor(
   suffix: String,
   val dstats: ExperimentDriverStats
-) extends BasicTextDBFieldFileProcessor[Unit](suffix) {
+) extends BasicTextDBProcessor[Unit](suffix) {
 
   /******** Counters to track what's going on ********/
 

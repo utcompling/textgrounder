@@ -744,7 +744,7 @@ package object ioutil {
    * the same mechanism for processing the files themselves as in
    * `FileProcessor`.
    */
-  trait TextFileProcessor[T] extends FileProcessor[T] {
+  trait LineProcessor[T] extends FileProcessor[T] {
     /**
      * Process a given file.
      *
