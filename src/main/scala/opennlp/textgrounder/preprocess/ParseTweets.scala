@@ -277,9 +277,7 @@ Look for any tweets containing the word "clinton" as well as either the words
   if *any* tweet matches the filter.""")
   var cfilter_groups = ap.option[String]("cfilter-groups",
     help="""Same as `--filter-groups` but does case-sensitive matching.""")
-  var geographic_only = ap.flag("geographic-only", "geog",
-    help="""Filter out tweets that don't have a geotag or that have a
-geotag outside of North America.  Also filter on min/max-followers, etc.""")
+
   var preserve_case = ap.flag("preserve-case",
     help="""Don't lowercase words.  This preserves the difference
     between e.g. the name "Mark" and the word "mark".""")
@@ -287,14 +285,19 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
     default = 1,
     help="""Largest size of n-grams to create.  Default 1, i.e. distribution
     only contains unigrams.""")
-  var min_tweets = ap.option[Int]("min-tweets",
-    default = 10,
-    help="""Minimum number of tweets per user for user to be accepted in
-    --by-user mode.""")
-  var max_tweets = ap.option[Int]("max-tweets",
-    default = 1000,
-    help="""Maximum number of tweets per user for user to be accepted in
-    --by-user mode.""")
+
+  // FIXME!! The following should really be controllable using the
+  // normal filter mechanism, rather than the special-case hacks below.
+  var geographic_only = ap.flag("geographic-only", "go",
+    help="""Filter out tweets that don't have a geotag.""")
+  var north_america_only = ap.flag("north-america-only", "nao",
+    help="""Filter out tweets that don't have a geotag or that have a
+    geotag outside of North America.""")
+  var filter_spammers = ap.flag("filter-spammers", "fs",
+    help="""Filter out tweets that don't have number of tweets within
+    [10, 1000], or number of followers >= 10, or number of people
+    following within [5, 1000].  This is an attempt to filter out
+    "spammers", i.e. accounts not associated with normal users.""")
 
   import ParseTweets.Tweet
 
@@ -1425,6 +1428,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     val MAX_NUMBER_FOLLOWING = 1000
     val MIN_NUMBER_FOLLOWING = 5
     val MIN_NUMBER_FOLLOWERS = 10
+    val MAX_NUMBER_TWEETS = 1000
+    val MIN_NUMBER_TWEETS = 10
     /**
      * Return true if this tweet combination (tweets for a given user)
      * appears to reflect a "spammer" user or some other user with
@@ -1447,9 +1452,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         (tw.following >= MIN_NUMBER_FOLLOWING &&
            tw.following <= MAX_NUMBER_FOLLOWING) &&
         (tw.followers >= MIN_NUMBER_FOLLOWERS) &&
-        (tw.numtweets >= opts.min_tweets && tw.numtweets <= opts.max_tweets)
-      if (opts.debug && !good)
-        logger.info("Rejecting is_nonspammer %s" format tw)
+        (tw.numtweets >= MIN_NUMBER_TWEETS &&
+         tw.numtweets <= MAX_NUMBER_TWEETS)
       if (!good)
         bump_counter("grouped tweets filtered due to failing following, followers, or min/max tweets restrictions")
       good
@@ -1462,25 +1466,29 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     val MAX_LNG = -60.0
 
     /**
-     * Return true of this tweet (combination) is located within the
-     * bounding box fo North America.
+     * Return true if this tweet (combination) is located within the
+     * bounding box of North America.
      */
-    private def northamerica_only(tw: Tweet): Boolean = {
+    private def matches_north_america(tw: Tweet): Boolean = {
       val good = (tw.lat >= MIN_LAT && tw.lat <= MAX_LAT) &&
                  (tw.long >= MIN_LNG && tw.long <= MAX_LNG)
-      if (opts.debug && !good)
-        logger.info("Rejecting northamerica_only %s" format tw)
       if (!good)
         bump_counter("grouped tweets filtered due to outside North America")
       good
     }
 
-    private def is_good_geo_tweet(tw: Tweet): Boolean = {
-      if (opts.debug)
-        logger.info("Considering %s" format tw)
-      has_latlong(tw) &&
-      is_nonspammer(tw) &&
-      northamerica_only(tw)
+    /**
+     * Return true if this tweet (combination) matches all of the
+     * misc. filters (--geographic-only, --north-america-only,
+     * --filter-spammers).
+     *
+     * FIXME: Eliminate misc. filters, make them possible using
+     * normal filter mechanism.
+     */
+    private def matches_misc_filters(tw: Tweet): Boolean = {
+      (!opts.geographic_only || has_latlong(tw)) &&
+      (!opts.north_america_only || matches_north_america(tw)) &&
+      (!opts.filter_spammers || is_nonspammer(tw))
     }
 
     /**
@@ -1593,16 +1601,12 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
           grouped_records.map(_.tweet)
         }
 
-      // If grouping by user, filter the tweet combinations, removing users
-      // without a specific coordinate; users that appear to be "spammers" or
-      // other users with non-standard behavior; and users located outside of
-      // North America.  FIXME: We still want to filter spammers; but this
-      // is trickier when not grouping by user.  How to do it?
-      val final_tweets =
-        if (opts.geographic_only) grouped_tweets.filter(is_good_geo_tweet)
-        else grouped_tweets
-
-      final_tweets.filter(note_remaining_tweets)
+      // Apply misc. filters, and note whatever remains.
+      // FIXME: Misc. filters should be doable using normal filter
+      // mechanism, rather than special-cased.
+      grouped_tweets
+        .filter(matches_misc_filters)
+        .filter(note_remaining_tweets)
     }
   }
 
