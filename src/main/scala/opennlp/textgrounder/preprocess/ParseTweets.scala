@@ -1483,6 +1483,14 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       northamerica_only(tw)
     }
 
+    /**
+     * Return true if a grouped set of tweets matches group-level filters
+     * (i.e. if any of them individually matches the filters).
+     * We've already checked each individual tweet against the
+     * group-level filters, and grouped tweets based on the group-filtering
+     * key.  Note that we only do things this way if we're not also
+     * grouping output on the same key; see below.
+     */
     private def matches_group_filters(records: Iterable[Record]) = {
       val good = records.exists(_.matches)
       if (!good)
@@ -1546,9 +1554,23 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
          -- Group by filter key;
          -- Filter to see if any tweet in group matches group filter
             (_.exists(_.matches))
-         -- Flatmap;
+         -- Flatten;
          -- Group by output key;
          -- Merge.
+
+      Note that in the cases of (3) and (5), we need to iterate over
+      the result of grouping.  Currently there are some issues doing
+      this in Scoobi.  We do have a fix in our private version, but it
+      potentially can lead to memory errors.  In general, the problem
+      is that we need to iterate twice through the list of grouped
+      tweets (once to check to see if any match, again to do the
+      flattening).  Hadoop doesn't really have support for this, so
+      we have to buffer everything, which can lead to memory errors.
+      (Note that Hadoop 0.21+/2.0+ has a feature to allow multiple
+      iteration in this case, but it also does buffering.  The only
+      difference is that it buffers only a certain amount in memory
+      and then spills the remainder to disk.  Scoobi should probably do
+      the same.)
       */
 
       val grouped_tweets =
