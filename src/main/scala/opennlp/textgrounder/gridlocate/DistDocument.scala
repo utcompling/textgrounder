@@ -680,8 +680,8 @@ abstract class DistDocument[TCoord : Serializer](
 
   override def toString = {
     val coordstr = if (has_coord) " at %s".format(coord) else ""
-    val corpus = schema.get_fixed_field("corpus")
-    val corpusstr = if (corpus != null) "%s/".format(corpus) else ""
+    val corpus_name = schema.get_fixed_field("corpus-name")
+    val corpusstr = if (corpus_name != null) "%s/".format(corpus_name) else ""
     "%s%s%s".format(corpusstr, title, coordstr)
   }
 

@@ -1911,7 +1911,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       // have to add the same field here
       val fields = Tweet.row_fields(opts)
       val fixed_fields = Map(
-          "corpus" -> opts.corpus_name,
+          "corpus-name" -> opts.corpus_name,
           "generating-app" -> "ParseTweets",
           "corpus-type" -> ("twitter-%s" format
             (if (opts.grouping == "none") "tweets" else opts.grouping))) ++
@@ -1993,7 +1993,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
 
     // create a schema given a set of data fields plus user params
     def create_schema(fields: Seq[String]) =
-      new Schema(fields, Map("corpus" -> opts.corpus_name))
+      new Schema(fields, Map("corpus-name" -> opts.corpus_name))
 
     // output lines of data in a DList to a corpus
     def dlist_output_lines(lines: DList[String],

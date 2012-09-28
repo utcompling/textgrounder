@@ -546,7 +546,7 @@ object FindPolitical extends
     def output_schema_for_suffix(corpus_suffix: String, fields: Seq[String]) {
       val outdir = output_directory_for_suffix(corpus_suffix)
       val fixed_fields =
-        Map("corpus" -> opts.corpus_name,
+        Map("corpus-name" -> opts.corpus_name,
             "generating-app" -> "FindPolitical",
             "corpus-type" -> "twitter-%s".format(corpus_suffix)) ++
         opts.non_default_params_string.toMap ++
