@@ -33,7 +33,7 @@ import org.apache.hadoop.fs._
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.corpusutil._
+import opennlp.textgrounder.util.textdbutil._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.hadoop._
 import opennlp.textgrounder.util.ioutil._
@@ -186,7 +186,7 @@ class GroupCorpusDriver extends
 class GroupCorpusFileProcessor(
   context: TaskInputOutputContext[_,_,_,_],
   driver: GroupCorpusDriver
-) extends BasicCorpusFieldFileProcessor[Unit](driver.params.input_suffix) {
+) extends BasicTextDBFieldFileProcessor[Unit](driver.params.input_suffix) {
   def process_row(fieldvals: Seq[String]): (Boolean, Boolean) =
     throw new IllegalStateException("This shouldn't be called")
 
@@ -209,7 +209,7 @@ trait GroupCorpusMapReducer extends HadoopExperimentMapReducer {
   override def init(context: TContext) {
     super.init(context)
     processor = create_processor(context)
-    processor.read_schema_from_corpus(driver.get_file_handler,
+    processor.read_schema_from_textdb(driver.get_file_handler,
         driver.params.input_dir)
     context.progress
   }
@@ -350,7 +350,7 @@ class GroupCorpusReducer extends
 }
 
 object GroupCorpus extends
-    ExperimentDriverApp("GroupCorpus") with HadoopCorpusApp {
+    ExperimentDriverApp("GroupCorpus") with HadoopTextDBApp {
   type TDriver = GroupCorpusDriver
 
   override def description =

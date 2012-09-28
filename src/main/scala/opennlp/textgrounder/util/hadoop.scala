@@ -35,7 +35,7 @@ import java.net.URI
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.corpusutil._
+import opennlp.textgrounder.util.textdbutil._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.printutil.{errprint, set_errout_prefix}
@@ -236,7 +236,7 @@ package object hadoop {
     }
   }
 
-  trait HadoopCorpusApp extends HadoopExperimentDriverApp {
+  trait HadoopTextDBApp extends HadoopExperimentDriverApp {
     def corpus_suffix: String
 
     def corpus_dirs: Iterable[String]
@@ -246,7 +246,7 @@ package object hadoop {
          seen, for Hadoop's benefit. */
       class RetrieveDocumentFilesFileProcessor(
         suffix: String
-      ) extends CorpusFileProcessor[Unit](suffix) {
+      ) extends TextDBFileProcessor[Unit](suffix) {
         def process_lines(lines: Iterator[String],
             filehand: FileHandler, file: String,
             compression: String, realname: String) = {

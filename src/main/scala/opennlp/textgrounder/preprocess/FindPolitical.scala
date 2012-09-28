@@ -27,7 +27,7 @@ import com.nicta.scoobi.Scoobi._
 
 import opennlp.textgrounder.{util => tgutil}
 import tgutil.argparser._
-import tgutil.corpusutil._
+import tgutil.textdbutil._
 import tgutil.hadoop._
 import tgutil.ioutil._
 import tgutil.collectionutil._
@@ -116,7 +116,7 @@ class FindPoliticalParams(ap: ArgParser) extends
  * @param suffix Suffix used to select document metadata files in a directory
  */
 class IdeoUserFileProcessor extends
-    CorpusFieldFileProcessor[(String, Double)]("ideo-users") {
+    TextDBFieldFileProcessor[(String, Double)]("ideo-users") {
   def handle_row(fieldvals: Seq[String]) = {
     val user = schema.get_field(fieldvals, "user")
     val ideology =
@@ -517,14 +517,14 @@ object FindPolitical extends
       }
       else {
         val processor = new IdeoUserFileProcessor
-        processor.read_corpus(filehand, opts.political_twitter_accounts).
+        processor.read_textdb(filehand, opts.political_twitter_accounts).
           flatten.toMap
       }
     // errprint("Accounts: %s", accounts)
 
     val suffix = "tweets"
     opts.schema =
-      CorpusFileProcessor.read_schema_from_corpus(filehand, opts.input, suffix)
+      TextDBFileProcessor.read_schema_from_textdb(filehand, opts.input, suffix)
 
     def output_directory_for_suffix(corpus_suffix: String) =
       opts.output + "-" + corpus_suffix
@@ -562,7 +562,7 @@ object FindPolitical extends
     var ideo_users: DList[IdeologicalUser] = null
 
     val ideo_fact = new IdeologicalUserAction(opts)
-    val matching_patterns = CorpusFileProcessor.
+    val matching_patterns = TextDBFileProcessor.
         get_matching_patterns(filehand, opts.input, suffix)
     val lines: DList[String] = TextInput.fromTextFile(matching_patterns: _*)
 

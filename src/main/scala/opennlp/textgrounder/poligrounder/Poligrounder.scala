@@ -66,7 +66,7 @@ import collection.mutable
 import opennlp.textgrounder.{util=>tgutil}
 import tgutil.argparser._
 import tgutil.collectionutil._
-import tgutil.corpusutil._
+import tgutil.textdbutil._
 import tgutil.distances._
 import tgutil.experiment._
 import tgutil.ioutil.{FileHandler, LocalFileHandler}
@@ -153,7 +153,7 @@ class PoligrounderParameters(parser: ArgParser = null) extends
  * @param suffix Suffix used to select document metadata files in a directory
  */
 class IdeoUserFileProcessor extends
-    CorpusFieldFileProcessor[(String, Double)]("ideo-users") {
+    TextDBFieldFileProcessor[(String, Double)]("ideo-users") {
   def handle_row(fieldvals: Seq[String]) = {
     val user = schema.get_field(fieldvals, "user")
     val ideology =
@@ -187,7 +187,7 @@ class PoligrounderDriver extends
     if (params.ideological_user_corpus != null) {
       val processor = new IdeoUserFileProcessor
       val users =
-        processor.read_corpus(new LocalFileHandler,
+        processor.read_textdb(new LocalFileHandler,
           params.ideological_user_corpus).flatten.toMap
       params.ideological_users = users
       params.ideological_users_liberal =

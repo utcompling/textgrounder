@@ -746,7 +746,7 @@ abstract class CellGridEvaluator[
     for (dir <- files) {
       val fileproc = new EvaluateCorpusFileProcessor(
         driver.params.eval_set + "-" + driver.document_file_suffix)
-      fileproc.read_schema_from_corpus(filehand, dir)
+      fileproc.read_schema_from_textdb(filehand, dir)
       val (continue, _) = fileproc.process_files(filehand, Seq(dir))
       if (!continue)
         return false

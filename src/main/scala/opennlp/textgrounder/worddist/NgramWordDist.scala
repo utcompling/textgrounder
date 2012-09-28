@@ -26,7 +26,7 @@ import util.control.Breaks._
 import java.io._
 
 import opennlp.textgrounder.util.collectionutil.DynamicArray
-import opennlp.textgrounder.util.corpusutil
+import opennlp.textgrounder.util.textdbutil
 import opennlp.textgrounder.util.ioutil.{FileHandler, FileFormatException}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
@@ -339,7 +339,7 @@ class DefaultNgramWordDistConstructor(
     parsed_ngrams.clear()
     val ngramcounts = countstr.split(" ")
     for (ngramcount <- ngramcounts) yield {
-      val (egram, count) = corpusutil.shallow_split_count_map_field(ngramcount)
+      val (egram, count) = textdbutil.shallow_split_count_map_field(ngramcount)
       if (parsed_ngrams contains egram)
         throw FileFormatException(
           "Ngram %s seen twice in same counts list" format egram)
@@ -404,7 +404,7 @@ class DefaultNgramWordDistConstructor(
     var addedTokens = 0
     var totalTokens = 0
     for ((egram, count) <- grams) {
-      val ngram = corpusutil.decode_ngram_for_count_map_field(egram)
+      val ngram = textdbutil.decode_ngram_for_count_map_field(egram)
       if (add_ngram_with_count(dist, ngram, count)) {
         addedTypes += 1
         addedTokens += count

@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  corpusutil.scala
+//  textdbutil.scala
 //
 //  Copyright (C) 2012 Ben Wing, The University of Texas at Austin
 //
@@ -26,7 +26,7 @@ import java.io.PrintStream
 import printutil.{errprint, warning}
 import ioutil._
 
-package object corpusutil {
+package object textdbutil {
   /**
    * A text-file processor where each line is made up of a fixed number
    * of fields, separated by some sort of separator (by default a tab
@@ -141,14 +141,14 @@ package object corpusutil {
   }
 
   /**
-   * An object describing a corpus schema, i.e. a description of each if the
-   * fields in a corpus, along with "fixed fields" containing the same
+   * An object describing a textdb schema, i.e. a description of each of the
+   * fields in a textdb, along with "fixed fields" containing the same
    * value for every row.
    *
    * @param fieldnames List of the name of each field
    * @param fixed_values Map specifying additional fields possessing the
    *   same value for every row.  This is optional, but usually at least
-   *   the "corpus" field should be given, with the name of the corpus
+   *   the "corpus-name" field should be given, with the name of the corpus
    *   (currently used purely for identification purposes).
    */
   class Schema(
@@ -262,7 +262,7 @@ package object corpusutil {
      */
     def construct_schema_file(filehand: FileHandler, dir: String,
         prefix: String, suffix: String) =
-      CorpusFileProcessor.construct_output_file(filehand, dir, prefix,
+      TextDBFileProcessor.construct_output_file(filehand, dir, prefix,
         suffix, "-schema.txt")
 
     /**
@@ -346,8 +346,8 @@ package object corpusutil {
   }
 
   /**
-   * File processor for reading in a "corpus" of documents.  The corpus
-   * has the following format:
+   * File processor for reading in a set of records in "textdb" format.
+   * The database has the following format:
    *
    * (1) The documents are stored as field-text files, separated by a TAB
    *     character.
@@ -359,11 +359,11 @@ package object corpusutil {
    *     The document files are named `DIR/PREFIX-SUFFIX.txt`
    *     (or `DIR/PREFIX-SUFFIX.txt.bz2` or similar, for compressed files),
    *     while the schema file is named `DIR/PREFIX-SUFFIX-schema.txt`.
-   *     Note that the SUFFIX is set when the `CorpusFileProcessor` is
+   *     Note that the SUFFIX is set when the `TextDBFileProcessor` is
    *     created, and typically specifies the category of corpus being
    *     read (e.g. "text" for corpora containing text or "unigram-counts"
    *     for a corpus containing unigram counts).  The directory is specified
-   *     in a particular call to `process_files` or `read_schema_from_corpus`.
+   *     in a particular call to `process_files` or `read_schema_from_textdb`.
    *     The prefix is arbitrary and descriptive -- i.e. any files in the
    *     appropriate directory and with the appropriate suffix, regardless
    *     of prefix, will be loaded.  The prefix of the currently-loading
@@ -385,7 +385,7 @@ package object corpusutil {
    * split can be located using a larger prefix of the form "SPLIT-SUFFIX".)
    *
    * Generally, after creating a file processor of this sort, the schema
-   * file needs to be read using `read_schema_from_corpus`; then the document
+   * file needs to be read using `read_schema_from_textdb`; then the document
    * files can be processed using `process_files`.  Most commonly, the same
    * directory is passed to both functions.  In more complicated setups,
    * however, different directory names can be used; multiple calls to
@@ -399,10 +399,10 @@ package object corpusutil {
    * @param suffix the suffix of the corpus files, as described above
    *     
    */
-  abstract class CorpusFileProcessor[T](
+  abstract class TextDBFileProcessor[T](
     suffix: String
   ) extends TextFileProcessor[T] {
-    import CorpusFileProcessor._
+    import TextDBFileProcessor._
 
     /**
      * Name of the schema file.
@@ -473,7 +473,7 @@ package object corpusutil {
      * given directory.  Set internal variables containing the schema file
      * and schema.
      */
-    def read_schema_from_corpus(filehand: FileHandler, dir: String) {
+    def read_schema_from_textdb(filehand: FileHandler, dir: String) {
       schema_file = find_schema_file(filehand, dir, suffix)
       schema_filehand = filehand
       val (_, base) = filehand.split_filename(schema_file)
@@ -493,7 +493,7 @@ package object corpusutil {
     }
   }
 
-  object CorpusFileProcessor {
+  object TextDBFileProcessor {
     val possible_compression_re = """(\.bz2|\.bzip2|\.gz|\.gzip)?$"""
     /**
      * For a given suffix, create a regular expression
@@ -550,7 +550,7 @@ package object corpusutil {
      * Locate and read the schema file of the appropriate suffix in the
      * given directory.
      */
-    def read_schema_from_corpus(filehand: FileHandler, dir: String,
+    def read_schema_from_textdb(filehand: FileHandler, dir: String,
           suffix: String) = {
       val schema_file = find_schema_file(filehand, dir, suffix)
       Schema.read_schema_file(filehand, schema_file)
@@ -577,13 +577,13 @@ package object corpusutil {
   /**
    * A basic file processor for reading in a "corpus" of documents and
    * processing rows as arrays of fields (ala `FieldTextFileProcessor`).
-   * You might want to use the higher-level `CorpusFieldFileProcessor`.
+   * You might want to use the higher-level `TextDBFieldFileProcessor`.
    *
    * @param suffix the suffix of the corpus files, as described above
    */
-  abstract class BasicCorpusFieldFileProcessor[T](
+  abstract class BasicTextDBFieldFileProcessor[T](
     suffix: String
-  ) extends CorpusFileProcessor[T](suffix) with FieldTextFileProcessor[T] {
+  ) extends TextDBFileProcessor[T](suffix) with FieldTextFileProcessor[T] {
     override def set_schema(schema: Schema) {
       super.set_schema(schema)
       set_fieldnames(schema.fieldnames)
@@ -609,8 +609,8 @@ package object corpusutil {
    *
    * @param suffix the suffix of the corpus files, as described above
    */
-  abstract class CorpusFieldFileProcessor[T](suffix: String) extends
-      BasicCorpusFieldFileProcessor[Seq[T]](suffix) {
+  abstract class TextDBFieldFileProcessor[T](suffix: String) extends
+      BasicTextDBFieldFileProcessor[Seq[T]](suffix) {
 
     def handle_row(fieldvals: Seq[String]): Option[T]
 
@@ -657,7 +657,7 @@ package object corpusutil {
     /**
      * Read a corpus from a directory and return the result of processing the
      * rows in the corpus. (If you want more control over the processing,
-     * call `read_schema_from_corpus` and then `process_files`.  This allows,
+     * call `read_schema_from_textdb` and then `process_files`.  This allows,
      * for example, reading files from multiple directories with a single
      * schema, or determining whether processing was aborted early or allowed
      * to run to completion.)
@@ -672,8 +672,8 @@ package object corpusutil {
      *   files read than exist in the directory if `handle_row` signalled that
      *   processing should stop.)
      */
-    def read_corpus(filehand: FileHandler, dir: String) = {
-      read_schema_from_corpus(filehand, dir)
+    def read_textdb(filehand: FileHandler, dir: String) = {
+      read_schema_from_textdb(filehand, dir)
       val (finished, value) = process_files(filehand, Seq(dir))
       value
     }
@@ -681,23 +681,23 @@ package object corpusutil {
     /*
     FIXME: Should be implemented.  Requires that process_files() returns
     the filename along with the value. (Should not be a problem for any
-    existing users of BasicCorpusFieldFileProcessor, because AFAIK they
+    existing users of BasicTextDBFieldFileProcessor, because AFAIK they
     ignore the value.)
 
-    def read_corpus_with_filenames(filehand: FileHandler, dir: String) = ...
+    def read_textdb_with_filenames(filehand: FileHandler, dir: String) = ...
     */
   }
 
   /**
    * Class for writing a "corpus" of documents.  The corpus has the
-   * format described in `CorpusFileProcessor`.
+   * format described in `TextDBFileProcessor`.
    *
    * @param schema the schema describing the fields in the document file
    * @param suffix the suffix of the corpus files, as described in
-   *   `CorpusFileProcessor`
+   *   `TextDBFileProcessor`
    *     
    */
-  class CorpusWriter(
+  class TextDBWriter(
     val schema: Schema,
     val suffix: String
   ) {
@@ -716,7 +716,7 @@ package object corpusutil {
      */
     def open_document_file(filehand: FileHandler, dir: String,
         prefix: String, compression: String = "none") = {
-      val file = CorpusFileProcessor.construct_output_file(filehand, dir,
+      val file = TextDBFileProcessor.construct_output_file(filehand, dir,
         prefix, suffix, ".txt")
       filehand.openw(file, compression = compression)
     }

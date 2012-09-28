@@ -26,7 +26,7 @@ import util.control.Breaks._
 import java.io._
 
 import opennlp.textgrounder.util.collectionutil.DynamicArray
-import opennlp.textgrounder.util.corpusutil
+import opennlp.textgrounder.util.textdbutil
 import opennlp.textgrounder.util.ioutil.{FileHandler, FileFormatException}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
@@ -263,7 +263,7 @@ class DefaultUnigramWordDistConstructor(
     keys_dynarr.clear()
     values_dynarr.clear()
     raw_keys_set.clear()
-    for ((word, count) <- corpusutil.decode_word_count_map(countstr)) {
+    for ((word, count) <- textdbutil.decode_word_count_map(countstr)) {
       /* FIXME: Is this necessary? */
       if (raw_keys_set contains word)
         throw FileFormatException(

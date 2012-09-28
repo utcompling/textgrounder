@@ -25,7 +25,7 @@ import collection.mutable
 
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.corpusutil
+import opennlp.textgrounder.util.textdbutil
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil.{FileHandler, LocalFileHandler}
@@ -932,9 +932,9 @@ class RandomGridLocateDocumentStrategy[
 
     protected def initialize_word_dist_suffix() = {
       if (word_dist_type == "ngram")
-        corpusutil.ngram_counts_suffix
+        textdbutil.ngram_counts_suffix
       else
-        corpusutil.unigram_counts_suffix
+        textdbutil.unigram_counts_suffix
     }
 
     protected def get_stopwords() = {
