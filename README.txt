@@ -295,8 +295,8 @@ Use 'hadoop fs -get'.
 Output format
 =============
 
-The normal output format from ParseTweets is called the "TextGrounder corpus"
-format.  This format stores data in as a tab-separated database, with one item
+The normal output format from ParseTweets is called the "textdb" format.
+This format stores data in as a tab-separated database, with one item
 per line.  There will be one or more files containing data, ending in
 '-SUFFIX.txt' (or '-SUFFIX.txt.bz2' or '-SUFFIX.txt.gz', if the data is
 compressed), where SUFFIX is an identifier referring to the particular sort
@@ -310,6 +310,23 @@ each reducer produces its own output file.  Storing the data this way makes
 it easy to read the files from Hadoop.  Large data files are typically
 stored compressed, and are automatically uncompressed as they are read in.
 
+The following formats are used for individual fields:
+
+* Integers and floating-point values, output in the obvious way.
+* Timestamps, output as long integers specifying milliseconds since the
+  Unix Epoch (Jan 1, 1970).
+* Lat/long coordinates, output as a comma-separated pair of floating-point
+  values.
+* Single strings.  URL encoding is used to encode TAB characters (%09 = field
+  separator), newlines (%0A = record separator), the percent sign (%25), and
+  any other characters that may be used as separators (e.g. greater-than
+  signs, spaces, and colons in various cases below).
+* Sequences of strings.  The individual strings are URL-encoded and separated
+  by >> signs.
+* "Count maps", i.e. maps from strings to integers (e.g. counts of words).
+  The format is "STRING:COUNT STRING:COUNT ...", where individual strings are
+  URL-encoded.  N-grams use the format "WORD1:WORD2:...:COUNT" for an
+  individual n-gram.
 
 =========
 About SBT
@@ -378,13 +395,149 @@ Running ParseTweets
 ===================
 
 ParseTweets can do a lot of things.  By default, it reads in tweets in JSON
-format (the raw format from Twitter) and converts them into the TextGrounder
-corpus format.  However, it can also handle different formats on input
-and output, as well as group or filter the tweets.
+format (the raw format from Twitter) and converts them into textdb format
+(see above).  However, it can also handle different formats on input
+and output, as well as group or filter the tweets.  For example, it is
+possible to read in tweets in textdb format, as well as write out tweets in
+JSON format when no grouping is done.
+
+When reading tweets in JSON format, duplicate tweets are automatically
+filtered out; filtering is by user ID.  This is important because Twitter
+often returns duplicate tweets, and it also allows overlapping scrapes of
+the same source data to be combined.  However, when reading data in other
+formats, no deduplication is done, because user ID's often aren't available
+(e.g. when tweets have been grouped).
+
+------ Input and output formats ------
+
+Input and output formats are specified using '--input-format' and
+'--output-format', respectively.  Currently, the following formats are handled:
+
+* "textdb" format, on both input and output.
+* JSON format, on both input and output, but output in JSON format is not
+  possible when tweets are grouped.
+* "raw-lines" format on input, treating the text of each line as if it
+   were a tweet.  This makes it possible to do n-gram processing and other
+   such operations on raw text.
+* "stats" format on output.  This outputs statistics on the tweets in
+  "textdb" format.
+
+Further control over the fields output in textdb format is possible using
+'--output-fields' (specifying which fields to output).  Output of n-grams
+is possible using the '--max-ngram' option, specifying the maximum size
+of n-grams to output (the default is 1, meaning output only unigrams).
 
 ------ Grouping ------
 
-Grouping is specified using '--grouping'.  Tweets can be grouped by user,
-by timeslice, or by input file.  All tweets to be grouped together will
-be compiled into a single "aggregated tweet", which will be output as if
-it were a single tweet.
+Grouping is specified using '--grouping' and can be done in the following ways:
+
+* No grouping (the default).
+* By user.  When doing this, the location (lat/long coordinates) of the group
+  are determined by the earliest tweet in the group that has a location.
+  (The 'geo-timestamp' field is used to help in tracking this.)
+* By time slice.  The '--timeslice' argument specifies the size of the time
+  slices, and all tweets within a given slice are aggregated.
+* By file.  All tweets in a given input file are aggregated.  This is
+  particularly useful when outputting statistics, or when doing n-gram
+  processing on raw text.
+
+------ Filtering ------
+
+When filtering tweets, tweets can be filtered either by the presence of
+particular words or word sequences in the text of a tweet or based on the
+timestamp of the tweet.  Arbitrary boolean expressions can be specified to
+express more complex filters.  Filtering can be done either on the individual
+tweet level ('--filter-tweets') or the group level ('--filter-groups'); in
+the latter case, a group will be passed through if any tweet in the group
+matches the filter.  Matching is normally case-insensitive, but case-sensitive
+matching is possible using the '--cfilter-tweets' or '--cfilter-groups'
+options.
+
+It is possible to filter by group without actually grouping the tweets
+together in the output; this is done by specifying the appropriate type of
+grouping using '--grouping', and then specifying '--ungrouped-output'.
+
+
+=====================
+Running FindPolitical
+=====================
+
+DOCUMENT ME.
+
+
+
+=======================
+Running PoligrounderApp
+=======================
+
+PoligrounderApp compares tweet corpora for two different time periods,
+looking for differences in the distribution of individual words or n-grams.
+
+Unlike ParseTweets and FindPolitical, this application does not currently
+use Scoobi or support running under Hadoop.  In practice, this has not yet
+proved to be a major issue in terms of speed.  However, it may require
+running the application on a machine with a large amount of memory (e.g.
+possibly 20 GB or more, depending on the size of the input corpus and the
+length of the time periods involved, since the entire distribution of
+words or n-grams in the two periods in question must currently be read
+into memory).
+
+The two time periods are specified using '--from' and '--to' (or '-f' and
+'-t').  Each time period is specified in the form "TIME/OFFSET", where
+TIME specifies an individual point of time and OFFSET an offset to
+another point of time. (This is similar to specifying a starting time
+and a length, except that the offset can be negative, which allows
+specifying an interval by its ending time.)
+
+Points of time are specified by the general format YYYYMMDDhhmmsszzz
+(year - month - day - hour - minute - second - time zone), where any of the
+lowercase portions can be omitted and colons can optionally be inserted for
+legibility.  For example, "2012061510EDT" specifies June 15, 2012, 10:00AM,
+Eastern Daylight Time; equivalent times are "20120615:10:00EDT",
+"2012:06:15:10:00:00:EDT", "20120615:10amEDT", etc., as well as "2012051510"
+if the current time zone is Eastern Daylight.
+
+Offsets can be given using the abbreviations "s" = second, "m" = minute,
+"h" = hour, "d" = day, "w" = week, e.g. "5m2s" for "5 minutes, 2 seconds"
+or "3w2d12h" for "3 weeks, 2 days, 12 hours".  Negative values are
+possible, e.g. "5h-2m" for "5 hours, less 2 minutes" (i.e. 4 hours,
+58 minutes).  Overall negative offsets, e.g. "-6h", lead to intervals
+backwards in time from the starting point.
+
+PoligrounderApp can operate in two modes:
+
+* 2-way (or "combined") mode simply compares the two time periods directly,
+  looking for words whose distributions differ most significantly across the
+  periods, using the log-likelihood statistic.  The words with the highest
+  log-likelihood values are output. 
+
+* 4-way (or "ideo-users") mode additionally divides the tweets into separate
+  categories according to the ideology of the users tweeting them --
+  liberal, conservative or centrist -- and throws away the centrist tweets,
+  leading to two axes of comparison (before vs. after and liberal vs.
+  conservative), for a total of four subcorpora to compare.  It then does a
+  4-way log-likelihood test, looking for words whose distribution differs
+  the most from what a simple assumption of independence between the two
+  axes would predict: i.e. words where the difference between before and
+  after is most correlated with the difference between liberal and
+  conservative.
+
+4-way mode is chosen automatically when a list of "ideological users"
+(Twitter users with associated ideologies on a scale from 0 to 1, where 0
+means liberal and 1 conservative) is given using '--ideological-user-corpus'
+(or '--iuc' for short).  This should be in textdb format, and is typically
+the output of a run of FindPolitical.
+
+A sample command line is as follows:
+
+$ poligrounder run opennlp.textgrounder.poligrounder.PoligrounderApp -i parsed-all-spritzer-immigration-jun-8-to-22 --iuc copy-in/out-all-spritzer-find-political-ideo-users  --from '2012061200EDT/3d' --to '2012061510EDT/1d'
+
+This operates in 4-way mode on the tweet corpus located in
+'parsed-all-spritzer-immigration-jun-8-to-22', using the list of ideological
+users in 'copy-in/out-all-spritzer-find-political-ideo-users', comparing two
+time periods, a before period running 3 days starting June 12, 2012 at
+midnight EDT, and an after period running exactly 1 day starting at 10 AM EDT
+on June 15, 2012 (right around the initial press releases of Obama's imminent
+announcement of an implementation of the "Dream Act", allowing for young
+illegal immigrants who have been in this country since childhood to get
+reprieves from deportation).
