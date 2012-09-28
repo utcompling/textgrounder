@@ -58,17 +58,22 @@ import tgutil.timeutil._
 
 class ParseTweetsParams(ap: ArgParser) extends
     ScoobiProcessFilesParams(ap) {
-  var grouping = ap.option[String]("grouping", "g", "gr", "group",
+  var grouping = ap.option[String]("grouping", "g",
     default = "none",
     choices = Seq("user", "time", "file", "none"),
-    help="""Mode for grouping tweets.  There are currently four methods
-    of grouping: `user`, `time` (i.e. all tweets within a given
+    help="""Mode for grouping tweets in the output.  There are currently
+    four methods of grouping: `user`, `time` (i.e. all tweets within a given
     timeslice, specified with `--timeslice`), `file` (all tweets within a
     given input file) and `none` (no grouping; tweets are passed through
     directly, after duplicated tweets have been removed).  Default is
-    `%default`.  Tweet grouping is used for two purposes: For filtering by
-    group (using `--filter-groups` or `--cfilter-groups`) and for outputting
-    grouped tweets using `--output-format=grouped-textdb`.""")
+    `%default`.  See also `--filter-grouping`.""")
+  var filter_grouping = ap.option[String]("filter-grouping", "fg",
+    choices = Seq("user", "time", "file", "none"),
+    help="""Mode for grouping tweets for filtering by group (using
+    `--filter-groups` or `--cfilter-groups`).  The possible modes are the
+    same as in `--grouping`.  The default is the same as `--grouping`, but
+    it is possible to specify a different type of grouping when applying the
+    group-level filters.""")
   var input_format = ap.option[String]("input-format", "if",
     choices = Seq("json", "textdb", "raw-lines"),
     default = "json",
@@ -87,19 +92,13 @@ class ParseTweetsParams(ap: ArgParser) extends
     file name, but this can still be useful for things like generating n-grams.)
     """)
   var output_format = ap.option[String]("output-format", "of",
-    choices = Seq("textdb", "grouped-textdb", "ungrouped-textdb",
-      "stats", "json"),
+    choices = Seq("textdb", "stats", "json"),
     default = "textdb",
     help="""Format for output of tweets or tweet groups.  Possibilities are
     
-    -- `textdb`, `grouped-textdb`, `ungrouped-textdb` (Store in textdb format,
-    i.e. as a simple database with one record per line, fields separated by TAB
-    characters, and a separate schema fle indicating the names of the columns.
-    An `ungrouped-textdb` is simply where each record corresponds to an
-    individual tweet, while in a `grouped-textdb`, each record corresponds to
-    a group of tweets, according to `--grouping`.  The value of `textdb` is an
-    alias for one of the other two: `grouped-textdb` if a value of `--grouping`
-    other than `none` is specified, `ungrouped-textdb` otherwise.)
+    -- `textdb` (Store in textdb format, i.e. as a simple database with one
+    record per line, fields separated by TAB characters, and a separate schema
+    file indicating the names of the columns.)
   
     -- `json` (Simply output JSON-formatted tweets directly, exactly as
     received.)
@@ -359,16 +358,26 @@ geotag outside of North America.  Also filter on min/max-followers, etc.""")
   var included_fields: Seq[String] = _
   var input_schema: Schema = _
 
+  /* Whether we are doing tweet-level filtering.  To check whether doing
+     group-level filtering, check whether filter_grouping == "none". */
+  var has_tweet_filtering: Boolean = _
+
   override def check_usage() {
     timeslice = (timeslice_float * 1000).toLong
-    if (output_format == "textdb") {
-      if (grouping != "none")
-        output_format = "grouped-textdb"
+    has_tweet_filtering = filter_tweets != null || cfilter_tweets != null
+    val has_group_filtering = filter_groups != null || cfilter_groups != null
+    if (filter_grouping == null) {
+      if (has_group_filtering)
+        filter_grouping = grouping
       else
-        output_format = "ungrouped-textdb"
+        filter_grouping = "none"
     }
-    if (output_format == "grouped-textdb" && grouping == "none")
-      ap.usageError("`grouped-textdb` output format not allowed when `--grouping=none`")
+    if (has_group_filtering && filter_grouping == "none")
+      ap.usageError("group-level filtering not possible when `--filter-grouping=none`")
+    if (!has_group_filtering && filter_grouping != "none")
+      ap.usageError("when not doing group-level filtering, `--filter-grouping` must be `none`")
+    if (output_format == "json" && grouping != "none")
+      ap.usageError("output grouping (--grouping) not possible when output format is JSON")
     included_fields = parse_output_fields(output_fields)
   }
 }
@@ -566,14 +575,15 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   /**
    * A tweet along with ancillary data used for merging and filtering.
    *
-   * @param key Key used for grouping (username or timestamp); stores the
-   *   raw text of a JSON when `--output-format=json`.
-   * @param matches Whether the tweet matches the user-level boolean filters
-   *   (if any)
+   * @param output_key Key used for output grouping (--grouping).
+   * @param filter_key Key used for filter grouping (--filter-grouping).
+   * @param matches Whether the tweet matches the group-level boolean filters
+   *   (if any).
    * @param tweet The tweet itself.
    */
   case class Record(
-    key: String,
+    output_key: String,
+    filter_key: String,
     matches: Boolean,
     tweet: Tweet
   )
@@ -1280,7 +1290,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     }
 
     def note_remaining_tweets(tweet: Tweet) = {
-      maybe_counter("tweets remaining after filtering and uniquifying")
+      maybe_counter("tweets remaining after uniquifying and tweet-level filtering")
       true
     }
 
@@ -1315,20 +1325,26 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * Apply any boolean filters given in `--filter-groups` or
      * `--cfilter-groups`.
      */
-    def filter_tweet_by_group_filters(tweet: Tweet) = {
+    private def filter_tweet_by_group_filters(tweet: Tweet) = {
       (filter_groups_ast == null || (filter_groups_ast matches tweet)) &&
        (cfilter_groups_ast == null || (cfilter_groups_ast matches tweet))
     }
 
-    def tweet_to_record(tweet: Tweet) = {
-      val key = opts.grouping match {
+    private def tweet_key(tweet: Tweet, keytype: String) = {
+      keytype match {
         case "user" => tweet.user
         case "file" => tweet.path
         case "time" =>
           ((tweet.min_timestamp / opts.timeslice) * opts.timeslice).toString
-        case "none" => tweet.id.toString
+        case "none" => ""
       }
-      Record(key, filter_tweet_by_group_filters(tweet), tweet)
+    }
+
+    private def tweet_to_record(tweet: Tweet) = {
+      Record(tweet_key(tweet, opts.grouping),
+             tweet_key(tweet, opts.filter_grouping),
+             filter_tweet_by_group_filters(tweet),
+             tweet)
     }
 
     /**
@@ -1338,8 +1354,8 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * For latitude and longitude, take the earliest provided values
      * ("earliest" by timestamp and "provided" meaning not missing).
      */
-    def merge_records(tw1: Record, tw2: Record): Record = {
-      assert(tw1.key == tw2.key)
+    private def merge_records(tw1: Record, tw2: Record): Record = {
+      assert(tw1.output_key == tw2.output_key)
       val t1 = tw1.tweet
       val t2 = tw2.tweet
       val id = if (t1.id != t2.id) -1L else t1.id
@@ -1391,14 +1407,14 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         Tweet("", path, text, t1.user, id, min_timestamp, max_timestamp,
           geo_timestamp, lat, long, followers, following, lang, numtweets,
           user_mentions, retweets, hashtags, urls)
-      Record(tw1.key, tw1.matches || tw2.matches, tweet)
+      Record(tw1.output_key, "", tw1.matches || tw2.matches, tweet)
     }
 
     /**
      * Return true if tweet (combination) has a fully-specified latitude
      * and longitude.
      */
-    def has_latlong(tw: Tweet) = {
+    private def has_latlong(tw: Tweet) = {
       val good = !isNaN(tw.lat) && !isNaN(tw.long)
       if (!good)
         bump_counter("grouped tweets filtered due to missing lat/long")
@@ -1425,7 +1441,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * instead too many people that a given account is following.  Perhaps
      * this is backwards?
      */
-    def is_nonspammer(tw: Tweet): Boolean = {
+    private def is_nonspammer(tw: Tweet): Boolean = {
       val good =
         (tw.following >= MIN_NUMBER_FOLLOWING &&
            tw.following <= MAX_NUMBER_FOLLOWING) &&
@@ -1448,7 +1464,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
      * Return true of this tweet (combination) is located within the
      * bounding box fo North America.
      */
-    def northamerica_only(tw: Tweet): Boolean = {
+    private def northamerica_only(tw: Tweet): Boolean = {
       val good = (tw.lat >= MIN_LAT && tw.lat <= MAX_LAT) &&
                  (tw.long >= MIN_LNG && tw.long <= MAX_LNG)
       if (opts.debug && !good)
@@ -1458,7 +1474,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       good
     }
 
-    def is_good_geo_tweet(tw: Tweet): Boolean = {
+    private def is_good_geo_tweet(tw: Tweet): Boolean = {
       if (opts.debug)
         logger.info("Considering %s" format tw)
       has_latlong(tw) &&
@@ -1466,34 +1482,104 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       northamerica_only(tw)
     }
 
-    def matches_group_filters(x: (String, Iterable[Record])) = {
-      val good = x._2.exists(_.matches)
+    private def matches_group_filters(records: Iterable[Record]) = {
+      val good = records.exists(_.matches)
       if (!good)
         bump_counter("grouped tweets filtered by group-level filters")
       good
     }
 
+    /**
+     * Apply group filtering (--filter-grouping, --filter-groups,
+     * --cfilter-groups) in the absence of output grouping on the same key.
+     */
+    private def do_group_filtering(records: DList[Record]) = {
+      records
+        .groupBy(_.filter_key)
+        .map(_._2) // throw away key
+        .filter(matches_group_filters)
+        .flatten
+    }
+
+    /**
+     * Group output according to --grouping.
+     */
+    private def do_output_grouping(records: DList[Record]) = {
+      records
+        .groupBy(_.output_key)
+        .combine(merge_records)
+        .map(_._2) // throw away key
+    }
+
+    private def note_remaining_tweets(tweet: Tweet) = {
+      bump_counter("grouped tweets remaining after output grouping and group-level filtering")
+      bump_counter("ungrouped tweets remaining after output grouping and group-level filtering",
+        tweet.numtweets)
+      true
+    }
+
     def apply(tweets: DList[Tweet]) = {
-      // Group by grouping key (username, timestamp, etc.).  username, then combine the records for a user into a
-      // tweet combination, with text concatenated and the location taken
-      // from the earliest tweet with a specific coordinate; then filter
-      // according to group-level user filters and convert back to tweets,
-      // since we have no more need of the extra record-level info.
-      val concatted = tweets.
-        map(tweet_to_record).   // convert to Record (which contains grouping
-                                // key and group-level filter result)
-        groupBy(_.key).         // group on grouping key
-        filter(matches_group_filters). // apply group-level user filters
-        combine(merge_records). // merge value tweet records
-        map(_._2.tweet)         // convert back to Tweet
+      /* Here we implement output grouping and group filtering.
+
+      Possibilities:
+
+      1. No output grouping, no group filtering:
+         -- Do nothing.
+
+      2. Output grouping, no group filtering:
+         -- Group by output key;
+         -- Merge.
+
+      3. No output grouping, group filtering:
+         -- Group by filter key;
+         -- Filter to see if any tweet in group matches group filter
+            (_.exists(_.matches));
+         -- Flatten.
+
+      4. Output grouping, filter grouping, same keys:
+         -- Group by output key;
+         -- Merge, merging the 'matches' values (a.matches || b.matches);
+         -- Filter results based on _.matches.
+      
+      5. Output grouping, filter grouping, different keys: Combine 3+2:
+         -- Group by filter key;
+         -- Filter to see if any tweet in group matches group filter
+            (_.exists(_.matches))
+         -- Flatmap;
+         -- Group by output key;
+         -- Merge.
+      */
+
+      val grouped_tweets =
+        if (opts.grouping == "none" && opts.filter_grouping == "none")
+          tweets
+        else {
+          // convert to Record (which contains grouping keys and group-level
+          // filter results)
+          val records = tweets.map(tweet_to_record)
+          val grouped_records =
+            (opts.grouping, opts.filter_grouping) match {
+              case (_, "none") => do_output_grouping(records)
+              case ("none", _) => do_group_filtering(records)
+              case (x, y) if x == y =>
+                do_output_grouping(records).filter(_.matches)
+              case (_, _) =>
+                do_output_grouping(do_group_filtering(records))
+            }
+          // convert back to Tweet
+          grouped_records.map(_.tweet)
+        }
 
       // If grouping by user, filter the tweet combinations, removing users
       // without a specific coordinate; users that appear to be "spammers" or
       // other users with non-standard behavior; and users located outside of
       // North America.  FIXME: We still want to filter spammers; but this
       // is trickier when not grouping by user.  How to do it?
-      if (opts.geographic_only) concatted.filter(is_good_geo_tweet)
-      else concatted
+      val final_tweets =
+        if (opts.geographic_only) grouped_tweets.filter(is_good_geo_tweet)
+        else grouped_tweets
+
+      final_tweets.filter(note_remaining_tweets)
     }
   }
 
@@ -1934,6 +2020,20 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
   def create_params(ap: ArgParser) = new ParseTweetsParams(ap)
   val progname = "ParseTweets"
 
+  private def grouping_type_english(opts: ParseTweetsParams,
+      grouptype: String) = {
+    grouptype match {
+      case "time" =>
+        "time, with slices of %g seconds".format(opts.timeslice_float)
+      case "user" =>
+        "user"
+      case "file" =>
+        "file"
+      case "none" =>
+        "not grouping"
+    }
+  }
+
   def run() {
     val opts = init_scoobi_app()
     val filehand = new HadoopFileHandler(configuration)
@@ -1942,25 +2042,21 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
       opts.corpus_name = last_component.replace("*", "_")
     }
     errprint("ParseTweets: " + (opts.grouping match {
-      case "time" =>
-        "grouping by time, with slices of %g seconds".
-          format(opts.timeslice_float)
-      case "user" =>
-        "grouping by user"
-      case "file" =>
-        "grouping by file"
-      case "none" =>
-        "not grouping"
+      case "none" => "not grouping output"
+      case x => "grouping output by " + grouping_type_english(opts, x)
+    }))
+    errprint("ParseTweets: " + (opts.filter_grouping match {
+      case "none" => "no group-level filtering"
+      case x => "group-level filtering by " + grouping_type_english(opts, x)
+    }))
+    errprint("ParseTweets: " + (opts.has_tweet_filtering match {
+      case false => "no tweet-level filtering"
+      case true => "doing tweet-level filtering"
     }))
     errprint("ParseTweets: " + (opts.output_format match {
-      case "ungrouped-textdb" =>
-        "outputting (ungrouped) tweets in textdb format"
-      case "grouped-textdb" =>
-        "outputting tweet groups in textdb format"
-      case "json" =>
-        "outputting ungrouped tweets as raw JSON"
-      case "stats" =>
-        "outputting statistics on tweets"
+      case "textdb" => "outputting in textdb format"
+      case "json" => "outputting as raw JSON"
+      case "stats" => "outputting statistics on tweets"
     }))
     val ptp = new ParseTweetsDriver(opts)
     // Firstly we load up all the (new-line-separated) JSON or textdb lines.
@@ -1982,9 +2078,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
     val tweets1 = new ParseAndUniquifyTweets(opts)(lines)
 
     /* Maybe group tweets */
-    val tweets =
-      if (opts.grouping == "none") tweets1
-      else new GroupTweets(opts)(tweets1)
+    val tweets = new GroupTweets(opts)(tweets1)
 
     // Construct output directory for a given corpus suffix, based on
     // user-provided output directory
@@ -2043,7 +2137,7 @@ object ParseTweets extends ScoobiProcessFilesApp[ParseTweetsParams] {
         persist(TextOutput.toTextFile(tweets.map(_.json), opts.output))
         rename_outfiles()
       }
-      case "grouped-textdb" | "ungrouped-textdb" => {
+      case "textdb" => {
         val tfct = new TokenizeCountAndFormat(opts)
         // Tokenize the combined text into words, possibly generate ngrams
         // from them, count them up and output results formatted into a record.
