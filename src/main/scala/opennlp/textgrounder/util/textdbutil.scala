@@ -575,9 +575,11 @@ package object textdbutil {
   }
 
   /**
-   * A basic file processor for reading in a "corpus" of documents and
-   * processing rows as arrays of fields (ala `FieldLineProcessor`).
-   * You might want to use the higher-level `TextDBProcessor`.
+   * A basic file processor for reading a "corpus" of records in
+   * textdb format. You might want to use the higher-level
+   * `TextDBProcessor`.
+   *
+   * FIXME: Should probably eliminate this.
    *
    * @param suffix the suffix of the corpus files, as described above
    */
@@ -590,20 +592,21 @@ package object textdbutil {
     }
   }
 
-  class ExitFieldProcessor[T](val value: Option[T]) extends Throwable { }
+  class ExitTextDBProcessor[T](val value: Option[T]) extends Throwable { }
 
   /**
-   * A file processor for reading in a "corpus" of documents and
-   * processing rows as arrays of fields (ala `FieldLineProcessor`).
-   * Each row is assumed to generate an object of type T.  The result
-   * of calling `process_file` will be a Seq[T] of all objects, and
-   * the result of calling `process_files` to process all files will
-   * be a Seq[Seq[T]], one per file.
+   * A file processor for reading in a "corpus" of records in textdb
+   * format (where each record or "row" is a single line, with fields
+   * separated by TAB) and processing each one.  Each row is assumed to
+   * generate an object of type T.  The result of calling `process_file`
+   * will be a Seq[T] of all objects, and the result of calling
+   * `process_files` to process all files will be a Seq[Seq[T]], one per
+   * file.
    *
    * You should implement `handle_row`, which is passed in the field
    * values, and should return either `Some(x)` for x of type T, if
    * you were able to process the row, or `None` otherwise.  If you
-   * want to exit further processing, throw a `ExitFieldProcessor(value)`,
+   * want to exit further processing, throw a `ExitTextDBProcessor(value)`,
    * where `value` is either `Some(x)` or `None`, as for a normal return
    * value.
    *
@@ -623,7 +626,7 @@ package object textdbutil {
           case None => { return (false, true) }
         }
       } catch {
-        case exit: ExitFieldProcessor[T] => {
+        case exit: ExitTextDBProcessor[T] => {
           exit.value match {
             case Some(x) => { values_so_far += x; return (true, false) }
             case None => { return (false, false) }
