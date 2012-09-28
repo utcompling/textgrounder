@@ -126,7 +126,7 @@ abstract class TwitterInfochimpsFileProcessor extends TextFileProcessor[Unit] {
           val raw_anchor = anchor
           assert(!(raw_anchor contains '\t'))
           val metadata =
-            Seq("corpus"->"twitter-infochimps",
+            Seq("corpus-name"->"twitter-infochimps",
                 "id"->id, "title"->id, "split"->"training",
                 "coord"->("%s,%s" format (lat, long)),"time"->time,
                 "username"->username, "userid"->userid,
