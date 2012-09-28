@@ -133,17 +133,18 @@ class PoligrounderParameters(parser: ArgParser = null) extends
   var ideological_users_conservative: Map[String, Double] = _
   var ideological_categories: Seq[String] = _
 
-  var mode = ap.option[String]("m", "mode",
-    default = "combined",
-    choices = Seq("combined", "ideo-users"),
-    help = """How to compare distributions.  Possible values are
-    
-    'combined': For a given time period, combine all users into a single
-    distribution.
-    
-    'ideo-users': Retrieve the ideology of the users and use that to
-    separate the users into liberal and conservative, and compare those
-    separately.""")
+  // Unused, determined by --ideological-user-corpus.
+//  var mode = ap.option[String]("m", "mode",
+//    default = "combined",
+//    choices = Seq("combined", "ideo-users"),
+//    help = """How to compare distributions.  Possible values are
+//    
+//    'combined': For a given time period, combine all users into a single
+//    distribution.
+//    
+//    'ideo-users': Retrieve the ideology of the users and use that to
+//    separate the users into liberal and conservative, and compare those
+//    separately.""")
 }
 
 /**
