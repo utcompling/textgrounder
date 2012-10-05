@@ -18,6 +18,7 @@ public class BaseApp {
     private String outputPath = null;
     private String xmlInputPath = null;
     private String kmlOutputPath = null;
+    private String dKmlOutputPath = null;
     private String logFilePath = null;
     private boolean outputGoldLocations = false;
     private boolean outputUserKML = false;
@@ -81,6 +82,7 @@ public class BaseApp {
         options.addOption("it", "iterations", true, "number of iterations for iterative models [default = 1]");
         options.addOption("o", "output", true, "output path");
         options.addOption("ok", "output-kml", true, "kml output path");
+        options.addOption("okd", "output-kml-dynamic", true, "dynamic kml output path");
         options.addOption("oku", "output-kml-users", false, "output user-based KML rather than toponym-based KML");
         options.addOption("gold", "output-gold-locations", false, "output gold locations rather than system locations in KML");
         options.addOption("gt", "gold-toponyms", false, "use gold toponyms (named entities) if available");
@@ -167,6 +169,8 @@ public class BaseApp {
                         kmlOutputPath = value;
                     else if(option.getOpt().equals("oku"))
                         outputUserKML = true;
+                    else if(option.getOpt().equals("okd"))
+                        dKmlOutputPath = value;
                     else if(option.getOpt().equals("os"))
                         seedOutputPath = value;
                     break;
@@ -305,6 +309,10 @@ public class BaseApp {
 
     public String getKMLOutputPath() {
         return kmlOutputPath;
+    }
+
+    public String getDKMLOutputPath() {
+        return dKmlOutputPath;
     }
 
     public boolean getOutputGoldLocations() {
