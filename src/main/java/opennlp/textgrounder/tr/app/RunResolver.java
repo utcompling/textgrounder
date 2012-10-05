@@ -174,6 +174,13 @@ public class RunResolver extends BaseApp {
             writeCorpusToKML.writeToKML(disambiguated, currentRun.getKMLOutputPath(), currentRun.getOutputGoldLocations(), currentRun.getOutputUserKML(), currentRun.getCorpusFormat());
         }
 
+        if(currentRun.getDKMLOutputPath() != null) {
+            System.out.print("Writing resolved corpus in Dynamic KML format to " + currentRun.getDKMLOutputPath() + " ...");
+            DynamicKMLWriter w = new DynamicKMLWriter(disambiguated);
+            w.write(new File(currentRun.getDKMLOutputPath()));
+            System.out.println("done.");
+        }
+
         endTime = System.currentTimeMillis();
         seconds = (endTime - startTime) / 1000F;
         System.out.println("\nTotal time elapsed: " + Float.toString(seconds/(float)60.0) + " minutes.");

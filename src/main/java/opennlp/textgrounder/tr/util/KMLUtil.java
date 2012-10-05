@@ -224,6 +224,22 @@ public class KMLUtil {
         writePinPlacemark(w, name, coord, null);
     }
 
+    public static void writePinTimeStampPlacemark(XMLStreamWriter w, String name,
+                                                  Coordinate coord, String context,
+                                                  int timeIndex) throws XMLStreamException {
+        w.writeStartElement("Placemark");
+        KMLUtil.writeWithCharacters(w, "name", name);
+        KMLUtil.writeWithCharacters(w, "description", context);
+        w.writeStartElement("TimeSpan");
+        KMLUtil.writeWithCharacters(w, "begin", timeIndex + "");
+        KMLUtil.writeWithCharacters(w, "end", (timeIndex + 5) + "");
+        w.writeEndElement(); // TimeSpan
+        w.writeStartElement("Point");
+        KMLUtil.writeWithCharacters(w, "coordinates", df.format(coord.getLngDegrees()) + "," + df.format(coord.getLatDegrees()));
+        w.writeEndElement(); // Point
+        w.writeEndElement(); // Placemark
+    }
+
     public static void writePinPlacemark(XMLStreamWriter w, String name,
                                          Coordinate coord, String styleUrl) throws XMLStreamException {
         w.writeStartElement("Placemark");
