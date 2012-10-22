@@ -8,11 +8,11 @@
 # args specified.  All arguments to 'tg-geolocate' can be given for this
 # script as well.
 
-if [ -z "$POLIGROUNDER_DIR" ]; then
-  echo "Must set POLIGROUNDER_DIR to top level of TextGrounder distribution"
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
-. $POLIGROUNDER_DIR/bin/config-geolocate-toponym
+. $TEXTGROUNDER_DIR/bin/config-geolocate-toponym
 
-__TG_EXTRA_ARGS="--gazetteer-file $IN_GAZETTEER_FILE" $POLIGROUNDER_DIR/bin/tg-geolocate --app geolocate-toponym ${1+"$@"}
+__TG_EXTRA_ARGS="--gazetteer-file $IN_GAZETTEER_FILE" $TEXTGROUNDER_DIR/bin/tg-geolocate --app geolocate-toponym ${1+"$@"}

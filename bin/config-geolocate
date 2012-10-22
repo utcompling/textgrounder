@@ -8,7 +8,7 @@
 
 # You need to set the following environment variables on input:
 
-# 1. POLIGROUNDER_DIR: Always required, points to top level of TextGrounder
+# 1. TEXTGROUNDER_DIR: Always required, points to top level of TextGrounder
 #                      distribution.
 # 2. Variables pointing to the corpora files: Either TG_CORPUS_DIR (which
 #    points to where the corpora are stored), or some other variable that
@@ -68,14 +68,14 @@
 #                preprocessed -- currently 'enwiki-20100905', the version
 #                used in Wing and Baldridge 2011.
 
-if [ -z "$POLIGROUNDER_DIR" ]; then
-  echo "Must set POLIGROUNDER_DIR to top level of TextGrounder distribution"
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
 CONFIG_GEOLOCATE_INCLUDED=yes
 
-TG_PYTHON_DIR="$POLIGROUNDER_DIR/src/main/python"
+TG_PYTHON_DIR="$TEXTGROUNDER_DIR/src/main/python"
 
 TG_HADOOP_DIR=${TG_HADOOP_DIR:-textgrounder-data}
 
@@ -104,13 +104,13 @@ fi
 
 if [ "$TG_REAL_USE_HDFS" = yes ]; then
   TG_FILE_PREF=
-  POLIGROUNDER_URL=$TG_HADOOP_DIR
+  TEXTGROUNDER_URL=$TG_HADOOP_DIR
 elif [ "$HADOOP" = yes ]; then
   TG_FILE_PREF=file:
-  POLIGROUNDER_URL=file:$POLIGROUNDER_DIR
+  TEXTGROUNDER_URL=file:$TEXTGROUNDER_DIR
 else
   TG_FILE_PREF=
-  POLIGROUNDER_URL=$POLIGROUNDER_DIR
+  TEXTGROUNDER_URL=$TEXTGROUNDER_DIR
 fi
 
 TG_CORPUS_URL=$TG_FILE_PREF$TG_CORPUS_DIR
@@ -189,7 +189,7 @@ set_wp_version $WP_VERSION
 
 # Include local configuration if it exists
 
-if [ -e "$POLIGROUNDER_DIR/bin/local-config-geolocate" ]; then
-  . "$POLIGROUNDER_DIR/bin/local-config-geolocate"
+if [ -e "$TEXTGROUNDER_DIR/bin/local-config-geolocate" ]; then
+  . "$TEXTGROUNDER_DIR/bin/local-config-geolocate"
 fi
 

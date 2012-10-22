@@ -11,14 +11,14 @@
 #
 ### (Almost) standard boilerplate to get config ###
 
-if [ -z "$POLIGROUNDER_DIR" ]; then
-  echo "Must set POLIGROUNDER_DIR to top level of TextGrounder distribution"
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
 # Non-standard here: Don't use permuted dumps
 USE_PERMUTED=no
-. $POLIGROUNDER_DIR/bin/config-geolocate
+. $TEXTGROUNDER_DIR/bin/config-geolocate
 
 ### End boilerplate to get config ###
 
