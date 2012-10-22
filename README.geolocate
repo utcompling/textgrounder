@@ -1,0 +1,382 @@
+See `README.textgrounder` for an introduction to TextGrounder and to the
+Geolocate subproject.  This file describes how exactly to run the
+applications in Geolocate.
+
+========================================
+Specifying where the corpora are located
+========================================
+
+The corpora are located using the environment variable TG_CORPUS_DIR.
+If this is unset, and TG_GROUPS_DIR is set, it will be initialized to
+the 'corpora' subdirectory of this variable.  If you are running
+directly on Longhorn, you can set TG_ON_LONGHORN to 'yes', which will
+set things up appropriately to use the corpora located in
+/scratch/01683/benwing/corpora.
+
+====================
+Running under Hadoop
+====================
+
+To run Geolocate under Hadoop with data in HDFS rather then locally, you
+will need to copy the data into HDFS, which you can do using
+'tg-copy-data-to-hadoop'.  You need to copy two things, the corpus or corpora
+you want to run on and some ancillary data needed for TextGrounder (basically
+the stop lists).  You run the command as follows:
+
+$ tg-copy-data-to-hadoop CORPUS ...
+
+where CORPUS is the name of a corpus, similar to what is specified when
+running 'tg-geolocate'.  Additionally, the pseudo-corpus 'textgrounder'
+will copy the ancillary TextGrounder data.  For example, to copy
+the Portuguese Wikipedia for March 15, 2012, as well as the ancillary data,
+run the following:
+
+$ tg-copy-data-to-hadoop textgrounder ptwiki-20120315
+
+Other possibilities for CORPUS are 'geotext' (the Twitter GeoText corpus),
+any other corpus listed in the corpus directory (TG_CORPUS_DIR), any
+tree containing corpora (all corpora underneath will be copied and the
+directory structure preserved), or any absolute path to a corpus or
+tree of corpora.
+
+Then, run as follows:
+
+$ TG_USE_HDFS=yes tg-geolocate --hadoop geotext output
+
+If you use '--verbose' as follows, you can see exactly which options are
+being passed to the underlying 'textgrounder' script:
+
+$ TG_USE_HDFS=yes tg-geolocate --hadoop --verbose geotext output
+
+By default, the data copied using 'tg-copy-data-to-hadoop' and referenced
+by 'tg-geolocate' or 'textgrounder' is placed in the directory
+'textgrounder-data' under your home directory on HDFS.  You can change this
+by setting TG_HADOOP_DIR before running 'tg-copy-data-to-hadoop'.
+
+==================
+Obtaining the Data
+==================
+
+If you don't have the data already (you do if you have access to the Comp
+Ling machines), download and unzip the processed Wikipedia/Twitter data and
+aux files from http://wing.best.vwh.net/wikigrounder.
+
+There are three sets of data to download:
+  * The processed Wikipedia data, in `wikipedia/`.  The files are
+    listed separately here and bzipped, in case you don't want them all.
+    If you're not sure, get them all; or read down below to see which ones
+    you need.
+  * The processed Twitter data, in `wikigrounder-twitter-1.0.tar.bz2`.
+  * Auxiliary files, in `wikigrounder-aux-1.0.tar.bz2`. NOTE: These really
+    aren't needed any more.  The only remaining auxiliary file is the
+    World Gazetteer, and that is needed only when doing toponym resolution.
+
+Untar these files somewhere.  It is generally recommended that you create
+a directory and set `TG_GROUPS_DIR` to point to it; then put the Wikipedia
+and Twitter data underneath the `$TG_GROUPS_DIR/corpora` subdirectory, and the
+auxiliary files (if needed) under `$TG_GROUPS_DIR/projects/textgrounder/data`.
+Alternatively, `TG_CORPUS_DIR` can be used to directly point to where the
+corpora are stored, and `TG_AUX_DIR` to directly point to where the auxiliary
+files (if needed) are stored.
+
+(Alternatively, if you are running on a UTexas Comp Ling machine, or a
+machine with a copy of the relevant portions of /groups/corpora and
+/groups/projects in the same places, set `TG_ON_COMP_LING_MACHINES` to a
+non-empty value and it will initialize those three for you.  If you are
+running on the UTexas Longhorn cluster, set `TG_ON_LONGHORN` to a non-empty
+value and the variables will be initialized appropriately for Longhorn.)
+
+The Wikipedia data was generated from [http://download.wikimedia.org/enwiki/20100904/enwiki-20100904-pages-articles.xml.bz2 the original English-language Wikipedia dump of September 4, 2010].
+
+The Twitter data was generated from [http://www.ark.cs.cmu.edu/GeoText/ The Geo-tagged Microblog corpus] created by [http://aclweb.org/anthology-new/D/D10/D10-1124.pdf Eisenstein et al (2010)].
+
+===========================
+Replicating the experiments
+===========================
+
+The code in Geolocate.scala does the actual geolocating.  Although these
+are written in Java and can conceivably be run directly using `java`,
+in practice it's much more convenient using either the `textgrounder`
+driver script or some other even higher-level front-end script.
+`textgrounder` sets up the paths correctly so that all libraries, etc.
+will be found, and takes an application to run, knowing how to map that
+application to the actual class that implements the application.  Each
+application typically takes various command-line arguments, and
+`textgrounder` itself also takes various command-line options (given
+*before* the application name), which mostly control operation of the
+JVM.
+
+In this case, document geotagging can be invoked directly with `textgrounder`
+using `textgrounder geolocate-document`, but the normal route is to
+go through a front-end script.  The following is a list of the front-end
+scripts available:
+
+  * `tg-geolocate` is the script you probably want to use.  It takes a
+    CORPUS parameter to specify which corpus you want to act on (currently
+    recognized: `geotext`; a Wikipedia corpus, e.g. `enwiki-20120307` or
+    `ptwiki-20120315`; `wikipedia`, which picks some "default" Wikipedia
+    corpus, specifically `enwiki-20100905` (the same one used for the
+    original Wing+Baldridge paper, and quite old by now); and
+    `geotext-wiki`, which is a combination of both the `wikipedia` and
+    `geotext` corpora).  This sets up additional arguments to
+    specify the data files for the corpus/corpora to be loaded/evaluated,
+    and the language of the data, e.g. to select the correct stopwords list.
+    The application to run is specified by the `--app` option; if omitted,
+    it defaults to `geolocate-document` (other possibilities are
+    `generate-kml` and `geolocate-toponym`).  For the Twitter corpora,
+    an additional option `--doc-thresh NUM` can be used to specify the
+    threshold, i.e. minimum number of documents that a vocabulary item
+    must be seen in; uncommon vocabulary before that is ignored (or
+    rather, converted to an OOV token).  Additional arguments to both
+    the app and `textgrounder` itself can be given.  Configuration values
+    (e.g. indicating where to find Wikipedia and Twitter, given the above
+    environment variables) are read from `config-geolocate` in the
+    TextGrounder `bin` directory; additional site-specific configuration
+    will be read from `local-config-geolocate`, if you create that file
+    in the `bin` directory.  There's a `sample.local-config-geolocate`
+    file in the directory giving a sample local config file.
+
+  * `tg-generate-kml` is exactly the same as `tg-geolocate --app generate-kml`
+    but easier to type.
+
+  * `geolocate-toponym` is almost exactly the same as
+    `tg-geolocate --app geolocate-toponym`, but also specifies a gazetteer
+    file as an extra argument.  You still need to supply a value for
+    `--eval-file` and `--eval-type`.
+
+  * `geolocate-toponym-tr-conll` is almost exactly the same as
+    `geolocate-toponym`, but also specifies arguments to evaluate on the
+    PCL-CoNLL corpus.
+
+  * `run-nohup` is a script for wrapping other scripts.  The other script
+    is run using `nohup`, so that a long-running experiment will not get
+    terminated if your shell session ends.  In addition, starting times
+    and arguments, along with all output, are logged to a file with a
+    unique, not-currently existing name, where the name incorporates the
+    name of the underlying script run, the current time and date, an
+    optional ID string (specified using the `-i` or `--id` argument),
+    and possibly an additional number needed to ensure that the file is
+    unique -- it will refuse to overwrite an existing file.  This ID is
+    useful for identifying different experiments using the same script.
+    The experiment runner `run-geolocate-exper.py`, which allows iterating
+    over different parameter settings, generates an ID based on the
+    current parameter settings.
+
+  * `python/run-geolocate-exper.py` is a framework for running a series of
+    experiments on similar arguments.  It was used extensively in running
+    the experiments for the paper.
+
+You can invoke `tg-geolocate wikipedia` with no options, and it will do
+something reasonable: It will attempt to geolocate the entire dev set of
+the old English Wikipedia corpus, using KL divergence as a strategy, with
+a grid size of 1 degrees.  Options you may find useful (which also apply to
+`textgrounder geolocate` and all front ends):
+
+`--degrees-per-cell NUM`
+`--dpc NUM`
+
+Set the size of a cell in degrees, which can be a fractional value.
+
+`--eval-set SET`
+
+Set the split to evaluate on, either "dev" or "test".
+
+`--strategy STRAT ...`
+
+Set the strategy to use for geolocating.  Sample strategies are
+`partial-kl-divergence` ("KL Divergence" in the paper),
+`average-cell-probability` ("ACP" in the paper),
+`naive-bayes-with-baseline` ("Naive Bayes" in the paper), and `baseline`
+(any of the baselines).  You can specify multiple `--strategy` options
+on the command line, and the specified strategies will be tried one after
+the other.
+
+`--baseline-strategy STRAT ...`
+
+Set the baseline strategy to use for geolocating. (It's a separate
+argument because some strategies use a baseline strategy as a fallback,
+and in those cases, both the strategy and baseline strategy need to be
+given.) Sample strategies are `link-most-common-toponym` ("??" in the
+paper), `num-documents`  ("??" in the paper), and `random` ("Random" in
+the paper).  You can specify multiple `--baseline-strategy` options,
+just like for `--strategy`.
+
+`--num-training-docs, --num-test-docs`
+
+One way of controlling how much work is done.  These specify the maximum
+number of documents (training and testing, respectively) to load/evaluate.
+
+`--max-time-per-stage SECS`
+`--mts SECS`
+
+Another way of controlling how much work is done.  Set the maximum amount
+of time to spend in each "stage" of processing.  A value of 300 will
+load enough to give you fairly reasonable results but not take too much
+time running.
+
+`--skip-initial N, --every-nth N`
+
+A final way of controlling how much work is done.  `--skip-initial`
+specifies a number of test documents to skip at the beginning before
+stating to evaluate.  `--every-nth` processes only every Nth document
+rather than all, if N > 1.  Used judiciously, they can be used to split
+up a long run.
+
+An additional argument specific to the Twitter front ends is
+`--doc-thresh`, which specifies the threshold (in number of documents)
+below which vocabulary is ignored.  See the paper for more details.
+
+==================
+Extracting results
+==================
+
+A few scripts are provided to extract the results (i.e. mean and median
+errors) from a series of runs with different parameters, and output the
+results either directly or sorted by error distance:
+
+  * `extract-raw-results.sh` extracts results from a number of runs of
+    any of the above front end programs.  It extracts the mean and median
+    errors from each specified file, computes the avg mean/median error,
+    and outputs a line giving the errors along with relevant parameters
+    for that particular run.
+
+  * `extract-results.sh` is similar but also sorts by distance (both
+    median and mean, as well as avg mean/median), to see which parameter
+    combinations gave the best results.
+
+===============
+Specifying data
+===============
+
+Data is specified using the `--input-corpus` argument, which takes a
+directory.  The corpus generally contains one or more "views" on the raw
+data comprising the corpus, with different views corresponding to differing
+ways of representing the original text of the documents -- as raw,
+word-split text (i.e. a list, in order, of the "tokens" that occur in the
+text, where punctuation marks count as their own tokens and hyphenated words
+may be split into separate tokens); as unigram word counts (for each unique
+word -- or more properly, token -- the number of times that word occurred);
+as bigram word counts (similar to unigram counts but pairs of adjacent tokens
+rather than single tokens are counted); etc.  Each such view has a schema
+file and one or more document files.  The schema file is a short file
+describing the structure of the document files.  The document files
+contain all the data for describing each document, including title, split
+(training, dev or test) and other metadata, as well as the text or word
+counts that are used to create the textual distribution of the document.
+
+The document files are laid out in a very simple database format,
+consisting of one document per line, where each line is composed of a
+fixed number of fields, separated by TAB characters. (E.g. one field
+would list the title, another the split, another all the word counts,
+etc.) A separate schema file lists the name of each expected field.  Some
+of these names (e.g. "title", "split", "text", "coord") have pre-defined
+meanings, but arbitrary names are allowed, so that additional
+corpus-specific information can be provided (e.g. retweet info for tweets
+that were retweeted from some other tweet, redirect info when a Wikipedia
+article is a redirect to another article, etc.).
+
+Additional data files (which are automatically handled by the
+`tg-geolocate` script) are specified using `--stopwords-file` and
+`--gazetteer-file`.  The stopwords file is a list of stopwords (one per
+line), i.e. words to be ignored when generating a distribution from the
+word counts in the counts file.  You don't normally have to specify this
+at all; if not, a default stopwords file is retrieved from inside the
+TextGrounder distribution.  The optional gazetteer file is used only
+when doing toponym resolution (--mode=geotag-toponyms), and doesn't
+apply at all when doing the normal document resolution, as was done in
+the paper.
+
+The following is a list of the generally-applicable defined fields:
+
+  * `title`: Title of the document.  Must be unique within a given corpus,
+  and must be present.  If no title exists (e.g. for a unique tweet), but
+  an ID exists, use the ID.  If neither exists, make up a unique number
+  or unique identifying string of some sort.
+
+  * `id`: The (usually) numeric ID of the document, if such a thing exists.
+  Currently used only when printing out documents.  For Wikipedia articles,
+  this corresponds to the internally-assigned ID.
+
+  * `split`: One of the strings "training", "dev", "test".  Must be present.
+
+  * `corpus`: Name of the corpus (e.g. "enwiki-20111007" for the English
+  Wikipedia of October 7, 2011.  Must be present.  The combination of
+  title and corpus uniquely identifies a document in the presence of
+  documents from multiple corpora.
+
+  * `coord`: Coordinates of a document, or blank.  If specified, the
+  format is two floats separated by a comma, giving latitude and longitude,
+  respectively (positive for north and east, negative for south and
+  west).
+
+The following is a list of fields specific to Wikipedia:
+
+  * `redir`: If this document is a Wikipedia redirect article, this
+  specifies the title of the document redirected to; otherwise, blank.
+  This field is not much used by the document-geotagging code (it is
+  more important during toponym geotagging).  Its main use in document
+  geotagging is in computing the incoming link count of a document (see
+  below).
+
+  * `incoming_links`: Number of incoming links, or blank if unknown.
+  This specifies the number of links pointing to the document from anywhere
+  else.  This is primarily used as part of certain baselines (`internal-link`
+  and `link-most-common-toponym`).  Note that the actual incoming link count
+  of a Wikipedia article includes the incoming link counts of any redirects
+  to that article.
+
+  * `namespace`: For Wikipedia articles, the namespace of the article.
+  Articles not in the `Main` namespace have the namespace attached to
+  the beginning of the article name, followed by a colon (but not all
+  articles with a colon in them have a namespace prefix).  The main
+  significance of this field is that articles not in the `Main` namespace
+  are ignored.  For documents not from Wikipedia, this field should be
+  blank.
+
+  * `is_list_of`, `is_disambig`, `is_list`: These fields should either
+  have  the value of "yes" or "no".  These are Wikipedia-specific fields
+  (identifying, respectively, whether the article title is "List of ...";
+  whether the article is a Wikipedia "disambiguation" page; and whether
+  the article is a list of any type, which includes the previous two
+  categories as well as some others).  None of these fields are currently
+  used.
+
+====================
+Generating KML files
+====================
+
+It is possible to generate KML files showing the distribution of particular
+words over the Earth's surface, using `tg-generate-kml` (e.g.
+`tg-generate-kml wikipedia --kml-words mountain,beach,war`).  The resulting
+KML files can be viewed using [http://earth.google.com Google Earth].
+The only necessary arg is `--kml-words`, a comma-separated list
+of the words to generate distributions for.  Each word is saved in a
+file named by appending the word to whatever is specified using
+`--kml-prefix`.  Another argument is `--kml-transform`, which is used
+to specify a function to apply to transform the probabilities in order
+to make the distinctions among them more visible.  It can be one of
+`none`, `log` and `logsquared` (actually computes the negative of the
+squared log).  The argument `--kml-max-height` can be used to specify
+the heights of the bars in the graph.  It is also possible to specify
+the colors of the bars in the graph by modifying constants given in
+`Geolocate.scala`, near the beginning (`class KMLParameters`).
+
+For example: For the Twitter corpus, running on different levels of the
+document threshold for discarding words, and for the four words "cool",
+"coo", "kool" and "kewl", the following code plots the distribution of
+each of the words across a cell of degree size 1x1. `--mts=300` is
+more for debugging and stops loading further data for generating the
+distribution after 300 seconds (5 minutes) has passed.  It's unnecessary
+here but may be useful if you have an enormous amount of data (e.g. all
+of Wikipedia).
+
+{{{
+for x in 0 5 40; do tg-geolocate geotext --doc-thresh $x --mts=300 --degrees-per-cell=1 --mode=generate-kml --kml-words='cool,coo,kool,kewl' --kml-prefix=kml-dist.$x.none. --kml-transform=none; done 
+}}}
+
+Another example, just for the words "cool" and "coo", but with different
+kinds of transformation of the probabilities.
+
+{{{
+for x in none log logsquared; do tg-geolocate geotext --doc-thresh 5 --mts=300 --degrees-per-cell=1 --mode=generate-kml --kml-words='cool,coo' --kml-prefix=kml-dist.5.$x. --kml-transform=$x; done 
+}}}
