@@ -1,7 +1,186 @@
-This file describes how to download and preprocess a Wikipedia dump into
-a TextGrounder corpus.
+See `README.textgrounder` for an introduction to TextGrounder and to the
+Geolocate subproject.  This file describes how to preprocess raw data from
+other sources to generate corpora for use in TextGrounder.
 
-=========== Quick start ==========
+=============
+Output format
+=============
+
+The normal output format from the various preprocessing applications is
+called the "textdb" format.  This is output by (e.g.) ParseTweets.
+
+This format stores data in as a tab-separated database, with one item
+per line.  There will be one or more files containing data, ending in
+'-SUFFIX.txt' (or '-SUFFIX.txt.bz2' or '-SUFFIX.txt.gz', if the data is
+compressed), where SUFFIX is an identifier referring to the particular sort
+of data stored. (E.g. tweet data uses the suffix 'tweets'.) In addition, there
+is a single file called a "schema", whose name ends in '-SUFFIX-schema.txt'.
+This specifies the name of each of the fields, as well as the name and value
+of any "fixed" fields (which, conceptually, have the same value for all rows,
+and are used to store extra info about the corpus).  Generally, there will
+be multiple output files when there are multiple reducers in Hadoop, since
+each reducer produces its own output file.  Storing the data this way makes
+it easy to read the files from Hadoop.  Large data files are typically
+stored compressed, and are automatically uncompressed as they are read in.
+
+The following formats are used for individual fields:
+
+* Integers and floating-point values, output in the obvious way.
+* Timestamps, output as long integers specifying milliseconds since the
+  Unix Epoch (Jan 1, 1970).
+* Lat/long coordinates, output as a comma-separated pair of floating-point
+  values.
+* Single strings.  URL encoding is used to encode TAB characters (%09 = field
+  separator), newlines (%0A = record separator), the percent sign (%25), and
+  any other characters that may be used as separators (e.g. greater-than
+  signs, spaces, and colons in various cases below).
+* Sequences of strings.  The individual strings are URL-encoded and separated
+  by >> signs.
+* "Count maps", i.e. maps from strings to integers (e.g. counts of words).
+  The format is "STRING:COUNT STRING:COUNT ...", where individual strings are
+  URL-encoded.  N-grams use the format "WORD1:WORD2:...:COUNT" for an
+  individual n-gram. (If additional parameters need to be specified, they
+  should be given in a format such as ":PARAM:VALUE", with an initial colon.
+  This facility isn't currently used.)
+
+All text should be encoded in UTF-8.
+
+The schema file is currently in the following format:
+
+-- The first line lists each field name separated by a tab.
+-- Additional lines specify "fixed fields", which are conceptually like
+   normal fields but have the same value for every row.  There is one
+   line per fixed field, with the field name, a tab, and the field value.
+
+Possibly at some point it may be necessary to specify the field type as well
+as its name.
+
+========================
+Downloading Twitter data
+========================
+
+There's a script called `twitter-pull` inside of the Twools package
+(https://bitbucket.org/utcompling/twools), which can be used for downloading
+tweets from the Twitter Streaming API.  This automatically handles retrying
+after errors along with exponential backoff (absolutely necessary when doing
+Twitter streaming, or you will get locked out temporarily), and starts a new
+file after a certain time period (by default, one day), to keep the resulting
+BZIP-ped files from getting overly large.
+
+===============
+Parsing Twitter
+===============
+
+ParseTweets (opennlp.textgrounder.preprocess.ParseTweets) is a preprocessing
+application that parses tweets in various ways, optionally filtering and/or
+grouping them by user, time, etc.  Numerous options are provided.
+
+ParseTweets can do a lot of things.  By default, it reads in tweets in JSON
+format (the raw format from Twitter) and converts them into textdb format
+(see above).  However, it can also handle different formats on input
+and output, as well as group or filter the tweets.  For example, it is
+possible to read in tweets in textdb format, as well as write out tweets in
+JSON format when no grouping is done.
+
+When reading tweets in JSON format, duplicate tweets are automatically
+filtered out; filtering is by user ID.  This is important because Twitter
+often returns duplicate tweets, and it also allows overlapping scrapes of
+the same source data to be combined.  However, when reading data in other
+formats, no deduplication is done, because user ID's often aren't available
+(e.g. when tweets have been grouped).
+
+------ Input and output formats ------
+
+Input and output formats are specified using '--input-format' and
+'--output-format', respectively.  Currently, the following formats are handled:
+
+* "textdb" format, on both input and output.
+* JSON format, on both input and output, but output in JSON format is not
+  possible when tweets are grouped.
+* "raw-lines" format on input, treating the text of each line as if it
+   were a tweet.  This makes it possible to do n-gram processing and other
+   such operations on raw text.
+* "stats" format on output.  This outputs statistics on the tweets in
+  "textdb" format.
+
+Further control over the fields output in textdb format is possible using
+'--output-fields' (specifying which fields to output).  Output of n-grams
+is possible using the '--max-ngram' option, specifying the maximum size
+of n-grams to output (the default is 1, meaning output only unigrams).
+
+In general, code written using Scoobi should "just work", and require litle
+or no more effort to get working than anything else that uses Hadoop.
+Specifically, you have to compile the code, build an assembly exactly as you
+would do for running other Hadoop code (see above), copy the data into HDFS,
+and run.  For example, you can run `TwitterPull.scala` as follows using
+the TextGrounder front end:
+
+$ textgrounder --hadoop run opennlp.textgrounder.preprocess.TwitterPull input output
+
+or you can run it directly using `hadoop`:
+
+------ Grouping ------
+
+Grouping is specified using '--grouping' and can be done in the following ways:
+
+* No grouping (the default).
+* By user.  When doing this, the location (lat/long coordinates) of the group
+  are determined by the earliest tweet in the group that has a location.
+  (The 'geo-timestamp' field is used to help in tracking this.)
+* By time slice.  The '--timeslice' argument specifies the size of the time
+  slices, and all tweets within a given slice are aggregated.
+* By file.  All tweets in a given input file are aggregated.  This is
+  particularly useful when outputting statistics, or when doing n-gram
+  processing on raw text.
+
+------ Filtering ------
+
+When filtering tweets, tweets can be filtered either by the presence of
+particular words or word sequences in the text of a tweet or based on the
+timestamp of the tweet.  Arbitrary boolean expressions can be specified to
+express more complex filters.  Filtering can be done either on the individual
+tweet level ('--filter-tweets') or the group level ('--filter-groups'); in
+the latter case, a group will be passed through if any tweet in the group
+matches the filter.  Matching is normally case-insensitive, but case-sensitive
+matching is possible using the '--cfilter-tweets' or '--cfilter-groups'
+options.
+
+It is possible to filter by group without actually grouping the tweets
+together in the output; this is done by specifying the appropriate type of
+grouping using '--grouping', and then specifying '--ungrouped-output'.
+
+=================================
+Other apps for processing Twitter
+=================================
+
+There's a script `python/run-process-geotext` used to preprocess the GeoText
+corpus of Eisenstein et al. (2010) into a textdb corpus.  This is a
+front end for `python/twitter_geotext_process.py` and runs similarly to
+the Wikipedia preprocessing code below.
+
+============================
+Parsing Wikipedia dump files
+============================
+
+*NOTE*: Parsing raw Wikipedia dump files is not easy.  Perhaps better
+would have been to download and run the MediaWiki software that generates
+the HTML that is actually output.  As it is, there may be occasional
+errors in processing.  For example, the code that locates the geotagged
+coordinate from an article uses various heuristics to locate the coordinate
+from various templates which might specify it, and other heuristics to
+fetch the correct coordinate if there is more than one.  In some cases,
+this will fetch the correct coordinate even if the MediaWiki software
+fails to find it (due to slightly incorrect formatting in the article);
+but in other cases, it may find a spurious coordinate. (This happens
+particularly for articles that mention a coordinate but don't happen to
+be themselves tagged with a coordinate, or when two coordinates are
+mentioned in an article. FIXME: We make things worse here by picking the
+first coordinate and ignoring `display=title`.  See comments in
+`get_coord()` about how to fix this.)
+
+
+------ Quick start ------
+
 Use the following to download a Wikipedia dump and preprocess it to create
 a corpus for input to TextGrounder:
 
@@ -14,9 +193,14 @@ named WIKITAG, and then preprocesses it into a corpus of the format
 needed by TextGrounder.
 
 $ download-preprocess-wiki 'preprocess-dump' to run all of the steps below.
-This calls 'run-processwiki'.
+This in turn calls 'run-processwiki' with a series of steps to execute.
+This script in turn uses the lower-level script `python/processwiki.py`
+to process the actual (unzipped) dump file on stdin according to various
+command-line arguments.
 
-=========== Introduction ==========
+
+------ In detail ------
+
 There are a large number of steps that go into preprocessing a Wikipedia
 dump, and a number of different files containing various sorts of
 information.  Not all of them actually go into the final corpus normally
@@ -78,10 +262,10 @@ From highest to lowest, there are the following levels of scripts:
    containing ancillary information of various sorts, including information
    previously generated the same script when run in a different mode.  The
    dump file is provided as the standard input of this script rather than
-   through a command-line argument, and generates its data files on its
-   standard output.  'processwiki.py' has no concept of any naming convention
-   for the files it generates; it is the job of 'run-processwiki' to keep
-   track of the various files.
+   through a command-line argument, and the script generates its data files
+   on its standard output.  'processwiki.py' has no concept of any naming
+   convention for the files it generates; it is the job of 'run-processwiki'
+   to keep track of the various files.
 
 
 For 'run-processwiki' and 'preprocess-dump', the dump file used for input
@@ -114,7 +298,7 @@ These two variables can be set on the command line used to execute
 'run-processwiki'.
 
 
-============== How preprocessing works, in detail ===============
+------ In even more detail ------
 
 The following describes in detail the set of steps executed by
 'download-preprocess-wiki' to generate a corpus.  It shows how individual
@@ -230,7 +414,8 @@ run-processwiki coord-counts
 
 convert-corpus-to-latest enwiki-20111007
 
-============== How to rerun a single step ===============
+
+------ How to rerun a single step ------
 
 If all the preprocessing has already been done for you, and you simply want
 to run a single step, then you don't need to do all of the above steps.
@@ -332,7 +517,8 @@ WP_VERSION=enwiki-20111007 NUM_SIMULTANEOUS=8 run-processwiki all-bigram-counts
    You can set a NUM_SIMULTANEOUS that's lower than the number of splits,
    and you get only that much simultaneity.
 
-============== Inpu files, intermediate files, output files ===============
+
+------ Input files, intermediate files, output files ------
 
 These are specified from the point of view of a dump named "enwiki-20111007",
 in approximate order of generation.
