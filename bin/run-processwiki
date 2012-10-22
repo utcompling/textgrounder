@@ -90,12 +90,12 @@ FOO
   exit 1
 fi
 
-if [ -z "$POLIGROUNDER_DIR" ]; then
-  echo "Must set POLIGROUNDER_DIR to top level of TextGrounder distribution"
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
-. $POLIGROUNDER_DIR/bin/config-geolocate
+. $TEXTGROUNDER_DIR/bin/config-geolocate
 
 PROCESSWIKI="$TG_PYTHON_DIR/processwiki.py"
 GENERATE_COMBINED="$TG_PYTHON_DIR/generate_combined.py"

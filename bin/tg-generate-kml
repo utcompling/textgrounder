@@ -6,9 +6,9 @@
 # This is exactly equivalent to 'tg-geolocate --app generate-kml'.  All
 # arguments to 'tg-geolocate' can be given for this script as well.
 
-if [ -z "$POLIGROUNDER_DIR" ]; then
-  echo "Must set POLIGROUNDER_DIR to top level of TextGrounder distribution"
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
-$POLIGROUNDER_DIR/bin/tg-geolocate --app generate-kml ${1+"$@"}
+$TEXTGROUNDER_DIR/bin/tg-geolocate --app generate-kml ${1+"$@"}

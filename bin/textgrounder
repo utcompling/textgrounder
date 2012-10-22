@@ -4,19 +4,19 @@
 # setting the maximum heap size.
 RESERVED_MEMORY=512
 
-POLIGROUNDER_VERSION=0.1.0
+TEXTGROUNDER_VERSION=0.1.0
 
 HADOOP_FAILURE_OK_ARGS="-Dmapred.max.map.failures.percent=20 -Dmapred.max.reduce.failures.percent=20"
 
-if [ -z "$POLIGROUNDER_DIR" ]; then
-  echo "Must set POLIGROUNDER_DIR to top level of PoliGrounder distribution"
+if [ -z "$TEXTGROUNDER_DIR" ]; then
+  echo "Must set TEXTGROUNDER_DIR to top level of TextGrounder distribution"
   exit 1
 fi
 
 JAVA="$JAVA_HOME/bin/java"
 HADOOP_BINARY="${HADOOP_BINARY:-hadoop}"
 
-# NOTE: If environment var PG_JAVA_OPT is set on entry, it will be used.
+# NOTE: If environment var TG_JAVA_OPT is set on entry, it will be used.
 
 # Process options
 
@@ -72,8 +72,8 @@ JAVA_MEMORY_OPT=
 # the physical memory of the machine.  
 if [ -n "$MEMORY" ]; then
   JAVA_MEMORY_OPT="-Xmx$MEMORY"
-elif [ -n "$PG_SET_JVM_MEMORY" ]; then
-  MEMMB=`$POLIGROUNDER_DIR/bin/textgrounder-memory`
+elif [ -n "$TG_SET_JVM_MEMORY" ]; then
+  MEMMB=`$TEXTGROUNDER_DIR/bin/textgrounder-memory`
   if [ "$VERBOSE" = yes ]; then
     echo "Output from textgrounder-memory is: $MEMMB"
   fi
@@ -112,14 +112,14 @@ if [ "$DEBUG" = yes ]; then
   #JAVA_DEBUG_OPT="$JAVA_DEBUG_OPT -XX:+TraceClassLoading"
 fi
 
-JARS="`echo $POLIGROUNDER_DIR/lib/*.jar $POLIGROUNDER_DIR/lib_managed/*/*.jar $POLIGROUNDER_DIR/lib_managed/*/*/*.jar $POLIGROUNDER_DIR/lib_managed/*/*/*/*.jar $POLIGROUNDER_DIR/output/*.jar $POLIGROUNDER_DIR/target/*.jar | tr ' ' ':'`"
+JARS="`echo $TEXTGROUNDER_DIR/lib/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*.jar $TEXTGROUNDER_DIR/lib_managed/*/*/*/*.jar $TEXTGROUNDER_DIR/output/*.jar $TEXTGROUNDER_DIR/target/*.jar | tr ' ' ':'`"
 SCALA_LIB="$HOME/.sbt/boot/scala-2.9.2/lib/scala-library.jar"
-CP="$POLIGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
+CP="$TEXTGROUNDER_DIR/target/classes:$SCALA_LIB:$JARS:$CLASSPATH"
 
 # Later options override earlier ones, so put command-line options after
-# the ones taken from environment variables (PG_JAVA_OPT and to some extent
-# JAVA_MEMORY_OPT, because it depends on env var PG_SET_JVM_MEMORY).
-JAVA_COMMAND="$JAVA $PG_JAVA_OPT $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $JAVA_USER_OPT -classpath $CP"
+# the ones taken from environment variables (TG_JAVA_OPT and to some extent
+# JAVA_MEMORY_OPT, because it depends on env var TG_SET_JVM_MEMORY).
+JAVA_COMMAND="$JAVA $TG_JAVA_OPT $JAVA_MEMORY_OPT $JAVA_DEBUG_OPT $JAVA_MISC_OPT $JAVA_USER_OPT -classpath $CP"
 
 CMD="$1"
 shift
@@ -127,15 +127,15 @@ shift
 help()
 {
 cat <<EOF
-PoliGrounder $POLIGROUNDER_VERSION usage:
-  poligrounder [OPTIONS ...] COMMAND [ARGS ...]
+TextGrounder $TEXTGROUNDER_VERSION usage:
+  textgrounder [OPTIONS ...] COMMAND [ARGS ...]
 
 Options (mostly low-level):
 
   --memory MEM          Specify maximum heap size (e.g. 2048m or 20g); if not
-                        given, PoliGrounder will attempt to set the heap size
+                        given, TextGrounder will attempt to set the heap size
                         to slightly under physical memory if the environment
-                        variable PG_SET_JVM_MEMORY is set; otherwise, the
+                        variable TG_SET_JVM_MEMORY is set; otherwise, the
                         JVM will be left to set the heap size automatically.
   --verbose             Show what commands are being executed.
   --debug-class         Show each class loaded, and where it's loaded from.
@@ -161,12 +161,12 @@ Options (mostly low-level):
 
 Environment variables:
 
-  POLIGROUNDER_DIR      Location of PoliGrounder installation; needs to be
+  TEXTGROUNDER_DIR      Location of TextGrounder installation; needs to be
                         set for this script to work at all.
-  PG_SET_JVM_MEMORY     If non-blank, set the maximum JVM heap size to slightly
+  TG_SET_JVM_MEMORY     If non-blank, set the maximum JVM heap size to slightly
                         under the total physical memory size; useful if you
                         are getting out-of-memory errors.
-  PG_JAVA_OPT           If non-blank, should contain additional options for
+  TG_JAVA_OPT           If non-blank, should contain additional options for
                         the JVM, and will be passed directly to the 'java'
                         executable.  See 'java -help' and 'java -X' for a
                         description of some possible options, although neither
@@ -181,14 +181,14 @@ Environment variables:
 
 General commands:
 
-  build-all             Build PoliGrounder from source using SBT.
+  build-all             Build TextGrounder from source using SBT.
   build                 Enter SBT command line, to issue further commands.
   build COMMAND ...     Run SBT using some other arbitrary command(s).
   sbt COMMAND ...       Run SBT using some other arbitrary command(s); same
                         as 'build'.
   run CLASS ...         Run the main method of a given class (with the
                         classpath set appropriately to pick up all
-                        PoliGrounder and library classes).
+                        TextGrounder and library classes).
   hdebrun CLASS ...     Stands for "Hadoop debug run".  Same as 'run', but
                         turn on stuff more suitable for a Hadoop run during
                         debugging.  Turns on --verbose and --hadoop and adds
@@ -198,7 +198,7 @@ General commands:
   javap OPTIONS ...     Run 'javap' (with the classpath set appropriately).
   scala OPTIONS ...     Run 'scala' (with the classpath set appropriately);
                         useful for getting a console to experiment with the
-                        PoliGrounder code.  Note that you can also use the
+                        TextGrounder code.  Note that you can also use the
                         command 'sbt console', although that requires that
                         SBT is set up properly and you can build from source
                         without errors.
@@ -249,8 +249,8 @@ command for more information.
 EOF
 }
 
-#RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=512m -Xmx2048M -Xss2M -jar $POLIGROUNDER_DIR/bin/sbt-launch-*.jar"
-RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=256m -Xmx1024M -Xss2M -jar $POLIGROUNDER_DIR/bin/sbt-launch-*.jar"
+#RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=512m -Xmx2048M -Xss2M -jar $TEXTGROUNDER_DIR/bin/sbt-launch-*.jar"
+RUN_SBT="$JAVA -XX:+CMSClassUnloadingEnabled -XX:MaxPermSize=256m -Xmx1024M -Xss2M -jar $TEXTGROUNDER_DIR/bin/sbt-launch-*.jar"
 
 execute()
 {
@@ -264,12 +264,12 @@ execute()
   RUNCMD="$1"; shift
   if [ "$VERBOSE" = yes ]; then
     if [ "$CD" = yes ]; then
-      echo Executing: cd $POLIGROUNDER_DIR
+      echo Executing: cd $TEXTGROUNDER_DIR
     fi
     echo Executing: $RUNCMD ${1+"$@"}
   fi
   if [ "$CD" = yes ]; then
-    cd $POLIGROUNDER_DIR
+    cd $TEXTGROUNDER_DIR
   fi
   $RUNCMD ${1+"$@"}
 }
@@ -292,13 +292,13 @@ elif [ "$CMD" = 'run-cp' ]; then
 
 elif [ "$CMD" = 'build' -o "$CMD" = 'sbt' ]; then
 
-  # We need to cd to the top-level PoliGrounder dir when running SBT,
+  # We need to cd to the top-level TextGrounder dir when running SBT,
   # so the proper build.sbt file gets picked up, etc.
   execute --cd "$RUN_SBT" ${1+"$@"}
 
 elif [ "$CMD" = 'build-all' ]; then
 
-  # We need to cd to the top-level PoliGrounder dir when running SBT,
+  # We need to cd to the top-level TextGrounder dir when running SBT,
   # so the proper build.sbt file gets picked up, etc.
   execute --cd "$RUN_SBT update compile" ${1+"$@"}
 
@@ -334,7 +334,7 @@ else
 
     # Geolocate commands
     geolocate-document)
-      # Include now because we need POLIGROUNDER_URL; but not before so that
+      # Include now because we need TEXTGROUNDER_URL; but not before so that
       # we don't get complaints about TG_CORPUS_DIR otherwise.
       . config-geolocate
 
@@ -344,9 +344,9 @@ else
       # pass (through --textgrounder-dir here, and also through corpora
       # paths in 'tg-geolocate').
       if [ -n "$HADOOP" ]; then
-        HADOOP_ARGS="--textgrounder-dir $POLIGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp
+        HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp
       elif [ -n "$HADOOP_NONDIST" ]; then
-        HADOOP_ARGS="--textgrounder-dir $POLIGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp
+        HADOOP_ARGS="--textgrounder-dir $TEXTGROUNDER_URL" CLASS=$TGGEOLOCATE.HadoopGeolocateDocumentApp
       else
         CLASS=$TGGEOLOCATE.GeolocateDocumentApp
       fi
@@ -366,14 +366,14 @@ else
     *) echo "Unrecognized command: $CMD"; help; exit 1;;
   esac
 
-  # We need to *not* cd to the top-level PoliGrounder dir, otherwise if
+  # We need to *not* cd to the top-level TextGrounder dir, otherwise if
   # there are command-line arguments referring relatively to files, the
   # files won't be found because the lookup will be relative to the
   # wrong directory.
 
   if [ -n "$HADOOP" ]; then
-    ASSEMBLY_DIR="$POLIGROUNDER_DIR/target"
-    ASSEMBLY_GLOB="$ASSEMBLY_DIR/PoliGrounder-*.jar"
+    ASSEMBLY_DIR="$TEXTGROUNDER_DIR/target"
+    ASSEMBLY_GLOB="$ASSEMBLY_DIR/TextGrounder-*.jar"
     if [ "`echo $ASSEMBLY_GLOB`" = "$ASSEMBLY_GLOB" ]; then
       echo "No assembly file!  Unable to execute in Hadoop distribute mode."
       exit 1

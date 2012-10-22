@@ -1,6 +1,6 @@
 import AssemblyKeys._ // for sbt-assembly
 
-name := "PoliGrounder"
+name := "TextGrounder"
 
 version := "0.1.0"
 

@@ -22,7 +22,7 @@
 
 
 # CHANGE THESE AS PER YOUR SETTINGS
-export POLIGROUNDER_DIR="$HOME/devel/textgrounder"
+export TEXTGROUNDER_DIR="$HOME/devel/textgrounder"
 #export HADOOP_DIR="~/patched-hadoop-0.20.2-new"
 export EXPDIR="/scratch/01683/benwing/exps/longruns"
 
@@ -76,7 +76,7 @@ if [ "$has_multiarg" = yes ]; then
 fi
 
 export ORIGARGS="$*"
-. $POLIGROUNDER_DIR/bin/tg-geolocate-process-opts
+. $TEXTGROUNDER_DIR/bin/tg-geolocate-process-opts
 
 if [ -z "$1" ]; then
   echo "No dataset specified."
@@ -92,7 +92,7 @@ ARGS="$*"
 
 export LOGDIR="$EXPDIR/$DATASET"
 
-cd $POLIGROUNDER_DIR
+cd $TEXTGROUNDER_DIR
 export PATH="`pwd`/bin:$PATH"
 export TG_ON_LONGHORN=yes
 
