@@ -42,4 +42,18 @@ object TextUtil {
                  docAsArray.slice(tokIndex + 1, endIndex).map(_.getForm)).filterNot(stoplist(_))
   }
 
+  def getContext(docAsArray:Array[Token], tokIndex:Int, windowSize:Int): String = {
+    val startIndex = math.max(0, tokIndex - windowSize)
+    val endIndex = math.min(docAsArray.length, tokIndex + windowSize + 1)
+
+    docAsArray.map(_.getOrigForm).slice(startIndex, endIndex).mkString("", " ", "")
+  }
+
+  def getContext(docAsArray:Array[StoredToken], tokIndex:Int, windowSize:Int): String = {
+    val startIndex = math.max(0, tokIndex - windowSize)
+    val endIndex = math.min(docAsArray.length, tokIndex + windowSize + 1)
+
+    docAsArray.map(_.getOrigForm).slice(startIndex, endIndex).mkString("", " ", "")
+  }
+
 }
