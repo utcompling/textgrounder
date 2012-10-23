@@ -58,6 +58,10 @@ libraryDependencies ++= Seq(
   // problems.) But not needed at all if we don't use that Hadoop POM.
   // "org.codehaus.jackson" % "jackson-mapper-asl" % "1.9.1",
   //
+  // Currently log4j is provided automatically by something (probably Scoobi).
+  // If this fails to be the case at some point, we can use the following:
+  // "log4j" % "log4j" % "1.2.17",
+  //
   // Trove
   "net.sf.trove4j" % "trove4j" % "3.0.2",
   //
@@ -84,7 +88,7 @@ libraryDependencies ++= Seq(
   // "com.codahale" % "trove-scala_2.9.1" % "0.0.2-SNAPSHOT"
   // Jerkson - a better library for processing JSON, although still in
   // development
-  "com.codahale" % "jerkson_2.9.1" % "0.5.0"  
+  "com.codahale" % "jerkson_2.9.1" % "0.5.0"
   )
 
 // turn on all warnings in Java code
