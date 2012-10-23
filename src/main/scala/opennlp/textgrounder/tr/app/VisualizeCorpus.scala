@@ -28,31 +28,47 @@ class VisualizeCorpus extends PApplet {
   var mapDetail:de.fhpotsdam.unfolding.Map = null
   var topoTextArea:Textarea = null
 
+  val INIT_WIDTH = 1024
+  val INIT_HEIGHT = 768
+
+  val BORDER_WIDTH = 10
+  val TEXTAREA_WIDTH = 185
+  var textareaHeight = INIT_HEIGHT - BORDER_WIDTH*2
+  var mapWidth = INIT_WIDTH - TEXTAREA_WIDTH - BORDER_WIDTH*3
+  var mapHeight = INIT_HEIGHT - BORDER_WIDTH*2
+  var textareaX = mapWidth+BORDER_WIDTH*2
+
   val CONTEXT_SIZE = 20
 
   val coordsMap = new scala.collection.mutable.HashMap[(Float, Float), List[TopoMention]]
 
+  var oldWidth = INIT_WIDTH
+  var oldHeight = INIT_HEIGHT
+
   override def setup {
-    size(800, 600, GLConstants.GLGRAPHICS)
+    size(INIT_WIDTH, INIT_HEIGHT/*, GLConstants.GLGRAPHICS*/)
+    //frame.setResizable(true)
     frame.setTitle("Corpus Visualizer")
+    //textMode(PConstants.SHAPE)
+
     val cp5 = new ControlP5(this)
 
-    mapDetail = new de.fhpotsdam.unfolding.Map(this, "detail", 10, 10, 585, 580/*, true, false, new Microsoft.AerialProvider*/)
+    mapDetail = new de.fhpotsdam.unfolding.Map(this, "detail", BORDER_WIDTH, BORDER_WIDTH, mapWidth, mapHeight/*, true, false, new Microsoft.AerialProvider*/)
     mapDetail.zoomToLevel(4)
-    mapDetail.setZoomRange(1, 10)
+    mapDetail.setZoomRange(2, 10)
+    //mapDetail.zoomAndPanTo(new Location(25.0f, 12.0f), 2) // map center
+    //mapDetail.zoomAndPanTo(new Location(38.5f, -98.0f), 2) // USA center
     val eventDispatcher = MapUtils.createDefaultEventDispatcher(this, mapDetail)
 
     topoTextArea = cp5.addTextarea("")
-                      .setPosition(605,10)
-                      .setSize(185, 580)
+                      .setPosition(textareaX, BORDER_WIDTH)
+                      .setSize(TEXTAREA_WIDTH, textareaHeight)
                       .setFont(createFont("arial",12))
                       .setLineHeight(14)
                       .setColor(color(0))
-                      //.setColorBackgroundColor(color(255,100))
-                      //.setColorForegroundColor(color(255,100))
 
     val tokenizer = new OpenNLPTokenizer
-    val corpus = TopoUtil.readStoredCorpusFromSerialized("/home/mihai/devel/textgrounder/trdev-gt-bmd.ser.gz")
+    val corpus = TopoUtil.readStoredCorpusFromSerialized(VisualizeCorpus.inputFile)
 
     for(doc <- corpus) {
       val docArray = TextUtil.getDocAsArray(doc)
@@ -76,20 +92,35 @@ class VisualizeCorpus extends PApplet {
 
   val RADIUS = 10
   var selectedCirc:(Float, Float, List[TopoMention]) = null
+  var oldSelectedCirc = selectedCirc
   var onScreen:List[((Float, Float), List[TopoMention])] = Nil
   val sb = new StringBuffer
 
   override def draw {
     background(255)
 
+    /*if(width != oldWidth || height != oldHeight) {
+      mapWidth = width - TEXTAREA_WIDTH - BORDER_WIDTH*3
+      mapHeight = height - BORDER_WIDTH*2
+      textareaX = mapWidth+BORDER_WIDTH*2
+      textareaHeight = mapHeight
+
+      mapDetail.mapDisplay.resize(mapWidth, mapHeight)
+      topoTextArea.setPosition(textareaX, BORDER_WIDTH)
+                  .setSize(TEXTAREA_WIDTH, textareaHeight)
+
+      oldWidth = width
+      oldHeight = height
+    }*/
+
     mapDetail.draw
-    topoTextArea.show
 
     onScreen =
     (for(((lat,lng),topolist) <- coordsMap) yield {
       val ufLoc:de.fhpotsdam.unfolding.geo.Location = new de.fhpotsdam.unfolding.geo.Location(lat, lng)
       val xy:Array[Float] = mapDetail.getScreenPositionFromLocation(ufLoc)
-      if(xy(0) >= 20 && xy(0) <= 585 && xy(1) >= 20 && xy(1) <= 580) {
+      if(xy(0) >= BORDER_WIDTH + RADIUS && xy(0) <= mapWidth + BORDER_WIDTH - RADIUS
+         && xy(1) >= BORDER_WIDTH + RADIUS && xy(1) <= mapHeight + BORDER_WIDTH - RADIUS) {
         if(selectedCirc != null && lat == selectedCirc._1 && lng == selectedCirc._2)
           fill(200, 0, 0, 100)
         else
@@ -104,27 +135,30 @@ class VisualizeCorpus extends PApplet {
         None
     }).flatten.toList
 
-    if(selectedCirc != null) {
-      sb.setLength(0)
-      sb.append(selectedCirc._3(0).toponym.getOrigForm)
-      var i = 1
-      for(topoMention <- selectedCirc._3) {
-        sb.append("\n\n")
-        sb.append(i)
-        sb.append(". ")
-        if(!topoMention.context.startsWith("[[")) sb.append("...")
-        sb.append(topoMention.context)
-        if(!topoMention.context.endsWith("]]")) sb.append("...")
-        sb.append(" (")
-        sb.append(topoMention.docid)
-        sb.append(")")
-        i += 1
+    if(selectedCirc != oldSelectedCirc) {
+      if(selectedCirc != null) {
+        sb.setLength(0)
+        sb.append(selectedCirc._3(0).toponym.getOrigForm)
+        var i = 1
+        for(topoMention <- selectedCirc._3) {
+          sb.append("\n\n")
+          sb.append(i)
+          sb.append(". ")
+          if(!topoMention.context.startsWith("[[")) sb.append("...")
+          sb.append(topoMention.context)
+          if(!topoMention.context.endsWith("]]")) sb.append("...")
+          sb.append(" (")
+          sb.append(topoMention.docid)
+          sb.append(")")
+            i += 1
+        }
+        topoTextArea.setText(sb.toString)
       }
-      topoTextArea.setText(sb.toString)
+      else
+        topoTextArea.setText("")
     }
-    else
-      topoTextArea.setText("")
-      
+    
+    oldSelectedCirc = selectedCirc
   }
 
   var mousePressedX = -1.0
@@ -140,6 +174,7 @@ class VisualizeCorpus extends PApplet {
     for(((lat, lng), topolist) <- onScreen) {
       val xy:Array[Float] = mapDetail.getScreenPositionFromLocation(new de.fhpotsdam.unfolding.geo.Location(lat, lng))
       if(PApplet.dist(mouseX, mouseY, xy(0), xy(1)) <= RADIUS) {
+        oldSelectedCirc = selectedCirc
         selectedCirc = (lat, lng, topolist)
         clickedCirc = true
       }
@@ -148,6 +183,7 @@ class VisualizeCorpus extends PApplet {
       if(selectedCirc != null/* && PApplet.dist(mouseX, mouseY, selectedCirc._1, selectedCirc._2) > RADIUS*/)
         topoTextArea.scroll(0)
       if(!clickedCirc) {
+        oldSelectedCirc = selectedCirc
         selectedCirc = null
       }
     }
@@ -158,7 +194,10 @@ class VisualizeCorpus extends PApplet {
 
 object VisualizeCorpus extends PApplet {
 
+  var inputFile:String = null
+
   def main(args:Array[String]) {
+    inputFile = args(0)
     PApplet.main(Array(/*"--present", */"opennlp.textgrounder.tr.app.VisualizeCorpus"))
   }
 }
