@@ -66,10 +66,18 @@ libraryDependencies ++= Seq(
   "net.sf.trove4j" % "trove4j" % "3.0.2",
   //
   // Scoobi
+  // The following is the library we actually use, but because it's not
+  // available on a web repository anywhere, we put a local copy in lib/.
+  // "com.nicta" % "scoobi_2.9.2" % "0.6.0-cdh3-SNAPSHOT-benwing",
+  //
+  // The following are other possibilities.
   // "com.nicta" % "scoobi_2.9.2" % "0.4.0",
-  "com.nicta" % "scoobi_2.9.2" % "0.6.0-cdh3-SNAPSHOT-benwing",
   // "com.nicta" % "scoobi_2.9.2" % "0.5.0-cdh3",
   // "com.nicta" % "scoobi_2.9.2" % "0.5.0-SNAPSHOT",
+  // This should hopefully indicate that we want the dependencies of
+  // Scoobi 0.5 but we "provide" the library itself (i.e. in reality we
+  // replace the library with an updated version, stored in the lib/ dir)
+  "com.nicta" % "scoobi_2.9.2" % "0.5.0-cdh3" % "provided",
   // "provided" if we use Scoobi's package-hadoop instead of sbt-assembly.
   // This is another way of building an assembly for Hadoop that includes all
   // the dependent libraries into the JAR file.  To do that, we have to move
@@ -84,12 +92,15 @@ libraryDependencies ++= Seq(
   // in Scoobi (among other things), but leads to compile errors that I don't
   // know how to fix.
   //  "com.nicta" % "scoobi_2.9.2" % "0.5.0-SNAPSHOT" % "provided",
+  //
+  // Dependencies for Scoobi, etc.
   "log4j" % "log4j" % "1.2.16",
   // The following needed for Scoobi 0.1, but evidently not any more.
   // "javassist" % "javassist" % "3.12.1.GA",
   //
   // Find repository for trove-scala; currently stored unmanaged
   // "com.codahale" % "trove-scala_2.9.1" % "0.0.2-SNAPSHOT"
+  //
   // Jerkson - a better library for processing JSON, although still in
   // development
   "com.codahale" % "jerkson_2.9.1" % "0.5.0"
