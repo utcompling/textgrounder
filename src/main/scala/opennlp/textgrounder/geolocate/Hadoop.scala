@@ -221,7 +221,7 @@ class DocumentEvaluationMapper extends
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver() = new TDriver
 
-  var evaluators: Iterable[CellGridEvaluator[SphereCoord,SphereDocument,_,_,_]] = null
+  var evaluators: Iterable[CellGridEvaluator[SphereCoord,SphereDocument,_,_,_]] = _
   val task = new ExperimentMeteredTask(driver, "document", "evaluating")
 
   class HadoopDocumentFileProcessor(

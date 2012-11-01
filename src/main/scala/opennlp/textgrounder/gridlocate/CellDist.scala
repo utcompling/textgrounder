@@ -47,9 +47,15 @@ class CellDist[
     cellprobs ++= probs
   }
 
-  def get_ranked_cells() = {
+  def get_ranked_cells(include: Iterable[TCell]) = {
+    val probs =
+      if (include.size == 0)
+        cellprobs
+      else
+        // Elements on right override those on left
+        include.map((_, 0.0)).toMap ++ cellprobs.toMap
     // sort by second element of tuple, in reverse order
-    cellprobs.toSeq sortWith (_._2 > _._2)
+    probs.toSeq sortWith (_._2 > _._2)
   }
 }
 

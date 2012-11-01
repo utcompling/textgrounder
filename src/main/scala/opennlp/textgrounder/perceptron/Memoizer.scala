@@ -16,7 +16,7 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.scalabha.classify.perceptron
+package opennlp.textgrounder.perceptron
 
 import collection.mutable
 

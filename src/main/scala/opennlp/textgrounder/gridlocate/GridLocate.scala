@@ -32,6 +32,7 @@ import opennlp.textgrounder.util.ioutil.{FileHandler, LocalFileHandler}
 import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.errprint
 
+import opennlp.textgrounder.perceptron._
 import opennlp.textgrounder.worddist._
 
 import WordDist.memoizer._
@@ -134,13 +135,12 @@ abstract class GridLocateDocumentStrategy[
   /**
    * For a given word distribution (describing a test document), return
    * an Iterable of tuples, each listing a particular cell on the Earth
-   * and a score of some sort.  The results should be in sorted order,
-   * with better cells earlier.  Currently there is no guarantee about
-   * the particular scores returned; for some strategies, lower scores
-   * are better, while for others, higher scores are better.  Currently,
-   * the wrapper code outputs the score but doesn't otherwise use it.
+   * and a score of some sort.  The cells given in `include` must be
+   * included in the list.  Higher scores are better.  The results should
+   * be in sorted order, with better cells earlier.
    */
-  def return_ranked_cells(word_dist: WordDist): Iterable[(TCell, Double)]
+  def return_ranked_cells(word_dist: WordDist, include: Iterable[TCell]):
+    Iterable[(TCell, Double)]
 }
 
 /**
@@ -154,12 +154,12 @@ class RandomGridLocateDocumentStrategy[
 ](
   cell_grid: TGrid
 ) extends GridLocateDocumentStrategy[TCell, TGrid](cell_grid) {
-  def return_ranked_cells(word_dist: WordDist) = {
-    val cells = cell_grid.iter_nonempty_cells()
-      val shuffled = (new Random()).shuffle(cells)
-      (for (cell <- shuffled) yield (cell, 0.0))
-    }
+  def return_ranked_cells(word_dist: WordDist, include: Iterable[TCell]) = {
+    val cells = cell_grid.iter_nonempty_cells_including(include)
+    val shuffled = (new Random()).shuffle(cells)
+    (for (cell <- shuffled) yield (cell, 0.0))
   }
+}
 
   /**
    * Class that implements a simple baseline strategy -- pick the "most
@@ -174,36 +174,28 @@ class RandomGridLocateDocumentStrategy[
     cell_grid: TGrid,
     internal_link: Boolean
   ) extends GridLocateDocumentStrategy[TCell, TGrid](cell_grid) {
-    var cached_ranked_mps: Iterable[(TCell, Double)] = null
-    def return_ranked_cells(word_dist: WordDist) = {
-      if (cached_ranked_mps == null) {
-        cached_ranked_mps = (
-          (for (cell <- cell_grid.iter_nonempty_cells())
-            yield (cell,
-              (if (internal_link)
-                 cell.combined_dist.incoming_links
-               else
-                 cell.combined_dist.num_docs_for_links).toDouble)).
-          toArray sortWith (_._2 > _._2))
-      }
-      cached_ranked_mps
+    def return_ranked_cells(word_dist: WordDist, include: Iterable[TCell]) = {
+      (for (cell <-
+          cell_grid.iter_nonempty_cells_including(include))
+        yield (cell,
+          (if (internal_link)
+             cell.combined_dist.incoming_links
+           else
+             cell.combined_dist.num_docs_for_links).toDouble)).
+      toArray sortWith (_._2 > _._2)
     }
   }
 
   /**
-   * Abstract class that implements a strategy for document geolocation that
+   * Abstract class that implements a strategy for grid location that
    * involves directly comparing the document distribution against each cell
    * in turn and computing a score.
-   *
-   * @param prefer_minimum If true, lower scores are better; if false, higher
-   *   scores are better.
    */
-  abstract class MinMaxScoreStrategy[
+  abstract class PointwiseScoreStrategy[
     TCell <: GenericGeoCell,
     TGrid <: CellGenericCellGrid[TCell]
   ](
-    cell_grid: TGrid,
-    prefer_minimum: Boolean
+    cell_grid: TGrid
   ) extends GridLocateDocumentStrategy[TCell, TGrid](cell_grid) {
     /**
      * Function to return the score of a document distribution against a
@@ -216,7 +208,8 @@ class RandomGridLocateDocumentStrategy[
      * cells. Return a sequence of tuples (cell, score) where 'cell'
      * indicates the cell and 'score' the score.
      */
-    def return_ranked_cells_serially(word_dist: WordDist) = {
+    def return_ranked_cells_serially(word_dist: WordDist,
+      include: Iterable[TCell]) = {
       /*
        The non-parallel way of doing things; Stephen resurrected it when
        merging the Dirichlet stuff.  Attempting to use the parallel method
@@ -225,7 +218,8 @@ class RandomGridLocateDocumentStrategy[
        */
         val buffer = mutable.Buffer[(TCell, Double)]()
 
-        for (cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)) {
+        for (cell <- cell_grid.iter_nonempty_cells_including(
+            include, nonempty_word_dist = true)) {
           if (debug("lots")) {
             errprint("Nonempty cell at indices %s = location %s, num_documents = %s",
               cell.describe_indices(), cell.describe_location(),
@@ -243,19 +237,21 @@ class RandomGridLocateDocumentStrategy[
      * cells. Return a sequence of tuples (cell, score) where 'cell'
      * indicates the cell and 'score' the score.
      */
-    def return_ranked_cells_parallel(word_dist: WordDist) = {
-      val cells = cell_grid.iter_nonempty_cells(nonempty_word_dist = true)
+    def return_ranked_cells_parallel(word_dist: WordDist,
+      include: Iterable[TCell]) = {
+      val cells = cell_grid.iter_nonempty_cells_including(
+        include, nonempty_word_dist = true)
       cells.par.map(c => (c, score_cell(word_dist, c))).toBuffer
     }
 
-    def return_ranked_cells(word_dist: WordDist) = {
+    def return_ranked_cells(word_dist: WordDist, include: Iterable[TCell]) = {
       // FIXME, eliminate this global reference
       val parallel = !GridLocateDriver.Params.no_parallel
       val cell_buf = {
         if (parallel)
-          return_ranked_cells_parallel(word_dist)
+          return_ranked_cells_parallel(word_dist, include)
         else
-          return_ranked_cells_serially(word_dist)
+          return_ranked_cells_serially(word_dist, include)
       }
 
       /* SCALABUG:
@@ -264,11 +260,7 @@ class RandomGridLocateDocumentStrategy[
          if/then as follows, return type is Iterable, even though both
          forks have the same type of mutable.buffer!
        */
-      val retval =
-        if (prefer_minimum)
-          cell_buf sortWith (_._2 < _._2)
-        else
-          cell_buf sortWith (_._2 > _._2)
+      val retval = cell_buf sortWith (_._2 > _._2)
 
       /* If doing things parallel, this code applies for debugging
          (serial has the debugging code embedded into it). */
@@ -303,7 +295,7 @@ class RandomGridLocateDocumentStrategy[
     cell_grid: TGrid,
     partial: Boolean = true,
     symmetric: Boolean = false
-  ) extends MinMaxScoreStrategy[TCell, TGrid](cell_grid, true) {
+  ) extends PointwiseScoreStrategy[TCell, TGrid](cell_grid) {
 
     var self_kl_cache: KLDivergenceCache = null
     val slow = false
@@ -319,14 +311,16 @@ class RandomGridLocateDocumentStrategy[
           partial = partial)
         kldiv = (kldiv + kldiv2) / 2.0
       }
-      kldiv
+      // Negate so that higher scores are better
+      -kldiv
     }
 
-    override def return_ranked_cells(word_dist: WordDist) = {
+    override def return_ranked_cells(word_dist: WordDist,
+        include: Iterable[TCell]) = {
       // This will be used by `score_cell` above.
       self_kl_cache = word_dist.get_kl_divergence_cache()
 
-      val cells = super.return_ranked_cells(word_dist)
+      val cells = super.return_ranked_cells(word_dist, include)
 
       if (debug("kldiv") && word_dist.isInstanceOf[FastSlowKLDivergence]) {
         val fast_slow_dist = word_dist.asInstanceOf[FastSlowKLDivergence]
@@ -376,7 +370,7 @@ class RandomGridLocateDocumentStrategy[
     cell_grid: TGrid,
     smoothed: Boolean = false,
     partial: Boolean = false
-  ) extends MinMaxScoreStrategy[TCell, TGrid](cell_grid, true) {
+  ) extends PointwiseScoreStrategy[TCell, TGrid](cell_grid) {
 
     def score_cell(word_dist: WordDist, cell: TCell) = {
       var cossim =
@@ -386,7 +380,8 @@ class RandomGridLocateDocumentStrategy[
       // Just in case of round-off problems
       assert(cossim <= 1.002)
       cossim = 1.002 - cossim
-      cossim
+      // Negate so that higher scores are better
+      -cossim
     }
   }
 
@@ -397,7 +392,7 @@ class RandomGridLocateDocumentStrategy[
   ](
     cell_grid: TGrid,
     use_baseline: Boolean = true
-  ) extends MinMaxScoreStrategy[TCell, TGrid](cell_grid, false) {
+  ) extends PointwiseScoreStrategy[TCell, TGrid](cell_grid) {
 
     def score_cell(word_dist: WordDist, cell: TCell) = {
       val params = cell_grid.table.driver.params
@@ -435,10 +430,10 @@ class RandomGridLocateDocumentStrategy[
     val cdist_factory =
       create_cell_dist_factory(cell_grid.table.driver.params.lru_cache_size)
 
-    def return_ranked_cells(word_dist: WordDist) = {
+    def return_ranked_cells(word_dist: WordDist, include: Iterable[TCell]) = {
       val celldist =
         cdist_factory.get_cell_dist_for_word_dist(cell_grid, word_dist)
-      celldist.get_ranked_cells()
+      celldist.get_ranked_cells(include)
     }
   }
 
@@ -633,6 +628,67 @@ class RandomGridLocateDocumentStrategy[
     //  def skip_every_n_test_docs =
     //    ap.option[Int]("skip-every-n-test-docs", "skip-n", default = 0,
     //      help = """Skip this many after each one processed.  Default 0.""")
+
+    //// Reranking options
+    var rerank =
+      ap.option[String]("rerank",
+        default = "none",
+        choices = Seq("none", "pointwise"),
+        help = """Type of reranking to do.  Possibilities are
+  'none', 'pointwise' (do pointwise reranking using a classifier).  Default
+  is '%default'.""")
+
+    var rerank_top_n =
+      ap.option[Int]("rerank-top-n",
+        default = 50,
+        help = """Number of top-ranked items to rerank.  Default is %default.""")
+
+    var rerank_classifier =
+      ap.option[String]("rerank-classifier",
+        default = "perceptron",
+        choices = Seq("perceptron", "avg-perceptron", "pa-perceptron",
+          "trivial"),
+        help = """Type of classifier to use for reranking.  Possibilities are
+  'perceptron' (perceptron using the basic algorithm); 'avg-perceptron'
+  (perceptron using the basic algorithm, where the weights from the various
+  rounds are averaged -- this usually improves results if the weights oscillate
+  around a certain error rate, rather than steadily improving); 'pa-perceptron'
+  (passive-aggressive perceptron, which usually leads to steady but gradually
+  dropping-off error rate improvements with increased number of rounds);
+  'trivial' (a trivial pointwise reranker for testing purposes).
+  Default %default.
+  
+  For the perceptron classifiers, see also `--pa-variant`,
+  `--perceptron-error-threshold`, `--perceptron-aggressiveness` and
+  `--perceptron-rounds`.""")
+
+    var pa_variant =
+      ap.option[Int]("pa-variant",
+        metavar = "INT",
+        choices = Seq(0, 1, 2),
+        help = """For passive-aggressive perceptron when reranking: variant
+  (0, 1, 2; default %default).""")
+
+    var perceptron_error_threshold =
+      ap.option[Double]("perceptron-error-threshold",
+        metavar = "DOUBLE",
+        default = 1e-10,
+        help = """For perceptron when reranking: Total error threshold below
+  which training stops (default: %default).""")
+
+    var perceptron_aggressiveness =
+      ap.option[Double]("perceptron-aggressiveness",
+        metavar = "DOUBLE",
+        default = 1.0,
+        help = """For perceptron: aggressiveness factor > 0.0
+  (default: %default).""")
+
+    var perceptron_rounds =
+      ap.option[Int]("perceptron-rounds",
+        metavar = "INT",
+        default = 10000,
+        help = """For perceptron: maximum number of training rounds
+  (default: %default).""")
 
     //// Options used when creating word distributions
     var word_dist =
@@ -879,11 +935,13 @@ class RandomGridLocateDocumentStrategy[
    * also returned by the run() function.  There are some scripts to parse the
    * console output.  See below.
    */
-  abstract class GridLocateDriver extends HadoopableArgParserExperimentDriver {
+  trait GridLocateDriver extends HadoopableArgParserExperimentDriver {
     type TDoc <: DistDocument[_]
-    type TGrid <: CellGrid[_, TDoc, _ <: GeoCell[_, TDoc]]
+    type TCell <: GeoCell[_, TDoc]
+    type TGrid <: CellGrid[_, TDoc, TCell]
     type TDocTable <: DistDocumentTable[_, TDoc, TGrid]
     override type TParam <: GridLocateParameters
+
     var stopwords: Set[String] = _
     var whitelist: Set[String] = _
     var cell_grid: TGrid = _
@@ -1018,7 +1076,7 @@ class RandomGridLocateDocumentStrategy[
     }
     cell_grid.finish()
     if(params.output_training_cell_dists) {
-      for(cell <- cell_grid.iter_nonempty_cells(true)) {
+      for(cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)) {
         print(cell.shortstr+"\t")
         val word_dist = cell.combined_dist.word_dist
         println(word_dist.toString)        
@@ -1050,6 +1108,110 @@ class RandomGridLocateDocumentStrategy[
       evalobj.finish()
       (stratname, strategy, evalobj)
     }
+  }
+}
+
+trait GridLocateDocumentDriver extends GridLocateDriver {
+  var strategies: Seq[(String, GridLocateDocumentStrategy[TCell, TGrid])] = _
+  var rankers: Map[GridLocateDocumentStrategy[TCell, TGrid],
+    Ranker[TDoc, TCell]] = _
+
+  override def handle_parameters() {
+    super.handle_parameters()
+    if (params.perceptron_aggressiveness <= 0)
+      param_error("Perceptron aggressiveness value should be strictly greater than zero")
+  }
+
+  def create_strategy(stratname: String) = {
+    stratname match {
+      case "random" =>
+        new RandomGridLocateDocumentStrategy[TCell, TGrid](cell_grid)
+      case "internal-link" =>
+        new MostPopularCellGridLocateDocumentStrategy[TCell, TGrid](
+          cell_grid, true)
+      case "num-documents" =>
+        new MostPopularCellGridLocateDocumentStrategy[TCell, TGrid](
+          cell_grid, false)
+      case "naive-bayes-no-baseline" =>
+        new NaiveBayesDocumentStrategy[TCell, TGrid](cell_grid, false)
+      case "naive-bayes-with-baseline" =>
+        new NaiveBayesDocumentStrategy[TCell, TGrid](cell_grid, true)
+      case "cosine-similarity" =>
+        new CosineSimilarityStrategy[TCell, TGrid](cell_grid, smoothed = false,
+          partial = false)
+      case "partial-cosine-similarity" =>
+        new CosineSimilarityStrategy[TCell, TGrid](cell_grid, smoothed = false,
+          partial = true)
+      case "smoothed-cosine-similarity" =>
+        new CosineSimilarityStrategy[TCell, TGrid](cell_grid, smoothed = true,
+          partial = false)
+      case "smoothed-partial-cosine-similarity" =>
+        new CosineSimilarityStrategy[TCell, TGrid](cell_grid, smoothed = true,
+          partial = true)
+      case "full-kl-divergence" =>
+        new KLDivergenceStrategy[TCell, TGrid](cell_grid, symmetric = false,
+          partial = false)
+      case "partial-kl-divergence" =>
+        new KLDivergenceStrategy[TCell, TGrid](cell_grid, symmetric = false,
+          partial = true)
+      case "symmetric-full-kl-divergence" =>
+        new KLDivergenceStrategy[TCell, TGrid](cell_grid, symmetric = true,
+          partial = false)
+      case "symmetric-partial-kl-divergence" =>
+        new KLDivergenceStrategy[TCell, TGrid](cell_grid, symmetric = true,
+          partial = true)
+      case "none" =>
+        null
+      case other => {
+        assert(false, "Internal error: Unhandled strategy %s" format other)
+        null
+      }
+    }
+  }
+
+  def create_strategies(): Seq[(String, GridLocateDocumentStrategy[TCell, TGrid])]
+
+  protected def create_pointwise_classifier_trainer() = {
+    params.rerank_classifier match {
+      case "pa-perceptron" =>
+        new PassiveAggressiveBinaryPerceptronTrainer(
+          params.pa_variant, params.perceptron_aggressiveness,
+          error_threshold = params.perceptron_error_threshold,
+          max_iterations = params.perceptron_rounds)
+      case "perceptron" | "avg-perceptron" =>
+        new BasicBinaryPerceptronTrainer(
+          params.perceptron_aggressiveness,
+          error_threshold = params.perceptron_error_threshold,
+          max_iterations = params.perceptron_rounds,
+          averaged = params.rerank_classifier == "avg-perceptron")
+    }
+  }
+
+  protected def create_basic_ranker(
+    strategy: GridLocateDocumentStrategy[TCell, TGrid]
+  ) = {
+    new CellGridRanker[TDoc, TCell, TGrid](strategy)
+  }
+
+  def create_ranker(strategy: GridLocateDocumentStrategy[TCell, TGrid]) = {
+    val basic_ranker = create_basic_ranker(strategy)
+    if (params.rerank == "none") basic_ranker
+    else params.rerank_classifier match {
+      case "trivial" =>
+        new TrivialDistDocumentReranker[TDoc, TCell, TGrid](
+          basic_ranker, params.rerank_top_n)
+      // FIXME!!!
+      case _ => basic_ranker
+    }
+  }
+
+  /**
+   * Set everything up for document grid-location.  Create and save a
+   * sequence of strategy objects.
+   */
+  override def setup_for_run() {
+    super.setup_for_run()
+    strategies = create_strategies()
   }
 }
 

@@ -318,7 +318,7 @@ class RankedSphereCellGridEvaluator(
   SphereCoord, SphereDocument, SphereCell, SphereCellGrid,
   SphereDocumentEvaluationResult
 ](strategy, stratname, driver) {
-  def create_grouped_eval_stats(driver: GridLocateDriver,
+  def create_grouped_eval_stats(driver: GridLocateDocumentDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
     new GroupedSphereDocumentEvalStats(
       driver, cell_grid, results_by_range, is_ranked = true)
@@ -328,7 +328,7 @@ class RankedSphereCellGridEvaluator(
 
   override def print_individual_result(doctag: String, document: SphereDocument,
       result: SphereDocumentEvaluationResult,
-      pred_cells: Array[(SphereCell, Double)]) {
+      pred_cells: Iterable[(SphereCell, Double)]) {
     super.print_individual_result(doctag, document, result, pred_cells)
 
     assert(doctag(0) == '#')
@@ -340,7 +340,7 @@ class RankedSphereCellGridEvaluator(
       else {
         strategy.cell_grid.asInstanceOf[MultiRegularCellGrid].
           output_ranking_grid(
-            pred_cells.asInstanceOf[Seq[(MultiRegularCell, Double)]],
+            pred_cells.asInstanceOf[Iterable[(MultiRegularCell, Double)]],
             result.true_cell.asInstanceOf[MultiRegularCell], grsize)
       }
     }
@@ -367,7 +367,7 @@ class MeanShiftSphereCellGridEvaluator(
   SphereDocumentEvaluationResult
 ](strategy, stratname, driver, k_best, mean_shift_window,
   mean_shift_max_stddev, mean_shift_max_iterations) {
-  def create_grouped_eval_stats(driver: GridLocateDriver,
+  def create_grouped_eval_stats(driver: GridLocateDocumentDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
     new GroupedSphereDocumentEvalStats(
       driver, cell_grid, results_by_range, is_ranked = false)
@@ -424,7 +424,8 @@ class PCLTravelGeolocateDocumentEvaluator(
       dist.add_document(split_text_into_words(text, ignore_punc = true))
     dist.finish_before_global()
     dist.finish_after_global()
-    val cells = strategy.return_ranked_cells(dist)
+    val cells =
+      strategy.return_ranked_cells(dist, include = Iterable[SphereCell]())
     errprint("")
     errprint("Document with title: %s", doc.title)
     val num_cells_to_show = 5
