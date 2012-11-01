@@ -16,7 +16,7 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.scalabha.classify
+package opennlp.textgrounder
 
 package object perceptron {
   type WeightVector = Array[Double]

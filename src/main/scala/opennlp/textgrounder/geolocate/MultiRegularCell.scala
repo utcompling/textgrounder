@@ -502,7 +502,7 @@ class MultiRegularCellGrid(
    *   of 21 will result in a ranking grid with the true cell and 10
    *   cells on each side shown.)
    */
-  def output_ranking_grid(pred_cells: Seq[(MultiRegularCell, Double)],
+  def output_ranking_grid(pred_cells: Iterable[(MultiRegularCell, Double)],
     true_cell: MultiRegularCell, grsize: Int) {
     val (true_latind, true_longind) =
       (true_cell.index.latind, true_cell.index.longind)
@@ -511,11 +511,13 @@ class MultiRegularCellGrid(
     val min_longind = true_longind - grsize / 2
     val max_longind = min_longind + grsize - 1
     val grid = mutable.Map[RegularCellIndex, (MultiRegularCell, Double, Int)]()
-    for (((cell, value), rank) <- pred_cells zip (1 to pred_cells.length)) {
+    for (((cell, score), rank) <- pred_cells zip (1 to pred_cells.size)) {
       val (la, lo) = (cell.index.latind, cell.index.longind)
       if (la >= min_latind && la <= max_latind &&
         lo >= min_longind && lo <= max_longind)
-        grid(cell.index) = (cell, value, rank)
+        // FIXME: This assumes KL-divergence or similar scores, which have
+        // been negated to make larger scores better.
+        grid(cell.index) = (cell, -score, rank)
     }
 
     errprint("Grid ranking, gridsize %dx%d", grsize, grsize)

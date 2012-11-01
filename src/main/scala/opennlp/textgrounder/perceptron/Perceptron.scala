@@ -1,4 +1,4 @@
-///////////////////////////////////////////////////////////////////////////////
+ ///////////////////////////////////////////////////////////////////////////////
 //  Perceptron.scala
 //
 //  Copyright (C) 2012 Ben Wing, The University of Texas at Austin
@@ -16,7 +16,7 @@
 //  limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 
-package opennlp.scalabha.classify.perceptron
+package opennlp.textgrounder.perceptron
 
 /**
  * A perceptron for binary classification.
@@ -24,27 +24,27 @@ package opennlp.scalabha.classify.perceptron
  * @author Ben Wing
  */
 
-import scala.util.control.Breaks._
+import util.control.Breaks._
 import collection.mutable
 import io.Source
 
 /**
- * A vector of real-valued features.  Defined as an abstract class because
- * some implementations might want to evaluate the features on-the-fly
+ * A vector of real-valued features.  In general, features are indexed
+ * both by a non-negative integer and by a class label (i.e. a label for
+ * the class that is associated with a particular instance by a classifier).
+ * Commonly, the class label is ignored when looking up a feature's value.
+ * Some implementations might want to evaluate the features on-the-fly
  * rather than store an actual vector of values.
  */
-abstract class FeatureVector {
+trait FeatureVector {
   /** Return the length of the feature vector.  This is the number of weights
     * that need to be created -- not necessarily the actual number of items
     * stored in the vector (which will be different especially in the case
     * of sparse vectors). */
   def length: Int
 
-  /** Return the value at index `i`. */
-  def apply(i: Int): Double
-
   /** Return the value at index `i`, for class `label`. */
-  def apply(i: Int, label: Int): Double = apply(i)
+  def apply(i: Int, label: Int): Double
 
   /** Return the squared magnitude of the feature vector for class `label`,
     * i.e. dot product of feature vector with itself */
@@ -64,39 +64,20 @@ abstract class FeatureVector {
 }
 
 /**
+ * A feature vector that ignores the class label.
+ */
+trait SimpleFeatureVector extends FeatureVector {
+  /** Return the value at index `i`. */
+  def apply(i: Int): Double
+
+  def apply(i: Int, label: Int) = apply(i)
+}
+
+/**
  * A feature vector in which the features are stored densely, i.e. as
  * an array of values.
  */
-abstract class DenseFeatureVector extends FeatureVector {
-  /** Add two feature vectors. */
-  def +(other: FeatureVector) = {
-    val len = length
-    val res = new WeightVector(len)
-    for (i <- 0 until len)
-      res(i) = this(i) + other(i)
-    new RawArrayFeatureVector(res)
-  }
-  
-  /** Subtract two feature vectors. */
-  def -(other: FeatureVector) = {
-    val len = length
-    val res = new WeightVector(len)
-    for (i <- 0 until len)
-      res(i) = this(i) - other(i)
-    new RawArrayFeatureVector(res)
-  }
-
-  /** Scale a feature vector. */
-  def *(scalar: Double) = {
-    val len = length
-    val res = new WeightVector(len)
-    for (i <- 0 until len)
-      res(i) = this(i)*scalar
-    new RawArrayFeatureVector(res)
-  }
-
-  /** Compute the dot product of the feature vector with a set of weights,
-    * for class `label`. */
+trait DenseFeatureVector extends FeatureVector {
   def dot_product(weights: WeightVector, label: Int) =
     (for (i <- 0 until length) yield apply(i, label)*weights(i)).sum
 
@@ -119,7 +100,34 @@ abstract class DenseFeatureVector extends FeatureVector {
  */
 class RawArrayFeatureVector(
   values: WeightVector
-) extends DenseFeatureVector {
+) extends DenseFeatureVector with SimpleFeatureVector {
+  /** Add two feature vectors. */
+  def +(other: SimpleFeatureVector) = {
+    val len = length
+    val res = new WeightVector(len)
+    for (i <- 0 until len)
+      res(i) = this(i) + other(i)
+    new RawArrayFeatureVector(res)
+  }
+  
+  /** Subtract two feature vectors. */
+  def -(other: SimpleFeatureVector) = {
+    val len = length
+    val res = new WeightVector(len)
+    for (i <- 0 until len)
+      res(i) = this(i) - other(i)
+    new RawArrayFeatureVector(res)
+  }
+
+  /** Scale a feature vector. */
+  def *(scalar: Double) = {
+    val len = length
+    val res = new WeightVector(len)
+    for (i <- 0 until len)
+      res(i) = this(i)*scalar
+    new RawArrayFeatureVector(res)
+  }
+
   /** Return the length of the feature vector. */
   def length = values.length
 
@@ -135,7 +143,7 @@ class RawArrayFeatureVector(
  */
 class ArrayFeatureVector(
   values: WeightVector
-) extends DenseFeatureVector {
+) extends DenseFeatureVector with SimpleFeatureVector {
   /** Return the length of the feature vector; + 1 including the extra bias
     * term. */
   def length = values.length + 1
@@ -162,7 +170,58 @@ class ArrayFeatureVector(
  * the features with non-zero values are stored, using a hash table or
  * similar.
  */
-abstract class SparseFeatureVector extends FeatureVector {
+class SparseFeatureVector(
+  feature_values: Map[String, Double]
+) extends SimpleFeatureVector {
+  protected val memoized_features = Map(0 -> 0.0) ++ // the intercept term
+    feature_values.map {
+      case (name, value) =>
+        (SparseFeatureVector.feature_mapper.memoize_string(name), value)
+    }
+
+  def length = {
+    // +1 because of the intercept term
+    SparseFeatureVector.feature_mapper.number_of_entries + 1
+  }
+
+  def apply(index: Int) = memoized_features.getOrElse(index, 0.0)
+  def apply(feature: String): Double =
+    apply(SparseFeatureVector.feature_mapper.memoize_string(feature))
+
+  def squared_magnitude(label: Int) =
+    memoized_features.map {
+      case (index, value) => value * value
+    }.sum
+
+  def diff_squared_magnitude(label1: Int, label2: Int) = 0.0
+
+  def dot_product(weights: WeightVector, label: Int) =
+    memoized_features.map {
+      case (index, value) => value * weights(index)
+    }.sum
+
+  def update_weights(weights: WeightVector, scale: Double, label: Int) {
+    memoized_features.map {
+      case (index, value) => weights(index) += scale * value
+    }
+  }
+
+  override def toString = {
+    "SparseFeatureVector(%s)" format
+    memoized_features.filter { case (index, value) => value > 0}.
+      toSeq.sorted.map {
+        case (index, value) =>
+          "%s(%s)=%.2f" format (
+            SparseFeatureVector.feature_mapper.unmemoize_string(index),
+            index, value
+          )
+      }.mkString(",")
+  }
+}
+
+object SparseFeatureVector {
+  // Set the minimum index to 1 so we can use 0 for the intercept term
+  val feature_mapper = new IntStringMemoizer(minimum_index = 1)
 }
 
 /**
@@ -172,48 +231,20 @@ abstract class SparseFeatureVector extends FeatureVector {
  */
 class SparseNominalFeatureVector(
   nominal_features: Iterable[String]
-) extends SparseFeatureVector {
-  val features = mutable.Set[Int](0) // the intercept term
-
-  // Add a feature to the vector
-  def add(feat: String) {
-    val index = SparseNominalFeatureVector.feature_mapper.memoize_string(feat)
-    features += index
-  }
-
-  for (i <- nominal_features)
-    add(i)
-
-  def length = {
-    // +1 because of the intercept term
-    SparseNominalFeatureVector.feature_mapper.number_of_entries + 1
-  }
-
-  def apply(i: Int) = {
-    if (features contains i) 1 else 0
-  }
-
-  def squared_magnitude(label: Int) = features.size
-
-  def diff_squared_magnitude(label1: Int, label2: Int) = 0
-
-  def dot_product(weights: WeightVector, label: Int) =
-    features.map(weights(_)).sum
-
-  def update_weights(weights: WeightVector, scale: Double, label: Int) =
-    features.map(i => weights(i) += scale)
-
+) extends SparseFeatureVector(
+  nominal_features.map((_, 1.0)).toMap
+) {
   override def toString = {
     "SparseNominalFeatureVector(%s)" format
-      features.filter(_ > 0).toSeq.sorted.
-      map(x => "%s:%s" format (x, SparseNominalFeatureVector.feature_mapper.unmemoize_string(x))).
-        mkString(",")
+    memoized_features.filter { case (index, value) => value > 0}.
+      toSeq.sorted.map {
+        case (index, value) =>
+          "%s(%s)" format (
+            SparseFeatureVector.feature_mapper.unmemoize_string(index),
+            index
+          )
+      }.mkString(",")
   }
-}
-
-object SparseNominalFeatureVector {
-  // Set the minimum index to 1 so we can use 0 for the intercept term
-  val feature_mapper = new IntStringMemoizer(minimum_index = 1)
 }
 
 /**
@@ -261,9 +292,11 @@ class SparseNominalInstanceFactory {
   }
 }
 
-abstract class ClassifyingPerceptron(numlabs: Int) {
+trait LinearClassifier {
   /** Return number of labels. */
-  def number_of_labels = numlabs
+  def number_of_labels: Int
+
+  assert(number_of_labels >= 2)
 
   /** Classify a given instance, returning the class (a label from 0 to
     * `number_of_labels`-1). */
@@ -275,13 +308,16 @@ abstract class ClassifyingPerceptron(numlabs: Int) {
     * label if such a prediction is desired. */
   def score(instance: FeatureVector): IndexedSeq[Double]
 }
+
 /**
- * A binary perceptron, created from an array of weights.  Normally
+ * A binary linear classifier, created from an array of weights.  Normally
  * created automatically by one of the trainer classes.
  */
-class BinaryPerceptron (
+class BinaryLinearClassifier (
   val weights: WeightVector
-) extends ClassifyingPerceptron(2) {
+) extends LinearClassifier {
+  val number_of_labels = 2
+
   /** Classify a given instance, returning the class, either 0 or 1. */
   def classify(instance: FeatureVector) = {
     val sc = binary_score(instance)
@@ -297,9 +333,36 @@ class BinaryPerceptron (
 }
 
 /**
- * Class for training a perceptron given a set of training instances and
- * associated labels.  The basic perceptron training algorithm, in all its
- * variants, works as follows:
+ * Class for training a linear classifier given a set of training instances and
+ * associated labels.
+ */
+trait LinearClassifierTrainer {
+  /** Create and initialize a vector of weights of length `len`.
+    * By default, initialized to all 0's, but could be changed. */
+  def new_weights(len: Int) = new WeightVector(len)
+
+  /** Create and initialize a vector of weights of length `len` to all 0's. */
+  def new_zero_weights(len: Int) = new WeightVector(len)
+
+  /** Check that all instances have the same length. */
+  def check_sequence_lengths(data: Iterable[(FeatureVector, Int)]) {
+    val len = data.head._1.length
+    for ((inst, label) <- data)
+      assert(inst.length == len)
+  }
+
+  /** Train a perceptron given a set of labeled instances. */
+  def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int):
+    LinearClassifier
+}
+
+/**
+ * Class for training a binary perceptron given a set of training instances
+ * and associated labels.  Use function application to train a new
+ * perceptron, e.g. `new BinaryPerceptronTrainer()(data)`.
+ *
+ * The basic perceptron training algorithm, in all its variants, works as
+ * follows:
  *
  * 1. We do multiple iterations, and in each iteration we loop through the
  *    training instances.
@@ -322,32 +385,6 @@ class BinaryPerceptron (
  * 4. We repeat until no further change (or at least, the total change is
  *    less than some small value), or until we've done a maximum number of
  *    iterations.
- */
-abstract class PerceptronTrainer {
-  /** Create and initialize a vector of weights of length `len`.
-    * By default, initialized to all 0's, but could be changed. */
-  def new_weights(len: Int) = new WeightVector(len)
-
-  /** Create and initialize a vector of weights of length `len` to all 0's. */
-  def new_zero_weights(len: Int) = new WeightVector(len)
-
-  /** Check that all instances have the same length. */
-  def check_sequence_lengths(data: Iterable[(FeatureVector, Int)]) {
-    val len = data.head._1.length
-    for ((inst, label) <- data)
-      assert(inst.length == len)
-  }
-
-  /** Train a perceptron given a set of labeled instances. */
-  def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int):
-    ClassifyingPerceptron
-}
-
-/**
- * Class for training a binary perceptron given a set of training instances
- * and associated labels.  Use function application to train a new
- * perceptron, e.g. `new BinaryPerceptronTrainer()(data)`.
- *
  * @param error_threshold Threshold that the sum of all scale factors for
  *    all instances must be below in order for training to stop.  In
  *    practice, in order to succeed with a threshold such as 1e-10, the
@@ -360,7 +397,7 @@ abstract class BinaryPerceptronTrainer(
   averaged: Boolean = false,
   error_threshold: Double = 1e-10,
   max_iterations: Int = 1000
-) extends PerceptronTrainer {
+) extends LinearClassifierTrainer {
   assert(error_threshold >= 0)
   assert(max_iterations > 0)
 
@@ -426,8 +463,8 @@ abstract class BinaryPerceptronTrainer(
     }
     if (averaged) {
       (0 until len).foreach(i => avg_weights(i) /= iter)
-      new BinaryPerceptron(avg_weights)
-    } else new BinaryPerceptron(weights)
+      new BinaryLinearClassifier(avg_weights)
+    } else new BinaryLinearClassifier(weights)
   }
 
   /** Train a perceptron given a set of labeled instances. */
@@ -559,15 +596,14 @@ object Maxutil {
  * requested; it is assumed that class-specific features are handled
  * automatically through this mechanism.
  */
-class SingleWeightMultiClassPerceptron (
+class SingleWeightMultiClassLinearClassifier (
   val weights: WeightVector,
-  val num_classes: Int
-) extends ClassifyingPerceptron(num_classes) {
-  assert(num_classes >= 2)
+  val number_of_labels: Int
+) extends LinearClassifier {
 
   /** Classify a given instance, returning the class. */
   def classify(instance: FeatureVector) =
-    Maxutil.argmax[Int](0 until num_classes, score_class(instance, _))
+    Maxutil.argmax[Int](0 until number_of_labels, score_class(instance, _))
 
   /** Score a given instance for a single class. */
   def score_class(instance: FeatureVector, clazz: Int) =
@@ -575,7 +611,7 @@ class SingleWeightMultiClassPerceptron (
 
   /** Score a given instance, returning an array of scores, one per class. */
   def score(instance: FeatureVector) =
-    (0 until num_classes).map(score_class(instance, _)).toArray
+    (0 until number_of_labels).map(score_class(instance, _)).toArray
 }
 
 /**
@@ -583,15 +619,14 @@ class SingleWeightMultiClassPerceptron (
  * Note that the feature vector is also passed the class in when a value is
  * requested.
  */
-class MultiClassPerceptron (
+class MultiClassLinearClassifier (
   val weights: IndexedSeq[WeightVector]
-) extends ClassifyingPerceptron(weights.length) {
-  val num_classes = weights.length
-  assert (num_classes >= 2)
+) extends LinearClassifier {
+  val number_of_labels = weights.length
 
   /** Classify a given instance, returning the class. */
   def classify(instance: FeatureVector) =
-    Maxutil.argmax[Int](0 until num_classes, score_class(instance, _))
+    Maxutil.argmax[Int](0 until number_of_labels, score_class(instance, _))
 
   /** Score a given instance for a single class. */
   def score_class(instance: FeatureVector, clazz: Int) =
@@ -599,7 +634,7 @@ class MultiClassPerceptron (
 
   /** Score a given instance, returning an array of scores, one per class. */
   def score(instance: FeatureVector) =
-    (0 until num_classes).map(score_class(instance, _)).toArray
+    (0 until number_of_labels).map(score_class(instance, _)).toArray
 }
 
 /**
@@ -609,7 +644,7 @@ class MultiClassPerceptron (
 abstract class SingleWeightMultiClassPerceptronTrainer(
   error_threshold: Double = 1e-10,
   max_iterations: Int = 1000
-) extends PerceptronTrainer {
+) extends LinearClassifierTrainer {
   assert(error_threshold >= 0)
   assert(max_iterations > 0)
 
@@ -623,7 +658,7 @@ abstract class SingleWeightMultiClassPerceptronTrainer(
   }
 
   def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int):
-    SingleWeightMultiClassPerceptron
+    SingleWeightMultiClassLinearClassifier
 }
 
 /**
@@ -673,7 +708,7 @@ class PassiveAggressiveSingleWeightMultiClassPerceptronTrainer(
         iter += 1
       }
     }
-    new SingleWeightMultiClassPerceptron(weights, num_classes)
+    new SingleWeightMultiClassLinearClassifier(weights, num_classes)
   }
 }
 
@@ -684,7 +719,7 @@ class PassiveAggressiveSingleWeightMultiClassPerceptronTrainer(
 abstract class MultiClassPerceptronTrainer(
   error_threshold: Double = 1e-10,
   max_iterations: Int = 1000
-) extends PerceptronTrainer {
+) extends LinearClassifierTrainer {
   assert(error_threshold >= 0)
   assert(max_iterations > 0)
 
@@ -700,7 +735,7 @@ abstract class MultiClassPerceptronTrainer(
   }
 
   def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int):
-    MultiClassPerceptron
+    MultiClassLinearClassifier
 }
 
 /**
@@ -752,7 +787,7 @@ class PassiveAggressiveMultiClassPerceptronTrainer(
         iter += 1
       }
     }
-    new MultiClassPerceptron(weights)
+    new MultiClassLinearClassifier(weights)
   }
 }
 
@@ -822,7 +857,7 @@ abstract class PassiveAggressiveCostSensitiveSingleWeightMultiClassPerceptronTra
         iter += 1
       }
     }
-    new SingleWeightMultiClassPerceptron(weights, num_classes)
+    new SingleWeightMultiClassLinearClassifier(weights, num_classes)
   }
 }
 
@@ -894,6 +929,6 @@ abstract class PassiveAggressiveCostSensitiveMultiClassPerceptronTrainer(
         iter += 1
       }
     }
-    new MultiClassPerceptron(weights)
+    new MultiClassLinearClassifier(weights)
   }
 }

@@ -116,8 +116,8 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
   val cdist_factory =
     new SphereCellDistFactory(sphere_grid.table.driver.params.lru_cache_size)
 
-  def return_ranked_cells(gen_word_dist: WordDist) = {
-    val word_dist = UnigramStrategy.check_unigram_dist(gen_word_dist)
+  def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
+    val word_dist = UnigramStrategy.check_unigram_dist(_word_dist)
     val wikipedia_table = sphere_grid.table.wikipedia_subtable
 
     // Look for a toponym, then a proper noun, then any word.
@@ -133,15 +133,16 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
     }
     if (maxword == None)
       maxword = word_dist.find_most_common_word(word => true)
-    cdist_factory.get_cell_dist(sphere_grid, maxword.get).get_ranked_cells()
+    cdist_factory.get_cell_dist(sphere_grid, maxword.get).
+      get_ranked_cells(include)
   }
 }
 
 class LinkMostCommonToponymGeolocateDocumentStrategy(
   sphere_grid: SphereCellGrid
 ) extends GeolocateDocumentStrategy(sphere_grid) {
-  def return_ranked_cells(gen_word_dist: WordDist) = {
-    val word_dist = UnigramStrategy.check_unigram_dist(gen_word_dist)
+  def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
+    val word_dist = UnigramStrategy.check_unigram_dist(_word_dist)
     val wikipedia_table = sphere_grid.table.wikipedia_subtable
 
     var maxword = word_dist.find_most_common_word(
@@ -190,7 +191,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
     // Append random cells and remove duplicates
     merge_numbered_sequences_uniquely(candcells,
       new RandomGridLocateDocumentStrategy[SphereCell, SphereCellGrid](sphere_grid).
-        return_ranked_cells(word_dist))
+        return_ranked_cells(word_dist, include))
   }
 }
 
@@ -297,14 +298,16 @@ uniform grid cell models?""")
 
 }
 
-abstract class GeolocateDriver extends GridLocateDriver {
-  type TGrid = SphereCellGrid
+trait GeolocateDriver extends GridLocateDriver {
   type TDoc = SphereDocument
+  type TCell = SphereCell
+  type TGrid = SphereCellGrid
   type TDocTable = SphereDocumentTable
   override type TParam <: GeolocateParameters
   var degrees_per_cell = 0.0
 
   override def handle_parameters() {
+    super.handle_parameters()
     if (params.miles_per_cell < 0)
       param_error("Miles per cell must be positive if specified")
     if (params.km_per_cell < 0)
@@ -322,8 +325,6 @@ abstract class GeolocateDriver extends GridLocateDriver {
         params.degrees_per_cell
     if (params.width_of_multi_cell <= 0)
       param_error("Width of multi cell must be positive")
-
-    super.handle_parameters()
   }
 
   protected def initialize_document_table(word_dist_factory: WordDistFactory) = {
@@ -520,17 +521,19 @@ strategies, since they require that --preserve-case-words be set internally.""")
 
 // FUCK ME.  Have to make this abstract and GeolocateDocumentDriver a subclass
 // so that the TParam can be overridden in HadoopGeolocateDocumentDriver.
-abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
+trait GeolocateDocumentTypeDriver extends GeolocateDriver with
+  GridLocateDocumentDriver {
   override type TParam <: GeolocateDocumentParameters
   type TRunRes =
     Seq[(String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
          CorpusEvaluator[_,_])]
 
-  var strategies: Seq[(String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid])] = _
-
   override def handle_parameters() {
     super.handle_parameters()
 
+    // The *-most-common-toponym strategies require case preserving
+    // (as if set by --preseve-case-words), while most other strategies want
+    // the opposite.  So check to make sure we don't have a clash.
     if (params.strategy contains "baseline") {
       var need_case = false
       var need_no_case = false
@@ -563,78 +566,32 @@ abstract class GeolocateDocumentTypeDriver extends GeolocateDriver {
       need_seq(params.eval_file, "eval-file", "evaluation file(s)")
   }
 
-  /**
-   * Set everything up for document geolocation.  Create and save a
-   * sequence of strategy objects, used by us and by the Hadoop interface,
-   * which does its own iteration over documents.
-   */
-  override def setup_for_run() {
-    super.setup_for_run()
-    val strats_unflat = (
+  override def create_strategy(stratname: String) = {
+    stratname match {
+      case "link-most-common-toponym" =>
+        new LinkMostCommonToponymGeolocateDocumentStrategy(cell_grid)
+      case "celldist-most-common-toponym" =>
+        new CellDistMostCommonToponymGeolocateDocumentStrategy(cell_grid)
+      case "average-cell-probability" =>
+        new SphereAverageCellProbabilityStrategy(cell_grid)
+      case other => super.create_strategy(other)
+    }
+  }
+
+  def create_strategies() = {
+    val strats_unflat =
       for (stratname <- params.strategy) yield {
         if (stratname == "baseline") {
           for (basestratname <- params.baseline_strategy) yield {
-            val strategy = basestratname match {
-              case "link-most-common-toponym" =>
-                new LinkMostCommonToponymGeolocateDocumentStrategy(cell_grid)
-              case "celldist-most-common-toponym" =>
-                new CellDistMostCommonToponymGeolocateDocumentStrategy(cell_grid)
-              case "random" =>
-                new RandomGridLocateDocumentStrategy[SphereCell, SphereCellGrid](cell_grid)
-              case "internal-link" =>
-                new MostPopularCellGridLocateDocumentStrategy[SphereCell, SphereCellGrid](cell_grid, true)
-              case "num-documents" =>
-                new MostPopularCellGridLocateDocumentStrategy[SphereCell, SphereCellGrid](cell_grid, false)
-              case _ => {
-                assert(false,
-                  "Internal error: Unhandled strategy " + basestratname);
-                null
-              }
-            }
+            val strategy = create_strategy(basestratname)
             ("baseline " + basestratname, strategy)
           }
         } else {
-          val strategy =
-            if (stratname.startsWith("naive-bayes-"))
-              new NaiveBayesDocumentStrategy[SphereCell, SphereCellGrid](cell_grid,
-                use_baseline = (stratname == "naive-bayes-with-baseline"))
-            else stratname match {
-              case "average-cell-probability" =>
-                new SphereAverageCellProbabilityStrategy(cell_grid)
-              case "cosine-similarity" =>
-                new CosineSimilarityStrategy[SphereCell, SphereCellGrid](cell_grid, smoothed = false,
-                  partial = false)
-              case "partial-cosine-similarity" =>
-                new CosineSimilarityStrategy[SphereCell, SphereCellGrid](cell_grid, smoothed = false,
-                  partial = true)
-              case "smoothed-cosine-similarity" =>
-                new CosineSimilarityStrategy[SphereCell, SphereCellGrid](cell_grid, smoothed = true,
-                  partial = false)
-              case "smoothed-partial-cosine-similarity" =>
-                new CosineSimilarityStrategy[SphereCell, SphereCellGrid](cell_grid, smoothed = true,
-                  partial = true)
-              case "full-kl-divergence" =>
-                new KLDivergenceStrategy[SphereCell, SphereCellGrid](cell_grid, symmetric = false,
-                  partial = false)
-              case "partial-kl-divergence" =>
-                new KLDivergenceStrategy[SphereCell, SphereCellGrid](cell_grid, symmetric = false,
-                  partial = true)
-              case "symmetric-full-kl-divergence" =>
-                new KLDivergenceStrategy[SphereCell, SphereCellGrid](cell_grid, symmetric = true,
-                  partial = false)
-              case "symmetric-partial-kl-divergence" =>
-                new KLDivergenceStrategy[SphereCell, SphereCellGrid](cell_grid, symmetric = true,
-                  partial = true)
-              case "none" =>
-                null
-            }
-          if (strategy != null)
-            Seq((stratname, strategy))
-          else
-            Seq()
+          val strategy = create_strategy(stratname)
+          Seq((stratname, strategy))
         }
-      })
-    strategies = strats_unflat reduce (_ ++ _)
+      }
+    strats_unflat.flatten filter { case (name, strat) => strat != null }
   }
 
   /**

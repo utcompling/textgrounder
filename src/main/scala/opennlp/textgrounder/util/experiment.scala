@@ -63,7 +63,7 @@ package object experiment {
    * same.
    */
 
-  abstract class ExperimentDriver {
+  trait ExperimentDriver {
     type TParam
     type TRunRes
     var params: TParam = _
@@ -621,7 +621,7 @@ package object experiment {
    * overridden to output the values of these ancillary parameters.
    */
 
-  abstract class ArgParserExperimentDriver extends ExperimentDriver {
+  trait ArgParserExperimentDriver extends ExperimentDriver {
     override type TParam <: ArgParserParameters
     
     override def param_error(string: String)  = {
@@ -640,7 +640,7 @@ package object experiment {
    * the project will be created.
    */
 
-  abstract class HadoopableArgParserExperimentDriver extends
+  trait HadoopableArgParserExperimentDriver extends
       ArgParserExperimentDriver with ExperimentDriverStats {
     /**
      * FileHandler object for this driver.

@@ -398,6 +398,26 @@ abstract class CellGrid[
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false):
     Iterable[TCell]
   
+  /**
+   * Iterate over all non-empty cells.
+   * 
+   * @param nonempty_word_dist If given, returned cells must also have a
+   *   non-empty word distribution; otherwise, they just need to have at least
+   *   one document in them. (Not all documents have word distributions, esp.
+   *   when --max-time-per-stage has been set to a non-zero value so that we
+   *   only load some subset of the word distributions for all documents.  But
+   *   even when not set, some documents may be listed in the document-data file
+   *   but have no corresponding word counts given in the counts file.)
+   */
+  def iter_nonempty_cells_including(include: Iterable[TCell],
+      nonempty_word_dist: Boolean = false) = {
+    val cells = iter_nonempty_cells(nonempty_word_dist)
+    if (include.size == 0)
+      cells
+    else
+      include.toSeq union cells.toSeq
+  }
+
   /*********************** Not meant to be overridden *********************/
   
   /* These are simply the sum of the corresponding counts
