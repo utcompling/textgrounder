@@ -664,6 +664,31 @@ package object collectionutil {
  //                        Misc. list/iterator functions                    //
  /////////////////////////////////////////////////////////////////////////////
 
+  /**
+   * An interruptible iterator that wraps an arbitrary iterator.  The iterator
+   * normally simply passes its operations down to the wrapped iterator, but
+   * after `stop()` is called, the iterator will act as if it is empty regardless
+   * of the wrapped iterator's state.
+   */
+  class InterruptibleIterator[T](iter: Iterator[T]) extends Iterator[T] {
+    private var interrupted = false
+
+    def hasNext = {
+      if (interrupted) false
+      else iter.hasNext
+    }
+
+    def next = {
+      if (interrupted) 
+        throw new java.util.NoSuchElementException("next on empty iterator")
+      else iter.next
+    }
+
+    def stop() {
+      interrupted = true
+    }
+  }
+
   def fromto(from: Int, too: Int) = {
     if (from <= too) (from to too)
     else (too to from)

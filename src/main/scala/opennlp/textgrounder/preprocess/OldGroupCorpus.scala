@@ -187,12 +187,7 @@ class GroupCorpusFileProcessor(
   context: TaskInputOutputContext[_,_,_,_],
   driver: GroupCorpusDriver
 ) extends BasicTextDBProcessor[Unit](driver.params.input_suffix) {
-  def process_row(fieldvals: Seq[String]): (Boolean, Boolean) =
-    throw new IllegalStateException("This shouldn't be called")
-
-  def process_lines(lines: Iterator[String],
-      filehand: FileHandler, file: String,
-      compression: String, realname: String) =
+  def process_row(fieldvals: Seq[String]): Option[Unit] =
     throw new IllegalStateException("This shouldn't be called")
 }
 
@@ -227,7 +222,7 @@ class GroupCorpusMapper extends
       map_context.write(
         new Text(schema.get_field(fieldvals, driver.params.field)),
         new Text(fieldvals.mkString("\t")))
-      (true, true)
+      Some(())
     }
   }
 
@@ -237,7 +232,7 @@ class GroupCorpusMapper extends
   override def setup(context: TContext) { init(context) }
 
   override def map(key: Object, value: Text, context: TContext) {
-    processor.parse_row(value.toString)
+    processor.process_line(value.toString)
     context.progress
   }
 }

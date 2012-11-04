@@ -64,7 +64,8 @@ package object ioutil {
   /**
    * Iterator that yields lines in a given encoding (by default, UTF-8) from
    * an input stream, usually with any terminating newline removed and usually
-   * with automatic closing of the stream when EOF is reached.
+   * with automatic closing of the stream when EOF is reached. `close` can be
+   * called at any point to force the iterator to not return any more lines.
    *
    * @param stream Input stream to read from.
    * @param encoding Encoding of the text; by default, UTF-8.
@@ -93,6 +94,7 @@ package object ioutil {
       if (hit_eof) false
       else {
         nextline = reader.readLine()
+        // errprint("Read line: %s" format nextline)
         if (nextline == null) {
           hit_eof = true
           if (close)
@@ -128,6 +130,8 @@ package object ioutil {
     }
 
     def close() {
+      hit_eof = true
+      nextline = null
       if (reader != null) {
         reader.close()
         reader = null
@@ -594,7 +598,7 @@ package object ioutil {
    *
    * @tparam T Type of result associated with a file.
    */
-  trait FileProcessor[T] {
+  trait OldFileProcessor[T] {
 
     /**
      * Process all files, calling `process_file` on each.
@@ -744,7 +748,7 @@ package object ioutil {
    * the same mechanism for processing the files themselves as in
    * `FileProcessor`.
    */
-  trait LineProcessor[T] extends FileProcessor[T] {
+  trait OldLineProcessor[T] extends OldFileProcessor[T] {
     /**
      * Process a given file.
      *
@@ -781,6 +785,228 @@ package object ioutil {
     def process_lines(lines: Iterator[String],
         filehand: FileHandler, file: String,
         compression: String, realname: String): (Boolean, T)
+
+    /***************** MAY BE IMPLEMENTED (THROUGH OVERRIDING) ***************/
+
+    /**
+     * Called when about to begin processing the lines from a file.
+     * Must be overridden, since it has an (empty) definition by default.
+     * Note that this is generally called just once per file, just like
+     * `begin_process_file`; but this function has compression info and
+     * the line iterator available to it.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param file File being processed.
+     */
+    def begin_process_lines(lines: Iterator[String],
+        filehand: FileHandler, file: String,
+        compression: String, realname: String) { }
+  }
+
+  /**
+   * Class that lets you process a series of files in turn; if any file
+   * names a directory, all files in the directory will be processed.
+   * If a file is given as 'null', that will be passed on unchanged.
+   * (Useful to signal input taken from an internal source.)
+   *
+   * @tparam T Type of result associated with a file.
+   */
+  trait FileProcessor[T] {
+
+    /**
+     * Process all files, calling `process_file` on each.
+     *
+     * @param files Files to process.  If any file names a directory,
+     *   all files in the directory will be processed.  If any file
+     *   is null, it will be passed on unchanged (see above; useful
+     *   e.g. for specifying input from an internal source).
+     * @param output_messages If true, output messages indicating the
+     *   files being processed.
+     * @return Iterator over values corresponding to files.
+     */
+    def process_files(filehand: FileHandler, files: Iterable[String],
+        output_messages: Boolean = true): Iterator[T] = {
+      def process_one_file(file: String): Iterator[T] = {
+        if (file != null && filehand.is_directory(file)) {
+          if (output_messages)
+            errprint("Processing directory %s..." format file)
+          begin_process_directory(filehand, file)
+          val retval = list_files(filehand, file).toIterator.
+            flatMap(process_one_file)
+          end_process_directory(filehand, file)
+          retval
+        } else {
+          if (output_messages && file != null)
+            errprint("Processing file %s..." format file)
+          begin_process_file(filehand, file)
+          val retval = process_file(filehand, file)
+          Iterator(retval)
+        }
+      }
+      begin_processing(filehand, files)
+      val retval = files.toIterator.flatMap(process_one_file)
+      end_processing(filehand, files)
+      retval
+    }
+
+    /*********************** MUST BE IMPLEMENTED *************************/
+
+    /**
+     * Process a given file.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param file The file to process (possibly null, see above).
+     * @return Value associated with file.
+     */
+    def process_file(filehand: FileHandler, file: String): T
+
+    /***************** MAY BE IMPLEMENTED (THROUGH OVERRIDING) ***************/
+
+    /**
+     * Called when about to begin processing all files in a directory.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param dir Directory being processed.
+     */
+    def begin_process_directory(filehand: FileHandler, dir: String) {
+    }
+
+    /**
+     * Called when finished processing all files in a directory.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param dir Directory being processed.
+     */
+    def end_process_directory(filehand: FileHandler, dir: String) {
+    }
+
+    /**
+     * Called when about to begin processing a file.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param file File being processed.
+     */
+    def begin_process_file(filehand: FileHandler, file: String) {
+    }
+
+    /**
+     * Called when finished processing a file.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param file File being processed.
+     */
+    def end_process_file(filehand: FileHandler, file: String) {
+    }
+
+    /**
+     * Called when about to begin processing files.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param dir Directory being processed.
+     */
+    def begin_processing(filehand: FileHandler, files: Iterable[String]) {
+    }
+
+    /**
+     * Called when finished processing all files.
+     * Must be overridden, since it has an (empty) definition by default.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param dir Directory being processed.
+     */
+    def end_processing(filehand: FileHandler, files: Iterable[String]) {
+    }
+
+    /**
+     * List the files in a directory to be processed.
+     *
+     * @param filehand The FileHandler for working with the files.
+     * @param dir Directory being processed.
+     *
+     * @return The list of files to process.
+     */
+    def list_files(filehand: FileHandler, dir: String) =
+      filehand.list_files(dir)
+  }
+
+  /**
+   * @param files Files to process.  If any file names a directory,
+   *   all files in the directory will be processed.  If any file
+   *   is null, it will be passed on unchanged (see above; useful
+   *   e.g. for specifying input from an internal source).
+   */
+  def iterate_files(filehand: FileHandler, files: Iterable[String]
+  ): Iterator[String] = {
+    files.toIterator.flatMap(file => {
+      if (!filehand.is_directory(file))
+        Iterator(file)
+      else
+        iterate_files(filehand, filehand.list_files(file))
+    })
+  }
+
+  def iterate_files_with_message(filehand: FileHandler, files: Iterable[String]
+  ) = {
+    var lastdir: String = null
+    for (file <- iterate_files(filehand, files)) yield {
+      errprint("Processing file %s..." format file)
+      var (dir, fname) = filehand.split_filename(file)
+      if (dir != lastdir) {
+        errprint("Processing directory %s..." format dir)
+        lastdir = dir
+      }
+      file
+    }
+  }
+
+  class ExitLineProcessor[T](val value: Option[T]) extends Throwable { }
+
+  /**
+   * Class that lets you process a series of text files in turn, using
+   * the same mechanism for processing the files themselves as in
+   * `FileProcessor`.
+   */
+  trait LineProcessor[T] extends FileProcessor[Iterator[T]] {
+    /**
+     * Process a given file.
+     *
+     * @param filehand The FileHandler for working with the file.
+     * @param file The file to process (possibly null, see above).
+     * @return True if file processing should continue; false to
+     *   abort any further processing.
+     */
+    def process_file(filehand: FileHandler, file: String) = {
+      val (lines, compression, realname) =
+        filehand.openr_with_compression_info(file)
+      begin_process_lines(lines, filehand, file, compression, realname)
+      lines.flatMap(line => {
+        try {
+          process_line(line)
+        } catch {
+          case exit: ExitLineProcessor[T] => {
+            lines.close()
+            exit.value
+          }
+        }
+      })
+    }
+
+    /*********************** MUST BE IMPLEMENTED *************************/
+
+    /**
+     * Process a given line, optionally returning a corresponding object.
+     * To continue processing further lines, simply return normally.
+     * To terminate further processing, exit by throwing 
+     *
+     * @param line The line, with any terminating newline removed.
+     * @return Either `Some(value)` for a value of type `T`, or `None`.
+     */
+    def process_line(line: String): Option[T]
 
     /***************** MAY BE IMPLEMENTED (THROUGH OVERRIDING) ***************/
 

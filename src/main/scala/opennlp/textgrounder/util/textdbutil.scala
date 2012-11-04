@@ -37,7 +37,7 @@ package object textdbutil {
    * @param split_re Regular expression used to split one field from another.
    *   By default a tab character.
    */
-  trait FieldLineProcessor[T] extends LineProcessor[T] {
+  trait OldFieldLineProcessor[T] extends OldLineProcessor[T] {
     val split_re: String = "\t"
 
     var all_num_processed = 0
@@ -137,7 +137,7 @@ package object textdbutil {
     }
 
     /* Also, the same "may-be-implemented" functions from the superclass
-       LineProcessor. */
+       OldLineProcessor. */
   }
 
   /**
@@ -359,7 +359,7 @@ package object textdbutil {
    *     The document files are named `DIR/PREFIX-SUFFIX.txt`
    *     (or `DIR/PREFIX-SUFFIX.txt.bz2` or similar, for compressed files),
    *     while the schema file is named `DIR/PREFIX-SUFFIX-schema.txt`.
-   *     Note that the SUFFIX is set when the `TextDBLineProcessor` is
+   *     Note that the SUFFIX is set when the `OldTextDBLineProcessor` is
    *     created, and typically specifies the category of corpus being
    *     read (e.g. "text" for corpora containing text or "unigram-counts"
    *     for a corpus containing unigram counts).  The directory is specified
@@ -399,9 +399,202 @@ package object textdbutil {
    * @param suffix the suffix of the corpus files, as described above
    *     
    */
+  abstract class OldTextDBLineProcessor[T](
+    suffix: String
+  ) extends OldLineProcessor[T] {
+    import TextDBProcessor._
+
+    /**
+     * Name of the schema file.
+     */
+    var schema_file: String = _
+    /**
+     * File handler of the schema file.
+     */
+    var schema_filehand: FileHandler = _
+    /**
+     * Directory of the schema file.
+     */
+    var schema_dir: String = _
+    /**
+     * Prefix of the schema file (see above).
+     */
+    var schema_prefix: String = _
+    /**
+     * Schema read from the schema file.
+     */
+    var schema: Schema = _
+
+    /**
+     * Current document file being read.
+     */
+    var current_document_file: String = _
+    /**
+     * File handler of the current document file.
+     */
+    var current_document_filehand: FileHandler = _
+    /**
+     * "Real name" of the current document file, after any compression suffix
+     * has been removed.
+     */
+    var current_document_realname: String = _
+    /**
+     * Type of compression of the current document file.
+     */
+    var current_document_compression: String = _
+    /**
+     * Directory of the current document file.
+     */
+    var current_document_dir: String = _
+    /**
+     * Prefix of the current document file (see above).
+     */
+    var current_document_prefix: String = _
+
+    def set_schema(schema: Schema) {
+      this.schema = schema
+    }
+
+    override def begin_process_lines(lines: Iterator[String],
+        filehand: FileHandler, file: String,
+        compression: String, realname: String) {
+      current_document_compression = compression
+      current_document_filehand = filehand
+      current_document_file = file
+      current_document_realname = realname
+      val (dir, base) = filehand.split_filename(realname)
+      current_document_dir = dir
+      current_document_prefix = base.stripSuffix("-" + suffix + ".txt")
+      super.begin_process_lines(lines, filehand, file, compression, realname)
+    }
+
+    /**
+     * Locate and read the schema file of the appropriate suffix in the
+     * given directory.  Set internal variables containing the schema file
+     * and schema.
+     */
+    def read_schema_from_textdb(filehand: FileHandler, dir: String) {
+      schema_file = find_schema_file(filehand, dir, suffix)
+      schema_filehand = filehand
+      val (_, base) = filehand.split_filename(schema_file)
+      schema_dir = dir
+      schema_prefix = base.stripSuffix("-" + suffix + "-schema.txt")
+      val schema = Schema.read_schema_file(filehand, schema_file)
+      set_schema(schema)
+    }
+
+    /**
+     * List only the document files of the appropriate suffix.
+     */
+    override def list_files(filehand: FileHandler, dir: String) = {
+      val filter = make_document_file_suffix_regex(suffix)
+      val files = filehand.list_files(dir)
+      for (file <- files if filter.findFirstMatchIn(file) != None) yield file
+    }
+  }
+
+  /**
+   * A line processor where each line is made up of a fixed number
+   * of fields, separated by some sort of separator (by default a tab
+   * character).  No implementation is provided for `process_lines`,
+   * the driver function.  This function in general should loop over the
+   * lines, calling `parse_row` on each one.
+   *
+   * @param split_re Regular expression used to split one field from another.
+   *   By default a tab character.
+   */
+  trait FieldLineProcessor[T] extends LineProcessor[T] {
+    val split_re: String = "\t"
+
+    var all_num_processed = 0
+    var all_num_bad = 0
+    var num_processed = 0
+    var num_bad = 0
+
+    var fieldnames: Seq[String] = _
+
+    /**
+     * Set the field names used for processing rows.
+     */
+    def set_fieldnames(fieldnames: Seq[String]) {
+      this.fieldnames = fieldnames
+    }
+
+    override def begin_process_file(filehand: FileHandler, file: String) {
+      num_processed = 0
+      num_bad = 0
+      super.begin_process_file(filehand, file)
+    }
+
+    override def end_process_file(filehand: FileHandler, file: String) {
+      all_num_processed += num_processed
+      all_num_bad += num_bad
+      super.end_process_file(filehand, file)
+    }
+
+    /**
+     * Parse a given row into fields.  Call either #process_row or
+     * #handle_bad_row.
+     *
+     * @param line Raw text of line describing the row
+     * @return Value associated with line (as `Some(x)`), or None.
+     */
+    def process_line(line: String): Option[T] = {
+      // println("[%s]" format line)
+      val fieldvals = line.split(split_re, -1)
+      if (fieldvals.length != fieldnames.length) {
+        handle_bad_row(line, fieldvals)
+        num_processed += 1
+        None
+      } else {
+        val retval = process_row(fieldvals)
+        if (retval == None)
+          handle_bad_row(line, fieldvals)
+        num_processed += 1
+        retval
+      }
+    }
+
+    /*********************** MUST BE IMPLEMENTED *************************/
+
+    /**
+     * Called when a "good" row is seen (good solely in that it has the
+     * correct number of fields).
+     *
+     * @param fieldvals List of the string values for each field.
+     * @return Value associated with row (as `Some(x)`), or None.  If
+     *   value is None, `handle_bad_row` will be called.
+     */
+    def process_row(fieldvals: Seq[String]): Option[T]
+
+    /******************* MAY BE IMPLEMENTED (OVERRIDDEN) *******************/
+
+    /**
+     * Called when a bad row is seen.  By default, output a warning.
+     *
+     * @param line Text of the row.
+     * @param fieldvals Field values parsed from the row.
+     */
+    def handle_bad_row(line: String, fieldvals: Seq[String]) {
+      val lineno = num_processed + 1
+      if (fieldnames.length != fieldvals.length) {
+        warning(
+          """Line %s: Bad record, expected %s fields, saw %s fields;
+          skipping line=%s""", lineno, fieldnames.length, fieldvals.length,
+          line)
+      } else {
+        warning("""Line %s: Bad record; skipping line=%s""", lineno, line)
+      }
+      num_bad += 1
+    }
+
+    /* Also, the same "may-be-implemented" functions from the superclass
+       LineProcessor. */
+  }
+
   abstract class TextDBLineProcessor[T](
     suffix: String
-  ) extends LineProcessor[T] {
+  ) extends FieldLineProcessor[T] {
     import TextDBProcessor._
 
     /**
@@ -583,6 +776,24 @@ package object textdbutil {
    *
    * @param suffix the suffix of the corpus files, as described above
    */
+  abstract class OldBasicTextDBProcessor[T](
+    suffix: String
+  ) extends OldTextDBLineProcessor[T](suffix) with OldFieldLineProcessor[T] {
+    override def set_schema(schema: Schema) {
+      super.set_schema(schema)
+      set_fieldnames(schema.fieldnames)
+    }
+  }
+
+  /**
+   * A basic file processor for reading a "corpus" of records in
+   * textdb format. You might want to use the higher-level
+   * `TextDBProcessor`.
+   *
+   * FIXME: Should probably eliminate this.
+   *
+   * @param suffix the suffix of the corpus files, as described above
+   */
   abstract class BasicTextDBProcessor[T](
     suffix: String
   ) extends TextDBLineProcessor[T](suffix) with FieldLineProcessor[T] {
@@ -612,8 +823,8 @@ package object textdbutil {
    *
    * @param suffix the suffix of the corpus files, as described above
    */
-  abstract class TextDBProcessor[T](suffix: String) extends
-      BasicTextDBProcessor[Seq[T]](suffix) {
+  abstract class OldTextDBProcessor[T](suffix: String) extends
+      OldBasicTextDBProcessor[Seq[T]](suffix) {
 
     def handle_row(fieldvals: Seq[String]): Option[T]
 
@@ -684,7 +895,73 @@ package object textdbutil {
     /*
     FIXME: Should be implemented.  Requires that process_files() returns
     the filename along with the value. (Should not be a problem for any
-    existing users of BasicTextDBProcessor, because AFAIK they
+    existing users of OldBasicTextDBProcessor, because AFAIK they
+    ignore the value.)
+
+    def read_textdb_with_filenames(filehand: FileHandler, dir: String) = ...
+    */
+  }
+
+  /**
+   * A file processor for reading in a "corpus" of records in textdb
+   * format (where each record or "row" is a single line, with fields
+   * separated by TAB) and processing each one.  Each row is assumed to
+   * generate an object of type T.  The result of calling `process_file`
+   * will be an Iterator[T] of all objects, and the result of calling
+   * `process_files` to process all files will be an Iterator[Iterator[T]],
+   * one per file.
+   *
+   * You should implement `process_row`, which is passed in the field
+   * values, and should return either `Some(x)` for x of type T, if
+   * you were able to process the row, or `None` otherwise.  If you
+   * want to exit further processing, throw a `ExitTextDBProcessor(value)`,
+   * where `value` is either `Some(x)` or `None`, as for a normal return
+   * value.
+   *
+   * @param suffix the suffix of the corpus files, as described above
+   */
+  abstract class TextDBProcessor[T](suffix: String) extends
+      BasicTextDBProcessor[T](suffix) {
+
+    val task = new MeteredTask("document", "reading")
+
+    override def process_line(line: String) = {
+      task.item_processed()
+      super.process_line(line)
+    }
+
+    override def end_processing(filehand: FileHandler, files: Iterable[String]) {
+      task.finish()
+      super.end_processing(filehand, files)
+    }
+
+    /**
+     * Read a corpus from a directory and return the result of processing the
+     * rows in the corpus. (If you want more control over the processing,
+     * call `read_schema_from_textdb` and then `process_files`.  This allows,
+     * for example, reading files from multiple directories with a single
+     * schema, or determining whether processing was aborted early or allowed
+     * to run to completion.)
+     *
+     * @param filehand File handler object of the directory
+     * @param dir Directory to read
+     *
+     * @return A sequence of sequences of values.  There is one inner sequence
+     *   per file read in, and each such sequence contains all the values
+     *   read from the file. (There may be fewer values than rows in a file
+     *   if some rows were rejected by `handle_row`, and there may be fewer
+     *   files read than exist in the directory if `handle_row` signalled that
+     *   processing should stop.)
+     */
+    def read_textdb(filehand: FileHandler, dir: String) = {
+      read_schema_from_textdb(filehand, dir)
+      process_files(filehand, Seq(dir))
+    }
+
+    /*
+    FIXME: Should be implemented.  Requires that process_files() returns
+    the filename along with the value. (Should not be a problem for any
+    existing users of OldBasicTextDBProcessor, because AFAIK they
     ignore the value.)
 
     def read_textdb_with_filenames(filehand: FileHandler, dir: String) = ...
@@ -693,11 +970,11 @@ package object textdbutil {
 
   /**
    * Class for writing a "corpus" of documents.  The corpus has the
-   * format described in `TextDBLineProcessor`.
+   * format described in `OldTextDBLineProcessor`.
    *
    * @param schema the schema describing the fields in the document file
    * @param suffix the suffix of the corpus files, as described in
-   *   `TextDBLineProcessor`
+   *   `OldTextDBLineProcessor`
    *     
    */
   class TextDBWriter(
