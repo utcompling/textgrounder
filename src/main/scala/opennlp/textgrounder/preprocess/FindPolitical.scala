@@ -117,7 +117,7 @@ class FindPoliticalParams(ap: ArgParser) extends
  */
 class IdeoUserFileProcessor extends
     TextDBProcessor[(String, Double)]("ideo-users") {
-  def handle_row(fieldvals: Seq[String]) = {
+  def process_row(fieldvals: Seq[String]) = {
     val user = schema.get_field(fieldvals, "user")
     val ideology =
       schema.get_field(fieldvals, "ideology").toDouble

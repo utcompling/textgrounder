@@ -246,7 +246,7 @@ package object hadoop {
          seen, for Hadoop's benefit. */
       class RetrieveDocumentFilesFileProcessor(
         suffix: String
-      ) extends TextDBLineProcessor[Unit](suffix) {
+      ) extends OldTextDBLineProcessor[Unit](suffix) {
         def process_lines(lines: Iterator[String],
             filehand: FileHandler, file: String,
             compression: String, realname: String) = {

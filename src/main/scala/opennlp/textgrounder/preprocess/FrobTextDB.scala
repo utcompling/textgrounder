@@ -104,7 +104,7 @@ containing unigram counts.""")
 class FrobTextDBProcessor(
   output_filehand: FileHandler,
   params: FrobTextDBParameters
-) extends BasicTextDBProcessor[Unit](params.input_suffix) {
+) extends TextDBProcessor[Unit](params.input_suffix) {
   val split_value_to_writer = mutable.Map[String, TextDBWriter]()
   val split_value_to_outstream = mutable.Map[String, PrintStream]()
   var unsplit_writer: TextDBWriter = _
@@ -225,18 +225,6 @@ class FrobTextDBProcessor(
     }
   }
 
-  def process_lines(lines: Iterator[String],
-      filehand: FileHandler, file: String,
-      compression: String, realname: String) = {
-    val task = new MeteredTask("document", "frobbing")
-    for (line <- lines) {
-      task.item_processed()
-      parse_row(line)
-    }
-    task.finish()
-    (true, ())
-  }
-
   override def end_process_file(filehand: FileHandler, file: String) {
     /* Close the output stream(s), clearing the appropriate variable(s) so
        that the necessary stream(s) will be re-created again for the
@@ -277,7 +265,7 @@ class FrobTextDBProcessor(
         get_unsplit_writer_and_outstream(new_fieldnames, new_fieldvals)
       writer.schema.output_row(outstream, new_fieldvals)
     }
-    (true, true)
+    Some(())
   }
 }
 

@@ -151,7 +151,7 @@ package object experiment {
    * may be run in parallel of different machines to completely a global
    * job.  Counters can be tracked both globally and per-task.
    */
-  abstract trait ExperimentDriverStats {
+  trait ExperimentDriverStats {
     /** Set of counters under the given group, using fully-qualified names. */
     protected val counters_by_group = setmap[String,String]()
     /** Set of counter groups under the given group, using fully-qualified

@@ -33,7 +33,7 @@ import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.mathutil.{mean, median}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
 
-import opennlp.textgrounder.gridlocate.{CellGridEvaluator,TextGrounderInfo,DistDocumentFileProcessor}
+import opennlp.textgrounder.gridlocate.{CellGridEvaluator,TextGrounderInfo,OldDistDocumentFileProcessor}
 
 /* Basic idea for hooking up Geolocate with Hadoop.  Hadoop works in terms
    of key-value pairs, as follows:
@@ -226,7 +226,7 @@ class DocumentEvaluationMapper extends
 
   class HadoopDocumentFileProcessor(
     context: TContext
-  ) extends DistDocumentFileProcessor(
+  ) extends OldDistDocumentFileProcessor(
     driver.params.eval_set + "-" + driver.document_file_suffix, driver
   ) {
     override def get_shortfile =

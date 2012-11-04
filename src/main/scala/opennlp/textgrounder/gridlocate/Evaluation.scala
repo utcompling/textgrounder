@@ -26,7 +26,7 @@ import collection.mutable
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.experiment.ExperimentDriverStats
 import opennlp.textgrounder.util.mathutil._
-import opennlp.textgrounder.util.ioutil.{FileHandler, FileProcessor}
+import opennlp.textgrounder.util.ioutil.{FileHandler, OldFileProcessor}
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.{curtimehuman, output_resource_usage}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
@@ -715,7 +715,7 @@ abstract class CellGridEvaluator[
    */
   class EvaluateCorpusFileProcessor(
     suffix: String
-  ) extends DistDocumentFileProcessor(suffix, driver) {
+  ) extends OldDistDocumentFileProcessor(suffix, driver) {
     def handle_document(fieldvals: Seq[String]) = {
       val doc = driver.document_table.create_and_init_document(
         schema, fieldvals, false)
@@ -1135,7 +1135,7 @@ trait DocumentIteratingEvaluator[TEvalDoc, TEvalRes] extends
   def iter_documents(filehand: FileHandler, filename: String):
     Iterable[TEvalDoc]
 
-  class EvaluationFileProcessor extends FileProcessor[Unit] {
+  class EvaluationFileProcessor extends OldFileProcessor[Unit] {
     /* Process all documents in a given file.  If return value is false,
        processing was interrupted due to a limit being reached, and
        no more files should be processed. */

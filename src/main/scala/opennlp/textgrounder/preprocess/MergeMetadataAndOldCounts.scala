@@ -175,25 +175,13 @@ class MMCUnigramWordDistHandler(
  */
 class MMCDocumentFileProcessor(
   suffix: String
-) extends BasicTextDBProcessor[Unit](suffix) {
+) extends TextDBProcessor[Unit](suffix) {
   val document_fieldvals = mutable.Map[String, Seq[String]]()
 
   def process_row(fieldvals: Seq[String]) = {
     val params = (schema.fieldnames zip fieldvals).toMap
     document_fieldvals(params("title")) = fieldvals
-    (true, true)
-  }
-
-  def process_lines(lines: Iterator[String],
-      filehand: FileHandler, file: String,
-      compression: String, realname: String) = {
-    val task = new MeteredTask("document", "reading")
-    for (line <- lines) {
-      task.item_processed()
-      parse_row(line)
-    }
-    task.finish()
-    (true, ())
+    Some(())
   }
 }
 
