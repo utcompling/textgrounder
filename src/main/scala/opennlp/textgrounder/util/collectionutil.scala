@@ -665,10 +665,11 @@ package object collectionutil {
  /////////////////////////////////////////////////////////////////////////////
 
   /**
-   * An interruptible iterator that wraps an arbitrary iterator.  The iterator
-   * normally simply passes its operations down to the wrapped iterator, but
-   * after `stop()` is called, the iterator will act as if it is empty regardless
-   * of the wrapped iterator's state.
+   * An interruptible iterator that wraps an arbitrary iterator.  You can stop
+   * further processing by calling `stop()`, which will make the iterator act
+   * as if it is empty regardless of how many items are left in the wrapped
+   * iterator. Note that calling `stop()` while mapping will stop iteration
+   * *after* the result of the current mapping call is returned.
    */
   class InterruptibleIterator[T](iter: Iterator[T]) extends Iterator[T] {
     private var interrupted = false
@@ -686,6 +687,29 @@ package object collectionutil {
 
     def stop() {
       interrupted = true
+    }
+  }
+
+  /**
+   * An empty iterator that executes some code when its contents are fetched.
+   * This is useful for ensuring that side-effecting code gets executed at the
+   * correct time in a complex iterator.
+   *
+   * @param body An expression or block of code to be executed when the iterator
+   *   is tripped.
+   */
+  class SideEffectIterator[T](body: => Any) extends Iterator[T] {
+    var executed = false
+
+    def hasNext = {
+      if (!executed)
+        body
+      executed = true
+      false
+    }
+
+    def next = {
+      throw new java.util.NoSuchElementException("next on empty iterator")
     }
   }
 

@@ -935,25 +935,27 @@ package object ioutil {
   }
 
   /**
-   * @param files Files to process.  If any file names a directory,
-   *   all files in the directory will be processed.  If any file
-   *   is null, it will be passed on unchanged (see above; useful
-   *   e.g. for specifying input from an internal source).
+   * Iterate over the given files, recursively processing the files in
+   * each directory given.
    */
-  def iterate_files(filehand: FileHandler, files: Iterable[String]
-  ): Iterator[String] = {
+  def iterate_files_recursively(filehand: FileHandler,
+      files: Iterable[String]): Iterator[String] = {
     files.toIterator.flatMap(file => {
       if (!filehand.is_directory(file))
         Iterator(file)
       else
-        iterate_files(filehand, filehand.list_files(file))
+        iterate_files_recursively(filehand, filehand.list_files(file))
     })
   }
 
-  def iterate_files_with_message(filehand: FileHandler, files: Iterable[String]
-  ) = {
+  /**
+   * Add "Processing ..." messages when processing each file, and when
+   * processing the first file of a directory.
+   */
+  def iterate_files_with_message(filehand: FileHandler,
+    files: Iterator[String]) = {
     var lastdir: String = null
-    for (file <- iterate_files(filehand, files)) yield {
+    for (file <- files) yield {
       errprint("Processing file %s..." format file)
       var (dir, fname) = filehand.split_filename(file)
       if (dir != lastdir) {

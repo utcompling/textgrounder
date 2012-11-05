@@ -750,6 +750,43 @@ package object textdbutil {
     }
 
     /**
+     * List only the document files of the appropriate suffix.
+     */
+    def filter_file_by_suffix(file: String, suffix: String) = {
+      val filter = make_document_file_suffix_regex(suffix)
+      filter.findFirstMatchIn(file) != None
+    }
+
+    /**
+     * Read a corpus from a directory and return the result of processing the
+     * rows in the corpus. (If you want more control over the processing,
+     * call `read_schema_from_textdb` and use `NewTextDBProcessor`.)
+     *
+     * @param filehand File handler object of the directory
+     * @param dir Directory to read
+     *
+     * @return An iterator of iterators of values.  There is one inner iterator
+     *   per file read in, and each such iterator contains all the values
+     *   read from the file. (There may be fewer values than rows in a file
+     *   if some rows were badly formatted.)
+     */
+    def read_textdb(filehand: FileHandler, dir: String,
+        suffix: String) = {
+      val schema = read_schema_from_textdb(filehand, dir, suffix)
+      val proc = new NewTextDBProcessor(schema)
+      val files = iterate_files_with_message(filehand,
+        iterate_files_recursively(filehand, Iterable(dir)).
+          filter(filter_file_by_suffix(_, suffix)))
+      files.map(file => filehand.openr(file).flatMap(proc.line_to_fields))
+    }
+
+    /*
+    FIXME: Should be implemented.
+
+    def read_textdb_with_filenames(filehand: FileHandler, dir: String) = ...
+    */
+
+    /**
      * Return a list of shell-style wildcard patterns matching all the document
      * files in the given directory with the given suffix (including compressed
      * files).
@@ -966,6 +1003,49 @@ package object textdbutil {
 
     def read_textdb_with_filenames(filehand: FileHandler, dir: String) = ...
     */
+  }
+
+  /**
+   * A file processor for reading in a "corpus" of records in textdb
+   * format (where each record or "row" is a single line, with fields
+   * separated by TAB) and processing each one.  Each row is assumed to
+   * generate an object of type T.  The result of calling `process_file`
+   * will be an Iterator[T] of all objects, and the result of calling
+   * `process_files` to process all files will be an Iterator[Iterator[T]],
+   * one per file.
+   *
+   * You should implement `process_row`, which is passed in the field
+   * values, and should return either `Some(x)` for x of type T, if
+   * you were able to process the row, or `None` otherwise.  If you
+   * want to exit further processing, throw a `ExitTextDBProcessor(value)`,
+   * where `value` is either `Some(x)` or `None`, as for a normal return
+   * value.
+   *
+   * @param suffix the suffix of the corpus files, as described above
+   */
+  class NewTextDBProcessor[T](
+    schema: Schema
+  ) {
+    val split_re: String = "\t"
+    var num_processed = 0
+    var num_bad = 0
+    
+    def line_to_fields(line: String): Option[Seq[String]] = {
+      val fieldvals = line.split(split_re, -1).toSeq
+      val retval =
+        if (fieldvals.length != schema.fieldnames.length) {
+          val lineno = num_processed + 1
+          warning(
+            """Line %s: Bad record, expected %s fields, saw %s fields;
+            skipping line=%s""", lineno, schema.fieldnames.length,
+            fieldvals.length, line)
+          num_bad += 1
+          None
+        } else
+          Some(fieldvals)
+      num_processed += 1
+      retval
+    }
   }
 
   /**
