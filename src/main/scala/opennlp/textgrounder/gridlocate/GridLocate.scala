@@ -102,7 +102,8 @@ object GenericTypes {
   type GenericCellGrid = CellGrid[_, _ <: GenericDistDocument,
     _ <: GenericGeoCell]
   type GenericDistDocumentTable =
-    DistDocumentTable[_, _ <: GenericDistDocument, _ <: GenericCellGrid]
+    DistDocumentTable[_, _ <: GenericDistDocument, _ <: GenericGeoCell,
+    _ <: GenericCellGrid]
   type CellGenericCellGrid[TCell <: GenericGeoCell] = CellGrid[_, _ <: GenericDistDocument,
     TCell]
 }
@@ -939,7 +940,7 @@ trait GridLocateDriver extends HadoopableArgParserExperimentDriver {
   type TDoc <: DistDocument[_]
   type TCell <: GeoCell[_, TDoc]
   type TGrid <: CellGrid[_, TDoc, TCell]
-  type TDocTable <: DistDocumentTable[_, TDoc, TGrid]
+  type TDocTable <: DistDocumentTable[_, TDoc, TCell, TGrid]
   override type TParam <: GridLocateParameters
 
   var stopwords: Set[String] = _
@@ -1098,9 +1099,7 @@ protected def process_strategies[T](strategies: Seq[(String, T)])(
     geneval: (String, T) => CorpusEvaluator[_,_]) = {
   for ((stratname, strategy) <- strategies) yield {
     val evalobj = geneval(stratname, strategy)
-    // For --eval-format=internal, there is no eval file.  To make the
-    // evaluation loop work properly, we pretend like there's a single
-    // eval file whose value is null.
+    // For --eval-format=internal, there is no eval file.
     val iterfiles =
       if (params.eval_file.length > 0) params.eval_file
       else params.input_corpus

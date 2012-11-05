@@ -337,7 +337,8 @@ abstract class CellGrid[
   TDoc <: DistDocument[TCoord],
   TCell <: GeoCell[TCoord, TDoc]
 ](
-    val table: DistDocumentTable[TCoord, TDoc, _ <: CellGrid[TCoord, TDoc, TCell]]
+    val table: DistDocumentTable[TCoord, TDoc, TCell,
+      _ <: CellGrid[TCoord, TDoc, TCell]]
 ) {
 
   /**

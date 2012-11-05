@@ -32,6 +32,7 @@ import opennlp.textgrounder.util.experiment._
 import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil.{errprint, warning}
+import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.Serializer
 import opennlp.textgrounder.util.textutil.capfirst
 
@@ -66,7 +67,8 @@ class DocumentLoadingProperties {
 abstract class DistDocumentTable[
   TCoord : Serializer,
   TDoc <: DistDocument[TCoord],
-  TGrid <: CellGrid[TCoord,TDoc,_]
+  TCell <: GeoCell[TCoord, TDoc],
+  TGrid <: CellGrid[TCoord, TDoc, TCell]
 ](
   /* SCALABUG!!! Declaring TDoc <: DistDocument[TCoord] isn't sufficient
      for Scala to believe that null is an OK value for TDoc, even though
@@ -250,58 +252,192 @@ abstract class DistDocumentTable[
   }
 
   /**
-   * A file processor that reads corpora containing document metadata,
-   * creates a DistDocument for each document described, and adds it to
-   * this document table.
+   * A file processor that reads document files from a corpora.
    *
-   * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "counts" or "document-metadata"
-   * @param cell_grid Cell grid to add newly created DistDocuments to
+   * @param suffix Suffix used for selecting the particular corpus from a
+   *  directory
+   * @param record_in_table Whether to record the document in the document
+   *  table.
+   * @param dstats ExperimentDriverStats used for recording counters and such.
+   *   Pass in null to not record counters.
    */
-  class DistDocumentTableFileProcessor(
-    suffix: String, cell_grid: TGrid,
-    task: ExperimentMeteredTask
-  ) extends OldDistDocumentFileProcessor(suffix, driver) {
-    def handle_document(fieldvals: Seq[String]) = {
-      val doc = create_and_init_document(schema, fieldvals, true)
-      if (doc != null) {
-        assert(doc.dist != null)
-        cell_grid.add_document_to_cell(doc)
-        (true, true)
-      }
-      else (false, true)
-    }
+  class DistDocumentFileProcessor(
+    filehand: FileHandler,
+    file: String,
+    schema: Schema,
+    record_in_table: Boolean
+  ) {
 
-    def process_lines(lines: Iterator[String],
-        filehand: FileHandler, file: String,
-        compression: String, realname: String) = {
-      // Stop if we've reached the maximum
-      var should_stop = false
+    /******** Counters to track what's going on ********/
+
+    def get_shortfile = filename_to_counter_name(filehand, file)
+
+    def filename_to_counter_name(filehand: FileHandler, file: String) = {
+      var (_, base) = filehand.split_filename(file)
       breakable {
-        for (line <- lines) {
-          if (!parse_row(line))
-            should_stop = true
-          if (task.item_processed())
-            should_stop = true
-          if ((driver.params.num_training_docs > 0 &&
-            task.num_processed >= driver.params.num_training_docs)) {
-            errprint("")
-            errprint("Stopping because limit of %s documents reached",
-              driver.params.num_training_docs)
-            should_stop = true
-          }
-          val sleep_at = debugval("sleep-at-docs")
-          if (sleep_at != "") {
-            if (task.num_processed == sleep_at.toInt) {
-              errprint("Reached %d documents, sleeping ...")
-              Thread.sleep(5000)
-            }
-          }
-          if (should_stop)
-            break
+        while (true) {
+          val newbase = """\.[a-z0-9]*$""".r.replaceAllIn(base, "")
+          if (newbase == base) break
+          base = newbase
         }
       }
-      (!should_stop, ())
+      """[^a-zA-Z0-9]""".r.replaceAllIn(base, "_") 
+    }
+
+    def get_file_counter_name(counter: String) =
+      "byfile." + get_shortfile + "." + counter
+
+    def increment_counter(counter: String, value: Long = 1) {
+      if (driver != null) {
+        val file_counter = get_file_counter_name(counter)
+        driver.increment_task_counter(file_counter, value)
+        driver.increment_task_counter(counter, value)
+        driver.increment_local_counter(file_counter, value)
+        driver.increment_local_counter(counter, value)
+      }
+    }
+
+    def increment_document_counter(counter: String) {
+      increment_counter(counter)
+      increment_counter("documents.total")
+    }
+
+    /******** Main code ********/
+
+    var lineno = 0
+
+    def fields_to_document(maybe_fieldvals: Option[Seq[String]]) = {
+      maybe_fieldvals match {
+        case None => {
+          increment_document_counter("documents.bad")
+          None
+        }
+        case Some(fieldvals) => {
+          try {
+            val doc = create_and_init_document(schema, fieldvals,
+              record_in_table)
+            if (doc == null) {
+              // FIXME!! Documents can also be skipped during evaluation even
+              // when create_and_init_document() returns a document.  See
+              // process_document() in CorpusEvaluator, along with
+              // would_skip_by_parameters() and so on.  We really need to
+              // separate out the recording of counters from document creation,
+              // and have document creation return a status indicating what's
+              // going on.
+              errprint("Skipped document %s",
+                schema.get_field_or_else(fieldvals, "title", "unknown title??"))
+              increment_document_counter("documents.skipped")
+              None
+            } else {
+              increment_document_counter("documents.processed")
+              Some(doc)
+            }
+          }
+          catch {
+            case e:DocumentValidationException => {
+              warning("Line %s: %s", lineno, e.message)
+              increment_document_counter("documents.bad")
+              None
+            }
+          }
+        }
+      }
+    }
+
+    // val task = new MeteredTask("document", "reading")
+    def iterate_documents() = {
+      val proc = new NewTextDBProcessor(schema)
+      val lines = filehand.openr(file)
+      val docs =
+        lines.flatMap(line => {
+          lineno += 1
+          val retval = fields_to_document(proc.line_to_fields(line))
+          // if (retval != None)
+          //  task.item_processed()
+          retval
+        })
+      if (debug("per-document") && driver != null) {
+        val output_stats = new SideEffectIterator[TDoc]({
+          def note(counter: String, english: String) {
+            val file_counter = get_file_counter_name(counter)
+            val value = driver.get_task_counter(file_counter)
+            errprint("Number of %s for file %s: %s", english, file,
+              value)
+          }
+
+          note("documents.processed", "documents processed")
+          note("documents.skipped", "documents skipped")
+          note("documents.bad", "bad documents")
+          note("documents.total", "total documents")
+        })
+        docs ++ output_stats
+      } else
+        docs
+    }
+  }
+
+  /**
+   * Read the documents from a textdb corpus.
+   *
+   * @param filehand The FileHandler for the directory of the corpus.
+   * @param dir Directory containing the corpus.
+   * @param suffix Suffix specifying the type of document file wanted
+   *   (e.g. "counts" or "document-metadata")
+   * @param record_in_table Whether to record documents in any subtables.
+   *   (FIXME: This should be an add-on to the iterator.)
+   * @return Iterator over documents.
+   */
+  def read_all_documents_from_textdb(filehand: FileHandler, dir: String,
+      suffix: String, record_in_subtable: Boolean) = {
+    val schema = TextDBProcessor.read_schema_from_textdb(filehand, dir, suffix)
+    val files = iterate_files_with_message(filehand,
+      iterate_files_recursively(filehand, Iterable(dir)).
+        filter(TextDBProcessor.filter_file_by_suffix(_, suffix)))
+    (for (file <- files) yield {
+      val proc = new DistDocumentFileProcessor(filehand, file, schema,
+        record_in_subtable)
+      proc.iterate_documents
+    }).flatten
+  }
+
+  /**
+   * Read the documents from a textdb corpus, stopping early if called for.
+   *
+   * @param filehand The FileHandler for the directory of the corpus.
+   * @param dir Directory containing the corpus.
+   * @param suffix Suffix specifying the type of document file wanted
+   *   (e.g. "counts" or "document-metadata")
+   * @param record_in_table Whether to record documents in any subtables.
+   *   (FIXME: This should be an add-on to the iterator.)
+   * @param task Task object for monitoring the documents read in.
+   * @return Iterator over documents.
+   */
+  def read_documents_from_textdb(filehand: FileHandler, dir: String,
+      suffix: String, record_in_subtable: Boolean,
+      task: ExperimentMeteredTask) = {
+    val dociter = new InterruptibleIterator(
+      read_all_documents_from_textdb(filehand, dir, suffix, record_in_subtable))
+    for (doc <- dociter) yield {
+      var should_stop = false
+      if (task.item_processed())
+        should_stop = true
+      if ((driver.params.num_training_docs > 0 &&
+        task.num_processed >= driver.params.num_training_docs)) {
+        errprint("")
+        errprint("Stopping because limit of %s documents reached",
+          driver.params.num_training_docs)
+        should_stop = true
+      }
+      val sleep_at = debugval("sleep-at-docs")
+      if (sleep_at != "") {
+        if (task.num_processed == sleep_at.toInt) {
+          errprint("Reached %d documents, sleeping ...")
+          Thread.sleep(5000)
+        }
+      }
+      if (should_stop)
+        dociter.stop()
+      doc
     }
   }
 
@@ -324,10 +460,16 @@ abstract class DistDocumentTable[
       val task =
         new ExperimentMeteredTask(driver, "document", "reading pass " + pass,
               maxtime = driver.params.max_time_per_stage)
-      val training_distproc =
-        new DistDocumentTableFileProcessor("training-" + suffix, cell_grid, task)
-      training_distproc.read_schema_from_textdb(filehand, dir)
-      training_distproc.process_files(filehand, Seq(dir))
+      // FIXME: I don't think we should be recording in subtables the first
+      // time through if we have multiple passes.  More generally, now that
+      // we've moved to an external iterator over documents, we should handle
+      // everything that way and eliminate `begin_training_pass` and
+      // `record_in_subtable` and such.
+      for (doc <- read_documents_from_textdb(filehand, dir,
+          "training-" + suffix, true, task)) {
+        assert(doc.dist != null)
+        cell_grid.add_document_to_cell(doc)
+      }
       task.finish()
       output_resource_usage()
     }
@@ -547,7 +689,7 @@ case class DocumentValidationException(
  */
 abstract class DistDocument[TCoord : Serializer](
   val schema: Schema,
-  val table: DistDocumentTable[TCoord,_,_]
+  val table: DistDocumentTable[TCoord,_,_,_]
 ) {
 
   import DistDocumentConverters._
@@ -908,124 +1050,6 @@ abstract class OldDistDocumentFileProcessor(
       if (dstats != null) {
         val file_counter = get_file_counter_name(counter)
         val value = dstats.get_task_counter(file_counter)
-        errprint("Number of %s for file %s: %s", english, file,
-          value)
-      }
-    }
-
-    if (debug("per-document")) {
-      note("documents.processed", "documents processed")
-      note("documents.skipped", "documents skipped")
-      note("documents.bad", "bad documents")
-      note("documents.total", "total documents")
-    }
-    super.end_process_file(filehand, file)
-  }
-}
-
-/**
- * A file processor that reads document files from a corpora.
- *
- * @param suffix Suffix used for selecting the particular corpus from a
- *  directory
- * @param record_in_table Whether to record the document in the document
- *  table.
- * @param dstats ExperimentDriverStats used for recording counters and such.
- *   Pass in null to not record counters.
- */
-abstract class DistDocumentFileProcessor[
-  TCoord,
-  XTDoc <: DistDocument[TCoord],
-  XTCell <: GeoCell[TCoord, XTDoc],
-  XTGrid <: CellGrid[TCoord, XTDoc, XTCell]
-](
-  suffix: String,
-  record_in_table: Boolean,
-  driver: GridLocateDocumentDriver {
-    type TDoc = XTDoc; type TCell = XTCell; type TGrid = XTGrid
-  }
-) extends BasicTextDBProcessor[XTDoc](suffix) {
-
-  /******** Counters to track what's going on ********/
-
-  var shortfile: String = _
-
-  def get_shortfile = shortfile
-
-  def filename_to_counter_name(filehand: FileHandler, file: String) = {
-    var (_, base) = filehand.split_filename(file)
-    breakable {
-      while (true) {
-        val newbase = """\.[a-z0-9]*$""".r.replaceAllIn(base, "")
-        if (newbase == base) break
-        base = newbase
-      }
-    }
-    """[^a-zA-Z0-9]""".r.replaceAllIn(base, "_") 
-  }
-
-  def get_file_counter_name(counter: String) =
-    "byfile." + get_shortfile + "." + counter
-
-  def increment_counter(counter: String, value: Long = 1) {
-    if (driver != null) {
-      val file_counter = get_file_counter_name(counter)
-      driver.increment_task_counter(file_counter, value)
-      driver.increment_task_counter(counter, value)
-      driver.increment_local_counter(file_counter, value)
-      driver.increment_local_counter(counter, value)
-    }
-  }
-
-  def increment_document_counter(counter: String) {
-    increment_counter(counter)
-    increment_counter("documents.total")
-  }
-
-  /******** Main code ********/
-
-  override def handle_bad_row(line: String, fieldvals: Seq[String]) {
-    increment_document_counter("documents.bad")
-    super.handle_bad_row(line, fieldvals)
-  }
-
-  def process_row(fieldvals: Seq[String]) = {
-    val retval =
-      try {
-        val doc =
-          driver.document_table.create_and_init_document(schema, fieldvals,
-            record_in_table)
-        if (doc == null)
-          None
-        else
-          Some(doc)
-      }
-      catch {
-        case e:DocumentValidationException => {
-          warning("Line %s: %s", num_processed + 1, e.message)
-          None
-        }
-      }
-    if (retval != None)
-      increment_document_counter("documents.processed")
-    else {
-      errprint("Skipped document %s",
-        schema.get_field_or_else(fieldvals, "title", "unknown title??"))
-      increment_document_counter("documents.skipped")
-    }
-    retval
-  }
-
-  override def begin_process_file(filehand: FileHandler, file: String) {
-    shortfile = filename_to_counter_name(filehand, file)
-    super.begin_process_file(filehand, file)
-  }
-
-  override def end_process_file(filehand: FileHandler, file: String) {
-    def note(counter: String, english: String) {
-      if (driver != null) {
-        val file_counter = get_file_counter_name(counter)
-        val value = driver.get_task_counter(file_counter)
         errprint("Number of %s for file %s: %s", english, file,
           value)
       }
