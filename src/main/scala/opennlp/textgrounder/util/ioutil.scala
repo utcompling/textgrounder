@@ -956,12 +956,12 @@ package object ioutil {
     files: Iterator[String]) = {
     var lastdir: String = null
     for (file <- files) yield {
-      errprint("Processing file %s..." format file)
       var (dir, fname) = filehand.split_filename(file)
       if (dir != lastdir) {
         errprint("Processing directory %s..." format dir)
         lastdir = dir
       }
+      errprint("Processing file %s..." format file)
       file
     }
   }
