@@ -1036,78 +1036,78 @@ trait GridLocateDriver extends HadoopableArgParserExperimentDriver {
         params.jelinek_factor)
     else
       new PseudoGoodTuringUnigramWordDistFactory(params.interpolate)
-}
-
-protected def read_stopwords() = {
-  Stopwords.read_stopwords(get_file_handler, params.stopwords_file,
-    params.language)
-}
-
-protected def read_whitelist() = {
-  Whitelist.read_whitelist(get_file_handler, params.whitelist_file)
-}
-
-protected def read_documents(table: TDocTable) {
-  for (fn <- params.input_corpus)
-    table.read_training_documents(get_file_handler, fn,
-      document_file_suffix, cell_grid)
-  table.finish_document_loading()
-}
-
-def setup_for_run() {
-  stopwords = read_stopwords()
-  whitelist = read_whitelist()
-  word_dist_factory = initialize_word_dist_factory()
-  word_dist_constructor = initialize_word_dist_constructor(word_dist_factory)
-  word_dist_factory.set_word_dist_constructor(word_dist_constructor)
-  document_table = initialize_document_table(word_dist_factory)
-  cell_grid = initialize_cell_grid(document_table)
-  // This accesses the stopwords and whitelist through the pointer to this in
-  // document_table.
-  read_documents(document_table)
-  if (debug("stop-after-reading-dists")) {
-    errprint("Stopping abruptly because debug flag stop-after-reading-dists set")
-    output_resource_usage()
-    // We throw to top level before exiting because hprof tends to report
-    // too much garbage as if it were live.  Unwinding the stack may fix
-    // some of that.  If you don't want this unwinding, comment out the
-    // throw and uncomment the call to System.exit().
-    throw new GridLocateAbruptExit
-    // System.exit(0)
   }
-  cell_grid.finish()
-  if(params.output_training_cell_dists) {
-    for(cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)) {
-      print(cell.shortstr+"\t")
-      val word_dist = cell.combined_dist.word_dist
-      println(word_dist.toString)        
+
+  protected def read_stopwords() = {
+    Stopwords.read_stopwords(get_file_handler, params.stopwords_file,
+      params.language)
+  }
+
+  protected def read_whitelist() = {
+    Whitelist.read_whitelist(get_file_handler, params.whitelist_file)
+  }
+
+  protected def read_documents(table: TDocTable) {
+    for (fn <- params.input_corpus)
+      table.read_training_documents(get_file_handler, fn,
+        document_file_suffix, cell_grid)
+    table.finish_document_loading()
+  }
+
+  def setup_for_run() {
+    stopwords = read_stopwords()
+    whitelist = read_whitelist()
+    word_dist_factory = initialize_word_dist_factory()
+    word_dist_constructor = initialize_word_dist_constructor(word_dist_factory)
+    word_dist_factory.set_word_dist_constructor(word_dist_constructor)
+    document_table = initialize_document_table(word_dist_factory)
+    cell_grid = initialize_cell_grid(document_table)
+    // This accesses the stopwords and whitelist through the pointer to this in
+    // document_table.
+    read_documents(document_table)
+    if (debug("stop-after-reading-dists")) {
+      errprint("Stopping abruptly because debug flag stop-after-reading-dists set")
+      output_resource_usage()
+      // We throw to top level before exiting because hprof tends to report
+      // too much garbage as if it were live.  Unwinding the stack may fix
+      // some of that.  If you don't want this unwinding, comment out the
+      // throw and uncomment the call to System.exit().
+      throw new GridLocateAbruptExit
+      // System.exit(0)
+    }
+    cell_grid.finish()
+    if(params.output_training_cell_dists) {
+      for(cell <- cell_grid.iter_nonempty_cells(nonempty_word_dist = true)) {
+        print(cell.shortstr+"\t")
+        val word_dist = cell.combined_dist.word_dist
+        println(word_dist.toString)        
+      }
     }
   }
-}
 
-/**
- * Given a list of strategies, process each in turn, evaluating all
- * documents using the strategy.
- *
- * @param strategies List of (name, strategy) pairs, giving strategy
- *   names and objects.
- * @param geneval Function to create an evaluator object to evaluate
- *   all documents, given a strategy.
- * @tparam T Supertype of all the strategy objects.
- */
-protected def process_strategies[T](strategies: Seq[(String, T)])(
-    geneval: (String, T) => CorpusEvaluator[_,_]) = {
-  for ((stratname, strategy) <- strategies) yield {
-    val evalobj = geneval(stratname, strategy)
-    // For --eval-format=internal, there is no eval file.
-    val iterfiles =
-      if (params.eval_file.length > 0) params.eval_file
-      else params.input_corpus
-    evalobj.process_files(get_file_handler, iterfiles)
-    evalobj.finish()
-    (stratname, strategy, evalobj)
+  /**
+   * Given a list of strategies, process each in turn, evaluating all
+   * documents using the strategy.
+   *
+   * @param strategies List of (name, strategy) pairs, giving strategy
+   *   names and objects.
+   * @param geneval Function to create an evaluator object to evaluate
+   *   all documents, given a strategy.
+   * @tparam T Supertype of all the strategy objects.
+   */
+  protected def process_strategies[T](strategies: Seq[(String, T)])(
+      geneval: (String, T) => CorpusEvaluator[_,_]) = {
+    for ((stratname, strategy) <- strategies) yield {
+      val evalobj = geneval(stratname, strategy)
+      // For --eval-format=internal, there is no eval file.
+      val iterfiles =
+        if (params.eval_file.length > 0) params.eval_file
+        else params.input_corpus
+      evalobj.process_files(get_file_handler, iterfiles)
+      evalobj.finish()
+      (stratname, strategy, evalobj)
+    }
   }
-}
 }
 
 trait GridLocateDocumentDriver extends GridLocateDriver {
