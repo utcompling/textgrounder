@@ -41,9 +41,9 @@ private final boolean expandRegions;
   private final List<Location> locations;
   private final Map<String, List<Location>> names;
   private final Map<String, Integer> ipes;
-  //private final Map<String, Integer> adms;
+  private final Map<String, Integer> adms;
   private Map<String, List<Coordinate>> ipePoints; // made mutable so can assign to null when done for faster GC
-  //private final Map<String, List<Coordinate>> admPoints;
+  private final Map<String, List<Coordinate>> admPoints;
 
   public GeoNamesGazetteer(BufferedReader reader) throws IOException {
     this(reader, true, 0.005);
@@ -79,9 +79,9 @@ private final boolean expandRegions;
     this.locations = new ArrayList<Location>();
     this.names = new HashMap<String, List<Location>>();
     this.ipes = new HashMap<String, Integer>();
-    //this.adms = new HashMap<String, Integer>();
+    this.adms = new HashMap<String, Integer>();
     this.ipePoints = new HashMap<String, List<Coordinate>>();
-    //this.admPoints = new HashMap<String, List<Coordinate>>();
+    this.admPoints = new HashMap<String, List<Coordinate>>();
 
     this.load(reader);
     if (this.expandRegions) {
@@ -91,12 +91,13 @@ private final boolean expandRegions;
       this.expandIPE();
       //for(Location loc : this.lookup("united states"))
       //     System.out.println(loc.getRegion().getCenter());
-      //this.expandADM();
+      this.expandADM();
     }
   }
 
   private boolean ignore(String cat, String type) {
-    return (cat.equals("H") || cat.equals("L") || cat.equals("S") || cat.equals("U") || cat.equals("V"));
+    return (cat.equals("H") || cat.equals("L") || cat.equals("S") || cat.equals("U") || cat.equals("V")
+         || cat.equals("R") || cat.equals("T"));
   }
 
   private boolean store(String cat, String type) {
@@ -143,7 +144,7 @@ private final boolean expandRegions;
     //this.ipePoints = null;
   }
 
-  /*private void expandADM() {
+  private void expandADM() {
     Clusterer clusterer = new KMeans();
 
     System.out.println("Selecting points for " + this.adms.size() + " administrative regions.");
@@ -169,17 +170,18 @@ private final boolean expandRegions;
 
         if (contained.size() > 0) {
           List<Coordinate> representatives = clusterer.clusterList(contained, k, SphericalGeometry.g());
+          representatives = Coordinate.removeNaNs(representatives);
           location.setRegion(new PointSetRegion(representatives));
 
           /*for (Coordinate c : representatives) {
             System.out.println("<Placemark><Point><coordinates>" +
                                c.getLngDegrees() + "," + c.getLatDegrees() +
                                "</coordinates></Point></Placemark>");
-          }*SLASH
+                               }*/
         }
       }
     }
-  }*/
+  }
 
   private String standardize(String name) {
     return name.toLowerCase().replace("’", "'");
@@ -232,7 +234,7 @@ private final boolean expandRegions;
           //    System.out.println(lat + ", " + lng);
 
           // try to get coordinates from right side in the case of weird characters in names messing up tabs between fields:
-          if((lat == Double.NaN || lng == Double.NaN) && fields.length > 19) {
+          if((Double.isNaN(lat) || Double.isNaN(lng)) && fields.length > 19) {
               try {
                   lat = Double.parseDouble(fields[fields.length-15]);
                   lng = Double.parseDouble(fields[fields.length-14]);
@@ -245,7 +247,7 @@ private final boolean expandRegions;
           //    System.out.println(lat + ", " + lng);
 
           // give up on trying to get coordinates:
-          if(lat == Double.NaN || lng == Double.NaN)
+          if(Double.isNaN(lat) || Double.isNaN(lng))
               continue;
 
           Coordinate coordinate = Coordinate.fromDegrees(lat, lng);
@@ -264,16 +266,16 @@ private final boolean expandRegions;
           }
           this.ipePoints.get(ipe).add(coordinate);
 
-          /*if (!this.admPoints.containsKey(adm)) {
+          if (!this.admPoints.containsKey(adm)) {
             this.admPoints.put(adm, new ArrayList<Coordinate>());
           }
-          this.admPoints.get(adm).add(coordinate);*/
+          this.admPoints.get(adm).add(coordinate);
 
           if (type.equals("PCLI")) {
             this.ipes.put(ipe, index);
-          } /*else if (type.equals("ADM1")) {
+          } else if (type.equals("ADM1")) {
             this.adms.put(adm, index);
-          }*/
+          }
 
           if (this.store(cat, type)) {
             Region region = new PointRegion(coordinate);
