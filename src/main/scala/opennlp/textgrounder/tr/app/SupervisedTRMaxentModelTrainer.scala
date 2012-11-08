@@ -50,7 +50,7 @@ object SupervisedTRFeatureExtractor extends App {
   println("Reading Wikipedia geotags from " + wikiCorpusInputFile.value.get + "...")
   val idsToCoords = new collection.mutable.HashMap[String, Coordinate]
   val fis = new FileInputStream(wikiCorpusInputFile.value.get)
-  fis.read; fis.read
+  //fis.read; fis.read
   val cbzis = new BZip2CompressorInputStream(fis)
   val in = new BufferedReader(new InputStreamReader(cbzis))
   var curLine = in.readLine
