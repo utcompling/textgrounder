@@ -92,6 +92,10 @@ public class RunResolver extends BaseApp {
             System.out.print("Running RANDOM resolver...");
             resolver = new RandomResolver();
         }
+        else if(currentRun.getResolverType() == RESOLVER_TYPE.POPULATION) {
+            System.out.print("Running POPULATION resolver...");
+            resolver = new PopulationResolver();
+        }
         else if(currentRun.getResolverType() == RESOLVER_TYPE.WEIGHTED_MIN_DIST) {
             System.out.println("Running WEIGHTED MINIMUM DISTANCE resolver with " + currentRun.getNumIterations() + " iteration(s)...");
             resolver = new WeightedMinDistResolver(currentRun.getNumIterations());

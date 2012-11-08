@@ -48,6 +48,7 @@ public class BaseApp {
 
     public static enum RESOLVER_TYPE {
         RANDOM,
+        POPULATION,
         BASIC_MIN_DIST,
         WEIGHTED_MIN_DIST,
         DOC_DIST,
@@ -193,8 +194,10 @@ public class BaseApp {
                         resolverType = RESOLVER_TYPE.LABEL_PROP_COMPLEX;
                     else if(value.toLowerCase().startsWith("m"))
                         resolverType = RESOLVER_TYPE.MAXENT;
-                    else if(value.toLowerCase().startsWith("p"))
+                    else if(value.toLowerCase().startsWith("pr"))
                         resolverType = RESOLVER_TYPE.PROB;
+                    else if(value.toLowerCase().startsWith("po"))
+                        resolverType = RESOLVER_TYPE.POPULATION;
                     else if(value.toLowerCase().startsWith("bayes"))
                         resolverType = RESOLVER_TYPE.BAYES_RULE;
                     else
