@@ -758,12 +758,47 @@ package object textdbutil {
     }
 
     /**
+     * Read a textdb corpus from a directory and return the schema and an
+     * iterator over all data files.  This will recursively process any
+     * subdirectories looking for data files.  The data files must have a suffix
+     * in their names that matches the given suffix. (If you want more control
+     * over the processing, call `read_schema_from_textdb`,
+     * `iterate_files_recursively`, and `filter_file_by_suffix`.)
+     *
+     * @param filehand File handler object of the directory
+     * @param dir Directory to read
+     * @param suffix Suffix picking out the correct data files
+     * @param with_message If true, "Processing ..." messages will be
+     *   displayed as each file is processed and as each directory is visited
+     *   during processing.
+     *
+     * @return A tuple `(schema, files)` where `schema` is the schema for the
+     *   corpus and `files` is an iterator over data files.
+     */
+    def get_textdb_files(filehand: FileHandler, dir: String,
+        suffix: String, with_messages: Boolean = true) = {
+      val schema = read_schema_from_textdb(filehand, dir, suffix)
+      val files = iterate_files_recursively(filehand, Iterable(dir)).
+          filter(filter_file_by_suffix(_, suffix))
+      val files_with_message =
+        if (with_messages)
+          iterate_files_with_message(filehand, files)
+        else
+          files
+      (schema, files_with_message)
+    }
+
+    /**
      * Read a corpus from a directory and return the result of processing the
      * rows in the corpus. (If you want more control over the processing,
      * call `read_schema_from_textdb` and use `NewTextDBProcessor`.)
      *
      * @param filehand File handler object of the directory
      * @param dir Directory to read
+     * @param suffix Suffix picking out the correct data files
+     * @param with_message If true, "Processing ..." messages will be
+     *   displayed as each file is processed and as each directory is visited
+     *   during processing.
      *
      * @return An iterator of iterators of values.  There is one inner iterator
      *   per file read in, and each such iterator contains all the values
@@ -771,12 +806,10 @@ package object textdbutil {
      *   if some rows were badly formatted.)
      */
     def read_textdb(filehand: FileHandler, dir: String,
-        suffix: String) = {
-      val schema = read_schema_from_textdb(filehand, dir, suffix)
+        suffix: String, with_messages: Boolean = true) = {
+      val (schema, files) =
+        get_textdb_files(filehand, dir, suffix, with_messages)
       val proc = new NewTextDBProcessor(schema)
-      val files = iterate_files_with_message(filehand,
-        iterate_files_recursively(filehand, Iterable(dir)).
-          filter(filter_file_by_suffix(_, suffix)))
       files.map(file => filehand.openr(file).flatMap(proc.line_to_fields))
     }
 
