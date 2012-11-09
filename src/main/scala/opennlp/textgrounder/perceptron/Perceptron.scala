@@ -296,8 +296,6 @@ trait LinearClassifier {
   /** Return number of labels. */
   def number_of_labels: Int
 
-  assert(number_of_labels >= 2)
-
   /** Classify a given instance, returning the class (a label from 0 to
     * `number_of_labels`-1). */
   def classify(instance: FeatureVector): Int
@@ -611,6 +609,8 @@ class SingleWeightMultiClassLinearClassifier (
   val number_of_labels: Int
 ) extends LinearClassifier {
 
+  assert(number_of_labels >= 2)
+
   /** Classify a given instance, returning the class. */
   def classify(instance: FeatureVector) =
     Maxutil.argmax[Int](0 until number_of_labels, score_class(instance, _))
@@ -633,6 +633,8 @@ class MultiClassLinearClassifier (
   val weights: IndexedSeq[WeightVector]
 ) extends LinearClassifier {
   val number_of_labels = weights.length
+
+  assert(number_of_labels >= 2)
 
   /** Classify a given instance, returning the class. */
   def classify(instance: FeatureVector) =
