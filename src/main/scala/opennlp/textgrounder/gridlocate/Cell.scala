@@ -467,6 +467,7 @@ abstract class CellGrid[
       table.num_recorded_documents_with_coordinates_by_split("training").value
     errprint("Training documents per non-empty cell: %g",
       recorded_training_docs_with_coordinates.toDouble / num_non_empty_cells)
+    table.driver.heartbeat
     // Clear out the document distributions of the training set, since
     // only needed when computing cells.
     //
@@ -474,8 +475,7 @@ abstract class CellGrid[
     // by never creating these distributions at all, but directly adding
     // them to the cells.  Would require a bit of thinking when reading
     // in the counts.
-    table.driver.heartbeat
-    table.clear_training_document_distributions()
-    table.driver.heartbeat
+    // table.clear_training_document_distributions()
+    // table.driver.heartbeat
   }
 }

@@ -102,7 +102,7 @@ trait PointwiseClassifyingReranker[TestItem, RerankInstance, Answer]
 
 /**
  * A pointwise reranker that uses a scoring classifier to assign a score
- * to each possible answer to be reranked.  The idea is that 
+ * to each possible answer to be reranked.  The idea is that ... FIXME.
  */
 trait PointwiseClassifyingRerankerWithTrainingData[
     TestItem, RerankInstance, Answer] extends
@@ -121,12 +121,61 @@ trait PointwiseClassifyingRerankerWithTrainingData[
     data: Iterable[(RerankInstance, Boolean)]
   ): ScoringBinaryClassifier[RerankInstance]
 
-  protected val rerank_classifier = {
+  lazy protected val rerank_classifier = {
+    if (training_data == null)
+      errprint("null training_data")
     val rerank_training_data = training_data.flatMap {
-      case (item, true_answer) =>
+      case (item, true_answer) => {
+        if (item == null)
+          errprint("null item")
+        if (true_answer == null)
+          errprint("null true_answer")
         get_rerank_training_instances(item, true_answer)
+      }
     }
     create_rerank_classifier(rerank_training_data)
+  }
+}
+
+/**
+ * A pointwise reranker that uses a linear classifier to assign a score
+ * to each possible answer to be reranked.
+ */
+trait LinearClassifierReranker[
+  TestItem, RerankInstance <: FeatureVector, Answer
+] extends PointwiseClassifyingRerankerWithTrainingData[
+  TestItem, RerankInstance, Answer
+] {
+  /**
+   * Trainer for the classifier used for reranking, given a set of training data
+   * (in the form of pairs of reranking instances and whether they represent
+   * correct answers).
+   */
+  protected def linear_classifier_trainer: BinaryLinearClassifierTrainer
+
+  /**
+   * An adapter class converting `BinaryLinearClassifier` (from the perceptron
+   * package) into a `ScoringBinaryClassifier`.
+   * FIXME: Just use one of the two everywhere.
+   */
+  class LinearClassifierAdapter(
+    cfier: BinaryLinearClassifier
+  ) extends ScoringBinaryClassifier[RerankInstance] {
+    /**
+     * The value of `minimum_positive` indicates the dividing line between values
+     * that should be considered positive and those that should be considered
+     * negative; typically this will be 0 or 0.5. */
+    def minimum_positive = 0.0
+    def score_item(item: RerankInstance) = cfier.binary_score(item)
+  }
+
+  protected def create_rerank_classifier(
+    data: Iterable[(RerankInstance, Boolean)]
+  ) = {
+    val adapted_data = data.map {
+      case (inst, truefalse) => (inst, if (truefalse) 1 else 0)
+    }
+    new LinearClassifierAdapter(linear_classifier_trainer(adapted_data, 2))
   }
 }
 
@@ -202,23 +251,29 @@ class TrivialDistDocumentReranker[
 ) extends DistDocumentReranker[TDoc, TCell, TGrid](
   _initial_ranker, _top_n
 ) {
-  val rerank_classifier =
+  lazy protected val rerank_classifier =
     new TrivialScoringBinaryClassifier[
       DistDocumentRerankInstance[TDoc, TCell, TGrid]](
         0 // FIXME: This is incorrect but doesn't matter
       )
 }
 
-abstract class PerceptronDistDocumentReranker[
+class LinearClassifierDistDocumentReranker[
   TDoc <: DistDocument[_],
   TCell <: GeoCell[_, TDoc],
   TGrid <: CellGrid[_, TDoc, TCell]
 ](
   _initial_ranker: Ranker[TDoc, TCell],
+  _trainer: BinaryLinearClassifierTrainer,
+  _training_data: Iterable[(TDoc, TCell)],
   _top_n: Int
 ) extends DistDocumentReranker[TDoc, TCell, TGrid](
   _initial_ranker, _top_n
-) {
-  // FIXME!
-  val rerank_classifier = null
+) with LinearClassifierReranker[TDoc,
+  DistDocumentRerankInstance[TDoc, TCell, TGrid],
+  TCell] {
+  val linear_classifier_trainer = _trainer
+  val training_data = _training_data
+  if (training_data == null)
+    errprint("null training_data in constructor")
 }

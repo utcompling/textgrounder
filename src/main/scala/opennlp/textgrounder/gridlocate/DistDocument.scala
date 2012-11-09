@@ -84,10 +84,10 @@ abstract class DistDocumentTable[
    */
   val loading_props = new DocumentLoadingProperties
 
-  /**
-   * List of documents in each split.
-   */
-  val documents_by_split = bufmap[String, TDoc]()
+//  /**
+//   * List of documents in each split.
+//   */
+//  val documents_by_split = bufmap[String, TDoc]()
 
   // Example of using TaskCounterWrapper directly for non-split values.
   // val num_documents = new driver.TaskCounterWrapper("num_documents") 
@@ -385,115 +385,52 @@ abstract class DistDocumentTable[
    *   (e.g. "counts" or "document-metadata")
    * @param record_in_table Whether to record documents in any subtables.
    *   (FIXME: This should be an add-on to the iterator.)
-   * @return Iterator over documents.
-   */
-  def read_all_documents_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String, record_in_subtable: Boolean) = {
-    val schema = TextDBProcessor.read_schema_from_textdb(filehand, dir, suffix)
-    val files = iterate_files_with_message(filehand,
-      iterate_files_recursively(filehand, Iterable(dir)).
-        filter(TextDBProcessor.filter_file_by_suffix(_, suffix)))
-    (for (file <- files) yield {
-      val proc = new DistDocumentFileProcessor(filehand, file, schema,
-        record_in_subtable)
-      proc.iterate_documents
-    }).flatten
-  }
-
-  /**
-   * Read the documents from a textdb corpus, stopping early if called for.
-   *
-   * @param filehand The FileHandler for the directory of the corpus.
-   * @param dir Directory containing the corpus.
-   * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "counts" or "document-metadata")
-   * @param record_in_table Whether to record documents in any subtables.
-   *   (FIXME: This should be an add-on to the iterator.)
-   * @param task Task object for monitoring the documents read in.
+   * @param finish_globally Whether to compute statistics of the documents'
+   *   distributions that depend on global (e.g. back-off) distribution
+   *   statistics.  Normally true, but may be false during bootstrapping of
+   *   those statistics.
    * @return Iterator over documents.
    */
   def read_documents_from_textdb(filehand: FileHandler, dir: String,
       suffix: String, record_in_subtable: Boolean,
-      task: ExperimentMeteredTask) = {
-    val dociter = new InterruptibleIterator(
-      read_all_documents_from_textdb(filehand, dir, suffix, record_in_subtable))
-    for (doc <- dociter) yield {
-      var should_stop = false
-      if (task.item_processed())
-        should_stop = true
-      if ((driver.params.num_training_docs > 0 &&
-        task.num_processed >= driver.params.num_training_docs)) {
-        errprint("")
-        errprint("Stopping because limit of %s documents reached",
-          driver.params.num_training_docs)
-        should_stop = true
-      }
-      val sleep_at = debugval("sleep-at-docs")
-      if (sleep_at != "") {
-        if (task.num_processed == sleep_at.toInt) {
-          errprint("Reached %d documents, sleeping ...")
-          Thread.sleep(5000)
-        }
-      }
-      if (should_stop)
-        dociter.stop()
-      doc
-    }
+      finish_globally: Boolean = true) = {
+    val (schema, files) =
+      TextDBProcessor.get_textdb_files(filehand, dir, suffix)
+    val docs =
+      (for (file <- files) yield {
+        val proc = new DistDocumentFileProcessor(filehand, file, schema,
+          record_in_subtable)
+        proc.iterate_documents
+      }).flatten
+    if (!finish_globally)
+      docs
+    else
+      docs.map(doc => {
+        if (doc.dist != null)
+          doc.dist.finish_after_global()
+        doc
+      })
   }
 
-  /**
-   * Read the training documents from the given corpus.  Documents listed in
-   * the document file(s) are created, listed in this table,
-   * and added to the cell grid corresponding to the table.
-   *
-   * @param filehand The FileHandler for working with the file.
-   * @param dir Directory containing the corpus.
-   * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "counts" or "document-metadata"
-   * @param cell_grid Cell grid into which the documents are added.
-   */
-  def read_training_documents(filehand: FileHandler, dir: String,
-      suffix: String, cell_grid: TGrid) {
-
-    for (pass <- 1 to cell_grid.num_training_passes) {
-      cell_grid.begin_training_pass(pass)
-      val task =
-        new ExperimentMeteredTask(driver, "document", "reading pass " + pass,
-              maxtime = driver.params.max_time_per_stage)
-      // FIXME: I don't think we should be recording in subtables the first
-      // time through if we have multiple passes.  More generally, now that
-      // we've moved to an external iterator over documents, we should handle
-      // everything that way and eliminate `begin_training_pass` and
-      // `record_in_subtable` and such.
-      for (doc <- read_documents_from_textdb(filehand, dir,
-          "training-" + suffix, true, task)) {
-        assert(doc.dist != null)
-        cell_grid.add_document_to_cell(doc)
-      }
-      task.finish()
-      output_resource_usage()
-    }
-  }
-
-  def clear_training_document_distributions() {
-    for (doc <- documents_by_split("training"))
-      doc.dist = null
-  }
+//  def clear_training_document_distributions() {
+//    for (doc <- documents_by_split("training"))
+//      doc.dist = null
+//  }
 
   def finish_document_loading() {
     // Compute overall distribution values (e.g. back-off statistics).
     errprint("Finishing global dist...")
     word_dist_factory.finish_global_distribution()
 
-    // Now compute per-document values dependent on the overall distribution
-    // statistics just computed.
-    errprint("Finishing document dists...")
-    for ((split, table) <- documents_by_split) {
-      for (doc <- table) {
-        if (doc.dist != null)
-          doc.dist.finish_after_global()
-      }
-    }
+//    // Now compute per-document values dependent on the overall distribution
+//    // statistics just computed.
+//    errprint("Finishing document dists...")
+//    for ((split, table) <- documents_by_split) {
+//      for (doc <- table) {
+//        if (doc.dist != null)
+//          doc.dist.finish_after_global()
+//      }
+//    }
 
     // Now output statistics on number of documents seen, etc.
     errprint("")
