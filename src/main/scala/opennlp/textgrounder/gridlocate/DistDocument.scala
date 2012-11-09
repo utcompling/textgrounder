@@ -357,7 +357,7 @@ abstract class DistDocumentTable[
           retval
         })
       if (debug("per-document") && driver != null) {
-        val output_stats = new SideEffectIterator[TDoc]({
+        val output_stats = new SideEffectIterator({
           def note(counter: String, english: String) {
             val file_counter = get_file_counter_name(counter)
             val value = driver.get_task_counter(file_counter)

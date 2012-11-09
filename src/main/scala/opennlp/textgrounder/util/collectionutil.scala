@@ -698,7 +698,7 @@ package object collectionutil {
    * @param body An expression or block of code to be executed when the iterator
    *   is tripped.
    */
-  class SideEffectIterator[T](body: => Any) extends Iterator[T] {
+  class SideEffectIterator(body: => Any) extends Iterator[Nothing] {
     var executed = false
 
     def hasNext = {
