@@ -351,9 +351,25 @@ trait LinearClassifierTrainer {
       assert(inst.length == len)
   }
 
-  /** Train a perceptron given a set of labeled instances. */
+  /** Train a linear classifier given a set of labeled instances. */
   def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int):
     LinearClassifier
+}
+
+/**
+ * Class for training a linear classifier given a set of training instances and
+ * associated labels.
+ */
+trait BinaryLinearClassifierTrainer extends LinearClassifierTrainer {
+  /** Train a linear classifier given a set of labeled instances. */
+  def apply(data: Iterable[(FeatureVector, Int)]): 
+    BinaryLinearClassifier
+
+  /** Train a linear classifier given a set of labeled instances. */
+  def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
+    assert(num_classes == 2)
+    apply(data)
+  }
 }
 
 /**
@@ -397,7 +413,7 @@ abstract class BinaryPerceptronTrainer(
   averaged: Boolean = false,
   error_threshold: Double = 1e-10,
   max_iterations: Int = 1000
-) extends LinearClassifierTrainer {
+) extends BinaryLinearClassifierTrainer {
   assert(error_threshold >= 0)
   assert(max_iterations > 0)
 
@@ -465,12 +481,6 @@ abstract class BinaryPerceptronTrainer(
       (0 until len).foreach(i => avg_weights(i) /= iter)
       new BinaryLinearClassifier(avg_weights)
     } else new BinaryLinearClassifier(weights)
-  }
-
-  /** Train a perceptron given a set of labeled instances. */
-  def apply(data: Iterable[(FeatureVector, Int)], num_classes: Int) = {
-    assert(num_classes == 2)
-    apply(data)
   }
 }
 

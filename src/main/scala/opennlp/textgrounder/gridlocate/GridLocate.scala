@@ -1047,11 +1047,96 @@ trait GridLocateDriver extends HadoopableArgParserExperimentDriver {
     Whitelist.read_whitelist(get_file_handler, params.whitelist_file)
   }
 
-  protected def read_documents(table: TDocTable) {
-    for (fn <- params.input_corpus)
-      table.read_training_documents(get_file_handler, fn,
-        document_file_suffix, cell_grid)
-    table.finish_document_loading()
+  /**
+   * Read the training documents.  This uses the values of the parameters
+   * to determine where to read the documents from and how many documents to
+   * read.
+   *
+   * @param operation Name of logical operation, to be displayed in progress
+   *   messages.
+   * @param record_in_table Whether to record documents in any subtables.
+   *   (FIXME: This should be an add-on to the iterator.)
+   * @param finish_globally Whether to compute statistics of the documents'
+   *   distributions that depend on global (e.g. back-off) distribution
+   *   statistics.  Normally true, but may be false during bootstrapping of
+   *   those statistics.
+   * @return Iterator over documents.
+   */
+  def read_training_documents(operation: String = "reading",
+      record_in_subtable: Boolean = false,
+      finish_globally: Boolean = true): Iterator[TDoc] = {
+    val task =
+      new ExperimentMeteredTask(this, "document", operation,
+        maxtime = params.max_time_per_stage)
+    val dociter = new InterruptibleIterator(
+      params.input_corpus.toIterator.flatMap(dir =>
+        document_table.read_documents_from_textdb(get_file_handler,
+          dir, "training-" + document_file_suffix, 
+          record_in_subtable, finish_globally)))
+    val docs =
+      for (doc <- dociter) yield {
+        var should_stop = false
+        if (task.item_processed())
+          should_stop = true
+        if ((params.num_training_docs > 0 &&
+          task.num_processed >= params.num_training_docs)) {
+          errprint("")
+          errprint("Stopping because limit of %s documents reached",
+            params.num_training_docs)
+          should_stop = true
+        }
+        val sleep_at = debugval("sleep-at-docs")
+        if (sleep_at != "") {
+          if (task.num_processed == sleep_at.toInt) {
+            errprint("Reached %d documents, sleeping ...")
+            Thread.sleep(5000)
+          }
+        }
+        if (should_stop)
+          dociter.stop()
+        doc
+      }
+    docs ++ new SideEffectIterator {
+      task.finish()
+      output_resource_usage()
+    }
+  }
+
+  /**
+   * Read the training documents from the given corpora and add them to
+   * the cell grid corresponding to the table.
+   *
+   * @param filehand The FileHandler for working with the file.
+   * @param dir Directory containing the corpus.
+   * @param suffix Suffix specifying the type of document file wanted
+   *   (e.g. "counts" or "document-metadata"
+   * @param cell_grid Cell grid into which the documents are added.
+   */
+  protected def read_training_documents_into_cell_grid() {
+    for (pass <- 1 to cell_grid.num_training_passes) {
+      cell_grid.begin_training_pass(pass)
+      // FIXME: I don't think we should be recording in subtables the first
+      // time through if we have multiple passes.  More generally, now that
+      // we've moved to an external iterator over documents, we should handle
+      // everything that way and eliminate `begin_training_pass` and
+      // `record_in_subtable` and such.
+      //
+      // FIXME #2: The "finish_globally" flag needs to be tied into the
+      // recording of global statistics in the word dists.  However, currently
+      // that's handled in a totally hacked fashion in a combination of
+      // DefaultUnigramWordDistConstructor.initialize_distribution()
+      // and DistDocument.set_field().  In reality, all the glop handled by
+      // finish_before_global() and note_dist_globally() (as well as
+      // record_in_subtable) and such should be handled by separate mapping
+      // stages onto the documents.
+      for (doc <- read_training_documents("reading pass " + pass,
+          record_in_subtable = true,
+          finish_globally = false)) {
+        assert(doc.dist != null)
+        cell_grid.add_document_to_cell(doc)
+      }
+    }
+    document_table.finish_document_loading()
   }
 
   def setup_for_run() {
@@ -1062,9 +1147,10 @@ trait GridLocateDriver extends HadoopableArgParserExperimentDriver {
     word_dist_factory.set_word_dist_constructor(word_dist_constructor)
     document_table = initialize_document_table(word_dist_factory)
     cell_grid = initialize_cell_grid(document_table)
-    // This accesses the stopwords and whitelist through the pointer to this in
-    // document_table.
-    read_documents(document_table)
+    // This accesses all the above items, either directly through the variables
+    // storing them, or (as for the stopwords and whitelist) through the pointer
+    // to this in document_table.
+    read_training_documents_into_cell_grid()
     if (debug("stop-after-reading-dists")) {
       errprint("Stopping abruptly because debug flag stop-after-reading-dists set")
       output_resource_usage()
@@ -1186,21 +1272,30 @@ trait GridLocateDocumentDriver extends GridLocateDriver {
     }
   }
 
-  protected def create_basic_ranker(
-    strategy: GridLocateDocumentStrategy[TCell, TGrid]
-  ) = {
-    new CellGridRanker[TDoc, TCell, TGrid](strategy)
-  }
-
   def create_ranker(strategy: GridLocateDocumentStrategy[TCell, TGrid]) = {
-    val basic_ranker = create_basic_ranker(strategy)
+    val basic_ranker = new CellGridRanker[TDoc, TCell, TGrid](strategy)
     if (params.rerank == "none") basic_ranker
     else params.rerank_classifier match {
       case "trivial" =>
         new TrivialDistDocumentReranker[TDoc, TCell, TGrid](
           basic_ranker, params.rerank_top_n)
-      // FIXME!!!
-      case _ => basic_ranker
+      case _ => {
+        val training_docs =
+          read_training_documents(operation = "training reranker").
+            map(doc => {
+              val cell = cell_grid.find_best_cell_for_document(doc, false)
+              // We should already have a cell for each training doc,
+              // right?
+              assert (cell != null)
+              (doc, cell)
+            }).toIterable
+        new LinearClassifierDistDocumentReranker[TDoc, TCell, TGrid](
+          basic_ranker,
+          create_pointwise_classifier_trainer(),
+          training_docs,
+          params.rerank_top_n
+        )
+      }
     }
   }
 
