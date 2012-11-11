@@ -1170,34 +1170,11 @@ trait GridLocateDriver extends HadoopableArgParserExperimentDriver {
       }
     }
   }
-
-  /**
-   * Given a list of strategies, process each in turn, evaluating all
-   * documents using the strategy.
-   *
-   * @param strategies List of (name, strategy) pairs, giving strategy
-   *   names and objects.
-   * @param geneval Function to create an evaluator object to evaluate
-   *   all documents, given a strategy.
-   * @tparam T Supertype of all the strategy objects.
-   */
-  protected def process_strategies[T](strategies: Seq[(String, T)])(
-      geneval: (String, T) => CorpusEvaluator[_,_]) = {
-    for ((stratname, strategy) <- strategies) yield {
-      val evalobj = geneval(stratname, strategy)
-      // For --eval-format=internal, there is no eval file.
-      val iterfiles =
-        if (params.eval_file.length > 0) params.eval_file
-        else params.input_corpus
-      evalobj.process_files(get_file_handler, iterfiles)
-      evalobj.finish()
-      (stratname, strategy, evalobj)
-    }
-  }
 }
 
 trait GridLocateDocumentDriver extends GridLocateDriver {
-  var strategies: Seq[(String, GridLocateDocumentStrategy[TCell, TGrid])] = _
+  var strategies:
+    Iterable[(String, GridLocateDocumentStrategy[TCell, TGrid])] = _
   var rankers: Map[GridLocateDocumentStrategy[TCell, TGrid],
     Ranker[TDoc, TCell]] = _
 

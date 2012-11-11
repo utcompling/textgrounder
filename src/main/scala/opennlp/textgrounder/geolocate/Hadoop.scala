@@ -221,7 +221,7 @@ class DocumentEvaluationMapper extends
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver() = new TDriver
 
-  var evaluators: Iterable[CellGridEvaluator[SphereCoord,SphereDocument,_,_,_]] = _
+  var evaluators: Iterable[CellGridEvaluator[SphereCoord,SphereDocument,_,_]] = _
   val task = new ExperimentMeteredTask(driver, "document", "evaluating")
 
   class HadoopDocumentFileProcessor(
@@ -287,8 +287,7 @@ didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
       evaluators =
         for ((stratname, strategy) <- driver.strategies)
           yield driver.create_document_evaluator(strategy, stratname).
-            asInstanceOf[CellGridEvaluator[
-              SphereCoord,SphereDocument,_,_,_]]
+            asInstanceOf[CellGridEvaluator[SphereCoord,SphereDocument,_,_]]
       if (driver.params.input_corpus.length != 1) {
         driver.params.parser.error(
           "FIXME: For Hadoop, currently need exactly one corpus")

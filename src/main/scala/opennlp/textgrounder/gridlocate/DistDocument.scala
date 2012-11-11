@@ -392,7 +392,7 @@ abstract class DistDocumentTable[
    * @return Iterator over documents.
    */
   def read_documents_from_textdb(filehand: FileHandler, dir: String,
-      suffix: String, record_in_subtable: Boolean,
+      suffix: String, record_in_subtable: Boolean = false,
       finish_globally: Boolean = true) = {
     val (schema, files) =
       TextDBProcessor.get_textdb_files(filehand, dir, suffix)

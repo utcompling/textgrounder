@@ -904,12 +904,12 @@ case class GeogWordDocument(words: Iterable[GeogWord])
 abstract class GeolocateToponymEvaluator(
   strategy: GeolocateToponymStrategy,
   stratname: String,
-  driver: GeolocateToponymDriver
-) extends CorpusEvaluator[
-  GeogWordDocument, ToponymEvaluationResult
-](stratname, driver) with DocumentIteratingEvaluator[
-  GeogWordDocument, ToponymEvaluationResult
-] {
+  driver: GeolocateToponymDriver,
+  filehand: FileHandler,
+  filenames: Iterable[String]
+) extends CorpusEvaluator(stratname, driver) {
+  type TEvalDoc = GeogWordDocument
+  type TEvalRes = ToponymEvaluationResult
   val toponym_results = new GeolocateToponymResults(driver)
 
   // Given an evaluation file, read in the words specified, including the
@@ -922,61 +922,63 @@ abstract class GeolocateToponymEvaluator(
   // If compute_context, also generate the set of "context" words used for
   // disambiguation (some window, e.g. size 20, of words around each
   // toponym).
-  def iter_documents(filehand: FileHandler, filename: String) = {
-    def return_word(word: GeogWord) = {
-      if (word.is_toponym) {
-        if (debug("lots")) {
-          errprint("Saw loc %s with true coordinates %s, true location %s",
-            word.word, word.coord, word.location)
+  def iter_documents = {
+    filenames.toIterator.flatMap(filename => {
+      def return_word(word: GeogWord) = {
+        if (word.is_toponym) {
+          if (debug("lots")) {
+            errprint("Saw loc %s with true coordinates %s, true location %s",
+              word.word, word.coord, word.location)
+          }
+        } else {
+          if (debug("tons"))
+            errprint("Non-toponym %s", word.word)
         }
-      } else {
-        if (debug("tons"))
-          errprint("Non-toponym %s", word.word)
+        word
       }
-      word
-    }
 
-    for ((k, g) <- iter_geogwords(filehand, filename).words.groupBy(_.document))
-      yield {
-      if (k != null)
-        errprint("Processing document %s...", k)
-      val results = (for (word <- g) yield return_word(word)).toArray
+      for ((k, g) <- iter_geogwords(filehand, filename).words.
+          groupBy(_.document).toIterator) yield {
+        if (k != null)
+          errprint("Processing document %s...", k)
+        val results = (for (word <- g) yield return_word(word)).toArray
 
-      // Now compute context for words
-      val nbcl = driver.params.naive_bayes_context_len
-      if (strategy.need_context()) {
-        // First determine whether each word is a stopword
-        for (i <- 0 until results.length) {
-          // FIXME: Check that we aren't accessing a list or something with
-          // O(N) random access
-          // If a word tagged as a toponym is homonymous with a stopword, it
-          // still isn't a stopword.
-          results(i).is_stop = (results(i).coord == null &&
-            (driver.stopwords contains results(i).word))
-        }
-        // Now generate context for toponyms
-        for (i <- 0 until results.length) {
-          // FIXME: Check that we aren't accessing a list or something with
-          // O(N) random access
-          if (results(i).coord != null) {
-            // Select up to naive_bayes_context_len words on either side;
-            // skip stopwords.  Associate each word with the distance away from
-            // the toponym.
-            val minind = 0 max i - nbcl
-            val maxind = results.length min i + nbcl + 1
-            results(i).context =
-              (for {
-                (dist, x) <- ((i - minind until i - maxind) zip results.slice(minind, maxind))
-                if (!(driver.stopwords contains x.word))
-              } yield (dist, x.word)).toArray
+        // Now compute context for words
+        val nbcl = driver.params.naive_bayes_context_len
+        if (strategy.need_context()) {
+          // First determine whether each word is a stopword
+          for (i <- 0 until results.length) {
+            // FIXME: Check that we aren't accessing a list or something with
+            // O(N) random access
+            // If a word tagged as a toponym is homonymous with a stopword, it
+            // still isn't a stopword.
+            results(i).is_stop = (results(i).coord == null &&
+              (driver.stopwords contains results(i).word))
+          }
+          // Now generate context for toponyms
+          for (i <- 0 until results.length) {
+            // FIXME: Check that we aren't accessing a list or something with
+            // O(N) random access
+            if (results(i).coord != null) {
+              // Select up to naive_bayes_context_len words on either side;
+              // skip stopwords.  Associate each word with the distance away from
+              // the toponym.
+              val minind = 0 max i - nbcl
+              val maxind = results.length min i + nbcl + 1
+              results(i).context =
+                (for {
+                  (dist, x) <- ((i - minind until i - maxind) zip results.slice(minind, maxind))
+                  if (!(driver.stopwords contains x.word))
+                } yield (dist, x.word)).toArray
+            }
           }
         }
-      }
 
-      val geogwords =
-        (for (word <- results if word.coord != null) yield word).toIterable
-      new GeogWordDocument(geogwords)
-    }
+        val geogwords =
+          (for (word <- results if word.coord != null) yield word).toIterable
+        new GeogWordDocument(geogwords)
+      }
+    })
   }
 
   // Disambiguate the toponym, specified in GEOGWORD.  Determine the possible
@@ -1083,8 +1085,12 @@ abstract class GeolocateToponymEvaluator(
 class TRCoNLLGeolocateToponymEvaluator(
   strategy: GeolocateToponymStrategy,
   stratname: String,
-  driver: GeolocateToponymDriver
-) extends GeolocateToponymEvaluator(strategy, stratname, driver) {
+  driver: GeolocateToponymDriver,
+  filehand: FileHandler,
+  filenames: Iterable[String]
+) extends GeolocateToponymEvaluator(
+  strategy, stratname, driver, filehand, filenames
+) {
   // Read a file formatted in TR-CONLL text format (.tr files).  An example of
   // how such files are fomatted is:
   //
@@ -1174,8 +1180,12 @@ class TRCoNLLGeolocateToponymEvaluator(
 class WikipediaGeolocateToponymEvaluator(
   strategy: GeolocateToponymStrategy,
   stratname: String,
-  driver: GeolocateToponymDriver
-) extends GeolocateToponymEvaluator(strategy, stratname, driver) {
+  driver: GeolocateToponymDriver,
+  filehand: FileHandler,
+  filenames: Iterable[String]
+) extends GeolocateToponymEvaluator(
+  strategy, stratname, driver, filehand, filenames
+) {
   def iter_geogwords(filehand: FileHandler, filename: String) = {
     var title: String = null
     val titlere = """Article title: (.*)$""".r
@@ -1541,7 +1551,7 @@ class GeolocateToponymDriver extends
     GeolocateDriver with StandaloneExperimentDriverStats {
   type TParam = GeolocateToponymParameters
   type TRunRes =
-    Seq[(String, GeolocateToponymStrategy, CorpusEvaluator[_,_])]
+    Iterable[(String, GeolocateToponymStrategy, Iterable[_])]
 
   override def handle_parameters() {
     super.handle_parameters()
@@ -1625,13 +1635,21 @@ class GeolocateToponymDriver extends
         }
       })
     val strats = strats_unflat reduce (_ ++ _)
-    process_strategies(strats)((stratname, strategy) => {
+    for ((stratname, strategy) <- strats) yield {
       // Generate reader object
-      if (params.eval_format == "tr-conll")
-        new TRCoNLLGeolocateToponymEvaluator(strategy, stratname, this)
-      else
-        new WikipediaGeolocateToponymEvaluator(strategy, stratname, this)
-    })
+      val filehand = get_file_handler
+      val evalobj =
+        if (params.eval_format == "tr-conll")
+          new TRCoNLLGeolocateToponymEvaluator(strategy, stratname, this,
+            filehand, params.eval_file)
+        else
+          new WikipediaGeolocateToponymEvaluator(strategy, stratname, this,
+            filehand, params.eval_file)
+      val docs = evalobj.iter_documents
+      // The call to `toList` forces evaluation of the Iterator
+      val results = evalobj.evaluate_documents(docs).toList
+      (stratname, strategy, results)
+    }
   }
 }
 
