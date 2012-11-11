@@ -315,9 +315,9 @@ class RankedSphereCellGridEvaluator(
   stratname: String,
   driver: GeolocateDocumentTypeDriver
 ) extends RankedCellGridEvaluator[
-  SphereCoord, SphereDocument, SphereCell, SphereCellGrid,
-  SphereDocumentEvaluationResult
+  SphereCoord, SphereDocument, SphereCell, SphereCellGrid
 ](strategy, stratname, driver) {
+  type TEvalRes = SphereDocumentEvaluationResult
   def create_grouped_eval_stats(driver: GridLocateDocumentDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
     new GroupedSphereDocumentEvalStats(
@@ -363,10 +363,10 @@ class MeanShiftSphereCellGridEvaluator(
   mean_shift_max_stddev: Double,
   mean_shift_max_iterations: Int
 ) extends MeanShiftCellGridEvaluator[
-  SphereCoord, SphereDocument, SphereCell, SphereCellGrid,
-  SphereDocumentEvaluationResult
+  SphereCoord, SphereDocument, SphereCell, SphereCellGrid
 ](strategy, stratname, driver, k_best, mean_shift_window,
   mean_shift_max_stddev, mean_shift_max_iterations) {
+  type TEvalRes = SphereDocumentEvaluationResult
   def create_grouped_eval_stats(driver: GridLocateDocumentDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
     new GroupedSphereDocumentEvalStats(
@@ -388,34 +388,36 @@ class TitledDocumentResult { }
 class PCLTravelGeolocateDocumentEvaluator(
   strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
   stratname: String,
-  driver: GeolocateDocumentTypeDriver
-) extends CorpusEvaluator[
-  TitledDocument, TitledDocumentResult
-](stratname, driver) with DocumentIteratingEvaluator[
-  TitledDocument, TitledDocumentResult
-] {
-  def iter_documents(filehand: FileHandler, filename: String) = {
-    val dom = try {
-      // On error, just return, so that we don't have problems when called
-      // on the whole PCL corpus dir (which includes non-XML files).
-      // FIXME!! Needs to use the FileHandler somehow for Hadoop access.
-      xml.XML.loadFile(filename)
-    } catch {
-      case _ => {
-        warning("Unable to parse XML filename: %s", filename)
-        null
+  driver: GeolocateDocumentTypeDriver,
+  filehand: FileHandler,
+  filenames: Iterable[String]
+) extends CorpusEvaluator(stratname, driver) {
+  type TEvalDoc = TitledDocument
+  type TEvalRes = TitledDocumentResult
+  def iter_documents = {
+    filenames.toIterator.flatMap(filename => {
+      val dom = try {
+        // On error, just return, so that we don't have problems when called
+        // on the whole PCL corpus dir (which includes non-XML files).
+        // FIXME!! Needs to use the FileHandler somehow for Hadoop access.
+        xml.XML.loadFile(filename)
+      } catch {
+        case _ => {
+          warning("Unable to parse XML filename: %s", filename)
+          null
+        }
       }
-    }
 
-    if (dom == null) Seq[TitledDocument]()
-    else for {
-      chapter <- dom \\ "div" if (chapter \ "@type").text == "chapter"
-      val (heads, nonheads) = chapter.child.partition(_.label == "head")
-      val headtext = (for (x <- heads) yield x.text) mkString ""
-      val text = (for (x <- nonheads) yield x.text) mkString ""
-      //errprint("Head text: %s", headtext)
-      //errprint("Non-head text: %s", text)
-    } yield TitledDocument(headtext, text)
+      if (dom == null) Iterator[TitledDocument]()
+      else (for {
+        chapter <- dom \\ "div" if (chapter \ "@type").text == "chapter"
+        val (heads, nonheads) = chapter.child.partition(_.label == "head")
+        val headtext = (for (x <- heads) yield x.text) mkString ""
+        val text = (for (x <- nonheads) yield x.text) mkString ""
+        //errprint("Head text: %s", headtext)
+        //errprint("Non-head text: %s", text)
+      } yield TitledDocument(headtext, text)).toIterator
+    })
   }
 
   def evaluate_document(doc: TitledDocument, doctag: String) = {

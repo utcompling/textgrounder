@@ -525,8 +525,8 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
   GridLocateDocumentDriver {
   override type TParam <: GeolocateDocumentParameters
   type TRunRes =
-    Seq[(String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
-         CorpusEvaluator[_,_])]
+    Iterable[(String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
+      Iterable[_])]
 
   override def handle_parameters() {
     super.handle_parameters()
@@ -608,10 +608,11 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
    */
   def create_document_evaluator(
       strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
-      stratname: String) = {
+      stratname: String): CorpusEvaluator = {
     // Generate reader object
     if (params.eval_format == "pcl-travel")
-      new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this)
+      new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this,
+        get_file_handler, params.eval_file)
     else if (params.coord_strategy == "top-ranked")
       new RankedSphereCellGridEvaluator(strategy, stratname, this)
     else
@@ -627,21 +628,27 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
    *
    * The current return type is as follows:
    *
-   * Seq[(java.lang.String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid], scala.collection.mutable.Map[evalobj.Document,opennlp.textgrounder.geolocate.EvaluationResult])] where val evalobj: opennlp.textgrounder.geolocate.CorpusEvaluator
+   * Iterable[(String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
+   *   Iterable[_]]
    *
    * This means you get a sequence of tuples of
    * (strategyname, strategy, results)
    * where:
    * strategyname = name of strategy as given on command line
    * strategy = strategy object
-   * results = map listing results for each document (an abstract type
-   * defined in CorpusEvaluator; the result type EvaluationResult
-   * is practically an abstract type, too -- the most useful dynamic
-   * type in practice is DocumentEvaluationResult)
+   * results = Iterable over result objects, one per document.
+   *
+   * NOTE: We force evaluation in this function because currently we mostly
+   * depend on side effects (e.g. printing results to stdout/stderr).
    */
   def run_after_setup() = {
-    process_strategies(strategies)((stratname, strategy) =>
-      create_document_evaluator(strategy, stratname))
+    for ((stratname, strategy) <- strategies) yield {
+      val evalobj = create_document_evaluator(strategy, stratname)
+      val docs = evalobj.iter_documents
+      // The call to `toList` forces evaluation of the Iterator
+      val results = evalobj.evaluate_documents(docs).toList
+      (stratname, strategy, results)
+    }
   }
 }
 

@@ -490,21 +490,21 @@ abstract class GroupedDocumentEvalStats[
  * Uses the command-line parameters to determine which documents
  * should be skipped.
  *
- * @tparam TEvalDoc Type of document to evaluate.
- * @tparam TEvalRes Type of result of evaluating a document.
- *
  * @param stratname Name of the strategy used for performing evaluation.
  *   This is output in various status messages.
  * @param driver Driver class that encapsulates command-line parameters and
  *   such, in particular command-line parameters that allow a subset of the
  *   total set of documents to be evaluated.
  */
-abstract class CorpusEvaluator[TEvalDoc, TEvalRes](
+abstract class CorpusEvaluator(
   stratname: String,
   val driver: GridLocateDriver
 ) {
+  /** Type of document to evaluate. */
+  type TEvalDoc
+  /** Type of result of evaluating a document. */
+  type TEvalRes
   var documents_processed = 0
-  val results = mutable.Map[TEvalDoc, TEvalRes]()
   var skip_initial = driver.params.skip_initial_test_docs
   var skip_n = 0
 
@@ -542,6 +542,12 @@ abstract class CorpusEvaluator[TEvalDoc, TEvalRes](
   }
 
   /**
+   * Return an Iterator listing the documents retrievable from the given
+   * filename.
+   */
+  def iter_documents: Iterator[TEvalDoc]
+
+  /**
    * Return true if document would be skipped; false if processed and
    * evaluated.
    */
@@ -570,77 +576,74 @@ abstract class CorpusEvaluator[TEvalDoc, TEvalRes](
   var last_elapsed = 0.0
   var last_processed = 0
 
-  /** Process a document.  This checks to see whether we should evaluate
-   * the document (e.g. based on parameters indicating which documents
-   * to evaluate), and evaluates as necessary, storing the results into
-   * `results`.
+  /**
+   * Evaluate a set of documents, or some subset of them.  This may skip
+   * some of the documents (e.g. based on the parameter
+   * `--every-nth-test-doc`) and may stop early (e.g. based on
+   * `--num-test-docs`).
    *
-   * @param doc Document to be processed.
-   * @return Tuple `(processed, keep_going)` where `processed` indicates
-   *   whether the document was processed or skipped, and `keep_going`
-   *   indicates whether processing of further documents should continue or
-   *   stop.
+   * @param docs Iterator over documents to evaluate.
+   * @return Iterator over evaluation results.
    */
-  def process_document(doc: TEvalDoc): (Boolean, Boolean) = {
-    // errprint("Processing document: %s", doc)
-    val num_processed = task.num_processed
-    val doctag = "#%d" format (1 + num_processed)
-    if (would_skip_document(doc, doctag)) {
-      errprint("Skipped document %s", doc)
-      (false, true)
-    } else {
-      val do_skip = would_skip_by_parameters()
-      if (do_skip)
-        errprint("Passed over document %s", doctag)
-      else {
-        // Don't put side-effecting code inside of an assert!
-        val result = evaluate_document(doc, doctag)
-        assert(result != null)
-        results(doc) = result
-      }
-
-      if (task.item_processed())
-        (!do_skip, false)
-      else {
-        val new_elapsed = task.elapsed_time
-        val new_processed = task.num_processed
-
-        if (would_stop_processing(new_processed)) {
-          task.finish()
-          (!do_skip, false)
+  def evaluate_documents(docs: Iterator[TEvalDoc]): Iterator[TEvalRes] = {
+    val dociter = new InterruptibleIterator(docs)
+    val results =
+      (for (doc <- dociter) yield {
+        // errprint("Processing document: %s", doc)
+        val num_processed = task.num_processed
+        val doctag = "#%d" format (1 + num_processed)
+        if (would_skip_document(doc, doctag)) {
+          errprint("Skipped document %s", doc)
+          None
         } else {
-          // If five minutes and ten documents have gone by, print out results
-          if ((new_elapsed - last_elapsed >= 300 &&
-            new_processed - last_processed >= 10)) {
-            errprint("Results after %d documents (strategy %s):",
-              task.num_processed, stratname)
-            output_results(isfinal = false)
-            errprint("End of results after %d documents (strategy %s):",
-              task.num_processed, stratname)
-            last_elapsed = new_elapsed
-            last_processed = new_processed
+          val result =
+            if (would_skip_by_parameters()) {
+              errprint("Passed over document %s", doctag)
+              None
+            } else {
+              // Don't put side-effecting code inside of an assert!
+              val res1 = evaluate_document(doc, doctag)
+              assert(res1 != null)
+              Some(res1)
+            }
+
+          if (task.item_processed()) {
+            dociter.stop()
+          } else {
+            val new_elapsed = task.elapsed_time
+            val new_processed = task.num_processed
+
+            if (would_stop_processing(new_processed)) {
+              dociter.stop()
+            } else {
+              // If five minutes and ten documents have gone by,
+              // print out results
+              if ((new_elapsed - last_elapsed >= 300 &&
+                new_processed - last_processed >= 10)) {
+                errprint("Results after %d documents (strategy %s):",
+                  task.num_processed, stratname)
+                output_results(isfinal = false)
+                errprint("End of results after %d documents (strategy %s):",
+                  task.num_processed, stratname)
+                last_elapsed = new_elapsed
+                last_processed = new_processed
+              }
+            }
           }
-          (!do_skip, true)
+          result
         }
-      }
-    }
+      }).flatten
+    results ++ new SideEffectIterator( {
+      task.finish()
+      errprint("")
+      errprint("Final results for strategy %s: All %d documents processed:",
+        stratname, task.num_processed)
+      errprint("Ending operation at %s", curtimehuman())
+      output_results(isfinal = true)
+      errprint("Ending final results for strategy %s", stratname)
+      output_resource_usage()
+    } )
   }
-
-  def finish() {
-    task.finish()
-
-    errprint("")
-    errprint("Final results for strategy %s: All %d documents processed:",
-      stratname, task.num_processed)
-    errprint("Ending operation at %s", curtimehuman())
-    output_results(isfinal = true)
-    errprint("Ending final results for strategy %s", stratname)
-  }
-
-  /** Process a set of files, extracting the documents in each one and
-    * evaluating them using `process_document`.
-    */
-  def process_files(filehand: FileHandler, files: Iterable[String]): Boolean
 }
 
 /**
@@ -664,7 +667,6 @@ abstract class CorpusEvaluator[TEvalDoc, TEvalRes](
  * @tparam XTDoc Type of the training and test documents
  * @tparam XTCell Type of a cell in a cell grid
  * @tparam XTGrid Type of a cell grid
- * @tparam TEvalRes Type of result of evaluating a document.
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
@@ -681,15 +683,16 @@ abstract class CellGridEvaluator[
   TCoord,
   XTDoc <: DistDocument[TCoord],
   XTCell <: GeoCell[TCoord, XTDoc],
-  XTGrid <: CellGrid[TCoord, XTDoc, XTCell],
-  TEvalRes <: DocumentEvaluationResult[TCoord, XTDoc, XTCell, XTGrid]
+  XTGrid <: CellGrid[TCoord, XTDoc, XTCell]
 ](
   val strategy: GridLocateDocumentStrategy[XTCell, XTGrid],
   val stratname: String,
   override val driver: GridLocateDocumentDriver {
     type TDoc = XTDoc; type TCell = XTCell; type TGrid = XTGrid
   }
-) extends CorpusEvaluator[XTDoc, TEvalRes](stratname, driver) {
+) extends CorpusEvaluator(stratname, driver) {
+  type TEvalDoc = XTDoc
+  override type TEvalRes <: DocumentEvaluationResult[TCoord, XTDoc, XTCell, XTGrid]
   def create_grouped_eval_stats(
     driver: GridLocateDocumentDriver,
     cell_grid: XTGrid,
@@ -701,82 +704,15 @@ abstract class CellGridEvaluator[
   val evalstats = create_grouped_eval_stats(driver,
     strategy.cell_grid, results_by_range = driver.params.results_by_range)
 
+  def iter_documents = {
+    driver.params.input_corpus.toIterator.flatMap(dir =>
+      driver.document_table.read_documents_from_textdb(driver.get_file_handler,
+        dir, driver.params.eval_set + "-" + driver.document_file_suffix))
+  }
+
   def output_results(isfinal: Boolean = false) {
     evalstats.output_results(all_results = isfinal)
  }
-
-  /**
-   * A file processor that reads corpora containing document metadata and
-   * creates a DistDocument for each document described, and evaluates it.
-   *
-   * @param suffix Suffix specifying the type of document file wanted
-   *   (e.g. "counts" or "document-metadata"
-   * @param cell_grid Cell grid to add newly created DistDocuments to
-   */
-  class EvaluateCorpusFileProcessor(
-    suffix: String
-  ) extends OldDistDocumentFileProcessor(suffix, driver) {
-    def handle_document(fieldvals: Seq[String]) = {
-      val doc = driver.document_table.create_and_init_document(
-        schema, fieldvals, false)
-      if (doc == null) (false, true)
-      else {
-        doc.dist.finish_after_global()
-        process_document(doc)
-      }
-    }
-
-    def process_lines(lines: Iterator[String],
-        filehand: FileHandler, file: String,
-        compression: String, realname: String) = {
-      var should_stop = false
-      breakable {
-        for (line <- lines) {
-          if (!parse_row(line)) {
-            should_stop = true
-            break
-          }
-        }
-      }
-      output_resource_usage()
-      (!should_stop, ())
-    }
-  }
-
-  def process_files(filehand: FileHandler, files: Iterable[String]):
-      Boolean = {
-    /* NOTE: `files` must actually be a list of directories, e.g. as
-       comes from the value of --input-corpus. */
-    for (dir <- files) {
-      val fileproc = new EvaluateCorpusFileProcessor(
-        driver.params.eval_set + "-" + driver.document_file_suffix)
-      fileproc.read_schema_from_textdb(filehand, dir)
-      val (continue, _) = fileproc.process_files(filehand, Seq(dir))
-      if (!continue)
-        return false
-    }
-    return true
-  }
-
-  //title = None
-  //words = []
-  //for line in openr(filename, errors="replace"):
-  //  if (rematch("Article title: (.*)$", line))
-  //    if (title != null)
-  //      yield (title, words)
-  //    title = m_[1]
-  //    words = []
-  //  else if (rematch("Link: (.*)$", line))
-  //    args = m_[1].split('|')
-  //    truedoc = args[0]
-  //    linkword = truedoc
-  //    if (len(args) > 1)
-  //      linkword = args[1]
-  //    words.append(linkword)
-  //  else:
-  //    words.append(line)
-  //if (title != null)
-  //  yield (title, words)
 
   override def would_skip_document(document: XTDoc, doctag: String) = {
     if (document.dist == null) {
@@ -888,7 +824,6 @@ abstract class CellGridEvaluator[
  * @tparam TDoc Type of the training and test documents
  * @tparam TCell Type of a cell in a cell grid
  * @tparam TGrid Type of a cell grid
- * @tparam TEvalRes Type of result of evaluating a document.
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
@@ -900,17 +835,16 @@ abstract class RankedCellGridEvaluator[
   TCoord,
   XTDoc <: DistDocument[TCoord],
   XTCell <: GeoCell[TCoord, XTDoc],
-  XTGrid <: CellGrid[TCoord, XTDoc, XTCell],
-  TEvalRes <: DocumentEvaluationResult[TCoord, XTDoc, XTCell, XTGrid]
+  XTGrid <: CellGrid[TCoord, XTDoc, XTCell]
 ](
   strategy: GridLocateDocumentStrategy[XTCell, XTGrid],
   stratname: String,
   driver: GridLocateDocumentDriver {
     type TDoc = XTDoc; type TCell = XTCell; type TGrid = XTGrid
   }
-) extends CellGridEvaluator[
-  TCoord, XTDoc, XTCell, XTGrid, TEvalRes
-](strategy, stratname, driver) {
+) extends CellGridEvaluator[TCoord, XTDoc, XTCell, XTGrid] (
+  strategy, stratname, driver
+) {
   /**
    * Create an evaluation-result object describing the top-ranked
    * predicted cell and the rank of the document's true cell among
@@ -1005,7 +939,6 @@ abstract class RankedCellGridEvaluator[
  * @tparam TDoc Type of the training and test documents
  * @tparam TCell Type of a cell in a cell grid
  * @tparam TGrid Type of a cell grid
- * @tparam TEvalRes Type of result of evaluating a document.
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
@@ -1017,8 +950,7 @@ abstract class CoordCellGridEvaluator[
   TCoord,
   XTDoc <: DistDocument[TCoord],
   XTCell <: GeoCell[TCoord, XTDoc],
-  XTGrid <: CellGrid[TCoord, XTDoc, XTCell],
-  TEvalRes <: DocumentEvaluationResult[TCoord, XTDoc, XTCell, XTGrid]
+  XTGrid <: CellGrid[TCoord, XTDoc, XTCell]
 ](
   strategy: GridLocateDocumentStrategy[XTCell, XTGrid],
   stratname: String,
@@ -1026,7 +958,7 @@ abstract class CoordCellGridEvaluator[
     type TDoc = XTDoc; type TCell = XTCell; type TGrid = XTGrid
   }
 ) extends CellGridEvaluator[
-  TCoord, XTDoc, XTCell, XTGrid, TEvalRes
+  TCoord, XTDoc, XTCell, XTGrid
 ](strategy, stratname, driver) {
   /**
    * Create an evaluation-result object describing the predicted coordinate.
@@ -1078,7 +1010,6 @@ abstract class CoordCellGridEvaluator[
  * @tparam TDoc Type of the training and test documents
  * @tparam TCell Type of a cell in a cell grid
  * @tparam TGrid Type of a cell grid
- * @tparam TEvalRes Type of result of evaluating a document.
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
@@ -1090,8 +1021,7 @@ abstract class MeanShiftCellGridEvaluator[
   TCoord,
   XTDoc <: DistDocument[TCoord],
   XTCell <: GeoCell[TCoord, XTDoc],
-  XTGrid <: CellGrid[TCoord, XTDoc, XTCell],
-  TEvalRes <: DocumentEvaluationResult[TCoord, XTDoc, XTCell, XTGrid]
+  XTGrid <: CellGrid[TCoord, XTDoc, XTCell]
 ](
   strategy: GridLocateDocumentStrategy[XTCell, XTGrid],
   stratname: String,
@@ -1102,9 +1032,9 @@ abstract class MeanShiftCellGridEvaluator[
   mean_shift_window: Double,
   mean_shift_max_stddev: Double,
   mean_shift_max_iterations: Int
-) extends CoordCellGridEvaluator[
-  TCoord, XTDoc, XTCell, XTGrid, TEvalRes
-](strategy, stratname, driver) {
+) extends CoordCellGridEvaluator[TCoord, XTDoc, XTCell, XTGrid](
+  strategy, stratname, driver
+) {
   def create_mean_shift_obj(h: Double, max_stddev: Double,
     max_iterations: Int): MeanShift[TCoord]
 
@@ -1116,43 +1046,5 @@ abstract class MeanShiftCellGridEvaluator[
     val top_k = pred_cells.take(k_best).map(_._1.get_center_coord).toSeq
     val shifted_values = mean_shift_obj.mean_shift(top_k)
     mean_shift_obj.vec_mean(shifted_values)
-  }
-}
-
-/**
- * A trait used when '--eval-format' is not 'internal', i.e. the test documents
- * don't come from the same corpus used to supply the training documents,
- * but come from some separate text file.  This is a general interface for
- * iterating over files and returning the test documents in those files
- * (possibly more than one per file).
- */
-trait DocumentIteratingEvaluator[TEvalDoc, TEvalRes] extends
-  CorpusEvaluator[TEvalDoc, TEvalRes] {
-  /**
-   * Return an Iterable listing the documents retrievable from the given
-   * filename.
-   */
-  def iter_documents(filehand: FileHandler, filename: String):
-    Iterable[TEvalDoc]
-
-  class EvaluationFileProcessor extends OldFileProcessor[Unit] {
-    /* Process all documents in a given file.  If return value is false,
-       processing was interrupted due to a limit being reached, and
-       no more files should be processed. */
-    def process_file(filehand: FileHandler, filename: String):
-        (Boolean, Unit) = {
-      for (doc <- iter_documents(filehand, filename)) {
-        val (processed, keep_going) = process_document(doc)
-        if (!keep_going)
-          return (false, ())
-      }
-      return (true, ())
-    }
-  }
-
-  def process_files(filehand: FileHandler, files: Iterable[String]) = {
-    val fileproc = new EvaluationFileProcessor
-    val (complete, _) = fileproc.process_files(filehand, files)
-    complete
   }
 }
