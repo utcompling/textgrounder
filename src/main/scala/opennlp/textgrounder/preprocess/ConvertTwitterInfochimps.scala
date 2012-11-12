@@ -140,10 +140,8 @@ trait TwitterInfochimpsFileProcessor {
     }).flatten
   }
 
-  def iterate_files(filehand: FileHandler, files: Iterable[String]) = {
-    iterate_files_with_message(filehand,
-      iterate_files_recursively(filehand, files))
-  }
+  def iterate_files(filehand: FileHandler, files: Iterable[String]) =
+    iterate_files_recursively_with_message(filehand, files)
 
   def iterate_fields(lines: Iterator[String]) = {
     MeteredTask.iterate("tweet", "parsing")(yield_fields(lines)) ++
