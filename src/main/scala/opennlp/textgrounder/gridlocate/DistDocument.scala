@@ -198,11 +198,6 @@ abstract class DistDocumentTable[
    */
   val loading_props = new DocumentLoadingProperties
 
-//  /**
-//   * List of documents in each split.
-//   */
-//  val documents_by_split = bufmap[String, TDoc]()
-
   // Example of using TaskCounterWrapper directly for non-split values.
   // val num_documents = new driver.TaskCounterWrapper("num_documents") 
 
@@ -352,7 +347,6 @@ abstract class DistDocumentTable[
         word_tokens_of_documents_with_coordinates_by_split(split) += tokens
       }
       if (record_in_table) {
-        // documents_by_split(split) += doc
         num_recorded_documents_by_split(split) += 1
         word_tokens_of_recorded_documents_by_split(split) += tokens
       }
@@ -479,25 +473,11 @@ abstract class DistDocumentTable[
       record_in_subtable, finish_globally)
     DocumentCounterTracker.process_statuses(statuses, driver)
   }
-//  def clear_training_document_distributions() {
-//    for (doc <- documents_by_split("training"))
-//      doc.dist = null
-//  }
 
   def finish_document_loading() {
     // Compute overall distribution values (e.g. back-off statistics).
     errprint("Finishing global dist...")
     word_dist_factory.finish_global_distribution()
-
-//    // Now compute per-document values dependent on the overall distribution
-//    // statistics just computed.
-//    errprint("Finishing document dists...")
-//    for ((split, table) <- documents_by_split) {
-//      for (doc <- table) {
-//        if (doc.dist != null)
-//          doc.dist.finish_after_global()
-//      }
-//    }
 
     // Now output statistics on number of documents seen, etc.
     errprint("")

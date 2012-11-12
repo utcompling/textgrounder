@@ -468,14 +468,5 @@ abstract class CellGrid[
     errprint("Training documents per non-empty cell: %g",
       recorded_training_docs_with_coordinates.toDouble / num_non_empty_cells)
     table.driver.heartbeat
-    // Clear out the document distributions of the training set, since
-    // only needed when computing cells.
-    //
-    // FIXME: Could perhaps save more memory, or at least total memory used,
-    // by never creating these distributions at all, but directly adding
-    // them to the cells.  Would require a bit of thinking when reading
-    // in the counts.
-    // table.clear_training_document_distributions()
-    // table.driver.heartbeat
   }
 }
