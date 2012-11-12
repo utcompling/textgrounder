@@ -18,7 +18,8 @@
 
 package opennlp.textgrounder.postprocess
 
-import opennlp.textgrounder.util.Twokenize
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.Twokenize
 import org.clapper.argot._
 import java.io._
 

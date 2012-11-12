@@ -22,9 +22,10 @@ import java.io.{FileSystem=>_,_}
 
 import org.apache.hadoop.io._
 
-import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.printutil.{errprint, warning}
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.argparser._
+import tgutil.experiment._
+import tgutil.printutil.{errprint, warning}
  
 import opennlp.textgrounder.gridlocate.DistDocument
 import opennlp.textgrounder.gridlocate.GenericTypes._

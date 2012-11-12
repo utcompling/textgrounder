@@ -32,10 +32,11 @@ import com.nicta.scoobi.Scoobi._
 // import com.nicta.scoobi.testing.HadoopLogFactory
 import com.nicta.scoobi.application.HadoopLogFactory
 
-import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.osutil._
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.printutil._
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.argparser._
+import tgutil.osutil._
+import tgutil.collectionutil._
+import tgutil.printutil._
 
 class ScoobiProcessFilesParams(val ap: ArgParser) {
   var debug = ap.flag("debug",

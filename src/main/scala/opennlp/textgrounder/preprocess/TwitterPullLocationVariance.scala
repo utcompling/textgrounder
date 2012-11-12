@@ -25,8 +25,9 @@ import java.lang.Double.isNaN
 import java.text.{SimpleDateFormat, ParseException}
 import math.pow
 
-import opennlp.textgrounder.util.Twokenize
-import opennlp.textgrounder.util.distances.{spheredist, SphereCoord}
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.Twokenize
+import tgutil.distances.{spheredist, SphereCoord}
 
 /*
  * This program takes, as input, files which contain one tweet

@@ -20,9 +20,10 @@ package opennlp.textgrounder.geolocate
 
 import collection.mutable
 
-import opennlp.textgrounder.util.distances._
-import opennlp.textgrounder.util.textdbutil.Schema
-import opennlp.textgrounder.util.printutil.warning
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.distances._
+import tgutil.textdbutil.Schema
+import tgutil.printutil.warning
 
 import opennlp.textgrounder.gridlocate.{DistDocument,DistDocumentTable}
 import opennlp.textgrounder.gridlocate.DistDocumentConverters._

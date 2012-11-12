@@ -20,9 +20,10 @@ package opennlp.textgrounder.poligrounder
 
 import collection.mutable
 
-import opennlp.textgrounder.util.distances._
-import opennlp.textgrounder.util.textdbutil.Schema
-import opennlp.textgrounder.util.printutil._
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.distances._
+import tgutil.textdbutil.Schema
+import tgutil.printutil._
 
 import opennlp.textgrounder.gridlocate.{DistDocument,DistDocumentTable,CellGrid}
 import opennlp.textgrounder.gridlocate.DistDocumentConverters._

@@ -19,8 +19,9 @@
 
 package opennlp.textgrounder.gridlocate
 
-import opennlp.textgrounder.util.printutil.{errprint, warning}
-import opennlp.textgrounder.util.experiment._
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.printutil.{errprint, warning}
+import tgutil.experiment._
 
 import opennlp.textgrounder.worddist.WordDistFactory
 /* FIXME: Eliminate this. */

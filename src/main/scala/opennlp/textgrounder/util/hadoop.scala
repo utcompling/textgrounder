@@ -33,12 +33,12 @@ import org.apache.hadoop.fs._
 import java.io.{FileSystem=>_,_}
 import java.net.URI
 
-import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.textdbutil._
-import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil._
-import opennlp.textgrounder.util.printutil.{errprint, set_errout_prefix}
+import argparser._
+import collectionutil._
+import textdbutil._
+import experiment._
+import ioutil._
+import printutil.{errprint, set_errout_prefix}
 
 package object hadoop {
   class HadoopFileHandler(conf: Configuration) extends FileHandler {

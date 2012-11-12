@@ -20,9 +20,10 @@ package opennlp.textgrounder.worddist
 
 import math._
 
-import opennlp.textgrounder.util.ioutil.FileHandler
-import opennlp.textgrounder.util.printutil.{errprint, warning}
-import opennlp.textgrounder.util.Serializer
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.ioutil.FileHandler
+import tgutil.printutil.{errprint, warning}
+import tgutil.Serializer
 
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 import opennlp.textgrounder.gridlocate.GenericTypes._

@@ -24,14 +24,15 @@ import math.{round, floor}
 import collection.mutable
 import util.control.Breaks._
 
-import opennlp.textgrounder.util.collectionutil.{DoubleTableByRange}
-import opennlp.textgrounder.util.distances._
-import opennlp.textgrounder.util.experiment.ExperimentDriverStats
-import opennlp.textgrounder.util.mathutil.{mean, median}
-import opennlp.textgrounder.util.ioutil.{FileHandler}
-import opennlp.textgrounder.util.osutil.output_resource_usage
-import opennlp.textgrounder.util.printutil.{errprint, warning}
-import opennlp.textgrounder.util.textutil.split_text_into_words
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.collectionutil.{DoubleTableByRange}
+import tgutil.distances._
+import tgutil.experiment.ExperimentDriverStats
+import tgutil.mathutil.{mean, median}
+import tgutil.ioutil.{FileHandler}
+import tgutil.osutil.output_resource_usage
+import tgutil.printutil.{errprint, warning}
+import tgutil.textutil.split_text_into_words
 
 import opennlp.textgrounder.gridlocate._
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._

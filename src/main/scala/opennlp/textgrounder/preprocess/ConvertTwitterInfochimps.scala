@@ -24,15 +24,16 @@ import java.io.PrintStream
 
 import org.apache.commons.lang3.StringEscapeUtils._
 
-import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil._
-import opennlp.textgrounder.util.MeteredTask
-import opennlp.textgrounder.util.osutil.output_resource_usage
-import opennlp.textgrounder.util.printutil._
-import opennlp.textgrounder.util.textutil.with_commas
-import opennlp.textgrounder.util.Twokenize
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.argparser._
+import tgutil.collectionutil._
+import tgutil.experiment._
+import tgutil.ioutil._
+import tgutil.MeteredTask
+import tgutil.osutil.output_resource_usage
+import tgutil.printutil._
+import tgutil.textutil.with_commas
+import tgutil.Twokenize
 
 /*
 

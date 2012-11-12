@@ -25,10 +25,11 @@ import util.control.Breaks._
 
 import java.io._
 
-import opennlp.textgrounder.util.collectionutil.DynamicArray
-import opennlp.textgrounder.util.textdbutil
-import opennlp.textgrounder.util.ioutil.{FileHandler, FileFormatException}
-import opennlp.textgrounder.util.printutil.{errprint, warning}
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.collectionutil.DynamicArray
+import tgutil.textdbutil
+import tgutil.ioutil.{FileHandler, FileFormatException}
+import tgutil.printutil.{errprint, warning}
 
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 import opennlp.textgrounder.gridlocate.GenericTypes._

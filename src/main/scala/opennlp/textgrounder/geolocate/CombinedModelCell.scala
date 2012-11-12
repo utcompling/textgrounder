@@ -18,10 +18,11 @@
 
 package opennlp.textgrounder.geolocate
 
-import opennlp.textgrounder.util.distances.spheredist
-import opennlp.textgrounder.util.distances.SphereCoord
-import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.printutil.{errprint, warning}
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.distances.spheredist
+import tgutil.distances.SphereCoord
+import tgutil.experiment._
+import tgutil.printutil.{errprint, warning}
 
 class CombinedModelCellGrid(table: SphereDocumentTable,
                             models: Seq[SphereCellGrid])

@@ -20,8 +20,9 @@ package opennlp.textgrounder.worddist
 
 import math._
 
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.printutil.errprint
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.collectionutil._
+import tgutil.printutil.errprint
 
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 // FIXME! For --tf-idf

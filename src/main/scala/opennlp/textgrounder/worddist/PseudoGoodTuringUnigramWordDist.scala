@@ -18,7 +18,8 @@
 
 package opennlp.textgrounder.worddist
 
-import opennlp.textgrounder.util.printutil.errprint
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.printutil.errprint
 
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 
