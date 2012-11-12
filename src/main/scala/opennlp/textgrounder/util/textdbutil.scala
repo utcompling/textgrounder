@@ -204,6 +204,16 @@ package object textdbutil {
         suffix, "-schema.txt")
 
     /**
+     * Locate the prefix in a schema after the directory and suffix have
+     * been removed.
+     */
+    def get_schema_prefix(filehand: FileHandler, schema_file: String,
+        suffix: String) = {
+      val (_, base) = filehand.split_filename(schema_file)
+      base.stripSuffix("-" + suffix + "-schema.txt")
+    }
+
+    /**
      * Read the given schema file.
      *
      * @param filehand File handler of schema file name.
@@ -478,6 +488,7 @@ package object textdbutil {
 
   object TextDBProcessor {
     val possible_compression_re = """(\.bz2|\.bzip2|\.gz|\.gzip)?$"""
+    val possible_compression_endings = Seq(".bz2", ".bzip2", ".gz", ".gzip")
     /**
      * For a given suffix, create a regular expression
      * ([[scala.util.matching.Regex]]) that matches document files of the
@@ -507,6 +518,17 @@ package object textdbutil {
         prefix: String, suffix: String, file_ending: String) = {
       val new_base = prefix + "-" + suffix + file_ending
       filehand.join_filename(dir, new_base)
+    }
+
+    def get_document_prefix(filehand: FileHandler, file: String,
+        suffix: String): String = {
+      val (_, base) = filehand.split_filename(file)
+      for (ending <- possible_compression_endings) {
+        val compressed_ending = ".txt" + ending
+        if (base.endsWith(compressed_ending))
+          return base.stripSuffix("-" + suffix + compressed_ending)
+      }
+      base.stripSuffix("-" + suffix + ".txt")
     }
 
     /**
@@ -603,6 +625,17 @@ package object textdbutil {
     }
 
     /**
+     * Read the items from a given textdb file.  Returns an iterator
+     * over a list of field values.
+     */
+    def read_textdb_file(filehand: FileHandler, file: String,
+        schema: Schema) = {
+      filehand.openr(file).zipWithIndex.flatMap {
+        case (line, idx) => line_to_fields(line, idx + 1, schema)
+      }
+    }
+
+    /**
      * Same as `read_textdb` but return also return the schema.
      *
      * @return A tuple `(schema, field_iter)` where `field_iter` is an
@@ -612,12 +645,7 @@ package object textdbutil {
         suffix: String, with_messages: Boolean = true) = {
       val (schema, files) =
         get_textdb_files(filehand, dir, suffix, with_messages)
-      val fields =
-        files.map(file => {
-          filehand.openr(file).zipWithIndex.flatMap {
-            case (line, idx) => line_to_fields(line, idx + 1, schema)
-          }
-        })
+      val fields = files.map(read_textdb_file(filehand, _, schema))
       (schema, fields)
     }
 
@@ -634,7 +662,7 @@ package object textdbutil {
      */
     def get_matching_patterns(filehand: FileHandler, dir: String,
         suffix: String) = {
-      val possible_endings = Seq("", ".bz2", ".bzip2", ".gz", ".gzip")
+      val possible_endings = Seq("") ++ possible_compression_endings
       for {ending <- possible_endings
            full_ending = "-%s.txt%s" format (suffix, ending)
            pattern = filehand.join_filename(dir, "*%s" format full_ending)
