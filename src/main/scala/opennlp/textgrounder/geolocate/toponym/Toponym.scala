@@ -976,7 +976,8 @@ abstract class GeolocateToponymEvaluator(
 
         val geogwords =
           (for (word <- results if word.coord != null) yield word).toIterable
-        new GeogWordDocument(geogwords)
+        val doc = new GeogWordDocument(geogwords)
+        new DocumentStatus(filehand, filename, Some(doc), "processed", "", "")
       }
     })
   }

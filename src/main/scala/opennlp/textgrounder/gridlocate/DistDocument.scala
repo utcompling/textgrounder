@@ -40,6 +40,120 @@ import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
 
 import GridLocateDriver.Debug._
 
+
+/////////////////////////////////////////////////////////////////////////////
+//                            Document loading                             //
+/////////////////////////////////////////////////////////////////////////////
+
+
+/**
+ * Description of the status of attempting to read a document from some
+ * external format in file `file` handled by `filehand`. `doc` is the document
+ * (which will generally only be present when `status` == "processed");
+ * `status` is "bad", "skipped" or "processed"; `reason` is a string
+ * indicating the reason why something is bad or skipped; and `docdesc`
+ * is a description of the document, useful especially for bad or skipped
+ * documents, where it generally describes what the document looked like
+ * at the point it was skipped or discovered bad.
+ */
+case class DocumentStatus[TDoc](
+  filehand: FileHandler,
+  file: String,
+  maybedoc: Option[TDoc],
+  status: String,
+  reason: String,
+  docdesc: String
+)
+
+/******** Counters to track what's going on ********/
+class DocumentCounterTracker(
+  shortfile: String,
+  driver: ExperimentDriverStats
+) {
+  def get_file_counter_name(counter: String) =
+    "byfile." + shortfile + "." + counter
+
+  def increment_counter(counter: String, value: Long = 1) {
+    if (driver != null) {
+      val file_counter = get_file_counter_name(counter)
+      driver.increment_task_counter(file_counter, value)
+      driver.increment_task_counter(counter, value)
+      driver.increment_local_counter(file_counter, value)
+      driver.increment_local_counter(counter, value)
+    }
+  }
+
+  def increment_document_counter(counter: String) {
+    increment_counter(counter)
+    increment_counter("documents.total")
+  }
+
+  def handle_status[T](status: DocumentStatus[T]) {
+    status.status match {
+      case "bad" => increment_document_counter("documents.bad")
+      case "skipped" => increment_document_counter("documents.skipped")
+      case "processed" => increment_document_counter("documents.processed")
+    }
+    status.status match {
+      case "skipped" =>
+        errprint("Skipped document %s because %s", status.docdesc, status.reason)
+      case "bad" =>
+        errprint("Unable to load document %s because %s", status.docdesc,
+          status.reason)
+      case _ => {}
+    }
+  }
+
+  def note_document_counters(file: String) {
+    def note(counter: String, english: String) {
+      val file_counter = get_file_counter_name(counter)
+      val value = driver.get_task_counter(file_counter)
+      errprint("Number of %s for file %s: %s", english, file,
+        value)
+    }
+
+    note("documents.processed", "documents processed")
+    note("documents.skipped", "documents skipped")
+    note("documents.bad", "bad documents")
+    note("documents.total", "total documents")
+  }
+}
+
+object DocumentCounterTracker {
+  def filename_to_counter_name(filehand: FileHandler, file: String) = {
+    var (_, base) = filehand.split_filename(file)
+    breakable {
+      while (true) {
+        val newbase = """\.[a-z0-9]*$""".r.replaceAllIn(base, "")
+        if (newbase == base) break
+        base = newbase
+      }
+    }
+    """[^a-zA-Z0-9]""".r.replaceAllIn(base, "_") 
+  }
+
+  def process_statuses[T](statuses: Iterator[DocumentStatus[T]],
+      driver: ExperimentDriverStats) = {
+    val byfile = new GroupByIterator(statuses,
+      (stat: DocumentStatus[T]) => (stat.filehand, stat.file))
+    (for (((filehand, file), file_statuses) <- byfile) yield {
+      val tracker = new DocumentCounterTracker(
+        filename_to_counter_name(filehand, file), driver)
+      val results = file_statuses.flatMap(status => {
+        tracker.handle_status(status)
+        status.maybedoc
+      })
+      if (debug("per-document")) {
+        val output_stats =
+          new SideEffectIterator({ tracker.note_document_counters(file) })
+        results ++ output_stats
+      } else
+        results
+    }).flatten
+  }
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 //                          DistDocument tables                            //
 /////////////////////////////////////////////////////////////////////////////
@@ -252,128 +366,74 @@ abstract class DistDocumentTable[
   }
 
   /**
-   * A file processor that reads document files from a corpora.
+   * Convert a set of fields from a textdb database into a document,
+   * returning a DocumentStatus describing the document.
    *
-   * @param suffix Suffix used for selecting the particular corpus from a
-   *  directory
+   * @param schema Schema for textdb, indicating names of fields, etc.
    * @param record_in_table Whether to record the document in the document
    *  table.
-   * @param dstats ExperimentDriverStats used for recording counters and such.
-   *   Pass in null to not record counters.
    */
-  class DistDocumentFileProcessor(
-    filehand: FileHandler,
-    file: String,
-    schema: Schema,
-    record_in_table: Boolean
-  ) {
-
-    /******** Counters to track what's going on ********/
-
-    def get_shortfile = filename_to_counter_name(filehand, file)
-
-    def filename_to_counter_name(filehand: FileHandler, file: String) = {
-      var (_, base) = filehand.split_filename(file)
-      breakable {
-        while (true) {
-          val newbase = """\.[a-z0-9]*$""".r.replaceAllIn(base, "")
-          if (newbase == base) break
-          base = newbase
-        }
-      }
-      """[^a-zA-Z0-9]""".r.replaceAllIn(base, "_") 
-    }
-
-    def get_file_counter_name(counter: String) =
-      "byfile." + get_shortfile + "." + counter
-
-    def increment_counter(counter: String, value: Long = 1) {
-      if (driver != null) {
-        val file_counter = get_file_counter_name(counter)
-        driver.increment_task_counter(file_counter, value)
-        driver.increment_task_counter(counter, value)
-        driver.increment_local_counter(file_counter, value)
-        driver.increment_local_counter(counter, value)
-      }
-    }
-
-    def increment_document_counter(counter: String) {
-      increment_counter(counter)
-      increment_counter("documents.total")
-    }
-
-    /******** Main code ********/
-
-    var lineno = 0
-
-    def fields_to_document(maybe_fieldvals: Option[Seq[String]]) = {
+  def fields_to_document(filehand: FileHandler, file: String,
+      maybe_fieldvals: Option[Seq[String]], lineno: Long,
+      schema: Schema, record_in_table: Boolean
+    ): DocumentStatus[TDoc] = {
+    val (maybedoc, status, reason, docdesc) =
       maybe_fieldvals match {
-        case None => {
-          increment_document_counter("documents.bad")
-          None
-        }
+        case None => (None, "bad", "badly formatted database row", "")
         case Some(fieldvals) => {
           try {
             val doc = create_and_init_document(schema, fieldvals,
               record_in_table)
-            if (doc == null) {
-              // FIXME!! Documents can also be skipped during evaluation even
-              // when create_and_init_document() returns a document.  See
-              // process_document() in CorpusEvaluator, along with
-              // would_skip_by_parameters() and so on.  We really need to
-              // separate out the recording of counters from document creation,
-              // and have document creation return a status indicating what's
-              // going on.
-              errprint("Skipped document %s",
-                schema.get_field_or_else(fieldvals, "title", "unknown title??"))
-              increment_document_counter("documents.skipped")
-              None
-            } else {
-              increment_document_counter("documents.processed")
-              Some(doc)
-            }
-          }
-          catch {
+            if (doc == null)
+              (None, "skipped", "unable to create document",
+                schema.get_field_or_else(fieldvals, "title",
+                  "unknown title??"))
+            else
+              (Some(doc), "processed", "", "")
+          } catch {
             case e:DocumentValidationException => {
               warning("Line %s: %s", lineno, e.message)
-              increment_document_counter("documents.bad")
-              None
+              (None, "bad", "error validating document field", "")
             }
           }
         }
       }
-    }
+    DocumentStatus[TDoc](filehand, file, maybedoc, status, reason, docdesc)
+  }
 
-    // val task = new MeteredTask("document", "reading")
-    def iterate_documents() = {
-      val proc = new NewTextDBProcessor(schema)
-      val lines = filehand.openr(file)
-      val docs =
-        lines.flatMap(line => {
-          lineno += 1
-          val retval = fields_to_document(proc.line_to_fields(line))
-          // if (retval != None)
-          //  task.item_processed()
-          retval
-        })
-      if (debug("per-document") && driver != null) {
-        val output_stats = new SideEffectIterator({
-          def note(counter: String, english: String) {
-            val file_counter = get_file_counter_name(counter)
-            val value = driver.get_task_counter(file_counter)
-            errprint("Number of %s for file %s: %s", english, file,
-              value)
-          }
+  /**
+   * Convert a line from a textdb database into a document, returning a
+   * DocumentStatus describing the document.
+   *
+   * @param schema Schema for textdb, indicating names of fields, etc.
+   * @param record_in_table Whether to record the document in the document
+   *  table.
+   */
+  def line_to_document(filehand: FileHandler, file: String, line: String,
+      lineno: Long, schema: Schema, record_in_table: Boolean
+    ): DocumentStatus[TDoc] = {
+    val maybe_fieldvals = line_to_fields(line, lineno, schema)
+    fields_to_document(filehand, file, maybe_fieldvals, lineno, schema,
+      record_in_table)
+  }
 
-          note("documents.processed", "documents processed")
-          note("documents.skipped", "documents skipped")
-          note("documents.bad", "bad documents")
-          note("documents.total", "total documents")
-        })
-        docs ++ output_stats
-      } else
-        docs
+  /**
+   * Iterate over the lines in a file in a textdb database, returning an
+   * iterator over DocumentStatus objects describing the attempt to
+   * convert each line to a document.
+   *
+   * @param schema Schema for textdb, indicating names of fields, etc.
+   * @param record_in_table Whether to record the document in the document
+   *  table.
+   */
+  def iterate_document_statuses(filehand: FileHandler, file: String,
+      schema: Schema, record_in_table: Boolean) = {
+    val lines = filehand.openr(file).zipWithIndex.map {
+      case (line, idx) => (filehand, file, line, idx + 1)
     }
+    lines.map { case (filehand, file, line, lineno) =>
+      line_to_document(filehand, file, line, lineno, schema,
+        record_in_table) }
   }
 
   /**
@@ -389,29 +449,36 @@ abstract class DistDocumentTable[
    *   distributions that depend on global (e.g. back-off) distribution
    *   statistics.  Normally true, but may be false during bootstrapping of
    *   those statistics.
-   * @return Iterator over documents.
+   * @return Iterator over document statuses.
    */
-  def read_documents_from_textdb(filehand: FileHandler, dir: String,
+  def read_document_statuses_from_textdb(filehand: FileHandler, dir: String,
       suffix: String, record_in_subtable: Boolean = false,
       finish_globally: Boolean = true) = {
     val (schema, files) =
       TextDBProcessor.get_textdb_files(filehand, dir, suffix)
-    val docs =
+    val docstats =
       (for (file <- files) yield {
-        val proc = new DistDocumentFileProcessor(filehand, file, schema,
-          record_in_subtable)
-        proc.iterate_documents
+        iterate_document_statuses(filehand, file, schema, record_in_subtable)
       }).flatten
     if (!finish_globally)
-      docs
+      docstats
     else
-      docs.map(doc => {
-        if (doc.dist != null)
-          doc.dist.finish_after_global()
-        doc
+      docstats.map(stat => {
+        stat.maybedoc.foreach(doc => {
+          if (doc.dist != null)
+            doc.dist.finish_after_global()
+        })
+        stat
       })
   }
 
+  def read_documents_from_textdb(filehand: FileHandler, dir: String,
+      suffix: String, record_in_subtable: Boolean = false,
+      finish_globally: Boolean = true) = {
+    val statuses = read_document_statuses_from_textdb(filehand, dir, suffix,
+      record_in_subtable, finish_globally)
+    DocumentCounterTracker.process_statuses(statuses, driver)
+  }
 //  def clear_training_document_distributions() {
 //    for (doc <- documents_by_split("training"))
 //      doc.dist = null

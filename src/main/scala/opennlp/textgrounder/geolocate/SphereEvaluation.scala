@@ -408,7 +408,7 @@ class PCLTravelGeolocateDocumentEvaluator(
         }
       }
 
-      if (dom == null) Iterator[TitledDocument]()
+      if (dom == null) Iterator[Nothing]()
       else (for {
         chapter <- dom \\ "div" if (chapter \ "@type").text == "chapter"
         val (heads, nonheads) = chapter.child.partition(_.label == "head")
@@ -416,8 +416,13 @@ class PCLTravelGeolocateDocumentEvaluator(
         val text = (for (x <- nonheads) yield x.text) mkString ""
         //errprint("Head text: %s", headtext)
         //errprint("Non-head text: %s", text)
-      } yield TitledDocument(headtext, text)).toIterator
+      } yield (filehand, filename, TitledDocument(headtext, text))).toIterator
     })
+  }
+
+  def iter_document_stats = iter_documents.map {
+    case (filehand, filename, doc) =>
+      new DocumentStatus(filehand, filename, Some(doc), "processed", "", "")
   }
 
   def evaluate_document(doc: TitledDocument, doctag: String) = {
