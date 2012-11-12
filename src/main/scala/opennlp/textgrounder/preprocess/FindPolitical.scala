@@ -110,21 +110,6 @@ class FindPoliticalParams(ap: ArgParser) extends
   }
 }
 
-/**
- * A simple field-text file processor that just records the users and ideology.
- *
- * @param suffix Suffix used to select document metadata files in a directory
- */
-class IdeoUserFileProcessor extends
-    TextDBProcessor[(String, Double)]("ideo-users") {
-  def process_row(fieldvals: Seq[String]) = {
-    val user = schema.get_field(fieldvals, "user")
-    val ideology =
-      schema.get_field(fieldvals, "ideology").toDouble
-    Some((user.toLowerCase, ideology))
-  }
-}
-
 object FindPolitical extends
     ScoobiProcessFilesApp[FindPoliticalParams] {
   abstract class FindPoliticalAction(opts: FindPoliticalParams)
@@ -516,9 +501,15 @@ object FindPolitical extends
         ptp.politico_accounts_map_to_ideo_users_map(politico_accounts)
       }
       else {
-        val processor = new IdeoUserFileProcessor
-        processor.read_textdb(filehand, opts.political_twitter_accounts).
-          flatten.toMap
+        val (schema, field_iter) =
+          TextDBProcessor.read_textdb_with_schema(filehand,
+            opts.political_twitter_accounts, "ideo-users")
+        (for (fieldvals <- field_iter.flatten) yield {
+          val user = schema.get_field(fieldvals, "user")
+          val ideology =
+            schema.get_field(fieldvals, "ideology").toDouble
+          (user.toLowerCase, ideology)
+        }).toMap
       }
     // errprint("Accounts: %s", accounts)
 
