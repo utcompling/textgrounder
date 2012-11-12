@@ -159,6 +159,13 @@ package object textdbutil {
     }
   }
 
+  class SchemaFromFile(
+    val filehand: FileHandler,
+    val filename: String,
+    fieldnames: Seq[String],
+    fixed_values: Map[String, String] = Map[String, String]()
+  ) extends Schema(fieldnames, fixed_values) { }
+
   /**
    * A Schema that can be used to select some fields from a larger schema.
    *
@@ -229,7 +236,7 @@ package object textdbutil {
               format(schema_file, line))
         fixed_fields += (from -> to)
       }
-      new Schema(fieldnames, fixed_fields)
+      new SchemaFromFile(filehand, schema_file, fieldnames, fixed_fields)
     }
 
     def get_field(fieldnames: Seq[String], fieldvals: Seq[String], key: String,
