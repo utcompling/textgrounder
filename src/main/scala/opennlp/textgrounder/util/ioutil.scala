@@ -753,6 +753,17 @@ package object ioutil {
     }
   }
 
+  /**
+   * Iterate over the given files, recursively processing the files in
+   * each directory given and displaying a message as each file is
+   * processed.
+   */
+  def iterate_files_recursively_with_message(filehand: FileHandler,
+      files: Iterable[String]) = {
+    iterate_files_with_message(filehand,
+      iterate_files_recursively(filehand, files))
+  }
+
   class ExitLineProcessor[T](val value: Option[T]) extends Throwable { }
 
   /**
