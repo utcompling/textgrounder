@@ -237,6 +237,7 @@ package object hadoop {
   }
 
   trait HadoopTextDBApp extends HadoopExperimentDriverApp {
+    // driver.params.eval_set + "-" + driver.document_file_suffix
     def corpus_suffix: String
 
     def corpus_dirs: Iterable[String]
@@ -244,24 +245,13 @@ package object hadoop {
     def initialize_hadoop_input(job: Job) {
       /* A very simple file processor that does nothing but note the files
          seen, for Hadoop's benefit. */
-      class RetrieveDocumentFilesFileProcessor(
-        suffix: String
-      ) extends OldTextDBLineProcessor[Unit](suffix) {
-        def process_lines(lines: Iterator[String],
-            filehand: FileHandler, file: String,
-            compression: String, realname: String) = {
-          errprint("Called with %s", file)
-          FileInputFormat.addInputPath(job, new Path(file))
-          (true, ())
-        }
+      val files =
+        iterate_files_recursively(driver.get_file_handler, corpus_dirs).
+          filter(TextDBProcessor.filter_file_by_suffix(_, corpus_suffix))
+      for (file <- files) {
+         errprint("Adding %s to input path", file)
+         FileInputFormat.addInputPath(job, new Path(file))
       }
-
-      val fileproc = new RetrieveDocumentFilesFileProcessor(
-        // driver.params.eval_set + "-" + driver.document_file_suffix
-        corpus_suffix
-      )
-      fileproc.process_files(driver.get_file_handler, corpus_dirs)
-      // FileOutputFormat.setOutputPath(job, new Path(params.outfile))
     }
   }
 
