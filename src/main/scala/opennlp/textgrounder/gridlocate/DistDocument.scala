@@ -25,16 +25,17 @@ import util.control.Breaks._
 
 import java.io._
 
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.textdbutil._
-import opennlp.textgrounder.util.distances._
-import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil._
-import opennlp.textgrounder.util.osutil.output_resource_usage
-import opennlp.textgrounder.util.printutil.{errprint, warning}
-import opennlp.textgrounder.util.MeteredTask
-import opennlp.textgrounder.util.Serializer
-import opennlp.textgrounder.util.textutil.capfirst
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.collectionutil._
+import tgutil.textdbutil._
+import tgutil.distances._
+import tgutil.experiment._
+import tgutil.ioutil._
+import tgutil.osutil.output_resource_usage
+import tgutil.printutil.{errprint, warning}
+import tgutil.MeteredTask
+import tgutil.Serializer
+import tgutil.textutil.capfirst
 
 import opennlp.textgrounder.worddist.{WordDist,WordDistFactory}
 

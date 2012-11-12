@@ -20,10 +20,11 @@ package opennlp.textgrounder.geolocate
 
 import collection.mutable
 
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.textdbutil.Schema
-import opennlp.textgrounder.util.printutil.{errprint, warning}
-import opennlp.textgrounder.util.textutil.capfirst
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.collectionutil._
+import tgutil.textdbutil.Schema
+import tgutil.printutil.{errprint, warning}
+import tgutil.textutil.capfirst
 
 import opennlp.textgrounder.gridlocate.DistDocumentConverters._
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._

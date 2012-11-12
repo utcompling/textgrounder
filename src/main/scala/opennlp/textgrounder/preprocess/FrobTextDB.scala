@@ -22,13 +22,14 @@ import collection.mutable
 
 import java.io._
 
-import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.textdbutil._
-import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil._
-import opennlp.textgrounder.util.MeteredTask
-import opennlp.textgrounder.util.printutil.warning
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.argparser._
+import tgutil.collectionutil._
+import tgutil.textdbutil._
+import tgutil.experiment._
+import tgutil.ioutil._
+import tgutil.MeteredTask
+import tgutil.printutil.warning
 
 import opennlp.textgrounder.gridlocate.DistDocument
 

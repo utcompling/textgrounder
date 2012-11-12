@@ -20,8 +20,9 @@ package opennlp.textgrounder.gridlocate
 
 import collection.mutable
 
-import opennlp.textgrounder.util.collectionutil.{LRUCache, doublemap}
-import opennlp.textgrounder.util.printutil.{errprint, warning}
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.collectionutil.{LRUCache, doublemap}
+import tgutil.printutil.{errprint, warning}
 
 import opennlp.textgrounder.worddist.{WordDist,UnigramWordDist}
 import opennlp.textgrounder.worddist.WordDist.memoizer._

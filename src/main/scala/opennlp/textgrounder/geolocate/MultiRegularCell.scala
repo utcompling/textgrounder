@@ -21,10 +21,11 @@ package opennlp.textgrounder.geolocate
 import math._
 import collection.mutable
 
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.distances._
-import opennlp.textgrounder.util.printutil.{errout, errprint}
-import opennlp.textgrounder.util.experiment._
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.collectionutil._
+import tgutil.distances._
+import tgutil.printutil.{errout, errprint}
+import tgutil.experiment._
 
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 

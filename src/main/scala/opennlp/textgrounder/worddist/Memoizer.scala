@@ -24,8 +24,9 @@ import com.codahale.trove.{mutable => trovescala}
 
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.printutil.errprint
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.collectionutil._
+import tgutil.printutil.errprint
 
 /**
  * A class for "memoizing" words, i.e. mapping them to some other type

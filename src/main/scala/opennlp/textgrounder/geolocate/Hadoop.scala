@@ -25,15 +25,16 @@ import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.hadoop.fs.Path
 
-import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.collectionutil.TransposeIterator
-import opennlp.textgrounder.util.distances._
-import opennlp.textgrounder.util.experiment.ExperimentMeteredTask
-import opennlp.textgrounder.util.hadoop._
-import opennlp.textgrounder.util.ioutil.FileHandler
-import opennlp.textgrounder.util.mathutil.{mean, median}
-import opennlp.textgrounder.util.printutil.{errprint, warning}
-import opennlp.textgrounder.util.textdbutil.TextDBProcessor
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.argparser._
+import tgutil.collectionutil.TransposeIterator
+import tgutil.distances._
+import tgutil.experiment.ExperimentMeteredTask
+import tgutil.hadoop._
+import tgutil.ioutil.FileHandler
+import tgutil.mathutil.{mean, median}
+import tgutil.printutil.{errprint, warning}
+import tgutil.textdbutil.TextDBProcessor
 
 import opennlp.textgrounder.gridlocate.{CellGridEvaluator,TextGrounderInfo,GridLocateDocumentStrategy,DocumentStatus}
 

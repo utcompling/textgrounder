@@ -23,13 +23,14 @@ package opennlp.textgrounder.gridlocate
 import util.control.Breaks._
 import collection.mutable
 
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.experiment.ExperimentDriverStats
-import opennlp.textgrounder.util.mathutil._
-import opennlp.textgrounder.util.ioutil.FileHandler
-import opennlp.textgrounder.util.MeteredTask
-import opennlp.textgrounder.util.osutil.{curtimehuman, output_resource_usage}
-import opennlp.textgrounder.util.printutil.{errprint, warning}
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.collectionutil._
+import tgutil.experiment.ExperimentDriverStats
+import tgutil.mathutil._
+import tgutil.ioutil.FileHandler
+import tgutil.MeteredTask
+import tgutil.osutil.{curtimehuman, output_resource_usage}
+import tgutil.printutil.{errprint, warning}
 
 import GridLocateDriver.Debug._
 

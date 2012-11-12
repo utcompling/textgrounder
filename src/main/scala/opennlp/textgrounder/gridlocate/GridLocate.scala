@@ -23,14 +23,15 @@ import util.Random
 import math._
 import collection.mutable
 
-import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.collectionutil._
-import opennlp.textgrounder.util.textdbutil
-import opennlp.textgrounder.util.distances._
-import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil.{FileHandler, LocalFileHandler}
-import opennlp.textgrounder.util.osutil.output_resource_usage
-import opennlp.textgrounder.util.printutil.errprint
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.argparser._
+import tgutil.collectionutil._
+import tgutil.textdbutil
+import tgutil.distances._
+import tgutil.experiment._
+import tgutil.ioutil.{FileHandler, LocalFileHandler}
+import tgutil.osutil.output_resource_usage
+import tgutil.printutil.errprint
 
 import opennlp.textgrounder.perceptron._
 import opennlp.textgrounder.worddist._

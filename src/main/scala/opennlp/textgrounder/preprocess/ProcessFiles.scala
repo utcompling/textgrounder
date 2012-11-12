@@ -18,9 +18,10 @@
 
 package opennlp.textgrounder.preprocess
 
-import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil._
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.argparser._
+import tgutil.experiment._
+import tgutil.ioutil._
 
 /*
    Common code for doing basic file-processing operations.

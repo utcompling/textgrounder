@@ -27,13 +27,14 @@ import java.io.{InputStream, PrintStream}
 import opennlp.textgrounder.worddist.IdentityMemoizer._
 import opennlp.textgrounder.gridlocate.DistDocument
 
-import opennlp.textgrounder.util.argparser._
-import opennlp.textgrounder.util.collectionutil.DynamicArray
-import opennlp.textgrounder.util.textdbutil._
-import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil._
-import opennlp.textgrounder.util.MeteredTask
-import opennlp.textgrounder.util.printutil.{errprint, warning}
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.argparser._
+import tgutil.collectionutil.DynamicArray
+import tgutil.textdbutil._
+import tgutil.experiment._
+import tgutil.ioutil._
+import tgutil.MeteredTask
+import tgutil.printutil.{errprint, warning}
 
 /////////////////////////////////////////////////////////////////////////////
 //                                  Main code                              //

@@ -21,7 +21,8 @@ package opennlp.textgrounder.worddist
 import scala.collection.mutable
 import math.{log, sqrt}
 
-import opennlp.textgrounder.util.collectionutil.DynamicArray
+import opennlp.textgrounder.{util => tgutil}
+import tgutil.collectionutil.DynamicArray
 
 import WordDist.memoizer.Word
 
