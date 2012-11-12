@@ -597,13 +597,28 @@ package object textdbutil {
      */
     def read_textdb(filehand: FileHandler, dir: String,
         suffix: String, with_messages: Boolean = true) = {
+      val (schema, fields) =
+        read_textdb_with_schema(filehand, dir, suffix, with_messages)
+      fields
+    }
+
+    /**
+     * Same as `read_textdb` but return also return the schema.
+     *
+     * @return A tuple `(schema, field_iter)` where `field_iter` is an
+     *   iterator of iterators of fields.
+     */
+    def read_textdb_with_schema(filehand: FileHandler, dir: String,
+        suffix: String, with_messages: Boolean = true) = {
       val (schema, files) =
         get_textdb_files(filehand, dir, suffix, with_messages)
-      files.map(file => {
-        filehand.openr(file).zipWithIndex.flatMap {
-          case (line, idx) => line_to_fields(line, idx + 1, schema)
-        }
-      })
+      val fields =
+        files.map(file => {
+          filehand.openr(file).zipWithIndex.flatMap {
+            case (line, idx) => line_to_fields(line, idx + 1, schema)
+          }
+        })
+      (schema, fields)
     }
 
     /*
