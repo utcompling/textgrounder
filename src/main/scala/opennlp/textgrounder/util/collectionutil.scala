@@ -661,7 +661,7 @@ package object collectionutil {
 //
 
  /////////////////////////////////////////////////////////////////////////////
- //                        Misc. list/iterator functions                    //
+ //                          General-purpose iterators                      //
  /////////////////////////////////////////////////////////////////////////////
 
   /**
@@ -712,6 +712,65 @@ package object collectionutil {
       throw new java.util.NoSuchElementException("next on empty iterator")
     }
   }
+
+  /**
+   * An iterator that transposes a list of iterators by fetching "across"
+   * rather than "down" the iterators.  That is, it fetches the first item
+   * in each iterator and returns a list of those items, then fetches the
+   * next item of each iterator, etc.  If some iterators are longer than
+   * others, then the returned list at that point will only included values
+   * from iterators for which such values still exist.
+   */
+  class TransposeIterator[T](iterators: Iterable[Iterator[T]]
+    ) extends Iterator[Iterable[T]] {
+    def hasNext = iterators.exists(_.hasNext)
+    def next = iterators.collect {
+      case iter@_ if iter.hasNext => iter.next
+    }
+  }
+
+  /**
+   * An iterator that wraps an arbitrary iterator, printing out each time
+   * `hasNext` and `next` are called and the results of calling them.
+   * This makes it easier to figure out the pattern by which a given iterator
+   * is accessed.
+   */
+  class PrintIterator[T](iter: Iterator[T]) extends Iterator[T] {
+    def hasNext = {
+      val res = iter.hasNext
+      println("hasNext: %s" format res)
+      res
+    }
+    def next = {
+      val res = iter.next
+      println("next: %s" format res)
+      res
+    }
+  }
+
+  /**
+   * An iterator to do the equivalent of a `groupBy` operation on a given
+   * iterator, grouping by the key specified by `keyfun`.  Returns a series
+   * of tuples of `(key, iterator)` where `key` is a key returned by `keyfun`
+   * and `iterator` iterates over all consecutive items which return that
+   * key when the keyfun is applied to them.
+   */
+  class GroupByIterator[T, K](
+      iter: Iterator[T], keyfun: (T) => K
+    ) extends Iterator[(K, Iterator[T])] {
+    protected var curiter = iter.buffered
+    def hasNext = curiter.hasNext
+    def next = {
+      val key = keyfun(curiter.head)
+      val (leading, trailing) = curiter.span(keyfun(_) == key)
+      curiter = trailing.buffered
+      (key, leading)
+    }
+  }
+
+ /////////////////////////////////////////////////////////////////////////////
+ //                        Misc. list/iterator functions                    //
+ /////////////////////////////////////////////////////////////////////////////
 
   def fromto(from: Int, too: Int) = {
     if (from <= too) (from to too)
