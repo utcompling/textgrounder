@@ -147,21 +147,6 @@ class PoligrounderParameters(parser: ArgParser = null) extends
 //    separately.""")
 }
 
-/**
- * A simple field-text file processor that just records the users and ideology.
- *
- * @param suffix Suffix used to select document metadata files in a directory
- */
-class IdeoUserFileProcessor extends
-    TextDBProcessor[(String, Double)]("ideo-users") {
-  def process_row(fieldvals: Seq[String]) = {
-    val user = schema.get_field(fieldvals, "user")
-    val ideology =
-      schema.get_field(fieldvals, "ideology").toDouble
-    Some((user, ideology))
-  }
-}
-
 class PoligrounderDriver extends
     GridLocateDriver with StandaloneExperimentDriverStats {
   type TParam = PoligrounderParameters
@@ -186,10 +171,16 @@ class PoligrounderDriver extends
     to_chunk = parse_interval(params.to)
 
     if (params.ideological_user_corpus != null) {
-      val processor = new IdeoUserFileProcessor
+      val (schema, field_iter) =
+        TextDBProcessor.read_textdb_with_schema(new LocalFileHandler,
+          params.ideological_user_corpus, "ideo-users")
       val users =
-        processor.read_textdb(new LocalFileHandler,
-          params.ideological_user_corpus).flatten.toMap
+        (for (fieldvals <- field_iter.flatten) yield {
+          val user = schema.get_field(fieldvals, "user")
+          val ideology =
+            schema.get_field(fieldvals, "ideology").toDouble
+          (user, ideology)
+        }).toMap
       params.ideological_users = users
       params.ideological_users_liberal =
         users filter { case (u, ideo) => ideo < 0.33 }
