@@ -129,7 +129,7 @@ trait SimpleUnigramWordDistConstructor {
  */
 class MMCUnigramWordDistHandler(
   schema: Schema,
-  document_fieldvals: mutable.Map[String, Seq[String]],
+  document_fieldvals: Map[String, Seq[String]],
   filehand: FileHandler,
   output_dir: String,
   output_file_prefix: String
@@ -167,24 +167,6 @@ class MMCUnigramWordDistHandler(
   }
 }
 
-/**
- * A simple field-text file processor that just records the documents read in,
- * by title.
- *
- * @param suffix Suffix used to select document metadata files in a directory
- */
-class MMCDocumentFileProcessor(
-  suffix: String
-) extends TextDBProcessor[Unit](suffix) {
-  val document_fieldvals = mutable.Map[String, Seq[String]]()
-
-  def process_row(fieldvals: Seq[String]) = {
-    val params = (schema.fieldnames zip fieldvals).toMap
-    document_fieldvals(params("title")) = fieldvals
-    Some(())
-  }
-}
-
 class MMCDriver extends ArgParserExperimentDriver {
   type TParam = MMCParameters
   type TRunRes = Unit
@@ -212,12 +194,12 @@ counts file also containing the metadata.
       param_error("Output dir %s must not already exist" format
         params.output_dir)
 
-    val fileproc =
-      new MMCDocumentFileProcessor(document_metadata_suffix)
-    fileproc.read_schema_from_textdb(filehand, params.input_dir)
+    val (schema, field_iter) =
+      TextDBProcessor.read_textdb_with_schema(filehand, params.input_dir,
+        document_metadata_suffix)
 
     if (params.output_file_prefix == null) {
-      var (_, base) = filehand.split_filename(fileproc.schema_file)
+      var (_, base) = filehand.split_filename(schema.filename)
       params.output_file_prefix = base.replaceAll("-[^-]*$", "")
       params.output_file_prefix =
         params.output_file_prefix.stripSuffix("-document-metadata")
@@ -225,11 +207,15 @@ counts file also containing the metadata.
         params.output_file_prefix)
     }
 
-    fileproc.process_files(filehand, Seq(params.input_dir))
+    val document_fieldvals =
+      (for (fieldvals <- field_iter.flatten) yield {
+        val params = (schema.fieldnames zip fieldvals).toMap
+        (params("title"), fieldvals)
+      }).toMap
 
     val counts_handler =
-      new MMCUnigramWordDistHandler(fileproc.schema,
-        fileproc.document_fieldvals, filehand, params.output_dir,
+      new MMCUnigramWordDistHandler(schema,
+        document_fieldvals, filehand, params.output_dir,
         params.output_file_prefix)
     counts_handler.read_word_counts(filehand, params.counts_file)
     counts_handler.finish()
