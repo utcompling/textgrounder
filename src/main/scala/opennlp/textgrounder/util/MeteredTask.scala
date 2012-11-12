@@ -18,6 +18,7 @@
 
 package opennlp.textgrounder.util
 
+import collectionutil.SideEffectIterator
 import osutil._
 import printutil.errprint
 import textutil._
@@ -128,3 +129,18 @@ class MeteredTask(item_name: String, verb: String,
   }
 }
 
+object MeteredTask {
+  def iterate[T](item_name: String, verb: String,
+    secs_between_output: Double = 15, maxtime: Double = 0.0
+  )(iter: Iterator[T]) = {
+    var task: MeteredTask = null
+    new SideEffectIterator({
+      task = new MeteredTask(item_name, verb, secs_between_output, maxtime)
+    }) ++
+    iter.map(x => {
+      task.item_processed()
+      x
+    }) ++
+    new SideEffectIterator({ task.finish() })
+  }
+}
