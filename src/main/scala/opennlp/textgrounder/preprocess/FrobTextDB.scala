@@ -104,13 +104,15 @@ containing unigram counts.""")
 class FrobTextDBProcessor(
   output_filehand: FileHandler,
   params: FrobTextDBParameters
-) extends TextDBProcessor[Unit](params.input_suffix) {
+) {
   val split_value_to_writer = mutable.Map[String, TextDBWriter]()
   val split_value_to_outstream = mutable.Map[String, PrintStream]()
   var unsplit_writer: TextDBWriter = _
   var unsplit_outstream: PrintStream = _
+  var schema_prefix: String = _
+  var current_document_prefix: String = _
 
-  def frob_row(fieldvals: Seq[String]) = {
+  def frob_row(schema: Schema, fieldvals: Seq[String]) = {
     val docparams = mutable.LinkedHashMap[String, String]()
     docparams ++= (rename_fields(schema.fieldnames) zip fieldvals)
     for (field <- params.remove_field)
@@ -166,8 +168,8 @@ class FrobTextDBProcessor(
    * creating one or both as necessary.  There will be one writer overall,
    * and one output stream per input file.
    */
-  def get_unsplit_writer_and_outstream(fieldnames: Seq[String],
-      fieldvals: Seq[String]) = {
+  def get_unsplit_writer_and_outstream(schema: SchemaFromFile,
+      fieldnames: Seq[String], fieldvals: Seq[String]) = {
     if (unsplit_writer == null) {
       /* Construct a new schema.  Create a new writer for this schema;
          write the schema out; and record the writer in
@@ -191,8 +193,8 @@ class FrobTextDBProcessor(
    * There will be one writer for each possible split value, and one output
    * stream per split value per input file.
    */
-  def get_split_writer_and_outstream(fieldnames: Seq[String],
-      fieldvals: Seq[String]) = {
+  def get_split_writer_and_outstream(schema: SchemaFromFile,
+      fieldnames: Seq[String], fieldvals: Seq[String]) = {
     val split =
       Schema.get_field_or_else(fieldnames, fieldvals, params.split_by_field)
     if (split == null)
@@ -225,27 +227,11 @@ class FrobTextDBProcessor(
     }
   }
 
-  override def end_process_file(filehand: FileHandler, file: String) {
-    /* Close the output stream(s), clearing the appropriate variable(s) so
-       that the necessary stream(s) will be re-created again for the
-       next input file.
-     */
-    if (params.split_by_field != null) {
-      for (outstream <- split_value_to_outstream.values)
-        outstream.close()
-      split_value_to_outstream.clear()
-    } else {
-      unsplit_outstream.close()
-      unsplit_outstream = null
-    }
-    super.end_process_file(filehand, file)
-  }
-
-  def process_row(fieldvals: Seq[String]) = {
-    val (new_fieldnames, new_fieldvals) = frob_row(fieldvals).unzip
+  def process_row(schema: SchemaFromFile, fieldvals: Seq[String]) = {
+    val (new_fieldnames, new_fieldvals) = frob_row(schema, fieldvals).unzip
     if (params.split_by_field != null) {
       val (writer, outstream) =
-        get_split_writer_and_outstream(new_fieldnames, new_fieldvals)
+        get_split_writer_and_outstream(schema, new_fieldnames, new_fieldvals)
       if (writer == null) {
         warning("Skipped row because can't find split field: %s",
           new_fieldvals mkString "\t")
@@ -262,10 +248,40 @@ class FrobTextDBProcessor(
       }
     } else {
       val (writer, outstream) =
-        get_unsplit_writer_and_outstream(new_fieldnames, new_fieldvals)
+        get_unsplit_writer_and_outstream(schema, new_fieldnames, new_fieldvals)
       writer.schema.output_row(outstream, new_fieldvals)
     }
     Some(())
+  }
+  def process_dir(filehand: FileHandler, dir: String) {
+    val (schema, files) =
+      TextDBProcessor.get_textdb_files(filehand, dir, params.input_suffix)
+    schema_prefix = Schema.get_schema_prefix(filehand, schema.filename,
+      params.input_suffix)
+    for (file <- files) {
+      current_document_prefix = TextDBProcessor.get_document_prefix(
+        filehand, dir, params.input_suffix)
+      for (fieldvals <-
+          TextDBProcessor.read_textdb_file(filehand, file, schema))
+        process_row(schema, fieldvals)
+      /* Close the output stream(s), clearing the appropriate variable(s)
+         so that the necessary stream(s) will be re-created again for the
+         next input file.
+
+         FIXME: This is rather bogus, since we directly know now when we're
+         opening a new file. (It was written this way using an internal
+         iterator -- the no-longer-existing TextDBProcessor and
+         FileProcessor interface.)
+       */
+      if (params.split_by_field != null) {
+        for (outstream <- split_value_to_outstream.values)
+          outstream.close()
+        split_value_to_outstream.clear()
+      } else {
+        unsplit_outstream.close()
+        unsplit_outstream = null
+      }
+    }
   }
 }
 
@@ -297,10 +313,8 @@ class FrobTextDBDriver extends
     super.run_after_setup()
 
     val filehand = get_file_handler
-    val fileproc =
-      new FrobTextDBProcessor(filehand, params)
-    fileproc.read_schema_from_textdb(filehand, params.input_dir)
-    fileproc.process_files(filehand, Seq(params.input_dir))
+    val fileproc = new FrobTextDBProcessor(filehand, params)
+    fileproc.process_dir(filehand, params.input_dir)
   }
 }
 
