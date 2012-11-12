@@ -26,14 +26,16 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.hadoop.fs.Path
 
 import opennlp.textgrounder.util.argparser._
+import opennlp.textgrounder.util.collectionutil.TransposeIterator
 import opennlp.textgrounder.util.distances._
 import opennlp.textgrounder.util.experiment.ExperimentMeteredTask
 import opennlp.textgrounder.util.hadoop._
 import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.mathutil.{mean, median}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
+import opennlp.textgrounder.util.textdbutil.TextDBProcessor
 
-import opennlp.textgrounder.gridlocate.{CellGridEvaluator,TextGrounderInfo,OldDistDocumentFileProcessor}
+import opennlp.textgrounder.gridlocate.{CellGridEvaluator,TextGrounderInfo,GridLocateDocumentStrategy,DocumentStatus}
 
 /* Basic idea for hooking up Geolocate with Hadoop.  Hadoop works in terms
    of key-value pairs, as follows:
@@ -220,91 +222,84 @@ class DocumentEvaluationMapper extends
   // more type erasure crap
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver() = new TDriver
+  type StrategyType = GridLocateDocumentStrategy[SphereCell, SphereCellGrid]
+  type DocStatsType = Iterator[DocumentStatus[SphereDocument]]
 
-  var evaluators: Iterable[CellGridEvaluator[SphereCoord,SphereDocument,_,_]] = _
   val task = new ExperimentMeteredTask(driver, "document", "evaluating")
+  val filehand = driver.get_file_handler
 
-  class HadoopDocumentFileProcessor(
-    context: TContext
-  ) extends OldDistDocumentFileProcessor(
-    driver.params.eval_set + "-" + driver.document_file_suffix, driver
-  ) {
-    override def get_shortfile =
-      filename_to_counter_name(driver.get_file_handler,
-        driver.get_configuration.get("mapred.input.dir"))
-
-    /* #### FIXME!!! Need to redo things so that different splits are
-       separated into different files. */
-    def handle_document(fieldvals: Seq[String]) = {
-      val table = driver.document_table
-      val doc = table.create_and_init_document(schema, fieldvals, false)
-      val retval = if (doc != null) {
-        doc.dist.finish_after_global()
-        var skipped = 0
-        var not_skipped = 0
-        for (e <- evaluators) {
-          val num_processed = task.num_processed
-          val doctag = "#%d" format (1 + num_processed)
-          if (e.would_skip_document(doc, doctag)) {
-            skipped += 1
-            errprint("Skipped document %s because evaluator would skip it",
-              doc)
-          } else {
-            not_skipped += 1
-            // Don't put side-effecting code inside of an assert!
-            val result =
-              e.evaluate_document(doc, doctag)
-            assert(result != null)
-            context.write(new Text(e.stratname),
-              new DoubleWritable(result.asInstanceOf[SphereDocumentEvaluationResult].pred_truedist))
-            task.item_processed()
-          }
-          context.progress
-        }
-        if (skipped > 0 && not_skipped > 0)
-          warning("""Something strange: %s evaluator(s) skipped document, but %s evaluator(s)
-didn't skip.  Usually all or none should skip.""", skipped, not_skipped)
-        (not_skipped > 0)
-      } else false
-      context.progress
-      (retval, true)
+  def get_stat_iters(strats: Iterable[(String, StrategyType)],
+      docstats: DocStatsType
+    ): Iterable[(String, StrategyType, DocStatsType)] = {
+    strats.size match {
+      case 0 => Iterable[Nothing]()
+      case 1 => {
+        val (stratname, strategy) = strats.head
+        Iterable((stratname, strategy, docstats))
+      }
+      case _ => {
+        val (head, tail) = (strats.head, strats.tail)
+        val (stratname, strategy) = head
+        val (left, right) = docstats.duplicate
+        Iterable((stratname, strategy, left)) ++ get_stat_iters(tail, right)
+      }
     }
-
-    def process_lines(lines: Iterator[String],
-        filehand: FileHandler, file: String,
-        compression: String, realname: String) =
-      throw new IllegalStateException(
-        "process_lines should never be called here")
   }
 
-  var processor: HadoopDocumentFileProcessor = _
-  override def init(context: TContext) {
+  override def run(context: TContext) {
     super.init(context)
     if (driver.params.eval_format != "internal")
       driver.params.parser.error(
         "For Hadoop, '--eval-format' must be 'internal'")
     else {
-      evaluators =
-        for ((stratname, strategy) <- driver.strategies)
-          yield driver.create_document_evaluator(strategy, stratname).
-            asInstanceOf[CellGridEvaluator[SphereCoord,SphereDocument,_,_]]
       if (driver.params.input_corpus.length != 1) {
         driver.params.parser.error(
           "FIXME: For Hadoop, currently need exactly one corpus")
-      } else {
-        processor = new HadoopDocumentFileProcessor(context)
-        processor.read_schema_from_textdb(driver.get_file_handler,
-            driver.params.input_corpus(0))
-        context.progress
       }
     }
-  }
-
-  override def setup(context: TContext) { init(context) }
-
-  override def map(key: Object, value: Text, context: TContext) {
-    processor.parse_row(value.toString)
+    val schema = TextDBProcessor.read_schema_from_textdb(filehand,
+      driver.params.input_corpus(0),
+      driver.params.eval_set + "-" + driver.document_file_suffix)
     context.progress
+
+    class HadoopIterator extends Iterator[(FileHandler, String, String, Long)] {
+      def hasNext = context.nextKeyValue
+      def next = {
+        // FIXME: Is this actually the line no or character offset???
+        val lineno = context.getCurrentKey.toString.toLong
+        val line = context.getCurrentValue.toString
+        (filehand, driver.get_configuration.get("mapred.input.dir"),
+          line, lineno)
+      }
+    }
+
+    val lines = new HadoopIterator
+    val orig_docstats =
+      lines.map {
+        case (filehand, file, line, lineno) => {
+          val docstat =
+            driver.document_table.line_to_document(filehand, file, line,
+              lineno, schema, false)
+          docstat.maybedoc.foreach(doc => {                        
+            if (doc.dist != null)
+              doc.dist.finish_after_global()
+          })
+          docstat
+        }
+      }
+    val stratname_evaluators =
+      for ((stratname, strategy, docstats) <-
+        get_stat_iters(driver.strategies, orig_docstats)) yield {
+          val evalobj = driver.create_cell_evaluator(strategy, stratname)
+          (stratname, evalobj.evaluate_documents(docstats))
+        }
+    val (stratnames, evaluators) = stratname_evaluators.unzip
+    for { results <- new TransposeIterator(evaluators);
+          (stratname, result) <- stratnames zip results } {
+      context.write(new Text(stratname),
+        new DoubleWritable(result.asInstanceOf[SphereDocumentEvaluationResult].
+          pred_truedist))
+    }
   }
 }
 

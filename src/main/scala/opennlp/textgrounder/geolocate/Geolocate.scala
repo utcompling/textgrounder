@@ -596,7 +596,7 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
 
   /**
    * Create the document evaluator object used to evaluate a given
-   * document.
+   * cell in a cell grid.
    *
    * @param strategy Strategy object that implements the mechanism for
    *   scoring different pseudodocuments against a document.  The
@@ -606,20 +606,19 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
    *   applying the mean-shift algorithm, etc.).
    * @param stratname Name of the strategy.
    */
-  def create_document_evaluator(
+  def create_cell_evaluator(
       strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
-      stratname: String): CorpusEvaluator = {
-    // Generate reader object
-    if (params.eval_format == "pcl-travel")
-      new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this,
-        get_file_handler, params.eval_file)
-    else if (params.coord_strategy == "top-ranked")
-      new RankedSphereCellGridEvaluator(strategy, stratname, this)
-    else
-      new MeanShiftSphereCellGridEvaluator(strategy, stratname, this,
-        params.k_best, params.mean_shift_window,
-        params.mean_shift_max_stddev,
-        params.mean_shift_max_iterations)
+      stratname: String
+    ) = {
+    params.coord_strategy match {
+      case "top-ranked" =>
+        new RankedSphereCellGridEvaluator(strategy, stratname, this)
+      case "mean-shift" =>
+        new MeanShiftSphereCellGridEvaluator(strategy, stratname, this,
+            params.k_best, params.mean_shift_window,
+            params.mean_shift_max_stddev,
+            params.mean_shift_max_iterations)
+    }
   }
 
   /**
@@ -643,11 +642,30 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
    */
   def run_after_setup() = {
     for ((stratname, strategy) <- strategies) yield {
-      val evalobj = create_document_evaluator(strategy, stratname)
-      val docs = evalobj.iter_documents
+      val results =
+        params.eval_format match {
+          case "pcl-travel" => {
+            val evalobj =
+              new PCLTravelGeolocateDocumentEvaluator(strategy, stratname, this,
+                get_file_handler, params.eval_file)
+            evalobj.evaluate_documents(evalobj.iter_document_stats)
+          }
+          case "internal" => {
+            val docstats =
+              params.input_corpus.toIterator.flatMap(dir =>
+                document_table.read_document_statuses_from_textdb(
+                  get_file_handler, dir,
+                  params.eval_set + "-" + document_file_suffix))
+            val evalobj = create_cell_evaluator(strategy, stratname)
+            evalobj.evaluate_documents(docstats)
+          }
+          case "raw-text" => {
+            throw new UnsupportedOperationException(
+              "raw-text eval format not yet implemented")
+          }
+        }
       // The call to `toList` forces evaluation of the Iterator
-      val results = evalobj.evaluate_documents(docs).toList
-      (stratname, strategy, results)
+      (stratname, strategy, results.toList)
     }
   }
 }

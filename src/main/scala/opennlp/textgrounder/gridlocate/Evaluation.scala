@@ -509,49 +509,31 @@ abstract class CorpusEvaluator(
   var skip_n = 0
 
   /**
-   * Return true if we should skip the next document due to parameters
+   * Determine whether we should skip the next document due to parameters
    * calling for certain documents in a certain sequence to be skipped.
+   * Return `(skip, reason)` where `skip` is true if document would be skipped,
+   * false if processed and evaluated; and `reason` is the reason for
+   * skipping.
    */
   def would_skip_by_parameters() = {
-    var do_skip = false
     if (skip_initial != 0) {
       skip_initial -= 1
-      do_skip = true
+      (true, "--skip-initial-test-docs setting")
     } else if (skip_n != 0) {
       skip_n -= 1
-      do_skip = true
-    } else
+      (true, "--every-nth-test-doc setting")
+    } else {
       skip_n = driver.params.every_nth_test_doc - 1
-    do_skip
+      (false, "")
+    }
   }
         
   /**
-   * Return true if we should stop processing, given that `new_processed`
-   * items have already been processed.
+   * Return `(skip, reason)` where `skip` is true if document would be skipped,
+   * false if processed and evaluated; and `reason` is the reason for
+   * skipping.
    */
-  def would_stop_processing(new_processed: Int) = {
-    // If max # of docs reached, stop
-    val stop = (driver.params.num_test_docs > 0 &&
-                 new_processed >= driver.params.num_test_docs)
-    if (stop) {
-      errprint("")
-      errprint("Stopping because limit of %s documents reached",
-        driver.params.num_test_docs)
-    }
-    stop
-  }
-
-  /**
-   * Return an Iterator listing the documents retrievable from the given
-   * filename.
-   */
-  def iter_documents: Iterator[TEvalDoc]
-
-  /**
-   * Return true if document would be skipped; false if processed and
-   * evaluated.
-   */
-  def would_skip_document(doc: TEvalDoc, doctag: String) = false
+  def would_skip_document(doc: TEvalDoc, doctag: String) = (false, "")
 
   /**
    * Evaluate a document.  Return an object describing the results of the
@@ -576,73 +558,97 @@ abstract class CorpusEvaluator(
   var last_elapsed = 0.0
   var last_processed = 0
 
+
+  def handle_status(stat: DocumentStatus[TEvalRes]) = {
+    stat.status match {
+      case "processed" => {
+        val new_elapsed = task.elapsed_time
+        val new_processed = task.num_processed
+        // If five minutes and ten documents have gone by,
+        // print out results
+        if ((new_elapsed - last_elapsed >= 300 &&
+          new_processed - last_processed >= 10)) {
+          errprint("Results after %d documents (strategy %s):",
+            task.num_processed, stratname)
+          output_results(isfinal = false)
+          errprint("End of results after %d documents (strategy %s):",
+            task.num_processed, stratname)
+          last_elapsed = new_elapsed
+          last_processed = new_processed
+        }
+      }
+      case _ => {}
+    }
+    stat
+  }
+
   /**
-   * Evaluate a set of documents, or some subset of them.  This may skip
+   * Evaluate the documents, or some subset of them.  This may skip
    * some of the documents (e.g. based on the parameter
    * `--every-nth-test-doc`) and may stop early (e.g. based on
    * `--num-test-docs`).
    *
-   * @param docs Iterator over documents to evaluate.
    * @return Iterator over evaluation results.
    */
-  def evaluate_documents(docs: Iterator[TEvalDoc]): Iterator[TEvalRes] = {
-    val dociter = new InterruptibleIterator(docs)
+  def evaluate_documents(docstats: Iterator[DocumentStatus[TEvalDoc]]) = {
+    val docstatiter = new InterruptibleIterator(docstats)
+    var stopped = false
     val results =
-      (for (doc <- dociter) yield {
-        // errprint("Processing document: %s", doc)
+      (for (stat <- docstatiter) yield {
+        // errprint("Processing document: %s", stat)
         val num_processed = task.num_processed
         val doctag = "#%d" format (1 + num_processed)
-        if (would_skip_document(doc, doctag)) {
-          errprint("Skipped document %s", doc)
-          None
-        } else {
-          val result =
-            if (would_skip_by_parameters()) {
-              errprint("Passed over document %s", doctag)
-              None
-            } else {
-              // Don't put side-effecting code inside of an assert!
-              val res1 = evaluate_document(doc, doctag)
-              assert(res1 != null)
-              Some(res1)
-            }
+        val (mayberes, status, reason, docdesc) =
+          (stat.maybedoc, stat.status) match {
+            case (Some(doc), "processed") => {
+              val (skip, reason) = would_skip_document(doc, doctag)
+              if (skip)
+                (None, "skipped", reason, doctag)
+              else {
+                val result = {
+                  val (skip, reason) = would_skip_by_parameters()
+                  if (skip)
+                    (None, "skipped", reason, doctag)
+                  else {
+                    // Don't put side-effecting code inside of an assert!
+                    val res1 = evaluate_document(doc, doctag)
+                    assert(res1 != null)
+                    (Some(res1), "processed", "", "")
+                  }
+                }
 
-          if (task.item_processed()) {
-            dociter.stop()
-          } else {
-            val new_elapsed = task.elapsed_time
-            val new_processed = task.num_processed
-
-            if (would_stop_processing(new_processed)) {
-              dociter.stop()
-            } else {
-              // If five minutes and ten documents have gone by,
-              // print out results
-              if ((new_elapsed - last_elapsed >= 300 &&
-                new_processed - last_processed >= 10)) {
-                errprint("Results after %d documents (strategy %s):",
-                  task.num_processed, stratname)
-                output_results(isfinal = false)
-                errprint("End of results after %d documents (strategy %s):",
-                  task.num_processed, stratname)
-                last_elapsed = new_elapsed
-                last_processed = new_processed
+                    
+                if (task.item_processed // If max time reached, stop
+                    ||
+                    // If max # of docs reached, stop
+                    (driver.params.num_test_docs > 0 &&
+                     task.num_processed >= driver.params.num_test_docs)) {
+                  stopped = true
+                  docstatiter.stop()
+                }
+                result
               }
             }
-          }
-          result
+            case _ => (None, stat.status, stat.reason, stat.docdesc)
         }
-      }).flatten
-    results ++ new SideEffectIterator( {
-      task.finish()
-      errprint("")
-      errprint("Final results for strategy %s: All %d documents processed:",
-        stratname, task.num_processed)
-      errprint("Ending operation at %s", curtimehuman())
-      output_results(isfinal = true)
-      errprint("Ending final results for strategy %s", stratname)
-      output_resource_usage()
-    } )
+        DocumentStatus(stat.filehand, stat.file, mayberes, status, reason,
+          docdesc)
+      }).map(handle_status) ++ new SideEffectIterator( {
+        if (stopped) {
+          errprint("")
+          errprint("Stopping because limit of %s documents reached",
+            driver.params.num_test_docs)
+        }
+        task.finish()
+        errprint("")
+        errprint("Final results for strategy %s: All %d documents processed:",
+          stratname, task.num_processed)
+        errprint("Ending operation at %s", curtimehuman())
+        output_results(isfinal = true)
+        errprint("Ending final results for strategy %s", stratname)
+        output_resource_usage()
+      } )
+    DocumentCounterTracker.process_statuses(results, driver)
   }
 }
 
@@ -704,12 +710,6 @@ abstract class CellGridEvaluator[
   val evalstats = create_grouped_eval_stats(driver,
     strategy.cell_grid, results_by_range = driver.params.results_by_range)
 
-  def iter_documents = {
-    driver.params.input_corpus.toIterator.flatMap(dir =>
-      driver.document_table.read_documents_from_textdb(driver.get_file_handler,
-        dir, driver.params.eval_set + "-" + driver.document_file_suffix))
-  }
-
   def output_results(isfinal: Boolean = false) {
     evalstats.output_results(all_results = isfinal)
  }
@@ -720,8 +720,8 @@ abstract class CellGridEvaluator[
       // so that the counts for many documents don't get read in.
       if (driver.params.max_time_per_stage == 0.0 && driver.params.num_training_docs == 0)
         warning("Can't evaluate document %s without distribution", document)
-      true
-    } else false
+      (true, "document has no distribution")
+    } else (false, "")
   }
 
   /**
@@ -793,7 +793,8 @@ abstract class CellGridEvaluator[
    *   the document and its evaluation results.
    */
   def evaluate_document(document: XTDoc, doctag: String): TEvalRes = {
-    assert(!would_skip_document(document, doctag))
+    val (skip, reason) = would_skip_document(document, doctag)
+    assert(!skip)
     assert(document.dist.finished)
     val true_cell =
       strategy.cell_grid.find_best_cell_for_document(document, true)

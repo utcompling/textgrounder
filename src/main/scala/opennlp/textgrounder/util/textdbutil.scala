@@ -809,8 +809,11 @@ package object textdbutil {
         suffix: String, with_messages: Boolean = true) = {
       val (schema, files) =
         get_textdb_files(filehand, dir, suffix, with_messages)
-      val proc = new NewTextDBProcessor(schema)
-      files.map(file => filehand.openr(file).flatMap(proc.line_to_fields))
+      files.map(file => {
+        filehand.openr(file).zipWithIndex.flatMap {
+          case (line, idx) => line_to_fields(line, idx + 1, schema)
+        }
+      })
     }
 
     /*
@@ -1039,46 +1042,21 @@ package object textdbutil {
   }
 
   /**
-   * A file processor for reading in a "corpus" of records in textdb
-   * format (where each record or "row" is a single line, with fields
-   * separated by TAB) and processing each one.  Each row is assumed to
-   * generate an object of type T.  The result of calling `process_file`
-   * will be an Iterator[T] of all objects, and the result of calling
-   * `process_files` to process all files will be an Iterator[Iterator[T]],
-   * one per file.
-   *
-   * You should implement `process_row`, which is passed in the field
-   * values, and should return either `Some(x)` for x of type T, if
-   * you were able to process the row, or `None` otherwise.  If you
-   * want to exit further processing, throw a `ExitTextDBProcessor(value)`,
-   * where `value` is either `Some(x)` or `None`, as for a normal return
-   * value.
-   *
-   * @param suffix the suffix of the corpus files, as described above
+   * Parse a line into fields, according to `split_re` (usually TAB).
+   * `lineno` and `schema` are used for verifying the correct number of
+   * fields and handling errors.
    */
-  class NewTextDBProcessor[T](
-    schema: Schema
-  ) {
-    val split_re: String = "\t"
-    var num_processed = 0
-    var num_bad = 0
-    
-    def line_to_fields(line: String): Option[Seq[String]] = {
-      val fieldvals = line.split(split_re, -1).toSeq
-      val retval =
-        if (fieldvals.length != schema.fieldnames.length) {
-          val lineno = num_processed + 1
-          warning(
-            """Line %s: Bad record, expected %s fields, saw %s fields;
-            skipping line=%s""", lineno, schema.fieldnames.length,
-            fieldvals.length, line)
-          num_bad += 1
-          None
-        } else
-          Some(fieldvals)
-      num_processed += 1
-      retval
-    }
+  def line_to_fields(line: String, lineno: Long, schema: Schema,
+      split_re: String = "\t"): Option[Seq[String]] = {
+    val fieldvals = line.split(split_re, -1).toSeq
+    if (fieldvals.length != schema.fieldnames.length) {
+      warning(
+        """Line %s: Bad record, expected %s fields, saw %s fields;
+        skipping line=%s""", lineno, schema.fieldnames.length,
+        fieldvals.length, line)
+      None
+    } else
+      Some(fieldvals)
   }
 
   /**
