@@ -158,20 +158,6 @@ object DocumentCounterTracker {
 //                          DistDocument tables                            //
 /////////////////////////////////////////////////////////////////////////////
 
-/**
- * A simple class holding properties referring to extra operations that
- * may be needed during document loading, depending on the particular
- * strategies and/or type of cell grids.  All extra operations start
- * out set to false.  If anyone requests extra, we do it.
- */
-class DocumentLoadingProperties {
-  var need_training_docs_in_memory_during_testing: Boolean = false
-  var need_two_passes_over_training_docs: Boolean = false
-  var need_dist_during_first_pass_over_training_docs: Boolean = false
-  var need_pass_over_eval_docs_during_training: Boolean = false
-  var need_dist_during_pass_over_eval_docs_during_training: Boolean = false
-}
-  
 //////////////////////  DistDocument table
 
 /**
@@ -191,13 +177,6 @@ abstract class DistDocumentTable[
   val driver: GridLocateDriver,
   val word_dist_factory: WordDistFactory
 ) {
-  /**
-   * Properties indicating whether we need to do more than simply do a
-   * single pass through training and eval documents.  Set by individual
-   * strategies or cell grid types.
-   */
-  val loading_props = new DocumentLoadingProperties
-
   // Example of using TaskCounterWrapper directly for non-split values.
   // val num_documents = new driver.TaskCounterWrapper("num_documents") 
 
