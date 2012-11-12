@@ -26,7 +26,7 @@ import collection.mutable
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.experiment.ExperimentDriverStats
 import opennlp.textgrounder.util.mathutil._
-import opennlp.textgrounder.util.ioutil.{FileHandler, OldFileProcessor}
+import opennlp.textgrounder.util.ioutil.FileHandler
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.{curtimehuman, output_resource_usage}
 import opennlp.textgrounder.util.printutil.{errprint, warning}
