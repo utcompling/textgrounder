@@ -27,7 +27,7 @@ import org.apache.commons.lang3.StringEscapeUtils._
 import opennlp.textgrounder.util.argparser._
 import opennlp.textgrounder.util.collectionutil._
 import opennlp.textgrounder.util.experiment._
-import opennlp.textgrounder.util.ioutil.{FileHandler, LocalFileHandler, OldLineProcessor}
+import opennlp.textgrounder.util.ioutil._
 import opennlp.textgrounder.util.MeteredTask
 import opennlp.textgrounder.util.osutil.output_resource_usage
 import opennlp.textgrounder.util.printutil._
@@ -108,13 +108,10 @@ are computed.""")
       help = """File(s) to process for input.""")
 }
 
-abstract class TwitterInfochimpsFileProcessor extends OldLineProcessor[Unit] {
-  def process_lines(lines: Iterator[String],
-      filehand: FileHandler, file: String,
-      compression: String, realname: String) = {
-    val task = new MeteredTask("tweet", "parsing")
+trait TwitterInfochimpsFileProcessor {
+  def yield_fields(lines: Iterator[String]) = {
     var lineno = 0
-    for (line <- lines) {
+    (for (line <- lines) yield {
       lineno += 1
       line.split("\t", -1).toList match {
         case id :: time :: userid :: username :: _ ::
@@ -132,69 +129,67 @@ abstract class TwitterInfochimpsFileProcessor extends OldLineProcessor[Unit] {
                 "username"->username, "userid"->userid,
                 "reply_username"->reply_username, "reply_userid"->reply_userid,
                 "anchor"->raw_anchor, "lang"->lang)
-          process_line(metadata, text)
+          Some((metadata, text))
         }
         case _ => {
           errprint("Bad line #%d: %s" format (lineno, line))
           errprint("Line length: %d" format line.split("\t", -1).length)
+          None
         }
       }
-      task.item_processed()
-    }
-    task.finish()
-    print_msg_heading("Memory/time usage:", blank_lines_before = 3)
-    output_resource_usage(dojava = false)
-    (true, ())
+    }).flatten
   }
 
-  // To be implemented
+  def iterate_files(filehand: FileHandler, files: Iterable[String]) = {
+    iterate_files_with_message(filehand,
+      iterate_files_recursively(filehand, files))
+  }
 
-  def process_line(metadata: Seq[(String, String)], text: String)
+  def iterate_fields(lines: Iterator[String]) = {
+    MeteredTask.iterate("tweet", "parsing")(yield_fields(lines)) ++
+    new SideEffectIterator {
+      print_msg_heading("Memory/time usage:", blank_lines_before = 3)
+      output_resource_usage(dojava = false)
+    }
+  }
 }
 
 class ConvertTwitterInfochimpsFileProcessor(
   params: ConvertTwitterInfochimpsParameters,
   suffix: String
 ) extends TwitterInfochimpsFileProcessor {
-  var outstream: PrintStream = _
-  val compression_type = "bzip2"
   var schema: Seq[String] = null
-  var current_filehand: FileHandler = _
 
-  override def begin_process_lines(lines: Iterator[String],
-      filehand: FileHandler, file: String,
-      compression: String, realname: String) {
-    val (_, outname) = filehand.split_filename(realname)
-    val out_text_name = "%s/twitter-infochimps-%s-%s.txt" format (
-      params.output_dir, outname, suffix)
-    errprint("Text document file is %s..." format out_text_name)
-    current_filehand = filehand
-    outstream = filehand.openw(out_text_name, compression = compression_type)
-    super.begin_process_lines(lines, filehand, file, compression, realname)
-  }
-
-  def process_line(metadata: Seq[(String, String)], text: String) {
-    val rawtext = unescapeHtml4(unescapeXml(text))
-    val splittext = Twokenize(rawtext)
-    val outdata = metadata ++ Seq("text"->(splittext mkString " "))
-    val (schema, fieldvals) = outdata.unzip
-    if (this.schema == null) {
-      // Output the schema file, first time we see a line
-      val schema_file_name =
-        "%s/twitter-infochimps-%s-schema.txt" format (params.output_dir, suffix)
-      val schema_stream = current_filehand.openw(schema_file_name)
-      errprint("Schema file is %s..." format schema_file_name)
-      schema_stream.println(schema mkString "\t")
-      schema_stream.close()
-      this.schema = schema
-    } else
-      assert (this.schema == schema)
-    outstream.println(fieldvals mkString "\t")
-  }
-
-  override def end_process_file(filehand: FileHandler, file: String) {
-    outstream.close()
-    super.end_process_file(filehand, file)
+  def process_files(filehand: FileHandler, files: Iterable[String]) {
+    for (file <- iterate_files(filehand, files)) {
+      val (lines, compression_type, realname) =
+        filehand.openr_with_compression_info(file)
+      val (_, outname) = filehand.split_filename(realname)
+      val out_text_name = "%s/twitter-infochimps-%s-%s.txt" format (
+        params.output_dir, outname, suffix)
+      errprint("Text document file is %s..." format out_text_name)
+      val outstream =
+        filehand.openw(out_text_name, compression = compression_type)
+      for ((metadata, text) <- iterate_fields(lines)) {
+        val rawtext = unescapeHtml4(unescapeXml(text))
+        val splittext = Twokenize(rawtext)
+        val outdata = metadata ++ Seq("text"->(splittext mkString " "))
+        val (schema, fieldvals) = outdata.unzip
+        if (this.schema == null) {
+          // Output the schema file, first time we see a line
+          val schema_file_name =
+            "%s/twitter-infochimps-%s-schema.txt" format (params.output_dir, suffix)
+          val schema_stream = filehand.openw(schema_file_name)
+          errprint("Schema file is %s..." format schema_file_name)
+          schema_stream.println(schema mkString "\t")
+          schema_stream.close()
+          this.schema = schema
+        } else
+          assert (this.schema == schema)
+        outstream.println(fieldvals mkString "\t")
+      }
+      outstream.close()
+    }
   }
 }
 
@@ -479,27 +474,7 @@ class TwitterInfochimpsStatsFileProcessor(
   params: ConvertTwitterInfochimpsParameters
 ) extends
     TwitterInfochimpsFileProcessor {
-  var curfile: String = _
-  var curfile_stats: TwitterStatistics = _
   val global_stats = new TwitterStatistics(params)
-
-  override def begin_process_file(filehand: FileHandler, file: String) {
-    val (_, outname) = filehand.split_filename(file)
-    curfile = outname
-    curfile_stats = new TwitterStatistics(params)
-    super.begin_process_file(filehand, file)
-  }
-
-  def process_line(metadata: Seq[(String, String)], text: String) {
-    curfile_stats.record_tweet(metadata, text)
-    global_stats.record_tweet(metadata, text)
-  }
-
-  def print_curfile_stats() {
-    print_msg_heading("Statistics for file %s:" format curfile,
-      blank_lines_before = 6)
-    curfile_stats.print_statistics()
-  }
 
   def print_global_stats(is_final: Boolean = false) {
     print_msg_heading(
@@ -508,15 +483,21 @@ class TwitterInfochimpsStatsFileProcessor(
     global_stats.print_statistics()
   }
 
-  override def end_process_file(filehand: FileHandler, file: String) {
-    print_curfile_stats()
-    print_global_stats()
-    super.end_process_file(filehand, file)
-  }
-
-  override def end_processing(filehand: FileHandler, files: Iterable[String]) {
+  def process_files(filehand: FileHandler, files: Iterable[String]) {
+    for (file <- iterate_files(filehand, files)) {
+      val lines = filehand.openr(file)
+      val (_, outname) = filehand.split_filename(file)
+      val curfile_stats = new TwitterStatistics(params)
+      for ((metadata, text) <- iterate_fields(lines)) {
+        curfile_stats.record_tweet(metadata, text)
+        global_stats.record_tweet(metadata, text)
+      }
+      print_msg_heading("Statistics for file %s:" format outname,
+        blank_lines_before = 6)
+      curfile_stats.print_statistics()
+      print_global_stats()
+    }
     print_global_stats(is_final = true)
-    super.end_processing(filehand, files)
   }
 }
 
