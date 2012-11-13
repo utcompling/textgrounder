@@ -75,7 +75,7 @@ class TimeDocument(
 class TimeDocumentTable(
   override val driver: PoligrounderDriver,
   word_dist_factory: WordDistFactory
-) extends DistDocumentTable[TimeCoord, TimeDocument](
+) extends DistDocumentTable[TimeCoord](
   driver, word_dist_factory
 ) {
   def create_document(schema: Schema) = new TimeDocument(schema, this)

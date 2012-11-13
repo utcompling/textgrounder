@@ -165,14 +165,7 @@ object DocumentCounterTracker {
  * Class maintaining tables listing all documents and mapping between
  * names, ID's and documents.
  */
-abstract class DistDocumentTable[
-  TCoord : Serializer,
-  TDoc <: DistDocument[TCoord]
-](
-  /* SCALABUG!!! Declaring TDoc <: DistDocument[TCoord] isn't sufficient
-     for Scala to believe that null is an OK value for TDoc, even though
-     DistDocument is a reference type and hence TDoc must be reference.
-   */
+abstract class DistDocumentTable[TCoord : Serializer](
   val driver: GridLocateDriver,
   val word_dist_factory: WordDistFactory
 ) {
@@ -246,7 +239,7 @@ abstract class DistDocumentTable[
   val word_tokens_of_recorded_documents_with_coordinates_by_split =
     driver.countermap("word_tokens_of_recorded_documents_with_coordinates_by_split")
 
-  def create_document(schema: Schema): TDoc
+  def create_document(schema: Schema): DistDocument[TCoord]
 
   /**
    * Implementation of `create_and_init_document`.  Subclasses should
@@ -318,7 +311,7 @@ abstract class DistDocumentTable[
         }
         // SCALABUG, same bug with null and a generic type inheriting from
         // a reference type
-        null.asInstanceOf[TDoc]
+        null.asInstanceOf[DistDocument[TCoord]]
       }
       if (doc.has_coord) {
         num_documents_with_coordinates_by_split(split) += 1
@@ -348,7 +341,7 @@ abstract class DistDocumentTable[
   def fields_to_document(filehand: FileHandler, file: String,
       maybe_fieldvals: Option[Seq[String]], lineno: Long,
       schema: Schema, record_in_table: Boolean
-    ): DocumentStatus[TDoc] = {
+    ): DocumentStatus[DistDocument[TCoord]] = {
     val (maybedoc, status, reason, docdesc) =
       maybe_fieldvals match {
         case None => (None, "bad", "badly formatted database row", "")
@@ -370,7 +363,7 @@ abstract class DistDocumentTable[
           }
         }
       }
-    DocumentStatus[TDoc](filehand, file, maybedoc, status, reason, docdesc)
+    DocumentStatus[DistDocument[TCoord]](filehand, file, maybedoc, status, reason, docdesc)
   }
 
   /**
@@ -383,7 +376,7 @@ abstract class DistDocumentTable[
    */
   def line_to_document(filehand: FileHandler, file: String, line: String,
       lineno: Long, schema: Schema, record_in_table: Boolean
-    ): DocumentStatus[TDoc] = {
+    ): DocumentStatus[DistDocument[TCoord]] = {
     val maybe_fieldvals = line_to_fields(line, lineno, schema)
     fields_to_document(filehand, file, maybe_fieldvals, lineno, schema,
       record_in_table)
@@ -651,7 +644,7 @@ case class DocumentValidationException(
  */
 abstract class DistDocument[TCoord : Serializer](
   val schema: Schema,
-  val table: DistDocumentTable[TCoord,_]
+  val table: DistDocumentTable[TCoord]
 ) {
 
   import DistDocumentConverters._
