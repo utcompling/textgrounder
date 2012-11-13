@@ -223,7 +223,7 @@ class DocumentEvaluationMapper extends
   // more type erasure crap
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver() = new TDriver
-  type StrategyType = GridLocateDocumentStrategy[SphereCoord, SphereDocument]
+  type StrategyType = GridLocateDocumentStrategy[SphereCoord]
   type DocStatsType = Iterator[DocumentStatus[SphereDocument]]
 
   val task = new ExperimentMeteredTask(driver, "document", "evaluating")

@@ -107,9 +107,9 @@ class GroupedSphereDocumentEvalStats(
   cell_grid: SphereCellGrid,
   results_by_range: Boolean,
   is_ranked: Boolean
-) extends GroupedDocumentEvalStats[
-  SphereCoord, SphereDocument
-](driver_stats, cell_grid, results_by_range) {
+) extends GroupedDocumentEvalStats[SphereCoord](
+  driver_stats, cell_grid, results_by_range
+) {
   override def create_stats(prefix: String) = {
     if (is_ranked)
       new RankedSphereDocumentEvalStats(driver_stats, prefix)
@@ -125,21 +125,21 @@ class GroupedSphereDocumentEvalStats(
       create_stats_for_range("degree_dist_to_pred_center", _))
 
   override def record_one_result(stats: DocumentEvalStats,
-      res: DocumentEvaluationResult[SphereCoord, SphereDocument]) {
+      res: DocumentEvaluationResult[SphereCoord]) {
     super.record_one_result(stats, res)
     stats.asInstanceOf[SphereDocumentEvalStats].
       record_predicted_degree_distance(res.pred_degdist)
   }
 
   override def record_one_oracle_result(stats: DocumentEvalStats,
-      res: DocumentEvaluationResult[SphereCoord, SphereDocument]) {
+      res: DocumentEvaluationResult[SphereCoord]) {
     super.record_one_oracle_result(stats, res)
     stats.asInstanceOf[SphereDocumentEvalStats].
       record_oracle_degree_distance(res.true_degdist)
   }
 
   override def record_result_by_range(
-    res: DocumentEvaluationResult[SphereCoord, SphereDocument]
+    res: DocumentEvaluationResult[SphereCoord]
   ) {
     super.record_result_by_range(res)
 
@@ -243,12 +243,12 @@ class GroupedSphereDocumentEvalStats(
  * cell grid and picks the central point of the top-ranked one.
  */
 class RankedSphereCellGridEvaluator(
-  strategy: GridLocateDocumentStrategy[SphereCoord, SphereDocument],
+  strategy: GridLocateDocumentStrategy[SphereCoord],
   stratname: String,
   driver: GeolocateDocumentTypeDriver
-) extends RankedCellGridEvaluator[
-  SphereCoord, SphereDocument
-](strategy, stratname, driver) {
+) extends RankedCellGridEvaluator[SphereCoord](
+  strategy, stratname, driver
+) {
   def create_grouped_eval_stats(driver: GridLocateDocumentDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
     new GroupedSphereDocumentEvalStats(
@@ -284,16 +284,15 @@ class RankedSphereCellGridEvaluator(
  * point that hopefully should be in the center of the largest cluster.
  */
 class MeanShiftSphereCellGridEvaluator(
-  strategy: GridLocateDocumentStrategy[SphereCoord, SphereDocument],
+  strategy: GridLocateDocumentStrategy[SphereCoord],
   stratname: String,
   driver: GeolocateDocumentTypeDriver,
   k_best: Int,
   mean_shift_window: Double,
   mean_shift_max_stddev: Double,
   mean_shift_max_iterations: Int
-) extends MeanShiftCellGridEvaluator[
-  SphereCoord, SphereDocument
-](strategy, stratname, driver, k_best, mean_shift_window,
+) extends MeanShiftCellGridEvaluator[SphereCoord](
+  strategy, stratname, driver, k_best, mean_shift_window,
   mean_shift_max_stddev, mean_shift_max_iterations) {
   def create_grouped_eval_stats(driver: GridLocateDocumentDriver,
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
@@ -311,7 +310,7 @@ class TitledDocumentResult { }
  * in the PCL Travel corpus.
  */
 class PCLTravelGeolocateDocumentEvaluator(
-  strategy: GridLocateDocumentStrategy[SphereCoord, SphereDocument],
+  strategy: GridLocateDocumentStrategy[SphereCoord],
   stratname: String,
   driver: GeolocateDocumentTypeDriver,
   filehand: FileHandler,

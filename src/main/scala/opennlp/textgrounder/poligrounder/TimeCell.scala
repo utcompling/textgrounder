@@ -43,7 +43,7 @@ class TimeCell(
   from: Long,
   to: Long,
   cell_grid: TimeCellGrid
-) extends GeoCell[TimeCoord, TimeDocument](cell_grid) {
+) extends GeoCell[TimeCoord](cell_grid) {
   /**
    * Return the boundary of the cell as a pair of coordinates, specifying the
    * beginning and end.
@@ -103,17 +103,17 @@ class TimeCellGrid(
   categories: Seq[String],
   category_of_doc: TimeDocument => String,
   override val table: TimeDocumentTable
-) extends CellGrid[TimeCoord, TimeDocument](table) {
+) extends CellGrid[TimeCoord](table) {
   
   val pairs = categories.map {
     x => (x, new TimeCellPair(x, before_chunk, after_chunk, this))
   }.toMap
   var total_num_cells = 2 * categories.length
 
-  def find_best_cell_for_document(doc: TimeDocument,
+  def find_best_cell_for_document(doc: DistDocument[TimeCoord],
       create_non_recorded: Boolean) = {
     assert(!create_non_recorded)
-    val category = category_of_doc(doc)
+    val category = category_of_doc(doc.asInstanceOf[TimeDocument])
     if (category != null)
       pairs(category).find_best_cell_for_coord(doc.coord)
     else {
@@ -123,7 +123,7 @@ class TimeCellGrid(
     }
   }
 
-  def add_document_to_cell(doc: TimeDocument) {
+  def add_document_to_cell(doc: DistDocument[TimeCoord]) {
     val cell = find_best_cell_for_document(doc, false)
     if (cell != null)
       cell.add_document(doc)

@@ -11,7 +11,7 @@ package object geolocate {
    * rather than in actual distance along a great circle.
    */
   class SphereDocumentEvaluationResult(
-    stats: DocumentEvaluationResult[SphereCoord, SphereDocument]
+    stats: DocumentEvaluationResult[SphereCoord]
   ) {
     /**
      * Distance in degrees between document's coordinate and central
@@ -26,12 +26,12 @@ package object geolocate {
   }
 
   implicit def to_SphereDocumentEvaluationResult(
-    stats: DocumentEvaluationResult[SphereCoord, SphereDocument]
+    stats: DocumentEvaluationResult[SphereCoord]
   ) = new SphereDocumentEvaluationResult(stats)
 
   type SphereDocument = DistDocument[SphereCoord]
-  type SphereCell = GeoCell[SphereCoord, SphereDocument]
-  type SphereCellGrid = CellGrid[SphereCoord, SphereDocument]
+  type SphereCell = GeoCell[SphereCoord]
+  type SphereCellGrid = CellGrid[SphereCoord]
   def get_sphere_doctable(grid: SphereCellGrid) =
     grid.table.asInstanceOf[SphereDocumentTable]
 }
