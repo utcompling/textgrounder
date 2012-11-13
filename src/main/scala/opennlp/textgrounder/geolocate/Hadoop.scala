@@ -36,7 +36,7 @@ import tgutil.mathutil.{mean, median}
 import tgutil.printutil.{errprint, warning}
 import tgutil.textdbutil.TextDBProcessor
 
-import opennlp.textgrounder.gridlocate.{CellGridEvaluator,TextGrounderInfo,GridLocateDocumentStrategy,DocumentStatus}
+import opennlp.textgrounder.gridlocate._
 
 /* Basic idea for hooking up Geolocate with Hadoop.  Hadoop works in terms
    of key-value pairs, as follows:
@@ -223,7 +223,7 @@ class DocumentEvaluationMapper extends
   // more type erasure crap
   def create_param_object(ap: ArgParser) = new TParam(ap)
   def create_driver() = new TDriver
-  type StrategyType = GridLocateDocumentStrategy[SphereCell, SphereCellGrid]
+  type StrategyType = GridLocateDocumentStrategy[SphereCoord, SphereDocument]
   type DocStatsType = Iterator[DocumentStatus[SphereDocument]]
 
   val task = new ExperimentMeteredTask(driver, "document", "evaluating")
@@ -298,8 +298,7 @@ class DocumentEvaluationMapper extends
     for { results <- new TransposeIterator(evaluators);
           (stratname, result) <- stratnames zip results } {
       context.write(new Text(stratname),
-        new DoubleWritable(result.asInstanceOf[SphereDocumentEvaluationResult].
-          pred_truedist))
+        new DoubleWritable(result.pred_truedist))
     }
   }
 }

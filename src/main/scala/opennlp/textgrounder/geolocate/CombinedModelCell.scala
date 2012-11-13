@@ -24,7 +24,7 @@ import tgutil.distances.SphereCoord
 import tgutil.experiment._
 import tgutil.printutil.{errprint, warning}
 
-class CombinedModelCellGrid(table: SphereDocumentTable,
+class CombinedModelCellGrid(override val table: SphereDocumentTable,
                             models: Seq[SphereCellGrid])
     extends SphereCellGrid(table) {
 

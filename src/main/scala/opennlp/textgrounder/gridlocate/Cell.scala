@@ -149,8 +149,7 @@ class CombinedWordDist(factory: WordDistFactory) {
  * @tparam TDoc The type of documents stored in a cell in the grid.
  */
 abstract class GeoCell[TCoord, TDoc <: DistDocument[TCoord]](
-    val cell_grid: CellGrid[TCoord, TDoc,
-      _ <: GeoCell[TCoord, TDoc]]
+    val cell_grid: CellGrid[TCoord, TDoc]
 ) {
   val combined_dist =
     new CombinedWordDist(cell_grid.table.word_dist_factory)
@@ -335,12 +334,12 @@ trait DocumentRememberingCell[TCoord, TDoc <: DistDocument[TCoord]] {
  */
 abstract class CellGrid[
   TCoord,
-  TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc]
+  TDoc <: DistDocument[TCoord]
 ](
-    val table: DistDocumentTable[TCoord, TDoc, TCell,
-      _ <: CellGrid[TCoord, TDoc, TCell]]
+    val table: DistDocumentTable[TCoord, TDoc]
 ) {
+
+  type TCell = GeoCell[TCoord, TDoc]
 
   /**
    * Total number of cells in the grid.
@@ -370,7 +369,7 @@ abstract class CellGrid[
    * such cells is to make sure that future evaluation results aren't affected.
    */
   def find_best_cell_for_document(doc: TDoc, create_non_recorded: Boolean):
-    TCell
+    GeoCell[TCoord, TDoc]
 
   /**
    * Add the given document to the cell grid.
@@ -398,7 +397,7 @@ abstract class CellGrid[
    *   but have no corresponding word counts given in the counts file.)
    */
   def iter_nonempty_cells(nonempty_word_dist: Boolean = false):
-    Iterable[TCell]
+    Iterable[GeoCell[TCoord, TDoc]]
   
   /**
    * Iterate over all non-empty cells.
@@ -411,7 +410,7 @@ abstract class CellGrid[
    *   even when not set, some documents may be listed in the document-data file
    *   but have no corresponding word counts given in the counts file.)
    */
-  def iter_nonempty_cells_including(include: Iterable[TCell],
+  def iter_nonempty_cells_including(include: Iterable[GeoCell[TCoord, TDoc]],
       nonempty_word_dist: Boolean = false) = {
     val cells = iter_nonempty_cells(nonempty_word_dist)
     if (include.size == 0)

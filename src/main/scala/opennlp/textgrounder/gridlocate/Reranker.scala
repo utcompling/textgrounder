@@ -181,49 +181,44 @@ trait LinearClassifierReranker[
 
 /**
  * @tparam TDoc Type of the training and test documents
- * @tparam TCell Type of a cell in a cell grid
- * @tparam TGrid Type of a cell grid
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
  */
 class CellGridRanker[
-  TDoc <: DistDocument[_],
-  TCell <: GeoCell[_, TDoc],
-  TGrid <: CellGrid[_, TDoc, TCell]
-](
-  strategy: GridLocateDocumentStrategy[TCell, TGrid]
-) extends Ranker[TDoc, TCell] {
+  TCoord,
+  TDoc <: DistDocument[TCoord]
+](strategy: GridLocateDocumentStrategy[TCoord, TDoc]
+ ) extends Ranker[TDoc, GeoCell[TCoord, TDoc]] {
+  type TCell = GeoCell[TCoord, TDoc]
   def evaluate(item: TDoc, include: Iterable[TCell]) =
     strategy.return_ranked_cells(item.dist, include)
 }
 
 class DistDocumentRerankInstance[
-  TDoc <: DistDocument[_],
-  TCell <: GeoCell[_, TDoc],
-  TGrid <: CellGrid[_, TDoc, TCell]
+  TCoord,
+  TDoc <: DistDocument[TCoord]
 ](
-  doc: TDoc, cell: TCell, score: Double
+  doc: TDoc, cell: GeoCell[TCoord, TDoc], score: Double
 ) extends SparseFeatureVector(Map("score" -> score)) {
 }
 
 abstract class DistDocumentReranker[
-  TDoc <: DistDocument[_],
-  TCell <: GeoCell[_, TDoc],
-  TGrid <: CellGrid[_, TDoc, TCell]
+  TCoord,
+  TDoc <: DistDocument[TCoord]
 ](
-  _initial_ranker: Ranker[TDoc, TCell],
+  _initial_ranker: Ranker[TDoc, GeoCell[TCoord, TDoc]],
   _top_n: Int
 ) extends PointwiseClassifyingReranker[
-  TDoc,
-  DistDocumentRerankInstance[TDoc, TCell, TGrid],
-  TCell] {
+  TDoc, DistDocumentRerankInstance[TCoord, TDoc], GeoCell[TCoord, TDoc]
+  ] {
   protected val top_n = _top_n
   protected val initial_ranker = _initial_ranker
 
+  type TCell = GeoCell[TCoord, TDoc]
   protected def create_rerank_instance(item: TDoc, possible_answer: TCell,
     score: Double) =
-      new DistDocumentRerankInstance[TDoc, TCell, TGrid](
+      new DistDocumentRerankInstance[TCoord, TDoc](
         item, possible_answer, score)
 }
 
@@ -242,36 +237,34 @@ class TrivialScoringBinaryClassifier[TestItem <: SparseFeatureVector](
 }
 
 class TrivialDistDocumentReranker[
-  TDoc <: DistDocument[_],
-  TCell <: GeoCell[_, TDoc],
-  TGrid <: CellGrid[_, TDoc, TCell]
+  TCoord,
+  TDoc <: DistDocument[TCoord]
 ](
-  _initial_ranker: Ranker[TDoc, TCell],
+  _initial_ranker: Ranker[TDoc, GeoCell[TCoord, TDoc]],
   _top_n: Int
-) extends DistDocumentReranker[TDoc, TCell, TGrid](
+) extends DistDocumentReranker[TCoord, TDoc](
   _initial_ranker, _top_n
 ) {
   lazy protected val rerank_classifier =
     new TrivialScoringBinaryClassifier[
-      DistDocumentRerankInstance[TDoc, TCell, TGrid]](
+      DistDocumentRerankInstance[TCoord, TDoc]](
         0 // FIXME: This is incorrect but doesn't matter
       )
 }
 
 class LinearClassifierDistDocumentReranker[
-  TDoc <: DistDocument[_],
-  TCell <: GeoCell[_, TDoc],
-  TGrid <: CellGrid[_, TDoc, TCell]
+  TCoord,
+  TDoc <: DistDocument[TCoord]
 ](
-  _initial_ranker: Ranker[TDoc, TCell],
+  _initial_ranker: Ranker[TDoc, GeoCell[TCoord, TDoc]],
   _trainer: BinaryLinearClassifierTrainer,
-  _training_data: Iterable[(TDoc, TCell)],
+  _training_data: Iterable[(TDoc, GeoCell[TCoord, TDoc])],
   _top_n: Int
-) extends DistDocumentReranker[TDoc, TCell, TGrid](
+) extends DistDocumentReranker[TCoord, TDoc](
   _initial_ranker, _top_n
 ) with LinearClassifierReranker[TDoc,
-  DistDocumentRerankInstance[TDoc, TCell, TGrid],
-  TCell] {
+  DistDocumentRerankInstance[TCoord, TDoc],
+  GeoCell[TCoord, TDoc]] {
   val linear_classifier_trainer = _trainer
   val training_data = _training_data
   if (training_data == null)
