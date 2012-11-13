@@ -196,12 +196,12 @@ class PoligrounderDriver extends
   protected def initialize_document_table(word_dist_factory: WordDistFactory) =
     new TimeDocumentTable(this, word_dist_factory)
 
-  protected def initialize_cell_grid(table: GDocTable[TimeCoord]) = {
+  protected def initialize_grid(table: GDocTable[TimeCoord]) = {
     val timetab = table.asInstanceOf[TimeDocumentTable]
     if (params.ideological_user_corpus == null)
-      new TimeCellGrid(from_chunk, to_chunk, Seq("all"), x => "all", timetab)
+      new TimeGrid(from_chunk, to_chunk, Seq("all"), x => "all", timetab)
     else
-      new TimeCellGrid(from_chunk, to_chunk, Seq("liberal", "conservative"),
+      new TimeGrid(from_chunk, to_chunk, Seq("liberal", "conservative"),
         x => {
           if (params.ideological_users_liberal contains x.user)
             "liberal"
@@ -215,11 +215,11 @@ class PoligrounderDriver extends
   def run_after_setup() {
     if (params.ideological_user_corpus == null)
       DistributionComparer.compare_cells_2way(
-        cell_grid.asInstanceOf[TimeCellGrid], "all",
+        grid.asInstanceOf[TimeGrid], "all",
         params.min_prob, params.max_items)
     else
       DistributionComparer.compare_cells_4way(
-        cell_grid.asInstanceOf[TimeCellGrid], "liberal", "conservative",
+        grid.asInstanceOf[TimeGrid], "liberal", "conservative",
         params.min_prob, params.max_items)
   }
 }

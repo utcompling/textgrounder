@@ -31,7 +31,7 @@ package object geolocate {
 
   type SphereDocument = GDoc[SphereCoord]
   type SphereCell = GCell[SphereCoord]
-  type SphereCellGrid = CellGrid[SphereCoord]
-  def get_sphere_doctable(grid: SphereCellGrid) =
+  type SphereGrid = GGrid[SphereCoord]
+  def get_sphere_doctable(grid: SphereGrid) =
     grid.table.asInstanceOf[SphereDocumentTable]
 }

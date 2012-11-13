@@ -42,8 +42,8 @@ import opennlp.textgrounder.worddist.WordDist.memoizer._
 class TimeCell(
   from: Long,
   to: Long,
-  cell_grid: TimeCellGrid
-) extends GCell[TimeCoord](cell_grid) {
+  grid: TimeGrid
+) extends GCell[TimeCoord](grid) {
   /**
    * Return the boundary of the cell as a pair of coordinates, specifying the
    * beginning and end.
@@ -69,7 +69,7 @@ class TimeCellPair(
   val category: String,
   val before_chunk: (Long, Long),
   val after_chunk: (Long, Long),
-  val grid: TimeCellGrid
+  val grid: TimeGrid
 ) {
   val before_cell = new TimeCell(before_chunk._1, before_chunk._2, grid)
   val after_cell = new TimeCell(after_chunk._1, after_chunk._2, grid)
@@ -97,13 +97,13 @@ class TimeCellPair(
 /**
  * Class for a "grid" of time intervals.
  */
-class TimeCellGrid(
+class TimeGrid(
   before_chunk: (Long, Long),
   after_chunk: (Long, Long),
   categories: Seq[String],
   category_of_doc: TimeDocument => String,
   override val table: TimeDocumentTable
-) extends CellGrid[TimeCoord](table) {
+) extends GGrid[TimeCoord](table) {
   
   val pairs = categories.map {
     x => (x, new TimeCellPair(x, before_chunk, after_chunk, this))
@@ -173,7 +173,7 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
   type Item
   type Dist <: WordDist
 
-  def get_pair(grid: TimeCellGrid, category: String) =
+  def get_pair(grid: TimeGrid, category: String) =
     grid.pairs(category)
   def get_dist(cell: TimeCell): Dist =
     cell.combined_dist.word_dist.asInstanceOf[Dist]
@@ -181,7 +181,7 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
   def lookup_item(dist: Dist, item: Item): Double
   def format_item(item: Item): String
 
-  def compare_cells_2way(grid: TimeCellGrid, category: String) {
+  def compare_cells_2way(grid: TimeGrid, category: String) {
     val before_dist = get_dist(get_pair(grid, category).before_cell)
     val after_dist = get_dist(get_pair(grid, category).after_cell)
 
@@ -230,7 +230,7 @@ abstract class DistributionComparer(min_prob: Double, max_items: Int) {
 
   }
 
-  def compare_cells_4way(grid: TimeCellGrid, category1: String,
+  def compare_cells_4way(grid: TimeGrid, category1: String,
       category2: String) {
     val before_dist_1 = get_dist(get_pair(grid, category1).before_cell)
     val after_dist_1 = get_dist(get_pair(grid, category1).after_cell)
@@ -334,7 +334,7 @@ class NgramComparer(min_prob: Double, max_items: Int) extends
 }
 
 object DistributionComparer {
-  def get_comparer(grid: TimeCellGrid, category: String, min_prob: Double,
+  def get_comparer(grid: TimeGrid, category: String, min_prob: Double,
       max_items: Int) =
     grid.pairs(category).before_cell.combined_dist.word_dist match {
       case _: UnigramWordDist =>
@@ -344,13 +344,13 @@ object DistributionComparer {
       case _ => throw new IllegalArgumentException("Don't know how to compare this type of word distribution")
     }
 
-  def compare_cells_2way(grid: TimeCellGrid, category: String, min_prob: Double,
+  def compare_cells_2way(grid: TimeGrid, category: String, min_prob: Double,
       max_items: Int) {
     val comparer = get_comparer(grid, category, min_prob, max_items)
     comparer.compare_cells_2way(grid, category)
   }
 
-  def compare_cells_4way(grid: TimeCellGrid, category1: String,
+  def compare_cells_4way(grid: TimeGrid, category1: String,
       category2: String, min_prob: Double, max_items: Int) {
     val comparer = get_comparer(grid, category1, min_prob, max_items)
     comparer.compare_cells_4way(grid, category1, category2)

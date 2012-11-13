@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  KDTreeCellGrid.scala
+//  KDTreeGrid.scala
 //
 //  Copyright (C) 2011, 2012 Stephen Roller, The University of Texas at Austin
 //  Copyright (C) 2011 Ben Wing, The University of Texas at Austin
@@ -33,7 +33,7 @@ import tgutil.printutil.{errprint, warning}
 import opennlp.textgrounder.worddist.UnigramWordDist
 
 class KdTreeCell(
-  cellgrid: KdTreeCellGrid,
+  cellgrid: KdTreeGrid,
   val kdleaf : KdTree
 ) extends RectangularCell(cellgrid) {
 
@@ -54,10 +54,10 @@ class KdTreeCell(
   }
 }
 
-object KdTreeCellGrid {
+object KdTreeGrid {
   def apply(table: SphereDocumentTable, bucketSize: Int, splitMethod: String,
-            useBackoff: Boolean, interpolateWeight: Double = 0.0) : KdTreeCellGrid = {
-    new KdTreeCellGrid(table, bucketSize, splitMethod match {
+            useBackoff: Boolean, interpolateWeight: Double = 0.0) : KdTreeGrid = {
+    new KdTreeGrid(table, bucketSize, splitMethod match {
       case "halfway" => KdTree.SplitMethod.HALFWAY
       case "median" => KdTree.SplitMethod.MEDIAN
       case "maxmargin" => KdTree.SplitMethod.MAX_MARGIN
@@ -65,12 +65,12 @@ object KdTreeCellGrid {
   }
 }
 
-class KdTreeCellGrid(override val table: SphereDocumentTable,
+class KdTreeGrid(override val table: SphereDocumentTable,
                      bucketSize: Int,
                      splitMethod: KdTree.SplitMethod,
                      useBackoff: Boolean,
                      interpolateWeight: Double)
-    extends SphereCellGrid(table) {
+    extends SphereGrid(table) {
   /**
    * Total number of cells in the grid.
    */

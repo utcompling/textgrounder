@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////
-//  CombinedModelCellGrid.scala
+//  CombinedModelGrid.scala
 //
 //  Copyright (C) 2012 Stephen Roller, The University of Texas at Austin
 //
@@ -24,9 +24,9 @@ import tgutil.distances.SphereCoord
 import tgutil.experiment._
 import tgutil.printutil.{errprint, warning}
 
-class CombinedModelCellGrid(override val table: SphereDocumentTable,
-                            models: Seq[SphereCellGrid])
-    extends SphereCellGrid(table) {
+class CombinedModelGrid(override val table: SphereDocumentTable,
+                            models: Seq[SphereGrid])
+    extends SphereGrid(table) {
 
   override var total_num_cells: Int = models.map(_.total_num_cells).sum
   override val num_training_passes: Int = models.map(_.num_training_passes).max

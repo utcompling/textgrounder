@@ -90,37 +90,37 @@ object RegularCellIndex {
      [error]     RegularCellIndex(latind, longind)
      [error]     ^
      */
-  def apply(cell_grid: MultiRegularCellGrid, latind: Int, longind: Int):
+  def apply(grid: MultiRegularGrid, latind: Int, longind: Int):
       RegularCellIndex = {
-    require(valid(cell_grid, latind, longind))
+    require(valid(grid, latind, longind))
     new RegularCellIndex(latind, longind)
   }
 
-  def valid(cell_grid: MultiRegularCellGrid, latind: Int, longind: Int) = (
-    latind >= cell_grid.minimum_latind &&
-    latind <= cell_grid.maximum_latind &&
-    longind >= cell_grid.minimum_longind &&
-    longind <= cell_grid.maximum_longind
+  def valid(grid: MultiRegularGrid, latind: Int, longind: Int) = (
+    latind >= grid.minimum_latind &&
+    latind <= grid.maximum_latind &&
+    longind >= grid.minimum_longind &&
+    longind <= grid.maximum_longind
   )
 
-  def coerce_indices(cell_grid: MultiRegularCellGrid, latind: Int,
+  def coerce_indices(grid: MultiRegularGrid, latind: Int,
       longind: Int) = {
     var newlatind = latind
     var newlongind = longind
-    if (newlatind > cell_grid.maximum_latind)
-      newlatind = cell_grid.maximum_latind
-    while (newlongind > cell_grid.maximum_longind)
-      newlongind -= (cell_grid.maximum_longind - cell_grid.minimum_longind + 1)
-    if (newlatind < cell_grid.minimum_latind)
-      newlatind = cell_grid.minimum_latind
-    while (newlongind < cell_grid.minimum_longind)
-      newlongind += (cell_grid.maximum_longind - cell_grid.minimum_longind + 1)
+    if (newlatind > grid.maximum_latind)
+      newlatind = grid.maximum_latind
+    while (newlongind > grid.maximum_longind)
+      newlongind -= (grid.maximum_longind - grid.minimum_longind + 1)
+    if (newlatind < grid.minimum_latind)
+      newlatind = grid.minimum_latind
+    while (newlongind < grid.minimum_longind)
+      newlongind += (grid.maximum_longind - grid.minimum_longind + 1)
     (newlatind, newlongind)
   }
 
-  def coerce(cell_grid: MultiRegularCellGrid, latind: Int, longind: Int) = {
-    val (newlatind, newlongind) = coerce_indices(cell_grid, latind, longind)
-    apply(cell_grid, newlatind, newlongind)
+  def coerce(grid: MultiRegularGrid, latind: Int, longind: Int) = {
+    val (newlatind, newlongind) = coerce_indices(grid, latind, longind)
+    apply(grid, newlatind, newlongind)
   }
 }
 
@@ -133,23 +133,23 @@ case class FractionalRegularCellIndex(latind: Double, longind: Double) {
 }
 
 /**
- * A cell where the cell grid is a MultiRegularCellGrid. (See that class.)
+ * A cell where the cell grid is a MultiRegularGrid. (See that class.)
  *
- * @param cell_grid The CellGrid object for the grid this cell is in,
- *   an instance of MultiRegularCellGrid.
+ * @param grid The Grid object for the grid this cell is in,
+ *   an instance of MultiRegularGrid.
  * @param index Index of (the southwest corner of) this cell in the grid
  */
 
 class MultiRegularCell(
-  cell_grid: MultiRegularCellGrid,
+  grid: MultiRegularGrid,
   val index: RegularCellIndex
-) extends RectangularCell(cell_grid) {
+) extends RectangularCell(grid) {
 
   def get_southwest_coord() =
-    cell_grid.multi_cell_index_to_near_corner_coord(index)
+    grid.multi_cell_index_to_near_corner_coord(index)
 
   def get_northeast_coord() =
-    cell_grid.multi_cell_index_to_far_corner_coord(index)
+    grid.multi_cell_index_to_far_corner_coord(index)
 
   def describe_location() = {
     "%s-%s" format (get_southwest_coord(), get_northeast_coord())
@@ -167,13 +167,13 @@ class MultiRegularCell(
     // wrap the longitude.  The call to `coerce()` will automatically
     // wrap the longitude, but we need to truncate the latitude ourselves,
     // or else we'll end up repeating cells.
-    val max_offset = cell_grid.width_of_multi_cell - 1
-    val maxlatind = cell_grid.maximum_latind min (index.latind + max_offset)
+    val max_offset = grid.width_of_multi_cell - 1
+    val maxlatind = grid.maximum_latind min (index.latind + max_offset)
 
     for (
       i <- index.latind to maxlatind;
       j <- index.longind to (index.longind + max_offset)
-    ) yield RegularCellIndex.coerce(cell_grid, i, j)
+    ) yield RegularCellIndex.coerce(grid, i, j)
   }
 }
 
@@ -195,11 +195,11 @@ class MultiRegularCell(
  * @param width_of_multi_cell Size of multi cells in tiling cells,
  *   determined by the --width-of-multi-cell option.
  */
-class MultiRegularCellGrid(
+class MultiRegularGrid(
   val degrees_per_cell: Double,
   val width_of_multi_cell: Int,
   override val table: SphereDocumentTable
-) extends SphereCellGrid(table) {
+) extends SphereGrid(table) {
 
   /**
    * Size of each cell (vertical dimension; horizontal dimension only near

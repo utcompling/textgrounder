@@ -85,7 +85,7 @@ doing geolocation is split up into various classes:
 
 -- Classes exist in `gridlocate` for an individual document (GDoc),
    the table of all documents (GDocTable), the grid containing cells
-   into which the documents are placed (CellGrid), and the individual cells
+   into which the documents are placed (Grid), and the individual cells
    in the grid (GCell).  There also needs to be a class specifying a
    coordinate identifying a document (e.g. time or latitude/longitude pair).
    Specific versions of all of these are created for Geolocate, identified
@@ -93,14 +93,14 @@ doing geolocation is split up into various classes:
    which is intended to indicate the fact that the grid refers to locations
    on the surface of a sphere.
 -- The cell grid class SphereGrid has subclasses for the different types of
-   grids (MultiRegularCellGrid, KDTreeCellGrid).
+   grids (MultiRegularGrid, KDTreeGrid).
 -- Different types of strategy objects (subclasses of
    GeolocateDocumentStrategy, in turn a subclass of GridLocateDocumentStrategy)
    implement the different inference methods specified using `--strategy`,
    e.g. KLDivergenceStrategy or NaiveBayesDocumentStrategy. The driver method
    `setup_for_run` creates the necessary strategy objects.
--- Evaluation is performed using different CellGridEvaluator objects, e.g.
-   RankedSphereCellGridEvaluator and MeanShiftSphereCellGridEvaluator. 
+-- Evaluation is performed using different GridEvaluator objects, e.g.
+   RankedSphereGridEvaluator and MeanShiftSphereGridEvaluator. 
 */
 
 /////////////////////////////////////////////////////////////////////////////
@@ -108,11 +108,11 @@ doing geolocation is split up into various classes:
 /////////////////////////////////////////////////////////////////////////////
 
 abstract class GeolocateDocumentStrategy(
-  sphere_grid: SphereCellGrid
+  sphere_grid: SphereGrid
 ) extends GridLocateDocumentStrategy[SphereCoord](sphere_grid) { }
 
 class CellDistMostCommonToponymGeolocateDocumentStrategy(
-  sphere_grid: SphereCellGrid
+  sphere_grid: SphereGrid
 ) extends GeolocateDocumentStrategy(sphere_grid) {
   val cdist_factory =
     new CellDistFactory[SphereCoord](sphere_grid.table.driver.params.lru_cache_size)
@@ -140,7 +140,7 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
 }
 
 class LinkMostCommonToponymGeolocateDocumentStrategy(
-  sphere_grid: SphereCellGrid
+  sphere_grid: SphereGrid
 ) extends GeolocateDocumentStrategy(sphere_grid) {
   def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
     val word_dist = UnigramStrategy.check_unigram_dist(_word_dist)
@@ -317,21 +317,21 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
   protected def initialize_document_table(word_dist_factory: WordDistFactory) =
     new SphereDocumentTable(this, word_dist_factory)
 
-  protected def initialize_cell_grid(table: GDocTable[SphereCoord]) = {
+  protected def initialize_grid(table: GDocTable[SphereCoord]) = {
     val spheretab = table.asInstanceOf[SphereDocumentTable]
     if (params.combined_kd_grid) {
       val kdcg =
-        KdTreeCellGrid(spheretab, params.kd_bucket_size, params.kd_split_method,
+        KdTreeGrid(spheretab, params.kd_bucket_size, params.kd_split_method,
           params.kd_use_backoff, params.kd_interpolate_weight)
       val mrcg =
-        new MultiRegularCellGrid(degrees_per_cell,
+        new MultiRegularGrid(degrees_per_cell,
           params.width_of_multi_cell, spheretab)
-      new CombinedModelCellGrid(spheretab, Seq(mrcg, kdcg))
+      new CombinedModelGrid(spheretab, Seq(mrcg, kdcg))
     } else if (params.kd_tree) {
-      KdTreeCellGrid(spheretab, params.kd_bucket_size, params.kd_split_method,
+      KdTreeGrid(spheretab, params.kd_bucket_size, params.kd_split_method,
         params.kd_use_backoff, params.kd_interpolate_weight)
     } else {
-      new MultiRegularCellGrid(degrees_per_cell,
+      new MultiRegularGrid(degrees_per_cell,
         params.width_of_multi_cell, spheretab)
     }
   }
@@ -554,11 +554,11 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
   override def create_strategy(stratname: String) = {
     stratname match {
       case "link-most-common-toponym" =>
-        new LinkMostCommonToponymGeolocateDocumentStrategy(cell_grid)
+        new LinkMostCommonToponymGeolocateDocumentStrategy(grid)
       case "celldist-most-common-toponym" =>
-        new CellDistMostCommonToponymGeolocateDocumentStrategy(cell_grid)
+        new CellDistMostCommonToponymGeolocateDocumentStrategy(grid)
       case "average-cell-probability" =>
-        new AverageCellProbabilityStrategy[SphereCoord](cell_grid)
+        new AverageCellProbabilityStrategy[SphereCoord](grid)
       case other => super.create_strategy(other)
     }
   }
@@ -610,7 +610,7 @@ The error is as follows:
 
 scala.tools.nsc.symtab.Types$TypeError: type mismatch;
 found   : (String, Iterator[evalobj.TEvalRes])
-  required: (java.lang.String, Iterator[opennlp.textgrounder.gridlocate.CellGridEvaluator[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]{def create_grouped_eval_stats(driver: opennlp.textgrounder.gridlocate.GridLocateDocumentDriver,cell_grid: opennlp.textgrounder.geolocate.package.SphereCellGrid,results_by_range: Boolean): opennlp.textgrounder.geolocate.GroupedSphereDocumentEvalStats; type TEvalRes >: opennlp.textgrounder.gridlocate.RankedDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] with opennlp.textgrounder.gridlocate.CoordDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] <: opennlp.textgrounder.gridlocate.DocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]}#TEvalRes])
+  required: (java.lang.String, Iterator[opennlp.textgrounder.gridlocate.GridEvaluator[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]{def create_grouped_eval_stats(driver: opennlp.textgrounder.gridlocate.GridLocateDocumentDriver,grid: opennlp.textgrounder.geolocate.package.SphereGrid,results_by_range: Boolean): opennlp.textgrounder.geolocate.GroupedSphereDocumentEvalStats; type TEvalRes >: opennlp.textgrounder.gridlocate.RankedDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] with opennlp.textgrounder.gridlocate.CoordDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] <: opennlp.textgrounder.gridlocate.DocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]}#TEvalRes])
   at scala.tools.nsc.typechecker.Contexts$Context.error(Contexts.scala:298)
   at scala.tools.nsc.typechecker.Infer$Inferencer.error(Infer.scala:207)
   at scala.tools.nsc.typechecker.Infer$Inferencer.typeError(Infer.scala:217)
@@ -802,22 +802,22 @@ found   : (String, Iterator[evalobj.TEvalRes])
   at java.lang.Thread.run(Thread.java:680)
 [error] (compile:compile) scala.tools.nsc.symtab.Types$TypeError: type mismatch;
 [error]  found   : (String, Iterator[evalobj.TEvalRes])
-[error]  required: (java.lang.String, Iterator[opennlp.textgrounder.gridlocate.CellGridEvaluator[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]{def create_grouped_eval_stats(driver: opennlp.textgrounder.gridlocate.GridLocateDocumentDriver,cell_grid: opennlp.textgrounder.geolocate.package.SphereCellGrid,results_by_range: Boolean): opennlp.textgrounder.geolocate.GroupedSphereDocumentEvalStats; type TEvalRes >: opennlp.textgrounder.gridlocate.RankedDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] with opennlp.textgrounder.gridlocate.CoordDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] <: opennlp.textgrounder.gridlocate.DocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]}#TEvalRes])
+[error]  required: (java.lang.String, Iterator[opennlp.textgrounder.gridlocate.GridEvaluator[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]{def create_grouped_eval_stats(driver: opennlp.textgrounder.gridlocate.GridLocateDocumentDriver,grid: opennlp.textgrounder.geolocate.package.SphereGrid,results_by_range: Boolean): opennlp.textgrounder.geolocate.GroupedSphereDocumentEvalStats; type TEvalRes >: opennlp.textgrounder.gridlocate.RankedDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] with opennlp.textgrounder.gridlocate.CoordDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] <: opennlp.textgrounder.gridlocate.DocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]}#TEvalRes])
 */
-): CellGridEvaluator[SphereCoord] = {
+): GridEvaluator[SphereCoord] = {
     params.coord_strategy match {
       case "top-ranked" =>
-        new RankedSphereCellGridEvaluator(strategy, stratname, this,
+        new RankedSphereGridEvaluator(strategy, stratname, this,
           new GroupedSphereDocumentEvalStats(this,
-            strategy.cell_grid, results_by_range = params.results_by_range,
+            strategy.grid, results_by_range = params.results_by_range,
             create_stats = (driver_stats, prefix) =>
               new RankedSphereDocumentEvalStats(driver_stats, prefix)
           )
         )
       case "mean-shift" =>
-        new MeanShiftCellGridEvaluator[SphereCoord](strategy, stratname, this,
+        new MeanShiftGridEvaluator[SphereCoord](strategy, stratname, this,
           new GroupedSphereDocumentEvalStats(this,
-            strategy.cell_grid, results_by_range = params.results_by_range,
+            strategy.grid, results_by_range = params.results_by_range,
             create_stats = (driver_stats, prefix) =>
               new CoordSphereDocumentEvalStats(driver_stats, prefix)),
           params.k_best,
