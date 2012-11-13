@@ -249,7 +249,7 @@ class RankedSphereCellGridEvaluator(
 ) extends RankedCellGridEvaluator[SphereCoord](
   strategy, stratname, driver
 ) {
-  def create_grouped_eval_stats(driver: GridLocateDocumentDriver,
+  def create_grouped_eval_stats(driver: GridLocateDocumentDriver[SphereCoord],
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
     new GroupedSphereDocumentEvalStats(
       driver, cell_grid, results_by_range, is_ranked = true)
@@ -294,7 +294,7 @@ class MeanShiftSphereCellGridEvaluator(
 ) extends MeanShiftCellGridEvaluator[SphereCoord](
   strategy, stratname, driver, k_best, mean_shift_window,
   mean_shift_max_stddev, mean_shift_max_iterations) {
-  def create_grouped_eval_stats(driver: GridLocateDocumentDriver,
+  def create_grouped_eval_stats(driver: GridLocateDocumentDriver[SphereCoord],
     cell_grid: SphereCellGrid, results_by_range: Boolean) =
     new GroupedSphereDocumentEvalStats(
       driver, cell_grid, results_by_range, is_ranked = false)

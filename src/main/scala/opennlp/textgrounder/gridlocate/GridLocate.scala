@@ -901,8 +901,7 @@ class DebugSettings {
  * also returned by the run() function.  There are some scripts to parse the
  * console output.  See below.
  */
-trait GridLocateDriver extends HadoopableArgParserExperimentDriver {
-  type TCoord
+trait GridLocateDriver[TCoord] extends HadoopableArgParserExperimentDriver {
   type TDocTable <: GDocTable[TCoord]
   override type TParam <: GridLocateParameters
 
@@ -1135,7 +1134,7 @@ trait GridLocateDriver extends HadoopableArgParserExperimentDriver {
   }
 }
 
-trait GridLocateDocumentDriver extends GridLocateDriver {
+trait GridLocateDocumentDriver[TCoord] extends GridLocateDriver[TCoord] {
   var strategies:
     Iterable[(String, GridLocateDocumentStrategy[TCoord])] = _
   var rankers: Map[
@@ -1279,7 +1278,7 @@ class GridLocateAbruptExit extends Throwable { }
 
 abstract class GridLocateApp(appname: String) extends
     ExperimentDriverApp(appname) {
-  type TDriver <: GridLocateDriver
+  type TDriver <: GridLocateDriver[_]
 
   override def run_program() = {
     try {

@@ -166,7 +166,7 @@ object DocumentCounterTracker {
  * names, ID's and documents.
  */
 abstract class GDocTable[TCoord : Serializer](
-  val driver: GridLocateDriver,
+  val driver: GridLocateDriver[TCoord],
   val word_dist_factory: WordDistFactory
 ) {
   // Example of using TaskCounterWrapper directly for non-split values.
