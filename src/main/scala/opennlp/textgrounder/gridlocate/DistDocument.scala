@@ -167,9 +167,7 @@ object DocumentCounterTracker {
  */
 abstract class DistDocumentTable[
   TCoord : Serializer,
-  TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc],
-  TGrid <: CellGrid[TCoord, TDoc, TCell]
+  TDoc <: DistDocument[TCoord]
 ](
   /* SCALABUG!!! Declaring TDoc <: DistDocument[TCoord] isn't sufficient
      for Scala to believe that null is an OK value for TDoc, even though
@@ -653,7 +651,7 @@ case class DocumentValidationException(
  */
 abstract class DistDocument[TCoord : Serializer](
   val schema: Schema,
-  val table: DistDocumentTable[TCoord,_,_,_]
+  val table: DistDocumentTable[TCoord,_]
 ) {
 
   import DistDocumentConverters._

@@ -198,7 +198,7 @@ class MultiRegularCell(
 class MultiRegularCellGrid(
   val degrees_per_cell: Double,
   val width_of_multi_cell: Int,
-  table: SphereDocumentTable
+  override val table: SphereDocumentTable
 ) extends SphereCellGrid(table) {
 
   /**

@@ -186,8 +186,6 @@ class EvalStatsWithRank(
  *
  * @tparam TCoord type of a coordinate
  * @tparam TDoc type of a document
- * @tparam TCell type of a cell
- * @tparam TGrid type of a cell grid
  *
  * @param document document whose coordinate is predicted
  * @param cell_grid cell grid against which error comparison should be done
@@ -195,12 +193,10 @@ class EvalStatsWithRank(
  */
 class DocumentEvaluationResult[
   TCoord,
-  TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc],
-  TGrid <: CellGrid[TCoord, TDoc, TCell]
+  TDoc <: DistDocument[TCoord]
 ](
   val document: TDoc,
-  val cell_grid: TGrid,
+  val cell_grid: CellGrid[TCoord, TDoc],
   val pred_coord: TCoord
 ) {
   /**
@@ -237,8 +233,6 @@ class DocumentEvaluationResult[
  *
  * @tparam TCoord type of a coordinate
  * @tparam TDoc type of a document
- * @tparam TCell type of a cell
- * @tparam TGrid type of a cell grid
  *
  * @param document document whose coordinate is predicted
  * @param cell_grid cell grid against which error comparison should be done
@@ -246,14 +240,12 @@ class DocumentEvaluationResult[
  */
 class CoordDocumentEvaluationResult[
   TCoord,
-  TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc],
-  TGrid <: CellGrid[TCoord, TDoc, TCell]
+  TDoc <: DistDocument[TCoord]
 ](
   document: TDoc,
-  cell_grid: TGrid,
+  cell_grid: CellGrid[TCoord, TDoc],
   pred_coord: TCoord
-) extends DocumentEvaluationResult[TCoord, TDoc, TCell, TGrid](
+) extends DocumentEvaluationResult[TCoord, TDoc](
   document, cell_grid, pred_coord
 ) {
   override def record_result(stats: DocumentEvalStats) {
@@ -267,13 +259,14 @@ class CoordDocumentEvaluationResult[
 }
 
 /**
+ *
  * Subclass of `DocumentEvaluationResult` where the predicted coordinate
- * is specifically the central point of one of the grid cells.
+ * is specifically the central point of one of the grid cells.  Here we use
+ * an algorithm that does cell-by-cell comparison and computes a ranking of
+ * all the cells.
  *
  * @tparam TCoord type of a coordinate
  * @tparam TDoc type of a document
- * @tparam TCell type of a cell
- * @tparam TGrid type of a cell grid
  *
  * @param document document whose coordinate is predicted
  * @param pred_cell top-ranked predicted cell in which the document should
@@ -283,15 +276,13 @@ class CoordDocumentEvaluationResult[
  */
 class RankedDocumentEvaluationResult[
   TCoord,
-  TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc],
-  TGrid <: CellGrid[TCoord, TDoc, TCell]
+  TDoc <: DistDocument[TCoord]
 ](
   document: TDoc,
-  val pred_cell: TCell,
+  val pred_cell: GeoCell[TCoord, TDoc],
   val true_rank: Int
-) extends DocumentEvaluationResult[TCoord, TDoc, TCell, TGrid](
-  document, pred_cell.cell_grid.asInstanceOf[TGrid],
+) extends DocumentEvaluationResult[TCoord, TDoc](
+  document, pred_cell.cell_grid.asInstanceOf[CellGrid[TCoord, TDoc]],
   pred_cell.get_center_coord()
 ) {
   override def record_result(stats: DocumentEvalStats) {
@@ -337,9 +328,8 @@ trait DocumentEvalStats extends EvalStats {
 abstract class CoordDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
   prefix: String
-) extends EvalStats(driver_stats, prefix, Map[String, String]())
-  with DocumentEvalStats {
-}
+) extends EvalStats(driver_stats, prefix, Map[String, String]()
+) with DocumentEvalStats { }
 
 /**
  * A class for accumulating statistics from multiple evaluation results,
@@ -349,8 +339,8 @@ abstract class RankedDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
   prefix: String,
   max_rank_for_credit: Int = 10
-) extends EvalStatsWithRank(driver_stats, prefix, max_rank_for_credit)
-  with DocumentEvalStats {
+) extends EvalStatsWithRank(driver_stats, prefix, max_rank_for_credit
+) with DocumentEvalStats {
   def record_true_rank(rank: Int) {
     record_result(rank)
   }
@@ -365,9 +355,6 @@ abstract class RankedDocumentEvalStats(
  *
  * @tparam TCoord type of a coordinate
  * @tparam TDoc type of a document
- * @tparam TCell type of a cell
- * @tparam TGrid type of a cell grid
- * @tparam TEvalRes type of object holding result of evaluating a document
  *
  * @param driver_stats Object (possibly a trait) through which global-level
  *   program statistics can be accumulated (in a Hadoop context, this maps
@@ -379,15 +366,13 @@ abstract class RankedDocumentEvalStats(
  */
 abstract class GroupedDocumentEvalStats[
   TCoord,
-  TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc],
-  TGrid <: CellGrid[TCoord, TDoc, TCell],
-  TEvalRes <: DocumentEvaluationResult[TCoord, TDoc, TCell, TGrid]
+  TDoc <: DistDocument[TCoord]
 ](
   driver_stats: ExperimentDriverStats,
-  cell_grid: TGrid,
+  cell_grid: CellGrid[TCoord, TDoc],
   results_by_range: Boolean
 ) {
+  type TEvalRes = DocumentEvaluationResult[TCoord, TDoc]
   def create_stats(prefix: String): DocumentEvalStats
   def create_stats_for_range[T](prefix: String, range: T) =
     create_stats(prefix + ".byrange." + range)
@@ -670,10 +655,8 @@ abstract class CorpusEvaluator(
  * coordinate that is associated with training and test documents, so that
  * computation of error distances possible.
  *
- * @tparam TCoord Type of the coordinate assigned to a document
+ * @tparam XTCoord Type of the coordinate assigned to a document
  * @tparam XTDoc Type of the training and test documents
- * @tparam XTCell Type of a cell in a cell grid
- * @tparam XTGrid Type of a cell grid
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
@@ -681,30 +664,29 @@ abstract class CorpusEvaluator(
  * @param driver Driver class that encapsulates command-line parameters and
  *   such.
  *
- * Note that we are forced to use the strange names `XTDoc` and `XTGrid`
- * because of an apparent Scala bug that prevents use of the more obvious
- * names `TDoc` and `TGrid` due to a naming clash.  Possibly there is a
- * solution to this problem but if so I can't figure it out.
+ * Note that we are forced to use the strange name `XTDoc` because of an
+ * apparent Scala bug that prevents use of the more obvious name `TDoc`
+ * due to a naming clash.  Possibly there is a solution to this problem
+ * but if so I can't figure it out.
  */
 abstract class CellGridEvaluator[
-  TCoord,
-  XTDoc <: DistDocument[TCoord],
-  XTCell <: GeoCell[TCoord, XTDoc],
-  XTGrid <: CellGrid[TCoord, XTDoc, XTCell]
+  XTCoord,
+  XTDoc <: DistDocument[XTCoord]
 ](
-  val strategy: GridLocateDocumentStrategy[XTCell, XTGrid],
+  val strategy: GridLocateDocumentStrategy[XTCoord, XTDoc],
   val stratname: String,
   override val driver: GridLocateDocumentDriver {
-    type TDoc = XTDoc; type TCell = XTCell; type TGrid = XTGrid
+    type TDoc = XTDoc; type TCoord = XTCoord
   }
 ) extends CorpusEvaluator(stratname, driver) {
   type TEvalDoc = XTDoc
-  override type TEvalRes <: DocumentEvaluationResult[TCoord, XTDoc, XTCell, XTGrid]
+  type XTCell = GeoCell[XTCoord, XTDoc]
+  override type TEvalRes <: DocumentEvaluationResult[XTCoord, XTDoc]
   def create_grouped_eval_stats(
     driver: GridLocateDocumentDriver,
-    cell_grid: XTGrid,
+    cell_grid: CellGrid[XTCoord, XTDoc],
     results_by_range: Boolean
-  ): GroupedDocumentEvalStats[TCoord, XTDoc, XTCell, XTGrid, TEvalRes]
+  ): GroupedDocumentEvalStats[XTCoord, XTDoc]
 
   val ranker = driver.create_ranker(strategy)
 
@@ -822,10 +804,8 @@ abstract class CellGridEvaluator[
  * score and computes the document's location by the central point of the
  * top-ranked cell.
  *
- * @tparam TCoord Type of the coordinate assigned to a document
- * @tparam TDoc Type of the training and test documents
- * @tparam TCell Type of a cell in a cell grid
- * @tparam TGrid Type of a cell grid
+ * @tparam XTCoord Type of the coordinate assigned to a document
+ * @tparam XTDoc Type of the training and test documents
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
@@ -834,26 +814,18 @@ abstract class CellGridEvaluator[
  *   such.
  */
 abstract class RankedCellGridEvaluator[
-  TCoord,
-  XTDoc <: DistDocument[TCoord],
-  XTCell <: GeoCell[TCoord, XTDoc],
-  XTGrid <: CellGrid[TCoord, XTDoc, XTCell]
+  XTCoord,
+  XTDoc <: DistDocument[XTCoord]
 ](
-  strategy: GridLocateDocumentStrategy[XTCell, XTGrid],
+  strategy: GridLocateDocumentStrategy[XTCoord, XTDoc],
   stratname: String,
   driver: GridLocateDocumentDriver {
-    type TDoc = XTDoc; type TCell = XTCell; type TGrid = XTGrid
-  }
-) extends CellGridEvaluator[TCoord, XTDoc, XTCell, XTGrid] (
+    type TDoc = XTDoc; type TCoord = XTCoord
+  }  
+) extends CellGridEvaluator[XTCoord, XTDoc] (
   strategy, stratname, driver
 ) {
-  /**
-   * Create an evaluation-result object describing the top-ranked
-   * predicted cell and the rank of the document's true cell among
-   * all predicted cells.
-   */
-  def create_cell_evaluation_result(document: XTDoc, pred_cell: XTCell,
-    true_rank: Int): TEvalRes
+  type TEvalRes = RankedDocumentEvaluationResult[XTCoord, XTDoc]
 
   /**
    * Print out the evaluation result, possibly along with some of the
@@ -865,8 +837,7 @@ abstract class RankedCellGridEvaluator[
     // errprint("%s:Document distribution: %s", doctag, document.dist)
     errprint("%s:  %d types, %f tokens",
       doctag, document.dist.model.num_types, document.dist.model.num_tokens)
-    errprint("%s:  true cell at rank: %s", doctag,
-      result.asInstanceOf[RankedDocumentEvaluationResult[_,_,_,_]].true_rank)
+    errprint("%s:  true cell at rank: %s", doctag, result.true_rank)
     errprint("%s:  true cell: %s", doctag, result.true_cell)
     val num_cells_to_output =
       if (driver.params.num_top_cells_to_output >= 0)
@@ -912,8 +883,7 @@ abstract class RankedCellGridEvaluator[
   def imp_evaluate_document(document: XTDoc, doctag: String,
       true_cell: XTCell, want_indiv_results: Boolean): TEvalRes = {
     val (pred_cells, true_rank) = return_ranked_cells(document, true_cell)
-    val result =
-      create_cell_evaluation_result(document, pred_cells.head._1, true_rank)
+    val result = new TEvalRes(document, pred_cells.head._1, true_rank)
 
     if (debug("all-scores")) {
       for (((cell, score), index) <- pred_cells.zipWithIndex) {
@@ -937,10 +907,8 @@ abstract class RankedCellGridEvaluator[
  * A general implementation of `CellGridEvaluator` that returns a single
  * best point for a given test document.
  *
- * @tparam TCoord Type of the coordinate assigned to a document
- * @tparam TDoc Type of the training and test documents
- * @tparam TCell Type of a cell in a cell grid
- * @tparam TGrid Type of a cell grid
+ * @tparam XTCoord Type of the coordinate assigned to a document
+ * @tparam XTDoc Type of the training and test documents
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
@@ -949,24 +917,18 @@ abstract class RankedCellGridEvaluator[
  *   such.
  */
 abstract class CoordCellGridEvaluator[
-  TCoord,
-  XTDoc <: DistDocument[TCoord],
-  XTCell <: GeoCell[TCoord, XTDoc],
-  XTGrid <: CellGrid[TCoord, XTDoc, XTCell]
+  XTCoord,
+  XTDoc <: DistDocument[XTCoord]
 ](
-  strategy: GridLocateDocumentStrategy[XTCell, XTGrid],
+  strategy: GridLocateDocumentStrategy[XTCoord, XTDoc],
   stratname: String,
   driver: GridLocateDocumentDriver {
-    type TDoc = XTDoc; type TCell = XTCell; type TGrid = XTGrid
+    type TDoc = XTDoc; type TCoord = XTCoord
   }
 ) extends CellGridEvaluator[
-  TCoord, XTDoc, XTCell, XTGrid
+  XTCoord, XTDoc
 ](strategy, stratname, driver) {
-  /**
-   * Create an evaluation-result object describing the predicted coordinate.
-   */
-  def create_coord_evaluation_result(document: XTDoc, cell_grid: XTGrid,
-    pred_coord: TCoord): TEvalRes
+  type TEvalRes = CoordDocumentEvaluationResult[XTCoord, XTDoc]
 
   /**
    * Print out the evaluation result.
@@ -985,13 +947,12 @@ abstract class CoordCellGridEvaluator[
       doctag, document.output_distance(result.pred_truedist), result.pred_coord)
   }
 
-  def find_best_point(document: XTDoc, true_cell: XTCell): TCoord
+  def find_best_point(document: XTDoc, true_cell: XTCell): XTCoord
 
   def imp_evaluate_document(document: XTDoc, doctag: String,
       true_cell: XTCell, want_indiv_results: Boolean): TEvalRes = {
     val pred_coord = find_best_point(document, true_cell)
-    val result = create_coord_evaluation_result(document, strategy.cell_grid,
-      pred_coord)
+    val result = new TEvalRes(document, strategy.cell_grid, pred_coord)
 
     if (want_indiv_results)
       print_individual_result(doctag, document, result)
@@ -1008,10 +969,8 @@ abstract class CoordCellGridEvaluator[
  * of the strongest cluster of points among the central points of the
  * pseudo-documents.
  *
- * @tparam TCoord Type of the coordinate assigned to a document
- * @tparam TDoc Type of the training and test documents
- * @tparam TCell Type of a cell in a cell grid
- * @tparam TGrid Type of a cell grid
+ * @tparam XTCoord Type of the coordinate assigned to a document
+ * @tparam XTDoc Type of the training and test documents
  *
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
@@ -1020,25 +979,23 @@ abstract class CoordCellGridEvaluator[
  *   such.
  */
 abstract class MeanShiftCellGridEvaluator[
-  TCoord,
-  XTDoc <: DistDocument[TCoord],
-  XTCell <: GeoCell[TCoord, XTDoc],
-  XTGrid <: CellGrid[TCoord, XTDoc, XTCell]
+  XTCoord,
+  XTDoc <: DistDocument[XTCoord]
 ](
-  strategy: GridLocateDocumentStrategy[XTCell, XTGrid],
+  strategy: GridLocateDocumentStrategy[XTCoord, XTDoc],
   stratname: String,
   driver: GridLocateDocumentDriver {
-    type TDoc = XTDoc; type TCell = XTCell; type TGrid = XTGrid
+    type TDoc = XTDoc; type TCoord = XTCoord
   },
   k_best: Int,
   mean_shift_window: Double,
   mean_shift_max_stddev: Double,
   mean_shift_max_iterations: Int
-) extends CoordCellGridEvaluator[TCoord, XTDoc, XTCell, XTGrid](
+) extends CoordCellGridEvaluator[XTCoord, XTDoc](
   strategy, stratname, driver
 ) {
   def create_mean_shift_obj(h: Double, max_stddev: Double,
-    max_iterations: Int): MeanShift[TCoord]
+    max_iterations: Int): MeanShift[XTCoord]
 
   val mean_shift_obj = create_mean_shift_obj(mean_shift_window,
     mean_shift_max_stddev, mean_shift_max_iterations)

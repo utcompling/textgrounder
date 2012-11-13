@@ -103,7 +103,7 @@ class TimeCellGrid(
   categories: Seq[String],
   category_of_doc: TimeDocument => String,
   override val table: TimeDocumentTable
-) extends CellGrid[TimeCoord, TimeDocument, TimeCell](table) {
+) extends CellGrid[TimeCoord, TimeDocument](table) {
   
   val pairs = categories.map {
     x => (x, new TimeCellPair(x, before_chunk, after_chunk, this))

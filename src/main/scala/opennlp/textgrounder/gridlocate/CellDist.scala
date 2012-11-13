@@ -34,13 +34,13 @@ import opennlp.textgrounder.worddist.WordDist.memoizer._
 
 class CellDist[
   TCoord,
-  TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc]
+  TDoc <: DistDocument[TCoord]
 ](
-  val cell_grid: CellGrid[TCoord, TDoc, TCell]
+  val cell_grid: CellGrid[TCoord, TDoc]
 ) {
-  val cellprobs: mutable.Map[TCell, Double] =
-    mutable.Map[TCell, Double]()
+  type TCell = GeoCell[TCoord, TDoc]
+
+  val cellprobs = mutable.Map[TCell, Double]()
 
   def set_cell_probabilities(
       probs: collection.Map[TCell, Double]) {
@@ -78,12 +78,11 @@ class CellDist[
  */
 
 class WordCellDist[TCoord,
-  TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc]
+  TDoc <: DistDocument[TCoord]
 ](
-  cell_grid: CellGrid[TCoord, TDoc, TCell],
+  cell_grid: CellGrid[TCoord, TDoc],
   val word: Word
-) extends CellDist[TCoord, TDoc, TCell](cell_grid) {
+) extends CellDist[TCoord, TDoc](cell_grid) {
   var normalized = false
 
   protected def init() {
@@ -141,13 +140,13 @@ class WordCellDist[TCoord,
 
 abstract class CellDistFactory[
   TCoord,
-  TDoc <: DistDocument[TCoord],
-  TCell <: GeoCell[TCoord, TDoc]
+  TDoc <: DistDocument[TCoord]
 ](
   val lru_cache_size: Int
 ) {
-  type TCellDist <: WordCellDist[TCoord, TDoc, TCell]
-  type TGrid <: CellGrid[TCoord, TDoc, TCell]
+  type TCellDist <: WordCellDist[TCoord, TDoc]
+  type TCell = GeoCell[TCoord, TDoc]
+  type TGrid = CellGrid[TCoord, TDoc]
   def create_word_cell_dist(cell_grid: TGrid, word: Word): TCellDist
 
   var cached_dists: LRUCache[Word, TCellDist] = null
@@ -188,7 +187,7 @@ abstract class CellDistFactory[
     val totalprob = (cellprobs.values sum)
     for ((cell, prob) <- cellprobs)
       cellprobs(cell) /= totalprob
-    val retval = new CellDist[TCoord, TDoc, TCell](cell_grid)
+    val retval = new CellDist[TCoord, TDoc](cell_grid)
     retval.set_cell_probabilities(cellprobs)
     retval
   }

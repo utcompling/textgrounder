@@ -151,9 +151,8 @@ class PoligrounderDriver extends
     GridLocateDriver with StandaloneExperimentDriverStats {
   type TParam = PoligrounderParameters
   type TRunRes = Unit
+  type TCoord = TimeCoord
   type TDoc = TimeDocument
-  type TCell = TimeCell
-  type TGrid = TimeCellGrid
   type TDocTable = TimeDocumentTable
 
   var degrees_per_cell = 0.0

@@ -27,9 +27,9 @@ import opennlp.textgrounder.gridlocate.{GeoCell,CellGrid}
 //                             Cells in a grid                             //
 /////////////////////////////////////////////////////////////////////////////
 
-abstract class SphereCell(
+abstract class KMLSphereCell(
   cell_grid: SphereCellGrid
-) extends GeoCell[SphereCoord, SphereDocument](cell_grid) {
+) extends SphereCell(cell_grid) {
   /**
    * Generate KML for a single cell.
    */
@@ -44,7 +44,7 @@ abstract class SphereCell(
  */
 abstract class PolygonalCell(
   cell_grid: SphereCellGrid
-) extends SphereCell(cell_grid) {
+) extends KMLSphereCell(cell_grid) {
   /**
    * Return the boundary of the cell as an Iterable of coordinates, tracing
    * out the boundary vertex by vertex.  The last coordinate should be the
@@ -155,7 +155,8 @@ abstract class RectangularCell(
   var num_docs: Int = 0
 
   def get_center_coord() = {
-    if (num_docs == 0 || cell_grid.table.driver.params.center_method == "center") {
+    if (num_docs == 0 ||
+      get_sphere_doctable(cell_grid).driver.params.center_method == "center") {
       // use the actual cell center
       // also, if we have an empty cell, there is no such thing as
       // a centroid, so default to the center
@@ -224,13 +225,5 @@ abstract class RectangularCell(
     </Placemark>
     // !!PY2SCALA: END_PASSTHRU
   }
-}
-
-/**
- * Abstract class for a grid of cells covering the earth.
- */
-abstract class SphereCellGrid(
-  override val table: SphereDocumentTable
-) extends CellGrid[SphereCoord, SphereDocument, SphereCell](table) {
 }
 
