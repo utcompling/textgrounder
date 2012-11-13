@@ -109,7 +109,7 @@ doing geolocation is split up into various classes:
 
 abstract class GeolocateDocumentStrategy(
   sphere_grid: SphereCellGrid
-) extends GridLocateDocumentStrategy[SphereCell, SphereCellGrid](sphere_grid) { }
+) extends GridLocateDocumentStrategy[SphereCoord, SphereDocument](sphere_grid) { }
 
 class CellDistMostCommonToponymGeolocateDocumentStrategy(
   sphere_grid: SphereCellGrid
@@ -119,7 +119,7 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
 
   def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
     val word_dist = UnigramStrategy.check_unigram_dist(_word_dist)
-    val wikipedia_table = sphere_grid.table.wikipedia_subtable
+    val wikipedia_table = get_sphere_doctable(sphere_grid).wikipedia_subtable
 
     // Look for a toponym, then a proper noun, then any word.
     // FIXME: How can 'word' be null?
@@ -144,7 +144,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
 ) extends GeolocateDocumentStrategy(sphere_grid) {
   def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
     val word_dist = UnigramStrategy.check_unigram_dist(_word_dist)
-    val wikipedia_table = sphere_grid.table.wikipedia_subtable
+    val wikipedia_table = get_sphere_doctable(sphere_grid).wikipedia_subtable
 
     var maxword = word_dist.find_most_common_word(
       word => word(0).isUpper && wikipedia_table.word_is_toponym(word))
@@ -191,16 +191,14 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
 
     // Append random cells and remove duplicates
     merge_numbered_sequences_uniquely(candcells,
-      new RandomGridLocateDocumentStrategy[SphereCell, SphereCellGrid](sphere_grid).
-        return_ranked_cells(word_dist, include))
+      new RandomGridLocateDocumentStrategy[SphereCoord, SphereDocument](
+        sphere_grid).return_ranked_cells(word_dist, include))
   }
 }
 
 class SphereAverageCellProbabilityStrategy(
   sphere_grid: SphereCellGrid
-) extends AverageCellProbabilityStrategy[
-  SphereCell, SphereCellGrid
-](sphere_grid) {
+) extends AverageCellProbabilityStrategy(sphere_grid) {
   type TCellDistFactory = SphereCellDistFactory
   def create_cell_dist_factory(lru_cache_size: Int) =
     new SphereCellDistFactory(lru_cache_size)
@@ -300,9 +298,8 @@ uniform grid cell models?""")
 }
 
 trait GeolocateDriver extends GridLocateDriver {
+  type TCoord = SphereCoord
   type TDoc = SphereDocument
-  type TCell = SphereCell
-  type TGrid = SphereCellGrid
   type TDocTable = SphereDocumentTable
   override type TParam <: GeolocateParameters
   var degrees_per_cell = 0.0
@@ -525,9 +522,7 @@ strategies, since they require that --preserve-case-words be set internally.""")
 trait GeolocateDocumentTypeDriver extends GeolocateDriver with
   GridLocateDocumentDriver {
   override type TParam <: GeolocateDocumentParameters
-  type TRunRes =
-    Iterable[(String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
-      Iterable[_])]
+  type TRunRes = Iterable[(String, GridLocateDocumentStrategy[SphereCoord, SphereDocument], Iterable[_])]
 
   override def handle_parameters() {
     super.handle_parameters()
@@ -608,9 +603,219 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
    * @param stratname Name of the strategy.
    */
   def create_cell_evaluator(
-      strategy: GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
+      strategy: GridLocateDocumentStrategy[SphereCoord, SphereDocument],
       stratname: String
-    ) = {
+/*
+If you leave off the return type of this function, then you get a compile
+crash when trying to compile the following code in
+Hadoop.scala:DocumentResultMapper:
+
+    val stratname_evaluators =
+      for ((stratname, strategy, docstats) <-
+        get_stat_iters(driver.strategies, orig_docstats)) yield {
+          val evalobj = driver.create_cell_evaluator(strategy, stratname)
+          (stratname, evalobj.evaluate_documents(docstats))
+        }
+
+The error is as follows:
+
+scala.tools.nsc.symtab.Types$TypeError: type mismatch;
+found   : (String, Iterator[evalobj.TEvalRes])
+  required: (java.lang.String, Iterator[opennlp.textgrounder.gridlocate.CellGridEvaluator[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]{def create_grouped_eval_stats(driver: opennlp.textgrounder.gridlocate.GridLocateDocumentDriver,cell_grid: opennlp.textgrounder.geolocate.package.SphereCellGrid,results_by_range: Boolean): opennlp.textgrounder.geolocate.GroupedSphereDocumentEvalStats; type TEvalRes >: opennlp.textgrounder.gridlocate.RankedDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] with opennlp.textgrounder.gridlocate.CoordDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] <: opennlp.textgrounder.gridlocate.DocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]}#TEvalRes])
+  at scala.tools.nsc.typechecker.Contexts$Context.error(Contexts.scala:298)
+  at scala.tools.nsc.typechecker.Infer$Inferencer.error(Infer.scala:207)
+  at scala.tools.nsc.typechecker.Infer$Inferencer.typeError(Infer.scala:217)
+  at scala.tools.nsc.typechecker.Infer$Inferencer.typeErrorTree(Infer.scala:232)
+  at scala.tools.nsc.typechecker.Typers$Typer.adapt(Typers.scala:936)
+  at scala.tools.nsc.typechecker.Typers$Typer.typed(Typers.scala:4282)
+  at scala.tools.nsc.typechecker.Typers$Typer.transformedOrTyped(Typers.scala:4430)
+  at scala.tools.nsc.typechecker.Typers$Typer.typedDefDef(Typers.scala:1760)
+  at scala.tools.nsc.typechecker.Typers$Typer.typed1(Typers.scala:3921)
+  at scala.tools.nsc.typechecker.Typers$Typer.typed(Typers.scala:4273)
+  at scala.tools.nsc.typechecker.Typers$Typer.typedStat$1(Typers.scala:2100)
+  at scala.tools.nsc.typechecker.Typers$Typer$$anonfun$24.apply(Typers.scala:2184)
+  at scala.tools.nsc.typechecker.Typers$Typer$$anonfun$24.apply(Typers.scala:2184)
+  at scala.collection.immutable.List.loop$1(List.scala:148)
+  at scala.collection.immutable.List.mapConserve(List.scala:164)
+  at scala.tools.nsc.typechecker.Typers$Typer.typedStats(Typers.scala:2184)
+  at scala.tools.nsc.typechecker.Typers$Typer.typedTemplate(Typers.scala:1512)
+  at scala.tools.nsc.typechecker.Typers$Typer.typedClassDef(Typers.scala:1278)
+  at scala.tools.nsc.typechecker.Typers$Typer.typed1(Typers.scala:3912)
+  at scala.tools.nsc.typechecker.Typers$Typer.typed(Typers.scala:4273)
+  at scala.tools.nsc.typechecker.Typers$Typer.typedStat$1(Typers.scala:2100)
+  at scala.tools.nsc.typechecker.Typers$Typer$$anonfun$24.apply(Typers.scala:2184)
+  at scala.tools.nsc.typechecker.Typers$Typer$$anonfun$24.apply(Typers.scala:2184)
+  at scala.collection.immutable.List.loop$1(List.scala:148)
+  at scala.collection.immutable.List.mapConserve(List.scala:164)
+  at scala.tools.nsc.typechecker.Typers$Typer.typedStats(Typers.scala:2184)
+  at scala.tools.nsc.typechecker.Typers$Typer.typedBlock(Typers.scala:1919)
+  at scala.tools.nsc.typechecker.Typers$Typer.typed1(Typers.scala:3953)
+  at scala.tools.nsc.typechecker.Typers$Typer.typed(Typers.scala:4273)
+  at scala.tools.nsc.typechecker.Typers$Typer.typed(Typers.scala:4333)
+  at scala.tools.nsc.typechecker.Typers$Typer.typedPos(Typers.scala:4337)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.transformFunction(UnCurry.scala:357)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.mainTransform(UnCurry.scala:599)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.transform(UnCurry.scala:148)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transformTrees$1.apply(Trees.scala:873)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transformTrees$1.apply(Trees.scala:873)
+  at scala.collection.immutable.List.loop$1(List.scala:148)
+  at scala.collection.immutable.List.mapConserve(List.scala:164)
+  at scala.tools.nsc.ast.Trees$Transformer.transformTrees(Trees.scala:873)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer$$anonfun$mainTransform$3.apply(UnCurry.scala:576)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer$$anonfun$mainTransform$3.apply(UnCurry.scala:574)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.withNeedLift$1(UnCurry.scala:476)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.mainTransform(UnCurry.scala:574)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.transform(UnCurry.scala:148)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer$$anonfun$mainTransform$3.apply(UnCurry.scala:576)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer$$anonfun$mainTransform$3.apply(UnCurry.scala:574)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.withNeedLift$1(UnCurry.scala:476)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.mainTransform(UnCurry.scala:574)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.transform(UnCurry.scala:148)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transform$4.apply(Trees.scala:777)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transform$4.apply(Trees.scala:776)
+  at scala.tools.nsc.ast.Trees$Transformer.atOwner(Trees.scala:899)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.atOwner(TypingTransformers.scala:38)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.atOwner(TypingTransformers.scala:31)
+  at scala.tools.nsc.ast.Trees$Transformer.transform(Trees.scala:775)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.transform(TypingTransformers.scala:53)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.mainTransform(UnCurry.scala:541)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.transform(UnCurry.scala:148)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transformStats$1.apply(Trees.scala:891)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transformStats$1.apply(Trees.scala:889)
+  at scala.collection.immutable.List.loop$1(List.scala:148)
+  at scala.collection.immutable.List.mapConserve(List.scala:164)
+  at scala.tools.nsc.ast.Trees$Transformer.transformStats(Trees.scala:889)
+  at scala.tools.nsc.ast.Trees$Transformer.transform(Trees.scala:799)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.transform(TypingTransformers.scala:53)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.mainTransform(UnCurry.scala:605)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.transform(UnCurry.scala:148)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transform$5.apply(Trees.scala:783)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transform$5.apply(Trees.scala:781)
+  at scala.tools.nsc.ast.Trees$Transformer.atOwner(Trees.scala:899)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.atOwner(TypingTransformers.scala:38)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.atOwner(TypingTransformers.scala:31)
+  at scala.tools.nsc.ast.Trees$Transformer.transform(Trees.scala:780)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.transform(TypingTransformers.scala:53)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.scala$tools$nsc$transform$UnCurry$UnCurryTransformer$$super$transform(UnCurry.scala:530)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer$$anonfun$mainTransform$1.apply(UnCurry.scala:530)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer$$anonfun$mainTransform$1.apply(UnCurry.scala:513)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.withNeedLift$1(UnCurry.scala:476)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.mainTransform(UnCurry.scala:512)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.transform(UnCurry.scala:148)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transformStats$1.apply(Trees.scala:891)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transformStats$1.apply(Trees.scala:889)
+  at scala.collection.immutable.List.loop$1(List.scala:148)
+  at scala.collection.immutable.List.mapConserve(List.scala:164)
+  at scala.tools.nsc.ast.Trees$Transformer.transformStats(Trees.scala:889)
+  at scala.tools.nsc.ast.Trees$Transformer.transform(Trees.scala:797)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.scala$tools$nsc$transform$TypingTransformers$TypingTransformer$$super$transform(TypingTransformers.scala:49)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer$$anonfun$transform$1.apply(TypingTransformers.scala:49)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer$$anonfun$transform$1.apply(TypingTransformers.scala:49)
+  at scala.tools.nsc.ast.Trees$Transformer.atOwner(Trees.scala:899)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.atOwner(TypingTransformers.scala:38)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.atOwner(TypingTransformers.scala:31)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.transform(TypingTransformers.scala:49)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.mainTransform(UnCurry.scala:602)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.transform(UnCurry.scala:148)
+  at scala.tools.nsc.ast.Trees$Transformer.transformTemplate(Trees.scala:875)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transform$2.apply(Trees.scala:767)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transform$2.apply(Trees.scala:766)
+  at scala.tools.nsc.ast.Trees$Transformer.atOwner(Trees.scala:899)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.atOwner(TypingTransformers.scala:38)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.atOwner(TypingTransformers.scala:31)
+  at scala.tools.nsc.ast.Trees$Transformer.transform(Trees.scala:765)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.transform(TypingTransformers.scala:53)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.mainTransform(UnCurry.scala:605)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.transform(UnCurry.scala:148)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transformStats$1.apply(Trees.scala:891)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transformStats$1.apply(Trees.scala:889)
+  at scala.collection.immutable.List.loop$1(List.scala:148)
+  at scala.collection.immutable.List.mapConserve(List.scala:164)
+  at scala.tools.nsc.ast.Trees$Transformer.transformStats(Trees.scala:889)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transform$1.apply(Trees.scala:761)
+  at scala.tools.nsc.ast.Trees$Transformer$$anonfun$transform$1.apply(Trees.scala:761)
+  at scala.tools.nsc.ast.Trees$Transformer.atOwner(Trees.scala:899)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.atOwner(TypingTransformers.scala:38)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.atOwner(TypingTransformers.scala:31)
+  at scala.tools.nsc.ast.Trees$Transformer.transform(Trees.scala:760)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.scala$tools$nsc$transform$TypingTransformers$TypingTransformer$$super$transform(TypingTransformers.scala:49)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer$$anonfun$transform$2.apply(TypingTransformers.scala:51)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer$$anonfun$transform$2.apply(TypingTransformers.scala:51)
+  at scala.tools.nsc.ast.Trees$Transformer.atOwner(Trees.scala:899)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.atOwner(TypingTransformers.scala:38)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.atOwner(TypingTransformers.scala:31)
+  at scala.tools.nsc.transform.TypingTransformers$TypingTransformer.transform(TypingTransformers.scala:51)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.mainTransform(UnCurry.scala:605)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.transform(UnCurry.scala:148)
+  at scala.tools.nsc.ast.Trees$Transformer.transformUnit(Trees.scala:892)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.transformUnit(UnCurry.scala:142)
+  at scala.tools.nsc.transform.UnCurry$UnCurryTransformer.transformUnit(UnCurry.scala:126)
+  at scala.tools.nsc.transform.Transform$Phase.apply(Transform.scala:30)
+  at scala.tools.nsc.Global$GlobalPhase.applyPhase(Global.scala:329)
+  at scala.tools.nsc.Global$GlobalPhase$$anonfun$run$1.apply(Global.scala:297)
+  at scala.tools.nsc.Global$GlobalPhase$$anonfun$run$1.apply(Global.scala:297)
+  at scala.collection.Iterator$class.foreach(Iterator.scala:772)
+  at scala.collection.mutable.ListBuffer$$anon$1.foreach(ListBuffer.scala:318)
+  at scala.tools.nsc.Global$GlobalPhase.run(Global.scala:297)
+  at scala.tools.nsc.Global$Run.compileSources(Global.scala:953)
+  at scala.tools.nsc.Global$Run.compile(Global.scala:1041)
+  at xsbt.CachedCompiler0.run(CompilerInterface.scala:90)
+  at xsbt.CachedCompiler0.liftedTree1$1(CompilerInterface.scala:72)
+  at xsbt.CachedCompiler0.run(CompilerInterface.scala:72)
+  at xsbt.CompilerInterface.run(CompilerInterface.scala:26)
+  at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+  at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:39)
+  at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:25)
+  at java.lang.reflect.Method.invoke(Method.java:597)
+  at sbt.compiler.AnalyzingCompiler.call(AnalyzingCompiler.scala:73)
+  at sbt.compiler.AnalyzingCompiler.compile(AnalyzingCompiler.scala:35)
+  at sbt.compiler.AnalyzingCompiler.compile(AnalyzingCompiler.scala:29)
+  at sbt.compiler.AggressiveCompile$$anonfun$4$$anonfun$compileScala$1$1.apply$mcV$sp(AggressiveCompile.scala:71)
+  at sbt.compiler.AggressiveCompile$$anonfun$4$$anonfun$compileScala$1$1.apply(AggressiveCompile.scala:71)
+  at sbt.compiler.AggressiveCompile$$anonfun$4$$anonfun$compileScala$1$1.apply(AggressiveCompile.scala:71)
+  at sbt.compiler.AggressiveCompile.sbt$compiler$AggressiveCompile$$timed(AggressiveCompile.scala:101)
+  at sbt.compiler.AggressiveCompile$$anonfun$4.compileScala$1(AggressiveCompile.scala:70)
+  at sbt.compiler.AggressiveCompile$$anonfun$4.apply(AggressiveCompile.scala:88)
+  at sbt.compiler.AggressiveCompile$$anonfun$4.apply(AggressiveCompile.scala:60)
+  at sbt.inc.IncrementalCompile$$anonfun$doCompile$1.apply(Compile.scala:24)
+  at sbt.inc.IncrementalCompile$$anonfun$doCompile$1.apply(Compile.scala:22)
+  at sbt.inc.Incremental$.cycle(Incremental.scala:39)
+  at sbt.inc.Incremental$.compile(Incremental.scala:26)
+  at sbt.inc.IncrementalCompile$.apply(Compile.scala:20)
+  at sbt.compiler.AggressiveCompile.compile2(AggressiveCompile.scala:96)
+  at sbt.compiler.AggressiveCompile.compile1(AggressiveCompile.scala:44)
+  at sbt.compiler.AggressiveCompile.apply(AggressiveCompile.scala:31)
+  at sbt.Compiler$.apply(Compiler.scala:79)
+  at sbt.Defaults$$anonfun$compileTask$1.apply(Defaults.scala:571)
+  at sbt.Defaults$$anonfun$compileTask$1.apply(Defaults.scala:571)
+  at sbt.Scoped$$anonfun$hf2$1.apply(Structure.scala:578)
+  at sbt.Scoped$$anonfun$hf2$1.apply(Structure.scala:578)
+  at scala.Function1$$anonfun$compose$1.apply(Function1.scala:49)
+  at sbt.Scoped$Reduced$$anonfun$combine$1$$anonfun$apply$12.apply(Structure.scala:311)
+  at sbt.Scoped$Reduced$$anonfun$combine$1$$anonfun$apply$12.apply(Structure.scala:311)
+  at sbt.$tilde$greater$$anonfun$$u2219$1.apply(TypeFunctions.scala:40)
+  at sbt.std.Transform$$anon$5.work(System.scala:71)
+  at sbt.Execute$$anonfun$submit$1$$anonfun$apply$1.apply(Execute.scala:232)
+  at sbt.Execute$$anonfun$submit$1$$anonfun$apply$1.apply(Execute.scala:232)
+  at sbt.ErrorHandling$.wideConvert(ErrorHandling.scala:18)
+  at sbt.Execute.work(Execute.scala:238)
+  at sbt.Execute$$anonfun$submit$1.apply(Execute.scala:232)
+  at sbt.Execute$$anonfun$submit$1.apply(Execute.scala:232)
+  at sbt.ConcurrentRestrictions$$anon$4$$anonfun$1.apply(ConcurrentRestrictions.scala:159)
+  at sbt.CompletionService$$anon$2.call(CompletionService.scala:30)
+  at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+  at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+  at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:439)
+  at java.util.concurrent.FutureTask$Sync.innerRun(FutureTask.java:303)
+  at java.util.concurrent.FutureTask.run(FutureTask.java:138)
+  at java.util.concurrent.ThreadPoolExecutor$Worker.runTask(ThreadPoolExecutor.java:886)
+  at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:908)
+  at java.lang.Thread.run(Thread.java:680)
+[error] (compile:compile) scala.tools.nsc.symtab.Types$TypeError: type mismatch;
+[error]  found   : (String, Iterator[evalobj.TEvalRes])
+[error]  required: (java.lang.String, Iterator[opennlp.textgrounder.gridlocate.CellGridEvaluator[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]{def create_grouped_eval_stats(driver: opennlp.textgrounder.gridlocate.GridLocateDocumentDriver,cell_grid: opennlp.textgrounder.geolocate.package.SphereCellGrid,results_by_range: Boolean): opennlp.textgrounder.geolocate.GroupedSphereDocumentEvalStats; type TEvalRes >: opennlp.textgrounder.gridlocate.RankedDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] with opennlp.textgrounder.gridlocate.CoordDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] <: opennlp.textgrounder.gridlocate.DocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]}#TEvalRes])
+*/
+): CellGridEvaluator[SphereCoord, SphereDocument] = {
     params.coord_strategy match {
       case "top-ranked" =>
         new RankedSphereCellGridEvaluator(strategy, stratname, this)
@@ -628,8 +833,7 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
    *
    * The current return type is as follows:
    *
-   * Iterable[(String, GridLocateDocumentStrategy[SphereCell, SphereCellGrid],
-   *   Iterable[_]]
+   * Iterable[(String, GridLocateDocumentStrategy[SphereCoord, SphereDocument], Iterable[_])]
    *
    * This means you get a sequence of tuples of
    * (strategyname, strategy, results)

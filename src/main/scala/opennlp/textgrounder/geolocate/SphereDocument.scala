@@ -90,8 +90,7 @@ abstract class SphereDocumentSubtable[TDoc <: SphereDocument](
 class SphereDocumentTable(
   override val driver: GeolocateDriver,
   word_dist_factory: WordDistFactory
-) extends DistDocumentTable[SphereCoord, SphereDocument, SphereCell,
-    SphereCellGrid](
+) extends DistDocumentTable[SphereCoord, SphereDocument](
   driver, word_dist_factory
 ) {
   val corpus_type_to_subtable =

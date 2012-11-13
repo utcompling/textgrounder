@@ -65,7 +65,7 @@ object KdTreeCellGrid {
   }
 }
 
-class KdTreeCellGrid(table: SphereDocumentTable,
+class KdTreeCellGrid(override val table: SphereDocumentTable,
                      bucketSize: Int,
                      splitMethod: KdTree.SplitMethod,
                      useBackoff: Boolean,
