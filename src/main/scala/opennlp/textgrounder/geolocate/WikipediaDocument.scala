@@ -54,7 +54,7 @@ import opennlp.textgrounder.worddist.WordDist.memoizer._
 class WikipediaDocument(
   schema: Schema,
   subtable: WikipediaDocumentSubtable
-) extends SphereDocument(schema, subtable.table) {
+) extends RealSphereDocument(schema, subtable.table) {
   var id = 0L
   var incoming_links_value: Option[Int] = None
   override def incoming_links = incoming_links_value
