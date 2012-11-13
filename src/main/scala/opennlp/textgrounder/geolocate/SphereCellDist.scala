@@ -22,7 +22,7 @@ import math._
 
 import opennlp.textgrounder.util.distances._
 
-import opennlp.textgrounder.gridlocate.{WordCellDist,CellDistFactory}
+import opennlp.textgrounder.gridlocate.{CellGrid,WordCellDist,CellDistFactory}
 import opennlp.textgrounder.worddist.WordDist.memoizer._
 
 /////////////////////////////////////////////////////////////////////////////
@@ -123,7 +123,7 @@ class SphereCellDistFactory(
 ) extends CellDistFactory[SphereCoord](
     lru_cache_size) {
   type TCellDist = SphereWordCellDist
-  def create_word_cell_dist(cell_grid: TGrid, word: Word) =
+  def create_word_cell_dist(cell_grid: CellGrid[SphereCoord], word: Word) =
     new TCellDist(cell_grid, word)
 }
 

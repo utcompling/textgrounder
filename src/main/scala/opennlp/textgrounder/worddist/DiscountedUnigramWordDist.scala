@@ -27,7 +27,6 @@ import tgutil.printutil.errprint
 import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
 // FIXME! For --tf-idf
 import opennlp.textgrounder.gridlocate.GridLocateDriver
-import opennlp.textgrounder.gridlocate.GenericTypes._
 
 import WordDist.memoizer._
 

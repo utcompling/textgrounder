@@ -25,14 +25,14 @@ import util.control.Breaks._
 
 import java.io._
 
-import opennlp.textgrounder.{util => tgutil}
-import tgutil.collectionutil.DynamicArray
-import tgutil.textdbutil
-import tgutil.ioutil.{FileHandler, FileFormatException}
-import tgutil.printutil.{errprint, warning}
+import opennlp.{textgrounder=>tg}
+import tg.util.collectionutil.DynamicArray
+import tg.util.textdbutil
+import tg.util.ioutil.{FileHandler, FileFormatException}
+import tg.util.printutil.{errprint, warning}
 
-import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
-import opennlp.textgrounder.gridlocate.GenericTypes._
+import tg.gridlocate.GDoc
+import tg.gridlocate.GridLocateDriver.Debug._
 
 import WordDist.memoizer._
 
@@ -366,7 +366,7 @@ class DefaultUnigramWordDistConstructor(
   def maybe_lowercase(word: String) =
     if (ignore_case) word.toLowerCase else word
 
-  def initialize_distribution(doc: GenericDistDocument, countstr: String,
+  def initialize_distribution(doc: GDoc[_], countstr: String,
       is_training_set: Boolean) {
     parse_counts(countstr)
     // Now set the distribution on the document; but don't use the test

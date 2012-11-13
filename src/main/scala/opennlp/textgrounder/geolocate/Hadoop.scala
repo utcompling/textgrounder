@@ -446,9 +446,9 @@ class DocumentEvaluationResultWritable extends RecordWritable {
         pred_center, pred_truedist, pred_degdist) = props
     new HadoopDocumentEvaluationResult(
       document.asInstanceOf[SphereDocument],
-      pred_cell.asInstanceOf[GeoCell],
+      pred_cell.asInstanceOf[GCell],
       true_rank.asInstanceOf[Int],
-      true_cell.asInstanceOf[GeoCell],
+      true_cell.asInstanceOf[GCell],
       num_docs_in_true_cell.asInstanceOf[Int],
       true_center.asInstanceOf[SphereCoord],
       true_truedist.asInstanceOf[Double],

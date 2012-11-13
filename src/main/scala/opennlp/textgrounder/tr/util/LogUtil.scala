@@ -9,7 +9,7 @@ object LogUtil {
   val DOC_PREFIX = "Document "
   val PRED_CELL_RANK_PREFIX = "  Predicted cell (at rank "
   val PRED_CELL_KL_PREFIX = ", kl-div "
-  val PRED_CELL_BOTTOM_LEFT_COORD_PREFIX = "): GeoCell(("
+  val PRED_CELL_BOTTOM_LEFT_COORD_PREFIX = "): GCell(("
   val TRUE_COORD_PREFIX = " at ("
   val PRED_COORD_PREFIX = " predicted cell center at ("
   val NEIGHBOR_PREFIX = " close neighbor: ("
