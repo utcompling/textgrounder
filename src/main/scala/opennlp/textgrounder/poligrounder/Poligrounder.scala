@@ -148,11 +148,9 @@ class PoligrounderParameters(parser: ArgParser = null) extends
 }
 
 class PoligrounderDriver extends
-    GridLocateDriver with StandaloneExperimentDriverStats {
+    GridLocateDriver[TimeCoord] with StandaloneExperimentDriverStats {
   type TParam = PoligrounderParameters
   type TRunRes = Unit
-  type TCoord = TimeCoord
-  type TDoc = TimeDocument
   type TDocTable = TimeDocumentTable
 
   var degrees_per_cell = 0.0
