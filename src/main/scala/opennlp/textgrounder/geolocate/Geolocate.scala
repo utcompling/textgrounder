@@ -290,7 +290,6 @@ uniform grid cell models?""")
 }
 
 trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
-  type TDocTable = SphereDocumentTable
   override type TParam <: GeolocateParameters
   var degrees_per_cell = 0.0
 
@@ -315,25 +314,25 @@ trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
       param_error("Width of multi cell must be positive")
   }
 
-  protected def initialize_document_table(word_dist_factory: WordDistFactory) = {
+  protected def initialize_document_table(word_dist_factory: WordDistFactory) =
     new SphereDocumentTable(this, word_dist_factory)
-  }
 
-  protected def initialize_cell_grid(table: SphereDocumentTable) = {
+  protected def initialize_cell_grid(table: GDocTable[SphereCoord]) = {
+    val spheretab = table.asInstanceOf[SphereDocumentTable]
     if (params.combined_kd_grid) {
       val kdcg =
-        KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method,
+        KdTreeCellGrid(spheretab, params.kd_bucket_size, params.kd_split_method,
           params.kd_use_backoff, params.kd_interpolate_weight)
       val mrcg =
         new MultiRegularCellGrid(degrees_per_cell,
-          params.width_of_multi_cell, table)
-      new CombinedModelCellGrid(table, Seq(mrcg, kdcg))
+          params.width_of_multi_cell, spheretab)
+      new CombinedModelCellGrid(spheretab, Seq(mrcg, kdcg))
     } else if (params.kd_tree) {
-      KdTreeCellGrid(table, params.kd_bucket_size, params.kd_split_method,
+      KdTreeCellGrid(spheretab, params.kd_bucket_size, params.kd_split_method,
         params.kd_use_backoff, params.kd_interpolate_weight)
     } else {
       new MultiRegularCellGrid(degrees_per_cell,
-        params.width_of_multi_cell, table)
+        params.width_of_multi_cell, spheretab)
     }
   }
 }
