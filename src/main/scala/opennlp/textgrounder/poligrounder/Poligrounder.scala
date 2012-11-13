@@ -151,7 +151,6 @@ class PoligrounderDriver extends
     GridLocateDriver[TimeCoord] with StandaloneExperimentDriverStats {
   type TParam = PoligrounderParameters
   type TRunRes = Unit
-  type TDocTable = TimeDocumentTable
 
   var degrees_per_cell = 0.0
   var from_chunk: (Long, Long) = _
@@ -194,13 +193,13 @@ class PoligrounderDriver extends
     super.initialize_word_dist_suffix() + "-tweets"
   }
 
-  protected def initialize_document_table(word_dist_factory: WordDistFactory) = {
+  protected def initialize_document_table(word_dist_factory: WordDistFactory) =
     new TimeDocumentTable(this, word_dist_factory)
-  }
 
-  protected def initialize_cell_grid(table: TimeDocumentTable) = {
+  protected def initialize_cell_grid(table: GDocTable[TimeCoord]) = {
+    val timetab = table.asInstanceOf[TimeDocumentTable]
     if (params.ideological_user_corpus == null)
-      new TimeCellGrid(from_chunk, to_chunk, Seq("all"), x => "all", table)
+      new TimeCellGrid(from_chunk, to_chunk, Seq("all"), x => "all", timetab)
     else
       new TimeCellGrid(from_chunk, to_chunk, Seq("liberal", "conservative"),
         x => {
@@ -210,7 +209,7 @@ class PoligrounderDriver extends
             "conservative"
           else
             null
-        }, table)
+        }, timetab)
   }
 
   def run_after_setup() {

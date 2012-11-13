@@ -902,13 +902,12 @@ class DebugSettings {
  * console output.  See below.
  */
 trait GridLocateDriver[TCoord] extends HadoopableArgParserExperimentDriver {
-  type TDocTable <: GDocTable[TCoord]
   override type TParam <: GridLocateParameters
 
   var stopwords: Set[String] = _
   var whitelist: Set[String] = _
   var cell_grid: CellGrid[TCoord] = _
-  var document_table: TDocTable = _
+  var document_table: GDocTable[TCoord] = _
   var word_dist_factory: WordDistFactory = _
   var word_dist_constructor: WordDistConstructor = _
   var document_file_suffix: String = _
@@ -942,9 +941,9 @@ trait GridLocateDriver[TCoord] extends HadoopableArgParserExperimentDriver {
   }
 
   protected def initialize_document_table(word_dist_factory: WordDistFactory):
-    TDocTable
+    GDocTable[TCoord]
 
-  protected def initialize_cell_grid(table: TDocTable): CellGrid[TCoord]
+  protected def initialize_cell_grid(table: GDocTable[TCoord]): CellGrid[TCoord]
 
   protected def word_dist_type = {
     if (params.word_dist == "unsmoothed-ngram") "ngram"
