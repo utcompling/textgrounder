@@ -53,21 +53,19 @@ abstract class DiscountedUnigramWordDistFactory(
   override def note_dist_globally(dist: WordDist) {
     val udist = dist.asInstanceOf[DiscountedUnigramWordDist]
     super.note_dist_globally(dist)
-    if (dist.note_globally) {
-      assert(!owp_adjusted)
-      for ((word, count) <- udist.model.iter_items) {
-        if (!(overall_word_probs contains word))
-          total_num_word_types += 1
-        // Record in overall_word_probs; note more tokens seen.
-        overall_word_probs(word) += count
-        // Our training docs should never have partial (interpolated) counts.
-        assert (count == count.toInt)
-        total_num_word_tokens += count.toInt
-        // Note document frequency of word
-        document_freq(word) += 1
-      }
-      num_documents += 1
+    assert(!owp_adjusted)
+    for ((word, count) <- udist.model.iter_items) {
+      if (!(overall_word_probs contains word))
+        total_num_word_types += 1
+      // Record in overall_word_probs; note more tokens seen.
+      overall_word_probs(word) += count
+      // Our training docs should never have partial (interpolated) counts.
+      assert (count == count.toInt)
+      total_num_word_tokens += count.toInt
+      // Note document frequency of word
+      document_freq(word) += 1
     }
+    num_documents += 1
     if (debug("lots")) {
       errprint("""For word dist, total tokens = %s, unseen_mass = %s, overall unseen mass = %s""",
         udist.model.num_tokens, udist.unseen_mass, udist.overall_unseen_mass)
@@ -104,9 +102,8 @@ abstract class DiscountedUnigramWordDistFactory(
 }
 
 abstract class DiscountedUnigramWordDist(
-  gen_factory: WordDistFactory,
-  note_globally: Boolean
-) extends UnigramWordDist(gen_factory, note_globally) {
+  gen_factory: WordDistFactory
+) extends UnigramWordDist(gen_factory) {
   type TThis = DiscountedUnigramWordDist
   type TKLCache = DiscountedUnigramKLDivergenceCache
   def dufactory = gen_factory.asInstanceOf[DiscountedUnigramWordDistFactory]
