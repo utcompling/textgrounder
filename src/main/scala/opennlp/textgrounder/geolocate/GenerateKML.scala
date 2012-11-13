@@ -24,10 +24,11 @@ import org.apache.hadoop.io._
 
 import opennlp.textgrounder.{util => tgutil}
 import tgutil.argparser._
+import tgutil.distances.SphereCoord
 import tgutil.experiment._
 import tgutil.printutil.{errprint, warning}
  
-import opennlp.textgrounder.gridlocate.GDoc
+import opennlp.textgrounder.gridlocate._
 
 import opennlp.textgrounder.worddist._
 import WordDist.memoizer._
@@ -165,7 +166,7 @@ class GenerateKMLDriver extends
    */
 
   def run_after_setup() {
-    val cdist_factory = new SphereCellDistFactory(params.lru_cache_size)
+    val cdist_factory = new CellDistFactory[SphereCoord](params.lru_cache_size)
     for (word <- params.split_kml_words) {
       val celldist = cdist_factory.get_cell_dist(cell_grid, memoize_string(word))
       if (!celldist.normalized) {
@@ -175,7 +176,8 @@ Not generating an empty KML file.""", word)
         val kmlparams = new KMLParameters()
         kmlparams.kml_max_height = params.kml_max_height
         kmlparams.kml_transform = params.kml_transform
-        celldist.generate_kml_file("%s%s.kml" format (params.kml_prefix, word),
+        SphereWordCellDist.generate_kml_file(celldist,
+          "%s%s.kml" format (params.kml_prefix, word),
           kmlparams)
       }
     }

@@ -387,11 +387,11 @@ class NaiveBayesDocumentStrategy[TCoord](
   }
 }
 
-abstract class AverageCellProbabilityStrategy[TCoord](
+class AverageCellProbabilityStrategy[TCoord](
   cell_grid: CellGrid[TCoord]
 ) extends GridLocateDocumentStrategy[TCoord](cell_grid) {
-  type TCellDistFactory <: CellDistFactory[TCoord]
-  def create_cell_dist_factory(lru_cache_size: Int): TCellDistFactory
+  def create_cell_dist_factory(lru_cache_size: Int) =
+    new CellDistFactory[TCoord](lru_cache_size)
 
   val cdist_factory =
     create_cell_dist_factory(cell_grid.table.driver.params.lru_cache_size)

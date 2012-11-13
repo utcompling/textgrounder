@@ -115,7 +115,7 @@ class CellDistMostCommonToponymGeolocateDocumentStrategy(
   sphere_grid: SphereCellGrid
 ) extends GeolocateDocumentStrategy(sphere_grid) {
   val cdist_factory =
-    new SphereCellDistFactory(sphere_grid.table.driver.params.lru_cache_size)
+    new CellDistFactory[SphereCoord](sphere_grid.table.driver.params.lru_cache_size)
 
   def return_ranked_cells(_word_dist: WordDist, include: Iterable[SphereCell]) = {
     val word_dist = UnigramStrategy.check_unigram_dist(_word_dist)
@@ -194,14 +194,6 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
       new RandomGridLocateDocumentStrategy[SphereCoord](
         sphere_grid).return_ranked_cells(word_dist, include))
   }
-}
-
-class SphereAverageCellProbabilityStrategy(
-  sphere_grid: SphereCellGrid
-) extends AverageCellProbabilityStrategy(sphere_grid) {
-  type TCellDistFactory = SphereCellDistFactory
-  def create_cell_dist_factory(lru_cache_size: Int) =
-    new SphereCellDistFactory(lru_cache_size)
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -567,7 +559,7 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
       case "celldist-most-common-toponym" =>
         new CellDistMostCommonToponymGeolocateDocumentStrategy(cell_grid)
       case "average-cell-probability" =>
-        new SphereAverageCellProbabilityStrategy(cell_grid)
+        new AverageCellProbabilityStrategy[SphereCoord](cell_grid)
       case other => super.create_strategy(other)
     }
   }
