@@ -57,7 +57,7 @@ import opennlp.textgrounder.worddist.WordDist.memoizer._
 class SphereWordCellDist(
   cell_grid: SphereCellGrid,
   word: Word
-) extends WordCellDist[SphereCoord, SphereDocument](
+) extends WordCellDist[SphereCoord](
   cell_grid, word) {
   // Convert cell to a KML file showing the distribution
   def generate_kml_file(filename: String, params: KMLParameters) {
@@ -120,7 +120,7 @@ class SphereWordCellDist(
 
 class SphereCellDistFactory(
     lru_cache_size: Int
-) extends CellDistFactory[SphereCoord, SphereDocument](
+) extends CellDistFactory[SphereCoord](
     lru_cache_size) {
   type TCellDist = SphereWordCellDist
   def create_word_cell_dist(cell_grid: TGrid, word: Word) =

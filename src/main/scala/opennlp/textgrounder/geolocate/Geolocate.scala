@@ -109,7 +109,7 @@ doing geolocation is split up into various classes:
 
 abstract class GeolocateDocumentStrategy(
   sphere_grid: SphereCellGrid
-) extends GridLocateDocumentStrategy[SphereCoord, SphereDocument](sphere_grid) { }
+) extends GridLocateDocumentStrategy[SphereCoord](sphere_grid) { }
 
 class CellDistMostCommonToponymGeolocateDocumentStrategy(
   sphere_grid: SphereCellGrid
@@ -191,7 +191,7 @@ class LinkMostCommonToponymGeolocateDocumentStrategy(
 
     // Append random cells and remove duplicates
     merge_numbered_sequences_uniquely(candcells,
-      new RandomGridLocateDocumentStrategy[SphereCoord, SphereDocument](
+      new RandomGridLocateDocumentStrategy[SphereCoord](
         sphere_grid).return_ranked_cells(word_dist, include))
   }
 }
@@ -522,7 +522,7 @@ strategies, since they require that --preserve-case-words be set internally.""")
 trait GeolocateDocumentTypeDriver extends GeolocateDriver with
   GridLocateDocumentDriver {
   override type TParam <: GeolocateDocumentParameters
-  type TRunRes = Iterable[(String, GridLocateDocumentStrategy[SphereCoord, SphereDocument], Iterable[_])]
+  type TRunRes = Iterable[(String, GridLocateDocumentStrategy[SphereCoord], Iterable[_])]
 
   override def handle_parameters() {
     super.handle_parameters()
@@ -603,7 +603,7 @@ trait GeolocateDocumentTypeDriver extends GeolocateDriver with
    * @param stratname Name of the strategy.
    */
   def create_cell_evaluator(
-      strategy: GridLocateDocumentStrategy[SphereCoord, SphereDocument],
+      strategy: GridLocateDocumentStrategy[SphereCoord],
       stratname: String
 /*
 If you leave off the return type of this function, then you get a compile
@@ -815,7 +815,7 @@ found   : (String, Iterator[evalobj.TEvalRes])
 [error]  found   : (String, Iterator[evalobj.TEvalRes])
 [error]  required: (java.lang.String, Iterator[opennlp.textgrounder.gridlocate.CellGridEvaluator[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]{def create_grouped_eval_stats(driver: opennlp.textgrounder.gridlocate.GridLocateDocumentDriver,cell_grid: opennlp.textgrounder.geolocate.package.SphereCellGrid,results_by_range: Boolean): opennlp.textgrounder.geolocate.GroupedSphereDocumentEvalStats; type TEvalRes >: opennlp.textgrounder.gridlocate.RankedDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] with opennlp.textgrounder.gridlocate.CoordDocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument] <: opennlp.textgrounder.gridlocate.DocumentEvaluationResult[opennlp.textgrounder.util.distances.package.SphereCoord,opennlp.textgrounder.geolocate.SphereDocument]}#TEvalRes])
 */
-): CellGridEvaluator[SphereCoord, SphereDocument] = {
+): CellGridEvaluator[SphereCoord] = {
     params.coord_strategy match {
       case "top-ranked" =>
         new RankedSphereCellGridEvaluator(strategy, stratname, this)
@@ -833,7 +833,7 @@ found   : (String, Iterator[evalobj.TEvalRes])
    *
    * The current return type is as follows:
    *
-   * Iterable[(String, GridLocateDocumentStrategy[SphereCoord, SphereDocument], Iterable[_])]
+   * Iterable[(String, GridLocateDocumentStrategy[SphereCoord], Iterable[_])]
    *
    * This means you get a sequence of tuples of
    * (strategyname, strategy, results)
