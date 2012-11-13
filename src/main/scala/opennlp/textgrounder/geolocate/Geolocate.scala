@@ -297,9 +297,7 @@ uniform grid cell models?""")
 
 }
 
-trait GeolocateDriver extends GridLocateDriver {
-  type TCoord = SphereCoord
-  type TDoc = SphereDocument
+trait GeolocateDriver extends GridLocateDriver[SphereCoord] {
   type TDocTable = SphereDocumentTable
   override type TParam <: GeolocateParameters
   var degrees_per_cell = 0.0
@@ -520,7 +518,7 @@ strategies, since they require that --preserve-case-words be set internally.""")
 // FUCK ME.  Have to make this abstract and GeolocateDocumentDriver a subclass
 // so that the TParam can be overridden in HadoopGeolocateDocumentDriver.
 trait GeolocateDocumentTypeDriver extends GeolocateDriver with
-  GridLocateDocumentDriver {
+  GridLocateDocumentDriver[SphereCoord] {
   override type TParam <: GeolocateDocumentParameters
   type TRunRes = Iterable[(String, GridLocateDocumentStrategy[SphereCoord], Iterable[_])]
 
