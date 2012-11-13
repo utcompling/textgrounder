@@ -143,15 +143,15 @@ class CombinedWordDist(factory: WordDistFactory) {
 /**
  * Abstract class for a general cell in a cell grid.
  * 
- * @param cell_grid The CellGrid object for the grid this cell is in.
+ * @param grid The Grid object for the grid this cell is in.
  * @tparam TCoord The type of the coordinate object used to specify a
  *   a point somewhere in the grid.
  */
 abstract class GCell[TCoord](
-    val cell_grid: CellGrid[TCoord]
+    val grid: GGrid[TCoord]
 ) {
   val combined_dist =
-    new CombinedWordDist(cell_grid.table.word_dist_factory)
+    new CombinedWordDist(grid.table.word_dist_factory)
   var most_popular_document: GDoc[TCoord] = _
   var mostpopdoc_links = 0
 
@@ -302,17 +302,17 @@ trait DocumentRememberingCell[TCoord] {
  * of all the documents in a cell (i.e. whose coordinate is within the cell)
  * are amalgamated to form the distribution of the cell.
  *
- * One example is the SphereCellGrid -- a grid of cells covering the Earth.
+ * One example is the SphereGrid -- a grid of cells covering the Earth.
  * ("Sphere" is used here in its mathematical meaning of the surface of a
  * round ball.) Coordinates, of type SphereCoord, are pairs of latitude and
  * longitude.  Documents are of type SphereDocument and have a SphereCoord
  * as their coordinate.  Cells are of type SphereCell.  Subclasses of
- * SphereCellGrid refer to particular grid cell shapes.  For example, the
- * MultiRegularCellGrid consists of a regular tiling of the surface of the
+ * SphereGrid refer to particular grid cell shapes.  For example, the
+ * MultiRegularGrid consists of a regular tiling of the surface of the
  * Earth into "rectangles" defined by minimum and maximum latitudes and
  * longitudes.  Most commonly, each tile is a cell, but it is possible for
  * a cell to consist of an NxN square of tiles, in which case the cells
- * overlap.  Another subclass is KDTreeCellGrid, with rectangular cells of
+ * overlap.  Another subclass is KDTreeGrid, with rectangular cells of
  * variable size so that the number of documents in a given cell stays more
  * or less constant.
  *
@@ -331,7 +331,7 @@ trait DocumentRememberingCell[TCoord] {
  * (3) After this, it should be possible to list the cells by calling
  *     `iter_nonempty_cells`.
  */
-abstract class CellGrid[TCoord](
+abstract class GGrid[TCoord](
     val table: GDocTable[TCoord]
 ) {
 
@@ -348,7 +348,7 @@ abstract class CellGrid[TCoord](
 
   /*
    * Called before each new pass of the training. Usually not
-   * needed, but needed for KDCellGrid and possibly future CellGrids.
+   * needed, but needed for KDGrid and possibly future Grids.
    */
   def begin_training_pass(pass: Int) = {}
 

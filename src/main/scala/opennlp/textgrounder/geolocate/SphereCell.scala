@@ -21,15 +21,15 @@ package opennlp.textgrounder.geolocate
 
 import opennlp.textgrounder.util.distances._
 
-import opennlp.textgrounder.gridlocate.{GCell,CellGrid}
+import opennlp.textgrounder.gridlocate.{GCell,GGrid}
 
 /////////////////////////////////////////////////////////////////////////////
 //                             Cells in a grid                             //
 /////////////////////////////////////////////////////////////////////////////
 
 abstract class KMLSphereCell(
-  cell_grid: SphereCellGrid
-) extends SphereCell(cell_grid) {
+  grid: SphereGrid
+) extends SphereCell(grid) {
   /**
    * Generate KML for a single cell.
    */
@@ -40,11 +40,11 @@ abstract class KMLSphereCell(
 /**
  * A cell in a polygonal shape.
  *
- * @param cell_grid The CellGrid object for the grid this cell is in.
+ * @param grid The Grid object for the grid this cell is in.
  */
 abstract class PolygonalCell(
-  cell_grid: SphereCellGrid
-) extends KMLSphereCell(cell_grid) {
+  grid: SphereGrid
+) extends KMLSphereCell(grid) {
   /**
    * Return the boundary of the cell as an Iterable of coordinates, tracing
    * out the boundary vertex by vertex.  The last coordinate should be the
@@ -133,11 +133,11 @@ abstract class PolygonalCell(
 /**
  * A cell in a rectangular shape.
  *
- * @param cell_grid The CellGrid object for the grid this cell is in.
+ * @param grid The Grid object for the grid this cell is in.
  */
 abstract class RectangularCell(
-  cell_grid: SphereCellGrid
-) extends PolygonalCell(cell_grid) {
+  grid: SphereGrid
+) extends PolygonalCell(grid) {
   /**
    * Return the coordinate of the southwest point of the rectangle.
    */
@@ -156,7 +156,7 @@ abstract class RectangularCell(
 
   def get_center_coord() = {
     if (num_docs == 0 ||
-      get_sphere_doctable(cell_grid).driver.params.center_method == "center") {
+      get_sphere_doctable(grid).driver.params.center_method == "center") {
       // use the actual cell center
       // also, if we have an empty cell, there is no such thing as
       // a centroid, so default to the center

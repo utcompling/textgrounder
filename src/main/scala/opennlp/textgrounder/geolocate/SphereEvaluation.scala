@@ -104,11 +104,11 @@ class RankedSphereDocumentEvalStats(
  */
 class GroupedSphereDocumentEvalStats(
   driver_stats: ExperimentDriverStats,
-  cell_grid: SphereCellGrid,
+  grid: SphereGrid,
   results_by_range: Boolean,
   create_stats: (ExperimentDriverStats, String) => DocumentEvalStats
 ) extends GroupedDocumentEvalStats[SphereCoord](
-  driver_stats, cell_grid, results_by_range, create_stats
+  driver_stats, grid, results_by_range, create_stats
 ) {
   val docs_by_degree_dist_to_true_center =
     docmap("degree_dist_to_true_center")
@@ -136,14 +136,14 @@ class GroupedSphereDocumentEvalStats(
   ) {
     super.record_result_by_range(res)
 
-    /* FIXME: This code specific to MultiRegularCellGrid is kind of ugly.
+    /* FIXME: This code specific to MultiRegularGrid is kind of ugly.
        Perhaps it should go elsewhere.
 
        FIXME: Also note that we don't actually make use of the info we
        record here. See below.
      */
-    cell_grid match {
-      case multigrid: MultiRegularCellGrid => {
+    grid match {
+      case multigrid: MultiRegularGrid => {
         /* For distance to center of true cell, which will be small (no more
            than width_of_multi_cell * size-of-tiling-cell); we convert to
            fractions of tiling-cell size and record in ranges corresponding
@@ -178,7 +178,7 @@ class GroupedSphereDocumentEvalStats(
           frac_pred_degdist))
        }
 
-      case kdgrid: KdTreeCellGrid => {
+      case kdgrid: KdTreeGrid => {
         // for kd trees, we do something similar to above,
         // but round to the nearest km...
         res.record_result(docs_by_true_dist_to_true_center(
@@ -193,8 +193,8 @@ class GroupedSphereDocumentEvalStats(
     super.output_results_by_range()
     errprint("")
 
-    cell_grid match {
-      case multigrid: MultiRegularCellGrid => {
+    grid match {
+      case multigrid: MultiRegularGrid => {
         for (
           (frac_truedist, obj) <-
             docs_by_true_dist_to_true_center.toSeq sortBy (_._1)
@@ -232,19 +232,19 @@ class GroupedSphereDocumentEvalStats(
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * Specialization of `RankedCellGridEvaluator` for SphereCoords (latitude/
+ * Specialization of `RankedGridEvaluator` for SphereCoords (latitude/
  * longitude coordinates on the surface of a sphere).  Class for evaluating
  * (geolocating) a test document using a strategy that ranks the cells in the
  * cell grid and picks the central point of the top-ranked one.
  *
  * Only needed to support debug("gridrank").
  */
-class RankedSphereCellGridEvaluator(
+class RankedSphereGridEvaluator(
   strategy: GridLocateDocumentStrategy[SphereCoord],
   stratname: String,
   driver: GeolocateDocumentTypeDriver,
   evalstats: GroupedDocumentEvalStats[SphereCoord]
-) extends RankedCellGridEvaluator[SphereCoord](
+) extends RankedGridEvaluator[SphereCoord](
   strategy, stratname, driver, evalstats
 ) {
   override def print_individual_result(doctag: String,
@@ -259,7 +259,7 @@ class RankedSphereCellGridEvaluator(
       val grsize = debugval("gridranksize").toInt
       result.true_cell match {
         case multireg: MultiRegularCell =>
-          strategy.cell_grid.asInstanceOf[MultiRegularCellGrid].
+          strategy.grid.asInstanceOf[MultiRegularGrid].
             output_ranking_grid(
               pred_cells.asInstanceOf[Iterable[(MultiRegularCell, Double)]],
               multireg, grsize)

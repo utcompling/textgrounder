@@ -22,7 +22,7 @@ import math._
 
 import opennlp.textgrounder.util.distances._
 
-import opennlp.textgrounder.gridlocate.{CellGrid,WordCellDist,CellDistFactory}
+import opennlp.textgrounder.gridlocate.{GGrid,WordCellDist,CellDistFactory}
 import opennlp.textgrounder.worddist.WordDist.memoizer._
 
 /////////////////////////////////////////////////////////////////////////////

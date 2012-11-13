@@ -168,7 +168,7 @@ class GenerateKMLDriver extends
   def run_after_setup() {
     val cdist_factory = new CellDistFactory[SphereCoord](params.lru_cache_size)
     for (word <- params.split_kml_words) {
-      val celldist = cdist_factory.get_cell_dist(cell_grid, memoize_string(word))
+      val celldist = cdist_factory.get_cell_dist(grid, memoize_string(word))
       if (!celldist.normalized) {
         warning("""Non-normalized distribution, apparently word %s not seen anywhere.
 Not generating an empty KML file.""", word)

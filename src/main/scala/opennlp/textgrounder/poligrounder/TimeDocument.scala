@@ -25,7 +25,7 @@ import tgutil.distances._
 import tgutil.textdbutil.Schema
 import tgutil.printutil._
 
-import opennlp.textgrounder.gridlocate.{GDoc,GDocTable,CellGrid}
+import opennlp.textgrounder.gridlocate.{GDoc,GDocTable,GGrid}
 import opennlp.textgrounder.gridlocate.GDocConverters._
 
 import opennlp.textgrounder.worddist.WordDistFactory

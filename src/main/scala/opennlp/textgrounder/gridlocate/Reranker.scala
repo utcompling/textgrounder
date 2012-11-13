@@ -183,7 +183,7 @@ trait LinearClassifierReranker[
  * @param strategy Object encapsulating the strategy used for performing
  *   evaluation.
  */
-class CellGridRanker[TCoord](
+class GridRanker[TCoord](
   strategy: GridLocateDocumentStrategy[TCoord]
  ) extends Ranker[GDoc[TCoord], GCell[TCoord]] {
   def evaluate(item: GDoc[TCoord], include: Iterable[GCell[TCoord]]) =
