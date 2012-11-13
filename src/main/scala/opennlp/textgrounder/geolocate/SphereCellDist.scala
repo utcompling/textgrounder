@@ -54,23 +54,21 @@ import opennlp.textgrounder.worddist.WordDist.memoizer._
  * @param cellprobs Hash table listing probabilities associated with cells
  */
 
-class SphereWordCellDist(
-  cell_grid: SphereCellGrid,
-  word: Word
-) extends WordCellDist[SphereCoord](
-  cell_grid, word) {
+object SphereWordCellDist {
   // Convert cell to a KML file showing the distribution
-  def generate_kml_file(filename: String, params: KMLParameters) {
+  def generate_kml_file(celldist: WordCellDist[SphereCoord],
+    filename: String, params: KMLParameters
+  ) {
     val xform = if (params.kml_transform == "log") (x: Double) => log(x)
     else if (params.kml_transform == "logsquared") (x: Double) => -log(x) * log(x)
     else (x: Double) => x
 
-    val xf_minprob = xform(cellprobs.values min)
-    val xf_maxprob = xform(cellprobs.values max)
+    val xf_minprob = xform(celldist.cellprobs.values min)
+    val xf_maxprob = xform(celldist.cellprobs.values max)
 
     def yield_cell_kml() = {
       for {
-        (cell, prob) <- cellprobs
+        (cell, prob) <- celldist.cellprobs
         kml <- cell.asInstanceOf[KMLSphereCell].generate_kml(
           xform(prob), xf_minprob, xf_maxprob, params)
         expr <- kml
@@ -98,9 +96,9 @@ class SphereWordCellDist(
             </IconStyle>
           </Style>
           <Folder>
-            <name>{ unmemoize_string(word) }</name>
+            <name>{ unmemoize_string(celldist.word) }</name>
             <open>1</open>
-            <description>{ "Cell distribution for word '%s'" format unmemoize_string(word) }</description>
+            <description>{ "Cell distribution for word '%s'" format unmemoize_string(celldist.word) }</description>
             <LookAt>
               <latitude>42</latitude>
               <longitude>-102</longitude>
@@ -117,13 +115,3 @@ class SphereWordCellDist(
     xml.XML.save(filename, kml)
   }
 }
-
-class SphereCellDistFactory(
-    lru_cache_size: Int
-) extends CellDistFactory[SphereCoord](
-    lru_cache_size) {
-  type TCellDist = SphereWordCellDist
-  def create_word_cell_dist(cell_grid: CellGrid[SphereCoord], word: Word) =
-    new TCellDist(cell_grid, word)
-}
-

@@ -131,13 +131,14 @@ class WordCellDist[TCoord](
  *   word.
  */
 
-abstract class CellDistFactory[TCoord](
+class CellDistFactory[TCoord](
   val lru_cache_size: Int
 ) {
-  type TCellDist <: WordCellDist[TCoord]
-  def create_word_cell_dist(cell_grid: CellGrid[TCoord], word: Word): TCellDist
+  def create_word_cell_dist(
+    cell_grid: CellGrid[TCoord], word: Word
+  ) = new WordCellDist[TCoord](cell_grid, word)
 
-  var cached_dists: LRUCache[Word, TCellDist] = null
+  var cached_dists: LRUCache[Word, WordCellDist[TCoord]] = null
 
   /**
    * Return a cell distribution over a single word, using a least-recently-used
