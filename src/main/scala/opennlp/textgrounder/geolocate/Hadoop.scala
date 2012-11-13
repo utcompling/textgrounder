@@ -280,7 +280,7 @@ class DocumentEvaluationMapper extends
         case (filehand, file, line, lineno) => {
           val docstat =
             driver.document_table.line_to_document(filehand, file, line,
-              lineno, schema, false)
+              lineno, schema, false, false)
           docstat.maybedoc.foreach(doc => {                        
             if (doc.dist != null)
               doc.dist.finish_after_global()

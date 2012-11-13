@@ -199,12 +199,8 @@ abstract class WordDistConstructor(factory: WordDistFactory) {
    *
    * @param doc Document to set the distribution of.
    * @param diststr String from the document file, describing the distribution.
-   * @param is_training_set True if this document is in the training set.
-   *   Generally, global (e.g. back-off) statistics should be initialized
-   *   only from training-set documents.
    */
-  def initialize_distribution(doc: GDoc[_], countstr: String,
-      is_training_set: Boolean)
+  def initialize_distribution(doc: GDoc[_], countstr: String)
 }
 
 class KLDivergenceCache {
@@ -216,7 +212,7 @@ class KLDivergenceCache {
  * (i.e. it's a singleton), but the particular factory used depends on a
  * command-line parameter.
  */
-abstract class WordDistFactory {
+trait WordDistFactory {
   /**
    * Total number of word types seen (size of vocabulary)
    */
@@ -236,14 +232,10 @@ abstract class WordDistFactory {
     this.constructor = constructor
   }
 
-  def create_word_dist(): WordDist = create_word_dist(note_globally = false)
-
   /**
-   * Create an empty word distribution.  If `note_globally` is true,
-   * the distribution is meant to be added to the global word-distribution
-   * statistics (see below).
+   * Create an empty word distribution.
    */
-  def create_word_dist(note_globally: Boolean): WordDist
+  def create_word_dist: WordDist
 
   /**
    * Add the given distribution to the global word-distribution statistics,
@@ -336,8 +328,7 @@ trait ItemStorage[Item] {
  * A word distribution, i.e. a statistical distribution over words in
  * a document, cell, etc.
  */
-abstract class WordDist(factory: WordDistFactory,
-    val note_globally: Boolean) {
+abstract class WordDist(factory: WordDistFactory) {
   type Item
   val model: ItemStorage[Item]
 

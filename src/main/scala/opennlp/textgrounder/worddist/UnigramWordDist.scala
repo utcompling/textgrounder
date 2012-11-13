@@ -102,10 +102,8 @@ class UnigramStorage extends ItemStorage[Word] {
  *   statistics.
  */
 
-abstract class UnigramWordDist(
-    factory: WordDistFactory,
-    note_globally: Boolean
-  ) extends WordDist(factory, note_globally) with FastSlowKLDivergence {
+abstract class UnigramWordDist(factory: WordDistFactory
+  ) extends WordDist(factory) with FastSlowKLDivergence {
   type Item = Word
   val pmodel = new UnigramStorage()
   val model = pmodel
@@ -275,8 +273,6 @@ class DefaultUnigramWordDistConstructor(
     }
   }
 
-  var seen_documents = new scala.collection.mutable.HashSet[String]()
-
   // Returns true if the word was counted, false if it was ignored due to stoplisting
   // and/or whitelisting
   protected def add_word_with_count(model: UnigramStorage, word: String,
@@ -349,10 +345,6 @@ class DefaultUnigramWordDistConstructor(
     val model = dist.model
     val oov = memoize_string("-OOV-")
 
-    /* Add the distribution to the global stats before eliminating
-       infrequent words. */
-    factory.note_dist_globally(dist)
-
     // If 'minimum_word_count' was given, then eliminate words whose count
     // is too small.
     if (minimum_word_count > 1) {
@@ -366,21 +358,12 @@ class DefaultUnigramWordDistConstructor(
   def maybe_lowercase(word: String) =
     if (ignore_case) word.toLowerCase else word
 
-  def initialize_distribution(doc: GDoc[_], countstr: String,
-      is_training_set: Boolean) {
+  def initialize_distribution(doc: GDoc[_], countstr: String) {
     parse_counts(countstr)
-    // Now set the distribution on the document; but don't use the test
-    // set's distributions in computing global smoothing values and such.
-    //
-    // FIXME: What is the purpose of first_time_document_seen??? When does
-    // it occur that we see a document multiple times?
-    var first_time_document_seen = !seen_documents.contains(doc.title)
-
-    val dist = factory.create_word_dist(note_globally =
-      is_training_set && first_time_document_seen)
+    // Now set the distribution on the document.
+    val dist = factory.create_word_dist
     add_keys_values(dist, keys_dynarr.array, values_dynarr.array,
       keys_dynarr.length)
-    seen_documents += doc.title
     doc.dist = dist
   }
 }

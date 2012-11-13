@@ -1025,6 +1025,7 @@ trait GridLocateDriver[TCoord] extends HadoopableArgParserExperimentDriver {
    */
   def read_training_documents(operation: String = "reading",
       record_in_subtable: Boolean = false,
+      note_globally: Boolean = false,
       finish_globally: Boolean = true): Iterator[GDoc[TCoord]] = {
     val task =
       new ExperimentMeteredTask(this, "document", operation,
@@ -1033,7 +1034,7 @@ trait GridLocateDriver[TCoord] extends HadoopableArgParserExperimentDriver {
       params.input_corpus.toIterator.flatMap(dir =>
         document_table.read_documents_from_textdb(get_file_handler,
           dir, "training-" + document_file_suffix, 
-          record_in_subtable, finish_globally)))
+          record_in_subtable, note_globally, finish_globally)))
     val docs =
       for (doc <- dociter) yield {
         var should_stop = false
@@ -1083,16 +1084,17 @@ trait GridLocateDriver[TCoord] extends HadoopableArgParserExperimentDriver {
       // `record_in_subtable` and such.
       //
       // FIXME #2: The "finish_globally" flag needs to be tied into the
-      // recording of global statistics in the word dists.  However, currently
+      // recording of global statistics in the word dists. [[However, currently
       // that's handled in a totally hacked fashion in a combination of
       // DefaultUnigramWordDistConstructor.initialize_distribution()
-      // and GDoc.set_field().  In reality, all the glop handled by
-      // finish_before_global() and note_dist_globally() (as well as
+      // and GDoc.set_field().]] -- not true. In reality, all the glop handled
+      // by finish_before_global() and note_dist_globally() (as well as
       // record_in_subtable) and such should be handled by separate mapping
       // stages onto the documents.
       for (doc <- read_training_documents("reading pass " + pass,
-          record_in_subtable = true,
-          finish_globally = false)) {
+            record_in_subtable = true,
+            note_globally = pass == 1,
+            finish_globally = false)) {
         assert(doc.dist != null)
         grid.add_document_to_cell(doc)
       }

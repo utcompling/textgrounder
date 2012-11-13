@@ -241,14 +241,11 @@ class OpenNLPNgramStorer extends NgramStorage {
  * @param factory A `WordDistFactory` object used to create this distribution.
  *   The object also stores global properties of various sorts (e.g. for
  *   smothing).
- * @param note_globally Whether n-grams added to this distribution should
- *   have an effect on the global statistics stored in the factory.
  */
 
 abstract class NgramWordDist(
-    factory: WordDistFactory,
-    note_globally: Boolean
-  ) extends WordDist(factory, note_globally) with FastSlowKLDivergence {
+    factory: WordDistFactory
+  ) extends WordDist(factory) with FastSlowKLDivergence {
   import NgramStorage.Ngram
   type Item = Ngram
   val model = new OpenNLPNgramStorer
@@ -348,8 +345,6 @@ class DefaultNgramWordDistConstructor(
     }
   }
 
-  var seen_documents = new scala.collection.mutable.HashSet[String]()
-
   /**
    * Returns true if the n-gram was counted, false if it was ignored due to
    * stoplisting and/or whitelisting. */
@@ -421,10 +416,6 @@ class DefaultNgramWordDistConstructor(
     val model = dist.asInstanceOf[NgramWordDist].model
     val oov = Seq("-OOV-")
 
-    /* Add the distribution to the global stats before eliminating
-       infrequent words. */
-    factory.note_dist_globally(dist)
-
     // If 'minimum_word_count' was given, then eliminate n-grams whose count
     // is too small by replacing them with -OOV-.
     // FIXME!!! This should almost surely operate at the word level, not the
@@ -440,20 +431,11 @@ class DefaultNgramWordDistConstructor(
   def maybe_lowercase(ngram: Ngram) =
     if (ignore_case) ngram.map(_ toLowerCase) else ngram
 
-  def initialize_distribution(doc: GDoc[_], countstr: String,
-      is_training_set: Boolean) {
+  def initialize_distribution(doc: GDoc[_], countstr: String) {
     parse_counts(countstr)
-    // Now set the distribution on the document; but don't use the test
-    // set's distributions in computing global smoothing values and such.
-    //
-    // FIXME: What is the purpose of first_time_document_seen??? When does
-    // it occur that we see a document multiple times?
-    var first_time_document_seen = !seen_documents.contains(doc.title)
-
-    val dist = factory.create_word_dist(note_globally =
-      is_training_set && first_time_document_seen)
+    // Now set the distribution on the document.
+    val dist = factory.create_word_dist
     add_parsed_ngrams(dist, parsed_ngrams)
-    seen_documents += doc.title
     doc.dist = dist
   }
 }

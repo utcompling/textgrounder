@@ -40,7 +40,7 @@ import opennlp.textgrounder.gridlocate.GridLocateDriver.Debug._
  */ 
 class PseudoGoodTuringUnigramWordDistFactory(
     interpolate_string: String
-  ) extends DiscountedUnigramWordDistFactory(interpolate_string == "yes") {
+) extends DiscountedUnigramWordDistFactory(interpolate_string == "yes") {
   // Total number of types seen once
   var total_num_types_seen_once = 0
 
@@ -74,16 +74,12 @@ class PseudoGoodTuringUnigramWordDistFactory(
     super.finish_global_distribution()
   }
 
-  def create_word_dist(note_globally: Boolean) =
-    new PseudoGoodTuringUnigramWordDist(this, note_globally)
+  def create_word_dist = new PseudoGoodTuringUnigramWordDist(this)
 }
 
 class PseudoGoodTuringUnigramWordDist(
-    factory: WordDistFactory,
-    note_globally: Boolean
-) extends DiscountedUnigramWordDist(
-    factory, note_globally
-  ) {
+    factory: WordDistFactory
+) extends DiscountedUnigramWordDist(factory) {
   /**
    * Here we compute the value of `overall_unseen_mass`, which depends
    * on the global `overall_word_probs` computed from all of the

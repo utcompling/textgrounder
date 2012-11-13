@@ -19,17 +19,15 @@
 package opennlp.textgrounder.worddist
 
 class UnsmoothedNgramWordDistFactory extends NgramWordDistFactory {
-  def create_word_dist(note_globally: Boolean) =
-    new UnsmoothedNgramWordDist(this, note_globally)
+  def create_word_dist = new UnsmoothedNgramWordDist(this)
 
   def finish_global_distribution() {
   }
 }
 
 class UnsmoothedNgramWordDist(
-  gen_factory: WordDistFactory,
-  note_globally: Boolean
-) extends NgramWordDist(gen_factory, note_globally) {
+  gen_factory: WordDistFactory
+) extends NgramWordDist(gen_factory) {
   import NgramStorage.Ngram
 
   type TThis = UnsmoothedNgramWordDist

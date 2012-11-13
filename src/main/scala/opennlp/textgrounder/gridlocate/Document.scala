@@ -340,7 +340,7 @@ abstract class GDocTable[TCoord : Serializer](
    */
   def fields_to_document(filehand: FileHandler, file: String,
       maybe_fieldvals: Option[Seq[String]], lineno: Long,
-      schema: Schema, record_in_table: Boolean
+      schema: Schema, record_in_table: Boolean, note_globally: Boolean
     ): DocumentStatus[GDoc[TCoord]] = {
     val (maybedoc, status, reason, docdesc) =
       maybe_fieldvals match {
@@ -353,8 +353,25 @@ abstract class GDocTable[TCoord : Serializer](
               (None, "skipped", "unable to create document",
                 schema.get_field_or_else(fieldvals, "title",
                   "unknown title??"))
-            else
+            else {
+              if (doc.dist != null) {
+                if (note_globally) {
+                  val factory = doc.table.word_dist_factory
+                  // Don't use the eval set's distributions in computing
+                  // global smoothing values and such, to avoid contaminating
+                  // the results (training on your eval set). In addition, if
+                  // this isn't the training or eval set, we shouldn't be
+                  // loading at all.
+                  //
+                  // Add the distribution to the global stats before
+                  // eliminating infrequent words through
+                  // `finish_before_global`.
+                  factory.note_dist_globally(doc.dist)
+                }
+                doc.dist.finish_before_global()
+              }
               (Some(doc), "processed", "", "")
+            }
           } catch {
             case e:DocumentValidationException => {
               warning("Line %s: %s", lineno, e.message)
@@ -375,11 +392,12 @@ abstract class GDocTable[TCoord : Serializer](
    *  table.
    */
   def line_to_document(filehand: FileHandler, file: String, line: String,
-      lineno: Long, schema: Schema, record_in_table: Boolean
+      lineno: Long, schema: Schema, record_in_table: Boolean,
+      note_globally: Boolean
     ): DocumentStatus[GDoc[TCoord]] = {
     val maybe_fieldvals = line_to_fields(line, lineno, schema)
     fields_to_document(filehand, file, maybe_fieldvals, lineno, schema,
-      record_in_table)
+      record_in_table, note_globally)
   }
 
   /**
@@ -392,13 +410,13 @@ abstract class GDocTable[TCoord : Serializer](
    *  table.
    */
   def iterate_document_statuses(filehand: FileHandler, file: String,
-      schema: Schema, record_in_table: Boolean) = {
+      schema: Schema, record_in_table: Boolean, note_globally: Boolean) = {
     val lines = filehand.openr(file).zipWithIndex.map {
       case (line, idx) => (filehand, file, line, idx + 1)
     }
     lines.map { case (filehand, file, line, lineno) =>
       line_to_document(filehand, file, line, lineno, schema,
-        record_in_table) }
+        record_in_table, note_globally) }
   }
 
   /**
@@ -418,12 +436,14 @@ abstract class GDocTable[TCoord : Serializer](
    */
   def read_document_statuses_from_textdb(filehand: FileHandler, dir: String,
       suffix: String, record_in_subtable: Boolean = false,
+      note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
     val (schema, files) =
       TextDBProcessor.get_textdb_files(filehand, dir, suffix)
     val docstats =
       (for (file <- files) yield {
-        iterate_document_statuses(filehand, file, schema, record_in_subtable)
+        iterate_document_statuses(filehand, file, schema, record_in_subtable,
+          note_globally)
       }).flatten
     if (!finish_globally)
       docstats
@@ -439,9 +459,10 @@ abstract class GDocTable[TCoord : Serializer](
 
   def read_documents_from_textdb(filehand: FileHandler, dir: String,
       suffix: String, record_in_subtable: Boolean = false,
+      note_globally: Boolean = false,
       finish_globally: Boolean = true) = {
     val statuses = read_document_statuses_from_textdb(filehand, dir, suffix,
-      record_in_subtable, finish_globally)
+      record_in_subtable, note_globally, finish_globally)
     DocumentCounterTracker.process_statuses(statuses, driver)
   }
 
@@ -747,17 +768,11 @@ abstract class GDoc[TCoord : Serializer](
   def set_field(field: String, value: String) {
     field match {
       case "counts" => {
-        // Set the distribution on the document.  But don't use the eval
-        // set's distributions in computing global smoothing values and such,
-        // to avoid contaminating the results (training on your eval set).
-        // In addition, if this isn't the training or eval set, we shouldn't
-        // be loading at all.
-        val is_training_set = (this.split == "training")
-        val is_eval_set = (this.split == table.driver.params.eval_set)
-        assert (is_training_set || is_eval_set)
-        table.word_dist_factory.constructor.initialize_distribution(this,
-          value, is_training_set)
-        dist.finish_before_global()
+        val factory = table.word_dist_factory
+        val constructor = factory.constructor
+        constructor.initialize_distribution(this, value)
+        // Handled by callers.
+        // dist.finish_before_global()
       }
       case _ => () // Just eat the other parameters
     }

@@ -54,7 +54,7 @@ import GridLocateDriver.Params
  */
 class CombinedWordDist(factory: WordDistFactory) {
   /** The combined word distribution itself. */
-  val word_dist = factory.create_word_dist()
+  val word_dist = factory.create_word_dist
   /** Number of documents included in incoming-link computation. */
   var num_docs_for_links = 0
   /** Total number of incoming links. */
